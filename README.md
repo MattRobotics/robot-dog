@@ -1,6 +1,8 @@
 # 🤖 Robot Dog
  
-Custom quadruped robot developed by Matt Robotics 🇮🇹
+Custom quadruped robot developed by Matt Robotics
+
+Designed and developed in Italy
  
 A long-term robotics project focused on:
  
@@ -113,7 +115,7 @@ robot-dog/
  
 ---
  
-## 🇮🇹 About
+## 🙂 About
  
 This repository is part of the Matt Robotics project.
  
@@ -127,5 +129,5 @@ Follow the project on:
  
 ---
  
-Built with passion by Matt Robotics 🇮🇹
+Built with passion in Italy by Matt Robotics
  
