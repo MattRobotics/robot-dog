@@ -211,21 +211,7 @@ Questo file **non è un simulatore dinamico completo del robot**, ma uno strumen
 
 ---
 
-## Posizione del file nel repository
-
-```text
-robot-dog/
-└─ 01_Docs/
-   └─ 01_Analysis/
-      ├─ ST3215_Quadruped_3S_Power_Load_Analysis.md
-      └─ ST3215_Quadruped_3S_Power_Load_Analysis.xlsx
-```
-
----
-
 ## File collegati utili
-
-Nello stesso repository, i file correlati dovrebbero stare in:
 
 - `01_Docs/03_Datasheets/` → datasheet dei servo e dei componenti elettrici;
 - `01_Docs/02_Architecture/` → documenti di architettura del quadrupede;
