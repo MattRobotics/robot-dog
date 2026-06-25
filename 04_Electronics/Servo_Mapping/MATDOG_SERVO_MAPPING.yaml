@@ -1,0 +1,124 @@
+schema_version: 1
+robot_id: MATDOG
+status: UNCALIBRATED
+
+servo_model: ST3215
+
+transport:
+  current_backend: NormaCore Station + Waveshare Bus Servo Adapter
+  future_backend: ESP32 motion controller
+  raw_servo_protocol_owner: NormaCore ST3215 driver
+
+control_contract:
+  dashboard_command_unit: rad
+  controller_command_unit: rad
+  actuator_target_unit: encoder_ticks
+  raw_encoder_range: [0, 4095]
+
+legs:
+  LF:
+    display_name: Front Left
+    joints:
+      hip:
+        joint_name: lf_hip_joint
+        servo_id: 13
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+      upper:
+        joint_name: lf_upper_leg_joint
+        servo_id: 12
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+      lower:
+        joint_name: lf_lower_leg_joint
+        servo_id: 11
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+
+  RF:
+    display_name: Front Right
+    joints:
+      hip:
+        joint_name: rf_hip_joint
+        servo_id: 23
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+      upper:
+        joint_name: rf_upper_leg_joint
+        servo_id: 22
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+      lower:
+        joint_name: rf_lower_leg_joint
+        servo_id: 21
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+
+  RH:
+    display_name: Rear Right
+    joints:
+      hip:
+        joint_name: rh_hip_joint
+        servo_id: 33
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+      upper:
+        joint_name: rh_upper_leg_joint
+        servo_id: 32
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+      lower:
+        joint_name: rh_lower_leg_joint
+        servo_id: 31
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+
+  LH:
+    display_name: Rear Left
+    joints:
+      hip:
+        joint_name: lh_hip_joint
+        servo_id: 43
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+      upper:
+        joint_name: lh_upper_leg_joint
+        servo_id: 42
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+      lower:
+        joint_name: lh_lower_leg_joint
+        servo_id: 41
+        direction: null
+        zero_encoder: null
+        min_rad: null
+        max_rad: null
+
+calibration_rules:
+  - Do not use Station generic Calibrate for MATDOG kinematic calibration.
+  - Record encoder zero only in the approved mechanical zero pose.
+  - Determine direction with one joint at a time and low-energy movement.
+  - Determine software limits from measured mechanical limits.
+  - Update this file only after a documented validation test.
