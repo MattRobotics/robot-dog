@@ -1,0 +1,60 @@
+schema_version: 1
+robot_id: MATDOG
+status: PARTIALLY_DEFINED
+
+units:
+  length: m
+  angle: rad
+
+coordinate_convention:
+  frame: base_link
+  x: forward
+  y: left
+  z: up
+  handedness: right_handed
+
+base_link:
+  description: >
+    Center of the lower face of the body, directly below the center of the
+    rectangle defined by the four hip joint axes.
+  hip_axis_height_from_base_link_m: null
+  note: >
+    Measure this value from the final CAD. Do not estimate it in software.
+
+body:
+  front_rear_hip_spacing_m: 0.225
+  left_right_hip_spacing_m: 0.095
+
+leg_geometry:
+  hip_to_knee_m: 0.090
+  knee_to_foot_m: 0.110
+  foot_contact_offset_m:
+    LF: null
+    RF: null
+    RH: null
+    LH: null
+  note: >
+    Each foot-contact offset must include the real eccentric rubber-foot geometry.
+
+target_pose:
+  stand_body_height_m: 0.150
+  note: Design target only; not yet a validated standing pose.
+
+gait_convention:
+  order: [LF, RF, RH, LH]
+  trot_diagonal_a: [LF, RH]
+  trot_diagonal_b: [RF, LH]
+
+mechanical_zero_pose:
+  description: >
+    Hip centered laterally, upper leg vertical downward, lower leg horizontal
+    and at 90 degrees relative to the upper leg.
+  joint_angles_rad:
+    hip: 0.0
+    upper: 0.0
+    lower: 0.0
+
+validation:
+  geometry_confirmed_from_cad: false
+  urdf_confirmed: false
+  foot_contact_frames_confirmed: false
