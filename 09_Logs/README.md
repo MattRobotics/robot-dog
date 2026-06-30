@@ -22,6 +22,7 @@ Important design decisions that affect the future of the project.
 Current documents:
 
 * ADR-001_Quadruped_Control_Architecture.md
+* ADR-002_URDF_REV00_Kinematic_Baseline.md
 
 ---
 
@@ -32,10 +33,15 @@ Hardware and software validation activities.
 Current documents:
 
 * 2026-06-17_ST3215_Bus_Validation.md
+* 2026-06-30_URDF_REV00_Kinematic_Validation.md
 
 ---
 
 ### Development Log
+
+Current documents:
+
+* 2026-06-30_URDF_REV00_Kinematic_Baseline.md
 
 Chronological project history.
 

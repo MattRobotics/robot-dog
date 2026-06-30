@@ -131,3 +131,29 @@ Follow the project on:
  
 Built with passion in Italy by Matt Robotics
  
+
+---
+
+## MATDOG URDF REV00 Kinematic Baseline
+
+The first complete MATDOG kinematic URDF baseline was completed on 2026-06-30.
+
+Canonical engineering package:
+
+`cad/urdf/matt_robodog_rev00/`
+
+The package includes:
+
+- Final URDF model
+- Final baked STL meshes
+- Collision mesh configuration
+- Servo mapping
+- Joint limits
+- Kinematic, mass and material workbook
+- Integrity manifest
+
+Status:
+
+**Approved for IK and gait development.**
+
+Dynamic inertial properties remain pending CAD extraction.

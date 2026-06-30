@@ -1,0 +1,498 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="matt_robodog_rev00">
+  <!-- MATDOG ENGINEERING METADATA | Source: Engineering_Data.xlsx / Weight | Modeled REV00 mass: 1.549 kg | Excluded hardware: head yaw actuator 0.061 kg (no head link in REV00). Mass values are verified. Standard URDF <inertial> blocks are intentionally deferred until CAD-derived center of mass and inertia tensors are available; physical material composition is documented per-link below. -->
+  <link name="base_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=285.0 | mass_kg=0.285000 | materials=PPA+CF (283 g); Steel fasteners (2 g) | components=Lower_Chassis 283 g + Fasteners 2 g | fastener_allocation=2 g assigned directly to base_link | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/base_link.stl" />
+      </geometry>
+      <material name="base_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/base_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="lf_hip_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=97.0 | mass_kg=0.097000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); Steel fasteners (4 g) | components=ACT_FL_Shoulder + Shoulder_Joint_L + leg fasteners | fastener_allocation=4 g leg fasteners provisionally allocated to hip_link | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lf_hip_link.stl" />
+      </geometry>
+      <material name="lf_hip_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lf_hip_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="lf_upper_leg_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=98.0 | mass_kg=0.098000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); ABS ESD cover (5 g) | components=ACT_FL_UpperLeg + Upper_Leg + Upper_Leg_Cover | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lf_upper_leg_link.stl" />
+      </geometry>
+      <material name="lf_upper_leg_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lf_upper_leg_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="lf_lower_leg_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=114.5 | mass_kg=0.114500 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (53.5 g) | components=ACT_FL_LowerLeg + Lower_Leg_L | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lf_lower_leg_link.stl" />
+      </geometry>
+      <material name="lf_lower_leg_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lf_lower_leg_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="lf_foot_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=6.5 | mass_kg=0.006500 | materials=TPU 95A (6.5 g) | components=Rubber_Foot FL | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lf_foot_link.stl" />
+      </geometry>
+      <material name="lf_foot_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lf_foot_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="rf_hip_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=97.0 | mass_kg=0.097000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); Steel fasteners (4 g) | components=ACT_FR_Shoulder + Shoulder_Joint_R + leg fasteners | fastener_allocation=4 g leg fasteners provisionally allocated to hip_link | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rf_hip_link.stl" />
+      </geometry>
+      <material name="rf_hip_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rf_hip_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="rf_upper_leg_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=98.0 | mass_kg=0.098000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); ABS ESD cover (5 g) | components=ACT_FR_UpperLeg + Upper_Leg + Upper_Leg_Cover | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rf_upper_leg_link.stl" />
+      </geometry>
+      <material name="rf_upper_leg_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rf_upper_leg_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="rf_lower_leg_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=114.5 | mass_kg=0.114500 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (53.5 g) | components=ACT_FR_LowerLeg + Lower_Leg_R | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rf_lower_leg_link.stl" />
+      </geometry>
+      <material name="rf_lower_leg_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rf_lower_leg_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="rf_foot_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=6.5 | mass_kg=0.006500 | materials=TPU 95A (6.5 g) | components=Rubber_Foot FR | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rf_foot_link.stl" />
+      </geometry>
+      <material name="rf_foot_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rf_foot_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="rh_hip_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=97.0 | mass_kg=0.097000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); Steel fasteners (4 g) | components=ACT_RR_Shoulder + Shoulder_Joint_R + leg fasteners | fastener_allocation=4 g leg fasteners provisionally allocated to hip_link | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rh_hip_link.stl" />
+      </geometry>
+      <material name="rh_hip_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rh_hip_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="rh_upper_leg_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=98.0 | mass_kg=0.098000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); ABS ESD cover (5 g) | components=ACT_RR_UpperLeg + Upper_Leg + Upper_Leg_Cover | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rh_upper_leg_link.stl" />
+      </geometry>
+      <material name="rh_upper_leg_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rh_upper_leg_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="rh_lower_leg_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=114.5 | mass_kg=0.114500 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (53.5 g) | components=ACT_RR_LowerLeg + Lower_Leg_R | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rh_lower_leg_link.stl" />
+      </geometry>
+      <material name="rh_lower_leg_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rh_lower_leg_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="rh_foot_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=6.5 | mass_kg=0.006500 | materials=TPU 95A (6.5 g) | components=Rubber_Foot RR | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rh_foot_link.stl" />
+      </geometry>
+      <material name="rh_foot_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/rh_foot_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="lh_hip_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=97.0 | mass_kg=0.097000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); Steel fasteners (4 g) | components=ACT_RL_Shoulder + Shoulder_Joint_L + leg fasteners | fastener_allocation=4 g leg fasteners provisionally allocated to hip_link | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lh_hip_link.stl" />
+      </geometry>
+      <material name="lh_hip_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lh_hip_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="lh_upper_leg_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=98.0 | mass_kg=0.098000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); ABS ESD cover (5 g) | components=ACT_RL_UpperLeg + Upper_Leg + Upper_Leg_Cover | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lh_upper_leg_link.stl" />
+      </geometry>
+      <material name="lh_upper_leg_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lh_upper_leg_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="lh_lower_leg_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=114.5 | mass_kg=0.114500 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (53.5 g) | components=ACT_RL_LowerLeg + Lower_Leg_L | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lh_lower_leg_link.stl" />
+      </geometry>
+      <material name="lh_lower_leg_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lh_lower_leg_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="lh_foot_link">
+    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=6.5 | mass_kg=0.006500 | materials=TPU 95A (6.5 g) | components=Rubber_Foot RL | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lh_foot_link.stl" />
+      </geometry>
+      <material name="lh_foot_link_mat">
+        <color rgba="0.10 0.10 0.10 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/lh_foot_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="lf_hip_joint" type="revolute">
+    <parent link="base_link" />
+    <child link="lf_hip_link" />
+    <origin xyz="0.1125 0.0475 0.0465" rpy="0 0 0" />
+    <axis xyz="1 0 0" />
+    <limit lower="-0.785398163397" upper="0.785398163397" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>13</motorId>
+      <motorDirection>1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="lf_upper_leg_joint" type="revolute">
+    <parent link="lf_hip_link" />
+    <child link="lf_upper_leg_link" />
+    <origin xyz="0 0.048 0" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+    <limit lower="-0.916297857297" upper="2.138028333693" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>12</motorId>
+      <motorDirection>1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="lf_lower_leg_joint" type="revolute">
+    <parent link="lf_upper_leg_link" />
+    <child link="lf_lower_leg_link" />
+    <origin xyz="0 0 -0.09" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+    <limit lower="-1.6057029118347832" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>11</motorId>
+      <motorDirection>1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="lf_foot_joint" type="fixed">
+    <parent link="lf_lower_leg_link" />
+    <child link="lf_foot_link" />
+    <origin xyz="0.107 -0.0015 -0.0499" rpy="0 0 0" />
+  </joint>
+  <joint name="rf_hip_joint" type="revolute">
+    <parent link="base_link" />
+    <child link="rf_hip_link" />
+    <origin xyz="0.1125 -0.0475 0.0465" rpy="0 0 0" />
+    <axis xyz="1 0 0" />
+    <limit lower="-0.785398163397" upper="0.785398163397" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>23</motorId>
+      <motorDirection>1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="rf_upper_leg_joint" type="revolute">
+    <parent link="rf_hip_link" />
+    <child link="rf_upper_leg_link" />
+    <origin xyz="0 -0.048 0" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+    <limit lower="-0.916297857297" upper="2.138028333693" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>22</motorId>
+      <motorDirection>-1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="rf_lower_leg_joint" type="revolute">
+    <parent link="rf_upper_leg_link" />
+    <child link="rf_lower_leg_link" />
+    <origin xyz="0 0 -0.09" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+    <limit lower="-1.6057029118347832" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>21</motorId>
+      <motorDirection>-1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="rf_foot_joint" type="fixed">
+    <parent link="rf_lower_leg_link" />
+    <child link="rf_foot_link" />
+    <origin xyz="0.107 0.0015 -0.0499" rpy="0 0 0" />
+  </joint>
+  <joint name="rh_hip_joint" type="revolute">
+    <parent link="base_link" />
+    <child link="rh_hip_link" />
+    <origin xyz="-0.1125 -0.0475 0.0265" rpy="0 0 0" />
+    <axis xyz="1 0 0" />
+    <limit lower="-0.785398163397" upper="0.785398163397" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>33</motorId>
+      <motorDirection>-1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="rh_upper_leg_joint" type="revolute">
+    <parent link="rh_hip_link" />
+    <child link="rh_upper_leg_link" />
+    <origin xyz="0 -0.048 0" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+    <limit lower="-0.916297857297" upper="2.138028333693" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>32</motorId>
+      <motorDirection>-1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="rh_lower_leg_joint" type="revolute">
+    <parent link="rh_upper_leg_link" />
+    <child link="rh_lower_leg_link" />
+    <origin xyz="0 0 -0.09" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+    <limit lower="-1.6057029118347832" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>31</motorId>
+      <motorDirection>-1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="rh_foot_joint" type="fixed">
+    <parent link="rh_lower_leg_link" />
+    <child link="rh_foot_link" />
+    <origin xyz="0.107 0.0015 -0.0499" rpy="0 0 0" />
+  </joint>
+  <joint name="lh_hip_joint" type="revolute">
+    <parent link="base_link" />
+    <child link="lh_hip_link" />
+    <origin xyz="-0.1125 0.0475 0.0265" rpy="0 0 0" />
+    <axis xyz="1 0 0" />
+    <limit lower="-0.785398163397" upper="0.785398163397" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>43</motorId>
+      <motorDirection>-1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="lh_upper_leg_joint" type="revolute">
+    <parent link="lh_hip_link" />
+    <child link="lh_upper_leg_link" />
+    <origin xyz="0 0.048 0" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+    <limit lower="-0.916297857297" upper="2.138028333693" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>42</motorId>
+      <motorDirection>1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="lh_lower_leg_joint" type="revolute">
+    <parent link="lh_upper_leg_link" />
+    <child link="lh_lower_leg_link" />
+    <origin xyz="0 0 -0.09" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+    <limit lower="-1.6057029118347832" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <dynamics damping="0" friction="0" />
+    <hardware>
+      <motorType>Feetech ST3215</motorType>
+      <motorId>41</motorId>
+      <motorDirection>1</motorDirection>
+      <armature>0</armature>
+    </hardware>
+  </joint>
+  <joint name="lh_foot_joint" type="fixed">
+    <parent link="lh_lower_leg_link" />
+    <child link="lh_foot_link" />
+    <origin xyz="0.107 -0.0015 -0.0499" rpy="0 0 0" />
+  </joint>
+</robot>

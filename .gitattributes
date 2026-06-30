@@ -1,0 +1,4 @@
+*.stl filter=lfs diff=lfs merge=lfs -text
+*.usp filter=lfs diff=lfs merge=lfs -text
+
+*.xlsx -text -diff
