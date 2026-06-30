@@ -1,13 +1,23 @@
-# Documentation
- 
-Project documentation, design notes and development logs.
- 
-Contents:
- 
-- Design decisions
-- Development diary
-- Technical notes
-- Research material
-- Future ideas
- 
-This folder documents the complete engineering journey of the robot.
+# MATDOG Documentation
+
+This directory contains stable engineering documentation and technical references.
+
+## Contents
+
+- architecture documents
+- calibration procedures
+- kinematic conventions
+- upstream integration contracts
+- technical research
+- design standards
+
+## Project History
+
+Chronological engineering history does not belong here.
+
+Use [09_Logs](../09_Logs/) for:
+
+- architecture decisions
+- validation reports
+- development milestones
+- test conclusions

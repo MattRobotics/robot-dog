@@ -1,4 +1,4 @@
-# ADR-002 — URDF REV00 Kinematic Baseline
+# ADR-003 — URDF REV00 Kinematic Baseline
 
 Date: 2026-06-30
 
@@ -16,7 +16,7 @@ The CAD model was decomposed into rigid URDF links, meshes were simplified for b
 
 The canonical robot description is stored at:
 
-`cad/urdf/matt_robodog_rev00/`
+`03_CAD/URDF/matt_robodog_rev00/`
 
 The canonical source of truth is:
 
