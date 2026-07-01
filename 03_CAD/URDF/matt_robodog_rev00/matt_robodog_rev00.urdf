@@ -1,4 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
+<!-- MATDOG MESH UNIT CONVENTION | STL vertex coordinates are exported from CAD in millimetres. Every visual and collision mesh applies scale="0.001 0.001 0.001" so the URDF remains SI-consistent: joint origins and CoM are metres; mass is kg; inertia is kg·m². -->
 <robot name="matt_robodog_rev00">
   <!-- MATDOG DYNAMIC PROPERTIES REV00 | 17-link CAD baseline mass: 2.480 kg | Per-link standard URDF <inertial> blocks are populated from Solid Edge physical-property reports. CoM origins are expressed in each local link frame; inertia tensors are about those CoMs and expressed in link axes. Detailed provenance, symmetry derivation and aggregate validation are recorded in Coordinate_Cinematiche_matt_robodog_rev00.xlsx / Inertial_Properties. No standalone neck yaw actuator link is represented in REV00. -->
   <link name="base_link">
@@ -11,7 +12,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/base_link.stl" />
+        <mesh filename="meshes/base_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="base_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -20,7 +21,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/base_link.stl" />
+        <mesh filename="meshes/base_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -34,7 +35,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_hip_link.stl" />
+        <mesh filename="meshes/lf_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="lf_hip_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -43,7 +44,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_hip_link.stl" />
+        <mesh filename="meshes/lf_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -57,7 +58,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_upper_leg_link.stl" />
+        <mesh filename="meshes/lf_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="lf_upper_leg_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -66,7 +67,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_upper_leg_link.stl" />
+        <mesh filename="meshes/lf_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -80,7 +81,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_lower_leg_link.stl" />
+        <mesh filename="meshes/lf_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="lf_lower_leg_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -89,7 +90,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_lower_leg_link.stl" />
+        <mesh filename="meshes/lf_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -103,7 +104,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_foot_link.stl" />
+        <mesh filename="meshes/lf_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="lf_foot_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -112,7 +113,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_foot_link.stl" />
+        <mesh filename="meshes/lf_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -126,7 +127,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_hip_link.stl" />
+        <mesh filename="meshes/rf_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="rf_hip_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -135,7 +136,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_hip_link.stl" />
+        <mesh filename="meshes/rf_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -149,7 +150,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_upper_leg_link.stl" />
+        <mesh filename="meshes/rf_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="rf_upper_leg_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -158,7 +159,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_upper_leg_link.stl" />
+        <mesh filename="meshes/rf_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -172,7 +173,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_lower_leg_link.stl" />
+        <mesh filename="meshes/rf_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="rf_lower_leg_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -181,7 +182,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_lower_leg_link.stl" />
+        <mesh filename="meshes/rf_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -195,7 +196,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_foot_link.stl" />
+        <mesh filename="meshes/rf_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="rf_foot_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -204,7 +205,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_foot_link.stl" />
+        <mesh filename="meshes/rf_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -218,7 +219,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_hip_link.stl" />
+        <mesh filename="meshes/rh_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="rh_hip_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -227,7 +228,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_hip_link.stl" />
+        <mesh filename="meshes/rh_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -241,7 +242,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_upper_leg_link.stl" />
+        <mesh filename="meshes/rh_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="rh_upper_leg_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -250,7 +251,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_upper_leg_link.stl" />
+        <mesh filename="meshes/rh_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -264,7 +265,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_lower_leg_link.stl" />
+        <mesh filename="meshes/rh_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="rh_lower_leg_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -273,7 +274,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_lower_leg_link.stl" />
+        <mesh filename="meshes/rh_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -287,7 +288,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_foot_link.stl" />
+        <mesh filename="meshes/rh_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="rh_foot_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -296,7 +297,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_foot_link.stl" />
+        <mesh filename="meshes/rh_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -310,7 +311,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_hip_link.stl" />
+        <mesh filename="meshes/lh_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="lh_hip_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -319,7 +320,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_hip_link.stl" />
+        <mesh filename="meshes/lh_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -333,7 +334,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_upper_leg_link.stl" />
+        <mesh filename="meshes/lh_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="lh_upper_leg_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -342,7 +343,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_upper_leg_link.stl" />
+        <mesh filename="meshes/lh_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -356,7 +357,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_lower_leg_link.stl" />
+        <mesh filename="meshes/lh_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="lh_lower_leg_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -365,7 +366,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_lower_leg_link.stl" />
+        <mesh filename="meshes/lh_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -379,7 +380,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_foot_link.stl" />
+        <mesh filename="meshes/lh_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
       <material name="lh_foot_link_mat">
         <color rgba="0.10 0.10 0.10 1.0" />
@@ -388,7 +389,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_foot_link.stl" />
+        <mesh filename="meshes/lh_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -425,7 +426,7 @@
     <child link="lf_lower_leg_link" />
     <origin xyz="0 0 -0.09" rpy="0 0 0" />
     <axis xyz="0 1 0" />
-    <limit lower="-1.6057029118347832" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <limit lower="-1.701696020690" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
     <dynamics damping="0" friction="0" />
     <hardware>
       <motorType>Feetech ST3215</motorType>
@@ -472,7 +473,7 @@
     <child link="rf_lower_leg_link" />
     <origin xyz="0 0 -0.09" rpy="0 0 0" />
     <axis xyz="0 1 0" />
-    <limit lower="-1.6057029118347832" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <limit lower="-1.701696020690" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
     <dynamics damping="0" friction="0" />
     <hardware>
       <motorType>Feetech ST3215</motorType>
@@ -519,7 +520,7 @@
     <child link="rh_lower_leg_link" />
     <origin xyz="0 0 -0.09" rpy="0 0 0" />
     <axis xyz="0 1 0" />
-    <limit lower="-1.6057029118347832" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <limit lower="-1.701696020690" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
     <dynamics damping="0" friction="0" />
     <hardware>
       <motorType>Feetech ST3215</motorType>
@@ -566,7 +567,7 @@
     <child link="lh_lower_leg_link" />
     <origin xyz="0 0 -0.09" rpy="0 0 0" />
     <axis xyz="0 1 0" />
-    <limit lower="-1.6057029118347832" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <limit lower="-1.701696020690" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
     <dynamics damping="0" friction="0" />
     <hardware>
       <motorType>Feetech ST3215</motorType>
