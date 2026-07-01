@@ -1,8 +1,13 @@
 <?xml version='1.0' encoding='utf-8'?>
 <robot name="matt_robodog_rev00">
-  <!-- MATDOG ENGINEERING METADATA | Source: Engineering_Data.xlsx / Weight | Modeled REV00 mass: 1.549 kg | Excluded hardware: head yaw actuator 0.061 kg (no head link in REV00). Mass values are verified. Standard URDF <inertial> blocks are intentionally deferred until CAD-derived center of mass and inertia tensors are available; physical material composition is documented per-link below. -->
+  <!-- MATDOG DYNAMIC PROPERTIES REV00 | 17-link CAD baseline mass: 2.480 kg | Per-link standard URDF <inertial> blocks are populated from Solid Edge physical-property reports. CoM origins are expressed in each local link frame; inertia tensors are about those CoMs and expressed in link axes. Detailed provenance, symmetry derivation and aggregate validation are recorded in Coordinate_Cinematiche_matt_robodog_rev00.xlsx / Inertial_Properties. No standalone neck yaw actuator link is represented in REV00. -->
   <link name="base_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=285.0 | mass_kg=0.285000 | materials=PPA+CF (283 g); Steel fasteners (2 g) | components=Lower_Chassis 283 g + Fasteners 2 g | fastener_allocation=2 g assigned directly to base_link | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=1.282000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | symmetry=direct CAD export | source=physprop__base_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.00584 -0.00065 0.02773" rpy="0 0 0" />
+      <mass value="1.282000" />
+      <inertia ixx="0.00147265728657" ixy="1.42294028465e-05" ixz="-0.000443609672652" iyy="0.00887012995059" iyz="-7.70141299896e-06" izz="0.00949906085204" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -20,7 +25,12 @@
     </collision>
   </link>
   <link name="lf_hip_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=97.0 | mass_kg=0.097000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); Steel fasteners (4 g) | components=ACT_FL_Shoulder + Shoulder_Joint_L + leg fasteners | fastener_allocation=4 g leg fasteners provisionally allocated to hip_link | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | symmetry=direct CAD export | source=physprop__lf_hip_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.00366 0.02982 0.00694" rpy="0 0 0" />
+      <mass value="0.050000" />
+      <inertia ixx="4.02252347591e-05" ixy="-1.31462768927e-06" ixz="-1.13953716339e-06" iyy="1.8958128496e-05" iyz="-4.46400670021e-06" izz="4.54280867449e-05" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -38,7 +48,12 @@
     </collision>
   </link>
   <link name="lf_upper_leg_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=98.0 | mass_kg=0.098000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); ABS ESD cover (5 g) | components=ACT_FL_UpperLeg + Upper_Leg + Upper_Leg_Cover | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.172500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | symmetry=direct CAD export | source=physprop__lf_upper_leg_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.00108 0.00015 -0.04503" rpy="0 0 0" />
+      <mass value="0.172500" />
+      <inertia ixx="0.000205436660094" ixy="-5.63507198417e-08" ixz="0" iyy="0.000199175976156" iyz="0" izz="3.111294525e-05" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -56,7 +71,12 @@
     </collision>
   </link>
   <link name="lf_lower_leg_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=114.5 | mass_kg=0.114500 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (53.5 g) | components=ACT_FL_LowerLeg + Lower_Leg_L | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | symmetry=direct CAD export | source=physprop__lf_lower_leg_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.03075 -0.00118 -0.01958" rpy="0 0 0" />
+      <mass value="0.059500" />
+      <inertia ixx="2.15172642767e-05" ixy="6.0930015348e-07" ixz="1.68302311374e-05" iyy="0.000102530052784" iyz="-3.71953235117e-07" izz="0.000104321477439" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -74,7 +94,12 @@
     </collision>
   </link>
   <link name="lf_foot_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=6.5 | mass_kg=0.006500 | materials=TPU 95A (6.5 g) | components=Rubber_Foot FL | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.017500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | symmetry=direct CAD export | source=physprop__lf_foot_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="-0.00052 0 0.01548" rpy="0 0 0" />
+      <mass value="0.017500" />
+      <inertia ixx="1.14526961866e-06" ixy="0" ixz="-1.55064671079e-08" iyy="1.20267175e-06" iyz="0" izz="1.14835213134e-06" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -92,7 +117,12 @@
     </collision>
   </link>
   <link name="rf_hip_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=97.0 | mass_kg=0.097000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); Steel fasteners (4 g) | components=ACT_FR_Shoulder + Shoulder_Joint_R + leg fasteners | fastener_allocation=4 g leg fasteners provisionally allocated to hip_link | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF hip | source=physprop__lf_hip_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.00366 -0.02982 0.00694" rpy="0 0 0" />
+      <mass value="0.050000" />
+      <inertia ixx="4.02252347591e-05" ixy="1.31462768927e-06" ixz="-1.13953716339e-06" iyy="1.8958128496e-05" iyz="4.46400670021e-06" izz="4.54280867449e-05" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -110,7 +140,12 @@
     </collision>
   </link>
   <link name="rf_upper_leg_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=98.0 | mass_kg=0.098000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); ABS ESD cover (5 g) | components=ACT_FR_UpperLeg + Upper_Leg + Upper_Leg_Cover | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.172500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF upper | source=physprop__lf_upper_leg_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.00108 -0.00015 -0.04503" rpy="0 0 0" />
+      <mass value="0.172500" />
+      <inertia ixx="0.000205436660094" ixy="5.63507198417e-08" ixz="0" iyy="0.000199175976156" iyz="0" izz="3.111294525e-05" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -128,7 +163,12 @@
     </collision>
   </link>
   <link name="rf_lower_leg_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=114.5 | mass_kg=0.114500 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (53.5 g) | components=ACT_FR_LowerLeg + Lower_Leg_R | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF lower | source=physprop__lf_lower_leg_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.03075 0.00118 -0.01958" rpy="0 0 0" />
+      <mass value="0.059500" />
+      <inertia ixx="2.15172642767e-05" ixy="-6.0930015348e-07" ixz="1.68302311374e-05" iyy="0.000102530052784" iyz="3.71953235117e-07" izz="0.000104321477439" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -146,7 +186,12 @@
     </collision>
   </link>
   <link name="rf_foot_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=6.5 | mass_kg=0.006500 | materials=TPU 95A (6.5 g) | components=Rubber_Foot FR | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.017500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: identical foot geometry | symmetry=identical foot geometry; LF local inertia copied | source=physprop__lf_foot_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="-0.00052 0 0.01548" rpy="0 0 0" />
+      <mass value="0.017500" />
+      <inertia ixx="1.14526961866e-06" ixy="0" ixz="-1.55064671079e-08" iyy="1.20267175e-06" iyz="0" izz="1.14835213134e-06" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -164,7 +209,12 @@
     </collision>
   </link>
   <link name="rh_hip_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=97.0 | mass_kg=0.097000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); Steel fasteners (4 g) | components=ACT_RR_Shoulder + Shoulder_Joint_R + leg fasteners | fastener_allocation=4 g leg fasteners provisionally allocated to hip_link | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF hip | source=physprop__lf_hip_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.00366 -0.02982 0.00694" rpy="0 0 0" />
+      <mass value="0.050000" />
+      <inertia ixx="4.02252347591e-05" ixy="1.31462768927e-06" ixz="-1.13953716339e-06" iyy="1.8958128496e-05" iyz="4.46400670021e-06" izz="4.54280867449e-05" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -182,7 +232,12 @@
     </collision>
   </link>
   <link name="rh_upper_leg_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=98.0 | mass_kg=0.098000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); ABS ESD cover (5 g) | components=ACT_RR_UpperLeg + Upper_Leg + Upper_Leg_Cover | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.172500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF upper | source=physprop__lf_upper_leg_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.00108 -0.00015 -0.04503" rpy="0 0 0" />
+      <mass value="0.172500" />
+      <inertia ixx="0.000205436660094" ixy="5.63507198417e-08" ixz="0" iyy="0.000199175976156" iyz="0" izz="3.111294525e-05" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -200,7 +255,12 @@
     </collision>
   </link>
   <link name="rh_lower_leg_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=114.5 | mass_kg=0.114500 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (53.5 g) | components=ACT_RR_LowerLeg + Lower_Leg_R | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF lower | source=physprop__lf_lower_leg_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.03075 0.00118 -0.01958" rpy="0 0 0" />
+      <mass value="0.059500" />
+      <inertia ixx="2.15172642767e-05" ixy="-6.0930015348e-07" ixz="1.68302311374e-05" iyy="0.000102530052784" iyz="3.71953235117e-07" izz="0.000104321477439" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -218,7 +278,12 @@
     </collision>
   </link>
   <link name="rh_foot_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=6.5 | mass_kg=0.006500 | materials=TPU 95A (6.5 g) | components=Rubber_Foot RR | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.017500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: identical foot geometry | symmetry=identical foot geometry; LF local inertia copied | source=physprop__lf_foot_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="-0.00052 0 0.01548" rpy="0 0 0" />
+      <mass value="0.017500" />
+      <inertia ixx="1.14526961866e-06" ixy="0" ixz="-1.55064671079e-08" iyy="1.20267175e-06" iyz="0" izz="1.14835213134e-06" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -236,7 +301,12 @@
     </collision>
   </link>
   <link name="lh_hip_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=97.0 | mass_kg=0.097000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); Steel fasteners (4 g) | components=ACT_RL_Shoulder + Shoulder_Joint_L + leg fasteners | fastener_allocation=4 g leg fasteners provisionally allocated to hip_link | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: same left-side local geometry | symmetry=same left-side local frame as LF | source=physprop__lf_hip_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.00366 0.02982 0.00694" rpy="0 0 0" />
+      <mass value="0.050000" />
+      <inertia ixx="4.02252347591e-05" ixy="-1.31462768927e-06" ixz="-1.13953716339e-06" iyy="1.8958128496e-05" iyz="-4.46400670021e-06" izz="4.54280867449e-05" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -254,7 +324,12 @@
     </collision>
   </link>
   <link name="lh_upper_leg_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=98.0 | mass_kg=0.098000 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (32 g); ABS ESD cover (5 g) | components=ACT_RL_UpperLeg + Upper_Leg + Upper_Leg_Cover | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.172500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: same left-side local geometry | symmetry=same left-side local frame as LF | source=physprop__lf_upper_leg_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.00108 0.00015 -0.04503" rpy="0 0 0" />
+      <mass value="0.172500" />
+      <inertia ixx="0.000205436660094" ixy="-5.63507198417e-08" ixz="0" iyy="0.000199175976156" iyz="0" izz="3.111294525e-05" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -272,7 +347,12 @@
     </collision>
   </link>
   <link name="lh_lower_leg_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=114.5 | mass_kg=0.114500 | materials=Feetech ST3215 actuator assembly (61 g; internal material not specified); PPA+CF (53.5 g) | components=ACT_RL_LowerLeg + Lower_Leg_L | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: same left-side local geometry | symmetry=same left-side local frame as LF | source=physprop__lf_lower_leg_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="0.03075 -0.00118 -0.01958" rpy="0 0 0" />
+      <mass value="0.059500" />
+      <inertia ixx="2.15172642767e-05" ixy="6.0930015348e-07" ixz="1.68302311374e-05" iyy="0.000102530052784" iyz="-3.71953235117e-07" izz="0.000104321477439" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
@@ -290,7 +370,12 @@
     </collision>
   </link>
   <link name="lh_foot_link">
-    <!-- MATDOG_ENGINEERING_PROPERTIES | mass_g=6.5 | mass_kg=0.006500 | materials=TPU 95A (6.5 g) | components=Rubber_Foot RL | fastener_allocation=No separately measured fasteners allocated | source=Engineering_Data.xlsx/Weight | inertial_status=Mass verified; center_of_mass and inertia_tensor pending CAD -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.017500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: identical foot geometry | symmetry=identical foot geometry; LF local inertia copied | source=physprop__lf_foot_link.txt + weight_breakdown_summary.txt -->
+    <inertial>
+      <origin xyz="-0.00052 0 0.01548" rpy="0 0 0" />
+      <mass value="0.017500" />
+      <inertia ixx="1.14526961866e-06" ixy="0" ixz="-1.55064671079e-08" iyy="1.20267175e-06" iyz="0" izz="1.14835213134e-06" />
+    </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
