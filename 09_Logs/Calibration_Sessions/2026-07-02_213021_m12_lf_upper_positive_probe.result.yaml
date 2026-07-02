@@ -1,0 +1,29 @@
+session_id: 2026-07-02_213021_m12_lf_upper_positive_probe
+robot: MATDOG
+joint: lf_upper_leg_joint
+servo_id: 12
+probe_type: encoder_positive_direction_test
+commanded_delta_ticks: 20
+
+telemetry:
+  commanded_start_ticks: 2859
+  commanded_target_ticks: 2879
+  observed_at_target_ticks: 2877
+  commanded_return_ticks: 2859
+  observed_before_torque_off_ticks: 2863
+
+visual_observation: >
+  Con incremento encoder positivo, la zampa sinistra anteriore è andata verso il posteriore.
+calibration_result:
+  encoder_increase_maps_to_urdf_q: positive
+  direction: 1
+  status: PASS_DIRECTION_TEST
+
+return_validation:
+  within_tolerance: true
+  tolerance_ticks: 8
+  observed_error_ticks: 4
+
+notes:
+  - Target e ritorno verificati correttamente.
+  - Zero cinematico finale e limiti software restano PENDING.

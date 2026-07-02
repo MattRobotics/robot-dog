@@ -1,0 +1,29 @@
+session_id: 2026-07-02_initial_approx_reference
+robot: MATDOG
+station_state: stopped_after_capture
+method: read_only_station_websocket_telemetry
+serial_owner_during_capture: Station
+pose_classification: initial_approx_reference
+important_note: >
+  Questa non è ancora la posa zero cinematica definitiva.
+  È una posa iniziale stabile usata come riferimento per il
+  successivo test dei versi e per la calibrazione MATDOG.
+samples_per_joint: 18
+observed_encoder_positions:
+  11: 2089
+  12: 2859
+  13: 3534
+  21: 4032
+  22: 1052
+  23: 15
+  31: 4015
+  32: 1018
+  33: 1520
+  41: 111
+  42: 2929
+  43: 1231
+stability_result: PASS
+notes:
+  - Tutti i 12 servo hanno restituito un solo valore stabile per 18 campioni.
+  - Nessuna scrittura EEPROM, offset, PID o limite è stata eseguita.
+  - I campi direction, zero_encoder_final e safe_limit_rad restano volutamente non definiti.

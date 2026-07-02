@@ -1,0 +1,32 @@
+session_id: 2026-07-02_212421_m13_lf_hip_positive_probe
+robot: MATDOG
+joint: lf_hip_joint
+servo_id: 13
+probe_type: encoder_positive_direction_test
+commanded_delta_ticks: 20
+
+telemetry:
+  commanded_start_ticks: 3544
+  commanded_target_ticks: 3564
+  observed_at_target_ticks: 3558
+  commanded_return_ticks: 3544
+  observed_before_torque_off_ticks: 3556
+  observed_after_torque_off_dry_run_ticks: 3557
+
+visual_observation: >
+  Con incremento encoder positivo, lf_hip_link ha ruotato verso il basso.
+calibration_result:
+  encoder_increase_maps_to_urdf_q: negative
+  direction: -1
+  status: PASS_DIRECTION_TEST
+
+return_validation:
+  within_tolerance: false
+  tolerance_ticks: 8
+  observed_error_ticks: 12
+
+notes:
+  - Il verso è stato identificato correttamente dal movimento visivo.
+  - Il ritorno non è rientrato nella tolleranza; mantenere il controllo rigido
+    nei test successivi e registrare l'evento come anomalia lieve.
+  - Zero cinematico finale e limiti software restano PENDING.

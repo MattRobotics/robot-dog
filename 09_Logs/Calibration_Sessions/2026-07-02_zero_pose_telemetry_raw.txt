@@ -1,0 +1,272 @@
+Connected to Station: ws://127.0.0.1:8889/api
+NormFS setup OK
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
+
+--- MATDOG TELEMETRY SNAPSHOT ---
+BUS: 5B14114953
+Motor 11 | present=2089 | target=2089 | range=2174-2174 | current=0
+Motor 12 | present=2859 | target=2859 | range=2944-2944 | current=0
+Motor 13 | present=3534 | target=3534 | range=1531-1531 | current=0
+Motor 21 | present=4032 | target=4032 | range=21-21 | current=0
+Motor 22 | present=1052 | target=1052 | range=1137-1213 | current=0
+Motor 23 | present=15 | target=15 | range=402-402 | current=0
+Motor 31 | present=4015 | target=4015 | range=4-4 | current=0
+Motor 32 | present=1018 | target=1018 | range=1103-1103 | current=0
+Motor 33 | present=1520 | target=1520 | range=1605-1605 | current=0
+Motor 41 | present=111 | target=111 | range=196-196 | current=0
+Motor 42 | present=2929 | target=2929 | range=3014-3014 | current=0
+Motor 43 | present=1231 | target=1231 | range=1316-1316 | current=0
