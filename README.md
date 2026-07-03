@@ -73,7 +73,8 @@ Trot diagonal pairs:
     Front-to-rear hip spacing: 225 mm
     Left-to-right hip spacing: 95 mm
     Hip-to-knee segment: 90 mm
-    Knee-to-foot segment: 110 mm
+    Knee-to-foot mechanical interface center: 110 mm
+    Knee-to-foot contact-frame distance: 118.1 mm
     Target stand body height: approximately 150 mm
 
 Coordinate convention:
@@ -147,3 +148,28 @@ Coordinate convention:
 ---
 
 Built and documented by Matt Robotics.
+
+## Mechanical Segment and Contact-Frame Terminology
+
+- `Hip-to-knee mechanical segment`: `90 mm`.
+- `Knee-to-foot mechanical interface center`: `110 mm`. This is the
+  nominal distance from the knee axis to the center of the lower-leg end
+  where the eccentric rubber foot attaches.
+- `Knee-to-foot contact-frame distance`: `118.1 mm`. This is the true
+  distance from the knee axis to the URDF `foot_joint`, which represents
+  the nominal ground-contact point of the eccentric rubber foot.
+
+The `110 mm` mechanical segment and the `118.1 mm` contact-frame distance
+are intentionally different. The contact-frame distance is the value to use
+for nominal ground contact, stand-pose development, IK and gait planning.
+
+## ST3215 URDF Effort and Velocity Semantics
+
+The REV00 URDF uses:
+
+    effort   = 0.902244 N*m
+    velocity = 3.03687289847 rad/s = 29 rpm
+
+These are conservative MATDOG nominal-operation limits for the intended 3S
+operating point. They are not Feetech-published performance values at exactly
+11.1 V and must not be interpreted as stall specifications.

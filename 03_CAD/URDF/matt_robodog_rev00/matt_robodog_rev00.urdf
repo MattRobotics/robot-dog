@@ -426,7 +426,7 @@
     <child link="lf_lower_leg_link" />
     <origin xyz="0 0 -0.09" rpy="0 0 0" />
     <axis xyz="0 1 0" />
-    <limit lower="-1.701696020690" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <limit lower="-1.605702911835" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
     <dynamics damping="0" friction="0" />
     <hardware>
       <motorType>Feetech ST3215</motorType>
@@ -473,7 +473,7 @@
     <child link="rf_lower_leg_link" />
     <origin xyz="0 0 -0.09" rpy="0 0 0" />
     <axis xyz="0 1 0" />
-    <limit lower="-1.701696020690" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <limit lower="-1.605702911835" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
     <dynamics damping="0" friction="0" />
     <hardware>
       <motorType>Feetech ST3215</motorType>
@@ -520,7 +520,7 @@
     <child link="rh_lower_leg_link" />
     <origin xyz="0 0 -0.09" rpy="0 0 0" />
     <axis xyz="0 1 0" />
-    <limit lower="-1.701696020690" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <limit lower="-1.605702911835" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
     <dynamics damping="0" friction="0" />
     <hardware>
       <motorType>Feetech ST3215</motorType>
@@ -567,7 +567,7 @@
     <child link="lh_lower_leg_link" />
     <origin xyz="0 0 -0.09" rpy="0 0 0" />
     <axis xyz="0 1 0" />
-    <limit lower="-1.701696020690" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
+    <limit lower="-1.605702911835" upper="0.654498469498" effort="0.902244" velocity="3.03687289847" />
     <dynamics damping="0" friction="0" />
     <hardware>
       <motorType>Feetech ST3215</motorType>

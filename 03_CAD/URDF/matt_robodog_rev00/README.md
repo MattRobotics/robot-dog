@@ -89,3 +89,28 @@ Before dynamic simulation, collision geometry should be simplified into primitiv
 Mass and material references are maintained in the Excel workbook.
 
 Link center-of-mass coordinates and inertia tensors are not yet authoritative. They must be extracted from Solid Edge before dynamic simulation is considered valid.
+
+## Mechanical Segment and Foot-Contact Frame
+
+- `hip_to_knee`: `90.0 mm`, measured between the relevant joint axes.
+- `knee_to_foot_interface_center`: `110.0 mm`, measured from the knee axis
+  to the center of the lower-leg endpoint where the eccentric rubber foot
+  attaches.
+- `knee_to_foot_contact_frame`: `118.1 mm`, measured from the knee axis to
+  the URDF `foot_joint`, which represents the nominal ground-contact point
+  of the eccentric rubber foot.
+
+The lower-leg mechanical interface center and the URDF `foot_joint` are
+intentionally different because the rubber foot is eccentric. Use the
+`foot_joint` contact-frame distance for IK, stand-pose and gait planning.
+
+## ST3215 URDF Effort and Velocity Semantics
+
+All twelve revolute leg joints currently use:
+
+    effort   = 0.902244 N*m
+    velocity = 3.03687289847 rad/s = 29 rpm
+
+These are conservative MATDOG nominal-operation limits for the intended 3S
+operating point. They are not an official Feetech torque-speed curve at
+exactly 11.1 V.

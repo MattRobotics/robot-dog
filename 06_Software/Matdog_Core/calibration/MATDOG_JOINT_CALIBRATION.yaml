@@ -25,7 +25,7 @@ joint_groups:
     urdf_min_rad: -0.916297857297
     urdf_max_rad: 2.138028333693
   lower_leg:
-    urdf_min_rad: -1.701696020690
+    urdf_min_rad: -1.605702911835
     urdf_max_rad: 0.654498469498
 
 joints:
@@ -148,3 +148,34 @@ joints:
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
     validation_status: PENDING_DIRECTION_TEST
+
+validation_notes:
+  lf_hip_return_probe:
+    joint: lf_hip_joint
+    servo_id: 13
+    direction: -1
+    direction_status: PASS
+    return_validation: RECHECK_REQUIRED
+    observed_error_ticks: 12
+    tolerance_ticks: 8
+    note: >
+      Encoder-positive direction was verified correctly. Repeat the return
+      probe before using lf_hip_joint in an automatic multi-servo pose.
+
+  lf_upper_leg_return_probe:
+    joint: lf_upper_leg_joint
+    servo_id: 12
+    direction: 1
+    direction_status: PASS
+    return_validation: PASS
+    observed_error_ticks: 4
+    tolerance_ticks: 8
+
+  lf_lower_leg_return_probe:
+    joint: lf_lower_leg_joint
+    servo_id: 11
+    direction: -1
+    direction_status: PASS
+    return_validation: PASS
+    observed_error_ticks: 2
+    tolerance_ticks: 8
