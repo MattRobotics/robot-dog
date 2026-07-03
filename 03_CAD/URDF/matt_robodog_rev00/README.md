@@ -54,6 +54,11 @@ base_link
 
 ## Joint Limits Consolidated in REV00
 
+Hip joints:
+
+- Minimum: -45.0 degrees
+- Maximum: +45.0 degrees
+
 Upper-leg joints:
 
 - Minimum: -52.5 degrees
