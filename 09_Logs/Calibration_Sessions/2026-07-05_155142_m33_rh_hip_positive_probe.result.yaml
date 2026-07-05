@@ -1,0 +1,32 @@
+session_id: 2026-07-05_155142_m33_rh_hip_positive_probe
+robot: MATDOG
+joint: rh_hip_joint
+servo_id: 33
+probe_type: encoder_positive_direction_test
+commanded_delta_ticks: 20
+
+telemetry:
+  commanded_start_ticks: 1483
+  commanded_target_ticks: 1503
+  observed_at_target_ticks: 1503
+  commanded_return_ticks: 1483
+  observed_before_torque_off_ticks: 1488
+
+visual_observation: >
+  Con incremento encoder positivo, rh_hip_link si è mosso verso il basso e
+  verso l'interno del robot.
+
+calibration_result:
+  encoder_increase_maps_to_urdf_q: positive
+  direction: 1
+  status: PASS_DIRECTION_TEST
+
+return_validation:
+  within_tolerance: true
+  tolerance_ticks: 8
+  observed_error_ticks: 5
+
+notes:
+  - Target raggiunto senza errore.
+  - Il verso encoder corrisponde al verso positivo del joint URDF.
+  - Zero cinematico finale e limiti software restano PENDING.

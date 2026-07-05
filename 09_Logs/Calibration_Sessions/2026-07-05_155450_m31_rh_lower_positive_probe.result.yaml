@@ -1,0 +1,32 @@
+session_id: 2026-07-05_155450_m31_rh_lower_positive_probe
+robot: MATDOG
+joint: rh_lower_leg_joint
+servo_id: 31
+probe_type: encoder_positive_direction_test
+commanded_delta_ticks: 20
+
+telemetry:
+  commanded_start_ticks: 3979
+  commanded_target_ticks: 3999
+  observed_at_target_ticks: 3997
+  commanded_return_ticks: 3979
+  observed_before_torque_off_ticks: 3983
+
+visual_observation: >
+  Con incremento encoder positivo, la parte bassa della zampa RH si è mossa
+  verso indietro e verso il basso.
+
+calibration_result:
+  encoder_increase_maps_to_urdf_q: positive
+  direction: 1
+  status: PASS_DIRECTION_TEST
+
+return_validation:
+  within_tolerance: true
+  tolerance_ticks: 8
+  observed_error_ticks: 4
+
+notes:
+  - q URDF positivo sul lower joint muove il foot frame verso indietro e in basso.
+  - Il verso encoder corrisponde al verso positivo del joint URDF.
+  - Zero cinematico finale e limiti software restano PENDING.

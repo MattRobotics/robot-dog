@@ -1,0 +1,22 @@
+2026-07-05 15:52:57,311 - Connection established
+2026-07-05 15:52:57,312 - Initial setup successful
+2026-07-05 15:52:57,408 - Aspetto il primo frame ST3215...
+2026-07-05 15:52:57,410 - Read stream 1 started
+2026-07-05 15:52:57,616 - === MATDOG MICRO-PROBE ===
+2026-07-05 15:52:57,617 - Bus: 5B14114953
+2026-07-05 15:52:57,617 - Servo: M32
+2026-07-05 15:52:57,617 - Present iniziale: 1009
+2026-07-05 15:52:57,618 - Target micro-probe: 1029
+2026-07-05 15:52:57,618 - Delta: +20 tick
+2026-07-05 15:52:57,618 - Speed=40 accel=5 hold=0.80s
+2026-07-05 15:52:57,618 - Priming: imposto goal uguale alla posizione attuale, torque ancora OFF.
+2026-07-05 15:52:57,803 - Abilito torque SOLO su M32
+2026-07-05 15:52:58,103 - HOLD iniziale raggiunto: present=1009 target=1009 err=0 tick
+2026-07-05 15:52:58,103 - Micro-movimento: 1009 -> 1029
+2026-07-05 15:52:58,955 - TARGET micro-movimento raggiunto: present=1027 target=1029 err=2 tick
+2026-07-05 15:52:58,955 - Ritorno automatico: 1029 -> 1009
+2026-07-05 15:52:59,758 - RITORNO iniziale raggiunto: present=1011 target=1009 err=2 tick
+2026-07-05 15:52:59,758 - Ritorno iniziale verificato.
+2026-07-05 15:52:59,758 - Micro-probe completato.
+2026-07-05 15:52:59,758 - Safety cleanup: ritorno a 1009
+2026-07-05 15:53:00,010 - Safety cleanup: torque OFF solo su M32

@@ -1,0 +1,32 @@
+session_id: 2026-07-05_155257_m32_rh_upper_positive_probe
+robot: MATDOG
+joint: rh_upper_leg_joint
+servo_id: 32
+probe_type: encoder_positive_direction_test
+commanded_delta_ticks: 20
+
+telemetry:
+  commanded_start_ticks: 1009
+  commanded_target_ticks: 1029
+  observed_at_target_ticks: 1027
+  commanded_return_ticks: 1009
+  observed_before_torque_off_ticks: 1011
+
+visual_observation: >
+  Con incremento encoder positivo, la parte inferiore della zampa RH si è
+  mossa verso avanti e verso l'alto.
+
+calibration_result:
+  encoder_increase_maps_to_urdf_q: negative
+  direction: -1
+  status: PASS_DIRECTION_TEST
+
+return_validation:
+  within_tolerance: true
+  tolerance_ticks: 8
+  observed_error_ticks: 2
+
+notes:
+  - q URDF positivo sul joint upper muove il foot frame verso indietro e in basso.
+  - Il movimento reale osservato è opposto.
+  - Zero cinematico finale e limiti software restano PENDING.
