@@ -17,8 +17,9 @@ Questo tool NON:
 
 import argparse
 import asyncio
+import hashlib
 import logging
-import statistics
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -38,6 +39,7 @@ sys.path.insert(0, str(EXAMPLE_DIR))
 from software.station.shared.station_py import new_station_client
 from target.gen_python.protobuf.drivers.st3215 import st3215
 from state import find_bus, parse_motor_state, resolve_bus_serial
+from matdog_joint_math import circular_tick_summary
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 logger = logging.getLogger("matdog_capture_visual_zero")
@@ -105,14 +107,91 @@ def find_motor_state(inference_state, bus_serial: str, motor_id: int):
     raise RuntimeError(f"Motore {motor_id} non trovato sul bus '{bus_serial}'")
 
 
-def median_tick(values: list[int]) -> int:
-    ordered = sorted(values)
-    midpoint = len(ordered) // 2
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
 
-    if len(ordered) % 2 == 1:
-        return ordered[midpoint]
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
 
-    return (ordered[midpoint - 1] + ordered[midpoint] + 1) // 2
+    return digest.hexdigest()
+
+
+def ensure_safe_output_path(output_path: Path, config_path: Path) -> Path:
+    """Accetta soltanto nuovi file YAML dentro il log directory MATDOG."""
+    output_path = output_path.resolve()
+    config_path = config_path.resolve()
+    log_root = DEFAULT_LOG_DIR.resolve()
+
+    if output_path == config_path:
+        raise RuntimeError(
+            "--output non può coincidere con MATDOG_JOINT_CALIBRATION.yaml"
+        )
+
+    try:
+        output_path.relative_to(log_root)
+    except ValueError as exc:
+        raise RuntimeError(
+            "--output deve stare sotto "
+            f"{log_root}, ricevuto: {output_path}"
+        ) from exc
+
+    if output_path.suffix.lower() not in {".yaml", ".yml"}:
+        raise RuntimeError(
+            "--output deve avere estensione .yaml oppure .yml"
+        )
+
+    if output_path.exists():
+        raise RuntimeError(
+            "Il file candidato esiste già e non verrà sovrascritto: "
+            f"{output_path}"
+        )
+
+    temporary_path = output_path.with_name(f".{output_path.name}.tmp")
+    if temporary_path.exists():
+        raise RuntimeError(
+            "Esiste un file temporaneo di una cattura precedente: "
+            f"{temporary_path}. Verificalo o rimuovilo manualmente."
+        )
+
+    return output_path
+
+
+def write_yaml_atomically(output_path: Path, content: str) -> None:
+    """Pubblica un candidato YAML senza sovrascrivere file esistenti.
+
+    Il file temporaneo viene eliminato solo quando è stato creato da
+    questa stessa esecuzione. Un temporaneo preesistente resta intatto.
+    """
+    temporary_path = output_path.with_name(f".{output_path.name}.tmp")
+    temporary_created = False
+
+    try:
+        try:
+            with temporary_path.open("x", encoding="utf-8") as handle:
+                temporary_created = True
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except FileExistsError as exc:
+            raise RuntimeError(
+                "File temporaneo già esistente: "
+                f"{temporary_path}. La cattura non viene proseguita."
+            ) from exc
+
+        try:
+            # link() crea il nome finale solo se non esiste già.
+            # Fallisce atomicamente con FileExistsError se qualcuno ha
+            # creato il candidato fra il controllo iniziale e questo punto.
+            os.link(temporary_path, output_path)
+        except FileExistsError as exc:
+            raise RuntimeError(
+                "Il file candidato esiste già e non verrà sovrascritto: "
+                f"{output_path}"
+            ) from exc
+    finally:
+        if temporary_created and temporary_path.exists():
+            temporary_path.unlink()
 
 
 def load_joint_map(config_path: Path):
@@ -190,6 +269,7 @@ async def main_async(args):
         else default_output_path()
     )
 
+    output_path = ensure_safe_output_path(output_path, config_path)
     joint_map = load_joint_map(config_path)
 
     client = None
@@ -233,19 +313,18 @@ async def main_async(args):
         for item in joint_map:
             joint_name = item["joint_name"]
             values = samples[joint_name]
-            low = min(values)
-            high = max(values)
-            spread = high - low
-            candidate = median_tick(values)
+            raw_low = min(values)
+            raw_high = max(values)
+            candidate, spread = circular_tick_summary(values)
 
             result_joints[joint_name] = {
                 "servo_id": item["servo_id"],
                 "direction": item["direction"],
                 "joint_group": item["joint_group"],
                 "samples_ticks": values,
-                "min_ticks": low,
-                "max_ticks": high,
-                "spread_ticks": spread,
+                "raw_min_ticks": raw_low,
+                "raw_max_ticks": raw_high,
+                "circular_spread_ticks": spread,
                 "zero_encoder_visual_candidate": candidate,
             }
 
@@ -253,7 +332,7 @@ async def main_async(args):
                 unstable.append((joint_name, spread, values))
 
         print("\n=== RISULTATO ZERO VISUALE — CANDIDATO ===")
-        print("joint                     servo  median  min  max  spread")
+        print("joint                     servo  median  raw_min raw_max circ_spread")
         print("----------------------------------------------------------")
 
         for item in joint_map:
@@ -262,9 +341,9 @@ async def main_async(args):
                 f"{item['joint_name']:25} "
                 f"M{row['servo_id']:02d}   "
                 f"{row['zero_encoder_visual_candidate']:4d}   "
-                f"{row['min_ticks']:4d} "
-                f"{row['max_ticks']:4d} "
-                f"{row['spread_ticks']:3d}"
+                f"{row['raw_min_ticks']:4d} "
+                f"{row['raw_max_ticks']:4d} "
+                f"{row['circular_spread_ticks']:3d}"
             )
 
         if unstable:
@@ -285,6 +364,13 @@ async def main_async(args):
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
+        config_hash = sha256_file(config_path)
+        config_data = yaml.safe_load(config_path.read_text())
+        canonical_urdf = (
+            config_data.get("kinematic_model", {})
+            .get("canonical_urdf", {})
+        )
+
         result = {
             "session_id": output_path.stem.replace(".result", ""),
             "robot": "MATDOG",
@@ -299,6 +385,8 @@ async def main_async(args):
                 "samples_per_joint": args.samples,
                 "max_spread_ticks": args.max_spread,
                 "config_source": str(config_path),
+                "config_sha256": config_hash,
+                "canonical_urdf_contract": canonical_urdf,
                 "note": (
                     "Read-only capture. "
                     "MATDOG_JOINT_CALIBRATION.yaml non è stato modificato."
@@ -307,13 +395,12 @@ async def main_async(args):
             "joints": result_joints,
         }
 
-        output_path.write_text(
-            yaml.safe_dump(
-                result,
-                sort_keys=False,
-                allow_unicode=True,
-            )
+        yaml_content = yaml.safe_dump(
+            result,
+            sort_keys=False,
+            allow_unicode=True,
         )
+        write_yaml_atomically(output_path, yaml_content)
 
         print("\nPASS: posa stabile.")
         print(f"File candidato salvato: {output_path}")

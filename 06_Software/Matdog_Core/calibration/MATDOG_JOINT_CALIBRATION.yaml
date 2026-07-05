@@ -5,6 +5,11 @@ robot:
   leg_order: [LF, RF, RH, LH]
   calibration_status: DIRECTION_MAPPING_COMPLETE_ZERO_PENDING
 
+kinematic_model:
+  canonical_urdf:
+    path: 03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
+    sha256: 5e28da3dba10fd3f2ea6ebf6f5d6271157bda0b12b82d92aedbe3031643089ef
+
 units:
   joint_angle: rad
   encoder_position: ticks_0_to_4095

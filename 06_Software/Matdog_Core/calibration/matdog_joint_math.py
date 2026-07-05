@@ -61,6 +61,52 @@ def signed_tick_delta(present_tick: int, reference_tick: int) -> int:
     ) - HALF_ENCODER_RANGE
 
 
+def circular_tick_summary(ticks: list[int]) -> tuple[int, int]:
+    """Restituisce mediana e spread sul cerchio encoder 0..4095.
+
+    La funzione trova l'arco circolare minimo che contiene tutti i
+    campioni. Questo evita falsi spread enormi vicino alla transizione
+    4095 -> 0 ed è indipendente dall'ordine di arrivo dei campioni.
+    """
+    if not ticks:
+        raise ValueError("ticks non può essere vuoto")
+
+    normalized = sorted(normalize_tick(tick) for tick in ticks)
+
+    if len(normalized) == 1:
+        return normalized[0], 0
+
+    gaps = []
+
+    for index, current in enumerate(normalized):
+        following = normalized[(index + 1) % len(normalized)]
+
+        if index == len(normalized) - 1:
+            following += ENCODER_MODULUS
+
+        gaps.append(following - current)
+
+    largest_gap_index = gaps.index(max(gaps))
+    arc_start = normalized[(largest_gap_index + 1) % len(normalized)]
+
+    unwrapped = sorted(
+        arc_start + ((tick - arc_start) % ENCODER_MODULUS)
+        for tick in normalized
+    )
+
+    midpoint = len(unwrapped) // 2
+
+    if len(unwrapped) % 2 == 1:
+        median_unwrapped = unwrapped[midpoint]
+    else:
+        median_unwrapped = (
+            unwrapped[midpoint - 1] + unwrapped[midpoint] + 1
+        ) // 2
+
+    spread = unwrapped[-1] - unwrapped[0]
+    return normalize_tick(median_unwrapped), spread
+
+
 def encoder_to_joint_rad(
     present_tick: int,
     zero_tick: int,

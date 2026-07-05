@@ -11,6 +11,7 @@ sys.path.insert(0, str(CALDIR))
 from matdog_joint_math import (
     ENCODER_MODULUS,
     RAD_PER_TICK,
+    circular_tick_summary,
     encoder_round_trip_error,
     encoder_to_joint_rad,
     joint_rad_to_encoder,
@@ -36,6 +37,44 @@ class TestMatdogJointMath(unittest.TestCase):
         self.assertEqual(signed_tick_delta(1, 4095), 2)
         self.assertEqual(signed_tick_delta(4095, 0), -1)
         self.assertEqual(signed_tick_delta(4094, 1), -3)
+
+    def test_circular_tick_summary_regular_samples(self):
+        candidate, spread = circular_tick_summary([1000, 1001, 1002, 1003, 1004])
+        self.assertEqual(candidate, 1002)
+        self.assertEqual(spread, 4)
+
+    def test_circular_tick_summary_across_wrap(self):
+        candidate, spread = circular_tick_summary([4094, 4095, 0, 1, 2])
+        self.assertEqual(candidate, 0)
+        self.assertEqual(spread, 4)
+
+    def test_circular_tick_summary_empty_is_rejected(self):
+        with self.assertRaises(ValueError):
+            circular_tick_summary([])
+
+    def test_circular_tick_summary_is_order_independent(self):
+        samples = [4094, 4095, 0, 1, 2]
+        variants = [
+            samples,
+            list(reversed(samples)),
+            [0, 4094, 2, 4095, 1],
+        ]
+
+        for values in variants:
+            with self.subTest(values=values):
+                candidate, spread = circular_tick_summary(values)
+                self.assertEqual(candidate, 0)
+                self.assertEqual(spread, 4)
+
+    def test_circular_tick_summary_even_samples_across_wrap(self):
+        candidate, spread = circular_tick_summary([4095, 0, 1, 2])
+        self.assertEqual(candidate, 1)
+        self.assertEqual(spread, 3)
+
+    def test_circular_tick_summary_single_sample(self):
+        candidate, spread = circular_tick_summary([4079])
+        self.assertEqual(candidate, 4079)
+        self.assertEqual(spread, 0)
 
     def test_zero_is_zero_rad_for_both_directions(self):
         for zero_tick in (0, 155, 1268, 2048, 2936, 3979, 4095):
