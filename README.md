@@ -116,7 +116,7 @@ Coordinate convention:
 ### Phase 2 — Locomotion
 
 - [ ] Mechanical zero calibration for all 12 joints
-- [ ] Encoder-to-radian calibration contract
+- [x] Encoder-to-radian calibration contract (software)
 - [ ] Single-leg forward kinematics
 - [ ] Single-leg inverse kinematics
 - [ ] Safe stand pose
