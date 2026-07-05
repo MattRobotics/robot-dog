@@ -122,32 +122,32 @@ joints:
   lh_hip_joint:
     servo_id: 43
     provisional_reference_encoder: 1231
-    direction: null
+    direction: 1
     zero_encoder_final: null
     joint_group: hip
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PENDING_DIRECTION_TEST
+    validation_status: PASS_DIRECTION_TEST
 
   lh_upper_leg_joint:
     servo_id: 42
     provisional_reference_encoder: 2929
-    direction: null
+    direction: 1
     zero_encoder_final: null
     joint_group: upper_leg
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PENDING_DIRECTION_TEST
+    validation_status: PASS_DIRECTION_TEST
 
   lh_lower_leg_joint:
     servo_id: 41
     provisional_reference_encoder: 111
-    direction: null
+    direction: -1
     zero_encoder_final: null
     joint_group: lower_leg
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PENDING_DIRECTION_TEST
+    validation_status: PASS_DIRECTION_TEST
 
 validation_notes:
   lf_hip_return_probe:
