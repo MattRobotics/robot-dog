@@ -1,0 +1,22 @@
+2026-07-05 15:40:26,946 - Connection established
+2026-07-05 15:40:26,947 - Initial setup successful
+2026-07-05 15:40:27,040 - Aspetto il primo frame ST3215...
+2026-07-05 15:40:27,042 - Read stream 1 started
+2026-07-05 15:40:27,248 - === MATDOG MICRO-PROBE ===
+2026-07-05 15:40:27,248 - Bus: 5B14114953
+2026-07-05 15:40:27,248 - Servo: M23
+2026-07-05 15:40:27,248 - Present iniziale: 4079
+2026-07-05 15:40:27,248 - Target micro-probe: 4059
+2026-07-05 15:40:27,248 - Delta: -20 tick
+2026-07-05 15:40:27,249 - Speed=40 accel=5 hold=0.80s
+2026-07-05 15:40:27,249 - Priming: imposto goal uguale alla posizione attuale, torque ancora OFF.
+2026-07-05 15:40:27,401 - Abilito torque SOLO su M23
+2026-07-05 15:40:27,702 - HOLD iniziale raggiunto: present=4079 target=4079 err=0 tick
+2026-07-05 15:40:27,702 - Micro-movimento: 4079 -> 4059
+2026-07-05 15:40:28,553 - TARGET micro-movimento raggiunto: present=4060 target=4059 err=1 tick
+2026-07-05 15:40:28,553 - Ritorno automatico: 4059 -> 4079
+2026-07-05 15:40:32,383 - RITORNO iniziale timeout: present=4070 target=4079 err=9 tick
+2026-07-05 15:40:32,383 - Ritorno non entro tolleranza: M23 present=4070 expected=4079. Il risultato del test verso resta valido; posizione raw registrata.
+2026-07-05 15:40:32,383 - Micro-probe completato.
+2026-07-05 15:40:32,383 - Safety cleanup: ritorno a 4079
+2026-07-05 15:40:32,635 - Safety cleanup: torque OFF solo su M23

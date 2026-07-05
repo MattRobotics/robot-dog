@@ -1,0 +1,32 @@
+session_id: 2026-07-05_154026_m23_rf_hip_negative_probe
+robot: MATDOG
+joint: rf_hip_joint
+servo_id: 23
+probe_type: encoder_negative_direction_test
+commanded_delta_ticks: -20
+
+telemetry:
+  commanded_start_ticks: 4079
+  commanded_target_ticks: 4059
+  observed_at_target_ticks: 4060
+  commanded_return_ticks: 4079
+  observed_before_torque_off_ticks: 4070
+
+visual_observation: >
+  Con decremento encoder, rf_hip_link si è mosso verso il basso e verso
+  l'interno del robot.
+calibration_result:
+  encoder_decrease_maps_to_urdf_q: positive
+  direction: -1
+  status: PASS_DIRECTION_TEST
+
+return_validation:
+  within_tolerance: false
+  tolerance_ticks: 8
+  observed_error_ticks: 9
+
+notes:
+  - Target raggiunto con errore di 1 tick.
+  - Il ritorno è stato fuori tolleranza di 1 tick.
+  - Il verso cinematico è identificato con certezza.
+  - Zero cinematico finale e limiti software restano PENDING.

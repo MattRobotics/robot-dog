@@ -1,0 +1,31 @@
+session_id: 2026-07-05_154451_m21_rf_lower_negative_probe
+robot: MATDOG
+joint: rf_lower_leg_joint
+servo_id: 21
+probe_type: encoder_negative_direction_test
+commanded_delta_ticks: -20
+
+telemetry:
+  commanded_start_ticks: 4071
+  commanded_target_ticks: 4051
+  observed_at_target_ticks: 4056
+  commanded_return_ticks: 4071
+  observed_before_torque_off_ticks: 4070
+
+visual_observation: >
+  Con decremento encoder, la parte bassa della zampa RF si è mossa verso
+  avanti e verso l'alto.
+calibration_result:
+  encoder_decrease_maps_to_urdf_q: negative
+  direction: 1
+  status: PASS_DIRECTION_TEST
+
+return_validation:
+  within_tolerance: true
+  tolerance_ticks: 8
+  observed_error_ticks: 1
+
+notes:
+  - q URDF positivo sul lower joint muove il foot frame verso indietro e in basso.
+  - Il movimento reale osservato è opposto.
+  - Zero cinematico finale e limiti software restano PENDING.
