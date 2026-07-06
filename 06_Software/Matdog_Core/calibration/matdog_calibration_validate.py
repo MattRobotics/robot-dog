@@ -101,11 +101,14 @@ def main() -> int:
     if robot.get("leg_order") != ["LF", "RF", "RH", "LH"]:
         errors.append(f"leg_order inatteso: {robot.get('leg_order')!r}")
 
-    expected_status = "DIRECTION_MAPPING_COMPLETE_ZERO_PENDING"
-    if robot.get("calibration_status") != expected_status:
+    pre_zero_status = "DIRECTION_MAPPING_COMPLETE_ZERO_PENDING"
+    visual_zero_status = "VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION"
+    calibration_status = robot.get("calibration_status")
+
+    if calibration_status not in {pre_zero_status, visual_zero_status}:
         errors.append(
             "calibration_status inatteso: "
-            f"{robot.get('calibration_status')!r}"
+            f"{calibration_status!r}"
         )
 
     model = data.get("kinematic_model", {}).get("canonical_urdf", {})
@@ -169,10 +172,21 @@ def main() -> int:
                 f"{reference!r}"
             )
 
-        if joint.get("zero_encoder_visual") is not None:
-            errors.append(
-                f"{joint_name}: zero_encoder_visual deve essere null in questa fase"
-            )
+        zero_visual = joint.get("zero_encoder_visual")
+
+        if calibration_status == pre_zero_status:
+            if zero_visual is not None:
+                errors.append(
+                    f"{joint_name}: zero_encoder_visual deve essere null "
+                    "nella fase pre-zero"
+                )
+
+        elif calibration_status == visual_zero_status:
+            if not isinstance(zero_visual, int) or not 0 <= zero_visual <= 4095:
+                errors.append(
+                    f"{joint_name}: zero_encoder_visual invalido: "
+                    f"{zero_visual!r}"
+                )
 
         if joint.get("zero_encoder_final") is not None:
             errors.append(
@@ -247,6 +261,7 @@ def main() -> int:
                 errors.append(f"{joint_name}: {exc}")
 
     print("=== MATDOG CALIBRATION CONTRACT ===")
+    print(f"Status: {calibration_status}")
     print(f"Config: {config_path}")
     print(f"URDF:   {urdf_path}")
     print(f"SHA256: {actual_hash}")

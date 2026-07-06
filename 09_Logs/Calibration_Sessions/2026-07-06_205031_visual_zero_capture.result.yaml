@@ -1,0 +1,342 @@
+session_id: 2026-07-06_205031_visual_zero_capture
+robot: MATDOG
+operation: visual_zero_capture_read_only
+status: PASS_STABLE_CAPTURE_CANDIDATE_NOT_APPLIED
+timestamp_utc: '2026-07-06T18:50:38.349815+00:00'
+station:
+  server: localhost:8888
+  bus_serial: 5B14114953
+capture:
+  samples_per_joint: 18
+  max_spread_ticks: 8
+  config_source: /home/matteo-manicardi/MATDOG/github/robot-dog/06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml
+  config_sha256: 5f6496a33d8b11d524fe1328c68edbc33e388caf5d59007027131b1a0e4bf98a
+  canonical_urdf_contract:
+    path: 03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
+    sha256: 5e28da3dba10fd3f2ea6ebf6f5d6271157bda0b12b82d92aedbe3031643089ef
+  note: Read-only capture. MATDOG_JOINT_CALIBRATION.yaml non è stato modificato.
+joints:
+  lf_hip_joint:
+    servo_id: 13
+    direction: -1
+    joint_group: hip
+    samples_ticks:
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    - 3541
+    raw_min_ticks: 3541
+    raw_max_ticks: 3541
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 3541
+  lf_upper_leg_joint:
+    servo_id: 12
+    direction: 1
+    joint_group: upper_leg
+    samples_ticks:
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    - 2819
+    raw_min_ticks: 2819
+    raw_max_ticks: 2819
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 2819
+  lf_lower_leg_joint:
+    servo_id: 11
+    direction: -1
+    joint_group: lower_leg
+    samples_ticks:
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    - 2069
+    raw_min_ticks: 2069
+    raw_max_ticks: 2069
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 2069
+  rf_hip_joint:
+    servo_id: 23
+    direction: -1
+    joint_group: hip
+    samples_ticks:
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    raw_min_ticks: 4070
+    raw_max_ticks: 4070
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 4070
+  rf_upper_leg_joint:
+    servo_id: 22
+    direction: -1
+    joint_group: upper_leg
+    samples_ticks:
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    - 1072
+    raw_min_ticks: 1072
+    raw_max_ticks: 1072
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 1072
+  rf_lower_leg_joint:
+    servo_id: 21
+    direction: 1
+    joint_group: lower_leg
+    samples_ticks:
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    - 4070
+    raw_min_ticks: 4070
+    raw_max_ticks: 4070
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 4070
+  rh_hip_joint:
+    servo_id: 33
+    direction: 1
+    joint_group: hip
+    samples_ticks:
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    - 1492
+    raw_min_ticks: 1492
+    raw_max_ticks: 1492
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 1492
+  rh_upper_leg_joint:
+    servo_id: 32
+    direction: -1
+    joint_group: upper_leg
+    samples_ticks:
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    - 1011
+    raw_min_ticks: 1011
+    raw_max_ticks: 1011
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 1011
+  rh_lower_leg_joint:
+    servo_id: 31
+    direction: 1
+    joint_group: lower_leg
+    samples_ticks:
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    - 4038
+    raw_min_ticks: 4038
+    raw_max_ticks: 4038
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 4038
+  lh_hip_joint:
+    servo_id: 43
+    direction: 1
+    joint_group: hip
+    samples_ticks:
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    - 1221
+    raw_min_ticks: 1221
+    raw_max_ticks: 1221
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 1221
+  lh_upper_leg_joint:
+    servo_id: 42
+    direction: 1
+    joint_group: upper_leg
+    samples_ticks:
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    - 2941
+    raw_min_ticks: 2941
+    raw_max_ticks: 2941
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 2941
+  lh_lower_leg_joint:
+    servo_id: 41
+    direction: -1
+    joint_group: lower_leg
+    samples_ticks:
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    - 140
+    raw_min_ticks: 140
+    raw_max_ticks: 140
+    circular_spread_ticks: 0
+    zero_encoder_visual_candidate: 140
