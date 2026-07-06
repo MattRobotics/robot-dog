@@ -2,3 +2,6 @@
 # Python generated files
 __pycache__/
 *.py[cod]
+
+# Local rollback snapshot created when applying visual-zero calibration.
+06_Software/Matdog_Core/calibration/*.before_visual_zero_backup

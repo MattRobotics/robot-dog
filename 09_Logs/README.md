@@ -20,6 +20,7 @@ Current records:
 
 - 2026-06-17_ST3215_Bus_Validation.md
 - 2026-06-30_URDF_REV00_Kinematic_Validation.md
+- 2026-07-06_Visual_Zero_and_Static_Actuation_Validation.md
 
 ## Development Log
 
@@ -28,6 +29,7 @@ Chronological milestone records.
 Current records:
 
 - 2026-06-30_URDF_REV00_Kinematic_Baseline.md
+- 2026-07-06_Visual_Zero_Calibration_and_Static_Control_Checkpoint.md
 
 ## Current Approved Baseline
 
@@ -37,8 +39,8 @@ The current kinematic baseline is stored in:
 
 ## Next Technical Milestone
 
-Mechanical zero calibration
-→ encoder-to-radian mapping
-→ single-leg forward kinematics
+Live single-leg forward kinematics from Station telemetry
+→ physical foot-position validation
 → single-leg inverse kinematics
+→ supported low-stand planning
 → safe stand pose
