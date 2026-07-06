@@ -156,6 +156,13 @@ async def main_async(args):
     if not -30 <= args.delta <= 30 or args.delta == 0:
         raise RuntimeError("--delta deve essere diverso da 0 e compreso fra -30 e +30")
 
+    if abs(args.delta) <= args.tolerance:
+        raise RuntimeError(
+            "delta insufficiente: |--delta| deve essere maggiore di "
+            "--tolerance, altrimenti il target può risultare raggiunto "
+            "senza movimento reale."
+        )
+
     client = None
     reader_task = None
     reader = None
