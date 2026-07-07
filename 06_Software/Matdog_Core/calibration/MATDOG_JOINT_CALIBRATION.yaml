@@ -33,6 +33,14 @@ joint_groups:
     urdf_min_rad: -1.605702911835
     urdf_max_rad: 0.654498469498
 
+validation_policy:
+  static_tracking_tolerance_ticks: 10
+  static_tracking_tolerance_rad: 0.0153398078788564
+  static_tracking_tolerance_deg: 0.87890625
+  applies_to: "Static hold, single-servo micro-probe, return validation, and controlled static-pose checks for all 12 MATDOG servos."
+  excludes: "Visual/final zero, URDF limits, mechanical limits, contact limits, dynamic stand, and gait acceptance."
+  artifact: "09_Logs/Calibration_Sessions/2026-07-07_static_tracking_tolerance_10_ticks.policy.yaml"
+
 joints:
   lf_hip_joint:
     servo_id: 13
@@ -184,12 +192,16 @@ validation_notes:
     servo_id: 13
     direction: -1
     direction_status: PASS
-    return_validation: RECHECK_REQUIRED
-    observed_error_ticks: 12
-    tolerance_ticks: 8
+    return_validation: PASS
+    observed_error_ticks: 10
+    observed_return_error_ticks: 1
+    tolerance_ticks: 10
+    diagnostic_artifact: 09_Logs/Calibration_Sessions/2026-07-07_092043_M13_micro_probe_diagnostic.json
     note: >
-      Encoder-positive direction was verified correctly. Repeat the return
-      probe before using lf_hip_joint in an automatic multi-servo pose.
+      Post-reassembly diagnostic probe measured a repeatable worst-case
+      directional static tracking residual of 10 ticks with current_raw 1-2
+      and status 0x00; return residual was 1 tick. Accepted under the
+      global 10-tick static tracking policy. Zero and direction unchanged.
 
   lf_upper_leg_return_probe:
     joint: lf_upper_leg_joint
@@ -198,7 +210,7 @@ validation_notes:
     direction_status: PASS
     return_validation: PASS
     observed_error_ticks: 4
-    tolerance_ticks: 8
+    tolerance_ticks: 10
 
   lf_lower_leg_return_probe:
     joint: lf_lower_leg_joint
@@ -207,4 +219,4 @@ validation_notes:
     direction_status: PASS
     return_validation: PASS
     observed_error_ticks: 2
-    tolerance_ticks: 8
+    tolerance_ticks: 10

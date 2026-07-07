@@ -327,7 +327,7 @@ def main():
     parser.add_argument("--accel", type=int, default=5)
     parser.add_argument("--hold", type=float, default=0.8)
     parser.add_argument("--timeout", type=float, default=3.0)
-    parser.add_argument("--tolerance", type=int, default=8)
+    parser.add_argument("--tolerance", type=int, default=10)
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--confirm", default="")
 

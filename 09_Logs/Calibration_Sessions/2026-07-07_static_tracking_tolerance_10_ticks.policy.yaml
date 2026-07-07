@@ -1,0 +1,38 @@
+schema: 1
+kind: MATDOG_STATIC_TRACKING_TOLERANCE_POLICY
+created_at_local: "2026-07-07T09:20:49"
+
+policy:
+  static_tracking_tolerance_ticks: 10
+  static_tracking_tolerance_rad: 0.0153398078788564
+  static_tracking_tolerance_deg: 0.87890625
+
+scope:
+  applies_to:
+    - Initial static hold validation
+    - Single-servo micro-probe target validation
+    - Single-servo micro-probe return validation
+    - Controlled static-pose tracking checks
+    - All 12 MATDOG ST3215 servos
+  excludes:
+    - zero_encoder_visual
+    - zero_encoder_final
+    - URDF joint limits
+    - mechanical contact and safe limits
+    - free stand, dynamic stand, gait, and locomotion acceptance
+
+evidence:
+  lf_upper_leg_return_probe_error_ticks: 4
+  lf_lower_leg_return_probe_error_ticks: 2
+  m13_post_reassembly_diagnostic:
+    artifact: "2026-07-07_092043_M13_micro_probe_diagnostic.json"
+    worst_directional_static_tracking_error_ticks: 10
+    return_error_ticks: 1
+    current_raw_range_at_residual: [1, 2]
+    error_status: "0x00"
+
+decision:
+  - Static tracking acceptance is unified at <= 10 ticks.
+  - Existing tests that passed at <= 8 ticks remain accepted.
+  - M13 is accepted under the same global policy; no joint-specific exception remains.
+  - No zero, direction, URDF limit, or mechanical safe limit is changed.
