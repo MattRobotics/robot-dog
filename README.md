@@ -8,11 +8,16 @@ The project combines mechanical design, 3D printing, ST3215 serial-bus servos, k
 
 **MATDOG REV00 kinematic baseline is archived and validated.**
 
-The current priority is locomotion development:
+**Mechanical visual-zero calibration and the encoder-to-radian software
+contract are complete for all 12 leg joints.**
 
-    Servo calibration
-    → stand pose
-    → single-leg FK and IK
+The current priority is single-leg forward kinematics using live encoder state
+read-only, before commanding a stand pose:
+
+    visual-zero calibration + encoder-to-radian contract
+    → single-leg FK (live read-only)
+    → single-leg IK
+    → safe stand pose
     → four-leg coordination
     → foot trajectories
     → trot in place
@@ -34,7 +39,10 @@ Validated so far:
 - CAD-derived URDF structure;
 - 17-link / 16-joint REV00 kinematic model;
 - visual and collision mesh placement;
-- safe upper- and lower-leg joint limits.
+- safe upper- and lower-leg joint limits;
+- mechanical visual-zero capture for all 12 leg joints;
+- encoder-to-radian URDF conversion contract;
+- global static tracking acceptance policy: <=10 ticks (±0.879°).
 
 ## Canonical REV00 Robot Description
 
@@ -92,6 +100,34 @@ Coordinate convention:
     RH: hip M33, upper M32, lower M31
     LH: hip M43, upper M42, lower M41
 
+## Calibration Status
+
+Mechanical visual-zero calibration was captured for all 12 leg joints on
+2026-07-06. The canonical encoder-to-radian contract is now the software
+source of truth for live joint state, FK and later IK.
+
+Static tracking acceptance is unified for all 12 ST3215 servos:
+
+    tolerance = <=10 encoder ticks
+    tolerance = ±0.879°
+
+This applies to static hold, single-servo micro-probe, return validation and
+controlled static-pose checks. It does not change visual or final zero,
+encoder direction, URDF limits, mechanical/contact limits, stand acceptance
+or dynamic locomotion acceptance.
+
+M13 (LF hip) was diagnosed separately after an initially tighter 8-tick
+threshold exposed a repeatable directional residual. Read-only range checks
+excluded a local mechanical stop; the diagnostic probe measured a worst-case
+static residual of 10 ticks with low current and status 0x00. M13 is accepted
+under the same shared policy as every other joint.
+
+Calibration records:
+
+- configuration: `06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml`;
+- tolerance policy: `09_Logs/Calibration_Sessions/2026-07-07_static_tracking_tolerance_10_ticks.policy.yaml`;
+- M13 diagnostic: `09_Logs/Calibration_Sessions/2026-07-07_092043_M13_micro_probe_diagnostic.json`.
+
 ## Repository Structure
 
     01_Docs/        Architecture, technical references and project documentation
@@ -115,9 +151,10 @@ Coordinate convention:
 
 ### Phase 2 — Locomotion
 
-- [ ] Mechanical zero calibration for all 12 joints
+- [x] Mechanical visual-zero calibration for all 12 joints
 - [x] Encoder-to-radian calibration contract (software)
-- [ ] Single-leg forward kinematics
+- [x] Global static tracking policy: <=10 ticks (±0.879°)
+- [ ] Single-leg forward kinematics (live read-only)
 - [ ] Single-leg inverse kinematics
 - [ ] Safe stand pose
 - [ ] Four-leg body-height control
@@ -143,6 +180,7 @@ Coordinate convention:
 - Architecture decisions: 09_Logs/Architecture_Decisions/
 - Validation reports: 09_Logs/Validation_Reports/
 - Development log: 09_Logs/Development_Log/
+- Calibration sessions: 09_Logs/Calibration_Sessions/
 - URDF REV00 package: 03_CAD/URDF/matt_robodog_rev00/
 
 ---
