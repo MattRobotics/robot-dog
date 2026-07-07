@@ -14,14 +14,22 @@ contract are complete for all 12 leg joints.**
 **LF single-leg forward kinematics is verified offline and live read-only from
 Station telemetry, using the canonical REV00 URDF.**
 
-The current priority is single-leg inverse kinematics offline. Live FK must be
-extended to RF, RH and LH before any commanded stand sequence:
+**Contact-reference inverse kinematics is verified offline for LF, RF, RH and
+LH through the canonical REV00 URDF and canonical foot-contact model.**
+
+**Canonical world/contact closure and four-leg FK → IK regressions are locked
+offline.**
+
+The current priority is read-only live FK validation for RF, RH and LH. No
+commanded stand sequence may begin before that phase completes:
 
     visual-zero calibration + encoder-to-radian contract
     → LF FK verified live read-only
-    → single-leg IK offline
+    → four-leg contact-reference IK + canonical world/contact regressions
     → live FK validation for RF / RH / LH
-    → safe stand pose
+    → offline safe stand pose
+    → rest-to-stand trajectory design
+    → controlled static stand validation
     → four-leg coordination
     → foot trajectories
     → trot in place
@@ -166,8 +174,9 @@ Calibration records:
 - [x] Encoder-to-radian calibration contract (software)
 - [x] Global static tracking policy: <=10 ticks (±0.879°)
 - [x] Single-leg forward kinematics (LF live read-only reference)
+- [x] Per-leg contact-reference inverse kinematics (LF / RF / RH / LH, offline)
+- [x] Canonical world/contact/IK closure regressions (offline)
 - [ ] Extend live FK validation to RF, RH and LH
-- [ ] Single-leg inverse kinematics
 - [ ] Safe stand pose
 - [ ] Four-leg body-height control
 - [ ] Trot in place
@@ -194,6 +203,7 @@ Calibration records:
 - Development log: 09_Logs/Development_Log/
 - Calibration sessions: 09_Logs/Calibration_Sessions/
 - LF live FK validation: 09_Logs/Calibration_Sessions/2026-07-07_lf_fk_live_validation.result.yaml
+- Canonical world/contact/IK regressions: 06_Software/Matdog_Core/kinematics/tests/test_matdog_quadruped_leg_contact_ik.py
 - URDF REV00 package: 03_CAD/URDF/matt_robodog_rev00/
 
 ---
