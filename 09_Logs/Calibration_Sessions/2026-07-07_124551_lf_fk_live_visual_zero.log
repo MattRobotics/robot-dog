@@ -1,0 +1,13 @@
+2026-07-07 12:45:51,638 - Connection established
+2026-07-07 12:45:51,639 - Initial setup successful
+2026-07-07 12:45:51,733 - Read stream 1 started
+
+ERRORE: Preflight visual-zero fallito: tolleranza=10 tick, errori={'lf_hip_joint': 4, 'lf_upper_leg_joint': 41, 'lf_lower_leg_joint': 2}
+=== MATDOG LF LIVE FK — READ ONLY ===
+Questo tool non invia torque, target, speed o accel.
+Prima di muovere manualmente il robot, verifica fisicamente torque OFF.
+Bus: 5B14114953
+Config: /home/matteo-manicardi/MATDOG/github/robot-dog/06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml
+URDF: /home/matteo-manicardi/MATDOG/github/robot-dog/03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
+LF servo order: lf_hip_joint=M13, lf_upper_leg_joint=M12, lf_lower_leg_joint=M11
+

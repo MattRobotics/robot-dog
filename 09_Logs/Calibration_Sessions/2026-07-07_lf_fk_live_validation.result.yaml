@@ -1,0 +1,99 @@
+schema: 1
+kind: MATDOG_LF_LIVE_FK_VALIDATION
+created_at_local: "2026-07-07T12:58:20+02:00"
+
+scope:
+  leg: LF
+  root_link: base_link
+  tip_link: lf_foot_link
+  servo_ids:
+    lf_hip_joint: 13
+    lf_upper_leg_joint: 12
+    lf_lower_leg_joint: 11
+  mode: read_only
+  station_is_sole_serial_owner: true
+  torque_or_goal_commands_sent: false
+
+software:
+  urdf: 03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
+  urdf_sha256: 5e28da3dba10fd3f2ea6ebf6f5d6271157bda0b12b82d92aedbe3031643089ef
+  fk_module: 06_Software/Matdog_Core/kinematics/matdog_urdf_fk.py
+  live_viewer: 06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py
+  calibration_config: 06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml
+  test_result: "9 tests passed"
+
+reference_visual_zero:
+  foot_position_base_link_m:
+    x: 0.219500
+    y: 0.094000
+    z: -0.093400
+
+evidence:
+  blocked_preflight_attempts:
+    - log: 09_Logs/Calibration_Sessions/2026-07-07_124551_lf_fk_live_visual_zero.log
+      preflight_errors_ticks:
+        lf_hip_joint: 4
+        lf_upper_leg_joint: 41
+        lf_lower_leg_joint: 2
+      result: BLOCKED_AS_DESIGNED
+      note: >
+        LF upper leg was outside the static visual-zero tolerance and the
+        read-only viewer correctly refused the visual-zero validation.
+
+    - log: 09_Logs/Calibration_Sessions/2026-07-07_125023_lf_fk_live_visual_zero.log
+      preflight_errors_ticks:
+        lf_hip_joint: 11
+        lf_upper_leg_joint: 1
+        lf_lower_leg_joint: 1
+      result: BLOCKED_AS_DESIGNED
+      note: >
+        LF hip was one tick beyond the shared <=10-tick static policy and the
+        read-only viewer correctly refused the visual-zero validation.
+
+  static_visual_zero:
+    log: 09_Logs/Calibration_Sessions/2026-07-07_125208_lf_fk_live_visual_zero.log
+    preflight_errors_ticks:
+      lf_hip_joint: 5
+      lf_upper_leg_joint: 2
+      lf_lower_leg_joint: 1
+    result: PASS
+
+  manual_m12_sweep:
+    log: 09_Logs/Calibration_Sessions/2026-07-07_125446_lf_fk_live_manual_m12_sweep.log
+    observed_m12_range_tick:
+      high: 2821
+      low: 2539
+    observed_m12_range_rad:
+      high: 0.003068
+      low: -0.429515
+    result: >
+      Foot frame changed continuously during manual articulation and returned
+      toward the visual-zero reference when the leg was restored.
+
+  return_to_visual_zero:
+    log: 09_Logs/Calibration_Sessions/2026-07-07_125820_lf_fk_live_return_to_visual_zero.log
+    preflight_errors_ticks:
+      lf_hip_joint: 6
+      lf_upper_leg_joint: 2
+      lf_lower_leg_joint: 1
+    stable_foot_position_base_link_m:
+      x: 0.219147
+      y: 0.095287
+      z: -0.093130
+    static_hold_s: 6.29
+    exit_status: 0
+    result: PASS
+
+decision:
+  status: PASS_LF_LIVE_FK_REFERENCE
+  accepted_claim: >
+    The LF live chain Station telemetry -> calibrated encoder-to-radian
+    conversion -> canonical URDF FK -> lf_foot_link is operational,
+    continuous during manual motion and stable after return to visual zero.
+  not_yet_claimed:
+    - Physical metrological accuracy against an external measured foot position.
+    - Live FK validation for RF, RH and LH.
+    - Single-leg inverse kinematics.
+    - Commanded stand, load-bearing or gait validation.
+  calibration_status_unchanged: VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION
+  next_gate: SINGLE_LEG_IK_OFFLINE

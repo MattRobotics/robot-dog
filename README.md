@@ -11,12 +11,16 @@ The project combines mechanical design, 3D printing, ST3215 serial-bus servos, k
 **Mechanical visual-zero calibration and the encoder-to-radian software
 contract are complete for all 12 leg joints.**
 
-The current priority is single-leg forward kinematics using live encoder state
-read-only, before commanding a stand pose:
+**LF single-leg forward kinematics is verified offline and live read-only from
+Station telemetry, using the canonical REV00 URDF.**
+
+The current priority is single-leg inverse kinematics offline. Live FK must be
+extended to RF, RH and LH before any commanded stand sequence:
 
     visual-zero calibration + encoder-to-radian contract
-    → single-leg FK (live read-only)
-    → single-leg IK
+    → LF FK verified live read-only
+    → single-leg IK offline
+    → live FK validation for RF / RH / LH
     → safe stand pose
     → four-leg coordination
     → foot trajectories
@@ -122,6 +126,13 @@ excluded a local mechanical stop; the diagnostic probe measured a worst-case
 static residual of 10 ticks with low current and status 0x00. M13 is accepted
 under the same shared policy as every other joint.
 
+LF live FK was validated on 2026-07-07 with Station as the sole serial owner.
+The read-only viewer converted live M13/M12/M11 encoder state to URDF joint
+angles and computed `lf_foot_link` in `base_link`. A manual M12 sweep produced
+continuous foot-frame motion; return-to-visual-zero passed with LF errors
+M13=6, M12=2 and M11=1 tick. This validates the LF software and telemetry
+chain, not physical metrology or the other three legs.
+
 Calibration records:
 
 - configuration: `06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml`;
@@ -154,7 +165,8 @@ Calibration records:
 - [x] Mechanical visual-zero calibration for all 12 joints
 - [x] Encoder-to-radian calibration contract (software)
 - [x] Global static tracking policy: <=10 ticks (±0.879°)
-- [ ] Single-leg forward kinematics (live read-only)
+- [x] Single-leg forward kinematics (LF live read-only reference)
+- [ ] Extend live FK validation to RF, RH and LH
 - [ ] Single-leg inverse kinematics
 - [ ] Safe stand pose
 - [ ] Four-leg body-height control
@@ -181,6 +193,7 @@ Calibration records:
 - Validation reports: 09_Logs/Validation_Reports/
 - Development log: 09_Logs/Development_Log/
 - Calibration sessions: 09_Logs/Calibration_Sessions/
+- LF live FK validation: 09_Logs/Calibration_Sessions/2026-07-07_lf_fk_live_validation.result.yaml
 - URDF REV00 package: 03_CAD/URDF/matt_robodog_rev00/
 
 ---
