@@ -1,0 +1,59 @@
+schema: 1
+kind: MATDOG_BODY_STANCE_GEOMETRY
+status: DESIGN_INTENT_CONFIRMED
+
+canonical_urdf:
+  path: 03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
+  sha256: 5e28da3dba10fd3f2ea6ebf6f5d6271157bda0b12b82d92aedbe3031643089ef
+
+frame_contract:
+  root_frame: base_link
+  world_ground_plane: "world Z = 0"
+  urdf_convention: "ROS / URDF: X forward, Y left, Z up; units in meters"
+
+visual_zero:
+  role: "repeatable encoder and mechanical calibration reference"
+  is_flat_quadruped_ground_stance: false
+  stance_interpretation: >
+    Joint visual-zero is intentionally non-coplanar across front and rear
+    feet because the MATDOG front hip axis is elevated relative to the rear.
+
+front_rear_geometry:
+  front_legs: [lf, rf]
+  rear_legs: [rh, lh]
+
+  front_hip_axis_elevation_relative_rear_m: 0.0200
+
+  visual_zero_front_contact_z_minus_rear_contact_z_m: 0.0200
+  expected_visual_zero_contact_spread_m: 0.0200
+
+design_intent:
+  - >
+    The front hip axis is intentionally elevated by 20 mm relative to the rear
+    hip axis.
+  - >
+    The geometry is intended to improve the forward stability margin when the
+    robot later carries head, neck, sensing hardware, or an object held by the
+    mouth.
+  - >
+    The geometry intentionally produces a more animal-like and feline body
+    posture rather than a flat table-like quadruped silhouette.
+  - >
+    The 20 mm elevation is a design intent, not a complete proof of stability.
+    Stability certification requires future mass properties, centre-of-mass,
+    support-polygon, payload, friction, and trajectory validation.
+
+reference_stance:
+  status: PENDING_OFFLINE_SOLVER
+  rule: >
+    A future reference stance must solve body pose and per-leg joint targets
+    together so that all four validated contact references lie on world Z = 0.
+  forbidden_shortcut: >
+    Do not force a single vertical world_from_base translation while every leg
+    remains at visual-zero; that pose is intentionally not coplanar.
+
+non_regression_rules:
+  - "Do not alter encoder visual zeros to compensate for the 20 mm body geometry."
+  - "Do not alter joint direction signs to compensate for the 20 mm body geometry."
+  - "Do not alter foot_joint eccentricity offsets to compensate for the 20 mm body geometry."
+  - "Do not treat visual-zero as the first commanded stand pose."

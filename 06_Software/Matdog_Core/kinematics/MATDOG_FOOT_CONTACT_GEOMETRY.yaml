@@ -1,0 +1,96 @@
+schema: 1
+kind: MATDOG_FOOT_CONTACT_GEOMETRY
+status: CAD_AND_STL_AUDITED
+
+canonical_urdf:
+  path: 03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
+  sha256: 5e28da3dba10fd3f2ea6ebf6f5d6271157bda0b12b82d92aedbe3031643089ef
+
+applies_to_links:
+  - lf_foot_link
+  - rf_foot_link
+  - rh_foot_link
+  - lh_foot_link
+
+foot_joint_bindings:
+  lf:
+    parent_link: lf_lower_leg_link
+    child_link: lf_foot_link
+    origin_xyz_m: [0.1070, -0.0015, -0.0499]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+
+  rf:
+    parent_link: rf_lower_leg_link
+    child_link: rf_foot_link
+    origin_xyz_m: [0.1070, 0.0015, -0.0499]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+
+  rh:
+    parent_link: rh_lower_leg_link
+    child_link: rh_foot_link
+    origin_xyz_m: [0.1070, 0.0015, -0.0499]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+
+  lh:
+    parent_link: lh_lower_leg_link
+    child_link: lh_foot_link
+    origin_xyz_m: [0.1070, -0.0015, -0.0499]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+
+frame:
+  name: foot_link
+  convention: "ROS / URDF: X forward, Y left, Z up; units in meters"
+  nominal_contact_point_m: [0.0, 0.0, 0.0]
+
+rigid_cylinder:
+  center_in_foot_link_m: [0.0, 0.0, 0.0149]
+  axis_in_foot_link_unit: [0.0, 1.0, 0.0]
+  radius_m: 0.0149
+
+support_surface:
+  total_tread_width_m: 0.0139
+  end_fillet_radius_m: 0.0020
+  central_rigid_support_width_m: 0.0099
+  nominal_strip_max_axis_tilt_from_ground_rad: 0.034906585
+
+contact_assumptions:
+  model: "rigid finite cylinder with conservative central support strip"
+  terrain_plane_default: "world Z = 0"
+  tread_centered_on_cylinder_axis: true
+  compliance_modeled: false
+  friction_modeled: false
+  dynamic_contact_patch_modeled: false
+
+mesh_audit:
+  urdf_mesh_scale_m_per_stl_unit: 0.001
+  canonical_mesh_sha256: e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc
+  all_four_foot_meshes_identical: true
+
+  bbox_extent_mm:
+    x: 29.792549
+    y: 25.500000
+    z: 29.786682
+
+  bbox_center_mm:
+    x: 0.000827
+    y: 0.000000
+    z: 14.910076
+
+  lowest_mesh_z_mm: 0.016735
+  lowest_outside_tread_z_mm: 12.370089
+  lowest_outside_minus_tread_mm: 12.353354
+
+cad_validation:
+  cylinder_radius_mm: 14.9
+  cylinder_diameter_mm: 29.8
+  total_tread_width_mm: 13.9
+  end_fillet_radius_mm: 2.0
+  nominal_contact_in_foot_link_mm: [0.0, 0.0, 0.0]
+  cylinder_center_in_foot_link_mm: [0.0, 0.0, 14.9]
+
+notes:
+  - "foot_joint is fixed and contains the real lower-leg-to-foot eccentricity."
+  - "Left legs use Y=-1.5 mm; right legs use Y=+1.5 mm in their local lower-leg frames."
+  - "The analytic cylinder remains centered in foot_link and must not duplicate the foot_joint lateral offset."
+  - "The low-band STL centroid is intentionally not used as a kinematic offset because it depends on mesh tessellation."
+  - "Collision mesh is for collision validation; analytic cylinder is for stable contact geometry."
