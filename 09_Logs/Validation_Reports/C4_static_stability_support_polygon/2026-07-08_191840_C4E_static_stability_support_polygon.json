@@ -1,0 +1,4682 @@
+{
+  "command_eligibility": {
+    "command_eligible": false,
+    "reason": "C4-E validates offline static support polygon only using a COM proxy. Hardware safe mode, operator approval and supervised execution checks are still required before any stand command."
+  },
+  "created_utc": "2026-07-08T19:18:40.071686+00:00",
+  "frames": [
+    {
+      "body_z_m": 0.1,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013564183905113,
+            0.09400007177349694
+          ],
+          "lh": [
+            -0.1437123690537963,
+            0.09400008934311888
+          ],
+          "rf": [
+            0.13013564183905113,
+            -0.09400007177349694
+          ],
+          "rh": [
+            -0.1437123690537963,
+            -0.09400008934311888
+          ]
+        },
+        "min_support_margin_m": 0.07400007883961197,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437123690537963,
+            -0.09400008934311888
+          ],
+          [
+            0.13013564183905113,
+            -0.09400007177349694
+          ],
+          [
+            0.13013564183905113,
+            0.09400007177349694
+          ],
+          [
+            -0.1437123690537963,
+            0.09400008934311888
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008012277787,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400007883961197,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400007883961197,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008140594384,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008140594384,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 0
+    },
+    {
+      "body_z_m": 0.101,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301356365328779,
+            0.09400007208099188
+          ],
+          "lh": [
+            -0.14371241836652243,
+            0.09400008884421761
+          ],
+          "rf": [
+            0.1301356365328779,
+            -0.09400007208099188
+          ],
+          "rh": [
+            -0.14371241836652243,
+            -0.09400008884421761
+          ]
+        },
+        "min_support_margin_m": 0.07400007882279072,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371241836652243,
+            -0.09400008884421761
+          ],
+          [
+            0.1301356365328779,
+            -0.09400007208099188
+          ],
+          [
+            0.1301356365328779,
+            0.09400007208099188
+          ],
+          [
+            -0.14371241836652243,
+            0.09400008884421761
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008004706271,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400007882279072,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400007882279072,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008127133478,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008127133478,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 1
+    },
+    {
+      "body_z_m": 0.10200000000000001,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013563130032887,
+            0.09400007241010806
+          ],
+          "lh": [
+            -0.14371246632708332,
+            0.09400008837926459
+          ],
+          "rf": [
+            0.13013563130032887,
+            -0.09400007241010806
+          ],
+          "rh": [
+            -0.14371246632708332,
+            -0.09400008837926459
+          ]
+        },
+        "min_support_margin_m": 0.07400007883254851,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371246632708332,
+            -0.09400008837926459
+          ],
+          [
+            0.13013563130032887,
+            -0.09400007241010806
+          ],
+          [
+            0.13013563130032887,
+            0.09400007241010806
+          ],
+          [
+            -0.14371246632708332,
+            0.09400008837926459
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400007999882692,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400007883254851,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400007883254851,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008116510538,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008116510538,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 2
+    },
+    {
+      "body_z_m": 0.10300000000000001,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013562613612967,
+            0.09400007276153648
+          ],
+          "lh": [
+            -0.14371251296112098,
+            0.09400008794753062
+          ],
+          "rf": [
+            0.13013562613612967,
+            -0.09400007276153648
+          ],
+          "rh": [
+            -0.14371251296112098,
+            -0.09400008794753062
+          ]
+        },
+        "min_support_margin_m": 0.07400007886900518,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371251296112098,
+            -0.09400008794753062
+          ],
+          [
+            0.13013562613612967,
+            -0.09400007276153648
+          ],
+          [
+            0.13013562613612967,
+            0.09400007276153648
+          ],
+          [
+            -0.14371251296112098,
+            0.09400008794753062
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400007997808657,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400007886900518,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400007886900518,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008108716802,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008108716802,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 3
+    },
+    {
+      "body_z_m": 0.10400000000000001,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013562103509374,
+            0.09400007313599053
+          ],
+          "lh": [
+            -0.14371255829316754,
+            0.09400008754836532
+          ],
+          "rf": [
+            0.13013562103509374,
+            -0.09400007313599053
+          ],
+          "rh": [
+            -0.14371255829316754,
+            -0.09400008754836532
+          ]
+        },
+        "min_support_margin_m": 0.07400007893232564,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371255829316754,
+            -0.09400008754836532
+          ],
+          [
+            0.13013562103509374,
+            -0.09400007313599053
+          ],
+          [
+            0.13013562103509374,
+            0.09400007313599053
+          ],
+          [
+            -0.14371255829316754,
+            0.09400008754836532
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.094000079984907,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400007893232564,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400007893232564,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008103748841,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008103748841,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 4
+    },
+    {
+      "body_z_m": 0.10500000000000001,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013561599198242,
+            0.09400007353424365
+          ],
+          "lh": [
+            -0.14371260234657712,
+            0.0940000871811917
+          ],
+          "rf": [
+            0.13013561599198242,
+            -0.09400007353424365
+          ],
+          "rh": [
+            -0.14371260234657712,
+            -0.0940000871811917
+          ]
+        },
+        "min_support_margin_m": 0.07400007902274021,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371260234657712,
+            -0.0940000871811917
+          ],
+          [
+            0.13013561599198242,
+            -0.09400007353424365
+          ],
+          [
+            0.13013561599198242,
+            0.09400007353424365
+          ],
+          [
+            -0.14371260234657712,
+            0.0940000871811917
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008001941988,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400007902274021,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400007902274021,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008101609962,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008101609962,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 5
+    },
+    {
+      "body_z_m": 0.10600000000000001,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013561100148147,
+            0.09400007395715394
+          ],
+          "lh": [
+            -0.14371264514358162,
+            0.09400008684546149
+          ],
+          "rf": [
+            0.13013561100148147,
+            -0.09400007395715394
+          ],
+          "rh": [
+            -0.14371264514358162,
+            -0.09400008684546149
+          ]
+        },
+        "min_support_margin_m": 0.07400007914054135,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371264514358162,
+            -0.09400008684546149
+          ],
+          [
+            0.13013561100148147,
+            -0.09400007395715394
+          ],
+          [
+            0.13013561100148147,
+            0.09400007395715394
+          ],
+          [
+            -0.14371264514358162,
+            0.09400008684546149
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.094000080081815,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400007914054135,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400007914054135,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008102308868,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008102308868,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 6
+    },
+    {
+      "body_z_m": 0.10700000000000001,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013560605818753,
+            0.09400007440561074
+          ],
+          "lh": [
+            -0.14371268670541854,
+            0.09400008654073223
+          ],
+          "rf": [
+            0.13013560605818753,
+            -0.09400007440561074
+          ],
+          "rh": [
+            -0.14371268670541854,
+            -0.09400008654073223
+          ]
+        },
+        "min_support_margin_m": 0.07400007928608279,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371268670541854,
+            -0.09400008654073223
+          ],
+          [
+            0.13013560605818753,
+            -0.09400007440561074
+          ],
+          [
+            0.13013560605818753,
+            0.09400007440561074
+          ],
+          [
+            -0.14371268670541854,
+            0.09400008654073223
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008017234877,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400007928608279,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400007928608279,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008105861478,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008105861478,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 7
+    },
+    {
+      "body_z_m": 0.108,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013560115653242,
+            0.09400007488058325
+          ],
+          "lh": [
+            -0.14371272705207633,
+            0.09400008626657469
+          ],
+          "rf": [
+            0.13013560115653242,
+            -0.09400007488058325
+          ],
+          "rh": [
+            -0.14371272705207633,
+            -0.09400008626657469
+          ]
+        },
+        "min_support_margin_m": 0.07400007945977131,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371272705207633,
+            -0.09400008626657469
+          ],
+          [
+            0.13013560115653242,
+            -0.09400007488058325
+          ],
+          [
+            0.13013560115653242,
+            0.09400007488058325
+          ],
+          [
+            -0.14371272705207633,
+            0.09400008626657469
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008029132587,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400007945977131,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400007945977131,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008112288045,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008112288045,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 8
+    },
+    {
+      "body_z_m": 0.10900000000000001,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013559629091914,
+            0.09400007538311624
+          ],
+          "lh": [
+            -0.14371276620257548,
+            0.09400008602264119
+          ],
+          "rf": [
+            0.13013559629091914,
+            -0.09400007538311624
+          ],
+          "rh": [
+            -0.14371276620257548,
+            -0.09400008602264119
+          ]
+        },
+        "min_support_margin_m": 0.07400007966209164,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371276620257548,
+            -0.09400008602264119
+          ],
+          [
+            0.13013559629091914,
+            -0.09400007538311624
+          ],
+          [
+            0.13013559629091914,
+            0.09400007538311624
+          ],
+          [
+            -0.14371276620257548,
+            0.09400008602264119
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008043912932,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400007966209164,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400007966209164,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008121616702,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008121616702,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 9
+    },
+    {
+      "body_z_m": 0.11,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301355914555695,
+            0.0940000759143289
+          ],
+          "lh": [
+            -0.14371280417466034,
+            0.0940000858086599
+          ],
+          "rf": [
+            0.1301355914555695,
+            -0.0940000759143289
+          ],
+          "rh": [
+            -0.14371280417466034,
+            -0.0940000858086599
+          ]
+        },
+        "min_support_margin_m": 0.07400007989360356,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371280417466034,
+            -0.0940000858086599
+          ],
+          [
+            0.1301355914555695,
+            -0.0940000759143289
+          ],
+          [
+            0.1301355914555695,
+            0.0940000759143289
+          ],
+          [
+            -0.14371280417466034,
+            0.0940000858086599
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008061621731,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400007989360356,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400007989360356,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008133883108,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008133883108,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 10
+    },
+    {
+      "body_z_m": 0.111,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013558664443636,
+            0.09400007647543167
+          ],
+          "lh": [
+            -0.1437128409851216,
+            0.09400008562436843
+          ],
+          "rf": [
+            0.13013558664443636,
+            -0.09400007647543167
+          ],
+          "rh": [
+            -0.1437128409851216,
+            -0.09400008562436843
+          ]
+        },
+        "min_support_margin_m": 0.07400008015492515,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437128409851216,
+            -0.09400008562436843
+          ],
+          [
+            0.13013558664443636,
+            -0.09400007647543167
+          ],
+          [
+            0.13013558664443636,
+            0.09400007647543167
+          ],
+          [
+            -0.1437128409851216,
+            0.09400008562436843
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008082310038,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008015492515,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008015492515,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.0740000814912756,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.0740000814912756,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 11
+    },
+    {
+      "body_z_m": 0.112,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301355818513823,
+            0.09400007706771533
+          ],
+          "lh": [
+            -0.14371287664961868,
+            0.09400008546960027
+          ],
+          "rf": [
+            0.1301355818513823,
+            -0.09400007706771533
+          ],
+          "rh": [
+            -0.14371287664961868,
+            -0.09400008546960027
+          ]
+        },
+        "min_support_margin_m": 0.07400008044676111,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371287664961868,
+            -0.09400008546960027
+          ],
+          [
+            0.1301355818513823,
+            -0.09400007706771533
+          ],
+          [
+            0.1301355818513823,
+            0.09400007706771533
+          ],
+          [
+            -0.14371287664961868,
+            0.09400008546960027
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008106037674,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008044676111,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008044676111,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.0740000816739924,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.0740000816739924,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 12
+    },
+    {
+      "body_z_m": 0.113,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013557706995058,
+            0.09400007769258775
+          ],
+          "lh": [
+            -0.14371291118261942,
+            0.09400008534424151
+          ],
+          "rf": [
+            0.13013557706995058,
+            -0.09400007769258775
+          ],
+          "rh": [
+            -0.14371291118261942,
+            -0.09400008534424151
+          ]
+        },
+        "min_support_margin_m": 0.07400008076990724,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371291118261942,
+            -0.09400008534424151
+          ],
+          [
+            0.13013557706995058,
+            -0.09400007769258775
+          ],
+          [
+            0.13013557706995058,
+            0.09400007769258775
+          ],
+          [
+            -0.14371291118261942,
+            0.09400008534424151
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008132873114,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008076990724,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008076990724,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008188755501,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008188755501,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 13
+    },
+    {
+      "body_z_m": 0.114,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013557229340902,
+            0.09400007835154417
+          ],
+          "lh": [
+            -0.14371294459759876,
+            0.09400008524820418
+          ],
+          "rf": [
+            0.13013557229340902,
+            -0.09400007835154417
+          ],
+          "rh": [
+            -0.14371294459759876,
+            -0.09400008524820418
+          ]
+        },
+        "min_support_margin_m": 0.0740000811252221,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371294459759876,
+            -0.09400008524820418
+          ],
+          [
+            0.13013557229340902,
+            -0.09400007835154417
+          ],
+          [
+            0.13013557229340902,
+            0.09400007835154417
+          ],
+          [
+            -0.14371294459759876,
+            0.09400008524820418
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008162890641,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.0740000811252221,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.0740000811252221,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008213259072,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008213259072,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 14
+    },
+    {
+      "body_z_m": 0.115,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301355675146637,
+            0.09400007904621537
+          ],
+          "lh": [
+            -0.14371297690675924,
+            0.09400008518149244
+          ],
+          "rf": [
+            0.1301355675146637,
+            -0.09400007904621537
+          ],
+          "rh": [
+            -0.14371297690675924,
+            -0.09400008518149244
+          ]
+        },
+        "min_support_margin_m": 0.07400008151368226,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371297690675924,
+            -0.09400008518149244
+          ],
+          [
+            0.1301355675146637,
+            -0.09400007904621537
+          ],
+          [
+            0.1301355675146637,
+            0.09400007904621537
+          ],
+          [
+            -0.14371297690675924,
+            0.09400008518149244
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008196176038,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008151368226,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008151368226,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008240983849,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008240983849,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 15
+    },
+    {
+      "body_z_m": 0.11599999999999999,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301355627263867,
+            0.0940000797783492
+          ],
+          "lh": [
+            -0.14371300812130175,
+            0.09400008514414479
+          ],
+          "rf": [
+            0.1301355627263867,
+            -0.0940000797783492
+          ],
+          "rh": [
+            -0.14371300812130175,
+            -0.09400008514414479
+          ]
+        },
+        "min_support_margin_m": 0.07400008193634809,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371300812130175,
+            -0.09400008514414479
+          ],
+          [
+            0.1301355627263867,
+            -0.0940000797783492
+          ],
+          [
+            0.1301355627263867,
+            0.0940000797783492
+          ],
+          [
+            -0.14371300812130175,
+            0.09400008514414479
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008232822858,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008193634809,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008193634809,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008272010906,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008272010906,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 16
+    },
+    {
+      "body_z_m": 0.11699999999999999,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301355579207136,
+            0.09400008054983884
+          ],
+          "lh": [
+            -0.1437130382511497,
+            0.09400008513626665
+          ],
+          "rf": [
+            0.1301355579207136,
+            -0.09400008054983884
+          ],
+          "rh": [
+            -0.1437130382511497,
+            -0.09400008513626665
+          ]
+        },
+        "min_support_margin_m": 0.07400008239439379,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437130382511497,
+            -0.09400008513626665
+          ],
+          [
+            0.1301355579207136,
+            -0.09400008054983884
+          ],
+          [
+            0.1301355579207136,
+            0.09400008054983884
+          ],
+          [
+            -0.1437130382511497,
+            0.09400008513626665
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008272935463,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008239439379,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008239439379,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008306431546,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008306431546,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 17
+    },
+    {
+      "body_z_m": 0.118,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013555308936245,
+            0.09400008136273712
+          ],
+          "lh": [
+            -0.1437130673051326,
+            0.094000085158023
+          ],
+          "rf": [
+            0.13013555308936245,
+            -0.09400008136273712
+          ],
+          "rh": [
+            -0.1437130673051326,
+            -0.094000085158023
+          ]
+        },
+        "min_support_margin_m": 0.07400008288911292,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437130673051326,
+            -0.094000085158023
+          ],
+          [
+            0.13013555308936245,
+            -0.09400008136273712
+          ],
+          [
+            0.13013555308936245,
+            0.09400008136273712
+          ],
+          [
+            -0.1437130673051326,
+            0.094000085158023
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008316629423,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008288911292,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008288911292,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008344347553,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008344347553,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 18
+    },
+    {
+      "body_z_m": 0.119,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013554822352708,
+            0.09400008221927084
+          ],
+          "lh": [
+            -0.14371309529081605,
+            0.09400008520962809
+          ],
+          "rf": [
+            0.13013554822352708,
+            -0.09400008221927084
+          ],
+          "rh": [
+            -0.14371309529081605,
+            -0.09400008520962809
+          ]
+        },
+        "min_support_margin_m": 0.07400008342192288,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371309529081605,
+            -0.09400008520962809
+          ],
+          [
+            0.13013554822352708,
+            -0.09400008221927084
+          ],
+          [
+            0.13013554822352708,
+            0.09400008221927084
+          ],
+          [
+            -0.14371309529081605,
+            0.09400008520962809
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008364031778,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008342192288,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008342192288,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008385871266,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008385871266,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 19
+    },
+    {
+      "body_z_m": 0.12,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301355433138464,
+            0.09400008312182453
+          ],
+          "lh": [
+            -0.1437131222146075,
+            0.09400008529137081
+          ],
+          "rf": [
+            0.1301355433138464,
+            -0.09400008312182453
+          ],
+          "rh": [
+            -0.1437131222146075,
+            -0.09400008529137081
+          ]
+        },
+        "min_support_margin_m": 0.07400008399436542,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437131222146075,
+            -0.09400008529137081
+          ],
+          [
+            0.1301355433138464,
+            -0.09400008312182453
+          ],
+          [
+            0.1301355433138464,
+            0.09400008312182453
+          ],
+          [
+            -0.1437131222146075,
+            0.09400008529137081
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008415281397,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008399436542,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008399436542,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008431126252,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008431126252,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 20
+    },
+    {
+      "body_z_m": 0.121,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301355383501792,
+            0.094000084073039
+          ],
+          "lh": [
+            -0.14371314808152572,
+            0.09400008540360315
+          ],
+          "rf": [
+            0.1301355383501792,
+            -0.094000084073039
+          ],
+          "rh": [
+            -0.14371314808152572,
+            -0.09400008540360315
+          ]
+        },
+        "min_support_margin_m": 0.07400008460816078,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371314808152572,
+            -0.09400008540360315
+          ],
+          [
+            0.1301355383501792,
+            -0.094000084073039
+          ],
+          [
+            0.1301355383501792,
+            0.094000084073039
+          ],
+          [
+            -0.14371314808152572,
+            0.09400008540360315
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008470533593,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008460816078,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008460816078,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008480251105,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008480251105,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 21
+    },
+    {
+      "body_z_m": 0.122,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013553332172123,
+            0.0940000850757107
+          ],
+          "lh": [
+            -0.1437131728954497,
+            0.09400008554673174
+          ],
+          "rf": [
+            0.13013553332172123,
+            -0.0940000850757107
+          ],
+          "rh": [
+            -0.1437131728954497,
+            -0.09400008554673174
+          ]
+        },
+        "min_support_margin_m": 0.07400008526514432,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437131728954497,
+            -0.09400008554673174
+          ],
+          [
+            0.13013553332172123,
+            -0.0940000850757107
+          ],
+          [
+            0.13013553332172123,
+            0.0940000850757107
+          ],
+          [
+            -0.1437131728954497,
+            0.09400008554673174
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008529954441,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008526514432,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008526514432,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.0740000853339445,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.0740000853339445,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 22
+    },
+    {
+      "body_z_m": 0.123,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301355282167945,
+            0.09400008613296022
+          ],
+          "lh": [
+            -0.1437131966587833,
+            0.09400008572124043
+          ],
+          "rf": [
+            0.1301355282167945,
+            -0.09400008613296022
+          ],
+          "rh": [
+            -0.1437131966587833,
+            -0.09400008572124043
+          ]
+        },
+        "min_support_margin_m": 0.0740000859072379,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437131966587833,
+            -0.09400008572124043
+          ],
+          [
+            0.1301355282167945,
+            -0.09400008613296022
+          ],
+          [
+            0.1301355282167945,
+            0.09400008613296022
+          ],
+          [
+            -0.1437131966587833,
+            0.09400008572124043
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008593730705,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008596737619,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008596737619,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.0740000859072379,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.0740000859072379,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 23
+    },
+    {
+      "body_z_m": 0.124,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013552302280854,
+            0.09400008724813398
+          ],
+          "lh": [
+            -0.14371321937263953,
+            0.09400008592768269
+          ],
+          "rf": [
+            0.13013552302280854,
+            -0.09400008724813398
+          ],
+          "rh": [
+            -0.14371321937263953,
+            -0.09400008592768269
+          ]
+        },
+        "min_support_margin_m": 0.07400008652420643,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371321937263953,
+            -0.09400008592768269
+          ],
+          [
+            0.13013552302280854,
+            -0.09400008724813398
+          ],
+          [
+            0.13013552302280854,
+            0.09400008724813398
+          ],
+          [
+            -0.14371321937263953,
+            0.09400008592768269
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008662064299,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008671707953,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008671707953,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008652420643,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008652420643,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 24
+    },
+    {
+      "body_z_m": 0.125,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301355177260292,
+            0.09400008842491804
+          ],
+          "lh": [
+            -0.14371324103657085,
+            0.0940000861666817
+          ],
+          "rf": [
+            0.1301355177260292,
+            -0.09400008842491804
+          ],
+          "rh": [
+            -0.14371324103657085,
+            -0.0940000861666817
+          ]
+        },
+        "min_support_margin_m": 0.07400008718685698,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371324103657085,
+            -0.0940000861666817
+          ],
+          [
+            0.1301355177260292,
+            -0.09400008842491804
+          ],
+          [
+            0.1301355177260292,
+            0.09400008842491804
+          ],
+          [
+            -0.14371324103657085,
+            0.0940000861666817
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.0940000873517828,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.0740000875167086,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.0740000875167086,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008718685698,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008718685698,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 25
+    },
+    {
+      "body_z_m": 0.126,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013551231147902,
+            0.0940000896673149
+          ],
+          "lh": [
+            -0.1437132616486953,
+            0.0940000864389584
+          ],
+          "rf": [
+            0.13013551231147902,
+            -0.0940000896673149
+          ],
+          "rh": [
+            -0.1437132616486953,
+            -0.0940000864389584
+          ]
+        },
+        "min_support_margin_m": 0.07400008789739293,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437132616486953,
+            -0.0940000864389584
+          ],
+          [
+            0.13013551231147902,
+            -0.0940000896673149
+          ],
+          [
+            0.13013551231147902,
+            0.0940000896673149
+          ],
+          [
+            -0.1437132616486953,
+            0.0940000864389584
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008813316953,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008836894612,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008836894612,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008789739293,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008789739293,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 26
+    },
+    {
+      "body_z_m": 0.127,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013550676282504,
+            0.09400009097975005
+          ],
+          "lh": [
+            -0.14371328120559715,
+            0.09400008674530394
+          ],
+          "rf": [
+            0.13013550676282504,
+            -0.09400009097975005
+          ],
+          "rh": [
+            -0.14371328120559715,
+            -0.09400008674530394
+          ]
+        },
+        "min_support_margin_m": 0.0740000886582473,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371328120559715,
+            -0.09400008674530394
+          ],
+          [
+            0.13013550676282504,
+            -0.09400009097975005
+          ],
+          [
+            0.13013550676282504,
+            0.09400009097975005
+          ],
+          [
+            -0.14371328120559715,
+            0.09400008674530394
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008896750163,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400008927675596,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400008927675596,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.0740000886582473,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.0740000886582473,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 27
+    },
+    {
+      "body_z_m": 0.128,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013550106211272,
+            0.09400009236705988
+          ],
+          "lh": [
+            -0.14371329970211716,
+            0.09400008708659166
+          ],
+          "rf": [
+            0.13013550106211272,
+            -0.09400009236705988
+          ],
+          "rh": [
+            -0.14371329970211716,
+            -0.09400008708659166
+          ]
+        },
+        "min_support_margin_m": 0.07400008947208372,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371329970211716,
+            -0.09400008708659166
+          ],
+          [
+            0.13013550106211272,
+            -0.09400009236705988
+          ],
+          [
+            0.13013550106211272,
+            0.09400009236705988
+          ],
+          [
+            -0.14371329970211716,
+            0.09400008708659166
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400008985773217,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400009024338063,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400009024338063,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400008947208372,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400008947208372,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 28
+    },
+    {
+      "body_z_m": 0.129,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013549518967868,
+            0.09400009383454322
+          ],
+          "lh": [
+            -0.14371331713135022,
+            0.09400008746380083
+          ],
+          "rf": [
+            0.13013549518967868,
+            -0.09400009383454322
+          ],
+          "rh": [
+            -0.14371331713135022,
+            -0.09400008746380083
+          ]
+        },
+        "min_support_margin_m": 0.0740000903418329,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371331713135022,
+            -0.09400008746380083
+          ],
+          [
+            0.13013549518967868,
+            -0.09400009383454322
+          ],
+          [
+            0.13013549518967868,
+            0.09400009383454322
+          ],
+          [
+            -0.14371331713135022,
+            0.09400008746380083
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400009080710733,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400009127238175,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400009127238175,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.0740000903418329,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.0740000903418329,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 29
+    },
+    {
+      "body_z_m": 0.13,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013548912368292,
+            0.09400009538807362
+          ],
+          "lh": [
+            -0.14371333348461257,
+            0.09400008787801312
+          ],
+          "rf": [
+            0.13013548912368292,
+            -0.09400009538807362
+          ],
+          "rh": [
+            -0.14371333348461257,
+            -0.09400008787801312
+          ]
+        },
+        "min_support_margin_m": 0.07400009127074127,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371333348461257,
+            -0.09400008787801312
+          ],
+          [
+            0.13013548912368292,
+            -0.09400009538807362
+          ],
+          [
+            0.13013548912368292,
+            0.09400009538807362
+          ],
+          [
+            -0.14371333348461257,
+            0.09400008787801312
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400009181922349,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400009236770572,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400009236770572,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400009127074127,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400009127074127,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 30
+    },
+    {
+      "body_z_m": 0.131,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013548284008886,
+            0.09400009703414401
+          ],
+          "lh": [
+            -0.14371334875124334,
+            0.0940000883304045
+          ],
+          "rf": [
+            0.13013548284008886,
+            -0.09400009703414401
+          ],
+          "rh": [
+            -0.14371334875124334,
+            -0.0940000883304045
+          ]
+        },
+        "min_support_margin_m": 0.07400009226238678,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371334875124334,
+            -0.0940000883304045
+          ],
+          [
+            0.13013548284008886,
+            -0.09400009703414401
+          ],
+          [
+            0.13013548284008886,
+            0.09400009703414401
+          ],
+          [
+            -0.14371334875124334,
+            0.0940000883304045
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400009289804691,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400009353370708,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400009353370708,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400009226238678,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400009226238678,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 31
+    },
+    {
+      "body_z_m": 0.132,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013547631194902,
+            0.0940000987799102
+          ],
+          "lh": [
+            -0.143713362918444,
+            0.0940000888222843
+          ],
+          "rf": [
+            0.13013547631194902,
+            -0.0940000987799102
+          ],
+          "rh": [
+            -0.143713362918444,
+            -0.0940000888222843
+          ]
+        },
+        "min_support_margin_m": 0.07400009332071993,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.143713362918444,
+            -0.0940000888222843
+          ],
+          [
+            0.13013547631194902,
+            -0.0940000987799102
+          ],
+          [
+            0.13013547631194902,
+            0.0940000987799102
+          ],
+          [
+            -0.143713362918444,
+            0.0940000888222843
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400009404795512,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400009477519034,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400009477519034,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400009332071993,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400009332071993,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 32
+    },
+    {
+      "body_z_m": 0.133,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013546950946825,
+            0.09400010063336506
+          ],
+          "lh": [
+            -0.1437133759713208,
+            0.0940000893550751
+          ],
+          "rf": [
+            0.13013546950946825,
+            -0.09400010063336506
+          ],
+          "rh": [
+            -0.1437133759713208,
+            -0.0940000893550751
+          ]
+        },
+        "min_support_margin_m": 0.07400009445013149,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437133759713208,
+            -0.0940000893550751
+          ],
+          [
+            0.13013546950946825,
+            -0.09400010063336506
+          ],
+          [
+            0.13013546950946825,
+            0.09400010063336506
+          ],
+          [
+            -0.1437133759713208,
+            0.0940000893550751
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400009527381871,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400009609750596,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400009609750596,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400009445013149,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400009445013149,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 33
+    },
+    {
+      "body_z_m": 0.134,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013546239908824,
+            0.09400010260336499
+          ],
+          "lh": [
+            -0.1437133878925247,
+            0.09400008993034174
+          ],
+          "rf": [
+            0.13013546239908824,
+            -0.09400010260336499
+          ],
+          "rh": [
+            -0.1437133878925247,
+            -0.09400008993034174
+          ]
+        },
+        "min_support_margin_m": 0.07400009565548032,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437133878925247,
+            -0.09400008993034174
+          ],
+          [
+            0.13013546239908824,
+            -0.09400010260336499
+          ],
+          [
+            0.13013546239908824,
+            0.09400010260336499
+          ],
+          [
+            -0.1437133878925247,
+            0.09400008993034174
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400009658102906,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400009750657785,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400009750657785,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400009565548032,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400009565548032,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 34
+    },
+    {
+      "body_z_m": 0.135,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013545494318024,
+            0.09400010469982671
+          ],
+          "lh": [
+            -0.1437133986620756,
+            0.09400009054979154
+          ],
+          "rf": [
+            0.13013545494318024,
+            -0.09400010469982671
+          ],
+          "rh": [
+            -0.1437133986620756,
+            -0.09400009054979154
+          ]
+        },
+        "min_support_margin_m": 0.07400009694218242,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437133986620756,
+            -0.09400009054979154
+          ],
+          [
+            0.13013545494318024,
+            -0.09400010469982671
+          ],
+          [
+            0.13013545494318024,
+            0.09400010469982671
+          ],
+          [
+            -0.1437133986620756,
+            0.09400009054979154
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400009797560174,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400009900902112,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400009900902112,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400009694218242,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400009694218242,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 35
+    },
+    {
+      "body_z_m": 0.136,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013544709944105,
+            0.09400010693385707
+          ],
+          "lh": [
+            -0.14371340825745738,
+            0.09400009121529465
+          ],
+          "rf": [
+            0.13013544709944105,
+            -0.09400010693385707
+          ],
+          "rh": [
+            -0.14371340825745738,
+            -0.09400009121529465
+          ]
+        },
+        "min_support_margin_m": 0.07400009831628068,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371340825745738,
+            -0.09400009121529465
+          ],
+          [
+            0.13013544709944105,
+            -0.09400010693385707
+          ],
+          [
+            0.13013544709944105,
+            0.09400010693385707
+          ],
+          [
+            -0.14371340825745738,
+            0.09400009121529465
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400009946425422,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400010061222782,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400010061222782,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400009831628068,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400009831628068,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 36
+    },
+    {
+      "body_z_m": 0.137,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013543881987744,
+            0.09400010931792668
+          ],
+          "lh": [
+            -0.1437134166530772,
+            0.09400009192889588
+          ],
+          "rf": [
+            0.13013543881987744,
+            -0.09400010931792668
+          ],
+          "rh": [
+            -0.1437134166530772,
+            -0.09400009192889588
+          ]
+        },
+        "min_support_margin_m": 0.07400009978452986,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437134166530772,
+            -0.09400009192889588
+          ],
+          [
+            0.13013543881987744,
+            -0.09400010931792668
+          ],
+          [
+            0.13013543881987744,
+            0.09400010931792668
+          ],
+          [
+            -0.1437134166530772,
+            0.09400009192889588
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400010105450268,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400010232447558,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400010232447558,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400009978452986,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400009978452986,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 37
+    },
+    {
+      "body_z_m": 0.138,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013543004989586,
+            0.09400011186610906
+          ],
+          "lh": [
+            -0.14371342382009503,
+            0.09400009269281943
+          ],
+          "rf": [
+            0.13013543004989586,
+            -0.09400011186610906
+          ],
+          "rh": [
+            -0.14371342382009503,
+            -0.09400009269281943
+          ]
+        },
+        "min_support_margin_m": 0.07400010135450716,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371342382009503,
+            -0.09400009269281943
+          ],
+          [
+            0.13013543004989586,
+            -0.09400011186610906
+          ],
+          [
+            0.13013543004989586,
+            0.09400011186610906
+          ],
+          [
+            -0.14371342382009503,
+            0.09400009269281943
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400010275478975,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400010415507241,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400010415507241,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400010135450716,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400010135450716,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 38
+    },
+    {
+      "body_z_m": 0.139,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013542072734413,
+            0.09400011459427976
+          ],
+          "lh": [
+            -0.14371342972623374,
+            0.0940000935095218
+          ],
+          "rf": [
+            0.13013542072734413,
+            -0.09400011459427976
+          ],
+          "rh": [
+            -0.14371342972623374,
+            -0.0940000935095218
+          ]
+        },
+        "min_support_margin_m": 0.07400010303473127,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371342972623374,
+            -0.0940000935095218
+          ],
+          [
+            0.13013542072734413,
+            -0.09400011459427976
+          ],
+          [
+            0.13013542072734413,
+            0.09400011459427976
+          ],
+          [
+            -0.14371342972623374,
+            0.0940000935095218
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.0940001045746141,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400010611449705,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400010611449705,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400010303473127,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400010303473127,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 39
+    },
+    {
+      "body_z_m": 0.13999999999999999,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013541078098137,
+            0.09400011752053848
+          ],
+          "lh": [
+            -0.14371343433540448,
+            0.0940000943816462
+          ],
+          "rf": [
+            0.13013541078098137,
+            -0.09400011752053848
+          ],
+          "rh": [
+            -0.14371343433540448,
+            -0.0940000943816462
+          ]
+        },
+        "min_support_margin_m": 0.07400010483482797,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371343433540448,
+            -0.0940000943816462
+          ],
+          [
+            0.13013541078098137,
+            -0.09400011752053848
+          ],
+          [
+            0.13013541078098137,
+            0.09400011752053848
+          ],
+          [
+            -0.14371343433540448,
+            0.0940000943816462
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.0940001065247304,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400010821463296,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400010821463296,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400010483482797,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400010483482797,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 40
+    },
+    {
+      "body_z_m": 0.141,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013540012870162,
+            0.09400012066550481
+          ],
+          "lh": [
+            -0.14371343760745434,
+            0.09400009531214243
+          ],
+          "rf": [
+            0.13013540012870162,
+            -0.09400012066550481
+          ],
+          "rh": [
+            -0.14371343760745434,
+            -0.09400009531214243
+          ]
+        },
+        "min_support_margin_m": 0.07400010676572957,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371343760745434,
+            -0.09400009531214243
+          ],
+          [
+            0.13013540012870162,
+            -0.09400012066550481
+          ],
+          [
+            0.13013540012870162,
+            0.09400012066550481
+          ],
+          [
+            -0.14371343760745434,
+            0.09400009531214243
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400010861736141,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400011046899341,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400011046899341,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400010676572957,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400010676572957,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 41
+    },
+    {
+      "body_z_m": 0.142,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.130135388675755,
+            0.09400012405280558
+          ],
+          "lh": [
+            -0.14371343949744567,
+            0.09400009630419644
+          ],
+          "rf": [
+            0.130135388675755,
+            -0.09400012405280558
+          ],
+          "rh": [
+            -0.14371343949744567,
+            -0.09400009630419644
+          ]
+        },
+        "min_support_margin_m": 0.07400010883985633,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371343949744567,
+            -0.09400009630419644
+          ],
+          [
+            0.130135388675755,
+            -0.09400012405280558
+          ],
+          [
+            0.130135388675755,
+            0.09400012405280558
+          ],
+          [
+            -0.14371343949744567,
+            0.09400009630419644
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400011086642027,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400011289298437,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400011289298437,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400010883985633,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400010883985633,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 42
+    },
+    {
+      "body_z_m": 0.143,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301353763118291,
+            0.09400012770961409
+          ],
+          "lh": [
+            -0.14371343995567532,
+            0.09400009736130135
+          ],
+          "rf": [
+            0.1301353763118291,
+            -0.09400012770961409
+          ],
+          "rh": [
+            -0.14371343995567532,
+            -0.09400009736130135
+          ]
+        },
+        "min_support_margin_m": 0.07400011107139912,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371343995567532,
+            -0.09400009736130135
+          ],
+          [
+            0.1301353763118291,
+            -0.09400012770961409
+          ],
+          [
+            0.1301353763118291,
+            0.09400012770961409
+          ],
+          [
+            -0.14371343995567532,
+            0.09400009736130135
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400011328782724,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400011550425563,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400011550425563,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400011107139912,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400011107139912,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 43
+    },
+    {
+      "body_z_m": 0.144,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013536290810607,
+            0.09400013166739632
+          ],
+          "lh": [
+            -0.14371343892680058,
+            0.09400009848733788
+          ],
+          "rf": [
+            0.13013536290810607,
+            -0.09400013166739632
+          ],
+          "rh": [
+            -0.14371343892680058,
+            -0.09400009848733788
+          ]
+        },
+        "min_support_margin_m": 0.07400011347670046,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371343892680058,
+            -0.09400009848733788
+          ],
+          [
+            0.13013536290810607,
+            -0.09400013166739632
+          ],
+          [
+            0.13013536290810607,
+            0.09400013166739632
+          ],
+          [
+            -0.14371343892680058,
+            0.09400009848733788
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400011589993959,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400011832317899,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400011832317899,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400011347670046,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400011347670046,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 44
+    },
+    {
+      "body_z_m": 0.145,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.130135348313639,
+            0.09400013596321574
+          ],
+          "lh": [
+            -0.14371343634932504,
+            0.09400009968650994
+          ],
+          "rf": [
+            0.130135348313639,
+            -0.09400013596321574
+          ],
+          "rh": [
+            -0.14371343634932504,
+            -0.09400009968650994
+          ]
+        },
+        "min_support_margin_m": 0.07400011607480891,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371343634932504,
+            -0.09400009968650994
+          ],
+          [
+            0.130135348313639,
+            -0.09400013596321574
+          ],
+          [
+            0.130135348313639,
+            0.09400013596321574
+          ],
+          [
+            -0.14371343634932504,
+            0.09400009968650994
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.0940001187242056,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400012137360268,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400012137360268,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400011607480891,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400011607480891,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 45
+    },
+    {
+      "body_z_m": 0.146,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.1301353323331597,
+            0.09400014061153575
+          ],
+          "lh": [
+            -0.143713432155118,
+            0.09400010096348849
+          ],
+          "rf": [
+            0.1301353323331597,
+            -0.09400014061153575
+          ],
+          "rh": [
+            -0.143713432155118,
+            -0.09400010096348849
+          ]
+        },
+        "min_support_margin_m": 0.07400011887481922,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.143713432155118,
+            -0.09400010096348849
+          ],
+          [
+            0.1301353323331597,
+            -0.09400014061153575
+          ],
+          [
+            0.1301353323331597,
+            0.09400014061153575
+          ],
+          [
+            -0.143713432155118,
+            0.09400010096348849
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.0940001217704353,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400012466605181,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400012466605181,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400011887481922,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400011887481922,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 46
+    },
+    {
+      "body_z_m": 0.147,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013531473434592,
+            0.09400014649941833
+          ],
+          "lh": [
+            -0.14371342626575728,
+            0.09400010232342203
+          ],
+          "rf": [
+            0.13013531473434592,
+            -0.09400014649941833
+          ],
+          "rh": [
+            -0.14371342626575728,
+            -0.09400010232342203
+          ]
+        },
+        "min_support_margin_m": 0.07400012228029156,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371342626575728,
+            -0.09400010232342203
+          ],
+          [
+            0.13013531473434592,
+            -0.09400014649941833
+          ],
+          [
+            0.13013531473434592,
+            0.09400014649941833
+          ],
+          [
+            -0.14371342626575728,
+            0.09400010232342203
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400012550659763,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400012873290422,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400012873290422,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400012228029156,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400012228029156,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 47
+    },
+    {
+      "body_z_m": 0.148,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013523002410435,
+            0.09399999846765865
+          ],
+          "lh": [
+            -0.1437134189115901,
+            0.09400010376547642
+          ],
+          "rf": [
+            0.13013523002410435,
+            -0.09399999846765865
+          ],
+          "rh": [
+            -0.1437134189115901,
+            -0.09400010376547642
+          ]
+        },
+        "min_support_margin_m": 0.07400004081586058,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.1437134189115901,
+            -0.09400010376547642
+          ],
+          [
+            0.13013523002410435,
+            -0.09399999846765865
+          ],
+          [
+            0.13013523002410435,
+            0.09399999846765865
+          ],
+          [
+            -0.1437134189115901,
+            0.09400010376547642
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.0940000485060791,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400004081586058,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400004081586058,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400005619630055,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400005619630055,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 48
+    },
+    {
+      "body_z_m": 0.149,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013522991405102,
+            0.09399999832290035
+          ],
+          "lh": [
+            -0.14371339188301643,
+            0.09400010520289964
+          ],
+          "rf": [
+            0.13013522991405102,
+            -0.09399999832290035
+          ],
+          "rh": [
+            -0.14371339188301643,
+            -0.09400010520289964
+          ]
+        },
+        "min_support_margin_m": 0.07400004130742104,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371339188301643,
+            -0.09400010520289964
+          ],
+          [
+            0.13013522991405102,
+            -0.09399999832290035
+          ],
+          [
+            0.13013522991405102,
+            0.09399999832290035
+          ],
+          [
+            -0.14371339188301643,
+            0.09400010520289964
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09400004911319182,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07400004130742104,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07400004130742104,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07400005691896563,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07400005691896563,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 49
+    },
+    {
+      "body_z_m": 0.15,
+      "evaluation": {
+        "contacts_world_xy_m": {
+          "lf": [
+            0.13013522828008084,
+            0.09399999640965956
+          ],
+          "lh": [
+            -0.14371694529805976,
+            0.09399999507047414
+          ],
+          "rf": [
+            0.13013522828008084,
+            -0.09399999640965956
+          ],
+          "rh": [
+            -0.14371694529805976,
+            -0.09399999507047414
+          ]
+        },
+        "min_support_margin_m": 0.07399999567547182,
+        "safe": true,
+        "support_hull_world_xy_m": [
+          [
+            -0.14371694529805976,
+            -0.09399999507047414
+          ],
+          [
+            0.13013522828008084,
+            -0.09399999640965956
+          ],
+          [
+            0.13013522828008084,
+            0.09399999640965956
+          ],
+          [
+            -0.14371694529805976,
+            0.09399999507047414
+          ]
+        ],
+        "test_points": [
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_center",
+            "support_margin_m": 0.09399999577327535,
+            "world_xy_m": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_plus_y",
+            "support_margin_m": 0.07399999587107886,
+            "world_xy_m": [
+              0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_plus_x_minus_y",
+            "support_margin_m": 0.07399999587107886,
+            "world_xy_m": [
+              0.02,
+              -0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_plus_y",
+            "support_margin_m": 0.07399999567547182,
+            "world_xy_m": [
+              -0.02,
+              0.02
+            ]
+          },
+          {
+            "inside_support_polygon": true,
+            "name": "com_proxy_minus_x_minus_y",
+            "support_margin_m": 0.07399999567547182,
+            "world_xy_m": [
+              -0.02,
+              -0.02
+            ]
+          }
+        ]
+      },
+      "trajectory_index": 50
+    }
+  ],
+  "kind": "MATDOG_C4E_OFFLINE_STATIC_STABILITY_SUPPORT_POLYGON",
+  "metrics": {
+    "all_samples_safe": true,
+    "safe_samples": 51,
+    "samples": 51,
+    "worst_sample": 50,
+    "worst_support_margin_m": 0.07399999567547182,
+    "worst_support_margin_mm": 73.99999567547182
+  },
+  "motor_command_used": false,
+  "offline_only": true,
+  "repo_root": "/home/matteo-manicardi/MATDOG/github/robot-dog",
+  "schema": 1,
+  "serial_used": false,
+  "source_reports": {
+    "c4c_rest_to_stand_trajectory": "/home/matteo-manicardi/MATDOG/github/robot-dog/09_Logs/Validation_Reports/C4_rest_to_stand_trajectory/2026-07-08_190405_C4C_contact_locked_rest_to_stand_trajectory.json",
+    "c4d_trajectory_timing_envelope": "/home/matteo-manicardi/MATDOG/github/robot-dog/09_Logs/Validation_Reports/C4_trajectory_timing_envelope/2026-07-08_191003_C4D_trajectory_timing_envelope.json"
+  },
+  "stability_policy": {
+    "cad_com_model_used": false,
+    "com_model": "base_link_origin_projection_proxy",
+    "com_proxy_world_xy_m": [
+      0.0,
+      0.0
+    ],
+    "com_uncertainty_xy_m": 0.02,
+    "min_required_support_margin_m": 0.0,
+    "support_polygon_source": "convex hull of four achieved foot contact references",
+    "tested_points": "center plus four corners of the COM uncertainty box"
+  },
+  "station_used": false,
+  "status": "OFFLINE_STATIC_STABILITY_VALID_WITH_COM_PROXY_UNCERTAINTY"
+}

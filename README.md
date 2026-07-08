@@ -48,9 +48,15 @@ timing envelope: 51 samples, 0.2 s sample interval, maximum measured speed
 6.454 deg/s and maximum measured acceleration 0.946 deg/s². The envelope remains
 offline-only and is not command-eligible.
 
-The current priority is now C4-E: offline static stability / support-polygon
-validation. No commanded stand sequence may begin before stability, supervised
-hardware safe mode and explicit operator approval gates are complete:
+**C4-E offline static stability / support-polygon validation is complete.**
+The C4-C/C4-D trajectory keeps the base-link COM proxy and its conservative
+±20 mm X/Y uncertainty box inside the four-foot support polygon for all 51
+samples. Worst support margin is 74.000 mm. This is still a proxy check and does
+not replace a future CAD-derived COM model.
+
+The current priority is now C4-F: hardware safe-mode preflight and supervised
+first-stand preparation. No commanded stand sequence may begin before hardware
+safe mode, explicit operator approval and abort procedure gates are complete:
 
     visual-zero calibration + encoder-to-radian contract
     → LF FK verified live read-only
@@ -198,10 +204,16 @@ C4-D offline trajectory timing and servo-envelope validation is archived in:
     06_Software/Matdog_Core/kinematics/MATDOG_TRAJECTORY_TIMING_ENVELOPE.md
     09_Logs/Validation_Reports/C4_trajectory_timing_envelope/2026-07-08_191003_C4D_trajectory_timing_envelope.json
 
-The next gate is C4-E offline static stability / support-polygon validation.
-The C4-C/C4-D trajectory must not be used as a commanded stand sequence until
-stability, supervised hardware safe mode and explicit operator approval gates
-are complete.
+C4-E offline static stability / support-polygon validation is archived in:
+
+    06_Software/Matdog_Core/kinematics/matdog_offline_static_stability_support_polygon.py
+    06_Software/Matdog_Core/kinematics/MATDOG_STATIC_STABILITY_SUPPORT_POLYGON.md
+    09_Logs/Validation_Reports/C4_static_stability_support_polygon/2026-07-08_191840_C4E_static_stability_support_polygon.json
+
+The next gate is C4-F hardware safe-mode preflight and supervised first-stand
+preparation. The C4-C/C4-D/C4-E trajectory must not be used as a commanded stand
+sequence until hardware safe mode, explicit operator approval and abort
+procedure gates are complete.
 
 Calibration records:
 
