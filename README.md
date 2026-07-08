@@ -54,9 +54,13 @@ The C4-C/C4-D trajectory keeps the base-link COM proxy and its conservative
 samples. Worst support margin is 74.000 mm. This is still a proxy check and does
 not replace a future CAD-derived COM model.
 
-The current priority is now C4-F: hardware safe-mode preflight and supervised
-first-stand preparation. No commanded stand sequence may begin before hardware
-safe mode, explicit operator approval and abort procedure gates are complete:
+**C4-F hardware safe-mode preflight is complete.** The source audit found no
+direct-serial risks and no existing stand-command candidate. Four existing
+command-capable calibration/probe tools are explicitly blacklisted for the first
+stand. Hardware checklist and abort policy are documented.
+
+The next phase is C5: supervised first physical stand. C5 must start in a new
+chat with read-only live validation before any physical command is considered:
 
     visual-zero calibration + encoder-to-radian contract
     → LF FK verified live read-only
@@ -210,10 +214,16 @@ C4-E offline static stability / support-polygon validation is archived in:
     06_Software/Matdog_Core/kinematics/MATDOG_STATIC_STABILITY_SUPPORT_POLYGON.md
     09_Logs/Validation_Reports/C4_static_stability_support_polygon/2026-07-08_191840_C4E_static_stability_support_polygon.json
 
-The next gate is C4-F hardware safe-mode preflight and supervised first-stand
-preparation. The C4-C/C4-D/C4-E trajectory must not be used as a commanded stand
-sequence until hardware safe mode, explicit operator approval and abort
-procedure gates are complete.
+C4-F hardware safe-mode preflight is archived in:
+
+    06_Software/Matdog_Core/kinematics/matdog_offline_hardware_safe_mode_preflight.py
+    06_Software/Matdog_Core/kinematics/MATDOG_HARDWARE_SAFE_MODE_PREFLIGHT.md
+    09_Logs/Validation_Reports/C4_hardware_safe_mode_preflight/2026-07-08_193744_C4F_hardware_safe_mode_source_audit.json
+
+The next phase is C5 supervised first physical stand. C5 must start in a new
+chat and begin with read-only live validation. The C4-C/C4-D/C4-E trajectory
+must not be used as a commanded stand sequence until C5 confirms hardware
+preflight, operator approval and abort readiness.
 
 Calibration records:
 

@@ -1,0 +1,1204 @@
+{
+  "command_capable_existing_tools": [
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_motor_commands\\b",
+          "\\bsend_motor_commands\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_leg_hold_probe.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_goal\\b",
+          "\\bsend_goal\\s*\\(",
+          "\\bawait\\s+send_motor_commands\\b",
+          "\\bsend_motor_commands\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_micro_probe.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_goal\\b",
+          "\\bsend_goal\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_micro_probe_diagnostic.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_motor_commands\\b",
+          "\\bsend_motor_commands\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_visual_zero_pose_probe.py",
+      "station_related": true
+    }
+  ],
+  "command_eligibility": {
+    "command_eligible": false,
+    "reason": "C4-F source audit only classifies existing tools and blocks first-stand execution until hardware checklist, operator approval and abort procedure are complete."
+  },
+  "created_utc": "2026-07-08T19:37:44.643168+00:00",
+  "direct_serial_risks": [],
+  "files": [
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "read_only",
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_apply_visual_zero.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "read-only",
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_calibration_validate.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "read-only",
+          "read_only",
+          "Nessun torque",
+          "Non invia comandi",
+          "legge soltanto",
+          "telemetria Station"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_capture_visual_zero.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "UTILITY_OR_LIBRARY",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": []
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_joint_math.py",
+      "station_related": false
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_motor_commands\\b",
+          "\\bsend_motor_commands\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_leg_hold_probe.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "read-only",
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_live_joint_monitor.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_goal\\b",
+          "\\bsend_goal\\s*\\(",
+          "\\bawait\\s+send_motor_commands\\b",
+          "\\bsend_motor_commands\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_micro_probe.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_goal\\b",
+          "\\bsend_goal\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_micro_probe_diagnostic.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_motor_commands\\b",
+          "\\bsend_motor_commands\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_visual_zero_pose_probe.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "UTILITY_OR_LIBRARY",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": []
+      },
+      "path": "06_Software/Matdog_Core/calibration/urdf_direction_reference.py",
+      "station_related": false
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station"
+        ],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_body_stance.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_foot_contact.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_leg_contact.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station"
+        ],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_leg_contact_ik.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "read-only"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": false,
+      "classification": "UTILITY_OR_LIBRARY",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station"
+        ],
+        "read_only": [],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_leg_ik.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": false,
+      "classification": "UTILITY_OR_LIBRARY",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station",
+          "no serial",
+          "no motor command"
+        ],
+        "read_only": [],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_offline_collision_contact_policy.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": false,
+      "classification": "UTILITY_OR_LIBRARY",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station",
+          "no serial",
+          "no motor command"
+        ],
+        "read_only": [],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_offline_rest_to_stand_trajectory.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": false,
+      "classification": "UTILITY_OR_LIBRARY",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station"
+        ],
+        "read_only": [],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_offline_safe_stand_candidate.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": false,
+      "classification": "UTILITY_OR_LIBRARY",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station",
+          "no serial",
+          "no motor command"
+        ],
+        "read_only": [],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_offline_static_stability_support_polygon.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": false,
+      "classification": "UTILITY_OR_LIBRARY",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station",
+          "no serial",
+          "no motor command"
+        ],
+        "read_only": [],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_offline_trajectory_timing_envelope.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": false,
+      "classification": "UTILITY_OR_LIBRARY",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station"
+        ],
+        "read_only": [],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_quadruped_leg_contact.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": false,
+      "classification": "UTILITY_OR_LIBRARY",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station"
+        ],
+        "read_only": [],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_quadruped_leg_contact_ik.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_urdf_fk.py",
+      "station_related": true
+    }
+  ],
+  "first_stand_blacklist": [
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_motor_commands\\b",
+          "\\bsend_motor_commands\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_leg_hold_probe.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_goal\\b",
+          "\\bsend_goal\\s*\\(",
+          "\\bawait\\s+send_motor_commands\\b",
+          "\\bsend_motor_commands\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_micro_probe.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_goal\\b",
+          "\\bsend_goal\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_micro_probe_diagnostic.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "COMMAND_CAPABLE_EXISTING_TOOL",
+      "command_capable": true,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": true,
+      "has_execute_confirm_gate": true,
+      "matches": {
+        "command": [
+          "\\bawait\\s+set_torque\\b",
+          "\\bset_torque\\s*\\(",
+          "\\bawait\\s+send_motor_commands\\b",
+          "\\bsend_motor_commands\\s*\\("
+        ],
+        "confirmation": [
+          "--execute",
+          "--confirm"
+        ],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_visual_zero_pose_probe.py",
+      "station_related": true
+    }
+  ],
+  "kind": "MATDOG_C4F_OFFLINE_HARDWARE_SAFE_MODE_SOURCE_AUDIT",
+  "metrics": {
+    "command_capable_existing_tools": 4,
+    "direct_serial_risks": 0,
+    "first_stand_blacklisted_tools": 4,
+    "live_read_only_tools": 10,
+    "offline_tools": 0,
+    "python_files_scanned": 24,
+    "stand_command_candidates": 0
+  },
+  "motor_command_used": false,
+  "offline_only": true,
+  "offline_tools": [],
+  "policy": {
+    "command_capable_existing_tools_allowed_for_first_stand": false,
+    "direct_serial_allowed": false,
+    "first_stand_command_allowed": false,
+    "required_next_gate": "manual hardware checklist, explicit operator approval, abort procedure, then read-only live preflight",
+    "station_single_serial_owner": true
+  },
+  "read_only_tools": [
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "read_only",
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_apply_visual_zero.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "read-only",
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_calibration_validate.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "read-only",
+          "read_only",
+          "Nessun torque",
+          "Non invia comandi",
+          "legge soltanto",
+          "telemetria Station"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_capture_visual_zero.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "read-only",
+          "Nessun torque"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/calibration/matdog_live_joint_monitor.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station"
+        ],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_body_stance.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_foot_contact.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_leg_contact.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": true,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [
+          "Offline only",
+          "no Station"
+        ],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_leg_contact_ik.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "read-only"
+        ],
+        "station": [
+          "Station",
+          "new_station_client",
+          "software\\.station",
+          "st3215/inference"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py",
+      "station_related": true
+    },
+    {
+      "claims_offline_only": false,
+      "claims_read_only": true,
+      "classification": "LIVE_READ_ONLY_TOOL",
+      "command_capable": false,
+      "direct_serial_risk": false,
+      "first_stand_forbidden": false,
+      "has_execute_confirm_gate": false,
+      "matches": {
+        "command": [],
+        "confirmation": [],
+        "direct_serial": [],
+        "offline": [],
+        "read_only": [
+          "Non invia comandi"
+        ],
+        "station": [
+          "Station"
+        ]
+      },
+      "path": "06_Software/Matdog_Core/kinematics/matdog_urdf_fk.py",
+      "station_related": true
+    }
+  ],
+  "repo_root": "/home/matteo-manicardi/MATDOG/github/robot-dog",
+  "schema": 1,
+  "serial_used": false,
+  "source_reports": {
+    "c4e_static_stability_support_polygon": "/home/matteo-manicardi/MATDOG/github/robot-dog/09_Logs/Validation_Reports/C4_static_stability_support_polygon/2026-07-08_191840_C4E_static_stability_support_polygon.json"
+  },
+  "stand_command_candidates": [],
+  "station_used": false,
+  "status": "OFFLINE_HARDWARE_SAFE_MODE_SOURCE_AUDIT_VALID"
+}
