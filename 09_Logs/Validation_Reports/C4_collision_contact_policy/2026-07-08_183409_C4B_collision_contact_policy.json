@@ -1,0 +1,232 @@
+{
+  "candidate_report": "/home/matteo-manicardi/MATDOG/github/robot-dog/09_Logs/Validation_Reports/2026-07-08_175245_C4A_offline_safe_stand_candidate.json",
+  "command_eligibility": {
+    "command_eligible": false,
+    "reason": "C4-B validates only the static C4-A candidate. Trajectory sampling, stability and supervised hardware gates are still required before any automatic stand command."
+  },
+  "created_utc": "2026-07-08T18:34:09.737143+00:00",
+  "kind": "MATDOG_C4B_OFFLINE_COLLISION_CONTACT_POLICY",
+  "knee_contact_clearance": [
+    {
+      "foot_contact_reference_world_m": [
+        0.13013522828008084,
+        0.09399999640965956,
+        2.1099354728659758e-08
+      ],
+      "knee_contact_clearance_m": 0.1139545279048702,
+      "leg_id": "lf",
+      "lower_leg_joint_world_m": [
+        0.07663569093522452,
+        0.09549999849177454,
+        0.11395454900422493
+      ],
+      "policy": "KNEE_CONTACT_CLEARANCE_OK"
+    },
+    {
+      "foot_contact_reference_world_m": [
+        0.13013522828008084,
+        -0.09399999640965956,
+        2.1099354728659758e-08
+      ],
+      "knee_contact_clearance_m": 0.1139545279048702,
+      "leg_id": "rf",
+      "lower_leg_joint_world_m": [
+        0.07663569093522452,
+        -0.09549999849177454,
+        0.11395454900422493
+      ],
+      "policy": "KNEE_CONTACT_CLEARANCE_OK"
+    },
+    {
+      "foot_contact_reference_world_m": [
+        -0.14371694529805976,
+        -0.09399999507047414,
+        2.987571762376462e-08
+      ],
+      "knee_contact_clearance_m": 0.1204377083997256,
+      "leg_id": "rh",
+      "lower_leg_joint_world_m": [
+        -0.18290612871506506,
+        -0.09549999843421862,
+        0.12043773827544323
+      ],
+      "policy": "KNEE_CONTACT_CLEARANCE_OK"
+    },
+    {
+      "foot_contact_reference_world_m": [
+        -0.14371694529805976,
+        0.09399999507047414,
+        2.987571762376462e-08
+      ],
+      "knee_contact_clearance_m": 0.1204377083997256,
+      "leg_id": "lh",
+      "lower_leg_joint_world_m": [
+        -0.18290612871506506,
+        0.09549999843421862,
+        0.12043773827544323
+      ],
+      "policy": "KNEE_CONTACT_CLEARANCE_OK"
+    }
+  ],
+  "link_ground_clearance": [
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": false,
+      "link_name": "base_link",
+      "max_z_m": 0.23102627563476563,
+      "min_z_m": 0.15,
+      "policy": "GROUND_CLEARANCE_OK"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": false,
+      "link_name": "lf_hip_link",
+      "max_z_m": 0.22999999965284237,
+      "min_z_m": 0.18524999865704808,
+      "policy": "GROUND_CLEARANCE_OK"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": false,
+      "link_name": "lf_upper_leg_link",
+      "max_z_m": 0.21170115375628157,
+      "min_z_m": 0.1011098830544757,
+      "policy": "GROUND_CLEARANCE_OK"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": true,
+      "link_name": "lf_lower_leg_link",
+      "max_z_m": 0.12520403296973984,
+      "min_z_m": 0.002907221544647301,
+      "policy": "EXPECTED_FOOT_FORK_LOW_CLEARANCE_REVIEW"
+    },
+    {
+      "is_foot_link": true,
+      "is_lower_leg_link": false,
+      "link_name": "lf_foot_link",
+      "max_z_m": 0.029793433868491665,
+      "min_z_m": -5.03712763100933e-07,
+      "policy": "FOOT_CONTACT_ALLOWED_RIGID_TPU"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": false,
+      "link_name": "rf_hip_link",
+      "max_z_m": 0.22999999965284237,
+      "min_z_m": 0.18524999865704808,
+      "policy": "GROUND_CLEARANCE_OK"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": false,
+      "link_name": "rf_upper_leg_link",
+      "max_z_m": 0.21164129554472114,
+      "min_z_m": 0.10105003715282279,
+      "policy": "GROUND_CLEARANCE_OK"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": true,
+      "link_name": "rf_lower_leg_link",
+      "max_z_m": 0.12520403296973984,
+      "min_z_m": 0.002907221544647301,
+      "policy": "EXPECTED_FOOT_FORK_LOW_CLEARANCE_REVIEW"
+    },
+    {
+      "is_foot_link": true,
+      "is_lower_leg_link": false,
+      "link_name": "rf_foot_link",
+      "max_z_m": 0.029793433868491665,
+      "min_z_m": -5.03712763100933e-07,
+      "policy": "FOOT_CONTACT_ALLOWED_RIGID_TPU"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": false,
+      "link_name": "rh_hip_link",
+      "max_z_m": 0.20999999946934272,
+      "min_z_m": 0.16524999794719425,
+      "policy": "GROUND_CLEARANCE_OK"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": false,
+      "link_name": "rh_upper_leg_link",
+      "max_z_m": 0.19500468292967812,
+      "min_z_m": 0.1062746650439453,
+      "policy": "GROUND_CLEARANCE_OK"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": true,
+      "link_name": "rh_lower_leg_link",
+      "max_z_m": 0.13168607818164804,
+      "min_z_m": 0.0028540108362080374,
+      "policy": "EXPECTED_FOOT_FORK_LOW_CLEARANCE_REVIEW"
+    },
+    {
+      "is_foot_link": true,
+      "is_lower_leg_link": false,
+      "link_name": "rh_foot_link",
+      "max_z_m": 0.02978682266208079,
+      "min_z_m": -1.0641833524957858e-06,
+      "policy": "FOOT_CONTACT_ALLOWED_RIGID_TPU"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": false,
+      "link_name": "lh_hip_link",
+      "max_z_m": 0.20999999946934272,
+      "min_z_m": 0.16524999794719425,
+      "policy": "GROUND_CLEARANCE_OK"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": false,
+      "link_name": "lh_upper_leg_link",
+      "max_z_m": 0.19504534318092667,
+      "min_z_m": 0.10630279042862832,
+      "policy": "GROUND_CLEARANCE_OK"
+    },
+    {
+      "is_foot_link": false,
+      "is_lower_leg_link": true,
+      "link_name": "lh_lower_leg_link",
+      "max_z_m": 0.131686078478385,
+      "min_z_m": 0.0028540108362080374,
+      "policy": "EXPECTED_FOOT_FORK_LOW_CLEARANCE_REVIEW"
+    },
+    {
+      "is_foot_link": true,
+      "is_lower_leg_link": false,
+      "link_name": "lh_foot_link",
+      "max_z_m": 0.02978682266208079,
+      "min_z_m": -1.0641833525027247e-06,
+      "policy": "FOOT_CONTACT_ALLOWED_RIGID_TPU"
+    }
+  ],
+  "matdog_specific_policy": {
+    "command_eligible": false,
+    "critical_kinematic_risk": "lower_leg_joint/knee descending toward or below the foot contact reference during rest-to-stand",
+    "distal_lower_leg_fork_low_clearance": "expected near the rigid TPU foot cylinder if above world Z=0",
+    "foot_link_contact": "allowed"
+  },
+  "material_assumption": {
+    "compression_model_used": false,
+    "foot_tpu_shore": "90D",
+    "treated_as": "practically_rigid_for_C4B"
+  },
+  "motor_command_used": false,
+  "offline_only": true,
+  "repo_root": "/home/matteo-manicardi/MATDOG/github/robot-dog",
+  "schema": 1,
+  "serial_used": false,
+  "station_used": false,
+  "status": "PASS_WITH_EXPECTED_FOOT_FORK_REVIEW",
+  "thresholds": {
+    "expected_foot_fork_low_clearance_m": 0.01,
+    "knee_contact_review_clearance_m": 0.03,
+    "non_foot_ground_tolerance_m": 1e-06
+  }
+}
