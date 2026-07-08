@@ -22,14 +22,22 @@ offline.**
 
 **C3 live FK read-only validation is complete for all four legs.**
 
-The current priority is now the offline safe stand candidate. No commanded
-stand sequence may begin before that phase completes:
+**C4-A offline safe stand candidate is complete.** The candidate keeps
+`base_link` parallel to the ground, places all four validated contact references
+on `world Z = 0`, satisfies URDF joint limits and preserves
+`NOMINAL_STRIP_CONTACT` for LF, RF, RH and LH. It remains offline-only and is
+not command-eligible.
+
+The current priority is now C4-B: offline collision/contact policy. No
+commanded stand sequence may begin before collision, contact, stability,
+trajectory and supervised hardware safety gates are complete:
 
     visual-zero calibration + encoder-to-radian contract
     → LF FK verified live read-only
     → four-leg contact-reference IK + canonical world/contact regressions
     → live FK validation for RF / RH / LH
-    → offline safe stand pose
+    → offline safe stand candidate
+    → offline collision/contact policy
     → rest-to-stand trajectory design
     → controlled static stand validation
     → four-leg coordination
@@ -147,8 +155,14 @@ C3-B live FK read-only validation is archived in:
 
     09_Logs/Calibration_Sessions/C3_live_fk/
 
-The next gate is the offline safe stand candidate. Visual-zero must not be used
-as a shortcut for a commanded stand pose.
+C4-A offline safe stand candidate is archived in:
+
+    06_Software/Matdog_Core/kinematics/matdog_offline_safe_stand_candidate.py
+    09_Logs/Validation_Reports/2026-07-08_175245_C4A_offline_safe_stand_candidate.json
+
+The next gate is C4-B offline collision/contact policy. The C4-A candidate must
+not be used as a commanded stand pose until collision, contact, stability,
+trajectory and supervised hardware safety gates are complete.
 
 Calibration records:
 
