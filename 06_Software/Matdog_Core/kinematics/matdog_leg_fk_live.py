@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MATDOG — FK live read-only della zampa LF.
+MATDOG — FK live read-only di una zampa MATDOG.
 
 Questo tool:
 - si collega esclusivamente alla telemetria pubblicata da NormaCore Station;
@@ -55,13 +55,33 @@ from matdog_urdf_fk import (
 
 EXPECTED_CALIBRATION_STATUS = "VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION"
 
-LF_JOINT_NAMES = (
-    "lf_hip_joint",
-    "lf_upper_leg_joint",
-    "lf_lower_leg_joint",
-)
+LEG_ORDER = ("lf", "rf", "rh", "lh")
 
-LF_TIP_LINK = "lf_foot_link"
+LEG_JOINT_NAMES = {
+    leg: (
+        f"{leg}_hip_joint",
+        f"{leg}_upper_leg_joint",
+        f"{leg}_lower_leg_joint",
+    )
+    for leg in LEG_ORDER
+}
+
+LEG_TIP_LINKS = {
+    leg: f"{leg}_foot_link"
+    for leg in LEG_ORDER
+}
+
+
+def normalize_leg_id(value: str) -> str:
+    leg_id = value.lower()
+
+    if leg_id not in LEG_JOINT_NAMES:
+        expected = ", ".join(LEG_ORDER)
+        raise ValueError(
+            f"leg non valida: {value!r}; valori ammessi: {expected}"
+        )
+
+    return leg_id
 
 
 @dataclass(frozen=True)
@@ -72,7 +92,10 @@ class LegJointCalibration:
     zero_encoder_visual: int
 
 
-def load_lf_calibration(config_path: Path) -> tuple[LegJointCalibration, ...]:
+def load_leg_calibration(
+    config_path: Path,
+    leg_id: str,
+) -> tuple[LegJointCalibration, ...]:
     data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
     status = data.get("robot", {}).get("calibration_status")
@@ -85,7 +108,7 @@ def load_lf_calibration(config_path: Path) -> tuple[LegJointCalibration, ...]:
     joints = data.get("joints", {})
     result: list[LegJointCalibration] = []
 
-    for joint_name in LF_JOINT_NAMES:
+    for joint_name in LEG_JOINT_NAMES[leg_id]:
         joint = joints.get(joint_name)
 
         if not isinstance(joint, dict):
@@ -124,7 +147,9 @@ def load_lf_calibration(config_path: Path) -> tuple[LegJointCalibration, ...]:
     servo_ids = [item.servo_id for item in result]
 
     if len(set(servo_ids)) != len(servo_ids):
-        raise RuntimeError(f"Servo LF duplicati nella calibrazione: {servo_ids}")
+        raise RuntimeError(
+            f"Servo {leg_id.upper()} duplicati nella calibrazione: {servo_ids}"
+        )
 
     return tuple(result)
 
@@ -158,7 +183,7 @@ def joint_radians_from_encoder_ticks(
 
     if missing or unexpected:
         raise ValueError(
-            "Mappa encoder LF non valida: "
+            "Mappa encoder zampa non valida: "
             f"missing={sorted(missing)}, unexpected={sorted(unexpected)}"
         )
 
@@ -209,6 +234,7 @@ def fk_from_encoder_ticks(
     repo_root: Path,
     calibration: tuple[LegJointCalibration, ...],
     encoder_ticks_by_servo: dict[int, int],
+    tip_link: str,
 ):
     urdf_path = verify_canonical_urdf(repo_root)
 
@@ -220,7 +246,7 @@ def fk_from_encoder_ticks(
     result = forward_kinematics(
         urdf_path=urdf_path,
         root_link="base_link",
-        tip_link=LF_TIP_LINK,
+        tip_link=tip_link,
         joint_positions_rad=joint_positions_rad,
         enforce_limits=True,
     )
@@ -328,7 +354,7 @@ def read_encoder_ticks(
 
     if missing:
         raise RuntimeError(
-            f"Motori LF mancanti sul bus {bus_serial}: {sorted(missing)}"
+            f"Motori attesi mancanti sul bus {bus_serial}: {sorted(missing)}"
         )
 
     return result
@@ -340,6 +366,7 @@ def print_sample(
     encoder_ticks: dict[int, int],
     joint_positions_rad: dict[str, float],
     foot_position_m: tuple[float, float, float],
+    tip_link: str,
 ) -> None:
     fields = []
 
@@ -355,7 +382,7 @@ def print_sample(
 
     print(f"[{elapsed_s:6.2f}s] " + " | ".join(fields))
     print(
-        "  lf_foot_link in base_link: "
+        f"  {tip_link} in base_link: "
         f"X={x:+.6f} m  Y={y:+.6f} m  Z={z:+.6f} m"
     )
 
@@ -377,8 +404,11 @@ async def main_async(args) -> None:
             "--require-visual-zero-tolerance deve essere >= 0"
         )
 
+    leg_id = normalize_leg_id(args.leg)
+    tip_link = LEG_TIP_LINKS[leg_id]
+
     config_path = Path(args.config).expanduser().resolve()
-    calibration = load_lf_calibration(config_path)
+    calibration = load_leg_calibration(config_path, leg_id)
     urdf_path = verify_canonical_urdf(REPO_ROOT)
 
     logger = logging.getLogger("matdog_leg_fk_live")
@@ -393,7 +423,7 @@ async def main_async(args) -> None:
         await wait_first_frame(reader, args.timeout)
         bus_serial = resolve_bus_serial(reader.latest, args.bus)
 
-        print("=== MATDOG LF LIVE FK — READ ONLY ===")
+        print(f"=== MATDOG {leg_id.upper()} LIVE FK — READ ONLY ===")
         print("Questo tool non invia torque, target, speed o accel.")
         print(
             "Prima di muovere manualmente il robot, verifica "
@@ -403,7 +433,7 @@ async def main_async(args) -> None:
         print(f"Config: {config_path}")
         print(f"URDF: {urdf_path}")
         print(
-            "LF servo order: "
+            f"{leg_id.upper()} servo order: "
             + ", ".join(
                 f"{item.joint_name}=M{item.servo_id}"
                 for item in calibration
@@ -441,6 +471,7 @@ async def main_async(args) -> None:
                 REPO_ROOT,
                 calibration,
                 encoder_ticks,
+                tip_link,
             )
 
             if (
@@ -467,7 +498,7 @@ async def main_async(args) -> None:
 
                 print(
                     "VISUAL-ZERO PREFLIGHT PASS: "
-                    f"tutti i joint LF entro "
+                    f"tutti i joint {leg_id.upper()} entro "
                     f"{args.require_visual_zero_tolerance} tick. "
                     f"errori={errors}"
                 )
@@ -486,6 +517,7 @@ async def main_async(args) -> None:
                     encoder_ticks=encoder_ticks,
                     joint_positions_rad=q_rad,
                     foot_position_m=fk_result.tip_position_m,
+                    tip_link=tip_link,
                 )
                 last_ticks = tick_tuple
                 last_print_time = now
@@ -505,10 +537,11 @@ async def main_async(args) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "MATDOG LF FK live read-only: "
+            "MATDOG FK live read-only: "
             "encoder Station -> radianti URDF -> foot frame."
         )
     )
+    parser.add_argument("--leg", default="lf", help="Zampa: lf, rf, rh oppure lh")
     parser.add_argument("--server", default="localhost:8888")
     parser.add_argument("--bus", default="auto")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
@@ -521,8 +554,8 @@ def main() -> None:
         default=None,
         metavar="TICKS",
         help=(
-            "Preflight read-only: blocca l'esecuzione se LF non è entro "
-            "questa tolleranza dallo zero visuale."
+            "Preflight read-only: blocca l'esecuzione se la zampa scelta "
+            "non è entro questa tolleranza dallo zero visuale."
         ),
     )
     args = parser.parse_args()
