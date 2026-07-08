@@ -42,9 +42,15 @@ stays parallel to the ground, and body height ramps from 100 mm to 150 mm. All
 51 sampled frames pass C4-B collision/contact policy with only the expected
 distal lower-leg foot-fork review.
 
-The current priority is now C4-D: offline trajectory timing and servo
-speed/acceleration envelope validation. No commanded stand sequence may begin
-before timing, stability and supervised hardware safety gates are complete:
+**C4-D offline trajectory timing and servo-envelope validation is complete.**
+The C4-C contact-locked IK trajectory is validated with a conservative 10 s
+timing envelope: 51 samples, 0.2 s sample interval, maximum measured speed
+6.454 deg/s and maximum measured acceleration 0.946 deg/s². The envelope remains
+offline-only and is not command-eligible.
+
+The current priority is now C4-E: offline static stability / support-polygon
+validation. No commanded stand sequence may begin before stability, supervised
+hardware safe mode and explicit operator approval gates are complete:
 
     visual-zero calibration + encoder-to-radian contract
     → LF FK verified live read-only
@@ -186,10 +192,16 @@ C4-C offline rest-to-stand trajectory sampling is archived in:
     06_Software/Matdog_Core/kinematics/MATDOG_REST_TO_STAND_TRAJECTORY_POLICY.md
     09_Logs/Validation_Reports/C4_rest_to_stand_trajectory/2026-07-08_190405_C4C_contact_locked_rest_to_stand_trajectory.json
 
-The next gate is C4-D offline trajectory timing and servo speed/acceleration
-envelope validation. The C4-C trajectory must not be used as a commanded stand
-sequence until timing, stability and supervised hardware safety gates are
-complete.
+C4-D offline trajectory timing and servo-envelope validation is archived in:
+
+    06_Software/Matdog_Core/kinematics/matdog_offline_trajectory_timing_envelope.py
+    06_Software/Matdog_Core/kinematics/MATDOG_TRAJECTORY_TIMING_ENVELOPE.md
+    09_Logs/Validation_Reports/C4_trajectory_timing_envelope/2026-07-08_191003_C4D_trajectory_timing_envelope.json
+
+The next gate is C4-E offline static stability / support-polygon validation.
+The C4-C/C4-D trajectory must not be used as a commanded stand sequence until
+stability, supervised hardware safe mode and explicit operator approval gates
+are complete.
 
 Calibration records:
 
