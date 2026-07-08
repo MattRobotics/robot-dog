@@ -1,0 +1,294 @@
+{
+  "body_pose": {
+    "base_link_parallel_to_ground": true,
+    "pitch_rad": 0.0,
+    "roll_rad": 0.0,
+    "rotation_world_from_base": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "translation_world_m": [
+      0.0,
+      0.0,
+      0.15
+    ],
+    "yaw_rad": 0.0
+  },
+  "command_eligibility": {
+    "command_eligible": false,
+    "reason": "C4-A is offline only. Self-collision, ground-collision, static stability, trajectory sampling, hardware safe mode and operator approval gates are not implemented yet."
+  },
+  "created_utc": "2026-07-08T17:52:45.557026+00:00",
+  "footprint_policy": {
+    "grid_step_deg": 4.0,
+    "source": "reachable FK seed per leg, not visual-zero XY shortcut"
+  },
+  "ground_plane": {
+    "normal_world_unit": [
+      0.0,
+      0.0,
+      1.0
+    ],
+    "world_z_m": 0.0
+  },
+  "ik_policy": {
+    "required_support_mode": "NOMINAL_STRIP_CONTACT",
+    "solver": "solve_leg_contact_reference_ik",
+    "tolerance_m": 1e-05
+  },
+  "kind": "MATDOG_C4A_OFFLINE_SAFE_STAND_CANDIDATE",
+  "legs": {
+    "lf": {
+      "achieved_contact_reference_world_m": [
+        0.13013522828008084,
+        0.09399999640965956,
+        2.1099354728659758e-08
+      ],
+      "fk_seed": {
+        "contact_base_m": [
+          0.1301352313457785,
+          0.094,
+          -0.14997744927931173
+        ],
+        "world_z_error_m": 2.2550720688269132e-05,
+        "world_z_error_mm": 0.022550720688269132
+      },
+      "iterations": 1,
+      "joint_positions_deg": {
+        "lf_hip_joint": -1.0468772398567207e-06,
+        "lf_lower_leg_joint": 20.02940831619265,
+        "lf_upper_leg_joint": 23.4839600844169
+      },
+      "joint_positions_rad": {
+        "lf_hip_joint": -1.8271454699690187e-08,
+        "lf_lower_leg_joint": 0.3495791223438952,
+        "lf_upper_leg_joint": 0.40987242488000036
+      },
+      "residual_m": 2.1621096564323197e-08,
+      "residual_mm": 2.1621096564323197e-05,
+      "support_mode": "NOMINAL_STRIP_CONTACT",
+      "target_contact_reference_world_m": [
+        0.1301352313457785,
+        0.094,
+        0.0
+      ],
+      "urdf_limit_margin_rad": {
+        "lf_hip_joint": {
+          "lower_rad": -0.785398163397,
+          "margin_to_lower_rad": 0.7853981451255453,
+          "margin_to_upper_rad": 0.7853981816684547,
+          "upper_rad": 0.785398163397,
+          "value_rad": -1.8271454699690187e-08
+        },
+        "lf_lower_leg_joint": {
+          "lower_rad": -1.605702911835,
+          "margin_to_lower_rad": 1.9552820341788952,
+          "margin_to_upper_rad": 0.30491934715410474,
+          "upper_rad": 0.654498469498,
+          "value_rad": 0.3495791223438952
+        },
+        "lf_upper_leg_joint": {
+          "lower_rad": -0.916297857297,
+          "margin_to_lower_rad": 1.3261702821770003,
+          "margin_to_upper_rad": 1.7281559088129999,
+          "upper_rad": 2.138028333693,
+          "value_rad": 0.40987242488000036
+        }
+      }
+    },
+    "lh": {
+      "achieved_contact_reference_world_m": [
+        -0.14371694529805976,
+        0.09399999507047414,
+        2.987571762376462e-08
+      ],
+      "fk_seed": {
+        "contact_base_m": [
+          -0.1437169534863073,
+          0.094,
+          -0.14995340236290153
+        ],
+        "world_z_error_m": 4.659763709846665e-05,
+        "world_z_error_mm": 0.04659763709846665
+      },
+      "iterations": 1,
+      "joint_positions_deg": {
+        "lh_hip_joint": -1.6002327191411288e-06,
+        "lh_lower_leg_joint": 0.0447702051179977,
+        "lh_upper_leg_joint": 51.47075582928662
+      },
+      "joint_positions_rad": {
+        "lh_hip_joint": -2.7929329747154383e-08,
+        "lh_lower_leg_joint": 0.0007813874861022763,
+        "lh_upper_leg_joint": 0.8983341577111159
+      },
+      "residual_m": 3.1367277961049966e-08,
+      "residual_mm": 3.136727796104996e-05,
+      "support_mode": "NOMINAL_STRIP_CONTACT",
+      "target_contact_reference_world_m": [
+        -0.1437169534863073,
+        0.094,
+        0.0
+      ],
+      "urdf_limit_margin_rad": {
+        "lh_hip_joint": {
+          "lower_rad": -0.785398163397,
+          "margin_to_lower_rad": 0.7853981354676702,
+          "margin_to_upper_rad": 0.7853981913263297,
+          "upper_rad": 0.785398163397,
+          "value_rad": -2.7929329747154383e-08
+        },
+        "lh_lower_leg_joint": {
+          "lower_rad": -1.605702911835,
+          "margin_to_lower_rad": 1.6064842993211021,
+          "margin_to_upper_rad": 0.6537170820118977,
+          "upper_rad": 0.654498469498,
+          "value_rad": 0.0007813874861022763
+        },
+        "lh_upper_leg_joint": {
+          "lower_rad": -0.916297857297,
+          "margin_to_lower_rad": 1.8146320150081159,
+          "margin_to_upper_rad": 1.2396941759818842,
+          "upper_rad": 2.138028333693,
+          "value_rad": 0.8983341577111159
+        }
+      }
+    },
+    "rf": {
+      "achieved_contact_reference_world_m": [
+        0.13013522828008084,
+        -0.09399999640965956,
+        2.1099354728659758e-08
+      ],
+      "fk_seed": {
+        "contact_base_m": [
+          0.1301352313457785,
+          -0.094,
+          -0.14997744927931173
+        ],
+        "world_z_error_m": 2.2550720688269132e-05,
+        "world_z_error_mm": 0.022550720688269132
+      },
+      "iterations": 1,
+      "joint_positions_deg": {
+        "rf_hip_joint": 1.0468772398567207e-06,
+        "rf_lower_leg_joint": 20.02940831619265,
+        "rf_upper_leg_joint": 23.4839600844169
+      },
+      "joint_positions_rad": {
+        "rf_hip_joint": 1.8271454699690187e-08,
+        "rf_lower_leg_joint": 0.3495791223438952,
+        "rf_upper_leg_joint": 0.40987242488000036
+      },
+      "residual_m": 2.1621096564323197e-08,
+      "residual_mm": 2.1621096564323197e-05,
+      "support_mode": "NOMINAL_STRIP_CONTACT",
+      "target_contact_reference_world_m": [
+        0.1301352313457785,
+        -0.094,
+        0.0
+      ],
+      "urdf_limit_margin_rad": {
+        "rf_hip_joint": {
+          "lower_rad": -0.785398163397,
+          "margin_to_lower_rad": 0.7853981816684547,
+          "margin_to_upper_rad": 0.7853981451255453,
+          "upper_rad": 0.785398163397,
+          "value_rad": 1.8271454699690187e-08
+        },
+        "rf_lower_leg_joint": {
+          "lower_rad": -1.605702911835,
+          "margin_to_lower_rad": 1.9552820341788952,
+          "margin_to_upper_rad": 0.30491934715410474,
+          "upper_rad": 0.654498469498,
+          "value_rad": 0.3495791223438952
+        },
+        "rf_upper_leg_joint": {
+          "lower_rad": -0.916297857297,
+          "margin_to_lower_rad": 1.3261702821770003,
+          "margin_to_upper_rad": 1.7281559088129999,
+          "upper_rad": 2.138028333693,
+          "value_rad": 0.40987242488000036
+        }
+      }
+    },
+    "rh": {
+      "achieved_contact_reference_world_m": [
+        -0.14371694529805976,
+        -0.09399999507047414,
+        2.987571762376462e-08
+      ],
+      "fk_seed": {
+        "contact_base_m": [
+          -0.1437169534863073,
+          -0.094,
+          -0.14995340236290153
+        ],
+        "world_z_error_m": 4.659763709846665e-05,
+        "world_z_error_mm": 0.04659763709846665
+      },
+      "iterations": 1,
+      "joint_positions_deg": {
+        "rh_hip_joint": 1.6002327191411288e-06,
+        "rh_lower_leg_joint": 0.0447702051179977,
+        "rh_upper_leg_joint": 51.47075582928662
+      },
+      "joint_positions_rad": {
+        "rh_hip_joint": 2.7929329747154383e-08,
+        "rh_lower_leg_joint": 0.0007813874861022763,
+        "rh_upper_leg_joint": 0.8983341577111159
+      },
+      "residual_m": 3.1367277961049966e-08,
+      "residual_mm": 3.136727796104996e-05,
+      "support_mode": "NOMINAL_STRIP_CONTACT",
+      "target_contact_reference_world_m": [
+        -0.1437169534863073,
+        -0.094,
+        0.0
+      ],
+      "urdf_limit_margin_rad": {
+        "rh_hip_joint": {
+          "lower_rad": -0.785398163397,
+          "margin_to_lower_rad": 0.7853981913263297,
+          "margin_to_upper_rad": 0.7853981354676702,
+          "upper_rad": 0.785398163397,
+          "value_rad": 2.7929329747154383e-08
+        },
+        "rh_lower_leg_joint": {
+          "lower_rad": -1.605702911835,
+          "margin_to_lower_rad": 1.6064842993211021,
+          "margin_to_upper_rad": 0.6537170820118977,
+          "upper_rad": 0.654498469498,
+          "value_rad": 0.0007813874861022763
+        },
+        "rh_upper_leg_joint": {
+          "lower_rad": -0.916297857297,
+          "margin_to_lower_rad": 1.8146320150081159,
+          "margin_to_upper_rad": 1.2396941759818842,
+          "upper_rad": 2.138028333693,
+          "value_rad": 0.8983341577111159
+        }
+      }
+    }
+  },
+  "motor_command_used": false,
+  "offline_only": true,
+  "repo_root": "/home/matteo-manicardi/MATDOG/github/robot-dog",
+  "schema": 1,
+  "serial_used": false,
+  "station_used": false,
+  "status": "OFFLINE_CANDIDATE_VALID"
+}
