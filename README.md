@@ -28,17 +28,24 @@ on `world Z = 0`, satisfies URDF joint limits and preserves
 `NOMINAL_STRIP_CONTACT` for LF, RF, RH and LH. It remains offline-only and is
 not command-eligible.
 
-The current priority is now C4-B: offline collision/contact policy. No
-commanded stand sequence may begin before collision, contact, stability,
-trajectory and supervised hardware safety gates are complete:
+**C4-B static offline collision/contact policy is complete.** The C4-A
+candidate has no non-foot ground penetration. The low lower-leg clearance near
+the foot is classified as expected distal foot-fork clearance around the rigid
+TPU 90D foot cylinder, not as an automatic failure. Knee/contact clearance is
+validated for the static candidate.
+
+The current priority is now C4-C: offline rest-to-stand trajectory sampling. No
+commanded stand sequence may begin before the full trajectory is sampled for
+collision, contact, knee/contact clearance, URDF limits, stability and
+supervised hardware safety gates:
 
     visual-zero calibration + encoder-to-radian contract
     → LF FK verified live read-only
     → four-leg contact-reference IK + canonical world/contact regressions
     → live FK validation for RF / RH / LH
     → offline safe stand candidate
-    → offline collision/contact policy
-    → rest-to-stand trajectory design
+    → static offline collision/contact policy
+    → offline rest-to-stand trajectory sampling
     → controlled static stand validation
     → four-leg coordination
     → foot trajectories
@@ -160,9 +167,16 @@ C4-A offline safe stand candidate is archived in:
     06_Software/Matdog_Core/kinematics/matdog_offline_safe_stand_candidate.py
     09_Logs/Validation_Reports/2026-07-08_175245_C4A_offline_safe_stand_candidate.json
 
-The next gate is C4-B offline collision/contact policy. The C4-A candidate must
-not be used as a commanded stand pose until collision, contact, stability,
-trajectory and supervised hardware safety gates are complete.
+C4-B static offline collision/contact policy is archived in:
+
+    06_Software/Matdog_Core/kinematics/matdog_offline_collision_contact_policy.py
+    06_Software/Matdog_Core/kinematics/MATDOG_COLLISION_CONTACT_POLICY.md
+    09_Logs/Validation_Reports/C4_collision_contact_policy/2026-07-08_183409_C4B_collision_contact_policy.json
+
+The next gate is C4-C offline rest-to-stand trajectory sampling. The static
+C4-A candidate must not be used as a commanded stand pose until the full
+trajectory is sampled for collision, contact, knee/contact clearance, URDF
+limits, stability and supervised hardware safety gates.
 
 Calibration records:
 
