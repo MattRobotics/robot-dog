@@ -34,10 +34,17 @@ the foot is classified as expected distal foot-fork clearance around the rigid
 TPU 90D foot cylinder, not as an automatic failure. Knee/contact clearance is
 validated for the static candidate.
 
-The current priority is now C4-C: offline rest-to-stand trajectory sampling. No
-commanded stand sequence may begin before the full trajectory is sampled for
-collision, contact, knee/contact clearance, URDF limits, stability and
-supervised hardware safety gates:
+**C4-C offline rest-to-stand trajectory sampling is complete.** Direct
+joint-space interpolation from visual-zero `q = 0` to the C4-A stand candidate
+is rejected. The valid offline trajectory is contact-locked IK: feet remain on
+the C4-A footprint, contact references remain on `world Z = 0`, `base_link`
+stays parallel to the ground, and body height ramps from 100 mm to 150 mm. All
+51 sampled frames pass C4-B collision/contact policy with only the expected
+distal lower-leg foot-fork review.
+
+The current priority is now C4-D: offline trajectory timing and servo
+speed/acceleration envelope validation. No commanded stand sequence may begin
+before timing, stability and supervised hardware safety gates are complete:
 
     visual-zero calibration + encoder-to-radian contract
     → LF FK verified live read-only
@@ -173,10 +180,16 @@ C4-B static offline collision/contact policy is archived in:
     06_Software/Matdog_Core/kinematics/MATDOG_COLLISION_CONTACT_POLICY.md
     09_Logs/Validation_Reports/C4_collision_contact_policy/2026-07-08_183409_C4B_collision_contact_policy.json
 
-The next gate is C4-C offline rest-to-stand trajectory sampling. The static
-C4-A candidate must not be used as a commanded stand pose until the full
-trajectory is sampled for collision, contact, knee/contact clearance, URDF
-limits, stability and supervised hardware safety gates.
+C4-C offline rest-to-stand trajectory sampling is archived in:
+
+    06_Software/Matdog_Core/kinematics/matdog_offline_rest_to_stand_trajectory.py
+    06_Software/Matdog_Core/kinematics/MATDOG_REST_TO_STAND_TRAJECTORY_POLICY.md
+    09_Logs/Validation_Reports/C4_rest_to_stand_trajectory/2026-07-08_190405_C4C_contact_locked_rest_to_stand_trajectory.json
+
+The next gate is C4-D offline trajectory timing and servo speed/acceleration
+envelope validation. The C4-C trajectory must not be used as a commanded stand
+sequence until timing, stability and supervised hardware safety gates are
+complete.
 
 Calibration records:
 
