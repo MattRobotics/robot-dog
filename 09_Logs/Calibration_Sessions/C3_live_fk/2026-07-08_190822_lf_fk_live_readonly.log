@@ -1,0 +1,37 @@
+2026-07-08 19:08:23,051 - Connection established
+2026-07-08 19:08:23,053 - Initial setup successful
+2026-07-08 19:08:23,144 - Read stream 1 started
+=== MATDOG LF LIVE FK — READ ONLY ===
+Questo tool non invia torque, target, speed o accel.
+Prima di muovere manualmente il robot, verifica fisicamente torque OFF.
+Bus: 5B14114953
+Config: /home/matteo-manicardi/MATDOG/github/robot-dog/06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml
+URDF: /home/matteo-manicardi/MATDOG/github/robot-dog/03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
+LF servo order: lf_hip_joint=M13, lf_upper_leg_joint=M12, lf_lower_leg_joint=M11
+
+[  0.41s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+[  1.30s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+[  2.22s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+[  3.11s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+[  4.00s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+[  4.89s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+[  5.80s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+[  6.66s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+[  7.58s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+[  8.47s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+[  9.36s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+[ 10.25s] M13=3535 q=+0.00920 rad (+0.53°) | M12=2821 q=+0.00307 rad (+0.18°) | M11=2071 q=-0.00307 rad (-0.18°)
+  lf_foot_link in base_link: X=+0.219224 m  Y=+0.095286 m  Z=-0.092966 m
+
+TIMEOUT: FK live conclusa senza inviare alcun comando.

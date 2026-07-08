@@ -1,0 +1,59 @@
+2026-07-08 19:12:10,659 - Connection established
+2026-07-08 19:12:10,660 - Initial setup successful
+2026-07-08 19:12:10,755 - Read stream 1 started
+=== MATDOG LH LIVE FK — READ ONLY ===
+Questo tool non invia torque, target, speed o accel.
+Prima di muovere manualmente il robot, verifica fisicamente torque OFF.
+Bus: 5B14114953
+Config: /home/matteo-manicardi/MATDOG/github/robot-dog/06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml
+URDF: /home/matteo-manicardi/MATDOG/github/robot-dog/03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
+LH servo order: lh_hip_joint=M43, lh_upper_leg_joint=M42, lh_lower_leg_joint=M41
+
+[  0.41s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[  1.32s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[  2.21s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[  3.11s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[  4.00s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[  4.89s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[  5.79s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[  6.66s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[  7.55s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[  8.45s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[  9.36s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 10.25s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 11.14s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 12.04s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 12.93s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 13.82s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 14.74s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 15.63s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 16.52s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 17.43s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 18.32s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 19.21s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+[ 20.08s] M43=1247 q=+0.03988 rad (+2.29°) | M42=2907 q=-0.05216 rad (-2.99°) | M41=  99 q=+0.06289 rad (+3.60°)
+  lh_foot_link in base_link: X=-0.001350 m  Y=+0.099582 m  Z=-0.112458 m
+
+TIMEOUT: FK live conclusa senza inviare alcun comando.
