@@ -11,8 +11,8 @@ The project combines mechanical design, 3D printing, ST3215 serial-bus servos, k
 **Mechanical visual-zero calibration and the encoder-to-radian software
 contract are complete for all 12 leg joints.**
 
-**LF single-leg forward kinematics is verified offline and live read-only from
-Station telemetry, using the canonical REV00 URDF.**
+**Live forward kinematics is verified read-only from Station telemetry for
+LF, RF, RH and LH, using the canonical REV00 URDF.**
 
 **Contact-reference inverse kinematics is verified offline for LF, RF, RH and
 LH through the canonical REV00 URDF and canonical foot-contact model.**
@@ -20,8 +20,10 @@ LH through the canonical REV00 URDF and canonical foot-contact model.**
 **Canonical world/contact closure and four-leg FK → IK regressions are locked
 offline.**
 
-The current priority is read-only live FK validation for RF, RH and LH. No
-commanded stand sequence may begin before that phase completes:
+**C3 live FK read-only validation is complete for all four legs.**
+
+The current priority is now the offline safe stand candidate. No commanded
+stand sequence may begin before that phase completes:
 
     visual-zero calibration + encoder-to-radian contract
     → LF FK verified live read-only
@@ -54,7 +56,8 @@ Validated so far:
 - safe upper- and lower-leg joint limits;
 - mechanical visual-zero capture for all 12 leg joints;
 - encoder-to-radian URDF conversion contract;
-- global static tracking acceptance policy: <=10 ticks (±0.879°).
+- global static tracking acceptance policy: <=10 ticks (±0.879°);
+- C3 live FK read-only validation for LF, RF, RH and LH.
 
 ## Canonical REV00 Robot Description
 
@@ -135,11 +138,17 @@ static residual of 10 ticks with low current and status 0x00. M13 is accepted
 under the same shared policy as every other joint.
 
 LF live FK was validated on 2026-07-07 with Station as the sole serial owner.
-The read-only viewer converted live M13/M12/M11 encoder state to URDF joint
-angles and computed `lf_foot_link` in `base_link`. A manual M12 sweep produced
-continuous foot-frame motion; return-to-visual-zero passed with LF errors
-M13=6, M12=2 and M11=1 tick. This validates the LF software and telemetry
-chain, not physical metrology or the other three legs.
+On 2026-07-08 the generalized live FK read-only tool was validated for all four
+legs: LF, RF, RH and LH. The tool reads Station telemetry only, converts encoder
+state to URDF joint angles and computes the selected `*_foot_link` in
+`base_link`, without sending torque, target, speed or accel commands.
+
+C3-B live FK read-only validation is archived in:
+
+    09_Logs/Calibration_Sessions/C3_live_fk/
+
+The next gate is the offline safe stand candidate. Visual-zero must not be used
+as a shortcut for a commanded stand pose.
 
 Calibration records:
 
@@ -176,7 +185,7 @@ Calibration records:
 - [x] Single-leg forward kinematics (LF live read-only reference)
 - [x] Per-leg contact-reference inverse kinematics (LF / RF / RH / LH, offline)
 - [x] Canonical world/contact/IK closure regressions (offline)
-- [ ] Extend live FK validation to RF, RH and LH
+- [x] Extend live FK validation to RF, RH and LH
 - [ ] Safe stand pose
 - [ ] Four-leg body-height control
 - [ ] Trot in place
