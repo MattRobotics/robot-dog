@@ -8,8 +8,8 @@ The project combines mechanical design, 3D printing, ST3215 serial-bus servos, k
 
 **MATDOG REV00 kinematic baseline is archived and validated.**
 
-**Mechanical visual-zero calibration and the encoder-to-radian software
-contract are complete for all 12 leg joints.**
+**Mechanical q=0 alignment, 12-servo ST3215 digital-zero calibration and the
+encoder-to-radian software contract are complete for all 12 leg joints.**
 
 **Live forward kinematics is verified read-only from Station telemetry for
 LF, RF, RH and LH, using the canonical REV00 URDF.**
@@ -35,8 +35,8 @@ TPU 90D foot cylinder, not as an automatic failure. Knee/contact clearance is
 validated for the static candidate.
 
 **C4-C offline rest-to-stand trajectory sampling is complete.** Direct
-joint-space interpolation from visual-zero `q = 0` to the C4-A stand candidate
-is rejected. The valid offline trajectory is contact-locked IK: feet remain on
+joint-space interpolation from the original mechanical `q = 0` reference to the
+C4-A stand candidate is rejected. The valid offline trajectory is contact-locked IK: feet remain on
 the C4-A footprint, contact references remain on `world Z = 0`, `base_link`
 stays parallel to the ground, and body height ramps from 100 mm to 150 mm. All
 51 sampled frames pass C4-B collision/contact policy with only the expected
@@ -59,17 +59,24 @@ direct-serial risks and no existing stand-command candidate. Four existing
 command-capable calibration/probe tools are explicitly blacklisted for the first
 stand. Hardware checklist and abort policy are documented.
 
-The next phase is C5: supervised first physical stand. C5 must start in a new
-chat with read-only live validation before any physical command is considered:
+**C5-R 12-servo digital-zero calibration is complete.** All joints were
+manually aligned at the validated mechanical `q = 0` pose with torque disabled.
+The signed ST3215 Position Offset was then calibrated so that mechanical
+`q = 0` is represented by encoder position `2048` on every joint. Final
+post-restart EEPROM read-back confirmed all 12 offsets, `LOCK = 1` and
+`TORQUE = 0`.
 
-    visual-zero calibration + encoder-to-radian contract
-    → LF FK verified live read-only
-    → four-leg contact-reference IK + canonical world/contact regressions
-    → live FK validation for RF / RH / LH
-    → offline safe stand candidate
-    → static offline collision/contact policy
-    → offline rest-to-stand trajectory sampling
-    → controlled static stand validation
+The next phase is MATDOG-specific automatic mechanical end-stop calibration
+and post-calibration validation before any new physical C5 stand attempt:
+
+    verified 12-servo digital zero
+    → design and offline audit of the automatic end-stop calibrator
+    → supervised one-joint-at-a-time mechanical contact acquisition
+    → derive measured contact limits and conservative safe limits
+    → update the canonical joint-calibration record
+    → read-only joint-state and four-leg FK closure
+    → regenerate and audit C5 encoder targets
+    → supervised rest-to-stand validation
     → four-leg coordination
     → foot trajectories
     → trot in place
@@ -92,7 +99,9 @@ Validated so far:
 - 17-link / 16-joint REV00 kinematic model;
 - visual and collision mesh placement;
 - safe upper- and lower-leg joint limits;
-- mechanical visual-zero capture for all 12 leg joints;
+- validated mechanical q=0 capture for all 12 leg joints;
+- 12-servo ST3215 digital-zero EEPROM calibration;
+- final post-restart EEPROM read-back with lock and torque verification;
 - encoder-to-radian URDF conversion contract;
 - global static tracking acceptance policy: <=10 ticks (±0.879°);
 - C3 live FK read-only validation for LF, RF, RH and LH.
@@ -155,9 +164,28 @@ Coordinate convention:
 
 ## Calibration Status
 
-Mechanical visual-zero calibration was captured for all 12 leg joints on
-2026-07-06. The canonical encoder-to-radian contract is now the software
-source of truth for live joint state, FK and later IK.
+Mechanical reference calibration was captured for all 12 leg joints on
+2026-07-06. On 2026-07-10 the complete 12-servo digital-zero calibration was
+validated: each physical mechanical `q = 0` encoder value was mapped to the
+canonical displayed value `2048` by writing the signed ST3215 Position Offset.
+
+The final post-restart read-back confirmed the planned offset on every servo,
+EEPROM `LOCK = 1`, `TORQUE = 0`, displayed positions from 2048 to 2051 ticks,
+and a maximum physical raw-encoder deviation of 3 ticks from the mechanical-q0
+capture.
+
+The canonical encoder-to-radian contract remains the software source of truth
+for live joint state, FK and IK. The digital recenter changes the servo-side
+encoder representation of `q = 0`; it does not change joint directions, URDF
+geometry, URDF limits or mechanical/contact limits.
+
+Canonical utility:
+
+    06_Software/Matdog_Core/calibration/matdog_digital_zero_calibration.py
+
+Procedure:
+
+    06_Software/Matdog_Core/calibration/MATDOG_DIGITAL_ZERO_CALIBRATION.md
 
 Static tracking acceptance is unified for all 12 ST3215 servos:
 
@@ -165,9 +193,9 @@ Static tracking acceptance is unified for all 12 ST3215 servos:
     tolerance = ±0.879°
 
 This applies to static hold, single-servo micro-probe, return validation and
-controlled static-pose checks. It does not change visual or final zero,
-encoder direction, URDF limits, mechanical/contact limits, stand acceptance
-or dynamic locomotion acceptance.
+controlled static-pose checks. It does not change the mechanical `q = 0`
+definition, calibrated digital zero, encoder direction, URDF limits,
+mechanical/contact limits, stand acceptance or dynamic locomotion acceptance.
 
 M13 (LF hip) was diagnosed separately after an initially tighter 8-tick
 threshold exposed a repeatable directional residual. Read-only range checks
@@ -220,14 +248,20 @@ C4-F hardware safe-mode preflight is archived in:
     06_Software/Matdog_Core/kinematics/MATDOG_HARDWARE_SAFE_MODE_PREFLIGHT.md
     09_Logs/Validation_Reports/C4_hardware_safe_mode_preflight/2026-07-08_193744_C4F_hardware_safe_mode_source_audit.json
 
-The next phase is C5 supervised first physical stand. C5 must start in a new
-chat and begin with read-only live validation. The C4-C/C4-D/C4-E trajectory
-must not be used as a commanded stand sequence until C5 confirms hardware
-preflight, operator approval and abort readiness.
+The next phase is a separate MATDOG mechanical end-stop calibration workflow.
+Its intended operator experience is a single controlled calibration action, but
+the implementation must remain Station-mediated, collision-aware and
+one-joint-at-a-time. It must measure physical contact limits, apply conservative
+safety margins, update the canonical calibration record, and complete a new
+read-only FK/target audit before any supervised rest-to-stand attempt.
 
 Calibration records:
 
-- configuration: `06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml`;
+- canonical configuration: `06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml`;
+- unified 12-servo tool: `06_Software/Matdog_Core/calibration/matdog_digital_zero_calibration.py`;
+- digital-zero procedure: `06_Software/Matdog_Core/calibration/MATDOG_DIGITAL_ZERO_CALIBRATION.md`;
+- mechanical end-stop calibration plan: `06_Software/Matdog_Core/calibration/MATDOG_MECHANICAL_ENDSTOP_CALIBRATION_PLAN.md`;
+- final digital-zero read-back: `09_Logs/Calibration/C5_R_digital_recenter/2026-07-10_145457Z_final_12_offset_readback.json`;
 - tolerance policy: `09_Logs/Calibration_Sessions/2026-07-07_static_tracking_tolerance_10_ticks.policy.yaml`;
 - M13 diagnostic: `09_Logs/Calibration_Sessions/2026-07-07_092043_M13_micro_probe_diagnostic.json`.
 
@@ -254,14 +288,28 @@ Calibration records:
 
 ### Phase 2 — Locomotion
 
-- [x] Mechanical visual-zero calibration for all 12 joints
+- [x] Mechanical q=0 calibration for all 12 joints
 - [x] Encoder-to-radian calibration contract (software)
+- [x] 12-servo ST3215 digital-zero EEPROM calibration
+- [x] Final post-restart EEPROM read-back for all 12 joints
 - [x] Global static tracking policy: <=10 ticks (±0.879°)
 - [x] Single-leg forward kinematics (LF live read-only reference)
 - [x] Per-leg contact-reference inverse kinematics (LF / RF / RH / LH, offline)
 - [x] Canonical world/contact/IK closure regressions (offline)
 - [x] Extend live FK validation to RF, RH and LH
-- [ ] Safe stand pose
+- [x] Offline safe stand candidate (C4-A)
+- [x] Static collision/contact policy (C4-B)
+- [x] Contact-locked rest-to-stand trajectory sampling (C4-C)
+- [x] Trajectory timing and servo-envelope validation (C4-D)
+- [x] Static stability and support-polygon validation (C4-E)
+- [x] Hardware safe-mode preflight and abort policy (C4-F)
+- [x] First supervised stand executor and supported hardware procedure implemented (pre-recenter reference)
+- [ ] MATDOG automatic mechanical end-stop calibration design and offline audit
+- [ ] Supervised 12-joint mechanical contact acquisition
+- [ ] Measured contact limits and conservative safe limits recorded in the canonical YAML
+- [ ] Post-limit-calibration read-only joint-state and four-leg FK closure
+- [ ] Regenerate and audit C5 encoder targets against digital zero and measured safe limits
+- [ ] Supervised physical stand validation after digital recenter and limit calibration
 - [ ] Four-leg body-height control
 - [ ] Trot in place
 - [ ] First slow walking tests
@@ -286,6 +334,8 @@ Calibration records:
 - Validation reports: 09_Logs/Validation_Reports/
 - Development log: 09_Logs/Development_Log/
 - Calibration sessions: 09_Logs/Calibration_Sessions/
+- Digital-zero calibration: 09_Logs/Calibration/C5_R_digital_recenter/
+- C5-R post-digital-zero handoff: 09_Logs/Development_Log/2026-07-10_C5R_POST_DIGITAL_ZERO_HANDOFF.md
 - LF live FK validation: 09_Logs/Calibration_Sessions/2026-07-07_lf_fk_live_validation.result.yaml
 - Canonical world/contact/IK regressions: 06_Software/Matdog_Core/kinematics/tests/test_matdog_quadruped_leg_contact_ik.py
 - URDF REV00 package: 03_CAD/URDF/matt_robodog_rev00/

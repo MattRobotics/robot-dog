@@ -1,9 +1,8 @@
-schema_version: 2
-
+schema_version: 3
 robot:
   name: MATDOG
   leg_order: [LF, RF, RH, LH]
-  calibration_status: VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION
+  calibration_status: DIGITAL_ZERO_CALIBRATED_AND_VERIFIED
 
 kinematic_model:
   canonical_urdf:
@@ -21,6 +20,20 @@ reference_pose:
     ma NON è ancora lo zero cinematico finale q=0 dell'URDF.
   captured_at: "2026-07-02"
   samples_per_joint: 18
+
+digital_zero_calibration:
+  status: PASS_FINAL_EEPROM_READBACK
+  calibrated_at: "2026-07-10"
+  target_displayed_encoder: 2048
+  position_offset_register: "0x1F"
+  eeprom_lock_register: "0x37"
+  method: "Station-mediated 12-servo ST3215 Position Offset calibration"
+  station_is_sole_serial_owner: true
+  torque_required_off: true
+  goal_position_commands_sent: false
+  final_readback_artifact: "09_Logs/Calibration/C5_R_digital_recenter/2026-07-10_145457Z_final_12_offset_readback.json"
+  final_readback_sha256: "15619d23ddcb17651ba729a0d69309b5b56befeb3377f123ff7f131582fcf8ec"
+  procedure: "06_Software/Matdog_Core/calibration/MATDOG_DIGITAL_ZERO_CALIBRATION.md"
 
 joint_groups:
   hip:
@@ -47,144 +60,180 @@ joints:
     provisional_reference_encoder: 3534
     direction: -1
     zero_encoder_visual: 3541
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 1543
+    digital_zero_offset_signed_i16: -505
+    final_readback_present_median: 2050
     joint_group: hip
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
   lf_upper_leg_joint:
     servo_id: 12
     provisional_reference_encoder: 2859
     direction: 1
     zero_encoder_visual: 2819
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 2907
+    digital_zero_offset_signed_i16: 859
+    final_readback_present_median: 2051
     joint_group: upper_leg
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
   lf_lower_leg_joint:
     servo_id: 11
     provisional_reference_encoder: 2089
     direction: -1
     zero_encoder_visual: 2069
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 2149
+    digital_zero_offset_signed_i16: 101
+    final_readback_present_median: 2048
     joint_group: lower_leg
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
   rf_hip_joint:
     servo_id: 23
     provisional_reference_encoder: 15
     direction: -1
     zero_encoder_visual: 4070
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 361
+    digital_zero_offset_signed_i16: -1687
+    final_readback_present_median: 2048
     joint_group: hip
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
   rf_upper_leg_joint:
     servo_id: 22
     provisional_reference_encoder: 1052
     direction: -1
     zero_encoder_visual: 1072
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 1157
+    digital_zero_offset_signed_i16: -891
+    final_readback_present_median: 2048
     joint_group: upper_leg
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
   rf_lower_leg_joint:
     servo_id: 21
     provisional_reference_encoder: 4032
     direction: 1
     zero_encoder_visual: 4070
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 62
+    digital_zero_offset_signed_i16: -1986
+    final_readback_present_median: 2049
     joint_group: lower_leg
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
   rh_hip_joint:
     servo_id: 33
     provisional_reference_encoder: 1520
     direction: 1
     zero_encoder_visual: 1492
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 1578
+    digital_zero_offset_signed_i16: -470
+    final_readback_present_median: 2048
     joint_group: hip
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
   rh_upper_leg_joint:
     servo_id: 32
     provisional_reference_encoder: 1018
     direction: -1
     zero_encoder_visual: 1011
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 1095
+    digital_zero_offset_signed_i16: -953
+    final_readback_present_median: 2048
     joint_group: upper_leg
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
   rh_lower_leg_joint:
     servo_id: 31
     provisional_reference_encoder: 4015
     direction: 1
     zero_encoder_visual: 4038
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 27
+    digital_zero_offset_signed_i16: -2021
+    final_readback_present_median: 2049
     joint_group: lower_leg
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
   lh_hip_joint:
     servo_id: 43
     provisional_reference_encoder: 1231
     direction: 1
     zero_encoder_visual: 1221
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 1308
+    digital_zero_offset_signed_i16: -740
+    final_readback_present_median: 2048
     joint_group: hip
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
   lh_upper_leg_joint:
     servo_id: 42
     provisional_reference_encoder: 2929
     direction: 1
     zero_encoder_visual: 2941
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 3027
+    digital_zero_offset_signed_i16: 979
+    final_readback_present_median: 2049
     joint_group: upper_leg
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
   lh_lower_leg_joint:
     servo_id: 41
     provisional_reference_encoder: 111
     direction: -1
     zero_encoder_visual: 140
-    zero_encoder_final: null
+    zero_encoder_final: 2048
+    geometric_q0_raw_unoffset: 224
+    digital_zero_offset_signed_i16: -1824
+    final_readback_present_median: 2048
     joint_group: lower_leg
     first_stand_limit_rad: {min: null, max: null}
     measured_contact_rad: {min: null, max: null}
     safe_limit_rad: {min: null, max: null}
-    validation_status: PASS_DIRECTION_TEST
+    validation_status: PASS_DIGITAL_ZERO_EEPROM_READBACK
 
 validation_notes:
   lf_hip_return_probe:

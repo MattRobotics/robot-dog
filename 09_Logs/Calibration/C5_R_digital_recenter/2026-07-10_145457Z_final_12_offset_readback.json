@@ -1,0 +1,256 @@
+{
+  "created_at_utc": "2026-07-10T14:54:57.462374+00:00",
+  "eeprom_writes_sent": false,
+  "failures": [],
+  "goal_position_commands_sent": false,
+  "hardware_operation": "read_only",
+  "motors": [
+    {
+      "display_delta_from_2048": 0,
+      "expected_offset": 101,
+      "joint": "LF_LOWER",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 11,
+      "offset_values": [
+        101
+      ],
+      "present_median": 2048,
+      "q0_raw": 2149,
+      "raw_delta": 0,
+      "raw_median": 2149,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    },
+    {
+      "display_delta_from_2048": 3,
+      "expected_offset": 859,
+      "joint": "LF_UPPER",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 12,
+      "offset_values": [
+        859
+      ],
+      "present_median": 2051,
+      "q0_raw": 2907,
+      "raw_delta": 3,
+      "raw_median": 2910,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    },
+    {
+      "display_delta_from_2048": 2,
+      "expected_offset": -505,
+      "joint": "LF_HIP",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 13,
+      "offset_values": [
+        -505
+      ],
+      "present_median": 2050,
+      "q0_raw": 1543,
+      "raw_delta": 2,
+      "raw_median": 1545,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    },
+    {
+      "display_delta_from_2048": 1,
+      "expected_offset": -1986,
+      "joint": "RF_LOWER",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 21,
+      "offset_values": [
+        -1986
+      ],
+      "present_median": 2049,
+      "q0_raw": 62,
+      "raw_delta": 1,
+      "raw_median": 63,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    },
+    {
+      "display_delta_from_2048": 0,
+      "expected_offset": -891,
+      "joint": "RF_UPPER",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 22,
+      "offset_values": [
+        -891
+      ],
+      "present_median": 2048,
+      "q0_raw": 1157,
+      "raw_delta": 0,
+      "raw_median": 1157,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    },
+    {
+      "display_delta_from_2048": 0,
+      "expected_offset": -1687,
+      "joint": "RF_HIP",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 23,
+      "offset_values": [
+        -1687
+      ],
+      "present_median": 2048,
+      "q0_raw": 361,
+      "raw_delta": 0,
+      "raw_median": 361,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    },
+    {
+      "display_delta_from_2048": 1,
+      "expected_offset": -2021,
+      "joint": "RH_LOWER",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 31,
+      "offset_values": [
+        -2021
+      ],
+      "present_median": 2049,
+      "q0_raw": 27,
+      "raw_delta": 1,
+      "raw_median": 28,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    },
+    {
+      "display_delta_from_2048": 0,
+      "expected_offset": -953,
+      "joint": "RH_UPPER",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 32,
+      "offset_values": [
+        -953
+      ],
+      "present_median": 2048,
+      "q0_raw": 1095,
+      "raw_delta": 0,
+      "raw_median": 1095,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    },
+    {
+      "display_delta_from_2048": 0,
+      "expected_offset": -470,
+      "joint": "RH_HIP",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 33,
+      "offset_values": [
+        -470
+      ],
+      "present_median": 2048,
+      "q0_raw": 1578,
+      "raw_delta": 0,
+      "raw_median": 1578,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    },
+    {
+      "display_delta_from_2048": 0,
+      "expected_offset": -1824,
+      "joint": "LH_LOWER",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 41,
+      "offset_values": [
+        -1824
+      ],
+      "present_median": 2048,
+      "q0_raw": 224,
+      "raw_delta": 0,
+      "raw_median": 224,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    },
+    {
+      "display_delta_from_2048": 1,
+      "expected_offset": 979,
+      "joint": "LH_UPPER",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 42,
+      "offset_values": [
+        979
+      ],
+      "present_median": 2049,
+      "q0_raw": 3027,
+      "raw_delta": 1,
+      "raw_median": 3028,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    },
+    {
+      "display_delta_from_2048": 0,
+      "expected_offset": -740,
+      "joint": "LH_HIP",
+      "lock_values": [
+        1
+      ],
+      "motor_id": 43,
+      "offset_values": [
+        -740
+      ],
+      "present_median": 2048,
+      "q0_raw": 1308,
+      "raw_delta": 0,
+      "raw_median": 1308,
+      "result": "PASS",
+      "torque_values": [
+        0
+      ]
+    }
+  ],
+  "samples": 21,
+  "schema": "matdog.st3215.final_12_offset_readback.v1",
+  "source_plan": "09_Logs/Calibration/C5_R_digital_recenter/2026-07-10_134700Z_digital_recenter_preview.json",
+  "source_q0": "09_Logs/Calibration/C5_R_digital_recenter/2026-07-10_134700Z_geometric_q0_candidate.json",
+  "status": "PASS",
+  "tolerance_ticks": 10,
+  "torque_commands_sent": false
+}
