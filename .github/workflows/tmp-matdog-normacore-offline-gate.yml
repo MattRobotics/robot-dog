@@ -46,14 +46,19 @@ jobs:
           grep -q 'MATDOG_MOTOR_IDS' "$file"
           grep -q 'M12_MIN_GUARD_TICK' "$file"
 
-      - name: Apply rustfmt and capture formatted sources
+      - name: Apply rustfmt and capture diagnostics
+        continue-on-error: true
         working-directory: norma-core
+        shell: bash
         run: |
-          cargo fmt --all
-          git diff --binary > ../ci-output/rustfmt.patch
+          set -o pipefail
+          cargo fmt --all 2>&1 | tee ../ci-output/rustfmt.log
+          fmt_rc=${PIPESTATUS[0]}
+          git diff --binary > ../ci-output/rustfmt.patch || true
           cp software/drivers/st3215/src/auto_calibrate/mod.rs ../ci-output/formatted/mod.rs
           cp software/drivers/st3215/src/auto_calibrate/matdog.rs ../ci-output/formatted/matdog.rs
           cp software/drivers/st3215/src/auto_calibrate/matdog_test.rs ../ci-output/formatted/matdog_test.rs
+          exit "$fmt_rc"
 
       - name: ST3215 unit tests
         continue-on-error: true
