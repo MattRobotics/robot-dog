@@ -4,83 +4,36 @@ MATDOG is a custom quadruped robot developed by Matt Robotics in Italy.
 
 The project combines mechanical design, 3D printing, ST3215 serial-bus servos, kinematics, gait generation, embedded control and future perception capabilities.
 
-## Current Engineering Milestone
+## Current Engineering Milestone — 2026-07-21
 
-**MATDOG REV00 kinematic baseline is archived and validated.**
+MATDOG REV00, digital zero, encoder-to-radian conversion, four-leg live FK, offline IK/contact closure, collision policy and offline contact-locked rest-to-stand planning are complete.
 
-**Mechanical q=0 alignment, 12-servo ST3215 digital-zero calibration and the
-encoder-to-radian software contract are complete for all 12 leg joints.**
+The mechanical end-stop calibration architecture is now frozen:
 
-**Live forward kinematics is verified read-only from Station telemetry for
-LF, RF, RH and LH, using the canonical REV00 URDF.**
+```text
+MATDOG AutoCalibrate command
+→ native NormaCore ST3215 Rust sequence
+→ RAM-only verified control
+→ position + velocity + PresentCurrent contact detector
+→ backoff + repeated contact
+→ measured contact and safe-limit record
+```
 
-**Contact-reference inverse kinematics is verified offline for LF, RF, RH and
-LH through the canonical REV00 URDF and canonical foot-contact model.**
+Command-capable Python end-stop prototypes created during the 2026-07-21 experiments are retired and must not be used again. The next hardware test is exclusively the native `LF_UPPER / M12 / MIN` pilot.
 
-**Canonical world/contact closure and four-leg FK → IK regressions are locked
-offline.**
+No new C5 stand attempt is command-eligible until:
 
-**C3 live FK read-only validation is complete for all four legs.**
+```text
+native M12 pilot PASS
+→ 24 validated joint contacts
+→ conservative safe limits in MATDOG_JOINT_CALIBRATION.yaml
+→ read-only four-leg FK closure
+→ regenerated HOME q=0 → LOW_STAND → NOMINAL_STAND targets
+→ collision, contact, support and timing audit
+→ supervised suspended stand
+```
 
-**C4-A offline safe stand candidate is complete.** The candidate keeps
-`base_link` parallel to the ground, places all four validated contact references
-on `world Z = 0`, satisfies URDF joint limits and preserves
-`NOMINAL_STRIP_CONTACT` for LF, RF, RH and LH. It remains offline-only and is
-not command-eligible.
-
-**C4-B static offline collision/contact policy is complete.** The C4-A
-candidate has no non-foot ground penetration. The low lower-leg clearance near
-the foot is classified as expected distal foot-fork clearance around the rigid
-TPU 90D foot cylinder, not as an automatic failure. Knee/contact clearance is
-validated for the static candidate.
-
-**C4-C offline rest-to-stand trajectory sampling is complete.** Direct
-joint-space interpolation from the original mechanical `q = 0` reference to the
-C4-A stand candidate is rejected. The valid offline trajectory is contact-locked IK: feet remain on
-the C4-A footprint, contact references remain on `world Z = 0`, `base_link`
-stays parallel to the ground, and body height ramps from 100 mm to 150 mm. All
-51 sampled frames pass C4-B collision/contact policy with only the expected
-distal lower-leg foot-fork review.
-
-**C4-D offline trajectory timing and servo-envelope validation is complete.**
-The C4-C contact-locked IK trajectory is validated with a conservative 10 s
-timing envelope: 51 samples, 0.2 s sample interval, maximum measured speed
-6.454 deg/s and maximum measured acceleration 0.946 deg/s². The envelope remains
-offline-only and is not command-eligible.
-
-**C4-E offline static stability / support-polygon validation is complete.**
-The C4-C/C4-D trajectory keeps the base-link COM proxy and its conservative
-±20 mm X/Y uncertainty box inside the four-foot support polygon for all 51
-samples. Worst support margin is 74.000 mm. This is still a proxy check and does
-not replace a future CAD-derived COM model.
-
-**C4-F hardware safe-mode preflight is complete.** The source audit found no
-direct-serial risks and no existing stand-command candidate. Four existing
-command-capable calibration/probe tools are explicitly blacklisted for the first
-stand. Hardware checklist and abort policy are documented.
-
-**C5-R 12-servo digital-zero calibration is complete.** All joints were
-manually aligned at the validated mechanical `q = 0` pose with torque disabled.
-The signed ST3215 Position Offset was then calibrated so that mechanical
-`q = 0` is represented by encoder position `2048` on every joint. Final
-post-restart EEPROM read-back confirmed all 12 offsets, `LOCK = 1` and
-`TORQUE = 0`.
-
-The next phase is MATDOG-specific automatic mechanical end-stop calibration
-and post-calibration validation before any new physical C5 stand attempt:
-
-    verified 12-servo digital zero
-    → design and offline audit of the automatic end-stop calibrator
-    → supervised one-joint-at-a-time mechanical contact acquisition
-    → derive measured contact limits and conservative safe limits
-    → update the canonical joint-calibration record
-    → read-only joint-state and four-leg FK closure
-    → regenerate and audit C5 encoder targets
-    → supervised rest-to-stand validation
-    → four-leg coordination
-    → foot trajectories
-    → trot in place
-    → first slow walking tests
+NormaCore foundation currently targets upstream `0.1.0-beta.9`, `normfs 0.1.0-beta.1`, PR #86 and MATDOG sparse servo discovery through ID 43.
 
 ## Validated Platform
 
@@ -289,30 +242,27 @@ Calibration records:
 ### Phase 2 — Locomotion
 
 - [x] Mechanical q=0 calibration for all 12 joints
-- [x] Encoder-to-radian calibration contract (software)
-- [x] 12-servo ST3215 digital-zero EEPROM calibration
-- [x] Final post-restart EEPROM read-back for all 12 joints
+- [x] Encoder-to-radian calibration contract
+- [x] 12-servo ST3215 digital-zero EEPROM calibration and final readback
 - [x] Global static tracking policy: <=10 ticks (±0.879°)
-- [x] Single-leg forward kinematics (LF live read-only reference)
-- [x] Per-leg contact-reference inverse kinematics (LF / RF / RH / LH, offline)
-- [x] Canonical world/contact/IK closure regressions (offline)
-- [x] Extend live FK validation to RF, RH and LH
-- [x] Offline safe stand candidate (C4-A)
-- [x] Static collision/contact policy (C4-B)
-- [x] Contact-locked rest-to-stand trajectory sampling (C4-C)
-- [x] Trajectory timing and servo-envelope validation (C4-D)
-- [x] Static stability and support-polygon validation (C4-E)
-- [x] Hardware safe-mode preflight and abort policy (C4-F)
-- [x] First supervised stand executor and supported hardware procedure implemented (pre-recenter reference)
-- [ ] MATDOG automatic mechanical end-stop calibration design and offline audit
-- [ ] Supervised 12-joint mechanical contact acquisition
-- [ ] Measured contact limits and conservative safe limits recorded in the canonical YAML
-- [ ] Post-limit-calibration read-only joint-state and four-leg FK closure
-- [ ] Regenerate and audit C5 encoder targets against digital zero and measured safe limits
-- [ ] Supervised physical stand validation after digital recenter and limit calibration
+- [x] Four-leg live FK and offline contact-reference IK closure
+- [x] C4-A…C4-F offline stand, collision, timing, stability and preflight references
+- [x] Mechanical end-stop prerequisite geometry and cross-leg parking poses
+- [x] NormaCore upstream update to 0.1.0-beta.9 / normfs 0.1.0-beta.1 foundation
+- [x] Retire command-capable Python end-stop prototypes
+- [ ] Commit and publish MATDOG sparse-ID discovery foundation in NormaCore fork
+- [ ] Implement native Rust MATDOG AutoCalibrate dispatcher and RAM-only primitives
+- [ ] Native LF_UPPER / M12 / MIN pilot
+- [ ] Supervised 12-joint / 24-contact acquisition
+- [ ] Record measured contacts and conservative safe limits in canonical YAML
+- [ ] Post-calibration read-only joint-state and four-leg FK closure
+- [ ] Regenerate and audit HOME q=0 → LOW_STAND → NOMINAL_STAND trajectory
+- [ ] Supervised suspended stand and gradual load transfer
 - [ ] Four-leg body-height control
+- [ ] Single-foot swing trajectory
 - [ ] Trot in place
 - [ ] First slow walking tests
+
 
 ### Phase 3 — Embedded Integration
 
@@ -336,6 +286,7 @@ Calibration records:
 - Calibration sessions: 09_Logs/Calibration_Sessions/
 - Digital-zero calibration: 09_Logs/Calibration/C5_R_digital_recenter/
 - C5-R post-digital-zero handoff: 09_Logs/Development_Log/2026-07-10_C5R_POST_DIGITAL_ZERO_HANDOFF.md
+- Native calibrator handoff: 09_Logs/Development_Log/2026-07-21_NATIVE_NORMACORE_CALIBRATOR_HANDOFF.md
 - LF live FK validation: 09_Logs/Calibration_Sessions/2026-07-07_lf_fk_live_validation.result.yaml
 - Canonical world/contact/IK regressions: 06_Software/Matdog_Core/kinematics/tests/test_matdog_quadruped_leg_contact_ik.py
 - URDF REV00 package: 03_CAD/URDF/matt_robodog_rev00/

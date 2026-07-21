@@ -1,5 +1,12 @@
 # MATDOG — C5-R Post-Digital-Zero Handoff
 
+
+> **Superseded next-step architecture (2026-07-21):** digital-zero facts in
+> this document remain canonical. The next implementation is now the native
+> NormaCore Rust MATDOG calibrator described in
+> `2026-07-21_NATIVE_NORMACORE_CALIBRATOR_HANDOFF.md`. Command-capable Python
+> prototypes are retired.
+
 ## Repository
 
 ```text

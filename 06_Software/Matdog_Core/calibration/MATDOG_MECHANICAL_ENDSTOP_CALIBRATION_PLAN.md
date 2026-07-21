@@ -1,184 +1,201 @@
-# MATDOG — Automatic Mechanical End-Stop Calibration Plan
+# MATDOG — Native NormaCore Mechanical End-Stop Calibrator Plan
 
-## Status
+**Status:** IMPLEMENTATION FOUNDATION — HARDWARE BLOCKED UNTIL NATIVE PILOT TESTS PASS
+**Canonical implementation:** NormaCore ST3215 driver, Rust
+**Pilot:** LF upper joint, servo M12, URDF minimum
+**EEPROM writes:** forbidden
 
-```text
-STATUS: PLANNED — NOT YET COMMAND-ELIGIBLE
-HARDWARE EXECUTION: NOT AUTHORIZED BY THIS DOCUMENT
-```
+## 1. Decision
 
-## Objective
-
-Create a MATDOG-specific automatic calibration workflow for all 12 ST3215 leg
-joints, with an operator experience comparable to pressing a single calibration
-control on a production robot.
-
-The workflow must discover the real mechanical contact range of every joint,
-derive conservative safe limits and store the validated results in the
-canonical MATDOG calibration record.
-
-This phase is separate from digital-zero calibration. Digital zero is already
-complete and maps mechanical `q = 0` to displayed encoder position `2048`.
-Mechanical end-stop calibration must not rewrite those Position Offset values.
-
-## Canonical joints
+The MATDOG mechanical end-stop calibrator shall be implemented as a robot-specific native sequence inside NormaCore, following the same architectural pattern used by SO101 and ElRobot:
 
 ```text
-LF: M13 hip, M12 upper, M11 lower
-RF: M23 hip, M22 upper, M21 lower
-RH: M33 hip, M32 upper, M31 lower
-LH: M43 hip, M42 upper, M41 lower
+software/drivers/st3215/src/auto_calibrate/matdog.rs
 ```
 
-## Mandatory architecture
+Python command-capable end-stop prototypes are retired and are not command-eligible.
 
-- NormaCore Station remains the sole serial owner.
-- No direct `pyserial` access is allowed.
-- The generic NormaCore `AutoCalibrate` operation is not authorized.
-- The tool must be MATDOG-specific and use the canonical servo map.
-- Normal unsigned ST3215 `GoalPosition` semantics must be preserved.
-- Signed `GoalPosition` experiments are forbidden.
-- EEPROM digital-zero offsets must remain unchanged.
-- The robot must remain supported throughout calibration.
-- Hardware motion requires a fresh explicit operator authorization.
+## 2. Robot identification
 
-## Required calibration strategy
-
-The final tool should expose a single top-level calibration action but execute
-a guarded internal sequence.
-
-Each joint must be calibrated separately:
+Auto-calibration may start only when the discovered motor set exactly equals:
 
 ```text
-preflight
-    -> place adjacent joints in a collision-safe prerequisite pose
-    -> apply conservative speed, acceleration and effort/current limits
-    -> approach one mechanical direction
-    -> detect contact
-    -> stop immediately
-    -> back off
-    -> validate repeatability
-    -> approach the opposite direction
-    -> detect contact
-    -> stop immediately
-    -> back off
-    -> validate repeatability
-    -> derive measured contact and safe operating limits
-    -> continue only after PASS
+11, 12, 13, 21, 22, 23, 31, 32, 33, 41, 42, 43
 ```
 
-The 12-joint order must not be chosen only by servo ID. It must be derived from
-a collision-safe dependency graph because the reachable range of one joint can
-depend on the position of the other two joints in the same leg.
+Missing or unexpected IDs fail before torque is enabled.
 
-Example dependency to preserve: a hip joint must not be driven toward a limit
-when the upper or lower leg position can cause self-contact.
+## 3. Permanent constraints
 
-## Contact detection
+- Station is the sole serial owner.
+- Normal unsigned ST3215 GoalPosition semantics.
+- No direct serial access.
+- No servo reset.
+- No Position Offset modification.
+- No EEPROM unlock/write/lock cycle.
+- No calibration freeze command.
+- One probing joint at a time.
+- All prerequisite joints are monitored.
+- Global torque-off cleanup is mandatory and must be read back.
 
-Mechanical contact must not be inferred from a single signal.
+## 4. MATDOG geometry
 
-A valid detector should combine:
+MATDOG is not front/rear symmetric. Front hip axes are 20 mm higher than rear hip axes. Four explicit leg profiles shall be retained.
 
-- commanded versus measured position progress;
-- low measured velocity or repeated lack of encoder progress;
-- motor current rise relative to the moving baseline;
-- elapsed-time and maximum-travel guards;
-- servo status/error flags;
-- agreement across repeated low-energy approaches.
-
-Contact must be rejected when evidence is ambiguous.
-
-Absolute current thresholds must be established experimentally for MATDOG and
-must not be copied blindly from another robot.
-
-## Safety controls
-
-The implementation must include:
-
-- low initial speed and acceleration;
-- conservative torque/effort or current limits where supported;
-- per-joint travel bounds narrower than any unknown full revolution;
-- per-approach timeout;
-- immediate stop and controlled backoff;
-- operator abort;
-- global torque-off abort path;
-- one active joint at a time;
-- live verification that all non-active joints remain within their safe
-  prerequisite windows;
-- audit logging after every approach;
-- no continuation after a failed or ambiguous joint.
-
-## Data to record
-
-For every joint, record at minimum:
+Joint map and directions:
 
 ```text
-servo ID
-joint name
-digital-zero offset
-mechanical q=0 raw encoder
-contact position in both directions
-repeatability spread
-approach direction
-current baseline and contact evidence
-speed and acceleration used
-backoff distance
-derived safe margin
-measured_contact_rad
-safe_limit_rad
-result and reason
+LF: M13 hip -1, M12 upper +1, M11 lower -1
+RF: M23 hip -1, M22 upper -1, M21 lower +1
+RH: M33 hip +1, M32 upper -1, M31 lower +1
+LH: M43 hip +1, M42 upper +1, M41 lower -1
 ```
 
-The canonical destination is:
+Order:
 
 ```text
-06_Software/Matdog_Core/calibration/
-MATDOG_JOINT_CALIBRATION.yaml
+LF → RF → RH → LH
 ```
 
-The existing fields `measured_contact_rad` and `safe_limit_rad` must be populated
-only after validated hardware measurements.
+Prerequisites:
 
-## Acceptance criteria
+```text
+HIP search:   hip 0°, upper +50°, lower 0°
+LOWER search: hip 0°, upper +90°, lower 0°
+LF search:    park LH upper at +30°
+RF search:    park RH upper at +30°
+```
 
-The mechanical end-stop phase is complete only when:
+## 5. Native primitives
 
-- all 12 joints pass repeated contact acquisition;
-- no self-collision or unintended leg-to-body contact occurs;
-- every joint has two validated contact limits or a documented intentionally
-  restricted side;
-- conservative safe margins are justified and recorded;
-- the safe limits are compatible with the canonical URDF limits;
-- digital-zero offsets are unchanged;
-- the robot returns to a known supported pose;
-- all EEPROM locks and torque states are verified as required;
-- a final read-only joint-state and four-leg FK closure passes;
-- C5 encoder targets are regenerated and audited against the measured limits.
+Add RAM-only primitives to the common calibrator or a MATDOG-specific helper:
 
-## Required work before hardware execution
+- verified RAM write with command result and register readback;
+- torque-state verification;
+- position command with progress watchdog;
+- fresh motor observation extraction;
+- hybrid limit approach;
+- immediate pressure stop;
+- controlled backoff and recovery verification;
+- repeated-contact comparison;
+- verified return home;
+- verified global torque-off cleanup.
 
-1. Audit the existing MATDOG and elrobot calibration implementations.
-2. Extract only the architectural ideas that are safe and applicable.
-3. Define the MATDOG collision-safe joint dependency order.
-4. Define low-energy motion parameters and abort thresholds.
-5. Build an offline/dry-run state machine and audit format.
-6. Review the complete command path before enabling motion.
-7. Obtain explicit operator authorization for the first supervised run.
+Existing SO101/ElRobot functions that reset servos or write EEPROM must not be called.
 
-## Relationship to C5
+## 6. Hybrid observation
 
-The previous C5 executor and its trajectory remain useful engineering
-references, but they are not command-eligible after the digital recenter.
+Each active-motor observation contains:
+
+- individual monotonic timestamp;
+- present position;
+- present speed;
+- present current;
+- goal position;
+- torque enable;
+- torque limit;
+- status/error;
+- last command and result.
+
+Current is a relative load/torque proxy. It is not reported as physical torque without characterization.
+
+## 7. Contact policy
+
+Contact requires persistent agreement of:
+
+```text
+commanded motion toward expected limit
++ sufficient previous travel
++ insufficient encoder progress
++ low velocity
++ current rise over direction/pose-specific moving baseline
++ fresh telemetry
++ status OK
++ prerequisite stability
++ travel/time guards respected
+```
+
+States:
+
+```text
+FREE_MOTION
+CONTACT_SUSPECTED
+CONTACT_CONFIRMED
+CONTACT_REPEATABLE
+AMBIGUOUS_CONTACT
+HARD_ABORT
+```
+
+A hard absolute-current threshold triggers immediate retract. A separate adaptive current delta participates in normal contact confirmation.
+
+## 8. M12 MIN pilot
+
+Sequence:
+
+1. exact 12-ID preflight;
+2. global torque OFF and readback;
+3. verify M12 and all prerequisite states;
+4. prime M12 at current position;
+5. configure RAM torque limit, speed and acceleration;
+6. verify RAM readback;
+7. enable M12 torque and verify readback;
+8. return to home 2048 if required;
+9. acquire moving-current baseline;
+10. coarse approach toward URDF minimum within a model guard;
+11. confirm hybrid contact;
+12. stop pressure and back off;
+13. fine second approach;
+14. require repeatability;
+15. return to 2048 within 10 ticks;
+16. global torque OFF and readback;
+17. publish progress and persistent report.
+
+## 9. Pilot acceptance
+
+PASS only when:
+
+- no EEPROM command exists in the executed path;
+- M12 demonstrably moves;
+- RAM writes and torque state are read back;
+- all observations are fresh and status is zero;
+- two contacts are repeatable;
+- backoff restores tracking and lowers current;
+- M12 returns home within 10 ticks;
+- all motors finish torque OFF.
+
+## 10. Full calibration
+
+After pilot PASS:
+
+```text
+LF upper min/max
+LF hip min/max at upper +50°
+LF lower min/max at upper +90°
+restore LF and LH parking
+
+RF upper min/max
+RF hip min/max at upper +50°
+RF lower min/max at upper +90°
+restore RF and RH parking
+
+RH upper/hip/lower
+LH upper/hip/lower
+```
+
+Each side uses two low-energy approaches. Measurements populate `measured_contact_rad` only after repeatability passes. `safe_limit_rad` is derived using a documented inward margin.
+
+## 11. Post-calibration gate
 
 Before a new physical stand:
 
 ```text
-mechanical end-stop calibration
-    -> canonical safe limits
-    -> read-only joint/FK closure
-    -> regenerate C5 encoder targets
-    -> wrap, limit, collision and frame-delta audit
-    -> hardware preflight
-    -> new supervised C5 stand
+24 contact results
+→ safe-limit YAML
+→ read-only joint/FK closure
+→ regenerate HOME→LOW_STAND→STAND trajectory
+→ collision/contact/support/timing audit
+→ supervised suspended stand
+→ gradual load transfer
 ```
+
+Old raw C5 targets remain non-command-eligible.

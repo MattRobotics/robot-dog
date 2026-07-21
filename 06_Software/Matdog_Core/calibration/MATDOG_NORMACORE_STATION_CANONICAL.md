@@ -489,3 +489,49 @@ Watcher: matdog.endstop.station_readonly_watch.v2
 Bus seriale: 5B14114953
 Validazione hardware: 2026-07-21
 ```
+
+## 12. Decisione architetturale nativa MATDOG — 2026-07-21
+
+Il calibratore meccanico command-capable non verrà più eseguito tramite wrapper
+Python. I prototipi M12 `fast`, `adapter`, `v2` e i probe basati su
+`CommandBarrier` sono ritirati.
+
+Il solo percorso futuro è:
+
+```text
+AutoCalibrate MATDOG
+→ driver ST3215 nativo Rust
+→ auto_calibrate/matdog.rs
+→ scritture RAM verificate
+→ InferenceState nativo
+→ posizione + velocità + PresentCurrent
+→ backoff + secondo approccio + report
+```
+
+Foundation NormaCore verificata:
+
+```text
+NormaCore 0.1.0-beta.9
+normfs 0.1.0-beta.1
+upstream 5b79422
+PR #86 f8efe97
+```
+
+La discovery stock per SO101/ElRobot non copre gli ID sparsi MATDOG. La fork
+deve mantenere una patch pulita/configurabile che rilevi almeno fino all'ID 43
+e deve accettare la calibrazione MATDOG solo con il set esatto:
+
+```text
+11 12 13 21 22 23 31 32 33 41 42 43
+```
+
+Le utility Python read-only possono restare diagnostiche e non devono importare
+o chiamare API di comando. Nessun client Python costituisce il motore del
+calibratore.
+
+Il documento operativo corrente è:
+
+```text
+09_Logs/Development_Log/
+2026-07-21_NATIVE_NORMACORE_CALIBRATOR_HANDOFF.md
+```
