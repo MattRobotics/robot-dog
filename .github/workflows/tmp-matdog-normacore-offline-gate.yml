@@ -68,6 +68,13 @@ jobs:
           set -o pipefail
           cargo test --package st3215 2>&1 | tee ../ci-output/st3215-tests.log
 
+      - name: Create minimal Station viewer asset
+        working-directory: norma-core
+        run: |
+          mkdir -p software/station/clients/station-viewer/dist
+          printf '<!doctype html><title>offline build gate</title>\n' \
+            > software/station/clients/station-viewer/dist/index.html
+
       - name: Station release build
         working-directory: norma-core
         shell: bash
