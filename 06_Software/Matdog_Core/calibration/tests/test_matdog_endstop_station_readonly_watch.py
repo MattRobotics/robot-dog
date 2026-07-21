@@ -139,6 +139,23 @@ def make_frame(
     return FakeInference("MATDOG-BUS", motors)
 
 
+def make_frame_from_stamps(
+    stamps: dict[int, int],
+    *,
+    app_start_id: int = 9,
+):
+    motors = [
+        FakeMotor(
+            motor_id,
+            stamps[motor_id],
+            app_start_id=app_start_id,
+        )
+        for motor_id in watcher.EXPECTED_MOTOR_IDS
+    ]
+
+    return FakeInference("MATDOG-BUS", motors)
+
+
 class ReadonlyWatcherTests(unittest.TestCase):
     def test_accumulator_builds_safe_report(self):
         accumulator = watcher.SnapshotAccumulator()
@@ -210,7 +227,53 @@ class ReadonlyWatcherTests(unittest.TestCase):
                 "MATDOG-BUS",
             )
 
-    def test_non_increasing_motor_timestamp_is_rejected(self):
+    def test_aggregate_frames_accept_duplicate_motor_stamps(self):
+        accumulator = watcher.SnapshotAccumulator()
+        stamps = {
+            motor_id: 1000 + motor_id
+            for motor_id in watcher.EXPECTED_MOTOR_IDS
+        }
+
+        accumulator.add_frame(
+            make_frame_from_stamps(stamps),
+            "MATDOG-BUS",
+        )
+
+        for motor_id in watcher.EXPECTED_MOTOR_IDS:
+            stamps = dict(stamps)
+            stamps[motor_id] += 1000
+            accumulator.add_frame(
+                make_frame_from_stamps(stamps),
+                "MATDOG-BUS",
+            )
+
+        received_frames = 1 + len(
+            watcher.EXPECTED_MOTOR_IDS
+        )
+        report = accumulator.report(
+            station_server="localhost",
+            bus_serial="MATDOG-BUS",
+            requested_frames=received_frames,
+            received_frames=received_frames,
+        )
+
+        self.assertTrue(report.all_motors_advanced)
+        self.assertTrue(
+            report.timestamps_strictly_increasing
+        )
+
+        for summary in report.motors:
+            self.assertEqual(summary.sample_count, 2)
+            self.assertEqual(
+                summary.frame_observation_count,
+                received_frames,
+            )
+            self.assertEqual(
+                summary.duplicate_frame_count,
+                received_frames - 2,
+            )
+
+    def test_timestamp_regression_is_rejected(self):
         accumulator = watcher.SnapshotAccumulator()
 
         accumulator.add_frame(
@@ -220,11 +283,34 @@ class ReadonlyWatcherTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             watcher.ReadonlyWatchError,
-            "timestamp monotonic non crescente",
+            "timestamp monotonic regressivo",
         ):
             accumulator.add_frame(
-                make_frame(1000),
+                make_frame(999),
                 "MATDOG-BUS",
+            )
+
+    def test_report_rejects_motor_without_advancement(self):
+        accumulator = watcher.SnapshotAccumulator()
+
+        accumulator.add_frame(
+            make_frame(1000),
+            "MATDOG-BUS",
+        )
+        accumulator.add_frame(
+            make_frame(1000),
+            "MATDOG-BUS",
+        )
+
+        with self.assertRaisesRegex(
+            watcher.ReadonlyWatchError,
+            "nessun avanzamento timestamp",
+        ):
+            accumulator.report(
+                station_server="localhost",
+                bus_serial="MATDOG-BUS",
+                requested_frames=2,
+                received_frames=2,
             )
 
     def test_station_restart_is_rejected(self):

@@ -67,6 +67,8 @@ class ReadonlyWatchError(RuntimeError):
 class MotorWatchSummary:
     motor_id: int
     sample_count: int
+    frame_observation_count: int
+    duplicate_frame_count: int
     first_monotonic_stamp_ns: int
     last_monotonic_stamp_ns: int
     first_system_stamp_ns: int
@@ -95,6 +97,7 @@ class ReadonlyWatchReport:
     station_app_start_id: int
     all_status_zero: bool
     all_torque_disabled: bool
+    all_motors_advanced: bool
     timestamps_strictly_increasing: bool
     command_api_available: bool
     motor_commands_sent: bool
@@ -110,6 +113,14 @@ class SnapshotAccumulator:
         self.expected_motor_ids = tuple(expected_motor_ids)
         self.samples: dict[int, list[StationMotorSnapshot]] = {
             motor_id: []
+            for motor_id in self.expected_motor_ids
+        }
+        self.frame_observation_counts: dict[int, int] = {
+            motor_id: 0
+            for motor_id in self.expected_motor_ids
+        }
+        self.duplicate_frame_counts: dict[int, int] = {
+            motor_id: 0
             for motor_id in self.expected_motor_ids
         }
         self.app_start_id: int | None = None
@@ -171,16 +182,28 @@ class SnapshotAccumulator:
                     "Restart Station rilevato durante il watcher"
                 )
 
+            self.frame_observation_counts[motor_id] += 1
             previous = self.samples[motor_id][-1:] or []
 
-            if (
-                previous
-                and snapshot.monotonic_stamp_ns
-                <= previous[0].monotonic_stamp_ns
-            ):
-                raise ReadonlyWatchError(
-                    f"M{motor_id}: timestamp monotonic non crescente"
+            if previous:
+                previous_stamp_ns = (
+                    previous[0].monotonic_stamp_ns
                 )
+
+                if (
+                    snapshot.monotonic_stamp_ns
+                    < previous_stamp_ns
+                ):
+                    raise ReadonlyWatchError(
+                        f"M{motor_id}: timestamp monotonic regressivo"
+                    )
+
+                if (
+                    snapshot.monotonic_stamp_ns
+                    == previous_stamp_ns
+                ):
+                    self.duplicate_frame_counts[motor_id] += 1
+                    continue
 
             self.samples[motor_id].append(snapshot)
 
@@ -202,11 +225,26 @@ class SnapshotAccumulator:
 
         for motor_id in self.expected_motor_ids:
             motor_samples = self.samples[motor_id]
+            frame_observation_count = (
+                self.frame_observation_counts[motor_id]
+            )
 
-            if len(motor_samples) != received_frames:
+            if frame_observation_count != received_frames:
                 raise ReadonlyWatchError(
-                    f"M{motor_id}: campioni {len(motor_samples)} "
-                    f"diversi dai frame {received_frames}"
+                    f"M{motor_id}: osservazioni "
+                    f"{frame_observation_count} diverse dai frame "
+                    f"{received_frames}"
+                )
+
+            if not motor_samples:
+                raise ReadonlyWatchError(
+                    f"M{motor_id}: nessun campione valido"
+                )
+
+            if received_frames > 1 and len(motor_samples) < 2:
+                raise ReadonlyWatchError(
+                    f"M{motor_id}: nessun avanzamento timestamp "
+                    "durante l'acquisizione"
                 )
 
             stamps = [
@@ -241,6 +279,12 @@ class SnapshotAccumulator:
                 MotorWatchSummary(
                     motor_id=motor_id,
                     sample_count=len(motor_samples),
+                    frame_observation_count=(
+                        frame_observation_count
+                    ),
+                    duplicate_frame_count=(
+                        self.duplicate_frame_counts[motor_id]
+                    ),
                     first_monotonic_stamp_ns=stamps[0],
                     last_monotonic_stamp_ns=stamps[-1],
                     first_system_stamp_ns=(
@@ -273,7 +317,7 @@ class SnapshotAccumulator:
             )
 
         return ReadonlyWatchReport(
-            schema="matdog.endstop.station_readonly_watch.v1",
+            schema="matdog.endstop.station_readonly_watch.v2",
             generated_at_utc=datetime.now(
                 timezone.utc
             ).isoformat(),
@@ -287,6 +331,7 @@ class SnapshotAccumulator:
             station_app_start_id=self.app_start_id,
             all_status_zero=all_status_zero,
             all_torque_disabled=all_torque_disabled,
+            all_motors_advanced=True,
             timestamps_strictly_increasing=(
                 timestamps_strictly_increasing
             ),
