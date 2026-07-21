@@ -1,4 +1,4 @@
-schema_version: 3
+schema_version: 4
 robot:
   name: MATDOG
   leg_order: [LF, RF, RH, LH]
@@ -34,6 +34,37 @@ digital_zero_calibration:
   final_readback_artifact: "09_Logs/Calibration/C5_R_digital_recenter/2026-07-10_145457Z_final_12_offset_readback.json"
   final_readback_sha256: "15619d23ddcb17651ba729a0d69309b5b56befeb3377f123ff7f131582fcf8ec"
   procedure: "06_Software/Matdog_Core/calibration/MATDOG_DIGITAL_ZERO_CALIBRATION.md"
+
+mechanical_endstop_calibration:
+  status: GEOMETRY_VALIDATED_OFFLINE_HARDWARE_BLOCKED
+  command_eligible: false
+  geometry_checkpoint:
+    artifact: "06_Software/Matdog_Core/calibration/MATDOG_MECHANICAL_ENDSTOP_GEOMETRY_CHECKPOINT_2026-07-20.md"
+    sha256: "9693363a384b19ce81519294f13b94fbd16b680c286e226020ce9d4e1de07f47"
+    validated_at: "2026-07-20"
+  prerequisites:
+    hip_probe_pose_rad:
+      hip: 0.0
+      upper_leg: 0.8726646259971648
+      lower_leg: 0.0
+    lower_probe_pose_rad:
+      hip: 0.0
+      upper_leg: 1.5707963267948966
+      lower_leg: 0.0
+    rear_parking_pose_rad:
+      hip: 0.0
+      upper_leg: 0.5235987755982988
+      lower_leg: 0.0
+  leg_order: [LF, RF, RH, LH]
+  front_leg_dependencies:
+    LF: {park_leg: LH, parking_pose: rear_parking_pose_rad}
+    RF: {park_leg: RH, parking_pose: rear_parking_pose_rad}
+    RH: null
+    LH: null
+  geometry_validation:
+    per_leg_path_step_deg: 1.0
+    rear_parking_path_step_deg: 0.5
+    result: PASS
 
 joint_groups:
   hip:

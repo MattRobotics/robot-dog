@@ -92,24 +92,139 @@ def main() -> int:
     data = yaml.safe_load(config_path.read_text())
     errors: list[str] = []
 
-    if data.get("schema_version") != 2:
+    if data.get("schema_version") != 4:
         errors.append(
-            f"schema_version atteso 2, trovato {data.get('schema_version')!r}"
+            f"schema_version atteso 4, trovato {data.get('schema_version')!r}"
         )
 
     robot = data.get("robot", {})
     if robot.get("leg_order") != ["LF", "RF", "RH", "LH"]:
         errors.append(f"leg_order inatteso: {robot.get('leg_order')!r}")
 
-    pre_zero_status = "DIRECTION_MAPPING_COMPLETE_ZERO_PENDING"
-    visual_zero_status = "VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION"
+    expected_calibration_status = (
+        "DIGITAL_ZERO_CALIBRATED_AND_VERIFIED"
+    )
     calibration_status = robot.get("calibration_status")
 
-    if calibration_status not in {pre_zero_status, visual_zero_status}:
+    if calibration_status != expected_calibration_status:
         errors.append(
             "calibration_status inatteso: "
             f"{calibration_status!r}"
         )
+
+    digital_zero = data.get("digital_zero_calibration", {})
+
+    if digital_zero.get("status") != "PASS_FINAL_EEPROM_READBACK":
+        errors.append(
+            "digital_zero_calibration.status inatteso: "
+            f"{digital_zero.get('status')!r}"
+        )
+
+    if digital_zero.get("target_displayed_encoder") != 2048:
+        errors.append(
+            "digital_zero target inatteso: "
+            f"{digital_zero.get('target_displayed_encoder')!r}"
+        )
+
+    if digital_zero.get("station_is_sole_serial_owner") is not True:
+        errors.append("Station deve restare sole serial owner")
+
+    if digital_zero.get("goal_position_commands_sent") is not False:
+        errors.append(
+            "digital-zero: goal_position_commands_sent deve essere false"
+        )
+
+    digital_artifact = digital_zero.get("final_readback_artifact")
+    digital_hash = digital_zero.get("final_readback_sha256")
+
+    if not isinstance(digital_artifact, str):
+        errors.append("final_readback_artifact mancante")
+    else:
+        digital_path = (REPO_ROOT / digital_artifact).resolve()
+        if not digital_path.is_file():
+            errors.append(
+                f"artifact digital-zero non trovato: {digital_path}"
+            )
+        elif sha256_file(digital_path) != digital_hash:
+            errors.append("SHA256 artifact digital-zero non coerente")
+
+    mechanical = data.get("mechanical_endstop_calibration", {})
+
+    if mechanical.get("status") != (
+        "GEOMETRY_VALIDATED_OFFLINE_HARDWARE_BLOCKED"
+    ):
+        errors.append(
+            "mechanical_endstop_calibration.status inatteso: "
+            f"{mechanical.get('status')!r}"
+        )
+
+    if mechanical.get("command_eligible") is not False:
+        errors.append(
+            "mechanical end-stop deve restare command_eligible=false"
+        )
+
+    expected_prerequisites = {
+        "hip_probe_pose_rad": {
+            "hip": 0.0,
+            "upper_leg": 0.8726646259971648,
+            "lower_leg": 0.0,
+        },
+        "lower_probe_pose_rad": {
+            "hip": 0.0,
+            "upper_leg": 1.5707963267948966,
+            "lower_leg": 0.0,
+        },
+        "rear_parking_pose_rad": {
+            "hip": 0.0,
+            "upper_leg": 0.5235987755982988,
+            "lower_leg": 0.0,
+        },
+    }
+
+    if mechanical.get("prerequisites") != expected_prerequisites:
+        errors.append("pose prerequisite meccaniche inattese")
+
+    expected_dependencies = {
+        "LF": {
+            "park_leg": "LH",
+            "parking_pose": "rear_parking_pose_rad",
+        },
+        "RF": {
+            "park_leg": "RH",
+            "parking_pose": "rear_parking_pose_rad",
+        },
+        "RH": None,
+        "LH": None,
+    }
+
+    if mechanical.get("front_leg_dependencies") != expected_dependencies:
+        errors.append("dipendenze cross-leg inattese")
+
+    checkpoint = mechanical.get("geometry_checkpoint", {})
+    checkpoint_artifact = checkpoint.get("artifact")
+    checkpoint_hash = checkpoint.get("sha256")
+
+    if not isinstance(checkpoint_artifact, str):
+        errors.append("geometry checkpoint artifact mancante")
+    else:
+        checkpoint_path = (REPO_ROOT / checkpoint_artifact).resolve()
+        if not checkpoint_path.is_file():
+            errors.append(
+                f"geometry checkpoint non trovato: {checkpoint_path}"
+            )
+        elif sha256_file(checkpoint_path) != checkpoint_hash:
+            errors.append("SHA256 geometry checkpoint non coerente")
+
+    expected_geometry_validation = {
+        "per_leg_path_step_deg": 1.0,
+        "rear_parking_path_step_deg": 0.5,
+        "result": "PASS",
+    }
+
+    if mechanical.get("geometry_validation") != (
+        expected_geometry_validation
+    ):
+        errors.append("geometry_validation inattesa")
 
     model = data.get("kinematic_model", {}).get("canonical_urdf", {})
     declared_path = model.get("path")
@@ -134,6 +249,24 @@ def main() -> int:
             "SHA256 URDF non coerente: "
             f"YAML={declared_hash!r}, file={actual_hash!r}"
         )
+
+    expected_joint_groups = {
+        "hip": {
+            "urdf_min_rad": -0.785398163397,
+            "urdf_max_rad": 0.785398163397,
+        },
+        "upper_leg": {
+            "urdf_min_rad": -0.916297857297,
+            "urdf_max_rad": 2.138028333693,
+        },
+        "lower_leg": {
+            "urdf_min_rad": -1.605702911835,
+            "urdf_max_rad": 0.654498469498,
+        },
+    }
+
+    if data.get("joint_groups") != expected_joint_groups:
+        errors.append("joint_groups non coerenti con i limiti canonici")
 
     joints = data.get("joints", {})
     if set(joints) != set(EXPECTED_JOINTS):
@@ -173,24 +306,46 @@ def main() -> int:
             )
 
         zero_visual = joint.get("zero_encoder_visual")
-
-        if calibration_status == pre_zero_status:
-            if zero_visual is not None:
-                errors.append(
-                    f"{joint_name}: zero_encoder_visual deve essere null "
-                    "nella fase pre-zero"
-                )
-
-        elif calibration_status == visual_zero_status:
-            if not isinstance(zero_visual, int) or not 0 <= zero_visual <= 4095:
-                errors.append(
-                    f"{joint_name}: zero_encoder_visual invalido: "
-                    f"{zero_visual!r}"
-                )
-
-        if joint.get("zero_encoder_final") is not None:
+        if (
+            not isinstance(zero_visual, int)
+            or not 0 <= zero_visual <= 4095
+        ):
             errors.append(
-                f"{joint_name}: zero_encoder_final deve essere null in questa fase"
+                f"{joint_name}: zero_encoder_visual invalido: "
+                f"{zero_visual!r}"
+            )
+
+        if joint.get("zero_encoder_final") != 2048:
+            errors.append(
+                f"{joint_name}: zero_encoder_final atteso 2048, "
+                f"trovato {joint.get('zero_encoder_final')!r}"
+            )
+
+        raw_q0 = joint.get("geometric_q0_raw_unoffset")
+        if not isinstance(raw_q0, int) or not 0 <= raw_q0 <= 4095:
+            errors.append(
+                f"{joint_name}: geometric_q0_raw_unoffset invalido: "
+                f"{raw_q0!r}"
+            )
+
+        offset = joint.get("digital_zero_offset_signed_i16")
+        if (
+            not isinstance(offset, int)
+            or not -32768 <= offset <= 32767
+        ):
+            errors.append(
+                f"{joint_name}: offset digitale i16 invalido: "
+                f"{offset!r}"
+            )
+
+        final_median = joint.get("final_readback_present_median")
+        if (
+            not isinstance(final_median, int)
+            or not 0 <= final_median <= 4095
+        ):
+            errors.append(
+                f"{joint_name}: final_readback_present_median invalido: "
+                f"{final_median!r}"
             )
 
         if joint.get("first_stand_limit_rad") != {"min": None, "max": None}:
@@ -198,12 +353,17 @@ def main() -> int:
                 f"{joint_name}: first_stand_limit_rad non deve essere impostato"
             )
 
+        if joint.get("measured_contact_rad") != {"min": None, "max": None}:
+            errors.append(
+                f"{joint_name}: measured_contact_rad deve restare null"
+            )
+
         if joint.get("safe_limit_rad") != {"min": None, "max": None}:
             errors.append(
                 f"{joint_name}: safe_limit_rad non deve essere impostato"
             )
 
-        if joint.get("validation_status") != "PASS_DIRECTION_TEST":
+        if joint.get("validation_status") != "PASS_DIGITAL_ZERO_EEPROM_READBACK":
             errors.append(
                 f"{joint_name}: validation_status inatteso: "
                 f"{joint.get('validation_status')!r}"
