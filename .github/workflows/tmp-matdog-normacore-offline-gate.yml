@@ -38,7 +38,8 @@ jobs:
             echo "Forbidden EEPROM/reset/offset/action/freeze operation found in MATDOG path"
             exit 1
           fi
-          grep -q 'RamRegister::PresentCurrent' software/drivers/st3215/src/protocol/memory.rs
+          grep -q 'PresentCurrent => ' software/drivers/st3215/src/protocol/memory.rs
+          grep -q 'get_motor_current' "$file"
           grep -q 'MATDOG_MOTOR_IDS' "$file"
           grep -q 'M12_MIN_GUARD_TICK' "$file"
 
