@@ -1,0 +1,55 @@
+name: Temporary MATDOG NormaCore Offline Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  normacore-rust-gate:
+    name: NormaCore Rust tests and Station build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout MATDOG NormaCore branch
+        uses: actions/checkout@v4
+        with:
+          repository: MattRobotics/norma-core
+          ref: matdog/native-calibrator-foundation
+          path: norma-core
+
+      - name: Setup protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          components: rustfmt
+
+      - name: Enforce MATDOG RAM-only source contract
+        working-directory: norma-core
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=software/drivers/st3215/src/auto_calibrate/matdog.rs
+          if grep -nE 'EepromRegister::|reg_write:[[:space:]]*Some|reset:[[:space:]]*Some|freeze_calibration:[[:space:]]*Some|action:[[:space:]]*Some|Offset\.address' "$file"; then
+            echo "Forbidden EEPROM/reset/offset/action/freeze operation found in MATDOG path"
+            exit 1
+          fi
+          grep -q 'RamRegister::PresentCurrent' software/drivers/st3215/src/protocol/memory.rs
+          grep -q 'MATDOG_MOTOR_IDS' "$file"
+          grep -q 'M12_MIN_GUARD_TICK' "$file"
+
+      - name: Rust format check
+        working-directory: norma-core
+        run: cargo fmt --all -- --check
+
+      - name: ST3215 unit tests
+        working-directory: norma-core
+        run: cargo test --package st3215
+
+      - name: Station release build
+        working-directory: norma-core
+        run: cargo build --release --package station
