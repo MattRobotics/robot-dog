@@ -75,7 +75,7 @@ class StationMotorSnapshot:
     torque_enabled: bool
     goal_tick: int
     last_command_id: bytes
-    last_command_result: st3215.CommandResult
+    last_command_result: st3215.CommandResult | None
 
 
 @dataclass(frozen=True)
@@ -184,13 +184,19 @@ def parse_motor_snapshot(motor_reader) -> StationMotorSnapshot:
         _u16(state, RAM_GOAL_POSITION)
     )
 
-    last_command = motor_reader.get_last_command()
-    command = last_command.get_command()
+    last_command_id = b""
+    last_command_result = None
 
-    last_command_id = bytes(
-        command.get_command_id()
-    )
-    last_command_result = last_command.get_result()
+    last_command = motor_reader.get_last_command()
+
+    if last_command is not None:
+        command = last_command.get_command()
+
+        if command is not None:
+            last_command_id = bytes(
+                command.get_command_id()
+            )
+            last_command_result = last_command.get_result()
 
     return StationMotorSnapshot(
         motor_id=motor_id,

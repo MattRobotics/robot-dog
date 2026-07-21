@@ -186,6 +186,43 @@ class StationTelemetryTests(unittest.TestCase):
             telemetry.st3215.CommandResult.CR_SUCCESS,
         )
 
+    def test_missing_last_command_is_valid_initial_state(self):
+        class FakeMotorWithoutLastCommand(FakeMotor):
+            def get_last_command(self):
+                return None
+
+        snapshot = telemetry.parse_motor_snapshot(
+            FakeMotorWithoutLastCommand(
+                stamp_ns=500,
+                present=2048,
+            )
+        )
+
+        self.assertEqual(snapshot.last_command_id, b"")
+        self.assertIsNone(snapshot.last_command_result)
+
+    def test_missing_command_body_is_valid_initial_state(self):
+        class FakeLastCommandWithoutCommand:
+            def get_command(self):
+                return None
+
+            def get_result(self):
+                return telemetry.st3215.CommandResult.CR_PROCESSING
+
+        class FakeMotorWithoutCommandBody(FakeMotor):
+            def get_last_command(self):
+                return FakeLastCommandWithoutCommand()
+
+        snapshot = telemetry.parse_motor_snapshot(
+            FakeMotorWithoutCommandBody(
+                stamp_ns=600,
+                present=2048,
+            )
+        )
+
+        self.assertEqual(snapshot.last_command_id, b"")
+        self.assertIsNone(snapshot.last_command_result)
+
     def test_detector_sample_preserves_motor_timestamp(self):
         snapshot = telemetry.parse_motor_snapshot(
             FakeMotor(
