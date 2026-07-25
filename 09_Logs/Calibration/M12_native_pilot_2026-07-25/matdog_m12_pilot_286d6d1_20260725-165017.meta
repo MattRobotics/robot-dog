@@ -1,0 +1,12 @@
+date=2026-07-25T16:50:28+02:00
+repository=/home/matteo-manicardi/norma-core
+branch=matdog/native-calibrator-foundation
+commit=286d6d1050c3f4abfad2139cb1325c934bb94c41
+config=/home/matteo-manicardi/MATDOG/runtime/station/station_m12_pilot_deadband2.yaml
+config_sha256=f648988540d22fb38aa9b66e19bdf059f05047025b6abd229b64d7eff5f20bd1
+serial=/dev/ttyACM0
+arming=MATDOG_NATIVE_CALIBRATOR_ARM=LF_UPPER_M12_MIN
+station_bin=/home/matteo-manicardi/norma-core/target/release/station
+station_sha256=4427e216f1d583754e8232e89d0213a2d3761a3075fe3099bb260d1f385c67f6
+data_dir=/home/matteo-manicardi/MATDOG/runtime/station/station_data_m12_pilot_286d6d1_20260725-165017
+log=/home/matteo-manicardi/MATDOG/runtime/station/matdog_m12_pilot_286d6d1_20260725-165017.log

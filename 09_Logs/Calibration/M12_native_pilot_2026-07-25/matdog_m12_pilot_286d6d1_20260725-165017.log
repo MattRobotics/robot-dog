@@ -1,0 +1,820 @@
+[2026-07-25T14:50:28Z INFO  station] App Start ID: 1784991028
+[2026-07-25T14:50:28Z INFO  station] Loaded configuration from: "/home/matteo-manicardi/MATDOG/runtime/station/station_m12_pilot_deadband2.yaml"
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: initializing at path: "/home/matteo-manicardi/MATDOG/runtime/station/station_data_m12_pilot_286d6d1_20260725-165017"
+[2026-07-25T14:50:28Z INFO  normfs-store] Starting recovery: cleaning up temp folder
+[2026-07-25T14:50:28Z INFO  normfs-store] Recovery completed: no temp files found
+[2026-07-25T14:50:28Z INFO  normfs-store] All 4 writer workers started successfully
+[2026-07-25T14:50:28Z INFO  normfs] S3 downloader disabled
+[2026-07-25T14:50:28Z INFO  normfs] NormFS initialized successfully (disk_monitor: enabled, s3: disabled)
+[2026-07-25T14:50:28Z INFO  station] Instance ID: de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  station] Main queue started
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states'
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups'
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  station] Inference queue started
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands'
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx'
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx'
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: registering queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' with type 0
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: subscribed to queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' with subscriber_id 0
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx'
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx'
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta'
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference'
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: registering queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' with type 11
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: subscribed to queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' with subscriber_id 0
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: registering queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' with type 10
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: subscribed to queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' with subscriber_id 0
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: registering queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' with type 12
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference'
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: subscribed to queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' with subscriber_id 0
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: registering queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' with type 13
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: subscribed to queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' with subscriber_id 0
+[2026-07-25T14:50:28Z INFO  st3215::driver] Started ST3215 bus
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring'
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes'
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: registering queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' with type 30
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: subscribed to queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' with subscriber_id 0
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: registering queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' with type 32
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: subscribed to queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' with subscriber_id 0
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring'
+[2026-07-25T14:50:28Z INFO  station] No USB video configuration found
+[2026-07-25T14:50:28Z INFO  station] No inference configuration found, using default normvla config
+[2026-07-25T14:50:28Z INFO  inferences] Starting inference driver with 1 configurations
+[2026-07-25T14:50:28Z INFO  inferences] Creating inference queue: inference/normvla
+[2026-07-25T14:50:28Z INFO  normfs] Auto-starting queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' in write mode for write request
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Starting queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' (readonly=false)
+[2026-07-25T14:50:28Z INFO  normfs] ========================================
+[2026-07-25T14:50:28Z INFO  normfs] Continuing queue: '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla'
+[2026-07-25T14:50:28Z INFO  motors_mirroring] Restored 0 bus modes from normfs
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' - WAL has no files or error: PathError(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' - Store has no files or error: Path(NoFilesFound)
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' - Latest file IDs summary: WAL=None, Store=None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' - Maximum file ID across WAL and Store: None
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' - No files found, starting fresh
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' - Recovery complete:
+[2026-07-25T14:50:28Z INFO  normfs]   - Will write to file ID: 1
+[2026-07-25T14:50:28Z INFO  normfs]   - Last entry ID in queue: None
+[2026-07-25T14:50:28Z INFO  normfs]   - Header entries_before: 0
+[2026-07-25T14:50:28Z INFO  normfs]   - Next entry will have ID: 0
+[2026-07-25T14:50:28Z INFO  normfs] ----------------------------------------
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: starting writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla', file: 1, last_entry_id: None, data size = 8 bytes, id size = 4 bytes
+[2026-07-25T14:50:28Z INFO  normfs_wal::writer] WAL writer: creating new writer for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla', file: 1, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' size 0 is within limit 2147483648
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processing old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla', current file: 1 (not included)
+[2026-07-25T14:50:28Z INFO  normfs::disk_monitor] Added disk monitoring for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' with max_size: 2147483648 (S3 offloading: disabled)
+[2026-07-25T14:50:28Z INFO  normfs] Added queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' to disk monitor with max_size: 2147483648
+[2026-07-25T14:50:28Z INFO  normfs] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' started successfully, last_entry_id: None
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: registering queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' with type 22
+[2026-07-25T14:50:28Z INFO  station::inference] Inference: subscribed to queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' with subscriber_id 0
+[2026-07-25T14:50:28Z INFO  normfs_wal] WalStore: processed 0 old files for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla'
+[2026-07-25T14:50:28Z INFO  inferences] Starting inference shared memory writer at "/dev/shm/normvla" (12MB, 4 buffers, 3145704 bytes per buffer)
+[2026-07-25T14:50:28Z INFO  inferences] Inference driver started
+[2026-07-25T14:50:28Z INFO  station] Drivers started
+[2026-07-25T14:50:28Z INFO  inferences] Inference processor started for queue: inference/normvla
+[2026-07-25T14:50:28Z INFO  normfs::server] NormFS server listening on 127.0.0.1:8888
+[2026-07-25T14:50:28Z INFO  station] NormFS server listening on 127.0.0.1:8888
+[2026-07-25T14:50:28Z INFO  station::web::server] WebSocket server listening on 127.0.0.1:8889
+[2026-07-25T14:50:28Z INFO  st3215::driver] New ST3215 port detected: /dev/ttyACM0
+[2026-07-25T14:50:28Z INFO  st3215::driver] Added ST3215 port to management: /dev/ttyACM0
+[2026-07-25T14:50:28Z WARN  inferences::formats::normvla] Skip: no_bus (auto mode — zero or multiple buses with torque: [5B14114953(torque=false)])
+[2026-07-25T14:50:28Z INFO  st3215::port] Attempting to open ST3215 port: /dev/ttyACM0
+[2026-07-25T14:50:28Z INFO  st3215::port] Successfully opened ST3215 port: /dev/ttyACM0
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 11
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 12
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 13
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 21
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 22
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 23
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 31
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 32
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 33
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 41
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 42
+[2026-07-25T14:50:28Z INFO  st3215::port] Detected new ST3215 motor ID on port: /dev/ttyACM0 43
+[2026-07-25T14:50:38Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=99; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:50:41Z INFO  motors_mirroring] Stopping mirroring for source bus: BusKey { bus_id: "5B14114953", bus_type: MbtSt3215 }
+[2026-07-25T14:50:41Z WARN  st3215::state] Received command with motor_id 0, skipping: RxEnvelope { monotonic_stamp_ns: 32026259136453, local_stamp_ns: 1784991041748207497, app_start_id: 1784991028, signal_type: St3215Command, bus: Some(St3215Bus { port_name: "/dev/ttyACM0", vid: 6790, pid: 21971, serial_number: "5B14114953", manufacturer: "", product: "USB Single Serial", port_baud_rate: 1000000 }), motor_id: 0, data: b"", command: Some(TxEnvelope { monotonic_stamp_ns: 32026258594364, local_stamp_ns: 1784991041747665542, app_start_id: 1784991028, target_bus_serial: "5B14114953", command_id: b"\0\0\0\x02", write: None, reg_write: None, action: None, reset: None, reset_calibration: Some(ResetCalibrationCommand { reset: true }), freeze_calibration: None, sync_write: None, auto_calibrate: None, stop_auto_calibrate: None }), error: None }
+[2026-07-25T14:50:41Z WARN  st3215::port] Rejecting non-MATDOG-RAM command while native MATDOG pilot arming is active: command_id=b"\0\0\0\x02"
+[2026-07-25T14:50:41Z WARN  st3215::state] Received command with motor_id 0, skipping: RxEnvelope { monotonic_stamp_ns: 32026259315981, local_stamp_ns: 1784991041748387034, app_start_id: 1784991028, signal_type: St3215CommandRejected, bus: Some(St3215Bus { port_name: "/dev/ttyACM0", vid: 6790, pid: 21971, serial_number: "5B14114953", manufacturer: "", product: "USB Single Serial", port_baud_rate: 1000000 }), motor_id: 0, data: b"", command: Some(TxEnvelope { monotonic_stamp_ns: 32026258594364, local_stamp_ns: 1784991041747665542, app_start_id: 1784991028, target_bus_serial: "5B14114953", command_id: b"\0\0\0\x02", write: None, reg_write: None, action: None, reset: None, reset_calibration: Some(ResetCalibrationCommand { reset: true }), freeze_calibration: None, sync_write: None, auto_calibrate: None, stop_auto_calibrate: None }), error: None }
+[2026-07-25T14:50:43Z WARN  st3215::state] Received command with motor_id 0, skipping: RxEnvelope { monotonic_stamp_ns: 32028393960715, local_stamp_ns: 1784991043883031787, app_start_id: 1784991028, signal_type: St3215Command, bus: Some(St3215Bus { port_name: "/dev/ttyACM0", vid: 6790, pid: 21971, serial_number: "5B14114953", manufacturer: "", product: "USB Single Serial", port_baud_rate: 1000000 }), motor_id: 0, data: b"", command: Some(TxEnvelope { monotonic_stamp_ns: 32028393825974, local_stamp_ns: 1784991043882897165, app_start_id: 1784991028, target_bus_serial: "5B14114953", command_id: b"\0\0\0\x03", write: None, reg_write: None, action: None, reset: None, reset_calibration: None, freeze_calibration: None, sync_write: None, auto_calibrate: Some(AutoCalibrateCommand { calibrate: true }), stop_auto_calibrate: None }), error: None }
+[2026-07-25T14:50:43Z INFO  st3215::port] Processing ST3215 AutoCalibrate command.
+[2026-07-25T14:50:43Z INFO  st3215::auto_calibrate] Starting auto-calibration sequence for bus 5B14114953
+[2026-07-25T14:50:44Z INFO  st3215::auto_calibrate] Found 12 motor(s): [11, 12, 13, 21, 22, 23, 31, 32, 33, 41, 42, 43]
+[2026-07-25T14:50:44Z WARN  st3215::state] Received command with motor_id 0, skipping: RxEnvelope { monotonic_stamp_ns: 32028569974456, local_stamp_ns: 1784991044059045659, app_start_id: 1784991028, signal_type: St3215CommandSuccess, bus: Some(St3215Bus { port_name: "/dev/ttyACM0", vid: 6790, pid: 21971, serial_number: "5B14114953", manufacturer: "", product: "USB Single Serial", port_baud_rate: 1000000 }), motor_id: 0, data: b"", command: Some(TxEnvelope { monotonic_stamp_ns: 32028393825974, local_stamp_ns: 1784991043882897165, app_start_id: 1784991028, target_bus_serial: "5B14114953", command_id: b"\0\0\0\x03", write: None, reg_write: None, action: None, reset: None, reset_calibration: None, freeze_calibration: None, sync_write: None, auto_calibrate: Some(AutoCalibrateCommand { calibrate: true }), stop_auto_calibrate: None }), error: None }
+[2026-07-25T14:50:44Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=0/11
+[2026-07-25T14:50:44Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:50:44Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=0/11, phase='MATDOG native M12 MIN preflight'
+[2026-07-25T14:50:44Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=1/11
+[2026-07-25T14:50:44Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:50:44Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=1/11, phase='Verify exact MATDOG ID set'
+[2026-07-25T14:50:44Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=2/11
+[2026-07-25T14:50:44Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:50:44Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=2/11, phase='Verified global torque OFF'
+[2026-07-25T14:50:44Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=3/11
+[2026-07-25T14:50:44Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:50:44Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=3/11, phase='Prime and configure M12 RAM only'
+[2026-07-25T14:50:44Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xfd\x07"
+[2026-07-25T14:50:44Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:44Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x30, Value: b"\x90\x01"
+[2026-07-25T14:50:44Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:44Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x29, Value: b"\x04"
+[2026-07-25T14:50:44Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:44Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2E, Value: b"P\0"
+[2026-07-25T14:50:44Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:44Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x28, Value: b"\x01"
+[2026-07-25T14:50:44Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:44Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:44Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=4/11
+[2026-07-25T14:50:44Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:50:44Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=4/11, phase='Return M12 to home 2048'
+[2026-07-25T14:50:44Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\0\x08"
+[2026-07-25T14:50:44Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:44Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=5/11
+[2026-07-25T14:50:44Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:50:44Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=5/11, phase='Acquire M12 moving-current baseline'
+[2026-07-25T14:50:44Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xc0\x07"
+[2026-07-25T14:50:44Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:44Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:44Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:44Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:44Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:44Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:44Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:44Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:44Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:44Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\0\x08"
+[2026-07-25T14:50:44Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:45Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:45Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:45Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:45Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:45Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:45Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:45Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:45Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=6/11
+[2026-07-25T14:50:45Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:50:45Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=6/11, phase='Coarse hybrid approach to M12 MIN'
+[2026-07-25T14:50:45Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xd7\x07"
+[2026-07-25T14:50:45Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:45Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:45Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:45Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:46Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:46Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:46Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=2007, present=2017, error=10, current=1, threshold=6, velocity=50
+[2026-07-25T14:50:46Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xb7\x07"
+[2026-07-25T14:50:46Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:46Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:46Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:46Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:46Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:46Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1975, present=1984, error=9, current=1, threshold=6, velocity=100
+[2026-07-25T14:50:46Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\x97\x07"
+[2026-07-25T14:50:46Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:46Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:46Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:46Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:46Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:47Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1943, present=1953, error=10, current=1, threshold=6, velocity=50
+[2026-07-25T14:50:47Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"w\x07"
+[2026-07-25T14:50:47Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:47Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:47Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:47Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:47Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:47Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1911, present=1920, error=9, current=1, threshold=6, velocity=100
+[2026-07-25T14:50:47Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"W\x07"
+[2026-07-25T14:50:47Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:47Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:47Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:47Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:47Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:47Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1879, present=1889, error=10, current=1, threshold=6, velocity=100
+[2026-07-25T14:50:47Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"7\x07"
+[2026-07-25T14:50:47Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:47Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:47Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:48Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:48Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:48Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1847, present=1857, error=10, current=0, threshold=6, velocity=50
+[2026-07-25T14:50:48Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\x17\x07"
+[2026-07-25T14:50:48Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:48Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:48Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:48Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:48Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:48Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1815, present=1825, error=10, current=0, threshold=6, velocity=50
+[2026-07-25T14:50:48Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xf7\x06"
+[2026-07-25T14:50:48Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:48Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:48Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:48Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=47, no_bus=53; max_diffs: bus=9ms, video=0ms
+[2026-07-25T14:50:48Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:48Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:49Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1783, present=1793, error=10, current=1, threshold=6, velocity=50
+[2026-07-25T14:50:49Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xd7\x06"
+[2026-07-25T14:50:49Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:49Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:49Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:49Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:49Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:49Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1751, present=1761, error=10, current=1, threshold=6, velocity=100
+[2026-07-25T14:50:49Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xb7\x06"
+[2026-07-25T14:50:49Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:49Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:49Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:49Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:49Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:49Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:49Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1719, present=1728, error=9, current=1, threshold=6, velocity=100
+[2026-07-25T14:50:49Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\x97\x06"
+[2026-07-25T14:50:49Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:50Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:50Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:50Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:50Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:50Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1687, present=1697, error=10, current=1, threshold=6, velocity=100
+[2026-07-25T14:50:50Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"w\x06"
+[2026-07-25T14:50:50Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:50Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:50Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:50Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:50Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:50Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1655, present=1664, error=9, current=1, threshold=6, velocity=100
+[2026-07-25T14:50:50Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"W\x06"
+[2026-07-25T14:50:50Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:50Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:50Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:51Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:51Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:51Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1623, present=1633, error=10, current=2, threshold=6, velocity=50
+[2026-07-25T14:50:51Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"7\x06"
+[2026-07-25T14:50:51Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:51Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:51Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:51Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:51Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:51Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:51Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1591, present=1600, error=9, current=1, threshold=6, velocity=100
+[2026-07-25T14:50:51Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\x17\x06"
+[2026-07-25T14:50:51Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:51Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:51Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:51Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:52Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:52Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1559, present=1569, error=10, current=1, threshold=6, velocity=50
+[2026-07-25T14:50:52Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xf7\x05"
+[2026-07-25T14:50:52Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:52Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:52Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:52Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:52Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:52Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1527, present=1537, error=10, current=1, threshold=6, velocity=50
+[2026-07-25T14:50:52Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xd7\x05"
+[2026-07-25T14:50:52Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:52Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:52Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:52Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:52Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:52Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:52Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1495, present=1505, error=10, current=2, threshold=6, velocity=50
+[2026-07-25T14:50:52Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xb7\x05"
+[2026-07-25T14:50:52Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:53Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:53Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:53Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:53Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:53Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=32, target=1463, present=1473, error=10, current=2, threshold=6, velocity=50
+[2026-07-25T14:50:53Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\x97\x05"
+[2026-07-25T14:50:53Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:53Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:53Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:53Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:53Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:53Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:53Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 contact confirmed: step=32, target=1431, present=1443, error=12, current=5, threshold=6, velocity=0
+[2026-07-25T14:50:53Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xa3\x05"
+[2026-07-25T14:50:53Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:53Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=7/11
+[2026-07-25T14:50:53Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:50:53Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=7/11, phase='Backoff and verify recovery'
+[2026-07-25T14:50:53Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\x03\x06"
+[2026-07-25T14:50:53Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:53Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:54Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:54Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:54Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:54Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:54Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:54Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:54Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:54Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:54Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:54Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:55Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:55Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=8/11
+[2026-07-25T14:50:55Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:50:55Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=8/11, phase='Fine hybrid repeat approach to M12 MIN'
+[2026-07-25T14:50:55Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xef\x05"
+[2026-07-25T14:50:55Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:55Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=8, target=1519, present=1528, error=9, current=0, threshold=6, velocity=100
+[2026-07-25T14:50:55Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xe7\x05"
+[2026-07-25T14:50:55Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:55Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:55Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:55Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:55Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:55Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=8, target=1511, present=1521, error=10, current=2, threshold=6, velocity=50
+[2026-07-25T14:50:55Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xdf\x05"
+[2026-07-25T14:50:55Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:55Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:55Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:55Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=8, target=1503, present=1513, error=10, current=4, threshold=6, velocity=50
+[2026-07-25T14:50:55Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xd7\x05"
+[2026-07-25T14:50:55Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:55Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:55Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=8, target=1495, present=1505, error=10, current=2, threshold=6, velocity=50
+[2026-07-25T14:50:55Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xcf\x05"
+[2026-07-25T14:50:55Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:55Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:55Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=8, target=1487, present=1497, error=10, current=2, threshold=6, velocity=100
+[2026-07-25T14:50:55Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xc7\x05"
+[2026-07-25T14:50:55Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:55Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:56Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:56Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=8, target=1479, present=1489, error=10, current=3, threshold=6, velocity=50
+[2026-07-25T14:50:56Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xbf\x05"
+[2026-07-25T14:50:56Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:56Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:56Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=8, target=1471, present=1481, error=10, current=2, threshold=6, velocity=50
+[2026-07-25T14:50:56Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xb7\x05"
+[2026-07-25T14:50:56Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:56Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:56Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=8, target=1463, present=1473, error=10, current=2, threshold=6, velocity=100
+[2026-07-25T14:50:56Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xaf\x05"
+[2026-07-25T14:50:56Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:56Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:56Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:56Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=8, target=1455, present=1464, error=9, current=2, threshold=6, velocity=50
+[2026-07-25T14:50:56Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xa7\x05"
+[2026-07-25T14:50:56Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:56Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:56Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=8, target=1447, present=1457, error=10, current=2, threshold=6, velocity=50
+[2026-07-25T14:50:56Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\x9f\x05"
+[2026-07-25T14:50:56Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:56Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:56Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:56Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 approach settled: step=8, target=1439, present=1449, error=10, current=3, threshold=6, velocity=50
+[2026-07-25T14:50:56Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\x97\x05"
+[2026-07-25T14:50:56Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:56Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:56Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:56Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 contact confirmed: step=8, target=1431, present=1443, error=12, current=4, threshold=6, velocity=0
+[2026-07-25T14:50:56Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xa3\x05"
+[2026-07-25T14:50:56Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:57Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=9/11
+[2026-07-25T14:50:57Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:50:57Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=9/11, phase='Verify repeatability'
+[2026-07-25T14:50:57Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=10/11
+[2026-07-25T14:50:57Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:50:57Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=10/11, phase='Return M12 home'
+[2026-07-25T14:50:57Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\xa3\x05"
+[2026-07-25T14:50:57Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:57Z INFO  st3215::port] Processing ST3215 Write command - Motor: 12, Address: 0x2A, Value: b"\0\x08"
+[2026-07-25T14:50:57Z INFO  st3215::port] ST3215 Write command completed - Motor: 12, Response: Write { source_bytes: b"\xff\xff\x0c\x02\0\xf1" }
+[2026-07-25T14:50:57Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:57Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:57Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:57Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:57Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:57Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:57Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:57Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:57Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:57Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:58Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:58Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:58Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:58Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:58Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:58Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:58Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:58Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:58Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:58Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=100, no_bus=0; max_diffs: bus=17ms, video=0ms
+[2026-07-25T14:50:58Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:59Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:59Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:59Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:59Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:59Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:59Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:59Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:59Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:59Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:50:59Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:00Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:00Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:00Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:00Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:00Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:00Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:00Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:00Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:00Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:00Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:01Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:01Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:01Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:01Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:01Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:01Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:01Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:01Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:01Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:01Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:02Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:02Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:02Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:02Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:02Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:02Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:02Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:02Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:02Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:03Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:03Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:03Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:03Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:03Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:03Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:03Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:03Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:03Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:03Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:04Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:04Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:04Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:04Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:04Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:04Z INFO  inferences::formats::normvla] Skip: invalid_range (bus=5B14114953 motor=11 range_min=2178 range_max=2178)
+[2026-07-25T14:51:04Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=InProgress, step=11/11
+[2026-07-25T14:51:04Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:51:04Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=11/11, phase='Final verified global torque OFF'
+[2026-07-25T14:51:04Z INFO  st3215::auto_calibrate::matdog] MATDOG M12 MIN complete: first=1443, second=1443, spread=0, baseline_median=1, baseline_mad=0
+[2026-07-25T14:51:04Z INFO  st3215::state] update_calibration_progress called: bus='5B14114953', status=Done, step=11/11
+[2026-07-25T14:51:04Z INFO  st3215::state] InferenceState has 1 buses, looking for '5B14114953'
+[2026-07-25T14:51:04Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=Done, step=11/11, phase='MATDOG M12 MIN completed'
+[2026-07-25T14:51:09Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=56, no_bus=44; max_diffs: bus=9ms, video=0ms
+[2026-07-25T14:51:19Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' size 0 is within limit 2147483648
+[2026-07-25T14:51:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' size 0 is within limit 2147483648
+[2026-07-25T14:51:29Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:51:39Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:51:42Z INFO  normfs_wal::writer] WAL writer: rotating file for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference', current file: 1, next entry: 44248
+[2026-07-25T14:51:42Z INFO  normfs_wal::writer] WAL writer: successfully rotated from file 1 to 2 for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference'
+[2026-07-25T14:51:43Z INFO  normfs_wal] WalStore: deleting file 1 for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference'
+[2026-07-25T14:51:43Z INFO  normfs-store] Successfully processed and deleted WAL file for queue: /de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference, file_id: U8(1), entries: U8(0) to U16(44247)
+[2026-07-25T14:51:49Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:51:50Z INFO  normfs_wal::reader] WAL reader: completed bytes range read, sent 1 entries, skipped 4679, from 48927 to Some(U16(48927)) step 1
+[2026-07-25T14:51:59Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:52:09Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:52:19Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' size 0 is within limit 2147483648
+[2026-07-25T14:52:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' size 0 is within limit 2147483648
+[2026-07-25T14:52:29Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:52:39Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:52:48Z INFO  normfs_wal::writer] WAL writer: rotating file for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference', current file: 2, next entry: 83573
+[2026-07-25T14:52:48Z INFO  normfs_wal::writer] WAL writer: successfully rotated from file 2 to 3 for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference'
+[2026-07-25T14:52:49Z INFO  normfs_wal] WalStore: deleting file 2 for queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference'
+[2026-07-25T14:52:49Z INFO  normfs-store] Successfully processed and deleted WAL file for queue: /de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference, file_id: U8(2), entries: U16(44248) to U32(83572)
+[2026-07-25T14:52:49Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:52:59Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:53:10Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:53:20Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/normvla' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-states' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/inference' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/meta' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/motors_mirroring/modes' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference-tags/rx' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/inference/mirroring' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/system/rx' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/rx' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/st3215/tx' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/startups' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/commands' size 0 is within limit 2147483648
+[2026-07-25T14:53:28Z INFO  normfs::disk_monitor] Queue '/de499b68d8fa588d0a924b87191f259c68d754907972010393e635153e2fa244/main' size 0 is within limit 2147483648
+[2026-07-25T14:53:30Z INFO  inferences::formats::normvla] Frame stats (last 100 frames): processed=0, skipped=100 (100.0%), reasons: bus_ahead=0, bus_diff=0, motor_error=0, video_ahead=0, video_diff=0, no_images=0, no_torque=0, invalid_range=0, no_bus=100; max_diffs: bus=0ms, video=0ms
