@@ -1,0 +1,62 @@
+MATDOG LF_UPPER_M12_MAX — hardware V14 from distance-aware V13
+result=PASS
+profile=LF_UPPER_M12_MAX
+bus=5B14114953
+architecture=restart-safe-profile-entry-v13-distance-aware
+robot_commit=4cdf440a2d37d1fe5e33c01f41687e460444a141
+norma_base_commit=32e3222c87016b7f5d7c1c1da497a4cea3e7b80a
+local_patch_commit=6ef728bc629a57efdabc43aa29ffc356c156b532
+station_version=NormaCore.Dev station 0.1.0-beta.9 (6ef728b)
+station_sha256=d09d6d5a71a90ffd439c1dd83388e73ba48c6c5c24ba6109d1e6c6b0ab8a5278
+validation_script=/home/matteo-manicardi/Downloads/MATDOG_LF_UPPER_M12_MAX_OFFLINE_DISTANCE_TIMEOUT_V13.sh
+validation_script_sha256=de419febc9c03339170cf6adf73459c172b258d15e16a320f53f3bd07b7521e9
+validation_marker=/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/OFFLINE_DISTANCE_TIMEOUT_V13_PASS.env
+validation_marker_sha256=70c3b3c642a58cc66acca50e9476e8ed00f3c2067c7b1232251c6cce11d20f2d
+contact_count=2
+serial_free_after_station_stop=true
+
+RESTART_SAFE_ENTRY_LOGS
+[2026-07-28T18:09:46Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX restart prerequisite inventory: M42 present=2385 target=2389
+[2026-07-28T18:09:46Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX restart prerequisite inventory: M13 present=2054 target=2048
+[2026-07-28T18:09:46Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX restart prerequisite inventory: M11 present=2047 target=2048
+[2026-07-28T18:09:46Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX establish prerequisite: M42 present=2385 target=2389
+[2026-07-28T18:09:47Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX establish prerequisite: M13 present=2054 target=2048
+[2026-07-28T18:09:47Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX establish prerequisite: M11 present=2047 target=2048
+
+HOME_RECOVERY_LOGS
+
+
+CONTACT_LOGS
+[2026-07-28T18:10:11Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX contact: step=32, target=3465, present=3443, error=22, current=12, threshold=5, velocity=0
+[2026-07-28T18:10:15Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX contact: step=8, target=3454, present=3442, error=12, current=4, threshold=5, velocity=0
+
+MOVE_PLAN_LOGS
+[2026-07-28T18:09:47Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX move plan: M42 start=2385 target=2389 distance=4 timeout_ms=12000
+[2026-07-28T18:09:47Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX move plan: M13 start=2054 target=2048 distance=6 timeout_ms=12000
+[2026-07-28T18:09:47Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX move plan: M11 start=2047 target=2048 distance=1 timeout_ms=12000
+[2026-07-28T18:09:47Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX move plan: M12 start=2367 target=2048 distance=319 timeout_ms=12975
+[2026-07-28T18:09:52Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX move plan: M12 start=2103 target=2048 distance=55 timeout_ms=12000
+[2026-07-28T18:10:11Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX move plan: M12 start=3443 target=3347 distance=96 timeout_ms=12000
+[2026-07-28T18:10:15Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX move plan: M12 start=3442 target=2048 distance=1394 timeout_ms=39850
+[2026-07-28T18:10:32Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX move plan: M11 start=2047 target=2048 distance=1 timeout_ms=12000
+[2026-07-28T18:10:32Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX move plan: M13 start=2054 target=2048 distance=6 timeout_ms=12000
+[2026-07-28T18:10:32Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX move plan: M42 start=2385 target=2048 distance=337 timeout_ms=13425
+
+FINAL_RETURN_PLAN
+[2026-07-28T18:10:15Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX move plan: M12 start=3442 target=2048 distance=1394 timeout_ms=39850
+
+COMPLETION_LOGS
+[2026-07-28T18:10:36Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_UPPER_M12_MAX complete: first=3443, second=3442, spread=1, baseline_median=0, baseline_mad=0
+
+FAILURE_LOGS
+
+
+FILES
+artifact=/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317
+worktree=/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/norma-core-worktree
+targeted_tests=/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/v13_motion_timeout_tests.log
+full_tests=/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/v13_st3215_full_tests.log
+log=/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/hardware_distance_timeout_v14_20260728T200941/station_LF_UPPER_M12_MAX_20260728T200941.log
+meta=/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/hardware_distance_timeout_v14_20260728T200941/station_LF_UPPER_M12_MAX_20260728T200941.meta
+data_dir=/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/hardware_distance_timeout_v14_20260728T200941/station_data
+summary=/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/hardware_distance_timeout_v14_20260728T200941/SUMMARY.txt

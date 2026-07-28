@@ -1,0 +1,10 @@
+   Compiling st3215 v0.1.0-beta.9 (/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/norma-core-worktree/software/drivers/st3215)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.48s
+     Running unittests src/lib.rs (/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/cargo-target/debug/deps/st3215-6a0863ae5e4b2de7)
+
+running 2 tests
+test auto_calibrate::matdog::tests::motion_timeout_covers_observed_m12_max_return ... ok
+test auto_calibrate::matdog::tests::motion_timeout_keeps_short_moves_fast_and_scales_for_every_profile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 75 filtered out; finished in 0.00s
+

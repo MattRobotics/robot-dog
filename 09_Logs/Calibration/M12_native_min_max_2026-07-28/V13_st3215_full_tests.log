@@ -1,0 +1,91 @@
+   Compiling st3215 v0.1.0-beta.9 (/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/norma-core-worktree/software/drivers/st3215)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.86s
+     Running unittests src/lib.rs (/home/matteo-manicardi/MATDOG/_archive/verification-artifacts/MATDOG_LF_UPPER_M12_MAX_OFFLINE_VALIDATION_V11_20260728T192317/cargo-target/debug/deps/st3215-6a0863ae5e4b2de7)
+
+running 77 tests
+test auto_calibrate::matdog::tests::armed_motor_allowlists_are_leg_scoped_and_include_front_parking_joint ... ok
+test auto_calibrate::matdog::tests::armed_ram_gate_restricts_registers_values_motors_and_goal_windows ... ok
+test auto_calibrate::matdog::tests::command_result_and_ram_readback_are_matched_exactly ... ok
+test auto_calibrate::matdog::tests::command_ids_are_scoped_and_monotonic ... ok
+test auto_calibrate::matdog::tests::current_rise_without_kinematic_stall_is_not_contact ... ok
+test auto_calibrate::matdog::tests::direction_generic_detector_confirms_stall_in_both_tick_directions ... ok
+test auto_calibrate::matdog::tests::every_guard_extends_only_64_ticks_beyond_its_urdf_limit ... ok
+test auto_calibrate::matdog::tests::exact_matdog_id_set_is_required ... ok
+test auto_calibrate::matdog::tests::global_torque_off_cleanup_is_exact ... ok
+test auto_calibrate::matdog::tests::front_lower_restore_order_keeps_rear_parking_until_active_leg_is_home ... ok
+test auto_calibrate::matdog::tests::hip_and_lower_prerequisites_match_geometry_checkpoint ... ok
+test auto_calibrate::matdog::tests::front_profiles_park_only_the_ipsilateral_rear_upper ... ok
+test auto_calibrate::matdog::tests::directions_transform_q_limits_into_leg_specific_unsigned_ticks ... ok
+test auto_calibrate::matdog::tests::lf_upper_m12_max_profile_matches_reviewed_geometry ... ok
+test auto_calibrate::matdog::tests::motion_timeout_covers_observed_m12_max_return ... ok
+test auto_calibrate::matdog::tests::motion_timeout_keeps_short_moves_fast_and_scales_for_every_profile ... ok
+test auto_calibrate::matdog::tests::hard_abort_inputs_are_direction_independent ... ok
+test auto_calibrate::matdog::tests::only_ram_motion_registers_are_allowlisted ... ok
+test auto_calibrate::matdog::tests::observation_reads_required_live_registers_and_error_state ... ok
+test auto_calibrate::matdog::tests::prerequisites_are_unique_and_never_include_the_probe_motor ... ok
+test auto_calibrate::matdog::tests::repeatability_uses_circular_distance_and_preserves_unsigned_goals ... ok
+test auto_calibrate::matdog::tests::robust_current_baseline_uses_median_and_mad ... ok
+test auto_calibrate::matdog::tests::profile_table_covers_exactly_24_unique_contacts ... ok
+test auto_calibrate::matdog::tests::startup_home_recovery_goal_gate_is_global_but_bounded ... ok
+test auto_calibrate::matdog::tests::startup_probe_and_prerequisite_corridors_are_restart_safe ... ok
+test auto_calibrate::matdog::tests::profile_entry_order_is_restart_safe_and_probe_lifecycle_is_strict ... ok
+test auto_calibrate::matdog::tests::startup_wrong_profile_residue_is_rejected ... ok
+test auto_calibrate::matdog::tests::startup_recovery_ram_gate_allows_exact_non_profile_home_sequence ... ok
+test auto_calibrate::matdog::tests::startup_v10_pose_classifies_m42_as_valid_prerequisite_residue ... ok
+test auto_calibrate::matdog::tests::validated_m12_min_profile_preserves_hardware_pilot_numbers ... ok
+test auto_calibrate::matdog::tests::unsupported_arming_values_are_rejected ... ok
+test auto_calibrate::matdog::tests::wrap_math_is_local_but_goal_targets_remain_unsigned ... ok
+test auto_calibrate::tests::exact_motor_topologies_dispatch_without_overlap ... ok
+test calibrate_test::test_dense_with_large_gap ... ok
+test calibrate_test::test_direct_arc_large_range ... ok
+test calibrate_test::test_edge_case_boundaries ... ok
+test calibrate_test::test_evenly_distributed ... ok
+test calibrate_test::test_multiple_gaps_wrap ... ok
+test calibrate_test::test_simple_direct_arc ... ok
+test calibrate_test::test_two_points_direct ... ok
+test calibrate_test::test_two_points_wrap ... ok
+test calibrate_test::test_wrap_around_basic ... ok
+test port::topology_discovery_tests::cold_boot_probes_only_supported_topologies ... ok
+test calibrate_test::test_wrap_around_large_gap ... ok
+test port::topology_discovery_tests::exact_matdog_disables_background_discovery ... ok
+test port::topology_discovery_tests::legacy_topology_never_scans_sparse_global_range ... ok
+test port::topology_discovery_tests::partial_matdog_scans_only_missing_matdog_ids ... ok
+test protocol::packet_test::test_action_request_to_bytes ... ok
+test calibrate_test::test_clustered_readings ... ok
+test calibrate_test::test_direct_arc_near_boundary ... ok
+test port::topology_discovery_tests::matdog_runtime_gate_allows_profile_motion_bounded_home_recovery_and_global_torque_off ... ok
+test port::topology_discovery_tests::matdog_runtime_gate_rejects_reset_and_eeprom_paths ... ok
+test protocol::packet_test::test_ping_request_to_bytes ... ok
+test protocol::packet_test::test_read_request_to_bytes ... ok
+test protocol::packet_test::test_reset_request_to_bytes ... ok
+test protocol::packet_test::test_sync_write_init_positions ... ok
+test protocol::packet_test::test_sync_write_variation_1 ... ok
+test protocol::packet_test::test_sync_write_request_to_bytes ... ok
+test protocol::packet_test::test_reg_write_request_to_bytes ... ok
+test protocol::packet_test::test_ping_response_parsing ... ok
+test protocol::packet_test::test_read_response_parsing ... ok
+test protocol::packet_test::test_sync_write_variation_10 ... ok
+test protocol::packet_test::test_sync_write_variation_2 ... ok
+test protocol::packet_test::test_sync_write_variation_3 ... ok
+test protocol::packet_test::test_sync_write_variation_4 ... ok
+test protocol::packet_test::test_sync_write_variation_5 ... ok
+test protocol::packet_test::test_sync_write_variation_6 ... ok
+test protocol::packet_test::test_sync_write_variation_7 ... ok
+test protocol::packet_test::test_sync_write_variation_8 ... ok
+test protocol::packet_test::test_sync_write_variation_9 ... ok
+test protocol::packet_test::test_write_request_to_bytes ... ok
+test protocol::units_test::test_normal_position_edge_cases ... ok
+test protocol::units_test::test_normal_position_negative_values ... ok
+test protocol::units_test::test_normal_position_positive_values ... ok
+test protocol::units_test::test_normal_position_wraparound ... ok
+test auto_calibrate::matdog::tests::canonical_matdog_source_has_no_eeprom_reset_offset_regwrite_action_or_freeze_path ... ok
+test auto_calibrate::matdog::tests::startup_envelopes_match_exhaustive_oracle_for_all_profiles_and_ticks ... ok
+
+test result: ok. 77 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+   Doc-tests st3215
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
