@@ -13,6 +13,7 @@ on:
       - "06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py"
+      - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py"
       - "03_CAD/URDF/matt_robodog_rev00/**"
   workflow_dispatch:
 
@@ -43,6 +44,7 @@ jobs:
           test -f 06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_2026-07-30.md
           test -f 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py
           test -f 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py
+          test -f 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py
           test -f 06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml
 
       - name: Install exact-mesh collision dependencies
@@ -64,7 +66,8 @@ jobs:
           mkdir -p ci-output
           python3 -m py_compile \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
-            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py
+            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py \
+            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py
           python3 - <<'PY' | tee ci-output/mesh-inventory.log
           from pathlib import Path
           import fcl
@@ -90,7 +93,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py \
+          python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py \
             --repo-root "$PWD" \
             --output ci-output/ordered-sequence-self-collision.json \
             2>&1 | tee ci-output/ordered-sequence-self-collision.log
@@ -105,7 +108,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py \
+          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py \
               --repo-root "$PWD" --certify-hardware \
               >ci-output/no-fixture.stdout 2>ci-output/no-fixture.stderr; then
             echo 'audit unexpectedly certified hardware without fixture' >&2
@@ -117,7 +120,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py \
+          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py \
               --repo-root "$PWD" \
               --fixture 06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml \
               --certify-hardware \
