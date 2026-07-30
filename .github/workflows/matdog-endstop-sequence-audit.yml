@@ -4,13 +4,22 @@ on:
   push:
     branches:
       - matdog/calibration-sequence-upper-lower-hip-audit
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/matdog-endstop-sequence-audit.yml"
+      - "06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_2026-07-30.md"
+      - "06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml"
+      - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py"
+      - "03_CAD/URDF/matt_robodog_rev00/**"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: matdog-ordered-endstop-geometry-${{ github.ref }}
+  group: matdog-ordered-endstop-geometry-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -20,6 +29,7 @@ jobs:
       - name: Checkout exact branch head
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Verify branch scope
