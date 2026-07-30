@@ -10,10 +10,13 @@ on:
     paths:
       - ".github/workflows/matdog-endstop-sequence-audit.yml"
       - "06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_2026-07-30.md"
+      - "06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_ADDENDUM_2026-07-30.md"
       - "06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py"
+      - "06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py"
+      - "06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py"
       - "03_CAD/URDF/matt_robodog_rev00/**"
   workflow_dispatch:
 
@@ -41,11 +44,17 @@ jobs:
           set -euo pipefail
           git diff --check
           git status --short
-          test -f 06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_2026-07-30.md
-          test -f 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py
-          test -f 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py
-          test -f 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py
-          test -f 06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml
+          for path in \
+            06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_2026-07-30.md \
+            06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_ADDENDUM_2026-07-30.md \
+            06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml \
+            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
+            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py \
+            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py \
+            06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py \
+            06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py; do
+            test -f "$path"
+          done
 
       - name: Install exact-mesh collision dependencies
         shell: bash
@@ -67,7 +76,9 @@ jobs:
           python3 -m py_compile \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py \
-            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py
+            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py \
+            06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py \
+            06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py
           python3 - <<'PY' | tee ci-output/mesh-inventory.log
           from pathlib import Path
           import fcl
@@ -88,6 +99,16 @@ jobs:
               assert vertices > 0 and faces > 0, f'empty mesh: {path}'
           print(f'mesh_count={len(files)}')
           PY
+
+      - name: Ordered session and detector oracle regressions
+        shell: bash
+        working-directory: 06_Software/Matdog_Core/calibration
+        run: |
+          set -o pipefail
+          python3 -m unittest -v test_matdog_endstop_session_oracle.py \
+            2>&1 | tee ../../../../ci-output/ordered-session-oracle.log
+          grep -q 'Ran 8 tests' ../../../../ci-output/ordered-session-oracle.log
+          grep -q '^OK$' ../../../../ci-output/ordered-session-oracle.log
 
       - name: Exact URDF mesh audit — UPPER then LOWER then HIP
         shell: bash
