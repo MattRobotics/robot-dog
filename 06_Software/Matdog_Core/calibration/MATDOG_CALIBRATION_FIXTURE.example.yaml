@@ -1,0 +1,15 @@
+schema_version: 1
+frame: base_link
+safety_margin_m: 0.010
+
+# Copy this file outside the example name and replace every placeholder with
+# measurements of the actual MATDOG support fixture expressed in base_link.
+# Hardware certification must reject this example unchanged.
+keepout_boxes:
+  - name: central_support
+    placeholder: true
+    min_xyz_m: [-0.050, -0.040, -0.100]
+    max_xyz_m: [0.050, 0.040, 0.000]
+    # The fixture may intentionally support the body; leg links must never enter.
+    ignore_links:
+      - base_link
