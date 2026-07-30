@@ -1,0 +1,13 @@
+mapping_id,leg,joint_name,servo_id,direction,direction_semantics,zero_tick,raw_q0_tick,digital_zero_offset_i16,final_readback_tick,status,source_id,evidence_path
+S-M13,LF,lf_hip_joint,13,-1,encoder_delta_to_positive_urdf_q,2048,1543,-505,2050,validated,R-CAL;R-DZERO-READBACK;R-DIR-M13,09_Logs/Calibration_Sessions/2026-07-02_212421_m13_lf_hip_positive_probe.result.yaml
+S-M12,LF,lf_upper_leg_joint,12,1,encoder_delta_to_positive_urdf_q,2048,2907,859,2051,validated,R-CAL;R-DZERO-READBACK;R-DIR-M12,09_Logs/Calibration_Sessions/2026-07-02_213021_m12_lf_upper_positive_probe.result.yaml
+S-M11,LF,lf_lower_leg_joint,11,-1,encoder_delta_to_positive_urdf_q,2048,2149,101,2048,validated,R-CAL;R-DZERO-READBACK;R-DIR-M11,09_Logs/Calibration_Sessions/2026-07-02_213351_m11_lf_lower_positive_probe.result.yaml
+S-M23,RF,rf_hip_joint,23,-1,encoder_delta_to_positive_urdf_q,2048,361,-1687,2048,validated,R-CAL;R-DZERO-READBACK;R-DIR-M23,09_Logs/Calibration_Sessions/2026-07-05_154026_m23_rf_hip_negative_probe.result.yaml
+S-M22,RF,rf_upper_leg_joint,22,-1,encoder_delta_to_positive_urdf_q,2048,1157,-891,2048,validated,R-CAL;R-DZERO-READBACK;R-DIR-M22,09_Logs/Calibration_Sessions/2026-07-05_154229_m22_rf_upper_positive_probe.result.yaml
+S-M21,RF,rf_lower_leg_joint,21,1,encoder_delta_to_positive_urdf_q,2048,62,-1986,2049,validated,R-CAL;R-DZERO-READBACK;R-DIR-M21,09_Logs/Calibration_Sessions/2026-07-05_154451_m21_rf_lower_negative_probe.result.yaml
+S-M33,RH,rh_hip_joint,33,1,encoder_delta_to_positive_urdf_q,2048,1578,-470,2048,validated,R-CAL;R-DZERO-READBACK;R-DIR-M33,09_Logs/Calibration_Sessions/2026-07-05_155142_m33_rh_hip_positive_probe.result.yaml
+S-M32,RH,rh_upper_leg_joint,32,-1,encoder_delta_to_positive_urdf_q,2048,1095,-953,2048,validated,R-CAL;R-DZERO-READBACK;R-DIR-M32,09_Logs/Calibration_Sessions/2026-07-05_155257_m32_rh_upper_positive_probe.result.yaml
+S-M31,RH,rh_lower_leg_joint,31,1,encoder_delta_to_positive_urdf_q,2048,27,-2021,2049,validated,R-CAL;R-DZERO-READBACK;R-DIR-M31,09_Logs/Calibration_Sessions/2026-07-05_155450_m31_rh_lower_positive_probe.result.yaml
+S-M43,LH,lh_hip_joint,43,1,encoder_delta_to_positive_urdf_q,2048,1308,-740,2048,validated,R-CAL;R-DZERO-READBACK;R-DIR-M43,09_Logs/Calibration_Sessions/2026-07-05_155839_m43_lh_hip_positive_probe.result.yaml
+S-M42,LH,lh_upper_leg_joint,42,1,encoder_delta_to_positive_urdf_q,2048,3027,979,2049,validated,R-CAL;R-DZERO-READBACK;R-DIR-M42,09_Logs/Calibration_Sessions/2026-07-05_160015_m42_lh_upper_positive_probe.result.yaml
+S-M41,LH,lh_lower_leg_joint,41,-1,encoder_delta_to_positive_urdf_q,2048,224,-1824,2048,validated,R-CAL;R-DZERO-READBACK;R-DIR-M41,09_Logs/Calibration_Sessions/2026-07-05_160206_m41_lh_lower_positive_probe.result.yaml

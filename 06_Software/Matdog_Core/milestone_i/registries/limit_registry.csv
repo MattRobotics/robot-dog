@@ -1,0 +1,51 @@
+limit_id,joint_name,servo_id,side,limit_type,value,units,status,classification,is_operational_safe_limit,source_id,evidence_path,notes
+L-URDF-M13-MIN,lf_hip_joint,13,MIN,urdf_joint,-0.785398163397,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M13-MAX,lf_hip_joint,13,MAX,urdf_joint,0.785398163397,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M12-MIN,lf_upper_leg_joint,12,MIN,urdf_joint,-0.916297857297,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M12-MAX,lf_upper_leg_joint,12,MAX,urdf_joint,2.138028333693,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M11-MIN,lf_lower_leg_joint,11,MIN,urdf_joint,-1.605702911835,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M11-MAX,lf_lower_leg_joint,11,MAX,urdf_joint,0.654498469498,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M23-MIN,rf_hip_joint,23,MIN,urdf_joint,-0.785398163397,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M23-MAX,rf_hip_joint,23,MAX,urdf_joint,0.785398163397,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M22-MIN,rf_upper_leg_joint,22,MIN,urdf_joint,-0.916297857297,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M22-MAX,rf_upper_leg_joint,22,MAX,urdf_joint,2.138028333693,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M21-MIN,rf_lower_leg_joint,21,MIN,urdf_joint,-1.605702911835,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M21-MAX,rf_lower_leg_joint,21,MAX,urdf_joint,0.654498469498,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M33-MIN,rh_hip_joint,33,MIN,urdf_joint,-0.785398163397,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M33-MAX,rh_hip_joint,33,MAX,urdf_joint,0.785398163397,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M32-MIN,rh_upper_leg_joint,32,MIN,urdf_joint,-0.916297857297,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M32-MAX,rh_upper_leg_joint,32,MAX,urdf_joint,2.138028333693,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M31-MIN,rh_lower_leg_joint,31,MIN,urdf_joint,-1.605702911835,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M31-MAX,rh_lower_leg_joint,31,MAX,urdf_joint,0.654498469498,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M43-MIN,lh_hip_joint,43,MIN,urdf_joint,-0.785398163397,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M43-MAX,lh_hip_joint,43,MAX,urdf_joint,0.785398163397,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M42-MIN,lh_upper_leg_joint,42,MIN,urdf_joint,-0.916297857297,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M42-MAX,lh_upper_leg_joint,42,MAX,urdf_joint,2.138028333693,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M41-MIN,lh_lower_leg_joint,41,MIN,urdf_joint,-1.605702911835,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-URDF-M41-MAX,lh_lower_leg_joint,41,MAX,urdf_joint,0.654498469498,rad,validated,MATDOG_VERIFIED,false,R-URDF,03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf,Model limit only
+L-CONTACT-M12-MIN,lf_upper_leg_joint,12,MIN,mechanical_contact,1443,tick,validated,HARDWARE_OBSERVATION,false,R-M12-MIN,06_Software/Matdog_Core/calibration/MATDOG_NATIVE_M12_MIN_PILOT_CHECKPOINT_2026-07-25.md,Repeatable physical contact not safe limit
+L-CONTACT-M12-MAX,lf_upper_leg_joint,12,MAX,mechanical_contact,3442,tick,validated,HARDWARE_OBSERVATION,false,R-M12-MAX,06_Software/Matdog_Core/calibration/MATDOG_NATIVE_M12_MIN_MAX_CHECKPOINT_2026-07-28.md,Fine contact; coarse was 3443; not safe limit
+L-SAFE-M13-MIN,lf_hip_joint,13,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M13-MAX,lf_hip_joint,13,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M12-MIN,lf_upper_leg_joint,12,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL;R-M12-MIN,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Mechanical contact does not supply safe limit
+L-SAFE-M12-MAX,lf_upper_leg_joint,12,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL;R-M12-MAX,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Mechanical contact does not supply safe limit
+L-SAFE-M11-MIN,lf_lower_leg_joint,11,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M11-MAX,lf_lower_leg_joint,11,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M23-MIN,rf_hip_joint,23,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M23-MAX,rf_hip_joint,23,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M22-MIN,rf_upper_leg_joint,22,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M22-MAX,rf_upper_leg_joint,22,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M21-MIN,rf_lower_leg_joint,21,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M21-MAX,rf_lower_leg_joint,21,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M33-MIN,rh_hip_joint,33,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M33-MAX,rh_hip_joint,33,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M32-MIN,rh_upper_leg_joint,32,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M32-MAX,rh_upper_leg_joint,32,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M31-MIN,rh_lower_leg_joint,31,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M31-MAX,rh_lower_leg_joint,31,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M43-MIN,lh_hip_joint,43,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M43-MAX,lh_hip_joint,43,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M42-MIN,lh_upper_leg_joint,42,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M42-MAX,lh_upper_leg_joint,42,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M41-MIN,lh_lower_leg_joint,41,MIN,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
+L-SAFE-M41-MAX,lh_lower_leg_joint,41,MAX,operational_safe,,tick,unknown,UNKNOWN,false,R-CAL,06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml,Missing evidence
