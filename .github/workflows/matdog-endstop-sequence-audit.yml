@@ -18,6 +18,7 @@ on:
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v4.py"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v5.py"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py"
+      - "06_Software/Matdog_Core/calibration/matdog_hip_clearance_search_v7.py"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py"
       - "06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py"
       - "03_CAD/URDF/matt_robodog_rev00/**"
@@ -57,6 +58,7 @@ jobs:
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v4.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v5.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py \
+            06_Software/Matdog_Core/calibration/matdog_hip_clearance_search_v7.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py \
             06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py; do
             test -f "$path"
@@ -86,6 +88,7 @@ jobs:
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v4.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v5.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py \
+            06_Software/Matdog_Core/calibration/matdog_hip_clearance_search_v7.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py \
             06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py
           python3 - <<'PY' | tee ci-output/mesh-inventory.log
@@ -119,20 +122,34 @@ jobs:
           grep -q 'Ran 8 tests' ../../../ci-output/ordered-session-oracle.log
           grep -q '^OK$' ../../../ci-output/ordered-session-oracle.log
 
-      - name: Exact URDF mesh audit — UPPER then LOWER then HIP
+      - name: Prove fixed horizontal compact pose cannot cover full HIP range
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py \
+              --repo-root "$PWD" \
+              --output ci-output/fixed-horizontal-unexpected-pass.json \
+              >ci-output/fixed-horizontal.stdout \
+              2>ci-output/fixed-horizontal.stderr; then
+            echo 'fixed UPPER-horizontal prerequisite unexpectedly passed full HIP sweep' >&2
+            exit 1
+          fi
+          grep -q 'no compact LOWER candidate supports complete HIP sweep' \
+            ci-output/fixed-horizontal.stderr
+          grep -q "base_link.*lf_lower_leg_link" ci-output/fixed-horizontal.stderr
+
+      - name: Search coordinated UPPER LOWER HIP clearance
         shell: bash
         run: |
           set -o pipefail
-          python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py \
+          python3 06_Software/Matdog_Core/calibration/matdog_hip_clearance_search_v7.py \
             --repo-root "$PWD" \
-            --output ci-output/ordered-sequence-self-collision.json \
-            2>&1 | tee ci-output/ordered-sequence-self-collision.log
-          grep -q '"result": "PASS"' ci-output/ordered-sequence-self-collision.json
-          grep -q 'ordered-upper-lower-hip-pair-filtered-fcl-v5' ci-output/ordered-sequence-self-collision.json
-          grep -q '"UPPER_MIN_MAX"' ci-output/ordered-sequence-self-collision.json
-          grep -q '"LOWER_MIN_MAX"' ci-output/ordered-sequence-self-collision.json
-          grep -q '"HIP_MIN_MAX"' ci-output/ordered-sequence-self-collision.json
-          test "$(grep -c '"final_home": true' ci-output/ordered-sequence-self-collision.json)" = 4
+            --output ci-output/coordinated-hip-clearance.json \
+            2>&1 | tee ci-output/coordinated-hip-clearance.log
+          grep -q '"result": "PASS"' ci-output/coordinated-hip-clearance.json
+          grep -q 'coordinated-upper-lower-hip-clearance-v7' \
+            ci-output/coordinated-hip-clearance.json
+          grep -q '"order_unchanged"' ci-output/coordinated-hip-clearance.json
 
       - name: Hardware certification must block without measured fixture
         shell: bash
