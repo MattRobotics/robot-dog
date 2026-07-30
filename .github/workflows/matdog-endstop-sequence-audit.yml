@@ -27,11 +27,12 @@ jobs:
   geometry-audit:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout exact branch head
+      - name: Checkout exact branch head including LFS meshes
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
+          lfs: true
 
       - name: Verify branch scope
         shell: bash
@@ -56,25 +57,39 @@ jobs:
             python-fcl==0.7.0.8 \
             PyYAML==6.0.2
 
-      - name: Syntax and import gate
+      - name: Syntax, import, and mesh inventory gate
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p ci-output
           python3 -m py_compile \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py
-          python3 - <<'PY'
+          python3 - <<'PY' | tee ci-output/mesh-inventory.log
+          from pathlib import Path
           import fcl
           import trimesh
+
           print('python-fcl:', getattr(fcl, '__version__', 'loaded'))
           print('trimesh:', trimesh.__version__)
+          root = Path('03_CAD/URDF/matt_robodog_rev00/meshes')
+          files = sorted(root.glob('*.stl'))
+          assert files, 'no STL collision meshes found'
+          for path in files:
+              mesh = trimesh.load_mesh(path, process=False)
+              if isinstance(mesh, trimesh.Scene):
+                  mesh = mesh.dump(concatenate=True)
+              vertices = len(getattr(mesh, 'vertices', ()))
+              faces = len(getattr(mesh, 'faces', ()))
+              print(f'{path.name}: bytes={path.stat().st_size} vertices={vertices} faces={faces}')
+              assert vertices > 0 and faces > 0, f'empty mesh: {path}'
+          print(f'mesh_count={len(files)}')
           PY
 
       - name: Exact URDF mesh audit — UPPER then LOWER then HIP
         shell: bash
         run: |
           set -o pipefail
-          mkdir -p ci-output
           python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py \
             --repo-root "$PWD" \
             --output ci-output/ordered-sequence-self-collision.json \
