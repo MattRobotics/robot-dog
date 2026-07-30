@@ -12,6 +12,7 @@ on:
       - "06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_2026-07-30.md"
       - "06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py"
+      - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py"
       - "03_CAD/URDF/matt_robodog_rev00/**"
   workflow_dispatch:
 
@@ -40,6 +41,7 @@ jobs:
           git status --short
           test -f 06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_2026-07-30.md
           test -f 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py
+          test -f 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py
           test -f 06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml
 
       - name: Install exact-mesh collision dependencies
@@ -59,7 +61,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m py_compile \
-            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py
+            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
+            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py
           python3 - <<'PY'
           import fcl
           import trimesh
@@ -72,21 +75,22 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p ci-output
-          python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
+          python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py \
             --repo-root "$PWD" \
             --output ci-output/ordered-sequence-self-collision.json \
             2>&1 | tee ci-output/ordered-sequence-self-collision.log
           grep -q '"result": "PASS"' ci-output/ordered-sequence-self-collision.json
+          grep -q 'ordered-upper-lower-hip-mesh-envelope-v2' ci-output/ordered-sequence-self-collision.json
           grep -q '"UPPER_MIN_MAX"' ci-output/ordered-sequence-self-collision.json
           grep -q '"LOWER_MIN_MAX"' ci-output/ordered-sequence-self-collision.json
           grep -q '"HIP_MIN_MAX"' ci-output/ordered-sequence-self-collision.json
-          grep -q '"final_home": true' ci-output/ordered-sequence-self-collision.json
+          test "$(grep -c '"final_home": true' ci-output/ordered-sequence-self-collision.json)" = 4
 
       - name: Hardware certification must block without measured fixture
         shell: bash
         run: |
           set -euo pipefail
-          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
+          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py \
               --repo-root "$PWD" --certify-hardware \
               >ci-output/no-fixture.stdout 2>ci-output/no-fixture.stderr; then
             echo 'audit unexpectedly certified hardware without fixture' >&2
@@ -98,7 +102,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
+          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py \
               --repo-root "$PWD" \
               --fixture 06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml \
               --certify-hardware \
