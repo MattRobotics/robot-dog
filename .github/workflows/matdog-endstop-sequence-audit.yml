@@ -106,9 +106,9 @@ jobs:
         run: |
           set -o pipefail
           python3 -m unittest -v test_matdog_endstop_session_oracle.py \
-            2>&1 | tee ../../../../ci-output/ordered-session-oracle.log
-          grep -q 'Ran 8 tests' ../../../../ci-output/ordered-session-oracle.log
-          grep -q '^OK$' ../../../../ci-output/ordered-session-oracle.log
+            2>&1 | tee ../../../ci-output/ordered-session-oracle.log
+          grep -q 'Ran 8 tests' ../../../ci-output/ordered-session-oracle.log
+          grep -q '^OK$' ../../../ci-output/ordered-session-oracle.log
 
       - name: Exact URDF mesh audit — UPPER then LOWER then HIP
         shell: bash
