@@ -1,0 +1,107 @@
+name: MATDOG Ordered Endstop Geometry Audit
+
+on:
+  push:
+    branches:
+      - matdog/calibration-sequence-upper-lower-hip-audit
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: matdog-ordered-endstop-geometry-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  geometry-audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify branch scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git status --short
+          test -f 06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_2026-07-30.md
+          test -f 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py
+          test -f 06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml
+
+      - name: Install exact-mesh collision dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libfcl-dev
+          python3 -m pip install --disable-pip-version-check \
+            numpy==2.3.2 \
+            trimesh==4.7.1 \
+            python-fcl==0.7.0.8 \
+            PyYAML==6.0.2
+
+      - name: Syntax and import gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py
+          python3 - <<'PY'
+          import fcl
+          import trimesh
+          print('python-fcl:', getattr(fcl, '__version__', 'loaded'))
+          print('trimesh:', trimesh.__version__)
+          PY
+
+      - name: Exact URDF mesh audit — UPPER then LOWER then HIP
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ci-output
+          python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
+            --repo-root "$PWD" \
+            --output ci-output/ordered-sequence-self-collision.json \
+            2>&1 | tee ci-output/ordered-sequence-self-collision.log
+          grep -q '"result": "PASS"' ci-output/ordered-sequence-self-collision.json
+          grep -q '"UPPER_MIN_MAX"' ci-output/ordered-sequence-self-collision.json
+          grep -q '"LOWER_MIN_MAX"' ci-output/ordered-sequence-self-collision.json
+          grep -q '"HIP_MIN_MAX"' ci-output/ordered-sequence-self-collision.json
+          grep -q '"final_home": true' ci-output/ordered-sequence-self-collision.json
+
+      - name: Hardware certification must block without measured fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
+              --repo-root "$PWD" --certify-hardware \
+              >ci-output/no-fixture.stdout 2>ci-output/no-fixture.stderr; then
+            echo 'audit unexpectedly certified hardware without fixture' >&2
+            exit 1
+          fi
+          grep -q 'hardware certification requires --fixture' ci-output/no-fixture.stderr
+
+      - name: Placeholder fixture must also block
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
+              --repo-root "$PWD" \
+              --fixture 06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml \
+              --certify-hardware \
+              >ci-output/placeholder.stdout 2>ci-output/placeholder.stderr; then
+            echo 'audit unexpectedly certified placeholder fixture' >&2
+            exit 1
+          fi
+          grep -q 'fixture box is still a placeholder' ci-output/placeholder.stderr
+
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matdog-ordered-endstop-geometry-audit
+          path: ci-output/
+          if-no-files-found: error
