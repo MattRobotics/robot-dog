@@ -1,0 +1,52 @@
+name: MATDOG LF LOWER M11 MIN V28R Evidence
+
+on:
+  push:
+    branches:
+      - matdog/lf-lower-m11-min-v28r-checkpoint
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify immutable evidence set
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=09_Logs/Calibration/LF_LOWER_M11_MIN_V28R_2026-07-31
+          (
+            cd "$root"
+            sha256sum -c SHA256SUMS
+          )
+          grep -qx 'result=PASS' "$root/SUMMARY.txt"
+          grep -qx 'contact_coarse_tick=3094' "$root/SUMMARY.txt"
+          grep -qx 'contact_fine_tick=3092' "$root/SUMMARY.txt"
+          grep -qx 'contact_spread_tick=2' "$root/SUMMARY.txt"
+          grep -qx 'final_global_torque_off_verified=true' "$root/SUMMARY.txt"
+          grep -qx 'serial_free_after_station_stop=true' "$root/SUMMARY.txt"
+          grep -qx 'st3215_tests=87' "$root/METADATA.env"
+          grep -qx 'rust_warnings=0' "$root/METADATA.env"
+          grep -q 'status=Done, step=14/14' "$root/station_excerpt.log"
+          grep -q 'complete: first=3094, second=3092, spread=2' "$root/station_excerpt.log"
+
+      - name: Enforce evidence-only and safety declaration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          root=09_Logs/Calibration/LF_LOWER_M11_MIN_V28R_2026-07-31
+          test ! -e "$root/MATDOG_LF_LOWER_M11_MIN_HARDWARE_HANDOFF_V28R.sh"
+          ! find "$root" -type f -perm /111 | grep -q .
+          checkpoint=06_Software/Matdog_Core/calibration/MATDOG_NATIVE_LF_LOWER_M11_MIN_CHECKPOINT_2026-07-31.md
+          grep -Fq 'GOAL_POSITION` resta unsigned `0..4095`' "$checkpoint"
+          grep -Fq 'sole scritture RAM' "$checkpoint"
+          grep -Fq 'nessun merge automatico in `main`' "$checkpoint"
