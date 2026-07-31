@@ -1,0 +1,22 @@
+conflict_id,domain,left_claim_id,right_claim_id,resolution,status,classification,source_id,notes
+CF-URDF-DIRECTION,direction,C-URDF-MOTOR-DIR,C-DIR-M13,Use hardware-backed calibration sign for encoder-to-q and leave custom-tag semantics open,OPEN,DECISION_REQUIRED,R-URDF;R-CAL,Also affects M11 M23 M21 M33 M31 M43 M41
+CF-URDF-DIRECTION-M11,direction,C-URDF-MOTOR-DIR,C-DIR-M11,Use hardware-backed calibration sign for encoder-to-q and leave custom-tag semantics open,OPEN,DECISION_REQUIRED,R-URDF;R-DIR-M11,Custom tag differs
+CF-URDF-DIRECTION-M23,direction,C-URDF-MOTOR-DIR,C-DIR-M23,Use hardware-backed calibration sign for encoder-to-q and leave custom-tag semantics open,OPEN,DECISION_REQUIRED,R-URDF;R-DIR-M23,Custom tag differs
+CF-URDF-DIRECTION-M21,direction,C-URDF-MOTOR-DIR,C-DIR-M21,Use hardware-backed calibration sign for encoder-to-q and leave custom-tag semantics open,OPEN,DECISION_REQUIRED,R-URDF;R-DIR-M21,Custom tag differs
+CF-URDF-DIRECTION-M33,direction,C-URDF-MOTOR-DIR,C-DIR-M33,Use hardware-backed calibration sign for encoder-to-q and leave custom-tag semantics open,OPEN,DECISION_REQUIRED,R-URDF;R-DIR-M33,Custom tag differs
+CF-URDF-DIRECTION-M31,direction,C-URDF-MOTOR-DIR,C-DIR-M31,Use hardware-backed calibration sign for encoder-to-q and leave custom-tag semantics open,OPEN,DECISION_REQUIRED,R-URDF;R-DIR-M31,Custom tag differs
+CF-URDF-DIRECTION-M43,direction,C-URDF-MOTOR-DIR,C-DIR-M43,Use hardware-backed calibration sign for encoder-to-q and leave custom-tag semantics open,OPEN,DECISION_REQUIRED,R-URDF;R-DIR-M43,Custom tag differs
+CF-URDF-DIRECTION-M41,direction,C-URDF-MOTOR-DIR,C-DIR-M41,Use hardware-backed calibration sign for encoder-to-q and leave custom-tag semantics open,OPEN,DECISION_REQUIRED,R-URDF;R-DIR-M41,Custom tag differs
+CF-VISUAL-DIGITAL,digital_zero,C-VISUAL-ZERO,C-DZERO,Digital zero supersedes visual zero for current displayed q-zero,CLOSED,SUPERSEDED,R-DZERO-READBACK;R-C5R-HANDOFF,Historical visual evidence retained
+CF-GOAL-WRAP,command_semantics,C-SIGNED-WRAP,C-GOAL-UNSIGNED,Unsigned 0..4095 command contract controls,CLOSED,SUPERSEDED,R-CAL;R-C5R-HANDOFF,Circular delta remains local math
+CF-URDF-COLLISION,collision,C-URDF-LIMITS,C-COLLISION-CONFIG,Require configuration-level collision analysis in addition to joint limits,OPEN,DECISION_REQUIRED,R-URDF;R-COLLISION,No scalar limit substitution
+CF-SOFTWARE-HARDWARE,calibration,C-PROFILES-24,C-UNKNOWN-CONTACTS-22,Report software-ready separately from hardware validation,OPEN,UNKNOWN,N-MATDOG;R-M12-MAX,Only 2 of 24 physically validated
+CF-CONTACT-SAFE,limits,C-M12-CONTACT,C-UNKNOWN-SAFE,Keep mechanical contacts separate and leave safe limits unknown,OPEN,UNKNOWN,R-M12-MAX;R-CAL,No safe-limit promotion
+CF-OWNER,station,C-STATION-OWNER,C-BUS-FUTURE,Current Station ownership remains fact while future A B C choice stays open,OPEN,DECISION_REQUIRED,R-STATION-CONTRACT;R-ADR-STATION,Future architecture cannot rewrite current fact
+CF-MAIN-PR,station,C-MAIN-TIMEOUT,C-PR-RESTART,Classify fork-main and experimental PR behaviors separately,OPEN,NORMACORE_EXPERIMENTAL_PR,N-MATDOG;N-PR-WORKFLOW,PR behavior is not main
+CF-GENERIC-MATDOG-SO101,station,C-GENERIC-SO101,C-NATIVE-RAM,MATDOG RAM-only profile gate controls its contact workflow,CLOSED,NORMACORE_GENERIC_REFERENCE,N-SO101;N-MATDOG,SO101 EEPROM flow does not transfer
+CF-GENERIC-MATDOG-ELROBOT,station,C-GENERIC-ELROBOT,C-NATIVE-RAM,MATDOG RAM-only profile gate controls its contact workflow,CLOSED,NORMACORE_GENERIC_REFERENCE,N-ELROBOT;N-MATDOG,ElRobot EEPROM flow does not transfer
+CF-C5-DZERO,first_stand,C-C5-OLD,C-DZERO,Old C5 target set is not command eligible after recenter,CLOSED,SUPERSEDED,R-C5;R-C5R-HANDOFF,Failure record remains historical
+CF-REALIGN-DZERO,first_stand,C-MECH-REALIGN,C-DZERO,Do not treat pre-recenter mechanical realignment as the primary plan,CLOSED,SUPERSEDED,R-C5;R-C5R-HANDOFF,Future diagnosis needs a new gate
+CF-XGO-PHYSICAL,architecture,C-XGO-ARCH,C-XGO-PHYSICAL,Transfer patterns only and prohibit physical values,CLOSED,XGOLITE_ARCHITECTURAL_REFERENCE,X-TRANSFER,Hard clean-room boundary
+CF-XGO-RATE,timing,C-XGO-PHYSICAL,C-UNKNOWN-RATE,Keep MATDOG timing unknown until MATDOG evidence exists,OPEN,UNKNOWN,X-TRANSFER,No XGo timing import

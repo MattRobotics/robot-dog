@@ -1,0 +1,20 @@
+frame_id,parent_frame,frame_type,origin_xyz_m,origin_rpy_rad,axes,units,status,classification,source_joint,source_link,source_id,notes
+base_link,,root,0 0 0,0 0 0,+X forward;+Y left;+Z up,m rad,materialized,MATDOG_VERIFIED,,base_link,R-URDF;R-ADR-URDF,URDF root and not a ground frame
+lf_hip_link,base_link,joint_child,0.1125 0.0475 0.0465,0 0 0,+X joint axis,m rad,materialized,MATDOG_VERIFIED,lf_hip_joint,lf_hip_link,R-URDF,Front left hip
+lf_upper_leg_link,lf_hip_link,joint_child,0 0.048 0,0 0 0,+Y joint axis,m rad,materialized,MATDOG_VERIFIED,lf_upper_leg_joint,lf_upper_leg_link,R-URDF,Left lateral hip offset
+lf_lower_leg_link,lf_upper_leg_link,joint_child,0 0 -0.09,0 0 0,+Y joint axis,m rad,materialized,MATDOG_VERIFIED,lf_lower_leg_joint,lf_lower_leg_link,R-URDF,Upper length represented by joint offset
+lf_foot_link,lf_lower_leg_link,nominal_foot,0.107 -0.0015 -0.0499,0 0 0,right-handed,m rad,materialized,MATDOG_VERIFIED,lf_foot_joint,lf_foot_link,R-URDF;R-FOOT-GEOM,Nominal frame is distinct from physical patch
+rf_hip_link,base_link,joint_child,0.1125 -0.0475 0.0465,0 0 0,+X joint axis,m rad,materialized,MATDOG_VERIFIED,rf_hip_joint,rf_hip_link,R-URDF,Front right hip
+rf_upper_leg_link,rf_hip_link,joint_child,0 -0.048 0,0 0 0,+Y joint axis,m rad,materialized,MATDOG_VERIFIED,rf_upper_leg_joint,rf_upper_leg_link,R-URDF,Right lateral hip offset
+rf_lower_leg_link,rf_upper_leg_link,joint_child,0 0 -0.09,0 0 0,+Y joint axis,m rad,materialized,MATDOG_VERIFIED,rf_lower_leg_joint,rf_lower_leg_link,R-URDF,Upper length represented by joint offset
+rf_foot_link,rf_lower_leg_link,nominal_foot,0.107 0.0015 -0.0499,0 0 0,right-handed,m rad,materialized,MATDOG_VERIFIED,rf_foot_joint,rf_foot_link,R-URDF;R-FOOT-GEOM,Nominal frame is distinct from physical patch
+rh_hip_link,base_link,joint_child,-0.1125 -0.0475 0.0265,0 0 0,+X joint axis,m rad,materialized,MATDOG_VERIFIED,rh_hip_joint,rh_hip_link,R-URDF,Rear is 0.0200 m lower than front
+rh_upper_leg_link,rh_hip_link,joint_child,0 -0.048 0,0 0 0,+Y joint axis,m rad,materialized,MATDOG_VERIFIED,rh_upper_leg_joint,rh_upper_leg_link,R-URDF,Right lateral hip offset
+rh_lower_leg_link,rh_upper_leg_link,joint_child,0 0 -0.09,0 0 0,+Y joint axis,m rad,materialized,MATDOG_VERIFIED,rh_lower_leg_joint,rh_lower_leg_link,R-URDF,Upper length represented by joint offset
+rh_foot_link,rh_lower_leg_link,nominal_foot,0.107 0.0015 -0.0499,0 0 0,right-handed,m rad,materialized,MATDOG_VERIFIED,rh_foot_joint,rh_foot_link,R-URDF;R-FOOT-GEOM,Nominal frame is distinct from physical patch
+lh_hip_link,base_link,joint_child,-0.1125 0.0475 0.0265,0 0 0,+X joint axis,m rad,materialized,MATDOG_VERIFIED,lh_hip_joint,lh_hip_link,R-URDF,Rear is 0.0200 m lower than front
+lh_upper_leg_link,lh_hip_link,joint_child,0 0.048 0,0 0 0,+Y joint axis,m rad,materialized,MATDOG_VERIFIED,lh_upper_leg_joint,lh_upper_leg_link,R-URDF,Left lateral hip offset
+lh_lower_leg_link,lh_upper_leg_link,joint_child,0 0 -0.09,0 0 0,+Y joint axis,m rad,materialized,MATDOG_VERIFIED,lh_lower_leg_joint,lh_lower_leg_link,R-URDF,Upper length represented by joint offset
+lh_foot_link,lh_lower_leg_link,nominal_foot,0.107 -0.0015 -0.0499,0 0 0,right-handed,m rad,materialized,MATDOG_VERIFIED,lh_foot_joint,lh_foot_link,R-URDF;R-FOOT-GEOM,Nominal frame is distinct from physical patch
+world,,planned_world,,,right-handed,m rad,unknown,DECISION_REQUIRED,,,R-STANCE-FRAME,Not materialized in REV00
+ground_plane,world,planned_ground,,,normal +Z,m rad,decision-required,DECISION_REQUIRED,,,R-STANCE-FRAME,Planned world Z=0 contract with placement unresolved
