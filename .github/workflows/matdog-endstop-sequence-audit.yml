@@ -46,6 +46,7 @@ jobs:
             06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v8.py \
             06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v9.py \
             06_Software/Matdog_Core/calibration/matdog_hip_guard_diagnostic_v10.py \
+            06_Software/Matdog_Core/calibration/matdog_hip_guard_diagnostic_v11.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py \
             06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py; do
             test -f "$path"
@@ -77,6 +78,7 @@ jobs:
             06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v8.py \
             06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v9.py \
             06_Software/Matdog_Core/calibration/matdog_hip_guard_diagnostic_v10.py \
+            06_Software/Matdog_Core/calibration/matdog_hip_guard_diagnostic_v11.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py \
             06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py
           python3 - <<'PY' | tee ci-output/mesh-inventory-and-support.log
@@ -165,12 +167,12 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python3 06_Software/Matdog_Core/calibration/matdog_hip_guard_diagnostic_v10.py \
+          python3 06_Software/Matdog_Core/calibration/matdog_hip_guard_diagnostic_v11.py \
             --repo-root "$PWD" \
             --output ci-output/hip-guard-diagnostic.json \
             2>&1 | tee ci-output/hip-guard-diagnostic.log
           grep -q '"result": "PASS"' ci-output/hip-guard-diagnostic.json
-          grep -q 'hip-guard-budget-diagnostic-v10' ci-output/hip-guard-diagnostic.json
+          grep -q 'hip-guard-budget-diagnostic-v11-two-stage' ci-output/hip-guard-diagnostic.json
           grep -q '"hardware_authorized": false' ci-output/hip-guard-diagnostic.json
           grep -q '"table_plane_z_m": -0.18' ci-output/hip-guard-diagnostic.json
           test "$(grep -c '"best_single_pose_both_directions"' ci-output/hip-guard-diagnostic.json)" = 4
