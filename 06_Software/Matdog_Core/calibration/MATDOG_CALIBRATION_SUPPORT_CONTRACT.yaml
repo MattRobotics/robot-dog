@@ -1,0 +1,22 @@
+schema_version: 1
+frame: base_link
+
+# Operator-validated physical setup used for supervised MATDOG calibration.
+table_plane_z_m: -0.180
+base_link_reference_z_m: 0.000
+
+support_fixture:
+  geometry_modeled: false
+  interference_status: operator_validated_impossible
+  validation_basis: manual_experimental_verification
+  required_sequence:
+    - UPPER_MIN_MAX
+    - UPPER_HORIZONTAL
+    - LOWER_MIN_MAX
+    - COORDINATED_UPPER_LOWER_COMPACT
+    - HIP_MIN_MAX
+
+# The fixture is intentionally excluded from geometric collision modeling.
+# The software must still verify MATDOG self-collision and table clearance.
+fixture_exclusion_authorized: true
+operator_assertion_date: 2026-07-31
