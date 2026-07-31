@@ -13,24 +13,29 @@ Claim classifications are defined in the source policy. Confidence is one of
 `blocked`, `unknown`. Decision status is `OPEN` or `CLOSED`; this foundation
 contains only evidence-consistent open decisions.
 
-`foundation_expectations.json` is the versioned acceptance manifest. It
+`foundation_expectations.json` is the versioned acceptance inventory. It
 contains immutable repository pins, exact registry ID sets, canonical counts
 and distributions, conflict/decision/unresolved states, critical provenance,
-joint directions, profile derivation constants and document metrics. Updating
-a registry and this baseline together is a review-visible semantic change.
+joint directions, parsed profile values and document metrics. It is not the
+sole evidence authority: code-owned enums and compatibility, pinned Git blobs,
+critical locator baselines, robot-dog historical values and the static
+NormaCore parser remain independent gates.
 
 ## Registry contracts
 
 - `source_manifest.csv`: `source_id, repository, ref, path, sha256,
   source_class, authority, scope, temporal_status, parse_status,
-  interpretation_status, notes`. Robot-dog hashes are checked against the
-  current repository. External hashes bind the pinned ref. Authority and scope
+  interpretation_status, notes`. Every hash-bearing row is checked against
+  `ref:path` in the matching explicit local Git repository. The sole exception
+  is the declared hashless upstream external reference. Authority and scope
   are mandatory. The M11 historical blob is explicitly text-only and
   non-parseable.
 - `source_claim_registry.csv`: exactly the mandatory fields `claim_id,
   domain, statement, classification, confidence, source_repository,
   source_ref, source_path, source_locator, units, applies_to, supersedes,
-  conflicts_with, notes`.
+  conflicts_with, notes, line_start, line_end,
+  expected_excerpt_sha256`. The final three fields are mandatory for
+  code-designated critical claims and blank for ordinary claims.
 - `source_conflict_registry.csv`: conflicting claim IDs, resolution rule,
   status, class and sources. Every `conflicts_with` edge must be covered.
 - `joint_registry.csv`: the exact 12 URDF revolute joints, topology, origin,
@@ -62,14 +67,23 @@ until this schema and its tests are deliberately updated with new evidence.
 XGo source rows may support only
 `XGOLITE_ARCHITECTURAL_REFERENCE` claims in architecture/interface domains.
 The exact conflict, decision and unresolved ID/status/category sets are
-data-driven and validated. Paths under `MattRobotics/robot-dog` must exist
-locally; paths for other repositories are ref-qualified and are not resolved
-against this worktree.
+validated. Frame, authority, temporal, parse/interpretation,
+conflict/decision/unresolved enums and the source class + authority + scope
+compatibility matrix are code-owned. Every hash-bearing source path is
+resolved at its pinned Git ref; no source is read from mutable worktree bytes.
+
+The validator proves repository/ref/path/blob identity, excerpt identity,
+numeric/mapping/formula/enum/count conformance (`MACHINE_VERIFIED`). Whether a
+verified excerpt is semantically sufficient for its claim remains a human
+review judgment (`HUMAN_REVIEWED`).
 
 The validator invocation is:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 \
 PYTHONPYCACHEPREFIX=/tmp/matdog-milestone-i-pycache \
-python3 06_Software/Matdog_Core/milestone_i/validate_foundation.py --check
+python3 06_Software/Matdog_Core/milestone_i/validate_foundation.py --check \
+  --robot-dog-repo /path/to/robot-dog \
+  --normacore-repo /path/to/norma-core \
+  --xgolite-repo /path/to/xgolite-low-level-reconstruction
 ```

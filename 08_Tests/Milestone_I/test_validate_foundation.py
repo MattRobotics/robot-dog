@@ -7,6 +7,8 @@ import contextlib
 import csv
 import importlib.util
 import io
+import json
+import os
 import shutil
 import sys
 import tempfile
@@ -16,10 +18,22 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 REPO_ROOT = Path(__file__).resolve().parents[2]
+ROBOT_DOG_REPO = Path(os.environ.get("MATDOG_ROBOT_DOG_REPO", REPO_ROOT))
+NORMACORE_REPO = Path(
+    os.environ.get("MATDOG_NORMACORE_REPO", REPO_ROOT.parents[2] / "norma-core")
+)
+XGOLITE_REPO = Path(
+    os.environ.get(
+        "MATDOG_XGOLITE_REPO",
+        REPO_ROOT.parents[2]
+        / "robotics-reverse/worktrees/xgolite-main-checkpoint",
+    )
+)
 VALIDATOR_PATH = REPO_ROOT / "06_Software/Matdog_Core/milestone_i/validate_foundation.py"
 SPEC = importlib.util.spec_from_file_location("matdog_foundation_validator", VALIDATOR_PATH)
 assert SPEC and SPEC.loader
 validator = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = validator
 SPEC.loader.exec_module(validator)
 
 
@@ -81,13 +95,41 @@ class FoundationValidatorTests(unittest.TestCase):
         self.assertIn(old, text)
         path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
-    def errors(self) -> list[str]:
-        return validator.validate(self.root)
+    def mutate_expectations(self, mutation) -> None:
+        path = self.root / "06_Software/Matdog_Core/milestone_i/foundation_expectations.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        mutation(data)
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
-    def exit_code(self) -> int:
+    def repository_paths(self, **overrides) -> dict[str, Path]:
+        paths = {
+            "robot_dog_repo": ROBOT_DOG_REPO,
+            "normacore_repo": NORMACORE_REPO,
+            "xgolite_repo": XGOLITE_REPO,
+        }
+        paths.update(overrides)
+        return paths
+
+    def errors(self, **overrides) -> list[str]:
+        return validator.validate(self.root, **self.repository_paths(**overrides))
+
+    def exit_code(self, **overrides) -> int:
         output = io.StringIO()
+        paths = self.repository_paths(**overrides)
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
-            return validator.main(["--check", "--root", str(self.root)])
+            return validator.main(
+                [
+                    "--check",
+                    "--root",
+                    str(self.root),
+                    "--robot-dog-repo",
+                    str(paths["robot_dog_repo"]),
+                    "--normacore-repo",
+                    str(paths["normacore_repo"]),
+                    "--xgolite-repo",
+                    str(paths["xgolite_repo"]),
+                ]
+            )
 
     def assert_error_contains(self, text: str) -> None:
         errors = self.errors()
@@ -183,7 +225,7 @@ class FoundationValidatorTests(unittest.TestCase):
             next(row for row in rows if row["source_id"] == "R-URDF")["sha256"] = "0" * 64
 
         self.mutate("source_manifest.csv", change)
-        self.assert_error_contains("local checksum mismatch")
+        self.assert_error_contains("pinned blob checksum mismatch")
 
     # Eight independently reproduced false PASS cases.
 
@@ -274,7 +316,7 @@ class FoundationValidatorTests(unittest.TestCase):
             )
 
         self.mutate("frame_registry.csv", change)
-        self.assert_error_contains("canonical status mismatch")
+        self.assert_error_contains("pinned-URDF/code status mismatch")
 
     def test_urdf_motor_direction_used_as_hardware_without_conflict(self) -> None:
         def change_joint(rows):
@@ -293,7 +335,7 @@ class FoundationValidatorTests(unittest.TestCase):
         self.mutate("joint_registry.csv", change_joint)
         self.mutate("servo_mapping_registry.csv", change_servo)
         self.mutate("source_conflict_registry.csv", change_conflict)
-        self.assert_error_contains("canonical encoder_to_q_direction mismatch")
+        self.assert_error_contains("pinned robot calibration encoder_to_q_direction mismatch")
 
     def test_acceptance_count_divergent(self) -> None:
         self.mutate_document(
@@ -311,6 +353,210 @@ class FoundationValidatorTests(unittest.TestCase):
             '"claims": 50',
         )
         self.assert_error_contains("handoff: metrics diverge")
+
+    # Fourteen final-remediation cases: the nine reproduced false PASS cases
+    # plus five additional fail-closed Git/enum/locator mutations.
+
+    def test_coordinated_joint_expectation_and_registries(self) -> None:
+        self.mutate_expectations(
+            lambda data: data["joint_directions"]["J-LF-HIP"].update(
+                encoder_to_q=1
+            )
+        )
+
+        def change_joint(rows):
+            next(row for row in rows if row["joint_id"] == "J-LF-HIP")[
+                "encoder_to_q_direction"
+            ] = "1"
+
+        def change_servo(rows):
+            next(row for row in rows if row["mapping_id"] == "S-M13")[
+                "direction"
+            ] = "1"
+
+        def change_profiles(rows):
+            minimum = next(
+                row for row in rows if row["profile_id"] == "LF_HIP_M13_MIN"
+            )
+            maximum = next(
+                row for row in rows if row["profile_id"] == "LF_HIP_M13_MAX"
+            )
+            minimum.update(
+                probe_sign="-1",
+                urdf_limit_tick="1536",
+                guard_tick="1472",
+                baseline_target_tick="1984",
+            )
+            maximum.update(
+                probe_sign="1",
+                urdf_limit_tick="2560",
+                guard_tick="2624",
+                baseline_target_tick="2112",
+            )
+
+        self.mutate("joint_registry.csv", change_joint)
+        self.mutate("servo_mapping_registry.csv", change_servo)
+        self.mutate("calibration_registry.csv", change_profiles)
+        self.assert_error_contains(
+            "pinned robot calibration encoder_to_q_direction mismatch"
+        )
+
+    def test_coordinated_frame_expectation_and_registry(self) -> None:
+        self.mutate_expectations(
+            lambda data: data["frame_statuses"].update(world="decision-required")
+        )
+
+        def change(rows):
+            next(row for row in rows if row["frame_id"] == "world")[
+                "status"
+            ] = "decision-required"
+
+        self.mutate("frame_registry.csv", change)
+        self.assert_error_contains("pinned-URDF/code status mismatch")
+
+    def test_coordinated_profile_expectation_calibration_and_limit(self) -> None:
+        def change_expectation(data):
+            values = data["hardware_validated_profiles"]["LF_UPPER_M12_MIN"]
+            values.update(
+                coarse_contact_tick=1444,
+                fine_contact_tick=1444,
+                measured_contact_tick=1444,
+            )
+
+        def change_profile(rows):
+            next(
+                row for row in rows if row["profile_id"] == "LF_UPPER_M12_MIN"
+            ).update(
+                coarse_contact_tick="1444",
+                fine_contact_tick="1444",
+                measured_contact_tick="1444",
+            )
+
+        def change_limit(rows):
+            next(row for row in rows if row["limit_id"] == "L-CONTACT-M12-MIN")[
+                "value"
+            ] = "1444"
+
+        self.mutate_expectations(change_expectation)
+        self.mutate("calibration_registry.csv", change_profile)
+        self.mutate("limit_registry.csv", change_limit)
+        self.assert_error_contains("differ from pinned checkpoint")
+
+    def test_locator_existing_but_wrong_segment(self) -> None:
+        wrong_hash = "fc492195c94522e03b5c43e74da9c5404d369cf67213d78d0399a9d28ef80a4e"
+
+        def change_claim(rows):
+            next(row for row in rows if row["claim_id"] == "C-FRAME-BASE").update(
+                source_locator="canonical source of truth",
+                line_start="21",
+                line_end="21",
+                expected_excerpt_sha256=wrong_hash,
+            )
+
+        def change_expectation(data):
+            data["critical_claim_provenance"]["C-FRAME-BASE"].update(
+                source_locator="canonical source of truth",
+                line_start=21,
+                line_end=21,
+                expected_excerpt_sha256=wrong_hash,
+            )
+
+        self.mutate("source_claim_registry.csv", change_claim)
+        self.mutate_expectations(change_expectation)
+        self.assert_error_contains("critical locator C-FRAME-BASE line_start mismatch")
+
+    def test_classification_incompatible_with_authority(self) -> None:
+        def change_claim(rows):
+            next(row for row in rows if row["claim_id"] == "C-MODEL-ORDER")[
+                "classification"
+            ] = "HARDWARE_OBSERVATION"
+
+        def change_expectation(data):
+            counts = data["claim_classification_counts"]
+            counts["MATDOG_VERIFIED"] -= 1
+            counts["HARDWARE_OBSERVATION"] += 1
+
+        self.mutate("source_claim_registry.csv", change_claim)
+        self.mutate_expectations(change_expectation)
+        self.assert_error_contains("incompatible with source class/authority/scope")
+
+    def test_normacore_hash_wrong(self) -> None:
+        def change(rows):
+            next(row for row in rows if row["source_id"] == "N-SO101")[
+                "sha256"
+            ] = "0" * 64
+
+        self.mutate("source_manifest.csv", change)
+        self.assert_error_contains("source N-SO101: pinned blob checksum mismatch")
+
+    def test_normacore_path_nonexistent(self) -> None:
+        def change(rows):
+            next(row for row in rows if row["source_id"] == "N-MATDOG-TEST")[
+                "path"
+            ] = "software/drivers/st3215/src/auto_calibrate/does_not_exist.rs"
+
+        self.mutate("source_manifest.csv", change)
+        self.assert_error_contains("source N-MATDOG-TEST: git object does not exist")
+
+    def test_xgolite_hash_wrong(self) -> None:
+        def change(rows):
+            next(row for row in rows if row["source_id"] == "X-H1-SPEC")[
+                "sha256"
+            ] = "0" * 64
+
+        self.mutate("source_manifest.csv", change)
+        self.assert_error_contains("source X-H1-SPEC: pinned blob checksum mismatch")
+
+    def test_xgolite_path_nonexistent(self) -> None:
+        def change(rows):
+            next(row for row in rows if row["source_id"] == "X-H1-SPEC")[
+                "path"
+            ] = "docs/reverse/does_not_exist.md"
+
+        self.mutate("source_manifest.csv", change)
+        self.assert_error_contains("source X-H1-SPEC: git object does not exist")
+
+    def test_external_git_ref_nonexistent(self) -> None:
+        def change(rows):
+            next(row for row in rows if row["source_id"] == "N-SO101")[
+                "ref"
+            ] = "0000000000000000000000000000000000000000"
+
+        self.mutate("source_manifest.csv", change)
+        self.assert_error_contains("source N-SO101: git object does not exist")
+
+    def test_repository_root_missing(self) -> None:
+        missing = self.root / "missing-normacore-repository"
+        errors = self.errors(normacore_repo=missing)
+        self.assertTrue(any("repository root missing" in error for error in errors), errors)
+        self.assertEqual(self.exit_code(normacore_repo=missing), 1)
+
+    def test_frame_status_bogus(self) -> None:
+        def change(rows):
+            next(row for row in rows if row["frame_id"] == "world")["status"] = "BOGUS"
+
+        self.mutate("frame_registry.csv", change)
+        self.assert_error_contains("invalid frame status 'BOGUS'")
+
+    def test_robot_historical_value_altered_in_registry(self) -> None:
+        def change(rows):
+            next(row for row in rows if row["mapping_id"] == "S-M13")[
+                "raw_q0_tick"
+            ] = "1544"
+
+        self.mutate("servo_mapping_registry.csv", change)
+        self.assert_error_contains("pinned robot calibration raw_q0_tick mismatch")
+
+    def test_expected_excerpt_hash_wrong(self) -> None:
+        def change(rows):
+            next(row for row in rows if row["claim_id"] == "C-DIR-M11")[
+                "expected_excerpt_sha256"
+            ] = "0" * 64
+
+        self.mutate("source_claim_registry.csv", change)
+        self.assert_error_contains(
+            "code-owned critical locator expected_excerpt_sha256 mismatch"
+        )
 
 
 if __name__ == "__main__":

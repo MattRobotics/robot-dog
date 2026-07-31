@@ -13,6 +13,21 @@ The authoritative operational NormaCore repository for this milestone is
 `MattRobotics/norma-core`, not the external upstream `norma-core/norma-core`.
 The upstream is reference-only and its PR #4 is unrelated to MATDOG.
 
+## Verification boundary
+
+`MACHINE_VERIFIED` means that the offline validator checks the declared Git
+repository identity, pinned ref, repository-relative path, blob SHA-256,
+critical line range and excerpt SHA-256 where present, numeric values,
+mapping, formulas, code-owned enums, compatibility matrix and inventory
+counts. Robot-dog, NormaCore main, NormaCore PR #4 and XGoLite blobs are read
+with `git cat-file` and `git show` from three explicitly supplied local
+repositories. The validator does not use the network.
+
+`HUMAN_REVIEWED` means that a reviewer judged whether the pinned source
+segment is semantically sufficient to support the claim. Segment identity and
+content are machine-verified; semantic sufficiency is not. The validator is
+not a universal semantic proof engine and no document may describe it as one.
+
 ## Classification vocabulary
 
 | Classification | Meaning |
@@ -50,6 +65,12 @@ The hash-pinned historical M11 direction blob
 The direction claim uses the exact text locator at lines 17-20; no YAML parser
 may be invoked implicitly for that source.
 
+Claims with critical provenance carry `line_start`, `line_end` and
+`expected_excerpt_sha256`. These values are checked against code-owned
+critical baselines and the pinned Git blob, so replacing a locator with a
+different existing sentence is rejected even if expectations and registry are
+changed together.
+
 ## Promotion and conflict rules
 
 - `UNKNOWN`, `CORROBORATED`, vendor evidence, or architecture references may
@@ -79,9 +100,13 @@ collision boundary are distinct concepts.
 ## Change rule
 
 Generated registries are reviewed data, not a replacement for evidence.
-`foundation_expectations.json` freezes the accepted identities,
-classifications, statuses, counts, repository pins and NormaCore profile
-derivation constants. Any later change must update sources, claims,
-conflicts/decisions, expectations, validator tests, acceptance counts, and
-handoff together. No listed decision is resolved merely to make validation
-pass.
+`foundation_expectations.json` inventories the accepted identities,
+classifications, statuses, counts, repository pins and derived profile values;
+it is not the sole authority for historical evidence. Robot-dog values are
+checked against the pinned base blobs, and all 24 profiles are statically
+derived from pinned NormaCore `matdog.rs`. Code-owned enums, source
+class/authority/scope compatibility and critical locators cannot be redefined
+by coordinated expectation edits. Any later change must update sources,
+claims, conflicts/decisions, expectations, validator tests, acceptance counts,
+and handoff together. No listed decision is resolved merely to make
+validation pass.

@@ -11,6 +11,7 @@
 - PR URL: <https://github.com/MattRobotics/robot-dog/pull/4>
 - Foundation classification: `FOUNDATION_PASS_WITH_LIMITS`
 - Remediation classification: `REMEDIATION_PASS_WITH_LIMITS`
+- Final remediation classification: `FINAL_REMEDIATION_PASS_WITH_LIMITS`
 
 This handoff is inside the remediated commit and therefore cannot contain the
 SHA of its own enclosing commit without a circular hash dependency. The
@@ -18,7 +19,7 @@ published branch/PR head and the external remediation report are authoritative
 for the final SHA. PR #4 must remain draft and must not be merged by this
 handoff.
 
-FOUNDATION_METRICS_JSON: {"claims": 51, "conflicts": 21, "decisions": 9, "frames": 19, "hardware_validated_profiles": 2, "joints": 12, "limits": 50, "materialized_frames": 17, "mutation_cases": 28, "operational_safe_limits": 0, "profiles": 24, "servos": 12, "sources": 66, "unit_tests": 29, "unresolved": 11}
+FOUNDATION_METRICS_JSON: {"claims": 51, "conflicts": 21, "decisions": 9, "frames": 19, "hardware_validated_profiles": 2, "joints": 12, "limits": 50, "materialized_frames": 17, "mutation_cases": 42, "operational_safe_limits": 0, "profiles": 24, "servos": 12, "sources": 66, "unit_tests": 43, "unresolved": 11}
 
 ## Original publication commits
 
@@ -36,7 +37,7 @@ recorded in Git, PR #4 and the external remediation report after publication.
 
 ## Independent-review remediation
 
-The 2026-07-31 review demonstrated eight false PASS cases: changed joint
+The first 2026-07-31 review demonstrated eight false PASS cases: changed joint
 origin, joint effort, frame origin, profile URDF-limit tick, removed claim,
 removed unresolved row, changed conflict status and empty source authority.
 All eight returned exit code zero at the initial head and are now versioned
@@ -58,6 +59,23 @@ comparison or frozen identities/statuses. The remediation adds:
 - exact inventories and status distributions for sources, claims, conflicts,
   decisions, unresolved rows, joints, frames, servos, profiles and limits;
 - 29 standard-library tests: one valid baseline and 28 rejected mutations.
+
+The second independent review then demonstrated nine further false PASS
+cases: three coordinated expectation/registry changes, a semantically wrong
+existing locator, an authority-incompatible claim classification, and wrong
+NormaCore/XGoLite hashes and paths. The final limited remediation adds:
+
+- explicit local repository arguments and offline `git cat-file`/`git show`
+  verification for all 65 hash-bearing source rows across robot-dog,
+  NormaCore main/PR and XGoLite;
+- pinned robot-dog base reads for URDF, direction, mapping, digital-zero
+  readback and M12 contact evidence;
+- deterministic static parsing of pinned NormaCore `matdog.rs` and direct
+  derivation of all 24 profiles without runtime import or Station;
+- code-owned enums, tolerance, source class + authority + scope compatibility
+  and critical locator baselines;
+- critical claim line ranges and excerpt SHA-256 checks;
+- 14 added fail-closed tests, for 43 tests total and 42 rejected mutations.
 
 ## Provenance changes
 
@@ -101,13 +119,20 @@ contact evidence. Zero operational safe limits are proven.
 
 ## Verification contract
 
-- Validator: exact foundation identity and substantive checks must PASS.
-- Tests: 29/29 must PASS; all 28 invalid mutations must produce errors.
+- Validator: exact foundation identity and machine-checkable content must PASS
+  using explicit robot-dog, NormaCore and XGoLite repository roots.
+- Tests: 43/43 must PASS; all 42 invalid mutations must return non-zero.
 - URDF XML, ten CSV files and the JSON expectation manifest must parse.
 - `git diff --check` and `git diff --check main...HEAD` must PASS.
 - UTF-8, secret/private-key/credential-URL, home-path, symlink, special-file,
   executable, pycache, temporary-artifact and Markdown-link scans must PASS.
 - Worktree must be clean after normal non-forced push.
+
+`MACHINE_VERIFIED` covers Git repository/ref/path/blob identity, critical
+segment identity, values, mappings, formulas, enums and counts.
+`HUMAN_REVIEWED` covers the semantic sufficiency of a verified segment for its
+claim. The validator does not and is not claimed to prove semantics
+automatically.
 
 ## Limits and next operation
 

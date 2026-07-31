@@ -8,18 +8,18 @@ MILESTONE_I_1=COMPLETE
 FOUNDATION_CLASSIFICATION=FOUNDATION_PASS_WITH_LIMITS
 INDEPENDENT_REVIEW_REMEDIATED=true
 REMEDIATION_CLASSIFICATION=REMEDIATION_PASS_WITH_LIMITS
+FINAL_REMEDIATION_CLASSIFICATION=FINAL_REMEDIATION_PASS_WITH_LIMITS
 HARDWARE_USED=false
 STATION_STARTED=false
 MILESTONE_I_2_STARTED=false
 ```
 
-All blocking findings from the 2026-07-31 independent foundation review are
-addressed. The remaining `UNKNOWN` and `DECISION_REQUIRED` rows are intentional
-future evidence/decision boundaries and require no change before this
-foundation can be reviewed for merge. This acceptance does not authorize a
-merge, hardware work, or Milestone I.2.
+The nine false PASS cases from the second independent review are addressed.
+The remaining `UNKNOWN`, `DECISION_REQUIRED` and declared semantic-review
+boundaries are intentional. This acceptance does not authorize a merge,
+hardware work, or Milestone I.2.
 
-FOUNDATION_METRICS_JSON: {"claims": 51, "conflicts": 21, "decisions": 9, "frames": 19, "hardware_validated_profiles": 2, "joints": 12, "limits": 50, "materialized_frames": 17, "mutation_cases": 28, "operational_safe_limits": 0, "profiles": 24, "servos": 12, "sources": 66, "unit_tests": 29, "unresolved": 11}
+FOUNDATION_METRICS_JSON: {"claims": 51, "conflicts": 21, "decisions": 9, "frames": 19, "hardware_validated_profiles": 2, "joints": 12, "limits": 50, "materialized_frames": 17, "mutation_cases": 42, "operational_safe_limits": 0, "profiles": 24, "servos": 12, "sources": 66, "unit_tests": 43, "unresolved": 11}
 
 ## Frozen references
 
@@ -77,24 +77,33 @@ observations and are not operational safe limits.
 
 ## Validation
 
-`foundation_expectations.json` freezes repository pins, exact registry ID
+`foundation_expectations.json` inventories repository pins, exact registry ID
 sets, canonical counts/distributions, conflict/decision/unresolved states,
-critical provenance, joint directions, profile derivation constants and these
-document metrics.
+critical provenance, parsed profile values and these document metrics. It is
+not the sole authority for robot evidence, NormaCore profiles, enums,
+compatibility or critical locators.
 
 The standard-library validator:
 
+- verifies all 65 hash-bearing manifest rows by reading `ref:path` with
+  `git cat-file`/`git show` from explicit local robot-dog, NormaCore and
+  XGoLite repositories; the validator performs no network access;
 - compares every joint topology, origin/RPY, axis, limit, effort, velocity,
-  servo ID and custom URDF hardware tag to REV00 with explicit numeric
-  tolerance;
+  servo ID and custom URDF hardware tag to the REV00 blob at the pinned
+  robot-dog base with code-owned numeric tolerance;
+- compares direction, mapping, zero/readback and M12 contact values to pinned
+  historical robot-dog blobs rather than mutable expectations/worktree files;
 - compares all 17 materialized frames to their source joint/link while keeping
   `world` and `ground_plane` planned and non-materialized;
-- regenerates all 24 NormaCore profiles from the pinned source hash and
-  formula constants, then compares order, roles, directions, allowed motors,
-  prerequisites, reverse restore order, home, limit, guard and evidence state;
+- statically parses pinned NormaCore `matdog.rs` without importing runtime or
+  starting Station, derives all 24 profiles, then compares order, roles,
+  directions, allowed motors, prerequisites, reverse restore order, home,
+  limit, guard and evidence state;
 - enforces exact source/claim/conflict/decision/unresolved identities,
-  distributions and statuses, mandatory source metadata and source-class
-  compatibility;
+  distributions and statuses, code-owned enums and source class + authority +
+  scope compatibility;
+- verifies code-owned critical line ranges and excerpt SHA-256 values against
+  pinned blobs;
 - verifies acceptance and handoff metrics against the machine-readable
   baseline.
 
@@ -103,14 +112,25 @@ Invocation:
 ```bash
 PYTHONDONTWRITEBYTECODE=1 \
 PYTHONPYCACHEPREFIX=/tmp/matdog-milestone-i-remediation-pycache \
-python3 06_Software/Matdog_Core/milestone_i/validate_foundation.py --check
+python3 06_Software/Matdog_Core/milestone_i/validate_foundation.py --check \
+  --robot-dog-repo /path/to/robot-dog \
+  --normacore-repo /path/to/norma-core \
+  --xgolite-repo /path/to/xgolite-low-level-reconstruction
 ```
 
-The suite contains 29 tests: one valid baseline and 28 invalid mutations. It
-retains the original 14 cases and adds all eight independent-review false
-PASS mutations plus provenance, M11 parse-state, source compatibility, planned
-frame, direction-conflict, acceptance and handoff divergence cases. Every
-invalid mutation must return at least one validator error.
+The suite contains 43 tests: one valid baseline and 42 invalid mutations. It
+retains all 29 existing tests and adds the nine second-review false PASS cases
+plus missing external ref/root, `BOGUS` frame status, robot historical-value
+and excerpt-hash mutations. Every invalid mutation returns a non-zero exit
+code.
+
+## Machine and human review boundary
+
+`MACHINE_VERIFIED` covers repository identity, ref, path, blob hash, critical
+segment identity, numeric values, mappings, formulas, enums and counts.
+`HUMAN_REVIEWED` covers whether a machine-verified segment is semantically
+sufficient evidence for the claim. No acceptance statement treats the
+validator as an automatic proof of claim semantics.
 
 ## Limits and excluded scope
 

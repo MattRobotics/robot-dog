@@ -541,6 +541,9 @@
   "critical_claim_provenance": {
     "C-DIR-M11": {
       "classification": "HARDWARE_OBSERVATION",
+      "expected_excerpt_sha256": "9fcfc13d38e61a6528f576a7a92090402de46e13f45d84fa1d5ed94e310e33e8",
+      "line_end": 20,
+      "line_start": 17,
       "source_locator": "lines 17-20: direction -1 and status PASS_DIRECTION_TEST",
       "source_path": "09_Logs/Calibration_Sessions/2026-07-02_213351_m11_lf_lower_positive_probe.result.yaml",
       "source_ref": "a6dc1184f56956dad696b3bcc24d74f375edb5b7",
@@ -548,6 +551,9 @@
     },
     "C-FRAME-BASE": {
       "classification": "MATDOG_VERIFIED",
+      "expected_excerpt_sha256": "b59a48b901a9a5d1d582a3efef2ac24a2cb1982a47ae56cd57616b1edf8e0091",
+      "line_end": 29,
+      "line_start": 27,
       "source_locator": "Kinematic Decisions: ROS convention",
       "source_path": "09_Logs/Architecture_Decisions/ADR-003_URDF_REV00_Kinematic_Baseline.md",
       "source_ref": "a6dc1184f56956dad696b3bcc24d74f375edb5b7",
@@ -555,6 +561,9 @@
     },
     "C-GENERIC-ELROBOT": {
       "classification": "NORMACORE_GENERIC_REFERENCE",
+      "expected_excerpt_sha256": "e46da2a8e9b625bb9eef95c4d4088070db0c919f9ff7a9b19eb2b46d78026b32",
+      "line_end": 141,
+      "line_start": 99,
       "source_locator": "send_eeprom_write_verified and save_calibration",
       "source_path": "software/drivers/st3215/src/auto_calibrate/elrobot.rs",
       "source_ref": "32e3222c87016b7f5d7c1c1da497a4cea3e7b80a",
@@ -562,6 +571,9 @@
     },
     "C-GENERIC-SO101": {
       "classification": "NORMACORE_GENERIC_REFERENCE",
+      "expected_excerpt_sha256": "2b02295e8de8ecb2e03ae1d82573f6460a868fce17fd7711980ee77ee085c1c9",
+      "line_end": 150,
+      "line_start": 110,
       "source_locator": "send_eeprom_write_verified and save_calibration",
       "source_path": "software/drivers/st3215/src/auto_calibrate/so101.rs",
       "source_ref": "32e3222c87016b7f5d7c1c1da497a4cea3e7b80a",
@@ -666,13 +678,15 @@
       "coarse_contact_tick": 3443,
       "fine_contact_tick": 3442,
       "measured_contact_tick": 3442,
-      "repeatability_spread_tick": 1
+      "repeatability_spread_tick": 1,
+      "urdf_limit_tick": 3442
     },
     "LF_UPPER_M12_MIN": {
       "coarse_contact_tick": 1443,
       "fine_contact_tick": 1443,
       "measured_contact_tick": 1443,
-      "repeatability_spread_tick": 0
+      "repeatability_spread_tick": 0,
+      "urdf_limit_tick": 1451
     }
   },
   "document_metrics": {
@@ -684,12 +698,12 @@
     "joints": 12,
     "limits": 50,
     "materialized_frames": 17,
-    "mutation_cases": 28,
+    "mutation_cases": 42,
     "operational_safe_limits": 0,
     "profiles": 24,
     "servos": 12,
     "sources": 66,
-    "unit_tests": 29,
+    "unit_tests": 43,
     "unresolved": 11
   }
 }

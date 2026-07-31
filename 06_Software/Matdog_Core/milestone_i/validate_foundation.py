@@ -9,9 +9,11 @@ import hashlib
 import json
 import math
 import re
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,8 @@ NORMA_PR_HEAD = "b06cc2bf2e36fb5bbaae12e48c5998c7668862ef"
 XGO_REPOSITORY = "MattRobotics/xgolite-low-level-reconstruction"
 XGO_TAG = "xgolite-static-closure-h2-2026-07-30"
 XGO_COMMIT = "a1b34a8594e5bc76c76b1e3ddf89a3aef2b98298"
+ABSOLUTE_TOLERANCE = 1e-9
+RELATIVE_TOLERANCE = 0.0
 
 CLASSIFICATIONS = {
     "MATDOG_VERIFIED",
@@ -49,6 +53,10 @@ PROFILE_STATUSES = {
     "unknown",
 }
 AUTHORITIES = {"PRIMARY", "SECONDARY", "SUPPORTING", "REFERENCE"}
+FRAME_STATUSES = {"materialized", "unknown", "decision-required"}
+CONFLICT_STATUSES = {"OPEN", "CLOSED"}
+DECISION_STATUSES = {"OPEN", "CLOSED"}
+UNRESOLVED_STATUSES = {"OPEN", "CLOSED"}
 TEMPORAL_STATUSES = {
     "CURRENT_CANONICAL",
     "CURRENT_SUPPORTING",
@@ -94,8 +102,110 @@ FROZEN_UNKNOWN = {
 }
 EXPECTED_M11_SHA256 = "272d5e8e4e9158cd6ac058aaee1282aa132172c24e0faf3775f5b5e472a3afe3"
 M11_SOURCE_ID = "R-DIR-M11"
-M11_CLAIM_ID = "C-DIR-M11"
 METRICS_PATTERN = re.compile(r"^FOUNDATION_METRICS_JSON: (\{.*\})$", re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class CriticalLocator:
+    repository: str
+    ref: str
+    path: str
+    source_locator: str
+    line_start: int
+    line_end: int
+    expected_excerpt_sha256: str
+
+
+CRITICAL_CLAIM_LOCATORS = {
+    "C-DIR-M11": CriticalLocator(
+        ROBOT_REPOSITORY,
+        ROBOT_BASE,
+        "09_Logs/Calibration_Sessions/2026-07-02_213351_m11_lf_lower_positive_probe.result.yaml",
+        "lines 17-20: direction -1 and status PASS_DIRECTION_TEST",
+        17,
+        20,
+        "9fcfc13d38e61a6528f576a7a92090402de46e13f45d84fa1d5ed94e310e33e8",
+    ),
+    "C-FRAME-BASE": CriticalLocator(
+        ROBOT_REPOSITORY,
+        ROBOT_BASE,
+        "09_Logs/Architecture_Decisions/ADR-003_URDF_REV00_Kinematic_Baseline.md",
+        "Kinematic Decisions: ROS convention",
+        27,
+        29,
+        "b59a48b901a9a5d1d582a3efef2ac24a2cb1982a47ae56cd57616b1edf8e0091",
+    ),
+    "C-GENERIC-SO101": CriticalLocator(
+        NORMA_REPOSITORY,
+        NORMA_MAIN,
+        "software/drivers/st3215/src/auto_calibrate/so101.rs",
+        "send_eeprom_write_verified and save_calibration",
+        110,
+        150,
+        "2b02295e8de8ecb2e03ae1d82573f6460a868fce17fd7711980ee77ee085c1c9",
+    ),
+    "C-GENERIC-ELROBOT": CriticalLocator(
+        NORMA_REPOSITORY,
+        NORMA_MAIN,
+        "software/drivers/st3215/src/auto_calibrate/elrobot.rs",
+        "send_eeprom_write_verified and save_calibration",
+        99,
+        141,
+        "e46da2a8e9b625bb9eef95c4d4088070db0c919f9ff7a9b19eb2b46d78026b32",
+    ),
+}
+
+
+# The third component is a normalized scope family derived from the source's
+# declared scope and evidence type.  This matrix is code-owned: expectations
+# may inventory distributions, but cannot redefine compatibility.
+CLAIM_CLASSIFICATION_MATRIX = {
+    ("MATDOG_VERIFIED", "PRIMARY", "MATDOG"): frozenset(
+        {"MATDOG_VERIFIED", "MATDOG_DERIVED", "UNKNOWN", "DECISION_REQUIRED"}
+    ),
+    ("MATDOG_VERIFIED", "SUPPORTING", "MATDOG"): frozenset(
+        {
+            "MATDOG_VERIFIED",
+            "MATDOG_DERIVED",
+            "SUPERSEDED",
+            "UNKNOWN",
+            "DECISION_REQUIRED",
+        }
+    ),
+    ("MATDOG_DERIVED", "PRIMARY", "MATDOG"): frozenset(
+        {"MATDOG_VERIFIED", "MATDOG_DERIVED", "UNKNOWN"}
+    ),
+    ("MATDOG_DERIVED", "SUPPORTING", "MATDOG"): frozenset(
+        {"MATDOG_VERIFIED", "MATDOG_DERIVED", "UNKNOWN"}
+    ),
+    ("CORROBORATED", "SECONDARY", "MATDOG"): frozenset(
+        {"MATDOG_VERIFIED", "MATDOG_DERIVED"}
+    ),
+    ("HARDWARE_OBSERVATION", "PRIMARY", "HARDWARE"): frozenset(
+        {"HARDWARE_OBSERVATION", "MATDOG_VERIFIED", "UNKNOWN"}
+    ),
+    ("HARDWARE_OBSERVATION", "SUPPORTING", "HARDWARE"): frozenset(
+        {"HARDWARE_OBSERVATION", "UNKNOWN"}
+    ),
+    ("SUPERSEDED", "PRIMARY", "HISTORICAL"): frozenset({"SUPERSEDED"}),
+    (
+        "NORMACORE_MATDOG_FORK_MAIN_FACT",
+        "PRIMARY",
+        "NORMACORE",
+    ): frozenset({"NORMACORE_MATDOG_FORK_MAIN_FACT"}),
+    ("NORMACORE_EXPERIMENTAL_PR", "PRIMARY", "NORMACORE"): frozenset(
+        {"NORMACORE_EXPERIMENTAL_PR"}
+    ),
+    ("NORMACORE_GENERIC_REFERENCE", "SECONDARY", "NORMACORE"): frozenset(
+        {"NORMACORE_GENERIC_REFERENCE"}
+    ),
+    ("NORMACORE_UPSTREAM_REFERENCE", "REFERENCE", "REFERENCE"): frozenset(
+        {"NORMACORE_UPSTREAM_REFERENCE"}
+    ),
+    ("XGOLITE_ARCHITECTURAL_REFERENCE", "REFERENCE", "REFERENCE"): frozenset(
+        {"XGOLITE_ARCHITECTURAL_REFERENCE"}
+    ),
+}
 
 REGISTRY_HEADERS = {
     "source_manifest.csv": [
@@ -127,6 +237,9 @@ REGISTRY_HEADERS = {
         "supersedes",
         "conflicts_with",
         "notes",
+        "line_start",
+        "line_end",
+        "expected_excerpt_sha256",
     ],
     "source_conflict_registry.csv": [
         "conflict_id",
@@ -294,16 +407,177 @@ INVENTORY_KEYS = {
 }
 
 
+class GitBlobResolver:
+    """Read only registered blobs from explicit, identity-checked repositories."""
+
+    def __init__(
+        self,
+        robot_dog_repo: Path | None,
+        normacore_repo: Path | None,
+        xgolite_repo: Path | None,
+        errors: list[str],
+    ) -> None:
+        self.errors = errors
+        self.roots = {
+            ROBOT_REPOSITORY: robot_dog_repo,
+            NORMA_REPOSITORY: normacore_repo,
+            XGO_REPOSITORY: xgolite_repo,
+        }
+        self.cache: dict[tuple[str, str, str], bytes | None] = {}
+        for repository, root in self.roots.items():
+            self._check_repository_root(repository, root)
+        self._check_commit_pin(ROBOT_REPOSITORY, ROBOT_BASE, ROBOT_BASE)
+        self._check_commit_pin(NORMA_REPOSITORY, NORMA_MAIN, NORMA_MAIN)
+        self._check_commit_pin(NORMA_REPOSITORY, NORMA_PR_HEAD, NORMA_PR_HEAD)
+        self._check_commit_pin(XGO_REPOSITORY, XGO_TAG, XGO_COMMIT)
+
+    @staticmethod
+    def _repository_name_from_url(url: str) -> str | None:
+        value = url.strip().removesuffix(".git").rstrip("/")
+        match = re.search(r"github\.com[/:]([^/]+/[^/]+)$", value)
+        return match.group(1) if match else None
+
+    def _run(
+        self, repository: str, arguments: list[str], *, label: str
+    ) -> subprocess.CompletedProcess[bytes] | None:
+        root = self.roots.get(repository)
+        if root is None:
+            return None
+        try:
+            return subprocess.run(
+                ["git", "-C", str(root), *arguments],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+        except OSError as exc:
+            self.errors.append(f"{label}: cannot execute git: {exc}")
+            return None
+
+    def _check_repository_root(self, repository: str, root: Path | None) -> None:
+        if root is None:
+            self.errors.append(f"repository root missing for {repository}")
+            return
+        root = root.resolve()
+        self.roots[repository] = root
+        if not root.is_dir():
+            self.errors.append(f"repository root missing for {repository}: {root}")
+            self.roots[repository] = None
+            return
+        inside = self._run(
+            repository,
+            ["rev-parse", "--is-inside-work-tree"],
+            label=f"repository {repository}",
+        )
+        if inside is None or inside.returncode != 0 or inside.stdout.strip() != b"true":
+            detail = "" if inside is None else inside.stderr.decode("utf-8", "replace").strip()
+            self.errors.append(f"repository root invalid for {repository}: {root}: {detail}")
+            self.roots[repository] = None
+            return
+        remotes = self._run(
+            repository,
+            ["config", "--get-regexp", r"^remote\..*\.url$"],
+            label=f"repository {repository}",
+        )
+        names: set[str] = set()
+        if remotes is not None and remotes.returncode in {0, 1}:
+            for line in remotes.stdout.decode("utf-8", "replace").splitlines():
+                _key, _separator, url = line.partition(" ")
+                name = self._repository_name_from_url(url)
+                if name:
+                    names.add(name)
+        if repository not in names:
+            self.errors.append(
+                f"repository root mismatch for {repository}: {root} has remotes {sorted(names)}"
+            )
+            self.roots[repository] = None
+
+    def _check_commit_pin(self, repository: str, ref: str, expected: str) -> None:
+        result = self._run(
+            repository,
+            ["rev-parse", f"{ref}^{{commit}}"],
+            label=f"repository {repository} ref {ref}",
+        )
+        if result is None:
+            return
+        if result.returncode != 0:
+            self.errors.append(
+                f"repository {repository}: required ref does not exist: {ref}"
+            )
+            return
+        actual = result.stdout.decode("ascii", "replace").strip()
+        if actual != expected:
+            self.errors.append(
+                f"repository {repository}: ref {ref} resolves to {actual}, expected {expected}"
+            )
+
+    def read(self, repository: str, ref: str, path: str, label: str) -> bytes | None:
+        key = (repository, ref, path)
+        if key in self.cache:
+            return self.cache[key]
+        if repository not in self.roots or self.roots[repository] is None:
+            self.errors.append(f"{label}: no matching local repository for {repository}")
+            self.cache[key] = None
+            return None
+        if not is_relative_repo_path(path):
+            self.cache[key] = None
+            return None
+        object_name = f"{ref}:{path}"
+        exists = self._run(
+            repository,
+            ["cat-file", "-e", object_name],
+            label=label,
+        )
+        if exists is None or exists.returncode != 0:
+            self.errors.append(f"{label}: git object does not exist: {object_name}")
+            self.cache[key] = None
+            return None
+        shown = self._run(repository, ["show", object_name], label=label)
+        if shown is None or shown.returncode != 0:
+            self.errors.append(f"{label}: git show failed: {object_name}")
+            self.cache[key] = None
+            return None
+        self.cache[key] = shown.stdout
+        return shown.stdout
+
+
+def decode_blob(label: str, blob: bytes | None, errors: list[str]) -> str | None:
+    if blob is None:
+        return None
+    try:
+        return blob.decode("utf-8")
+    except UnicodeError as exc:
+        errors.append(f"{label}: pinned blob is not UTF-8: {exc}")
+        return None
+
+
+def excerpt_bytes(blob: bytes, line_start: int, line_end: int) -> bytes | None:
+    lines = blob.splitlines(keepends=True)
+    if line_start < 1 or line_end < line_start or line_end > len(lines):
+        return None
+    return b"".join(lines[line_start - 1 : line_end])
+
+
+def source_scope_family(source: dict[str, str]) -> str:
+    source_class = source["source_class"]
+    scope = source["scope"].casefold()
+    if source_class == "HARDWARE_OBSERVATION":
+        hardware_terms = ("evidence", "contact", "direction", "readback", "run metadata")
+        return "HARDWARE" if any(term in scope for term in hardware_terms) else "INVALID"
+    if source_class == "SUPERSEDED":
+        return "HISTORICAL"
+    if source_class.startswith("NORMACORE_") and source_class != "NORMACORE_UPSTREAM_REFERENCE":
+        return "NORMACORE"
+    if source_class in {
+        "NORMACORE_UPSTREAM_REFERENCE",
+        "XGOLITE_ARCHITECTURAL_REFERENCE",
+    }:
+        return "REFERENCE"
+    return "MATDOG"
+
+
 def split_ids(value: str) -> list[str]:
     return [item for item in value.split(";") if item]
-
-
-def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def is_relative_repo_path(value: str) -> bool:
@@ -319,12 +593,11 @@ def parse_vector(value: str, size: int) -> tuple[float, ...]:
 
 
 def numeric_equal(left: float, right: float, expectations: dict[str, Any]) -> bool:
-    tolerance = expectations["numeric_tolerance"]
     return math.isclose(
         left,
         right,
-        rel_tol=float(tolerance["relative"]),
-        abs_tol=float(tolerance["absolute"]),
+        rel_tol=RELATIVE_TOLERANCE,
+        abs_tol=ABSOLUTE_TOLERANCE,
     )
 
 
@@ -384,6 +657,28 @@ def load_expectations(root: Path, errors: list[str]) -> dict[str, Any]:
     }
     if pins != expected_pins:
         errors.append(f"foundation expectations: repository pins mismatch: {pins!r}")
+    if data.get("numeric_tolerance") != {
+        "absolute": ABSOLUTE_TOLERANCE,
+        "relative": RELATIVE_TOLERANCE,
+    }:
+        errors.append("foundation expectations: numeric tolerance differs from code-owned gate")
+    critical = data.get("critical_claim_provenance", {})
+    for claim_id, baseline in CRITICAL_CLAIM_LOCATORS.items():
+        expected = critical.get(claim_id, {})
+        code_owned = {
+            "source_repository": baseline.repository,
+            "source_ref": baseline.ref,
+            "source_path": baseline.path,
+            "source_locator": baseline.source_locator,
+            "line_start": baseline.line_start,
+            "line_end": baseline.line_end,
+            "expected_excerpt_sha256": baseline.expected_excerpt_sha256,
+        }
+        for field, wanted in code_owned.items():
+            if expected.get(field) != wanted:
+                errors.append(
+                    f"foundation expectations: critical locator {claim_id} {field} mismatch"
+                )
     return data
 
 
@@ -450,8 +745,8 @@ def check_inventory(
 
 
 def check_sources(
-    root: Path,
     rows: list[dict[str, str]],
+    resolver: GitBlobResolver,
     expectations: dict[str, Any],
     errors: list[str],
 ) -> set[str]:
@@ -503,11 +798,6 @@ def check_sources(
                 errors.append(f"source {label}: wrong robot-dog base ref")
             if row["temporal_status"] == "UNKNOWN_STATUS":
                 errors.append(f"source {label}: robot-dog source cannot have UNKNOWN_STATUS")
-            local = root / row["path"]
-            if not local.is_file():
-                errors.append(f"source {label}: local path does not exist: {row['path']}")
-            elif digest and sha256(local) != digest:
-                errors.append(f"source {label}: local checksum mismatch")
         elif row["repository"] == NORMA_REPOSITORY:
             if row["source_class"] == "NORMACORE_EXPERIMENTAL_PR":
                 if row["ref"] != NORMA_PR_HEAD:
@@ -532,6 +822,18 @@ def check_sources(
         else:
             errors.append(f"source {label}: unrecognized repository {row['repository']!r}")
 
+        if label != "N-UPSTREAM" and row["repository"] in resolver.roots:
+            blob = resolver.read(
+                row["repository"], row["ref"], row["path"], f"source {label}"
+            )
+            if blob is not None and digest:
+                actual_digest = hashlib.sha256(blob).hexdigest()
+                if actual_digest != digest:
+                    errors.append(
+                        f"source {label}: pinned blob checksum mismatch: "
+                        f"manifest={digest} git={actual_digest}"
+                    )
+
     xgo_anchor = next((row for row in rows if row["source_id"] == "X-README"), None)
     if not xgo_anchor or XGO_COMMIT not in xgo_anchor["notes"]:
         errors.append("source manifest: XGoLite tag commit pin is missing")
@@ -546,24 +848,23 @@ def check_sources(
             errors.append("source R-DIR-M11: expected TEXT_ONLY_NONPARSEABLE")
         if m11["interpretation_status"] != "PINNED_HUMAN_TEXT":
             errors.append("source R-DIR-M11: expected PINNED_HUMAN_TEXT")
-        m11_path = root / m11["path"]
-        if m11_path.is_file():
-            try:
-                lines = m11_path.read_text(encoding="utf-8").splitlines()
-            except (OSError, UnicodeError) as exc:
-                errors.append(f"source R-DIR-M11: text read failed: {exc}")
-            else:
-                expected_lines = {
-                    17: "calibration_result:",
-                    18: "  encoder_increase_maps_to_urdf_q: negative",
-                    19: "  direction: -1",
-                    20: "  status: PASS_DIRECTION_TEST",
-                }
-                for line_number, expected_line in expected_lines.items():
-                    if len(lines) < line_number or lines[line_number - 1] != expected_line:
-                        errors.append(
-                            f"source R-DIR-M11: text locator line {line_number} mismatch"
-                        )
+        m11_blob = resolver.read(
+            ROBOT_REPOSITORY, ROBOT_BASE, m11["path"], "source R-DIR-M11"
+        )
+        text = decode_blob("source R-DIR-M11", m11_blob, errors)
+        if text is not None:
+            lines = text.splitlines()
+            expected_lines = {
+                17: "calibration_result:",
+                18: "  encoder_increase_maps_to_urdf_q: negative",
+                19: "  direction: -1",
+                20: "  status: PASS_DIRECTION_TEST",
+            }
+            for line_number, expected_line in expected_lines.items():
+                if len(lines) < line_number or lines[line_number - 1] != expected_line:
+                    errors.append(
+                        f"source R-DIR-M11: text locator line {line_number} mismatch"
+                    )
 
     profile_source = next((row for row in rows if row["source_id"] == "N-MATDOG"), None)
     expected_profile_sha = expectations["normacore_profile_derivation"]["source_sha256"]
@@ -572,23 +873,19 @@ def check_sources(
     return ids
 
 
-def source_class_compatible(source_class: str, classification: str) -> bool:
-    exact_classes = {
-        "NORMACORE_MATDOG_FORK_MAIN_FACT",
-        "NORMACORE_EXPERIMENTAL_PR",
-        "NORMACORE_GENERIC_REFERENCE",
-        "NORMACORE_UPSTREAM_REFERENCE",
-        "XGOLITE_ARCHITECTURAL_REFERENCE",
-    }
-    if source_class in exact_classes:
-        return source_class == classification
-    return classification not in exact_classes
+def source_class_compatible(source: dict[str, str], classification: str) -> bool:
+    key = (
+        source["source_class"],
+        source["authority"],
+        source_scope_family(source),
+    )
+    return classification in CLAIM_CLASSIFICATION_MATRIX.get(key, frozenset())
 
 
 def check_claims(
-    root: Path,
     rows: list[dict[str, str]],
     source_rows: list[dict[str, str]],
+    resolver: GitBlobResolver,
     expectations: dict[str, Any],
     errors: list[str],
 ) -> set[str]:
@@ -623,15 +920,12 @@ def check_claims(
         source = source_triples.get(triple)
         if source is None:
             errors.append(f"claim {label}: source ref/path is not registered in source manifest")
-        elif not source_class_compatible(source["source_class"], row["classification"]):
+        elif not source_class_compatible(source, row["classification"]):
             errors.append(
                 f"claim {label}: classification {row['classification']} is incompatible "
-                f"with source class {source['source_class']}"
+                f"with source class/authority/scope "
+                f"{source['source_class']}/{source['authority']}/{source['scope']}"
             )
-        if row["source_repository"] == ROBOT_REPOSITORY and not (
-            root / row["source_path"]
-        ).is_file():
-            errors.append(f"claim {label}: local source path does not exist")
         if label in FROZEN_UNKNOWN and row["classification"] != "UNKNOWN":
             errors.append(f"claim {label}: frozen UNKNOWN was improperly promoted")
         if row["source_repository"] == XGO_REPOSITORY:
@@ -656,32 +950,68 @@ def check_claims(
         if row is None:
             continue
         for field, wanted in expected.items():
-            if row[field] != wanted:
+            wanted_text = str(wanted) if field in {"line_start", "line_end"} else wanted
+            if row[field] != wanted_text:
                 errors.append(
                     f"claim {claim_id}: critical provenance {field} mismatch: "
-                    f"{row[field]!r} != {wanted!r}"
+                    f"{row[field]!r} != {wanted_text!r}"
                 )
 
-    frame_claim = row_by_id.get("C-FRAME-BASE")
-    if frame_claim:
-        frame_source = root / frame_claim["source_path"]
-        if frame_source.is_file():
-            text = frame_source.read_text(encoding="utf-8")
-            if "ROS convention: X forward, Y left, Z up." not in text:
-                errors.append("claim C-FRAME-BASE: locator does not resolve in pinned source")
+    for claim_id, baseline in CRITICAL_CLAIM_LOCATORS.items():
+        row = row_by_id.get(claim_id)
+        if row is None:
+            continue
+        code_owned = {
+            "source_repository": baseline.repository,
+            "source_ref": baseline.ref,
+            "source_path": baseline.path,
+            "source_locator": baseline.source_locator,
+            "line_start": str(baseline.line_start),
+            "line_end": str(baseline.line_end),
+            "expected_excerpt_sha256": baseline.expected_excerpt_sha256,
+        }
+        for field, wanted in code_owned.items():
+            if row[field] != wanted:
+                errors.append(
+                    f"claim {claim_id}: code-owned critical locator {field} mismatch: "
+                    f"{row[field]!r} != {wanted!r}"
+                )
+        blob = resolver.read(
+            baseline.repository,
+            baseline.ref,
+            baseline.path,
+            f"claim {claim_id} critical locator",
+        )
+        if blob is None:
+            continue
+        segment = excerpt_bytes(blob, baseline.line_start, baseline.line_end)
+        if segment is None:
+            errors.append(f"claim {claim_id}: critical locator line range is invalid")
+            continue
+        actual_hash = hashlib.sha256(segment).hexdigest()
+        if actual_hash != baseline.expected_excerpt_sha256:
+            errors.append(
+                f"claim {claim_id}: pinned critical excerpt hash mismatch: {actual_hash}"
+            )
 
-    m11_claim = row_by_id.get(M11_CLAIM_ID)
-    if m11_claim and m11_claim["source_locator"] != (
-        "lines 17-20: direction -1 and status PASS_DIRECTION_TEST"
-    ):
-        errors.append("claim C-DIR-M11: precise text-only locator is required")
+    for row in rows:
+        locator_fields = (
+            row["line_start"],
+            row["line_end"],
+            row["expected_excerpt_sha256"],
+        )
+        if row["claim_id"] not in CRITICAL_CLAIM_LOCATORS and any(locator_fields):
+            if not all(locator_fields):
+                errors.append(
+                    f"claim {row['claim_id']}: machine locator fields must be all present or all empty"
+                )
     return claim_ids
 
 
 def check_source_links(
-    root: Path,
     registries: dict[str, list[dict[str, str]]],
     source_ids: set[str],
+    resolver: GitBlobResolver,
     errors: list[str],
 ) -> None:
     for name, rows in registries.items():
@@ -695,24 +1025,199 @@ def check_source_links(
             if evidence:
                 if not is_relative_repo_path(evidence):
                     errors.append(f"{name}:{number}: evidence path must be repository-relative")
-                elif not (root / evidence).is_file():
-                    errors.append(
-                        f"{name}:{number}: evidence path does not exist: {evidence}"
+                else:
+                    resolver.read(
+                        ROBOT_REPOSITORY,
+                        ROBOT_BASE,
+                        evidence,
+                        f"{name}:{number}: evidence path",
                     )
 
 
 def parse_urdf(
-    root: Path, errors: list[str]
+    resolver: GitBlobResolver, errors: list[str]
 ) -> tuple[ET.Element | None, set[str], dict[str, ET.Element]]:
-    path = root / "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf"
+    path = "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf"
+    blob = resolver.read(ROBOT_REPOSITORY, ROBOT_BASE, path, "canonical URDF")
+    if blob is None:
+        return None, set(), {}
     try:
-        urdf_root = ET.parse(path).getroot()
-    except (OSError, ET.ParseError) as exc:
+        urdf_root = ET.fromstring(blob)
+    except ET.ParseError as exc:
         errors.append(f"URDF parse failed: {exc}")
         return None, set(), {}
     links = {node.get("name", "") for node in urdf_root.findall("link")}
     joints = {node.get("name", ""): node for node in urdf_root.findall("joint")}
     return urdf_root, links, joints
+
+
+def parse_robot_joint_calibration(
+    resolver: GitBlobResolver, errors: list[str]
+) -> dict[str, dict[str, int]]:
+    path = "06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml"
+    text = decode_blob(
+        "robot joint calibration",
+        resolver.read(ROBOT_REPOSITORY, ROBOT_BASE, path, "robot joint calibration"),
+        errors,
+    )
+    if text is None:
+        return {}
+    lines = text.splitlines()
+    try:
+        start = lines.index("joints:") + 1
+    except ValueError:
+        errors.append("robot joint calibration: joints section missing")
+        return {}
+    parsed: dict[str, dict[str, int]] = {}
+    current: str | None = None
+    for line in lines[start:]:
+        if line and not line.startswith(" "):
+            break
+        joint_match = re.fullmatch(r"  ([a-z0-9_]+):", line)
+        if joint_match:
+            current = joint_match.group(1)
+            parsed[current] = {}
+            continue
+        field_match = re.fullmatch(r"    ([a-z0-9_]+): (-?\d+)", line)
+        if current and field_match:
+            parsed[current][field_match.group(1)] = int(field_match.group(2))
+    required_fields = {
+        "servo_id",
+        "direction",
+        "zero_encoder_final",
+        "geometric_q0_raw_unoffset",
+        "digital_zero_offset_signed_i16",
+        "final_readback_present_median",
+    }
+    if set(parsed) != JOINTS:
+        errors.append(
+            f"robot joint calibration: exact joint set mismatch: {sorted(parsed)}"
+        )
+    for joint_name, values in parsed.items():
+        missing = sorted(required_fields - set(values))
+        if missing:
+            errors.append(
+                f"robot joint calibration {joint_name}: missing integer fields {missing}"
+            )
+    return parsed
+
+
+def parse_direction_evidence(
+    source_rows: list[dict[str, str]],
+    resolver: GitBlobResolver,
+    errors: list[str],
+) -> dict[int, int]:
+    by_id = {row["source_id"]: row for row in source_rows}
+    directions: dict[int, int] = {}
+    for servo_id in sorted(SERVO_IDS):
+        source_id = f"R-DIR-M{servo_id}"
+        source = by_id.get(source_id)
+        if source is None:
+            errors.append(f"direction evidence: source {source_id} missing")
+            continue
+        text = decode_blob(
+            f"direction evidence M{servo_id}",
+            resolver.read(
+                ROBOT_REPOSITORY,
+                ROBOT_BASE,
+                source["path"],
+                f"direction evidence M{servo_id}",
+            ),
+            errors,
+        )
+        if text is None:
+            continue
+        matches = re.findall(r"(?m)^\s*direction:\s*(-?1)\s*$", text)
+        if len(matches) != 1 or "PASS_DIRECTION_TEST" not in text:
+            errors.append(
+                f"direction evidence M{servo_id}: deterministic direction/status parse failed"
+            )
+            continue
+        directions[servo_id] = int(matches[0])
+    return directions
+
+
+def parse_final_readback(
+    resolver: GitBlobResolver, errors: list[str]
+) -> dict[int, dict[str, Any]]:
+    path = (
+        "09_Logs/Calibration/C5_R_digital_recenter/"
+        "2026-07-10_145457Z_final_12_offset_readback.json"
+    )
+    blob = resolver.read(ROBOT_REPOSITORY, ROBOT_BASE, path, "final offset readback")
+    text = decode_blob("final offset readback", blob, errors)
+    if text is None:
+        return {}
+    try:
+        document = json.loads(text)
+    except json.JSONDecodeError as exc:
+        errors.append(f"final offset readback: JSON parse failed: {exc}")
+        return {}
+    if not isinstance(document, dict) or document.get("status") != "PASS":
+        errors.append("final offset readback: top-level PASS status missing")
+        return {}
+    motors = document.get("motors")
+    if not isinstance(motors, list):
+        errors.append("final offset readback: motors array missing")
+        return {}
+    parsed: dict[int, dict[str, Any]] = {}
+    for motor in motors:
+        if not isinstance(motor, dict) or not isinstance(motor.get("motor_id"), int):
+            errors.append("final offset readback: malformed motor row")
+            continue
+        motor_id = motor["motor_id"]
+        if motor_id in parsed:
+            errors.append(f"final offset readback: duplicate motor {motor_id}")
+        parsed[motor_id] = motor
+    if set(parsed) != SERVO_IDS:
+        errors.append("final offset readback: exact servo set mismatch")
+    return parsed
+
+
+def parse_contact_evidence(
+    resolver: GitBlobResolver, errors: list[str]
+) -> dict[str, dict[str, int]]:
+    path = "06_Software/Matdog_Core/calibration/MATDOG_NATIVE_M12_MIN_MAX_CHECKPOINT_2026-07-28.md"
+    text = decode_blob(
+        "M12 contact checkpoint",
+        resolver.read(ROBOT_REPOSITORY, ROBOT_BASE, path, "M12 contact checkpoint"),
+        errors,
+    )
+    if text is None:
+        return {}
+    pattern = re.compile(
+        r"(?m)^MIN\n"
+        r"  coarse:\s+(\d+) tick\n"
+        r"  fine:\s+(\d+) tick\n"
+        r"  spread:\s+(\d+) tick\n"
+        r"  limite URDF:\s+(\d+) tick\n"
+        r"\nMAX\n"
+        r"  coarse:\s+(\d+) tick\n"
+        r"  fine:\s+(\d+) tick\n"
+        r"  spread:\s+(\d+) tick\n"
+        r"  limite URDF:\s+(\d+) tick$"
+    )
+    match = pattern.search(text)
+    if match is None:
+        errors.append("M12 contact checkpoint: deterministic MIN/MAX parse failed")
+        return {}
+    values = [int(value) for value in match.groups()]
+    return {
+        "LF_UPPER_M12_MIN": {
+            "coarse_contact_tick": values[0],
+            "fine_contact_tick": values[1],
+            "repeatability_spread_tick": values[2],
+            "urdf_limit_tick": values[3],
+            "measured_contact_tick": values[1],
+        },
+        "LF_UPPER_M12_MAX": {
+            "coarse_contact_tick": values[4],
+            "fine_contact_tick": values[5],
+            "repeatability_spread_tick": values[6],
+            "urdf_limit_tick": values[7],
+            "measured_contact_tick": values[5],
+        },
+    }
 
 
 def parse_int(label: str, field: str, value: str, errors: list[str]) -> int | None:
@@ -737,6 +1242,9 @@ def check_joints_and_servos(
     urdf_links: set[str],
     urdf_joints: dict[str, ET.Element],
     conflicts: list[dict[str, str]],
+    robot_calibration: dict[str, dict[str, int]],
+    direction_evidence: dict[int, int],
+    final_readback: dict[int, dict[str, Any]],
     expectations: dict[str, Any],
     errors: list[str],
 ) -> None:
@@ -746,24 +1254,30 @@ def check_joints_and_servos(
     if {row["leg"] for row in joints} != LEGS:
         errors.append("joints: exact leg set mismatch")
 
-    expected_directions = expectations["joint_directions"]
     joint_by_name: dict[str, dict[str, str]] = {}
     for row in joints:
         label = f"joint {row['joint_id']}"
         name = row["urdf_joint_name"]
         joint_by_name[name] = row
-        direction_expectation = expected_directions.get(row["joint_id"])
-        if direction_expectation:
-            for field, wanted in (
-                ("servo_id", direction_expectation["servo_id"]),
-                ("encoder_to_q_direction", direction_expectation["encoder_to_q"]),
-                ("urdf_motor_direction", direction_expectation["urdf_motor_direction"]),
+        canonical = robot_calibration.get(name)
+        if canonical:
+            for field, canonical_field in (
+                ("servo_id", "servo_id"),
+                ("encoder_to_q_direction", "direction"),
+                ("zero_encoder_tick", "zero_encoder_final"),
             ):
                 actual = parse_int(label, field, row[field], errors)
+                wanted = canonical[canonical_field]
                 if actual is not None and actual != wanted:
                     errors.append(
-                        f"{label}: canonical {field} mismatch: {actual} != {wanted}"
+                        f"{label}: pinned robot calibration {field} mismatch: "
+                        f"{actual} != {wanted}"
                     )
+            servo_id = canonical["servo_id"]
+            if direction_evidence.get(servo_id) != canonical["direction"]:
+                errors.append(
+                    f"{label}: direction result blob disagrees with pinned calibration"
+                )
 
         if row["units"] != "m rad N.m rad/s tick":
             errors.append(f"{label}: units mismatch")
@@ -942,6 +1456,41 @@ def check_joints_and_servos(
         readback = parse_int(
             label, "final_readback_tick", servo["final_readback_tick"], errors
         )
+        canonical = robot_calibration.get(joint_name)
+        if canonical:
+            expected_fields = {
+                "servo_id": canonical["servo_id"],
+                "direction": canonical["direction"],
+                "zero_tick": canonical["zero_encoder_final"],
+                "raw_q0_tick": canonical["geometric_q0_raw_unoffset"],
+                "digital_zero_offset_i16": canonical[
+                    "digital_zero_offset_signed_i16"
+                ],
+                "final_readback_tick": canonical["final_readback_present_median"],
+            }
+            for field, wanted in expected_fields.items():
+                actual = parse_int(label, field, servo[field], errors)
+                if actual is not None and actual != wanted:
+                    errors.append(
+                        f"{label}: pinned robot calibration {field} mismatch: "
+                        f"{actual} != {wanted}"
+                    )
+            readback_row = final_readback.get(canonical["servo_id"])
+            if readback_row is None:
+                errors.append(f"{label}: pinned final readback row missing")
+            else:
+                readback_expected = {
+                    "q0_raw": canonical["geometric_q0_raw_unoffset"],
+                    "expected_offset": canonical["digital_zero_offset_signed_i16"],
+                    "present_median": canonical["final_readback_present_median"],
+                    "result": "PASS",
+                }
+                for field, wanted in readback_expected.items():
+                    if readback_row.get(field) != wanted:
+                        errors.append(
+                            f"{label}: final readback {field} mismatch: "
+                            f"{readback_row.get(field)!r} != {wanted!r}"
+                        )
         if zero != 2048:
             errors.append(f"{label}: zero tick must be 2048")
         if raw is not None and offset is not None and offset != raw - 2048:
@@ -957,15 +1506,29 @@ def check_frames(
     expectations: dict[str, Any],
     errors: list[str],
 ) -> None:
-    expected_statuses = expectations["frame_statuses"]
     materialized = 0
     for row in frames:
         frame_id = row["frame_id"]
         label = f"frame {frame_id}"
-        expected_status = expected_statuses.get(frame_id)
+        if frame_id in urdf_links:
+            expected_status = "materialized"
+        elif frame_id == "world":
+            expected_status = "unknown"
+        elif frame_id == "ground_plane":
+            expected_status = "decision-required"
+        else:
+            expected_status = None
+        if row["status"] not in FRAME_STATUSES:
+            errors.append(f"{label}: invalid frame status {row['status']!r}")
         if row["status"] != expected_status:
             errors.append(
-                f"{label}: canonical status mismatch: {row['status']!r} != {expected_status!r}"
+                f"{label}: pinned-URDF/code status mismatch: "
+                f"{row['status']!r} != {expected_status!r}"
+            )
+        expectation_status = expectations["frame_statuses"].get(frame_id)
+        if expectation_status != expected_status:
+            errors.append(
+                f"{label}: expectation status differs from pinned-URDF/code baseline"
             )
         if row["units"] != "m rad":
             errors.append(f"{label}: units must be 'm rad'")
@@ -1074,83 +1637,215 @@ def tick_for_delta(home: int, direction: int, delta: int) -> int:
     return home + direction * delta
 
 
-def expected_profiles_from_derivation(
-    joints: list[dict[str, str]],
+def parse_normacore_profiles(
+    resolver: GitBlobResolver,
     expectations: dict[str, Any],
     errors: list[str],
 ) -> list[dict[str, str]]:
-    derivation = expectations["normacore_profile_derivation"]
-    joint_by_leg_role = {(row["leg"], row["joint_kind"]): row for row in joints}
-    expected_joint_keys = {
-        (leg, role)
-        for leg in derivation["leg_order"]
-        for role in derivation["joint_role_order"]
-    }
-    missing_joint_keys = sorted(expected_joint_keys - set(joint_by_leg_role))
-    if missing_joint_keys:
-        errors.append(f"profiles: missing canonical joints: {missing_joint_keys}")
+    path = "software/drivers/st3215/src/auto_calibrate/matdog.rs"
+    text = decode_blob(
+        "NormaCore matdog.rs",
+        resolver.read(NORMA_REPOSITORY, NORMA_MAIN, path, "NormaCore matdog.rs"),
+        errors,
+    )
+    if text is None:
         return []
-    for key, row in joint_by_leg_role.items():
-        for field in ("encoder_to_q_direction", "servo_id"):
-            try:
-                int(row[field])
-            except ValueError:
-                errors.append(
-                    f"profiles: joint {key} has invalid integer {field}: {row[field]!r}"
-                )
+
+    def integer_constant(name: str) -> int | None:
+        matches = re.findall(
+            rf"(?m)^const {re.escape(name)}: [^=]+ = (-?\d+);$", text
+        )
+        if len(matches) != 1:
+            errors.append(f"NormaCore matdog.rs: constant {name} parse failed")
+            return None
+        return int(matches[0])
+
+    def integer_array(name: str) -> list[int] | None:
+        matches = re.findall(
+            rf"(?m)^const {re.escape(name)}: \[u8; \d+\] = \[([^\]]+)\];$",
+            text,
+        )
+        if len(matches) != 1:
+            errors.append(f"NormaCore matdog.rs: array {name} parse failed")
+            return None
+        try:
+            return [int(part.strip()) for part in matches[0].split(",")]
+        except ValueError:
+            errors.append(f"NormaCore matdog.rs: array {name} contains a non-integer")
+            return None
+
+    constant_names = (
+        "HOME_TICK",
+        "GUARD_OVERSHOOT_TICKS",
+        "BASELINE_TRAVEL_TICKS",
+        "HIP_MIN_DELTA",
+        "HIP_MAX_DELTA",
+        "UPPER_MIN_DELTA",
+        "UPPER_MAX_DELTA",
+        "LOWER_MIN_DELTA",
+        "LOWER_MAX_DELTA",
+        "UPPER_30_DELTA",
+        "UPPER_50_DELTA",
+        "UPPER_90_DELTA",
+    )
+    constants = {name: integer_constant(name) for name in constant_names}
+    allowed = {
+        leg: integer_array(f"{leg}_ALLOWED") for leg in ("LF", "RF", "RH", "LH")
+    }
+    if any(value is None for value in constants.values()) or any(
+        value is None for value in allowed.values()
+    ):
+        return []
+
+    required_formulas = (
+        "for leg in [Leg::Lf, Leg::Rf, Leg::Rh, Leg::Lh]",
+        "for joint in [JointKind::Upper, JointKind::Hip, JointKind::Lower]",
+        "for side in [ContactSide::Min, ContactSide::Max]",
+        "Leg::Lf => targets.push(static_target(Leg::Lh, JointKind::Upper, UPPER_30_DELTA)?)",
+        "Leg::Rf => targets.push(static_target(Leg::Rh, JointKind::Upper, UPPER_30_DELTA)?)",
+        "targets.push(static_target(leg, JointKind::Upper, UPPER_50_DELTA)?)",
+        "targets.push(static_target(leg, JointKind::Upper, UPPER_90_DELTA)?)",
+        "let probe_sign = spec.direction * q_sign;",
+    )
+    for formula in required_formulas:
+        if formula not in text:
+            errors.append(f"NormaCore matdog.rs: required static formula missing: {formula}")
+
+    table_match = re.search(
+        r"(?ms)^const JOINT_SPECS: \[JointSpec; 12\] = \[(.*?)^\];$", text
+    )
+    if table_match is None:
+        errors.append("NormaCore matdog.rs: JOINT_SPECS table parse failed")
+        return []
+    spec_blocks = re.findall(r"(?ms)    JointSpec \{(.*?)^    \},$", table_match.group(1))
+    if len(spec_blocks) != 12:
+        errors.append(
+            f"NormaCore matdog.rs: expected 12 JointSpec blocks; got {len(spec_blocks)}"
+        )
+        return []
+    leg_labels = {"Lf": "LF", "Rf": "RF", "Rh": "RH", "Lh": "LH"}
+    kind_labels = {"Hip": "hip", "Upper": "upper", "Lower": "lower"}
+    specs: dict[tuple[str, str], dict[str, Any]] = {}
+    for block in spec_blocks:
+        fields: dict[str, str] = {}
+        for field in ("leg", "kind", "name", "motor_id", "direction", "min_delta", "max_delta"):
+            match = re.search(rf"(?m)^        {field}: (.+),$", block)
+            if match is None:
+                errors.append(f"NormaCore matdog.rs: JointSpec field {field} missing")
                 return []
+            fields[field] = match.group(1)
+        leg_token = fields["leg"].removeprefix("Leg::")
+        kind_token = fields["kind"].removeprefix("JointKind::")
+        if leg_token not in leg_labels or kind_token not in kind_labels:
+            errors.append("NormaCore matdog.rs: unknown JointSpec leg/kind")
+            return []
+        try:
+            motor_id = int(fields["motor_id"])
+            direction = int(fields["direction"])
+            min_delta = int(constants[fields["min_delta"]])
+            max_delta = int(constants[fields["max_delta"]])
+        except (KeyError, TypeError, ValueError):
+            errors.append("NormaCore matdog.rs: JointSpec numeric/token parse failed")
+            return []
+        key = (leg_labels[leg_token], kind_labels[kind_token])
+        specs[key] = {
+            "leg": key[0],
+            "role": key[1],
+            "name": fields["name"].strip('"'),
+            "motor_id": motor_id,
+            "direction": direction,
+            "MIN": min_delta,
+            "MAX": max_delta,
+        }
+    expected_keys = {
+        (leg, role)
+        for leg in ("LF", "RF", "RH", "LH")
+        for role in ("upper", "hip", "lower")
+    }
+    if set(specs) != expected_keys:
+        errors.append("NormaCore matdog.rs: exact leg/joint table mismatch")
+        return []
+
+    home = int(constants["HOME_TICK"])
+    guard = int(constants["GUARD_OVERSHOOT_TICKS"])
+    baseline = int(constants["BASELINE_TRAVEL_TICKS"])
+    prerequisites_by_role = {
+        "upper": (("hip", 0), ("lower", 0)),
+        "hip": (("upper", int(constants["UPPER_50_DELTA"])), ("lower", 0)),
+        "lower": (("hip", 0), ("upper", int(constants["UPPER_90_DELTA"]))),
+    }
+    expected_derivation = {
+        "allowed_motor_ids": allowed,
+        "baseline_travel_ticks": baseline,
+        "guard_overshoot_ticks": guard,
+        "home_visual_zero_tick": home,
+        "joint_limit_delta_ticks": {
+            role: {side: specs[("LF", role)][side] for side in ("MIN", "MAX")}
+            for role in ("hip", "lower", "upper")
+        },
+        "joint_role_order": ["upper", "hip", "lower"],
+        "leg_order": ["LF", "RF", "RH", "LH"],
+        "parking_upper_delta_ticks": int(constants["UPPER_30_DELTA"]),
+        "prerequisite_joint_deltas": {
+            role: [[target, delta] for target, delta in targets]
+            for role, targets in prerequisites_by_role.items()
+        },
+        "side_order": ["MIN", "MAX"],
+        "source_id": "N-MATDOG",
+        "source_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+    }
+    if expectations.get("normacore_profile_derivation") != expected_derivation:
+        errors.append(
+            "foundation expectations: NormaCore derivation differs from parsed pinned matdog.rs"
+        )
+
     expected: list[dict[str, str]] = []
-    home = int(derivation["home_visual_zero_tick"])
-    guard_overshoot = int(derivation["guard_overshoot_ticks"])
-    baseline_travel = int(derivation["baseline_travel_ticks"])
     order = 0
-    for leg in derivation["leg_order"]:
-        for role in derivation["joint_role_order"]:
-            joint = joint_by_leg_role.get((leg, role))
-            if joint is None:
-                continue
-            direction = int(joint["encoder_to_q_direction"])
-            servo_id = int(joint["servo_id"])
+    for leg in ("LF", "RF", "RH", "LH"):
+        for role in ("upper", "hip", "lower"):
+            spec = specs[(leg, role)]
             prerequisites: list[tuple[int, int]] = []
             parking_leg = {"LF": "LH", "RF": "RH"}.get(leg)
             if parking_leg:
-                parking_joint = joint_by_leg_role[(parking_leg, "upper")]
-                parking_tick = tick_for_delta(
-                    home,
-                    int(parking_joint["encoder_to_q_direction"]),
-                    int(derivation["parking_upper_delta_ticks"]),
+                parking = specs[(parking_leg, "upper")]
+                prerequisites.append(
+                    (
+                        parking["motor_id"],
+                        tick_for_delta(
+                            home,
+                            parking["direction"],
+                            int(constants["UPPER_30_DELTA"]),
+                        ),
+                    )
                 )
-                prerequisites.append((int(parking_joint["servo_id"]), parking_tick))
-            for target_role, delta in derivation["prerequisite_joint_deltas"][role]:
-                target_joint = joint_by_leg_role[(leg, target_role)]
-                target_tick = tick_for_delta(
-                    home, int(target_joint["encoder_to_q_direction"]), int(delta)
+            for target_role, delta in prerequisites_by_role[role]:
+                target = specs[(leg, target_role)]
+                prerequisites.append(
+                    (
+                        target["motor_id"],
+                        tick_for_delta(home, target["direction"], delta),
+                    )
                 )
-                prerequisites.append((int(target_joint["servo_id"]), target_tick))
-
-            for side in derivation["side_order"]:
+            for side in ("MIN", "MAX"):
                 order += 1
-                q_sign = -1 if side == "MIN" else 1
-                probe_sign = direction * q_sign
-                delta = int(derivation["joint_limit_delta_ticks"][role][side])
-                urdf_tick = tick_for_delta(home, direction, delta)
+                probe_sign = spec["direction"] * (-1 if side == "MIN" else 1)
+                urdf_tick = tick_for_delta(home, spec["direction"], spec[side])
                 expected.append(
                     {
-                        "profile_id": f"{leg}_{role.upper()}_M{servo_id}_{side}",
+                        "profile_id": f"{leg}_{role.upper()}_M{spec['motor_id']}_{side}",
                         "profile_order": str(order),
                         "leg": leg,
                         "joint_role": role,
-                        "joint_name": joint["urdf_joint_name"],
-                        "servo_id": str(servo_id),
+                        "joint_name": spec["name"],
+                        "servo_id": str(spec["motor_id"]),
                         "contact_side": side,
                         "probe_sign": str(probe_sign),
                         "home_visual_zero_tick": str(home),
                         "urdf_limit_tick": str(urdf_tick),
-                        "guard_tick": str(urdf_tick + probe_sign * guard_overshoot),
-                        "baseline_target_tick": str(home + probe_sign * baseline_travel),
+                        "guard_tick": str(urdf_tick + probe_sign * guard),
+                        "baseline_target_tick": str(home + probe_sign * baseline),
                         "allowed_motor_ids": ";".join(
-                            f"M{motor_id}"
-                            for motor_id in derivation["allowed_motor_ids"][leg]
+                            f"M{motor_id}" for motor_id in allowed[leg] or []
                         ),
                         "prerequisite_targets": ";".join(
                             f"M{motor_id}={target}" for motor_id, target in prerequisites
@@ -1164,12 +1859,12 @@ def expected_profiles_from_derivation(
 
 
 def check_profiles(
-    joints: list[dict[str, str]],
     profiles: list[dict[str, str]],
+    expected_profiles: list[dict[str, str]],
+    contact_evidence: dict[str, dict[str, int]],
     expectations: dict[str, Any],
     errors: list[str],
 ) -> None:
-    expected_profiles = expected_profiles_from_derivation(joints, expectations, errors)
     expected_by_id = {row["profile_id"]: row for row in expected_profiles}
     actual_by_id = {row["profile_id"]: row for row in profiles}
     if [row["profile_id"] for row in profiles] != [
@@ -1177,7 +1872,11 @@ def check_profiles(
     ]:
         errors.append("profiles: canonical NormaCore all_profiles order mismatch")
 
-    hardware_expected = expectations["hardware_validated_profiles"]
+    hardware_expected = contact_evidence
+    if expectations.get("hardware_validated_profiles") != hardware_expected:
+        errors.append(
+            "foundation expectations: hardware profile values differ from pinned checkpoint"
+        )
     formula_fields = (
         "profile_order",
         "leg",
@@ -1250,13 +1949,13 @@ def check_profiles(
     compare_counter(
         "profiles software status",
         Counter(row["software_status"] for row in profiles),
-        expectations["profile_status_counts"]["software"],
+        {"software-ready": 24},
         errors,
     )
     compare_counter(
         "profiles hardware status",
         Counter(row["hardware_status"] for row in profiles),
-        expectations["profile_status_counts"]["hardware"],
+        {"hardware-pending": 22, "validated": 2},
         errors,
     )
 
@@ -1265,6 +1964,7 @@ def check_limits(
     joints: list[dict[str, str]],
     profiles: list[dict[str, str]],
     limits: list[dict[str, str]],
+    contact_evidence: dict[str, dict[str, int]],
     expectations: dict[str, Any],
     errors: list[str],
 ) -> None:
@@ -1335,6 +2035,11 @@ def check_limits(
             or contact["is_operational_safe_limit"] != "false"
         ):
             errors.append(f"limit {contact_id}: mechanical-contact evidence mismatch")
+        pinned = contact_evidence.get(profile_id)
+        if pinned and contact["value"] != str(pinned["measured_contact_tick"]):
+            errors.append(
+                f"limit {contact_id}: value differs from pinned robot checkpoint"
+            )
 
     for row in limits:
         if row["classification"] not in CLASSIFICATIONS:
@@ -1356,11 +2061,13 @@ def check_limits(
         errors,
     )
     safe_count = sum(row["is_operational_safe_limit"] == "true" for row in limits)
-    expected_safe = expectations["canonical_counts"]["operational_safe_limits"]
+    expected_safe = 0
     if safe_count != expected_safe:
         errors.append(
             f"limits: expected {expected_safe} operational-safe flags; got {safe_count}"
         )
+    if expectations["canonical_counts"]["operational_safe_limits"] != expected_safe:
+        errors.append("foundation expectations: operational safe-limit count must remain zero")
 
 
 def check_conflicts_decisions_unresolved(
@@ -1383,6 +2090,8 @@ def check_conflicts_decisions_unresolved(
             errors.append(f"conflict {label}: resolution is empty")
         if row["classification"] not in CLASSIFICATIONS:
             errors.append(f"conflict {label}: invalid classification")
+        if row["status"] not in CONFLICT_STATUSES:
+            errors.append(f"conflict {label}: invalid status {row['status']!r}")
         expected_status = expected_conflict_statuses.get(label)
         if row["status"] != expected_status:
             errors.append(
@@ -1419,6 +2128,8 @@ def check_conflicts_decisions_unresolved(
                 errors.append(f"decision {label}: required field {field} is empty")
         if row["status"] != expected_decisions.get(label):
             errors.append(f"decision {label}: canonical status mismatch")
+        if row["status"] not in DECISION_STATUSES:
+            errors.append(f"decision {label}: invalid status {row['status']!r}")
     compare_counter(
         "decisions statuses",
         Counter(row["status"] for row in decisions),
@@ -1433,6 +2144,8 @@ def check_conflicts_decisions_unresolved(
             errors.append(f"unresolved {label}: unknown decision")
         if not row["required_evidence"]:
             errors.append(f"unresolved {label}: required evidence is empty")
+        if row["status"] not in UNRESOLVED_STATUSES:
+            errors.append(f"unresolved {label}: invalid status {row['status']!r}")
         expected = expected_unresolved.get(label)
         if expected and (
             row["domain"] != expected["category"]
@@ -1485,27 +2198,42 @@ def check_document_metrics(
             errors.append(f"{label}: metrics diverge from foundation expectations")
 
 
-def validate(root: Path) -> list[str]:
+def validate(
+    root: Path,
+    *,
+    robot_dog_repo: Path | None = None,
+    normacore_repo: Path | None = None,
+    xgolite_repo: Path | None = None,
+) -> list[str]:
     root = root.resolve()
     errors: list[str] = []
+    resolver = GitBlobResolver(robot_dog_repo, normacore_repo, xgolite_repo, errors)
     expectations = load_expectations(root, errors)
     registries = load_registries(root, errors)
     if not expectations:
         return errors
     check_inventory(registries, expectations, errors)
     sources = registries["source_manifest.csv"]
-    source_ids = check_sources(root, sources, expectations, errors)
+    source_ids = check_sources(sources, resolver, expectations, errors)
     claims = registries["source_claim_registry.csv"]
-    claim_ids = check_claims(root, claims, sources, expectations, errors)
-    check_source_links(root, registries, source_ids, errors)
+    claim_ids = check_claims(claims, sources, resolver, expectations, errors)
+    check_source_links(registries, source_ids, resolver, errors)
 
-    _urdf_root, urdf_links, urdf_joints = parse_urdf(root, errors)
+    _urdf_root, urdf_links, urdf_joints = parse_urdf(resolver, errors)
+    robot_calibration = parse_robot_joint_calibration(resolver, errors)
+    direction_evidence = parse_direction_evidence(sources, resolver, errors)
+    final_readback = parse_final_readback(resolver, errors)
+    contact_evidence = parse_contact_evidence(resolver, errors)
+    expected_profiles = parse_normacore_profiles(resolver, expectations, errors)
     check_joints_and_servos(
         registries["joint_registry.csv"],
         registries["servo_mapping_registry.csv"],
         urdf_links,
         urdf_joints,
         registries["source_conflict_registry.csv"],
+        robot_calibration,
+        direction_evidence,
+        final_readback,
         expectations,
         errors,
     )
@@ -1517,8 +2245,9 @@ def validate(root: Path) -> list[str]:
         errors,
     )
     check_profiles(
-        registries["joint_registry.csv"],
         registries["calibration_registry.csv"],
+        expected_profiles,
+        contact_evidence,
         expectations,
         errors,
     )
@@ -1526,6 +2255,7 @@ def validate(root: Path) -> list[str]:
         registries["joint_registry.csv"],
         registries["calibration_registry.csv"],
         registries["limit_registry.csv"],
+        contact_evidence,
         expectations,
         errors,
     )
@@ -1546,6 +2276,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="validate and return non-zero on error")
     parser.add_argument("--root", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--robot-dog-repo",
+        type=Path,
+        required=True,
+        help="local MattRobotics/robot-dog Git repository",
+    )
+    parser.add_argument(
+        "--normacore-repo",
+        type=Path,
+        required=True,
+        help="local MattRobotics/norma-core Git repository",
+    )
+    parser.add_argument(
+        "--xgolite-repo",
+        type=Path,
+        required=True,
+        help="local MattRobotics/xgolite-low-level-reconstruction Git repository",
+    )
     return parser
 
 
@@ -1555,7 +2303,12 @@ def main(argv: list[str] | None = None) -> int:
         print("error: --check is required", file=sys.stderr)
         return 2
     root = args.root or Path(__file__).resolve().parents[3]
-    errors = validate(root)
+    errors = validate(
+        root,
+        robot_dog_repo=args.robot_dog_repo,
+        normacore_repo=args.normacore_repo,
+        xgolite_repo=args.xgolite_repo,
+    )
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
