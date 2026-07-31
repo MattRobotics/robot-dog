@@ -14,13 +14,14 @@ STATION_LOG="$OUT/station_${EXPECTED_PROFILE}_${STAMP}.log"
 SUMMARY="$OUT/SUMMARY.env"
 HTTP_DIR="$OUT/http-verification"
 STATION_PID=''
+STATION_WAS_STARTED=false
 SESSION_RESULT=NOT_STARTED
 CALIBRATION_STARTED=false
+FINALIZED=false
 
 fail() { printf 'HARD BLOCK: %s\n' "$*" >&2; exit 1; }
 section() { printf '\n================================================================\n%s\n================================================================\n' "$1"; }
 need() { command -v "$1" >/dev/null 2>&1 || fail "required command missing: $1"; }
-require_line() { grep -qx "$2" "$1" || fail "missing exact line in $1: $2"; }
 port_busy() { ss -ltnH 2>/dev/null | awk '{print $4}' | grep -Eq "(^|:)$1$"; }
 
 stop_station() {
@@ -55,26 +56,38 @@ serial_is_free() {
 
 write_nonpass_summary() {
   mkdir -p "$OUT"
+  [[ -f "$STATION_LOG" ]] || : > "$STATION_LOG"
   cat > "$SUMMARY" <<EOF
 result=$SESSION_RESULT
 profile=$EXPECTED_PROFILE
 bus_id=$BUS_ID
 calibration_started=$CALIBRATION_STARTED
-hardware_phase_entered=true
-station_started=$([[ -n "$STATION_PID" ]] && echo true || echo false)
+hardware_phase_entered=$STATION_WAS_STARTED
+station_started=$STATION_WAS_STARTED
 serial_free_after_station_stop=$(serial_is_free && echo true || echo false)
 completed_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
   sha256sum "$SUMMARY" "$STATION_LOG" 2>/dev/null > "$OUT/SHA256SUMS" || true
 }
 
+cleanup_on_exit() {
+  local rc=$?
+  if [[ -n "$STATION_PID" ]]; then
+    stop_station
+    STATION_PID=''
+  fi
+  if (( rc != 0 )) && [[ "$FINALIZED" != true ]]; then
+    [[ "$SESSION_RESULT" != NOT_STARTED ]] || SESSION_RESULT=FAIL_PRECHECK_OR_LAUNCH
+    write_nonpass_summary
+    printf '\nControlled cleanup completed. Inspect %s\n' "$OUT" >&2
+  fi
+}
+
 on_interrupt() {
   SESSION_RESULT=ABORTED_BY_OPERATOR
-  stop_station
-  write_nonpass_summary
-  printf '\nABORTED_BY_OPERATOR. Station stopped; inspect %s\n' "$OUT" >&2
   exit 130
 }
+trap cleanup_on_exit EXIT
 trap on_interrupt INT TERM HUP
 
 [[ ${1:-} == --launch-supervised ]] || {
@@ -169,6 +182,7 @@ read -r -p "Type $EXPECTED_PROFILE to arm this single profile: " ACK5
 [[ "$ACK5" == "$EXPECTED_PROFILE" ]] || fail "profile arming confirmation mismatch"
 
 section "START STATION — NO AUTOMATIC CALIBRATION"
+SESSION_RESULT=LAUNCHING_STATION
 RUN_DATA="$HOME/MATDOG/runtime/station/station_data_${EXPECTED_PROFILE}_SUPERVISED_V32_${STAMP}"
 mkdir -p "$RUN_DATA"
 env MATDOG_NATIVE_CALIBRATOR_ARM="$EXPECTED_PROFILE" RUST_LOG=info \
@@ -179,6 +193,7 @@ env MATDOG_NATIVE_CALIBRATOR_ARM="$EXPECTED_PROFILE" RUST_LOG=info \
   --web 127.0.0.1:8889 \
   > >(tee -a "$STATION_LOG") 2>&1 &
 STATION_PID=$!
+STATION_WAS_STARTED=true
 printf 'station_pid=%s\n' "$STATION_PID"
 
 section "HTTP AND NATIVE UI HEALTH CHECK"
@@ -191,7 +206,9 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 [[ -s "$HTTP_INDEX" ]] || fail "Station HTTP index not available"
-grep -Eq '<div[^>]+id=["'"']root["'"']' "$HTTP_INDEX" || fail "served page is not the React Station viewer"
+if ! grep -Fq 'id="root"' "$HTTP_INDEX" && ! grep -Fq "id='root'" "$HTTP_INDEX"; then
+  fail "served page is not the React Station viewer"
+fi
 
 VIEWER_DIST="$NORMACORE_WORKTREE/software/station/clients/station-viewer/dist"
 [[ -d "$VIEWER_DIST/assets" ]] || fail "validated viewer dist is missing"
@@ -254,6 +271,7 @@ serial_is_free || fail "serial is still busy after Station stop"
 section "VERIFY HARDWARE RESULT"
 [[ "$SESSION_RESULT" == PASS_CANDIDATE ]] || {
   write_nonpass_summary
+  FINALIZED=true
   fail "hardware session did not reach PASS: $SESSION_RESULT"
 }
 [[ "$CALIBRATION_STARTED" == true ]] || fail "calibration start was not observed"
@@ -305,5 +323,6 @@ hip_profiles_blocked=true
 completed_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 sha256sum "$SUMMARY" "$STATION_LOG" "$OUT/runner.log" > "$OUT/SHA256SUMS"
+FINALIZED=true
 cat "$SUMMARY"
 printf '\nHARDWARE PASS artifact: %s\n' "$OUT"
