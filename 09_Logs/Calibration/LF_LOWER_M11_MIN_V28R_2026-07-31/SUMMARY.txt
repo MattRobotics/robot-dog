@@ -1,0 +1,23 @@
+MATDOG LF_LOWER_M11_MIN — hardware V28R
+result=PASS
+profile=LF_LOWER_M11_MIN
+bus=5B14114953
+runner=V28R
+architecture=ordered-upper-lower-hip-v20-probe-home-handoff-v27r
+contact_coarse_tick=3094
+contact_fine_tick=3092
+contact_spread_tick=2
+baseline_median=0
+baseline_mad=0
+return_m11_start=3092
+return_m11_target=2048
+return_m11_distance=1044
+return_m11_timeout_ms=31100
+return_m12_start=3067
+return_m12_target=2048
+return_m12_distance=1019
+return_m12_timeout_ms=30475
+final_status=Done_14_of_14
+final_global_torque_off_verified=true
+serial_free_after_station_stop=true
+source_note=reconstructed_from_verified_terminal_output_not_byte_identical_local_SUMMARY
