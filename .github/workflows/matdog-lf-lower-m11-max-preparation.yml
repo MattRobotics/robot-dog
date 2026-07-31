@@ -25,10 +25,13 @@ jobs:
           root=06_Software/Matdog_Core/calibration
           gate="$root/MATDOG_LF_LOWER_M11_MAX_OFFLINE_GATE_V29.sh"
           runner="$root/MATDOG_LF_LOWER_M11_MAX_HARDWARE_RUNNER_V29.sh"
+          executor="$root/MATDOG_LF_LOWER_M11_MAX_OFFLINE_EXECUTOR_V30.sh"
           bash -n "$gate"
           bash -n "$runner"
+          bash -n "$executor"
           test ! -x "$gate"
           test ! -x "$runner"
+          test ! -x "$executor"
 
       - name: Enforce pinned profile and hard-disabled runner
         shell: bash
@@ -37,8 +40,9 @@ jobs:
           root=06_Software/Matdog_Core/calibration
           gate="$root/MATDOG_LF_LOWER_M11_MAX_OFFLINE_GATE_V29.sh"
           runner="$root/MATDOG_LF_LOWER_M11_MAX_HARDWARE_RUNNER_V29.sh"
+          executor="$root/MATDOG_LF_LOWER_M11_MAX_OFFLINE_EXECUTOR_V30.sh"
           doc="$root/MATDOG_LF_LOWER_M11_MAX_PREPARATION_2026-07-31.md"
-          for file in "$gate" "$runner" "$doc"; do
+          for file in "$gate" "$runner" "$executor" "$doc"; do
             grep -Fq 'fff8e8989ca945bb56982ab5f626e3b45ba8b2dd' "$file"
           done
           grep -Fq 'PROFILE=LF_LOWER_M11_MAX' "$gate"
@@ -57,6 +61,24 @@ jobs:
           grep -Fq 'exit 78' "$runner"
           ! grep -Fq -- '--execute' "$runner"
           ! grep -Fq 'MATDOG_OPERATOR_ACK' "$runner"
+
+      - name: Enforce isolated offline executor contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          executor=06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_OFFLINE_EXECUTOR_V30.sh
+          grep -Fq 'ROBOT_DOG_PREPARATION_BASE=01d4a43dee0585111b4fd337fdee9f59d769e510' "$executor"
+          grep -Fq 'GATE_BLOB=336992edfc4a049dee47deb490fd3b049419c7c0' "$executor"
+          grep -Fq 'RUNNER_BLOB=698610dff8aca9443e0e9943fe629fd143e9b432' "$executor"
+          grep -Fq 'git -C "$NORMACORE_PRIMARY" worktree add --detach' "$executor"
+          grep -Fq 'NORMACORE_REPO="$NORMACORE_WORKTREE"' "$executor"
+          grep -Fq '[[ "$runner_rc" == 78 ]]' "$executor"
+          grep -Fq 'runner_state=PREPARED_NOT_EXECUTED' "$executor"
+          grep -Fq 'hardware_started=false' "$executor"
+          grep -Fq 'serial_opened=false' "$executor"
+          grep -Fq 'No hardware was started' "$executor"
+          ! grep -Fq 'MATDOG_NATIVE_CALIBRATOR_ARM=' "$executor"
+          ! grep -Fq -- '--execute' "$executor"
           git diff --check
 
       - name: Publish preparation hashes
@@ -67,10 +89,12 @@ jobs:
           sha256sum \
             06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_OFFLINE_GATE_V29.sh \
             06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_HARDWARE_RUNNER_V29.sh \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_OFFLINE_EXECUTOR_V30.sh \
             06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_PREPARATION_2026-07-31.md \
             > ci-output/SHA256SUMS
           printf '%s\n' \
             'result=PASS' \
+            'offline_executor=V30' \
             'hardware_started=false' \
             'serial_opened=false' \
             'runner_state=PREPARED_NOT_EXECUTED' \
