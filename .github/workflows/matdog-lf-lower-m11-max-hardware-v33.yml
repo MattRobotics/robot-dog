@@ -1,0 +1,86 @@
+name: MATDOG LF LOWER M11 MAX Hardware V33
+
+on:
+  push:
+    branches:
+      - matdog/lf-lower-m11-max-preparation
+  pull_request:
+    branches:
+      - matdog/lf-lower-m11-min-v28r-checkpoint
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  http-decode-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate V32 base and V33 wrapper syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=06_Software/Matdog_Core/calibration
+          base="$root/MATDOG_LF_LOWER_M11_MAX_HARDWARE_SUPERVISED_V32.sh"
+          wrapper="$root/MATDOG_LF_LOWER_M11_MAX_HARDWARE_SUPERVISED_V33.sh"
+          bash -n "$base"
+          bash -n "$wrapper"
+          test ! -x "$base"
+          test ! -x "$wrapper"
+          test "$(git hash-object "$base")" = ffbc29dba0952cf241f605a8f4f7dfa881d003fa
+          grep -Fq 'curl --compressed -fsS -D "$HTTP_DIR/matdog-ui.headers"' "$wrapper"
+          grep -Fq 'auto_calibrate_invocation=manual_ui_only' "$wrapper"
+          ! grep -Fq -- '--execute' "$wrapper"
+          ! grep -Fq 'MATDOG_OPERATOR_ACK' "$wrapper"
+          git diff --check
+
+      - name: Materialize patched launcher without hardware
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=06_Software/Matdog_Core/calibration
+          wrapper="$root/MATDOG_LF_LOWER_M11_MAX_HARDWARE_SUPERVISED_V33.sh"
+          archive="$RUNNER_TEMP/archive"
+          mkdir -p "$archive"
+          set +e
+          MATDOG_VERIFICATION_ARCHIVE="$archive" bash "$wrapper" --launch-supervised >"$RUNNER_TEMP/materialize.log" 2>&1
+          rc=$?
+          set -e
+          test "$rc" -ne 0
+          patched=$(find "$archive" -type f -name 'MATDOG_LF_LOWER_M11_MAX_HARDWARE_SUPERVISED_V33_materialized.sh' -print -quit)
+          test -n "$patched"
+          bash -n "$patched"
+          grep -Fq 'curl --compressed -fsS -D "$HTTP_DIR/index.headers"' "$patched"
+          grep -Fq 'curl --compressed -fsS -D "$HTTP_DIR/matdog-ui.headers"' "$patched"
+          grep -Fq 'runner=V33_HTTP_DECODE' "$patched"
+          grep -Fq 'Auto Calibrate only when you are physically ready' "$patched"
+          ! grep -Fq -- '--execute' "$patched"
+          ! grep -Fq 'MATDOG_OPERATOR_ACK' "$patched"
+          grep -Fq 'hardware readiness marker not found' "$RUNNER_TEMP/materialize.log"
+
+      - name: Publish V33 contract hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-output
+          sha256sum \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_HARDWARE_SUPERVISED_V32.sh \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_HARDWARE_SUPERVISED_V33.sh \
+            > ci-output/SHA256SUMS
+          printf '%s\n' \
+            'result=PASS' \
+            'runner=V33_HTTP_DECODE' \
+            'http_content_decoding=curl_compressed' \
+            'http_headers_recorded=true' \
+            'auto_calibrate_invocation=manual_ui_only' \
+            'hardware_started=false' \
+            'serial_opened=false' \
+            > ci-output/SUMMARY.env
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: matdog-lf-lower-m11-max-hardware-v33
+          path: ci-output/
+          if-no-files-found: error
