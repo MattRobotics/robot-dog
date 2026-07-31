@@ -4,7 +4,7 @@ set -Eeuo pipefail
 PROFILE=LF_LOWER_M11_MAX
 NORMACORE_HEAD=fff8e8989ca945bb56982ab5f626e3b45ba8b2dd
 NORMACORE_BASE=32e3222c87016b7f5d7c1c1da497a4cea3e7b80a
-ROBOT_DOG_HEAD=01d4a43dee0585111b4fd337fdee9f59d769e510
+ROBOT_DOG_PREPARATION_BASE=01d4a43dee0585111b4fd337fdee9f59d769e510
 GATE_BLOB=336992edfc4a049dee47deb490fd3b049419c7c0
 RUNNER_BLOB=698610dff8aca9443e0e9943fe629fd143e9b432
 
@@ -53,16 +53,15 @@ grep -Fq 'st3215:' "$STATION_CONFIG" || fail "Station configuration has no st321
 section "FETCH AND PIN REMOTE SOURCE"
 git -C "$NORMACORE_PRIMARY" fetch matt \
   refs/heads/matdog/lf-lower-m11-min-v28r-alignment
-
-git -C "$ROBOT_DOG_PRIMARY" fetch origin \
-  refs/heads/matdog/lf-lower-m11-max-preparation
-
 observed_normacore=$(git -C "$NORMACORE_PRIMARY" rev-parse FETCH_HEAD)
 [[ "$observed_normacore" == "$NORMACORE_HEAD" ]] || fail "NormaCore remote head moved: $observed_normacore"
 
-observed_robot_dog=$(git -C "$ROBOT_DOG_PRIMARY" ls-remote --exit-code --heads origin \
-  refs/heads/matdog/lf-lower-m11-max-preparation | awk 'NR==1 {print $1}')
-[[ "$observed_robot_dog" == "$ROBOT_DOG_HEAD" ]] || fail "robot-dog remote head moved: $observed_robot_dog"
+git -C "$ROBOT_DOG_PRIMARY" fetch origin \
+  refs/heads/matdog/lf-lower-m11-max-preparation
+observed_robot_dog=$(git -C "$ROBOT_DOG_PRIMARY" rev-parse FETCH_HEAD)
+git -C "$ROBOT_DOG_PRIMARY" merge-base --is-ancestor \
+  "$ROBOT_DOG_PREPARATION_BASE" "$observed_robot_dog" ||
+  fail "robot-dog preparation branch no longer descends from reviewed base"
 
 git -C "$NORMACORE_PRIMARY" merge-base --is-ancestor "$NORMACORE_BASE" "$NORMACORE_HEAD" ||
   fail "NormaCore main base is not an ancestor of aligned source"
@@ -85,13 +84,13 @@ fi
 printf 'normacore_worktree=%s\n' "$NORMACORE_WORKTREE"
 
 section "EXTRACT EXACT REVIEWED GATE AND HARD-DISABLED RUNNER"
-observed_gate_blob=$(git -C "$ROBOT_DOG_PRIMARY" rev-parse "$ROBOT_DOG_HEAD:$GATE_PATH")
-observed_runner_blob=$(git -C "$ROBOT_DOG_PRIMARY" rev-parse "$ROBOT_DOG_HEAD:$RUNNER_PATH")
+observed_gate_blob=$(git -C "$ROBOT_DOG_PRIMARY" rev-parse "$observed_robot_dog:$GATE_PATH")
+observed_runner_blob=$(git -C "$ROBOT_DOG_PRIMARY" rev-parse "$observed_robot_dog:$RUNNER_PATH")
 [[ "$observed_gate_blob" == "$GATE_BLOB" ]] || fail "offline gate blob mismatch"
 [[ "$observed_runner_blob" == "$RUNNER_BLOB" ]] || fail "runner blob mismatch"
 
-git -C "$ROBOT_DOG_PRIMARY" show "$ROBOT_DOG_HEAD:$GATE_PATH" > "$OUT/offline-gate-v29.sh"
-git -C "$ROBOT_DOG_PRIMARY" show "$ROBOT_DOG_HEAD:$RUNNER_PATH" > "$OUT/hardware-runner-v29-hard-disabled.sh"
+git -C "$ROBOT_DOG_PRIMARY" show "$observed_robot_dog:$GATE_PATH" > "$OUT/offline-gate-v29.sh"
+git -C "$ROBOT_DOG_PRIMARY" show "$observed_robot_dog:$RUNNER_PATH" > "$OUT/hardware-runner-v29-hard-disabled.sh"
 bash -n "$OUT/offline-gate-v29.sh"
 bash -n "$OUT/hardware-runner-v29-hard-disabled.sh"
 sha256sum "$OUT/offline-gate-v29.sh" "$OUT/hardware-runner-v29-hard-disabled.sh" > "$OUT/SCRIPT_SHA256SUMS"
@@ -138,7 +137,8 @@ cat > "$SUMMARY" <<SUMMARY_EOF
 result=PASS
 profile=$PROFILE
 normacore_head=$NORMACORE_HEAD
-robot_dog_head=$ROBOT_DOG_HEAD
+robot_dog_preparation_base=$ROBOT_DOG_PREPARATION_BASE
+robot_dog_head=$observed_robot_dog
 normacore_worktree=$NORMACORE_WORKTREE
 offline_marker=$marker
 runner_preparation=$prep_dir
