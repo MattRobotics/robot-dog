@@ -23,7 +23,8 @@ mkdir -p "$OUT"
 exec > >(tee "$OUT/offline-gate.log") 2>&1
 
 printf '===== %s offline gate V29 =====\n' "$PROFILE"
-[[ -d "$NORMACORE_REPO/.git" ]] || fail "NormaCore repository not found: $NORMACORE_REPO"
+git -C "$NORMACORE_REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail "NormaCore repository/worktree not found: $NORMACORE_REPO"
+[[ "$(git -C "$NORMACORE_REPO" rev-parse --is-inside-work-tree)" == true ]] || fail "NormaCore path is not a Git worktree"
 [[ -f "$SOURCE" && -f "$TESTS" ]] || fail "aligned MATDOG source files are missing"
 [[ "$(git -C "$NORMACORE_REPO" rev-parse HEAD)" == "$EXPECTED_HEAD" ]] || fail "unexpected NormaCore HEAD"
 git -C "$NORMACORE_REPO" merge-base --is-ancestor "$EXPECTED_BASE" HEAD || fail "main base is not an ancestor"
