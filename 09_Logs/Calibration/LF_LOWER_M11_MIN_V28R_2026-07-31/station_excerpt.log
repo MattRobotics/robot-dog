@@ -1,0 +1,13 @@
+# Curated excerpt reconstructed verbatim from verified terminal output.
+# This is not represented as a byte-identical copy of the complete local log.
+
+[2026-07-31T15:13:59Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_LOWER_M11_MIN restart prerequisite inventory: M42 present=2385 target=2389
+[2026-07-31T15:13:59Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_LOWER_M11_MIN restart prerequisite inventory: M13 present=2054 target=2048
+[2026-07-31T15:13:59Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_LOWER_M11_MIN restart prerequisite inventory: M12 present=3067 target=3072
+[2026-07-31T15:13:59Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_LOWER_M11_MIN restart probe inventory: M11 present=2063 home=2048 guard=3159
+[2026-07-31T15:14:15Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_LOWER_M11_MIN contact: step=32, target=3119, present=3094, error=25, current=16, threshold=5, velocity=0
+[2026-07-31T15:14:18Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_LOWER_M11_MIN contact: step=8, target=3105, present=3092, error=13, current=4, threshold=5, velocity=0
+[2026-07-31T15:14:44Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_LOWER_M11_MIN move plan: M42 start=2385 target=2048 distance=337 timeout_ms=13425
+[2026-07-31T15:14:48Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=InProgress, step=14/14, phase='LF_LOWER_M11_MIN: Final verified global torque OFF'
+[2026-07-31T15:14:48Z INFO  st3215::auto_calibrate::matdog] MATDOG LF_LOWER_M11_MIN complete: first=3094, second=3092, spread=2, baseline_median=0, baseline_mad=0
+[2026-07-31T15:14:48Z INFO  st3215::state] Updating auto_calibration for bus '5B14114953': status=Done, step=14/14, phase='LF_LOWER_M11_MIN: completed'
