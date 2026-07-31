@@ -558,6 +558,101 @@ class FoundationValidatorTests(unittest.TestCase):
             "code-owned critical locator expected_excerpt_sha256 mismatch"
         )
 
+    # Joint-to-profile association remediation: ten dedicated mutations.
+
+    def test_joint_min_profile_nonexistent(self) -> None:
+        self.mutate(
+            "joint_registry.csv",
+            lambda rows: next(
+                row for row in rows if row["joint_id"] == "J-LF-HIP"
+            ).update(min_profile_id="BOGUS_PROFILE_ID"),
+        )
+        self.assert_error_contains("min_profile_id references unknown calibration profile")
+
+    def test_joint_max_profile_nonexistent(self) -> None:
+        self.mutate(
+            "joint_registry.csv",
+            lambda rows: next(
+                row for row in rows if row["joint_id"] == "J-LF-HIP"
+            ).update(max_profile_id="BOGUS_PROFILE_ID"),
+        )
+        self.assert_error_contains("max_profile_id references unknown calibration profile")
+
+    def test_joint_min_max_profiles_swapped(self) -> None:
+        def change(rows):
+            joint = next(row for row in rows if row["joint_id"] == "J-LF-HIP")
+            joint["min_profile_id"], joint["max_profile_id"] = (
+                joint["max_profile_id"],
+                joint["min_profile_id"],
+            )
+
+        self.mutate("joint_registry.csv", change)
+        self.assert_error_contains("profile LF_HIP_M13_MAX contact_side mismatch")
+
+    def test_joint_profile_belongs_to_another_joint(self) -> None:
+        self.mutate(
+            "joint_registry.csv",
+            lambda rows: next(
+                row for row in rows if row["joint_id"] == "J-LF-HIP"
+            ).update(min_profile_id="LF_UPPER_M12_MIN"),
+        )
+        self.assert_error_contains("profile LF_UPPER_M12_MIN joint_name mismatch")
+
+    def test_joint_profile_belongs_to_another_leg(self) -> None:
+        self.mutate(
+            "joint_registry.csv",
+            lambda rows: next(
+                row for row in rows if row["joint_id"] == "J-LF-HIP"
+            ).update(min_profile_id="RF_HIP_M23_MIN"),
+        )
+        self.assert_error_contains("profile RF_HIP_M23_MIN leg mismatch")
+
+    def test_joint_profile_servo_id_differs(self) -> None:
+        self.mutate(
+            "calibration_registry.csv",
+            lambda rows: next(
+                row for row in rows if row["profile_id"] == "LF_HIP_M13_MIN"
+            ).update(servo_id="99"),
+        )
+        self.assert_error_contains("profile LF_HIP_M13_MIN servo_id mismatch")
+
+    def test_joint_min_and_max_profile_ids_equal(self) -> None:
+        def change(rows):
+            joint = next(row for row in rows if row["joint_id"] == "J-LF-HIP")
+            joint["max_profile_id"] = joint["min_profile_id"]
+
+        self.mutate("joint_registry.csv", change)
+        self.assert_error_contains("min_profile_id and max_profile_id must be distinct")
+
+    def test_joint_min_profile_empty(self) -> None:
+        self.mutate(
+            "joint_registry.csv",
+            lambda rows: next(
+                row for row in rows if row["joint_id"] == "J-LF-HIP"
+            ).update(min_profile_id=""),
+        )
+        self.assert_error_contains("min_profile_id is required")
+
+    def test_joint_max_profile_empty(self) -> None:
+        self.mutate(
+            "joint_registry.csv",
+            lambda rows: next(
+                row for row in rows if row["joint_id"] == "J-LF-HIP"
+            ).update(max_profile_id=""),
+        )
+        self.assert_error_contains("max_profile_id is required")
+
+    def test_joint_profile_duplicated_between_joints(self) -> None:
+        self.mutate(
+            "joint_registry.csv",
+            lambda rows: next(
+                row for row in rows if row["joint_id"] == "J-LF-UPPER"
+            ).update(min_profile_id="LF_HIP_M13_MIN"),
+        )
+        self.assert_error_contains(
+            "profile LF_HIP_M13_MIN is associated more than once"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

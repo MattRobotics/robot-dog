@@ -1858,6 +1858,97 @@ def parse_normacore_profiles(
     return expected
 
 
+def check_joint_profile_associations(
+    joints: list[dict[str, str]],
+    profiles: list[dict[str, str]],
+    expected_profiles: list[dict[str, str]],
+    errors: list[str],
+) -> None:
+    actual_by_id = {row["profile_id"]: row for row in profiles}
+    expected_by_binding = {
+        (
+            row["leg"],
+            row["joint_name"],
+            row["joint_role"],
+            row["servo_id"],
+            row["contact_side"],
+        ): row
+        for row in expected_profiles
+    }
+    associations: dict[str, list[str]] = {}
+
+    for joint in joints:
+        label = f"joint {joint['joint_id']}"
+        minimum_id = joint["min_profile_id"].strip()
+        maximum_id = joint["max_profile_id"].strip()
+        if not minimum_id:
+            errors.append(f"{label}: min_profile_id is required")
+        if not maximum_id:
+            errors.append(f"{label}: max_profile_id is required")
+        if minimum_id and maximum_id and minimum_id == maximum_id:
+            errors.append(f"{label}: min_profile_id and max_profile_id must be distinct")
+
+        for field, side, profile_id in (
+            ("min_profile_id", "MIN", minimum_id),
+            ("max_profile_id", "MAX", maximum_id),
+        ):
+            if not profile_id:
+                continue
+            associations.setdefault(profile_id, []).append(f"{joint['joint_id']}.{field}")
+            profile = actual_by_id.get(profile_id)
+            if profile is None:
+                errors.append(
+                    f"{label}: {field} references unknown calibration profile "
+                    f"{profile_id!r}"
+                )
+            else:
+                expected_metadata = {
+                    "contact_side": side,
+                    "leg": joint["leg"],
+                    "joint_name": joint["urdf_joint_name"],
+                    "joint_role": joint["joint_kind"],
+                    "servo_id": joint["servo_id"],
+                }
+                for metadata_field, wanted in expected_metadata.items():
+                    if profile[metadata_field] != wanted:
+                        errors.append(
+                            f"{label}: profile {profile_id} {metadata_field} mismatch: "
+                            f"{profile[metadata_field]!r} != {wanted!r}"
+                        )
+
+            binding = (
+                joint["leg"],
+                joint["urdf_joint_name"],
+                joint["joint_kind"],
+                joint["servo_id"],
+                side,
+            )
+            expected = expected_by_binding.get(binding)
+            if expected is None:
+                errors.append(
+                    f"{label}: no pinned NormaCore {side} profile matches the joint"
+                )
+            elif profile_id != expected["profile_id"]:
+                errors.append(
+                    f"{label}: {field} differs from pinned NormaCore profile: "
+                    f"{profile_id!r} != {expected['profile_id']!r}"
+                )
+
+    for profile_id, uses in associations.items():
+        if len(uses) > 1:
+            errors.append(
+                f"joint profiles: profile {profile_id} is associated more than once: "
+                f"{uses}"
+            )
+    for profile in expected_profiles:
+        uses = associations.get(profile["profile_id"], [])
+        if len(uses) != 1:
+            errors.append(
+                f"joint profiles: pinned NormaCore profile {profile['profile_id']} "
+                f"must be associated exactly once; got {len(uses)}"
+            )
+
+
 def check_profiles(
     profiles: list[dict[str, str]],
     expected_profiles: list[dict[str, str]],
@@ -2235,6 +2326,12 @@ def validate(
         direction_evidence,
         final_readback,
         expectations,
+        errors,
+    )
+    check_joint_profile_associations(
+        registries["joint_registry.csv"],
+        registries["calibration_registry.csv"],
+        expected_profiles,
         errors,
     )
     check_frames(

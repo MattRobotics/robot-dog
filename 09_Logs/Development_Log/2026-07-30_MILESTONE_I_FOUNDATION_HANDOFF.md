@@ -12,6 +12,7 @@
 - Foundation classification: `FOUNDATION_PASS_WITH_LIMITS`
 - Remediation classification: `REMEDIATION_PASS_WITH_LIMITS`
 - Final remediation classification: `FINAL_REMEDIATION_PASS_WITH_LIMITS`
+- Joint-profile remediation classification: `JOINT_PROFILE_REMEDIATION_PASS`
 
 This handoff is inside the remediated commit and therefore cannot contain the
 SHA of its own enclosing commit without a circular hash dependency. The
@@ -19,7 +20,7 @@ published branch/PR head and the external remediation report are authoritative
 for the final SHA. PR #4 must remain draft and must not be merged by this
 handoff.
 
-FOUNDATION_METRICS_JSON: {"claims": 51, "conflicts": 21, "decisions": 9, "frames": 19, "hardware_validated_profiles": 2, "joints": 12, "limits": 50, "materialized_frames": 17, "mutation_cases": 42, "operational_safe_limits": 0, "profiles": 24, "servos": 12, "sources": 66, "unit_tests": 43, "unresolved": 11}
+FOUNDATION_METRICS_JSON: {"claims": 51, "conflicts": 21, "decisions": 9, "frames": 19, "hardware_validated_profiles": 2, "joints": 12, "limits": 50, "materialized_frames": 17, "mutation_cases": 52, "operational_safe_limits": 0, "profiles": 24, "servos": 12, "sources": 66, "unit_tests": 53, "unresolved": 11}
 
 ## Original publication commits
 
@@ -77,6 +78,16 @@ NormaCore/XGoLite hashes and paths. The final limited remediation adds:
 - critical claim line ranges and excerpt SHA-256 checks;
 - 14 added fail-closed tests, for 43 tests total and 42 rejected mutations.
 
+The concluding joint-profile remediation closes
+`VALIDATOR-JOINT-PROFILE-ASSOCIATION-FALSE-PASS`. The validator now checks
+that all 12 joints use non-empty, distinct MIN/MAX IDs; that each referenced
+calibration profile matches side, leg, joint name/role and servo ID; that the
+IDs equal the 24 profiles derived statically from pinned NormaCore
+`matdog.rs`; and that every profile is associated exactly once with its
+canonical joint. Ten dedicated mutations were added while retaining all 43
+existing tests, for 53 tests total and 52 rejected mutations. This association
+is now `MACHINE_VERIFIED`.
+
 ## Provenance changes
 
 - `C-FRAME-BASE` now cites the pinned REV00 ADR section that actually defines
@@ -121,7 +132,7 @@ contact evidence. Zero operational safe limits are proven.
 
 - Validator: exact foundation identity and machine-checkable content must PASS
   using explicit robot-dog, NormaCore and XGoLite repository roots.
-- Tests: 43/43 must PASS; all 42 invalid mutations must return non-zero.
+- Tests: 53/53 must PASS; all 52 invalid mutations must return non-zero.
 - URDF XML, ten CSV files and the JSON expectation manifest must parse.
 - `git diff --check` and `git diff --check main...HEAD` must PASS.
 - UTF-8, secret/private-key/credential-URL, home-path, symlink, special-file,

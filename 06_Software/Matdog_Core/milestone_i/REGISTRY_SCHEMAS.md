@@ -41,7 +41,10 @@ NormaCore parser remain independent gates.
 - `joint_registry.csv`: the exact 12 URDF revolute joints, topology, origin,
   RPY, axis, lower/upper/effort/velocity fields, units, servo association,
   custom `motorType`/`motorId`/`motorDirection`/`armature` values and profile
-  IDs.
+  IDs. Each MIN/MAX profile ID is mandatory and distinct, resolves to exactly
+  one calibration row with the matching side, leg, joint name/role and servo
+  ID, equals the corresponding profile derived from pinned NormaCore
+  `matdog.rs`, and may be associated with only its canonical joint.
 - `frame_registry.csv`: root, joint and nominal foot frames, transforms,
   axes/units, status, source joint, source link and provenance. Planned frames
   have no materialized source joint/link.
@@ -73,7 +76,8 @@ compatibility matrix are code-owned. Every hash-bearing source path is
 resolved at its pinned Git ref; no source is read from mutable worktree bytes.
 
 The validator proves repository/ref/path/blob identity, excerpt identity,
-numeric/mapping/formula/enum/count conformance (`MACHINE_VERIFIED`). Whether a
+numeric/mapping/formula/enum/count conformance, including every joint's exact
+MIN/MAX profile association (`MACHINE_VERIFIED`). Whether a
 verified excerpt is semantically sufficient for its claim remains a human
 review judgment (`HUMAN_REVIEWED`).
 

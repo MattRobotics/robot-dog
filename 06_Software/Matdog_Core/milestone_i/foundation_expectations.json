@@ -698,12 +698,12 @@
     "joints": 12,
     "limits": 50,
     "materialized_frames": 17,
-    "mutation_cases": 42,
+    "mutation_cases": 52,
     "operational_safe_limits": 0,
     "profiles": 24,
     "servos": 12,
     "sources": 66,
-    "unit_tests": 43,
+    "unit_tests": 53,
     "unresolved": 11
   }
 }

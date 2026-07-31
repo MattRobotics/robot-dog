@@ -9,6 +9,7 @@ FOUNDATION_CLASSIFICATION=FOUNDATION_PASS_WITH_LIMITS
 INDEPENDENT_REVIEW_REMEDIATED=true
 REMEDIATION_CLASSIFICATION=REMEDIATION_PASS_WITH_LIMITS
 FINAL_REMEDIATION_CLASSIFICATION=FINAL_REMEDIATION_PASS_WITH_LIMITS
+JOINT_PROFILE_REMEDIATION_CLASSIFICATION=JOINT_PROFILE_REMEDIATION_PASS
 HARDWARE_USED=false
 STATION_STARTED=false
 MILESTONE_I_2_STARTED=false
@@ -19,7 +20,7 @@ The remaining `UNKNOWN`, `DECISION_REQUIRED` and declared semantic-review
 boundaries are intentional. This acceptance does not authorize a merge,
 hardware work, or Milestone I.2.
 
-FOUNDATION_METRICS_JSON: {"claims": 51, "conflicts": 21, "decisions": 9, "frames": 19, "hardware_validated_profiles": 2, "joints": 12, "limits": 50, "materialized_frames": 17, "mutation_cases": 42, "operational_safe_limits": 0, "profiles": 24, "servos": 12, "sources": 66, "unit_tests": 43, "unresolved": 11}
+FOUNDATION_METRICS_JSON: {"claims": 51, "conflicts": 21, "decisions": 9, "frames": 19, "hardware_validated_profiles": 2, "joints": 12, "limits": 50, "materialized_frames": 17, "mutation_cases": 52, "operational_safe_limits": 0, "profiles": 24, "servos": 12, "sources": 66, "unit_tests": 53, "unresolved": 11}
 
 ## Frozen references
 
@@ -99,6 +100,10 @@ The standard-library validator:
   starting Station, derives all 24 profiles, then compares order, roles,
   directions, allowed motors, prerequisites, reverse restore order, home,
   limit, guard and evidence state;
+- verifies that every joint's non-empty, distinct MIN/MAX profile IDs resolve
+  to the canonical calibration rows, match side, leg, joint name/role and
+  servo ID, equal the profiles derived from pinned `matdog.rs`, and are each
+  associated exactly once (`MACHINE_VERIFIED`);
 - enforces exact source/claim/conflict/decision/unresolved identities,
   distributions and statuses, code-owned enums and source class + authority +
   scope compatibility;
@@ -118,11 +123,11 @@ python3 06_Software/Matdog_Core/milestone_i/validate_foundation.py --check \
   --xgolite-repo /path/to/xgolite-low-level-reconstruction
 ```
 
-The suite contains 43 tests: one valid baseline and 42 invalid mutations. It
-retains all 29 existing tests and adds the nine second-review false PASS cases
-plus missing external ref/root, `BOGUS` frame status, robot historical-value
-and excerpt-hash mutations. Every invalid mutation returns a non-zero exit
-code.
+The suite contains 53 tests: one valid baseline and 52 invalid mutations. It
+retains all 43 existing tests and adds ten joint-profile mutations covering
+missing IDs, swapped sides, wrong joint/leg/servo, equal or empty MIN/MAX IDs,
+and duplicate cross-joint association. Every invalid mutation returns a
+non-zero exit code.
 
 ## Machine and human review boundary
 
