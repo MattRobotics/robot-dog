@@ -1,0 +1,83 @@
+name: MATDOG LF LOWER M11 MAX Preparation
+
+on:
+  push:
+    branches:
+      - matdog/lf-lower-m11-max-preparation
+  pull_request:
+    branches:
+      - matdog/lf-lower-m11-min-v28r-checkpoint
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preparation-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate shell syntax without execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=06_Software/Matdog_Core/calibration
+          gate="$root/MATDOG_LF_LOWER_M11_MAX_OFFLINE_GATE_V29.sh"
+          runner="$root/MATDOG_LF_LOWER_M11_MAX_HARDWARE_RUNNER_V29.sh"
+          bash -n "$gate"
+          bash -n "$runner"
+          test ! -x "$gate"
+          test ! -x "$runner"
+
+      - name: Enforce pinned profile and hard-disabled runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=06_Software/Matdog_Core/calibration
+          gate="$root/MATDOG_LF_LOWER_M11_MAX_OFFLINE_GATE_V29.sh"
+          runner="$root/MATDOG_LF_LOWER_M11_MAX_HARDWARE_RUNNER_V29.sh"
+          doc="$root/MATDOG_LF_LOWER_M11_MAX_PREPARATION_2026-07-31.md"
+          for file in "$gate" "$runner" "$doc"; do
+            grep -Fq 'fff8e8989ca945bb56982ab5f626e3b45ba8b2dd' "$file"
+          done
+          grep -Fq 'PROFILE=LF_LOWER_M11_MAX' "$gate"
+          grep -Fq 'probe_sign=-1' "$gate"
+          grep -Fq 'baseline_target_tick=1984' "$gate"
+          grep -Fq 'urdf_limit_tick=1621' "$gate"
+          grep -Fq 'guard_tick=1557' "$gate"
+          grep -Fq 'prerequisite_m42_tick=2389' "$gate"
+          grep -Fq 'prerequisite_m13_tick=2048' "$gate"
+          grep -Fq 'prerequisite_m12_tick=3072' "$gate"
+          grep -Fq 'hardware_started=false' "$gate"
+          grep -Fq 'serial_opened=false' "$gate"
+          grep -Fq 'this checkpoint supports --prepare only' "$runner"
+          grep -Fq 'STATION_LAUNCH_COMMAND.disabled' "$runner"
+          grep -Fq 'result=PREPARED_NOT_EXECUTED' "$runner"
+          grep -Fq 'exit 78' "$runner"
+          ! grep -Fq -- '--execute' "$runner"
+          ! grep -Fq 'MATDOG_OPERATOR_ACK' "$runner"
+          git diff --check
+
+      - name: Publish preparation hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-output
+          sha256sum \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_OFFLINE_GATE_V29.sh \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_HARDWARE_RUNNER_V29.sh \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_PREPARATION_2026-07-31.md \
+            > ci-output/SHA256SUMS
+          printf '%s\n' \
+            'result=PASS' \
+            'hardware_started=false' \
+            'serial_opened=false' \
+            'runner_state=PREPARED_NOT_EXECUTED' \
+            > ci-output/SUMMARY.env
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: matdog-lf-lower-m11-max-preparation
+          path: ci-output/
+          if-no-files-found: error
