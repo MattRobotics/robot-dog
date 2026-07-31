@@ -11,7 +11,8 @@ on:
       - ".github/workflows/matdog-endstop-sequence-audit.yml"
       - "06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_2026-07-30.md"
       - "06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_ADDENDUM_2026-07-30.md"
-      - "06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml"
+      - "06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_SUPPORT_CONTRACT_2026-07-31.md"
+      - "06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_SUPPORT_CONTRACT.yaml"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py"
@@ -19,6 +20,7 @@ on:
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v5.py"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py"
       - "06_Software/Matdog_Core/calibration/matdog_hip_clearance_search_v7.py"
+      - "06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v8.py"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py"
       - "06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py"
       - "03_CAD/URDF/matt_robodog_rev00/**"
@@ -51,7 +53,8 @@ jobs:
           for path in \
             06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_2026-07-30.md \
             06_Software/Matdog_Core/calibration/MATDOG_ENDSTOP_SEQUENCE_REDESIGN_ADDENDUM_2026-07-30.md \
-            06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml \
+            06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_SUPPORT_CONTRACT_2026-07-31.md \
+            06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_SUPPORT_CONTRACT.yaml \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v2.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v3.py \
@@ -59,6 +62,7 @@ jobs:
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v5.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py \
             06_Software/Matdog_Core/calibration/matdog_hip_clearance_search_v7.py \
+            06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v8.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py \
             06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py; do
             test -f "$path"
@@ -76,7 +80,7 @@ jobs:
             python-fcl==0.7.0.8 \
             PyYAML==6.0.2
 
-      - name: Syntax, import, and mesh inventory gate
+      - name: Syntax, import, mesh inventory, and support contract gate
         shell: bash
         run: |
           set -euo pipefail
@@ -89,12 +93,14 @@ jobs:
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v5.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py \
             06_Software/Matdog_Core/calibration/matdog_hip_clearance_search_v7.py \
+            06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v8.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py \
             06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py
-          python3 - <<'PY' | tee ci-output/mesh-inventory.log
+          python3 - <<'PY' | tee ci-output/mesh-inventory-and-support.log
           from pathlib import Path
           import fcl
           import trimesh
+          import yaml
 
           print('python-fcl:', getattr(fcl, '__version__', 'loaded'))
           print('trimesh:', trimesh.__version__)
@@ -110,6 +116,22 @@ jobs:
               print(f'{path.name}: bytes={path.stat().st_size} vertices={vertices} faces={faces}')
               assert vertices > 0 and faces > 0, f'empty mesh: {path}'
           print(f'mesh_count={len(files)}')
+
+          support_path = Path(
+              '06_Software/Matdog_Core/calibration/'
+              'MATDOG_CALIBRATION_SUPPORT_CONTRACT.yaml'
+          )
+          support = yaml.safe_load(support_path.read_text(encoding='utf-8'))
+          assert support['schema_version'] == 1
+          assert support['frame'] == 'base_link'
+          assert support['table_plane_z_m'] == -0.180
+          assert support['base_link_reference_z_m'] == 0.000
+          assert support['support_fixture']['geometry_modeled'] is False
+          assert support['support_fixture']['interference_status'] == 'operator_validated_impossible'
+          assert support['fixture_exclusion_authorized'] is True
+          print('support_contract=PASS')
+          print('table_plane_z_m=-0.180')
+          print('fixture_geometry_modeled=false')
           PY
 
       - name: Ordered session and detector oracle regressions
@@ -138,7 +160,7 @@ jobs:
             ci-output/fixed-horizontal.stderr
           grep -q "base_link.*lf_lower_leg_link" ci-output/fixed-horizontal.stderr
 
-      - name: Search coordinated UPPER LOWER HIP clearance
+      - name: Search coordinated UPPER LOWER HIP clearance at URDF limits
         shell: bash
         run: |
           set -o pipefail
@@ -151,31 +173,21 @@ jobs:
             ci-output/coordinated-hip-clearance.json
           grep -q '"order_unchanged"' ci-output/coordinated-hip-clearance.json
 
-      - name: Hardware certification must block without measured fixture
+      - name: Guarded sequence, table plane, and fixture exclusion audit
         shell: bash
         run: |
-          set -euo pipefail
-          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py \
-              --repo-root "$PWD" --certify-hardware \
-              >ci-output/no-fixture.stdout 2>ci-output/no-fixture.stderr; then
-            echo 'audit unexpectedly certified hardware without fixture' >&2
-            exit 1
-          fi
-          grep -q 'hardware certification requires --fixture' ci-output/no-fixture.stderr
-
-      - name: Placeholder fixture must also block
-        shell: bash
-        run: |
-          set -euo pipefail
-          if python3 06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py \
-              --repo-root "$PWD" \
-              --fixture 06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_FIXTURE.example.yaml \
-              --certify-hardware \
-              >ci-output/placeholder.stdout 2>ci-output/placeholder.stderr; then
-            echo 'audit unexpectedly certified placeholder fixture' >&2
-            exit 1
-          fi
-          grep -q 'fixture box is still a placeholder' ci-output/placeholder.stderr
+          set -o pipefail
+          python3 06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v8.py \
+            --repo-root "$PWD" \
+            --output ci-output/guarded-support-audit.json \
+            2>&1 | tee ci-output/guarded-support-audit.log
+          grep -q '"result": "PASS"' ci-output/guarded-support-audit.json
+          grep -q 'ordered-guarded-support-contract-v8' ci-output/guarded-support-audit.json
+          grep -q '"guard_ticks": 64' ci-output/guarded-support-audit.json
+          grep -q '"table_plane_z_m": -0.18' ci-output/guarded-support-audit.json
+          grep -q '"support_fixture_geometry_modeled": false' ci-output/guarded-support-audit.json
+          grep -q 'operator_validated_impossible' ci-output/guarded-support-audit.json
+          test "$(grep -c '"coordinated_hip_prerequisite"' ci-output/guarded-support-audit.json)" = 4
 
       - name: Upload audit evidence
         if: always()
