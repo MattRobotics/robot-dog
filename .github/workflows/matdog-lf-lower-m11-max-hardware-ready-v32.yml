@@ -1,0 +1,120 @@
+name: MATDOG LF LOWER M11 MAX Hardware Ready V32
+
+on:
+  push:
+    branches:
+      - matdog/lf-lower-m11-max-preparation
+  pull_request:
+    branches:
+      - matdog/lf-lower-m11-min-v28r-checkpoint
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hardware-ready-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate shell syntax and non-executable repository state
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=06_Software/Matdog_Core/calibration
+          preflight="$root/MATDOG_LF_LOWER_M11_MAX_HARDWARE_PREFLIGHT_V32.sh"
+          supervised="$root/MATDOG_LF_LOWER_M11_MAX_HARDWARE_SUPERVISED_V32.sh"
+          bash -n "$preflight"
+          bash -n "$supervised"
+          test ! -x "$preflight"
+          test ! -x "$supervised"
+          git diff --check
+
+      - name: Enforce read-only preflight contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_HARDWARE_PREFLIGHT_V32.sh
+          grep -Fq 'HARDWARE_READY_NOT_STARTED' "$file"
+          grep -Fq 'hardware_started=false' "$file"
+          grep -Fq 'serial_opened=false' "$file"
+          grep -Fq 'physical_setup_confirmation_required=true' "$file"
+          grep -Fq 'operator_presence_required=true' "$file"
+          grep -Fq 'master_disconnect_access_required=true' "$file"
+          grep -Fq 'contact_corridor=1557..1685' "$file"
+          grep -Fq 'goal_position_unsigned=true' "$file"
+          grep -Fq 'ram_only=true' "$file"
+          grep -Fq 'hip_profiles_blocked=true' "$file"
+          ! grep -Fq 'MATDOG_NATIVE_CALIBRATOR_ARM=' "$file"
+          ! grep -Fq -- '--web 127.0.0.1:8889' "$file"
+          ! grep -Eq '(^|[[:space:]])(python|python3|stty|socat|minicom|screen|picocom|dd)([[:space:]]|$)' "$file"
+
+      - name: Enforce supervised single-profile launch and manual UI gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_HARDWARE_SUPERVISED_V32.sh
+          grep -Fq -- '--launch-supervised' "$file"
+          grep -Fq 'EXPECTED_PROFILE=LF_LOWER_M11_MAX' "$file"
+          grep -Fq 'MATDOG_NATIVE_CALIBRATOR_ARM="$EXPECTED_PROFILE"' "$file"
+          grep -Fq 'Type ROBOT_SUPPORTED' "$file"
+          grep -Fq 'Type ALL_LEGS_FREE' "$file"
+          grep -Fq 'Type OPERATOR_PRESENT' "$file"
+          grep -Fq 'Type MASTER_DISCONNECT_READY' "$file"
+          grep -Fq 'This script does not click or invoke Auto Calibrate' "$file"
+          grep -Fq 'status=Done, step=14/14' "$file"
+          grep -Fq 'Final verified global torque OFF' "$file"
+          grep -Fq 'serial_free_after_station_stop=true' "$file"
+          grep -Fq 'contact_count=2' "$file"
+          grep -Fq 'contact_corridor=1557..1685' "$file"
+          grep -Fq 'http_matdog_ui_hash_match=true' "$file"
+          ! grep -Eq 'curl[^\n]*(--request|-X)[[:space:]]*(POST|PUT|PATCH|DELETE)' "$file"
+          ! grep -Eq '/(auto[_-]?calibrat|calibration/start|command|motor)' "$file"
+          ! grep -Eq '(^|[[:space:]])(python|python3|stty|socat|minicom|screen|picocom|dd)([[:space:]]|$)' "$file"
+          ! grep -Fq 'pyserial' "$file"
+          ! grep -Fq 'ResetCalibration' "$file"
+          ! grep -Fq 'Position Offset' "$file"
+          ! grep -Fq 'RegWrite' "$file"
+          ! grep -Fq 'Action' "$file"
+          ! grep -Fq 'FreezeCalibration' "$file"
+
+      - name: Enforce checkpoint evidence and permanent constraints
+        shell: bash
+        run: |
+          set -euo pipefail
+          doc=06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_OFFLINE_PASS_2026-07-31.md
+          grep -Fq 'cargo test --package st3215: 87 passed, 0 failed' "$doc"
+          grep -Fq 'runner_state=PREPARED_NOT_EXECUTED' "$doc"
+          grep -Fq 'hardware_started=false' "$doc"
+          grep -Fq 'serial_opened=false' "$doc"
+          grep -Fq 'probe_sign               = -1' "$doc"
+          grep -Fq 'contact_corridor         = 1557..1685' "$doc"
+          grep -Fq 'hip_profiles_blocked     = true' "$doc"
+          grep -Fq 'Non è stato eseguito `npm audit fix`' "$doc"
+
+      - name: Publish V32 hardware-ready hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-output
+          sha256sum \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_OFFLINE_PASS_2026-07-31.md \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_HARDWARE_PREFLIGHT_V32.sh \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_HARDWARE_SUPERVISED_V32.sh \
+            > ci-output/SHA256SUMS
+          printf '%s\n' \
+            'result=PASS' \
+            'profile=LF_LOWER_M11_MAX' \
+            'package=hardware-ready-v32' \
+            'preflight=READ_ONLY' \
+            'calibration_start=MANUAL_UI_ONLY' \
+            'hardware_started=false' \
+            'serial_opened=false' \
+            > ci-output/SUMMARY.env
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: matdog-lf-lower-m11-max-hardware-ready-v32
+          path: ci-output/
+          if-no-files-found: error
