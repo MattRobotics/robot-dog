@@ -21,6 +21,7 @@ on:
       - "06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py"
       - "06_Software/Matdog_Core/calibration/matdog_hip_clearance_search_v7.py"
       - "06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v8.py"
+      - "06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v9.py"
       - "06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py"
       - "06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py"
       - "03_CAD/URDF/matt_robodog_rev00/**"
@@ -63,6 +64,7 @@ jobs:
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py \
             06_Software/Matdog_Core/calibration/matdog_hip_clearance_search_v7.py \
             06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v8.py \
+            06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v9.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py \
             06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py; do
             test -f "$path"
@@ -94,6 +96,7 @@ jobs:
             06_Software/Matdog_Core/calibration/matdog_endstop_sequence_geometry_audit_v6.py \
             06_Software/Matdog_Core/calibration/matdog_hip_clearance_search_v7.py \
             06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v8.py \
+            06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v9.py \
             06_Software/Matdog_Core/calibration/matdog_endstop_session_oracle.py \
             06_Software/Matdog_Core/calibration/test_matdog_endstop_session_oracle.py
           python3 - <<'PY' | tee ci-output/mesh-inventory-and-support.log
@@ -177,7 +180,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python3 06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v8.py \
+          python3 06_Software/Matdog_Core/calibration/matdog_guarded_support_audit_v9.py \
             --repo-root "$PWD" \
             --output ci-output/guarded-support-audit.json \
             2>&1 | tee ci-output/guarded-support-audit.log
