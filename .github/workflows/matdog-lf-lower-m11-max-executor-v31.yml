@@ -1,0 +1,72 @@
+name: MATDOG LF LOWER M11 MAX Executor V31
+
+on:
+  push:
+    branches:
+      - matdog/lf-lower-m11-max-preparation
+  pull_request:
+    branches:
+      - matdog/lf-lower-m11-min-v28r-checkpoint
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  executor-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate worktree-aware gate and executor syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=06_Software/Matdog_Core/calibration
+          gate="$root/MATDOG_LF_LOWER_M11_MAX_OFFLINE_GATE_V29.sh"
+          runner="$root/MATDOG_LF_LOWER_M11_MAX_HARDWARE_RUNNER_V29.sh"
+          executor="$root/MATDOG_LF_LOWER_M11_MAX_OFFLINE_EXECUTOR_V31.sh"
+          bash -n "$gate"
+          bash -n "$runner"
+          bash -n "$executor"
+          grep -Fq 'rev-parse --is-inside-work-tree' "$gate"
+          ! grep -Fq '[[ -d "$NORMACORE_REPO/.git" ]]' "$gate"
+          grep -Fq 'GATE_BLOB=4bcc50546c3776b8fbc62e2e08f22eae4ce5f68d' "$executor"
+          grep -Fq 'RUNNER_BLOB=698610dff8aca9443e0e9943fe629fd143e9b432' "$executor"
+          grep -Fq 'worktree_state=REUSED' "$executor"
+          grep -Fq 'runner_rc' "$executor"
+          grep -Fq '[[ "$runner_rc" == 78 ]]' "$executor"
+          grep -Fq 'runner_state=PREPARED_NOT_EXECUTED' "$executor"
+          grep -Fq 'hardware_started=false' "$executor"
+          grep -Fq 'serial_opened=false' "$executor"
+          ! grep -Fq -- '--execute' "$executor"
+          ! grep -Fq 'MATDOG_OPERATOR_ACK' "$executor"
+          test ! -x "$gate"
+          test ! -x "$runner"
+          test ! -x "$executor"
+          git diff --check
+
+      - name: Publish V31 contract hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-output
+          sha256sum \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_OFFLINE_GATE_V29.sh \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_HARDWARE_RUNNER_V29.sh \
+            06_Software/Matdog_Core/calibration/MATDOG_LF_LOWER_M11_MAX_OFFLINE_EXECUTOR_V31.sh \
+            > ci-output/SHA256SUMS
+          printf '%s\n' \
+            'result=PASS' \
+            'executor=V31' \
+            'worktree_aware=true' \
+            'runner_state=PREPARED_NOT_EXECUTED' \
+            'hardware_started=false' \
+            'serial_opened=false' \
+            > ci-output/SUMMARY.env
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: matdog-lf-lower-m11-max-executor-v31
+          path: ci-output/
+          if-no-files-found: error
