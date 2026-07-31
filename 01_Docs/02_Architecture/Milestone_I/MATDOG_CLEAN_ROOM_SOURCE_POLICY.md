@@ -36,10 +36,19 @@ Allowed confidence values are `HIGH`, `MEDIUM`, `LOW`, and
 ## Source and document state
 
 Source rows also carry one of `CURRENT_CANONICAL`, `CURRENT_SUPPORTING`,
-`HISTORICAL`, `SUPERSEDED`, `HARDWARE_EVIDENCE`, `EXPERIMENTAL`, or
-`UNKNOWN_STATUS`. A historical file is preserved, not retroactively edited.
-Every numerical claim records units; blank units mean not applicable, never
-an implicit unit.
+`SUPERSEDED`, `HARDWARE_EVIDENCE`, `EXPERIMENTAL`, or `UNKNOWN_STATUS`, plus
+explicit parse and interpretation states. Parse state is one of
+`STRUCTURED_PARSEABLE`, `TEXT_PARSEABLE`, `TEXT_ONLY_NONPARSEABLE`, or
+`EXTERNAL_REFERENCE`; interpretation is one of `MACHINE_READABLE`,
+`PINNED_STATIC_TEXT`, `PINNED_HUMAN_TEXT`, or `REFERENCE_ONLY`. A historical
+file is preserved, not retroactively edited. Every numerical claim records
+units; blank units mean not applicable, never an implicit unit.
+
+The hash-pinned historical M11 direction blob
+`2026-07-02_213351_m11_lf_lower_positive_probe.result.yaml` is explicitly
+`TEXT_ONLY_NONPARSEABLE` / `PINNED_HUMAN_TEXT`. Its bytes remain unchanged.
+The direction claim uses the exact text locator at lines 17-20; no YAML parser
+may be invoked implicitly for that source.
 
 ## Promotion and conflict rules
 
@@ -53,8 +62,9 @@ an implicit unit.
 - XGoLite geometry, frames, signs, zeros, offsets, IDs, registers, timing,
   gains, bus details, and servo characteristics are prohibited as MATDOG
   physical facts.
-- Generic NormaCore EEPROM/reset/freeze behavior is not a MATDOG calibration
-  contract. The MATDOG contact path is RAM-only.
+- Generic NormaCore EEPROM behavior is not a MATDOG calibration contract.
+  SO101 and ElRobot are registered as separate claims with separate source
+  paths and locators. The MATDOG contact path is RAM-only.
 
 ## Command-position semantics
 
@@ -68,7 +78,10 @@ collision boundary are distinct concepts.
 
 ## Change rule
 
-Generated registries are reviewed data, not a replacement for evidence. Any
-later change must update sources, claims, conflicts/decisions, validator tests,
-acceptance counts, and handoff together. No listed decision is resolved merely
-to make validation pass.
+Generated registries are reviewed data, not a replacement for evidence.
+`foundation_expectations.json` freezes the accepted identities,
+classifications, statuses, counts, repository pins and NormaCore profile
+derivation constants. Any later change must update sources, claims,
+conflicts/decisions, expectations, validator tests, acceptance counts, and
+handoff together. No listed decision is resolved merely to make validation
+pass.

@@ -25,8 +25,12 @@ MATDOG native contact-profile implementation. PR #4 supplies experimental
 restart-safe and distance-aware behavior only. XGoLite supplies architecture
 patterns only.
 
-The exact file-level pins, hashes, authority, scope, and temporal status are
-in `06_Software/Matdog_Core/milestone_i/registries/source_manifest.csv`.
+The exact file-level pins, hashes, authority, scope, temporal state, parse
+state, and interpretation state are in
+`06_Software/Matdog_Core/milestone_i/registries/source_manifest.csv`.
+Accepted source/claim identities and repository pins are frozen separately in
+`foundation_expectations.json`, so loss of a row or a formally valid
+substitution cannot pass on count alone.
 
 ## Inventory classification highlights
 
@@ -39,8 +43,15 @@ in `06_Software/Matdog_Core/milestone_i/registries/source_manifest.csv`.
   recenter. They are not command eligible.
 - The old geometry YAML is supporting historical context; the REV00 URDF and
   newer kinematic contracts govern this foundation.
+- The historical M11 direction blob is hash-pinned, non-parseable as YAML and
+  consumed only as human-readable text at the registered line locator. Its
+  bytes were not repaired or normalized.
 - XGoLite's 55-claim closure (37 verified, 10 corroborated, 8 unknown) and its
   24 still-open proof items describe that repository, not MATDOG confidence.
+
+The 24-profile expectation is generated from the constants and formulas of
+the `N-MATDOG` source hash at the pinned NormaCore main commit. It is not a
+second manually copied 24-row table.
 
 ## Remote-state observation
 

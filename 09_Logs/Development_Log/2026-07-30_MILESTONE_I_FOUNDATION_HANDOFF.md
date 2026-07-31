@@ -1,22 +1,26 @@
-# MATDOG Milestone I foundation handoff — 2026-07-30
+# MATDOG Milestone I foundation handoff — remediated 2026-07-31
 
 ## Publication identity
 
 - Repository: `MattRobotics/robot-dog`
 - Branch: `agents/milestone-i-matdog-clean-room-spec`
 - Base/main: `a6dc1184f56956dad696b3bcc24d74f375edb5b7`
-- Technical payload head at PR creation:
-  `e0b3c5738be13bd97aa5a0bd67db1ed51b2f7f18`
+- Independently reviewed initial head:
+  `36c86b74ac344319ff1ff2c9e4c89dd8bb319653`
 - Draft PR: `MattRobotics/robot-dog#4`
 - PR URL: <https://github.com/MattRobotics/robot-dog/pull/4>
-- Classification: `FOUNDATION_PASS_WITH_LIMITS`
+- Foundation classification: `FOUNDATION_PASS_WITH_LIMITS`
+- Remediation classification: `REMEDIATION_PASS_WITH_LIMITS`
 
-This handoff is the final versioned metadata file and therefore cannot contain
-the SHA of its own enclosing commit without a circular hash dependency. The
-published branch head after this handoff is authoritative in Git and PR #4;
-the external report records that exact final SHA.
+This handoff is inside the remediated commit and therefore cannot contain the
+SHA of its own enclosing commit without a circular hash dependency. The
+published branch/PR head and the external remediation report are authoritative
+for the final SHA. PR #4 must remain draft and must not be merged by this
+handoff.
 
-## Commits before this handoff
+FOUNDATION_METRICS_JSON: {"claims": 51, "conflicts": 21, "decisions": 9, "frames": 19, "hardware_validated_profiles": 2, "joints": 12, "limits": 50, "materialized_frames": 17, "mutation_cases": 28, "operational_safe_limits": 0, "profiles": 24, "servos": 12, "sources": 66, "unit_tests": 29, "unresolved": 11}
+
+## Original publication commits
 
 1. `7957f8610914126eba05fb82be59ef13c6b0081f` —
    `docs(milestone-i): freeze clean-room source baseline`
@@ -24,76 +28,97 @@ the external report records that exact final SHA.
    `docs(milestone-i): define canonical MATDOG contracts`
 3. `e0b3c5738be13bd97aa5a0bd67db1ed51b2f7f18` —
    `test(milestone-i): validate clean-room foundation`
+4. `36c86b74ac344319ff1ff2c9e4c89dd8bb319653` —
+   original publication metadata head reviewed independently.
 
-## Delivered files
+The remediation commit(s) follow this initial head. Their exact SHAs are
+recorded in Git, PR #4 and the external remediation report after publication.
 
-Eight documents under `01_Docs/02_Architecture/Milestone_I/`:
+## Independent-review remediation
 
-- clean-room source policy;
-- cross-repository baseline;
-- canonical kinematic convention;
-- joint and servo contract;
-- frame convention;
-- calibration and limit semantics;
-- Station integration boundary;
-- foundation acceptance.
+The 2026-07-31 review demonstrated eight false PASS cases: changed joint
+origin, joint effort, frame origin, profile URDF-limit tick, removed claim,
+removed unresolved row, changed conflict status and empty source authority.
+All eight returned exit code zero at the initial head and are now versioned
+negative tests.
+
+Root cause was validation of shape and broad counts without full canonical
+comparison or frozen identities/statuses. The remediation adds:
+
+- `foundation_expectations.json` with repository pins, exact IDs,
+  distributions/statuses, critical provenance, directions, formula constants
+  and acceptance/handoff metrics;
+- complete numeric joint-to-URDF checks including origin/RPY,
+  effort/velocity and every custom hardware tag;
+- complete materialized-frame checks with explicit source joint/link and
+  planned handling for `world` / `ground_plane`;
+- formula-derived comparison of all 24 NormaCore profiles, including exact
+  order, roles, allowed motors, prerequisites, reverse restore order, home,
+  limit, guard and software/hardware/evidence state;
+- exact inventories and status distributions for sources, claims, conflicts,
+  decisions, unresolved rows, joints, frames, servos, profiles and limits;
+- 29 standard-library tests: one valid baseline and 28 rejected mutations.
+
+## Provenance changes
+
+- `C-FRAME-BASE` now cites the pinned REV00 ADR section that actually defines
+  the coordinate axes.
+- `C-UNKNOWN-IMU` was removed because absence was not positive evidence. The
+  intentional gap remains in `D-IMU` and `U-IMU`.
+- `C-GENERIC-CAL` was split into `C-GENERIC-SO101` and
+  `C-GENERIC-ELROBOT`, each with its own source file and locator; the generic
+  conflict was split accordingly.
+- The historical M11 direction blob remains byte-for-byte unchanged at SHA-256
+  `272d5e8e4e9158cd6ac058aaee1282aa132172c24e0faf3775f5b5e472a3afe3`.
+  It is explicitly `TEXT_ONLY_NONPARSEABLE` / `PINNED_HUMAN_TEXT`, and the
+  claim uses lines 17-20 instead of an implicit YAML parse.
+
+The claim total is still 51 only as the net result of removing one unsupported
+claim and replacing one composite claim with two independent claims. The
+classification distribution changed to 5 `UNKNOWN` and 2
+`NORMACORE_GENERIC_REFERENCE`. Conflicts changed from 20 to 21, with 14 open
+and 7 closed. Decisions remain 9 open and unresolved rows remain 11 (8
+`UNKNOWN`, 3 `DECISION_REQUIRED`).
+
+## Delivered foundation
+
+Eight policy/contract/acceptance documents remain under
+`01_Docs/02_Architecture/Milestone_I/`.
 
 Under `06_Software/Matdog_Core/milestone_i/`:
 
 - schema documentation;
-- ten CSV registries: sources, claims, conflicts, joints, frames, servo
-  mappings, calibration profiles, limits, decisions and unresolved items;
-- deterministic standard-library validator.
+- ten CSV registries;
+- the machine-readable expectation manifest;
+- the deterministic standard-library validator.
 
-Tests are in `08_Tests/Milestone_I/test_validate_foundation.py`. This file is
-the versioned handoff.
+Tests remain in `08_Tests/Milestone_I/test_validate_foundation.py`.
 
-## Counts and state
+Current canonical counts are 66 sources, 51 claims, 21 conflicts, 9
+decisions, 11 unresolved rows, 12 joints, 19 frames (17 materialized), 12
+servo mappings, 24 profiles and 50 limit rows. Two profiles have physical
+contact evidence. Zero operational safe limits are proven.
 
-- Sources: 66 = 37 robot-dog + 15 NormaCore fork + 13 XGoLite + 1 external
-  NormaCore upstream reference.
-- Claims: 51 = 11 `MATDOG_VERIFIED`, 3 `MATDOG_DERIVED`, 13
-  `HARDWARE_OBSERVATION`, 7 `NORMACORE_MATDOG_FORK_MAIN_FACT`, 1
-  `NORMACORE_EXPERIMENTAL_PR`, 1 `NORMACORE_GENERIC_REFERENCE`, 2
-  `XGOLITE_ARCHITECTURAL_REFERENCE`, 4 `SUPERSEDED`, 6 `UNKNOWN`, 3
-  `DECISION_REQUIRED`.
-- Canonical joints / servo mappings: 12 / 12.
-- Profiles: 24 software-ready; 2 hardware-validated; 22 hardware-pending.
-- Safe limits: 0 proven; 24 explicitly unknown.
-- Conflicts: 20 total; 14 open and 6 closed by explicit classification.
-- Decisions: 9 open.
-- Unresolved: 11 = 8 `UNKNOWN` + 3 `DECISION_REQUIRED`.
+## Verification contract
 
-The only physically validated contacts are LF upper M12 MIN at 1443/1443
-tick with spread 0 and LF upper M12 MAX at 3443/3442 tick with spread 1.
-Neither is an operational safe limit and neither is generalized to another
-profile.
-
-## Verification
-
-- Foundation validator: PASS — 66 sources, 51 claims, 12 joints, 24 profiles.
-- Offline mutation tests: 14/14 PASS.
-- Canonical URDF XML parse: PASS.
-- Ten CSV parse: PASS.
-- UTF-8, relative Markdown links, credential/private-key/credential-URL,
-  disallowed home path, symlink, special-file and temporary-artifact scans:
-  PASS.
-- `git diff --check main...HEAD`: PASS before publication.
-- Each technical commit passed `git diff --check HEAD^..HEAD`.
+- Validator: exact foundation identity and substantive checks must PASS.
+- Tests: 29/29 must PASS; all 28 invalid mutations must produce errors.
+- URDF XML, ten CSV files and the JSON expectation manifest must parse.
+- `git diff --check` and `git diff --check main...HEAD` must PASS.
+- UTF-8, secret/private-key/credential-URL, home-path, symlink, special-file,
+  executable, pycache, temporary-artifact and Markdown-link scans must PASS.
+- Worktree must be clean after normal non-forced push.
 
 ## Limits and next operation
 
-Open work includes the remaining 22 contacts, all 24 safe limits, URDF custom
-direction-tag semantics, world placement, collision/runtime representation,
-first-stand envelope, bus-owner deployment, controller placement, real-time
-rates, MATDOG IMU/estimator and current characterization.
+Intentional open work includes the remaining 22 contacts, all 24 safe limits,
+URDF custom direction-tag semantics, world placement, collision/runtime
+representation, first-stand envelope, bus-owner deployment, controller
+placement, real-time rates, MATDOG IMU/estimator and current characterization.
 
-The next proposed operation is human review of draft PR #4. A later offline
-I.2 gate requires separate authorization and must carry all registered
-unknowns and decisions forward. This handoff does not authorize I.2 or any
-hardware work.
-
-No hardware or device was accessed; no serial port was opened; Station was
-not started; no torque, EEPROM, Position Offset, calibration run or firmware
-operation occurred. No gait, operational IK, new FK, planner, serial runtime
-adapter or merge was implemented. NormaCore and XGoLite remained read-only.
+A new independent review is required before merge. Milestone I.2 requires
+separate authorization and was not started. No hardware or device was
+accessed; no serial port was opened; Station was not started; no torque,
+EEPROM, Position Offset, calibration run or firmware operation occurred. No
+gait, operational IK, new FK, planner or serial runtime adapter was
+implemented. NormaCore and XGoLite remained read-only.

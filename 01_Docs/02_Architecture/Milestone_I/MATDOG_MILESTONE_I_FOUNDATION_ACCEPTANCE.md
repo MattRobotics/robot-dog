@@ -6,14 +6,20 @@
 MILESTONE_I_0=COMPLETE
 MILESTONE_I_1=COMPLETE
 FOUNDATION_CLASSIFICATION=FOUNDATION_PASS_WITH_LIMITS
+INDEPENDENT_REVIEW_REMEDIATED=true
+REMEDIATION_CLASSIFICATION=REMEDIATION_PASS_WITH_LIMITS
 HARDWARE_USED=false
 STATION_STARTED=false
 MILESTONE_I_2_STARTED=false
 ```
 
-The foundation is complete and internally validated. Correctly registered
-`UNKNOWN` and `DECISION_REQUIRED` items prevent an unqualified pass but do not
-block further authorized offline work.
+All blocking findings from the 2026-07-31 independent foundation review are
+addressed. The remaining `UNKNOWN` and `DECISION_REQUIRED` rows are intentional
+future evidence/decision boundaries and require no change before this
+foundation can be reviewed for merge. This acceptance does not authorize a
+merge, hardware work, or Milestone I.2.
+
+FOUNDATION_METRICS_JSON: {"claims": 51, "conflicts": 21, "decisions": 9, "frames": 19, "hardware_validated_profiles": 2, "joints": 12, "limits": 50, "materialized_frames": 17, "mutation_cases": 28, "operational_safe_limits": 0, "profiles": 24, "servos": 12, "sources": 66, "unit_tests": 29, "unresolved": 11}
 
 ## Frozen references
 
@@ -35,39 +41,76 @@ block further authorized offline work.
 |---|---|
 | Source rows | 66: 37 robot-dog; 15 NormaCore fork; 13 XGoLite; 1 external upstream |
 | Claims | 51 |
-| Claim classes | 11 `MATDOG_VERIFIED`; 3 `MATDOG_DERIVED`; 13 `HARDWARE_OBSERVATION`; 7 fork-main facts; 1 experimental PR; 1 generic reference; 2 XGo architecture; 4 superseded; 6 unknown; 3 decision required |
+| Claim classes | 11 `MATDOG_VERIFIED`; 3 `MATDOG_DERIVED`; 13 `HARDWARE_OBSERVATION`; 7 fork-main facts; 1 experimental PR; 2 generic references; 2 XGo architecture; 4 superseded; 5 unknown; 3 decision required |
 | Joints / servo mappings | 12 / 12 |
+| Frames | 19: 17 materialized; `world` and `ground_plane` planned |
 | Contact profiles | 24 software-ready; 2 hardware-validated; 22 hardware-pending |
-| Operational safe limits | 0 proven; 24 explicitly unknown |
-| Conflicts | 20 total: 14 open; 6 closed by source/status separation |
+| Limit rows | 50: 24 URDF; 2 mechanical contact; 24 operational-safe unknown |
+| Operational safe limits | 0 proven |
+| Conflicts | 21 total: 14 open; 7 closed by source/status separation |
 | Decisions | 9 open |
 | Unresolved | 11: 8 `UNKNOWN`; 3 `DECISION_REQUIRED` |
+
+The claim total remains 51 only because remediation removed the unsupported IMU
+claim and split one composite generic claim into separate SO101 and ElRobot
+claims. The distribution changed from 6 to 5 `UNKNOWN` and from 1 to 2
+`NORMACORE_GENERIC_REFERENCE`; it was not held constant as an acceptance
+constraint.
 
 The only physically validated contact profiles are
 `LF_UPPER_M12_MIN` (1443/1443 tick; spread 0) and
 `LF_UPPER_M12_MAX` (3443/3442 tick; spread 1). They remain mechanical-contact
 observations and are not operational safe limits.
 
+## Provenance remediation
+
+- `C-FRAME-BASE` now cites the pinned REV00 ADR section that explicitly
+  defines X-forward, Y-left and Z-up.
+- The unsupported `C-UNKNOWN-IMU` claim was removed. `D-IMU` and `U-IMU`
+  retain the proof gap without treating absence as positive evidence.
+- The composite generic calibration claim is split into
+  `C-GENERIC-SO101` and `C-GENERIC-ELROBOT`, each with its own pinned file and
+  locator.
+- Historical M11 evidence remains byte-for-byte unchanged and hash-pinned.
+  The manifest marks it `TEXT_ONLY_NONPARSEABLE` /
+  `PINNED_HUMAN_TEXT`; `C-DIR-M11` uses the precise lines 17-20 locator.
+
 ## Validation
 
-The standard-library validator parses all ten CSV registries and the canonical
-URDF; checks local hashes and paths; validates repository pins; enforces the
-12-joint and 12-servo model; checks all 24 profiles; and prevents the defined
-promotion errors. Invocation:
+`foundation_expectations.json` freezes repository pins, exact registry ID
+sets, canonical counts/distributions, conflict/decision/unresolved states,
+critical provenance, joint directions, profile derivation constants and these
+document metrics.
+
+The standard-library validator:
+
+- compares every joint topology, origin/RPY, axis, limit, effort, velocity,
+  servo ID and custom URDF hardware tag to REV00 with explicit numeric
+  tolerance;
+- compares all 17 materialized frames to their source joint/link while keeping
+  `world` and `ground_plane` planned and non-materialized;
+- regenerates all 24 NormaCore profiles from the pinned source hash and
+  formula constants, then compares order, roles, directions, allowed motors,
+  prerequisites, reverse restore order, home, limit, guard and evidence state;
+- enforces exact source/claim/conflict/decision/unresolved identities,
+  distributions and statuses, mandatory source metadata and source-class
+  compatibility;
+- verifies acceptance and handoff metrics against the machine-readable
+  baseline.
+
+Invocation:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 \
-PYTHONPYCACHEPREFIX=/tmp/matdog-milestone-i-pycache \
+PYTHONPYCACHEPREFIX=/tmp/matdog-milestone-i-remediation-pycache \
 python3 06_Software/Matdog_Core/milestone_i/validate_foundation.py --check
 ```
 
-Result: `PASS` with 66 sources, 51 claims, 12 joints and 24 profiles.
-
-Fourteen offline mutation tests pass: valid baseline; missing joint; duplicate
-servo; invalid direction; invalid classification; invalid confidence; empty
-source ref; improper UNKNOWN promotion; mechanical contact used as safe;
-XGo source promoted to MATDOG; nonexistent URDF joint; missing conflict;
-decision without evidence; and incorrect local checksum.
+The suite contains 29 tests: one valid baseline and 28 invalid mutations. It
+retains the original 14 cases and adds all eight independent-review false
+PASS mutations plus provenance, M11 parse-state, source compatibility, planned
+frame, direction-conflict, acceptance and handoff divergence cases. Every
+invalid mutation must return at least one validator error.
 
 ## Limits and excluded scope
 
@@ -78,5 +121,5 @@ operational IK, new FK, planner, firmware, serial runtime adapter, motion, or
 hardware calibration has been started. No source or historical evidence file
 was retroactively modified.
 
-The next proposed operation is an independently authorized offline I.2 design
-gate after human review of the draft PR. This document does not authorize it.
+A new independent review is still required before merge. The PR must remain
+draft. Milestone I.2 and hardware activity remain outside this acceptance.

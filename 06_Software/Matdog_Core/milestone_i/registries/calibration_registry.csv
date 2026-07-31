@@ -1,25 +1,25 @@
-profile_id,leg,joint_name,servo_id,contact_side,software_status,hardware_status,probe_sign,urdf_limit_tick,guard_tick,baseline_target_tick,prerequisite_targets,coarse_contact_tick,fine_contact_tick,repeatability_spread_tick,measured_contact_tick,operational_safe_limit_tick,units,source_id,evidence_path,notes
-LF_UPPER_M12_MIN,LF,lf_upper_leg_joint,12,MIN,software-ready,validated,-1,1451,1387,1984,M42=2389;M13=2048;M11=2048,1443,1443,0,1443,,tick,N-MATDOG;R-M12-MIN,06_Software/Matdog_Core/calibration/MATDOG_NATIVE_M12_MIN_PILOT_CHECKPOINT_2026-07-25.md,Mechanical contact only
-LF_UPPER_M12_MAX,LF,lf_upper_leg_joint,12,MAX,software-ready,validated,1,3442,3506,2112,M42=2389;M13=2048;M11=2048,3443,3442,1,3442,,tick,N-MATDOG;R-M12-MAX,06_Software/Matdog_Core/calibration/MATDOG_NATIVE_M12_MIN_MAX_CHECKPOINT_2026-07-28.md,Mechanical contact only
-LF_HIP_M13_MIN,LF,lf_hip_joint,13,MIN,software-ready,hardware-pending,1,2560,2624,2112,M42=2389;M12=2617;M11=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-LF_HIP_M13_MAX,LF,lf_hip_joint,13,MAX,software-ready,hardware-pending,-1,1536,1472,1984,M42=2389;M12=2617;M11=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-LF_LOWER_M11_MIN,LF,lf_lower_leg_joint,11,MIN,software-ready,hardware-pending,1,3095,3159,2112,M42=2389;M13=2048;M12=3072,,,,,,tick,N-MATDOG,,No physical contact evidence
-LF_LOWER_M11_MAX,LF,lf_lower_leg_joint,11,MAX,software-ready,hardware-pending,-1,1621,1557,1984,M42=2389;M13=2048;M12=3072,,,,,,tick,N-MATDOG,,No physical contact evidence
-RF_UPPER_M22_MIN,RF,rf_upper_leg_joint,22,MIN,software-ready,hardware-pending,1,2645,2709,2112,M32=1707;M23=2048;M21=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-RF_UPPER_M22_MAX,RF,rf_upper_leg_joint,22,MAX,software-ready,hardware-pending,-1,654,590,1984,M32=1707;M23=2048;M21=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-RF_HIP_M23_MIN,RF,rf_hip_joint,23,MIN,software-ready,hardware-pending,1,2560,2624,2112,M32=1707;M22=1479;M21=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-RF_HIP_M23_MAX,RF,rf_hip_joint,23,MAX,software-ready,hardware-pending,-1,1536,1472,1984,M32=1707;M22=1479;M21=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-RF_LOWER_M21_MIN,RF,rf_lower_leg_joint,21,MIN,software-ready,hardware-pending,-1,1001,937,1984,M32=1707;M23=2048;M22=1024,,,,,,tick,N-MATDOG,,No physical contact evidence
-RF_LOWER_M21_MAX,RF,rf_lower_leg_joint,21,MAX,software-ready,hardware-pending,1,2475,2539,2112,M32=1707;M23=2048;M22=1024,,,,,,tick,N-MATDOG,,No physical contact evidence
-RH_UPPER_M32_MIN,RH,rh_upper_leg_joint,32,MIN,software-ready,hardware-pending,1,2645,2709,2112,M33=2048;M31=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-RH_UPPER_M32_MAX,RH,rh_upper_leg_joint,32,MAX,software-ready,hardware-pending,-1,654,590,1984,M33=2048;M31=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-RH_HIP_M33_MIN,RH,rh_hip_joint,33,MIN,software-ready,hardware-pending,-1,1536,1472,1984,M32=1479;M31=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-RH_HIP_M33_MAX,RH,rh_hip_joint,33,MAX,software-ready,hardware-pending,1,2560,2624,2112,M32=1479;M31=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-RH_LOWER_M31_MIN,RH,rh_lower_leg_joint,31,MIN,software-ready,hardware-pending,-1,1001,937,1984,M33=2048;M32=1024,,,,,,tick,N-MATDOG,,No physical contact evidence
-RH_LOWER_M31_MAX,RH,rh_lower_leg_joint,31,MAX,software-ready,hardware-pending,1,2475,2539,2112,M33=2048;M32=1024,,,,,,tick,N-MATDOG,,No physical contact evidence
-LH_UPPER_M42_MIN,LH,lh_upper_leg_joint,42,MIN,software-ready,hardware-pending,-1,1451,1387,1984,M43=2048;M41=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-LH_UPPER_M42_MAX,LH,lh_upper_leg_joint,42,MAX,software-ready,hardware-pending,1,3442,3506,2112,M43=2048;M41=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-LH_HIP_M43_MIN,LH,lh_hip_joint,43,MIN,software-ready,hardware-pending,-1,1536,1472,1984,M42=2617;M41=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-LH_HIP_M43_MAX,LH,lh_hip_joint,43,MAX,software-ready,hardware-pending,1,2560,2624,2112,M42=2617;M41=2048,,,,,,tick,N-MATDOG,,No physical contact evidence
-LH_LOWER_M41_MIN,LH,lh_lower_leg_joint,41,MIN,software-ready,hardware-pending,1,3095,3159,2112,M43=2048;M42=3072,,,,,,tick,N-MATDOG,,No physical contact evidence
-LH_LOWER_M41_MAX,LH,lh_lower_leg_joint,41,MAX,software-ready,hardware-pending,-1,1621,1557,1984,M43=2048;M42=3072,,,,,,tick,N-MATDOG,,No physical contact evidence
+profile_id,profile_order,leg,joint_role,joint_name,servo_id,contact_side,software_status,hardware_status,probe_sign,home_visual_zero_tick,urdf_limit_tick,guard_tick,baseline_target_tick,allowed_motor_ids,prerequisite_targets,restore_order,coarse_contact_tick,fine_contact_tick,repeatability_spread_tick,measured_contact_tick,operational_safe_limit_tick,is_operational_safe_limit,units,source_id,evidence_path,notes
+LF_UPPER_M12_MIN,1,LF,upper,lf_upper_leg_joint,12,MIN,software-ready,validated,-1,2048,1451,1387,1984,M11;M12;M13;M42,M42=2389;M13=2048;M11=2048,M11;M13;M42,1443,1443,0,1443,,false,tick,N-MATDOG;R-M12-MIN,06_Software/Matdog_Core/calibration/MATDOG_NATIVE_M12_MIN_PILOT_CHECKPOINT_2026-07-25.md,Mechanical contact only
+LF_UPPER_M12_MAX,2,LF,upper,lf_upper_leg_joint,12,MAX,software-ready,validated,1,2048,3442,3506,2112,M11;M12;M13;M42,M42=2389;M13=2048;M11=2048,M11;M13;M42,3443,3442,1,3442,,false,tick,N-MATDOG;R-M12-MAX,06_Software/Matdog_Core/calibration/MATDOG_NATIVE_M12_MIN_MAX_CHECKPOINT_2026-07-28.md,Mechanical contact only
+LF_HIP_M13_MIN,3,LF,hip,lf_hip_joint,13,MIN,software-ready,hardware-pending,1,2048,2560,2624,2112,M11;M12;M13;M42,M42=2389;M12=2617;M11=2048,M11;M12;M42,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+LF_HIP_M13_MAX,4,LF,hip,lf_hip_joint,13,MAX,software-ready,hardware-pending,-1,2048,1536,1472,1984,M11;M12;M13;M42,M42=2389;M12=2617;M11=2048,M11;M12;M42,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+LF_LOWER_M11_MIN,5,LF,lower,lf_lower_leg_joint,11,MIN,software-ready,hardware-pending,1,2048,3095,3159,2112,M11;M12;M13;M42,M42=2389;M13=2048;M12=3072,M12;M13;M42,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+LF_LOWER_M11_MAX,6,LF,lower,lf_lower_leg_joint,11,MAX,software-ready,hardware-pending,-1,2048,1621,1557,1984,M11;M12;M13;M42,M42=2389;M13=2048;M12=3072,M12;M13;M42,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RF_UPPER_M22_MIN,7,RF,upper,rf_upper_leg_joint,22,MIN,software-ready,hardware-pending,1,2048,2645,2709,2112,M21;M22;M23;M32,M32=1707;M23=2048;M21=2048,M21;M23;M32,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RF_UPPER_M22_MAX,8,RF,upper,rf_upper_leg_joint,22,MAX,software-ready,hardware-pending,-1,2048,654,590,1984,M21;M22;M23;M32,M32=1707;M23=2048;M21=2048,M21;M23;M32,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RF_HIP_M23_MIN,9,RF,hip,rf_hip_joint,23,MIN,software-ready,hardware-pending,1,2048,2560,2624,2112,M21;M22;M23;M32,M32=1707;M22=1479;M21=2048,M21;M22;M32,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RF_HIP_M23_MAX,10,RF,hip,rf_hip_joint,23,MAX,software-ready,hardware-pending,-1,2048,1536,1472,1984,M21;M22;M23;M32,M32=1707;M22=1479;M21=2048,M21;M22;M32,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RF_LOWER_M21_MIN,11,RF,lower,rf_lower_leg_joint,21,MIN,software-ready,hardware-pending,-1,2048,1001,937,1984,M21;M22;M23;M32,M32=1707;M23=2048;M22=1024,M22;M23;M32,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RF_LOWER_M21_MAX,12,RF,lower,rf_lower_leg_joint,21,MAX,software-ready,hardware-pending,1,2048,2475,2539,2112,M21;M22;M23;M32,M32=1707;M23=2048;M22=1024,M22;M23;M32,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RH_UPPER_M32_MIN,13,RH,upper,rh_upper_leg_joint,32,MIN,software-ready,hardware-pending,1,2048,2645,2709,2112,M31;M32;M33,M33=2048;M31=2048,M31;M33,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RH_UPPER_M32_MAX,14,RH,upper,rh_upper_leg_joint,32,MAX,software-ready,hardware-pending,-1,2048,654,590,1984,M31;M32;M33,M33=2048;M31=2048,M31;M33,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RH_HIP_M33_MIN,15,RH,hip,rh_hip_joint,33,MIN,software-ready,hardware-pending,-1,2048,1536,1472,1984,M31;M32;M33,M32=1479;M31=2048,M31;M32,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RH_HIP_M33_MAX,16,RH,hip,rh_hip_joint,33,MAX,software-ready,hardware-pending,1,2048,2560,2624,2112,M31;M32;M33,M32=1479;M31=2048,M31;M32,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RH_LOWER_M31_MIN,17,RH,lower,rh_lower_leg_joint,31,MIN,software-ready,hardware-pending,-1,2048,1001,937,1984,M31;M32;M33,M33=2048;M32=1024,M32;M33,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+RH_LOWER_M31_MAX,18,RH,lower,rh_lower_leg_joint,31,MAX,software-ready,hardware-pending,1,2048,2475,2539,2112,M31;M32;M33,M33=2048;M32=1024,M32;M33,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+LH_UPPER_M42_MIN,19,LH,upper,lh_upper_leg_joint,42,MIN,software-ready,hardware-pending,-1,2048,1451,1387,1984,M41;M42;M43,M43=2048;M41=2048,M41;M43,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+LH_UPPER_M42_MAX,20,LH,upper,lh_upper_leg_joint,42,MAX,software-ready,hardware-pending,1,2048,3442,3506,2112,M41;M42;M43,M43=2048;M41=2048,M41;M43,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+LH_HIP_M43_MIN,21,LH,hip,lh_hip_joint,43,MIN,software-ready,hardware-pending,-1,2048,1536,1472,1984,M41;M42;M43,M42=2617;M41=2048,M41;M42,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+LH_HIP_M43_MAX,22,LH,hip,lh_hip_joint,43,MAX,software-ready,hardware-pending,1,2048,2560,2624,2112,M41;M42;M43,M42=2617;M41=2048,M41;M42,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+LH_LOWER_M41_MIN,23,LH,lower,lh_lower_leg_joint,41,MIN,software-ready,hardware-pending,1,2048,3095,3159,2112,M41;M42;M43,M43=2048;M42=3072,M42;M43,,,,,,false,tick,N-MATDOG,,No physical contact evidence
+LH_LOWER_M41_MAX,24,LH,lower,lh_lower_leg_joint,41,MAX,software-ready,hardware-pending,-1,2048,1621,1557,1984,M41;M42;M43,M43=2048;M42=3072,M42;M43,,,,,,false,tick,N-MATDOG,,No physical contact evidence

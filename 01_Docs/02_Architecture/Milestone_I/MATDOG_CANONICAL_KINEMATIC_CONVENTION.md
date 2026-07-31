@@ -7,8 +7,11 @@ Status: `CURRENT_CANONICAL` for Milestone I.1.
 The canonical model is the REV00 URDF at the hash recorded in the source
 manifest. It contains 12 revolute joints and four fixed foot joints. Canonical
 leg order is `LF, RF, RH, LH`; joint order within each leg is `hip, upper,
-lower`. The complete parent/child, origin, axis, limits, servo mapping, and
-evidence are machine-readable in `joint_registry.csv`.
+lower`. The complete parent/child, origin XYZ/RPY, axis, lower/upper limit,
+effort, velocity, servo mapping, custom URDF hardware tags, units, and
+evidence are machine-readable in `joint_registry.csv`. The offline validator
+compares every numeric field to REV00 with an explicit absolute tolerance of
+`1e-9` and zero relative tolerance.
 
 The mapping is:
 
@@ -53,7 +56,8 @@ inputs only. URDF joint limits are model constraints, not measured contacts or
 safe limits. Collision uses detailed mesh geometry for offline inspection;
 per-joint compliance cannot establish configuration-level collision safety.
 
-The URDF custom `motorDirection` values disagree with multiple hardware-probe
-signs. Their semantics are therefore `DECISION_REQUIRED`; the hardware-backed
-calibration direction is the canonical encoder-to-q sign, without editing the
-URDF in this milestone.
+The URDF custom `motorDirection` values disagree with the hardware-probe signs
+for exactly M13, M11, M23, M21, M33, M31, M43 and M41. Every mismatch has an
+open conflict row. Their semantics are therefore `DECISION_REQUIRED`; the
+hardware-backed calibration direction is the canonical encoder-to-q sign,
+without editing the URDF in this milestone.

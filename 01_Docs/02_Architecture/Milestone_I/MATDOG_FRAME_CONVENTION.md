@@ -10,7 +10,9 @@ for rotation, seconds for time when time is explicitly modeled. In
 `base_link`, +X is forward, +Y is left, and +Z is up. Joint positive rotation
 is the URDF right-hand-rule direction about the recorded axis.
 
-`base_link` is the actual root frame of REV00 and is centered on the body
+The axis claim is sourced to the pinned REV00 ADR section that explicitly
+states the ROS X-forward/Y-left/Z-up convention. `base_link` is the actual root
+frame of REV00 and is centered on the body
 reference used by the model; it is not silently moved to a ground or center-of-
 mass frame. The four leg chains inherit their hip-joint origins from it. Front
 hips are at z=0.0465 m and rear hips at z=0.0265 m, a 0.0200 m front/rear
@@ -30,8 +32,11 @@ promoted to a point-frame fact.
 
 ## World, ground and collision
 
-The REV00 URDF does not materialize a `world` link/joint. `world` and a ground
-plane therefore remain `DECISION_REQUIRED`. The planned contract is a
+Every materialized registry row names its URDF source joint and source link;
+parent, origin XYZ/RPY, units and state are checked against REV00. The REV00
+URDF does not materialize a `world` link/joint. `world` and `ground_plane`
+therefore have planned frame types, blank materialized source fields and
+explicit `unknown` / `decision-required` states. The planned contract is a
 right-handed world with ground plane `world Z=0`, but its robot placement is
 not selected here.
 

@@ -28,9 +28,10 @@ distance-aware timeouts (minimum 12 s, 40 tick/s expectation plus 5 s), and a
 16-tick active-probe home settle while static/prerequisite tolerance remains
 10 ticks. These PR behaviors are not labeled fork-main facts.
 
-Generic SO101/ElRobot reset, Position Offset, EEPROM and freeze workflows are
-`NORMACORE_GENERIC_REFERENCE` and are not applicable to MATDOG contact
-calibration.
+SO101 and ElRobot generic EEPROM calibration behavior is represented by two
+independent `NORMACORE_GENERIC_REFERENCE` claims, each pointing to its own
+pinned source file and locator. Neither behavior is applicable to the MATDOG
+RAM-only contact path.
 
 ## Ownership decision left open
 

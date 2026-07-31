@@ -14,7 +14,8 @@ CF-SOFTWARE-HARDWARE,calibration,C-PROFILES-24,C-UNKNOWN-CONTACTS-22,Report soft
 CF-CONTACT-SAFE,limits,C-M12-CONTACT,C-UNKNOWN-SAFE,Keep mechanical contacts separate and leave safe limits unknown,OPEN,UNKNOWN,R-M12-MAX;R-CAL,No safe-limit promotion
 CF-OWNER,station,C-STATION-OWNER,C-BUS-FUTURE,Current Station ownership remains fact while future A B C choice stays open,OPEN,DECISION_REQUIRED,R-STATION-CONTRACT;R-ADR-STATION,Future architecture cannot rewrite current fact
 CF-MAIN-PR,station,C-MAIN-TIMEOUT,C-PR-RESTART,Classify fork-main and experimental PR behaviors separately,OPEN,NORMACORE_EXPERIMENTAL_PR,N-MATDOG;N-PR-WORKFLOW,PR behavior is not main
-CF-GENERIC-MATDOG,station,C-GENERIC-CAL,C-NATIVE-RAM,MATDOG RAM-only profile gate controls its contact workflow,CLOSED,NORMACORE_GENERIC_REFERENCE,N-SO101;N-ELROBOT;N-MATDOG,Generic reset and EEPROM flows do not transfer
+CF-GENERIC-MATDOG-SO101,station,C-GENERIC-SO101,C-NATIVE-RAM,MATDOG RAM-only profile gate controls its contact workflow,CLOSED,NORMACORE_GENERIC_REFERENCE,N-SO101;N-MATDOG,SO101 EEPROM flow does not transfer
+CF-GENERIC-MATDOG-ELROBOT,station,C-GENERIC-ELROBOT,C-NATIVE-RAM,MATDOG RAM-only profile gate controls its contact workflow,CLOSED,NORMACORE_GENERIC_REFERENCE,N-ELROBOT;N-MATDOG,ElRobot EEPROM flow does not transfer
 CF-C5-DZERO,first_stand,C-C5-OLD,C-DZERO,Old C5 target set is not command eligible after recenter,CLOSED,SUPERSEDED,R-C5;R-C5R-HANDOFF,Failure record remains historical
 CF-REALIGN-DZERO,first_stand,C-MECH-REALIGN,C-DZERO,Do not treat pre-recenter mechanical realignment as the primary plan,CLOSED,SUPERSEDED,R-C5;R-C5R-HANDOFF,Future diagnosis needs a new gate
 CF-XGO-PHYSICAL,architecture,C-XGO-ARCH,C-XGO-PHYSICAL,Transfer patterns only and prohibit physical values,CLOSED,XGOLITE_ARCHITECTURAL_REFERENCE,X-TRANSFER,Hard clean-room boundary

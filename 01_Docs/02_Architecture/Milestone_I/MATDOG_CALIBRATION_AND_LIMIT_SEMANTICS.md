@@ -23,8 +23,12 @@ Status: `CURRENT_CANONICAL` vocabulary for Milestone I.1.
 
 ## Current contact state
 
-Pinned NormaCore main generates 24 profiles. Their exact implementation
-parameters and evidence status are in `calibration_registry.csv`.
+Pinned NormaCore main generates 24 profiles. Their implementation parameters
+and evidence status are in `calibration_registry.csv`. The validator rebuilds
+all 24 from the `N-MATDOG` source hash, leg/joint/side order, home tick 2048,
+joint delta constants, direction map, 64-tick guard and baseline formulas,
+allowed motors, prerequisites and reverse restore order recorded in
+`foundation_expectations.json`; it then compares every derived field.
 
 - `LF_UPPER_M12_MIN`: coarse 1443 tick, fine 1443 tick, spread 0; URDF limit
   1451 tick. `validated` only as a mechanical contact.
@@ -47,5 +51,9 @@ and lower q=0. Front-leg profiles additionally park the ipsilateral rear upper
 joint at +0.523598775598 rad: LF parks LH; RF parks RH. These are derived
 clearance poses, not joint limits or general safe poses.
 
-The native profile order is LF, RF, RH, LH; within each leg upper, hip, lower;
-within each joint MIN then MAX. No such profile may run under this milestone.
+The registry records profile order, joint role, allowed motor IDs,
+prerequisite motor/target pairs, reverse restore order, home/visual zero,
+modeled limit, travel guard, software/hardware states, mechanical evidence and
+an explicit false operational-safe flag. The native profile order is LF, RF,
+RH, LH; within each leg upper, hip, lower; within each joint MIN then MAX. No
+such profile may run under this milestone.
