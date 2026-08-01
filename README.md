@@ -1,321 +1,273 @@
 # MATDOG — Custom Quadruped Robot
 
-MATDOG is a custom quadruped robot developed by Matt Robotics in Italy.
+MATDOG is a custom quadruped robot developed by Matt Robotics in Italy. The project combines mechanical design, 3D printing, ST3215 serial-bus servos, kinematics, native calibration, gait generation, embedded control and future perception capabilities.
 
-The project combines mechanical design, 3D printing, ST3215 serial-bus servos, kinematics, gait generation, embedded control and future perception capabilities.
+## Current Engineering Milestone — 2026-08-01
 
-## Current Engineering Milestone — 2026-07-21
+The REV00 mechanical and kinematic foundation is complete:
 
-MATDOG REV00, digital zero, encoder-to-radian conversion, four-leg live FK, offline IK/contact closure, collision policy and offline contact-locked rest-to-stand planning are complete.
+- 17 links, 16 joints and 12 revolute leg joints;
+- canonical CAD-derived URDF and collision meshes;
+- exact 12-servo mapping;
+- four-leg live forward kinematics from Station telemetry;
+- offline IK/contact closure, collision policy and stand-planning references;
+- historical 12-servo EEPROM digital-zero calibration and read-back;
+- native NormaCore RAM-only mechanical-contact calibrator.
 
-The mechanical end-stop calibration architecture is now frozen:
+All six physical contacts of the LF leg have now completed supervised hardware acquisition:
+
+| Joint | Servo | MIN | MAX | Spread |
+|---|---:|---:|---:|---:|
+| LF upper | M12 | 1443 / 1443 | 3443 / 3442 | 0 / 1 ticks |
+| LF lower | M11 | 3094 / 3092 | 1664 / 1666 | 2 / 2 ticks |
+| LF hip | M13 | 2530 / 2530 | 1595 / 1595 | 0 / 0 ticks |
+
+The combined HIP program completed MIN → HOME → MAX → HOME, `Done 20/20`, verified global torque OFF and released the serial port.
+
+The next development step is no longer another isolated profile. It is the complete LF sequence:
 
 ```text
-MATDOG AutoCalibrate command
-→ native NormaCore ST3215 Rust sequence
-→ RAM-only verified control
-→ position + velocity + PresentCurrent contact detector
-→ backoff + repeated contact
-→ measured contact and safe-limit record
+LF UPPER MIN/MAX
+→ LF LOWER MIN/MAX
+→ LF HIP MIN/MAX
+→ compare both endpoints with the REV00 URDF
+→ derive calibrated software q=0
+→ place LF at accepted HOME
+→ verified global torque OFF
 ```
 
-Command-capable Python end-stop prototypes created during the 2026-07-21 experiments are retired and must not be used again. The next hardware test is exclusively the native `LF_UPPER / M12 / MIN` pilot.
+## Why HOME is being recalculated
 
-No new C5 stand attempt is command-eligible until:
+The displayed encoder value `2048` currently corresponds to the visual/mechanical pose captured before full contact acquisition. That pose was useful and repeatable, but it was initially established by physical alignment rather than by solving against both measured mechanical endpoints.
+
+After MIN and MAX are known, each joint produces two independent q=0 candidates:
 
 ```text
-native M12 pilot PASS
-→ 24 validated joint contacts
-→ conservative safe limits in MATDOG_JOINT_CALIBRATION.yaml
-→ read-only four-leg FK closure
-→ regenerated HOME q=0 → LOW_STAND → NOMINAL_STAND targets
-→ collision, contact, support and timing audit
-→ supervised suspended stand
+zero_from_MIN = measured_MIN - direction × URDF_MIN_delta
+zero_from_MAX = measured_MAX - direction × URDF_MAX_delta
 ```
 
-NormaCore foundation currently targets upstream `0.1.0-beta.9`, `normfs 0.1.0-beta.1`, PR #86 and MATDOG sparse servo discovery through ID 43.
+A calibrated HOME is accepted only when both candidates agree within 24 ticks and the resulting target stays within 96 ticks of the existing digital home. Encoder scale and direction remain fixed.
 
-## Validated Platform
+Current LF evidence shows:
 
-    Asus Ubuntu
-    → NormaCore Station
-    → Waveshare Bus Servo Adapter
-    → custom power-distribution board
-    → 12 × Feetech ST3215
+| Joint | zero from MIN | zero from MAX | Disagreement | Status |
+|---|---:|---:|---:|---|
+| M12 upper | 2040 | 2048 | 8 | consistent |
+| M11 lower | 2046 | 2092 | 46 | re-acquire |
+| M13 hip | 2018 | 2107 | 89 | re-acquire |
 
-Validated so far:
+The small repeatability spread therefore proves repeatability, but not yet full mechanical seating for M11 and M13. This matches the operator observation that HIP MAX approached too slowly and appeared not to load the stop fully.
 
-- 12-servo bus communication;
-- custom power-distribution board;
-- canonical servo mapping;
-- CAD-derived URDF structure;
-- 17-link / 16-joint REV00 kinematic model;
-- visual and collision mesh placement;
-- safe upper- and lower-leg joint limits;
-- validated mechanical q=0 capture for all 12 leg joints;
-- 12-servo ST3215 digital-zero EEPROM calibration;
-- final post-restart EEPROM read-back with lock and torque verification;
-- encoder-to-radian URDF conversion contract;
-- global static tracking acceptance policy: <=10 ticks (±0.879°);
-- C3 live FK read-only validation for LF, RF, RH and LH.
+## V38 full-LF program
 
-## Canonical REV00 Robot Description
+NormaCore branch:
 
-The official REV00 package is stored in:
+```text
+matdog/full-calibration-v38
+```
 
-03_CAD/URDF/matt_robodog_rev00/
+MATDOG record branch:
 
-It contains:
+```text
+matdog/full-calibration-program-v38
+```
 
-- canonical URDF model;
-- baked STL meshes;
-- collision configuration;
-- URDF Studio project archive;
-- kinematic, mass and material workbook;
-- SHA-256 integrity manifest.
+Explicit Station arm token:
 
-## Current Robot Description
+```text
+LF_LEG_FULL_V38
+```
 
-    4 legs
-    17 links
-    16 joints
-    12 revolute leg joints
-    4 fixed foot joints
+V38 uses a faster, firmer but still bounded envelope:
+
+```text
+TorqueLimit = 500
+GoalSpeed   = 160
+Acc         = 8
+coarse step = 64 ticks
+fine step   = 8 ticks
+settle      = 900 ms
+```
+
+Unchanged protections:
+
+- Station is the only serial owner;
+- standard unsigned `GoalPosition`;
+- RAM writes only to TorqueEnable, Acc, GoalPosition, GoalSpeed and TorqueLimit;
+- model-derived contact corridors and 64-tick guards;
+- hard-current abort at raw 200;
+- status and driver-error aborts;
+- repeated-contact verification;
+- verified global torque OFF on success or failure.
+
+The new HOME remains software-level. V38 performs no Position Offset, EEPROM LOCK, reset, ResetCalibration, RegWrite, Action, Save or Freeze operation.
+
+When endpoint consistency fails, the program logs the new contacts, reports `MODEL_ZERO_INCONSISTENT`, does not replace HOME and turns torque off globally.
+
+## Rollout to all four legs
 
 Canonical leg order:
 
-    [LF, RF, RH, LH]
+```text
+LF → RF → RH → LH
+```
 
-Trot diagonal pairs:
+Canonical servo mapping:
 
-    LF + RH
-    RF + LH
+```text
+LF: hip M13, upper M12, lower M11
+RF: hip M23, upper M22, lower M21
+RH: hip M33, upper M32, lower M31
+LH: hip M43, upper M42, lower M41
+```
 
-## Current Geometry
+RF is the mirrored front-leg application of the validated LF logic.
 
-    Front-to-rear hip spacing: 225 mm
-    Left-to-right hip spacing: 95 mm
-    Hip-to-knee segment: 90 mm
-    Knee-to-foot mechanical interface center: 110 mm
-    Knee-to-foot contact-frame distance: 118.1 mm
-    Target stand body height: approximately 150 mm
+LH is the next requested hardware development. Its UPPER/LOWER horizontal geometry is expected to match the established HIP strategy, but the exact LF-front parking pose must first be selected by an offline collision sweep. The target will not be guessed from visual inspection.
+
+The final one-button 12-joint program becomes hardware-eligible after:
+
+```text
+LF V38 model-zero PASS
+→ LH rear-clearance sequence PASS
+→ mirrored RF and RH offline tests PASS
+→ final four-leg HOME collision and FK audit PASS
+→ full LF → RF → RH → LH supervised execution
+```
+
+## Validated Platform
+
+```text
+Asus Ubuntu
+→ NormaCore Station
+→ Waveshare Bus Servo Adapter
+→ custom power-distribution board
+→ 12 × Feetech ST3215
+```
+
+## Canonical REV00 Robot Description
+
+```text
+4 legs
+17 links
+16 joints
+12 revolute leg joints
+4 fixed foot joints
+```
+
+Geometry:
+
+```text
+front-to-rear hip spacing: 225 mm
+left-to-right hip spacing: 95 mm
+hip-to-knee segment: 90 mm
+knee-to-foot mechanical interface center: 110 mm
+knee-to-foot contact-frame distance: 118.1 mm
+target stand body height: approximately 150 mm
+```
 
 Coordinate convention:
 
-    X = forward
-    Y = left
-    Z = up
-    Units = metres and radians
-    Right-handed coordinate system
+```text
+X = forward
+Y = left
+Z = up
+units = metres and radians
+right-handed coordinate system
+```
 
-## Canonical Servo Mapping
+The canonical URDF package is stored in:
 
-    LF: hip M13, upper M12, lower M11
-    RF: hip M23, upper M22, lower M21
-    RH: hip M33, upper M32, lower M31
-    LH: hip M43, upper M42, lower M41
+```text
+03_CAD/URDF/matt_robodog_rev00/
+```
 
-## Calibration Status
+It contains the URDF, baked STL meshes, collision configuration, URDF Studio archive, physical-property records and integrity manifest.
 
-Mechanical reference calibration was captured for all 12 leg joints on
-2026-07-06. On 2026-07-10 the complete 12-servo digital-zero calibration was
-validated: each physical mechanical `q = 0` encoder value was mapped to the
-canonical displayed value `2048` by writing the signed ST3215 Position Offset.
+## Calibration records
 
-The final post-restart read-back confirmed the planned offset on every servo,
-EEPROM `LOCK = 1`, `TORQUE = 0`, displayed positions from 2048 to 2051 ticks,
-and a maximum physical raw-encoder deviation of 3 ticks from the mechanical-q0
-capture.
+Canonical configuration:
 
-The canonical encoder-to-radian contract remains the software source of truth
-for live joint state, FK and IK. The digital recenter changes the servo-side
-encoder representation of `q = 0`; it does not change joint directions, URDF
-geometry, URDF limits or mechanical/contact limits.
+```text
+06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml
+```
 
-Canonical utility:
+Current V38 records:
 
-    06_Software/Matdog_Core/calibration/matdog_digital_zero_calibration.py
+```text
+06_Software/Matdog_Core/calibration/MATDOG_FULL_CALIBRATION_PROGRAM_V38.md
+06_Software/Matdog_Core/calibration/MATDOG_LF_CONTACT_EVIDENCE_2026-08-01.yaml
+06_Software/Matdog_Core/calibration/matdog_model_zero_solver.py
+06_Software/Matdog_Core/calibration/tests/test_matdog_model_zero_solver.py
+```
 
-Procedure:
+Historical digital-zero records:
 
-    06_Software/Matdog_Core/calibration/MATDOG_DIGITAL_ZERO_CALIBRATION.md
+```text
+06_Software/Matdog_Core/calibration/MATDOG_DIGITAL_ZERO_CALIBRATION.md
+09_Logs/Calibration/C5_R_digital_recenter/
+```
 
-Static tracking acceptance is unified for all 12 ST3215 servos:
-
-    tolerance = <=10 encoder ticks
-    tolerance = ±0.879°
-
-This applies to static hold, single-servo micro-probe, return validation and
-controlled static-pose checks. It does not change the mechanical `q = 0`
-definition, calibrated digital zero, encoder direction, URDF limits,
-mechanical/contact limits, stand acceptance or dynamic locomotion acceptance.
-
-M13 (LF hip) was diagnosed separately after an initially tighter 8-tick
-threshold exposed a repeatable directional residual. Read-only range checks
-excluded a local mechanical stop; the diagnostic probe measured a worst-case
-static residual of 10 ticks with low current and status 0x00. M13 is accepted
-under the same shared policy as every other joint.
-
-LF live FK was validated on 2026-07-07 with Station as the sole serial owner.
-On 2026-07-08 the generalized live FK read-only tool was validated for all four
-legs: LF, RF, RH and LH. The tool reads Station telemetry only, converts encoder
-state to URDF joint angles and computes the selected `*_foot_link` in
-`base_link`, without sending torque, target, speed or accel commands.
-
-C3-B live FK read-only validation is archived in:
-
-    09_Logs/Calibration_Sessions/C3_live_fk/
-
-C4-A offline safe stand candidate is archived in:
-
-    06_Software/Matdog_Core/kinematics/matdog_offline_safe_stand_candidate.py
-    09_Logs/Validation_Reports/2026-07-08_175245_C4A_offline_safe_stand_candidate.json
-
-C4-B static offline collision/contact policy is archived in:
-
-    06_Software/Matdog_Core/kinematics/matdog_offline_collision_contact_policy.py
-    06_Software/Matdog_Core/kinematics/MATDOG_COLLISION_CONTACT_POLICY.md
-    09_Logs/Validation_Reports/C4_collision_contact_policy/2026-07-08_183409_C4B_collision_contact_policy.json
-
-C4-C offline rest-to-stand trajectory sampling is archived in:
-
-    06_Software/Matdog_Core/kinematics/matdog_offline_rest_to_stand_trajectory.py
-    06_Software/Matdog_Core/kinematics/MATDOG_REST_TO_STAND_TRAJECTORY_POLICY.md
-    09_Logs/Validation_Reports/C4_rest_to_stand_trajectory/2026-07-08_190405_C4C_contact_locked_rest_to_stand_trajectory.json
-
-C4-D offline trajectory timing and servo-envelope validation is archived in:
-
-    06_Software/Matdog_Core/kinematics/matdog_offline_trajectory_timing_envelope.py
-    06_Software/Matdog_Core/kinematics/MATDOG_TRAJECTORY_TIMING_ENVELOPE.md
-    09_Logs/Validation_Reports/C4_trajectory_timing_envelope/2026-07-08_191003_C4D_trajectory_timing_envelope.json
-
-C4-E offline static stability / support-polygon validation is archived in:
-
-    06_Software/Matdog_Core/kinematics/matdog_offline_static_stability_support_polygon.py
-    06_Software/Matdog_Core/kinematics/MATDOG_STATIC_STABILITY_SUPPORT_POLYGON.md
-    09_Logs/Validation_Reports/C4_static_stability_support_polygon/2026-07-08_191840_C4E_static_stability_support_polygon.json
-
-C4-F hardware safe-mode preflight is archived in:
-
-    06_Software/Matdog_Core/kinematics/matdog_offline_hardware_safe_mode_preflight.py
-    06_Software/Matdog_Core/kinematics/MATDOG_HARDWARE_SAFE_MODE_PREFLIGHT.md
-    09_Logs/Validation_Reports/C4_hardware_safe_mode_preflight/2026-07-08_193744_C4F_hardware_safe_mode_source_audit.json
-
-The next phase is a separate MATDOG mechanical end-stop calibration workflow.
-Its intended operator experience is a single controlled calibration action, but
-the implementation must remain Station-mediated, collision-aware and
-one-joint-at-a-time. It must measure physical contact limits, apply conservative
-safety margins, update the canonical calibration record, and complete a new
-read-only FK/target audit before any supervised rest-to-stand attempt.
-
-Calibration records:
-
-- canonical configuration: `06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml`;
-- unified 12-servo tool: `06_Software/Matdog_Core/calibration/matdog_digital_zero_calibration.py`;
-- digital-zero procedure: `06_Software/Matdog_Core/calibration/MATDOG_DIGITAL_ZERO_CALIBRATION.md`;
-- mechanical end-stop calibration plan: `06_Software/Matdog_Core/calibration/MATDOG_MECHANICAL_ENDSTOP_CALIBRATION_PLAN.md`;
-- final digital-zero read-back: `09_Logs/Calibration/C5_R_digital_recenter/2026-07-10_145457Z_final_12_offset_readback.json`;
-- tolerance policy: `09_Logs/Calibration_Sessions/2026-07-07_static_tracking_tolerance_10_ticks.policy.yaml`;
-- M13 diagnostic: `09_Logs/Calibration_Sessions/2026-07-07_092043_M13_micro_probe_diagnostic.json`.
+The EEPROM digital-zero state remains preserved while the new software model-zero is evaluated across all 12 joints.
 
 ## Repository Structure
 
-    01_Docs/        Architecture, technical references and project documentation
-    02_BOM/         Bills of materials and component records
-    03_CAD/         CAD, URDF, meshes and mechanical exports
-    04_Electronics/ Wiring, power, servo mapping and electronics design
-    05_Firmware/    Future low-level and embedded firmware
-    06_Software/    Kinematics, gait, control and software tools
-    07_Media/       Images, videos and public project media
-    08_Tests/       Validation procedures, scripts and test outputs
-    09_Logs/        Decisions, validation reports and development history
+```text
+01_Docs/        architecture and technical references
+02_BOM/         bills of materials
+03_CAD/         CAD, URDF and meshes
+04_Electronics/ wiring, power and servo mapping
+05_Firmware/    embedded firmware
+06_Software/    calibration, kinematics, gait and control
+07_Media/       project media
+08_Tests/       validation procedures and tests
+09_Logs/        evidence and development history
+```
 
 ## Roadmap
 
-### Phase 1 — Foundation
+### Foundation
 
 - [x] Mechanical architecture
-- [x] ST3215 bus and power-distribution validation
-- [x] Canonical servo mapping
-- [x] MATDOG REV00 URDF kinematic baseline
+- [x] ST3215 bus and custom power validation
+- [x] Canonical 12-servo mapping
+- [x] REV00 URDF and collision baseline
+- [x] Four-leg live FK and offline IK/contact closure
+- [x] Historical digital-zero EEPROM calibration
+- [x] Native RAM-only 24-contact calibrator foundation
 
-### Phase 2 — Locomotion
+### Mechanical calibration
 
-- [x] Mechanical q=0 calibration for all 12 joints
-- [x] Encoder-to-radian calibration contract
-- [x] 12-servo ST3215 digital-zero EEPROM calibration and final readback
-- [x] Global static tracking policy: <=10 ticks (±0.879°)
-- [x] Four-leg live FK and offline contact-reference IK closure
-- [x] C4-A…C4-F offline stand, collision, timing, stability and preflight references
-- [x] Mechanical end-stop prerequisite geometry and cross-leg parking poses
-- [x] NormaCore upstream update to 0.1.0-beta.9 / normfs 0.1.0-beta.1 foundation
-- [x] Retire command-capable Python end-stop prototypes
-- [ ] Commit and publish MATDOG sparse-ID discovery foundation in NormaCore fork
-- [ ] Implement native Rust MATDOG AutoCalibrate dispatcher and RAM-only primitives
-- [ ] Native LF_UPPER / M12 / MIN pilot
-- [ ] Supervised 12-joint / 24-contact acquisition
-- [ ] Record measured contacts and conservative safe limits in canonical YAML
-- [ ] Post-calibration read-only joint-state and four-leg FK closure
-- [ ] Regenerate and audit HOME q=0 → LOW_STAND → NOMINAL_STAND trajectory
-- [ ] Supervised suspended stand and gradual load transfer
+- [x] LF upper MIN and MAX
+- [x] LF lower MIN and MAX
+- [x] LF hip combined MIN and MAX
+- [x] Independent offline model-zero solver
+- [ ] LF full one-click V38 hardware validation
+- [ ] LH rear-leg clearance and full sequence
+- [ ] RF mirrored front-leg sequence
+- [ ] RH mirrored rear-leg sequence
+- [ ] Complete 12-joint Auto Calibrate sequence
+- [ ] Canonical YAML update with accepted contacts and software HOME targets
+- [ ] Four-leg post-calibration FK and collision closure
+
+### Locomotion
+
+- [ ] Regenerate HOME → LOW_STAND → NOMINAL_STAND from calibrated model zero
+- [ ] Supervised suspended stand
 - [ ] Four-leg body-height control
 - [ ] Single-foot swing trajectory
 - [ ] Trot in place
 - [ ] First slow walking tests
 
-
-### Phase 3 — Embedded Integration
+### Embedded integration and autonomy
 
 - [ ] Battery and BMS integration
 - [ ] Jetson integration
 - [ ] Low-level motion-controller evaluation
-- [ ] IMU and safety/watchdog integration
-
-### Phase 4 — Perception and Autonomy
-
-- [ ] Depth vision
-- [ ] Object detection
-- [ ] Voice interaction
-- [ ] Autonomous behaviour
-
-## Project Records
-
-- Architecture decisions: 09_Logs/Architecture_Decisions/
-- Validation reports: 09_Logs/Validation_Reports/
-- Development log: 09_Logs/Development_Log/
-- Calibration sessions: 09_Logs/Calibration_Sessions/
-- Digital-zero calibration: 09_Logs/Calibration/C5_R_digital_recenter/
-- C5-R post-digital-zero handoff: 09_Logs/Development_Log/2026-07-10_C5R_POST_DIGITAL_ZERO_HANDOFF.md
-- Native calibrator handoff: 09_Logs/Development_Log/2026-07-21_NATIVE_NORMACORE_CALIBRATOR_HANDOFF.md
-- LF live FK validation: 09_Logs/Calibration_Sessions/2026-07-07_lf_fk_live_validation.result.yaml
-- Canonical world/contact/IK regressions: 06_Software/Matdog_Core/kinematics/tests/test_matdog_quadruped_leg_contact_ik.py
-- URDF REV00 package: 03_CAD/URDF/matt_robodog_rev00/
+- [ ] IMU and watchdog integration
+- [ ] Depth vision, perception and autonomous behaviour
 
 ---
 
 Built and documented by Matt Robotics.
-
-## Mechanical Segment and Contact-Frame Terminology
-
-- `Hip-to-knee mechanical segment`: `90 mm`.
-- `Knee-to-foot mechanical interface center`: `110 mm`. This is the
-  nominal distance from the knee axis to the center of the lower-leg end
-  where the eccentric rubber foot attaches.
-- `Knee-to-foot contact-frame distance`: `118.1 mm`. This is the true
-  distance from the knee axis to the URDF `foot_joint`, which represents
-  the nominal ground-contact point of the eccentric rubber foot.
-
-The `110 mm` mechanical segment and the `118.1 mm` contact-frame distance
-are intentionally different. The contact-frame distance is the value to use
-for nominal ground contact, stand-pose development, IK and gait planning.
-
-## ST3215 URDF Effort and Velocity Semantics
-
-The REV00 URDF uses:
-
-    effort   = 0.902244 N*m
-    velocity = 3.03687289847 rad/s = 29 rpm
-
-These are conservative MATDOG nominal-operation limits for the intended 3S
-operating point. They are not Feetech-published performance values at exactly
-11.1 V and must not be interpreted as stall specifications.
