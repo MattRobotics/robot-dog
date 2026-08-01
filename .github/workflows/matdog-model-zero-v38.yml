@@ -5,6 +5,8 @@ on:
     branches:
       - matdog/full-calibration-program-v38
   pull_request:
+    branches:
+      - matdog/lf-lower-m11-min-v28r-checkpoint
   workflow_dispatch:
 
 permissions:
