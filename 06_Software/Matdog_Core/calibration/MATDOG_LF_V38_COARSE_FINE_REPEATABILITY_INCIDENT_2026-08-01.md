@@ -80,4 +80,35 @@ spread(1416 coarse, 1440 fine) = 24 -> rejected
 spread(1440 fine, 1443 historical fine) = 3 -> accepted
 ```
 
-The same correction must be present in LF V38, LH V39 and all-legs V40 before any further hardware run.
+## Verified hotfix
+
+NormaCore head:
+
+```text
+b16df4351e5455cfd5c64aff0994fa30d6a83dc1
+```
+
+GitHub Actions:
+
+```text
+workflow: MATDOG Full LF Calibration V38
+run: 30698562034
+result: PASS
+102/102 ST3215 tests: PASS
+Station viewer build: PASS
+Station release build: PASS
+hardware_started=false
+serial_opened=false
+```
+
+Artifact:
+
+```text
+id: 8818098589
+digest: sha256:a531d629005fe52a8643ca7876415d0615a3688f735f5aa30d5652059cc344fd
+matdog.rs: fecb94f179086299b0722a15599eb50bc60b332140bfb8086a0f96ec35ed3f01
+matdog_test.rs: ca23bced4af60cb75b8559ed93d9ed54652ee071f8b5170a7140f42d1ffc3bba
+Station: 78a8bf5db665a40c84b32b8edafa0d0051da50e432f68c329a6a98cf63e0b6be
+```
+
+The same correction is carried into LF V38, LH V39 and all-legs V40 before any further hardware run.
