@@ -4,156 +4,33 @@ MATDOG is a custom quadruped robot developed by Matt Robotics in Italy. The proj
 
 ## Current Engineering Milestone — 2026-08-01
 
-The REV00 mechanical and kinematic foundation is complete:
+The complete native mechanical-calibration program is implemented and verified offline.
 
-- 17 links, 16 joints and 12 revolute leg joints;
-- canonical CAD-derived URDF and collision meshes;
-- exact 12-servo mapping;
-- four-leg live forward kinematics from Station telemetry;
-- offline IK/contact closure, collision policy and stand-planning references;
-- historical 12-servo EEPROM digital-zero calibration and read-back;
-- native NormaCore RAM-only mechanical-contact calibrator.
-
-All six physical contacts of the LF leg have now completed supervised hardware acquisition:
-
-| Joint | Servo | MIN | MAX | Spread |
-|---|---:|---:|---:|---:|
-| LF upper | M12 | 1443 / 1443 | 3443 / 3442 | 0 / 1 ticks |
-| LF lower | M11 | 3094 / 3092 | 1664 / 1666 | 2 / 2 ticks |
-| LF hip | M13 | 2530 / 2530 | 1595 / 1595 | 0 / 0 ticks |
-
-The combined HIP program completed MIN → HOME → MAX → HOME, `Done 20/20`, verified global torque OFF and released the serial port.
-
-The current staged implementation is:
-
-```text
-LF full V38 hardware validation
-→ LH full V39 hardware validation
-→ mirrored RF and RH sequences
-→ complete LF → RF → RH → LH Auto Calibrate
-```
-
-## Why HOME is being recalculated
-
-The displayed encoder value `2048` currently corresponds to the visual/mechanical pose captured before full contact acquisition. That pose was useful and repeatable, but it was initially established by physical alignment rather than by solving against both measured mechanical endpoints.
-
-After MIN and MAX are known, each joint produces two independent q=0 candidates:
-
-```text
-zero_from_MIN = measured_MIN - direction × URDF_MIN_delta
-zero_from_MAX = measured_MAX - direction × URDF_MAX_delta
-```
-
-A calibrated HOME is accepted only when both candidates agree within 24 ticks and the resulting target stays within 96 ticks of the existing digital home. Encoder scale and direction remain fixed.
-
-Current LF evidence shows:
-
-| Joint | zero from MIN | zero from MAX | Disagreement | Status |
-|---|---:|---:|---:|---|
-| M12 upper | 2040 | 2048 | 8 | consistent |
-| M11 lower | 2046 | 2092 | 46 | re-acquire |
-| M13 hip | 2018 | 2107 | 89 | re-acquire |
-
-The small repeatability spread therefore proves repeatability, but not yet full mechanical seating for M11 and M13. This matches the operator observation that HIP MAX approached too slowly and appeared not to load the stop fully.
-
-## V38 full-LF program
-
-NormaCore branch:
-
-```text
-matdog/full-calibration-v38
-```
-
-MATDOG record branch:
-
-```text
-matdog/full-calibration-program-v38
-```
-
-Explicit Station arm token:
-
-```text
-LF_LEG_FULL_V38
-```
-
-V38 uses a faster, firmer but still bounded envelope:
-
-```text
-TorqueLimit = 500
-GoalSpeed   = 160
-Acc         = 8
-coarse step = 64 ticks
-fine step   = 8 ticks
-settle      = 900 ms
-```
-
-Unchanged protections:
-
-- Station is the only serial owner;
-- standard unsigned `GoalPosition`;
-- RAM writes only to TorqueEnable, Acc, GoalPosition, GoalSpeed and TorqueLimit;
-- model-derived contact corridors and 64-tick guards;
-- hard-current abort at raw 200;
-- status and driver-error aborts;
-- repeated-contact verification;
-- verified global torque OFF on success or failure.
-
-The new HOME remains software-level. V38 performs no Position Offset, EEPROM LOCK, reset, ResetCalibration, RegWrite, Action, Save or Freeze operation.
-
-When endpoint consistency fails, the program logs the new contacts, reports `MODEL_ZERO_INCONSISTENT`, does not replace HOME and turns torque off globally.
-
-## V39 full-LH rear-leg program
-
-NormaCore branch:
-
-```text
-matdog/lh-full-calibration-v39
-```
-
-MATDOG record branch:
-
-```text
-matdog/lh-full-calibration-program-v39
-```
-
-Explicit Station arm token:
-
-```text
-LH_LEG_FULL_V39
-```
-
-The canonical exact-mesh audit of 2026-07-20 already proved that RH and LH calibration paths are clear with the other three legs at HOME. Therefore **LH does not require LF to be parked forward**.
-
-For the LH HIP contact stages the native prerequisites are:
-
-```text
-M42 = 3072  # upper horizontal
-M41 = 3038  # lower folded/parallel
-M43 = probing hip
-```
-
-One Auto Calibrate executes:
-
-```text
-M42 UPPER MIN/MAX
-M41 LOWER MIN/MAX
-M43 HIP MIN/MAX
-URDF endpoint consistency for all three joints
-LH calibrated software q=0 placement
-global torque OFF
-```
-
-All non-LH motors remain constrained to the bounded HOME corridor.
-
-## Rollout to all four legs
-
-Canonical leg order:
+A single Station **Auto Calibrate** action can now execute:
 
 ```text
 LF → RF → RH → LH
+24 mechanical contacts
+12 model-derived q=0 targets
+complete calibrated software HOME
+verified global torque OFF
 ```
 
-Canonical servo mapping:
+The final program is intentionally still draft and hardware-gated. No merge into `main` has been performed.
+
+## Validated foundation
+
+- 4 legs, 17 links, 16 joints and 12 revolute leg joints;
+- canonical REV00 CAD-derived URDF and collision meshes;
+- exact sparse ST3215 topology: `11,12,13,21,22,23,31,32,33,41,42,43`;
+- canonical servo mapping and encoder-to-radian direction contract;
+- four-leg live FK through Station telemetry;
+- offline IK/contact closure and exact-mesh collision audit;
+- historical 12-servo EEPROM digital-zero calibration and read-back;
+- Station-owned RAM-only mechanical-contact calibrator;
+- repeated contact, backoff, recovery and global torque-OFF verification.
+
+## Canonical servo mapping
 
 ```text
 LF: hip M13, upper M12, lower M11
@@ -162,39 +39,222 @@ RH: hip M33, upper M32, lower M31
 LH: hip M43, upper M42, lower M41
 ```
 
-RF is the mirrored front-leg application of the validated LF logic and retains the geometrically validated RH-upper parking prerequisite. RH is the mirrored rear-leg application of LH and requires no additional front-leg parking.
-
-The final one-button 12-joint program becomes hardware-eligible after:
+Canonical calibration order:
 
 ```text
-LF V38 model-zero PASS
-→ LH V39 model-zero PASS
-→ mirrored RF and RH offline tests PASS
-→ final four-leg HOME collision and FK audit PASS
-→ full LF → RF → RH → LH supervised execution
+LF → RF → RH → LH
 ```
 
-## Validated Platform
+## LF hardware evidence
+
+All six LF mechanical contacts completed supervised acquisition:
+
+| Joint | Servo | MIN | MAX | Spread |
+|---|---:|---:|---:|---:|
+| upper | M12 | 1443 / 1443 | 3443 / 3442 | 0 / 1 ticks |
+| lower | M11 | 3094 / 3092 | 1664 / 1666 | 2 / 2 ticks |
+| hip | M13 | 2530 / 2530 | 1595 / 1595 | 0 / 0 ticks |
+
+The LF HIP combined cycle completed:
 
 ```text
-Asus Ubuntu
-→ NormaCore Station
-→ Waveshare Bus Servo Adapter
-→ custom power-distribution board
-→ 12 × Feetech ST3215
+MIN → HOME → MAX → HOME
+Done 20/20
+global torque OFF verified
+serial port released
 ```
 
-## Canonical REV00 Robot Description
+The first HIP MAX approach was visibly too slow and probably under-seated. The later full-leg programs therefore use a faster, firmer but still bounded motion envelope.
+
+## Model-derived q=0
+
+The historical displayed HOME at encoder tick 2048 was initially established by visual/mechanical alignment. It remains preserved, but it is no longer assumed to be the final kinematic zero.
+
+For each joint, the program derives two independent candidates from the measured mechanical endpoints and the fixed REV00 URDF model:
 
 ```text
-4 legs
-17 links
-16 joints
-12 revolute leg joints
-4 fixed foot joints
+zero_from_MIN = measured_MIN - direction × URDF_MIN_delta
+zero_from_MAX = measured_MAX - direction × URDF_MAX_delta
 ```
 
-Geometry:
+The encoder scale and direction are not refitted.
+
+Acceptance requires:
+
+```text
+circular_distance(zero_from_MIN, zero_from_MAX) <= 24 ticks
+circular_distance(estimated_zero, 2048) <= 96 ticks
+```
+
+On failure:
+
+```text
+MODEL_ZERO_INCONSISTENT <LEG>
+contacts remain logged
+next leg does not start
+calibrated HOME is not applied
+global torque OFF verified
+```
+
+Current historical LF evidence diagnoses:
+
+| Joint | zero from MIN | zero from MAX | Disagreement | Result |
+|---|---:|---:|---:|---|
+| M12 upper | 2040 | 2048 | 8 | consistent candidate 2044 |
+| M11 lower | 2046 | 2092 | 46 | re-acquire with V38 |
+| M13 hip | 2018 | 2107 | 89 | re-acquire with V38 |
+
+This demonstrates why repeatability alone does not prove full mechanical seating.
+
+## V38 — complete LF program
+
+```text
+NormaCore branch: matdog/full-calibration-v38
+MATDOG record branch: matdog/full-calibration-program-v38
+arm token: LF_LEG_FULL_V38
+```
+
+One Auto Calibrate executes:
+
+```text
+M12 UPPER MIN/MAX
+M11 LOWER MIN/MAX
+M13 HIP MIN/MAX
+three URDF endpoint-consistency gates
+LF calibrated software q=0 placement
+global torque OFF
+```
+
+Offline verification:
+
+```text
+100/100 ST3215 tests: PASS
+Station viewer build: PASS
+Station release build: PASS
+```
+
+## V39 — complete LH rear-leg program
+
+```text
+NormaCore branch: matdog/lh-full-calibration-v39
+MATDOG record branch: matdog/lh-full-calibration-program-v39
+arm token: LH_LEG_FULL_V39
+```
+
+The exact-mesh checkpoint of 2026-07-20 already proved that an active rear leg does not require any front-leg parking. Therefore LH does **not** move LF forward.
+
+LH HIP prerequisites:
+
+```text
+M42 = 3072  # upper horizontal
+M41 = 3038  # lower folded/parallel
+M43 = probing hip
+```
+
+Offline verification:
+
+```text
+104/104 ST3215 tests: PASS
+Station viewer build: PASS
+Station release build: PASS
+```
+
+## V40 — complete 24-contact, 12-joint program
+
+```text
+NormaCore branch: matdog/all-legs-full-calibration-v40
+MATDOG record branch: matdog/all-legs-full-calibration-program-v40
+arm token: MATDOG_ALL_LEGS_FULL_V40
+```
+
+A single Auto Calibrate action executes:
+
+```text
+LF six contacts → LF model-zero gate
+RF six contacts → RF model-zero gate
+RH six contacts → RH model-zero gate
+LH six contacts → LH model-zero gate
+12 accepted software q=0 targets
+all HIP joints → all UPPER joints → all LOWER joints
+verify all 12 holds
+global torque OFF
+```
+
+### Why final HOME is delayed
+
+During the 24 contact acquisitions, every stage returns to the historical digital HOME and turns torque off. A newly derived q=0 is stored in memory but is not applied immediately, because the restart-safe gate for the next leg still expects the common digital reference.
+
+The 12 calibrated targets are applied only after all four legs pass. This prevents an earlier calibrated leg from invalidating the startup envelope of a later leg.
+
+### Front and rear geometry
+
+- LF and RF front-leg profiles retain the validated ipsilateral rear-UPPER parking prerequisite.
+- LF retains the hardware-validated combined HIP stage.
+- RH and LH rear-leg profiles require no additional front-leg parking.
+
+### Offline verification
+
+```text
+workflow: MATDOG All Legs Full Calibration V40
+run: 30696228454
+108/108 ST3215 tests: PASS
+Station viewer build: PASS
+Station release build: PASS
+order, fail-closed and safety contracts: PASS
+hardware_started=false
+serial_opened=false
+```
+
+Artifact:
+
+```text
+id: 8817381318
+digest: sha256:e6868d89cdd2473485b4469fc804f1091cf96587b365aa7c84228953db595ede
+matdog.rs: a955f7de9a1c3405cf4d4e705d545e499162ba3cb378261bb9ca7afcf53999b7
+matdog_test.rs: 23d60c377ee40b8f71c8969989b70e8098b0ae7126392d81af4e631f347ee696
+Station: a5d2bd00ad90ad3c4fc3268f52a847dce390a040042d51a7633de89b7b70ff9c
+```
+
+## Motion envelope
+
+```text
+TorqueLimit = 500
+GoalSpeed   = 160
+Acc         = 8
+coarse step = 64 ticks
+fine step   = 8 ticks
+settle      = 900 ms
+hard-current abort = 200
+```
+
+The faster envelope addresses under-seating without enlarging URDF-derived contact corridors or 64-tick mechanical guards.
+
+## Permanent safety contract
+
+- Station is the only serial owner.
+- `GoalPosition` remains standard unsigned ST3215.
+- Writes remain RAM-only: TorqueEnable, Acc, GoalPosition, GoalSpeed and TorqueLimit.
+- Status, driver-error and hard-current aborts remain active.
+- Every contact stage ends with verified global torque OFF.
+- Final calibrated HOME ends with verified global torque OFF.
+- No EEPROM, Position Offset, LOCK, reset, ResetCalibration, RegWrite, Action, Save or Freeze.
+- Any failed stage blocks the next stage.
+- The first V38, V39 and V40 runs remain supervised with robot supported, all legs free, operator present and master disconnect accessible.
+
+## Hardware rollout gate
+
+```text
+1. LF_LEG_FULL_V38 hardware model-zero PASS
+2. LH_LEG_FULL_V39 hardware model-zero PASS
+3. MATDOG_ALL_LEGS_FULL_V40 first supervised full run
+4. update canonical YAML with 12 accepted software q=0 values
+5. four-leg post-calibration FK and collision closure
+6. regenerate HOME → LOW_STAND → NOMINAL_STAND trajectories
+```
+
+The complete V40 program is implemented, but its launcher remains hard-blocked until the two individual LF and LH checkpoints exist in the evidence archive.
+
+## Canonical REV00 geometry
 
 ```text
 front-to-rear hip spacing: 225 mm
@@ -215,42 +275,32 @@ units = metres and radians
 right-handed coordinate system
 ```
 
-The canonical URDF package is stored in:
+Canonical URDF package:
 
 ```text
 03_CAD/URDF/matt_robodog_rev00/
 ```
 
-It contains the URDF, baked STL meshes, collision configuration, URDF Studio archive, physical-property records and integrity manifest.
-
 ## Calibration records
-
-Canonical configuration:
 
 ```text
 06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml
-```
-
-Current records:
-
-```text
 06_Software/Matdog_Core/calibration/MATDOG_FULL_CALIBRATION_PROGRAM_V38.md
+06_Software/Matdog_Core/calibration/MATDOG_ALL_LEGS_FULL_CALIBRATION_V40.md
 06_Software/Matdog_Core/calibration/MATDOG_LF_CONTACT_EVIDENCE_2026-08-01.yaml
 06_Software/Matdog_Core/calibration/MATDOG_MECHANICAL_ENDSTOP_GEOMETRY_CHECKPOINT_2026-07-20.md
 06_Software/Matdog_Core/calibration/matdog_model_zero_solver.py
 06_Software/Matdog_Core/calibration/tests/test_matdog_model_zero_solver.py
 ```
 
-Historical digital-zero records:
+Historical digital-zero records remain preserved in:
 
 ```text
 06_Software/Matdog_Core/calibration/MATDOG_DIGITAL_ZERO_CALIBRATION.md
 09_Logs/Calibration/C5_R_digital_recenter/
 ```
 
-The EEPROM digital-zero state remains preserved while the new software model-zero is evaluated across all 12 joints.
-
-## Repository Structure
+## Repository structure
 
 ```text
 01_Docs/        architecture and technical references
@@ -266,48 +316,35 @@ The EEPROM digital-zero state remains preserved while the new software model-zer
 
 ## Roadmap
 
-### Foundation
+### Completed
 
-- [x] Mechanical architecture
-- [x] ST3215 bus and custom power validation
-- [x] Canonical 12-servo mapping
-- [x] REV00 URDF and collision baseline
-- [x] Four-leg live FK and offline IK/contact closure
-- [x] Historical digital-zero EEPROM calibration
-- [x] Native RAM-only 24-contact calibrator foundation
+- [x] Mechanical architecture and REV00 URDF
+- [x] ST3215 bus and canonical mapping
+- [x] Historical 12-servo digital zero
+- [x] Four-leg FK and offline contact/collision model
+- [x] Native 24-contact calibrator foundation
+- [x] LF six-contact hardware evidence
+- [x] Independent model-zero solver
+- [x] LF V38 offline implementation and CI
+- [x] LH V39 offline implementation and CI
+- [x] Complete V40 offline implementation and CI
 
-### Mechanical calibration
+### Immediate hardware checkpoints
 
-- [x] LF upper MIN and MAX
-- [x] LF lower MIN and MAX
-- [x] LF hip combined MIN and MAX
-- [x] Independent offline model-zero solver
-- [x] LF full one-click V38 offline implementation and CI
-- [ ] LF full one-click V38 hardware validation
-- [ ] LH full one-click V39 offline implementation and CI
-- [ ] LH full one-click V39 hardware validation
-- [ ] RF mirrored front-leg sequence
-- [ ] RH mirrored rear-leg sequence
-- [ ] Complete 12-joint Auto Calibrate sequence
-- [ ] Canonical YAML update with accepted contacts and software HOME targets
-- [ ] Four-leg post-calibration FK and collision closure
+- [ ] LF V38 model-zero PASS
+- [ ] LH V39 model-zero PASS
+- [ ] Complete V40 supervised PASS
+- [ ] Save 12 accepted software q=0 values in canonical YAML
+- [ ] Post-calibration four-leg FK/collision closure
 
 ### Locomotion
 
-- [ ] Regenerate HOME → LOW_STAND → NOMINAL_STAND from calibrated model zero
+- [ ] Regenerate calibrated HOME and stand trajectories
 - [ ] Supervised suspended stand
 - [ ] Four-leg body-height control
 - [ ] Single-foot swing trajectory
 - [ ] Trot in place
 - [ ] First slow walking tests
-
-### Embedded integration and autonomy
-
-- [ ] Battery and BMS integration
-- [ ] Jetson integration
-- [ ] Low-level motion-controller evaluation
-- [ ] IMU and watchdog integration
-- [ ] Depth vision, perception and autonomous behaviour
 
 ---
 
