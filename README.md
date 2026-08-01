@@ -24,16 +24,13 @@ All six physical contacts of the LF leg have now completed supervised hardware a
 
 The combined HIP program completed MIN → HOME → MAX → HOME, `Done 20/20`, verified global torque OFF and released the serial port.
 
-The next development step is no longer another isolated profile. It is the complete LF sequence:
+The current staged implementation is:
 
 ```text
-LF UPPER MIN/MAX
-→ LF LOWER MIN/MAX
-→ LF HIP MIN/MAX
-→ compare both endpoints with the REV00 URDF
-→ derive calibrated software q=0
-→ place LF at accepted HOME
-→ verified global torque OFF
+LF full V38 hardware validation
+→ LH full V39 hardware validation
+→ mirrored RF and RH sequences
+→ complete LF → RF → RH → LH Auto Calibrate
 ```
 
 ## Why HOME is being recalculated
@@ -105,6 +102,49 @@ The new HOME remains software-level. V38 performs no Position Offset, EEPROM LOC
 
 When endpoint consistency fails, the program logs the new contacts, reports `MODEL_ZERO_INCONSISTENT`, does not replace HOME and turns torque off globally.
 
+## V39 full-LH rear-leg program
+
+NormaCore branch:
+
+```text
+matdog/lh-full-calibration-v39
+```
+
+MATDOG record branch:
+
+```text
+matdog/lh-full-calibration-program-v39
+```
+
+Explicit Station arm token:
+
+```text
+LH_LEG_FULL_V39
+```
+
+The canonical exact-mesh audit of 2026-07-20 already proved that RH and LH calibration paths are clear with the other three legs at HOME. Therefore **LH does not require LF to be parked forward**.
+
+For the LH HIP contact stages the native prerequisites are:
+
+```text
+M42 = 3072  # upper horizontal
+M41 = 3038  # lower folded/parallel
+M43 = probing hip
+```
+
+One Auto Calibrate executes:
+
+```text
+M42 UPPER MIN/MAX
+M41 LOWER MIN/MAX
+M43 HIP MIN/MAX
+URDF endpoint consistency for all three joints
+LH calibrated software q=0 placement
+global torque OFF
+```
+
+All non-LH motors remain constrained to the bounded HOME corridor.
+
 ## Rollout to all four legs
 
 Canonical leg order:
@@ -122,15 +162,13 @@ RH: hip M33, upper M32, lower M31
 LH: hip M43, upper M42, lower M41
 ```
 
-RF is the mirrored front-leg application of the validated LF logic.
-
-LH is the next requested hardware development. Its UPPER/LOWER horizontal geometry is expected to match the established HIP strategy, but the exact LF-front parking pose must first be selected by an offline collision sweep. The target will not be guessed from visual inspection.
+RF is the mirrored front-leg application of the validated LF logic and retains the geometrically validated RH-upper parking prerequisite. RH is the mirrored rear-leg application of LH and requires no additional front-leg parking.
 
 The final one-button 12-joint program becomes hardware-eligible after:
 
 ```text
 LF V38 model-zero PASS
-→ LH rear-clearance sequence PASS
+→ LH V39 model-zero PASS
 → mirrored RF and RH offline tests PASS
 → final four-leg HOME collision and FK audit PASS
 → full LF → RF → RH → LH supervised execution
@@ -193,11 +231,12 @@ Canonical configuration:
 06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml
 ```
 
-Current V38 records:
+Current records:
 
 ```text
 06_Software/Matdog_Core/calibration/MATDOG_FULL_CALIBRATION_PROGRAM_V38.md
 06_Software/Matdog_Core/calibration/MATDOG_LF_CONTACT_EVIDENCE_2026-08-01.yaml
+06_Software/Matdog_Core/calibration/MATDOG_MECHANICAL_ENDSTOP_GEOMETRY_CHECKPOINT_2026-07-20.md
 06_Software/Matdog_Core/calibration/matdog_model_zero_solver.py
 06_Software/Matdog_Core/calibration/tests/test_matdog_model_zero_solver.py
 ```
@@ -243,8 +282,10 @@ The EEPROM digital-zero state remains preserved while the new software model-zer
 - [x] LF lower MIN and MAX
 - [x] LF hip combined MIN and MAX
 - [x] Independent offline model-zero solver
+- [x] LF full one-click V38 offline implementation and CI
 - [ ] LF full one-click V38 hardware validation
-- [ ] LH rear-leg clearance and full sequence
+- [ ] LH full one-click V39 offline implementation and CI
+- [ ] LH full one-click V39 hardware validation
 - [ ] RF mirrored front-leg sequence
 - [ ] RH mirrored rear-leg sequence
 - [ ] Complete 12-joint Auto Calibrate sequence
