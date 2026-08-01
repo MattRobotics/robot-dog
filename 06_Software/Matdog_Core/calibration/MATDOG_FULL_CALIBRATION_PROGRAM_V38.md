@@ -1,7 +1,7 @@
 # MATDOG Full Calibration Program V38
 
 Date: 2026-08-01  
-Status: implementation and offline verification in progress  
+Status: LF implementation verified offline; LH V39 implementation in progress  
 Primary runtime: NormaCore Station native ST3215 calibrator
 
 ## Objective
@@ -18,7 +18,7 @@ The rollout remains evidence-driven:
 
 ```text
 LF full sequence
-→ LH rear-leg geometry and hardware sequence
+→ LH rear-leg sequence
 → RF mirrored front sequence
 → RH mirrored rear sequence
 → LF → RF → RH → LH complete 12-joint orchestration
@@ -180,24 +180,37 @@ parking joint: RH upper M32
 
 The code must instantiate the mirrored joint directions and existing RF profile table; it must not copy LF tick signs manually.
 
-## LH rear-leg development gate
+## LH rear-leg sequence
 
-LH is the next hardware sequence requested after LF. Its mapping is:
+LH is the next hardware sequence requested after LF:
 
 ```text
 LH: hip M43, upper M42, lower M41
+arm token: LH_LEG_FULL_V39
 ```
 
-UPPER and LOWER horizontal/parallel placement remains the expected HIP prerequisite. A front-leg clearance pose must be selected by an offline collision sweep before LH hardware is enabled. The likely mechanism is parking LF through M12, but no exact target is accepted merely from visual intuition.
+The canonical exact-mesh audit completed on 2026-07-20 already established that RH and LH active calibration paths pass cross-leg checks with the other three legs at HOME. **No LF-front parking movement is required for LH.**
 
-Required LH gates:
+The existing native LH HIP prerequisites are:
 
-1. enumerate candidate LF M12 parking angles;
-2. validate all LH prerequisite paths and both contact corridors against collision meshes;
-3. select the smallest sufficient parking movement;
-4. lock the target and reverse recovery order in tests;
-5. run the complete LH sequence with one explicit arm token;
-6. verify model-zero consistency and final HOME.
+```text
+M42 = 3072  # upper orizzontale, q=+90°
+M41 = 3038  # lower folded/parallela alla upper
+M43 = probing joint
+```
+
+V39 therefore keeps every non-LH motor inside the bounded HOME corridor and executes:
+
+```text
+M42 UPPER MIN/MAX
+M41 LOWER MIN/MAX
+M43 HIP MIN/MAX
+three endpoint-consistency checks
+LH calibrated software q=0 placement
+global torque OFF
+```
+
+No new collision sweep is required merely to invent a front parking target; the earlier geometric checkpoint is the authoritative result.
 
 ## Complete four-leg program
 
@@ -212,28 +225,31 @@ Each leg must finish its own contact and model-zero gates before the next leg st
 The full program becomes hardware-eligible only after:
 
 - LF V38 PASS with all three model-zero estimates accepted;
-- LH rear-clearance sequence PASS;
+- LH V39 hardware PASS;
 - mirrored RF and RH offline profile tests PASS;
 - four-leg final-HOME collision and FK audit PASS.
 
 ## Canonical files
 
 - `MATDOG_LF_CONTACT_EVIDENCE_2026-08-01.yaml`
+- `MATDOG_MECHANICAL_ENDSTOP_GEOMETRY_CHECKPOINT_2026-07-20.md`
 - `matdog_model_zero_solver.py`
 - `tests/test_matdog_model_zero_solver.py`
 - `MATDOG_JOINT_CALIBRATION.yaml`
 - canonical URDF: `03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf`
 
-NormaCore implementation branch:
+NormaCore implementation branches:
 
 ```text
 MattRobotics/norma-core
 matdog/full-calibration-v38
+matdog/lh-full-calibration-v39
 ```
 
-MATDOG record branch:
+MATDOG record branches:
 
 ```text
 MattRobotics/robot-dog
 matdog/full-calibration-program-v38
+matdog/lh-full-calibration-program-v39
 ```
