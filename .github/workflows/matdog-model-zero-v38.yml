@@ -1,0 +1,56 @@
+name: MATDOG Model Zero V38
+
+on:
+  push:
+    branches:
+      - matdog/full-calibration-program-v38
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  model-zero:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run independent model-zero tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd 06_Software/Matdog_Core/calibration
+          PYTHONPATH=. python3 -m unittest -v tests/test_matdog_model_zero_solver.py 2>&1 | tee /tmp/model-zero-tests.log
+          grep -Fq 'Ran 5 tests' /tmp/model-zero-tests.log
+          grep -Fq 'OK' /tmp/model-zero-tests.log
+
+      - name: Verify current LF evidence decisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          solver=06_Software/Matdog_Core/calibration/matdog_model_zero_solver.py
+          python3 "$solver" --joint upper --min 1443,1443 --max 3443,3442 > /tmp/upper.json
+          set +e
+          python3 "$solver" --joint lower --min 3094,3092 --max 1664,1666 > /tmp/lower.json
+          lower_rc=$?
+          python3 "$solver" --joint hip --min 2530,2530 --max 1595,1595 > /tmp/hip.json
+          hip_rc=$?
+          set -e
+          test "$lower_rc" = 2
+          test "$hip_rc" = 2
+          grep -Fq '"decision": "MODEL_ZERO_ACCEPTED"' /tmp/upper.json
+          grep -Fq '"estimated_zero_tick": 2044' /tmp/upper.json
+          grep -Fq '"endpoint_disagreement_ticks": 46' /tmp/lower.json
+          grep -Fq '"decision": "MODEL_ZERO_INCONSISTENT"' /tmp/lower.json
+          grep -Fq '"endpoint_disagreement_ticks": 89' /tmp/hip.json
+          grep -Fq '"decision": "MODEL_ZERO_INCONSISTENT"' /tmp/hip.json
+
+      - name: Enforce offline-only contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          solver=06_Software/Matdog_Core/calibration/matdog_model_zero_solver.py
+          ! grep -Eqi 'serial|pyserial|requests|socket|torque|goal_position|write_register' "$solver"
+          grep -Fq 'ENDPOINT_CONSISTENCY_TICKS = 24' "$solver"
+          grep -Fq 'MAX_SHIFT_FROM_DIGITAL_HOME_TICKS = 96' "$solver"
