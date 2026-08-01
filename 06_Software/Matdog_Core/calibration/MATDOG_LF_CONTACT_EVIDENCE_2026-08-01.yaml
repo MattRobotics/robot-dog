@@ -1,0 +1,120 @@
+schema_version: 1
+robot: MATDOG
+leg: LF
+captured_at_utc: "2026-08-01"
+status: SIX_CONTACTS_REPEATABLE_MODEL_ZERO_RECHECK_REQUIRED
+
+contract:
+  encoder_modulus: 4096
+  digital_home_tick: 2048
+  urdf_scale_is_fixed: true
+  fit_joint_specific_encoder_scale: false
+  station_is_sole_serial_owner: true
+  goal_position_unsigned: true
+  ram_only: true
+  eeprom_written_during_contact_calibration: false
+  final_global_torque_off_required: true
+
+urdf_tick_model:
+  upper:
+    servo_id: 12
+    direction: 1
+    minimum_delta_ticks: -597
+    maximum_delta_ticks: 1394
+    theoretical_minimum_tick_at_home_2048: 1451
+    theoretical_maximum_tick_at_home_2048: 3442
+  lower:
+    servo_id: 11
+    direction: -1
+    minimum_delta_ticks: -1047
+    maximum_delta_ticks: 427
+    theoretical_minimum_tick_at_home_2048: 3095
+    theoretical_maximum_tick_at_home_2048: 1621
+  hip:
+    servo_id: 13
+    direction: -1
+    minimum_delta_ticks: -512
+    maximum_delta_ticks: 512
+    theoretical_minimum_tick_at_home_2048: 2560
+    theoretical_maximum_tick_at_home_2048: 1536
+
+measured_contacts:
+  upper:
+    minimum: {first_tick: 1443, second_tick: 1443, spread_ticks: 0}
+    maximum: {first_tick: 3443, second_tick: 3442, spread_ticks: 1}
+  lower:
+    minimum: {first_tick: 3094, second_tick: 3092, spread_ticks: 2}
+    maximum: {first_tick: 1664, second_tick: 1666, spread_ticks: 2}
+  hip:
+    minimum: {first_tick: 2530, second_tick: 2530, spread_ticks: 0}
+    maximum: {first_tick: 1595, second_tick: 1595, spread_ticks: 0}
+    v37_completion:
+      status: PASS
+      steps: "20/20"
+      global_torque_off: true
+      serial_free_after_stop: true
+
+model_zero_policy:
+  method: fixed_urdf_scale_two_endpoint_zero_candidates
+  endpoint_consistency_tolerance_ticks: 24
+  maximum_shift_from_digital_home_ticks: 96
+  apply_home_only_if_all_joints_accepted: true
+  failure_result: MODEL_ZERO_INCONSISTENT
+  failure_action:
+    record_contacts: true
+    replace_home: false
+    verified_global_torque_off: true
+
+current_offline_result:
+  upper:
+    representative_minimum_contact_tick: 1443
+    representative_maximum_contact_tick: 3442
+    zero_from_minimum_tick: 2040
+    zero_from_maximum_tick: 2048
+    endpoint_disagreement_ticks: 8
+    estimated_zero_tick: 2044
+    accepted: true
+  lower:
+    representative_minimum_contact_tick: 3093
+    representative_maximum_contact_tick: 1665
+    zero_from_minimum_tick: 2046
+    zero_from_maximum_tick: 2092
+    endpoint_disagreement_ticks: 46
+    estimated_zero_tick: 2069
+    accepted: false
+  hip:
+    representative_minimum_contact_tick: 2530
+    representative_maximum_contact_tick: 1595
+    zero_from_minimum_tick: 2018
+    zero_from_maximum_tick: 2107
+    endpoint_disagreement_ticks: 89
+    estimated_zero_tick: 2062
+    accepted: false
+
+interpretation:
+  - All six contacts are experimentally repeatable.
+  - Repeatability does not by itself prove that each contact fully seated at the mechanical stop.
+  - The upper joint already supports an URDF-consistent software q=0 candidate.
+  - Lower and hip require one full re-acquisition with the faster V38 motion envelope.
+  - The existing EEPROM digital-zero calibration remains historical and unchanged.
+
+next_program:
+  arm_token: LF_LEG_FULL_V38
+  motion_envelope:
+    torque_limit: 500
+    goal_speed: 160
+    acceleration: 8
+    coarse_step_ticks: 64
+    fine_step_ticks: 8
+    contact_settle_window_ms: 900
+    hard_current_abort_raw: 200
+  order:
+    - LF_UPPER_M12_MIN
+    - LF_UPPER_M12_MAX
+    - LF_LOWER_M11_MIN
+    - LF_LOWER_M11_MAX
+    - LF_HIP_M13_MIN
+    - LF_HIP_M13_MAX
+    - DERIVE_URDF_MODEL_ZERO
+    - PLACE_LF_AT_ACCEPTED_SOFTWARE_Q0
+    - VERIFIED_GLOBAL_TORQUE_OFF
