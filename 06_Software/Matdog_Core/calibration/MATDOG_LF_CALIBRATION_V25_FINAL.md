@@ -173,10 +173,10 @@ backup
 
 ## 8. Next milestone
 
+NormaCore PR #11 and the post-merge workflow cleanup PR #12 are complete. The exact LF V25 source remains frozen on `release/matdog-lf-calibrator-v25`.
+
 ```text
-merge NormaCore PR #11
-→ preserve release/matdog-lf-calibrator-v25
-→ generalize V25 to RF without changing LF evidence
+generalize merged V25 architecture to RF without changing LF evidence
 → supervised RF six-contact calibration
 → RF affine gate and transactional freeze
 ```
