@@ -1,0 +1,45 @@
+name: MATDOG Public Repository Cleanup Trigger
+
+on:
+  push:
+    branches:
+      - chore/public-repository-cleanup-v25
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out cleanup branch
+        uses: actions/checkout@v4
+        with:
+          ref: chore/public-repository-cleanup-v25
+          fetch-depth: 0
+
+      - name: Apply public repository cleanup
+        run: python3 tools/repository_public_cleanup.py
+
+      - name: Validate cleanup
+        shell: bash
+        run: |
+          git diff --check
+          if git grep -niE 'xgo[ _-]*lite|xgolite' -- ':!*.png' ':!*.jpg' ':!*.jpeg'; then
+            echo 'Private research identifier remains in tracked public files.' >&2
+            exit 1
+          fi
+          grep -F '**LF only: V25 hardware validated and frozen**' README.md
+          grep -F 'complete all-leg calibration: not yet validated' REPOSITORY_VERIFICATION_INDEX.md
+          test ! -e .github/workflows/public-repository-cleanup-v25.yml
+          test ! -e .github/workflows/public-repository-cleanup-trigger.yml
+          test ! -e tools/repository_public_cleanup.py
+
+      - name: Commit final PR content
+        shell: bash
+        run: |
+          git config user.name 'MattRobotics Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'docs(repo): restore project overview and redact private research references'
+          git push origin HEAD:chore/public-repository-cleanup-v25
