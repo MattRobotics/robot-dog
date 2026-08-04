@@ -1,10 +1,64 @@
 # MATDOG — Custom Quadruped Robot
 
-MATDOG is a custom quadruped robot developed by Matt Robotics in Italy. It combines a CAD-derived mechanical design, 3D-printed structure, twelve Feetech ST3215 serial-bus servos, NormaCore Station integration, calibrated kinematics and a future modular gait/embedded-control stack.
+MATDOG is a custom quadruped robot developed by Matt Robotics in Italy. The project covers the complete robot stack: mechanical design, 3D-printed structure, power distribution, twelve Feetech ST3215 serial-bus servos, CAD-derived kinematics, calibration, locomotion, embedded control and future perception/autonomy.
 
-## Current milestone — LF calibrated and frozen
+## Project scope
 
-On 4 August 2026 the complete left-front leg calibration completed successfully with the validated **MATDOG LF calibrator V25**.
+MATDOG is not only a calibration project. This repository is the engineering source of truth for:
+
+- mechanical architecture, CAD, URDF and collision geometry;
+- electronics, power distribution, battery/BMS integration and servo wiring;
+- servo mapping, joint conventions and calibration records;
+- forward/inverse kinematics, contact geometry and trajectory validation;
+- gait, balance, stand-up and future locomotion control;
+- embedded-compute, sensing, watchdog and autonomy planning;
+- validation reports, decisions and reproducible project evidence.
+
+## System architecture
+
+```text
+MATDOG mechanical platform
+→ 12 × Feetech ST3215 serial-bus servos
+→ custom power-distribution and protection
+→ Waveshare Bus Servo Adapter
+→ NormaCore Station/ST3215 runtime
+→ MATDOG calibration, kinematics and locomotion software
+→ future embedded controller, Jetson, IMU and perception stack
+```
+
+### Repository responsibilities
+
+```text
+MattRobotics/robot-dog
+→ public MATDOG source of truth: CAD, URDF, electronics, calibration evidence,
+  kinematics, locomotion, validation and project decisions
+
+MattRobotics/norma-core
+→ Station/ST3215 integration fork and native MATDOG calibration runtime
+```
+
+Private research material is intentionally excluded from this public repository and is not part of the MATDOG runtime or public technical baseline.
+
+## Current validated state
+
+| Area | Status |
+|---|---|
+| Mechanical architecture and REV00 CAD/URDF | Validated |
+| Twelve-servo bus, sparse IDs, mapping and directions | Validated |
+| Digital-home commissioning and EEPROM readback | Validated for all 12 servos |
+| Encoder-to-radian conversion and live read-only FK | Validated for all four legs |
+| Offline contact, collision, timing and support references | Validated as engineering references |
+| Mechanical end-stop calibration | **LF only: V25 hardware validated and frozen** |
+| RF, RH and LH mechanical calibration | Not yet hardware validated |
+| Complete 12-joint persistent profile | Not yet complete |
+| Stand-up and locomotion | Pending post-calibration regeneration and validation |
+| Embedded/autonomy integration | Planned |
+
+> **Important:** the only mechanically hardware-validated calibration program is **LF V25**. Older V28–V42 experiments and previous “all legs” concepts are historical development records, not current programs and not valid development bases.
+
+## Current milestone — LF V25 calibrated and frozen
+
+On 4 August 2026 the complete left-front leg calibration completed successfully.
 
 ```text
 58/58 sequence complete
@@ -18,22 +72,21 @@ persistent LF profile PASS
 global torque OFF verified
 ```
 
-The exact NormaCore source is frozen in:
-
-```text
-MattRobotics/norma-core
-release/matdog-lf-calibrator-v25
-source head: f87dd1fbc7e8100d275c74f9af448642f3429680
-PR: MattRobotics/norma-core#11
-```
-
 Canonical technical record:
 
 ```text
 06_Software/Matdog_Core/calibration/MATDOG_LF_CALIBRATION_V25_FINAL.md
 ```
 
-## LF calibration result
+Exact validated NormaCore source:
+
+```text
+branch: release/matdog-lf-calibrator-v25
+source head: f87dd1fbc7e8100d275c74f9af448642f3429680
+implementation PR: MattRobotics/norma-core#11
+```
+
+### LF final result
 
 | Joint | Motor | MIN contact | MAX contact | Affine q0 before EEPROM | Final displayed q0 |
 |---|---:|---:|---:|---:|---:|
@@ -41,67 +94,36 @@ Canonical technical record:
 | LF upper | M12 | 1439 | 3443 | 2040 | 2051 |
 | LF lower | M11 | 3093 | 1658 | 2074 | 2046 |
 
-Measured mechanical spans versus the CAD/URDF model:
-
-| Joint | URDF span | Measured span | Difference |
-|---|---:|---:|---:|
-| M13 hip | 90.00° | 82.18° | −7.82° |
-| M12 upper | 174.99° | 176.13° | +1.14° |
-| M11 lower | 129.55° | 126.12° | −3.43° |
-
 Frozen ST3215 Position Offsets:
 
 | Motor | Previous | Frozen |
 |---|---:|---:|
 | M11 | 101 | 127 |
 | M12 | 859 | 851 |
-| M13 | −505 | −486 |
+| M13 | -505 | -486 |
 
-The persistent affine profile is the source of truth for LF joint-state conversion and future motion planning. Digital `2048` now represents the calibrated physical `q = 0` within the final readback residual of 0–3 ticks.
+LF V25 is now a frozen reference leg. It must not be rerun unless LF mechanics, servo, mounting, URDF or calibration state changes.
 
-## Permanent calibration rules
+## Robot definition
 
-- Station is the sole ST3215 serial owner during motion.
-- ST3215 `GoalPosition` remains unsigned standard `0..4095`; signed-wrap is forbidden.
-- The initial digital-home commissioning program remains separate from mechanical leg calibration.
-- Calibration measures physical endpoints and derives q0 from the URDF; it does not redefine the CAD geometry silently.
-- A single speed sample is not proof that a held joint moved; real position drift and state integrity are authoritative.
-- Bounded friction/chamfer plateaus may be crossed only when a deeper coarse scout already proved that travel.
-- Every contact must satisfy repeatability, URDF/affine consistency and the supervised hardware-witness gate.
-- EEPROM writes are allowed only after complete measurement PASS, verified Station shutdown and serial release.
-- EEPROM provisioning is transactional: backup, unlock, staged writes, Action, readback, relock and rollback on failure.
-- LF V25 must not be rerun unless LF mechanics, servo, mounting, URDF or calibration state changes.
-
-## Validated platform
-
-```text
-Asus Ubuntu
-→ NormaCore Station
-→ Waveshare Bus Servo Adapter
-→ custom power-distribution board
-→ 12 × Feetech ST3215
-```
-
-Validated:
-
-- twelve-servo bus and sparse-ID topology;
-- custom power distribution and wiring;
-- canonical servo mapping and joint directions;
-- REV00 CAD/URDF kinematic model;
-- mechanical and digital q0 commissioning;
-- encoder-to-radian conversion;
-- read-only live FK for all four legs;
-- offline contact, collision, timing and support-polygon references;
-- native Station-mediated mechanical contact calibration;
-- complete LF endpoint measurement, affine alignment, EEPROM freeze and persistent profile.
-
-## Canonical robot definition
+Canonical REV00 package:
 
 ```text
 03_CAD/URDF/matt_robodog_rev00/
 ```
 
-The REV00 package contains the canonical URDF, visual and collision meshes, workbook, URDF Studio project and integrity manifest.
+The package includes the canonical URDF, visual/collision meshes, workbook, URDF Studio project and integrity manifest.
+
+### Geometry
+
+```text
+front-to-rear hip spacing: 225 mm
+left-to-right hip spacing: 95 mm
+hip-to-knee segment: 90 mm
+knee-to-foot mechanical interface: 110 mm
+knee-to-contact-frame distance: 118.1 mm
+target nominal body height: about 150 mm
+```
 
 Coordinate convention:
 
@@ -113,15 +135,13 @@ units = metres and radians
 right-handed frame
 ```
 
-Current geometry:
+### Servo mapping
 
 ```text
-front-to-rear hip spacing: 225 mm
-left-to-right hip spacing: 95 mm
-hip-to-knee segment: 90 mm
-knee-to-foot mechanical interface: 110 mm
-knee-to-contact-frame distance: 118.1 mm
-target nominal body height: about 150 mm
+LF: M13 hip, M12 upper, M11 lower
+RF: M23 hip, M22 upper, M21 lower
+RH: M33 hip, M32 upper, M31 lower
+LH: M43 hip, M42 upper, M41 lower
 ```
 
 Canonical leg order and trot diagonals:
@@ -132,46 +152,35 @@ LF + RH
 RF + LH
 ```
 
-Canonical servo mapping:
+## Permanent control and calibration rules
 
-```text
-LF: M13 hip, M12 upper, M11 lower
-RF: M23 hip, M22 upper, M21 lower
-RH: M33 hip, M32 upper, M31 lower
-LH: M43 hip, M42 upper, M41 lower
-```
-
-## Repository roles
-
-```text
-MattRobotics/robot-dog
-→ MATDOG source of truth: CAD, URDF, calibration evidence, profiles,
-  kinematics, gait, electronics, validation and project decisions
-
-MattRobotics/norma-core
-→ Station/ST3215 integration fork and native MATDOG calibration runtime
-
-MattRobotics/xgolite-low-level-reconstruction
-→ read-only architecture and firmware-research reference; not MATDOG runtime
-```
+- Station is the sole ST3215 serial owner during motion.
+- ST3215 `GoalPosition` remains unsigned standard `0..4095`; signed-wrap is forbidden.
+- Digital-home commissioning remains separate from mechanical endpoint calibration.
+- Calibration measures physical endpoints and derives the joint model from the URDF; it does not silently redefine CAD geometry.
+- Every contact must satisfy repeatability, model consistency and supervised hardware evidence.
+- EEPROM writes are allowed only after complete measurement PASS, verified Station shutdown and serial release.
+- EEPROM provisioning is transactional and must include backup, readback, relock and rollback on failure.
+- RF/RH/LH must be generalized from merged V25 architecture through data-driven leg profiles, not by reviving old versioned programs.
 
 ## Roadmap
 
 ### Foundation
 
 - [x] Mechanical architecture and REV00 CAD/URDF
-- [x] ST3215 bus, mapping, directions and digital-home commissioning
+- [x] ST3215 bus, mapping and directions
+- [x] Twelve-servo digital-home commissioning
 - [x] Encoder/radian conversion and four-leg read-only FK
-- [x] Offline stand, contact, collision, timing and stability references
-- [x] Native NormaCore MATDOG contact-calibration foundation
+- [x] Offline contact, collision, timing and support references
+- [x] Native Station-mediated calibration foundation
 
 ### Mechanical calibration
 
 - [x] LF six-contact calibration
 - [x] LF affine q0 derivation and URDF gate
 - [x] LF transactional EEPROM freeze
-- [x] LF persistent calibration profile
-- [ ] Generalize the validated V25 architecture to RF
+- [x] LF persistent profile
+- [ ] Generalize the validated V25 architecture to RF from merged `norma-core/main`
 - [ ] Calibrate and freeze RF
 - [ ] Calibrate and freeze RH
 - [ ] Calibrate and freeze LH
@@ -179,9 +188,9 @@ MattRobotics/xgolite-low-level-reconstruction
 
 ### Locomotion
 
-- [ ] Recompute read-only four-leg FK using all frozen profiles
+- [ ] Recompute four-leg FK with all frozen profiles
 - [ ] Regenerate HOME → LOW_STAND → NOMINAL_STAND
-- [ ] Complete collision/contact/support audit with calibrated limits
+- [ ] Repeat collision/contact/support audit with calibrated limits
 - [ ] Supervised suspended stand
 - [ ] Gradual load transfer and nominal stand
 - [ ] Single-foot swing trajectory
@@ -191,8 +200,8 @@ MattRobotics/xgolite-low-level-reconstruction
 ### Embedded integration and autonomy
 
 - [ ] Battery and smart BMS integration
+- [ ] Embedded motion-controller evaluation
 - [ ] Jetson integration
-- [ ] Low-level motion-controller evaluation
 - [ ] IMU, estimator and watchdog integration
 - [ ] Depth vision, object detection, voice and autonomous behaviour
 
@@ -210,7 +219,14 @@ MattRobotics/xgolite-low-level-reconstruction
 09_Logs/        decisions, reports and historical evidence
 ```
 
-Historical experiments and superseded calibration versions remain preserved in closed PRs and `09_Logs/`; they are not current operating instructions.
+## Development policy
+
+- `main` is the only active branch in `robot-dog` after milestone cleanup.
+- New calibration development starts from the current merged architecture.
+- At most one clearly named active calibration branch should exist while a milestone is under development.
+- Temporary version-numbered workflows and branches must be removed after closeout.
+- Closed PRs preserve historical experiments; obsolete branches are not retained as operational choices.
+- Public documentation must describe MATDOG itself and must not expose unrelated private research material.
 
 ---
 
