@@ -1,0 +1,1844 @@
+{
+  "collision_mesh_manifest": {
+    "base_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "7b149643a6a71ae8ac37780085c021c5bff0c4491ebd42f1393150cb987e9e6e",
+      "stl_relative_path": "meshes/base_link.stl",
+      "triangle_count": 105330
+    },
+    "lf_foot_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+      "stl_relative_path": "meshes/lf_foot_link.stl",
+      "triangle_count": 9410
+    },
+    "lf_hip_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "7d28351aba669cc1a8e11ad60b89db001f9689b728e4e8eb05849af69e1e4879",
+      "stl_relative_path": "meshes/lf_hip_link.stl",
+      "triangle_count": 22992
+    },
+    "lf_lower_leg_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "97f2bb775768fdbcef59638916eaef2cd34b21bf01e6197ef3900b0df85d7ae2",
+      "stl_relative_path": "meshes/lf_lower_leg_link.stl",
+      "triangle_count": 18096
+    },
+    "lf_upper_leg_link": {
+      "degenerate_triangles_dropped": 2,
+      "sha256": "dfaf754764ded80743b00ae5d1dde208301ab5a3cebc9e29a38d8513dbe4cd93",
+      "stl_relative_path": "meshes/lf_upper_leg_link.stl",
+      "triangle_count": 39448
+    },
+    "lh_foot_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+      "stl_relative_path": "meshes/lh_foot_link.stl",
+      "triangle_count": 9410
+    },
+    "lh_hip_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "543f6f04a4dc45a0b176eba8db8ab7819ab20a328aa4f7fd9c9d4b77c1612094",
+      "stl_relative_path": "meshes/lh_hip_link.stl",
+      "triangle_count": 22992
+    },
+    "lh_lower_leg_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "97f2bb775768fdbcef59638916eaef2cd34b21bf01e6197ef3900b0df85d7ae2",
+      "stl_relative_path": "meshes/lh_lower_leg_link.stl",
+      "triangle_count": 18096
+    },
+    "lh_upper_leg_link": {
+      "degenerate_triangles_dropped": 2,
+      "sha256": "dfaf754764ded80743b00ae5d1dde208301ab5a3cebc9e29a38d8513dbe4cd93",
+      "stl_relative_path": "meshes/lh_upper_leg_link.stl",
+      "triangle_count": 39448
+    },
+    "rf_foot_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+      "stl_relative_path": "meshes/rf_foot_link.stl",
+      "triangle_count": 9410
+    },
+    "rf_hip_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "ebd664b3db2065ac3341184a6b12700caca6cdece57adae72f935882ed9df4c0",
+      "stl_relative_path": "meshes/rf_hip_link.stl",
+      "triangle_count": 22992
+    },
+    "rf_lower_leg_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "c52ae662c09455f53db5bc8efc13332919942c7f938ada5a8c0e987f54ac3bc8",
+      "stl_relative_path": "meshes/rf_lower_leg_link.stl",
+      "triangle_count": 18094
+    },
+    "rf_upper_leg_link": {
+      "degenerate_triangles_dropped": 2,
+      "sha256": "3c2508690ac89d006d25cabf3917ce52dc2c0b09e4ec5e051da8f71ff1a7e760",
+      "stl_relative_path": "meshes/rf_upper_leg_link.stl",
+      "triangle_count": 39448
+    },
+    "rh_foot_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+      "stl_relative_path": "meshes/rh_foot_link.stl",
+      "triangle_count": 9410
+    },
+    "rh_hip_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "2e9f31952e51b5748546c803c06d72316a3a776226f1f72775c1e8d383e1f325",
+      "stl_relative_path": "meshes/rh_hip_link.stl",
+      "triangle_count": 22992
+    },
+    "rh_lower_leg_link": {
+      "degenerate_triangles_dropped": 0,
+      "sha256": "c52ae662c09455f53db5bc8efc13332919942c7f938ada5a8c0e987f54ac3bc8",
+      "stl_relative_path": "meshes/rh_lower_leg_link.stl",
+      "triangle_count": 18094
+    },
+    "rh_upper_leg_link": {
+      "degenerate_triangles_dropped": 2,
+      "sha256": "3c2508690ac89d006d25cabf3917ce52dc2c0b09e4ec5e051da8f71ff1a7e760",
+      "stl_relative_path": "meshes/rh_upper_leg_link.stl",
+      "triangle_count": 39448
+    }
+  },
+  "content_sha256": "f4fc309f18fea34952d7e316d368c49edfb77c79cb0b4caca52fade2da2aa58d",
+  "endpoints": [
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "lf_hip_max",
+      "is_cross_leg_contact": false,
+      "joint_group": "hip",
+      "joint_name": "lf_hip_joint",
+      "leg": "lf",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          0.610865238198,
+          0.959931088596
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lf_lower_leg_joint": 0.0,
+        "lf_upper_leg_joint": 0.872664625997
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 13,
+      "side": "max",
+      "urdf_declared_limit_rad": 0.785398163397,
+      "urdf_lower_rad": -0.785398163397,
+      "urdf_upper_rad": 0.785398163397
+    },
+    {
+      "bracket_clear_rad": -0.828963217773,
+      "bracket_contact_rad": -0.829031394697,
+      "clearance_before_contact_m": 1.14e-06,
+      "contact_link_pair": [
+        "base_link",
+        "lf_upper_leg_link"
+      ],
+      "delta_from_declared_rad": -0.0436332313,
+      "endpoint_id": "lf_hip_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "hip",
+      "joint_name": "lf_hip_joint",
+      "leg": "lf",
+      "mesh_predicted_contact_rad": -0.829031394697,
+      "model_limit_mismatch": true,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -0.959931088596,
+          -0.610865238198
+        ],
+        "bisection_iterations": 8,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lf_lower_leg_joint": 0.0,
+        "lf_upper_leg_joint": 0.872664625997
+      },
+      "result_kind": "MESH_CONTACT_FOUND",
+      "sensitivity": {
+        "clearance_far_m": 4.2783e-05,
+        "clearance_near_m": 1.14e-06,
+        "estimated_uncertainty_rad": 0.003602086413,
+        "finite_difference_step_rad": 0.001,
+        "gradient_m_per_rad": 0.041642532,
+        "gradient_stable": true,
+        "tolerance_used_m": 0.00015,
+        "unstable_reason": null
+      },
+      "servo_id": 13,
+      "side": "min",
+      "urdf_declared_limit_rad": -0.785398163397,
+      "urdf_lower_rad": -0.785398163397,
+      "urdf_upper_rad": 0.785398163397
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "lf_lower_leg_max",
+      "is_cross_leg_contact": false,
+      "joint_group": "lower_leg",
+      "joint_name": "lf_lower_leg_joint",
+      "leg": "lf",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          0.479965544299,
+          0.829031394697
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lf_hip_joint": 0.0,
+        "lf_upper_leg_joint": 1.570796326795
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 11,
+      "side": "max",
+      "urdf_declared_limit_rad": 0.654498469498,
+      "urdf_lower_rad": -1.605702911835,
+      "urdf_upper_rad": 0.654498469498
+    },
+    {
+      "bracket_clear_rad": -1.709604543868,
+      "bracket_contact_rad": -1.709672720791,
+      "clearance_before_contact_m": 1.244e-06,
+      "contact_link_pair": [
+        "lf_foot_link",
+        "lf_upper_leg_link"
+      ],
+      "delta_from_declared_rad": -0.103969808956,
+      "endpoint_id": "lf_lower_leg_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "lower_leg",
+      "joint_name": "lf_lower_leg_joint",
+      "leg": "lf",
+      "mesh_predicted_contact_rad": -1.709672720791,
+      "model_limit_mismatch": true,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -1.780235837034,
+          -1.431169986636
+        ],
+        "bisection_iterations": 8,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lf_hip_joint": 0.0,
+        "lf_upper_leg_joint": 1.570796326795
+      },
+      "result_kind": "MESH_CONTACT_FOUND",
+      "sensitivity": {
+        "clearance_far_m": 5.5385e-05,
+        "clearance_near_m": 1.244e-06,
+        "estimated_uncertainty_rad": 0.002770549285,
+        "finite_difference_step_rad": 0.001,
+        "gradient_m_per_rad": 0.054140889,
+        "gradient_stable": true,
+        "tolerance_used_m": 0.00015,
+        "unstable_reason": null
+      },
+      "servo_id": 11,
+      "side": "min",
+      "urdf_declared_limit_rad": -1.605702911835,
+      "urdf_lower_rad": -1.605702911835,
+      "urdf_upper_rad": 0.654498469498
+    },
+    {
+      "bracket_clear_rad": 1.278930915553,
+      "bracket_contact_rad": 1.278999092477,
+      "clearance_before_contact_m": 3.906e-06,
+      "contact_link_pair": [
+        "lf_foot_link",
+        "lh_foot_link"
+      ],
+      "delta_from_declared_rad": null,
+      "endpoint_id": "lf_upper_leg_max",
+      "is_cross_leg_contact": true,
+      "joint_group": "upper_leg",
+      "joint_name": "lf_upper_leg_joint",
+      "leg": "lf",
+      "mesh_predicted_contact_rad": 1.278999092477,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          1.963495408494,
+          2.312561258892
+        ],
+        "bisection_iterations": 8,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lf_hip_joint": 0.0,
+        "lf_lower_leg_joint": 0.0
+      },
+      "result_kind": "UNINTENDED_COLLISION_BEFORE_ENDPOINT",
+      "sensitivity": null,
+      "servo_id": 12,
+      "side": "max",
+      "urdf_declared_limit_rad": 2.138028333693,
+      "urdf_lower_rad": -0.916297857297,
+      "urdf_upper_rad": 2.138028333693
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "lf_upper_leg_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "upper_leg",
+      "joint_name": "lf_upper_leg_joint",
+      "leg": "lf",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -1.090830782496,
+          -0.741764932098
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lf_hip_joint": 0.0,
+        "lf_lower_leg_joint": 0.0
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 12,
+      "side": "min",
+      "urdf_declared_limit_rad": -0.916297857297,
+      "urdf_lower_rad": -0.916297857297,
+      "urdf_upper_rad": 2.138028333693
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "lh_hip_max",
+      "is_cross_leg_contact": false,
+      "joint_group": "hip",
+      "joint_name": "lh_hip_joint",
+      "leg": "lh",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          0.610865238198,
+          0.959931088596
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lh_lower_leg_joint": 0.0,
+        "lh_upper_leg_joint": 0.872664625997
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 43,
+      "side": "max",
+      "urdf_declared_limit_rad": 0.785398163397,
+      "urdf_lower_rad": -0.785398163397,
+      "urdf_upper_rad": 0.785398163397
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "lh_hip_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "hip",
+      "joint_name": "lh_hip_joint",
+      "leg": "lh",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -0.959931088596,
+          -0.610865238198
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lh_lower_leg_joint": 0.0,
+        "lh_upper_leg_joint": 0.872664625997
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 43,
+      "side": "min",
+      "urdf_declared_limit_rad": -0.785398163397,
+      "urdf_lower_rad": -0.785398163397,
+      "urdf_upper_rad": 0.785398163397
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "lh_lower_leg_max",
+      "is_cross_leg_contact": false,
+      "joint_group": "lower_leg",
+      "joint_name": "lh_lower_leg_joint",
+      "leg": "lh",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          0.479965544299,
+          0.829031394697
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lh_hip_joint": 0.0,
+        "lh_upper_leg_joint": 1.570796326795
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 41,
+      "side": "max",
+      "urdf_declared_limit_rad": 0.654498469498,
+      "urdf_lower_rad": -1.605702911835,
+      "urdf_upper_rad": 0.654498469498
+    },
+    {
+      "bracket_clear_rad": -1.709604543868,
+      "bracket_contact_rad": -1.709672720791,
+      "clearance_before_contact_m": 1.244e-06,
+      "contact_link_pair": [
+        "lh_foot_link",
+        "lh_upper_leg_link"
+      ],
+      "delta_from_declared_rad": -0.103969808956,
+      "endpoint_id": "lh_lower_leg_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "lower_leg",
+      "joint_name": "lh_lower_leg_joint",
+      "leg": "lh",
+      "mesh_predicted_contact_rad": -1.709672720791,
+      "model_limit_mismatch": true,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -1.780235837034,
+          -1.431169986636
+        ],
+        "bisection_iterations": 8,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lh_hip_joint": 0.0,
+        "lh_upper_leg_joint": 1.570796326795
+      },
+      "result_kind": "MESH_CONTACT_FOUND",
+      "sensitivity": {
+        "clearance_far_m": 5.5385e-05,
+        "clearance_near_m": 1.244e-06,
+        "estimated_uncertainty_rad": 0.002770549285,
+        "finite_difference_step_rad": 0.001,
+        "gradient_m_per_rad": 0.054140889,
+        "gradient_stable": true,
+        "tolerance_used_m": 0.00015,
+        "unstable_reason": null
+      },
+      "servo_id": 41,
+      "side": "min",
+      "urdf_declared_limit_rad": -1.605702911835,
+      "urdf_lower_rad": -1.605702911835,
+      "urdf_upper_rad": 0.654498469498
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "lh_upper_leg_max",
+      "is_cross_leg_contact": false,
+      "joint_group": "upper_leg",
+      "joint_name": "lh_upper_leg_joint",
+      "leg": "lh",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          1.963495408494,
+          2.312561258892
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lh_hip_joint": 0.0,
+        "lh_lower_leg_joint": 0.0
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 42,
+      "side": "max",
+      "urdf_declared_limit_rad": 2.138028333693,
+      "urdf_lower_rad": -0.916297857297,
+      "urdf_upper_rad": 2.138028333693
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "lh_upper_leg_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "upper_leg",
+      "joint_name": "lh_upper_leg_joint",
+      "leg": "lh",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -1.090830782496,
+          -0.741764932098
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "lh_hip_joint": 0.0,
+        "lh_lower_leg_joint": 0.0
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 42,
+      "side": "min",
+      "urdf_declared_limit_rad": -0.916297857297,
+      "urdf_lower_rad": -0.916297857297,
+      "urdf_upper_rad": 2.138028333693
+    },
+    {
+      "bracket_clear_rad": 0.828963217773,
+      "bracket_contact_rad": 0.829031394697,
+      "clearance_before_contact_m": 1.14e-06,
+      "contact_link_pair": [
+        "base_link",
+        "rf_upper_leg_link"
+      ],
+      "delta_from_declared_rad": 0.0436332313,
+      "endpoint_id": "rf_hip_max",
+      "is_cross_leg_contact": false,
+      "joint_group": "hip",
+      "joint_name": "rf_hip_joint",
+      "leg": "rf",
+      "mesh_predicted_contact_rad": 0.829031394697,
+      "model_limit_mismatch": true,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          0.610865238198,
+          0.959931088596
+        ],
+        "bisection_iterations": 8,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rf_lower_leg_joint": 0.0,
+        "rf_upper_leg_joint": 0.872664625997
+      },
+      "result_kind": "MESH_CONTACT_FOUND",
+      "sensitivity": {
+        "clearance_far_m": 4.2783e-05,
+        "clearance_near_m": 1.14e-06,
+        "estimated_uncertainty_rad": 0.003602086413,
+        "finite_difference_step_rad": 0.001,
+        "gradient_m_per_rad": -0.041642532,
+        "gradient_stable": true,
+        "tolerance_used_m": 0.00015,
+        "unstable_reason": null
+      },
+      "servo_id": 23,
+      "side": "max",
+      "urdf_declared_limit_rad": 0.785398163397,
+      "urdf_lower_rad": -0.785398163397,
+      "urdf_upper_rad": 0.785398163397
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "rf_hip_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "hip",
+      "joint_name": "rf_hip_joint",
+      "leg": "rf",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -0.959931088596,
+          -0.610865238198
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rf_lower_leg_joint": 0.0,
+        "rf_upper_leg_joint": 0.872664625997
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 23,
+      "side": "min",
+      "urdf_declared_limit_rad": -0.785398163397,
+      "urdf_lower_rad": -0.785398163397,
+      "urdf_upper_rad": 0.785398163397
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "rf_lower_leg_max",
+      "is_cross_leg_contact": false,
+      "joint_group": "lower_leg",
+      "joint_name": "rf_lower_leg_joint",
+      "leg": "rf",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          0.479965544299,
+          0.829031394697
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rf_hip_joint": 0.0,
+        "rf_upper_leg_joint": 1.570796326795
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 21,
+      "side": "max",
+      "urdf_declared_limit_rad": 0.654498469498,
+      "urdf_lower_rad": -1.605702911835,
+      "urdf_upper_rad": 0.654498469498
+    },
+    {
+      "bracket_clear_rad": -1.710422666954,
+      "bracket_contact_rad": -1.710490843878,
+      "clearance_before_contact_m": 2.39e-07,
+      "contact_link_pair": [
+        "rf_foot_link",
+        "rf_upper_leg_link"
+      ],
+      "delta_from_declared_rad": -0.104787932043,
+      "endpoint_id": "rf_lower_leg_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "lower_leg",
+      "joint_name": "rf_lower_leg_joint",
+      "leg": "rf",
+      "mesh_predicted_contact_rad": -1.710490843878,
+      "model_limit_mismatch": true,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -1.780235837034,
+          -1.431169986636
+        ],
+        "bisection_iterations": 8,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rf_hip_joint": 0.0,
+        "rf_upper_leg_joint": 1.570796326795
+      },
+      "result_kind": "MESH_CONTACT_FOUND",
+      "sensitivity": {
+        "clearance_far_m": 5.4272e-05,
+        "clearance_near_m": 2.39e-07,
+        "estimated_uncertainty_rad": 0.002776069951,
+        "finite_difference_step_rad": 0.001,
+        "gradient_m_per_rad": 0.054033221,
+        "gradient_stable": true,
+        "tolerance_used_m": 0.00015,
+        "unstable_reason": null
+      },
+      "servo_id": 21,
+      "side": "min",
+      "urdf_declared_limit_rad": -1.605702911835,
+      "urdf_lower_rad": -1.605702911835,
+      "urdf_upper_rad": 0.654498469498
+    },
+    {
+      "bracket_clear_rad": 1.278930915553,
+      "bracket_contact_rad": 1.278999092477,
+      "clearance_before_contact_m": 3.906e-06,
+      "contact_link_pair": [
+        "rf_foot_link",
+        "rh_foot_link"
+      ],
+      "delta_from_declared_rad": null,
+      "endpoint_id": "rf_upper_leg_max",
+      "is_cross_leg_contact": true,
+      "joint_group": "upper_leg",
+      "joint_name": "rf_upper_leg_joint",
+      "leg": "rf",
+      "mesh_predicted_contact_rad": 1.278999092477,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          1.963495408494,
+          2.312561258892
+        ],
+        "bisection_iterations": 8,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rf_hip_joint": 0.0,
+        "rf_lower_leg_joint": 0.0
+      },
+      "result_kind": "UNINTENDED_COLLISION_BEFORE_ENDPOINT",
+      "sensitivity": null,
+      "servo_id": 22,
+      "side": "max",
+      "urdf_declared_limit_rad": 2.138028333693,
+      "urdf_lower_rad": -0.916297857297,
+      "urdf_upper_rad": 2.138028333693
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "rf_upper_leg_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "upper_leg",
+      "joint_name": "rf_upper_leg_joint",
+      "leg": "rf",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -1.090830782496,
+          -0.741764932098
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rf_hip_joint": 0.0,
+        "rf_lower_leg_joint": 0.0
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 22,
+      "side": "min",
+      "urdf_declared_limit_rad": -0.916297857297,
+      "urdf_lower_rad": -0.916297857297,
+      "urdf_upper_rad": 2.138028333693
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "rh_hip_max",
+      "is_cross_leg_contact": false,
+      "joint_group": "hip",
+      "joint_name": "rh_hip_joint",
+      "leg": "rh",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          0.610865238198,
+          0.959931088596
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rh_lower_leg_joint": 0.0,
+        "rh_upper_leg_joint": 0.872664625997
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 33,
+      "side": "max",
+      "urdf_declared_limit_rad": 0.785398163397,
+      "urdf_lower_rad": -0.785398163397,
+      "urdf_upper_rad": 0.785398163397
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "rh_hip_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "hip",
+      "joint_name": "rh_hip_joint",
+      "leg": "rh",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -0.959931088596,
+          -0.610865238198
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rh_lower_leg_joint": 0.0,
+        "rh_upper_leg_joint": 0.872664625997
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 33,
+      "side": "min",
+      "urdf_declared_limit_rad": -0.785398163397,
+      "urdf_lower_rad": -0.785398163397,
+      "urdf_upper_rad": 0.785398163397
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "rh_lower_leg_max",
+      "is_cross_leg_contact": false,
+      "joint_group": "lower_leg",
+      "joint_name": "rh_lower_leg_joint",
+      "leg": "rh",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          0.479965544299,
+          0.829031394697
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rh_hip_joint": 0.0,
+        "rh_upper_leg_joint": 1.570796326795
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 31,
+      "side": "max",
+      "urdf_declared_limit_rad": 0.654498469498,
+      "urdf_lower_rad": -1.605702911835,
+      "urdf_upper_rad": 0.654498469498
+    },
+    {
+      "bracket_clear_rad": -1.710422666954,
+      "bracket_contact_rad": -1.710490843878,
+      "clearance_before_contact_m": 2.39e-07,
+      "contact_link_pair": [
+        "rh_foot_link",
+        "rh_upper_leg_link"
+      ],
+      "delta_from_declared_rad": -0.104787932043,
+      "endpoint_id": "rh_lower_leg_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "lower_leg",
+      "joint_name": "rh_lower_leg_joint",
+      "leg": "rh",
+      "mesh_predicted_contact_rad": -1.710490843878,
+      "model_limit_mismatch": true,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -1.780235837034,
+          -1.431169986636
+        ],
+        "bisection_iterations": 8,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rh_hip_joint": 0.0,
+        "rh_upper_leg_joint": 1.570796326795
+      },
+      "result_kind": "MESH_CONTACT_FOUND",
+      "sensitivity": {
+        "clearance_far_m": 5.4272e-05,
+        "clearance_near_m": 2.39e-07,
+        "estimated_uncertainty_rad": 0.002776069951,
+        "finite_difference_step_rad": 0.001,
+        "gradient_m_per_rad": 0.054033221,
+        "gradient_stable": true,
+        "tolerance_used_m": 0.00015,
+        "unstable_reason": null
+      },
+      "servo_id": 31,
+      "side": "min",
+      "urdf_declared_limit_rad": -1.605702911835,
+      "urdf_lower_rad": -1.605702911835,
+      "urdf_upper_rad": 0.654498469498
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "rh_upper_leg_max",
+      "is_cross_leg_contact": false,
+      "joint_group": "upper_leg",
+      "joint_name": "rh_upper_leg_joint",
+      "leg": "rh",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          1.963495408494,
+          2.312561258892
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rh_hip_joint": 0.0,
+        "rh_lower_leg_joint": 0.0
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 32,
+      "side": "max",
+      "urdf_declared_limit_rad": 2.138028333693,
+      "urdf_lower_rad": -0.916297857297,
+      "urdf_upper_rad": 2.138028333693
+    },
+    {
+      "bracket_clear_rad": null,
+      "bracket_contact_rad": null,
+      "clearance_before_contact_m": null,
+      "contact_link_pair": null,
+      "delta_from_declared_rad": null,
+      "endpoint_id": "rh_upper_leg_min",
+      "is_cross_leg_contact": false,
+      "joint_group": "upper_leg",
+      "joint_name": "rh_upper_leg_joint",
+      "leg": "rh",
+      "mesh_predicted_contact_rad": null,
+      "model_limit_mismatch": false,
+      "numerical_search": {
+        "analysis_envelope_rad": [
+          -1.090830782496,
+          -0.741764932098
+        ],
+        "bisection_iterations": 0,
+        "bisection_resolution_rad": 0.0001,
+        "coarse_step_rad": 0.01745329252
+      },
+      "other_legs_pose_rad": {},
+      "prerequisite_pose_rad": {
+        "rh_hip_joint": 0.0,
+        "rh_lower_leg_joint": 0.0
+      },
+      "result_kind": "NO_MESH_CONTACT_IN_ENVELOPE",
+      "sensitivity": null,
+      "servo_id": 32,
+      "side": "min",
+      "urdf_declared_limit_rad": -0.916297857297,
+      "urdf_lower_rad": -0.916297857297,
+      "urdf_upper_rad": 2.138028333693
+    }
+  ],
+  "generation_timestamp_utc": "2026-08-07T15:57:42.407627+00:00",
+  "geometry_compiler": {
+    "source_combined_sha256": "8b4347d4dd95edc461a2289ca8b313b63591e557f252fd3cd1ebbce790a70f2b",
+    "source_file_sha256": {
+      "matdog_geometry_compiler.py": "481c8116e7c29a8c68db749004d7a2a3d94ca5cebdf6d7b4ab899f0a88ae8373",
+      "matdog_geometry_contact_search.py": "368e8af2ea8f427351e8a9c2930c3f46c2482ef3bcad05bfba08014bc4eb10d9",
+      "matdog_geometry_mesh_kernel.py": "6e7e7f467baa1159a7d97da9addc97c19b769130f3e78fbc72e0e753b8b98024",
+      "matdog_geometry_path_planner.py": "1ee9a2fed64c0be66aef4d763e110b7936504e615073925d6846837b3d5d0eff",
+      "matdog_geometry_profile.py": "f53224f9a126b9ea7f79c1ec70f17cea81e09c641310d513602a803dca5a7106",
+      "matdog_geometry_scene.py": "e35ab4c9af7c8edccdf68d5863d37963325c8b46313bc895349f69ade63ce0a8",
+      "matdog_geometry_uncertainty.py": "756df85713e7d80987fe0fda2efdac89d74365dcb51296d8b624281e0c5a6e63"
+    }
+  },
+  "manufacturing_tolerance": {
+    "assembly_tolerance_note": "UNKNOWN: bushing play, screw/fastener tolerance, servo horn backlash and inter-part assembly stack-up are not modelled; only the nominal STL geometry and the per-part print tolerance are used here.",
+    "print_tolerance_m": 0.00015
+  },
+  "numerical_parameters": {
+    "bisection_resolution_rad": 0.0001,
+    "coarse_step_rad": 0.017453292519943295,
+    "envelope_margin_rad": 0.17453292519943295,
+    "grid_cell_size_m": 0.005,
+    "max_bisection_iterations": 40,
+    "max_narrow_phase_candidate_pairs": 500000,
+    "min_clearance_pass_m": 0.003,
+    "min_gradient_m_per_rad": 1e-06,
+    "model_limit_mismatch_threshold_rad": 0.03490658503988659,
+    "narrow_phase_margin_m": 0.001,
+    "parking_path_step_rad": 0.008726646259971648,
+    "parking_seed_angles_deg": [
+      30.0,
+      40.0,
+      50.0,
+      60.0,
+      70.0,
+      80.0,
+      90.0
+    ],
+    "path_step_rad": 0.017453292519943295,
+    "sensitivity_step_rad": 0.001
+  },
+  "parking_plans": {
+    "lf": {
+      "active_leg_sequence_min_clearance_m": 0.000116815,
+      "active_leg_sequence_passed": false,
+      "auxiliary_parking_required": true,
+      "leg": "lf",
+      "park_path_min_clearance_m": null,
+      "park_path_passed": null,
+      "parked_leg": "lh",
+      "parking_angle_rad": null,
+      "reason": "NEEDS_HUMAN_DECISION: no seed parking angle in (30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0) for lh resolved the collision; a search over a wider/finer angle range or a different auxiliary leg may be required",
+      "segments": [
+        {
+          "description": "upper probe negative (home prerequisite)",
+          "end_rad": -0.916297857297,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lf_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 54,
+          "start_rad": 0.0
+        },
+        {
+          "description": "upper probe return to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lf_upper_leg_joint",
+          "min_clearance_m": 0.01001557,
+          "passed": true,
+          "sample_count": 54,
+          "start_rad": -0.916297857297
+        },
+        {
+          "description": "upper probe positive (home prerequisite)",
+          "end_rad": 2.138028333693,
+          "first_collision_angle_rad": 1.291543646476,
+          "first_collision_pair": [
+            "lf_foot_link",
+            "lh_foot_link"
+          ],
+          "joint_name": "lf_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": false,
+          "sample_count": 124,
+          "start_rad": 0.0
+        },
+        {
+          "description": "upper probe return to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": 1.509709802975,
+          "first_collision_pair": [
+            "lf_foot_link",
+            "lh_lower_leg_link"
+          ],
+          "joint_name": "lf_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": false,
+          "sample_count": 124,
+          "start_rad": 2.138028333693
+        },
+        {
+          "description": "transition to HIP prerequisite",
+          "end_rad": 0.872664625997,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lf_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 51,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe negative",
+          "end_rad": -0.785398163397,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lf_hip_joint",
+          "min_clearance_m": 0.00395904,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lf_hip_joint",
+          "min_clearance_m": 0.000116815,
+          "passed": false,
+          "sample_count": 46,
+          "start_rad": -0.785398163397
+        },
+        {
+          "description": "hip probe positive",
+          "end_rad": 0.785398163397,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lf_hip_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lf_hip_joint",
+          "min_clearance_m": 0.002305558,
+          "passed": false,
+          "sample_count": 46,
+          "start_rad": 0.785398163397
+        },
+        {
+          "description": "transition HIP prerequisite -> LOWER prerequisite",
+          "end_rad": 1.570796326795,
+          "first_collision_angle_rad": 1.291543646476,
+          "first_collision_pair": [
+            "lf_foot_link",
+            "lh_foot_link"
+          ],
+          "joint_name": "lf_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": false,
+          "sample_count": 41,
+          "start_rad": 0.872664625997
+        },
+        {
+          "description": "lower probe negative",
+          "end_rad": -1.605702911835,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lf_lower_leg_joint",
+          "min_clearance_m": 0.00327732,
+          "passed": true,
+          "sample_count": 94,
+          "start_rad": 0.0
+        },
+        {
+          "description": "lower probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lf_lower_leg_joint",
+          "min_clearance_m": 0.001,
+          "passed": false,
+          "sample_count": 94,
+          "start_rad": -1.605702911835
+        },
+        {
+          "description": "lower probe positive",
+          "end_rad": 0.654498469498,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lf_lower_leg_joint",
+          "min_clearance_m": 0.001661652,
+          "passed": false,
+          "sample_count": 39,
+          "start_rad": 0.0
+        },
+        {
+          "description": "lower probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lf_lower_leg_joint",
+          "min_clearance_m": 0.002571741,
+          "passed": false,
+          "sample_count": 39,
+          "start_rad": 0.654498469498
+        },
+        {
+          "description": "restore leg to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": 1.518436449235,
+          "first_collision_pair": [
+            "lf_foot_link",
+            "lh_lower_leg_link"
+          ],
+          "joint_name": "lf_upper_leg_joint",
+          "min_clearance_m": 0.00327732,
+          "passed": false,
+          "sample_count": 91,
+          "start_rad": 1.570796326795
+        }
+      ]
+    },
+    "lh": {
+      "active_leg_sequence_min_clearance_m": 0.001,
+      "active_leg_sequence_passed": false,
+      "auxiliary_parking_required": false,
+      "leg": "lh",
+      "park_path_min_clearance_m": null,
+      "park_path_passed": null,
+      "parked_leg": null,
+      "parking_angle_rad": null,
+      "reason": "NEEDS_HUMAN_DECISION: no mesh intersection found anywhere in the sequence, but minimum modelled clearance 1.0000 mm at 'lower probe return' is below the configured PASS bar (3.0000 mm); this is a margin finding, not a collision, so auxiliary parking of another leg is not applicable",
+      "segments": [
+        {
+          "description": "upper probe negative (home prerequisite)",
+          "end_rad": -0.916297857297,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 54,
+          "start_rad": 0.0
+        },
+        {
+          "description": "upper probe return to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 54,
+          "start_rad": -0.916297857297
+        },
+        {
+          "description": "upper probe positive (home prerequisite)",
+          "end_rad": 2.138028333693,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_upper_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 124,
+          "start_rad": 0.0
+        },
+        {
+          "description": "upper probe return to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_upper_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 124,
+          "start_rad": 2.138028333693
+        },
+        {
+          "description": "transition to HIP prerequisite",
+          "end_rad": 0.872664625997,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_upper_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 51,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe negative",
+          "end_rad": -0.785398163397,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_hip_joint",
+          "min_clearance_m": 0.008114453,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_hip_joint",
+          "min_clearance_m": 0.005488842,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": -0.785398163397
+        },
+        {
+          "description": "hip probe positive",
+          "end_rad": 0.785398163397,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_hip_joint",
+          "min_clearance_m": 0.008999435,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_hip_joint",
+          "min_clearance_m": 0.005974641,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": 0.785398163397
+        },
+        {
+          "description": "transition HIP prerequisite -> LOWER prerequisite",
+          "end_rad": 1.570796326795,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_upper_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 41,
+          "start_rad": 0.872664625997
+        },
+        {
+          "description": "lower probe negative",
+          "end_rad": -1.605702911835,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_lower_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 94,
+          "start_rad": 0.0
+        },
+        {
+          "description": "lower probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_lower_leg_joint",
+          "min_clearance_m": 0.001,
+          "passed": false,
+          "sample_count": 94,
+          "start_rad": -1.605702911835
+        },
+        {
+          "description": "lower probe positive",
+          "end_rad": 0.654498469498,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_lower_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 39,
+          "start_rad": 0.0
+        },
+        {
+          "description": "lower probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_lower_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 39,
+          "start_rad": 0.654498469498
+        },
+        {
+          "description": "restore leg to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "lh_upper_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 91,
+          "start_rad": 1.570796326795
+        }
+      ]
+    },
+    "rf": {
+      "active_leg_sequence_min_clearance_m": 0.000116815,
+      "active_leg_sequence_passed": false,
+      "auxiliary_parking_required": true,
+      "leg": "rf",
+      "park_path_min_clearance_m": null,
+      "park_path_passed": null,
+      "parked_leg": "rh",
+      "parking_angle_rad": null,
+      "reason": "NEEDS_HUMAN_DECISION: no seed parking angle in (30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0) for rh resolved the collision; a search over a wider/finer angle range or a different auxiliary leg may be required",
+      "segments": [
+        {
+          "description": "upper probe negative (home prerequisite)",
+          "end_rad": -0.916297857297,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rf_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 54,
+          "start_rad": 0.0
+        },
+        {
+          "description": "upper probe return to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rf_upper_leg_joint",
+          "min_clearance_m": 0.01001557,
+          "passed": true,
+          "sample_count": 54,
+          "start_rad": -0.916297857297
+        },
+        {
+          "description": "upper probe positive (home prerequisite)",
+          "end_rad": 2.138028333693,
+          "first_collision_angle_rad": 1.291543646476,
+          "first_collision_pair": [
+            "rf_foot_link",
+            "rh_foot_link"
+          ],
+          "joint_name": "rf_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": false,
+          "sample_count": 124,
+          "start_rad": 0.0
+        },
+        {
+          "description": "upper probe return to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": 1.509709802975,
+          "first_collision_pair": [
+            "rf_foot_link",
+            "rh_lower_leg_link"
+          ],
+          "joint_name": "rf_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": false,
+          "sample_count": 124,
+          "start_rad": 2.138028333693
+        },
+        {
+          "description": "transition to HIP prerequisite",
+          "end_rad": 0.872664625997,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rf_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 51,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe negative",
+          "end_rad": -0.785398163397,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rf_hip_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rf_hip_joint",
+          "min_clearance_m": 0.002305558,
+          "passed": false,
+          "sample_count": 46,
+          "start_rad": -0.785398163397
+        },
+        {
+          "description": "hip probe positive",
+          "end_rad": 0.785398163397,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rf_hip_joint",
+          "min_clearance_m": 0.00395904,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rf_hip_joint",
+          "min_clearance_m": 0.000116815,
+          "passed": false,
+          "sample_count": 46,
+          "start_rad": 0.785398163397
+        },
+        {
+          "description": "transition HIP prerequisite -> LOWER prerequisite",
+          "end_rad": 1.570796326795,
+          "first_collision_angle_rad": 1.291543646476,
+          "first_collision_pair": [
+            "rf_foot_link",
+            "rh_foot_link"
+          ],
+          "joint_name": "rf_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": false,
+          "sample_count": 41,
+          "start_rad": 0.872664625997
+        },
+        {
+          "description": "lower probe negative",
+          "end_rad": -1.605702911835,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rf_lower_leg_joint",
+          "min_clearance_m": 0.00327732,
+          "passed": true,
+          "sample_count": 94,
+          "start_rad": 0.0
+        },
+        {
+          "description": "lower probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rf_lower_leg_joint",
+          "min_clearance_m": 0.001,
+          "passed": false,
+          "sample_count": 94,
+          "start_rad": -1.605702911835
+        },
+        {
+          "description": "lower probe positive",
+          "end_rad": 0.654498469498,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rf_lower_leg_joint",
+          "min_clearance_m": 0.001661652,
+          "passed": false,
+          "sample_count": 39,
+          "start_rad": 0.0
+        },
+        {
+          "description": "lower probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rf_lower_leg_joint",
+          "min_clearance_m": 0.002571743,
+          "passed": false,
+          "sample_count": 39,
+          "start_rad": 0.654498469498
+        },
+        {
+          "description": "restore leg to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": 1.518436449235,
+          "first_collision_pair": [
+            "rf_foot_link",
+            "rh_lower_leg_link"
+          ],
+          "joint_name": "rf_upper_leg_joint",
+          "min_clearance_m": 0.00327732,
+          "passed": false,
+          "sample_count": 91,
+          "start_rad": 1.570796326795
+        }
+      ]
+    },
+    "rh": {
+      "active_leg_sequence_min_clearance_m": 0.001,
+      "active_leg_sequence_passed": false,
+      "auxiliary_parking_required": false,
+      "leg": "rh",
+      "park_path_min_clearance_m": null,
+      "park_path_passed": null,
+      "parked_leg": null,
+      "parking_angle_rad": null,
+      "reason": "NEEDS_HUMAN_DECISION: no mesh intersection found anywhere in the sequence, but minimum modelled clearance 1.0000 mm at 'lower probe return' is below the configured PASS bar (3.0000 mm); this is a margin finding, not a collision, so auxiliary parking of another leg is not applicable",
+      "segments": [
+        {
+          "description": "upper probe negative (home prerequisite)",
+          "end_rad": -0.916297857297,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 54,
+          "start_rad": 0.0
+        },
+        {
+          "description": "upper probe return to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_upper_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 54,
+          "start_rad": -0.916297857297
+        },
+        {
+          "description": "upper probe positive (home prerequisite)",
+          "end_rad": 2.138028333693,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_upper_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 124,
+          "start_rad": 0.0
+        },
+        {
+          "description": "upper probe return to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_upper_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 124,
+          "start_rad": 2.138028333693
+        },
+        {
+          "description": "transition to HIP prerequisite",
+          "end_rad": 0.872664625997,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_upper_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 51,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe negative",
+          "end_rad": -0.785398163397,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_hip_joint",
+          "min_clearance_m": 0.009017167,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_hip_joint",
+          "min_clearance_m": 0.005991228,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": -0.785398163397
+        },
+        {
+          "description": "hip probe positive",
+          "end_rad": 0.785398163397,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_hip_joint",
+          "min_clearance_m": 0.008114453,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": 0.0
+        },
+        {
+          "description": "hip probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_hip_joint",
+          "min_clearance_m": 0.005488842,
+          "passed": true,
+          "sample_count": 46,
+          "start_rad": 0.785398163397
+        },
+        {
+          "description": "transition HIP prerequisite -> LOWER prerequisite",
+          "end_rad": 1.570796326795,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_upper_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 41,
+          "start_rad": 0.872664625997
+        },
+        {
+          "description": "lower probe negative",
+          "end_rad": -1.605702911835,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_lower_leg_joint",
+          "min_clearance_m": 0.0085,
+          "passed": true,
+          "sample_count": 94,
+          "start_rad": 0.0
+        },
+        {
+          "description": "lower probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_lower_leg_joint",
+          "min_clearance_m": 0.001,
+          "passed": false,
+          "sample_count": 94,
+          "start_rad": -1.605702911835
+        },
+        {
+          "description": "lower probe positive",
+          "end_rad": 0.654498469498,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_lower_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 39,
+          "start_rad": 0.0
+        },
+        {
+          "description": "lower probe return",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_lower_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 39,
+          "start_rad": 0.654498469498
+        },
+        {
+          "description": "restore leg to home",
+          "end_rad": 0.0,
+          "first_collision_angle_rad": null,
+          "first_collision_pair": null,
+          "joint_name": "rh_upper_leg_joint",
+          "min_clearance_m": 0.013787832,
+          "passed": true,
+          "sample_count": 91,
+          "start_rad": 1.570796326795
+        }
+      ]
+    }
+  },
+  "robot_dog_commit_sha": "344675f4107683133fdb0f1f7171b54e05e6aa4b",
+  "robot_dog_working_tree_dirty": true,
+  "schema_version": "matdog.calibration_geometry_profile.v1",
+  "unresolved_assumptions": [
+    "lf: NEEDS_HUMAN_DECISION: no seed parking angle in (30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0) for lh resolved the collision; a search over a wider/finer angle range or a different auxiliary leg may be required",
+    "lf_hip_max: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "lf_hip_min: MODEL_LIMIT_MISMATCH, mesh-predicted contact differs from the declared URDF limit by -0.043633 rad; NEEDS_HUMAN_DECISION on whether to revise the URDF limit (the compiler never does this automatically).",
+    "lf_lower_leg_max: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "lf_lower_leg_min: MODEL_LIMIT_MISMATCH, mesh-predicted contact differs from the declared URDF limit by -0.103970 rad; NEEDS_HUMAN_DECISION on whether to revise the URDF limit (the compiler never does this automatically).",
+    "lf_upper_leg_max: UNINTENDED_COLLISION_BEFORE_ENDPOINT against lf_foot_link/lh_foot_link even with the leg's determined parking context; NEEDS_HUMAN_DECISION on whether a different auxiliary pose or a mechanical redesign is required.",
+    "lf_upper_leg_min: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "lh_hip_max: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "lh_hip_min: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "lh_lower_leg_max: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "lh_lower_leg_min: MODEL_LIMIT_MISMATCH, mesh-predicted contact differs from the declared URDF limit by -0.103970 rad; NEEDS_HUMAN_DECISION on whether to revise the URDF limit (the compiler never does this automatically).",
+    "lh_upper_leg_max: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "lh_upper_leg_min: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "manufacturing tolerance UNKNOWN: only the +/-0.15mm per-part print tolerance is modelled; assembly-level stack-up (bushings, screws, servo horn backlash, fit clearances) is not known and is not included in the sensitivity estimate.",
+    "min_clearance_pass_m=3mm ('adequate clearance' threshold for path PASS) is a documented conservative default chosen for this compiler, not a project-mandated value; NEEDS_HUMAN_DECISION if a different bar is intended.",
+    "narrow_phase_margin_m=1mm / grid_cell_size_m=5mm are compiler performance/precision parameters tuned for MATDOG's actual mm-scale collision meshes; they are configurable and reported here rather than hardcoded assumptions, per canonical handoff section 4.",
+    "rf: NEEDS_HUMAN_DECISION: no seed parking angle in (30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0) for rh resolved the collision; a search over a wider/finer angle range or a different auxiliary leg may be required",
+    "rf_hip_max: MODEL_LIMIT_MISMATCH, mesh-predicted contact differs from the declared URDF limit by 0.043633 rad; NEEDS_HUMAN_DECISION on whether to revise the URDF limit (the compiler never does this automatically).",
+    "rf_hip_min: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "rf_lower_leg_max: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "rf_lower_leg_min: MODEL_LIMIT_MISMATCH, mesh-predicted contact differs from the declared URDF limit by -0.104788 rad; NEEDS_HUMAN_DECISION on whether to revise the URDF limit (the compiler never does this automatically).",
+    "rf_upper_leg_max: UNINTENDED_COLLISION_BEFORE_ENDPOINT against rf_foot_link/rh_foot_link even with the leg's determined parking context; NEEDS_HUMAN_DECISION on whether a different auxiliary pose or a mechanical redesign is required.",
+    "rf_upper_leg_min: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "rh_hip_max: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "rh_hip_min: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "rh_lower_leg_max: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "rh_lower_leg_min: MODEL_LIMIT_MISMATCH, mesh-predicted contact differs from the declared URDF limit by -0.104788 rad; NEEDS_HUMAN_DECISION on whether to revise the URDF limit (the compiler never does this automatically).",
+    "rh_upper_leg_max: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes.",
+    "rh_upper_leg_min: no mesh contact found within the analysis envelope around the declared URDF limit; that limit likely originates from a constraint this compiler does not model (e.g. servo internal range), not from these collision meshes."
+  ],
+  "urdf": {
+    "relative_path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+    "sha256": "5e28da3dba10fd3f2ea6ebf6f5d6271157bda0b12b82d92aedbe3031643089ef"
+  }
+}
