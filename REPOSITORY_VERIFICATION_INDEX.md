@@ -27,18 +27,42 @@ complete all-leg calibration: not yet validated
 
 No V28–V42 or “all legs” experimental implementation is a current program. Future leg work must start from merged `norma-core/main` and generalize the proven V25 architecture through data-driven leg profiles.
 
+## Canonical calibration architecture update — 2026-08-07
+
+The current development contract for the next calibration phase is:
+
+```text
+06_Software/Matdog_Core/calibration/
+MATDOG_CALIBRATION_CANONICAL_HANDOFF_2026-08-07.md
+```
+
+That document supersedes older RF development prescriptions where they conflict with it. In particular it freezes the geometry-first three-phase plan:
+
+```text
+1. offline Geometry Compiler / 24 mesh-predicted contacts and safe paths
+2. one generic V25-derived full-leg engine in norma-core
+3. RF -> RH -> LH hardware completion
+```
+
+It also records the corrected q=0 policy: manual/visual home is only a seed; final q=0 must be derived from model geometry plus repeatable hardware contact evidence, staged and verified before any separately authorized EEPROM freeze.
+
+The 2026-07-20 geometry checkpoint remains historical validated evidence for one collision-free path. Its +50°/+90° prerequisites and +30° rear parking are safe seeds, not permanent proof that those auxiliary poses are always necessary or minimal.
+
 ## Canonical records
 
 ```text
 README.md
+REPOSITORY_VERIFICATION_INDEX.md
+06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_CANONICAL_HANDOFF_2026-08-07.md
 06_Software/Matdog_Core/calibration/MATDOG_LF_CALIBRATION_V25_FINAL.md
+06_Software/Matdog_Core/calibration/MATDOG_MECHANICAL_ENDSTOP_GEOMETRY_CHECKPOINT_2026-07-20.md
 09_Logs/Development_Log/2026-08-04_LF_V25_AND_REPOSITORY_CLEANUP.md
 ```
 
 ## Repository hygiene policy
 
-- `robot-dog` retains only `main` as an active remote branch after cleanup.
-- `norma-core` retains only `main` and `release/matdog-lf-calibrator-v25` after cleanup.
+- `robot-dog` retains only `main` as an active remote branch after cleanup, except short-lived reviewed development/documentation branches required by branch protection.
+- `norma-core` retains `main`, `release/matdog-lf-calibrator-v25`, and only the single active next-milestone/review branch when needed.
 - Closed pull requests preserve the historical audit trail.
 - Failed, cancelled, incomplete and superseded workflow runs may be deleted.
 - Only successful V25 evidence and durable current CI are retained.
