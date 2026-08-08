@@ -35,16 +35,75 @@ had a sign error in 3 of 6 LF hardware-contact-angle derivations
 `contact_model_status` for a hardware-oracle endpoint (LF only) is now
 driven by MESH-vs-HARDWARE agreement; HARDWARE-vs-URDF agreement is kept
 as a separate, informational `hardware_vs_urdf_status` field, never
-conflated with the decision. Hardware contact angles stored as the
-actual angle (not a pre-computed delta), removing the v2 sign-error
+conflated with the decision. Hardware contact angles are stored as the
+actual angle rather than a pre-computed delta, removing the v2 sign-error
 class structurally.
 
-Result: **LF 6/6 = MODEL_INCOMPLETE** (no mesh finding, or absence of
-one, corresponds to where LF V25 hardware actually stopped for any of
-the six joints). 4 `MODEL_LIMIT_MISMATCH` (RF/RH/LH, no hardware oracle,
-never auto-promoted to `MODEL_INCOMPLETE`), 14 `NO_MODELED_ENDSTOP`, 0
-`PATH_COLLISION_BEFORE_ENDPOINT`, 0 `UNINTENDED_SELF_COLLISION`.
+Result: **LF 6/6 = MODEL_INCOMPLETE** because no mesh finding corresponds
+to where LF V25 hardware actually stopped for any of the six endpoints.
+The remaining model-only result is 4 `MODEL_LIMIT_MISMATCH`, 14
+`NO_MODELED_ENDSTOP`, 0 `PATH_COLLISION_BEFORE_ENDPOINT`, 0
+`UNINTENDED_SELF_COLLISION`.
 
-Full record: `06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1_COMPLETION_2026-08-07.md`.
+Full record:
 
-Status: `PASS_GEOMETRY_COMPILER_COMPLETE_WITH_EXPLICIT_MODEL_GAPS`.
+`06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1_COMPLETION_2026-08-07.md`
+
+Status:
+
+`PASS_GEOMETRY_COMPILER_COMPLETE_WITH_EXPLICIT_MODEL_GAPS`
+
+---
+
+## Search-envelope interpretation — canonical clarification 2026-08-08
+
+The Geometry Compiler does **not** clamp FK to URDF limits. `RobotScene`
+uses `enforce_limits=False`, so collision geometry can be evaluated beyond
+the `<limit>` values.
+
+Phase 1 nevertheless used a deliberately bounded outer search margin:
+
+```text
+DEFAULT_ENVELOPE_MARGIN_RAD = 10 deg
+```
+
+The search therefore reaches:
+
+```text
+MAX: declared URDF maximum + 10 deg
+MIN: declared URDF minimum - 10 deg
+```
+
+This is directly demonstrated by v3 contacts beyond the old limits, e.g.
+LF hip MIN `-47.500 deg` vs `-45 deg`, LF lower MIN `-97.957 deg` vs
+`-92 deg`, RF hip MAX `+47.500 deg` vs `+45 deg`, and RF/RH lower MIN at
+about `-98.004 deg` vs `-92 deg`.
+
+### Exact meaning of `NO_MODELED_ENDSTOP`
+
+In schema v3:
+
+```text
+NO_MODELED_ENDSTOP
+=
+no relevant same-leg mesh contact found inside the documented bounded
+analysis envelope
+```
+
+It does **not** mean that no STL collision could ever occur at a much
+larger angle.
+
+The full clarification and the recommended extended pre-Phase-2 model
+sanity check are recorded in:
+
+`06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_ENVELOPE_CLARIFICATION_2026-08-08.md`
+
+### LF remains valid
+
+This bounded-envelope clarification does not change LF 6/6
+`MODEL_INCOMPLETE`: LF has real V25 hardware contact angles. A mesh
+collision that is absent at the hardware stop or appears several degrees
+after hardware has already stopped does not represent the same endpoint.
+
+For RF/RH/LH, which do not yet have equivalent hardware oracles,
+`NO_MODELED_ENDSTOP` must always be read with the envelope qualifier.
