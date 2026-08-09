@@ -1,7 +1,10 @@
 # MATDOG — Geometry Compiler Phase 1B addendum
 
 **Date:** 2026-08-08
-**Status:** CLOSURE CANDIDATE — local validation complete (targeted 39/39, compiler 24/24, final full suite 122/122). Committed and published in Draft PR #16; awaiting human review and explicit merge authorization. Not merged. Phase 2 not started.
+**Status:** **CLOSED** — reviewed and merged. Validation complete (targeted 39/39, compiler 24/24,
+final full suite 122/122). Merged to `main` via PR #16 (squash) as commit
+`5b66044e225fcd921e44b98cc710f028da441a64` on 2026-08-09. Schema v4 is the current canonical
+profile. Phase 2 is NEXT and NOT STARTED.
 **Supersedes for endpoint metrology:** `MATDOG_GEOMETRY_COMPILER_PHASE1_COMPLETION_2026-08-07.md`
 (schema v3). That record is **historical, not deleted** — its findings remain valid as a
 description of what the v3 policy could see.
