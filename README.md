@@ -158,8 +158,14 @@ Verdict **`SUPPORTED`**:
 | witness geometry | 12/12 on external structure, radial 15.6–106.6 mm |
 | historical v3 non-adjacent findings | −47.5000° and −97.9570° both reproduce exactly |
 
-An initial candidate export was rotated 180° about Y through z=−45 mm; the frame error was caught
-geometrically in GATE B before any physics ran, corrected at source, and re-verified by SHA256.
+The motor-pin geometry edit itself was made in CAD. The first four upper-leg STL exports then
+carried a common proper rigid frame error — each rotated 180° about Y through z = −45 mm
+(`x' = -x; y' = y; z' = -z - 90 mm`); `base_link.stl` was unaffected. GATE B STEP 1 diagnosed it
+geometrically before any collision physics ran. The frame error was corrected **directly in the
+binary STL vertices and normals** by applying the determined rigid transform: no second CAD export
+and no retessellation were performed for it, and triangle count, order and attributes were
+preserved. The corrected files were reloaded and verified geometrically and by SHA256 before GATE B
+physics.
 
 ### The five corrected STLs
 

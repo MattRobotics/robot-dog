@@ -53,13 +53,12 @@ Full record: `06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE
 
 Status: `PASS_GEOMETRY_COMPILER_COMPLETE_WITH_EXPLICIT_MODEL_GAPS`.
 
-**Superseded for endpoint metrology by Phase 1B (2026-08-08).** The LF 6/6
-`MODEL_INCOMPLETE` verdict above was not caused by missing STL hardstop geometry.
-It was caused by the blanket `adjacent pair -> EXCLUDE` policy (which made the
-hardstop unobservable, since it lives on the revolute parent/child pair) combined
-with motor centre pins modelled in nominal contact in the assembly STLs (which
-made every adjacent pair read INTERSECTING at every angle). See the Phase 1B
-entry below. This run is retained unchanged.
+**Superseded for endpoint metrology by Phase 1B (2026-08-08).** The v3 LF 6/6
+`MODEL_INCOMPLETE` verdict did not establish that hardstop geometry was absent
+from the STL. Phase 1B showed that the blanket adjacent-pair exclusion made the
+revolute hardstop unobservable, while the original motor-pin representation kept
+adjacent pairs permanently INTERSECTING. See the Phase 1B entry below. This run
+is retained unchanged as historical evidence.
 
 ## `2026-08-08_231600` — CURRENT CANONICAL (schema v4, Phase 1B)
 

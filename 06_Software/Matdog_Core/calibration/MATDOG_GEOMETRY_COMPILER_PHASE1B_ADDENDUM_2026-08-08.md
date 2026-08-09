@@ -1,7 +1,7 @@
 # MATDOG — Geometry Compiler Phase 1B addendum
 
 **Date:** 2026-08-08
-**Status:** CLOSURE CANDIDATE — local validation complete (targeted 39/39, compiler 24/24, final full suite 122/122). Awaiting human review. Not committed, not pushed, no PR.
+**Status:** CLOSURE CANDIDATE — local validation complete (targeted 39/39, compiler 24/24, final full suite 122/122). Committed and published in Draft PR #16; awaiting human review and explicit merge authorization. Not merged. Phase 2 not started.
 **Supersedes for endpoint metrology:** `MATDOG_GEOMETRY_COMPILER_PHASE1_COMPLETION_2026-08-07.md`
 (schema v3). That record is **historical, not deleted** — its findings remain valid as a
 description of what the v3 policy could see.
@@ -76,9 +76,27 @@ pair. No GATE A conclusion rests on it.
 
 Five candidate STLs, corrected in CAD to give the motor pins ≈0.10–0.15 mm clearance.
 
-An initial candidate export had a frame error — all four `*_upper_leg_link.stl` were rotated 180°
-about Y through z=−45 mm (`x'=-x; y'=y; z'=-z-90mm`). GATE B STEP 1 detected it geometrically
-before any physics was run; it was corrected at source and re-verified by SHA256.
+#### Candidate frame history — what actually happened
+
+Recorded precisely, because the correction path matters for provenance:
+
+1. The intended **motor-pin geometry edit was made in CAD**.
+2. The **first four upper-leg STL exports carried a common proper rigid frame error**: each
+   `*_upper_leg_link.stl` was rotated 180° about Y through z = −45 mm
+   (`x' = -x; y' = y; z' = -z - 90 mm`; determinant +1, so a rotation, not a reflection).
+   `base_link.stl` was unaffected.
+3. GATE B STEP 1 **diagnosed the error geometrically**, before any collision physics was run,
+   by testing candidate re-orientations against the original surface.
+4. The frame error was then corrected **directly in the binary STL vertices and normals**, by
+   applying the determined rigid transform to the existing files.
+5. **No second CAD export and no retessellation were performed for the frame correction.** The
+   candidate **triangle count, triangle order and attribute bytes were preserved**; only the
+   vertex/normal coordinates were rigidly transformed.
+6. The corrected files were **reloaded from disk and verified geometrically and by SHA256**
+   against the supplied manifest **before** any GATE B physics.
+
+The retriangulation noted above therefore belongs to the original CAD export of the pin edit, not
+to this frame correction.
 
 Post-correction results:
 
