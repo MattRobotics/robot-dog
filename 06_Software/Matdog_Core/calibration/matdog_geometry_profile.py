@@ -37,7 +37,12 @@ for _extra_path in (KINEMATICS_DIR, CALIBRATION_DIR):
 
 from matdog_urdf_fk import CANONICAL_URDF_RELATIVE_PATH  # noqa: E402
 
-from matdog_geometry_scene import RobotScene  # noqa: E402
+from matdog_geometry_scene import (  # noqa: E402
+    PAIR_CLASS_REVOLUTE_ADJACENT,
+    RobotScene,
+    active_revolute_contact_pair,
+    load_link_adjacency,
+)
 from matdog_geometry_contact_search import (  # noqa: E402
     LF_V25_HARDWARE_EVIDENCE,
     EndpointContactResult,
@@ -46,8 +51,37 @@ from matdog_geometry_path_planner import ParkingPlan  # noqa: E402
 from matdog_geometry_uncertainty import ContactSensitivityResult, ManufacturingToleranceInputs  # noqa: E402
 
 
-SCHEMA_VERSION = "matdog.calibration_geometry_profile.v3"
-"""v2 (2026-08-07 reconciliation, first pass): adds contact_model_status
+SCHEMA_VERSION = "matdog.calibration_geometry_profile.v4"
+"""v4 (2026-08-08, Phase 1B -- adjacent revolute endstop metrology): the
+meaning of an endpoint record changes materially, so this is a new schema
+version rather than an in-place edit of v3. v1/v2/v3 artifacts are retained
+unchanged; v3 is HISTORICAL/SUPERSEDED for endpoint metrology, not deleted.
+
+What changed, and why v3 records are not comparable field-for-field:
+
+  * v3 searched for the endstop among this leg's NON-ADJACENT pairs and
+    excluded every parent/child pair. GATE A (2026-08-08) showed the designed
+    hardstop physically lives ON the revolute parent/child pair, so v3 was
+    incapable by construction of observing it, and all six LF endpoints came
+    out MODEL_INCOMPLETE.
+  * v4 defines ENDSTOP METROLOGY on exactly one pair per joint, the ACTIVE
+    REVOLUTE PARENT-CHILD pair (`active_revolute_pair` below), derived from
+    URDF topology.
+  * PATH SAFETY is now a separate, explicitly named concern covering every
+    other relevant pair, with the active pair excluded from its own sweep.
+    Same-leg obstructions (e.g. hip<->foot during a LOWER probe) are now
+    reported as path collisions; v3 only recognised cross-leg ones.
+  * Adjacent-pair collision only became measurable at all after the motor-pin
+    STL representation fix (GATE B, five meshes), recorded in
+    `collision_mesh_manifest` hashes.
+  * New per-endpoint fields: `active_revolute_pair`, `pair_class`,
+    `endpoint_evidence_class`.
+
+`endpoint_evidence_class` deliberately does not promote every adjacent contact
+to "hardware hardstop": LF has a V25 hardware oracle, RF/RH/LH have geometric
+endpoint candidates pending their own hardware validation.
+
+v2 (2026-08-07 reconciliation, first pass): adds contact_model_status
 (replacing the old implicit "same-leg found => endpoint" rule), explicit
 clearance_kind (EXACT/LOWER_BOUND) + clearance_gate_result on path
 segments, segment-scoped parking reasons, and per-pair tolerance budget
@@ -148,6 +182,66 @@ def geometry_compiler_source_hash(repo_root: Path) -> str:
     return hashlib.sha256(concatenated.encode("utf-8")).hexdigest()
 
 
+def _pair_policy_record() -> dict[str, Any]:
+    """Machine-readable statement of the Phase 1B pair policy, so a consumer
+    can tell which rules produced the endpoint numbers without inferring it."""
+    adjacency = load_link_adjacency()
+
+    def _sorted_pairs(pairs):
+        return sorted(sorted(p) for p in pairs)
+
+    return {
+        "policy_version": "phase1b_joint_aware_adjacency",
+        "supersedes": "phase1_v3_blanket_adjacent_exclusion",
+        "rules": {
+            "revolute_adjacent": "INCLUDE in collision analysis",
+            "fixed_adjacent": "structural attachment -> EXCLUDE from endstop metrology and path collision",
+            "non_adjacent": "unchanged pre-existing clearance/path-safety policy",
+        },
+        "endstop_metrology": "active revolute parent-child pair only (one pair per joint)",
+        "path_safety": "all other relevant pairs; active pair excluded from its own sweep",
+        "clearance_gate_applies_to": "NON_ADJACENT only",
+        "clearance_gate_excluded_from": (
+            "REVOLUTE_ADJACENT -- their healthy resting state is sub-mm contact-fit separation "
+            "(GATE B measured 0.0026-0.0372 mm at q=0), so the generic gate does not apply"
+        ),
+        "revolute_adjacent_pairs": _sorted_pairs(adjacency.revolute_pairs),
+        "fixed_adjacent_pairs": _sorted_pairs(adjacency.fixed_pairs),
+        "revolute_adjacent_pair_count": len(adjacency.revolute_pairs),
+        "fixed_adjacent_pair_count": len(adjacency.fixed_pairs),
+        "active_pair_by_joint": {
+            joint: list(active_revolute_contact_pair(joint))
+            for joint in sorted(adjacency.ordered_pair_by_joint)
+            if adjacency.joint_type_by_pair[frozenset(adjacency.ordered_pair_by_joint[joint])] != "fixed"
+        },
+    }
+
+
+def _endpoint_evidence_class(result: EndpointContactResult) -> str:
+    """How much this endpoint's number is actually worth.
+
+    HARDWARE_CONFIRMED_CONTACT   mesh contact agrees with a real hardware
+                                 oracle for this endpoint (LF V25 only).
+    HARDWARE_CONTRADICTED        a hardware oracle exists and disagrees.
+    GEOMETRIC_ENDPOINT_CANDIDATE an adjacent-pair contact was localized but no
+                                 hardware oracle exists for this leg -- a model
+                                 prediction awaiting hardware validation, NOT a
+                                 measured hardstop.
+    PATH_LIMITED                 a path obstruction precedes the articulation's
+                                 own contact.
+    NO_MODELED_CONTACT           nothing found in the analysis envelope.
+    """
+    if result.contact_model_status == "PATH_COLLISION_BEFORE_ENDPOINT":
+        return "PATH_LIMITED"
+    if result.result_kind != "MESH_CONTACT_FOUND":
+        return "NO_MODELED_CONTACT"
+    if result.mesh_vs_hardware_status == "AGREES":
+        return "HARDWARE_CONFIRMED_CONTACT"
+    if result.mesh_vs_hardware_status == "DISAGREES":
+        return "HARDWARE_CONTRADICTED"
+    return "GEOMETRIC_ENDPOINT_CANDIDATE"
+
+
 def _endpoint_record(result: EndpointContactResult, sensitivity: ContactSensitivityResult | None) -> dict[str, Any]:
     endpoint = result.endpoint
 
@@ -163,6 +257,9 @@ def _endpoint_record(result: EndpointContactResult, sensitivity: ContactSensitiv
         "urdf_upper_rad": _round(endpoint.urdf_upper_rad),
         "prerequisite_pose_rad": {k: _round(v) for k, v in sorted(endpoint.prerequisite_overrides.items())},
         "other_legs_pose_rad": {k: _round(v) for k, v in sorted(result.other_legs_pose.items())},
+        "active_revolute_pair": list(active_revolute_contact_pair(endpoint.joint_name)),
+        "pair_class": PAIR_CLASS_REVOLUTE_ADJACENT,
+        "endpoint_evidence_class": _endpoint_evidence_class(result),
         "result_kind": result.result_kind,
         "mesh_predicted_contact_rad": _round(result.mesh_predicted_contact_rad),
         "delta_from_declared_rad": _round(result.delta_from_declared_rad),
@@ -349,6 +446,7 @@ def build_geometry_profile(
             "sha256": hashlib.sha256(urdf_path.read_bytes()).hexdigest(),
         },
         "collision_mesh_manifest": mesh_manifest,
+        "pair_policy": _pair_policy_record(),
         "geometry_compiler": {
             "source_file_sha256": geometry_compiler_source_manifest(repo_root),
             "source_combined_sha256": geometry_compiler_source_hash(repo_root),

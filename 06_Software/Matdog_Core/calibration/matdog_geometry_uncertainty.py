@@ -31,7 +31,11 @@ if str(CALIBRATION_DIR) not in sys.path:
     sys.path.insert(0, str(CALIBRATION_DIR))
 
 from matdog_geometry_contact_search import EndpointSpec, _pose_for_probe_angle  # noqa: E402
-from matdog_geometry_scene import RobotScene  # noqa: E402
+from matdog_geometry_scene import (  # noqa: E402
+    PAIR_CLASS_REVOLUTE_ADJACENT,
+    RobotScene,
+    classify_link_pair,
+)
 
 
 DEFAULT_PRINT_TOLERANCE_M = 0.00015
@@ -138,6 +142,41 @@ def compute_contact_sensitivity(
     sign = -1.0 if endpoint.side == "max" else 1.0
     angle_near = clear_angle_rad
     angle_far = clear_angle_rad + sign * step_rad
+
+    if classify_link_pair(contact_link_a, contact_link_b) == PAIR_CLASS_REVOLUTE_ADJACENT:
+        # NOT APPLICABLE, reported rather than approximated.
+        #
+        # This method infers an angular uncertainty from how fast the pair's
+        # MINIMUM clearance changes with angle. That inference silently assumes
+        # the minimum clearance belongs to the contact feature. On a revolute
+        # parent/child pair it does not: the closest points are the motor-pin
+        # fit at the joint core, microns apart and essentially invariant in the
+        # joint angle by construction (a surface of revolution about the axis).
+        # The gradient would therefore be ~0 regardless of how the real hardstop
+        # surfaces are approaching, and the resulting uncertainty figure would be
+        # meaningless -- while costing a near-miss narrow-phase pass over an
+        # enormous candidate set to compute.
+        return ContactSensitivityResult(
+            contact_angle_rad=clear_angle_rad,
+            contact_link_a=contact_link_a,
+            contact_link_b=contact_link_b,
+            finite_difference_step_rad=step_rad,
+            clearance_near_m=float("nan"),
+            clearance_near_kind=None,
+            clearance_far_m=float("nan"),
+            clearance_far_kind=None,
+            gradient_m_per_rad=None,
+            gradient_stable=False,
+            tolerance_used_m=tolerance_m,
+            tolerance_budget_note=TOLERANCE_BUDGET_NOTE,
+            estimated_uncertainty_rad=None,
+            unstable_reason=(
+                "contact pair is REVOLUTE_ADJACENT: its minimum clearance is the joint-core "
+                "motor-pin fit, which is angle-invariant by construction, so a clearance-gradient "
+                "sensitivity is not applicable to this endpoint. A hardstop-surface-local "
+                "sensitivity method is required instead (Phase 1B UNKNOWN)."
+            ),
+        )
 
     pose_near = _pose_for_probe_angle(endpoint, angle_near, other_legs_pose)
     pose_far = _pose_for_probe_angle(endpoint, angle_far, other_legs_pose)

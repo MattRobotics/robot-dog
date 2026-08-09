@@ -49,24 +49,42 @@ class TestNamingAndAdjacency(unittest.TestCase):
         with self.assertRaises(GeometrySceneError):
             leg_of_joint("bogus_joint")
 
-    def test_adjacent_pairs_excluded_from_candidates(self):
+    def test_candidate_set_is_joint_type_aware(self):
+        """Phase 1B replaces the v3 rule `adjacent -> EXCLUDE`.
+
+        The candidate set now keeps REVOLUTE adjacencies (that is where the
+        designed hardstop lives) and drops only FIXED structural attachments.
+        The old assertion -- that no candidate is adjacent -- encoded exactly
+        the bug GATE A found, so it is inverted here rather than deleted.
+        """
+        from matdog_geometry_scene import (
+            PAIR_CLASS_FIXED_ADJACENT,
+            PAIR_CLASS_REVOLUTE_ADJACENT,
+            classify_link_pair,
+        )
+
         candidates = all_candidate_collision_pairs()
 
         self.assertTrue(is_adjacent_pair("base_link", "lf_hip_link"))
-        self.assertTrue(is_adjacent_pair("lf_hip_link", "lf_upper_leg_link"))
-        self.assertTrue(is_adjacent_pair("lf_upper_leg_link", "lf_lower_leg_link"))
         self.assertTrue(is_adjacent_pair("lf_lower_leg_link", "lf_foot_link"))
 
+        # revolute adjacencies ARE candidates now
+        self.assertIn(("base_link", "lf_hip_link"), candidates)
+        self.assertEqual(classify_link_pair("base_link", "lf_hip_link"), PAIR_CLASS_REVOLUTE_ADJACENT)
+
+        # fixed adjacencies are never candidates
         for pair in candidates:
-            self.assertFalse(is_adjacent_pair(*pair), f"{pair} should not be a candidate")
+            self.assertNotEqual(
+                classify_link_pair(*pair), PAIR_CLASS_FIXED_ADJACENT,
+                f"{pair} is a fixed structural attachment and must be excluded",
+            )
 
-        # every non-adjacent combination should appear exactly once
-        expected_count = 0
-        for i, a in enumerate(ALL_LINKS):
-            for b in ALL_LINKS[i + 1 :]:
-                if not is_adjacent_pair(a, b):
-                    expected_count += 1
-
+        expected_count = sum(
+            1
+            for i, a in enumerate(ALL_LINKS)
+            for b in ALL_LINKS[i + 1 :]
+            if classify_link_pair(a, b) != PAIR_CLASS_FIXED_ADJACENT
+        )
         self.assertEqual(len(candidates), expected_count)
         self.assertEqual(len(set(candidates)), len(candidates))
 

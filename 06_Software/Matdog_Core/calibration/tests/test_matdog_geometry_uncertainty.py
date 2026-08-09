@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import math
 import unittest
 from pathlib import Path
 
@@ -60,20 +61,43 @@ class TestSensitivityPairPinning(unittest.TestCase):
         self.assertEqual(self.sensitivity.contact_link_a, self.result.contact_link_a)
         self.assertEqual(self.sensitivity.contact_link_b, self.result.contact_link_b)
 
-    def test_sensitivity_uses_check_link_pair_directly_on_the_endpoint_pair(self):
-        """Proves the fix at the numeric level: `compute_contact_sensitivity`'s
-        near-probe clearance must equal `scene.check_link_pair` evaluated
-        directly on the endpoint's own pair at the same pose -- the
-        pre-fix implementation called `worst_pair_at_pose` instead, which
-        is not guaranteed to agree (it can return a different, worse
-        pair's clearance)."""
-        pose_near = _pose_for_probe_angle(self.endpoint, self.result.bracket_clear_rad, {})
-        direct = self.scene.check_link_pair(
-            self.result.contact_link_a, self.result.contact_link_b, pose_near, require_distance=True
-        )
+    def test_revolute_adjacent_contact_reports_sensitivity_not_applicable(self):
+        """Phase 1B: the endpoint contact pair is now the ACTIVE REVOLUTE pair,
+        and the clearance-gradient method does not apply to it.
 
-        self.assertAlmostEqual(self.sensitivity.clearance_near_m, direct.clearance_m, places=9)
-        self.assertEqual(self.sensitivity.clearance_near_kind, direct.clearance_kind)
+        That method assumes the pair's MINIMUM clearance belongs to the contact
+        feature. On a revolute parent/child pair the minimum is the joint-core
+        motor-pin fit -- microns wide and invariant in the joint angle -- so the
+        gradient would be ~0 no matter how the real hardstop surfaces approach.
+        The correct behaviour is to say so, not to emit a number."""
+        from matdog_geometry_scene import PAIR_CLASS_REVOLUTE_ADJACENT, classify_link_pair
+
+        self.assertEqual(
+            classify_link_pair(self.result.contact_link_a, self.result.contact_link_b),
+            PAIR_CLASS_REVOLUTE_ADJACENT,
+        )
+        self.assertFalse(self.sensitivity.gradient_stable)
+        self.assertIsNone(self.sensitivity.estimated_uncertainty_rad)
+        self.assertIn("REVOLUTE_ADJACENT", self.sensitivity.unstable_reason)
+
+    def test_sensitivity_uses_check_link_pair_directly_on_the_requested_pair(self):
+        """Original regression, retained on a pair where the method applies:
+        the gradient must be evaluated on the pair it was ASKED about, not on
+        whatever `worst_pair_at_pose` considers worst near that pose."""
+        link_a, link_b = "base_link", "lf_upper_leg_link"
+        clear_angle = math.radians(-30.0)
+
+        sensitivity = compute_contact_sensitivity(
+            self.scene, self.endpoint, clear_angle, {}, link_a, link_b
+        )
+        self.assertEqual(sensitivity.contact_link_a, link_a)
+        self.assertEqual(sensitivity.contact_link_b, link_b)
+
+        pose_near = _pose_for_probe_angle(self.endpoint, clear_angle, {})
+        direct = self.scene.check_link_pair(link_a, link_b, pose_near, require_distance=True)
+
+        self.assertAlmostEqual(sensitivity.clearance_near_m, direct.clearance_m, places=9)
+        self.assertEqual(sensitivity.clearance_near_kind, direct.clearance_kind)
 
     def test_tolerance_budget_note_present_and_explicit_about_two_parts(self):
         self.assertEqual(self.sensitivity.tolerance_budget_note, TOLERANCE_BUDGET_NOTE)

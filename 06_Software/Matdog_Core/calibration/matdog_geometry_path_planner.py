@@ -31,10 +31,12 @@ if str(CALIBRATION_DIR) not in sys.path:
 
 from matdog_geometry_scene import (  # noqa: E402
     RobotScene,
+    active_revolute_contact_pair,
     full_pose,
     joint_name,
     leg_of_link,
     leg_pose_overrides,
+    path_safety_pairs,
 )
 from matdog_geometry_contact_search import (  # noqa: E402
     HIP_PREREQUISITE_UPPER_RAD,
@@ -185,6 +187,8 @@ def _sweep_and_validate(
             value += direction * step_rad
         samples_rad.append(end_rad)
 
+    boolean_pairs = path_safety_pairs(exclude_pair=active_revolute_contact_pair(active_joint))
+
     min_clearance: float | None = None
     min_clearance_kind: str | None = None
     first_collision_angle: float | None = None
@@ -195,6 +199,27 @@ def _sweep_and_validate(
         overrides.update(fixed_active_leg_overrides)
         overrides[active_joint] = angle
         pose = full_pose(overrides)
+
+        # Boolean obstruction is tested over the PATH SAFETY set (non-adjacent
+        # + revolute adjacent), with the SWEPT joint's own active revolute pair
+        # excluded -- the same CLASS A rule the endpoint search applies. That
+        # pair reaching contact means "this joint hit its own hardstop", which
+        # is a joint-limit question owned by endstop metrology, not "something
+        # is in the way". Including it also made every sample re-evaluate a
+        # near-contact pair that cannot be cached (its angle is the one moving):
+        # measured 1.52 s/sample versus 0.20 s/sample, a 7.4x cost on every
+        # parking and path sweep.
+        #
+        # Clearance is measured only over NON_ADJACENT pairs: a revolute hinge's
+        # healthy resting state is sub-millimetre separation, so folding it into
+        # the minimum-clearance figure would drag every segment under the
+        # generic gate for no physical reason.
+        collide, pair = scene.is_colliding_at_pose(pose, link_pairs=boolean_pairs)
+
+        if collide:
+            first_collision_angle = angle
+            first_collision_pair = pair
+            break
 
         if index % clearance_stride == 0:
             link_a, link_b, result = scene.worst_pair_at_pose(pose)
@@ -207,13 +232,6 @@ def _sweep_and_validate(
             if result.clearance_m is not None and (min_clearance is None or result.clearance_m < min_clearance):
                 min_clearance = result.clearance_m
                 min_clearance_kind = result.clearance_kind
-        else:
-            collide, pair = scene.is_colliding_at_pose(pose)
-
-            if collide:
-                first_collision_angle = angle
-                first_collision_pair = pair
-                break
 
     if first_collision_angle is not None:
         gate = "FAIL"

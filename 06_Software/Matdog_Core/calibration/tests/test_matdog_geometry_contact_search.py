@@ -177,15 +177,36 @@ class TestModelLimitMismatch(unittest.TestCase):
         self.assertTrue(result.model_limit_mismatch)
         self.assertIsNotNone(result.delta_from_declared_rad)
         self.assertGreater(abs(result.delta_from_declared_rad), math.radians(2.0))
-        # Item F: a mesh contact far beyond the declared limit must never
-        # be auto-promoted to MODELED_ENDSTOP_CONTACT just because it
-        # exists -- and with no hardware oracle for RF, the only
-        # reachable non-endpoint status is MODEL_LIMIT_MISMATCH (never
-        # MODEL_INCOMPLETE, which is reserved for legs with a hardware
-        # oracle proving disagreement).
-        self.assertEqual(result.contact_model_status, "MODEL_LIMIT_MISMATCH")
+
+        # Item F, the invariant this test exists to protect: a mesh contact far
+        # beyond the declared limit is NEVER auto-promoted to a designed
+        # endpoint just because it exists. Still true.
+        self.assertNotEqual(result.contact_model_status, "MODELED_ENDSTOP_CONTACT")
+
+        # RF has no hardware oracle, so neither hardware comparison is available
+        # and MODEL_INCOMPLETE (reserved for a proven hardware disagreement)
+        # stays unreachable.
         self.assertEqual(result.hardware_vs_urdf_status, "NOT_AVAILABLE")
         self.assertEqual(result.mesh_vs_hardware_status, "NOT_AVAILABLE")
+        self.assertNotEqual(result.contact_model_status, "MODEL_INCOMPLETE")
+
+        # Phase 1B: this pose (LOWER prerequisite, upper=+90 deg) puts a
+        # same-leg obstruction ahead of the hip's own articulation contact, and
+        # a path obstruction outranks the mismatch diagnostic. v3 reported only
+        # CROSS-leg obstructions, so it could not see this and fell through to
+        # MODEL_LIMIT_MISMATCH. Surfacing same-leg path events is a required
+        # Phase 1B behaviour, not a regression -- the mismatch diagnostic itself
+        # is still set (asserted above) and is covered directly, without a path
+        # collision in play, by
+        # TestLFV25MeshVsHardwareReconciliation.
+        # test_model_limit_mismatch_remains_available_as_independent_diagnostic.
+        self.assertEqual(result.contact_model_status, "PATH_COLLISION_BEFORE_ENDPOINT")
+        self.assertIsNotNone(result.path_collision_angle_rad)
+        self.assertLess(
+            abs(result.path_collision_angle_rad),
+            abs(result.mesh_predicted_contact_rad),
+            "a path obstruction may only outrank the endpoint if it genuinely comes first",
+        )
 
 
 class TestClassifyContactModelStatusUnintendedSelfCollision(unittest.TestCase):
@@ -209,7 +230,7 @@ class TestClassifyContactModelStatusUnintendedSelfCollision(unittest.TestCase):
 
         status, reason, hw_note, hw_vs_urdf, mesh_vs_hw = _classify_contact_model_status(
             endpoint,
-            same_leg_found=True,
+            active_pair_found=True,
             mesh_contact_rad=coarse_step * 1.5,  # well within 2 coarse steps of home
             delta_rad=coarse_step * 1.5 - endpoint.urdf_upper_rad,
             mismatch=True,
@@ -236,7 +257,7 @@ class TestClassifyContactModelStatusUnintendedSelfCollision(unittest.TestCase):
 
         status, reason, hw_note, hw_vs_urdf, mesh_vs_hw = _classify_contact_model_status(
             endpoint,
-            same_leg_found=True,
+            active_pair_found=True,
             mesh_contact_rad=endpoint.urdf_lower_rad - 0.001,  # near declared, far from home
             delta_rad=-0.001,
             mismatch=False,
@@ -323,7 +344,7 @@ class TestLFV25MeshVsHardwareReconciliation(unittest.TestCase):
         mesh_contact_rad = -1.709725  # -97.957 deg, this session's confirmed compiler search result
         status, reason, hw_note, hw_vs_urdf, mesh_vs_hw = _classify_contact_model_status(
             endpoint,
-            same_leg_found=True,
+            active_pair_found=True,
             mesh_contact_rad=mesh_contact_rad,
             delta_rad=mesh_contact_rad - endpoint.urdf_lower_rad,
             mismatch=True,
@@ -348,7 +369,7 @@ class TestLFV25MeshVsHardwareReconciliation(unittest.TestCase):
                 endpoint = self._endpoint(endpoint_id)
                 status, reason, hw_note, hw_vs_urdf, mesh_vs_hw = _classify_contact_model_status(
                     endpoint,
-                    same_leg_found=False,
+                    active_pair_found=False,
                     mesh_contact_rad=None,
                     delta_rad=None,
                     mismatch=False,
@@ -360,44 +381,58 @@ class TestLFV25MeshVsHardwareReconciliation(unittest.TestCase):
                 self.assertEqual(mesh_vs_hw, "NO_MESH_CONTACT")
                 self.assertIsNotNone(hw_note)
 
-    def test_all_six_lf_hardware_validated_endpoints_are_model_incomplete(self):
-        """Point 3: with the real mesh-search results from this session
-        (hip_min/lower_min have a mesh contact several degrees past
-        hardware; hip_max/upper_min/upper_max/lower_max have no mesh
-        contact at all), every one of the 6 hardware-validated LF
-        endpoints must resolve to MODEL_INCOMPLETE -- none of the six
-        mesh contacts (or absences) actually correspond to where V25
-        hardware proved the real endstop is."""
+    def test_lf_endpoints_classified_by_agreement_with_the_hardware_oracle(self):
+        """Point 3, updated for Phase 1B.
 
-        # (endpoint_id, mesh_contact_rad or None) -- mesh values are this
-        # session's confirmed compiler search results (geometry search is
-        # unchanged by this classification fix).
+        The invariant under test is unchanged: an LF mesh contact is promoted to
+        MODELED_ENDSTOP_CONTACT only when it agrees with the V25 hardware
+        oracle, and must fall to MODEL_INCOMPLETE when it disagrees -- never
+        promoted merely because a contact exists.
+
+        What changed is the data. Under v3 the search looked at NON-adjacent
+        pairs and produced a contact for only two LF endpoints (-47.500 deg and
+        -97.957 deg), both disagreeing, so all six resolved to MODEL_INCOMPLETE.
+        Phase 1B measures the ACTIVE REVOLUTE pair and finds a contact on all
+        six; three now agree with hardware. Pinning the old six-way
+        MODEL_INCOMPLETE result here would enshrine a superseded conclusion, so
+        these are the Phase 1B compiler values (run 2026-08-08_231600).
+        """
+        # endpoint_id -> (mesh_contact_rad, expected_status)
         cases = {
-            "lf_hip_min": -0.829031394697,  # -47.500 deg
-            "lf_hip_max": None,
-            "lf_upper_leg_min": None,
-            "lf_upper_leg_max": None,
-            "lf_lower_leg_min": -1.709725,  # -97.957 deg
-            "lf_lower_leg_max": None,
+            "lf_hip_min": (math.radians(-46.0117), "MODEL_INCOMPLETE"),        # hw -42.8027
+            "lf_hip_max": (math.radians(45.2305), "MODEL_INCOMPLETE"),         # hw +39.3750
+            "lf_upper_leg_min": (math.radians(-52.0391), "MODELED_ENDSTOP_CONTACT"),   # hw -53.5254
+            "lf_upper_leg_max": (math.radians(121.8750), "MODELED_ENDSTOP_CONTACT"),   # hw +122.6074
+            "lf_lower_leg_min": (math.radians(-92.0703), "MODELED_ENDSTOP_CONTACT"),   # hw -91.8457
+            "lf_lower_leg_max": (math.radians(38.1797), "MODEL_INCOMPLETE"),   # hw +34.2773
         }
         self.assertEqual(set(cases), set(LF_V25_HARDWARE_EVIDENCE))
 
-        for endpoint_id, mesh_contact_rad in cases.items():
+        for endpoint_id, (mesh_contact_rad, expected_status) in cases.items():
             with self.subTest(endpoint_id=endpoint_id):
                 endpoint = self._endpoint(endpoint_id)
                 declared = endpoint.urdf_upper_rad if endpoint_id.endswith("max") else endpoint.urdf_lower_rad
+                delta = mesh_contact_rad - declared
                 status, reason, hw_note, hw_vs_urdf, mesh_vs_hw = _classify_contact_model_status(
                     endpoint,
-                    same_leg_found=mesh_contact_rad is not None,
+                    active_pair_found=True,
                     mesh_contact_rad=mesh_contact_rad,
-                    delta_rad=(mesh_contact_rad - declared) if mesh_contact_rad is not None else None,
-                    mismatch=(mesh_contact_rad is not None),
+                    delta_rad=delta,
+                    mismatch=abs(delta) > math.radians(2.0),
                     coarse_step_rad=math.radians(1.0),
                     path_collision_angle_rad=None,
                     model_limit_mismatch_threshold_deg=2.0,
                 )
-                self.assertEqual(status, "MODEL_INCOMPLETE", f"{endpoint_id}: got {status} ({reason})")
-                self.assertIn(mesh_vs_hw, ("DISAGREES", "NO_MESH_CONTACT"))
+                self.assertEqual(status, expected_status, f"{endpoint_id}: got {status} ({reason})")
+                self.assertEqual(
+                    mesh_vs_hw,
+                    "AGREES" if expected_status == "MODELED_ENDSTOP_CONTACT" else "DISAGREES",
+                )
+                self.assertIsNotNone(hw_note)
+
+        # Exactly the three endpoints carried as an explicit Phase 1B UNKNOWN.
+        incomplete = {k for k, (_m, s) in cases.items() if s == "MODEL_INCOMPLETE"}
+        self.assertEqual(incomplete, {"lf_hip_min", "lf_hip_max", "lf_lower_leg_max"})
 
     def test_model_limit_mismatch_remains_available_as_independent_diagnostic(self):
         """Point 4: MODEL_LIMIT_MISMATCH must still be reachable as the
@@ -409,7 +444,7 @@ class TestLFV25MeshVsHardwareReconciliation(unittest.TestCase):
         rf_endpoint = self._endpoint("rf_hip_max")
         status, reason, hw_note, hw_vs_urdf, mesh_vs_hw = _classify_contact_model_status(
             rf_endpoint,
-            same_leg_found=True,
+            active_pair_found=True,
             mesh_contact_rad=rf_endpoint.urdf_upper_rad + math.radians(2.5),
             delta_rad=math.radians(2.5),
             mismatch=True,
@@ -427,7 +462,7 @@ class TestLFV25MeshVsHardwareReconciliation(unittest.TestCase):
         lf_endpoint = self._endpoint("lf_hip_min")
         status, reason, hw_note, hw_vs_urdf, mesh_vs_hw = _classify_contact_model_status(
             lf_endpoint,
-            same_leg_found=True,
+            active_pair_found=True,
             mesh_contact_rad=-0.829031394697,
             delta_rad=-0.829031394697 - lf_endpoint.urdf_lower_rad,
             mismatch=True,
@@ -454,7 +489,7 @@ class TestLFV25MeshVsHardwareReconciliation(unittest.TestCase):
 
                 with self.subTest(endpoint_id=endpoint_id, case="mesh_found_mismatched"):
                     status, *_ = _classify_contact_model_status(
-                        endpoint, same_leg_found=True,
+                        endpoint, active_pair_found=True,
                         mesh_contact_rad=declared + math.radians(6.0),
                         delta_rad=math.radians(6.0), mismatch=True,
                         coarse_step_rad=math.radians(1.0), path_collision_angle_rad=None,
@@ -465,7 +500,7 @@ class TestLFV25MeshVsHardwareReconciliation(unittest.TestCase):
 
                 with self.subTest(endpoint_id=endpoint_id, case="no_mesh_found"):
                     status, *_ = _classify_contact_model_status(
-                        endpoint, same_leg_found=False,
+                        endpoint, active_pair_found=False,
                         mesh_contact_rad=None, delta_rad=None, mismatch=False,
                         coarse_step_rad=math.radians(1.0), path_collision_angle_rad=None,
                         model_limit_mismatch_threshold_deg=2.0,

@@ -49,15 +49,16 @@ def _endpoint_row(record: dict[str, Any]) -> str:
         f"| {record['leg'].upper()} | {record['joint_group']} | {record['side']} "
         f"| {_deg(record['urdf_declared_limit_rad'])} | {_deg(record['mesh_predicted_contact_rad'])} "
         f"| {delta} | {pair_text} | {_mm(record['clearance_before_contact_m'])} "
-        f"| **{record.get('contact_model_status', record['result_kind'])}** | {path_text} |"
+        f"| **{record.get('contact_model_status', record['result_kind'])}** "
+        f"| {record.get('endpoint_evidence_class', '-')} | {path_text} |"
     )
 
 
 def _endpoint_table(endpoints: list[dict[str, Any]]) -> str:
     header = (
         "| Leg | Joint | Side | Declared URDF | Mesh predicted contact | Delta | Contact pair "
-        "| Clearance before contact | Contact model status | Path collision (if any) |\n"
-        "|---|---|---|---:|---:|---:|---|---:|---|---|\n"
+        "| Clearance before contact | Contact model status | Evidence class | Path collision (if any) |\n"
+        "|---|---|---|---:|---:|---:|---|---:|---|---|---|\n"
     )
     rows = "\n".join(_endpoint_row(r) for r in sorted(endpoints, key=lambda r: r["endpoint_id"]))
     return header + rows
@@ -180,7 +181,7 @@ def render_report(profile: dict[str, Any]) -> str:
     lf_v25_rows: list[dict[str, Any]] = profile.get("lf_v25_hardware_reconciliation", [])
 
     lines: list[str] = []
-    lines.append("# MATDOG Calibration Geometry Profile — Phase 1 report")
+    lines.append("# MATDOG Calibration Geometry Profile — Phase 1B report")
     lines.append("")
     lines.append(f"schema_version: `{profile['schema_version']}`")
     lines.append(f"generation_timestamp_utc: `{profile['generation_timestamp_utc']}`")
@@ -191,6 +192,32 @@ def render_report(profile: dict[str, Any]) -> str:
     lines.append("")
     lines.append("HARDWARE NOT USED. NORMA-CORE NOT MODIFIED. NO COMMIT/PUSH/PR/MERGE.")
     lines.append("")
+
+    policy = profile.get("pair_policy")
+    if policy:
+        lines.append("## Pair policy in force (Phase 1B)")
+        lines.append("")
+        lines.append(f"`{policy['policy_version']}`, supersedes `{policy['supersedes']}`.")
+        lines.append("")
+        lines.append("| concern | rule |")
+        lines.append("|---|---|")
+        lines.append(f"| REVOLUTE adjacent ({policy['revolute_adjacent_pair_count']} pairs) "
+                     f"| {policy['rules']['revolute_adjacent']} |")
+        lines.append(f"| FIXED adjacent ({policy['fixed_adjacent_pair_count']} pairs) "
+                     f"| {policy['rules']['fixed_adjacent']} |")
+        lines.append(f"| NON adjacent | {policy['rules']['non_adjacent']} |")
+        lines.append(f"| ENDSTOP METROLOGY | {policy['endstop_metrology']} |")
+        lines.append(f"| PATH SAFETY | {policy['path_safety']} |")
+        lines.append(f"| clearance gate applies to | {policy['clearance_gate_applies_to']} |")
+        lines.append("")
+        lines.append(f"Clearance gate exclusion: {policy['clearance_gate_excluded_from']}.")
+        lines.append("")
+        lines.append("Evidence classes: `HARDWARE_CONFIRMED_CONTACT` (mesh agrees with a real "
+                     "hardware oracle), `HARDWARE_CONTRADICTED`, `GEOMETRIC_ENDPOINT_CANDIDATE` "
+                     "(model prediction awaiting hardware validation -- RF/RH/LH), `PATH_LIMITED`, "
+                     "`NO_MODELED_CONTACT`. An adjacent contact is never auto-promoted to "
+                     "\"hardware hardstop\".")
+        lines.append("")
 
     lines.append("## LF V25 hardware reconciliation (read before the 24-endpoint table)")
     lines.append("")
