@@ -14,16 +14,33 @@ plan structure and the q=0 policy.
 
 ### robot-dog
 
+Provenance is recorded as **merge points**, not as a repository HEAD. A tracked document
+cannot correctly pin the HEAD of the very history that contains it: the commit adding or
+editing this file necessarily moves `main`. Merge SHAs are immutable and are therefore the
+durable reference.
+
 ```text
-final main                5b66044e225fcd921e44b98cc710f028da441a64
-PR #16                    MERGED (squash) 2026-08-09
-                          feat(calib): complete adjacent endstop metrology Phase 1B
-                          head was 2d39180307ecbcf273517751f7d58da29f47dc48 (24 files)
-PR #15                    CLOSED, NEVER MERGED (superseded)
-                          head 751fe1eff44a2d97714438a040f04f4a8050ea04
-remote branches           main only
-local branches            main only
+Phase 1B technical merge        PR #16, squash
+                                merge SHA 5b66044e225fcd921e44b98cc710f028da441a64
+                                feat(calib): complete adjacent endstop metrology Phase 1B
+                                head was 2d39180307ecbcf273517751f7d58da29f47dc48 (24 files)
+
+Phase 1B documentation closeout PR #17, squash
+                                merge SHA 2363b2a4e86b0fb440837dbd1d8698ed5666dcb1
+                                docs(calib): close Phase 1B and hand off Phase 2
+
+Superseded, never merged        PR #15
+                                head 751fe1eff44a2d97714438a040f04f4a8050ea04
+
+canonical branch                main
+current canonical HEAD          resolve from `origin/main` -- intentionally NOT self-pinned
+                                here, for the reason given above
+remote branches                 main only
+local primary checkout          main only, clean
 ```
+
+Later documentation-consistency commits may follow these merges; they do not change the Phase 1B
+engineering result, which is fixed by PR #16.
 
 Deleted after proof of preservation (identical trees, no worktree, no uncommitted state):
 `matdog/geometry-adjacent-endstop-phase1b`, `matdog/geometry-compiler-phase1`,
