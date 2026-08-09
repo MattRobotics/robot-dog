@@ -27,16 +27,32 @@ complete all-leg calibration: not yet validated
 
 No V28–V42 or “all legs” experimental implementation is a current program. Future leg work must start from merged `norma-core/main` and generalize the proven V25 architecture through data-driven leg profiles.
 
-## Canonical calibration architecture update — 2026-08-07
+## Canonical calibration contract — current entry point
 
-The current development contract for the next calibration phase is:
+The **current operational entry point and contract for Phase 2** is:
+
+```text
+06_Software/Matdog_Core/calibration/
+MATDOG_CALIBRATION_CANONICAL_HANDOFF_PHASE1B_CLOSED_2026-08-09.md
+```
+
+Read that first. It records the Phase 1B closure state, the canonical geometry hashes and
+schema-v4 artifacts, the open engineering items, and the Phase 2A/2B/2C → Phase 3 entry
+conditions.
+
+### Retained architectural reference — 2026-08-07
 
 ```text
 06_Software/Matdog_Core/calibration/
 MATDOG_CALIBRATION_CANONICAL_HANDOFF_2026-08-07.md
 ```
 
-That document supersedes older RF development prescriptions where they conflict with it. In particular it freezes the geometry-first three-phase plan:
+This earlier handoff is **retained as an architectural and historical reference**, not deleted.
+It is **no longer the current Phase-2 entry point**: where the two conflict on endpoint
+metrology or on the pre-Phase-2 plan, the 2026-08-09 handoff governs. It remains authoritative
+for the material the newer document does not restate, and it still supersedes older RF
+development prescriptions where they conflict with it. In particular it froze the geometry-first
+three-phase plan:
 
 ```text
 1. offline Geometry Compiler / 24 mesh-predicted contacts and safe paths
