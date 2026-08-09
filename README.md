@@ -49,7 +49,7 @@ Private research material is intentionally excluded from this public repository 
 | Encoder-to-radian conversion and live read-only FK | Validated for all four legs |
 | Offline contact, collision, timing and support references | Validated as engineering references |
 | Geometry Compiler Phase 1 (24-endpoint offline audit) | Validated 2026-08-07; endpoint metrology **superseded by Phase 1B** |
-| Geometry Compiler Phase 1B (adjacent revolute endstop metrology) | **Locally validated 2026-08-08 (24/24 endpoints, full suite 122/122 PASS); closure candidate pending human review** |
+| Geometry Compiler Phase 1B (adjacent revolute endstop metrology) | **VALIDATED AND MERGED** — 24/24 endpoints, final geometry suite 122/122 PASS, schema v4 current canonical (PR #16, `5b66044`) |
 | Collision-mesh motor-pin representation | Corrected in 5 STLs, `rev00` unchanged |
 | Mechanical end-stop calibration | **LF only: V25 hardware validated and frozen** |
 | RF, RH and LH mechanical calibration | Not yet hardware validated |
@@ -351,13 +351,46 @@ RF + LH
 
 ### Geometry Compiler
 
-- [x] Phase 1 — 24-endpoint offline audit (2026-08-07, schema v3)
+- [x] Phase 1 — 24-endpoint offline audit (2026-08-07, schema v3; superseded for endpoint metrology)
 - [x] GATE A — adjacent-link raw baseline diagnostic
 - [x] GATE B — motor-pin clearance mesh correction, verdict SUPPORTED
-- [x] Phase 1B — joint-aware adjacency, endstop metrology vs path safety (schema v4)
+- [x] **Phase 1B — CLOSED**, merged via PR #16 (`5b66044`): joint-aware adjacency, endstop
+      metrology vs path safety, schema v4 canonical
 - [ ] Resolve the three LF hardware-contradicted endpoints
 - [ ] Hardstop-surface-local sensitivity method for adjacent endpoints
-- [ ] Phase 2 — generic V25-derived full-leg engine in norma-core — **NOT STARTED**
+
+## Next milestone — Phase 2 (NOT STARTED)
+
+Phase 1B is closed. The next milestone is a **generic V25-derived full-leg engine in
+`norma-core`**. It has **not** been started.
+
+**Phase 2A — offline engine generalization.** Start from current merged `norma-core` `main`.
+The historical RF worktree (`matdog/rf-calibrator-from-lf-v25`) is preserved **evidence**, not
+the development base. Generalize the proven LF V25 architecture through **data-driven leg
+profiles** (LF, RF, RH, LH), preserving the permanent contracts: Station is sole serial owner
+during motion; `GoalPosition` unsigned `0..4095` with no signed wrap; contact acquisition RAM-only
+until an explicit persistence gate; no Position Offset / EEPROM change without a separately
+authorized transactional backup/readback/rollback; torque OFF on every hardware exit and failure
+path. Schema-v4 outputs must be consumed correctly — RF/RH/LH endpoints are
+`GEOMETRIC_ENDPOINT_CANDIDATE`, i.e. predicted search targets and bounds, **not**
+hardware-confirmed stops, and must never silently overwrite URDF or q0. LF V25 remains the
+immutable hardware oracle and is not re-run or re-zeroed because three modeled endpoints disagree.
+
+**Phase 2B — path/parking pre-hardware gate.** Before any new real-leg calibration motion, the
+parking/path-safety planning whose gate is still `passed=False` on all four legs must be resolved
+or explicitly redesigned, and prerequisites/parking validated for the leg being calibrated under
+the Phase 1B semantics (active revolute contact = endstop metrology; every other relevant contact
+= path safety). No motion is authorized merely because an endpoint candidate exists. Parking being
+unchanged from v3 was acceptable for Phase 1B closure; it is **not** acceptable to ignore before
+Phase 2 hardware execution.
+
+**Phase 2C — offline validation.** Unit tests, deterministic leg-profile mapping, FRONT/HIND
+geometry handling, mirror logic, safe prerequisites, path/parking checks, failure/abort paths,
+torque-off contracts, and no hardware imports or access in offline tests.
+
+**Phase 3 — hardware.** Only after Phase 2 offline review and a **new explicit hardware
+authorization**: RF → validate/freeze → RH → validate/freeze → LH → validate/freeze → complete
+twelve-joint persistent profile. Legs are **not** batch-approved; each remains its own evidence gate.
 
 ### Locomotion
 

@@ -58,6 +58,7 @@ REPOSITORY_VERIFICATION_INDEX.md
 06_Software/Matdog_Core/calibration/MATDOG_MECHANICAL_ENDSTOP_GEOMETRY_CHECKPOINT_2026-07-20.md
 06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1_COMPLETION_2026-08-07.md
 06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1B_ADDENDUM_2026-08-08.md
+06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_CANONICAL_HANDOFF_PHASE1B_CLOSED_2026-08-09.md
 09_Logs/Development_Log/2026-08-04_LF_V25_AND_REPOSITORY_CLEANUP.md
 09_Logs/Validation_Reports/Geometry_Compiler/README.md
 ```
@@ -119,11 +120,26 @@ Diagnostic evidence archived (not in this repository):
 Full record:
 `06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1B_ADDENDUM_2026-08-08.md`
 
-Step 2 of the three-phase plan (generic V25-derived full-leg engine in
-norma-core) has **not** started.
+### Closure state
 
-An earlier draft documentation PR (#15) predates GATE A/GATE B and is
-**superseded**; it must not be used as a source of truth.
+```text
+Phase 1B: CLOSED
+  PR #16 merged (squash) 2026-08-09 -> main 5b66044e225fcd921e44b98cc710f028da441a64
+  PR #15 CLOSED, NEVER MERGED (superseded; head 751fe1eff44a2d97714438a040f04f4a8050ea04)
+  remote branches after cleanup: main only
+Phase 2: NEXT, NOT STARTED
+```
+
+PR #15 predates GATE A/GATE B. Its schema-v3 bounded-envelope clarification remains
+valid **historically for v3** and is preserved in the closed PR. Its operational
+recommendation (Phase 1 -> extended `NO_MODELED_ENDSTOP` audit -> Phase 2) is
+**superseded and must not be used as the current plan**: schema v4 resolves 24/24
+endpoints with 0 `NO_MODELED_ENDSTOP`, so that audit is no longer the pre-Phase-2
+blocker.
+
+Step 2 of the three-phase plan (generic V25-derived full-leg engine in norma-core)
+has **not** started. The canonical Phase 2 entry conditions are recorded in
+`06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_CANONICAL_HANDOFF_PHASE1B_CLOSED_2026-08-09.md`.
 
 ## Repository hygiene policy
 
