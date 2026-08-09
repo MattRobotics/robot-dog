@@ -57,19 +57,73 @@ REPOSITORY_VERIFICATION_INDEX.md
 06_Software/Matdog_Core/calibration/MATDOG_LF_CALIBRATION_V25_FINAL.md
 06_Software/Matdog_Core/calibration/MATDOG_MECHANICAL_ENDSTOP_GEOMETRY_CHECKPOINT_2026-07-20.md
 06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1_COMPLETION_2026-08-07.md
+06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1B_ADDENDUM_2026-08-08.md
 09_Logs/Development_Log/2026-08-04_LF_V25_AND_REPOSITORY_CLEANUP.md
+09_Logs/Validation_Reports/Geometry_Compiler/README.md
+```
+
+Historical, retained, superseded for endpoint metrology:
+
+```text
 09_Logs/Validation_Reports/Geometry_Compiler/2026-08-07_204107_MATDOG_CALIBRATION_GEOMETRY_PROFILE.json
 09_Logs/Validation_Reports/Geometry_Compiler/2026-08-07_204107_MATDOG_CALIBRATION_GEOMETRY_REPORT.md
 ```
 
-## Geometry Compiler Phase 1 — closed 2026-08-07
+## Geometry Compiler Phase 1 — closed 2026-08-07, endpoint metrology SUPERSEDED
 
 `PASS_GEOMETRY_COMPILER_COMPLETE_WITH_EXPLICIT_MODEL_GAPS`, offline only,
 24/24 endpoints processed, schema v3. See
 `06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1_COMPLETION_2026-08-07.md`
-for the full record. This closes step 1 of the three-phase plan in the
-canonical calibration architecture update above; step 2 (generic
-V25-derived full-leg engine in norma-core) has not started.
+for the full record.
+
+Phase 1's **endpoint metrology is superseded by Phase 1B** (below). The v3
+artifacts are retained unchanged as historical evidence and must not be
+deleted; they remain an accurate description of what the v3 policy could
+observe. They are no longer the source of truth for joint endpoints.
+
+## Geometry Compiler Phase 1B — adjacent revolute endstop metrology, 2026-08-08
+
+Phase 1 reported LF 6/6 `MODEL_INCOMPLETE`. The cause was not missing STL
+hardstop geometry. Two defects compounded:
+
+```text
+1. policy: `adjacent pair -> EXCLUDE` treated REVOLUTE hinges and FIXED
+   structural attachments identically, making the real hardstop -- which
+   lives ON the revolute parent/child pair -- unobservable by construction
+2. mesh: the assembly STLs modelled the motor centre pins in nominal contact
+   with the adjacent link, so adjacent pairs read INTERSECTING at every angle
+```
+
+Corrected policy, derived from URDF topology rather than a hard-coded list:
+
+```text
+parent-child REVOLUTE -> INCLUDE in collision analysis        (12 pairs)
+parent-child FIXED    -> structural attachment -> EXCLUDE      (4 pairs)
+
+ENDSTOP METROLOGY = active revolute parent-child pair
+PATH SAFETY       = all other relevant collision pairs
+```
+
+Five collision meshes corrected for the motor-pin representation
+(`base_link.stl`, `lf/rf/rh/lh_upper_leg_link.stl`). Canonical filenames,
+same local frame/scale/coordinates; **`rev00` unchanged and the URDF
+byte-identical**. All other STLs untouched.
+
+Diagnostic evidence archived (not in this repository):
+
+```text
+/home/matteo-manicardi/MATDOG/_archive/geometry-diagnostics/GATE_A_ADJACENT_BASELINE_2026-08-08
+/home/matteo-manicardi/MATDOG/_archive/geometry-diagnostics/GATE_B_MOTORPIN_SUPPORTED_2026-08-08
+```
+
+Full record:
+`06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1B_ADDENDUM_2026-08-08.md`
+
+Step 2 of the three-phase plan (generic V25-derived full-leg engine in
+norma-core) has **not** started.
+
+An earlier draft documentation PR (#15) predates GATE A/GATE B and is
+**superseded**; it must not be used as a source of truth.
 
 ## Repository hygiene policy
 

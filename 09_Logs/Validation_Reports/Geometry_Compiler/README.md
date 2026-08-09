@@ -8,7 +8,11 @@ were deleted; each is kept for audit trail per repository hygiene policy.
 |---|---|---|---|
 | `2026-08-07_155742` | v1 | **SUPERSEDED** (historical / pre-reconciliation) | `b327aa21fa3ec29b5e1762831883e85d448662134b4ff0892952920d43fbb322` |
 | `2026-08-07_193932` | v2 | **SUPERSEDED** (intermediate reconciliation) | `d3db673832bba3803082231717d578c5e15a70d47ce11ba59beded76777fc7d3` |
-| `2026-08-07_204107` | v3 | **FINAL CANONICAL PHASE-1** | `6b438285f7145b2cb4f9fc11f1e9b2342dfbb7360d83976ad9a25cd590a0b7c5` |
+| `2026-08-07_204107` | v3 | **SUPERSEDED for endpoint metrology** by Phase 1B; retained as historical Phase-1 canonical | `6b438285f7145b2cb4f9fc11f1e9b2342dfbb7360d83976ad9a25cd590a0b7c5` |
+| `2026-08-08_231600` | v4 | **CURRENT CANONICAL** (Phase 1B, adjacent revolute endstop metrology) | `c2e980bfc49e80b957fc0a326b1ac98724fc1d4ac16121da19fcf6ab2be3eff6` |
+
+Nothing here is ever deleted. A run marked SUPERSEDED remains an accurate record of what the
+policy of its day could observe; it is simply no longer the source of truth.
 
 ## `2026-08-07_155742` — SUPERSEDED
 
@@ -30,7 +34,7 @@ the MESH-vs-HARDWARE gap -- the wrong comparison for that decision. Also
 had a sign error in 3 of 6 LF hardware-contact-angle derivations
 (hip_min, upper_leg_min, lower_leg_min).
 
-## `2026-08-07_204107` — FINAL CANONICAL PHASE-1 (schema v3)
+## `2026-08-07_204107` — HISTORICAL PHASE-1 CANONICAL, SUPERSEDED for endpoint metrology (schema v3)
 
 `contact_model_status` for a hardware-oracle endpoint (LF only) is now
 driven by MESH-vs-HARDWARE agreement; HARDWARE-vs-URDF agreement is kept
@@ -48,3 +52,36 @@ never auto-promoted to `MODEL_INCOMPLETE`), 14 `NO_MODELED_ENDSTOP`, 0
 Full record: `06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1_COMPLETION_2026-08-07.md`.
 
 Status: `PASS_GEOMETRY_COMPILER_COMPLETE_WITH_EXPLICIT_MODEL_GAPS`.
+
+**Superseded for endpoint metrology by Phase 1B (2026-08-08).** The LF 6/6
+`MODEL_INCOMPLETE` verdict above was not caused by missing STL hardstop geometry.
+It was caused by the blanket `adjacent pair -> EXCLUDE` policy (which made the
+hardstop unobservable, since it lives on the revolute parent/child pair) combined
+with motor centre pins modelled in nominal contact in the assembly STLs (which
+made every adjacent pair read INTERSECTING at every angle). See the Phase 1B
+entry below. This run is retained unchanged.
+
+## `2026-08-08_231600` — CURRENT CANONICAL (schema v4, Phase 1B)
+
+First run with joint-aware adjacency and the corrected motor-pin collision meshes.
+
+Policy in force:
+
+```text
+parent-child REVOLUTE -> INCLUDE in collision analysis        (12 pairs)
+parent-child FIXED    -> structural attachment -> EXCLUDE      (4 pairs)
+
+ENDSTOP METROLOGY = active revolute parent-child pair
+PATH SAFETY       = all other relevant collision pairs
+```
+
+Schema v4 adds `active_revolute_pair`, `pair_class` and `endpoint_evidence_class`
+per endpoint, plus a top-level `pair_policy` block. `endpoint_evidence_class`
+exists so a modeled adjacent contact is never silently promoted to a
+hardware-confirmed mechanical contact: LF has a V25 hardware oracle, RF/RH/LH
+carry `GEOMETRIC_ENDPOINT_CANDIDATE` pending their own hardware validation.
+
+Full record:
+`06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1B_ADDENDUM_2026-08-08.md`.
+
+Status: `PASS_PHASE1B_24_OF_24_ADJACENT_ENDPOINTS_WITH_EXPLICIT_LF_HARDWARE_GAPS`.

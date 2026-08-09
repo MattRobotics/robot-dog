@@ -1,0 +1,51 @@
+{
+ "manifest_version": "matdog.collision_mesh_manifest.v1",
+ "generated_for_profile": "2026-08-08_231600_MATDOG_CALIBRATION_GEOMETRY_PROFILE.json",
+ "profile_content_sha256": "928ff09616a1ad80df029a99afe2061e41a0bedec6bfdc9b3f80f74af4867828",
+ "profile_schema_version": "matdog.calibration_geometry_profile.v4",
+ "urdf_relative_path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+ "urdf_sha256": "5e28da3dba10fd3f2ea6ebf6f5d6271157bda0b12b82d92aedbe3031643089ef",
+ "urdf_changed_in_phase1b": false,
+ "model_revision": "rev00 (unchanged)",
+ "phase1b_changed_meshes": {
+  "base_link.stl": {
+   "old_sha256": "7b149643a6a71ae8ac37780085c021c5bff0c4491ebd42f1393150cb987e9e6e",
+   "new_sha256": "644a83e98fd116f3fc8e5d8792ca2b60b0bdb09bcafa4fc49140d641079e4b6b"
+  },
+  "lf_upper_leg_link.stl": {
+   "old_sha256": "dfaf754764ded80743b00ae5d1dde208301ab5a3cebc9e29a38d8513dbe4cd93",
+   "new_sha256": "3c484b110a622274d1f8446b30329b8e16a0ff542d25da2a39334d41e8f4f169"
+  },
+  "lh_upper_leg_link.stl": {
+   "old_sha256": "dfaf754764ded80743b00ae5d1dde208301ab5a3cebc9e29a38d8513dbe4cd93",
+   "new_sha256": "3c484b110a622274d1f8446b30329b8e16a0ff542d25da2a39334d41e8f4f169"
+  },
+  "rf_upper_leg_link.stl": {
+   "old_sha256": "3c2508690ac89d006d25cabf3917ce52dc2c0b09e4ec5e051da8f71ff1a7e760",
+   "new_sha256": "08fab5e3229280f21a52c6cfbfdab32f1e8345aae6e10648360ae30fe1e06b16"
+  },
+  "rh_upper_leg_link.stl": {
+   "old_sha256": "3c2508690ac89d006d25cabf3917ce52dc2c0b09e4ec5e051da8f71ff1a7e760",
+   "new_sha256": "08fab5e3229280f21a52c6cfbfdab32f1e8345aae6e10648360ae30fe1e06b16"
+  }
+ },
+ "all_collision_meshes": {
+  "base_link.stl": "644a83e98fd116f3fc8e5d8792ca2b60b0bdb09bcafa4fc49140d641079e4b6b",
+  "lf_foot_link.stl": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+  "lf_hip_link.stl": "7d28351aba669cc1a8e11ad60b89db001f9689b728e4e8eb05849af69e1e4879",
+  "lf_lower_leg_link.stl": "97f2bb775768fdbcef59638916eaef2cd34b21bf01e6197ef3900b0df85d7ae2",
+  "lf_upper_leg_link.stl": "3c484b110a622274d1f8446b30329b8e16a0ff542d25da2a39334d41e8f4f169",
+  "lh_foot_link.stl": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+  "lh_hip_link.stl": "543f6f04a4dc45a0b176eba8db8ab7819ab20a328aa4f7fd9c9d4b77c1612094",
+  "lh_lower_leg_link.stl": "97f2bb775768fdbcef59638916eaef2cd34b21bf01e6197ef3900b0df85d7ae2",
+  "lh_upper_leg_link.stl": "3c484b110a622274d1f8446b30329b8e16a0ff542d25da2a39334d41e8f4f169",
+  "rf_foot_link.stl": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+  "rf_hip_link.stl": "ebd664b3db2065ac3341184a6b12700caca6cdece57adae72f935882ed9df4c0",
+  "rf_lower_leg_link.stl": "c52ae662c09455f53db5bc8efc13332919942c7f938ada5a8c0e987f54ac3bc8",
+  "rf_upper_leg_link.stl": "08fab5e3229280f21a52c6cfbfdab32f1e8345aae6e10648360ae30fe1e06b16",
+  "rh_foot_link.stl": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+  "rh_hip_link.stl": "2e9f31952e51b5748546c803c06d72316a3a776226f1f72775c1e8d383e1f325",
+  "rh_lower_leg_link.stl": "c52ae662c09455f53db5bc8efc13332919942c7f938ada5a8c0e987f54ac3bc8",
+  "rh_upper_leg_link.stl": "08fab5e3229280f21a52c6cfbfdab32f1e8345aae6e10648360ae30fe1e06b16"
+ }
+}

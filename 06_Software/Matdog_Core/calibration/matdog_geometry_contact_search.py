@@ -37,10 +37,11 @@ from matdog_geometry_scene import (  # noqa: E402
     JOINT_GROUPS,
     LEG_IDS,
     RobotScene,
+    active_revolute_contact_pair,
     full_pose,
     joint_name,
     pair_is_cross_leg,
-    same_leg_non_adjacent_pairs,
+    path_safety_pairs,
 )
 
 
@@ -58,7 +59,7 @@ LOWER_PREREQUISITE_UPPER_RAD = 1.5707963267948966  # +90 deg, checkpoint search 
 
 MESH_HARDWARE_AGREEMENT_THRESHOLD_DEG = 2.0
 """When a direct hardware contact angle is known for an endpoint, a
-same-leg mesh contact within this many degrees of the REAL hardware
+active revolute pair contact within this many degrees of the REAL hardware
 contact (not the declared URDF limit) is accepted as representing that
 same physical event (MODELED_ENDSTOP_CONTACT). Matches
 DEFAULT_MODEL_LIMIT_MISMATCH_THRESHOLD_RAD's 2deg for consistency; no LF
@@ -182,10 +183,11 @@ class EndpointContactResult:
     endpoint: EndpointSpec
     result_kind: str
     """One of: MESH_CONTACT_FOUND, NO_MESH_CONTACT_IN_ENVELOPE -- outcome
-    of the ENDSTOP_CONTACT_POLICY (same-leg-only) search alone. A cross-leg
-    obstruction never appears here any more (it cannot: the same-leg
-    search's candidate pairs exclude every other leg by construction) --
-    see `path_collision_link_a/b` and `contact_model_status` for that."""
+    of the ENDSTOP METROLOGY (active revolute pair) search alone. A cross-leg
+    obstruction never appears here any more (it cannot: the endstop
+    metrology search evaluates exactly one pair, this joint's own active
+    revolute parent/child) -- see `path_collision_link_a/b` and
+    `contact_model_status` for that."""
     mesh_predicted_contact_rad: float | None
     contact_link_a: str | None
     contact_link_b: str | None
@@ -208,9 +210,10 @@ class EndpointContactResult:
     (see `_classify_contact_model_status`)."""
     contact_model_status_reason: str
     path_collision_angle_rad: float | None
-    """Angle (rad) of the first PATH_SELF_COLLISION_POLICY (full pair set,
-    cross-leg included) obstruction found in the sweep, independent of
-    the same-leg search above; None if none was found in the envelope."""
+    """Angle (rad) of the first PATH SAFETY obstruction found in the sweep
+    (every relevant pair except this joint's own active revolute pair and the
+    fixed structural attachments), independent of the endstop search above;
+    None if none was found in the envelope."""
     path_collision_link_a: str | None
     path_collision_link_b: str | None
     hardware_evidence_note: str | None
@@ -224,7 +227,7 @@ class EndpointContactResult:
     for that decision is mesh_vs_hardware_status below."""
     mesh_vs_hardware_status: str
     """AGREES | DISAGREES | NO_MESH_CONTACT | NOT_AVAILABLE -- does the
-    same-leg mesh contact (if any) correspond to the same real physical
+    active revolute pair contact (if any) correspond to the same real physical
     event the hardware oracle found. This is the primary comparison
     driving contact_model_status when a hardware oracle exists (canonical
     handoff reconciliation review): a mesh contact several degrees past
@@ -370,8 +373,8 @@ def _coarse_scout(
     coarse_step_rad resolution; thin endpoint-specific adapter over
     `bracket_collision_boundary`. `link_pairs=None` means the default
     PATH_SELF_COLLISION_POLICY (all non-adjacent pairs, cross-leg
-    included); pass `same_leg_non_adjacent_pairs(endpoint.leg)` for the
-    ENDSTOP_CONTACT_POLICY (this leg's own geometry only)."""
+    included); pass the active revolute pair for ENDSTOP METROLOGY, or
+    `path_safety_pairs(exclude_pair=...)` for PATH SAFETY."""
     declared = endpoint.urdf_declared_limit_rad
     sign = 1.0 if endpoint.side == "max" else -1.0
     envelope_end = declared + sign * envelope_margin_rad
@@ -407,7 +410,7 @@ def _bisect_to_resolution(
 def _classify_contact_model_status(
     endpoint: EndpointSpec,
     *,
-    same_leg_found: bool,
+    active_pair_found: bool,
     mesh_contact_rad: float | None,
     delta_rad: float | None,
     mismatch: bool,
@@ -419,11 +422,11 @@ def _classify_contact_model_status(
     (contact_model_status, reason, hardware_evidence_note,
     hardware_vs_urdf_status, mesh_vs_hardware_status).
 
-    Two collision policies feed this: the ENDSTOP_CONTACT_POLICY
-    (same-leg-only) search decides whether *this joint's own geometry*
-    shows a contact; the PATH_SELF_COLLISION_POLICY (full pair set)
-    search decides whether some *other* obstruction (almost always
-    cross-leg, by construction) is encountered first along the sweep.
+    Two collision policies feed this: ENDSTOP METROLOGY (the active revolute
+    parent/child pair alone) decides whether *this joint's own articulation*
+    reaches contact; PATH SAFETY (every other relevant pair) decides whether
+    some other obstruction -- same-leg or cross-leg -- is encountered first
+    along the sweep.
 
     When a hardware oracle is available (LF only, LF_V25_HARDWARE_EVIDENCE),
     the decision is driven by MESH vs HARDWARE agreement, not hardware vs
@@ -460,7 +463,7 @@ def _classify_contact_model_status(
 
     if hw_contact_rad is None:
         mesh_vs_hardware_status = "NOT_AVAILABLE"
-    elif not same_leg_found:
+    elif not active_pair_found:
         mesh_vs_hardware_status = "NO_MESH_CONTACT"
     else:
         assert mesh_contact_rad is not None
@@ -470,27 +473,27 @@ def _classify_contact_model_status(
         )
 
     has_path_collision = path_collision_angle_rad is not None
-    path_precedes_same_leg = has_path_collision and (
-        not same_leg_found or abs(path_collision_angle_rad) < abs(mesh_contact_rad)  # type: ignore[arg-type]
+    path_precedes_active_pair = has_path_collision and (
+        not active_pair_found or abs(path_collision_angle_rad) < abs(mesh_contact_rad)  # type: ignore[arg-type]
     )
 
-    if path_precedes_same_leg:
+    if path_precedes_active_pair:
         reason = (
-            f"cross-leg path obstruction found at {math.degrees(path_collision_angle_rad):.2f} deg, "  # type: ignore[arg-type]
-            "before any same-leg mesh contact in the envelope (or none exists at all); this is a "
-            "path/parking prerequisite, not this joint's own designed limit"
+            f"path obstruction found at {math.degrees(path_collision_angle_rad):.2f} deg, "  # type: ignore[arg-type]
+            "before this joint's active revolute pair makes contact in the envelope (or it never "
+            "does); this is a path/parking prerequisite, not this joint's own designed limit"
         )
         return "PATH_COLLISION_BEFORE_ENDPOINT", reason, hw_note, hardware_vs_urdf_status, mesh_vs_hardware_status
 
-    if same_leg_found:
+    if active_pair_found:
         assert mesh_contact_rad is not None and delta_rad is not None
         swept_from_home_rad = abs(mesh_contact_rad)
 
         if swept_from_home_rad <= 2.0 * coarse_step_rad:
             reason = (
-                f"same-leg mesh contact found within {math.degrees(swept_from_home_rad):.2f} deg of "
+                f"active-pair mesh contact found within {math.degrees(swept_from_home_rad):.2f} deg of "
                 "home (2 coarse steps or less) -- too close to home to plausibly be the intended "
-                "joint limit; flagged as an incidental/unintended same-leg collision rather than a "
+                "joint limit; flagged as an incidental/unintended articulation collision rather than a "
                 "designed endstop"
             )
             return (
@@ -502,7 +505,7 @@ def _classify_contact_model_status(
 
             if mesh_vs_hardware_status == "AGREES":
                 reason = (
-                    f"same-leg mesh contact at {math.degrees(mesh_contact_rad):.2f} deg agrees with the "
+                    f"active revolute pair contact at {math.degrees(mesh_contact_rad):.2f} deg agrees with the "
                     f"LF V25 hardware contact at {math.degrees(hw_contact_rad):.2f} deg (delta "
                     f"{mesh_hw_delta_deg:+.2f} deg, within the {MESH_HARDWARE_AGREEMENT_THRESHOLD_DEG:.1f} "
                     "deg agreement band) -- represents the same real physical event"
@@ -510,7 +513,7 @@ def _classify_contact_model_status(
                 status = "MODELED_ENDSTOP_CONTACT"
             else:
                 reason = (
-                    f"same-leg mesh contact at {math.degrees(mesh_contact_rad):.2f} deg does NOT match "
+                    f"active revolute pair contact at {math.degrees(mesh_contact_rad):.2f} deg does NOT match "
                     f"the LF V25 hardware contact at {math.degrees(hw_contact_rad):.2f} deg (delta "
                     f"{mesh_hw_delta_deg:+.2f} deg) -- this mesh event is not the real mechanical "
                     "endstop; recorded as a diagnostic collision only, not the endpoint"
@@ -527,7 +530,7 @@ def _classify_contact_model_status(
         # No hardware oracle for this leg: fall back to mesh-vs-declared-URDF.
         if not mismatch:
             reason = (
-                f"same-leg mesh contact at {math.degrees(mesh_contact_rad):.2f} deg is within "
+                f"active revolute pair contact at {math.degrees(mesh_contact_rad):.2f} deg is within "
                 f"{model_limit_mismatch_threshold_deg:.1f} deg of the declared limit "
                 "(no hardware oracle for this leg to cross-check against)"
             )
@@ -536,7 +539,7 @@ def _classify_contact_model_status(
             )
 
         reason = (
-            f"same-leg mesh contact at {math.degrees(mesh_contact_rad):.2f} deg is "
+            f"active revolute pair contact at {math.degrees(mesh_contact_rad):.2f} deg is "
             f"{math.degrees(delta_rad):+.2f} deg from the declared limit; no direct hardware evidence "
             "available for this leg, so whether this is a real endstop or a modelling artifact cannot "
             "be determined (MODEL_INCOMPLETE is reserved for legs with a hardware oracle proving a "
@@ -544,17 +547,17 @@ def _classify_contact_model_status(
         )
         return "MODEL_LIMIT_MISMATCH", reason, hw_note, hardware_vs_urdf_status, mesh_vs_hardware_status
 
-    # No same-leg mesh contact found at all.
+    # No active revolute pair contact found at all.
     if hw_contact_rad is not None:
         reason = (
-            "no same-leg mesh contact found in the analysis envelope, but LF V25 hardware proves a "
+            "no active revolute pair contact found in the analysis envelope, but LF V25 hardware proves a "
             f"real contact exists at {math.degrees(hw_contact_rad):.2f} deg -- the real stopping "
             "mechanism (servo/bracket internal limit, not the collision STL) is not represented in "
             "this model"
         )
         return "MODEL_INCOMPLETE", reason, hw_note, hardware_vs_urdf_status, mesh_vs_hardware_status
 
-    reason = "no same-leg mesh contact found in the analysis envelope; no hardware oracle for this leg"
+    reason = "no active revolute pair contact found in the analysis envelope; no hardware oracle for this leg"
     return "NO_MODELED_ENDSTOP", reason, hw_note, hardware_vs_urdf_status, mesh_vs_hardware_status
 
 
@@ -569,28 +572,38 @@ def search_endpoint_contact(
     max_bisection_iterations: int = DEFAULT_MAX_BISECTION_ITERATIONS,
     model_limit_mismatch_threshold_rad: float = DEFAULT_MODEL_LIMIT_MISMATCH_THRESHOLD_RAD,
 ) -> EndpointContactResult:
-    """Coarse-bracket + bisection search for one endpoint's real mesh
-    contact, run as two independent policies (canonical handoff
-    reconciliation section 2/3):
+    """Coarse-bracket + bisection search for one endpoint, run as two
+    explicitly separated policies (Phase 1B):
 
-    1. ENDSTOP_CONTACT_POLICY -- this leg's own non-adjacent pairs only,
-       answering "does this joint's own geometry show a contact".
-    2. PATH_SELF_COLLISION_POLICY -- the full candidate pair set (cross-leg
-       included), answering "is anything else in the way first".
+    1. ENDSTOP METROLOGY -- the ACTIVE REVOLUTE PARENT-CHILD PAIR, and only
+       that pair. For HIP that is base_link<->hip_link, for UPPER
+       hip_link<->upper_leg_link, for LOWER upper_leg_link<->lower_leg_link.
+       This is where the designed mechanical hardstop physically lives, so a
+       SEPARATED -> INTERSECTING transition on this pair IS the endpoint.
+    2. PATH SAFETY -- every other relevant pair (non-adjacent plus the other
+       revolute adjacent pairs, fixed attachments excluded), answering "is
+       anything else in the way first". The active pair is deliberately absent
+       from this set: its contact is the desired result, not an obstruction.
 
-    A cross-leg obstruction can no longer silently terminate the same-leg
-    search and be misreported as if it were this joint's own limit; the
-    two are combined by `_classify_contact_model_status`."""
+    The historical regression this preserves: while probing LOWER, a
+    hip<->foot intersection appearing before upper<->lower touches is a
+    PATH_COLLISION_BEFORE_ENDPOINT, never the LOWER endstop.
+
+    Supersedes the v3 policy, which searched this leg's NON-adjacent pairs for
+    the endstop and excluded every adjacent pair. GATE A showed that made the
+    real event unobservable by construction; GATE B confirmed the corrected
+    geometry exposes it on exactly these active pairs."""
     context_pose = dict(other_legs_pose) if other_legs_pose is not None else {}
     declared = endpoint.urdf_declared_limit_rad
     envelope = (
         min(declared - envelope_margin_rad, declared + envelope_margin_rad),
         max(declared - envelope_margin_rad, declared + envelope_margin_rad),
     )
-    leg_pairs = same_leg_non_adjacent_pairs(endpoint.leg)
+    active_pair = active_revolute_contact_pair(endpoint.joint_name)
+    leg_pairs = (active_pair,)
 
-    # 1. ENDSTOP_CONTACT_POLICY: same-leg-only search.
-    same_leg_bracket = _coarse_scout(
+    # 1. ENDSTOP METROLOGY: the active revolute parent/child pair only.
+    active_pair_bracket = _coarse_scout(
         scene, endpoint, context_pose, coarse_step_rad, envelope_margin_rad, link_pairs=leg_pairs
     )
 
@@ -605,8 +618,8 @@ def search_endpoint_contact(
     delta: float | None = None
     mismatch = False
 
-    if same_leg_bracket is not None:
-        clear_angle, contact_angle = same_leg_bracket
+    if active_pair_bracket is not None:
+        clear_angle, contact_angle = active_pair_bracket
         clear_angle, contact_angle, iterations = _bisect_to_resolution(
             scene, endpoint, context_pose, clear_angle, contact_angle,
             bisection_resolution_rad, max_bisection_iterations, link_pairs=leg_pairs,
@@ -617,30 +630,40 @@ def search_endpoint_contact(
 
         if pair is None:
             raise ContactSearchError(
-                f"{endpoint.endpoint_id}: il bracket di bisezione (same-leg) converge ma il "
-                "campione al contatto non risulta in collisione; ricerca instabile"
+                f"{endpoint.endpoint_id}: il bracket di bisezione (active revolute pair) converge "
+                "ma il campione al contatto non risulta in collisione; ricerca instabile"
             )
 
         contact_link_a, contact_link_b = pair
-        # Pinned to the SAME pair that converged (not worst_pair_at_pose's
-        # possibly-different worst pair overall), for the same reason the
-        # sensitivity analysis is pinned (canonical handoff section 8).
-        clear_pose = _pose_for_probe_angle(endpoint, clear_angle, context_pose)
-        clearance_result = scene.check_link_pair(
-            contact_link_a, contact_link_b, clear_pose, require_distance=True
-        )
         result_kind = "MESH_CONTACT_FOUND"
         mesh_contact_rad = contact_angle
         bracket_clear, bracket_contact = clear_angle, contact_angle
-        clearance_before = clearance_result.clearance_m
+
+        # No exact clearance is computed for the active revolute pair, and that
+        # is deliberate, for two independent reasons.
+        #
+        # Cost: one bisection step before contact these surfaces are microns
+        # apart, so the near-miss narrow phase would have to resolve an enormous
+        # candidate set for a single number.
+        #
+        # Meaning: that number would be a property of this mesh revision, not a
+        # physical assembly clearance. It sits far below the scales that decide
+        # whether two printed parts actually touch -- per-part print tolerance
+        # (+/-0.15 mm), observed CAD/tessellation/model surface differences of
+        # O(0.1 mm), and unmodelled assembly stack-up (bushings, screws,
+        # backlash). Reporting it would invite exactly the misreading it cannot
+        # support. The endpoint regression requirement is semantic -- adjacent
+        # revolute at q=0 is SEPARATED -- not a clearance value to preserve.
+        clearance_before = None
         delta = contact_angle - declared
         mismatch = abs(delta) > model_limit_mismatch_threshold_rad
 
-    # 2. PATH_SELF_COLLISION_POLICY: full pair set, independent of the
-    # same-leg result above -- may find nothing, may find the same
-    # same-leg pair, or may find a cross-leg obstruction earlier/only.
+    # 2. PATH SAFETY: every other relevant pair, with the active revolute pair
+    # excluded so this joint's own designed contact is never reported as an
+    # obstruction to itself.
+    safety_pairs = path_safety_pairs(exclude_pair=active_pair)
     path_bracket = _coarse_scout(
-        scene, endpoint, context_pose, coarse_step_rad, envelope_margin_rad, link_pairs=None
+        scene, endpoint, context_pose, coarse_step_rad, envelope_margin_rad, link_pairs=safety_pairs
     )
     path_angle: float | None = None
     path_link_a: str | None = None
@@ -650,18 +673,21 @@ def search_endpoint_contact(
         p_clear, p_contact = path_bracket
         p_clear, p_contact, _p_iter = _bisect_to_resolution(
             scene, endpoint, context_pose, p_clear, p_contact,
-            bisection_resolution_rad, max_bisection_iterations, link_pairs=None,
+            bisection_resolution_rad, max_bisection_iterations, link_pairs=safety_pairs,
         )
         path_pose = _pose_for_probe_angle(endpoint, p_contact, context_pose)
-        _collide, pair = scene.is_colliding_at_pose(path_pose, link_pairs=None)
+        _collide, pair = scene.is_colliding_at_pose(path_pose, link_pairs=safety_pairs)
 
-        if pair is not None and pair_is_cross_leg(*pair):
+        # Any obstruction from a pair that is not this joint's own articulation
+        # is a path event -- same-leg (e.g. hip<->foot during a LOWER probe) as
+        # well as cross-leg. v3 only recognised the cross-leg case.
+        if pair is not None:
             path_angle = p_contact
             path_link_a, path_link_b = pair
 
     status, status_reason, hw_note, hardware_vs_urdf_status, mesh_vs_hardware_status = _classify_contact_model_status(
         endpoint,
-        same_leg_found=(result_kind == "MESH_CONTACT_FOUND"),
+        active_pair_found=(result_kind == "MESH_CONTACT_FOUND"),
         mesh_contact_rad=mesh_contact_rad,
         delta_rad=delta,
         mismatch=mismatch,

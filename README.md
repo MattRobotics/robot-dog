@@ -48,6 +48,9 @@ Private research material is intentionally excluded from this public repository 
 | Digital-home commissioning and EEPROM readback | Validated for all 12 servos |
 | Encoder-to-radian conversion and live read-only FK | Validated for all four legs |
 | Offline contact, collision, timing and support references | Validated as engineering references |
+| Geometry Compiler Phase 1 (24-endpoint offline audit) | Validated 2026-08-07; endpoint metrology **superseded by Phase 1B** |
+| Geometry Compiler Phase 1B (adjacent revolute endstop metrology) | **Locally validated 2026-08-08 (24/24 endpoints, full suite 122/122 PASS); closure candidate pending human review** |
+| Collision-mesh motor-pin representation | Corrected in 5 STLs, `rev00` unchanged |
 | Mechanical end-stop calibration | **LF only: V25 hardware validated and frozen** |
 | RF, RH and LH mechanical calibration | Not yet hardware validated |
 | Complete 12-joint persistent profile | Not yet complete |
@@ -103,6 +106,160 @@ Frozen ST3215 Position Offsets:
 | M13 | -505 | -486 |
 
 LF V25 is now a frozen reference leg. It must not be rerun unless LF mechanics, servo, mounting, URDF or calibration state changes.
+
+## Geometry Compiler — Phase 1 and Phase 1B
+
+The Geometry Compiler is the offline, hardware-free audit that derives each joint's geometric
+endpoint from the URDF and the collision meshes, and cross-checks it against hardware evidence
+where hardware evidence exists. It never moves a servo.
+
+### Phase 1 (2026-08-07) and what it got wrong
+
+Phase 1 reported **LF 6/6 `MODEL_INCOMPLETE`**: not one of the six LF joints had a mesh finding
+corresponding to where V25 hardware actually stopped. The apparent conclusion was that the
+collision STLs lacked hardstop geometry.
+
+That conclusion was wrong. Two defects compounded:
+
+1. **A conceptual policy error.** Phase 1 applied one blanket rule, `adjacent pair -> EXCLUDE`,
+   treating a REVOLUTE hinge and a FIXED structural attachment identically. The designed
+   mechanical hardstop physically lives *on the revolute parent/child pair* — so excluding every
+   adjacency made the real endstop **unobservable by construction**.
+2. **A mesh representation error.** The assembly STLs modelled the **motor centre pins** in
+   nominal contact with the mating screws/pulleys of the adjacent link. That produced a
+   permanent, angle-invariant overlap at the joint core, so the adjacent pairs read
+   `INTERSECTING` at *every* angle and no `SEPARATED -> INTERSECTING` transition could be located
+   even if they had been included.
+
+Fixing either alone changes nothing. Phase 1B fixes both.
+
+### GATE A — is the hardstop really on the adjacent pair?
+
+A read-only diagnostic on the original geometry, production code untouched. All three LF adjacent
+pairs were `INTERSECTING` across the entire sweep. The permanent overlap was found to be
+**99.4–100 % within 6 mm of the joint axis**, in discrete concentric shells at Ø≈3 mm and
+Ø≈5.5 mm spanning ≈±17.5 mm axially — shaft geometry, coaxial with the joint. The link owning
+that feature is `base_link` for HIP and `<leg>_upper_leg_link` for UPPER/LOWER, reproduced from
+the mesh alone and matching the motor-pin ownership found independently in CAD.
+
+Genuine far-field contact (radial reach up to 96 mm — real external structure) appears within one
+1° step of the V25 hardware angle on three endpoints, and not one step earlier.
+
+### GATE B — does removing only the pin interference fix it?
+
+Five collision meshes were corrected in CAD to give the motor pins ≈0.10–0.15 mm clearance.
+Verdict **`SUPPORTED`**:
+
+| check | result |
+|---|---|
+| candidate mesh sanity (geometric, retriangulation-tolerant) | PASS 5/5 |
+| q=0 on the three LF adjacent pairs | **3/3 SEPARATED** (were 3/3 INTERSECTING) |
+| LF first adjacent contacts, standard kernel, no mask | **6/6 localized** |
+| witness geometry | 12/12 on external structure, radial 15.6–106.6 mm |
+| historical v3 non-adjacent findings | −47.5000° and −97.9570° both reproduce exactly |
+
+An initial candidate export was rotated 180° about Y through z=−45 mm; the frame error was caught
+geometrically in GATE B before any physics ran, corrected at source, and re-verified by SHA256.
+
+### The five corrected STLs
+
+`base_link.stl`, `lf_upper_leg_link.stl`, `rf_upper_leg_link.stl`, `rh_upper_leg_link.stl`,
+`lh_upper_leg_link.stl`. Canonical filenames, same local frame, same scale, same coordinates.
+
+**`rev00` is unchanged and the URDF is byte-identical** — `<visual>` and `<collision>` already
+reference these filenames, so nothing in the URDF needed editing. All other STLs are untouched.
+The CAD exports retriangulated the surfaces, so triangle counts and IDs changed; integrity was
+therefore established geometrically, never by triangle correspondence.
+
+### Phase 1B policy — REVOLUTE vs FIXED
+
+```text
+parent-child connected by REVOLUTE joint -> INCLUDE in collision analysis
+parent-child connected by FIXED joint    -> structural attachment -> EXCLUDE from endstop metrology
+```
+
+12 revolute pairs; 4 fixed pairs (`<leg>_lower_leg_link ↔ <leg>_foot_link`). Adjacency and joint
+type are derived from URDF topology, not from a hard-coded list.
+
+### Endstop metrology vs path safety
+
+```text
+ENDSTOP METROLOGY = active revolute parent-child pair (exactly one pair per joint)
+    HIP   -> base  <-> hip
+    UPPER -> hip   <-> upper
+    LOWER -> upper <-> lower
+
+PATH SAFETY = all other relevant collision pairs
+```
+
+The active pair is excluded from its own path-obstruction set: its contact is the *desired
+result*, not an obstruction. Conversely, a `hip ↔ foot` collision met during a LOWER search stays
+a path-safety event and is never mistaken for the LOWER endstop — a regression that is
+explicitly tested.
+
+### Adjacent clearance policy
+
+A revolute hinge's healthy resting state is sub-millimetre separation, so the generic 3 mm
+minimum-clearance gate is **not** applied to revolute adjacent pairs; they contribute to path
+safety through the boolean intersection test only. The non-adjacent clearance policy
+(`EXACT` / `LOWER_BOUND` / `UNRESOLVED_FOR_THRESHOLD`) is unchanged.
+
+The q=0 micro-clearances measured in GATE B are evidence about the current mesh revision, **not** a
+physical assembly clearance and not a threshold to preserve. Their limit is CAD/tessellation/
+mechanical significance: they sit far below per-part print tolerance (±0.15 mm), below the observed
+CAD/tessellation/model surface differences of O(0.1 mm) between original and corrected meshes, and
+below unmodelled assembly stack-up. The regression requirement is therefore semantic — adjacent
+revolute at q=0 is SEPARATED — and no policy depends on the value.
+
+### Phase 1B results — 24 endpoints
+
+Run `2026-08-08_231600`, schema v4, exit 0, 59:27, peak RSS 541 MB.
+
+| outcome | v3 (2026-08-07) | Phase 1B |
+|---|---:|---:|
+| `MODELED_ENDSTOP_CONTACT` | 6 | **21** |
+| `NO_MODELED_ENDSTOP` | 14 | **0** |
+| `MODEL_INCOMPLETE` | 6 (all LF) | 3 (all LF) |
+| path collisions detected | 0 | 6 |
+
+Every endpoint now resolves a first contact on its own active revolute pair.
+
+LF against the V25 hardware oracle — 3 of 6 agree within the 2° band:
+
+| endpoint | mesh contact | V25 hardware | delta |
+|---|---:|---:|---:|
+| `lf_upper_leg_min` | −52.0391° | −53.5254° | +1.486° |
+| `lf_upper_leg_max` | +121.8750° | +122.6074° | −0.732° |
+| `lf_lower_leg_min` | −92.0703° | −91.8457° | −0.225° |
+| `lf_hip_min` | −46.0117° | −42.8027° | **−3.209°** |
+| `lf_hip_max` | +45.2305° | +39.3750° | **+5.856°** |
+| `lf_lower_leg_max` | +38.1797° | +34.2773° | **+3.902°** |
+
+The two historical non-adjacent findings reproduce exactly and are now correctly classified as
+**path** events rather than endpoints: `base_link ↔ lf_upper_leg_link` at −47.5000° and
+`lf_foot_link ↔ lf_upper_leg_link` at −97.9570°. In both cases the joint's own articulation
+contact occurs at a smaller |q|, so the endpoint and the obstruction are reported separately.
+
+Mirror geometry is consistent to within 0.004° on upper/lower legs.
+
+Parking is **`REVALIDATED / UNCHANGED FROM v3`** — deliberately not called PASS. All four legs
+report `passed=False`, bit-identical to v3 (same clearances, same auxiliary flags). The Phase 1B
+changes altered no parking verdict; the gate was already failing in v3 on non-adjacent clearance
+and remains a pre-existing open item.
+
+### Still open
+
+The three LF endpoints above with large deltas (`lf_hip_min`, `lf_hip_max`, `lf_lower_leg_max`)
+remain an explicit **UNKNOWN**. The model stops later than the hardware did and the reason is
+unidentified; they are recorded as `HARDWARE_CONTRADICTED`, never as agreement. RF/RH/LH have no
+hardware oracle at all and carry `GEOMETRIC_ENDPOINT_CANDIDATE` — model predictions awaiting
+their own hardware validation, not measured hardstops.
+
+Full technical record:
+
+```text
+06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1B_ADDENDUM_2026-08-08.md
+```
 
 ## Robot definition
 
@@ -185,6 +342,16 @@ RF + LH
 - [ ] Calibrate and freeze RH
 - [ ] Calibrate and freeze LH
 - [ ] Validate the complete twelve-joint persistent profile
+
+### Geometry Compiler
+
+- [x] Phase 1 — 24-endpoint offline audit (2026-08-07, schema v3)
+- [x] GATE A — adjacent-link raw baseline diagnostic
+- [x] GATE B — motor-pin clearance mesh correction, verdict SUPPORTED
+- [x] Phase 1B — joint-aware adjacency, endstop metrology vs path safety (schema v4)
+- [ ] Resolve the three LF hardware-contradicted endpoints
+- [ ] Hardstop-surface-local sensitivity method for adjacent endpoints
+- [ ] Phase 2 — generic V25-derived full-leg engine in norma-core — **NOT STARTED**
 
 ### Locomotion
 

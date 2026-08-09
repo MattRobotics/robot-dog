@@ -66,6 +66,24 @@ SEPARATED_NARROW lower bound rather than a wrong verdict. Configurable per
 call.
 """
 
+BOOLEAN_COLLISION_MARGIN_M = 0.0
+"""
+Narrow-phase margin for a pure INTERSECTION test, as opposed to a clearance
+measurement. Zero is not a weakening of the test: two triangles that intersect
+necessarily have overlapping AABBs, so at margin 0 they always land in a shared
+grid cell and are still found. The margin exists only to pull in *near-miss*
+pairs whose exact distance the clearance path needs.
+
+Kept separate from `DEFAULT_NARROW_PHASE_MARGIN_M` on purpose. Once the motor-pin
+interpenetration was removed (Phase 1B), the revolute adjacent pairs sit roughly
+0.003-0.04 mm apart at q=0 -- comfortably inside the 1 mm near-miss margin, which
+made every AABB in the joint region overlap and generated millions of candidate
+pairs, tripping the 500k safety cap before any verdict was produced (measured in
+GATE B). Lowering the shared default to 0 would have "fixed" that by silently
+destroying the clearance path's ability to report an EXACT figure for anything
+further than 0 apart. Two questions, two margins.
+"""
+
 DEFAULT_GRID_CELL_SIZE_M = 0.005
 """
 Fixed uniform-grid cell size for narrow-phase candidate pruning (5 mm),
@@ -75,13 +93,30 @@ correctness of the candidate search does not depend on this value (see
 `_triangle_grid_index`), only its speed/memory profile does.
 """
 
-DEFAULT_MAX_NARROW_PHASE_CANDIDATE_PAIRS = 500_000
+DEFAULT_MAX_NARROW_PHASE_CANDIDATE_PAIRS = 2_000_000
 """
 Hard safety cap on narrow-phase candidate pairs per link-pair check. This
 exists so a pathological input fails fast with a clear error instead of
 growing an unbounded in-memory structure (the failure mode that produced
 repeated OOM kills before this cap and the fixed-cell grid replaced the
 mesh-derived k-d tree radius approach).
+
+Raised from 500_000 to 2_000_000 in Phase 1B, on measurement rather than by
+reflex. The revolute adjacent pairs are now legitimately evaluated (they carry
+the endstop), and two nearly-touching, finely-tessellated surfaces produce a
+large but BOUNDED candidate set even at margin 0. Measured at q=0 with the
+corrected meshes and the default 5 mm cell:
+
+    base_link <-> lf_hip_link                545_705   (exceeded the old cap by ~9%)
+    lf_hip_link <-> lf_upper_leg_link        458_396
+    lf_upper_leg_link <-> lf_lower_leg_link  423_544
+
+The old cap turned a normal, correct result into a hard failure. Shrinking the
+grid cell instead is not available here: at 2 mm and below the meshes' largest
+triangles (bounding radius up to 138 mm) blow through
+`_MAX_GRID_CELLS_PER_TRIANGLE`. The `seen` set at this cap costs roughly 350 MB
+worst case and stays O(unique candidate pairs), which is the property the cap
+was introduced to guarantee.
 """
 
 _MAX_GRID_CELLS_PER_TRIANGLE = 10_000
@@ -917,15 +952,36 @@ def _resolve_batch_overlap(
     `triangle_triangle_overlap` precisely: the vectorised 11-axis SAT
     resolves the (expected to be large majority of) non-coplanar pairs,
     and only the (expected rare) coplanar-flagged subset falls back to the
-    exact scalar 2D-projected test."""
-    not_separated, is_coplanar = _batched_triangle_overlap_mask(triangles_a, triangles_b, eps)
-    overlap = not_separated.copy()
+    exact scalar 2D-projected test.
 
-    coplanar_indices = np.flatnonzero(is_coplanar)
+    A per-triangle AABB test runs first. It is a pure optimisation and cannot
+    change any verdict: two triangles whose axis-aligned boxes are disjoint
+    cannot intersect, so those pairs are answered False without paying for the
+    11-axis SAT. The grid only guarantees cell CO-OCCUPANCY, not box overlap,
+    so on the near-contact revolute pairs most candidates fail here -- which is
+    where the saving comes from (measured: the dominant per-sample cost of an
+    endpoint sweep was this one pair's narrow phase).
+    """
+    min_a, max_a = triangles_a.min(axis=1), triangles_a.max(axis=1)
+    min_b, max_b = triangles_b.min(axis=1), triangles_b.max(axis=1)
+    boxes_overlap = np.all((min_a <= max_b) & (min_b <= max_a), axis=1)
 
-    for index in coplanar_indices:
-        overlap[index] = triangle_triangle_overlap(triangles_a[index], triangles_b[index], eps)
+    overlap = np.zeros(triangles_a.shape[0], dtype=bool)
+    candidates = np.flatnonzero(boxes_overlap)
 
+    if candidates.size == 0:
+        return overlap
+
+    subset_a = triangles_a[candidates]
+    subset_b = triangles_b[candidates]
+
+    not_separated, is_coplanar = _batched_triangle_overlap_mask(subset_a, subset_b, eps)
+    resolved = not_separated.copy()
+
+    for index in np.flatnonzero(is_coplanar):
+        resolved[index] = triangle_triangle_overlap(subset_a[index], subset_b[index], eps)
+
+    overlap[candidates] = resolved
     return overlap
 
 
