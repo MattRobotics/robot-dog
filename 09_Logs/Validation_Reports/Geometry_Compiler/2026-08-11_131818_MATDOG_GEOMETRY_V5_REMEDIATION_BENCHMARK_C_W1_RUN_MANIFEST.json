@@ -1,0 +1,686 @@
+{
+  "artifacts": {
+    "combined_profile": {
+      "file_sha256": "a482dd28fc97ec387f9a6fd03c501ea7cf5045dc97a384fbb5fe9bcdd23d73fa",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_C_W1_COMBINED_PROFILE.json"
+    },
+    "combined_report": {
+      "file_sha256": "3960b1d7c767593756a39ae86ba6d43be5f58e02fb1f6d948b1fab59a1720bd2",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_C_W1_COMBINED_REPORT.md"
+    },
+    "endpoint_profile": {
+      "file_sha256": "23ca4709385019466cfb5782a7e0e6f2053fd0d632b67db6c94bd00c05f5e147",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_C_W1_ENDPOINT_PROFILE.json"
+    },
+    "endpoint_report": {
+      "file_sha256": "3d4db1daf7c04cd28dfb80bbcc6c783637390139efc1b712d7b184c97358bc6c",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_C_W1_ENDPOINT_REPORT.md"
+    },
+    "oracle_json": {
+      "file_sha256": "aa181df9cfe2628564227c2b94fdcc0eeab94112cdc5135af6bc4a558fa648f0",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_C_W1_G4_G7_ORACLE.json"
+    },
+    "oracle_report": {
+      "file_sha256": "3d8bc62f44bc407f6928c7e7b734959189b9850097d188149cfe8ce6d6240401",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_C_W1_G4_G7_ORACLE.md"
+    },
+    "parking_json": {
+      "file_sha256": "65cd6d25e28c6547b9cdbdf267eafc6b6452f34347415cb5e20dfbe3798047ca",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_C_W1_PATH_PARKING.json"
+    },
+    "parking_report": {
+      "file_sha256": "3ec37630ba3594c91d4ccada04d6768be80d13c03cc176e8d0a056ab149801f0",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_C_W1_PATH_PARKING.md"
+    }
+  },
+  "benchmark_id": "C",
+  "bundle_validity": {
+    "artifact_count": 8,
+    "artifact_hash_algorithm": "SHA256",
+    "manifest_required": true,
+    "marker": "RUN_MANIFEST_PUBLISHED_LAST"
+  },
+  "constraints": {
+    "collision_candidate_cap_changed": false,
+    "hardware_used": false,
+    "merge_performed": false,
+    "norma_core_modified": false,
+    "safety_threshold_relaxed": false
+  },
+  "determinism": {
+    "status": "REFERENCE_CAPTURED"
+  },
+  "execution": {
+    "batch_strategy": "12_topology_derived_actuated_joint_batches_min_then_max_dynamic_scheduling",
+    "canonical_result_sort_key": [
+      "canonical_endpoint_index"
+    ],
+    "numerical_thread_limits": {
+      "MKL_NUM_THREADS": 1,
+      "NUMEXPR_NUM_THREADS": 1,
+      "OMP_NUM_THREADS": 1,
+      "OPENBLAS_NUM_THREADS": 1
+    },
+    "parent_writer_pid": 269795,
+    "physical_core_target": 1,
+    "worker_count": 1,
+    "worker_model": "single_parent_process"
+  },
+  "gates": {
+    "canonical_context_free_endpoint_searches": "24/24",
+    "canonical_endpoint_coverage": "24/24",
+    "endpoint_path_vs_parking_baseline_consistency": "24/24",
+    "g4_g7_oracle_status": "PASS",
+    "parent_bundle_publications": 1,
+    "pure_q0_vs_g4_replay_contacts": "24/24",
+    "q0_active_revolute_pairs_separated": "12/12",
+    "worker_writes": 0
+  },
+  "generated_at_utc": "2026-08-11T11:18:45.151945+00:00",
+  "manifest_content_sha256": "9b13dd758f6a8bcf3da24bdf0619303705c2ad8cc44187040a4a846d211d1a46",
+  "oracle_summary": {
+    "endpoint_count": 24,
+    "geometric_contact_found_count": 24,
+    "no_geometric_contact_count": 0,
+    "path_obstruction_count": 6,
+    "path_obstruction_precedes_contact_count": 2
+  },
+  "parameters": {
+    "clearance_sample_stride": 10,
+    "max_obstruction_bisection_iterations": 40,
+    "obstruction_bisection_resolution_rad": 0.0001,
+    "one_dof_grid_divisions": 6,
+    "path_step_rad": 0.017453292519943295,
+    "two_dof_grid_divisions": 4
+  },
+  "parking_summary": {
+    "all_start_configurations_valid": true,
+    "baseline_obstructed_count": 6,
+    "diagnostic_target_outside_urdf_limits_count": 16,
+    "endpoint_plan_count": 24,
+    "executable_urdf_target_count": 8,
+    "external_safety_policy_applied": false,
+    "geometry_feasible_complete_sequence_count": 24,
+    "no_complete_sequence_count": 0,
+    "outcome_counts": {
+      "FEASIBLE_1DOF_PLAN_FOUND": 6,
+      "NOT_NEEDED": 18
+    }
+  },
+  "path_consistency": {
+    "coarse_step_rad": 0.017453292519943295,
+    "collision_free_count": 18,
+    "consistent_endpoint_count": 24,
+    "endpoint_count": 24,
+    "max_precise_to_refined_delta_rad": 3.6703973194107675e-13,
+    "obstructed_count": 6,
+    "rows": [
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 0,
+        "endpoint_id": "lf_hip_joint:min",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 1,
+        "endpoint_id": "lf_hip_joint:max",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 2,
+        "endpoint_id": "lf_upper_leg_joint:min",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "PATH_OBSTRUCTION",
+        "canonical_endpoint_index": 3,
+        "effective_sample_interval_rad": 0.01743541004809836,
+        "endpoint_bisection_resolution_rad": 0.0001,
+        "endpoint_id": "lf_upper_leg_joint:max",
+        "endpoint_path_status": "PATH_OBSTRUCTION",
+        "first_sampled_obstruction_angle_rad": 1.290220343559279,
+        "link_pair": [
+          "lf_foot_link",
+          "lh_foot_link"
+        ],
+        "obstructed": true,
+        "planner_bisection_resolution_rad": 0.0001,
+        "planner_refined_bracket_width_rad": 6.810707049997866e-05,
+        "planner_refined_obstruction_angle_rad": 1.279050783997215,
+        "precise_obstruction_angle_rad": 1.279050783997,
+        "precise_to_refined_delta_rad": 2.149391775674303e-13,
+        "relation": "cross_branch",
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "PATH_OBSTRUCTION",
+        "canonical_endpoint_index": 4,
+        "effective_sample_interval_rad": 0.01727955132676344,
+        "endpoint_bisection_resolution_rad": 0.0001,
+        "endpoint_id": "lf_lower_leg_joint:min",
+        "endpoint_path_status": "PATH_OBSTRUCTION",
+        "first_sampled_obstruction_angle_rad": -1.486041414101656,
+        "link_pair": [
+          "lf_hip_link",
+          "lf_lower_leg_link"
+        ],
+        "obstructed": true,
+        "planner_bisection_resolution_rad": 0.0001,
+        "planner_refined_bracket_width_rad": 6.7498247369846e-05,
+        "planner_refined_obstruction_angle_rad": -1.470854308443367,
+        "precise_obstruction_angle_rad": -1.470854308443,
+        "precise_to_refined_delta_rad": 3.6703973194107675e-13,
+        "relation": "same_branch",
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 5,
+        "endpoint_id": "lf_lower_leg_joint:max",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 6,
+        "endpoint_id": "rf_hip_joint:min",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 7,
+        "endpoint_id": "rf_hip_joint:max",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 8,
+        "endpoint_id": "rf_upper_leg_joint:min",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "PATH_OBSTRUCTION",
+        "canonical_endpoint_index": 9,
+        "effective_sample_interval_rad": 0.01743541004809836,
+        "endpoint_bisection_resolution_rad": 0.0001,
+        "endpoint_id": "rf_upper_leg_joint:max",
+        "endpoint_path_status": "PATH_OBSTRUCTION",
+        "first_sampled_obstruction_angle_rad": 1.290220343559279,
+        "link_pair": [
+          "rf_foot_link",
+          "rh_foot_link"
+        ],
+        "obstructed": true,
+        "planner_bisection_resolution_rad": 0.0001,
+        "planner_refined_bracket_width_rad": 6.810707049997866e-05,
+        "planner_refined_obstruction_angle_rad": 1.279050783997215,
+        "precise_obstruction_angle_rad": 1.279050783997,
+        "precise_to_refined_delta_rad": 2.149391775674303e-13,
+        "relation": "cross_branch",
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "PATH_OBSTRUCTION",
+        "canonical_endpoint_index": 10,
+        "effective_sample_interval_rad": 0.01727955132676344,
+        "endpoint_bisection_resolution_rad": 0.0001,
+        "endpoint_id": "rf_lower_leg_joint:min",
+        "endpoint_path_status": "PATH_OBSTRUCTION",
+        "first_sampled_obstruction_angle_rad": -1.486041414101656,
+        "link_pair": [
+          "rf_hip_link",
+          "rf_lower_leg_link"
+        ],
+        "obstructed": true,
+        "planner_bisection_resolution_rad": 0.0001,
+        "planner_refined_bracket_width_rad": 6.7498247369846e-05,
+        "planner_refined_obstruction_angle_rad": -1.470854308443367,
+        "precise_obstruction_angle_rad": -1.470854308443,
+        "precise_to_refined_delta_rad": 3.6703973194107675e-13,
+        "relation": "same_branch",
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 11,
+        "endpoint_id": "rf_lower_leg_joint:max",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 12,
+        "endpoint_id": "rh_hip_joint:min",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 13,
+        "endpoint_id": "rh_hip_joint:max",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 14,
+        "endpoint_id": "rh_upper_leg_joint:min",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 15,
+        "endpoint_id": "rh_upper_leg_joint:max",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "PATH_OBSTRUCTION",
+        "canonical_endpoint_index": 16,
+        "effective_sample_interval_rad": 0.01727955132676344,
+        "endpoint_bisection_resolution_rad": 0.0001,
+        "endpoint_id": "rh_lower_leg_joint:min",
+        "endpoint_path_status": "PATH_OBSTRUCTION",
+        "first_sampled_obstruction_angle_rad": -1.486041414101656,
+        "link_pair": [
+          "rh_hip_link",
+          "rh_lower_leg_link"
+        ],
+        "obstructed": true,
+        "planner_bisection_resolution_rad": 0.0001,
+        "planner_refined_bracket_width_rad": 6.7498247369846e-05,
+        "planner_refined_obstruction_angle_rad": -1.470854308443367,
+        "precise_obstruction_angle_rad": -1.470854308443,
+        "precise_to_refined_delta_rad": 3.6703973194107675e-13,
+        "relation": "same_branch",
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 17,
+        "endpoint_id": "rh_lower_leg_joint:max",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 18,
+        "endpoint_id": "lh_hip_joint:min",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 19,
+        "endpoint_id": "lh_hip_joint:max",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 20,
+        "endpoint_id": "lh_upper_leg_joint:min",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 21,
+        "endpoint_id": "lh_upper_leg_joint:max",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "PATH_OBSTRUCTION",
+        "canonical_endpoint_index": 22,
+        "effective_sample_interval_rad": 0.01727955132676344,
+        "endpoint_bisection_resolution_rad": 0.0001,
+        "endpoint_id": "lh_lower_leg_joint:min",
+        "endpoint_path_status": "PATH_OBSTRUCTION",
+        "first_sampled_obstruction_angle_rad": -1.486041414101656,
+        "link_pair": [
+          "lh_hip_link",
+          "lh_lower_leg_link"
+        ],
+        "obstructed": true,
+        "planner_bisection_resolution_rad": 0.0001,
+        "planner_refined_bracket_width_rad": 6.7498247369846e-05,
+        "planner_refined_obstruction_angle_rad": -1.470854308443367,
+        "precise_obstruction_angle_rad": -1.470854308443,
+        "precise_to_refined_delta_rad": 3.6703973194107675e-13,
+        "relation": "same_branch",
+        "status": "PASS"
+      },
+      {
+        "baseline_path_status": "COLLISION_FREE",
+        "canonical_endpoint_index": 23,
+        "endpoint_id": "lh_lower_leg_joint:max",
+        "endpoint_path_status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+        "obstructed": false,
+        "status": "PASS"
+      }
+    ],
+    "status": "PASS"
+  },
+  "provenance": {
+    "canonical_semantic_source_file_sha256": {
+      "matdog_geometry_compiler_v5.py": "9d2cb6e8d89382e3266622e4c230fd31dc307b4995a81071bcb8447587645dc9",
+      "matdog_geometry_contact_search_v5.py": "cc0cdaada456d0fab144a2f4991acf0518aabad2ff807194433ca70e88f86170",
+      "matdog_geometry_full_runner_v5.py": "9a9ee4e4265e06f9fb6ac26a050cda3f28e8acf5ac958b18eb6d895aed31e06e",
+      "matdog_geometry_mesh_kernel.py": "f7119fd93b913968ea342269b4369546ecbcad2e8731e7d4d8fabd4ba08c017c",
+      "matdog_geometry_model_v5.py": "e40925c52263329773cc69f310059c697234dc85514d220487b651f6098bf686",
+      "matdog_geometry_path_planner_v5.py": "6d63b03c059ffe1c212a522cb84cc05d496093e055d7ab87ff9d0ed8c2eda528",
+      "matdog_geometry_process_workers_v5.py": "fcc69696ed85bb5a7ec8269681e5e7e63738dd23e33b7007fd9df59cccee0d49",
+      "matdog_geometry_profile_v5.py": "f9d4a6ba6968e5dacc6d01d1eaa0becb14a2b3c3c41c25e34ec62dfdf935ad3f",
+      "matdog_geometry_scene_v5.py": "e6a9daf4d83330515cd2f662ff6ead52163579fc55167c80974266386771b739"
+    },
+    "collision_mesh_sha256": {
+      "base_link": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "lf_foot_link": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "lf_hip_link": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "lf_lower_leg_link": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "lf_upper_leg_link": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "lh_foot_link": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "lh_hip_link": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "lh_lower_leg_link": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "lh_upper_leg_link": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "rf_foot_link": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "rf_hip_link": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "rf_lower_leg_link": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "rf_upper_leg_link": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "rh_foot_link": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "rh_hip_link": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "rh_lower_leg_link": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "rh_upper_leg_link": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    "execution_source_file_sha256": {
+      "matdog_geometry_compiler_v5.py": "9d2cb6e8d89382e3266622e4c230fd31dc307b4995a81071bcb8447587645dc9",
+      "matdog_geometry_contact_search_v5.py": "cc0cdaada456d0fab144a2f4991acf0518aabad2ff807194433ca70e88f86170",
+      "matdog_geometry_full_runner_v5.py": "9a9ee4e4265e06f9fb6ac26a050cda3f28e8acf5ac958b18eb6d895aed31e06e",
+      "matdog_geometry_g4_oracle_v5.py": "610de57a27c79eccb62b9ed4acbda85085983199027f4f3755e9a12e09588fd9",
+      "matdog_geometry_mesh_kernel.py": "f7119fd93b913968ea342269b4369546ecbcad2e8731e7d4d8fabd4ba08c017c",
+      "matdog_geometry_model_v5.py": "e40925c52263329773cc69f310059c697234dc85514d220487b651f6098bf686",
+      "matdog_geometry_path_planner_v5.py": "6d63b03c059ffe1c212a522cb84cc05d496093e055d7ab87ff9d0ed8c2eda528",
+      "matdog_geometry_process_workers_v5.py": "fcc69696ed85bb5a7ec8269681e5e7e63738dd23e33b7007fd9df59cccee0d49",
+      "matdog_geometry_profile_v5.py": "f9d4a6ba6968e5dacc6d01d1eaa0becb14a2b3c3c41c25e34ec62dfdf935ad3f",
+      "matdog_geometry_report_v5.py": "227d2ff5a972e1ebe1577b54227bc51152692017e2813e617114fe755887c7e8",
+      "matdog_geometry_scene_v5.py": "e6a9daf4d83330515cd2f662ff6ead52163579fc55167c80974266386771b739"
+    },
+    "g4_reference_content_sha256": "4a2a2324f2838b9da0240f838e8172701ff35f83d20d29edddeec2fe15d83a61",
+    "g4_reference_file_sha256": "f1b059a58c51508345ec583cc421cf9ca66ec8e9ac5547649c05bbf755e5c5fa",
+    "g4_reference_relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-10_164419_MATDOG_NEW_GEOMETRY_PHASE1B_REFERENCE_PROFILE.json",
+    "g4_replay_source_file_sha256": {
+      "matdog_geometry_contact_search_v5.py": "cc0cdaada456d0fab144a2f4991acf0518aabad2ff807194433ca70e88f86170",
+      "matdog_geometry_g4_oracle_v5.py": "610de57a27c79eccb62b9ed4acbda85085983199027f4f3755e9a12e09588fd9",
+      "matdog_geometry_mesh_kernel.py": "f7119fd93b913968ea342269b4369546ecbcad2e8731e7d4d8fabd4ba08c017c",
+      "matdog_geometry_model_v5.py": "e40925c52263329773cc69f310059c697234dc85514d220487b651f6098bf686",
+      "matdog_geometry_process_workers_v5.py": "fcc69696ed85bb5a7ec8269681e5e7e63738dd23e33b7007fd9df59cccee0d49",
+      "matdog_geometry_profile_v5.py": "f9d4a6ba6968e5dacc6d01d1eaa0becb14a2b3c3c41c25e34ec62dfdf935ad3f",
+      "matdog_geometry_scene_v5.py": "e6a9daf4d83330515cd2f662ff6ead52163579fc55167c80974266386771b739"
+    },
+    "input_file_sha256": {
+      "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    "q0_status_by_joint": {
+      "lf_hip_joint": "SEPARATED_NARROW",
+      "lf_lower_leg_joint": "SEPARATED_NARROW",
+      "lf_upper_leg_joint": "SEPARATED_NARROW",
+      "lh_hip_joint": "SEPARATED_NARROW",
+      "lh_lower_leg_joint": "SEPARATED_NARROW",
+      "lh_upper_leg_joint": "SEPARATED_NARROW",
+      "rf_hip_joint": "SEPARATED_NARROW",
+      "rf_lower_leg_joint": "SEPARATED_NARROW",
+      "rf_upper_leg_joint": "SEPARATED_NARROW",
+      "rh_hip_joint": "SEPARATED_NARROW",
+      "rh_lower_leg_joint": "SEPARATED_NARROW",
+      "rh_upper_leg_joint": "SEPARATED_NARROW"
+    },
+    "urdf_relative_path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+    "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+  },
+  "pure_q0_vs_g4_replay_contacts": {
+    "acceptance_basis": "MAX_DECLARED_BISECTION_RESOLUTION",
+    "endpoint_count": 24,
+    "matching_endpoint_count": 24,
+    "max_contact_angle_delta_rad": 6.907807659217724e-12,
+    "rows": [
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.609246152474043e-12,
+        "endpoint_id": "lf_hip_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.564504164581649e-12,
+        "endpoint_id": "lf_hip_joint:max",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.956523914576792e-12,
+        "endpoint_id": "lf_upper_leg_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 6.907807659217724e-12,
+        "endpoint_id": "lf_upper_leg_joint:max",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 5.218714349553011e-12,
+        "endpoint_id": "lf_lower_leg_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.1649348980190553e-12,
+        "endpoint_id": "lf_lower_leg_joint:max",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.564504164581649e-12,
+        "endpoint_id": "rf_hip_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.609246152474043e-12,
+        "endpoint_id": "rf_hip_joint:max",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.956523914576792e-12,
+        "endpoint_id": "rf_upper_leg_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 6.907807659217724e-12,
+        "endpoint_id": "rf_upper_leg_joint:max",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 5.218714349553011e-12,
+        "endpoint_id": "rf_lower_leg_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.1649348980190553e-12,
+        "endpoint_id": "rf_lower_leg_joint:max",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.560840428600386e-12,
+        "endpoint_id": "rh_hip_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.609246152474043e-12,
+        "endpoint_id": "rh_hip_joint:max",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.956523914576792e-12,
+        "endpoint_id": "rh_upper_leg_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 6.907807659217724e-12,
+        "endpoint_id": "rh_upper_leg_joint:max",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 5.218714349553011e-12,
+        "endpoint_id": "rh_lower_leg_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.1649348980190553e-12,
+        "endpoint_id": "rh_lower_leg_joint:max",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.609246152474043e-12,
+        "endpoint_id": "lh_hip_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.560840428600386e-12,
+        "endpoint_id": "lh_hip_joint:max",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.956523914576792e-12,
+        "endpoint_id": "lh_upper_leg_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 6.907807659217724e-12,
+        "endpoint_id": "lh_upper_leg_joint:max",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 5.218714349553011e-12,
+        "endpoint_id": "lh_lower_leg_joint:min",
+        "status": "PASS"
+      },
+      {
+        "acceptance_tolerance_rad": 0.0001,
+        "contact_angle_delta_rad": 2.1649348980190553e-12,
+        "endpoint_id": "lh_lower_leg_joint:max",
+        "status": "PASS"
+      }
+    ],
+    "status": "PASS"
+  },
+  "resource_enforcement": {
+    "cpu_affinity": "PROCESS_SCHED_AFFINITY_INHERITED_BY_SPAWN_WORKERS",
+    "cpuset_cpus_effective_role": "TELEMETRY_ONLY",
+    "memory_swap_oom": "CGROUP_V2_VALIDATED"
+  },
+  "resources": {
+    "aabb_surviving_pairs": "NOT_INSTRUMENTED",
+    "cgroup_v2": {
+      "cpuset_cpus_effective": null,
+      "memory_events": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0,
+        "sock_throttled": 0
+      },
+      "memory_max": "6442450944",
+      "memory_peak_bytes": 466382848,
+      "memory_swap_max": "0",
+      "memory_swap_peak_bytes": 0,
+      "process_cpu_affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "relative_path": "/user.slice/user-1000.slice/user@1000.service/app.slice/matdog-geometry-v5-remediation-c-131818.service",
+      "version": 2
+    },
+    "collision_candidate_pairs": "NOT_INSTRUMENTED",
+    "evaluated_1d_candidates": 94,
+    "evaluated_2d_candidates": 0,
+    "grid_entries_serialized": 94,
+    "triangle_count": 119696
+  },
+  "schema_version": "matdog.geometry_compiler_v5.integrated_run.v2",
+  "semantic_content_sha256": {
+    "combined_profile": "0a772234a46afad14eb4af0999294020bb0fb8974ca0b68f3ccd780fa057db51",
+    "endpoint_profile": "de205209f6015734f43af7f49146ecf60f89a74d6ce1276ce134c189a89c9f7e",
+    "parking_v2": "67c58430e78241af1a636cdcc22092ff855371713fc7f26bc56412f7c7181139"
+  },
+  "timings_seconds": {
+    "canonical_endpoint_compute": 522.73314,
+    "integrated_internal_wall": 3359.696038,
+    "noncanonical_g4_replay_compute": 531.316916,
+    "parking_compute": 2276.664515
+  }
+}

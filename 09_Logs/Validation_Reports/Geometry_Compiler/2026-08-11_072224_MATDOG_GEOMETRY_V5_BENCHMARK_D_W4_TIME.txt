@@ -1,0 +1,23 @@
+	Command being timed: "/usr/bin/python3 -B /home/matteo-manicardi/MATDOG/worktrees/robot-dog-geometry-v5/06_Software/Matdog_Core/calibration/matdog_geometry_full_runner_v5.py --repo-root /home/matteo-manicardi/MATDOG/worktrees/robot-dog-geometry-v5 --urdf /home/matteo-manicardi/MATDOG/worktrees/robot-dog-geometry-v5/03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf --g4-reference-profile /home/matteo-manicardi/MATDOG/worktrees/robot-dog-geometry-v5/09_Logs/Validation_Reports/Geometry_Compiler/2026-08-10_164419_MATDOG_NEW_GEOMETRY_PHASE1B_REFERENCE_PROFILE.json --artifact-prefix /home/matteo-manicardi/MATDOG/worktrees/robot-dog-geometry-v5/09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_072224_MATDOG_GEOMETRY_V5_BENCHMARK_D_W4 --benchmark-id D --workers 4 --determinism-reference-manifest /home/matteo-manicardi/MATDOG/worktrees/robot-dog-geometry-v5/09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_072224_MATDOG_GEOMETRY_V5_BENCHMARK_C_W1_RUN_MANIFEST.json --path-step-rad 0.017453292519943295 --one-dof-grid-divisions 6 --two-dof-grid-divisions 4 --clearance-sample-stride 10 --require-cgroup-v2 --require-memory-max-bytes 6442450944 --require-memory-swap-max-bytes 0 --require-cpu-affinity 0-3"
+	User time (seconds): 3182.71
+	System time (seconds): 159.55
+	Percent of CPU this job got: 195%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 28:27.39
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 457312
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 33615432
+	Voluntary context switches: 414
+	Involuntary context switches: 1671078
+	Swaps: 0
+	File system inputs: 1608
+	File system outputs: 1304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

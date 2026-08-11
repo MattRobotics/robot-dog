@@ -1,0 +1,2716 @@
+{
+  "analysis_parameters": {
+    "bisection_resolution_rad": 0.0001,
+    "canonical_path_domain": "Q0_TO_GEOMETRIC_CONTACT_OR_DECLARED_LIMIT",
+    "coarse_step_rad": 0.01745329252,
+    "envelope_margin_rad": 0.174532925199,
+    "grid_cell_size_m": 0.005,
+    "max_bisection_iterations": 40,
+    "max_narrow_phase_candidate_pairs": 2000000,
+    "narrow_phase_margin_m": 0.001
+  },
+  "endpoint_searches": [
+    {
+      "active_revolute_pair": [
+        "base_link",
+        "lf_hip_link"
+      ],
+      "articulated_branch_id": "lf_hip_joint",
+      "declared_limit_rad": -0.785398163397,
+      "geometric_contact": {
+        "angle_rad": -0.803055986689,
+        "bracket": {
+          "clear_rad": -0.802987809765,
+          "contact_rad": -0.803055986689
+        },
+        "link_pair": [
+          "base_link",
+          "lf_hip_link"
+        ],
+        "minus_declared_limit_rad": -0.017657823292,
+        "relation": "body_vs_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.959931088596,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lf_hip_joint",
+        "limit_side": "min",
+        "presentation_id": "lf_hip_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.803055986689,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 0
+    },
+    {
+      "active_revolute_pair": [
+        "base_link",
+        "lf_hip_link"
+      ],
+      "articulated_branch_id": "lf_hip_joint",
+      "declared_limit_rad": 0.785398163397,
+      "geometric_contact": {
+        "angle_rad": 0.78928424806,
+        "bracket": {
+          "clear_rad": 0.789216071136,
+          "contact_rad": 0.78928424806
+        },
+        "link_pair": [
+          "base_link",
+          "lf_hip_link"
+        ],
+        "minus_declared_limit_rad": 0.003886084663,
+        "relation": "body_vs_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.959931088596
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lf_hip_joint",
+        "limit_side": "max",
+        "presentation_id": "lf_hip_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.78928424806
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 0
+    },
+    {
+      "active_revolute_pair": [
+        "lf_hip_link",
+        "lf_upper_leg_link"
+      ],
+      "articulated_branch_id": "lf_hip_joint",
+      "declared_limit_rad": -0.916297857297,
+      "geometric_contact": {
+        "angle_rad": -0.90988922645,
+        "bracket": {
+          "clear_rad": -0.909821049526,
+          "contact_rad": -0.90988922645
+        },
+        "link_pair": [
+          "lf_hip_link",
+          "lf_upper_leg_link"
+        ],
+        "minus_declared_limit_rad": 0.006408630847,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.090830782496,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lf_upper_leg_joint",
+        "limit_side": "min",
+        "presentation_id": "lf_upper_leg_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.90988922645,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 1
+    },
+    {
+      "active_revolute_pair": [
+        "lf_hip_link",
+        "lf_upper_leg_link"
+      ],
+      "articulated_branch_id": "lf_hip_joint",
+      "declared_limit_rad": 2.138028333693,
+      "geometric_contact": {
+        "angle_rad": 2.127120025868,
+        "bracket": {
+          "clear_rad": 2.127051848944,
+          "contact_rad": 2.127120025868
+        },
+        "link_pair": [
+          "lf_hip_link",
+          "lf_upper_leg_link"
+        ],
+        "minus_declared_limit_rad": -0.010908307825,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            2.312561258892
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lf_upper_leg_joint",
+        "limit_side": "max",
+        "presentation_id": "lf_upper_leg_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": 1.279050783997,
+        "bracket": {
+          "clear_rad": 1.278982676927,
+          "contact_rad": 1.279050783997
+        },
+        "link_pair": [
+          "lf_foot_link",
+          "lh_foot_link"
+        ],
+        "precedes_geometric_contact": true,
+        "relation": "cross_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            2.127120025868
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "PATH_OBSTRUCTION"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 1
+    },
+    {
+      "active_revolute_pair": [
+        "lf_upper_leg_link",
+        "lf_lower_leg_link"
+      ],
+      "articulated_branch_id": "lf_hip_joint",
+      "declared_limit_rad": -1.605702911835,
+      "geometric_contact": {
+        "angle_rad": -1.606998273389,
+        "bracket": {
+          "clear_rad": -1.606930096465,
+          "contact_rad": -1.606998273389
+        },
+        "link_pair": [
+          "lf_upper_leg_link",
+          "lf_lower_leg_link"
+        ],
+        "minus_declared_limit_rad": -0.001295361554,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.780235837034,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lf_lower_leg_joint",
+        "limit_side": "min",
+        "presentation_id": "lf_lower_leg_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": -1.470854308443,
+        "bracket": {
+          "clear_rad": -1.470786810196,
+          "contact_rad": -1.470854308443
+        },
+        "link_pair": [
+          "lf_hip_link",
+          "lf_lower_leg_link"
+        ],
+        "precedes_geometric_contact": true,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.606998273389,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "PATH_OBSTRUCTION"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 2
+    },
+    {
+      "active_revolute_pair": [
+        "lf_upper_leg_link",
+        "lf_lower_leg_link"
+      ],
+      "articulated_branch_id": "lf_hip_joint",
+      "declared_limit_rad": 0.654498469498,
+      "geometric_contact": {
+        "angle_rad": 0.666361254258,
+        "bracket": {
+          "clear_rad": 0.666293077334,
+          "contact_rad": 0.666361254258
+        },
+        "link_pair": [
+          "lf_upper_leg_link",
+          "lf_lower_leg_link"
+        ],
+        "minus_declared_limit_rad": 0.01186278476,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.829031394697
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lf_lower_leg_joint",
+        "limit_side": "max",
+        "presentation_id": "lf_lower_leg_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.666361254258
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 2
+    },
+    {
+      "active_revolute_pair": [
+        "base_link",
+        "rf_hip_link"
+      ],
+      "articulated_branch_id": "rf_hip_joint",
+      "declared_limit_rad": -0.785398163397,
+      "geometric_contact": {
+        "angle_rad": -0.78928424806,
+        "bracket": {
+          "clear_rad": -0.789216071136,
+          "contact_rad": -0.78928424806
+        },
+        "link_pair": [
+          "base_link",
+          "rf_hip_link"
+        ],
+        "minus_declared_limit_rad": -0.003886084663,
+        "relation": "body_vs_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.959931088596,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rf_hip_joint",
+        "limit_side": "min",
+        "presentation_id": "rf_hip_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.78928424806,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 0
+    },
+    {
+      "active_revolute_pair": [
+        "base_link",
+        "rf_hip_link"
+      ],
+      "articulated_branch_id": "rf_hip_joint",
+      "declared_limit_rad": 0.785398163397,
+      "geometric_contact": {
+        "angle_rad": 0.803055986689,
+        "bracket": {
+          "clear_rad": 0.802987809765,
+          "contact_rad": 0.803055986689
+        },
+        "link_pair": [
+          "base_link",
+          "rf_hip_link"
+        ],
+        "minus_declared_limit_rad": 0.017657823292,
+        "relation": "body_vs_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.959931088596
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rf_hip_joint",
+        "limit_side": "max",
+        "presentation_id": "rf_hip_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.803055986689
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 0
+    },
+    {
+      "active_revolute_pair": [
+        "rf_hip_link",
+        "rf_upper_leg_link"
+      ],
+      "articulated_branch_id": "rf_hip_joint",
+      "declared_limit_rad": -0.916297857297,
+      "geometric_contact": {
+        "angle_rad": -0.90988922645,
+        "bracket": {
+          "clear_rad": -0.909821049526,
+          "contact_rad": -0.90988922645
+        },
+        "link_pair": [
+          "rf_hip_link",
+          "rf_upper_leg_link"
+        ],
+        "minus_declared_limit_rad": 0.006408630847,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.090830782496,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rf_upper_leg_joint",
+        "limit_side": "min",
+        "presentation_id": "rf_upper_leg_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.90988922645,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 1
+    },
+    {
+      "active_revolute_pair": [
+        "rf_hip_link",
+        "rf_upper_leg_link"
+      ],
+      "articulated_branch_id": "rf_hip_joint",
+      "declared_limit_rad": 2.138028333693,
+      "geometric_contact": {
+        "angle_rad": 2.127120025868,
+        "bracket": {
+          "clear_rad": 2.127051848944,
+          "contact_rad": 2.127120025868
+        },
+        "link_pair": [
+          "rf_hip_link",
+          "rf_upper_leg_link"
+        ],
+        "minus_declared_limit_rad": -0.010908307825,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            2.312561258892
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rf_upper_leg_joint",
+        "limit_side": "max",
+        "presentation_id": "rf_upper_leg_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": 1.279050783997,
+        "bracket": {
+          "clear_rad": 1.278982676927,
+          "contact_rad": 1.279050783997
+        },
+        "link_pair": [
+          "rf_foot_link",
+          "rh_foot_link"
+        ],
+        "precedes_geometric_contact": true,
+        "relation": "cross_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            2.127120025868
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "PATH_OBSTRUCTION"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 1
+    },
+    {
+      "active_revolute_pair": [
+        "rf_upper_leg_link",
+        "rf_lower_leg_link"
+      ],
+      "articulated_branch_id": "rf_hip_joint",
+      "declared_limit_rad": -1.605702911835,
+      "geometric_contact": {
+        "angle_rad": -1.606998273389,
+        "bracket": {
+          "clear_rad": -1.606930096465,
+          "contact_rad": -1.606998273389
+        },
+        "link_pair": [
+          "rf_upper_leg_link",
+          "rf_lower_leg_link"
+        ],
+        "minus_declared_limit_rad": -0.001295361554,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.780235837034,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rf_lower_leg_joint",
+        "limit_side": "min",
+        "presentation_id": "rf_lower_leg_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": -1.470854308443,
+        "bracket": {
+          "clear_rad": -1.470786810196,
+          "contact_rad": -1.470854308443
+        },
+        "link_pair": [
+          "rf_hip_link",
+          "rf_lower_leg_link"
+        ],
+        "precedes_geometric_contact": true,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.606998273389,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "PATH_OBSTRUCTION"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 2
+    },
+    {
+      "active_revolute_pair": [
+        "rf_upper_leg_link",
+        "rf_lower_leg_link"
+      ],
+      "articulated_branch_id": "rf_hip_joint",
+      "declared_limit_rad": 0.654498469498,
+      "geometric_contact": {
+        "angle_rad": 0.666361254258,
+        "bracket": {
+          "clear_rad": 0.666293077334,
+          "contact_rad": 0.666361254258
+        },
+        "link_pair": [
+          "rf_upper_leg_link",
+          "rf_lower_leg_link"
+        ],
+        "minus_declared_limit_rad": 0.01186278476,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.829031394697
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rf_lower_leg_joint",
+        "limit_side": "max",
+        "presentation_id": "rf_lower_leg_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.666361254258
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 2
+    },
+    {
+      "active_revolute_pair": [
+        "base_link",
+        "rh_hip_link"
+      ],
+      "articulated_branch_id": "rh_hip_joint",
+      "declared_limit_rad": -0.785398163397,
+      "geometric_contact": {
+        "angle_rad": -0.788125240354,
+        "bracket": {
+          "clear_rad": -0.78805706343,
+          "contact_rad": -0.788125240354
+        },
+        "link_pair": [
+          "base_link",
+          "rh_hip_link"
+        ],
+        "minus_declared_limit_rad": -0.002727076957,
+        "relation": "body_vs_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.959931088596,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rh_hip_joint",
+        "limit_side": "min",
+        "presentation_id": "rh_hip_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.788125240354,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 0
+    },
+    {
+      "active_revolute_pair": [
+        "base_link",
+        "rh_hip_link"
+      ],
+      "articulated_branch_id": "rh_hip_joint",
+      "declared_limit_rad": 0.785398163397,
+      "geometric_contact": {
+        "angle_rad": 0.803055986689,
+        "bracket": {
+          "clear_rad": 0.802987809765,
+          "contact_rad": 0.803055986689
+        },
+        "link_pair": [
+          "base_link",
+          "rh_hip_link"
+        ],
+        "minus_declared_limit_rad": 0.017657823292,
+        "relation": "body_vs_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.959931088596
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rh_hip_joint",
+        "limit_side": "max",
+        "presentation_id": "rh_hip_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.803055986689
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 0
+    },
+    {
+      "active_revolute_pair": [
+        "rh_hip_link",
+        "rh_upper_leg_link"
+      ],
+      "articulated_branch_id": "rh_hip_joint",
+      "declared_limit_rad": -0.916297857297,
+      "geometric_contact": {
+        "angle_rad": -0.90988922645,
+        "bracket": {
+          "clear_rad": -0.909821049526,
+          "contact_rad": -0.90988922645
+        },
+        "link_pair": [
+          "rh_hip_link",
+          "rh_upper_leg_link"
+        ],
+        "minus_declared_limit_rad": 0.006408630847,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.090830782496,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rh_upper_leg_joint",
+        "limit_side": "min",
+        "presentation_id": "rh_upper_leg_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.90988922645,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 1
+    },
+    {
+      "active_revolute_pair": [
+        "rh_hip_link",
+        "rh_upper_leg_link"
+      ],
+      "articulated_branch_id": "rh_hip_joint",
+      "declared_limit_rad": 2.138028333693,
+      "geometric_contact": {
+        "angle_rad": 2.127120025868,
+        "bracket": {
+          "clear_rad": 2.127051848944,
+          "contact_rad": 2.127120025868
+        },
+        "link_pair": [
+          "rh_hip_link",
+          "rh_upper_leg_link"
+        ],
+        "minus_declared_limit_rad": -0.010908307825,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            2.312561258892
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rh_upper_leg_joint",
+        "limit_side": "max",
+        "presentation_id": "rh_upper_leg_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            2.127120025868
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 1
+    },
+    {
+      "active_revolute_pair": [
+        "rh_upper_leg_link",
+        "rh_lower_leg_link"
+      ],
+      "articulated_branch_id": "rh_hip_joint",
+      "declared_limit_rad": -1.605702911835,
+      "geometric_contact": {
+        "angle_rad": -1.606998273389,
+        "bracket": {
+          "clear_rad": -1.606930096465,
+          "contact_rad": -1.606998273389
+        },
+        "link_pair": [
+          "rh_upper_leg_link",
+          "rh_lower_leg_link"
+        ],
+        "minus_declared_limit_rad": -0.001295361554,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.780235837034,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rh_lower_leg_joint",
+        "limit_side": "min",
+        "presentation_id": "rh_lower_leg_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": -1.470854308443,
+        "bracket": {
+          "clear_rad": -1.470786810196,
+          "contact_rad": -1.470854308443
+        },
+        "link_pair": [
+          "rh_hip_link",
+          "rh_lower_leg_link"
+        ],
+        "precedes_geometric_contact": true,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.606998273389,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "PATH_OBSTRUCTION"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 2
+    },
+    {
+      "active_revolute_pair": [
+        "rh_upper_leg_link",
+        "rh_lower_leg_link"
+      ],
+      "articulated_branch_id": "rh_hip_joint",
+      "declared_limit_rad": 0.654498469498,
+      "geometric_contact": {
+        "angle_rad": 0.666361254258,
+        "bracket": {
+          "clear_rad": 0.666293077334,
+          "contact_rad": 0.666361254258
+        },
+        "link_pair": [
+          "rh_upper_leg_link",
+          "rh_lower_leg_link"
+        ],
+        "minus_declared_limit_rad": 0.01186278476,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.829031394697
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "rh_lower_leg_joint",
+        "limit_side": "max",
+        "presentation_id": "rh_lower_leg_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.666361254258
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 2
+    },
+    {
+      "active_revolute_pair": [
+        "base_link",
+        "lh_hip_link"
+      ],
+      "articulated_branch_id": "lh_hip_joint",
+      "declared_limit_rad": -0.785398163397,
+      "geometric_contact": {
+        "angle_rad": -0.803055986689,
+        "bracket": {
+          "clear_rad": -0.802987809765,
+          "contact_rad": -0.803055986689
+        },
+        "link_pair": [
+          "base_link",
+          "lh_hip_link"
+        ],
+        "minus_declared_limit_rad": -0.017657823292,
+        "relation": "body_vs_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.959931088596,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lh_hip_joint",
+        "limit_side": "min",
+        "presentation_id": "lh_hip_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.803055986689,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 0
+    },
+    {
+      "active_revolute_pair": [
+        "base_link",
+        "lh_hip_link"
+      ],
+      "articulated_branch_id": "lh_hip_joint",
+      "declared_limit_rad": 0.785398163397,
+      "geometric_contact": {
+        "angle_rad": 0.788125240354,
+        "bracket": {
+          "clear_rad": 0.78805706343,
+          "contact_rad": 0.788125240354
+        },
+        "link_pair": [
+          "base_link",
+          "lh_hip_link"
+        ],
+        "minus_declared_limit_rad": 0.002727076957,
+        "relation": "body_vs_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.959931088596
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lh_hip_joint",
+        "limit_side": "max",
+        "presentation_id": "lh_hip_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.788125240354
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 0
+    },
+    {
+      "active_revolute_pair": [
+        "lh_hip_link",
+        "lh_upper_leg_link"
+      ],
+      "articulated_branch_id": "lh_hip_joint",
+      "declared_limit_rad": -0.916297857297,
+      "geometric_contact": {
+        "angle_rad": -0.90988922645,
+        "bracket": {
+          "clear_rad": -0.909821049526,
+          "contact_rad": -0.90988922645
+        },
+        "link_pair": [
+          "lh_hip_link",
+          "lh_upper_leg_link"
+        ],
+        "minus_declared_limit_rad": 0.006408630847,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.090830782496,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lh_upper_leg_joint",
+        "limit_side": "min",
+        "presentation_id": "lh_upper_leg_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -0.90988922645,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 1
+    },
+    {
+      "active_revolute_pair": [
+        "lh_hip_link",
+        "lh_upper_leg_link"
+      ],
+      "articulated_branch_id": "lh_hip_joint",
+      "declared_limit_rad": 2.138028333693,
+      "geometric_contact": {
+        "angle_rad": 2.127120025868,
+        "bracket": {
+          "clear_rad": 2.127051848944,
+          "contact_rad": 2.127120025868
+        },
+        "link_pair": [
+          "lh_hip_link",
+          "lh_upper_leg_link"
+        ],
+        "minus_declared_limit_rad": -0.010908307825,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            2.312561258892
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lh_upper_leg_joint",
+        "limit_side": "max",
+        "presentation_id": "lh_upper_leg_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            2.127120025868
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 1
+    },
+    {
+      "active_revolute_pair": [
+        "lh_upper_leg_link",
+        "lh_lower_leg_link"
+      ],
+      "articulated_branch_id": "lh_hip_joint",
+      "declared_limit_rad": -1.605702911835,
+      "geometric_contact": {
+        "angle_rad": -1.606998273389,
+        "bracket": {
+          "clear_rad": -1.606930096465,
+          "contact_rad": -1.606998273389
+        },
+        "link_pair": [
+          "lh_upper_leg_link",
+          "lh_lower_leg_link"
+        ],
+        "minus_declared_limit_rad": -0.001295361554,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.780235837034,
+            0.0
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lh_lower_leg_joint",
+        "limit_side": "min",
+        "presentation_id": "lh_lower_leg_joint:min"
+      },
+      "path_obstruction": {
+        "angle_rad": -1.470854308443,
+        "bracket": {
+          "clear_rad": -1.470786810196,
+          "contact_rad": -1.470854308443
+        },
+        "link_pair": [
+          "lh_hip_link",
+          "lh_lower_leg_link"
+        ],
+        "precedes_geometric_contact": true,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            -1.606998273389,
+            0.0
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "PATH_OBSTRUCTION"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 2
+    },
+    {
+      "active_revolute_pair": [
+        "lh_upper_leg_link",
+        "lh_lower_leg_link"
+      ],
+      "articulated_branch_id": "lh_hip_joint",
+      "declared_limit_rad": 0.654498469498,
+      "geometric_contact": {
+        "angle_rad": 0.666361254258,
+        "bracket": {
+          "clear_rad": 0.666293077334,
+          "contact_rad": 0.666361254258
+        },
+        "link_pair": [
+          "lh_upper_leg_link",
+          "lh_lower_leg_link"
+        ],
+        "minus_declared_limit_rad": 0.01186278476,
+        "relation": "same_branch",
+        "search": {
+          "bisection_iterations": 8,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.829031394697
+          ],
+          "max_bisection_iterations": 40,
+          "start_rad": 0.0
+        },
+        "status": "GEOMETRIC_CONTACT_FOUND"
+      },
+      "identity": {
+        "joint_name": "lh_lower_leg_joint",
+        "limit_side": "max",
+        "presentation_id": "lh_lower_leg_joint:max"
+      },
+      "path_obstruction": {
+        "angle_rad": null,
+        "bracket": {
+          "clear_rad": null,
+          "contact_rad": null
+        },
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "search": {
+          "bisection_iterations": 0,
+          "bisection_resolution_rad": 0.0001,
+          "coarse_step_rad": 0.01745329252,
+          "domain_rad": [
+            0.0,
+            0.666361254258
+          ],
+          "max_bisection_iterations": 40
+        },
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      },
+      "search_context": {
+        "joint_positions_rad": {}
+      },
+      "structural_depth": 2
+    }
+  ],
+  "generation_metadata": {
+    "generated_at_utc": "2026-08-11T12:20:16.620434+00:00",
+    "integrated_execution": {
+      "batch_strategy": "12_topology_derived_actuated_joint_batches_min_then_max",
+      "benchmark_id": "D",
+      "canonical_result_sort_key": [
+        "canonical_endpoint_index"
+      ],
+      "numerical_thread_limits": {
+        "MKL_NUM_THREADS": 1,
+        "NUMEXPR_NUM_THREADS": 1,
+        "OMP_NUM_THREADS": 1,
+        "OPENBLAS_NUM_THREADS": 1
+      },
+      "parent_writer_pid": 282095,
+      "worker_model": "spawn_process_pool"
+    },
+    "repository_materialization": {
+      "commit_sha": "3735c03ac416f2830ad305fb85ce9ae13abcef10",
+      "working_tree_dirty": true
+    },
+    "runtime_seconds": 248.817139,
+    "worker_count": 4
+  },
+  "geometry_pair_policy": {
+    "active_pair_by_joint": {
+      "lf_hip_joint": [
+        "base_link",
+        "lf_hip_link"
+      ],
+      "lf_lower_leg_joint": [
+        "lf_upper_leg_link",
+        "lf_lower_leg_link"
+      ],
+      "lf_upper_leg_joint": [
+        "lf_hip_link",
+        "lf_upper_leg_link"
+      ],
+      "lh_hip_joint": [
+        "base_link",
+        "lh_hip_link"
+      ],
+      "lh_lower_leg_joint": [
+        "lh_upper_leg_link",
+        "lh_lower_leg_link"
+      ],
+      "lh_upper_leg_joint": [
+        "lh_hip_link",
+        "lh_upper_leg_link"
+      ],
+      "rf_hip_joint": [
+        "base_link",
+        "rf_hip_link"
+      ],
+      "rf_lower_leg_joint": [
+        "rf_upper_leg_link",
+        "rf_lower_leg_link"
+      ],
+      "rf_upper_leg_joint": [
+        "rf_hip_link",
+        "rf_upper_leg_link"
+      ],
+      "rh_hip_joint": [
+        "base_link",
+        "rh_hip_link"
+      ],
+      "rh_lower_leg_joint": [
+        "rh_upper_leg_link",
+        "rh_lower_leg_link"
+      ],
+      "rh_upper_leg_joint": [
+        "rh_hip_link",
+        "rh_upper_leg_link"
+      ]
+    },
+    "active_pair_contact_search_rule": "search exactly the selected revolute joint parent-child pair",
+    "fixed_adjacent_pair_count": 4,
+    "fixed_adjacent_pairs": [
+      [
+        "lf_lower_leg_link",
+        "lf_foot_link"
+      ],
+      [
+        "rf_lower_leg_link",
+        "rf_foot_link"
+      ],
+      [
+        "rh_lower_leg_link",
+        "rh_foot_link"
+      ],
+      [
+        "lh_lower_leg_link",
+        "lh_foot_link"
+      ]
+    ],
+    "path_obstruction_pair_rule": "all collision pairs except fixed adjacency and the active pair",
+    "path_relation_values": [
+      "same_branch",
+      "body_vs_branch",
+      "cross_branch",
+      "body_internal"
+    ],
+    "revolute_adjacent_pair_count": 12,
+    "revolute_adjacent_pairs": [
+      [
+        "base_link",
+        "lf_hip_link"
+      ],
+      [
+        "base_link",
+        "rf_hip_link"
+      ],
+      [
+        "base_link",
+        "rh_hip_link"
+      ],
+      [
+        "base_link",
+        "lh_hip_link"
+      ],
+      [
+        "lf_hip_link",
+        "lf_upper_leg_link"
+      ],
+      [
+        "lf_upper_leg_link",
+        "lf_lower_leg_link"
+      ],
+      [
+        "rf_hip_link",
+        "rf_upper_leg_link"
+      ],
+      [
+        "rf_upper_leg_link",
+        "rf_lower_leg_link"
+      ],
+      [
+        "rh_hip_link",
+        "rh_upper_leg_link"
+      ],
+      [
+        "rh_upper_leg_link",
+        "rh_lower_leg_link"
+      ],
+      [
+        "lh_hip_link",
+        "lh_upper_leg_link"
+      ],
+      [
+        "lh_upper_leg_link",
+        "lh_lower_leg_link"
+      ]
+    ],
+    "version": "v5_pure_geometry_topology_driven"
+  },
+  "geometry_unknowns": [
+    {
+      "code": "ADJACENT_HARDSTOP_LOCAL_SENSITIVITY_NOT_COMPUTED",
+      "description": "minimum adjacent-pair clearance is dominated by joint-core fit and is not a hardstop-feature derivative"
+    },
+    {
+      "code": "NOMINAL_COLLISION_GEOMETRY_ONLY",
+      "description": "assembly stack-up, bushings, screws, backlash and fit clearances are not represented"
+    }
+  ],
+  "model": {
+    "articulated_branches": [
+      {
+        "branch_id": "lf_hip_joint",
+        "deterministic_sort_motor_id": 13,
+        "joint_names": [
+          "lf_hip_joint",
+          "lf_upper_leg_joint",
+          "lf_lower_leg_joint"
+        ],
+        "link_names": [
+          "lf_hip_link",
+          "lf_upper_leg_link",
+          "lf_lower_leg_link",
+          "lf_foot_link"
+        ],
+        "root_joint_name": "lf_hip_joint"
+      },
+      {
+        "branch_id": "rf_hip_joint",
+        "deterministic_sort_motor_id": 23,
+        "joint_names": [
+          "rf_hip_joint",
+          "rf_upper_leg_joint",
+          "rf_lower_leg_joint"
+        ],
+        "link_names": [
+          "rf_hip_link",
+          "rf_upper_leg_link",
+          "rf_lower_leg_link",
+          "rf_foot_link"
+        ],
+        "root_joint_name": "rf_hip_joint"
+      },
+      {
+        "branch_id": "rh_hip_joint",
+        "deterministic_sort_motor_id": 33,
+        "joint_names": [
+          "rh_hip_joint",
+          "rh_upper_leg_joint",
+          "rh_lower_leg_joint"
+        ],
+        "link_names": [
+          "rh_hip_link",
+          "rh_upper_leg_link",
+          "rh_lower_leg_link",
+          "rh_foot_link"
+        ],
+        "root_joint_name": "rh_hip_joint"
+      },
+      {
+        "branch_id": "lh_hip_joint",
+        "deterministic_sort_motor_id": 43,
+        "joint_names": [
+          "lh_hip_joint",
+          "lh_upper_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "link_names": [
+          "lh_hip_link",
+          "lh_upper_leg_link",
+          "lh_lower_leg_link",
+          "lh_foot_link"
+        ],
+        "root_joint_name": "lh_hip_joint"
+      }
+    ],
+    "joints": [
+      {
+        "articulated_branch_id": "lf_hip_joint",
+        "axis_xyz": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "child_link": "lf_hip_link",
+        "limit": {
+          "lower_rad": -0.785398163397,
+          "upper_rad": 0.785398163397
+        },
+        "motor_direction": 1,
+        "motor_id": 13,
+        "name": "lf_hip_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.1125,
+          0.0475,
+          0.0465
+        ],
+        "parent_link": "base_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": "lf_hip_joint",
+        "axis_xyz": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "child_link": "lf_upper_leg_link",
+        "limit": {
+          "lower_rad": -0.916297857297,
+          "upper_rad": 2.138028333693
+        },
+        "motor_direction": 1,
+        "motor_id": 12,
+        "name": "lf_upper_leg_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.048,
+          0.0
+        ],
+        "parent_link": "lf_hip_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": "lf_hip_joint",
+        "axis_xyz": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "child_link": "lf_lower_leg_link",
+        "limit": {
+          "lower_rad": -1.605702911835,
+          "upper_rad": 0.654498469498
+        },
+        "motor_direction": 1,
+        "motor_id": 11,
+        "name": "lf_lower_leg_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          -0.09
+        ],
+        "parent_link": "lf_upper_leg_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": null,
+        "axis_xyz": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "child_link": "lf_foot_link",
+        "limit": null,
+        "motor_direction": null,
+        "motor_id": null,
+        "name": "lf_foot_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.107,
+          -0.0015,
+          -0.0499
+        ],
+        "parent_link": "lf_lower_leg_link",
+        "selected_actuated": false,
+        "type": "fixed"
+      },
+      {
+        "articulated_branch_id": "rf_hip_joint",
+        "axis_xyz": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "child_link": "rf_hip_link",
+        "limit": {
+          "lower_rad": -0.785398163397,
+          "upper_rad": 0.785398163397
+        },
+        "motor_direction": 1,
+        "motor_id": 23,
+        "name": "rf_hip_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.1125,
+          -0.0475,
+          0.0465
+        ],
+        "parent_link": "base_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": "rf_hip_joint",
+        "axis_xyz": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "child_link": "rf_upper_leg_link",
+        "limit": {
+          "lower_rad": -0.916297857297,
+          "upper_rad": 2.138028333693
+        },
+        "motor_direction": -1,
+        "motor_id": 22,
+        "name": "rf_upper_leg_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          -0.048,
+          0.0
+        ],
+        "parent_link": "rf_hip_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": "rf_hip_joint",
+        "axis_xyz": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "child_link": "rf_lower_leg_link",
+        "limit": {
+          "lower_rad": -1.605702911835,
+          "upper_rad": 0.654498469498
+        },
+        "motor_direction": -1,
+        "motor_id": 21,
+        "name": "rf_lower_leg_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          -0.09
+        ],
+        "parent_link": "rf_upper_leg_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": null,
+        "axis_xyz": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "child_link": "rf_foot_link",
+        "limit": null,
+        "motor_direction": null,
+        "motor_id": null,
+        "name": "rf_foot_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.107,
+          0.0015,
+          -0.0499
+        ],
+        "parent_link": "rf_lower_leg_link",
+        "selected_actuated": false,
+        "type": "fixed"
+      },
+      {
+        "articulated_branch_id": "rh_hip_joint",
+        "axis_xyz": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "child_link": "rh_hip_link",
+        "limit": {
+          "lower_rad": -0.785398163397,
+          "upper_rad": 0.785398163397
+        },
+        "motor_direction": -1,
+        "motor_id": 33,
+        "name": "rh_hip_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          -0.1125,
+          -0.0475,
+          0.0265
+        ],
+        "parent_link": "base_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": "rh_hip_joint",
+        "axis_xyz": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "child_link": "rh_upper_leg_link",
+        "limit": {
+          "lower_rad": -0.916297857297,
+          "upper_rad": 2.138028333693
+        },
+        "motor_direction": -1,
+        "motor_id": 32,
+        "name": "rh_upper_leg_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          -0.048,
+          0.0
+        ],
+        "parent_link": "rh_hip_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": "rh_hip_joint",
+        "axis_xyz": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "child_link": "rh_lower_leg_link",
+        "limit": {
+          "lower_rad": -1.605702911835,
+          "upper_rad": 0.654498469498
+        },
+        "motor_direction": -1,
+        "motor_id": 31,
+        "name": "rh_lower_leg_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          -0.09
+        ],
+        "parent_link": "rh_upper_leg_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": null,
+        "axis_xyz": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "child_link": "rh_foot_link",
+        "limit": null,
+        "motor_direction": null,
+        "motor_id": null,
+        "name": "rh_foot_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.107,
+          0.0015,
+          -0.0499
+        ],
+        "parent_link": "rh_lower_leg_link",
+        "selected_actuated": false,
+        "type": "fixed"
+      },
+      {
+        "articulated_branch_id": "lh_hip_joint",
+        "axis_xyz": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "child_link": "lh_hip_link",
+        "limit": {
+          "lower_rad": -0.785398163397,
+          "upper_rad": 0.785398163397
+        },
+        "motor_direction": -1,
+        "motor_id": 43,
+        "name": "lh_hip_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          -0.1125,
+          0.0475,
+          0.0265
+        ],
+        "parent_link": "base_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": "lh_hip_joint",
+        "axis_xyz": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "child_link": "lh_upper_leg_link",
+        "limit": {
+          "lower_rad": -0.916297857297,
+          "upper_rad": 2.138028333693
+        },
+        "motor_direction": 1,
+        "motor_id": 42,
+        "name": "lh_upper_leg_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.048,
+          0.0
+        ],
+        "parent_link": "lh_hip_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": "lh_hip_joint",
+        "axis_xyz": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "child_link": "lh_lower_leg_link",
+        "limit": {
+          "lower_rad": -1.605702911835,
+          "upper_rad": 0.654498469498
+        },
+        "motor_direction": 1,
+        "motor_id": 41,
+        "name": "lh_lower_leg_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          -0.09
+        ],
+        "parent_link": "lh_upper_leg_link",
+        "selected_actuated": true,
+        "type": "revolute"
+      },
+      {
+        "articulated_branch_id": null,
+        "axis_xyz": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "child_link": "lh_foot_link",
+        "limit": null,
+        "motor_direction": null,
+        "motor_id": null,
+        "name": "lh_foot_joint",
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.107,
+          -0.0015,
+          -0.0499
+        ],
+        "parent_link": "lh_lower_leg_link",
+        "selected_actuated": false,
+        "type": "fixed"
+      }
+    ],
+    "links": [
+      {
+        "articulated_branch_id": null,
+        "has_collision_mesh": true,
+        "name": "base_link"
+      },
+      {
+        "articulated_branch_id": "lf_hip_joint",
+        "has_collision_mesh": true,
+        "name": "lf_hip_link"
+      },
+      {
+        "articulated_branch_id": "lf_hip_joint",
+        "has_collision_mesh": true,
+        "name": "lf_upper_leg_link"
+      },
+      {
+        "articulated_branch_id": "lf_hip_joint",
+        "has_collision_mesh": true,
+        "name": "lf_lower_leg_link"
+      },
+      {
+        "articulated_branch_id": "lf_hip_joint",
+        "has_collision_mesh": true,
+        "name": "lf_foot_link"
+      },
+      {
+        "articulated_branch_id": "rf_hip_joint",
+        "has_collision_mesh": true,
+        "name": "rf_hip_link"
+      },
+      {
+        "articulated_branch_id": "rf_hip_joint",
+        "has_collision_mesh": true,
+        "name": "rf_upper_leg_link"
+      },
+      {
+        "articulated_branch_id": "rf_hip_joint",
+        "has_collision_mesh": true,
+        "name": "rf_lower_leg_link"
+      },
+      {
+        "articulated_branch_id": "rf_hip_joint",
+        "has_collision_mesh": true,
+        "name": "rf_foot_link"
+      },
+      {
+        "articulated_branch_id": "rh_hip_joint",
+        "has_collision_mesh": true,
+        "name": "rh_hip_link"
+      },
+      {
+        "articulated_branch_id": "rh_hip_joint",
+        "has_collision_mesh": true,
+        "name": "rh_upper_leg_link"
+      },
+      {
+        "articulated_branch_id": "rh_hip_joint",
+        "has_collision_mesh": true,
+        "name": "rh_lower_leg_link"
+      },
+      {
+        "articulated_branch_id": "rh_hip_joint",
+        "has_collision_mesh": true,
+        "name": "rh_foot_link"
+      },
+      {
+        "articulated_branch_id": "lh_hip_joint",
+        "has_collision_mesh": true,
+        "name": "lh_hip_link"
+      },
+      {
+        "articulated_branch_id": "lh_hip_joint",
+        "has_collision_mesh": true,
+        "name": "lh_upper_leg_link"
+      },
+      {
+        "articulated_branch_id": "lh_hip_joint",
+        "has_collision_mesh": true,
+        "name": "lh_lower_leg_link"
+      },
+      {
+        "articulated_branch_id": "lh_hip_joint",
+        "has_collision_mesh": true,
+        "name": "lh_foot_link"
+      }
+    ],
+    "root_link": "base_link",
+    "selected_actuated_joint_count": 12,
+    "selected_actuated_joint_names": [
+      "lf_hip_joint",
+      "lf_upper_leg_joint",
+      "lf_lower_leg_joint",
+      "rf_hip_joint",
+      "rf_upper_leg_joint",
+      "rf_lower_leg_joint",
+      "rh_hip_joint",
+      "rh_upper_leg_joint",
+      "rh_lower_leg_joint",
+      "lh_hip_joint",
+      "lh_upper_leg_joint",
+      "lh_lower_leg_joint"
+    ]
+  },
+  "path_plans": [],
+  "provenance": {
+    "collision_meshes": {
+      "base_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+        "stl_relative_path": "meshes/collision/base_link.stl",
+        "triangle_count": 22044
+      },
+      "lf_foot_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+        "stl_relative_path": "meshes/collision/lf_foot_link.stl",
+        "triangle_count": 2248
+      },
+      "lf_hip_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+        "stl_relative_path": "meshes/collision/lf_hip_link.stl",
+        "triangle_count": 6016
+      },
+      "lf_lower_leg_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+        "stl_relative_path": "meshes/collision/lf_lower_leg_link.stl",
+        "triangle_count": 12336
+      },
+      "lf_upper_leg_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+        "stl_relative_path": "meshes/collision/lf_upper_leg_link.stl",
+        "triangle_count": 3802
+      },
+      "lh_foot_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+        "stl_relative_path": "meshes/collision/lh_foot_link.stl",
+        "triangle_count": 2248
+      },
+      "lh_hip_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+        "stl_relative_path": "meshes/collision/lh_hip_link.stl",
+        "triangle_count": 6018
+      },
+      "lh_lower_leg_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+        "stl_relative_path": "meshes/collision/lh_lower_leg_link.stl",
+        "triangle_count": 12336
+      },
+      "lh_upper_leg_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+        "stl_relative_path": "meshes/collision/lh_upper_leg_link.stl",
+        "triangle_count": 3802
+      },
+      "rf_foot_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+        "stl_relative_path": "meshes/collision/rf_foot_link.stl",
+        "triangle_count": 2248
+      },
+      "rf_hip_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+        "stl_relative_path": "meshes/collision/rf_hip_link.stl",
+        "triangle_count": 6016
+      },
+      "rf_lower_leg_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+        "stl_relative_path": "meshes/collision/rf_lower_leg_link.stl",
+        "triangle_count": 12352
+      },
+      "rf_upper_leg_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+        "stl_relative_path": "meshes/collision/rf_upper_leg_link.stl",
+        "triangle_count": 3806
+      },
+      "rh_foot_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+        "stl_relative_path": "meshes/collision/rh_foot_link.stl",
+        "triangle_count": 2248
+      },
+      "rh_hip_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+        "stl_relative_path": "meshes/collision/rh_hip_link.stl",
+        "triangle_count": 6018
+      },
+      "rh_lower_leg_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+        "stl_relative_path": "meshes/collision/rh_lower_leg_link.stl",
+        "triangle_count": 12352
+      },
+      "rh_upper_leg_link": {
+        "degenerate_triangles_dropped": 0,
+        "origin_rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "origin_xyz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale_xyz": [
+          0.001,
+          0.001,
+          0.001
+        ],
+        "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+        "stl_relative_path": "meshes/collision/rh_upper_leg_link.stl",
+        "triangle_count": 3806
+      }
+    },
+    "geometry_compiler": {
+      "source_combined_sha256": "e4eea175e90131b1d8e55ae381fe8e88d6f966c0f87d4eee5c064d0a6967737f",
+      "source_file_sha256": {
+        "matdog_geometry_compiler_v5.py": "9d2cb6e8d89382e3266622e4c230fd31dc307b4995a81071bcb8447587645dc9",
+        "matdog_geometry_contact_search_v5.py": "cc0cdaada456d0fab144a2f4991acf0518aabad2ff807194433ca70e88f86170",
+        "matdog_geometry_full_runner_v5.py": "9a9ee4e4265e06f9fb6ac26a050cda3f28e8acf5ac958b18eb6d895aed31e06e",
+        "matdog_geometry_mesh_kernel.py": "f7119fd93b913968ea342269b4369546ecbcad2e8731e7d4d8fabd4ba08c017c",
+        "matdog_geometry_model_v5.py": "e40925c52263329773cc69f310059c697234dc85514d220487b651f6098bf686",
+        "matdog_geometry_path_planner_v5.py": "6d63b03c059ffe1c212a522cb84cc05d496093e055d7ab87ff9d0ed8c2eda528",
+        "matdog_geometry_process_workers_v5.py": "fcc69696ed85bb5a7ec8269681e5e7e63738dd23e33b7007fd9df59cccee0d49",
+        "matdog_geometry_profile_v5.py": "f9d4a6ba6968e5dacc6d01d1eaa0becb14a2b3c3c41c25e34ec62dfdf935ad3f",
+        "matdog_geometry_scene_v5.py": "e6a9daf4d83330515cd2f662ff6ead52163579fc55167c80974266386771b739"
+      }
+    },
+    "urdf": {
+      "relative_path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+      "sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+    }
+  },
+  "schema_version": "matdog.calibration_geometry_profile.v5",
+  "semantic_content_sha256": "de205209f6015734f43af7f49146ecf60f89a74d6ce1276ce134c189a89c9f7e"
+}

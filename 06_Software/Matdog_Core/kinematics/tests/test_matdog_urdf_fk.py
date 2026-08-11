@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import unittest
 
@@ -32,6 +33,15 @@ class TestMatdogUrdfFk(unittest.TestCase):
     def test_canonical_urdf_integrity(self):
         self.assertTrue(self.urdf.is_file())
         self.assertEqual(sha256_file(self.urdf), CANONICAL_URDF_SHA256)
+
+    def test_collision_path_separation_is_the_only_urdf_text_change(self):
+        current = self.urdf.read_text(encoding="utf-8")
+        normalized = current.replace("meshes/collision/", "meshes/")
+        digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+        self.assertEqual(
+            digest,
+            "5e28da3dba10fd3f2ea6ebf6f5d6271157bda0b12b82d92aedbe3031643089ef",
+        )
 
     def test_lf_chain_matches_canonical_joint_order(self):
         result = forward_kinematics(
