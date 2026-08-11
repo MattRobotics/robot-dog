@@ -7,7 +7,7 @@ robot:
 kinematic_model:
   canonical_urdf:
     path: 03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
-    sha256: 5e28da3dba10fd3f2ea6ebf6f5d6271157bda0b12b82d92aedbe3031643089ef
+    sha256: 3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59
 
 units:
   joint_angle: rad

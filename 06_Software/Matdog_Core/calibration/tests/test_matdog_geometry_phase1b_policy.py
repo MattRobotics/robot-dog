@@ -51,15 +51,25 @@ from matdog_geometry_scene import (  # noqa: E402
     path_safety_pairs,
 )
 
-MESH_DIR = REPO_ROOT / "03_CAD/URDF/matt_robodog_rev00/meshes"
+VISUAL_MESH_DIR = REPO_ROOT / "03_CAD/URDF/matt_robodog_rev00/meshes"
+COLLISION_MESH_DIR = VISUAL_MESH_DIR / "collision"
 
-# The five collision meshes corrected by the motor-pin clearance fix (GATE B).
-EXPECTED_MESH_SHA256 = {
+# These five historical detailed meshes remain unchanged visual assets after G1.
+EXPECTED_VISUAL_MESH_SHA256 = {
     "base_link.stl": "644a83e98fd116f3fc8e5d8792ca2b60b0bdb09bcafa4fc49140d641079e4b6b",
     "lf_upper_leg_link.stl": "3c484b110a622274d1f8446b30329b8e16a0ff542d25da2a39334d41e8f4f169",
     "lh_upper_leg_link.stl": "3c484b110a622274d1f8446b30329b8e16a0ff542d25da2a39334d41e8f4f169",
     "rf_upper_leg_link.stl": "08fab5e3229280f21a52c6cfbfdab32f1e8345aae6e10648360ae30fe1e06b16",
     "rh_upper_leg_link.stl": "08fab5e3229280f21a52c6cfbfdab32f1e8345aae6e10648360ae30fe1e06b16",
+}
+
+# Their approved G1 collision representations are pinned independently.
+EXPECTED_COLLISION_MESH_SHA256 = {
+    "base_link.stl": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+    "lf_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+    "lh_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+    "rf_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+    "rh_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
 }
 
 _SCENE: RobotScene | None = None
@@ -339,28 +349,46 @@ class TestCorrectedGeometryAtHome(unittest.TestCase):
 
 
 class TestMeshIntegrity(unittest.TestCase):
-    """16: the five corrected meshes must be the validated ones."""
+    """16: visual assets stay fixed and collision assets follow approved G1."""
 
-    def test_five_corrected_mesh_hashes(self):
-        for name, expected in EXPECTED_MESH_SHA256.items():
-            path = MESH_DIR / name
+    def test_five_historical_visual_mesh_hashes(self):
+        for name, expected in EXPECTED_VISUAL_MESH_SHA256.items():
+            path = VISUAL_MESH_DIR / name
             self.assertTrue(path.is_file(), f"missing {name}")
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            self.assertEqual(digest, expected, f"{name} is not the GATE-B-validated mesh")
+            self.assertEqual(digest, expected, f"{name} visual geometry changed")
 
     def test_meshes_are_real_binary_stl_not_lfs_pointers(self):
-        for name in EXPECTED_MESH_SHA256:
-            with (MESH_DIR / name).open("rb") as handle:
-                head = handle.read(64)
-            self.assertFalse(head.startswith(b"version https://git-lfs"),
-                             f"{name} is an unsmudged LFS pointer")
+        for directory, names in (
+            (VISUAL_MESH_DIR, EXPECTED_VISUAL_MESH_SHA256),
+            (COLLISION_MESH_DIR, EXPECTED_COLLISION_MESH_SHA256),
+        ):
+            for name in names:
+                with (directory / name).open("rb") as handle:
+                    head = handle.read(64)
+                self.assertFalse(head.startswith(b"version https://git-lfs"),
+                                 f"{directory / name} is an unsmudged LFS pointer")
 
     def test_scene_mesh_hashes_match_files_on_disk(self):
-        """Staleness guard: the loaded scene must reflect the files on disk."""
+        """Staleness guard: the scene follows the URDF collision manifest.
+
+        G1 explicitly separated detailed visual meshes from the approved
+        collision meshes, so the old root-level visual-file constants are no
+        longer valid expectations for ``RobotScene.mesh``.
+        """
         scene = shared_scene()
-        for name, expected in EXPECTED_MESH_SHA256.items():
+        for name, approved_collision_sha in EXPECTED_COLLISION_MESH_SHA256.items():
             link = name[:-4]
-            self.assertEqual(scene.mesh(link).sha256, expected, f"{link} scene mesh is stale")
+            entry = scene.mesh_manifest[link]
+            collision_path = scene.urdf_path.parent / entry.stl_relative_path
+            expected = hashlib.sha256(collision_path.read_bytes()).hexdigest()
+            self.assertEqual(collision_path, COLLISION_MESH_DIR / name)
+            self.assertEqual(expected, approved_collision_sha, f"{link} collision mesh changed")
+            self.assertEqual(
+                scene.mesh(link).sha256,
+                expected,
+                f"{link} scene mesh does not match URDF collision filename",
+            )
 
 
 class TestNoHardwareAccess(unittest.TestCase):

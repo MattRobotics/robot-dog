@@ -1,0 +1,226 @@
+{
+  "artifacts": {
+    "combined_profile": {
+      "file_sha256": "06f5d1e7f46db1cf0f6084ca75f36a27d76c18e25d26c8addc53a4967e7b41d1",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_072224_MATDOG_GEOMETRY_V5_BENCHMARK_C_W1_COMBINED_PROFILE.json"
+    },
+    "combined_report": {
+      "file_sha256": "26fe99b64fddc1b719983c4a8b1323472a902217188776b08dc3296965e3187c",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_072224_MATDOG_GEOMETRY_V5_BENCHMARK_C_W1_COMBINED_REPORT.md"
+    },
+    "endpoint_profile": {
+      "file_sha256": "e9fa23d5c5ee98c56d622064b7ed7577ea9867f6db498909afbfc61d11156079",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_072224_MATDOG_GEOMETRY_V5_BENCHMARK_C_W1_ENDPOINT_PROFILE.json"
+    },
+    "endpoint_report": {
+      "file_sha256": "9f7cd25ef7f91078956dcf798b18f9f2ca7668e3d43ed30841a469040f188a98",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_072224_MATDOG_GEOMETRY_V5_BENCHMARK_C_W1_ENDPOINT_REPORT.md"
+    },
+    "oracle_json": {
+      "file_sha256": "8a1b685e627b7c1dad2aedaf8cb6db87169a2ad1527b81368f8977ec4dc56311",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_072224_MATDOG_GEOMETRY_V5_BENCHMARK_C_W1_G4_G7_ORACLE.json"
+    },
+    "oracle_report": {
+      "file_sha256": "0d6084fe11aca86ca9200fc50d1fc212ea2946eba44f9209dfb9b2075aa19e38",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_072224_MATDOG_GEOMETRY_V5_BENCHMARK_C_W1_G4_G7_ORACLE.md"
+    },
+    "parking_json": {
+      "file_sha256": "18fb81d05c7f4eb35d35d36880a8dd60627c1d98e982dafa2b8df52f2f519f65",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_072224_MATDOG_GEOMETRY_V5_BENCHMARK_C_W1_PATH_PARKING.json"
+    },
+    "parking_report": {
+      "file_sha256": "93b1b2fbcc9c25fefae7168ab9200b130f1f1541e06e197758a485e1a543fbb9",
+      "relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_072224_MATDOG_GEOMETRY_V5_BENCHMARK_C_W1_PATH_PARKING.md"
+    }
+  },
+  "benchmark_id": "C",
+  "constraints": {
+    "collision_candidate_cap_changed": false,
+    "hardware_used": false,
+    "merge_performed": false,
+    "norma_core_modified": false,
+    "safety_threshold_relaxed": false
+  },
+  "determinism": {
+    "status": "REFERENCE_CAPTURED"
+  },
+  "execution": {
+    "batch_strategy": "12_topology_derived_actuated_joint_batches_min_then_max_dynamic_scheduling",
+    "canonical_result_sort_key": [
+      "canonical_endpoint_index"
+    ],
+    "numerical_thread_limits": {
+      "MKL_NUM_THREADS": 1,
+      "NUMEXPR_NUM_THREADS": 1,
+      "OMP_NUM_THREADS": 1,
+      "OPENBLAS_NUM_THREADS": 1
+    },
+    "parent_writer_pid": 184810,
+    "physical_core_target": 1,
+    "worker_count": 1,
+    "worker_model": "single_parent_process"
+  },
+  "gates": {
+    "canonical_endpoint_coverage": "24/24",
+    "g4_g7_oracle_status": "PASS",
+    "parent_bundle_publications": 1,
+    "q0_active_revolute_pairs_separated": "12/12",
+    "worker_writes": 0
+  },
+  "generated_at_utc": "2026-08-11T05:42:47.516498+00:00",
+  "oracle_summary": {
+    "endpoint_count": 24,
+    "geometric_contact_found_count": 24,
+    "no_geometric_contact_count": 0,
+    "path_obstruction_count": 6,
+    "path_obstruction_precedes_contact_count": 2
+  },
+  "parameters": {
+    "clearance_sample_stride": 10,
+    "one_dof_grid_divisions": 6,
+    "path_step_rad": 0.017453292519943295,
+    "two_dof_grid_divisions": 4
+  },
+  "parking_summary": {
+    "all_start_configurations_valid": true,
+    "baseline_obstructed_count": 6,
+    "diagnostic_target_outside_urdf_limits_count": 16,
+    "endpoint_plan_count": 24,
+    "executable_urdf_target_count": 8,
+    "external_safety_policy_applied": false,
+    "geometry_feasible_complete_sequence_count": 24,
+    "no_complete_sequence_count": 0,
+    "outcome_counts": {
+      "FEASIBLE_1DOF_PLAN_FOUND": 6,
+      "NOT_NEEDED": 18
+    }
+  },
+  "provenance": {
+    "collision_mesh_sha256": {
+      "base_link": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "lf_foot_link": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "lf_hip_link": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "lf_lower_leg_link": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "lf_upper_leg_link": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "lh_foot_link": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "lh_hip_link": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "lh_lower_leg_link": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "lh_upper_leg_link": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "rf_foot_link": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "rf_hip_link": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "rf_lower_leg_link": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "rf_upper_leg_link": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "rh_foot_link": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "rh_hip_link": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "rh_lower_leg_link": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "rh_upper_leg_link": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    "execution_source_file_sha256": {
+      "matdog_geometry_compiler_v5.py": "9177933062304ef4597cbe918b017be3b1cef43669998e5bdd3e4ccd13636563",
+      "matdog_geometry_contact_search_v5.py": "fb1fb4e93a78ea9a6caef38359a73b28173a995f456fb9db00e7ee1cd68b12b3",
+      "matdog_geometry_full_runner_v5.py": "c9479b93491e31aac836cb2a12aa58b1e44ffd1bb87275f0c7a6f7f31dcaca85",
+      "matdog_geometry_g4_oracle_v5.py": "7b05e7364fef4e843384fe719fbe13808f02102c843e71ff06b18261908922b0",
+      "matdog_geometry_mesh_kernel.py": "f7119fd93b913968ea342269b4369546ecbcad2e8731e7d4d8fabd4ba08c017c",
+      "matdog_geometry_model_v5.py": "e40925c52263329773cc69f310059c697234dc85514d220487b651f6098bf686",
+      "matdog_geometry_path_planner_v5.py": "636b6550b7ecd4421b77109ba811b2e6768fca11f117c0b93d87035dbd6cc02f",
+      "matdog_geometry_process_workers_v5.py": "77773d158ca3cd54fbc2c6720ae070d3b28b8d66dca50d137035564f218984f2",
+      "matdog_geometry_profile_v5.py": "9562cd34eae461815ea3c36014f0c7dcfa4dc9e5adb2040bcc19e9c9f7be75b8",
+      "matdog_geometry_report_v5.py": "227d2ff5a972e1ebe1577b54227bc51152692017e2813e617114fe755887c7e8",
+      "matdog_geometry_scene_v5.py": "e6a9daf4d83330515cd2f662ff6ead52163579fc55167c80974266386771b739"
+    },
+    "g4_reference_content_sha256": "4a2a2324f2838b9da0240f838e8172701ff35f83d20d29edddeec2fe15d83a61",
+    "g4_reference_file_sha256": "f1b059a58c51508345ec583cc421cf9ca66ec8e9ac5547649c05bbf755e5c5fa",
+    "g4_reference_relative_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-10_164419_MATDOG_NEW_GEOMETRY_PHASE1B_REFERENCE_PROFILE.json",
+    "input_file_sha256": {
+      "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    "q0_status_by_joint": {
+      "lf_hip_joint": "SEPARATED_NARROW",
+      "lf_lower_leg_joint": "SEPARATED_NARROW",
+      "lf_upper_leg_joint": "SEPARATED_NARROW",
+      "lh_hip_joint": "SEPARATED_NARROW",
+      "lh_lower_leg_joint": "SEPARATED_NARROW",
+      "lh_upper_leg_joint": "SEPARATED_NARROW",
+      "rf_hip_joint": "SEPARATED_NARROW",
+      "rf_lower_leg_joint": "SEPARATED_NARROW",
+      "rf_upper_leg_joint": "SEPARATED_NARROW",
+      "rh_hip_joint": "SEPARATED_NARROW",
+      "rh_lower_leg_joint": "SEPARATED_NARROW",
+      "rh_upper_leg_joint": "SEPARATED_NARROW"
+    },
+    "semantic_source_file_sha256": {
+      "matdog_geometry_compiler_v5.py": "9177933062304ef4597cbe918b017be3b1cef43669998e5bdd3e4ccd13636563",
+      "matdog_geometry_contact_search_v5.py": "fb1fb4e93a78ea9a6caef38359a73b28173a995f456fb9db00e7ee1cd68b12b3",
+      "matdog_geometry_full_runner_v5.py": "c9479b93491e31aac836cb2a12aa58b1e44ffd1bb87275f0c7a6f7f31dcaca85",
+      "matdog_geometry_g4_oracle_v5.py": "7b05e7364fef4e843384fe719fbe13808f02102c843e71ff06b18261908922b0",
+      "matdog_geometry_mesh_kernel.py": "f7119fd93b913968ea342269b4369546ecbcad2e8731e7d4d8fabd4ba08c017c",
+      "matdog_geometry_model_v5.py": "e40925c52263329773cc69f310059c697234dc85514d220487b651f6098bf686",
+      "matdog_geometry_path_planner_v5.py": "636b6550b7ecd4421b77109ba811b2e6768fca11f117c0b93d87035dbd6cc02f",
+      "matdog_geometry_process_workers_v5.py": "77773d158ca3cd54fbc2c6720ae070d3b28b8d66dca50d137035564f218984f2",
+      "matdog_geometry_profile_v5.py": "9562cd34eae461815ea3c36014f0c7dcfa4dc9e5adb2040bcc19e9c9f7be75b8",
+      "matdog_geometry_scene_v5.py": "e6a9daf4d83330515cd2f662ff6ead52163579fc55167c80974266386771b739"
+    },
+    "urdf_relative_path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+    "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+  },
+  "resources": {
+    "aabb_surviving_pairs": "NOT_INSTRUMENTED",
+    "cgroup_v2": {
+      "cpuset_cpus_effective": null,
+      "memory_events": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0,
+        "sock_throttled": 0
+      },
+      "memory_max": "6442450944",
+      "memory_peak_bytes": 467124224,
+      "memory_swap_max": "0",
+      "memory_swap_peak_bytes": 0,
+      "process_cpu_affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "relative_path": "/user.slice/user-1000.slice/user@1000.service/app.slice/matdog-geometry-v5-c-20260811-072224.service",
+      "version": 2
+    },
+    "collision_candidate_pairs": "NOT_INSTRUMENTED",
+    "evaluated_1d_candidates": 94,
+    "evaluated_2d_candidates": 0,
+    "grid_entries_serialized": 94,
+    "triangle_count": 119696
+  },
+  "schema_version": "matdog.geometry_compiler_v5.integrated_run.v1",
+  "semantic_content_sha256": {
+    "combined_profile": "e99e2b65ea8d032f94b5d1aa815432a292c1771766e556fc7115dc7a1f5de73e",
+    "endpoint_profile": "cad2f194c49d063b5a09ae4602b9acf61a701de48791e5d1aae04f1439db1211",
+    "parking_v2": "3cda03c2c02ba5fbe6def7821ce72d4aa9e4ca66e7ca8655a2b8f0e92dde297c"
+  },
+  "timings_seconds": {
+    "endpoint_compute": 531.505577,
+    "integrated_internal_wall": 2716.355623,
+    "parking_compute": 2162.539309
+  }
+}

@@ -1,0 +1,225 @@
+{
+  "constraints": [
+    "LF evidence is not mirrored to any other assembly.",
+    "Hardware comparison does not alter geometry, URDF, meshes, search or thresholds.",
+    "Path obstruction context does not erase geometric endpoint contact."
+  ],
+  "generation_metadata": {
+    "generated_at_utc": "2026-08-10T19:06:54.265306+00:00"
+  },
+  "geometry_profile": {
+    "file_sha256": "1a004561ac3213749f28e0da262f211ff6f7021a0230b1415fbe24f46fdf2b01",
+    "schema_version": "matdog.calibration_geometry_profile.v5",
+    "semantic_content_sha256": "d4180810252d43e4cce349e638ef499f55ebb41e057b9fd9d9ced68e206a1ecd"
+  },
+  "hardware_evidence": {
+    "dataset_id": "MATDOG_LF_V25_2026-08-04",
+    "file_sha256": "6eae3201a00b5299550028d5b4e1e73d67520deccf5a85e548f3b07b1777cab4",
+    "schema_version": "matdog.hardware_endpoint_evidence.v1",
+    "scope": {
+      "assembly": "LF only",
+      "geometry_authority": false,
+      "mirroring_to_other_assemblies": false,
+      "safety_policy_authority": false
+    }
+  },
+  "reconciler": {
+    "agreement_threshold_deg": 2.0,
+    "source_file": "matdog_geometry_hardware_reconciler.py",
+    "source_sha256": "111da4045c983c4f3a5acd0061dbbe3c7b77fbda7e120693a927f5f0a40f5dfe"
+  },
+  "reconciliation_content_sha256": "520270899794790b21a1e43e34d28131e5fa10fa9624f71e87c667142cff91c2",
+  "reconciliations": [
+    {
+      "corrective_action": "NONE AUTOMATIC; preserve geometry, disagreement cause remains an engineering UNKNOWN",
+      "declared_limit_rad": -0.785398163397,
+      "evidence_id": "lf_hip_min",
+      "geometric_contact_angle_rad": -0.803055986692,
+      "geometric_contact_link_pair": [
+        "base_link",
+        "lf_hip_link"
+      ],
+      "geometric_contact_status": "GEOMETRIC_CONTACT_FOUND",
+      "geometry_minus_hardware_deg": -3.208984375165604,
+      "geometry_minus_hardware_rad": -0.05600734299169274,
+      "geometry_vs_hardware_status": "DISAGREES",
+      "hardware_contact_angle_rad": -0.7470486437003072,
+      "hardware_minus_declared_deg": 2.197265624974316,
+      "hardware_minus_declared_rad": 0.03834951969669276,
+      "hardware_vs_declared_status": "DISAGREES",
+      "identity": {
+        "joint_name": "lf_hip_joint",
+        "limit_side": "min"
+      },
+      "path_obstruction_context": {
+        "angle_rad": -0.790579609617,
+        "link_pair": [
+          "base_link",
+          "lf_lower_leg_link"
+        ],
+        "precedes_geometric_contact": true,
+        "relation": "body_vs_branch",
+        "status": "PATH_OBSTRUCTION"
+      }
+    },
+    {
+      "corrective_action": "NONE AUTOMATIC; preserve geometry, disagreement cause remains an engineering UNKNOWN",
+      "declared_limit_rad": 0.785398163397,
+      "evidence_id": "lf_hip_max",
+      "geometric_contact_angle_rad": 0.789284248063,
+      "geometric_contact_link_pair": [
+        "base_link",
+        "lf_hip_link"
+      ],
+      "geometric_contact_status": "GEOMETRIC_CONTACT_FOUND",
+      "geometry_minus_hardware_deg": 5.847656250166622,
+      "geometry_minus_hardware_rad": 0.10206085509023277,
+      "geometry_vs_hardware_status": "DISAGREES",
+      "hardware_contact_angle_rad": 0.6872233929727672,
+      "hardware_minus_declared_deg": -5.624999999974314,
+      "hardware_minus_declared_rad": -0.09817477042423273,
+      "hardware_vs_declared_status": "DISAGREES",
+      "identity": {
+        "joint_name": "lf_hip_joint",
+        "limit_side": "max"
+      },
+      "path_obstruction_context": {
+        "angle_rad": null,
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      }
+    },
+    {
+      "corrective_action": "NONE; preserve geometry and record agreement",
+      "declared_limit_rad": -0.916297857297,
+      "evidence_id": "lf_upper_leg_min",
+      "geometric_contact_angle_rad": -0.909889226453,
+      "geometric_contact_link_pair": [
+        "lf_hip_link",
+        "lf_upper_leg_link"
+      ],
+      "geometric_contact_status": "GEOMETRIC_CONTACT_FOUND",
+      "geometry_minus_hardware_deg": 1.3925781248198816,
+      "geometry_minus_hardware_rad": 0.0243050733693555,
+      "geometry_vs_hardware_status": "AGREES",
+      "hardware_contact_angle_rad": -0.9341942998223555,
+      "hardware_minus_declared_deg": -1.0253906250013185,
+      "hardware_minus_declared_rad": -0.017896442525355494,
+      "hardware_vs_declared_status": "AGREES",
+      "identity": {
+        "joint_name": "lf_upper_leg_joint",
+        "limit_side": "min"
+      },
+      "path_obstruction_context": {
+        "angle_rad": null,
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      }
+    },
+    {
+      "corrective_action": "NONE; preserve geometry and record agreement",
+      "declared_limit_rad": 2.138028333693,
+      "evidence_id": "lf_upper_leg_max",
+      "geometric_contact_angle_rad": 2.127120025875,
+      "geometric_contact_link_pair": [
+        "lf_hip_link",
+        "lf_upper_leg_link"
+      ],
+      "geometric_contact_status": "GEOMETRIC_CONTACT_FOUND",
+      "geometry_minus_hardware_deg": -0.7324218746040259,
+      "geometry_minus_hardware_rad": -0.012783173225469291,
+      "geometry_vs_hardware_status": "AGREES",
+      "hardware_contact_angle_rad": 2.1399031991004693,
+      "hardware_minus_declared_deg": 0.10742187500305897,
+      "hardware_minus_declared_rad": 0.0018748654074691729,
+      "hardware_vs_declared_status": "AGREES",
+      "identity": {
+        "joint_name": "lf_upper_leg_joint",
+        "limit_side": "max"
+      },
+      "path_obstruction_context": {
+        "angle_rad": null,
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      }
+    },
+    {
+      "corrective_action": "NONE; preserve geometry and record agreement",
+      "declared_limit_rad": -1.605702911835,
+      "evidence_id": "lf_lower_leg_min",
+      "geometric_contact_angle_rad": -1.606998273394,
+      "geometric_contact_link_pair": [
+        "lf_upper_leg_link",
+        "lf_lower_leg_link"
+      ],
+      "geometric_contact_status": "GEOMETRIC_CONTACT_FOUND",
+      "geometry_minus_hardware_deg": -0.22851562528660982,
+      "geometry_minus_hardware_rad": -0.003988350053504952,
+      "geometry_vs_hardware_status": "AGREES",
+      "hardware_contact_angle_rad": -1.603009923340495,
+      "hardware_minus_declared_deg": 0.15429687501241643,
+      "hardware_minus_declared_rad": 0.0026929884945048332,
+      "hardware_vs_declared_status": "AGREES",
+      "identity": {
+        "joint_name": "lf_lower_leg_joint",
+        "limit_side": "min"
+      },
+      "path_obstruction_context": {
+        "angle_rad": -1.709877251569,
+        "link_pair": [
+          "lf_upper_leg_link",
+          "lf_foot_link"
+        ],
+        "precedes_geometric_contact": false,
+        "relation": "same_branch",
+        "status": "PATH_OBSTRUCTION"
+      }
+    },
+    {
+      "corrective_action": "NONE AUTOMATIC; preserve geometry, disagreement cause remains an engineering UNKNOWN",
+      "declared_limit_rad": 0.654498469498,
+      "evidence_id": "lf_lower_leg_max",
+      "geometric_contact_angle_rad": 0.66636125426,
+      "geometric_contact_link_pair": [
+        "lf_upper_leg_link",
+        "lf_lower_leg_link"
+      ],
+      "geometric_contact_status": "GEOMETRIC_CONTACT_FOUND",
+      "geometry_minus_hardware_deg": 3.9023437501419527,
+      "geometry_minus_hardware_rad": 0.06810874698460001,
+      "geometry_vs_hardware_status": "DISAGREES",
+      "hardware_contact_angle_rad": 0.5982525072754,
+      "hardware_minus_declared_deg": -3.2226562500072427,
+      "hardware_minus_declared_rad": -0.05624596222259992,
+      "hardware_vs_declared_status": "DISAGREES",
+      "identity": {
+        "joint_name": "lf_lower_leg_joint",
+        "limit_side": "max"
+      },
+      "path_obstruction_context": {
+        "angle_rad": null,
+        "link_pair": null,
+        "precedes_geometric_contact": false,
+        "relation": null,
+        "status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+      }
+    }
+  ],
+  "schema_version": "matdog.geometry_hardware_reconciliation.v1",
+  "summary": {
+    "geometry_modified": false,
+    "geometry_only_endpoint_count": 18,
+    "geometry_vs_hardware_counts": {
+      "AGREES": 3,
+      "DISAGREES": 3,
+      "NO_GEOMETRIC_CONTACT": 0
+    },
+    "hardware_evidence_endpoint_count": 6
+  }
+}

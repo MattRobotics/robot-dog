@@ -1,0 +1,47 @@
+MATDOG Geometry Compiler V5 — G7 same-new-geometry reference replay
+Date: 2026-08-10
+
+Scope:
+  approved 17 collision meshes
+  119696 collision triangles
+  V5 pure geometry endpoint + independent path-obstruction search
+  frozen G4 context/search oracle
+  workers=1
+  OMP_NUM_THREADS=1
+  OPENBLAS_NUM_THREADS=1
+  MKL_NUM_THREADS=1
+  NUMEXPR_NUM_THREADS=1
+
+Result:
+  q=0 active revolute separation: 12/12
+  endpoints processed: 24/24
+  geometric contacts found: 24/24
+  path obstructions: 6
+  path obstructions preceding geometric contact: 2
+  G4/G7 oracle: PASS
+  unexpected regressions: 0
+  semantic_content_sha256: d4180810252d43e4cce349e638ef499f55ebb41e057b9fd9d9ced68e206a1ecd
+
+Timing/resource measurement (/usr/bin/time -v):
+  internal endpoint/path runtime: 521.142610 s
+  wall time: 8:45.31 = 525.31 s
+  user time: 513.04 s
+  system time: 11.24 s
+  CPU: 99%
+  peak RSS: 439076 KiB = 428.78515625 MiB = 449.613824 MB decimal
+  swap: 0
+  exit status: 0
+
+Maximum oracle differences:
+  contact absolute delta: 6.997957768817287e-12 rad
+  path absolute delta: 5.748956866113986e-12 rad
+  declared comparison tolerance: 0.0001 rad per endpoint
+
+This is the frozen G7 refactor-oracle measurement, not final Benchmark C.
+Benchmark C is measured only after the final V5 geometry/path implementation
+is complete; Benchmark D then uses the same final implementation with four
+process workers under the 6 GiB / zero-swap contract.
+
+NO HARDWARE USED.
+NO NORMA-CORE MODIFIED.
+NO MERGE PERFORMED.

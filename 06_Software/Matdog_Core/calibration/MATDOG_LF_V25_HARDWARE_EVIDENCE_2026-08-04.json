@@ -1,0 +1,65 @@
+{
+  "schema_version": "matdog.hardware_endpoint_evidence.v1",
+  "dataset_id": "MATDOG_LF_V25_2026-08-04",
+  "status": "IMMUTABLE_EXTERNAL_EVIDENCE",
+  "scope": {
+    "assembly": "LF only",
+    "mirroring_to_other_assemblies": false,
+    "geometry_authority": false,
+    "safety_policy_authority": false
+  },
+  "source_references": [
+    "06_Software/Matdog_Core/calibration/MATDOG_LF_CALIBRATION_V25_FINAL.md",
+    "06_Software/Matdog_Core/calibration/_archive/MATDOG_LF_MEASURE_FREEZE_V25_execute_20260804T041729Z/final-lf-profile.json"
+  ],
+  "angle_convention": "URDF joint radians; nominal ST3215 tick scale used by the accepted V25 evidence derivation",
+  "endpoints": [
+    {
+      "evidence_id": "lf_hip_min",
+      "joint_name": "lf_hip_joint",
+      "limit_side": "min",
+      "hardware_contact_angle_rad": -0.7470486437003072,
+      "approved_contact_angle_deg": -42.803
+    },
+    {
+      "evidence_id": "lf_hip_max",
+      "joint_name": "lf_hip_joint",
+      "limit_side": "max",
+      "hardware_contact_angle_rad": 0.6872233929727672,
+      "approved_contact_angle_deg": 39.375
+    },
+    {
+      "evidence_id": "lf_upper_leg_min",
+      "joint_name": "lf_upper_leg_joint",
+      "limit_side": "min",
+      "hardware_contact_angle_rad": -0.9341942998223555,
+      "approved_contact_angle_deg": -53.525
+    },
+    {
+      "evidence_id": "lf_upper_leg_max",
+      "joint_name": "lf_upper_leg_joint",
+      "limit_side": "max",
+      "hardware_contact_angle_rad": 2.1399031991004693,
+      "approved_contact_angle_deg": 122.607
+    },
+    {
+      "evidence_id": "lf_lower_leg_min",
+      "joint_name": "lf_lower_leg_joint",
+      "limit_side": "min",
+      "hardware_contact_angle_rad": -1.603009923340495,
+      "approved_contact_angle_deg": -91.846
+    },
+    {
+      "evidence_id": "lf_lower_leg_max",
+      "joint_name": "lf_lower_leg_joint",
+      "limit_side": "max",
+      "hardware_contact_angle_rad": 0.5982525072754,
+      "approved_contact_angle_deg": 34.277
+    }
+  ],
+  "constraints": [
+    "Never modify collision geometry, URDF limits, search domains or tolerances to improve agreement.",
+    "Never mirror LF evidence onto RF, RH or LH.",
+    "A hardware disagreement is a reconciliation result, not a pure-geometry failure."
+  ]
+}

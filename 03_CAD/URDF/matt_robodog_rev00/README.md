@@ -11,8 +11,11 @@ This directory is the canonical REV00 robot description used as the starting poi
 - `matt_robodog_rev00.urdf`
   Canonical URDF model.
 
-- `meshes/`
-  Final STL visual and collision meshes used by the URDF.
+- `meshes/*.stl`
+  Detailed STL visual meshes used by the URDF.
+
+- `meshes/collision/*.stl`
+  Dedicated, simplified STL collision meshes used by the URDF.
 
 - `textures/`
   URDF Studio texture assets, when present.
@@ -83,11 +86,16 @@ No compensating mesh transform should be reintroduced without updating the canon
 
 ## Collision Status
 
-The current REV00 model uses the same mesh for visual and collision geometry.
+The REV00 model keeps the detailed meshes under `meshes/` for `<visual>` and
+uses the approved dedicated meshes under `meshes/collision/` for
+`<collision>`. Both sets retain their canonical link filenames; the directory
+separates their roles.
 
-This is appropriate for CAD verification and kinematic preview.
-
-Before dynamic simulation, collision geometry should be simplified into primitives or low-complexity collision meshes.
+The dedicated collision baseline approved on 2026-08-10 contains 17 meshes,
+119,696 triangles and 5,986,228 bytes. It reduces the historical 472,020-triangle
+collision set by 74.64%. Collision origins and `scale="0.001 0.001 0.001"`
+remain unchanged, so this representation change does not create a new
+mechanical revision.
 
 ## Physical Data Status
 

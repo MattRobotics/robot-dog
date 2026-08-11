@@ -21,7 +21,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/base_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/base_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -44,7 +44,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_hip_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/lf_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -67,7 +67,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/lf_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -90,7 +90,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/lf_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -113,7 +113,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lf_foot_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/lf_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -136,7 +136,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_hip_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/rf_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -159,7 +159,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/rf_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -182,7 +182,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/rf_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -205,7 +205,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rf_foot_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/rf_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -228,7 +228,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_hip_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/rh_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -251,7 +251,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/rh_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -274,7 +274,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/rh_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -297,7 +297,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/rh_foot_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/rh_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -320,7 +320,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_hip_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/lh_hip_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -343,7 +343,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/lh_upper_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -366,7 +366,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/lh_lower_leg_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>
@@ -389,7 +389,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/lh_foot_link.stl"  scale="0.001 0.001 0.001" />
+        <mesh filename="meshes/collision/lh_foot_link.stl"  scale="0.001 0.001 0.001" />
       </geometry>
     </collision>
   </link>

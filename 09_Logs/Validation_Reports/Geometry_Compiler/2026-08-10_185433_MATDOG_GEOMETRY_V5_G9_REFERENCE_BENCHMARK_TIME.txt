@@ -1,0 +1,59 @@
+MATDOG Geometry Compiler V5 — G9 path/parking reference execution
+Date: 2026-08-10
+
+Scope:
+  frozen G7 pure-geometry profile input
+  24 canonical endpoint tasks
+  topology-driven deterministic sampled 1-DOF search, then 2-DOF if needed
+  path-in, task path, task return, and path-out validation
+  raw geometric feasibility and clearance evidence only
+  workers=1
+  OMP_NUM_THREADS=1
+  OPENBLAS_NUM_THREADS=1
+  MKL_NUM_THREADS=1
+  NUMEXPR_NUM_THREADS=1
+
+Result:
+  endpoint plans: 24/24
+  start configurations valid: 24/24
+  baseline sampled path obstructions: 6
+  geometry-feasible complete sequences: 24/24
+  no-complete-sequence outcomes: 0
+  NOT_NEEDED: 18
+  FEASIBLE_1DOF_PLAN_FOUND: 6
+  FEASIBLE_2DOF_PLAN_FOUND: 0
+  diagnostic targets outside URDF limits: 16
+  URDF-executable targets: 8
+  external safety policy applied: false
+  parking semantic_content_sha256: 3e09aec7ca355f79f43abe803b672958b9d992b1aab9c27b5cc7cdff571b9757
+  derived profile semantic_content_sha256: a37c4e97c47970362e7758edd56c72170148ef4addee97fb330b0f03c0090e07
+
+Timing/resource measurement (/usr/bin/time -v):
+  internal path/parking runtime: 2127.924844 s
+  wall time: 35:32.27 = 2132.27 s
+  user time: 2052.15 s
+  system time: 75.89 s
+  CPU: 99%
+  peak RSS: 476200 KiB = 465.0390625 MiB = 487.6288 MB decimal
+  swap: 0
+  exit status: 0
+
+Semantics:
+  sampled path step: 0.017453292519943295 rad (1 degree)
+  1-DOF normalized grid divisions: 6
+  2-DOF normalized grid divisions: 4
+  clearance sample stride: 10
+  path feasibility is intersection/no-intersection at every listed sampled
+  configuration; this is not a continuous swept-volume proof.
+  clearance is exact-or-conservative-lower-bound evidence on the declared
+  sampled subset; no clearance threshold changes geometric feasibility.
+
+This is the frozen workers=1 G9 path/parking reference measurement, not final
+Benchmark C. Benchmark C is measured only after the final integrated V5
+geometry/path implementation is complete; Benchmark D then uses the same
+final implementation with four process workers under the 6 GiB / zero-swap
+contract.
+
+NO HARDWARE USED.
+NO NORMA-CORE MODIFIED.
+NO MERGE PERFORMED.
