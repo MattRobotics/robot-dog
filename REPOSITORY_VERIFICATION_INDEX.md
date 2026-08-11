@@ -1,167 +1,253 @@
 # MATDOG repository verification index
 
-**Scope:** canonical remote state after LF V25 closeout and repository cleanup.
+**Current status:** Phase 2A0 CLOSED / Geometry Compiler V5 merged.  
+**Current next milestone:** Phase 2A — Generic V25-derived full-leg calibration engine.
 
 ## Current sources of truth
 
 ```text
 MattRobotics/robot-dog
-  active branch: main
-  role: public MATDOG project source of truth
+  default branch: main
+  post-Phase-2A0 merge baseline:
+  f07aa094a1b78c5670cc36ef3fdb349422a38955
+  role: robot-specific CAD / URDF / geometry / calibration evidence / project decisions
 
 MattRobotics/norma-core
-  active development branch: main
-  immutable validated release: release/matdog-lf-calibrator-v25
-  reviewed V25 source head: f87dd1fbc7e8100d275c74f9af448642f3429680
+  default branch: main
+  Phase 2A entry baseline observed 2026-08-11:
+  f47b1ba579c623139058a8b0118648015739ab10
+  role: Station/ST3215 runtime and native MATDOG calibrator
+
+immutable LF V25 release:
+  release/matdog-lf-calibrator-v25
+  f87dd1fbc7e8100d275c74f9af448642f3429680
 ```
 
-## Validation status
+Always re-verify live remote/local state before implementation. The SHAs above are entry checkpoints, not permission to ignore newer legitimate commits.
+
+## Phase state
 
 ```text
-LF V25: hardware validated, affine profile saved, EEPROM frozen
-RF: not yet hardware validated
-RH: not yet hardware validated
-LH: not yet hardware validated
-complete all-leg calibration: not yet validated
+Phase 1     CLOSED / historical endpoint-metrology candidate
+Phase 1B    CLOSED
+Phase 2A0   CLOSED / Geometry Compiler V5 merged via PR #19
+Phase 2A    NEXT / generic V25-derived full-leg engine
+Phase 2B    pending / final path-parking safety integration
+Phase 2C    pending / complete offline validation
+hardware    later: RF -> RH -> LH
 ```
 
-No V28–V42 or “all legs” experimental implementation is a current program. Future leg work must start from merged `norma-core/main` and generalize the proven V25 architecture through data-driven leg profiles.
+## Current operational entry point
 
-## Canonical calibration contract — current entry point
-
-The **current operational entry point and contract for Phase 2** is:
-
-```text
-06_Software/Matdog_Core/calibration/
-MATDOG_CALIBRATION_CANONICAL_HANDOFF_PHASE1B_CLOSED_2026-08-09.md
-```
-
-Read that first. It records the Phase 1B closure state, the canonical geometry hashes and
-schema-v4 artifacts, the open engineering items, and the Phase 2A/2B/2C → Phase 3 entry
-conditions.
-
-### Retained architectural reference — 2026-08-07
+Read first:
 
 ```text
 06_Software/Matdog_Core/calibration/
-MATDOG_CALIBRATION_CANONICAL_HANDOFF_2026-08-07.md
+MATDOG_PHASE2A_GENERIC_V25_ENTRY_HANDOFF_2026-08-11.md
 ```
 
-This earlier handoff is **retained as an architectural and historical reference**, not deleted.
-It is **no longer the current Phase-2 entry point**: where the two conflict on endpoint
-metrology or on the pre-Phase-2 plan, the 2026-08-09 handoff governs. It remains authoritative
-for the material the newer document does not restate, and it still supersedes older RF
-development prescriptions where they conflict with it. In particular it froze the geometry-first
-three-phase plan:
+Phase 2A0 closeout record:
 
 ```text
-1. offline Geometry Compiler / 24 mesh-predicted contacts and safe paths
-2. one generic V25-derived full-leg engine in norma-core
-3. RF -> RH -> LH hardware completion
+09_Logs/Development_Log/
+2026-08-11_PHASE2A0_GEOMETRY_V5_CLOSEOUT.md
 ```
 
-It also records the corrected q=0 policy: manual/visual home is only a seed; final q=0 must be derived from model geometry plus repeatable hardware contact evidence, staged and verified before any separately authorized EEPROM freeze.
+Geometry Compiler artifact index:
 
-The 2026-07-20 geometry checkpoint remains historical validated evidence for one collision-free path. Its +50°/+90° prerequisites and +30° rear parking are safe seeds, not permanent proof that those auxiliary poses are always necessary or minimal.
+```text
+09_Logs/Validation_Reports/Geometry_Compiler/README.md
+```
+
+The older Phase1B-closed and 2026-08-07 calibration handoffs remain historical/architectural references but are no longer the current milestone entry point.
+
+## Geometry Compiler V5 canonical record
+
+Merged PR:
+
+```text
+robot-dog #19
+reviewed head:
+2890daf0a8ac6103d3856f208a5f042528fc0da0
+
+squash merge commit on main:
+f07aa094a1b78c5670cc36ef3fdb349422a38955
+```
+
+Corrected canonical semantic hashes:
+
+```text
+endpoint
+  de205209f6015734f43af7f49146ecf60f89a74d6ce1276ce134c189a89c9f7e
+parking
+  67c58430e78241af1a636cdcc22092ff855371713fc7f26bc56412f7c7181139
+combined
+  0a772234a46afad14eb4af0999294020bb0fb8974ca0b68f3ccd780fa057db51
+```
+
+Corrected determinism manifests:
+
+```text
+C workers=1
+b86b5d35678df4510989ea49fb5d42acaea2e4838226d7017456399dfceb0d81
+
+D workers=4
+0db86e633599f63a769dbba75db3a54c1e6470e128c007eb24c465f92a428b17
+```
+
+Final canonical evidence:
+
+```text
+24/24 geometric contacts
+24/24 canonical contexts empty
+24/24 endpoint/planner consistency
+6 direct-target obstructions
+18 collision-free direct paths
+
+parking:
+18 NOT_NEEDED
+6 FEASIBLE_1DOF_PLAN_FOUND
+24/24 complete sequences
+94 evaluated 1DOF candidates
+0 requiring 2DOF
+```
+
+Final tests:
+
+```text
+241/241 geometry discovery PASS
+58/58 adjacent offline calibration PASS
+299/299 total PASS
+```
+
+Independent adversarial review findings were all closed before merge:
+
+```text
+B1 CLOSED
+M1 CLOSED
+M2 CLOSED
+M3 CLOSED
+m1-m5 CLOSED
+NO NEW BLOCKER / MAJOR
+```
+
+Permanent semantic boundary:
+
+```text
+CANONICAL V5 != G4 REPLAY
+```
+
+## External safety-policy state
+
+Final reference policy uses the unchanged 3 mm threshold:
+
+```text
+16 PASS
+0 FAIL
+8 UNRESOLVED
+0 motion authorizations
+```
+
+All eight `UNRESOLVED` are `DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS`.
+
+```text
+lf_hip_joint:min
+lf_lower_leg_joint:min
+rf_hip_joint:max
+rf_lower_leg_joint:min
+rh_hip_joint:max
+rh_lower_leg_joint:min
+lh_hip_joint:min
+lh_lower_leg_joint:min
+```
+
+There are zero FAIL and zero UNRESOLVED results among the eight `EXECUTABLE_URDF_DOMAIN` endpoints.
+
+Never reinterpret:
+
+```text
+UNRESOLVED as PASS
+DIAGNOSTIC as EXECUTABLE
+GEOMETRIC CONTACT as MOTION AUTHORIZATION
+```
+
+These eight unresolved lower bounds remain explicit Phase 2B/2C inputs.
+
+## Hardware calibration truth
+
+Only LF V25 is mechanically hardware validated.
+
+```text
+HIP   MIN -42.803°   MAX +39.375°
+UPPER MIN -53.525°   MAX +122.607°
+LOWER MIN -91.846°   MAX +34.277°
+```
+
+RF/RH/LH remain geometry-only until future hardware validation.
+
+LF V25 must remain immutable. Older V28–V42 and duplicated all-leg/RF experiments are historical development evidence, not active programs.
+
+## Phase 2A architecture contract
+
+Target:
+
+```text
+LegSessionStateMachine
++
+LegCalibrationSpec
+```
+
+not four independent state machines.
+
+Before refactoring LF V25, classify every materially relevant LF constant/helper/state transition:
+
+```text
+A — generic calibration behavior
+B — geometry/profile/spec data
+C — global ST3215 hardware/safety parameter
+D — historical LF-only evidence
+```
+
+Phase 2A is offline software foundation work. No physical movement, Station probing, direct serial work or EEPROM writes are authorized by the phase.
+
+## Known next-phase issues that must remain visible
+
+1. Pre-existing live-FK calibration-status mismatch:
+   `DIGITAL_ZERO_CALIBRATED_AND_VERIFIED` vs `VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION`.
+2. 16 diagnostic geometry targets outside operational URDF limits.
+3. 8 unresolved conservative clearance lower bounds, all outside executable target domain.
+4. RF/RH/LH lack hardware oracle evidence.
+5. Do not copy LF measured spans as other-leg coordinates.
+6. FRONT/HIND geometry is not interchangeable by convention.
+7. A fitted affine diagnostic must never erase raw model-vs-hardware discrepancy.
 
 ## Canonical records
+
+Current:
 
 ```text
 README.md
 REPOSITORY_VERIFICATION_INDEX.md
-06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_CANONICAL_HANDOFF_2026-08-07.md
-06_Software/Matdog_Core/calibration/MATDOG_LF_CALIBRATION_V25_FINAL.md
-06_Software/Matdog_Core/calibration/MATDOG_MECHANICAL_ENDSTOP_GEOMETRY_CHECKPOINT_2026-07-20.md
-06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1_COMPLETION_2026-08-07.md
-06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1B_ADDENDUM_2026-08-08.md
-06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_CANONICAL_HANDOFF_PHASE1B_CLOSED_2026-08-09.md
-09_Logs/Development_Log/2026-08-04_LF_V25_AND_REPOSITORY_CLEANUP.md
+06_Software/Matdog_Core/calibration/MATDOG_PHASE2A_GENERIC_V25_ENTRY_HANDOFF_2026-08-11.md
+09_Logs/Development_Log/2026-08-11_PHASE2A0_GEOMETRY_V5_CLOSEOUT.md
 09_Logs/Validation_Reports/Geometry_Compiler/README.md
+06_Software/Matdog_Core/calibration/MATDOG_LF_CALIBRATION_V25_FINAL.md
 ```
 
-Historical, retained, superseded for endpoint metrology:
+Historical references retained:
 
 ```text
-09_Logs/Validation_Reports/Geometry_Compiler/2026-08-07_204107_MATDOG_CALIBRATION_GEOMETRY_PROFILE.json
-09_Logs/Validation_Reports/Geometry_Compiler/2026-08-07_204107_MATDOG_CALIBRATION_GEOMETRY_REPORT.md
+06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_CANONICAL_HANDOFF_2026-08-07.md
+06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_CANONICAL_HANDOFF_PHASE1B_CLOSED_2026-08-09.md
+06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1B_ADDENDUM_2026-08-08.md
 ```
 
-## Geometry Compiler Phase 1 — closed 2026-08-07, endpoint metrology SUPERSEDED
+Superseded Geometry Compiler candidate evidence remains preserved in its original validation-artifact locations and clearly labelled as superseded.
 
-`PASS_GEOMETRY_COMPILER_COMPLETE_WITH_EXPLICIT_MODEL_GAPS`, offline only,
-24/24 endpoints processed, schema v3. See
-`06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1_COMPLETION_2026-08-07.md`
-for the full record.
+## Repository hygiene
 
-Phase 1's **endpoint metrology is superseded by Phase 1B** (below). The v3
-artifacts are retained unchanged as historical evidence and must not be
-deleted; they remain an accurate description of what the v3 policy could
-observe. They are no longer the source of truth for joint endpoints.
-
-## Geometry Compiler Phase 1B — adjacent revolute endstop metrology, 2026-08-08
-
-Phase 1 reported LF 6/6 `MODEL_INCOMPLETE`. The cause was not missing STL
-hardstop geometry. Two defects compounded:
-
-```text
-1. policy: `adjacent pair -> EXCLUDE` treated REVOLUTE hinges and FIXED
-   structural attachments identically, making the real hardstop -- which
-   lives ON the revolute parent/child pair -- unobservable by construction
-2. mesh: the assembly STLs modelled the motor centre pins in nominal contact
-   with the adjacent link, so adjacent pairs read INTERSECTING at every angle
-```
-
-Corrected policy, derived from URDF topology rather than a hard-coded list:
-
-```text
-parent-child REVOLUTE -> INCLUDE in collision analysis        (12 pairs)
-parent-child FIXED    -> structural attachment -> EXCLUDE      (4 pairs)
-
-ENDSTOP METROLOGY = active revolute parent-child pair
-PATH SAFETY       = all other relevant collision pairs
-```
-
-Five collision meshes corrected for the motor-pin representation
-(`base_link.stl`, `lf/rf/rh/lh_upper_leg_link.stl`). Canonical filenames,
-same local frame/scale/coordinates; **`rev00` unchanged and the URDF
-byte-identical**. All other STLs untouched.
-
-Diagnostic evidence archived (not in this repository):
-
-```text
-/home/matteo-manicardi/MATDOG/_archive/geometry-diagnostics/GATE_A_ADJACENT_BASELINE_2026-08-08
-/home/matteo-manicardi/MATDOG/_archive/geometry-diagnostics/GATE_B_MOTORPIN_SUPPORTED_2026-08-08
-```
-
-Full record:
-`06_Software/Matdog_Core/calibration/MATDOG_GEOMETRY_COMPILER_PHASE1B_ADDENDUM_2026-08-08.md`
-
-### Closure state
-
-```text
-Phase 1B: CLOSED
-  PR #16 merged (squash) 2026-08-09 -> main 5b66044e225fcd921e44b98cc710f028da441a64
-  PR #15 CLOSED, NEVER MERGED (superseded; head 751fe1eff44a2d97714438a040f04f4a8050ea04)
-  remote branches after cleanup: main only
-Phase 2: NEXT, NOT STARTED
-```
-
-PR #15 predates GATE A/GATE B. Its schema-v3 bounded-envelope clarification remains
-valid **historically for v3** and is preserved in the closed PR. Its operational
-recommendation (Phase 1 -> extended `NO_MODELED_ENDSTOP` audit -> Phase 2) is
-**superseded and must not be used as the current plan**: schema v4 resolves 24/24
-endpoints with 0 `NO_MODELED_ENDSTOP`, so that audit is no longer the pre-Phase-2
-blocker.
-
-Step 2 of the three-phase plan (generic V25-derived full-leg engine in norma-core)
-has **not** started. The canonical Phase 2 entry conditions are recorded in
-`06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_CANONICAL_HANDOFF_PHASE1B_CLOSED_2026-08-09.md`.
-
-## Repository hygiene policy
-
-- `robot-dog` retains only `main` as an active remote branch after cleanup, except short-lived reviewed development/documentation branches required by branch protection.
-- `norma-core` retains `main`, `release/matdog-lf-calibrator-v25`, and only the single active next-milestone/review branch when needed.
-- Closed pull requests preserve the historical audit trail.
-- Failed, cancelled, incomplete and superseded workflow runs may be deleted.
-- Only successful V25 evidence and durable current CI are retained.
-- Private external research material is excluded from the public MATDOG baseline.
+- Active development must start from verified current `main`, never from a merged historical branch.
+- Merged/retired development branches may be deleted after their unique state is preserved by merged commits, PR history and a closeout log.
+- Historical handoffs, validation artifacts and immutable releases must not be deleted merely to make the repository look cleaner.
+- No force-push or destructive history rewrite.
+- No merge into `main` without explicit authorization.
