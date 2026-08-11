@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 import hashlib
 import math
 from pathlib import Path
+from types import SimpleNamespace
 import sys
 import unittest
+from unittest.mock import patch
 
 
 CALIBRATION_DIR = Path(__file__).resolve().parents[1]
@@ -32,10 +35,12 @@ from matdog_geometry_contact_search_v5 import (  # noqa: E402
     PathObstructionResultV5,
     load_endpoint_specs,
 )
+import matdog_geometry_profile_v5 as profile_module  # noqa: E402
 from matdog_geometry_profile_v5 import (  # noqa: E402
     GeometryProfileV5Error,
     SCHEMA_VERSION,
     build_geometry_profile_v5,
+    combined_source_sha256,
     find_geometry_mismatches_v5,
     semantic_content_sha256,
     validate_pure_geometry_profile,
@@ -113,10 +118,16 @@ class ProfileFixture(unittest.TestCase):
             analyses.append(EndpointAnalysisV5(geometry=geometry, path=path))
         return tuple(analyses)
 
-    def build(self, *, workers: int = 1, runtime: float = 1.0):
+    def build(
+        self,
+        *,
+        workers: int = 1,
+        runtime: float = 1.0,
+        analyses: tuple[EndpointAnalysisV5, ...] | None = None,
+    ):
         return build_geometry_profile_v5(
             self.scene,
-            self.fake_analyses(),
+            self.fake_analyses() if analyses is None else analyses,
             repo_root=REPO_ROOT,
             worker_count=workers,
             runtime_seconds=runtime,
@@ -136,6 +147,18 @@ class TestPureProfile(ProfileFixture):
         joints = profile["model"]["joints"]
         self.assertEqual(sum(joint["selected_actuated"] for joint in joints), 12)
         self.assertTrue(all("motor_direction" in joint for joint in joints))
+        self.assertNotIn("repository", profile["provenance"])
+        repository = profile["generation_metadata"]["repository_materialization"]
+        self.assertEqual(set(repository), {"commit_sha", "working_tree_dirty"})
+
+    def test_all_24_canonical_endpoint_contexts_are_explicitly_empty(self):
+        profile = self.build()
+        contexts = [
+            record["search_context"]["joint_positions_rad"]
+            for record in profile["endpoint_searches"]
+        ]
+        self.assertEqual(len(contexts), 24)
+        self.assertTrue(all(context == {} for context in contexts))
 
     def test_hardware_and_safety_fields_are_absent(self):
         profile = self.build()
@@ -166,6 +189,21 @@ class TestPureProfile(ProfileFixture):
 
 
 class TestSemanticDeterminism(ProfileFixture):
+    def test_repository_dirty_audit_distinguishes_clean_dirty_and_git_failure(self):
+        cases = (
+            (SimpleNamespace(returncode=0, stdout="", stderr=""), False),
+            (SimpleNamespace(returncode=0, stdout=" M source.py\n", stderr=""), True),
+            (SimpleNamespace(returncode=1, stdout="", stderr="failure"), None),
+        )
+        for completed, expected in cases:
+            with self.subTest(expected=expected):
+                with patch.object(
+                    profile_module.subprocess,
+                    "run",
+                    return_value=completed,
+                ):
+                    self.assertIs(profile_module._git_dirty(REPO_ROOT), expected)
+
     def test_worker_runtime_and_timestamp_metadata_do_not_change_semantic_hash(self):
         profile_1 = self.build(workers=1, runtime=12.5)
         profile_4 = self.build(workers=4, runtime=3.25)
@@ -179,6 +217,42 @@ class TestSemanticDeterminism(ProfileFixture):
             semantic_content_sha256(profile_4),
         )
 
+    def test_repository_materialization_metadata_is_nonsemantic(self):
+        profile = self.build()
+        changed = deepcopy(profile)
+        changed["generation_metadata"]["repository_materialization"] = {
+            "commit_sha": "f" * 40,
+            "working_tree_dirty": not profile["generation_metadata"][
+                "repository_materialization"
+            ]["working_tree_dirty"],
+        }
+        self.assertEqual(
+            profile["semantic_content_sha256"],
+            semantic_content_sha256(changed),
+        )
+        validate_pure_geometry_profile(changed)
+
+    def test_semantic_source_hash_change_changes_hash_and_fails_live_provenance(self):
+        profile = self.build()
+        changed = deepcopy(profile)
+        source_manifest = changed["provenance"]["geometry_compiler"][
+            "source_file_sha256"
+        ]
+        first_source = sorted(source_manifest)[0]
+        source_manifest[first_source] = "0" * 64
+        changed["provenance"]["geometry_compiler"][
+            "source_combined_sha256"
+        ] = combined_source_sha256(source_manifest)
+        self.assertNotEqual(
+            profile["semantic_content_sha256"],
+            semantic_content_sha256(changed),
+        )
+        changed["semantic_content_sha256"] = semantic_content_sha256(changed)
+        self.assertIn(
+            "pure geometry source manifest mismatch",
+            find_geometry_mismatches_v5(changed, self.scene, repo_root=REPO_ROOT),
+        )
+
     def test_semantic_geometry_change_changes_hash(self):
         profile = self.build()
         changed = deepcopy(profile)
@@ -186,6 +260,75 @@ class TestSemanticDeterminism(ProfileFixture):
         self.assertNotEqual(
             semantic_content_sha256(profile),
             semantic_content_sha256(changed),
+        )
+
+
+class TestProfileWideAnalysisParameters(ProfileFixture):
+    def _replace_result_parameter(
+        self,
+        analyses: tuple[EndpointAnalysisV5, ...],
+        *,
+        layer: str,
+        field: str,
+    ) -> tuple[EndpointAnalysisV5, ...]:
+        changed = list(analyses)
+        analysis = changed[1]
+        result = analysis.geometry if layer == "geometric_contact" else analysis.path
+        assert result is not None
+        if field == "envelope_margin_rad":
+            domain = list(result.search_domain_rad)
+            domain[0 if analysis.geometry.endpoint.side == "min" else 1] += 0.01
+            updated_result = replace(result, search_domain_rad=tuple(domain))
+        else:
+            delta = 1 if field == "max_bisection_iterations" else 0.01
+            updated_result = replace(result, **{field: getattr(result, field) + delta})
+        changed[1] = (
+            replace(analysis, geometry=updated_result)
+            if layer == "geometric_contact"
+            else replace(analysis, path=updated_result)
+        )
+        return tuple(changed)
+
+    def test_every_profile_wide_search_parameter_must_be_uniform(self):
+        analyses = self.fake_analyses()
+        fields_by_layer = {
+            "geometric_contact": (
+                "coarse_step_rad",
+                "envelope_margin_rad",
+                "bisection_resolution_rad",
+                "max_bisection_iterations",
+            ),
+            "path_obstruction": (
+                "coarse_step_rad",
+                "bisection_resolution_rad",
+                "max_bisection_iterations",
+            ),
+        }
+        for layer, fields in fields_by_layer.items():
+            for field in fields:
+                with self.subTest(layer=layer, field=field):
+                    changed = self._replace_result_parameter(
+                        analyses,
+                        layer=layer,
+                        field=field,
+                    )
+                    with self.assertRaisesRegex(
+                        GeometryProfileV5Error,
+                        rf"STOP: profile-wide analysis parameter mismatch.*{field}",
+                    ):
+                        self.build(analyses=changed)
+
+    def test_per_endpoint_direct_path_domain_is_not_misreported_as_envelope_margin(self):
+        analyses = self.fake_analyses()
+        changed = self._replace_result_parameter(
+            analyses,
+            layer="path_obstruction",
+            field="envelope_margin_rad",
+        )
+        profile = self.build(analyses=changed)
+        self.assertEqual(
+            profile["analysis_parameters"]["canonical_path_domain"],
+            "Q0_TO_GEOMETRIC_CONTACT_OR_DECLARED_LIMIT",
         )
 
 

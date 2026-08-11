@@ -32,6 +32,8 @@ GEOMETRIC_CONTACT_FOUND = "GEOMETRIC_CONTACT_FOUND"
 NO_GEOMETRIC_CONTACT_IN_SEARCH_DOMAIN = "NO_GEOMETRIC_CONTACT_IN_SEARCH_DOMAIN"
 PATH_OBSTRUCTION = "PATH_OBSTRUCTION"
 NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN = "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+PATH_DOMAIN_FULL_ENDPOINT_ENVELOPE = "FULL_ENDPOINT_ENVELOPE"
+PATH_DOMAIN_DIRECT_TO_GEOMETRIC_TARGET = "DIRECT_TO_GEOMETRIC_TARGET"
 
 
 class GeometryContactSearchV5Error(RuntimeError):
@@ -54,6 +56,25 @@ class EndpointSpecV5:
     @property
     def urdf_declared_limit_rad(self) -> float:
         return self.urdf_lower_rad if self.side == "min" else self.urdf_upper_rad
+
+
+@dataclass(frozen=True)
+class EndpointSearchTaskV5:
+    """Geometry-only endpoint work item.
+
+    Canonical V5 tasks use an empty context and a direct q=0-to-target path
+    domain.  The frozen G4 oracle subclasses this record to attach historical
+    replay evidence without making that evidence part of the canonical task
+    type.
+    """
+
+    endpoint: EndpointSpecV5
+    context_pose_rad: dict[str, float]
+    coarse_step_rad: float
+    envelope_margin_rad: float
+    bisection_resolution_rad: float
+    max_bisection_iterations: int
+    path_domain_mode: str
 
 
 @dataclass(frozen=True)
@@ -222,9 +243,20 @@ def _search_first_transition(
     envelope_margin_rad: float,
     bisection_resolution_rad: float,
     max_bisection_iterations: int,
+    domain_end_rad: float | None = None,
 ) -> tuple[tuple[float, float] | None, int, tuple[float, float]]:
     sign, domain_min, domain_max = _search_domain(endpoint, envelope_margin_rad)
-    domain_end = domain_max if sign > 0.0 else domain_min
+    if domain_end_rad is None:
+        domain_end = domain_max if sign > 0.0 else domain_min
+    else:
+        domain_end = float(domain_end_rad)
+        if not math.isfinite(domain_end) or sign * domain_end <= 0.0:
+            raise GeometryContactSearchV5Error(
+                f"{endpoint.endpoint_id}: invalid explicit path-domain end "
+                f"{domain_end_rad!r}"
+            )
+        domain_min = min(0.0, domain_end)
+        domain_max = max(0.0, domain_end)
 
     def collides(angle_rad: float) -> bool:
         pose = _pose_for_angle(scene, endpoint, angle_rad, context_pose_rad)
@@ -242,13 +274,31 @@ def _search_first_transition(
             "q=0/start validity is a hard gate, not an endpoint result"
         )
 
-    bracket = bracket_collision_boundary(
-        collides,
-        0.0,
-        sign,
-        domain_end,
-        coarse_step_rad,
-    )
+    if domain_end_rad is None:
+        # Frozen G4 replay semantics: fixed coarse increments plus a possible
+        # final partial step.  This branch must remain byte-for-byte
+        # equivalent in behavior to the historical validated search.
+        bracket = bracket_collision_boundary(
+            collides,
+            0.0,
+            sign,
+            domain_end,
+            coarse_step_rad,
+        )
+    else:
+        # Canonical direct-path semantics: use the same equal subdivisions as
+        # the parking baseline (ceil(total_delta / step)).  The two layers can
+        # therefore compare the identical q=0-to-target coarse sweep before
+        # this layer refines its first transition by bisection.
+        intervals = max(1, int(math.ceil(abs(domain_end) / coarse_step_rad)))
+        last_clear = 0.0
+        bracket = None
+        for index in range(1, intervals + 1):
+            candidate = domain_end * index / intervals
+            if collides(candidate):
+                bracket = (last_clear, candidate)
+                break
+            last_clear = candidate
     if bracket is None:
         return None, 0, (domain_min, domain_max)
     clear_angle, contact_angle = bracket
@@ -340,6 +390,7 @@ def search_path_obstruction(
     envelope_margin_rad: float = DEFAULT_ENVELOPE_MARGIN_RAD,
     bisection_resolution_rad: float = DEFAULT_BISECTION_RESOLUTION_RAD,
     max_bisection_iterations: int = DEFAULT_MAX_BISECTION_ITERATIONS,
+    domain_end_rad: float | None = None,
 ) -> PathObstructionResultV5:
     context = dict(context_pose_rad or {})
     context.pop(endpoint.joint_name, None)
@@ -353,6 +404,7 @@ def search_path_obstruction(
         envelope_margin_rad=envelope_margin_rad,
         bisection_resolution_rad=bisection_resolution_rad,
         max_bisection_iterations=max_bisection_iterations,
+        domain_end_rad=domain_end_rad,
     )
     if bracket is None:
         return PathObstructionResultV5(
@@ -405,6 +457,7 @@ def analyze_endpoint(
     envelope_margin_rad: float = DEFAULT_ENVELOPE_MARGIN_RAD,
     bisection_resolution_rad: float = DEFAULT_BISECTION_RESOLUTION_RAD,
     max_bisection_iterations: int = DEFAULT_MAX_BISECTION_ITERATIONS,
+    path_domain_mode: str = PATH_DOMAIN_FULL_ENDPOINT_ENVELOPE,
 ) -> EndpointAnalysisV5:
     kwargs = {
         "context_pose_rad": context_pose_rad,
@@ -414,5 +467,27 @@ def analyze_endpoint(
         "max_bisection_iterations": max_bisection_iterations,
     }
     geometry = search_geometric_endpoint(scene, endpoint, **kwargs)
-    path = search_path_obstruction(scene, endpoint, **kwargs) if include_path_obstruction else None
+    if path_domain_mode == PATH_DOMAIN_FULL_ENDPOINT_ENVELOPE:
+        path_domain_end = None
+    elif path_domain_mode == PATH_DOMAIN_DIRECT_TO_GEOMETRIC_TARGET:
+        path_domain_end = (
+            geometry.contact_angle_rad
+            if geometry.status == GEOMETRIC_CONTACT_FOUND
+            else endpoint.urdf_declared_limit_rad
+        )
+    else:
+        raise GeometryContactSearchV5Error(
+            f"{endpoint.endpoint_id}: unsupported path-domain mode "
+            f"{path_domain_mode!r}"
+        )
+    path = (
+        search_path_obstruction(
+            scene,
+            endpoint,
+            **kwargs,
+            domain_end_rad=path_domain_end,
+        )
+        if include_path_obstruction
+        else None
+    )
     return EndpointAnalysisV5(geometry=geometry, path=path)

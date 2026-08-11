@@ -44,6 +44,10 @@ matdog_geometry_contact_search_v5.py
   pure active-pair endpoint search
   independent PATH_OBSTRUCTION search
   explicit context pose; no mandatory legacy prerequisite
+  canonical V5 uses an empty context and the DIRECT_TO_GEOMETRIC_TARGET
+    path domain (q=0 -> geometric contact, or declared limit when no contact)
+  the historical FULL_ENDPOINT_ENVELOPE path domain is reachable only from
+    the non-canonical G4 replay task type
 
 matdog_geometry_profile_v5.py / matdog_geometry_report_v5.py
   pure geometry serialization and reporting
@@ -215,8 +219,8 @@ Hardware Reconciler and Safety Policy record their own source/input digests.
 | `urdf_declared_limit_rad` | RENAME | `declared_limit_rad` |
 | `urdf_lower_rad` | RESTRUCTURE | `model.joints[].limit.lower_rad` |
 | `urdf_upper_rad` | RESTRUCTURE | `model.joints[].limit.upper_rad` |
-| `prerequisite_pose_rad` | RESTRUCTURE | effective `search_context.joint_positions_rad`, never mandatory |
-| `other_legs_pose_rad` | RESTRUCTURE | same complete context; remove “other legs” concept |
+| `prerequisite_pose_rad` | RESTRUCTURE | effective `search_context.joint_positions_rad`, never mandatory and **empty in every canonical V5 record**; the legacy pose survives only inside non-canonical G4 replay evidence |
+| `other_legs_pose_rad` | RESTRUCTURE | same complete context; remove “other legs” concept; likewise empty in canonical V5 |
 | `active_revolute_pair` | KEEP | topology-derived pair |
 | `pair_class` | KEEP | topology-derived |
 | `endpoint_evidence_class` | RESTRUCTURE | independent contact/path outcomes; hardware moves out |

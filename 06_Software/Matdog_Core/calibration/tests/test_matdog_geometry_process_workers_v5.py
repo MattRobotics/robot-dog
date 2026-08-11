@@ -25,6 +25,7 @@ if str(CALIBRATION_DIR) not in sys.path:
 
 from matdog_geometry_contact_search_v5 import (  # noqa: E402
     GEOMETRIC_CONTACT_FOUND,
+    PATH_DOMAIN_FULL_ENDPOINT_ENVELOPE,
     EndpointAnalysisV5,
     EndpointSpecV5,
     GeometricEndpointResultV5,
@@ -89,6 +90,7 @@ def _contact_tasks() -> tuple[G4ReplayTask, ...]:
             envelope_margin_rad=0.2,
             bisection_resolution_rad=0.0001,
             max_bisection_iterations=40,
+            path_domain_mode=PATH_DOMAIN_FULL_ENDPOINT_ENVELOPE,
             g4_record={},
         )
         for joint_index in range(12)

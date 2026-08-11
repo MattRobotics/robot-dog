@@ -39,7 +39,6 @@ PURE_GEOMETRY_SOURCE_FILES: tuple[str, ...] = (
     "matdog_geometry_model_v5.py",
     "matdog_geometry_scene_v5.py",
     "matdog_geometry_contact_search_v5.py",
-    "matdog_geometry_g4_oracle_v5.py",
     "matdog_geometry_profile_v5.py",
     "matdog_geometry_process_workers_v5.py",
     "matdog_geometry_compiler_v5.py",
@@ -100,7 +99,7 @@ def _git_value(repo_root: Path, args: list[str]) -> str | None:
         return None
     if completed.returncode != 0:
         return None
-    return completed.stdout.strip() or None
+    return completed.stdout.strip()
 
 
 def _git_dirty(repo_root: Path) -> bool | None:
@@ -356,6 +355,83 @@ def validate_pure_geometry_profile(profile: dict[str, Any]) -> None:
         )
 
 
+def _search_parameter_record(
+    analysis: EndpointAnalysisV5,
+    *,
+    path_layer: bool,
+) -> dict[str, float | int | None]:
+    endpoint = analysis.geometry.endpoint
+    result = analysis.path if path_layer else analysis.geometry
+    if result is None:
+        raise GeometryProfileV5Error(
+            f"{endpoint.endpoint_id}: path parameter record requested without a path result"
+        )
+    domain_end = (
+        result.search_domain_rad[0]
+        if endpoint.side == "min"
+        else result.search_domain_rad[1]
+    )
+    return {
+        "coarse_step_rad": _round(result.coarse_step_rad),
+        "envelope_margin_rad": _round(
+            abs(domain_end - endpoint.urdf_declared_limit_rad)
+        ),
+        "bisection_resolution_rad": _round(result.bisection_resolution_rad),
+        "max_bisection_iterations": result.max_bisection_iterations,
+    }
+
+
+def _uniform_analysis_parameters(
+    analyses: tuple[EndpointAnalysisV5, ...],
+) -> dict[str, Any]:
+    """Return profile-wide parameters only after proving they are uniform.
+
+    Geometry and path results both carry the numerical search configuration.
+    The endpoint-envelope margin applies only to geometric contact discovery;
+    canonical path domains are deliberately per-endpoint q=0-to-target ranges.
+    Every parameter that is actually declared uniform for a layer is checked
+    rather than silently copied from the first endpoint.
+    """
+
+    expected = _search_parameter_record(analyses[0], path_layer=False)
+    for analysis in analyses:
+        endpoint_id = analysis.geometry.endpoint.endpoint_id
+        layer_records = [(
+            "geometric_contact",
+            _search_parameter_record(analysis, path_layer=False),
+            tuple(expected),
+        )]
+        if analysis.path is not None:
+            layer_records.append((
+                "path_obstruction",
+                _search_parameter_record(analysis, path_layer=True),
+                (
+                    "coarse_step_rad",
+                    "bisection_resolution_rad",
+                    "max_bisection_iterations",
+                ),
+            ))
+        for layer_name, current, uniform_keys in layer_records:
+            mismatches = {
+                key: {"expected": expected[key], "actual": current[key]}
+                for key in uniform_keys
+                if current[key] != expected[key]
+            }
+            if mismatches:
+                raise GeometryProfileV5Error(
+                    "STOP: profile-wide analysis parameter mismatch for "
+                    f"{endpoint_id} {layer_name}: {mismatches}"
+                )
+
+    return {
+        **expected,
+        "canonical_path_domain": "Q0_TO_GEOMETRIC_CONTACT_OR_DECLARED_LIMIT",
+        "narrow_phase_margin_m": DEFAULT_NARROW_PHASE_MARGIN_M,
+        "grid_cell_size_m": DEFAULT_GRID_CELL_SIZE_M,
+        "max_narrow_phase_candidate_pairs": DEFAULT_MAX_NARROW_PHASE_CANDIDATE_PAIRS,
+    }
+
+
 def build_geometry_profile_v5(
     scene: RobotSceneV5,
     analyses: Iterable[EndpointAnalysisV5],
@@ -385,35 +461,20 @@ def build_geometry_profile_v5(
 
     repo_root = Path(repo_root).resolve()
     source_manifest = geometry_source_manifest(source_files)
-    analysis_parameters = {
-        "coarse_step_rad": _round(analyses[0].geometry.coarse_step_rad),
-        "envelope_margin_rad": _round(
-            abs(
-                max(analyses[0].geometry.search_domain_rad, key=abs)
-                - analyses[0].geometry.endpoint.urdf_declared_limit_rad
-            )
-        ),
-        "bisection_resolution_rad": _round(
-            analyses[0].geometry.bisection_resolution_rad
-        ),
-        "max_bisection_iterations": analyses[0].geometry.max_bisection_iterations,
-        "narrow_phase_margin_m": DEFAULT_NARROW_PHASE_MARGIN_M,
-        "grid_cell_size_m": DEFAULT_GRID_CELL_SIZE_M,
-        "max_narrow_phase_candidate_pairs": DEFAULT_MAX_NARROW_PHASE_CANDIDATE_PAIRS,
-    }
+    analysis_parameters = _uniform_analysis_parameters(analyses)
 
     profile: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "generation_metadata": {
             "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-            "working_tree_dirty": _git_dirty(repo_root),
             "worker_count": worker_count,
             "runtime_seconds": _round(runtime_seconds, 6),
+            "repository_materialization": {
+                "commit_sha": _git_value(repo_root, ["rev-parse", "HEAD"]),
+                "working_tree_dirty": _git_dirty(repo_root),
+            },
         },
         "provenance": {
-            "repository": {
-                "commit_sha": _git_value(repo_root, ["rev-parse", "HEAD"]),
-            },
             "urdf": {
                 "relative_path": _portable_path(scene.urdf_path, repo_root),
                 "sha256": _sha256_file(scene.urdf_path),

@@ -31,10 +31,10 @@ from typing import Iterable  # noqa: E402
 
 from matdog_geometry_contact_search_v5 import (  # noqa: E402
     EndpointAnalysisV5,
+    EndpointSearchTaskV5,
     analyze_endpoint,
 )
 from matdog_geometry_mesh_kernel import clear_mesh_cache  # noqa: E402
-from matdog_geometry_g4_oracle_v5 import G4ReplayTask  # noqa: E402
 from matdog_geometry_path_planner_v5 import (  # noqa: E402
     EndpointParkingPlanV5,
     EndpointParkingTaskV5,
@@ -54,7 +54,7 @@ class GeometryProcessWorkerV5Error(RuntimeError):
 @dataclass(frozen=True)
 class ContactWorkItemV5:
     canonical_endpoint_index: int
-    task: G4ReplayTask
+    task: EndpointSearchTaskV5
 
 
 @dataclass(frozen=True)
@@ -140,7 +140,7 @@ def _validate_scene_fingerprint(
 
 def build_contact_work_batches(
     actuated_joint_names: Iterable[str],
-    tasks: Iterable[G4ReplayTask],
+    tasks: Iterable[EndpointSearchTaskV5],
 ) -> tuple[ContactWorkBatchV5, ...]:
     tasks = tuple(tasks)
     joint_names = tuple(actuated_joint_names)
@@ -151,7 +151,7 @@ def build_contact_work_batches(
         for joint_name in joint_names
         for side in ("min", "max")
     ]
-    actual_by_key: dict[tuple[str, str], G4ReplayTask] = {}
+    actual_by_key: dict[tuple[str, str], EndpointSearchTaskV5] = {}
     for task in tasks:
         key = (task.endpoint.joint_name, task.endpoint.side)
         if key in actual_by_key:
@@ -272,6 +272,7 @@ def _analyze_contact_batch_with_scene(
             envelope_margin_rad=task.envelope_margin_rad,
             bisection_resolution_rad=task.bisection_resolution_rad,
             max_bisection_iterations=task.max_bisection_iterations,
+            path_domain_mode=task.path_domain_mode,
         )
         results.append(
             ContactWorkResultV5(
@@ -349,7 +350,7 @@ def execute_contact_tasks(
     urdf_path: Path,
     actuated_joint_names: Iterable[str],
     expected_fingerprint: GeometryInputFingerprintV5,
-    tasks: Iterable[G4ReplayTask],
+    tasks: Iterable[EndpointSearchTaskV5],
     *,
     workers: int,
     include_path_obstruction: bool,

@@ -32,19 +32,14 @@ for _thread_environment_name in (
 
 from matdog_geometry_contact_search_v5 import (
     EndpointAnalysisV5,
+    EndpointSearchTaskV5,
+    PATH_DOMAIN_DIRECT_TO_GEOMETRIC_TARGET,
     load_endpoint_specs,
 )
 from matdog_geometry_mesh_kernel import clear_mesh_cache
 from matdog_geometry_process_workers_v5 import (
     execute_contact_tasks,
     scene_input_fingerprint,
-)
-from matdog_geometry_g4_oracle_v5 import (
-    G4ReplayTask,
-    build_g4_replay_tasks,
-    compare_g4_g7,
-    load_frozen_g4_profile,
-    render_g4_g7_report,
 )
 from matdog_geometry_profile_v5 import (
     PURE_GEOMETRY_SOURCE_FILES,
@@ -78,10 +73,9 @@ class GeometryCompilerV5Run:
     analyses: tuple[EndpointAnalysisV5, ...]
     q0_status_by_joint: dict[str, str]
     runtime_seconds: float
-    g4_g7_comparison: dict[str, Any] | None
 
 
-def _default_tasks(scene: RobotSceneV5) -> tuple[G4ReplayTask, ...]:
+def _default_tasks(scene: RobotSceneV5) -> tuple[EndpointSearchTaskV5, ...]:
     """Canonical geometry-only endpoint tasks with all other joints at home.
 
     G4 replay tasks are built separately from the frozen profile. Keeping the
@@ -96,17 +90,44 @@ def _default_tasks(scene: RobotSceneV5) -> tuple[G4ReplayTask, ...]:
     )
 
     return tuple(
-        G4ReplayTask(
+        EndpointSearchTaskV5(
             endpoint=endpoint,
             context_pose_rad={},
             coarse_step_rad=DEFAULT_COARSE_STEP_RAD,
             envelope_margin_rad=DEFAULT_ENVELOPE_MARGIN_RAD,
             bisection_resolution_rad=DEFAULT_BISECTION_RESOLUTION_RAD,
             max_bisection_iterations=DEFAULT_MAX_BISECTION_ITERATIONS,
-            g4_record={},
+            path_domain_mode=PATH_DOMAIN_DIRECT_TO_GEOMETRIC_TARGET,
         )
         for endpoint in load_endpoint_specs(scene.model)
     )
+
+
+def _assert_canonical_context_free(
+    tasks: tuple[EndpointSearchTaskV5, ...],
+    analyses: tuple[EndpointAnalysisV5, ...] | None = None,
+) -> None:
+    if len(tasks) != 24 or any(task.context_pose_rad for task in tasks):
+        raise GeometryCompilerV5Error(
+            "STOP: canonical V5 requires exactly 24 context-free endpoint tasks"
+        )
+    if any(
+        task.path_domain_mode != PATH_DOMAIN_DIRECT_TO_GEOMETRIC_TARGET
+        for task in tasks
+    ):
+        raise GeometryCompilerV5Error(
+            "STOP: canonical V5 requires direct q=0-to-geometric-target path domains"
+        )
+    if analyses is None:
+        return
+    if len(analyses) != 24 or any(
+        analysis.geometry.context_pose_rad
+        or (analysis.path is not None and analysis.path.context_pose_rad)
+        for analysis in analyses
+    ):
+        raise GeometryCompilerV5Error(
+            "STOP: canonical V5 endpoint results contain non-model search context"
+        )
 
 
 def run_geometry_compiler_v5(
@@ -115,7 +136,6 @@ def run_geometry_compiler_v5(
     urdf_path: Path,
     workers: int = 1,
     include_path_obstruction: bool = True,
-    g4_reference_profile_path: Path | None = None,
     source_files: tuple[str, ...] = V5_PROFILE_SOURCE_FILES,
 ) -> GeometryCompilerV5Run:
     if workers not in (1, 4):
@@ -134,16 +154,8 @@ def run_geometry_compiler_v5(
             f"STOP: q=0 active-pair hard gate failed; count={len(q0_status)}, intersecting={bad_q0}"
         )
 
-    g4_profile = None
-    if g4_reference_profile_path is not None:
-        g4_profile = load_frozen_g4_profile(g4_reference_profile_path)
-        tasks = build_g4_replay_tasks(
-            scene,
-            load_endpoint_specs(scene.model),
-            g4_profile,
-        )
-    else:
-        tasks = _default_tasks(scene)
+    tasks = _default_tasks(scene)
+    _assert_canonical_context_free(tasks)
 
     input_fingerprint = scene_input_fingerprint(scene)
     actuated_joint_names = scene.model.actuated_joint_names
@@ -160,6 +172,7 @@ def run_geometry_compiler_v5(
         include_path_obstruction=include_path_obstruction,
     )
     runtime = time.perf_counter() - started
+    _assert_canonical_context_free(tasks, analyses)
 
     scene = RobotSceneV5.from_urdf(Path(urdf_path))
     if scene_input_fingerprint(scene) != input_fingerprint:
@@ -170,10 +183,6 @@ def run_geometry_compiler_v5(
         raise GeometryCompilerV5Error(
             "STOP: geometry source provenance changed during endpoint execution"
         )
-
-    comparison = None
-    if g4_profile is not None:
-        comparison = compare_g4_g7(tasks, analyses)
 
     profile = build_geometry_profile_v5(
         scene,
@@ -212,7 +221,6 @@ def run_geometry_compiler_v5(
         analyses=analyses,
         q0_status_by_joint=q0_status,
         runtime_seconds=runtime,
-        g4_g7_comparison=comparison,
     )
     del scene
     clear_mesh_cache()
@@ -260,9 +268,7 @@ def main() -> int:
     parser.add_argument("--urdf", type=Path, default=None)
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--without-path-obstruction", action="store_true")
-    parser.add_argument("--g4-reference-profile", type=Path, default=None)
     parser.add_argument("--profile-path", type=Path, default=None)
-    parser.add_argument("--oracle-json-path", type=Path, default=None)
     args = parser.parse_args()
 
     repo_root = args.repo_root.resolve()
@@ -272,7 +278,6 @@ def main() -> int:
         urdf_path=urdf_path,
         workers=args.workers,
         include_path_obstruction=not args.without_path_obstruction,
-        g4_reference_profile_path=args.g4_reference_profile,
     )
 
     profile_path = args.profile_path or _default_profile_path(repo_root)
@@ -282,19 +287,6 @@ def main() -> int:
     )
     write_geometry_report_v5(render_geometry_report_v5(run.profile), report_path)
 
-    oracle_json_path = None
-    oracle_report_path = None
-    if run.g4_g7_comparison is not None:
-        oracle_json_path = args.oracle_json_path or profile_path.with_name(
-            profile_path.name.replace("PURE_PROFILE.json", "G4_G7_ORACLE.json")
-        )
-        _atomic_json(run.g4_g7_comparison, oracle_json_path)
-        oracle_report_path = oracle_json_path.with_suffix(".md")
-        write_geometry_report_v5(
-            render_g4_g7_report(run.g4_g7_comparison),
-            oracle_report_path,
-        )
-
     print("=== MATDOG GEOMETRY COMPILER V5 — PURE GEOMETRY ===")
     print(f"q=0 active pairs separated: {len(run.q0_status_by_joint)}/12")
     print(f"endpoints processed: {len(run.analyses)}")
@@ -303,9 +295,6 @@ def main() -> int:
     print(f"semantic_content_sha256: {run.profile['semantic_content_sha256']}")
     print(f"profile: {profile_path}")
     print(f"report: {report_path}")
-    if oracle_json_path is not None:
-        print(f"G4/G7 oracle JSON: {oracle_json_path}")
-        print(f"G4/G7 oracle report: {oracle_report_path}")
     print("NO HARDWARE USED. NO NORMA-CORE MODIFIED. NO MERGE PERFORMED.")
     return 0
 

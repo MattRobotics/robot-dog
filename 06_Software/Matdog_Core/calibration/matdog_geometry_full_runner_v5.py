@@ -35,12 +35,16 @@ for _thread_environment_name in THREAD_ENVIRONMENT_NAMES:
 
 
 from matdog_geometry_compiler_v5 import run_geometry_compiler_v5  # noqa: E402
+from matdog_geometry_contact_search_v5 import EndpointAnalysisV5  # noqa: E402
 from matdog_geometry_g4_oracle_v5 import (  # noqa: E402
     EXPECTED_G4_CONTENT_SHA256,
     render_g4_g7_report,
+    run_g4_replay_v5,
 )
 from matdog_geometry_mesh_kernel import clear_mesh_cache  # noqa: E402
 from matdog_geometry_path_planner_v5 import (  # noqa: E402
+    DEFAULT_MAX_OBSTRUCTION_BISECTION_ITERATIONS,
+    DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD,
     PARKING_SCHEMA_V2,
     PARKING_V2_SEMANTIC_KEYS,
     ParkingPlannerParametersV5,
@@ -48,6 +52,7 @@ from matdog_geometry_path_planner_v5 import (  # noqa: E402
     derive_geometry_profile_with_path_plans,
     endpoint_parking_tasks_from_profile,
     render_parking_report,
+    validate_endpoint_path_plan_consistency,
     validate_parking_artifact,
 )
 from matdog_geometry_process_workers_v5 import (  # noqa: E402
@@ -70,7 +75,19 @@ EXPECTED_G4_FILE_SHA256 = (
 CANONICAL_MEMORY_MAX_BYTES = 6 * 1024 * 1024 * 1024
 CANONICAL_MEMORY_SWAP_MAX_BYTES = 0
 CANONICAL_PHYSICAL_CPU_AFFINITY = (0, 1, 2, 3)
-RUN_SCHEMA_VERSION = "matdog.geometry_compiler_v5.integrated_run.v1"
+RUN_SCHEMA_VERSION = "matdog.geometry_compiler_v5.integrated_run.v2"
+EXPECTED_BUNDLE_ARTIFACT_KEYS = frozenset(
+    {
+        "endpoint_profile",
+        "endpoint_report",
+        "oracle_json",
+        "oracle_report",
+        "parking_json",
+        "parking_report",
+        "combined_profile",
+        "combined_report",
+    }
+)
 FINAL_SOURCE_FILES = tuple(
     dict.fromkeys(
         (
@@ -80,8 +97,23 @@ FINAL_SOURCE_FILES = tuple(
         )
     )
 )
+G4_REPLAY_SOURCE_FILES = (
+    "matdog_geometry_mesh_kernel.py",
+    "matdog_geometry_model_v5.py",
+    "matdog_geometry_scene_v5.py",
+    "matdog_geometry_contact_search_v5.py",
+    "matdog_geometry_process_workers_v5.py",
+    "matdog_geometry_profile_v5.py",
+    "matdog_geometry_g4_oracle_v5.py",
+)
 FINAL_EXECUTION_SOURCE_FILES = tuple(
-    dict.fromkeys((*FINAL_SOURCE_FILES, "matdog_geometry_report_v5.py"))
+    dict.fromkeys(
+        (
+            *FINAL_SOURCE_FILES,
+            *G4_REPLAY_SOURCE_FILES,
+            "matdog_geometry_report_v5.py",
+        )
+    )
 )
 
 
@@ -128,6 +160,21 @@ def _json_bytes(value: dict[str, Any]) -> bytes:
     return (
         json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
     ).encode("utf-8")
+
+
+def _manifest_content_sha256(manifest: dict[str, Any]) -> str:
+    content = {
+        key: value
+        for key, value in manifest.items()
+        if key != "manifest_content_sha256"
+    }
+    canonical = json.dumps(
+        content,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _inside_repo(path: Path, repo_root: Path, *, label: str) -> Path:
@@ -186,6 +233,22 @@ def _semantic_parking_payload(artifact: dict[str, Any]) -> dict[str, Any]:
     if artifact.get("schema_version") != PARKING_SCHEMA_V2:
         raise GeometryFullRunnerV5Error("STOP: canonical comparison requires parking v2")
     return {key: artifact[key] for key in PARKING_V2_SEMANTIC_KEYS}
+
+
+def _semantic_oracle_payload(oracle: dict[str, Any]) -> dict[str, Any]:
+    """Exclude only replay execution materialization from oracle equality."""
+
+    provenance = oracle.get("replay_execution_provenance")
+    if not isinstance(provenance, dict):
+        raise GeometryFullRunnerV5Error(
+            "STOP: G4 replay oracle lacks execution provenance"
+        )
+    return {
+        **oracle,
+        "replay_execution_provenance": {
+            key: value for key, value in provenance.items() if key != "workers"
+        },
+    }
 
 
 def _read_cgroup_v2() -> dict[str, Any]:
@@ -287,8 +350,12 @@ def _parse_cpu_affinity(value: str) -> tuple[int, ...]:
     return tuple(sorted(cpus))
 
 
-def _publish_no_clobber_bundle(payloads: dict[Path, bytes]) -> None:
-    """Publish staged bytes with hard-link O_EXCL semantics and rollback."""
+def _publish_no_clobber_bundle(
+    payloads: dict[Path, bytes],
+    *,
+    manifest_path: Path,
+) -> None:
+    """Publish data first and the validity-marker manifest last."""
 
     if not payloads:
         raise GeometryFullRunnerV5Error("STOP: empty artifact bundle")
@@ -296,6 +363,11 @@ def _publish_no_clobber_bundle(payloads: dict[Path, bytes]) -> None:
     if len(parents) != 1:
         raise GeometryFullRunnerV5Error("STOP: canonical bundle must use one directory")
     parent = parents.pop()
+    manifest_path = Path(manifest_path).resolve()
+    if manifest_path not in payloads or manifest_path.parent != parent:
+        raise GeometryFullRunnerV5Error(
+            "STOP: bundle validity-marker manifest is missing or outside its bundle"
+        )
     parent.mkdir(parents=True, exist_ok=True)
     existing = [str(path) for path in payloads if path.exists()]
     if existing:
@@ -313,9 +385,18 @@ def _publish_no_clobber_bundle(payloads: dict[Path, bytes]) -> None:
                 handle.flush()
                 os.fsync(handle.fileno())
             staged[target] = stage
-        for target, stage in staged.items():
+        data_targets = sorted(path for path in staged if path != manifest_path)
+        for target in data_targets:
+            stage = staged[target]
             os.link(stage, target)
             published.append(target)
+        directory_descriptor = os.open(parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_descriptor)
+        finally:
+            os.close(directory_descriptor)
+        os.link(staged[manifest_path], manifest_path)
+        published.append(manifest_path)
         directory_descriptor = os.open(parent, os.O_RDONLY)
         try:
             os.fsync(directory_descriptor)
@@ -340,42 +421,98 @@ def _publish_no_clobber_bundle(payloads: dict[Path, bytes]) -> None:
             pass
 
 
-def _load_reference_artifact(
-    manifest: dict[str, Any],
-    name: str,
+def _load_validated_integrated_bundle(
+    manifest_path: Path,
     repo_root: Path,
-) -> tuple[dict[str, Any], dict[str, str]]:
-    record = manifest.get("artifacts", {}).get(name)
-    if not isinstance(record, dict):
-        raise GeometryFullRunnerV5Error(
-            f"STOP: determinism reference lacks {name!r}"
-        )
-    path_value = record.get("relative_path")
-    if not isinstance(path_value, str) or Path(path_value).is_absolute():
-        raise GeometryFullRunnerV5Error(
-            f"STOP: invalid determinism artifact path for {name!r}"
-        )
-    path = _inside_repo(repo_root / path_value, repo_root, label=f"reference {name}")
+    *,
+    expected_benchmark: str | None = None,
+) -> tuple[dict[str, Any], str, dict[str, bytes], dict[str, dict[str, str]]]:
+    """Load one complete manifest-marked bundle from one byte snapshot."""
+
+    path = _inside_repo(manifest_path, repo_root, label="integrated bundle manifest")
     if not path.is_file():
         raise GeometryFullRunnerV5Error(
-            f"STOP: determinism reference artifact changed: {path}"
+            f"STOP: integrated bundle has no validity-marker manifest: {path}"
         )
-    payload = path.read_bytes()
-    observed_sha = _sha256_bytes(payload)
-    if observed_sha != record.get("file_sha256"):
-        raise GeometryFullRunnerV5Error(
-            f"STOP: determinism reference artifact changed: {path}"
-        )
+    manifest_payload = path.read_bytes()
+    manifest_file_sha = _sha256_bytes(manifest_payload)
     try:
-        parsed = json.loads(payload)
+        manifest = json.loads(manifest_payload)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise GeometryFullRunnerV5Error(
-            f"STOP: invalid determinism reference JSON: {path}"
+            f"STOP: invalid integrated bundle manifest JSON: {path}"
         ) from exc
-    return parsed, {
-        "relative_path": _relative(path, repo_root),
-        "file_sha256": observed_sha,
-    }
+    if manifest.get("schema_version") != RUN_SCHEMA_VERSION:
+        raise GeometryFullRunnerV5Error(
+            "STOP: integrated bundle manifest schema is not the corrected v2 contract"
+        )
+    if manifest.get("manifest_content_sha256") != _manifest_content_sha256(manifest):
+        raise GeometryFullRunnerV5Error(
+            "STOP: integrated bundle manifest content SHA is invalid"
+        )
+    if expected_benchmark is not None and manifest.get("benchmark_id") != expected_benchmark:
+        raise GeometryFullRunnerV5Error(
+            f"STOP: expected Benchmark {expected_benchmark} bundle"
+        )
+    validity = manifest.get("bundle_validity")
+    if validity != {
+        "marker": "RUN_MANIFEST_PUBLISHED_LAST",
+        "manifest_required": True,
+        "artifact_count": len(EXPECTED_BUNDLE_ARTIFACT_KEYS),
+        "artifact_hash_algorithm": "SHA256",
+    }:
+        raise GeometryFullRunnerV5Error(
+            "STOP: integrated bundle validity-marker contract is incomplete"
+        )
+    records = manifest.get("artifacts")
+    if not isinstance(records, dict) or set(records) != EXPECTED_BUNDLE_ARTIFACT_KEYS:
+        raise GeometryFullRunnerV5Error(
+            "STOP: integrated bundle artifact set is incomplete or unexpected"
+        )
+
+    payloads: dict[str, bytes] = {}
+    snapshots: dict[str, dict[str, str]] = {}
+    observed_paths: set[Path] = set()
+    for name in sorted(EXPECTED_BUNDLE_ARTIFACT_KEYS):
+        record = records[name]
+        if not isinstance(record, dict) or set(record) != {
+            "relative_path",
+            "file_sha256",
+        }:
+            raise GeometryFullRunnerV5Error(
+                f"STOP: invalid integrated bundle record for {name!r}"
+            )
+        path_value = record.get("relative_path")
+        if not isinstance(path_value, str) or Path(path_value).is_absolute():
+            raise GeometryFullRunnerV5Error(
+                f"STOP: invalid integrated artifact path for {name!r}"
+            )
+        artifact_path = _inside_repo(
+            repo_root / path_value,
+            repo_root,
+            label=f"integrated bundle {name}",
+        )
+        if artifact_path.parent != path.parent or artifact_path in observed_paths:
+            raise GeometryFullRunnerV5Error(
+                f"STOP: integrated artifact aliases or escapes its bundle: {name}"
+            )
+        observed_paths.add(artifact_path)
+        if not artifact_path.is_file():
+            raise GeometryFullRunnerV5Error(
+                f"STOP: integrated bundle artifact is missing: {artifact_path}"
+            )
+        payload = artifact_path.read_bytes()
+        observed_sha = _sha256_bytes(payload)
+        if observed_sha != record.get("file_sha256"):
+            raise GeometryFullRunnerV5Error(
+                f"STOP: integrated bundle artifact SHA mismatch: {artifact_path}"
+            )
+        payloads[name] = payload
+        snapshots[name] = {
+            "relative_path": _relative(artifact_path, repo_root),
+            "file_sha256": observed_sha,
+        }
+    return manifest, manifest_file_sha, payloads, snapshots
 
 
 def _compare_with_reference(
@@ -387,6 +524,7 @@ def _compare_with_reference(
     combined_profile: dict[str, Any],
     oracle: dict[str, Any],
     semantic_source_manifest: dict[str, str],
+    g4_replay_source_manifest: dict[str, str],
     execution_source_manifest: dict[str, str],
     input_file_manifest: dict[str, str],
 ) -> dict[str, Any]:
@@ -395,14 +533,13 @@ def _compare_with_reference(
         repo_root,
         label="determinism reference manifest",
     )
-    manifest_payload = path.read_bytes()
-    manifest_file_sha = _sha256_bytes(manifest_payload)
-    try:
-        manifest = json.loads(manifest_payload)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise GeometryFullRunnerV5Error(
-            f"STOP: invalid determinism reference manifest JSON: {path}"
-        ) from exc
+    manifest, manifest_file_sha, bundle_payloads, bundle_snapshots = (
+        _load_validated_integrated_bundle(
+            path,
+            repo_root,
+            expected_benchmark="C",
+        )
+    )
     if (
         manifest.get("schema_version") != RUN_SCHEMA_VERSION
         or manifest.get("benchmark_id") != "C"
@@ -411,18 +548,15 @@ def _compare_with_reference(
         raise GeometryFullRunnerV5Error(
             "STOP: D determinism reference is not a canonical workers=1 Benchmark C"
         )
-    reference_endpoint, endpoint_snapshot = _load_reference_artifact(
-        manifest, "endpoint_profile", repo_root
-    )
-    reference_parking, parking_snapshot = _load_reference_artifact(
-        manifest, "parking_json", repo_root
-    )
-    reference_combined, combined_snapshot = _load_reference_artifact(
-        manifest, "combined_profile", repo_root
-    )
-    reference_oracle, oracle_snapshot = _load_reference_artifact(
-        manifest, "oracle_json", repo_root
-    )
+    try:
+        reference_endpoint = json.loads(bundle_payloads["endpoint_profile"])
+        reference_parking = json.loads(bundle_payloads["parking_json"])
+        reference_combined = json.loads(bundle_payloads["combined_profile"])
+        reference_oracle = json.loads(bundle_payloads["oracle_json"])
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise GeometryFullRunnerV5Error(
+            "STOP: corrected Benchmark C bundle contains invalid JSON"
+        ) from exc
     validate_pure_geometry_profile(reference_endpoint)
     validate_parking_artifact(reference_parking)
     validate_pure_geometry_profile(reference_combined)
@@ -449,10 +583,19 @@ def _compare_with_reference(
             _semantic_profile_payload(reference_combined)
             == _semantic_profile_payload(combined_profile)
         ),
-        "g4_g7_oracle_payload_equal": reference_oracle == oracle,
+        "g4_replay_oracle_semantic_payload_equal": (
+            _semantic_oracle_payload(reference_oracle)
+            == _semantic_oracle_payload(oracle)
+        ),
         "semantic_source_manifest_equal": (
-            manifest.get("provenance", {}).get("semantic_source_file_sha256")
+            manifest.get("provenance", {}).get(
+                "canonical_semantic_source_file_sha256"
+            )
             == semantic_source_manifest
+        ),
+        "g4_replay_source_manifest_equal": (
+            manifest.get("provenance", {}).get("g4_replay_source_file_sha256")
+            == g4_replay_source_manifest
         ),
         "execution_source_manifest_equal": (
             manifest.get("provenance", {}).get("execution_source_file_sha256")
@@ -471,12 +614,7 @@ def _compare_with_reference(
         "status": "PASS",
         "reference_manifest_relative_path": _relative(path, repo_root),
         "reference_manifest_file_sha256": manifest_file_sha,
-        "reference_artifacts": {
-            "endpoint_profile": endpoint_snapshot,
-            "parking_json": parking_snapshot,
-            "combined_profile": combined_snapshot,
-            "oracle_json": oracle_snapshot,
-        },
+        "reference_artifacts": bundle_snapshots,
         **comparisons,
     }
 
@@ -514,6 +652,76 @@ def _artifact_record(path: Path, payload: bytes, repo_root: Path) -> dict[str, s
     return {
         "relative_path": _relative(path, repo_root),
         "file_sha256": _sha256_bytes(payload),
+    }
+
+
+def _compare_canonical_contacts_to_replay(
+    canonical: tuple[EndpointAnalysisV5, ...],
+    replay: tuple[EndpointAnalysisV5, ...],
+) -> dict[str, Any]:
+    """Prove that removing legacy context did not move active-pair contacts."""
+
+    if len(canonical) != 24 or len(replay) != 24:
+        raise GeometryFullRunnerV5Error(
+            "STOP: pure/replay endpoint comparison requires 24/24 analyses"
+        )
+    replay_by_key = {
+        (item.geometry.endpoint.joint_name, item.geometry.endpoint.side): item
+        for item in replay
+    }
+    if len(replay_by_key) != 24:
+        raise GeometryFullRunnerV5Error(
+            "STOP: replay endpoint identities are not unique"
+        )
+    rows = []
+    max_delta = 0.0
+    for item in canonical:
+        result = item.geometry
+        key = (result.endpoint.joint_name, result.endpoint.side)
+        reference = replay_by_key.get(key)
+        if reference is None:
+            raise GeometryFullRunnerV5Error(
+                f"STOP: replay lacks canonical endpoint {result.endpoint.endpoint_id}"
+            )
+        other = reference.geometry
+        tolerance = max(
+            result.bisection_resolution_rad,
+            other.bisection_resolution_rad,
+        )
+        if (
+            result.status != other.status
+            or result.contact_link_pair != other.contact_link_pair
+            or (result.contact_angle_rad is None) != (other.contact_angle_rad is None)
+        ):
+            raise GeometryFullRunnerV5Error(
+                f"STOP: pure-q0 contact identity/status differs from replay for "
+                f"{result.endpoint.endpoint_id}"
+            )
+        delta = None
+        if result.contact_angle_rad is not None:
+            assert other.contact_angle_rad is not None
+            delta = abs(result.contact_angle_rad - other.contact_angle_rad)
+            if delta > tolerance:
+                raise GeometryFullRunnerV5Error(
+                    f"STOP: pure-q0 contact moved beyond declared resolution for "
+                    f"{result.endpoint.endpoint_id}: delta={delta}, tolerance={tolerance}"
+                )
+            max_delta = max(max_delta, delta)
+        rows.append(
+            {
+                "endpoint_id": result.endpoint.endpoint_id,
+                "status": "PASS",
+                "contact_angle_delta_rad": delta,
+                "acceptance_tolerance_rad": tolerance,
+            }
+        )
+    return {
+        "status": "PASS",
+        "endpoint_count": 24,
+        "matching_endpoint_count": 24,
+        "max_contact_angle_delta_rad": max_delta,
+        "acceptance_basis": "MAX_DECLARED_BISECTION_RESOLUTION",
+        "rows": rows,
     }
 
 
@@ -569,10 +777,17 @@ def run_integrated_geometry_v5(
     if not require_cgroup_v2 and (
         required_memory_max_bytes is not None
         or required_memory_swap_max_bytes is not None
-        or required_cpu_affinity is not None
     ):
         raise GeometryFullRunnerV5Error(
-            "STOP: cgroup limits cannot be required without --require-cgroup-v2"
+            "STOP: cgroup memory limits cannot be required without --require-cgroup-v2"
+        )
+    if required_cpu_affinity is not None and sorted(os.sched_getaffinity(0)) != list(
+        required_cpu_affinity
+    ):
+        raise GeometryFullRunnerV5Error(
+            "STOP: process CPU affinity does not match the required inherited "
+            f"scheduler mask: expected={list(required_cpu_affinity)}, "
+            f"observed={sorted(os.sched_getaffinity(0))}"
         )
     parameters.validate()
 
@@ -580,6 +795,7 @@ def run_integrated_geometry_v5(
     generated_at = datetime.now(timezone.utc).isoformat()
     parent_pid = os.getpid()
     initial_sources = geometry_source_manifest(FINAL_SOURCE_FILES)
+    initial_replay_sources = geometry_source_manifest(G4_REPLAY_SOURCE_FILES)
     initial_execution_sources = geometry_source_manifest(
         FINAL_EXECUTION_SOURCE_FILES
     )
@@ -613,15 +829,32 @@ def run_integrated_geometry_v5(
         urdf_path=urdf_path,
         workers=workers,
         include_path_obstruction=True,
-        g4_reference_profile_path=g4_path,
         source_files=FINAL_SOURCE_FILES,
     )
-    if (
-        compiler_run.g4_g7_comparison is None
-        or compiler_run.g4_g7_comparison.get("status") != "PASS"
-    ):
-        raise GeometryFullRunnerV5Error("STOP: integrated G4/G7 oracle did not PASS")
     endpoint_profile = compiler_run.profile
+    canonical_contexts = [
+        record.get("search_context", {}).get("joint_positions_rad")
+        for record in endpoint_profile.get("endpoint_searches", [])
+    ]
+    if len(canonical_contexts) != 24 or any(context != {} for context in canonical_contexts):
+        raise GeometryFullRunnerV5Error(
+            "STOP: canonical endpoint profile is not 24/24 context-free"
+        )
+
+    replay_run = run_g4_replay_v5(
+        repo_root=repo_root,
+        urdf_path=urdf_path,
+        g4_profile_path=g4_path,
+        workers=workers,
+        source_files=G4_REPLAY_SOURCE_FILES,
+    )
+    oracle = replay_run.comparison
+    if oracle.get("status") != "PASS":
+        raise GeometryFullRunnerV5Error("STOP: separated G4 replay oracle did not PASS")
+    pure_replay_contacts = _compare_canonical_contacts_to_replay(
+        compiler_run.analyses,
+        replay_run.analyses,
+    )
     endpoint_profile["generation_metadata"]["integrated_execution"] = {
         "benchmark_id": benchmark_id,
         "parent_writer_pid": parent_pid,
@@ -667,6 +900,11 @@ def run_integrated_geometry_v5(
         parameters=parameters,
     )
     parking_runtime = time.perf_counter() - parking_started
+    path_consistency = validate_endpoint_path_plan_consistency(
+        endpoint_profile,
+        plans,
+        path_step_rad=parameters.path_step_rad,
+    )
 
     postflight_scene = RobotSceneV5.from_urdf(urdf_path)
     if scene_input_fingerprint(postflight_scene) != initial_fingerprint:
@@ -687,6 +925,8 @@ def run_integrated_geometry_v5(
     clear_mesh_cache()
     if (
         geometry_source_manifest(FINAL_SOURCE_FILES) != initial_sources
+        or geometry_source_manifest(G4_REPLAY_SOURCE_FILES)
+        != initial_replay_sources
         or geometry_source_manifest(FINAL_EXECUTION_SOURCE_FILES)
         != initial_execution_sources
         or _sha256_file(g4_path) != initial_g4_file_sha
@@ -720,6 +960,22 @@ def run_integrated_geometry_v5(
         },
     }
     validate_parking_artifact(parking_artifact)
+    expected_refinement_contract = {
+        "obstruction_bisection_resolution_rad": (
+            DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD
+        ),
+        "max_obstruction_bisection_iterations": (
+            DEFAULT_MAX_OBSTRUCTION_BISECTION_ITERATIONS
+        ),
+    }
+    if any(
+        parking_artifact["parameters"].get(key) != value
+        for key, value in expected_refinement_contract.items()
+    ):
+        raise GeometryFullRunnerV5Error(
+            "STOP: canonical parking artifact lacks the required obstruction "
+            "refinement contract"
+        )
     combined_profile = derive_geometry_profile_with_path_plans(
         endpoint_profile,
         parking_artifact,
@@ -729,7 +985,6 @@ def run_integrated_geometry_v5(
     ] = round(parking_runtime, 6)
     validate_pure_geometry_profile(combined_profile)
 
-    oracle = compiler_run.g4_g7_comparison
     determinism = {"status": "REFERENCE_CAPTURED"}
     if determinism_reference_manifest is not None:
         determinism = _compare_with_reference(
@@ -740,6 +995,7 @@ def run_integrated_geometry_v5(
             combined_profile=combined_profile,
             oracle=oracle,
             semantic_source_manifest=initial_sources,
+            g4_replay_source_manifest=initial_replay_sources,
             execution_source_manifest=initial_execution_sources,
             input_file_manifest=initial_input_files,
         )
@@ -821,11 +1077,18 @@ def run_integrated_geometry_v5(
             "g4_reference_file_sha256": initial_g4_file_sha,
             "g4_reference_content_sha256": EXPECTED_G4_CONTENT_SHA256,
             "input_file_sha256": initial_input_files,
-            "semantic_source_file_sha256": initial_sources,
+            "canonical_semantic_source_file_sha256": initial_sources,
+            "g4_replay_source_file_sha256": initial_replay_sources,
             "execution_source_file_sha256": initial_execution_sources,
         },
         "parameters": {
             "path_step_rad": parameters.path_step_rad,
+            "obstruction_bisection_resolution_rad": (
+                DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD
+            ),
+            "max_obstruction_bisection_iterations": (
+                DEFAULT_MAX_OBSTRUCTION_BISECTION_ITERATIONS
+            ),
             "one_dof_grid_divisions": parameters.one_dof_grid_divisions,
             "two_dof_grid_divisions": parameters.two_dof_grid_divisions,
             "clearance_sample_stride": parameters.clearance_sample_stride,
@@ -834,6 +1097,9 @@ def run_integrated_geometry_v5(
             "q0_active_revolute_pairs_separated": "12/12",
             "g4_g7_oracle_status": oracle["status"],
             "canonical_endpoint_coverage": "24/24",
+            "canonical_context_free_endpoint_searches": "24/24",
+            "pure_q0_vs_g4_replay_contacts": "24/24",
+            "endpoint_path_vs_parking_baseline_consistency": "24/24",
             "worker_writes": 0,
             "parent_bundle_publications": 1,
         },
@@ -844,7 +1110,10 @@ def run_integrated_geometry_v5(
         },
         "determinism": determinism,
         "timings_seconds": {
-            "endpoint_compute": round(compiler_run.runtime_seconds, 6),
+            "canonical_endpoint_compute": round(compiler_run.runtime_seconds, 6),
+            "noncanonical_g4_replay_compute": round(
+                replay_run.runtime_seconds, 6
+            ),
             "parking_compute": round(parking_runtime, 6),
             "integrated_internal_wall": round(total_runtime, 6),
         },
@@ -858,6 +1127,8 @@ def run_integrated_geometry_v5(
             "aabb_surviving_pairs": "NOT_INSTRUMENTED",
         },
         "parking_summary": parking_artifact["summary"],
+        "path_consistency": path_consistency,
+        "pure_q0_vs_g4_replay_contacts": pure_replay_contacts,
         "oracle_summary": {
             key: oracle[key]
             for key in (
@@ -876,12 +1147,36 @@ def run_integrated_geometry_v5(
             "collision_candidate_cap_changed": False,
             "safety_threshold_relaxed": False,
         },
+        "resource_enforcement": {
+            "memory_swap_oom": (
+                "CGROUP_V2_VALIDATED"
+                if cgroup is not None
+                else "NOT_REQUIRED_NOT_ENFORCED"
+            ),
+            "cpu_affinity": (
+                "PROCESS_SCHED_AFFINITY_INHERITED_BY_SPAWN_WORKERS"
+                if required_cpu_affinity is not None
+                else "NOT_REQUIRED_NOT_ENFORCED"
+            ),
+            "cpuset_cpus_effective_role": (
+                "TELEMETRY_ONLY" if cgroup is not None else "NOT_COLLECTED"
+            ),
+        },
+        "bundle_validity": {
+            "marker": "RUN_MANIFEST_PUBLISHED_LAST",
+            "manifest_required": True,
+            "artifact_count": len(EXPECTED_BUNDLE_ARTIFACT_KEYS),
+            "artifact_hash_algorithm": "SHA256",
+        },
     }
+    manifest["manifest_content_sha256"] = _manifest_content_sha256(manifest)
     manifest_payload = _json_bytes(manifest)
     materialized_payloads[paths.run_manifest] = manifest_payload
 
     if (
         geometry_source_manifest(FINAL_SOURCE_FILES) != initial_sources
+        or geometry_source_manifest(G4_REPLAY_SOURCE_FILES)
+        != initial_replay_sources
         or geometry_source_manifest(FINAL_EXECUTION_SOURCE_FILES)
         != initial_execution_sources
         or _input_file_manifest(input_file_paths, repo_root) != initial_input_files
@@ -892,7 +1187,10 @@ def run_integrated_geometry_v5(
         )
     _verify_determinism_reference_snapshot(determinism, repo_root)
     integrated_output_paths(output_prefix, repo_root)
-    _publish_no_clobber_bundle(materialized_payloads)
+    _publish_no_clobber_bundle(
+        materialized_payloads,
+        manifest_path=paths.run_manifest,
+    )
     return manifest
 
 

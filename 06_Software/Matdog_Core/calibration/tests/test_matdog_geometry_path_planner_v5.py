@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 import hashlib
 import math
 import os
@@ -205,6 +206,177 @@ def _candidate(configuration: dict[str, float]) -> planner._FeasibleCandidate:
     )
 
 
+def _consistency_fixture():
+    records = []
+    plans = []
+    for index in range(24):
+        joint = f"joint_{index}"
+        endpoint_id = f"{joint}:max"
+        obstructed = index == 0
+        pair = ("blocker_a", "blocker_b")
+        path = {
+            "status": (
+                planner.PATH_OBSTRUCTED
+                if obstructed
+                else "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+            ),
+            "angle_rad": 0.45 if obstructed else None,
+            "link_pair": list(pair) if obstructed else None,
+            "relation": "same_branch" if obstructed else None,
+            "search": {
+                "coarse_step_rad": 0.1,
+                "bisection_resolution_rad": (
+                    planner.DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD
+                ),
+                "domain_rad": [0.0, 1.0],
+            },
+        }
+        records.append(
+            {
+                "identity": {
+                    "presentation_id": endpoint_id,
+                    "joint_name": joint,
+                    "limit_side": "max",
+                },
+                "declared_limit_rad": 0.8,
+                "search_context": {"joint_positions_rad": {}},
+                "geometric_contact": {
+                    "status": "GEOMETRIC_CONTACT_FOUND",
+                    "angle_rad": 1.0,
+                },
+                "path_obstruction": path,
+            }
+        )
+        obstruction = (
+            FirstObstructionV5(
+                sample_index=5,
+                progress=0.5,
+                joint_positions_rad={joint: 0.5},
+                link_pair=pair,
+                relation="same_branch",
+            )
+            if obstructed
+            else None
+        )
+        refined = (
+            planner.RefinedObstructionV5(
+                clear_progress=0.44996,
+                contact_progress=0.45005,
+                clear_joint_positions_rad={joint: 0.44996},
+                contact_joint_positions_rad={joint: 0.45005},
+                link_pair=pair,
+                relation="same_branch",
+                bisection_resolution_rad=(
+                    planner.DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD
+                ),
+                bisection_iterations=7,
+            )
+            if obstructed
+            else None
+        )
+        baseline = SimpleNamespace(
+            active_pair_excluded=(f"parent_{index}", f"child_{index}"),
+            moving_joint_names=(joint,),
+            start_joint_positions_rad={joint: 0.0},
+            end_joint_positions_rad={joint: 1.0},
+            status=(planner.PATH_OBSTRUCTED if obstructed else planner.PATH_COLLISION_FREE),
+            first_obstruction=obstruction,
+            refined_first_obstruction=refined,
+            planned_sample_count=11,
+            evaluated_sample_count=6 if obstructed else 11,
+        )
+        plans.append(
+            SimpleNamespace(
+                canonical_endpoint_index=index,
+                endpoint_id=endpoint_id,
+                joint_name=joint,
+                limit_side="max",
+                target_angle_rad=1.0,
+                allowed_endpoint_contact_pair=(f"parent_{index}", f"child_{index}"),
+                baseline_task_path=baseline,
+            )
+        )
+    return {"endpoint_searches": records}, tuple(plans)
+
+
+class TestEndpointPathPlanConsistency(unittest.TestCase):
+    def test_all_24_direct_sweeps_pass_with_precise_boundary_in_sample_bracket(self):
+        profile, plans = _consistency_fixture()
+        with patch.object(planner, "validate_pure_geometry_profile"):
+            result = planner.validate_endpoint_path_plan_consistency(
+                profile,
+                plans,
+                path_step_rad=0.1,
+            )
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["consistent_endpoint_count"], 24)
+        self.assertEqual(result["obstructed_count"], 1)
+        self.assertAlmostEqual(
+            result["max_precise_to_refined_delta_rad"],
+            0.00005,
+        )
+
+    def test_context_target_domain_status_pair_relation_and_angle_tamper_stop(self):
+        mutators = {
+            "non-empty context": lambda profile, plans: profile["endpoint_searches"][0][
+                "search_context"
+            ]["joint_positions_rad"].update({"legacy": 0.0}),
+            "target": lambda profile, plans: setattr(plans[0], "target_angle_rad", 0.9),
+            "domain": lambda profile, plans: profile["endpoint_searches"][0][
+                "path_obstruction"
+            ]["search"].update({"domain_rad": [0.0, 0.9]}),
+            "status": lambda profile, plans: profile["endpoint_searches"][0][
+                "path_obstruction"
+            ].update({"status": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"}),
+            "pair": lambda profile, plans: profile["endpoint_searches"][0][
+                "path_obstruction"
+            ].update({"link_pair": ["wrong", "pair"]}),
+            "relation": lambda profile, plans: profile["endpoint_searches"][0][
+                "path_obstruction"
+            ].update({"relation": "cross_branch"}),
+            "angle": lambda profile, plans: profile["endpoint_searches"][0][
+                "path_obstruction"
+            ].update({"angle_rad": 0.448}),
+        }
+        for name, mutate in mutators.items():
+            with self.subTest(name=name):
+                profile, immutable_plans = _consistency_fixture()
+                plans = list(immutable_plans)
+                # SimpleNamespace is intentionally mutable for direct negative
+                # boundary tests; production plans remain frozen dataclasses.
+                mutate(profile, plans)
+                with patch.object(planner, "validate_pure_geometry_profile"):
+                    with self.assertRaisesRegex(
+                        planner.GeometryPathPlannerV5Error,
+                        "STOP:",
+                    ):
+                        planner.validate_endpoint_path_plan_consistency(
+                            profile,
+                            plans,
+                            path_step_rad=0.1,
+                        )
+
+    def test_refined_bracket_wider_than_declared_resolution_stops(self):
+        profile, immutable_plans = _consistency_fixture()
+        plans = list(immutable_plans)
+        baseline = plans[0].baseline_task_path
+        baseline.refined_first_obstruction = replace(
+            baseline.refined_first_obstruction,
+            clear_progress=0.44,
+            clear_joint_positions_rad={"joint_0": 0.44},
+        )
+        with patch.object(planner, "validate_pure_geometry_profile"):
+            with self.assertRaisesRegex(
+                planner.GeometryPathPlannerV5Error,
+                "declared bisection resolution",
+            ):
+                planner.validate_endpoint_path_plan_consistency(
+                    profile,
+                    plans,
+                    path_step_rad=0.1,
+                )
+
+
 class TestSavedProfileTaskLoader(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -212,7 +384,7 @@ class TestSavedProfileTaskLoader(unittest.TestCase):
         cls.scene = RobotSceneV5.from_urdf(URDF_PATH)
         cls.tasks = endpoint_parking_tasks_from_profile(cls.scene, cls.profile)
 
-    def test_exact_24_task_join_does_not_carry_legacy_context(self):
+    def test_parking_task_boundary_does_not_copy_endpoint_search_context(self):
         self.assertEqual(len(self.tasks), 24)
         self.assertEqual(self.tasks[0].endpoint.endpoint_id, "lf_hip_joint:min")
         self.assertFalse(hasattr(self.tasks[0], "context_pose_rad"))
@@ -303,6 +475,18 @@ class TestPathSemantics(unittest.TestCase):
         )
         self.assertEqual(result.status, planner.PATH_OBSTRUCTED)
         self.assertLess(result.evaluated_sample_count, result.planned_sample_count)
+        refined = result.refined_first_obstruction
+        self.assertIsNotNone(refined)
+        assert refined is not None
+        self.assertLess(refined.clear_joint_positions_rad["active"], 0.1)
+        self.assertGreaterEqual(refined.contact_joint_positions_rad["active"], 0.1)
+        self.assertLessEqual(
+            refined.contact_joint_positions_rad["active"]
+            - refined.clear_joint_positions_rad["active"],
+            planner.DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD,
+        )
+        self.assertEqual(refined.link_pair, ("opaque_a", "opaque_b"))
+        self.assertEqual(refined.relation, "same_branch")
 
     def test_normalized_grid_is_bounded_and_not_historical_seed_table(self):
         values = planner._grid_values(-0.7, 1.3, 6)
@@ -578,6 +762,92 @@ class TestParkingArtifact(unittest.TestCase):
             derived_1["generation_metadata"]["path_planning"],
             derived_4["generation_metadata"]["path_planning"],
         )
+
+    def test_v2_rejects_unproven_refined_obstruction_brackets(self):
+        artifact = self._artifact_v2(
+            worker_count=1,
+            relative_path="reports/refinement.json",
+            file_sha256="6" * 64,
+        )
+        segment = artifact["plans"][0]["task_path"]
+        segment.update(
+            {
+                "status": planner.PATH_OBSTRUCTED,
+                "collision_free": False,
+                "evaluated_sample_count": 2,
+                "first_sampled_obstruction": {
+                    "sample_index": 1,
+                    "progress": 0.5,
+                    "joint_positions_rad": {
+                        "active": 0.5,
+                        "escape_a": 0.0,
+                        "escape_b": 0.0,
+                    },
+                    "link_pair": ["opaque_a", "opaque_b"],
+                    "relation": "same_branch",
+                },
+                "refined_first_obstruction": {
+                    "clear_progress": 0.49995,
+                    "contact_progress": 0.5,
+                    "clear_joint_positions_rad": {
+                        "active": 0.49995,
+                        "escape_a": 0.0,
+                        "escape_b": 0.0,
+                    },
+                    "contact_joint_positions_rad": {
+                        "active": 0.5,
+                        "escape_a": 0.0,
+                        "escape_b": 0.0,
+                    },
+                    "link_pair": ["opaque_a", "opaque_b"],
+                    "relation": "same_branch",
+                    "bisection_resolution_rad": (
+                        planner.DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD
+                    ),
+                    "bisection_iterations": 13,
+                },
+            }
+        )
+        artifact["summary"]["geometry_feasible_complete_sequence_count"] -= 1
+        artifact["summary"]["no_complete_sequence_count"] += 1
+        artifact["semantic_content_sha256"] = parking_content_sha256(artifact)
+        validate_parking_artifact(artifact)
+
+        def widen_bracket(value):
+            refined = value["plans"][0]["task_path"][
+                "refined_first_obstruction"
+            ]
+            refined["clear_progress"] = 0.49
+            refined["clear_joint_positions_rad"]["active"] = 0.49
+
+        def invert_progress(value):
+            refined = value["plans"][0]["task_path"][
+                "refined_first_obstruction"
+            ]
+            refined["clear_progress"] = 0.50001
+            refined["clear_joint_positions_rad"]["active"] = 0.50001
+
+        def break_interpolation(value):
+            value["plans"][0]["task_path"]["refined_first_obstruction"][
+                "contact_joint_positions_rad"
+            ]["active"] = 0.49999
+
+        for name, mutate in {
+            "width": widen_bracket,
+            "progress": invert_progress,
+            "interpolation": break_interpolation,
+        }.items():
+            with self.subTest(name=name):
+                changed = deepcopy(artifact)
+                mutate(changed)
+                changed["semantic_content_sha256"] = parking_content_sha256(
+                    changed
+                )
+                with self.assertRaisesRegex(
+                    planner.GeometryPathPlannerV5Error,
+                    "refined obstruction",
+                ):
+                    validate_parking_artifact(changed)
 
     def test_frozen_v1_artifact_remains_readable_and_unchanged(self):
         frozen_path = G7_PROFILE_PATH.with_name(

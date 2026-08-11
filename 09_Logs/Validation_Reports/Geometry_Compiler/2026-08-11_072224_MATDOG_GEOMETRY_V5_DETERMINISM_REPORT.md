@@ -1,5 +1,21 @@
 # MATDOG Geometry Compiler V5 — workers 1/4 determinism report
 
+> **STATUS: SUPERSEDED PRE-AUDIT V5 CANDIDATE EVIDENCE.**
+> This document describes the pre-audit V5 candidate. An independent adversarial
+> audit of PR #19 found that the integrated runner reused one frozen-G4-context
+> replay as both replay evidence and the canonical "pure geometry" endpoint
+> profile, so the published canonical artifact carried legacy 30/50/90 degree
+> context on 20 of 24 endpoints and its path-obstruction layer contradicted the
+> pure q=0 parking results.
+>
+> The semantic hashes quoted below (`cad2f194…`, `3cda03c2…`, `e99e2b65…`) are
+> **not canonical**. The corrected canonical bundle is
+> `2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4_*`; see
+> `2026-08-11_132758_MATDOG_GEOMETRY_V5_DETERMINISM_REPORT.md`.
+>
+> This file is retained unchanged in substance for provenance. Nothing in the
+> `2026-08-11_072224` bundle was overwritten or deleted.
+
 **Date:** 2026-08-11<br>
 **Result:** **PASS**<br>
 **Reference run:** C, workers=1<br>

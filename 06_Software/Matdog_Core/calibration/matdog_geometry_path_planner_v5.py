@@ -30,6 +30,8 @@ from typing import Any, Iterable
 from matdog_geometry_contact_search_v5 import (
     GEOMETRIC_CONTACT_FOUND,
     NO_GEOMETRIC_CONTACT_IN_SEARCH_DOMAIN,
+    NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN,
+    PATH_OBSTRUCTION,
     EndpointSpecV5,
     load_endpoint_specs,
 )
@@ -45,6 +47,8 @@ DEFAULT_PATH_STEP_RAD = math.radians(1.0)
 DEFAULT_1DOF_GRID_DIVISIONS = 6
 DEFAULT_2DOF_GRID_DIVISIONS = 4
 DEFAULT_CLEARANCE_SAMPLE_STRIDE = 10
+DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD = 0.0001
+DEFAULT_MAX_OBSTRUCTION_BISECTION_ITERATIONS = 40
 
 PATH_COLLISION_FREE = "COLLISION_FREE"
 PATH_OBSTRUCTED = "PATH_OBSTRUCTION"
@@ -99,6 +103,18 @@ class FirstObstructionV5:
 
 
 @dataclass(frozen=True)
+class RefinedObstructionV5:
+    clear_progress: float
+    contact_progress: float
+    clear_joint_positions_rad: dict[str, float]
+    contact_joint_positions_rad: dict[str, float]
+    link_pair: tuple[str, str]
+    relation: str
+    bisection_resolution_rad: float
+    bisection_iterations: int
+
+
+@dataclass(frozen=True)
 class PathValidationV5:
     path_id: str
     start_joint_positions_rad: dict[str, float]
@@ -115,6 +131,7 @@ class PathValidationV5:
     sampled_configuration_sha256: str
     reversed_sampled_configuration_sha256: str
     reverse_validation_of: str | None = None
+    refined_first_obstruction: RefinedObstructionV5 | None = None
 
     @property
     def collision_free(self) -> bool:
@@ -345,6 +362,62 @@ def _configuration_sequence_sha256(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _refine_first_obstruction(
+    scene: RobotSceneV5,
+    samples: tuple[tuple[float, dict[str, float]], ...],
+    sample_index: int,
+    pairs: tuple[tuple[str, str], ...],
+) -> RefinedObstructionV5 | None:
+    """Bisect one planner clear/contact sample interval in joint space."""
+
+    if sample_index <= 0:
+        return None
+    clear_progress, clear_pose = samples[sample_index - 1]
+    contact_progress, contact_pose = samples[sample_index]
+    clear_pose = dict(clear_pose)
+    contact_pose = dict(contact_pose)
+    iterations = 0
+    while (
+        max(
+            abs(contact_pose[name] - clear_pose[name])
+            for name in scene.model.actuated_joint_names
+        )
+        > DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD
+        and iterations < DEFAULT_MAX_OBSTRUCTION_BISECTION_ITERATIONS
+    ):
+        midpoint_progress = (clear_progress + contact_progress) / 2.0
+        midpoint_pose = {
+            name: round((clear_pose[name] + contact_pose[name]) / 2.0, 15)
+            for name in scene.model.actuated_joint_names
+        }
+        collides, _pair = scene.first_collision_at_pose(
+            midpoint_pose,
+            link_pairs=pairs,
+        )
+        if collides:
+            contact_progress = midpoint_progress
+            contact_pose = midpoint_pose
+        else:
+            clear_progress = midpoint_progress
+            clear_pose = midpoint_pose
+        iterations += 1
+    collides, pair = scene.first_collision_at_pose(contact_pose, link_pairs=pairs)
+    if not collides or pair is None:
+        raise GeometryPathPlannerV5Error(
+            "refined planner obstruction lost its contact-side collision"
+        )
+    return RefinedObstructionV5(
+        clear_progress=clear_progress,
+        contact_progress=contact_progress,
+        clear_joint_positions_rad=clear_pose,
+        contact_joint_positions_rad=contact_pose,
+        link_pair=pair,
+        relation=scene.model.pair_relation(*pair),
+        bisection_resolution_rad=DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD,
+        bisection_iterations=iterations,
+    )
+
+
 def validate_configuration_path(
     scene: RobotSceneV5,
     *,
@@ -387,6 +460,7 @@ def validate_configuration_path(
                 raise GeometryPathPlannerV5Error(
                     f"{path_id}: collision reported without a pair"
                 )
+            refined = _refine_first_obstruction(scene, samples, index, pairs)
             return PathValidationV5(
                 path_id=path_id,
                 start_joint_positions_rad=start,
@@ -408,6 +482,7 @@ def validate_configuration_path(
                 clearance_samples_evaluated=clearance_count,
                 sampled_configuration_sha256=sequence_sha256,
                 reversed_sampled_configuration_sha256=reversed_sequence_sha256,
+                refined_first_obstruction=refined,
             )
 
         should_measure = (
@@ -758,7 +833,18 @@ def plan_endpoint_parking(
     baseline = baseline_feasibility
     obstruction = baseline.first_obstruction
     assert obstruction is not None
-    relevant = _relevant_movable_joints(scene, task, obstruction.link_pair)
+    refined_obstruction = baseline.refined_first_obstruction
+    blocking_pair = (
+        refined_obstruction.link_pair
+        if refined_obstruction is not None
+        else obstruction.link_pair
+    )
+    blocking_relation = (
+        refined_obstruction.relation
+        if refined_obstruction is not None
+        else obstruction.relation
+    )
+    relevant = _relevant_movable_joints(scene, task, blocking_pair)
     search_domains = {
         name: (
             float(scene.model.joints[name].lower_limit_rad),
@@ -789,8 +875,8 @@ def plan_endpoint_parking(
             allowed_endpoint_contact_pair=endpoint.active_link_pair,
             start_configuration_valid=True,
             baseline_task_path=baseline,
-            first_blocking_pair=obstruction.link_pair,
-            first_blocking_relation=obstruction.relation,
+            first_blocking_pair=blocking_pair,
+            first_blocking_relation=blocking_relation,
             relevant_movable_joint_names=(),
             outcome=PARKING_NO_MOVABLE_JOINT,
             parking_degrees_of_freedom=0,
@@ -838,8 +924,8 @@ def plan_endpoint_parking(
             allowed_endpoint_contact_pair=endpoint.active_link_pair,
             start_configuration_valid=True,
             baseline_task_path=baseline,
-            first_blocking_pair=obstruction.link_pair,
-            first_blocking_relation=obstruction.relation,
+            first_blocking_pair=blocking_pair,
+            first_blocking_relation=blocking_relation,
             relevant_movable_joint_names=relevant,
             outcome=PARKING_FEASIBLE_1DOF,
             parking_degrees_of_freedom=1,
@@ -914,8 +1000,8 @@ def plan_endpoint_parking(
         allowed_endpoint_contact_pair=endpoint.active_link_pair,
         start_configuration_valid=True,
         baseline_task_path=baseline,
-        first_blocking_pair=obstruction.link_pair,
-        first_blocking_relation=obstruction.relation,
+        first_blocking_pair=blocking_pair,
+        first_blocking_relation=blocking_relation,
         relevant_movable_joint_names=relevant,
         outcome=outcome,
         parking_degrees_of_freedom=degrees,
@@ -967,10 +1053,325 @@ def plan_all_endpoint_parking(
     )
 
 
+def validate_endpoint_path_plan_consistency(
+    geometry_profile: dict[str, Any],
+    plans: Iterable[EndpointParkingPlanV5],
+    *,
+    path_step_rad: float,
+) -> dict[str, Any]:
+    """Hard-gate the two representations of the canonical direct sweep.
+
+    Endpoint search and the planner independently bisect the first transition
+    on the same equal coarse grid.  Their refined contact-side boundaries must
+    agree within the larger of their declared bisection resolutions.
+    """
+
+    validate_pure_geometry_profile(geometry_profile)
+    if not (math.isfinite(path_step_rad) and path_step_rad > 0.0):
+        raise GeometryPathPlannerV5Error(
+            "STOP: path-consistency gate received an invalid sample step"
+        )
+    records = geometry_profile.get("endpoint_searches")
+    if not isinstance(records, list) or len(records) != 24:
+        raise GeometryPathPlannerV5Error(
+            "STOP: path-consistency gate requires 24 canonical endpoint records"
+        )
+    typed_plans = tuple(sorted(plans, key=lambda plan: plan.canonical_endpoint_index))
+    if (
+        len(typed_plans) != 24
+        or [plan.canonical_endpoint_index for plan in typed_plans] != list(range(24))
+    ):
+        raise GeometryPathPlannerV5Error(
+            "STOP: path-consistency gate requires canonical parking indices 0..23"
+        )
+
+    rows: list[dict[str, Any]] = []
+    max_delta = 0.0
+    for index, (record, plan) in enumerate(zip(records, typed_plans, strict=True)):
+        identity = record.get("identity", {})
+        endpoint_id = identity.get("presentation_id")
+        joint_name = identity.get("joint_name")
+        limit_side = identity.get("limit_side")
+        if (
+            endpoint_id != plan.endpoint_id
+            or joint_name != plan.joint_name
+            or limit_side != plan.limit_side
+        ):
+            raise GeometryPathPlannerV5Error(
+                f"STOP: path-consistency identity mismatch at canonical index {index}"
+            )
+        if record.get("search_context", {}).get("joint_positions_rad") != {}:
+            raise GeometryPathPlannerV5Error(
+                f"STOP: {endpoint_id}: canonical endpoint path has non-empty context"
+            )
+
+        geometric = record.get("geometric_contact", {})
+        if geometric.get("status") == GEOMETRIC_CONTACT_FOUND:
+            target = geometric.get("angle_rad")
+        elif geometric.get("status") == NO_GEOMETRIC_CONTACT_IN_SEARCH_DOMAIN:
+            target = record.get("declared_limit_rad")
+        else:
+            raise GeometryPathPlannerV5Error(
+                f"STOP: {endpoint_id}: unsupported geometric target status"
+            )
+        if not isinstance(target, (int, float)) or not math.isfinite(float(target)):
+            raise GeometryPathPlannerV5Error(
+                f"STOP: {endpoint_id}: canonical direct target is not finite"
+            )
+        target = float(target)
+        if not math.isclose(
+            plan.target_angle_rad, target, rel_tol=0.0, abs_tol=1e-12
+        ):
+            raise GeometryPathPlannerV5Error(
+                f"STOP: {endpoint_id}: endpoint and parking targets differ"
+            )
+
+        path = record.get("path_obstruction")
+        if not isinstance(path, dict):
+            raise GeometryPathPlannerV5Error(
+                f"STOP: {endpoint_id}: canonical endpoint path layer is missing"
+            )
+        search = path.get("search", {})
+        coarse_step = search.get("coarse_step_rad")
+        resolution = search.get("bisection_resolution_rad")
+        domain = search.get("domain_rad")
+        expected_domain = [min(0.0, target), max(0.0, target)]
+        if (
+            not isinstance(coarse_step, (int, float))
+            or not math.isclose(
+                float(coarse_step), path_step_rad, rel_tol=0.0, abs_tol=1e-12
+            )
+            or not isinstance(resolution, (int, float))
+            or not math.isfinite(float(resolution))
+            or float(resolution) <= 0.0
+            or not isinstance(domain, list)
+            or len(domain) != 2
+            or any(
+                not math.isclose(
+                    float(observed), expected, rel_tol=0.0, abs_tol=1e-12
+                )
+                for observed, expected in zip(domain, expected_domain, strict=True)
+            )
+        ):
+            raise GeometryPathPlannerV5Error(
+                f"STOP: {endpoint_id}: endpoint path is not the declared direct sweep"
+            )
+
+        baseline = plan.baseline_task_path
+        if (
+            baseline.active_pair_excluded != plan.allowed_endpoint_contact_pair
+            or baseline.moving_joint_names != (plan.joint_name,)
+            or not math.isclose(
+                baseline.end_joint_positions_rad[plan.joint_name],
+                target,
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            )
+            or any(
+                not math.isclose(float(value), 0.0, rel_tol=0.0, abs_tol=1e-12)
+                for value in baseline.start_joint_positions_rad.values()
+            )
+            or any(
+                name != plan.joint_name
+                and not math.isclose(
+                    float(value), 0.0, rel_tol=0.0, abs_tol=1e-12
+                )
+                for name, value in baseline.end_joint_positions_rad.items()
+            )
+        ):
+            raise GeometryPathPlannerV5Error(
+                f"STOP: {endpoint_id}: planner baseline is not the same q=0 direct sweep"
+            )
+
+        endpoint_obstructed = path.get("status") == PATH_OBSTRUCTION
+        endpoint_clear = path.get("status") == NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN
+        if not (endpoint_obstructed or endpoint_clear):
+            raise GeometryPathPlannerV5Error(
+                f"STOP: {endpoint_id}: unsupported endpoint path status"
+            )
+        baseline_obstructed = baseline.status == PATH_OBSTRUCTED
+        if endpoint_obstructed != baseline_obstructed:
+            raise GeometryPathPlannerV5Error(
+                f"STOP: {endpoint_id}: endpoint/planner obstruction status mismatch"
+            )
+
+        row: dict[str, Any] = {
+            "canonical_endpoint_index": index,
+            "endpoint_id": endpoint_id,
+            "status": "PASS",
+            "obstructed": endpoint_obstructed,
+            "endpoint_path_status": path.get("status"),
+            "baseline_path_status": baseline.status,
+        }
+        if endpoint_obstructed:
+            obstruction = baseline.first_obstruction
+            refined = baseline.refined_first_obstruction
+            precise_angle = path.get("angle_rad")
+            if (
+                obstruction is None
+                or refined is None
+                or not isinstance(precise_angle, (int, float))
+                or tuple(path.get("link_pair", ())) != refined.link_pair
+                or path.get("relation") != refined.relation
+                or obstruction.sample_index <= 0
+                or obstruction.sample_index >= baseline.planned_sample_count
+                or baseline.planned_sample_count <= 1
+                or baseline.evaluated_sample_count != obstruction.sample_index + 1
+            ):
+                raise GeometryPathPlannerV5Error(
+                    f"STOP: {endpoint_id}: endpoint/planner first blocker mismatch"
+                )
+            sample_angle = obstruction.joint_positions_rad[plan.joint_name]
+            intervals = baseline.planned_sample_count - 1
+            expected_sample_progress = obstruction.sample_index / intervals
+            previous_progress = (obstruction.sample_index - 1) / intervals
+            previous_angle = target * (obstruction.sample_index - 1) / intervals
+            precise_angle = float(precise_angle)
+            refined_angle = refined.contact_joint_positions_rad[plan.joint_name]
+            pose_names = set(baseline.start_joint_positions_rad)
+            if (
+                not pose_names
+                or set(baseline.end_joint_positions_rad) != pose_names
+                or set(obstruction.joint_positions_rad) != pose_names
+                or set(refined.clear_joint_positions_rad) != pose_names
+                or set(refined.contact_joint_positions_rad) != pose_names
+                or not math.isfinite(refined.clear_progress)
+                or not math.isfinite(refined.contact_progress)
+                or not math.isfinite(refined.bisection_resolution_rad)
+                or refined.bisection_resolution_rad <= 0.0
+                or not math.isclose(
+                    refined.bisection_resolution_rad,
+                    DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD,
+                    rel_tol=0.0,
+                    abs_tol=1e-15,
+                )
+                or not isinstance(refined.bisection_iterations, int)
+                or isinstance(refined.bisection_iterations, bool)
+                or not 0
+                <= refined.bisection_iterations
+                <= DEFAULT_MAX_OBSTRUCTION_BISECTION_ITERATIONS
+            ):
+                raise GeometryPathPlannerV5Error(
+                    f"STOP: {endpoint_id}: invalid planner refinement evidence"
+                )
+            refined_width = max(
+                abs(
+                    refined.contact_joint_positions_rad[name]
+                    - refined.clear_joint_positions_rad[name]
+                )
+                for name in pose_names
+            )
+            tolerance = max(
+                float(resolution),
+                refined.bisection_resolution_rad,
+            ) + 1e-12
+            lower = min(previous_angle, sample_angle) - tolerance
+            upper = max(previous_angle, sample_angle) + tolerance
+            delta = abs(refined_angle - precise_angle)
+            effective_interval = abs(target) / intervals
+            if (
+                not lower <= precise_angle <= upper
+                or not lower <= refined_angle <= upper
+                or delta > tolerance
+                or not math.isclose(
+                    obstruction.progress,
+                    expected_sample_progress,
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                )
+                or not (
+                    previous_progress
+                    <= refined.clear_progress
+                    < refined.contact_progress
+                    <= expected_sample_progress
+                )
+                or refined_width > refined.bisection_resolution_rad + 1e-12
+                or any(
+                    not math.isclose(
+                        refined_pose[name],
+                        baseline.start_joint_positions_rad[name]
+                        + (
+                            baseline.end_joint_positions_rad[name]
+                            - baseline.start_joint_positions_rad[name]
+                        )
+                        * progress,
+                        rel_tol=0.0,
+                        abs_tol=1e-12,
+                    )
+                    for progress, refined_pose in (
+                        (
+                            refined.clear_progress,
+                            refined.clear_joint_positions_rad,
+                        ),
+                        (
+                            refined.contact_progress,
+                            refined.contact_joint_positions_rad,
+                        ),
+                    )
+                    for name in pose_names
+                )
+                or any(
+                    not math.isclose(
+                        obstruction.joint_positions_rad[name],
+                        baseline.start_joint_positions_rad[name]
+                        + (
+                            baseline.end_joint_positions_rad[name]
+                            - baseline.start_joint_positions_rad[name]
+                        )
+                        * expected_sample_progress,
+                        rel_tol=0.0,
+                        abs_tol=1e-12,
+                    )
+                    for name in pose_names
+                )
+            ):
+                raise GeometryPathPlannerV5Error(
+                    f"STOP: {endpoint_id}: refined endpoint/planner obstruction "
+                    "differs beyond the declared bisection resolution"
+                )
+            max_delta = max(max_delta, delta)
+            row.update(
+                {
+                    "link_pair": list(refined.link_pair),
+                    "relation": refined.relation,
+                    "precise_obstruction_angle_rad": precise_angle,
+                    "first_sampled_obstruction_angle_rad": sample_angle,
+                    "planner_refined_obstruction_angle_rad": refined_angle,
+                    "precise_to_refined_delta_rad": delta,
+                    "effective_sample_interval_rad": effective_interval,
+                    "endpoint_bisection_resolution_rad": float(resolution),
+                    "planner_bisection_resolution_rad": (
+                        refined.bisection_resolution_rad
+                    ),
+                    "planner_refined_bracket_width_rad": refined_width,
+                }
+            )
+        elif (
+            baseline.first_obstruction is not None
+            or baseline.refined_first_obstruction is not None
+        ):
+            raise GeometryPathPlannerV5Error(
+                f"STOP: {endpoint_id}: collision-free baseline retains an obstruction"
+            )
+        rows.append(row)
+
+    return {
+        "status": "PASS",
+        "endpoint_count": 24,
+        "consistent_endpoint_count": 24,
+        "obstructed_count": sum(row["obstructed"] for row in rows),
+        "collision_free_count": sum(not row["obstructed"] for row in rows),
+        "max_precise_to_refined_delta_rad": max_delta,
+        "coarse_step_rad": path_step_rad,
+        "rows": rows,
+    }
+
+
 def _path_record(path: PathValidationV5 | None) -> dict[str, Any] | None:
     if path is None:
         return None
     obstruction = path.first_obstruction
+    refined = path.refined_first_obstruction
     return {
         "path_id": path.path_id,
         "start_joint_positions_rad": path.start_joint_positions_rad,
@@ -990,6 +1391,20 @@ def _path_record(path: PathValidationV5 | None) -> dict[str, Any] | None:
                 "relation": obstruction.relation,
             }
             if obstruction is not None
+            else None
+        ),
+        "refined_first_obstruction": (
+            {
+                "clear_progress": refined.clear_progress,
+                "contact_progress": refined.contact_progress,
+                "clear_joint_positions_rad": refined.clear_joint_positions_rad,
+                "contact_joint_positions_rad": refined.contact_joint_positions_rad,
+                "link_pair": list(refined.link_pair),
+                "relation": refined.relation,
+                "bisection_resolution_rad": refined.bisection_resolution_rad,
+                "bisection_iterations": refined.bisection_iterations,
+            }
+            if refined is not None
             else None
         ),
         "min_clearance_m": path.min_clearance_m,
@@ -1032,9 +1447,19 @@ def parking_plan_record(plan: EndpointParkingPlanV5) -> dict[str, Any]:
         "start_configuration_valid": plan.start_configuration_valid,
         "baseline_task_path": _path_record(plan.baseline_task_path),
         "first_sampled_blocking_pair": (
+            list(plan.baseline_task_path.first_obstruction.link_pair)
+            if plan.baseline_task_path.first_obstruction is not None
+            else None
+        ),
+        "first_sampled_blocking_relation": (
+            plan.baseline_task_path.first_obstruction.relation
+            if plan.baseline_task_path.first_obstruction is not None
+            else None
+        ),
+        "first_refined_blocking_pair": (
             list(plan.first_blocking_pair) if plan.first_blocking_pair else None
         ),
-        "first_sampled_blocking_relation": plan.first_blocking_relation,
+        "first_refined_blocking_relation": plan.first_blocking_relation,
         "relevant_movable_joint_names": list(plan.relevant_movable_joint_names),
         "outcome": plan.outcome,
         "parking_degrees_of_freedom": plan.parking_degrees_of_freedom,
@@ -1083,6 +1508,161 @@ def parking_content_sha256(artifact: dict[str, Any]) -> str:
         )
     canonical = json.dumps(content, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _validate_serialized_refined_obstruction(
+    segment: dict[str, Any],
+    *,
+    endpoint_id: Any,
+    declared_resolution_rad: float,
+    max_iterations: int,
+) -> None:
+    """Validate that serialized refinement evidence proves its own contract."""
+
+    sampled = segment.get("first_sampled_obstruction")
+    refined = segment.get("refined_first_obstruction")
+    planned = segment.get("planned_sample_count")
+    evaluated = segment.get("evaluated_sample_count")
+    if not isinstance(sampled, dict) or not isinstance(refined, dict):
+        raise GeometryPathPlannerV5Error(
+            f"{endpoint_id}: obstructed path lacks sampled/refined evidence"
+        )
+    sample_index = sampled.get("sample_index")
+    if (
+        not isinstance(planned, int)
+        or isinstance(planned, bool)
+        or planned < 2
+        or not isinstance(evaluated, int)
+        or isinstance(evaluated, bool)
+        or not isinstance(sample_index, int)
+        or isinstance(sample_index, bool)
+        or not 1 <= sample_index < planned
+        or evaluated != sample_index + 1
+    ):
+        raise GeometryPathPlannerV5Error(
+            f"{endpoint_id}: invalid sampled obstruction index"
+        )
+    intervals = planned - 1
+    expected_sample_progress = sample_index / intervals
+    previous_progress = (sample_index - 1) / intervals
+
+    def finite_number(value: Any) -> bool:
+        return (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(float(value))
+        )
+
+    sample_progress = sampled.get("progress")
+    clear_progress = refined.get("clear_progress")
+    contact_progress = refined.get("contact_progress")
+    if (
+        not finite_number(sample_progress)
+        or not math.isclose(
+            float(sample_progress),
+            expected_sample_progress,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+        or not finite_number(clear_progress)
+        or not finite_number(contact_progress)
+        or not (
+            previous_progress
+            <= float(clear_progress)
+            < float(contact_progress)
+            <= expected_sample_progress
+        )
+    ):
+        raise GeometryPathPlannerV5Error(
+            f"{endpoint_id}: refined obstruction progress is outside its sampled bracket"
+        )
+
+    start = segment.get("start_joint_positions_rad")
+    end = segment.get("end_joint_positions_rad")
+    sampled_pose = sampled.get("joint_positions_rad")
+    clear_pose = refined.get("clear_joint_positions_rad")
+    contact_pose = refined.get("contact_joint_positions_rad")
+    pose_records = (start, end, sampled_pose, clear_pose, contact_pose)
+    if not all(isinstance(pose, dict) and pose for pose in pose_records):
+        raise GeometryPathPlannerV5Error(
+            f"{endpoint_id}: refined obstruction pose evidence is incomplete"
+        )
+    pose_names = set(start)
+    if any(set(pose) != pose_names for pose in pose_records[1:]):
+        raise GeometryPathPlannerV5Error(
+            f"{endpoint_id}: refined obstruction pose joints are inconsistent"
+        )
+    if any(
+        not finite_number(value)
+        for pose in pose_records
+        for value in pose.values()
+    ):
+        raise GeometryPathPlannerV5Error(
+            f"{endpoint_id}: refined obstruction pose is not finite"
+        )
+
+    def interpolation_matches(pose: dict[str, Any], progress: float) -> bool:
+        return all(
+            math.isclose(
+                float(pose[name]),
+                float(start[name])
+                + (float(end[name]) - float(start[name])) * progress,
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            )
+            for name in pose_names
+        )
+
+    if (
+        not interpolation_matches(sampled_pose, expected_sample_progress)
+        or not interpolation_matches(clear_pose, float(clear_progress))
+        or not interpolation_matches(contact_pose, float(contact_progress))
+    ):
+        raise GeometryPathPlannerV5Error(
+            f"{endpoint_id}: refined obstruction poses do not match path interpolation"
+        )
+    bracket_width = max(
+        abs(float(contact_pose[name]) - float(clear_pose[name]))
+        for name in pose_names
+    )
+    if bracket_width > declared_resolution_rad + 1e-12:
+        raise GeometryPathPlannerV5Error(
+            f"{endpoint_id}: refined obstruction bracket exceeds declared resolution"
+        )
+
+    link_pair = refined.get("link_pair")
+    relation = refined.get("relation")
+    sampled_link_pair = sampled.get("link_pair")
+    sampled_relation = sampled.get("relation")
+    iterations = refined.get("bisection_iterations")
+    resolution = refined.get("bisection_resolution_rad")
+    if (
+        not isinstance(link_pair, list)
+        or len(link_pair) != 2
+        or any(not isinstance(link, str) or not link for link in link_pair)
+        or not isinstance(relation, str)
+        or not relation
+        or not isinstance(sampled_link_pair, list)
+        or len(sampled_link_pair) != 2
+        or any(
+            not isinstance(link, str) or not link for link in sampled_link_pair
+        )
+        or not isinstance(sampled_relation, str)
+        or not sampled_relation
+        or not finite_number(resolution)
+        or not math.isclose(
+            float(resolution),
+            declared_resolution_rad,
+            rel_tol=0.0,
+            abs_tol=1e-15,
+        )
+        or not isinstance(iterations, int)
+        or isinstance(iterations, bool)
+        or not 0 <= iterations <= max_iterations
+    ):
+        raise GeometryPathPlannerV5Error(
+            f"{endpoint_id}: invalid refined obstruction contract"
+        )
 
 
 def validate_parking_artifact(artifact: dict[str, Any]) -> None:
@@ -1263,6 +1843,45 @@ def validate_parking_artifact(artifact: dict[str, Any]) -> None:
     ):
         raise GeometryPathPlannerV5Error("parking combined source SHA mismatch")
 
+    parameters_record = artifact.get("parameters", {})
+    if not isinstance(parameters_record, dict):
+        raise GeometryPathPlannerV5Error("parking parameter record is invalid")
+    refinement_keys = {
+        "obstruction_bisection_resolution_rad",
+        "max_obstruction_bisection_iterations",
+    }
+    has_refinement_contract = refinement_keys.issubset(parameters_record)
+    if refinement_keys.intersection(parameters_record) and not has_refinement_contract:
+        raise GeometryPathPlannerV5Error(
+            "parking obstruction refinement parameter contract is incomplete"
+        )
+    if has_refinement_contract:
+        declared_refinement_resolution = parameters_record.get(
+            "obstruction_bisection_resolution_rad"
+        )
+        declared_refinement_iterations = parameters_record.get(
+            "max_obstruction_bisection_iterations"
+        )
+        if (
+            not isinstance(declared_refinement_resolution, (int, float))
+            or isinstance(declared_refinement_resolution, bool)
+            or not math.isfinite(float(declared_refinement_resolution))
+            or float(declared_refinement_resolution) <= 0.0
+            or not math.isclose(
+                float(declared_refinement_resolution),
+                DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD,
+                rel_tol=0.0,
+                abs_tol=1e-15,
+            )
+            or not isinstance(declared_refinement_iterations, int)
+            or isinstance(declared_refinement_iterations, bool)
+            or declared_refinement_iterations
+            != DEFAULT_MAX_OBSTRUCTION_BISECTION_ITERATIONS
+        ):
+            raise GeometryPathPlannerV5Error(
+                "parking obstruction refinement parameter contract is invalid"
+            )
+        declared_refinement_resolution = float(declared_refinement_resolution)
     for plan in plans:
         outcome = plan.get("outcome")
         task_path = plan.get("task_path")
@@ -1294,6 +1913,26 @@ def validate_parking_artifact(artifact: dict[str, Any]) -> None:
             raise GeometryPathPlannerV5Error(
                 f"{plan.get('endpoint_id')}: allowed endpoint contact pair is inconsistent"
             )
+        if has_refinement_contract:
+            baseline = plan.get("baseline_task_path", {})
+            sampled = baseline.get("first_sampled_obstruction")
+            refined = baseline.get("refined_first_obstruction")
+            if plan.get("first_sampled_blocking_pair") != (
+                sampled.get("link_pair") if isinstance(sampled, dict) else None
+            ) or plan.get("first_sampled_blocking_relation") != (
+                sampled.get("relation") if isinstance(sampled, dict) else None
+            ):
+                raise GeometryPathPlannerV5Error(
+                    f"{plan.get('endpoint_id')}: sampled blocker summary is inconsistent"
+                )
+            if plan.get("first_refined_blocking_pair") != (
+                refined.get("link_pair") if isinstance(refined, dict) else None
+            ) or plan.get("first_refined_blocking_relation") != (
+                refined.get("relation") if isinstance(refined, dict) else None
+            ):
+                raise GeometryPathPlannerV5Error(
+                    f"{plan.get('endpoint_id')}: refined blocker summary is inconsistent"
+                )
         for segment in (plan.get("baseline_task_path"), path_in, task_path, task_return, path_out):
             if segment is None:
                 continue
@@ -1312,6 +1951,20 @@ def validate_parking_artifact(artifact: dict[str, Any]) -> None:
                 raise GeometryPathPlannerV5Error(
                     f"{plan.get('endpoint_id')}: invalid planned/evaluated sample counts"
                 )
+            if has_refinement_contract:
+                sampled = segment.get("first_sampled_obstruction")
+                refined = segment.get("refined_first_obstruction")
+                if expected_collision_free and (sampled is not None or refined is not None):
+                    raise GeometryPathPlannerV5Error(
+                        f"{plan.get('endpoint_id')}: collision-free path retains obstruction evidence"
+                    )
+                if not expected_collision_free:
+                    _validate_serialized_refined_obstruction(
+                        segment,
+                        endpoint_id=plan.get("endpoint_id"),
+                        declared_resolution_rad=declared_refinement_resolution,
+                        max_iterations=declared_refinement_iterations,
+                    )
         if task_return is not None:
             if task_return.get("reverse_validation_of") != task_path.get("path_id"):
                 raise GeometryPathPlannerV5Error(
@@ -1478,12 +2131,19 @@ def build_parking_artifact(
         },
         "parameters": {
             "path_step_rad": parameters.path_step_rad,
+            "obstruction_bisection_resolution_rad": (
+                DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD
+            ),
+            "max_obstruction_bisection_iterations": (
+                DEFAULT_MAX_OBSTRUCTION_BISECTION_ITERATIONS
+            ),
             "one_dof_grid_divisions": parameters.one_dof_grid_divisions,
             "two_dof_grid_divisions": parameters.two_dof_grid_divisions,
             "clearance_sample_stride": parameters.clearance_sample_stride,
             "path_feasibility_semantics": (
-                "intersection/no-intersection at every listed linear configuration sample; "
-                "not a continuous swept-volume proof"
+                "intersection/no-intersection at every listed linear configuration sample, "
+                "with the first clear/contact sample interval locally bisected to the "
+                "declared obstruction resolution; not a continuous swept-volume proof"
             ),
             "search_domain_rule": (
                 "finite uniform normalized grids listed per plan, bounded by each relevant "
@@ -1654,18 +2314,43 @@ def render_parking_report(artifact: dict[str, Any]) -> str:
         "Search is normalized to URDF limits: 1-DOF first, 2-DOF only if no 1-DOF plan is feasible.",
         "The declared search domain is the finite grid serialized per plan; it is not a continuous-domain proof.",
         "Path feasibility is evaluated at every serialized-step configuration, not as continuous swept volume.",
+        "The first baseline obstruction is additionally bisected to the serialized refinement resolution; sampled and refined evidence remain distinct.",
         "A DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS target is not an executable robot motion claim.",
         "No fixed historical parking-angle seed list and no safety threshold is used.",
         "",
-        "| Endpoint | Target domain | Baseline | First sampled blocker | Relation | Relevant joints | Outcome | In/task/return/out | Candidates 1D/2D | Parking rad | Min clearance |",
-        "|---|---|---|---|---|---|---|---|---:|---|---:|",
+        "| Endpoint | Target domain | Baseline | First blocker (refined when available) | Relation | Refined contact / bracket / resolution rad | Relevant joints | Outcome | In/task/return/out | Candidates 1D/2D | Parking rad | Min clearance |",
+        "|---|---|---|---|---|---|---|---|---|---:|---|---:|",
     ]
     for plan in artifact["plans"]:
+        blocker_pair = plan.get(
+            "first_refined_blocking_pair",
+            plan.get("first_sampled_blocking_pair"),
+        )
         blocker = (
-            " ↔ ".join(plan["first_sampled_blocking_pair"])
-            if plan["first_sampled_blocking_pair"]
+            " ↔ ".join(blocker_pair)
+            if blocker_pair
             else "-"
         )
+        blocker_relation = plan.get(
+            "first_refined_blocking_relation",
+            plan.get("first_sampled_blocking_relation"),
+        )
+        refined = plan["baseline_task_path"].get("refined_first_obstruction")
+        joint_name = plan["joint_name"]
+        if (
+            refined is None
+            or joint_name not in refined.get("clear_joint_positions_rad", {})
+            or joint_name not in refined.get("contact_joint_positions_rad", {})
+        ):
+            refinement = "-"
+        else:
+            clear_angle = refined["clear_joint_positions_rad"][joint_name]
+            contact_angle = refined["contact_joint_positions_rad"][joint_name]
+            refinement = (
+                f"`{contact_angle:.9f}` / "
+                f"`{abs(contact_angle - clear_angle):.9g}` / "
+                f"`{refined['bisection_resolution_rad']:.9g}`"
+            )
         objective = plan["objective"]
         clearance = objective["min_clearance_m"] if objective is not None else None
         segments = "/".join(
@@ -1680,7 +2365,8 @@ def render_parking_report(artifact: dict[str, Any]) -> str:
         lines.append(
             f"| {plan['endpoint_id']} | {plan['target_domain']} | "
             f"{plan['baseline_task_path']['status']} | {blocker} | "
-            f"{plan['first_sampled_blocking_relation'] or '-'} | "
+            f"{blocker_relation or '-'} | "
+            f"{refinement} | "
             f"{', '.join(plan['relevant_movable_joint_names']) or '-'} | {plan['outcome']} | "
             f"{segments} | {plan['evaluated_1d_candidates']}/{plan['evaluated_2d_candidates']} | "
             f"`{plan['parking_configuration_rad']}` | {clearance if clearance is not None else '-'} |"

@@ -14,8 +14,11 @@ deleted; each is kept for audit trail per repository hygiene policy.
 | `2026-08-10_164419` | v4 | **G4 REFERENCE** (approved new collision geometry + unchanged Phase1B algorithm; not V5 canonical) | `f1b059a58c51508345ec583cc421cf9ca66ec8e9ac5547649c05bbf755e5c5fa` |
 | `2026-08-10_185433` | v5 | **G7 FROZEN PURE-GEOMETRY REFERENCE** | `1a004561ac3213749f28e0da262f211ff6f7021a0230b1415fbe24f46fdf2b01` |
 | `2026-08-10_185433` | v5 + parking-v1 | **G9 FROZEN PATH/PARKING REFERENCE** | `418b6dca07475ff0bb2ae131cbf35844eced30c6cb11b9f80d196aa8c2b883de` |
-| `2026-08-11_072224 C` | v5 + parking-v2 | **WORKERS=1 DETERMINISM REFERENCE** | `06f5d1e7f46db1cf0f6084ca75f36a27d76c18e25d26c8addc53a4967e7b41d1` |
-| `2026-08-11_072224 D` | v5 + parking-v2 | **CURRENT PURE-GEOMETRY DEPLOYMENT CANONICAL** | `1c112a1af7af484cebc77736155118a924f327364a72e6bdb590980c70786dea` |
+| `2026-08-11_072224 C` | v5 + parking-v2 | **SUPERSEDED PRE-AUDIT V5 CANDIDATE EVIDENCE** | `06f5d1e7f46db1cf0f6084ca75f36a27d76c18e25d26c8addc53a4967e7b41d1` |
+| `2026-08-11_072224 D` | v5 + parking-v2 | **SUPERSEDED PRE-AUDIT V5 CANDIDATE EVIDENCE** | `1c112a1af7af484cebc77736155118a924f327364a72e6bdb590980c70786dea` |
+| `2026-08-11_131818 C` | v5 + parking-v2 | **CORRECTED WORKERS=1 DETERMINISM REFERENCE** | `23ca4709385019466cfb5782a7e0e6f2053fd0d632b67db6c94bd00c05f5e147` |
+| `2026-08-11_131818 D` | v5 + parking-v2 | **CURRENT PURE-GEOMETRY DEPLOYMENT CANONICAL** | `dd8cb42c3b916d067f97a321c5ffcdfb013dde1f2f2a6ba71f73becff360dc0f` |
+| `2026-08-11_132758` | G12 consumers | **CURRENT G12 RECONCILER + SAFETY POLICY** | `d7fa04e2b8cde6b1049d4c34c5ba15fa1febde8b2fbf9fd8f14853034b98cc9a` |
 
 Nothing here is ever deleted. A run marked SUPERSEDED remains an accurate record of what the
 policy of its day could observe; it is simply no longer the source of truth.
@@ -125,37 +128,89 @@ Both remain immutable gate history.
 Hardware reconciliation and the historical 3 mm policy are separate consumers
 under the same timestamp. They are not embedded in pure geometry.
 
-## `2026-08-11_072224` — FINAL V5 C/D
+## `2026-08-11_072224` — SUPERSEDED PRE-AUDIT V5 CANDIDATE EVIDENCE
 
-The integrated final pipeline was run once with one worker (C) and once with
-four spawned processes (D). Endpoint, parking-v2 and combined semantic
-payloads, the G4 oracle, inputs and source manifests are exactly equal. D is
-the canonical deployment profile.
+Retained unchanged for provenance. **Not canonical.** An independent
+adversarial audit of PR #19 found that the integrated runner required the
+frozen G4 profile and reused one G4-context replay as both replay evidence and
+the canonical "pure geometry" endpoint profile. The published canonical
+artifact therefore carried the legacy `30 / 50 / 90` degree prerequisite
+context on 20 of 24 endpoints, and its `path_obstruction` layer contradicted
+the pure `q=0` parking results in the same combined profile on four endpoints.
+
+These semantic hashes are **SUPERSEDED** and must not be cited as canonical:
 
 ```text
-endpoint semantic SHA256:
+SUPERSEDED endpoint semantic SHA256:
 cad2f194c49d063b5a09ae4602b9acf61a701de48791e5d1aae04f1439db1211
 
-parking-v2 semantic SHA256:
+SUPERSEDED parking-v2 semantic SHA256:
 3cda03c2c02ba5fbe6def7821ce72d4aa9e4ca66e7ca8655a2b8f0e92dde297c
 
-combined semantic SHA256:
+SUPERSEDED combined semantic SHA256:
 e99e2b65ea8d032f94b5d1aa815432a292c1771766e556fc7115dc7a1f5de73e
 ```
 
-Result: 24/24 contacts, six path obstructions, 18 `NOT_NEEDED` parking
-outcomes and six `FEASIBLE_1DOF_PLAN_FOUND`, with 24/24 complete geometric
-sequences. D wall time is 1,707.39 s; cgroup process-tree peak is
-1,795,829,760 bytes, swap is zero, and the 6 GiB resource gate passes.
+Its four narrative reports (`*_FINAL_VALIDATION_REPORT.md`,
+`*_DETERMINISM_REPORT.md`, `*_ABCD_PERFORMANCE_REPORT.md`,
+`*_TEST_SUMMARY.md`) and its two `*_G12_*` consumer artifacts are likewise
+superseded. Each narrative report carries a banner pointing to its corrected
+replacement. Nothing in this bundle was overwritten or deleted.
+
+## `2026-08-11_131818` — CORRECTED FINAL V5 C/D (CANONICAL)
+
+The corrected integrated pipeline was run once with one worker (C) and once
+with four spawned processes (D). The canonical endpoint profile is now
+context-free and the frozen-G4 replay is a separate, explicitly non-canonical
+execution. Endpoint, parking-v2 and combined semantic payloads, the replay
+oracle payload, inputs and all three source manifests are exactly equal
+between C and D. D is the canonical deployment profile.
+
+```text
+endpoint semantic SHA256:
+de205209f6015734f43af7f49146ecf60f89a74d6ce1276ce134c189a89c9f7e
+
+parking-v2 semantic SHA256:
+67c58430e78241af1a636cdcc22092ff855371713fc7f26bc56412f7c7181139
+
+combined semantic SHA256:
+0a772234a46afad14eb4af0999294020bb0fb8974ca0b68f3ccd780fa057db51
+
+C run manifest SHA256: b86b5d35678df4510989ea49fb5d42acaea2e4838226d7017456399dfceb0d81
+D run manifest SHA256: 0db86e633599f63a769dbba75db3a54c1e6470e128c007eb24c465f92a428b17
+```
+
+Result: 24/24 canonical endpoint search contexts empty; 24/24 geometric
+contacts; six canonical direct-target path obstructions and 18 collision-free
+direct paths; endpoint/planner path consistency 24/24 with a maximum
+precise/refined delta of `3.6703973194107675e-13 rad`; 18 `NOT_NEEDED` and six
+`FEASIBLE_1DOF_PLAN_FOUND` parking outcomes with 24/24 complete geometric
+sequences and 94 evaluated 1-DOF candidates. D wall time is 1,691.92 s; the
+cgroup process-tree peak is 1,798,238,208 bytes, swap is zero, and the 6 GiB
+resource gate passes.
+
+The canonical path domain is `q=0` to the geometric target. An obstruction
+lying beyond the target is not a canonical path-obstruction result; the
+historical full-envelope view lives only in the non-canonical replay artifacts
+(`*_G4_G7_ORACLE.*`, `artifact_role: NONCANONICAL_G4_REPLAY_ORACLE`,
+`canonical_profile_eligible: false`).
 
 Start with:
 
-- `2026-08-11_072224_MATDOG_GEOMETRY_V5_FINAL_VALIDATION_REPORT.md`;
-- `2026-08-11_072224_MATDOG_GEOMETRY_V5_DETERMINISM_REPORT.md`;
-- `2026-08-11_072224_MATDOG_GEOMETRY_V5_ABCD_PERFORMANCE_REPORT.md`;
-- `2026-08-11_072224_MATDOG_GEOMETRY_V5_TEST_SUMMARY.md`.
+- `2026-08-11_132758_MATDOG_GEOMETRY_V5_FINAL_VALIDATION_REPORT.md`;
+- `2026-08-11_132758_MATDOG_GEOMETRY_V5_DETERMINISM_REPORT.md`;
+- `2026-08-11_132758_MATDOG_GEOMETRY_V5_ABCD_PERFORMANCE_REPORT.md`;
+- `2026-08-11_132758_MATDOG_GEOMETRY_V5_TEST_SUMMARY.md`.
 
-The final LF reconciliation and external safety-policy reports are named
-`*_G12_LF_HARDWARE_RECONCILIATION.*` and
-`*_G12_EXTERNAL_SAFETY_POLICY.*`. They consume the final D artifacts and grant
-no motion authorization.
+## `2026-08-11_132758` — CURRENT G12 CONSUMERS
+
+`*_G12_FINAL_LF_HARDWARE_RECONCILIATION.*` consumes the corrected combined
+profile `0a772234…` and reports 3 AGREES, 3 DISAGREES, 18 geometry-only
+endpoints and `geometry_modified: false`.
+
+`*_G12_FINAL_EXTERNAL_SAFETY_POLICY.*` consumes the corrected parking artifact
+`67c58430…` at the unchanged external 3 mm threshold and reports 16 PASS,
+0 FAIL, 8 UNRESOLVED and zero motion authorizations.
+
+The earlier `2026-08-11_072224_*_G12_*` artifacts consume superseded hashes and
+are retained as superseded evidence only.

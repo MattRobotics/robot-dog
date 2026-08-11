@@ -76,6 +76,44 @@ def _parking_payload(value: str, *, audit: str) -> dict:
     }
 
 
+def _write_integrated_bundle(
+    repo: Path,
+    *,
+    benchmark: str = "C",
+    json_values: dict[str, dict] | None = None,
+) -> Path:
+    json_values = json_values or {}
+    artifacts = {}
+    for name in sorted(runner.EXPECTED_BUNDLE_ARTIFACT_KEYS):
+        suffix = ".json" if name.endswith("profile") or name.endswith("json") else ".md"
+        path = repo / f"run_{name}{suffix}"
+        if suffix == ".json":
+            _write_json(path, json_values.get(name, {"name": name}))
+        else:
+            path.write_text(f"# {name}\n", encoding="utf-8")
+        artifacts[name] = {
+            "relative_path": path.name,
+            "file_sha256": _sha256(path),
+        }
+    manifest = {
+        "schema_version": runner.RUN_SCHEMA_VERSION,
+        "benchmark_id": benchmark,
+        "execution": {"worker_count": 1 if benchmark == "C" else 4},
+        "provenance": {},
+        "artifacts": artifacts,
+        "bundle_validity": {
+            "marker": "RUN_MANIFEST_PUBLISHED_LAST",
+            "manifest_required": True,
+            "artifact_count": len(runner.EXPECTED_BUNDLE_ARTIFACT_KEYS),
+            "artifact_hash_algorithm": "SHA256",
+        },
+    }
+    manifest["manifest_content_sha256"] = runner._manifest_content_sha256(manifest)
+    manifest_path = repo / "run_RUN_MANIFEST.json"
+    _write_json(manifest_path, manifest)
+    return manifest_path
+
+
 class TestIntegratedOutputPaths(unittest.TestCase):
     def test_paths_are_unique_repo_bound_and_suffix_constrained(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -119,9 +157,13 @@ class TestNoClobberBundlePublication(unittest.TestCase):
             payloads = {
                 parent / "a.json": b"alpha",
                 parent / "b.md": b"beta",
-                parent / "c.json": b"gamma",
+                parent / "manifest.json": b"gamma",
             }
-            runner._publish_no_clobber_bundle(payloads)
+            manifest_path = parent / "manifest.json"
+            runner._publish_no_clobber_bundle(
+                payloads,
+                manifest_path=manifest_path,
+            )
             self.assertEqual(
                 {path: path.read_bytes() for path in payloads},
                 payloads,
@@ -130,7 +172,8 @@ class TestNoClobberBundlePublication(unittest.TestCase):
 
             with self.assertRaisesRegex(runner.GeometryFullRunnerV5Error, "appeared"):
                 runner._publish_no_clobber_bundle(
-                    {path: b"replacement" for path in payloads}
+                    {path: b"replacement" for path in payloads},
+                    manifest_path=manifest_path,
                 )
             self.assertEqual(
                 {path: path.read_bytes() for path in payloads},
@@ -143,7 +186,7 @@ class TestNoClobberBundlePublication(unittest.TestCase):
             payloads = {
                 parent / "a.json": b"alpha",
                 parent / "b.json": b"beta",
-                parent / "c.json": b"gamma",
+                parent / "manifest.json": b"gamma",
             }
             real_link = os.link
             calls = 0
@@ -157,7 +200,10 @@ class TestNoClobberBundlePublication(unittest.TestCase):
 
             with patch.object(runner.os, "link", side_effect=fail_second_link):
                 with self.assertRaisesRegex(OSError, "synthetic"):
-                    runner._publish_no_clobber_bundle(payloads)
+                    runner._publish_no_clobber_bundle(
+                        payloads,
+                        manifest_path=parent / "manifest.json",
+                    )
 
             self.assertFalse(any(path.exists() for path in payloads))
             self.assertEqual(list(parent.glob(".matdog-v5-stage-*")), [])
@@ -166,7 +212,10 @@ class TestNoClobberBundlePublication(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
             with self.assertRaisesRegex(runner.GeometryFullRunnerV5Error, "empty"):
-                runner._publish_no_clobber_bundle({})
+                runner._publish_no_clobber_bundle(
+                    {},
+                    manifest_path=root / "manifest.json",
+                )
             with self.assertRaisesRegex(
                 runner.GeometryFullRunnerV5Error,
                 "one directory",
@@ -174,9 +223,155 @@ class TestNoClobberBundlePublication(unittest.TestCase):
                 runner._publish_no_clobber_bundle(
                     {
                         root / "a" / "one": b"1",
-                        root / "b" / "two": b"2",
-                    }
+                        root / "b" / "manifest.json": b"2",
+                    },
+                    manifest_path=root / "b" / "manifest.json",
                 )
+
+    def test_manifest_is_the_last_visible_link(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary).resolve() / "bundle"
+            manifest_path = parent / "run_RUN_MANIFEST.json"
+            payloads = {
+                parent / "z-data.json": b"z",
+                manifest_path: b"manifest",
+                parent / "a-data.json": b"a",
+            }
+            destinations = []
+            real_link = os.link
+
+            def observe_link(source, destination):
+                destinations.append(Path(destination))
+                return real_link(source, destination)
+
+            with patch.object(runner.os, "link", side_effect=observe_link):
+                runner._publish_no_clobber_bundle(
+                    payloads,
+                    manifest_path=manifest_path,
+                )
+            self.assertEqual(destinations[-1], manifest_path)
+
+
+class TestIntegratedBundleValidityMarker(unittest.TestCase):
+    def test_complete_manifest_marked_bundle_is_accepted(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary).resolve()
+            manifest_path = _write_integrated_bundle(repo)
+            manifest, digest, payloads, snapshots = (
+                runner._load_validated_integrated_bundle(
+                    manifest_path,
+                    repo,
+                    expected_benchmark="C",
+                )
+            )
+            self.assertEqual(manifest["benchmark_id"], "C")
+            self.assertEqual(digest, _sha256(manifest_path))
+            self.assertEqual(set(payloads), runner.EXPECTED_BUNDLE_ARTIFACT_KEYS)
+            self.assertEqual(set(snapshots), runner.EXPECTED_BUNDLE_ARTIFACT_KEYS)
+
+    def test_visible_data_without_manifest_is_not_a_valid_bundle(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary).resolve()
+            (repo / "orphan_ENDPOINT_PROFILE.json").write_text("{}\n")
+            with self.assertRaisesRegex(
+                runner.GeometryFullRunnerV5Error,
+                "no validity-marker manifest",
+            ):
+                runner._load_validated_integrated_bundle(
+                    repo / "missing_RUN_MANIFEST.json",
+                    repo,
+                )
+
+    def test_tampered_member_and_unexpected_manifest_member_are_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary).resolve()
+            manifest_path = _write_integrated_bundle(repo)
+            manifest = json.loads(manifest_path.read_text())
+            endpoint_path = repo / manifest["artifacts"]["endpoint_profile"][
+                "relative_path"
+            ]
+            endpoint_path.write_bytes(b"tampered")
+            with self.assertRaisesRegex(
+                runner.GeometryFullRunnerV5Error,
+                "artifact SHA mismatch",
+            ):
+                runner._load_validated_integrated_bundle(manifest_path, repo)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary).resolve()
+            manifest_path = _write_integrated_bundle(repo)
+            manifest = json.loads(manifest_path.read_text())
+            manifest["artifacts"]["unexpected"] = deepcopy(
+                manifest["artifacts"]["endpoint_report"]
+            )
+            manifest["manifest_content_sha256"] = runner._manifest_content_sha256(
+                manifest
+            )
+            _write_json(manifest_path, manifest)
+            with self.assertRaisesRegex(
+                runner.GeometryFullRunnerV5Error,
+                "artifact set",
+            ):
+                runner._load_validated_integrated_bundle(manifest_path, repo)
+
+    def test_manifest_content_hash_and_missing_member_are_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary).resolve()
+            manifest_path = _write_integrated_bundle(repo)
+            manifest = json.loads(manifest_path.read_text())
+            manifest["benchmark_id"] = "D"
+            _write_json(manifest_path, manifest)
+            with self.assertRaisesRegex(
+                runner.GeometryFullRunnerV5Error,
+                "manifest content SHA is invalid",
+            ):
+                runner._load_validated_integrated_bundle(manifest_path, repo)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary).resolve()
+            manifest_path = _write_integrated_bundle(repo)
+            manifest = json.loads(manifest_path.read_text())
+            missing = repo / manifest["artifacts"]["endpoint_report"][
+                "relative_path"
+            ]
+            missing.unlink()
+            with self.assertRaisesRegex(
+                runner.GeometryFullRunnerV5Error,
+                "artifact is missing",
+            ):
+                runner._load_validated_integrated_bundle(manifest_path, repo)
+
+    def test_determinism_snapshot_detects_manifest_and_member_changes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary).resolve()
+            manifest_path = _write_integrated_bundle(repo)
+            manifest_bytes = manifest_path.read_bytes()
+            _manifest, manifest_sha, _payloads, snapshots = (
+                runner._load_validated_integrated_bundle(manifest_path, repo)
+            )
+            determinism = {
+                "status": "PASS",
+                "reference_manifest_relative_path": manifest_path.name,
+                "reference_manifest_file_sha256": manifest_sha,
+                "reference_artifacts": snapshots,
+            }
+            runner._verify_determinism_reference_snapshot(determinism, repo)
+
+            manifest_path.write_bytes(manifest_bytes + b" ")
+            with self.assertRaisesRegex(
+                runner.GeometryFullRunnerV5Error,
+                "Benchmark C manifest changed",
+            ):
+                runner._verify_determinism_reference_snapshot(determinism, repo)
+
+            manifest_path.write_bytes(manifest_bytes)
+            report_path = repo / snapshots["endpoint_report"]["relative_path"]
+            report_path.write_bytes(report_path.read_bytes() + b"tamper")
+            with self.assertRaisesRegex(
+                runner.GeometryFullRunnerV5Error,
+                "Benchmark C artifact changed",
+            ):
+                runner._verify_determinism_reference_snapshot(determinism, repo)
 
 
 class TestSyntheticCgroupContract(unittest.TestCase):
@@ -299,7 +494,10 @@ class TestBenchmarkContract(unittest.TestCase):
     def test_cgroup_limits_require_explicit_cgroup_mode(self):
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary).resolve()
-            with self.assertRaisesRegex(runner.GeometryFullRunnerV5Error, "cgroup limits"):
+            with self.assertRaisesRegex(
+                runner.GeometryFullRunnerV5Error,
+                "cgroup memory limits",
+            ):
                 runner.run_integrated_geometry_v5(
                     repo_root=repo,
                     urdf_path=repo / "robot.urdf",
@@ -345,11 +543,20 @@ class TestBenchmarkContract(unittest.TestCase):
             "generation_metadata": {},
             "semantic_content_sha256": "a" * 64,
             "geometry_fact": "same",
+            "endpoint_searches": [
+                {"search_context": {"joint_positions_rad": {}}}
+                for _index in range(24)
+            ],
         }
         compiler_run = SimpleNamespace(
             profile=endpoint_profile,
-            g4_g7_comparison=oracle,
+            analyses=tuple(range(24)),
             runtime_seconds=1.25,
+        )
+        replay_run = SimpleNamespace(
+            analyses=tuple(range(24)),
+            comparison=oracle,
+            runtime_seconds=0.75,
         )
         plans = tuple(
             SimpleNamespace(
@@ -366,6 +573,14 @@ class TestBenchmarkContract(unittest.TestCase):
                 "schema_version": PARKING_SCHEMA_V2,
                 "generation_metadata": {},
                 "semantic_content_sha256": "b" * 64,
+                "parameters": {
+                    "obstruction_bisection_resolution_rad": (
+                        runner.DEFAULT_OBSTRUCTION_BISECTION_RESOLUTION_RAD
+                    ),
+                    "max_obstruction_bisection_iterations": (
+                        runner.DEFAULT_MAX_OBSTRUCTION_BISECTION_ITERATIONS
+                    ),
+                },
                 "summary": {"endpoint_plan_count": 24},
             }
 
@@ -396,14 +611,27 @@ class TestBenchmarkContract(unittest.TestCase):
                 patch.object(runner, "scene_input_fingerprint", return_value=fingerprint)
             )
             stack.enter_context(patch.object(runner, "clear_mesh_cache"))
-            stack.enter_context(
+            compiler = stack.enter_context(
                 patch.object(runner, "run_geometry_compiler_v5", return_value=compiler_run)
+            )
+            replay = stack.enter_context(
+                patch.object(runner, "run_g4_replay_v5", return_value=replay_run)
+            )
+            stack.enter_context(
+                patch.object(
+                    runner,
+                    "_compare_canonical_contacts_to_replay",
+                    return_value={"status": "PASS", "endpoint_count": 24},
+                )
+            )
+            stack.enter_context(
+                patch.object(runner.os, "sched_getaffinity", return_value={0, 1, 2, 3})
             )
             stack.enter_context(patch.object(runner, "validate_pure_geometry_profile"))
             stack.enter_context(
                 patch.object(runner, "find_geometry_mismatches_v5", return_value=[])
             )
-            stack.enter_context(
+            task_loader = stack.enter_context(
                 patch.object(
                     runner,
                     "endpoint_parking_tasks_from_profile",
@@ -412,6 +640,13 @@ class TestBenchmarkContract(unittest.TestCase):
             )
             stack.enter_context(
                 patch.object(runner, "execute_parking_tasks", return_value=plans)
+            )
+            stack.enter_context(
+                patch.object(
+                    runner,
+                    "validate_endpoint_path_plan_consistency",
+                    return_value={"status": "PASS", "endpoint_count": 24},
+                )
             )
             stack.enter_context(
                 patch.object(runner, "build_parking_artifact_v2", side_effect=parking_builder)
@@ -476,6 +711,15 @@ class TestBenchmarkContract(unittest.TestCase):
                 determinism_reference_manifest=reference,
                 **resource_contract,
             )
+            self.assertNotIn("g4_reference_profile_path", compiler.call_args.kwargs)
+            self.assertIs(
+                task_loader.call_args.args[1],
+                endpoint_profile,
+            )
+            self.assertEqual(
+                replay.call_args.kwargs["g4_profile_path"],
+                repo / "g4.json",
+            )
         return manifest, compare, publish
 
     def test_fully_mocked_c_and_d_preserve_workers_reference_and_parent_publish_contract(self):
@@ -499,9 +743,32 @@ class TestBenchmarkContract(unittest.TestCase):
                             "combined_profile": "c" * 64,
                         },
                     )
+                    if benchmark == "C":
+                        self.assertEqual(
+                            manifest["resource_enforcement"],
+                            {
+                                "memory_swap_oom": "NOT_REQUIRED_NOT_ENFORCED",
+                                "cpu_affinity": "NOT_REQUIRED_NOT_ENFORCED",
+                                "cpuset_cpus_effective_role": "NOT_COLLECTED",
+                            },
+                        )
+                    else:
+                        self.assertEqual(
+                            manifest["resource_enforcement"]["memory_swap_oom"],
+                            "CGROUP_V2_VALIDATED",
+                        )
+                        self.assertEqual(
+                            manifest["resource_enforcement"]["cpu_affinity"],
+                            "PROCESS_SCHED_AFFINITY_INHERITED_BY_SPAWN_WORKERS",
+                        )
                     publish.assert_called_once()
                     published_payloads = publish.call_args.args[0]
                     self.assertEqual(len(published_payloads), 9)
+                    self.assertTrue(
+                        publish.call_args.kwargs["manifest_path"].name.endswith(
+                            "_RUN_MANIFEST.json"
+                        )
+                    )
                     if benchmark == "C":
                         compare.assert_not_called()
                         self.assertEqual(
@@ -520,8 +787,17 @@ class TestDeterminismReference(unittest.TestCase):
             endpoint = _profile_payload("a", audit="C")
             parking = _parking_payload("b", audit="C")
             combined = _profile_payload("c", audit="C")
-            oracle = {"status": "PASS", "value": 1}
+            oracle = {
+                "status": "PASS",
+                "value": 1,
+                "replay_execution_provenance": {
+                    "workers": 1,
+                    "path_domain_mode": "FULL_ENDPOINT_ENVELOPE",
+                    "g4_file_sha256": "5" * 64,
+                },
+            }
             semantic_sources = {"semantic.py": "1" * 64}
+            replay_sources = {"oracle.py": "4" * 64}
             execution_sources = {"report.py": "2" * 64}
             input_files = {"robot.urdf": "3" * 64}
             values = {
@@ -530,29 +806,21 @@ class TestDeterminismReference(unittest.TestCase):
                 "combined_profile": combined,
                 "oracle_json": oracle,
             }
-            artifacts = {}
-            for name, value in values.items():
-                path = repo / f"{name}.json"
-                _write_json(path, value)
-                artifacts[name] = {
-                    "relative_path": path.name,
-                    "file_sha256": _sha256(path),
-                }
-            manifest_path = repo / "C_RUN_MANIFEST.json"
-            _write_json(
-                manifest_path,
-                {
-                    "schema_version": runner.RUN_SCHEMA_VERSION,
-                    "benchmark_id": "C",
-                    "execution": {"worker_count": 1},
-                    "provenance": {
-                        "semantic_source_file_sha256": semantic_sources,
-                        "execution_source_file_sha256": execution_sources,
-                        "input_file_sha256": input_files,
-                    },
-                    "artifacts": artifacts,
-                },
+            manifest_path = _write_integrated_bundle(
+                repo,
+                json_values=values,
             )
+            manifest = json.loads(manifest_path.read_text())
+            manifest["provenance"] = {
+                "canonical_semantic_source_file_sha256": semantic_sources,
+                "g4_replay_source_file_sha256": replay_sources,
+                "execution_source_file_sha256": execution_sources,
+                "input_file_sha256": input_files,
+            }
+            manifest["manifest_content_sha256"] = runner._manifest_content_sha256(
+                manifest
+            )
+            _write_json(manifest_path, manifest)
 
             current_endpoint = deepcopy(endpoint)
             current_endpoint["generation_metadata"] = {"audit": "D"}
@@ -560,6 +828,8 @@ class TestDeterminismReference(unittest.TestCase):
             current_parking["generation_metadata"] = {"audit": "D"}
             current_combined = deepcopy(combined)
             current_combined["generation_metadata"] = {"audit": "D"}
+            current_oracle = deepcopy(oracle)
+            current_oracle["replay_execution_provenance"]["workers"] = 4
             with (
                 patch.object(runner, "validate_pure_geometry_profile"),
                 patch.object(runner, "validate_parking_artifact"),
@@ -575,8 +845,9 @@ class TestDeterminismReference(unittest.TestCase):
                     endpoint_profile=current_endpoint,
                     parking_artifact=current_parking,
                     combined_profile=current_combined,
-                    oracle=oracle,
+                    oracle=current_oracle,
                     semantic_source_manifest=semantic_sources,
+                    g4_replay_source_manifest=replay_sources,
                     execution_source_manifest=execution_sources,
                     input_file_manifest=input_files,
                 )
@@ -600,8 +871,28 @@ class TestDeterminismReference(unittest.TestCase):
                         endpoint_profile=current_endpoint,
                         parking_artifact=current_parking,
                         combined_profile=current_combined,
-                        oracle=oracle,
+                        oracle=current_oracle,
                         semantic_source_manifest=semantic_sources,
+                        g4_replay_source_manifest=replay_sources,
+                        execution_source_manifest=execution_sources,
+                        input_file_manifest=input_files,
+                    )
+
+                current_combined["geometry_fact"]["value"] = "c"
+                current_oracle["value"] = 2
+                with self.assertRaisesRegex(
+                    runner.GeometryFullRunnerV5Error,
+                    "semantic determinism mismatch",
+                ):
+                    runner._compare_with_reference(
+                        reference_manifest_path=manifest_path,
+                        repo_root=repo,
+                        endpoint_profile=current_endpoint,
+                        parking_artifact=current_parking,
+                        combined_profile=current_combined,
+                        oracle=current_oracle,
+                        semantic_source_manifest=semantic_sources,
+                        g4_replay_source_manifest=replay_sources,
                         execution_source_manifest=execution_sources,
                         input_file_manifest=input_files,
                     )
