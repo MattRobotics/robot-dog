@@ -1,0 +1,202 @@
+# MATDOG servo allocation — final 17 units
+
+# Derived from the 2026-08-27 ST3215 provisioning campaign.
+# Authoritative evidence: 09_Logs/Validation_Reports/ST3215_Provisioning_2026-08-27/
+
+schema_version: 1
+allocated_at: "2026-08-27"
+total_units: 17
+profile: MATDOG_C018_V1
+
+# WARNING: this table maps PHYSICAL UNIT -> JOINT -> BUS ID.
+# It says nothing about joint calibration. All calibration is RESET as of 2026-08-27;
+# see 09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md
+
+units:
+  - unit: M22
+    joint: LF_HIP
+    bus_id: 13
+    source_id: 22
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2048
+    center_error_ticks: 0
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: M22__20260827_134852Z
+  - unit: ELR01
+    joint: LF_UPPER
+    bus_id: 12
+    source_id: 6
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2048
+    center_error_ticks: 0
+    cold_verify: PASS
+    provisioner_firmware: V6
+    session: ELR01__20260827_140449Z
+  - unit: M33
+    joint: LF_LOWER
+    bus_id: 11
+    source_id: 33
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2049
+    center_error_ticks: 1
+    cold_verify: PASS
+    provisioner_firmware: V6
+    session: M33__20260827_140704Z
+  - unit: NEW01
+    joint: RF_HIP
+    bus_id: 23
+    source_id: 1
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2047
+    center_error_ticks: -1
+    cold_verify: PASS
+    provisioner_firmware: V4
+    session: NEW01__20260827_122920Z
+  - unit: ELR03
+    joint: RF_UPPER
+    bus_id: 22
+    source_id: 7
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2049
+    center_error_ticks: 1
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: ELR03__20260827_130419Z
+  - unit: NEW03
+    joint: RF_LOWER
+    bus_id: 21
+    source_id: 1
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2048
+    center_error_ticks: 0
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: NEW03__20260827_131754Z
+  - unit: NEW06
+    joint: RH_HIP
+    bus_id: 33
+    source_id: 1
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2047
+    center_error_ticks: -1
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: NEW06__20260827_132535Z
+  - unit: ELR02
+    joint: RH_UPPER
+    bus_id: 32
+    source_id: 1
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2049
+    center_error_ticks: 1
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: ELR02__20260827_132834Z
+  - unit: NEW05
+    joint: RH_LOWER
+    bus_id: 31
+    source_id: 1
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2049
+    center_error_ticks: 1
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: NEW05__20260827_133055Z
+  - unit: M43
+    joint: LH_HIP
+    bus_id: 43
+    source_id: 43
+    id_recode: SKIPPED_SOURCE_EQUALS_TARGET
+    position_offset: 0
+    center_physical_raw: 2049
+    center_error_ticks: 1
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: M43__20260827_133313Z
+  - unit: M42
+    joint: LH_UPPER
+    bus_id: 42
+    source_id: 42
+    id_recode: SKIPPED_SOURCE_EQUALS_TARGET
+    position_offset: 0
+    center_physical_raw: 2048
+    center_error_ticks: 0
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: M42__20260827_133526Z
+  - unit: M41
+    joint: LH_LOWER
+    bus_id: 41
+    source_id: 41
+    id_recode: SKIPPED_SOURCE_EQUALS_TARGET
+    position_offset: 0
+    center_physical_raw: 2049
+    center_error_ticks: 1
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: M41__20260827_133737Z
+  - unit: M31
+    joint: NECK_ROTATION
+    bus_id: 51
+    source_id: 31
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2048
+    center_error_ticks: 0
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: M31__20260827_133936Z
+  - unit: M11
+    joint: NECK_PITCH
+    bus_id: 52
+    source_id: 11
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2049
+    center_error_ticks: 1
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: M11__20260827_134139Z
+  - unit: NEW04
+    joint: HEAD_ROTATION
+    bus_id: 53
+    source_id: 1
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2048
+    center_error_ticks: 0
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: NEW04__20260827_134334Z
+  - unit: NEW02
+    joint: HEAD_PITCH
+    bus_id: 54
+    source_id: 1
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2049
+    center_error_ticks: 1
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: NEW02__20260827_134520Z
+  - unit: ELR04
+    joint: JAW
+    bus_id: 55
+    source_id: 8
+    id_recode: RECODED
+    position_offset: 0
+    center_physical_raw: 2049
+    center_error_ticks: 1
+    cold_verify: PASS
+    provisioner_firmware: V5
+    session: ELR04__20260827_134707Z

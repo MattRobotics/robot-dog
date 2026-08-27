@@ -1,0 +1,16 @@
+f4a87a443011f15e4f105858fec62fc15ca5a77c 2026-08-14 fix(matdog): preserve rejected-profile G3C cleanup
+d580c63ed63c839d7c365772411cffc26ee4b959 2026-08-14 test(matdog): freeze G3C LF progress traces
+9551a722d350c39db3c8cf06d4c94b96fd23be3a 2026-08-14 fix(matdog): require session context for G3B pressure release
+30d1fdfe96d1501420b77a0f8b9525f2d15d2e5f 2026-08-14 fix(matdog): require LF context before G3B writes
+3263d763f130894725994fb0936b8f701a57c603 2026-08-14 fix(matdog): preserve G3B W7 observation semantics
+beb3f94a8162ce01cfc5ac1efae723e08ff5a0f6 2026-08-14 refactor(matdog): extract G3B goal authority
+64e760d4a04c3af669fdd002c2727fc11888d040 2026-08-14 refactor(matdog): add G3A structural foundation
+254352d524c1926b2b68ee0e1984b0fe9684f750 2026-08-13 docs(matdog): synchronize final G2 M-27s gate
+9f29152a8b9e147a3afb98caa7eafe3f6d06e4f0 2026-08-13 docs(matdog): resolve final G2 CI closure findings
+89aa0a41c017e6e0187d5540f6c2becaa3c4404f 2026-08-13 docs(matdog): close G2 GoalPosition call graph
+4c952cb70d13476ba960d3717a1a22658d84cd6c 2026-08-13 docs(matdog): resolve G2 architecture gate consistency
+df1ffb068af03ec457289d018a6f02b291fea6b0 2026-08-13 docs(matdog): resolve final G2 closure findings
+168bf108033a6b528d3c8c54a6dbfc0a20dea930 2026-08-13 docs(matdog): close G2 review 3 findings
+f2115c57a6ec270ff9cf58ded9a8c37acf77f9dd 2026-08-13 docs(matdog): revise G2 contract after review 2
+f4c5a500697d04e4c45641385170a4a630a0f38a 2026-08-13 docs(matdog): revise G2 contract after independent review
+2047c11ad9498af7f14061eafe2e631cb4bc7380 2026-08-13 docs(matdog): freeze G1 audit and G2 generic spec contract

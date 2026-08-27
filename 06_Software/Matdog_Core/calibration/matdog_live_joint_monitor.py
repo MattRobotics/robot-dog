@@ -41,6 +41,14 @@ from target.gen_python.protobuf.drivers.st3215 import st3215
 from state import find_bus, parse_motor_state, resolve_bus_serial
 from matdog_joint_math import encoder_to_joint_rad, signed_tick_delta
 
+# --- MATDOG calibration fail-closed gate (2026-08-27) -------------------------
+# Blocks hardware acquisition while calibration is reset. See
+# 09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "calibration"))
+from matdog_calibration_gate import require_hardware_authorized  # noqa: E402
+# -----------------------------------------------------------------------------
+
+
 
 class BusReader:
     def __init__(self, client):
@@ -99,6 +107,8 @@ def read_motor_state(inference_state, bus_serial, motor_id):
 
 
 async def main_async(args):
+    # FAIL-CLOSED: refuse before acquiring any hardware handle.
+    require_hardware_authorized("matdog_live_joint_monitor", getattr(args, "config", None))
     config_path = Path(args.config).expanduser().resolve()
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 

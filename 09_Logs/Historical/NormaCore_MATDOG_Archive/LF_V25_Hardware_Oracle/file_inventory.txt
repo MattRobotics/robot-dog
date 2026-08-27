@@ -1,0 +1,17 @@
+ .github/workflows/matdog-lf-freeze-artifact.yml    |  184 +
+ .../workflows/matdog-native-calibrator-check.yml   |   92 +-
+ .github/workflows/matdog-native-observer-check.yml |   89 +
+ .github/workflows/matdog-v42-pinned-station.yml    |  146 +
+ .../drivers/st3215/src/auto_calibrate/matdog.rs    | 3981 ++++++++++++++++++--
+ .../st3215/src/auto_calibrate/matdog_test.rs       | 2641 ++++++++++++-
+ .../drivers/st3215/src/bin/matdog_lf_freeze.rs     |  596 +++
+ software/drivers/st3215/src/port.rs                |  468 ++-
+ tools/matdog/matdog_headless_auto_calibrate.py     | 2201 +++++++++++
+ tools/matdog/matdog_lf_profile.py                  |  354 ++
+ tools/matdog/matdog_native_observer_contract.py    |   49 +
+ tools/matdog/matdog_v42_pinned_launcher.py         |   76 +
+ .../matdog/test_matdog_headless_auto_calibrate.py  |  464 +++
+ tools/matdog/test_matdog_lf_profile.py             |  187 +
+ .../matdog/test_matdog_native_observer_contract.py |  226 ++
+ tools/matdog/test_matdog_v42_pinned_launcher.py    |   56 +
+ 16 files changed, 11278 insertions(+), 532 deletions(-)

@@ -1,0 +1,146 @@
+name: MATDOG V42 Pinned Station Artifact
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/matdog-v42-pinned-station.yml"
+      - "software/drivers/st3215/**"
+      - "software/station/bin/station/**"
+      - "tools/matdog/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: matdog-v42-pinned-station-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-prove:
+    name: Build reviewed Station artifact and run offline gates
+    runs-on: ubuntu-24.04
+    env:
+      ARTIFACT_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ARTIFACT_SOURCE_SHA }}
+
+      - name: Prove exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$ARTIFACT_SOURCE_SHA"
+
+      - name: Setup protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          version: "23.x"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          components: rustfmt
+
+      - name: Install native build dependency
+        run: sudo apt-get update && sudo apt-get install -y nasm
+
+      - name: Prepare evidence directory
+        run: mkdir -p ci-output
+
+      - name: Verify q0-first source ordering
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee ci-output/q0-first-order.log
+          from pathlib import Path
+          source = Path("software/drivers/st3215/src/auto_calibrate/matdog.rs").read_text()
+          normalize = source.find(
+              'self.next_phase("Normalize every displaced MATDOG joint to q=0 with one uniform rule")?;'
+          )
+          create = source.find(
+              'self.next_phase("Create LF state machine from verified q=0 session entry")?;'
+          )
+          if normalize < 0 or create < 0 or not normalize < create:
+              raise SystemExit("q0-first source ordering is missing or reversed")
+          if "const STARTUP_HOME_RECOVERY_LIMIT_TICKS: u16 = 64;" not in source:
+              raise SystemExit("startup home recovery limit is not the reviewed 64 ticks")
+          print("MATDOG V42 q0-first startup ordering: PASS")
+          PY
+
+      - name: Rust format check
+        run: |
+          rustfmt --edition 2021 --check --config skip_children=true \
+            software/drivers/st3215/src/port.rs \
+            software/drivers/st3215/src/auto_calibrate/mod.rs \
+            software/drivers/st3215/src/auto_calibrate/matdog.rs \
+            software/drivers/st3215/src/auto_calibrate/matdog_test.rs
+
+      - name: ST3215 tests
+        run: cargo test --package st3215 2>&1 | tee ci-output/st3215-tests.log
+
+      - name: Headless runner and pin tests
+        run: |
+          python3 -m unittest -v \
+            tools.matdog.test_matdog_headless_auto_calibrate \
+            tools.matdog.test_matdog_v42_pinned_launcher \
+            2>&1 | tee ci-output/headless-runner-tests.log
+
+      - name: Create CI-only Station viewer stub
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset=software/station/clients/station-viewer/dist/index.html
+          test ! -e "$asset"
+          mkdir -p "$(dirname "$asset")"
+          printf '<!doctype html><title>MATDOG V42 pinned Station</title>\n' > "$asset"
+
+      - name: Build release Station
+        run: cargo build --release --package station 2>&1 | tee ci-output/station-build.log
+
+      - name: Record immutable provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$ARTIFACT_SOURCE_SHA"
+          sha256sum target/release/station | tee ci-output/station.sha256
+          git rev-parse HEAD | tee ci-output/source-commit.txt
+          file target/release/station | tee ci-output/station.file.txt
+          strings target/release/station | grep -F \
+            "Normalize every displaced MATDOG joint to q=0 with one uniform rule" \
+            | head -n 1 | tee ci-output/q0-first-binary-string.txt
+          strings target/release/station | grep -F \
+            "Create LF state machine from verified q=0 session entry" \
+            | head -n 1 | tee ci-output/q0-state-machine-binary-string.txt
+
+      - name: Remove CI-only viewer stub
+        if: always()
+        run: rm -rf software/station/clients/station-viewer/dist
+
+      - name: Upload immutable Station artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: matdog-v42-station-${{ env.ARTIFACT_SOURCE_SHA }}
+          path: |
+            target/release/station
+            ci-output/station.sha256
+            ci-output/source-commit.txt
+            ci-output/station.file.txt
+            ci-output/q0-first-binary-string.txt
+            ci-output/q0-state-machine-binary-string.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matdog-v42-verification-${{ env.ARTIFACT_SOURCE_SHA }}
+          path: ci-output/
+          if-no-files-found: error
+          retention-days: 30

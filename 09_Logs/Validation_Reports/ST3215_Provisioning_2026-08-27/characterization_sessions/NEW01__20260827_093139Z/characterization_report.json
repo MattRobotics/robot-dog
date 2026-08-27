@@ -1,0 +1,863 @@
+{
+  "artifacts": {
+    "AFTER_PRIME": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/characterization/sessions/NEW01__20260827_093139Z/02_after_prime_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T09:36:58.351273+00:00",
+      "sha256": "d66d7300482aa424f1a13b11b12d9dad24c2c753d85a3f9e2273d0688cc293cd"
+    },
+    "BEFORE": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/characterization/sessions/NEW01__20260827_093139Z/01_before_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T09:34:22.601104+00:00",
+      "sha256": "d66d7300482aa424f1a13b11b12d9dad24c2c753d85a3f9e2273d0688cc293cd"
+    },
+    "COLD1": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/characterization/sessions/NEW01__20260827_093139Z/03_after_cold_cycle1_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T09:38:44.814514+00:00",
+      "sha256": "24acb4d0a20ebb41d0344971547e60ce73ad418821d6d260cd70972867a05ee7"
+    },
+    "COLD2": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/characterization/sessions/NEW01__20260827_093139Z/04_after_cold_cycle2_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T09:40:21.811615+00:00",
+      "sha256": "24acb4d0a20ebb41d0344971547e60ce73ad418821d6d260cd70972867a05ee7"
+    }
+  },
+  "command_surface": {
+    "allowed_examples": [
+      "@ARM",
+      "@PRIME 1A2B3C4D",
+      "@TRACE 1A2B3C4D",
+      "@HELP"
+    ],
+    "allowed_patterns": [
+      "^@ARM$",
+      "^@PRIME (?:[0-9A-F]{8})$",
+      "^@TRACE (?:[0-9A-F]{8})$",
+      "^@HELP$"
+    ],
+    "arbitrary_address_value": "NOT IMPLEMENTED",
+    "arbitrary_goal_position": "NOT IMPLEMENTED",
+    "arbitrary_id": "NOT IMPLEMENTED",
+    "arm_performs_servo_writes": "NO",
+    "broadcast_write": "NOT IMPLEMENTED",
+    "centering_move": "NOT IMPLEMENTED",
+    "constants_deferred_to_review": [
+      "PRIME_MAX_DELTA_TICKS",
+      "COLD_ABSENCE_DEBOUNCE_MS",
+      "COLD_RETURN_STABLE_SAMPLES"
+    ],
+    "constants_selected_by_this_tool": [],
+    "eeprom_unlock": "NOT IMPLEMENTED",
+    "eeprom_write": "NOT IMPLEMENTED",
+    "factory_reset": "NOT IMPLEMENTED",
+    "firmware_write_allowlist": [
+      {
+        "address": "0x28",
+        "value": 0,
+        "width": 1
+      },
+      {
+        "address": "0x30",
+        "value": 300,
+        "width": 2
+      }
+    ],
+    "forbidden_tokens_rejected": [
+      "@BEGIN",
+      "@EXECUTE",
+      "@NORMALIZE_MATDOG",
+      "@QC_FAST",
+      "@READ",
+      "@DUMP_RAW",
+      "@BENCH",
+      "@CAPTURE",
+      "@RAMTEST",
+      "@PING",
+      "@SCAN",
+      "@SNAPSHOT71",
+      "@SAFE_OFF",
+      "@WRITE",
+      "@SETID",
+      "@GOAL",
+      "@TORQUE",
+      "@TORQUE_ON",
+      "@RESET",
+      "@CALIBRATE",
+      "@CENTER",
+      "@UNLOCK",
+      "@OFFSET"
+    ],
+    "generic_write": "NOT IMPLEMENTED",
+    "host_exposed_torque_on": "NOT IMPLEMENTED",
+    "id_write": "NOT IMPLEMENTED",
+    "mid_position_calibration": "NOT IMPLEMENTED",
+    "motion_allowlist": {
+      "acc": 50,
+      "position": "CURRENT_POSITION_READ_BY_FIRMWARE",
+      "primitive": "WritePosEx",
+      "speed": 365
+    },
+    "position_offset_write": "NOT IMPLEMENTED",
+    "write_capable_commands": [
+      "@PRIME"
+    ]
+  },
+  "constants_deferred_to_review": {
+    "COLD_ABSENCE_DEBOUNCE_MS": "DEFERRED_TO_REVIEW",
+    "COLD_RETURN_STABLE_SAMPLES": "DEFERRED_TO_REVIEW",
+    "PRIME_MAX_DELTA_TICKS": "DEFERRED_TO_REVIEW"
+  },
+  "constants_selected_by_this_tool": [],
+  "evidence_ordering": {
+    "before_persist_index": 1,
+    "before_persisted": true,
+    "evidence_precedes_write": true,
+    "first_write_capable_command_index": 3,
+    "ledger": [
+      {
+        "command": "@ARM",
+        "event": "command"
+      },
+      {
+        "event": "persist",
+        "sha256": "d66d7300482aa424f1a13b11b12d9dad24c2c753d85a3f9e2273d0688cc293cd",
+        "slot": "BEFORE"
+      },
+      {
+        "command": "@TRACE 3B485213",
+        "event": "command"
+      },
+      {
+        "command": "@PRIME 3B485213",
+        "event": "command"
+      },
+      {
+        "event": "persist",
+        "sha256": "d66d7300482aa424f1a13b11b12d9dad24c2c753d85a3f9e2273d0688cc293cd",
+        "slot": "AFTER_PRIME"
+      },
+      {
+        "command": "@TRACE 3B485213",
+        "event": "command"
+      },
+      {
+        "event": "persist",
+        "sha256": "24acb4d0a20ebb41d0344971547e60ce73ad418821d6d260cd70972867a05ee7",
+        "slot": "COLD1"
+      },
+      {
+        "command": "@TRACE 3B485213",
+        "event": "command"
+      },
+      {
+        "event": "persist",
+        "sha256": "24acb4d0a20ebb41d0344971547e60ce73ad418821d6d260cd70972867a05ee7",
+        "slot": "COLD2"
+      }
+    ]
+  },
+  "finished_utc": "2026-08-27T09:42:24.648420+00:00",
+  "firmware_fqbn": "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,DebugLevel=none,PSRAM=opi",
+  "firmware_source_sha256": "a2c8c0cf631e65e97b440d4d90933921dc0af7e8207f1007a343479e20b98ecd",
+  "phases": {
+    "arm": {
+      "before": {
+        "baud": 0,
+        "id": 1,
+        "lock": 1,
+        "model": 777,
+        "physical_raw": 339,
+        "position_offset": 85,
+        "present_position": 254,
+        "response_status": 1,
+        "sha256": "d66d7300482aa424f1a13b11b12d9dad24c2c753d85a3f9e2273d0688cc293cd",
+        "slot": "BEFORE",
+        "status": 0,
+        "temperature": 35,
+        "torque_enable": 0,
+        "torque_limit": 300,
+        "voltage": 112
+      },
+      "discovered_id": 1,
+      "host_gate": [
+        {
+          "actual": 1,
+          "expected": "1",
+          "gate": "responders",
+          "ok": true
+        },
+        {
+          "actual": 0,
+          "expected": "0x00",
+          "gate": "ping_status",
+          "ok": true
+        },
+        {
+          "actual": 0,
+          "expected": "0x00",
+          "gate": "model_status",
+          "ok": true
+        },
+        {
+          "actual": 777,
+          "expected": "777",
+          "gate": "scan_model",
+          "ok": true
+        },
+        {
+          "actual": 777,
+          "expected": "777",
+          "gate": "model_0x03",
+          "ok": true
+        },
+        {
+          "actual": 0,
+          "expected": "0",
+          "gate": "baud",
+          "ok": true
+        },
+        {
+          "actual": 1,
+          "expected": "1",
+          "gate": "response_status",
+          "ok": true
+        },
+        {
+          "actual": 85,
+          "expected": "-2048..2047",
+          "gate": "position_offset_domain",
+          "ok": true
+        },
+        {
+          "actual": 254,
+          "expected": "0..4095",
+          "gate": "present_position_domain",
+          "ok": true
+        },
+        {
+          "actual": 1,
+          "expected": "0 or 1",
+          "gate": "lock_domain",
+          "ok": true
+        },
+        {
+          "actual": 0,
+          "expected": "0",
+          "gate": "torque_off",
+          "ok": true
+        },
+        {
+          "actual": 112,
+          "expected": "40..140",
+          "gate": "voltage",
+          "ok": true
+        },
+        {
+          "actual": 35,
+          "expected": "<=70",
+          "gate": "temperature",
+          "ok": true
+        },
+        {
+          "actual": 0,
+          "expected": "0x00",
+          "gate": "status",
+          "ok": true
+        }
+      ],
+      "responders": 1,
+      "token_bound": true
+    },
+    "prime": {
+      "repetitions": [
+        {
+          "acc": 50,
+          "cmd_ack": 1,
+          "cmd_status": 0,
+          "current": 0,
+          "delta_immediate": 0,
+          "delta_ticks": 0,
+          "elapsed_us": 328675,
+          "exposure_us": 295,
+          "goal": 254,
+          "index": 1,
+          "max_delta": 0,
+          "max_temperature": 35,
+          "max_voltage": 112,
+          "min_delta": 0,
+          "min_voltage": 111,
+          "off_ack": 1,
+          "off_read_status": 0,
+          "off_readback": 0,
+          "off_result": "CONFIRMED",
+          "off_status": 0,
+          "p0": 254,
+          "p_first": 254,
+          "p_settled": 254,
+          "peak_abs_current": 0,
+          "peak_abs_delta": 0,
+          "peak_abs_load": 0,
+          "peak_abs_speed": 0,
+          "read_us": 342,
+          "reason": null,
+          "result": "OK",
+          "samples": 165,
+          "settled": true,
+          "settled_us": 328675,
+          "speed": 365,
+          "status": 0,
+          "temperature": 35,
+          "total_us": 659,
+          "voltage": 112,
+          "writeposex_us": 364
+        },
+        {
+          "acc": 50,
+          "cmd_ack": 1,
+          "cmd_status": 0,
+          "current": 0,
+          "delta_immediate": 0,
+          "delta_ticks": 0,
+          "elapsed_us": 328679,
+          "exposure_us": 291,
+          "goal": 254,
+          "index": 2,
+          "max_delta": 0,
+          "max_temperature": 35,
+          "max_voltage": 112,
+          "min_delta": 0,
+          "min_voltage": 111,
+          "off_ack": 1,
+          "off_read_status": 0,
+          "off_readback": 0,
+          "off_result": "CONFIRMED",
+          "off_status": 0,
+          "p0": 254,
+          "p_first": 254,
+          "p_settled": 254,
+          "peak_abs_current": 0,
+          "peak_abs_delta": 0,
+          "peak_abs_load": 0,
+          "peak_abs_speed": 0,
+          "read_us": 338,
+          "reason": null,
+          "result": "OK",
+          "samples": 165,
+          "settled": true,
+          "settled_us": 328679,
+          "speed": 365,
+          "status": 0,
+          "temperature": 35,
+          "total_us": 650,
+          "voltage": 112,
+          "writeposex_us": 359
+        },
+        {
+          "acc": 50,
+          "cmd_ack": 1,
+          "cmd_status": 0,
+          "current": 0,
+          "delta_immediate": 0,
+          "delta_ticks": 0,
+          "elapsed_us": 328671,
+          "exposure_us": 291,
+          "goal": 254,
+          "index": 3,
+          "max_delta": 0,
+          "max_temperature": 35,
+          "max_voltage": 112,
+          "min_delta": 0,
+          "min_voltage": 111,
+          "off_ack": 1,
+          "off_read_status": 0,
+          "off_readback": 0,
+          "off_result": "CONFIRMED",
+          "off_status": 0,
+          "p0": 254,
+          "p_first": 254,
+          "p_settled": 254,
+          "peak_abs_current": 0,
+          "peak_abs_delta": 0,
+          "peak_abs_load": 0,
+          "peak_abs_speed": 0,
+          "read_us": 339,
+          "reason": null,
+          "result": "OK",
+          "samples": 165,
+          "settled": true,
+          "settled_us": 328671,
+          "speed": 365,
+          "status": 0,
+          "temperature": 35,
+          "total_us": 649,
+          "voltage": 112,
+          "writeposex_us": 358
+        },
+        {
+          "acc": 50,
+          "cmd_ack": 1,
+          "cmd_status": 0,
+          "current": 0,
+          "delta_immediate": 0,
+          "delta_ticks": 0,
+          "elapsed_us": 328681,
+          "exposure_us": 291,
+          "goal": 254,
+          "index": 4,
+          "max_delta": 0,
+          "max_temperature": 35,
+          "max_voltage": 112,
+          "min_delta": 0,
+          "min_voltage": 111,
+          "off_ack": 1,
+          "off_read_status": 0,
+          "off_readback": 0,
+          "off_result": "CONFIRMED",
+          "off_status": 0,
+          "p0": 254,
+          "p_first": 254,
+          "p_settled": 254,
+          "peak_abs_current": 0,
+          "peak_abs_delta": 0,
+          "peak_abs_load": 0,
+          "peak_abs_speed": 0,
+          "read_us": 339,
+          "reason": null,
+          "result": "OK",
+          "samples": 165,
+          "settled": true,
+          "settled_us": 328681,
+          "speed": 365,
+          "status": 0,
+          "temperature": 35,
+          "total_us": 649,
+          "voltage": 112,
+          "writeposex_us": 358
+        },
+        {
+          "acc": 50,
+          "cmd_ack": 1,
+          "cmd_status": 0,
+          "current": 0,
+          "delta_immediate": 0,
+          "delta_ticks": 0,
+          "elapsed_us": 328672,
+          "exposure_us": 291,
+          "goal": 254,
+          "index": 5,
+          "max_delta": 0,
+          "max_temperature": 35,
+          "max_voltage": 112,
+          "min_delta": 0,
+          "min_voltage": 111,
+          "off_ack": 1,
+          "off_read_status": 0,
+          "off_readback": 0,
+          "off_result": "CONFIRMED",
+          "off_status": 0,
+          "p0": 254,
+          "p_first": 254,
+          "p_settled": 254,
+          "peak_abs_current": 0,
+          "peak_abs_delta": 0,
+          "peak_abs_load": 0,
+          "peak_abs_speed": 0,
+          "read_us": 343,
+          "reason": null,
+          "result": "OK",
+          "samples": 165,
+          "settled": true,
+          "settled_us": 328672,
+          "speed": 365,
+          "status": 0,
+          "temperature": 35,
+          "total_us": 650,
+          "voltage": 112,
+          "writeposex_us": 359
+        }
+      ],
+      "summary": {
+        "PRIME_MAX_DELTA_TICKS": "DEFERRED_TO_REVIEW",
+        "delta_abs_max": 0,
+        "delta_max": 0,
+        "delta_min": 0,
+        "exposure_us": [
+          295,
+          291,
+          291,
+          291,
+          291
+        ],
+        "exposure_us_max": 295,
+        "exposure_us_min": 291,
+        "observed_delta_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "observed_peak_abs_delta": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "peak_abs_delta_max": 0,
+        "prime_parameters": {
+          "acc": 50,
+          "speed": 365,
+          "torque_limit": 300
+        },
+        "repetitions": 5
+      },
+      "write_records": [
+        {
+          "ack": 1,
+          "address": 40,
+          "expect": 0,
+          "name": "TorqueEnable",
+          "read_status": 0,
+          "readback": 0,
+          "result": "OK",
+          "status": 0,
+          "width": 1
+        },
+        {
+          "ack": 1,
+          "address": 48,
+          "expect": 300,
+          "name": "TorqueLimit",
+          "read_status": 0,
+          "readback": 300,
+          "result": "OK",
+          "status": 0,
+          "width": 2
+        },
+        {
+          "ack": 1,
+          "address": 40,
+          "expect": 0,
+          "name": "TorqueEnable",
+          "read_status": 0,
+          "readback": 0,
+          "result": "OK",
+          "status": 0,
+          "width": 1
+        },
+        {
+          "ack": 1,
+          "address": 48,
+          "expect": 300,
+          "name": "TorqueLimit",
+          "read_status": 0,
+          "readback": 300,
+          "result": "OK",
+          "status": 0,
+          "width": 2
+        },
+        {
+          "ack": 1,
+          "address": 40,
+          "expect": 0,
+          "name": "TorqueEnable",
+          "read_status": 0,
+          "readback": 0,
+          "result": "OK",
+          "status": 0,
+          "width": 1
+        },
+        {
+          "ack": 1,
+          "address": 48,
+          "expect": 300,
+          "name": "TorqueLimit",
+          "read_status": 0,
+          "readback": 300,
+          "result": "OK",
+          "status": 0,
+          "width": 2
+        },
+        {
+          "ack": 1,
+          "address": 40,
+          "expect": 0,
+          "name": "TorqueEnable",
+          "read_status": 0,
+          "readback": 0,
+          "result": "OK",
+          "status": 0,
+          "width": 1
+        },
+        {
+          "ack": 1,
+          "address": 48,
+          "expect": 300,
+          "name": "TorqueLimit",
+          "read_status": 0,
+          "readback": 300,
+          "result": "OK",
+          "status": 0,
+          "width": 2
+        },
+        {
+          "ack": 1,
+          "address": 40,
+          "expect": 0,
+          "name": "TorqueEnable",
+          "read_status": 0,
+          "readback": 0,
+          "result": "OK",
+          "status": 0,
+          "width": 1
+        },
+        {
+          "ack": 1,
+          "address": 48,
+          "expect": 300,
+          "name": "TorqueLimit",
+          "read_status": 0,
+          "readback": 300,
+          "result": "OK",
+          "status": 0,
+          "width": 2
+        },
+        {
+          "ack": 1,
+          "address": 40,
+          "expect": 0,
+          "name": "TorqueEnable",
+          "read_status": 0,
+          "readback": 0,
+          "result": "OK",
+          "status": 0,
+          "width": 1
+        }
+      ],
+      "writes_within_allowlist": true
+    },
+    "traces": [
+      {
+        "COLD_ABSENCE_DEBOUNCE_MS": "DEFERRED_TO_REVIEW",
+        "COLD_RETURN_STABLE_SAMPLES": "DEFERRED_TO_REVIEW",
+        "absence_durations_ms": [
+          21720
+        ],
+        "cold_observed": {
+          "baud": 0,
+          "id": 1,
+          "lock": 1,
+          "model": 777,
+          "physical_raw": 339,
+          "position_offset": 85,
+          "present_position": 254,
+          "response_status": 1,
+          "sha256": "24acb4d0a20ebb41d0344971547e60ce73ad418821d6d260cd70972867a05ee7",
+          "slot": "COLD1",
+          "status": 0,
+          "temperature": 35,
+          "torque_enable": 0,
+          "torque_limit": 1000,
+          "voltage": 112
+        },
+        "episode_1_gap_ms_seeded_from_firmware": true,
+        "episodes": [
+          {
+            "absent_polls": 181,
+            "duration_ms": 21720,
+            "ended": true,
+            "first_absent_t_ms": 267743,
+            "first_return_t_ms": 289463,
+            "gap_ms": 21741,
+            "index": 1,
+            "last_present_t_ms": 267722,
+            "return_to_stable_ms": 399,
+            "return_to_stable_polls": 20,
+            "stable": true,
+            "streak_breaks": 0,
+            "unclean_after_return": 0
+          }
+        ],
+        "findings": [],
+        "firmware_episodes": [
+          {
+            "absent_polls": 181,
+            "duration_ms": 21720,
+            "ended": true,
+            "first_absent_t_ms": 267743,
+            "first_return_t_ms": 289463,
+            "gap_ms": 21741,
+            "index": 1,
+            "last_present_t_ms": 267722,
+            "return_to_stable_ms": 399,
+            "return_to_stable_polls": 20,
+            "stable": true,
+            "streak_breaks": 0,
+            "unclean_after_return": 0
+          }
+        ],
+        "longest_absence_ms": 21720,
+        "ok": true,
+        "polls": 201,
+        "return_to_stable_ms": [
+          399
+        ],
+        "return_to_stable_polls": [
+          20
+        ],
+        "shortest_absence_ms": 21720,
+        "stable_target_samples": 20,
+        "termination": "STABLE_AFTER_ABSENCE",
+        "trace_index": 1,
+        "unclean_after_return": [
+          0
+        ],
+        "usable": true
+      },
+      {
+        "COLD_ABSENCE_DEBOUNCE_MS": "DEFERRED_TO_REVIEW",
+        "COLD_RETURN_STABLE_SAMPLES": "DEFERRED_TO_REVIEW",
+        "absence_durations_ms": [
+          5280
+        ],
+        "cold_observed": {
+          "baud": 0,
+          "id": 1,
+          "lock": 1,
+          "model": 777,
+          "physical_raw": 339,
+          "position_offset": 85,
+          "present_position": 254,
+          "response_status": 1,
+          "sha256": "24acb4d0a20ebb41d0344971547e60ce73ad418821d6d260cd70972867a05ee7",
+          "slot": "COLD2",
+          "status": 0,
+          "temperature": 35,
+          "torque_enable": 0,
+          "torque_limit": 1000,
+          "voltage": 112
+        },
+        "episode_1_gap_ms_seeded_from_firmware": true,
+        "episodes": [
+          {
+            "absent_polls": 44,
+            "duration_ms": 5280,
+            "ended": true,
+            "first_absent_t_ms": 366859,
+            "first_return_t_ms": 372139,
+            "gap_ms": 5301,
+            "index": 1,
+            "last_present_t_ms": 366838,
+            "return_to_stable_ms": 399,
+            "return_to_stable_polls": 20,
+            "stable": true,
+            "streak_breaks": 0,
+            "unclean_after_return": 0
+          }
+        ],
+        "findings": [],
+        "firmware_episodes": [
+          {
+            "absent_polls": 44,
+            "duration_ms": 5280,
+            "ended": true,
+            "first_absent_t_ms": 366859,
+            "first_return_t_ms": 372139,
+            "gap_ms": 5301,
+            "index": 1,
+            "last_present_t_ms": 366838,
+            "return_to_stable_ms": 399,
+            "return_to_stable_polls": 20,
+            "stable": true,
+            "streak_breaks": 0,
+            "unclean_after_return": 0
+          }
+        ],
+        "longest_absence_ms": 5280,
+        "ok": true,
+        "polls": 746,
+        "return_to_stable_ms": [
+          399
+        ],
+        "return_to_stable_polls": [
+          20
+        ],
+        "shortest_absence_ms": 5280,
+        "stable_target_samples": 20,
+        "termination": "STABLE_AFTER_ABSENCE",
+        "trace_index": 2,
+        "unclean_after_return": [
+          0
+        ],
+        "usable": true
+      }
+    ]
+  },
+  "port": "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00",
+  "provisioner_hardware_freeze": "UNCHANGED_BLOCKED",
+  "reason": null,
+  "runner_sha256": "70b9f66ae11720f152c109e1da1b5916b7feddca7daee115442da477555737fb",
+  "schema": "MATDOG_ST3215_CHARACTERIZE_V1",
+  "session_dir": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/characterization/sessions/NEW01__20260827_093139Z",
+  "started_utc": "2026-08-27T09:33:54.810229+00:00",
+  "static_audit_checks": {
+    "acc_constant_is_50": true,
+    "allowlist_default_deny": true,
+    "allowlist_no_calibration_literal": true,
+    "allowlist_no_forbidden_register": true,
+    "allowlist_no_torque_on_literal": true,
+    "allowlist_only_two_registers": true,
+    "allowlist_torque_limit_value_300_only": true,
+    "allowlist_torque_limit_width_two_only": true,
+    "allowlist_torque_value_zero_only": true,
+    "allowlist_torque_width_one_only": true,
+    "arm_declares_no_writes": true,
+    "convergence_fault_commands_torque_off": true,
+    "convergence_fault_declares_no_eeprom_writes": true,
+    "convergence_fault_never_moves": true,
+    "convergence_fault_reports_power_removal": true,
+    "convergence_fault_sets_recovery_stage": true,
+    "convergence_post_prime_torque_off_verified": true,
+    "convergence_repetition_failure_enters_fault": true,
+    "deferred_markers_present": true,
+    "every_write_site_approved": true,
+    "forbidden_primitives_have_zero_call_sites": true,
+    "freeze_block_untouched": true,
+    "motion_acc_is_the_canonical_constant": true,
+    "motion_call_uses_current_position": true,
+    "motion_domain_checked_before_command": true,
+    "motion_exactly_one_call_site": true,
+    "motion_position_read_inside_primitive": true,
+    "motion_signature_has_no_position_parameter": true,
+    "motion_speed_is_the_canonical_constant": true,
+    "no_canonical_profile_table": true,
+    "no_forbidden_patterns": true,
+    "no_provisioner_allocation_table": true,
+    "repetitions_is_5": true,
+    "speed_constant_is_365": true,
+    "tool_selects_no_constants": true,
+    "torque_limit_constant_is_300": true,
+    "torque_limit_is_the_only_word_write": true
+  },
+  "static_audit_ok": true,
+  "tool": "matdog_st3215_characterize_v1",
+  "tool_version": "1.0.0",
+  "unit": "NEW01",
+  "verdict": "PASS"
+}

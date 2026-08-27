@@ -25,6 +25,9 @@ The control flow must remain modular:
     → joint targets in radians
     → actuator adapter
 
-The actuator adapter may initially use NormaCore Station and the Waveshare Bus Servo Adapter.
+The actuator backend is the **ESP32-S3 motion coprocessor** over native USB CDC, driving the
+Seeed Bus Servo Driver. NormaCore Station and the Waveshare Bus Servo Adapter were the historical
+bench/development path and are no longer required — see
+[ARCHITECTURE.md](../../01_Docs/02_Architecture/ARCHITECTURE.md).
 
 A future ESP32 motion controller may replace only the actuator layer, without rewriting gait, IK or calibration logic.

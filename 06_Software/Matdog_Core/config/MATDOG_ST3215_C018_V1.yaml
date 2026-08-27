@@ -1,0 +1,129 @@
+# MATDOG_C018_V1 — canonical ST-3215-C018 persistent profile (machine-readable)
+#
+# Human-readable canonical document:
+#   01_Docs/02_Architecture/MATDOG_ST3215_C018_V1_PROFILE.md
+#
+# These values are MATDOG engineering choices verified on MATDOG hardware.
+# They are NOT a Feetech-prescribed configuration and carry no vendor endorsement.
+
+schema_version: 1
+profile_id: MATDOG_C018_V1
+status: FROZEN
+frozen_at: "2026-08-27"
+
+servo:
+  vendor: Feetech
+  variant: ST-3215-C018
+  model_register:
+    address: "0x03"
+    width: 2
+    expected_value: 777
+    note: >
+      The C018 exposes its model word at 0x03. NormaCore's
+      software/drivers/st3215/src/protocol/memory.rs declares ModelNumber at 0x00;
+      for the C018 that is a source-map defect and must not be used for identity gating.
+      Defect still open upstream; tracked as a dependency risk.
+
+invariants:
+  goal_position_domain: [0, 4095]
+  goal_position_signed_wrap: FORBIDDEN
+  physical_raw_center: 2048
+  center_acceptance_ticks: 1
+  final_position_offset: 0
+
+forbidden_operations:
+  - CalibrationOfs
+  - one_key_middle
+  - factory_reset
+  - broadcast_write
+
+# The 20 registers that constitute the persistent profile contract.
+# Verified identical on all 17 provisioned units after a true cold power cycle.
+persistent_profile:
+  MinAngle:                  { address: "0x09", width: 2, value: 0 }
+  MaxAngle:                  { address: "0x0B", width: 2, value: 4095 }
+  MaxTemperature:            { address: "0x0D", width: 1, value: 70 }
+  MaxVoltage:                { address: "0x0E", width: 1, value: 140 }
+  MinVoltage:                { address: "0x0F", width: 1, value: 40 }
+  MaxTorque:                 { address: "0x10", width: 2, value: 1000 }
+  P:                         { address: "0x15", width: 1, value: 32 }
+  D:                         { address: "0x16", width: 1, value: 32 }
+  I:                         { address: "0x17", width: 1, value: 0 }
+  MinStartupForce:           { address: "0x18", width: 2, value: 16 }
+  CWDead:                    { address: "0x1A", width: 1, value: 1 }
+  CCWDead:                   { address: "0x1B", width: 1, value: 1 }
+  ProtectionCurrent:         { address: "0x1C", width: 2, value: 310 }
+  Mode:                      { address: "0x21", width: 1, value: 0 }
+  ProtectionTorque:          { address: "0x22", width: 1, value: 20 }
+  ProtectionTime:            { address: "0x23", width: 1, value: 200 }
+  OverloadTorque:            { address: "0x24", width: 1, value: 80 }
+  SpeedClosedLoopP:          { address: "0x25", width: 1, value: 10 }
+  OverCurrentProtectionTime: { address: "0x26", width: 1, value: 200 }
+  VelocityClosedLoopI:       { address: "0x27", width: 1, value: 200 }
+
+profile_fingerprint:
+  algorithm: sha256
+  scope: the 20 persistent_profile registers
+  value: "ae3ae5ce6ddda1c003fcde9f8ce12fed7f1272639b183e1ba23e27eae0cc5b4d"
+  observed_on_units: 17
+
+position_offset:
+  address: "0x1F"
+  width: 2
+  encoding: int16_le_twos_complement
+  value: 0
+  storage: EEPROM
+  note: written by the provisioner; not part of the 20-register delta set
+
+baud:
+  address: "0x06"
+  policy: VERIFICATION_ONLY_IN_V1
+  expected_value: 0
+  expected_bps: 1000000
+  written_by_v1_tooling: false
+
+# Read and recorded, never written. Values are observations, not targets.
+preserve_only:
+  ReturnDelay:       { address: "0x07", observed_on_all_17: 0 }
+  ResponseStatus:    { address: "0x08", observed_on_all_17: 1 }
+  UnloadCondition:   { address: "0x12", observed_on_all_17: 12 }
+  LedAlarm:          { address: "0x13", observed_on_all_17: 44 }
+  AngularResolution: { address: "0x1E", observed_on_all_17: 1 }
+
+# TorqueLimit is RAM/runtime and deliberately NOT part of the persistent profile.
+runtime_policy:
+  torque_limit_is_persistent_profile: false
+  provisioning_centering:
+    validated_on_hardware: true
+    TorqueLimit: 300
+    GoalSpeed: 365
+    Acc: 50
+  post_cold_observation:
+    TorqueLimit: 1000
+    semantics: OBSERVED_NOT_ASSERTED
+    note: power-on default observed after cold cycle, not a written target
+  gait_head_jaw_limits: TBD
+
+characterization_constants:
+  source: NEW01_CHARACTERIZATION
+  PRIME_MAX_DELTA_TICKS: 1
+  COLD_ABSENCE_DEBOUNCE_MS: 1500
+  COLD_RETURN_STABLE_SAMPLES: 10
+
+hardware_validation_scope:
+  profile_eeprom_write_branch:
+    status: NOT_HARDWARE_EXERCISED
+    evidence: "DELTA_COUNT WRITE=0 SKIP=20 on all 22 sessions (440 SKIP, 0 WRITE)"
+    reason: all 17 units already held the canonical values, so every register was correctly skipped
+  eeprom_write_mechanism:
+    status: HARDWARE_EXERCISED
+    via:
+      - { register: PositionOffset, address: "0x1F", operations: 17 }
+      - { register: Lock,           address: "0x37", operations: 62 }
+  exercised_on_hardware:
+    - centering to physical RAW 2048
+    - PositionOffset set to 0
+    - ID recode
+    - warm verification
+    - true cold power cycle
+    - acceptance gate

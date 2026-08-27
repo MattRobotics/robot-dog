@@ -1,0 +1,261 @@
+name: MATDOG Native Calibrator Offline Check
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/matdog-native-calibrator-check.yml"
+      - "protobufs/drivers/st3215/**"
+      - "software/drivers/st3215/**"
+      - "software/station/bin/station/**"
+      - "tools/matdog/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: matdog-native-calibrator-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-verification:
+    name: 24 profiles, RAM-only contract, Rust tests, Station build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout reviewed revision
+        uses: actions/checkout@v4
+
+      - name: Setup protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          version: "23.x"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          components: rustfmt
+
+      - name: Install Station native build dependency
+        run: sudo apt-get update && sudo apt-get install -y nasm
+
+      - name: Prepare verification logs
+        run: mkdir -p ci-output
+
+      - name: Enforce canonical 24-contact RAM-only q0-first contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee ci-output/ram-only-contract.log
+          from pathlib import Path
+          import re
+
+          source_path = Path("software/drivers/st3215/src/auto_calibrate/matdog.rs")
+          tests_path = Path("software/drivers/st3215/src/auto_calibrate/matdog_test.rs")
+          port_path = Path("software/drivers/st3215/src/port.rs")
+          module_path = Path("software/drivers/st3215/src/auto_calibrate/mod.rs")
+          profile_path = Path("tools/matdog/matdog_lf_profile.py")
+          source = source_path.read_text()
+          tests = tests_path.read_text()
+          port = port_path.read_text()
+          module = module_path.read_text()
+          profile = profile_path.read_text()
+
+          forbidden_source = (
+              "EepromRegister",
+              "RamRegister::Lock",
+              "ST3215Request::",
+              "reg_write: Some",
+              "reset: Some",
+              "reset_calibration: Some",
+              "freeze_calibration: Some",
+              "action: Some",
+              "Offset.address",
+              "matdog_v2",
+              "LF_FIXED_SCALE_REJECT",
+          )
+          forbidden_other = (
+              "write.motor_id != 12",
+              "matdog_pilot_is_armed",
+              "matdog_armed_motor_ids",
+          )
+          required_source = (
+              "all_profiles",
+              "profile_for_arm_value",
+              "ram_write_allowed_for_profile",
+              "held_targets: Vec<StaticTarget>",
+              "verify_static_holds_except",
+              "MAX_TELEMETRY_AGE",
+              "prerequisite_restore_order",
+              "global_torque_off_verified",
+              "GUARD_OVERSHOOT_TICKS",
+              "UPPER_30_DELTA",
+              "UPPER_85_DELTA",
+              "UPPER_90_DELTA",
+              "PROBE_TRACKING_ERROR_FLOOR_TICKS",
+              "LF_CONTACT_WITNESS_TOLERANCE_TICKS",
+              "probe_tracking_error_limit",
+              "MATDOG LF CONTACT WITNESS:",
+              "accepted: affine.accepted && contact_witness_accepted",
+              "MATDOG LF URDF FREEZE GATE: PASS",
+              "MATDOG_LF_PROFILE_V1|joint=",
+          )
+          required_tests = (
+              "profile_table_covers_exactly_24_unique_contacts",
+              "front_lower_restore_order_keeps_rear_parking_until_active_leg_is_home",
+              "armed_ram_gate_restricts_registers_values_motors_and_goal_windows",
+              "canonical_matdog_source_has_no_eeprom_reset_offset_regwrite_action_or_freeze_path",
+              "accepted_endpoint_q0_is_used_only_for_transactional_staging",
+              "full_lf_final_order_stages_m13_m11_m12_then_restores_m42",
+              "historical_contacts_use_affine_and_uniform_witness_freeze_gate",
+              "v24_m13_fine_tracking_uses_detector_consistent_global_floor",
+              "lf_contact_witness_gate_is_uniform_and_rejects_v24_m12_cable_obstruction",
+              "affine_gate_accepts_real_span_while_fixed_scale_stays_diagnostic",
+          )
+          required_port = (
+              "matdog_command_allowed_with",
+              "matdog_armed_command_allowed",
+              "native MATDOG profile arming is active",
+          )
+          required_module = (
+              "mod matdog;",
+              "matdog_ram_write_allowed_for_arm_value",
+          )
+          required_profile = (
+              "estimated_q0_tick={record['q0_affine']}",
+              "q0_affine",
+          )
+
+          expected_constants = {
+              "HOME_TICK": 2048,
+              "GUARD_OVERSHOOT_TICKS": 64,
+              "UPPER_30_DELTA": 341,
+              "UPPER_85_DELTA": 967,
+              "UPPER_90_DELTA": 1024,
+              "LF_CONTACT_WITNESS_TOLERANCE_TICKS": 24,
+          }
+          constant_errors = []
+          for name, expected in expected_constants.items():
+              match = re.search(
+                  rf"(?m)^const {name}: [^=]+ = (-?\d+);$",
+                  source,
+              )
+              if match is None:
+                  constant_errors.append(f"missing constant {name}")
+              elif int(match.group(1)) != expected:
+                  constant_errors.append(
+                      f"{name}={match.group(1)} expected {expected}"
+                  )
+
+          return_start = source.find(
+              "self.transition_lf_state(LfSessionState::ReturnHip)"
+          )
+          return_end = source.find(
+              "self.transition_lf_state(LfSessionState::RestoreParking)",
+              return_start,
+          )
+          if return_start < 0 or return_end < 0:
+              constant_errors.append("missing final LF return state-machine section")
+          else:
+              return_body = source[return_start:return_end]
+              required_staged = (
+                  "hip_staged_q0",
+                  "lower_staged_q0",
+                  "upper_staged_q0",
+              )
+              missing_staged = [token for token in required_staged if token not in return_body]
+              if missing_staged:
+                  constant_errors.append(
+                      f"missing transactional staged q0 targets: {missing_staged}"
+                  )
+              if "affine.estimated_zero_tick" not in return_body:
+                  constant_errors.append("affine q0 is not used as the staging target")
+              if "fixed_scale.estimated_zero_tick" in return_body:
+                  constant_errors.append("fixed-scale diagnostic used as staging target")
+
+          found = [token for token in forbidden_source if token in source]
+          found += [token for token in forbidden_other if token in port or token in module]
+          missing = [token for token in required_source if token not in source]
+          missing += [token for token in required_tests if token not in tests]
+          missing += [token for token in required_port if token not in port]
+          missing += [token for token in required_module if token not in module]
+          missing += [token for token in required_profile if token not in profile]
+
+          stale = [
+              path for path in (
+                  Path("software/drivers/st3215/src/auto_calibrate/matdog_v2.rs"),
+                  Path("software/drivers/st3215/src/auto_calibrate/matdog_v2_test.rs"),
+              )
+              if path.exists()
+          ]
+          if stale:
+              found.extend(str(path) for path in stale)
+
+          if found or missing or constant_errors:
+              if found:
+                  print(f"forbidden or stale MATDOG source: {found}")
+              if missing:
+                  print(f"missing MATDOG source requirements: {missing}")
+              if constant_errors:
+                  print(f"MATDOG q0/geometry contract errors: {constant_errors}")
+              raise SystemExit(1)
+
+          print("MATDOG canonical 24-contact RAM-only affine+witness q0 contract: PASS")
+          PY
+
+      - name: MATDOG Rust format check
+        shell: bash
+        run: |
+          set -o pipefail
+          rustfmt --edition 2021 --check --config skip_children=true \
+            software/drivers/st3215/src/port.rs \
+            software/drivers/st3215/src/auto_calibrate/mod.rs \
+            software/drivers/st3215/src/auto_calibrate/matdog.rs \
+            software/drivers/st3215/src/auto_calibrate/matdog_test.rs \
+            software/drivers/st3215/src/bin/matdog_lf_freeze.rs \
+            2>&1 | tee ci-output/matdog-rustfmt.log
+
+      - name: ST3215 unit tests
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --package st3215 2>&1 | tee ci-output/st3215-tests.log
+
+      - name: Headless runner unit tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 -m unittest -v \
+            tools.matdog.test_matdog_headless_auto_calibrate \
+            tools.matdog.test_matdog_lf_profile \
+            2>&1 | tee ci-output/headless-runner-tests.log
+
+      - name: Create CI-only Station viewer stub
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset=software/station/clients/station-viewer/dist/index.html
+          test ! -e "$asset"
+          mkdir -p "$(dirname "$asset")"
+          printf '<!doctype html><title>MATDOG offline build gate</title>\n' > "$asset"
+          echo "Created ignored CI-only viewer stub." | tee ci-output/station-viewer-stub.log
+
+      - name: Station release build
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo build --release --package station 2>&1 | tee ci-output/station-build.log
+
+      - name: Remove CI-only viewer stub
+        if: always()
+        run: rm -rf software/station/clients/station-viewer/dist
+
+      - name: Upload offline verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matdog-native-calibrator-24-contact-offline-logs
+          path: ci-output/
+          if-no-files-found: error

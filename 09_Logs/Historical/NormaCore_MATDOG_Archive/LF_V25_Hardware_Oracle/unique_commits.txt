@@ -1,0 +1,92 @@
+f87dd1fbc7e8100d275c74f9af448642f3429680 2026-08-03 chore(matdog): preserve final V25 launcher pin
+222129694eb13c379c4a15dee76da588200436bb 2026-08-03 chore(matdog): preserve final V25 launcher pin
+a1248e7d017df7ef9bfaadd8bd4108e236135276 2026-08-03 chore(matdog): preserve final V25 launcher pin
+a53816d3511829b692352bb9b5fa2f7146b3c154 2026-08-03 chore(matdog): pin reviewed V25 LF artifact
+3f6a9099ea11f90da5981d9ea2cada1c7779878b 2026-08-03 ci(matdog): enforce affine and supervised-witness LF contract
+cddb36f850cc47f9b5fb788f7841bc1039063fe0 2026-08-03 ci(matdog): remove completed V25 write workflow
+c3ebd3c22b02cc84310b1031dfdb70149fd84a18 2026-08-03 ci(matdog): remove completed V25 fixture materializer
+7bb7b321e1776ae5c347b000ccee1dc94ddb09d6 2026-08-03 ci(matdog): remove completed V25 source materializer
+8de7d592f3ecddaebc616d6785fcee03640d3f4f 2026-08-03 fix(matdog): complete LF contact sequence with bounded evidence gates
+3b14d1265494a4b61c71b9e464467fa03e3beb2a 2026-08-03 ci(matdog): align V25 replay telemetry with affine q0
+da30d44ce896a9b5040e49e8df883a5b0921e08d 2026-08-03 ci(matdog): include supervised-witness fixture alignment
+cea0a2058fbc728ab826ad03db09c57212c20fab 2026-08-03 ci(matdog): align V25 tests with supervised LF witness
+fcce4bed4cdacea78eab408b3dad9e1f48beb102 2026-08-03 ci(matdog): repair V25 materializer payload
+1933c852240d3e189cb3118ad8ec91081ab6f13a 2026-08-03 ci(matdog): run V25 final LF materializer
+2abd6d719dee0a1ecf8fb644f06d9c638dcbeca8 2026-08-03 ci(matdog): add one-shot V25 final LF materializer
+165bf197df178ef0862b97be1b8e9384dd1ef107 2026-08-03 ci(matdog): pin V23 friction-aware LF artifact
+0359fb8fc37b7c9b5b1662ba5860e7b756228c8d 2026-08-03 ci(matdog): remove one-shot friction materializer
+fe9b0882e9adcd68a1d2285747e600dcee2a5073 2026-08-03 ci(matdog): remove friction-fix trigger
+ec2fb26fd7697743472042952c1a23eca2786c27 2026-08-03 ci(matdog): remove temporary push materializer
+1ff7e01868b5580e317b9ba649e620f682c2f735 2026-08-03 ci(matdog): remove temporary PR materializer
+36b85d86727e3b041dc61c7845ad3106cf7cfed4 2026-08-03 ci(matdog): restore permanent read-only offline gate
+0ada0b913dcc34207186d30f4df0af41a8091bff 2026-08-03 ci(matdog): publish validated V23 correction through PR gate
+45957b0e2f0b17810d0b0e8e246f8e24987ec8a3 2026-08-03 ci(matdog): publish validated friction fix after remote rebase
+f519fe94e865af9d48dde633846419df84df3921 2026-08-03 fix(matdog): distinguish friction plateaus from held motion
+b5b58d55638848ae7f046cf4a1e715bcc73c30d9 2026-08-03 test(matdog): align held-role fixtures with LF topology
+c6b07adeee40af45cdedba869f72c8edcfc75e61 2026-08-03 ci(matdog): materialize V23 correction through permanent gate
+04abc05a8e1d9a7bd7031166ee9bd2b2522b0f45 2026-08-03 ci(matdog): trigger registered friction materializer
+9e574e563589db4a7b6ea53fe7d172db2bc94a0f 2026-08-03 ci(matdog): add push materializer for friction fix
+1e41d84927d2c7f04c99551c42e921a2d1258900 2026-08-03 ci(matdog): add static-hold friction materializer
+ad4a2fba7b6bb5b661a88a8a990eac99bce6416e 2026-08-03 ci(matdog): trigger static-hold friction materialization
+28f5200aa7e78e18f944635dc7d5e32e1c3cda17 2026-08-03 ci(matdog): materialize general static-hold and friction fix
+2050b4294f30002c76b067d45be35b174cfcf218 2026-08-03 ci(matdog): pin torque-off drift-fix artifact
+3a88821dc531e0d6d0701031222cc6e25261ceb7 2026-08-03 ci(matdog): remove temporary torque-off PR materializer
+b4a8d851a9899cabedc2cea7408e0cbb92467c17 2026-08-03 ci(matdog): remove temporary torque-off materializer
+711026e6086b21be2d2e6da7c48494b6353ea484 2026-08-03 fix(matdog): validate torque-off motion by real drift
+b8e4e819ac032e740cf928d7620ded174784089f 2026-08-03 ci(matdog): format only torque-off fix sources
+c781fa2c92f50eaececf7d8bac5832ae7c6a37a0 2026-08-03 ci(matdog): make torque-off fix transformation structural
+b0200182eb667adb36df90294560683440efbc38 2026-08-03 ci(matdog): add visible general torque-off fix materializer
+8bf96d72b6b5a30e9c77fd1812b18a721904d9ff 2026-08-03 ci(matdog): trigger torque-off motion materialization
+4e4020910050ab23ab3927fef150747407a3e818 2026-08-03 ci(matdog): materialize general torque-off motion fix
+de91af58287d85e415dc539c8f8051142c676d48 2026-08-03 fix(matdog): pin final LF measurement and freeze artifact
+b9b76b6c6474172fd0e602b6ec3481bff730d794 2026-08-03 ci(matdog): fix exact-source artifact preflight
+ea0ab523fd30ee78396412a54ea132fb164287ed 2026-08-03 ci(matdog): build final LF measurement and freeze artifact
+43db39bebfbe2e92e32f1d8b98ad3beaace5cb38 2026-08-03 ci(matdog): remove completed one-shot materialization workflow
+3aa53ebcea5c62a915c7119a8f38827a2d274fb9 2026-08-03 ci(matdog): remove temporary LF freeze verification workflow
+ea4f01f283d092ab2c97c3f46fc1668aaad0542e 2026-08-03 ci(matdog): remove temporary LF freeze transformer workflow
+a459146c117183edffa88596dae18a86f5437776 2026-08-03 ci(matdog): verify LF staging, latest-only runner and freeze tool
+f4a673f1cabde1f8e9ae265bdc84aadbc408dc07 2026-08-03 feat(matdog): materialize LF measurement and freeze pipeline
+4b834f8d521996806f5f95696dfafd2c6f47ef74 2026-08-03 ci(matdog): materialize production source without workflow mutation
+207d20948d76ae90cd9123d8be5c5c15c0a43f3d 2026-08-03 ci(matdog): expose one-shot LF materialization as PR check
+01a49038c050e98c50d76759b7a2c2ea74bf838d 2026-08-03 ci(matdog): materialize reviewed LF freeze source once
+2d9ac20bda8204e5828ce92e3c0289036cd0adb8 2026-08-03 ci(matdog): verify latest-only runner contract and package tests
+50ec2c106d5d20f96cb5566aa8caade9043cbfb3 2026-08-03 test(matdog): align runner checks with latest-only native thermal authority
+8323d7f82d0189db3c48a53765d3d4d104aa3917 2026-08-03 ci(matdog): verify canonical LF contact fixtures
+196303cbce97c990ad4f485f0b8e0e428293626c 2026-08-03 fix(matdog): use canonical contact fixtures in LF freeze tests
+aa118d1340d5cc2de20279b2ca11bf96f24c1661 2026-08-03 fix(matdog): complete source-boundary replacements and shorten preflight
+10d35c67760ff508f9381fc522f6c2a7c5c95ce7 2026-08-03 fix(matdog): remove immediate thermal threshold by exact source line
+4e54abadde4c7bf4b6a29454b01dc5da5c710ac1 2026-08-03 ci(matdog): format and verify transformed LF freeze source
+d28b07f07f1426e16921c4c972e3596b10f84b07 2026-08-03 fix(matdog): confirm all direct thermal spikes and repair scan insertion
+9186cbea3de18d0a7d2b62d9d8a6e339263d207b 2026-08-03 fix(matdog): match top-level Rust test functions in LF upgrade
+89363d845cea212395c72cba940324af9a38f4e7 2026-08-03 fix(matdog): target verified cleanup for LF profile emission
+3487e7dd2cde478c230d266522b9975ef8b28a4c 2026-08-03 ci(matdog): retry LF freeze upgrade with exact marker fix
+30df77ad65db15330a906e0174e6511325184c27 2026-08-03 fix(matdog): make thermal call marker whitespace-independent
+d62652c744822d5f8b1aada04c5fc04a1570a57f 2026-08-03 ci(matdog): verify LF freeze source upgrade
+94243a552fc5c72107724e371cf7c402fabd62f7 2026-08-03 build(matdog): add fail-closed LF freeze source upgrade
+61d625a42f0676bebabfc00ef2dd709df64590f3 2026-08-03 test(matdog): cover LF staged and frozen profiles
+7b4e09cfe73a4e6e7238d6a2c61a646e77f13449 2026-08-03 feat(matdog): add transactional LF EEPROM freeze tool
+cc29da2b4345960a109af2c10698f5984a84ea69 2026-08-03 feat(matdog): add LF staged and frozen profile builder
+ada5bdf7c54d1f752492a0aefbacb5911a8cfc79 2026-08-03 chore(matdog): pin corrected native-authority Station artifact
+26e743b1e62714b3d09c0fe3a6472bc9e56380b4 2026-08-03 ci(matdog): remove phase-reconstruction workflow
+55b4a59b75db3db2739a071c79c24eb1e768ceeb 2026-08-03 test(matdog): remove joint-specific observer tests
+45d4cd6e67faf315b11c8f164f0b67d56d6576ad 2026-08-03 refactor(matdog): remove duplicate phase state machine
+76cffb4f6f1039810444813ab05b381ba38df4f9 2026-08-03 ci(matdog): enforce native observer authority boundary
+92af6b45cc28f7cbe011fac5f7e2e107f1bc680a 2026-08-03 test(matdog): pin native observer authority boundary
+35f8612e65b4cdc83181c6d31f54f44c1271e28b 2026-08-03 refactor(matdog): pin native-authority observer
+bea1804c822ac5f09001fdbbf877f214349211e5 2026-08-03 test(matdog): cover generic native priming lifecycle
+759dd8be1419b0edf5c4070db3f39c881fcb6ff8 2026-08-03 refactor(matdog): make native calibrator sole motion authority
+345afc7891daf7529c5e822fba43f689dfda5637 2026-08-03 test(matdog): replay M42 priming telemetry transition
+62b0f72bcdfe3cc0fa40f851a8e6ee04243a772a 2026-08-03 fix(matdog): observe bounded M42 parking prime transition
+4102637855e4cc3693ea6453a9530cd4ff601b7a 2026-08-03 fix(st3215): admit bounded M42 q0 priming target
+68c4a69faa73a38ddfd6ad6bb81ea3eb613444ef 2026-08-03 ci(matdog): verify q0-first observer contract
+874ce146201c9a35ffb5c6f9ae7b79d3ac41952a 2026-08-03 test(matdog): require q0 phase contract installation
+350609bcc04375e1663148ed43cfab975b6749df 2026-08-03 fix(matdog): install q0 phase-aware runner contract
+a5fd8b2400afdca1d7b7f46fab246ae3afa1433f 2026-08-03 test(matdog): cover phase-aware q0 observer
+48f93040cb954a28adca4be3bd772739d823311b 2026-08-03 fix(matdog): observe q0-first startup phase correctly
+556e1143e9ddf3f255d12e9701cce5012a316fad 2026-08-03 ci(matdog): test pinned Station launcher
+24c3c2062862eb96fa350e9f702069986c024809 2026-08-03 test(matdog): verify pinned Station launcher
+b461198679416f4065da1630cde8931b1f55490f 2026-08-03 fix(matdog): pin q0-first Station artifact
+b112ae4a7c6866305d3deb3b49efa3105beea528 2026-08-03 ci(matdog): build Station from exact PR head
+5e7602ad03d584232cc82a501e6ce3f1a1a8c5ba 2026-08-03 ci(matdog): publish pinned V42 Station artifact
+b17f39e4676c44c1dcad3bd854abfad15d9487c4 2026-08-02 ci(matdog): align offline gate with q0-first geometry
+ddb615aec92f0e0b558697293a9b2161f793691b 2026-08-02 feat(st3215): add q0-first MATDOG LF calibrator

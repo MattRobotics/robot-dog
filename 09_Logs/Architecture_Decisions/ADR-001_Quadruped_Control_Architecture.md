@@ -1,5 +1,19 @@
 # ADR-001 - Quadruped Control Architecture
 
+> ## ⚠️ SUPERSEDED DECISION RECORD — 2026-08-27
+>
+> This ADR records the **original** control-architecture decision: NormaCore Station as sole
+> ST3215 owner, via the Waveshare Bus Servo Adapter, for 12 servos.
+>
+> That decision has been **superseded**. MATDOG now uses a dedicated ESP32-S3 motion coprocessor as
+> the operational owner of the ST3215 bus, over native USB CDC, driving a Seeed Bus Servo Driver,
+> for 17 servos.
+>
+> This record is preserved unedited as the historical decision it was. Current architecture:
+> [ARCHITECTURE.md](../../01_Docs/02_Architecture/ARCHITECTURE.md) ·
+> [historical index](../Historical/README.md)
+
+
 Date: 2026-06-17
 
 ## Status

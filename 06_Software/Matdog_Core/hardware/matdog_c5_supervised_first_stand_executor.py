@@ -58,6 +58,14 @@ from software.station.shared.station_py import new_station_client, send_commands
 from target.gen_python.protobuf.station import commands as station_commands, drivers  # noqa: E402
 from target.gen_python.protobuf.drivers.st3215 import st3215  # noqa: E402
 
+# --- MATDOG calibration fail-closed gate (2026-08-27) -------------------------
+# Blocks hardware acquisition while calibration is reset. See
+# 09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "calibration"))
+from matdog_calibration_gate import require_hardware_authorized  # noqa: E402
+# -----------------------------------------------------------------------------
+
+
 
 RAM_TORQUE_ENABLE = 0x28
 RAM_ACC = 0x29
@@ -312,6 +320,8 @@ def build_sequence(
 
 
 async def main_async(args):
+    # FAIL-CLOSED: refuse before acquiring any hardware handle.
+    require_hardware_authorized("matdog_c5_supervised_first_stand_executor", getattr(args, "config", None))
     calibration = load_joint_calibration(args.config)
     sequence, summary = build_sequence(
         c4c_report=args.c4c_report,

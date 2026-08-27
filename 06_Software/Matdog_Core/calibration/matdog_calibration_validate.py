@@ -11,6 +11,17 @@ Read-only:
 from __future__ import annotations
 
 import argparse
+import sys as _sys
+from pathlib import Path as _Path
+
+_sys.path.insert(0, str(_Path(__file__).resolve().parent))
+from matdog_calibration_gate import (  # noqa: E402
+    calibration_state,
+    hardware_motion_authorized,
+    load_calibration,
+    refusal_reason,
+    stale_banner,
+)
 import hashlib
 import sys
 import xml.etree.ElementTree as ET
@@ -83,6 +94,14 @@ def main() -> int:
         description="Valida il contratto MATDOG YAML <-> URDF."
     )
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    parser.add_argument(
+        "--historical",
+        action="store_true",
+        help=(
+            "read-only inspection of stale/historical calibration. Output is labelled "
+            "STALE and never reports PASS as current truth."
+        ),
+    )
     args = parser.parse_args()
 
     config_path = Path(args.config).expanduser().resolve()
@@ -445,9 +464,48 @@ def main() -> int:
             print(f"- {error}")
         return 1
 
-    print("\nPASS: YAML, mapping servo, direzioni, assi e URDF sono bloccati")
-    print("      sullo stesso riferimento cinematico REV00.")
-    return 0
+    # ---- calibration fail-closed gate -------------------------------------
+    # The structural contract above (YAML/mapping/axes/URDF) may well be intact,
+    # but a structurally valid file describing a robot that has been rebuilt is
+    # NOT a pass. The gate decides the verdict.
+    gate_data = load_calibration(config_path)
+    authorized = hardware_motion_authorized(gate_data)
+
+    if authorized:
+        print("\nPASS: YAML, mapping servo, direzioni, assi e URDF sono bloccati")
+        print("      sullo stesso riferimento cinematico REV00.")
+        print(f"      Calibration state: {calibration_state(gate_data)}")
+        return 0
+
+    banner = stale_banner(gate_data)
+    print()
+    print("=" * 72)
+    print(banner)
+    print("=" * 72)
+    print("STRUCTURAL CONTRACT: OK "
+          "(YAML, mapping servo, direzioni, assi e URDF coerenti con REV00)")
+    print()
+    print(f"CALIBRATION STATE:   {calibration_state(gate_data)}")
+    print(f"REASON:              {refusal_reason(gate_data)}")
+    print()
+
+    if args.historical:
+        print("HISTORICAL INSPECTION (--historical): values above are STALE and are")
+        print("shown for provenance only. They are NOT current robot state and MUST")
+        print("NOT be used to command hardware.")
+        print()
+        print("RESULT: STALE — historical inspection only, NOT a pass.")
+        return 0
+
+    print("RESULT: FAIL — stale calibration cannot be validated as current.")
+    print()
+    print("  The structural contract is intact, but all 17 servos were removed,")
+    print("  provisioned to PositionOffset=0 and remounted on 2026-08-27.")
+    print("  Full recalibration is required before this file describes the robot.")
+    print()
+    print("  Read-only historical inspection: re-run with --historical")
+    print("  See 09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md")
+    return 2
 
 
 if __name__ == "__main__":

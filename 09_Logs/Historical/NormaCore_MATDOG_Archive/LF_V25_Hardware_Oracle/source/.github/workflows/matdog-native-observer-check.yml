@@ -1,0 +1,89 @@
+name: MATDOG Native Observer Check
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/matdog-native-observer-check.yml"
+      - "tools/matdog/matdog_native_observer_contract.py"
+      - "tools/matdog/matdog_v42_pinned_launcher.py"
+      - "tools/matdog/test_matdog_native_observer_contract.py"
+      - "tools/matdog/test_matdog_v42_pinned_launcher.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: matdog-native-observer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  observer-contract:
+    name: Enforce native motion authority and external safety invariants
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Prove exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Enforce observer authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          observer = Path(
+              "tools/matdog/matdog_native_observer_contract.py"
+          ).read_text()
+          launcher = Path(
+              "tools/matdog/matdog_v42_pinned_launcher.py"
+          ).read_text()
+
+          required = (
+              "_matdog_native_authority_observer = True",
+              "def validate_running(self, frame: Any) -> None:",
+              "self.validate_common(frame)",
+              "matdog_native_observer_contract.install(runner)",
+          )
+          combined = observer + "\n" + launcher
+          missing = [token for token in required if token not in combined]
+          if missing:
+              raise SystemExit(
+                  f"missing native observer requirements: {missing}"
+              )
+
+          forbidden_observer = (
+              "M42",
+              "HOME_TICK",
+              "current_step",
+              "calibration.phase",
+              "CONTROLLED_GOAL_CORRIDORS",
+              "CONTROLLED_POSITION_CORRIDORS",
+              "NONPARTICIPATING_MOTOR_IDS",
+              "EXPECTED_ACTIVE_TORQUE_LIMIT",
+          )
+          found = [token for token in forbidden_observer if token in observer]
+          if found:
+              raise SystemExit(
+                  "external observer reconstructs native motion policy: "
+                  f"{found}"
+              )
+
+          print("MATDOG native-authority observer boundary: PASS")
+          PY
+
+      - name: Replay generic priming and global fault cases
+        run: |
+          python3 -m unittest -v \
+            tools.matdog.test_matdog_native_observer_contract \
+            tools.matdog.test_matdog_v42_pinned_launcher

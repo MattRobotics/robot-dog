@@ -1,0 +1,1414 @@
+diff --git a/software/drivers/st3215/src/auto_calibrate/matdog.rs b/software/drivers/st3215/src/auto_calibrate/matdog.rs
+index 65c16f3..aef6f02 100644
+--- a/software/drivers/st3215/src/auto_calibrate/matdog.rs
++++ b/software/drivers/st3215/src/auto_calibrate/matdog.rs
+@@ -99,6 +99,12 @@ const LOWER_FOLDED_DELTA: i16 = -990;
+ const CONTACT_ACCEPTANCE_INNER_TICKS: u16 = 64;
+ const LF_HIP_SEQUENCE_ARM_VALUE: &str = "LF_HIP_M13_MIN_MAX";
+ const LF_FULL_SEQUENCE_ARM_VALUE: &str = "LF_LEG_STATE_MACHINE";
++const RF_FULL_SEQUENCE_ARM_VALUE: &str = "RF_LEG_STATE_MACHINE";
++// RF relative-span witness: the authoritative mechanical span per joint is
++// derived from the same supervised LF V25 hardware contact pair used by the
++// LF absolute witness, not from a separate RF-specific constant. RF never
++// compares against absolute (possibly mirrored) endpoint ticks.
++const RF_WITNESS_TOLERANCE_TICKS: u16 = LF_CONTACT_WITNESS_TOLERANCE_TICKS;
+ const ADAPTIVE_FINE_SCOUT_TICKS: u16 = 32;
+ // Fine approaches use smaller increments and may settle slightly before the
+ // coarse scout. A lag greater than one fine step is treated as a bounded
+@@ -496,6 +502,21 @@ fn is_lf_full_sequence(profile: &ContactProfile) -> bool {
+         && profile.allowed_motor_ids == &LF_ALLOWED
+ }
+ 
++fn rf_full_sequence_profile() -> Result<ContactProfile, String> {
++    let mut profile = build_profile(Leg::Rf, JointKind::Upper, ContactSide::Min)?;
++    profile.arm_value = RF_FULL_SEQUENCE_ARM_VALUE.to_string();
++    profile.label = RF_FULL_SEQUENCE_ARM_VALUE.to_string();
++    profile.allowed_motor_ids = &RF_ALLOWED;
++    profile.prerequisites = vec![static_target(Leg::Rh, JointKind::Upper, UPPER_30_DELTA)?];
++    Ok(profile)
++}
++
++fn is_rf_full_sequence(profile: &ContactProfile) -> bool {
++    profile.arm_value == RF_FULL_SEQUENCE_ARM_VALUE
++        && profile.leg == Leg::Rf
++        && profile.allowed_motor_ids == &RF_ALLOWED
++}
++
+ pub(crate) fn all_profiles() -> Result<Vec<ContactProfile>, String> {
+     let mut profiles = Vec::with_capacity(24);
+     for leg in [Leg::Lf, Leg::Rf, Leg::Rh, Leg::Lh] {
+@@ -515,6 +536,9 @@ pub(crate) fn profile_for_arm_value(value: &str) -> Result<ContactProfile, Strin
+     if value == LF_HIP_SEQUENCE_ARM_VALUE {
+         return lf_hip_sequence_profile(ContactSide::Min);
+     }
++    if value == RF_FULL_SEQUENCE_ARM_VALUE {
++        return rf_full_sequence_profile();
++    }
+     all_profiles()?
+         .into_iter()
+         .find(|profile| profile.arm_value == value)
+@@ -526,6 +550,7 @@ pub(crate) fn profile_for_arm_value(value: &str) -> Result<ContactProfile, Strin
+                 .collect::<Vec<_>>();
+             supported.push(LF_HIP_SEQUENCE_ARM_VALUE.to_string());
+             supported.push(LF_FULL_SEQUENCE_ARM_VALUE.to_string());
++            supported.push(RF_FULL_SEQUENCE_ARM_VALUE.to_string());
+             format!(
+                 "unsupported {MATDOG_ARM_ENV}={value:?}; expected one of: {}",
+                 supported.join(", ")
+@@ -537,6 +562,7 @@ fn hardware_profile_allowed(profile: &ContactProfile) -> Result<(), String> {
+     if profile.joint == JointKind::Hip
+         && !is_lf_hip_sequence(profile)
+         && !is_lf_full_sequence(profile)
++        && !is_rf_full_sequence(profile)
+     {
+         return Err(format!("{}: {}", profile.label, HIP_HARDWARE_BLOCK_REASON));
+     }
+@@ -582,7 +608,13 @@ pub(crate) fn ram_write_allowed_for_profile(
+         register.address() as u32 == address && register.size() as usize == value.len()
+     });
+ 
+-    let profile_participant = !is_lf_full_sequence(profile) || LF_ALLOWED.contains(&motor_id);
++    let profile_participant = if is_lf_full_sequence(profile) {
++        LF_ALLOWED.contains(&motor_id)
++    } else if is_rf_full_sequence(profile) {
++        RF_ALLOWED.contains(&motor_id)
++    } else {
++        true
++    };
+     let startup_home_recovery_motor = MATDOG_MOTOR_IDS.contains(&motor_id);
+     match register {
+         // Exact global torque OFF must always remain reachable. Torque ON and
+@@ -663,6 +695,37 @@ fn lf_full_sequence_goal_allowed(motor_id: u8, target: u16) -> bool {
+     false
+ }
+ 
++fn rf_full_sequence_goal_allowed(motor_id: u8, target: u16) -> bool {
++    if full_sequence_joint_goal_allowed(Leg::Rf, JointKind::Hip, motor_id, target)
++        || full_sequence_joint_goal_allowed(Leg::Rf, JointKind::Upper, motor_id, target)
++        || full_sequence_joint_goal_allowed(Leg::Rf, JointKind::Lower, motor_id, target)
++    {
++        return true;
++    }
++
++    if motor_id == spec_for(Leg::Rh, JointKind::Upper).motor_id {
++        let Ok(parking) = static_target(Leg::Rh, JointKind::Upper, UPPER_30_DELTA) else {
++            return false;
++        };
++        // Mirrors the LF q=0 normalization priming band exactly (see the M42
++        // branch of lf_full_sequence_goal_allowed above): a bounded settle
++        // around the observed startup tick before torque enable, not a
++        // separately widened corridor. Parking target derives from the same
++        // static_target/UPPER_30_DELTA formula already used by every
++        // existing RF prerequisite on current main (prerequisites_for()),
++        // not from the archived branch's 1044/1032 constants.
++        let low = HOME_TICK
++            .min(parking.target_tick)
++            .saturating_sub(STATIC_TOLERANCE_TICKS);
++        let high = HOME_TICK
++            .max(parking.target_tick)
++            .min(protocol::MAX_ANGLE_STEP);
++        return (low..=high).contains(&target);
++    }
++
++    false
++}
++
+ fn lf_full_joint_corridor(motor_id: u8) -> Option<TickCorridor> {
+     let joint = match motor_id {
+         11 => Some(JointKind::Lower),
+@@ -728,6 +791,71 @@ fn lf_participant_corridor(motor_id: u8) -> Result<TickCorridor, String> {
+     }
+ }
+ 
++fn rf_full_joint_corridor(motor_id: u8) -> Option<TickCorridor> {
++    let joint = match motor_id {
++        21 => Some(JointKind::Lower),
++        22 => Some(JointKind::Upper),
++        23 => Some(JointKind::Hip),
++        _ => None,
++    }?;
++    let minimum = build_profile(Leg::Rf, joint, ContactSide::Min).ok()?;
++    let maximum = build_profile(Leg::Rf, joint, ContactSide::Max).ok()?;
++    Some(TickCorridor {
++        low: minimum.guard_tick.min(maximum.guard_tick),
++        high: minimum
++            .guard_tick
++            .max(maximum.guard_tick)
++            .min(protocol::MAX_ANGLE_STEP),
++    })
++}
++
++fn rf_parking_corridor() -> Result<TickCorridor, String> {
++    let parking = static_target(Leg::Rh, JointKind::Upper, UPPER_30_DELTA)?;
++    Ok(TickCorridor {
++        low: HOME_TICK
++            .min(parking.target_tick)
++            .saturating_sub(PROBE_PASSIVE_RESTORE_DRIFT_TICKS),
++        high: HOME_TICK
++            .max(parking.target_tick)
++            .saturating_add(PROBE_PASSIVE_RESTORE_DRIFT_TICKS)
++            .min(protocol::MAX_ANGLE_STEP),
++    })
++}
++
++fn rf_passive_corridor(state: RfSessionState, motor_id: u8) -> Result<TickCorridor, String> {
++    if motor_id == 32 {
++        return rf_parking_corridor();
++    }
++    if !matches!(motor_id, 21 | 22 | 23) {
++        return Err(format!("M{motor_id} is not an RF passive participant"));
++    }
++    if matches!(
++        state,
++        RfSessionState::Preflight
++            | RfSessionState::InitialRecovery
++            | RfSessionState::Cleanup
++            | RfSessionState::TorqueOff
++    ) {
++        return rf_full_joint_corridor(motor_id)
++            .ok_or_else(|| format!("no full RF corridor for M{motor_id}"));
++    }
++    Ok(TickCorridor {
++        low: HOME_TICK.saturating_sub(PROBE_PASSIVE_RESTORE_DRIFT_TICKS),
++        high: HOME_TICK
++            .saturating_add(PROBE_PASSIVE_RESTORE_DRIFT_TICKS)
++            .min(protocol::MAX_ANGLE_STEP),
++    })
++}
++
++fn rf_participant_corridor(motor_id: u8) -> Result<TickCorridor, String> {
++    if motor_id == 32 {
++        rf_parking_corridor()
++    } else {
++        rf_full_joint_corridor(motor_id)
++            .ok_or_else(|| format!("no commanded RF corridor for M{motor_id}"))
++    }
++}
++
+ fn armed_goal_target_allowed(profile: &ContactProfile, motor_id: u8, target: u16) -> bool {
+     // Before strict profile roles exist, every canonical MATDOG joint may
+     // receive exactly one generic geometric target: digital HOME/q=0. Initial
+@@ -739,6 +867,9 @@ fn armed_goal_target_allowed(profile: &ContactProfile, motor_id: u8, target: u16
+     if is_lf_full_sequence(profile) {
+         return lf_full_sequence_goal_allowed(motor_id, target);
+     }
++    if is_rf_full_sequence(profile) {
++        return rf_full_sequence_goal_allowed(motor_id, target);
++    }
+     if is_lf_hip_sequence(profile) && motor_id == profile.motor_id {
+         let Ok(minimum) = lf_hip_sequence_profile(ContactSide::Min) else {
+             return false;
+@@ -858,6 +989,18 @@ fn fine_contact_reproduces_coarse_depth(
+         <= FINE_CONTACT_SCOUT_LAG_TOLERANCE_TICKS
+ }
+ 
++// A plateau found before the RF anchor-predicted second-contact region is
++// not treated as a valid contact; approach_with_scout_and_expected_region()
++// continues the bounded search instead of accepting it. `None` (every LF
++// call site and every RF first/anchor-side call) never rejects on this
++// basis.
++fn position_inside_expected_region(position: u16, expected_region: Option<(u16, u16)>) -> bool {
++    match expected_region {
++        Some((low, high)) => (low..=high).contains(&position),
++        None => true,
++    }
++}
++
+ #[cfg(test)]
+ fn position_inside_adaptive_contact_acceptance(
+     profile: &ContactProfile,
+@@ -1356,6 +1499,398 @@ impl LfSessionStateMachine {
+     }
+ }
+ 
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++enum RfSessionState {
++    Preflight,
++    InitialRecovery,
++    Parking,
++    UpperMin,
++    UpperMax,
++    UpperHorizontal,
++    LowerMin,
++    LowerMax,
++    LowerFolded,
++    // Physical execution order for RF HIP M23 is reversed from LF: MAX
++    // (probe_sign<0, tick decrescenti) is the real first physical contact
++    // (downward); MIN (probe_sign>0, tick crescenti) is the real second
++    // physical contact (upward). These two state names track physical
++    // order; rf_contact_state() below is the only place that maps them to
++    // the logical ContactSide::{Min,Max} defined by build_profile().
++    HipDown,
++    HipUp,
++    Diagnostics,
++    ReturnHip,
++    ReturnLowerHeld,
++    ReturnUpper,
++    RestoreParking,
++    Cleanup,
++    TorqueOff,
++}
++
++impl RfSessionState {
++    const fn label(self) -> &'static str {
++        match self {
++            Self::Preflight => "preflight",
++            Self::InitialRecovery => "initial-recovery",
++            Self::Parking => "parking",
++            Self::UpperMin => "upper-min",
++            Self::UpperMax => "upper-max",
++            Self::UpperHorizontal => "upper-horizontal",
++            Self::LowerMin => "lower-min",
++            Self::LowerMax => "lower-max",
++            Self::LowerFolded => "lower-folded",
++            Self::HipDown => "hip-down",
++            Self::HipUp => "hip-up",
++            Self::Diagnostics => "diagnostics",
++            Self::ReturnHip => "return-hip",
++            Self::ReturnLowerHeld => "return-lower-held",
++            Self::ReturnUpper => "return-upper",
++            Self::RestoreParking => "restore-parking",
++            Self::Cleanup => "cleanup",
++            Self::TorqueOff => "torque-off",
++        }
++    }
++}
++
++#[derive(Debug, Clone)]
++struct RfSessionStateMachine {
++    state: RfSessionState,
++    active: Option<LfActiveMotor>,
++    held_targets: Vec<StaticTarget>,
++    entry_positions: Vec<(u8, u16)>,
++    contacts: [Option<DualContactResult>; 3],
++    fixed_scale: [Option<ModelZeroEstimate>; 3],
++    affine: [Option<AffineJointCalibration>; 3],
++    trace: Vec<RfSessionState>,
++}
++
++impl RfSessionStateMachine {
++    fn new(entry_positions: Vec<(u8, u16)>) -> Result<Self, String> {
++        let ids = entry_positions
++            .iter()
++            .map(|(motor_id, _)| *motor_id)
++            .collect::<Vec<_>>();
++        if !is_exact_matdog_motor_set(&ids) {
++            return Err(
++                "RF state machine requires one entry position for every canonical ID".into(),
++            );
++        }
++        Ok(Self {
++            state: RfSessionState::Preflight,
++            active: None,
++            held_targets: Vec::new(),
++            entry_positions,
++            contacts: [None; 3],
++            fixed_scale: [None; 3],
++            affine: [None; 3],
++            trace: vec![RfSessionState::Preflight],
++        })
++    }
++
++    fn transition(&mut self, next: RfSessionState) -> Result<(), String> {
++        let allowed = self.state == next
++            || matches!(next, RfSessionState::Cleanup)
++            || matches!(
++                (self.state, next),
++                (RfSessionState::Preflight, RfSessionState::InitialRecovery)
++                    | (RfSessionState::InitialRecovery, RfSessionState::Parking)
++                    | (RfSessionState::Parking, RfSessionState::UpperMin)
++                    | (RfSessionState::UpperMin, RfSessionState::UpperMax)
++                    | (RfSessionState::UpperMax, RfSessionState::UpperHorizontal)
++                    | (RfSessionState::UpperHorizontal, RfSessionState::LowerMin)
++                    | (RfSessionState::LowerMin, RfSessionState::LowerMax)
++                    | (RfSessionState::LowerMax, RfSessionState::LowerFolded)
++                    | (RfSessionState::LowerFolded, RfSessionState::HipDown)
++                    | (RfSessionState::HipDown, RfSessionState::HipUp)
++                    | (RfSessionState::HipUp, RfSessionState::Diagnostics)
++                    | (RfSessionState::Diagnostics, RfSessionState::ReturnHip)
++                    | (RfSessionState::ReturnHip, RfSessionState::ReturnLowerHeld)
++                    | (RfSessionState::ReturnLowerHeld, RfSessionState::ReturnUpper)
++                    | (RfSessionState::ReturnUpper, RfSessionState::RestoreParking)
++                    | (RfSessionState::RestoreParking, RfSessionState::Cleanup)
++                    | (RfSessionState::Cleanup, RfSessionState::TorqueOff)
++            );
++        if !allowed {
++            return Err(format!(
++                "invalid RF state transition: {} -> {}",
++                self.state.label(),
++                next.label()
++            ));
++        }
++        if self.state != next && !matches!(next, RfSessionState::Cleanup) {
++            self.validate_transition_entry(next)?;
++        }
++        if self.state != next {
++            self.state = next;
++            if next != RfSessionState::Diagnostics {
++                self.active = None;
++            }
++            self.trace.push(next);
++        }
++        Ok(())
++    }
++
++    fn validate_transition_entry(&self, next: RfSessionState) -> Result<(), String> {
++        let required_holds: &[u8] = match next {
++            RfSessionState::Preflight
++            | RfSessionState::InitialRecovery
++            | RfSessionState::Parking
++            | RfSessionState::Cleanup
++            | RfSessionState::TorqueOff => &[],
++            RfSessionState::UpperMin
++            | RfSessionState::UpperMax
++            | RfSessionState::UpperHorizontal => &[32],
++            RfSessionState::LowerMin | RfSessionState::LowerMax | RfSessionState::LowerFolded => {
++                &[22, 32]
++            }
++            RfSessionState::HipDown
++            | RfSessionState::HipUp
++            | RfSessionState::Diagnostics
++            | RfSessionState::ReturnHip => &[21, 22, 32],
++            RfSessionState::ReturnLowerHeld
++            | RfSessionState::ReturnUpper
++            | RfSessionState::RestoreParking => &[21, 22, 23, 32],
++        };
++        let observed_holds = self
++            .held_targets
++            .iter()
++            .map(|target| target.motor_id)
++            .collect::<BTreeSet<_>>();
++        let expected_holds = required_holds.iter().copied().collect::<BTreeSet<_>>();
++        if observed_holds != expected_holds {
++            return Err(format!(
++                "RF transition {} -> {} has wrong held set: expected={expected_holds:?}, observed={observed_holds:?}",
++                self.state.label(),
++                next.label(),
++            ));
++        }
++
++        let required_previous_active = match (self.state, next) {
++            (RfSessionState::UpperMin, RfSessionState::UpperMax)
++            | (RfSessionState::UpperMax, RfSessionState::UpperHorizontal) => Some(22),
++            (RfSessionState::LowerMin, RfSessionState::LowerMax)
++            | (RfSessionState::LowerMax, RfSessionState::LowerFolded) => Some(21),
++            (RfSessionState::HipDown, RfSessionState::HipUp)
++            | (RfSessionState::HipUp, RfSessionState::Diagnostics)
++            | (RfSessionState::Diagnostics, RfSessionState::ReturnHip) => Some(23),
++            _ => None,
++        };
++        if let Some(required_motor) = required_previous_active {
++            if self.active.map(|active| active.motor_id) != Some(required_motor) {
++                return Err(format!(
++                    "RF transition {} -> {} requires active M{required_motor}",
++                    self.state.label(),
++                    next.label(),
++                ));
++            }
++        }
++        Ok(())
++    }
++
++    fn active_motor_allowed(&self, motor_id: u8) -> bool {
++        match self.state {
++            RfSessionState::InitialRecovery => matches!(motor_id, 21 | 22 | 23),
++            RfSessionState::Parking | RfSessionState::RestoreParking => motor_id == 32,
++            RfSessionState::UpperMin
++            | RfSessionState::UpperMax
++            | RfSessionState::UpperHorizontal => motor_id == 22,
++            RfSessionState::LowerMin | RfSessionState::LowerMax | RfSessionState::LowerFolded => {
++                motor_id == 21
++            }
++            RfSessionState::HipDown
++            | RfSessionState::HipUp
++            | RfSessionState::Diagnostics
++            | RfSessionState::ReturnHip => motor_id == 23,
++            RfSessionState::ReturnLowerHeld => motor_id == 21,
++            RfSessionState::ReturnUpper => motor_id == 22,
++            RfSessionState::Preflight | RfSessionState::Cleanup | RfSessionState::TorqueOff => {
++                false
++            }
++        }
++    }
++
++    fn set_active(
++        &mut self,
++        motor_id: u8,
++        target_tick: u16,
++        kind: LfActiveKind,
++    ) -> Result<(), String> {
++        if !self.active_motor_allowed(motor_id) {
++            return Err(format!(
++                "M{motor_id} cannot be active in RF state {}",
++                self.state.label()
++            ));
++        }
++        let corridor = rf_participant_corridor(motor_id)?;
++        if !corridor.contains(target_tick) {
++            return Err(format!(
++                "M{motor_id} target {target_tick} outside RF state corridor {}..={}",
++                corridor.low, corridor.high
++            ));
++        }
++        self.active = Some(LfActiveMotor {
++            motor_id,
++            target_tick,
++            kind,
++        });
++        Ok(())
++    }
++
++    fn update_active_target(&mut self, motor_id: u8, target_tick: u16) -> Result<(), String> {
++        let corridor = rf_participant_corridor(motor_id)?;
++        if !corridor.contains(target_tick) {
++            return Err(format!(
++                "M{motor_id} target {target_tick} outside RF commanded corridor {}..={}",
++                corridor.low, corridor.high
++            ));
++        }
++        let active = self
++            .active
++            .as_mut()
++            .filter(|active| active.motor_id == motor_id)
++            .ok_or_else(|| {
++                format!(
++                    "M{motor_id} GoalPosition update has no matching active RF role in {}",
++                    self.state.label()
++                )
++            })?;
++        active.target_tick = target_tick;
++        Ok(())
++    }
++
++    fn clear_active(&mut self, motor_id: u8) {
++        if self.active.map(|active| active.motor_id) == Some(motor_id) {
++            self.active = None;
++        }
++    }
++
++    fn hold(&mut self, target: StaticTarget) -> Result<(), String> {
++        let allowed = matches!(
++            (self.state, target.motor_id),
++            (RfSessionState::Parking, 32)
++                | (RfSessionState::UpperHorizontal, 22)
++                | (RfSessionState::LowerFolded, 21)
++                | (RfSessionState::ReturnHip, 23)
++                | (RfSessionState::ReturnLowerHeld, 21)
++                | (RfSessionState::ReturnUpper, 22)
++        );
++        if !allowed {
++            return Err(format!(
++                "M{} cannot be promoted to held in RF state {}",
++                target.motor_id,
++                self.state.label()
++            ));
++        }
++        let active = self.active.ok_or_else(|| {
++            format!(
++                "M{} cannot be held without a completed active move",
++                target.motor_id
++            )
++        })?;
++        if active.motor_id != target.motor_id || active.target_tick != target.target_tick {
++            return Err(format!(
++                "M{} held target {} does not match active M{} target {}",
++                target.motor_id, target.target_tick, active.motor_id, active.target_tick
++            ));
++        }
++        let corridor = rf_participant_corridor(target.motor_id)?;
++        if !corridor.contains(target.target_tick) {
++            return Err(format!(
++                "M{} held target {} outside {}..={}",
++                target.motor_id, target.target_tick, corridor.low, corridor.high
++            ));
++        }
++        self.release(target.motor_id);
++        self.held_targets.push(target);
++        self.clear_active(target.motor_id);
++        Ok(())
++    }
++
++    fn release(&mut self, motor_id: u8) {
++        self.held_targets
++            .retain(|target| target.motor_id != motor_id);
++    }
++
++    fn role_for(&self, motor_id: u8) -> Result<LfMotorRole, String> {
++        if let Some(active) = self.active.filter(|active| active.motor_id == motor_id) {
++            return Ok(match active.kind {
++                LfActiveKind::Commanded => LfMotorRole::ActivelyCommanded {
++                    target_tick: active.target_tick,
++                },
++                LfActiveKind::ContactProbe => LfMotorRole::ContactProbe {
++                    target_tick: active.target_tick,
++                },
++            });
++        }
++        if let Some(target) = self
++            .held_targets
++            .iter()
++            .find(|target| target.motor_id == motor_id)
++        {
++            return Ok(LfMotorRole::ActivelyHeld {
++                target_tick: target.target_tick,
++            });
++        }
++        if matches!(motor_id, 21 | 22 | 23 | 32) {
++            return Ok(LfMotorRole::PassiveTorqueOffSafe {
++                corridor: rf_passive_corridor(self.state, motor_id)?,
++            });
++        }
++        let entry_tick = self
++            .entry_positions
++            .iter()
++            .find_map(|(entry_id, tick)| (*entry_id == motor_id).then_some(*tick))
++            .ok_or_else(|| format!("M{motor_id} has no RF session-entry observation"))?;
++        Ok(LfMotorRole::NonParticipatingTorqueOff { entry_tick })
++    }
++
++    fn record_contacts(&mut self, joint: JointKind, contacts: DualContactResult) {
++        self.contacts[lf_joint_index(joint)] = Some(contacts);
++    }
++
++    fn record_diagnostics(
++        &mut self,
++        joint: JointKind,
++        fixed_scale: ModelZeroEstimate,
++        affine: AffineJointCalibration,
++    ) {
++        let index = lf_joint_index(joint);
++        self.fixed_scale[index] = Some(fixed_scale);
++        self.affine[index] = Some(affine);
++    }
++
++    fn has_complete_evidence(&self) -> bool {
++        self.contacts.iter().all(Option::is_some)
++            && self.fixed_scale.iter().all(Option::is_some)
++            && self.affine.iter().all(Option::is_some)
++    }
++
++    fn trace_summary(&self) -> String {
++        self.trace
++            .iter()
++            .map(|state| state.label())
++            .collect::<Vec<_>>()
++            .join(" -> ")
++    }
++
++    fn complete_verified_cleanup(&mut self) -> Result<(), String> {
++        self.held_targets.clear();
++        self.active = None;
++        self.transition(RfSessionState::TorqueOff)
++    }
++}
++
++const fn rf_contact_state(joint: JointKind, side: ContactSide) -> RfSessionState {
++    match (joint, side) {
++        (JointKind::Upper, ContactSide::Min) => RfSessionState::UpperMin,
++        (JointKind::Upper, ContactSide::Max) => RfSessionState::UpperMax,
++        (JointKind::Lower, ContactSide::Min) => RfSessionState::LowerMin,
++        (JointKind::Lower, ContactSide::Max) => RfSessionState::LowerMax,
++        (JointKind::Hip, ContactSide::Max) => RfSessionState::HipDown,
++        (JointKind::Hip, ContactSide::Min) => RfSessionState::HipUp,
++    }
++}
++
+ const fn lf_joint_index(joint: JointKind) -> usize {
+     match joint {
+         JointKind::Hip => 0,
+@@ -1375,7 +1910,137 @@ const fn lf_contact_state(joint: JointKind, side: ContactSide) -> LfSessionState
+     }
+ }
+ 
+-fn validate_lf_role_observation(
++fn validate_lf_role_observation(
++    motor_id: u8,
++    observation: MotorObservation,
++    role: LfMotorRole,
++    now_ns: u64,
++) -> Result<(), String> {
++    let max_age_ns = u64::try_from(MAX_TELEMETRY_AGE.as_nanos()).unwrap_or(u64::MAX);
++    let age_ns = now_ns.saturating_sub(observation.monotonic_stamp_ns);
++    if observation.monotonic_stamp_ns == 0 || age_ns > max_age_ns {
++        return Err(format!(
++            "M{motor_id} telemetry stale in LF role {role:?}: age_ns={age_ns}"
++        ));
++    }
++    if observation.has_driver_error || observation.status != 0 {
++        return Err(format!(
++            "M{motor_id} unhealthy in LF role {role:?}: status=0x{:02X}, driver_error={}",
++            observation.status, observation.has_driver_error
++        ));
++    }
++    if observation.current >= HARD_CURRENT_ABORT_RAW {
++        return Err(format!(
++            "M{motor_id} hard current in LF role {role:?}: {} >= {}",
++            observation.current, HARD_CURRENT_ABORT_RAW
++        ));
++    }
++    validate_matdog_temperature(motor_id, observation)
++        .map_err(|message| format!("{message} in LF role {role:?}"))?;
++
++    match role {
++        LfMotorRole::ActivelyCommanded { target_tick }
++        | LfMotorRole::ContactProbe { target_tick } => {
++            validate_lf_active_readback(motor_id, observation, target_tick)
++        }
++        LfMotorRole::ActivelyHeld { target_tick } => {
++            validate_lf_active_readback(motor_id, observation, target_tick)?;
++            let error = circular_distance(observation.position, target_tick);
++            if error > STATIC_TOLERANCE_TICKS {
++                return Err(format!(
++                    "actively-held M{motor_id} drifted: target={target_tick}, present={}, error={error}",
++                    observation.position
++                ));
++            }
++            Ok(())
++        }
++        LfMotorRole::PassiveTorqueOffSafe { corridor } => {
++            if observation.torque_enabled {
++                return Err(format!("passive-safe M{motor_id} unexpectedly torque ON"));
++            }
++            if !corridor.contains(observation.position) {
++                return Err(format!(
++                    "passive-safe M{motor_id} left state corridor: present={}, allowed={}..={}",
++                    observation.position, corridor.low, corridor.high
++                ));
++            }
++            Ok(())
++        }
++        LfMotorRole::NonParticipatingTorqueOff { entry_tick } => {
++            if observation.torque_enabled {
++                return Err(format!(
++                    "non-participating M{motor_id} unexpectedly torque ON"
++                ));
++            }
++            let drift = circular_distance(observation.position, entry_tick);
++            if drift > NON_PARTICIPATING_MAX_DRIFT_TICKS {
++                return Err(format!(
++                    "non-participating M{motor_id} moved unexpectedly: entry={entry_tick}, present={}, drift={drift}",
++                    observation.position
++                ));
++            }
++            Ok(())
++        }
++    }
++}
++
++fn validate_lf_active_readback(
++    motor_id: u8,
++    observation: MotorObservation,
++    target_tick: u16,
++) -> Result<(), String> {
++    if !observation.torque_enabled {
++        return Err(format!("active M{motor_id} torque unexpectedly OFF"));
++    }
++    if observation.torque_limit != TORQUE_LIMIT {
++        return Err(format!(
++            "active M{motor_id} torque limit changed: expected={TORQUE_LIMIT}, observed={}",
++            observation.torque_limit
++        ));
++    }
++    if observation.goal_position != target_tick {
++        return Err(format!(
++            "active M{motor_id} goal changed: expected={target_tick}, observed={}",
++            observation.goal_position
++        ));
++    }
++    let corridor = lf_participant_corridor(motor_id)?;
++    if !corridor.contains(observation.position) || !corridor.contains(target_tick) {
++        return Err(format!(
++            "active M{motor_id} left commanded corridor: present={}, target={target_tick}, allowed={}..={}",
++            observation.position, corridor.low, corridor.high
++        ));
++    }
++    Ok(())
++}
++
++fn validate_lf_session_snapshot(
++    state: &InferenceState,
++    bus_serial: &str,
++    session: &LfSessionStateMachine,
++    ignored_motor: u8,
++    now_ns: u64,
++) -> Result<(), String> {
++    let found = motor_ids_for_bus(state, bus_serial).map_err(|error| error.to_string())?;
++    if !is_exact_matdog_motor_set(&found) {
++        return Err(format!(
++            "LF runtime ID set changed: expected={:?}, found={found:?}",
++            MATDOG_MOTOR_IDS
++        ));
++    }
++    for motor_id in MATDOG_MOTOR_IDS {
++        if motor_id == ignored_motor {
++            continue;
++        }
++        let observation = observation_from_state(state, bus_serial, motor_id)
++            .map_err(|error| error.to_string())?;
++        let role = session.role_for(motor_id)?;
++        validate_lf_role_observation(motor_id, observation, role, now_ns)?;
++    }
++    Ok(())
++}
++
++fn validate_rf_role_observation(
+     motor_id: u8,
+     observation: MotorObservation,
+     role: LfMotorRole,
+@@ -1385,31 +2050,31 @@ fn validate_lf_role_observation(
+     let age_ns = now_ns.saturating_sub(observation.monotonic_stamp_ns);
+     if observation.monotonic_stamp_ns == 0 || age_ns > max_age_ns {
+         return Err(format!(
+-            "M{motor_id} telemetry stale in LF role {role:?}: age_ns={age_ns}"
++            "M{motor_id} telemetry stale in RF role {role:?}: age_ns={age_ns}"
+         ));
+     }
+     if observation.has_driver_error || observation.status != 0 {
+         return Err(format!(
+-            "M{motor_id} unhealthy in LF role {role:?}: status=0x{:02X}, driver_error={}",
++            "M{motor_id} unhealthy in RF role {role:?}: status=0x{:02X}, driver_error={}",
+             observation.status, observation.has_driver_error
+         ));
+     }
+     if observation.current >= HARD_CURRENT_ABORT_RAW {
+         return Err(format!(
+-            "M{motor_id} hard current in LF role {role:?}: {} >= {}",
++            "M{motor_id} hard current in RF role {role:?}: {} >= {}",
+             observation.current, HARD_CURRENT_ABORT_RAW
+         ));
+     }
+     validate_matdog_temperature(motor_id, observation)
+-        .map_err(|message| format!("{message} in LF role {role:?}"))?;
++        .map_err(|message| format!("{message} in RF role {role:?}"))?;
+ 
+     match role {
+         LfMotorRole::ActivelyCommanded { target_tick }
+         | LfMotorRole::ContactProbe { target_tick } => {
+-            validate_lf_active_readback(motor_id, observation, target_tick)
++            validate_rf_active_readback(motor_id, observation, target_tick)
+         }
+         LfMotorRole::ActivelyHeld { target_tick } => {
+-            validate_lf_active_readback(motor_id, observation, target_tick)?;
++            validate_rf_active_readback(motor_id, observation, target_tick)?;
+             let error = circular_distance(observation.position, target_tick);
+             if error > STATIC_TOLERANCE_TICKS {
+                 return Err(format!(
+@@ -1449,7 +2114,7 @@ fn validate_lf_role_observation(
+     }
+ }
+ 
+-fn validate_lf_active_readback(
++fn validate_rf_active_readback(
+     motor_id: u8,
+     observation: MotorObservation,
+     target_tick: u16,
+@@ -1469,7 +2134,7 @@ fn validate_lf_active_readback(
+             observation.goal_position
+         ));
+     }
+-    let corridor = lf_participant_corridor(motor_id)?;
++    let corridor = rf_participant_corridor(motor_id)?;
+     if !corridor.contains(observation.position) || !corridor.contains(target_tick) {
+         return Err(format!(
+             "active M{motor_id} left commanded corridor: present={}, target={target_tick}, allowed={}..={}",
+@@ -1479,17 +2144,17 @@ fn validate_lf_active_readback(
+     Ok(())
+ }
+ 
+-fn validate_lf_session_snapshot(
++fn validate_rf_session_snapshot(
+     state: &InferenceState,
+     bus_serial: &str,
+-    session: &LfSessionStateMachine,
++    session: &RfSessionStateMachine,
+     ignored_motor: u8,
+     now_ns: u64,
+ ) -> Result<(), String> {
+     let found = motor_ids_for_bus(state, bus_serial).map_err(|error| error.to_string())?;
+     if !is_exact_matdog_motor_set(&found) {
+         return Err(format!(
+-            "LF runtime ID set changed: expected={:?}, found={found:?}",
++            "RF runtime ID set changed: expected={:?}, found={found:?}",
+             MATDOG_MOTOR_IDS
+         ));
+     }
+@@ -1500,7 +2165,7 @@ fn validate_lf_session_snapshot(
+         let observation = observation_from_state(state, bus_serial, motor_id)
+             .map_err(|error| error.to_string())?;
+         let role = session.role_for(motor_id)?;
+-        validate_lf_role_observation(motor_id, observation, role, now_ns)?;
++        validate_rf_role_observation(motor_id, observation, role, now_ns)?;
+     }
+     Ok(())
+ }
+@@ -1997,6 +2662,92 @@ fn lf_contact_witness_accepted(joint: JointKind, contacts: DualContactResult) ->
+     minimum <= LF_CONTACT_WITNESS_TOLERANCE_TICKS && maximum <= LF_CONTACT_WITNESS_TOLERANCE_TICKS
+ }
+ 
++// LF V25 authoritative measured mechanical span per joint, sourced directly
++// from the frozen hardware run log (station.log / REPORT.txt,
++// MATDOG_LF_MEASURE_FREEZE_V25_execute_20260804T041729Z, tied to
++// release/matdog-lf-calibrator-v25 @ f87dd1fbc7e8100d275c74f9af448642f3429680
++// per MATDOG_LF_CALIBRATION_V25_FINAL.md "Final contact evidence"):
++//   "MATDOG LF EVIDENCE: LF HIP   ... span_ticks=935/1024  ..."
++//   "MATDOG LF EVIDENCE: LF UPPER ... span_ticks=2004/1991 ..."
++//   "MATDOG LF EVIDENCE: LF LOWER ... span_ticks=1435/1474 ..."
++// Deliberately independent from lf_reference_contact_ticks() above, which
++// serves LF's own absolute-tick witness gate and must not change.
++fn rf_reference_span_ticks(joint: JointKind) -> u16 {
++    match joint {
++        JointKind::Hip => 935,
++        JointKind::Upper => 2004,
++        JointKind::Lower => 1435,
++    }
++}
++
++// RF relative-span witness: predicts the region for the second RF contact
++// from the first really-measured RF contact (anchor) plus the second side's
++// own physical direction and the authoritative LF V25 mechanical span, then
++// intersects with the existing geometric guard/corridor. Never widens that
++// corridor; an empty intersection is a hard conflict, not a fallback.
++fn rf_expected_second_contact_region(
++    anchor_tick: u16,
++    second_probe_sign: i8,
++    reference_span_ticks: u16,
++    generic_low: u16,
++    generic_high: u16,
++) -> Result<(u16, u16), String> {
++    let expected_second_tick = advance_tick(anchor_tick, second_probe_sign, reference_span_ticks)
++        .map_err(|err| {
++            format!(
++                "RF anchor+span prediction leaves unsigned tick range: anchor={anchor_tick}, span={reference_span_ticks}, sign={second_probe_sign}: {err}"
++            )
++        })?;
++    let raw_low = expected_second_tick.saturating_sub(RF_WITNESS_TOLERANCE_TICKS);
++    let raw_high = expected_second_tick
++        .saturating_add(RF_WITNESS_TOLERANCE_TICKS)
++        .min(protocol::MAX_ANGLE_STEP);
++    let region_low = raw_low.max(generic_low);
++    let region_high = raw_high.min(generic_high);
++    if region_low > region_high {
++        return Err(format!(
++            "RF anchor-region conflict: predicted region {raw_low}..={raw_high} \
++             (anchor={anchor_tick}, span={reference_span_ticks}, expected={expected_second_tick}) \
++             does not overlap geometric corridor {generic_low}..={generic_high}; requires \
++             prerequisite/corridor re-audit before searching the second contact"
++        ));
++    }
++    Ok((region_low, region_high))
++}
++
++// RF post-hoc span witness: measured_span_ticks must come from a
++// direction-aware computation (see derive_affine_joint_calibration's use of
++// directional_progress(..., spec.direction)), never from circular_distance,
++// which could otherwise treat an incompatible 0/4095 wrap as a plausible
++// short-arc span.
++fn rf_contact_witness_deviation(reference_span_ticks: u16, measured_span_ticks: u16) -> u16 {
++    reference_span_ticks.abs_diff(measured_span_ticks)
++}
++
++fn rf_contact_witness_accepted(reference_span_ticks: u16, measured_span_ticks: u16) -> bool {
++    rf_contact_witness_deviation(reference_span_ticks, measured_span_ticks)
++        <= RF_WITNESS_TOLERANCE_TICKS
++}
++
++fn derive_rf_joint_evidence(
++    spec: JointSpec,
++    contacts: DualContactResult,
++) -> JointCalibrationEvidence {
++    let fixed_scale = derive_model_zero(spec, contacts);
++    let affine = derive_affine_joint_calibration(spec, contacts);
++    let reference_span_ticks = rf_reference_span_ticks(spec.kind);
++    let contact_witness_accepted =
++        rf_contact_witness_accepted(reference_span_ticks, affine.measured_span_ticks);
++    JointCalibrationEvidence {
++        spec,
++        contacts,
++        fixed_scale,
++        affine,
++        contact_witness_accepted,
++        accepted: affine.accepted && contact_witness_accepted,
++    }
++}
++
+ fn derive_affine_joint_calibration(
+     spec: JointSpec,
+     contacts: DualContactResult,
+@@ -2604,6 +3355,7 @@ struct MatdogRamOnlyCalibrator {
+     held_targets: Vec<StaticTarget>,
+     probe_home_handoff_active: bool,
+     lf_session: Option<LfSessionStateMachine>,
++    rf_session: Option<RfSessionStateMachine>,
+ }
+ 
+ impl MatdogRamOnlyCalibrator {
+@@ -2627,6 +3379,7 @@ impl MatdogRamOnlyCalibrator {
+             held_targets: Vec::new(),
+             probe_home_handoff_active: false,
+             lf_session: None,
++            rf_session: None,
+         }
+     }
+ 
+@@ -3181,6 +3934,11 @@ impl MatdogRamOnlyCalibrator {
+                 .hold(target)
+                 .map_err(|message| -> DynError { message.into() })?;
+         }
++        if let Some(session) = &mut self.rf_session {
++            session
++                .hold(target)
++                .map_err(|message| -> DynError { message.into() })?;
++        }
+         self.held_targets
+             .retain(|held| held.motor_id != target.motor_id);
+         self.held_targets.push(target);
+@@ -3193,6 +3951,78 @@ impl MatdogRamOnlyCalibrator {
+         if let Some(session) = &mut self.lf_session {
+             session.release(motor_id);
+         }
++        if let Some(session) = &mut self.rf_session {
++            session.release(motor_id);
++        }
++    }
++
++    fn transition_rf_state(&mut self, next: RfSessionState) -> Result<(), DynError> {
++        let session = self
++            .rf_session
++            .as_mut()
++            .ok_or("RF state transition requested before session creation")?;
++        session
++            .transition(next)
++            .map_err(|message| -> DynError { message.into() })?;
++        info!("MATDOG RF STATE: {}", next.label());
++        Ok(())
++    }
++
++    fn set_rf_active(
++        &mut self,
++        motor_id: u8,
++        target_tick: u16,
++        kind: LfActiveKind,
++    ) -> Result<(), DynError> {
++        let session = self
++            .rf_session
++            .as_mut()
++            .ok_or("RF active role requested before session creation")?;
++        session
++            .set_active(motor_id, target_tick, kind)
++            .map_err(|message| -> DynError { message.into() })
++    }
++
++    fn record_rf_contacts(
++        &mut self,
++        joint: JointKind,
++        contacts: DualContactResult,
++    ) -> Result<(), DynError> {
++        let session = self
++            .rf_session
++            .as_mut()
++            .ok_or("RF contacts produced without a state machine")?;
++        session.record_contacts(joint, contacts);
++        Ok(())
++    }
++
++    fn record_rf_diagnostics(
++        &mut self,
++        joint: JointKind,
++        fixed_scale: ModelZeroEstimate,
++        affine: AffineJointCalibration,
++    ) -> Result<(), DynError> {
++        let session = self
++            .rf_session
++            .as_mut()
++            .ok_or("RF diagnostics produced without a state machine")?;
++        session.record_diagnostics(joint, fixed_scale, affine);
++        Ok(())
++    }
++
++    fn verify_rf_session_others_except(&self, ignored_motor: u8) -> Result<(), DynError> {
++        let session = self
++            .rf_session
++            .as_ref()
++            .ok_or("RF role verification requested before session creation")?;
++        validate_rf_session_snapshot(
++            &self.current_state(),
++            &self.target_bus_serial,
++            session,
++            ignored_motor,
++            systime::get_monotonic_stamp_ns(),
++        )
++        .map_err(|message| -> DynError { message.into() })
+     }
+ 
+     async fn measure_lf_joint_pair_efficient(
+@@ -3291,6 +4121,230 @@ impl MatdogRamOnlyCalibrator {
+         })
+     }
+ 
++    async fn measure_rf_joint_pair_efficient(
++        &mut self,
++        minimum_profile: ContactProfile,
++        maximum_profile: ContactProfile,
++    ) -> Result<DualContactResult, DynError> {
++        if minimum_profile.motor_id != maximum_profile.motor_id
++            || minimum_profile.side != ContactSide::Min
++            || maximum_profile.side != ContactSide::Max
++        {
++            return Err("invalid RF MIN/MAX profile pair".into());
++        }
++        self.remove_held_target(minimum_profile.motor_id);
++        self.transition_rf_state(rf_contact_state(minimum_profile.joint, ContactSide::Min))?;
++        self.profile = minimum_profile;
++        self.set_rf_active(
++            self.profile.motor_id,
++            self.latest_observation(self.profile.motor_id)?
++                .goal_position,
++            LfActiveKind::ContactProbe,
++        )?;
++        // First contact: unchanged generic search, no anchor/region involved.
++        let minimum = self.measure_lf_contact_side_efficient(None).await?;
++        // First fine contact resolved -> becomes the RF anchor.
++        let anchor_tick = contact_result_tick(minimum);
++
++        self.stop_pressure(self.profile.motor_id, minimum.second_tick)
++            .await?;
++        self.transition_rf_state(rf_contact_state(maximum_profile.joint, ContactSide::Max))?;
++        self.profile = maximum_profile;
++        self.set_rf_active(
++            self.profile.motor_id,
++            self.latest_observation(self.profile.motor_id)?
++                .goal_position,
++            LfActiveKind::ContactProbe,
++        )?;
++        let reference_span_ticks = rf_reference_span_ticks(self.profile.joint);
++        let maximum = self
++            .measure_rf_second_contact_side_with_anchor(
++                anchor_tick,
++                reference_span_ticks,
++                Some(minimum.second_tick),
++            )
++            .await?;
++        Ok(DualContactResult { minimum, maximum })
++    }
++
++    async fn measure_rf_hip_pair_physical_order(
++        &mut self,
++        minimum_profile: ContactProfile,
++        maximum_profile: ContactProfile,
++    ) -> Result<DualContactResult, DynError> {
++        if minimum_profile.motor_id != maximum_profile.motor_id
++            || minimum_profile.side != ContactSide::Min
++            || maximum_profile.side != ContactSide::Max
++        {
++            return Err("invalid RF HIP MIN/MAX profile pair".into());
++        }
++        // Physical execution order for RF HIP M23 is reversed from LF: MAX
++        // (probe_sign<0, tick decrescenti) is the real first physical
++        // contact (downward); MIN (probe_sign>0, tick crescenti) is the
++        // real second physical contact (upward). DualContactResult logical
++        // labeling (.minimum/.maximum) is assembled correctly regardless of
++        // this physical execution order.
++        self.remove_held_target(maximum_profile.motor_id);
++        self.transition_rf_state(rf_contact_state(maximum_profile.joint, ContactSide::Max))?;
++        self.profile = maximum_profile;
++        self.set_rf_active(
++            self.profile.motor_id,
++            self.latest_observation(self.profile.motor_id)?
++                .goal_position,
++            LfActiveKind::ContactProbe,
++        )?;
++        let maximum = self.measure_lf_contact_side_efficient(None).await?;
++        let anchor_tick = contact_result_tick(maximum);
++
++        self.stop_pressure(self.profile.motor_id, maximum.second_tick)
++            .await?;
++        self.transition_rf_state(rf_contact_state(minimum_profile.joint, ContactSide::Min))?;
++        self.profile = minimum_profile;
++        self.set_rf_active(
++            self.profile.motor_id,
++            self.latest_observation(self.profile.motor_id)?
++                .goal_position,
++            LfActiveKind::ContactProbe,
++        )?;
++        let reference_span_ticks = rf_reference_span_ticks(JointKind::Hip);
++        let minimum = self
++            .measure_rf_second_contact_side_with_anchor(
++                anchor_tick,
++                reference_span_ticks,
++                Some(maximum.second_tick),
++            )
++            .await?;
++        Ok(DualContactResult { minimum, maximum })
++    }
++
++    async fn measure_rf_second_contact_side_with_anchor(
++        &mut self,
++        anchor_tick: u16,
++        reference_span_ticks: u16,
++        previous_contact_tick: Option<u16>,
++    ) -> Result<ContactResult, DynError> {
++        // Pressure release at the CURRENT (first-contact) position only --
++        // target == present position, zero net displacement toward the
++        // second side. Mechanical safety (stop holding pressure against the
++        // first stop), not second-side search/forward movement, so it may
++        // precede the fail-closed gate below.
++        self.next_phase(&format!(
++            "{} release pressure at first contact",
++            self.profile.label
++        ))?;
++        if let Some(previous) = previous_contact_tick {
++            self.stop_pressure(self.profile.motor_id, previous).await?;
++        }
++
++        // Fail-closed: anchor+span compatibility against the second
++        // profile's own generic corridor, verified BEFORE any forward/search
++        // movement toward the second contact -- including the moving
++        // baseline acquisition.
++        self.next_phase(&format!(
++            "{} anchor-region compatibility gate",
++            self.profile.label
++        ))?;
++        let (initial_generic_low, initial_generic_high) =
++            adaptive_contact_acceptance_bounds(&self.profile, None);
++        let initial_region = rf_expected_second_contact_region(
++            anchor_tick,
++            self.profile.probe_sign,
++            reference_span_ticks,
++            initial_generic_low,
++            initial_generic_high,
++        )
++        .map_err(|message| -> DynError { message.into() })?;
++
++        self.next_phase(&format!(
++            "{} moving baseline from current pose",
++            self.profile.label
++        ))?;
++        let baseline = self.acquire_moving_current_baseline_forward().await?;
++
++        self.next_phase(&format!("{} coarse scouting pass", self.profile.label))?;
++        let coarse_scout_tick = self
++            .approach_with_scout_and_expected_region(
++                COARSE_STEP_TICKS,
++                baseline,
++                None,
++                Some(initial_region),
++            )
++            .await?;
++
++        self.next_phase(&format!("{} coarse backoff", self.profile.label))?;
++        self.backoff_and_verify(coarse_scout_tick, baseline).await?;
++
++        self.next_phase(&format!("{} fine metrology pass 1", self.profile.label))?;
++        let first_tick = {
++            let (generic_low, generic_high) =
++                adaptive_contact_acceptance_bounds(&self.profile, Some(coarse_scout_tick));
++            let region = rf_expected_second_contact_region(
++                anchor_tick,
++                self.profile.probe_sign,
++                reference_span_ticks,
++                generic_low,
++                generic_high,
++            )
++            .map_err(|message| -> DynError { message.into() })?;
++            self.approach_with_scout_and_expected_region(
++                FINE_STEP_TICKS,
++                baseline,
++                Some(coarse_scout_tick),
++                Some(region),
++            )
++            .await?
++        };
++
++        self.next_phase(&format!("{} fine metrology backoff", self.profile.label))?;
++        self.backoff_and_verify(first_tick, baseline).await?;
++
++        self.next_phase(&format!("{} fine metrology pass 2", self.profile.label))?;
++        let second_tick = {
++            let (generic_low, generic_high) =
++                adaptive_contact_acceptance_bounds(&self.profile, Some(coarse_scout_tick));
++            let region = rf_expected_second_contact_region(
++                anchor_tick,
++                self.profile.probe_sign,
++                reference_span_ticks,
++                generic_low,
++                generic_high,
++            )
++            .map_err(|message| -> DynError { message.into() })?;
++            self.approach_with_scout_and_expected_region(
++                FINE_STEP_TICKS,
++                baseline,
++                Some(coarse_scout_tick),
++                Some(region),
++            )
++            .await?
++        };
++
++        self.next_phase(&format!(
++            "{} fine-to-fine repeatability",
++            self.profile.label
++        ))?;
++        let spread_ticks = repeatability_spread(first_tick, second_tick)?;
++        info!(
++            "MATDOG {} persistent RF second-contact side complete (anchor={}, authoritative_span={}): scout={}, fine1={}, fine2={}, spread={}, baseline_median={}, baseline_mad={}",
++            self.profile.label,
++            anchor_tick,
++            reference_span_ticks,
++            coarse_scout_tick,
++            first_tick,
++            second_tick,
++            spread_ticks,
++            baseline.median_current,
++            baseline.mad_current,
++        );
++        Ok(ContactResult {
++            coarse_scout_tick,
++            first_tick,
++            second_tick,
++            spread_ticks,
++            baseline,
++        })
++    }
++
+     async fn acquire_moving_current_baseline_forward(&mut self) -> Result<BaselineStats, DynError> {
+         let motor_id = self.profile.motor_id;
+         let initial = self.latest_observation(motor_id)?;
+@@ -3964,6 +5018,17 @@ impl MatdogRamOnlyCalibrator {
+         step_ticks: u16,
+         baseline: BaselineStats,
+         coarse_scout_tick: Option<u16>,
++    ) -> Result<u16, DynError> {
++        self.approach_with_scout_and_expected_region(step_ticks, baseline, coarse_scout_tick, None)
++            .await
++    }
++
++    async fn approach_with_scout_and_expected_region(
++        &mut self,
++        step_ticks: u16,
++        baseline: BaselineStats,
++        coarse_scout_tick: Option<u16>,
++        expected_region: Option<(u16, u16)>,
+     ) -> Result<u16, DynError> {
+         let motor_id = self.profile.motor_id;
+         let start = self.latest_observation(motor_id)?;
+@@ -4013,6 +5078,18 @@ impl MatdogRamOnlyCalibrator {
+                 match detector.observe(observation, target) {
+                     ContactState::FreeMotion | ContactState::ContactSuspected => {}
+                     ContactState::ContactConfirmed => {
++                        if !position_inside_expected_region(observation.position, expected_region) {
++                            info!(
++                                "MATDOG {} premature plateau before predicted RF second-contact region: target={}, present={}, current={}, threshold={}, velocity={}",
++                                self.profile.label,
++                                target,
++                                observation.position,
++                                observation.current,
++                                baseline.contact_threshold(),
++                                speed_magnitude(observation.velocity),
++                            );
++                            continue 'approach_steps;
++                        }
+                         if let Some(scout) = coarse_scout_tick {
+                             let scout_lag = fine_contact_scout_lag_ticks(
+                                 observation.position,
+@@ -4115,6 +5192,13 @@ impl MatdogRamOnlyCalibrator {
+                         .confirm_kinematic_plateau(target, last_stamp, scout)
+                         .await?
+                     {
++                        if !position_inside_expected_region(contact.position, expected_region) {
++                            info!(
++                                "MATDOG {} premature kinematic plateau before predicted RF second-contact region: target={}, present={}, current={}",
++                                self.profile.label, target, contact.position, contact.current,
++                            );
++                            continue 'approach_steps;
++                        }
+                         let scout_lag = fine_contact_scout_lag_ticks(
+                             contact.position,
+                             scout,
+diff --git a/software/drivers/st3215/src/auto_calibrate/matdog_test.rs b/software/drivers/st3215/src/auto_calibrate/matdog_test.rs
+index b6e6b6e..3692429 100644
+--- a/software/drivers/st3215/src/auto_calibrate/matdog_test.rs
++++ b/software/drivers/st3215/src/auto_calibrate/matdog_test.rs
+@@ -1728,6 +1728,84 @@ fn v41_affine_solver_accepts_complete_observed_lf_contact_set() {
+     assert!((850..=1150).contains(&hip.scale_permille));
+ }
+ 
++#[test]
++fn rf_witness_deviation_24_accepts_25_rejects() {
++    let reference = rf_reference_span_ticks(JointKind::Hip); // 935, LF V25 hardware-measured
++    assert_eq!(reference, 935);
++    assert!(rf_contact_witness_accepted(reference, reference + 24));
++    assert!(!rf_contact_witness_accepted(reference, reference + 25));
++}
++
++#[test]
++fn rf_witness_accepts_translated_pair_with_correct_span_not_absolute_ticks() {
++    // RF Upper, direction=-1: minimum=2600, maximum=2600-2004=596 (span
++    // exactly 2004, the LF V25 hardware-measured span), both inside the RF
++    // Upper generic corridors, but far from LF's own absolute contact ticks
++    // (1443/3442) and not mirrored around HOME=2048 -- proves the witness
++    // compares SPAN, not absolute or mirrored endpoint ticks.
++    let spec = *spec_for(Leg::Rf, JointKind::Upper);
++    let contact = |tick| ContactResult {
++        coarse_scout_tick: tick,
++        first_tick: tick,
++        second_tick: tick,
++        spread_ticks: 0,
++        baseline: BaselineStats {
++            median_current: 1,
++            mad_current: 0,
++        },
++    };
++    let contacts = DualContactResult {
++        minimum: contact(2600),
++        maximum: contact(596),
++    };
++    let evidence = derive_rf_joint_evidence(spec, contacts);
++    assert_eq!(evidence.affine.measured_span_ticks, 2004);
++    assert!(evidence.contact_witness_accepted);
++}
++
++#[test]
++fn rf_anchor_region_empty_intersection_fails_closed_before_second_side_forward_movement() {
++    // rf_expected_second_contact_region is the function called in the RF
++    // second-contact call site BEFORE acquire_moving_current_baseline_forward()
++    // / approach_with_scout_and_expected_region(): an Err here, by
++    // construction of that call site, prevents every forward/search movement
++    // toward the second side -- not just a warning after the fact.
++    let result = rf_expected_second_contact_region(100, 1, 10, 500, 600);
++    assert!(result.is_err());
++    assert!(result.unwrap_err().contains("does not overlap"));
++}
++
++#[test]
++fn rf_premature_plateau_outside_expected_region_is_rejected_by_production_predicate() {
++    // Same predicate actually used inside
++    // approach_with_scout_and_expected_region()'s ContactConfirmed branches,
++    // not a test-only duplicate.
++    let region = Some((2511u16, 2559u16));
++    assert!(!position_inside_expected_region(2470, region));
++    assert!(position_inside_expected_region(2530, region));
++    assert!(position_inside_expected_region(2470, None));
++}
++
++#[test]
++fn rf_hip_physical_order_is_max_down_first_min_up_second() {
++    let hip_max = build_profile(Leg::Rf, JointKind::Hip, ContactSide::Max).unwrap();
++    let hip_min = build_profile(Leg::Rf, JointKind::Hip, ContactSide::Min).unwrap();
++    // MAX: tick decrescenti (probe_sign<0) = physically DOWN, per hardware
++    // evidence (M23 decrement encoder -> rf_hip_link downward); physically
++    // first.
++    assert!(hip_max.probe_sign < 0);
++    // MIN: tick crescenti (probe_sign>0) = physically UP; physically second.
++    assert!(hip_min.probe_sign > 0);
++    assert_eq!(
++        rf_contact_state(JointKind::Hip, ContactSide::Max),
++        RfSessionState::HipDown
++    );
++    assert_eq!(
++        rf_contact_state(JointKind::Hip, ContactSide::Min),
++        RfSessionState::HipUp
++    );
++}
++
+ #[test]
+ fn lf_state_machine_runs_the_full_simulated_path_with_runtime_roles() {
+     let mut session = LfSessionStateMachine::new(lf_entry_positions()).unwrap();

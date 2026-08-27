@@ -1,0 +1,123 @@
+{
+  "bus_serial": "5B14114953",
+  "confirmation_required": "WRITE ALL 12 DIGITAL ZERO OFFSETS",
+  "created_at_utc": "2026-08-14T13:56:49.664568+00:00",
+  "motor_order": [
+    13,
+    12,
+    11,
+    33,
+    32,
+    31,
+    43,
+    42,
+    41,
+    23,
+    22,
+    21
+  ],
+  "motors": {
+    "11": {
+      "joint": "LF_LOWER",
+      "new_offset_signed_i16": 153,
+      "old_offset_signed_i16": 127,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 2074,
+      "raw_encoder_q0": 2201
+    },
+    "12": {
+      "joint": "LF_UPPER",
+      "new_offset_signed_i16": 868,
+      "old_offset_signed_i16": 851,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 2065,
+      "raw_encoder_q0": 2916
+    },
+    "13": {
+      "joint": "LF_HIP",
+      "new_offset_signed_i16": -535,
+      "old_offset_signed_i16": -486,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 1999,
+      "raw_encoder_q0": 1513
+    },
+    "21": {
+      "joint": "RF_LOWER",
+      "new_offset_signed_i16": -2008,
+      "old_offset_signed_i16": -1986,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 2026,
+      "raw_encoder_q0": 40
+    },
+    "22": {
+      "joint": "RF_UPPER",
+      "new_offset_signed_i16": -875,
+      "old_offset_signed_i16": -891,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 2064,
+      "raw_encoder_q0": 1173
+    },
+    "23": {
+      "joint": "RF_HIP",
+      "new_offset_signed_i16": -1691,
+      "old_offset_signed_i16": -1687,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 2044,
+      "raw_encoder_q0": 357
+    },
+    "31": {
+      "joint": "RH_LOWER",
+      "new_offset_signed_i16": -1961,
+      "old_offset_signed_i16": -2021,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 2108,
+      "raw_encoder_q0": 87
+    },
+    "32": {
+      "joint": "RH_UPPER",
+      "new_offset_signed_i16": -891,
+      "old_offset_signed_i16": -953,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 2110,
+      "raw_encoder_q0": 1157
+    },
+    "33": {
+      "joint": "RH_HIP",
+      "new_offset_signed_i16": -483,
+      "old_offset_signed_i16": -470,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 2035,
+      "raw_encoder_q0": 1565
+    },
+    "41": {
+      "joint": "LH_LOWER",
+      "new_offset_signed_i16": -1854,
+      "old_offset_signed_i16": -1824,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 2018,
+      "raw_encoder_q0": 194
+    },
+    "42": {
+      "joint": "LH_UPPER",
+      "new_offset_signed_i16": 967,
+      "old_offset_signed_i16": 979,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 2036,
+      "raw_encoder_q0": 3015
+    },
+    "43": {
+      "joint": "LH_HIP",
+      "new_offset_signed_i16": -680,
+      "old_offset_signed_i16": -740,
+      "predicted_displayed_after_write": 2048,
+      "present_q0": 2108,
+      "raw_encoder_q0": 1368
+    }
+  },
+  "q0_tolerance_ticks": 10,
+  "schema": "matdog.st3215.digital_zero_plan.v2",
+  "source_pre_recenter_backup": "09_Logs/Calibration/Digital_Zero/2026-08-14_135649Z_st3215_pre_recenter_backup.json",
+  "source_q0_snapshot": "09_Logs/Calibration/Digital_Zero/2026-08-14_135649Z_mechanical_q0_snapshot.json",
+  "target_displayed_position": 2048,
+  "write_performed": false
+}
