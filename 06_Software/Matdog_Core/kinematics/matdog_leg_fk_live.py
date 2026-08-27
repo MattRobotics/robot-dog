@@ -44,8 +44,17 @@ sys.path.insert(0, str(CALIBRATION_DIR))
 sys.path.insert(0, str(NORMACORE))
 sys.path.insert(0, str(EXAMPLE_DIR))
 
+# --- MATDOG calibration fail-closed gate (2026-08-27) -------------------------
+# Blocks hardware acquisition while calibration is reset. See
+# 09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "calibration"))
+from matdog_calibration_gate import require_hardware_authorized  # noqa: E402
+# -----------------------------------------------------------------------------
+
+
 from matdog_joint_math import encoder_to_joint_rad, signed_tick_delta
 from matdog_urdf_fk import (
+
     CANONICAL_URDF_SHA256,
     canonical_urdf_path,
     forward_kinematics,
@@ -260,6 +269,7 @@ try:
     from software.station.shared.station_py import new_station_client
     from target.gen_python.protobuf.drivers.st3215 import st3215
     from state import find_bus, parse_motor_state, resolve_bus_serial
+
 except Exception as exc:
     STATION_IMPORT_ERROR = exc
 
@@ -388,6 +398,8 @@ def print_sample(
 
 
 async def main_async(args) -> None:
+    # FAIL-CLOSED: refuse before acquiring any hardware handle.
+    require_hardware_authorized("matdog_leg_fk_live", getattr(args, "config", None))
     require_station_dependencies()
 
     if args.duration <= 0.0:

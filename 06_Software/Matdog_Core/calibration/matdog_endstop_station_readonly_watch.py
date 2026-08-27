@@ -44,10 +44,19 @@ from software.station.shared.station_py import new_station_client
 from target.gen_python.protobuf.drivers.st3215 import st3215
 
 from matdog_endstop_station_telemetry import (
+
     StationMotorSnapshot,
     find_motor_reader,
     parse_motor_snapshot,
 )
+
+# --- MATDOG calibration fail-closed gate (2026-08-27) -------------------------
+# Blocks hardware acquisition while calibration is reset. See
+# 09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "calibration"))
+from matdog_calibration_gate import require_hardware_authorized  # noqa: E402
+# -----------------------------------------------------------------------------
+
 
 
 INFERENCE_QUEUE = "st3215/inference"
@@ -411,6 +420,8 @@ async def collect_readonly_report(
 
 
 async def main_async(args: argparse.Namespace) -> int:
+    # FAIL-CLOSED: refuse before acquiring any hardware handle.
+    require_hardware_authorized("matdog_endstop_station_readonly_watch", getattr(args, "config", None))
     logger = logging.getLogger(
         "matdog_endstop_station_readonly_watch"
     )

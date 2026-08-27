@@ -39,6 +39,14 @@ from mirror import MotorCommand
 from state import find_bus, parse_motor_state, resolve_bus_serial
 from matdog_joint_math import signed_tick_delta
 
+# --- MATDOG calibration fail-closed gate (2026-08-27) -------------------------
+# Blocks hardware acquisition while calibration is reset. See
+# 09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "calibration"))
+from matdog_calibration_gate import require_hardware_authorized  # noqa: E402
+# -----------------------------------------------------------------------------
+
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 logger = logging.getLogger("matdog_visual_zero_pose_probe")
 
@@ -161,6 +169,8 @@ def load_targets(config_path):
 
 
 async def main_async(args):
+    # FAIL-CLOSED: refuse before acquiring any hardware handle.
+    require_hardware_authorized("matdog_visual_zero_pose_probe", getattr(args, "config", None))
     config_path = Path(args.config).expanduser().resolve()
     targets = load_targets(config_path)
 
