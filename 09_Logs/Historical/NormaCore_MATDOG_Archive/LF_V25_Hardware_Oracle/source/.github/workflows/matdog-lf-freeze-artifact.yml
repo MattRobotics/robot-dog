@@ -1,0 +1,184 @@
+name: MATDOG LF Measurement and Freeze Artifact
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/matdog-lf-freeze-artifact.yml"
+      - ".github/workflows/matdog-native-calibrator-check.yml"
+      - "protobufs/drivers/st3215/**"
+      - "software/drivers/st3215/**"
+      - "software/station/bin/station/**"
+      - "tools/matdog/matdog_headless_auto_calibrate.py"
+      - "tools/matdog/matdog_native_observer_contract.py"
+      - "tools/matdog/matdog_lf_profile.py"
+      - "tools/matdog/test_matdog_headless_auto_calibrate.py"
+      - "tools/matdog/test_matdog_native_observer_contract.py"
+      - "tools/matdog/test_matdog_lf_profile.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: matdog-lf-measurement-freeze-artifact-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-package:
+    name: Test and package Station plus LF freeze provisioner
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact reviewed revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Record exact source revision
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=all)"
+          mkdir -p ci-output package/bin package/source package/metadata
+          git rev-parse HEAD | tee ci-output/source-commit.txt package/metadata/source-commit.txt
+          git status --short --branch | tee ci-output/git-status.txt
+
+      - name: Setup protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          version: "23.x"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          components: rustfmt
+
+      - name: Install Station native build dependency
+        run: sudo apt-get update && sudo apt-get install -y nasm
+
+      - name: Architecture boundary gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee ci-output/architecture-gate.log
+          from pathlib import Path
+
+          port = Path("software/drivers/st3215/src/port.rs").read_text()
+          matdog = Path("software/drivers/st3215/src/auto_calibrate/matdog.rs").read_text()
+          runner = Path("tools/matdog/matdog_headless_auto_calibrate.py").read_text()
+          observer = Path("tools/matdog/matdog_native_observer_contract.py").read_text()
+          profile = Path("tools/matdog/matdog_lf_profile.py").read_text()
+          freeze = Path("software/drivers/st3215/src/bin/matdog_lf_freeze.rs").read_text()
+          combined = port + matdog + runner + observer + profile + freeze
+
+          forbidden = (
+              "MATDOG_MAX_TRANSIENTS_PER_MOTOR",
+              "MATDOG_MAX_TRANSIENTS_TOTAL",
+              "MATDOG_IMMEDIATE_THERMAL_ABORT_C",
+              "confirmed_or_budget_exhausted",
+              "classify_matdog_temperature_sample",
+              "preflight lasting at least 30 seconds",
+          )
+          required = (
+              "read_motor_temperature_direct",
+              "MATDOG_THERMAL_SAMPLE_PERIOD",
+              "classify_matdog_direct_temperature_samples",
+              "MATDOG LF URDF FREEZE GATE: PASS",
+              "MATDOG_LF_PROFILE_V1|joint=",
+              "hip_staged_q0",
+              "lower_staged_q0",
+              "upper_staged_q0",
+              "class LatestOnlyQueue",
+              "default=10",
+              "default=1.0",
+              "m11_last_recorded_stamp_ns",
+              "LF_FREEZE_COMMIT",
+              "rollback",
+              "LF_STAGED",
+              "LF_FROZEN",
+          )
+          found = [token for token in forbidden if token in combined]
+          missing = [token for token in required if token not in combined]
+          if found or missing:
+              raise SystemExit(f"found={found}; missing={missing}")
+          print("MATDOG LF measurement/freeze architecture gate: PASS")
+          PY
+
+      - name: Rust format check
+        run: |
+          set -o pipefail
+          rustfmt --edition 2021 --check --config skip_children=true \
+            software/drivers/st3215/src/port.rs \
+            software/drivers/st3215/src/auto_calibrate/mod.rs \
+            software/drivers/st3215/src/auto_calibrate/matdog.rs \
+            software/drivers/st3215/src/auto_calibrate/matdog_test.rs \
+            software/drivers/st3215/src/bin/matdog_lf_freeze.rs \
+            2>&1 | tee ci-output/rustfmt.log
+
+      - name: Complete Rust tests
+        run: |
+          set -o pipefail
+          cargo test --package st3215 --all-targets 2>&1 | tee ci-output/rust-tests.log
+
+      - name: Complete Python tests
+        run: |
+          set -o pipefail
+          python3 -m unittest -v \
+            tools.matdog.test_matdog_headless_auto_calibrate \
+            tools.matdog.test_matdog_native_observer_contract \
+            tools.matdog.test_matdog_lf_profile \
+            2>&1 | tee ci-output/python-tests.log
+
+      - name: Create CI-only Station viewer stub
+        run: |
+          set -euo pipefail
+          asset=software/station/clients/station-viewer/dist/index.html
+          test ! -e "$asset"
+          mkdir -p "$(dirname "$asset")"
+          printf '<!doctype html><title>MATDOG LF final artifact</title>\n' > "$asset"
+
+      - name: Build release Station and provisioner
+        run: |
+          set -o pipefail
+          cargo build --release --package station 2>&1 | tee ci-output/station-build.log
+          cargo build --release --package st3215 --bin matdog_lf_freeze \
+            2>&1 | tee ci-output/freeze-build.log
+
+      - name: Remove CI-only Station viewer stub
+        if: always()
+        run: rm -rf software/station/clients/station-viewer/dist
+
+      - name: Package exact reviewed deliverable
+        run: |
+          set -euo pipefail
+          cp target/release/station package/bin/station
+          cp target/release/matdog_lf_freeze package/bin/matdog_lf_freeze
+          cp tools/matdog/matdog_headless_auto_calibrate.py package/source/
+          cp tools/matdog/matdog_native_observer_contract.py package/source/
+          cp tools/matdog/matdog_lf_profile.py package/source/
+          cp software/drivers/st3215/src/port.rs package/source/
+          cp software/drivers/st3215/src/auto_calibrate/matdog.rs package/source/
+          cp software/drivers/st3215/src/bin/matdog_lf_freeze.rs package/source/
+          cp .github/workflows/matdog-native-calibrator-check.yml package/source/
+          sha256sum package/bin/* package/source/* | tee package/metadata/SHA256SUMS
+          file package/bin/* | tee package/metadata/file.txt
+          ldd package/bin/station | tee package/metadata/station-ldd.txt
+          ldd package/bin/matdog_lf_freeze | tee package/metadata/freeze-ldd.txt
+          ! grep -Fq "not found" package/metadata/station-ldd.txt
+          ! grep -Fq "not found" package/metadata/freeze-ldd.txt
+          strings package/bin/station > package/metadata/station-strings.txt
+          grep -Fq "Normalize every displaced MATDOG joint to q=0 with one uniform rule" \
+            package/metadata/station-strings.txt
+          grep -Fq "MATDOG LF URDF FREEZE GATE: PASS" \
+            package/metadata/station-strings.txt
+          strings package/bin/matdog_lf_freeze > package/metadata/freeze-strings.txt
+          grep -Fq "LF_FREEZE_COMMIT" package/metadata/freeze-strings.txt
+          cp -a ci-output package/ci-output
+
+      - name: Upload final LF measurement/freeze artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: matdog-lf-measurement-freeze-final
+          path: package/
+          if-no-files-found: error

@@ -1,0 +1,86 @@
+{
+  "schema": "matdog.rf-calibrator.handoff.v1",
+  "date": "2026-08-05",
+  "purpose": "Historical transfer to Claude; no RF hardware certification",
+  "repository": "MattRobotics/norma-core",
+  "desired_final_branches": [
+    "main",
+    "release/matdog-lf-calibrator-v25"
+  ],
+  "immutable_lf_release": {
+    "branch": "release/matdog-lf-calibrator-v25",
+    "sha": "f87dd1fbc7e8100d275c74f9af448642f3429680",
+    "implementation_pr": 11,
+    "hardware_validated": true
+  },
+  "main_before_handoff": "f6f18405ea3515e076e1d612e1bc6e908f7a9793",
+  "experimental_rf_archive": {
+    "branch_to_delete": "matdog/rf-native-calibrator",
+    "head_sha": "9482086baba6fac0c266c3dc509352b6547d0365",
+    "pr": 18,
+    "hardware_validated": false,
+    "merge_wholesale": false,
+    "ahead_of_main_commits": 101
+  },
+  "branches_to_delete_after_archival": [
+    "matdog/rf-native-calibrator",
+    "tmp/rf-final-v25-span-repair",
+    "tmp/rf-v25-span-canonical-publish",
+    "tmp/rf-v25-span-final-publish",
+    "tmp/rf-v25-span-tolerance-24",
+    "archive/rf-calibrator-handoff"
+  ],
+  "open_prs_to_close_unmerged": [18, 24, 25, 26],
+  "revoked_experimental_commits": [
+    "763c767d085bbb7c5025886c89f34191a11e9722",
+    "5d7ac696739b823a4532f433ca5a3bc47a491221",
+    "408d4b511ab6ae61d17e8f518efd03a58e2a5c3a",
+    "80b6078ea7d56367567ab23682c825547960c5ed",
+    "9ed73efcc69862c2ca4865c583ce6c58ff3797b0",
+    "b5b1256e3309c4d4d299194f48b9272ecb4ec9ce",
+    "dca9d104c358841099a86910cb380fcd9eecea23",
+    "9482086baba6fac0c266c3dc509352b6547d0365"
+  ],
+  "canonical_motor_ids": [11, 12, 13, 21, 22, 23, 31, 32, 33, 41, 42, 43],
+  "mapping": {
+    "LF": {"hip": 13, "upper": 12, "lower": 11, "directions": [-1, 1, -1]},
+    "RF": {"hip": 23, "upper": 22, "lower": 21, "directions": [-1, -1, 1]},
+    "RH": {"hip": 33, "upper": 32, "lower": 31, "directions": [1, -1, 1]},
+    "LH": {"hip": 43, "upper": 42, "lower": 41, "directions": [1, 1, -1]}
+  },
+  "lf_v25_contacts": {
+    "hip": {"motor": 13, "min": 2535, "max": 1600, "affine_q0": 2067},
+    "upper": {"motor": 12, "min": 1439, "max": 3443, "affine_q0": 2040},
+    "lower": {"motor": 11, "min": 3093, "max": 1658, "affine_q0": 2074}
+  },
+  "rf_prerequisite_targets_to_reaudit": {
+    "parking_m32": 1707,
+    "upper_m22": 1024,
+    "lower_m21": 1058,
+    "rejected_affine_attempt": {"upper_m22": 1044, "lower_m21": 1032}
+  },
+  "required_witness": {
+    "method": "first RF contact as encoder anchor; second endpoint predicted from immutable LF V25 measured span; compare RF measured span to LF witness tolerance",
+    "absolute_mirror_ticks_forbidden": true,
+    "force_q0_2048_forbidden": true,
+    "experimental_head_tolerance_ticks": 16,
+    "pending_intended_lf_witness_tolerance_ticks": 24,
+    "instruction": "Read immutable LF V25 source and reuse its exact witness tolerance; do not choose a number from the failing RF trace"
+  },
+  "permanent_contracts": {
+    "station_sole_serial_owner": true,
+    "goal_position_unsigned": true,
+    "signed_wrap_forbidden": true,
+    "measurement_ram_only": true,
+    "rf_eeprom_freeze_authorized": false,
+    "global_torque_off_required": true,
+    "per_motor_exceptions_forbidden": true,
+    "temporary_workflows_forbidden": true,
+    "one_development_branch_only": true
+  },
+  "handoff_documents": [
+    "tools/matdog/MATDOG_RF_CALIBRATOR_CLAUDE_HANDOFF_2026-08-05.md",
+    "tools/matdog/CLAUDE_PROMPT_RF_CALIBRATOR_2026-08-05.md",
+    "tools/matdog/MATDOG_RF_CALIBRATOR_HANDOFF_STATE_2026-08-05.json"
+  ]
+}

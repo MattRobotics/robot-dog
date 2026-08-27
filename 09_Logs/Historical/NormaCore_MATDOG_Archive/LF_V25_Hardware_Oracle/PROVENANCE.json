@@ -1,0 +1,28 @@
+{
+  "archive_id": "LF_V25_HARDWARE_ORACLE",
+  "classification": [
+    "HISTORICAL HARDWARE ORACLE",
+    "STATION-MEDIATED ARCHITECTURE",
+    "PRE-2026-08-27 PHYSICAL INSTALLATION",
+    "NOT CURRENT MATDOG RUNTIME",
+    "NOT CURRENT CALIBRATION",
+    "DO NOT COMMAND HARDWARE FROM THIS ARCHIVE"
+  ],
+  "source_repository": "MattRobotics/norma-core",
+  "original_branch": "release/matdog-lf-calibrator-v25",
+  "head_commit": "f87dd1fbc7e8100d275c74f9af448642f3429680",
+  "head_tree": "b1a18b52b381e64549f485ceb67e0dfd0198f93b",
+  "merge_base_with_main": "32e3222c87016b7f5d7c1c1da497a4cea3e7b80a",
+  "main_at_archive_time": "4a8ed6337261553b79c928975808d294c9ca723b",
+  "unique_commits_on_branch": 92,
+  "main_ahead_by": 19,
+  "fully_merged_into_main": false,
+  "files_changed": 16,
+  "archived_at": "2026-08-27",
+  "station_dependency": "REQUIRED \u2014 Station was sole ST3215 serial owner in this architecture",
+  "superseded_reason": "ESP32-S3 coprocessor selected as ST3215 bus owner; robot physically reassembled 2026-08-27",
+  "replacement_location": "09_Logs/Historical/NormaCore_MATDOG_Archive/LF_V25_Hardware_Oracle/",
+  "bundle": "bundles/lf_v25_unique.bundle",
+  "bundle_requires_base": "32e3222c87016b7f5d7c1c1da497a4cea3e7b80a",
+  "bundle_base_reachable_from": "MattRobotics/norma-core main (retained)"
+}

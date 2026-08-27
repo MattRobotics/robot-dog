@@ -1,0 +1,26 @@
+{
+  "archive_id": "GENERIC_V25_SUPERSEDED_WIP",
+  "classification": [
+    "SUPERSEDED DEVELOPMENT WIP",
+    "STATION-MEDIATED IMPLEMENTATION",
+    "NOT CURRENT RUNTIME",
+    "NOT FINAL GENERIC CALIBRATOR",
+    "DO NOT USE AS HARDWARE AUTHORIZATION"
+  ],
+  "source_repository": "MattRobotics/norma-core",
+  "original_branch": "matdog/generic-v25-full-leg-engine",
+  "head_commit": "f4a87a443011f15e4f105858fec62fc15ca5a77c",
+  "head_tree": "e011b9410c1bd0c501884085b5d3c0824eef463d",
+  "merge_base_with_main": "4a8ed6337261553b79c928975808d294c9ca723b",
+  "main_at_archive_time": "4a8ed6337261553b79c928975808d294c9ca723b",
+  "unique_commits_on_branch": 16,
+  "main_ahead_by": 0,
+  "fully_merged_into_main": false,
+  "files_changed": 17,
+  "archived_at": "2026-08-27",
+  "hardware_validated": false,
+  "scope": "offline only \u2014 G0/G1/G2 gates and G3A/G3B/G3C structural work; never executed on hardware",
+  "replacement_location": "09_Logs/Historical/NormaCore_MATDOG_Archive/Generic_V25_Superseded_WIP/",
+  "bundle": "bundles/generic_v25_unique.bundle",
+  "bundle_requires_base": "4a8ed6337261553b79c928975808d294c9ca723b"
+}
