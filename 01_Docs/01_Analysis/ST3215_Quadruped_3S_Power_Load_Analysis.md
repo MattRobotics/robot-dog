@@ -11,7 +11,7 @@ Il workbook è stato creato per verificare se la configurazione attuale di alime
 Il file **`ST3215_Quadruped_3S_Power_Load_Analysis.xlsx`** è stato costruito per:
 
 - raccogliere in un unico posto i dati principali del servo **Feetech ST-3215-C018**;
-- analizzare l’alimentazione di **12 servo** su **serial bus TTL**;
+- analizzare l’alimentazione di **12 servo** (analisi originale; il robot ora ne monta **17**: 12 zampe + 5 testa/mascella — il carico va rivalutato) su **serial bus TTL**;
 - modellare una distribuzione di potenza con **4 rami da 3 motori** (`3+3+3+3`);
 - calcolare la **caduta di tensione** sul motore più lontano del ramo;
 - stimare la **coppia disponibile** e la **corrente assorbita** in funzione della tensione batteria;
