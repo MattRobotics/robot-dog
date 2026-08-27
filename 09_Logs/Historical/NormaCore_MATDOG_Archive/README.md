@@ -80,6 +80,7 @@ MATDOG-specific ownership and development no longer live there.
 | [`RF_Calibrator_Local_Only/`](RF_Calibrator_Local_Only/README.md) | local-only uncommitted work, +1 176 lines | **SUPERSEDED WIP — never committed or pushed** |
 | [`NormaCore_Main_MATDOG_Content/`](NormaCore_Main_MATDOG_Content/README.md) | MATDOG files merged into `norma-core` `main` | **HISTORICAL — main retained upstream** |
 | [`bundles/`](bundles/) | git bundles carrying the unique commits of both retired branches | provenance |
+| [`MIGRATION_REPORT.md`](MIGRATION_REPORT.md) | the retirement itself: gates, SHAs, verification, final repo state | record |
 
 Integrity: each directory carries a `SHA256SUMS`; verify with `sha256sum -c SHA256SUMS`.
 
