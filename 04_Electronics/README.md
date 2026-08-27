@@ -67,15 +67,42 @@ re-measured.
 
 ---
 
-## Power
+## Power and wiring — validation status
 
-The custom distribution board and branch wiring are validated for the locomotion-development
-phase. Protection is deliberately minimal in the current revision: one externally accessible ATO
-main fuse, removable without disassembly.
+The 17-servo power architecture is **decided and under design**. It has **not** been validated as a
+final assembled configuration, and nothing here should be read as saying otherwise.
+
+### VALIDATED — proven on real hardware
+
+- **ESP32-S3 direct ST3215 bus operation** — the coprocessor exclusively owned and drove the bus.
+- **Direct bus-control path**, to the extent covered by real bring-up evidence.
+- **QC and provisioning** — 26 QC runs and 17/17 units provisioned.
+
+Evidence: [Bench QC V6.1](../09_Logs/Validation_Reports/ST3215_Bench_QC_2026-08-24/README.md) ·
+[provisioning campaign](../09_Logs/Validation_Reports/ST3215_Provisioning_2026-08-27/README.md).
+
+> That evidence is **bench** evidence: single-unit bench rig, one servo at a time. It says nothing
+> about the assembled 17-servo power system.
+
+### DECIDED — not yet final-hardware-validated
+
+- the custom final **busbar / power distribution**;
+- the **ATO protection implementation** (rating TBD);
+- the final **17-servo wiring**;
+- the final **17-servo power budget**.
+
+Protection is deliberately minimal in the current revision: one externally accessible ATO main
+fuse, removable without disassembly.
 
 > **The existing 3S power-load analysis was written for 12 servos.** The robot now has 17. The load
 > budget must be re-evaluated before sustained multi-servo motion — see
 > [`01_Docs/01_Analysis/ST3215_Quadruped_3S_Power_Load_Analysis.md`](../01_Docs/01_Analysis/ST3215_Quadruped_3S_Power_Load_Analysis.md).
+
+### Historical
+
+The earlier custom distribution board and branch wiring were validated for the **12-servo**
+Station-mediated development phase. That validation belongs to a configuration the robot no longer
+has, and does not carry over to the 17-servo design.
 
 ---
 
