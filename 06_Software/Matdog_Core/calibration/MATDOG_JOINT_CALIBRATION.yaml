@@ -1,3 +1,21 @@
+# =============================================================================
+# ⚠️  CALIBRATION RESET — 2026-08-27
+#
+#     ALL CALIBRATION DATA IN THIS FILE IS STALE.
+#
+#     The 17 servos were removed, bench-provisioned to PositionOffset = 0 and
+#     REMOUNTED. Every joint zero, direction and limit below describes a
+#     physical installation that NO LONGER EXISTS.
+#
+#     DO NOT command hardware from this file until full recalibration completes.
+#     See: 09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md
+#
+#     NOTE ON robot.calibration_status BELOW:
+#     the enum value is deliberately UNCHANGED because six tools hard-assert it.
+#     Read `calibration_reset:` (near the end of this file) for actual state.
+#     Changing the enum requires updating those six consumers in the same change.
+# =============================================================================
+
 schema_version: 4
 robot:
   name: MATDOG
@@ -300,3 +318,73 @@ validation_notes:
     return_validation: PASS
     observed_error_ticks: 2
     tolerance_ticks: 10
+
+# -----------------------------------------------------------------------------
+# CALIBRATION RESET — added 2026-08-27 (additive; no existing key was modified)
+# -----------------------------------------------------------------------------
+# This block is the AUTHORITATIVE statement of calibration state.
+# Where it disagrees with robot.calibration_status or
+# digital_zero_calibration.status above, THIS BLOCK WINS.
+calibration_reset:
+  state: CALIBRATION_RESET_PENDING_FULL_RECALIBRATION
+  effective: "2026-08-27"
+  trigger: full physical reassembly of all 17 servos
+  authoritative_document: 09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md
+
+  all_joint_data_below_is_stale: true
+  hardware_motion_authorized: false
+
+  servo_baseline:
+    position_offset: 0
+    physical_raw_center: 2048
+    center_tolerance_ticks: 1
+    profile: MATDOG_C018_V1
+    evidence: 09_Logs/Validation_Reports/ST3215_Provisioning_2026-08-27/
+    note: >
+      All 17 units hold PositionOffset = 0. This is a servo-level guarantee only
+      and says nothing about joint zero, mounting or direction.
+
+  joint_count_changed:
+    previous: 12
+    current: 17
+    added: [NECK_ROTATION, NECK_PITCH, HEAD_ROTATION, HEAD_PITCH, JAW]
+    note: >
+      The 12 joint entries below cover legs only. The 5 head/jaw joints have
+      never been calibrated and are absent from this file by design.
+
+  bus_ids_changed: true
+  bus_id_warning: >
+    Several units were recoded to new bus IDs during provisioning. Historical
+    records keyed by bus ID will associate the WRONG joint if read against the
+    current robot. Current mapping: 06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml
+
+  forbidden:
+    - CalibrationOfs
+    - one_key_middle
+    - rewriting PositionOffset to compensate mechanical mounting error
+    - automatic import of any pre-2026-08-27 digital q0
+
+  q0_policy: >
+    The mechanical intent is a zero or minimal q0 correction, but the final value
+    MUST BE MEASURED, not assumed or asserted. A small measured residual is a
+    legitimate outcome. Do not impose q0_correction = 0.
+
+  superseded_evidence:
+    - path: 09_Logs/Calibration/Digital_Zero/
+      status: HISTORICAL_EVIDENCE_PRESERVED
+    - path: 09_Logs/Calibration/C5_R_digital_recenter/
+      status: HISTORICAL_EVIDENCE_PRESERVED
+    - item: LF V25 hardware calibration
+      status: ORACLE_AND_HISTORY_NOT_CURRENT_INSTALLATION
+
+  required_before_motion:
+    - full calibration from scratch
+    - re-capture and redefine digital q0 on the new installation
+    - verify mapping and directions for all 17 joints
+    - keep physical RAW centre, mechanics, digital-zero mapping and joint calibration separate
+
+  open_item: >
+    robot.calibration_status still reads DIGITAL_ZERO_CALIBRATED_AND_VERIFIED because six
+    tools hard-assert that exact string. A follow-up change must introduce a proper reset
+    enum together with updates to all six consumers so they fail closed on stale calibration.
+    Until then treat those tools as unsafe to run against hardware.
