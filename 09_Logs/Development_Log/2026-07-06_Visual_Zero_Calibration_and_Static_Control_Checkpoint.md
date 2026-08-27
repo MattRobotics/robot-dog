@@ -1,5 +1,19 @@
 # 2026-07-06 - Visual-Zero Calibration and Static Control Checkpoint
 
+> ## ⚠️ SUPERSEDED DOCUMENTATION — STATION-MEDIATED PHASE
+>
+> This document describes the **Station-mediated, 12-servo** architecture and the pre-2026-08-27
+> physical installation. It is **historical evidence**, not current operational truth.
+>
+> - The **ESP32-S3 coprocessor** now owns the ST3215 bus, not NormaCore Station.
+> - The robot has **17 servos** (12 leg + 5 head/jaw), not 12.
+> - **All calibration was RESET** on 2026-08-27; 14 of 17 servos were recoded to new bus IDs.
+>
+> Current: [ARCHITECTURE.md](../../01_Docs/02_Architecture/ARCHITECTURE.md) ·
+> [calibration reset](../../09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md) ·
+> [historical archive](../../09_Logs/Historical/NormaCore_MATDOG_Archive/README.md)
+
+
 ## Milestone
 
 MATDOG completed the transition from direction-only encoder mapping to a stored visual-zero reference and a validated static control path for all 12 leg servos.

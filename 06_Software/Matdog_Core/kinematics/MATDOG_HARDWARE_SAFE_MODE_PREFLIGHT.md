@@ -1,5 +1,20 @@
 # MATDOG — Hardware Safe-Mode Preflight
 
+> ## ⚠️ SUPERSEDED ON TWO POINTS — 2026-08-27
+>
+> This preflight was written for the **Station-mediated, 12-servo** architecture and the
+> pre-reassembly installation. Two things changed:
+>
+> 1. **Bus ownership** — the ESP32-S3 coprocessor now owns the ST3215 bus, not Station.
+>    See [ARCHITECTURE.md](../../../01_Docs/02_Architecture/ARCHITECTURE.md).
+> 2. **Calibration is RESET** — all 17 servos were remounted. No preflight in this document
+>    authorizes motion until full recalibration completes.
+>    See [calibration reset](../../../09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md).
+>
+> The **safety reasoning** below remains valid and is worth preserving: single bus owner, explicit
+> blacklists, abort policy, command eligibility. The Station-specific mechanics are not.
+
+
 ## Purpose
 
 This document records the C4-F hardware safe-mode preflight before the first physical stand.
@@ -52,7 +67,8 @@ At the end of C4-F, the following remain forbidden:
 - gait command;
 - use of any first-stand blacklisted tool.
 
-Station remains the only serial bus owner.
+The **ESP32-S3 coprocessor** is the operational owner of the ST3215 serial bus. Whatever component
+holds the bus, exactly one owner is permitted at a time.
 
 ## Hardware preflight checklist for C5
 
