@@ -1,0 +1,420 @@
+{
+  "before_state": {
+    "identity": {
+      "baud_register_0x06": 0,
+      "id_register_0x05": 1,
+      "model_0x03": 777,
+      "response_status_0x08": 1,
+      "return_delay_0x07": 0
+    },
+    "physical_raw": 339,
+    "physical_raw_formula": "(present_position + signed_position_offset) mod 4096",
+    "position_offset_raw16": 85,
+    "position_offset_signed": 85,
+    "preserve_only_fields": {
+      "AngularResolution_0x1E": 1,
+      "BaudRate_0x06": 0,
+      "LedAlarm_0x13": 44,
+      "ResponseStatus_0x08": 1,
+      "ReturnDelay_0x07": 0,
+      "UnloadCondition_0x12": 12
+    },
+    "profile_fields": {
+      "CCWDead_0x1B": 1,
+      "CWDead_0x1A": 1,
+      "D_0x16": 32,
+      "I_0x17": 0,
+      "MaxAngle_0x0B": 4095,
+      "MaxTemperature_0x0D": 70,
+      "MaxTorque_0x10": 1000,
+      "MaxVoltage_0x0E": 140,
+      "MinAngle_0x09": 0,
+      "MinStartupForce_0x18": 16,
+      "MinVoltage_0x0F": 40,
+      "Mode_0x21": 0,
+      "OverCurrentProtectionTime_0x26": 200,
+      "OverloadTorque_0x24": 80,
+      "P_0x15": 32,
+      "ProtectionCurrent_0x1C": 310,
+      "ProtectionTime_0x23": 200,
+      "ProtectionTorque_0x22": 20,
+      "SpeedClosedLoopP_0x25": 10,
+      "VelocityClosedLoopI_0x27": 200
+    },
+    "ram": {
+      "lock_0x37": 1,
+      "torque_enable_0x28": 0,
+      "torque_limit_0x30": 1000
+    },
+    "raw_artifact": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/NEW01__20260827_100521Z/01_before_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T10:05:49.191668+00:00",
+      "sha256": "24acb4d0a20ebb41d0344971547e60ce73ad418821d6d260cd70972867a05ee7"
+    },
+    "raw_hex": "030A000903010000010000FF0F468C28E8030C2C2F2020001000010136010155000014C8500AC8C80000000000000000E803000000000001FE00000000007023000000FE000000",
+    "raw_length": 71,
+    "raw_sha256": "24acb4d0a20ebb41d0344971547e60ce73ad418821d6d260cd70972867a05ee7",
+    "slot": "BEFORE",
+    "telemetry": {
+      "moving_0x42": 0,
+      "present_current_0x45_signed": 0,
+      "present_load_0x3C_signed": 0,
+      "present_position_0x38_raw16": 254,
+      "present_speed_0x3A_signed": 0,
+      "present_temperature_0x3F": 35,
+      "present_voltage_0x3E": 112,
+      "status_0x40": 0
+    }
+  },
+  "canonical_delta": [
+    {
+      "action": "SKIP",
+      "address": "0x09",
+      "current": 0,
+      "name": "MinAngle",
+      "target": 0,
+      "width": 2
+    },
+    {
+      "action": "SKIP",
+      "address": "0x0B",
+      "current": 4095,
+      "name": "MaxAngle",
+      "target": 4095,
+      "width": 2
+    },
+    {
+      "action": "SKIP",
+      "address": "0x0D",
+      "current": 70,
+      "name": "MaxTemperature",
+      "target": 70,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x0E",
+      "current": 140,
+      "name": "MaxVoltage",
+      "target": 140,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x0F",
+      "current": 40,
+      "name": "MinVoltage",
+      "target": 40,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x10",
+      "current": 1000,
+      "name": "MaxTorque",
+      "target": 1000,
+      "width": 2
+    },
+    {
+      "action": "SKIP",
+      "address": "0x15",
+      "current": 32,
+      "name": "P",
+      "target": 32,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x16",
+      "current": 32,
+      "name": "D",
+      "target": 32,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x17",
+      "current": 0,
+      "name": "I",
+      "target": 0,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x18",
+      "current": 16,
+      "name": "MinStartupForce",
+      "target": 16,
+      "width": 2
+    },
+    {
+      "action": "SKIP",
+      "address": "0x1A",
+      "current": 1,
+      "name": "CWDead",
+      "target": 1,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x1B",
+      "current": 1,
+      "name": "CCWDead",
+      "target": 1,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x1C",
+      "current": 310,
+      "name": "ProtectionCurrent",
+      "target": 310,
+      "width": 2
+    },
+    {
+      "action": "SKIP",
+      "address": "0x21",
+      "current": 0,
+      "name": "Mode",
+      "target": 0,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x22",
+      "current": 20,
+      "name": "ProtectionTorque",
+      "target": 20,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x23",
+      "current": 200,
+      "name": "ProtectionTime",
+      "target": 200,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x24",
+      "current": 80,
+      "name": "OverloadTorque",
+      "target": 80,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x25",
+      "current": 10,
+      "name": "SpeedClosedLoopP",
+      "target": 10,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x26",
+      "current": 200,
+      "name": "OverCurrentProtectionTime",
+      "target": 200,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x27",
+      "current": 200,
+      "name": "VelocityClosedLoopI",
+      "target": 200,
+      "width": 1
+    }
+  ],
+  "center_goal_displayed": 1963,
+  "cold_cycles_required": 2,
+  "cold_states": [],
+  "command_surface": {
+    "allowed_examples": [
+      "@BEGIN NEW01",
+      "@EXECUTE 1A2B3C4D",
+      "@HELP"
+    ],
+    "allowed_patterns": [
+      "^@BEGIN (?:[A-Z0-9]{1,15})$",
+      "^@EXECUTE (?:[0-9A-F]{8})$",
+      "^@HELP$"
+    ],
+    "arbitrary_goal_position": "NOT IMPLEMENTED",
+    "arbitrary_id_write": "NOT IMPLEMENTED",
+    "baud_write": "NOT IMPLEMENTED (verification only)",
+    "begin_performs_servo_writes": "NO",
+    "broadcast_write": "NOT IMPLEMENTED",
+    "calibration_ofs": "NOT IMPLEMENTED",
+    "confirmation_string": "NONE (evidence contract is the gate)",
+    "factory_reset": "NOT IMPLEMENTED",
+    "forbidden_tokens_rejected": [
+      "@NORMALIZE_MATDOG",
+      "@QC_FAST",
+      "@READ",
+      "@DUMP_RAW",
+      "@BENCH",
+      "@CAPTURE",
+      "@RAMTEST",
+      "@PING",
+      "@SCAN",
+      "@SNAPSHOT71",
+      "@SAFE_OFF",
+      "@WRITE",
+      "@SETID",
+      "@GOAL",
+      "@TORQUE",
+      "@RESET",
+      "@CALIBRATE"
+    ],
+    "generic_eeprom_write": "NOT IMPLEMENTED",
+    "host_exposed_torque_on": "NOT IMPLEMENTED",
+    "host_supplies_source_id": "NO (firmware discovers it)",
+    "host_supplies_target_id": "NO (firmware owns the allocation map)"
+  },
+  "commands_sent": [
+    "@BEGIN NEW01",
+    "@EXECUTE B9FF30F8"
+  ],
+  "eeprom_writes": [],
+  "finished_utc": "2026-08-27T10:05:54.234328+00:00",
+  "firmware": {
+    "binary": {
+      "actual_sha256": "38955b9d2a17e5ca8272e7b7c911646afdbaaa5d11e5db8c6e8870ba0c22884b",
+      "expected_sha256": "38955b9d2a17e5ca8272e7b7c911646afdbaaa5d11e5db8c6e8870ba0c22884b",
+      "match": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/build/esp32.esp32.esp32s3/matdog_st3215_provisioner_v1.ino.bin"
+    },
+    "fqbn": "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,DebugLevel=none,PSRAM=opi",
+    "source": {
+      "actual_sha256": "14019c084a77b3b050b4f3b84470472e12aae368c38096894e87a00bd7cada20",
+      "expected_sha256": "14019c084a77b3b050b4f3b84470472e12aae368c38096894e87a00bd7cada20",
+      "match": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/matdog_st3215_provisioner_v1.ino"
+    }
+  },
+  "firmware_unresolved_constants": [
+    {
+      "name": "PRIME_MAX_DELTA_TICKS",
+      "provisional": "1",
+      "reason": "campaign_evidence_at_speed300_acc20_only"
+    },
+    {
+      "name": "COLD_ABSENCE_DEBOUNCE_MS",
+      "provisional": "1500",
+      "reason": "no_servo_power_cycle_ever_measured"
+    },
+    {
+      "name": "COLD_RETURN_STABLE_SAMPLES",
+      "provisional": "10",
+      "reason": "no_servo_power_cycle_ever_measured"
+    }
+  ],
+  "hardware_freeze": "CLEARED",
+  "id_recode_proof": null,
+  "initial_physical_raw": 339,
+  "initial_present_position": 254,
+  "motion_telemetry": {},
+  "offset_zero_proof": null,
+  "old_position_offset": 85,
+  "physical_label": "NEW01",
+  "port": "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00",
+  "profile": "MATDOG_C018_V1",
+  "profile_fingerprint_before": "ae3ae5ce6ddda1c003fcde9f8ce12fed7f1272639b183e1ba23e27eae0cc5b4d",
+  "profile_fingerprint_final": null,
+  "profile_fingerprint_target": "ae3ae5ce6ddda1c003fcde9f8ce12fed7f1272639b183e1ba23e27eae0cc5b4d",
+  "raw_artifacts": {
+    "BEFORE": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/NEW01__20260827_100521Z/01_before_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T10:05:49.191668+00:00",
+      "sha256": "24acb4d0a20ebb41d0344971547e60ce73ad418821d6d260cd70972867a05ee7"
+    }
+  },
+  "reason": "ProvisionError: EXECUTE_RESULT PASS missing",
+  "runner_sha256": "9e3266431deb1bc8b51964bc287371e6c544975c391c92c8cc30ebc068c360e1",
+  "schema": "MATDOG_ST3215_PROVISIONER_V1",
+  "session_dir": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/NEW01__20260827_100521Z",
+  "session_token_accepted": "B9FF30F8",
+  "source_id": 1,
+  "started_utc": "2026-08-27T10:05:21.381309+00:00",
+  "static_write_audit": {
+    "checks": {
+      "allocation_matches_host": true,
+      "baud_not_in_write_allowlist": true,
+      "begin_declares_no_writes": true,
+      "every_write_site_approved": true,
+      "late_stage_registers_not_in_profile": true,
+      "no_forbidden_patterns": true,
+      "preserve_only_never_written": true,
+      "profile_table_matches_host": true,
+      "write_allowlist_is_enforced": true
+    },
+    "firmware_source": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/matdog_st3215_provisioner_v1.ino",
+    "forbidden_pattern_hits": [],
+    "hardware_freeze_blocked": false,
+    "late_stage_violations": [],
+    "ok": true,
+    "preserve_only_violations": [],
+    "primitives_with_zero_call_sites": [
+      "CalibrationOfs",
+      "EnableTorque",
+      "LockEprom",
+      "RegWriteAction",
+      "SyncWritePosEx",
+      "WheelMode",
+      "WriteSpe",
+      "genWrite",
+      "regWrite",
+      "syncWrite",
+      "unLockEprom"
+    ],
+    "unapproved_write_sites": [],
+    "unresolved_constants": [],
+    "write_sites": [
+      {
+        "approved": true,
+        "function": "provWrite",
+        "line": 484,
+        "primitive": "writeWord",
+        "why": "word writes, gated by writeAllowed() and verified by readback"
+      },
+      {
+        "approved": true,
+        "function": "provWrite",
+        "line": 485,
+        "primitive": "writeByte",
+        "why": "byte writes, gated by writeAllowed() and verified by readback"
+      },
+      {
+        "approved": true,
+        "function": "provWritePosEx",
+        "line": 528,
+        "primitive": "WritePosEx",
+        "why": "the only motion primitive; position domain 0..4095 checked first, speed/acc pinned to the canonical centering constants"
+      },
+      {
+        "approved": true,
+        "function": "provWriteIdAdvisory",
+        "line": 552,
+        "primitive": "writeByte",
+        "why": "ID recode; still gated by writeAllowed(), ACK advisory because the servo may already answer under the new ID"
+      }
+    ]
+  },
+  "target_id": 23,
+  "target_joint": "RF_HIP",
+  "tool": "matdog_st3215_provisioner_v1",
+  "tool_version": "1.0.0",
+  "verdict": "FAIL",
+  "warm_state": null
+}

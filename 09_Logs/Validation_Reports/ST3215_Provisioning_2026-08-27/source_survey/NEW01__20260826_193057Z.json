@@ -1,0 +1,394 @@
+{
+  "command_surface": {
+    "allowed_examples": [
+      "@SCAN 0 253",
+      "@SNAPSHOT71 13",
+      "@SAFE_OFF 13"
+    ],
+    "allowed_patterns": [
+      "^@SCAN 0 253$",
+      "^@SNAPSHOT71 (?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-3])$",
+      "^@SAFE_OFF (?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-3])$"
+    ],
+    "broadcast_writes": "NOT IMPLEMENTED",
+    "calibration_ofs": "NOT IMPLEMENTED",
+    "eeprom_unlock_or_write": "NOT IMPLEMENTED",
+    "forbidden_tokens_rejected": [
+      "@NORMALIZE_MATDOG",
+      "@QC_FAST",
+      "@READ",
+      "@DUMP_RAW",
+      "@BENCH",
+      "@CAPTURE",
+      "@RAMTEST",
+      "@PING",
+      "@HELP"
+    ],
+    "id_change": "NOT IMPLEMENTED",
+    "only_permitted_write": "TorqueEnable=0 via @SAFE_OFF (firmware-gated)",
+    "position_commands": "NOT IMPLEMENTED",
+    "torque_on": "NOT IMPLEMENTED"
+  },
+  "commands_sent": [
+    "@SCAN 0 253",
+    "@SNAPSHOT71 1",
+    "@SAFE_OFF 1",
+    "@SNAPSHOT71 1",
+    "@SNAPSHOT71 1"
+  ],
+  "comparison": {
+    "post1_vs_post2": {
+      "eeprom_diffs": [],
+      "ram_invariant_diffs": [],
+      "telemetry_diffs": [],
+      "torque_enable_a": 0,
+      "torque_enable_b": 0
+    },
+    "pre_vs_post1": {
+      "eeprom_diffs": [],
+      "ram_invariant_diffs": [],
+      "telemetry_diffs": [],
+      "torque_enable_a": 0,
+      "torque_enable_b": 0
+    },
+    "pre_vs_post2": {
+      "eeprom_diffs": [],
+      "ram_invariant_diffs": [],
+      "telemetry_diffs": [],
+      "torque_enable_a": 0,
+      "torque_enable_b": 0
+    },
+    "summary": {
+      "all_ok": true,
+      "eeprom_invariant_ok": true,
+      "ram_invariant_ok": true,
+      "telemetry_variation_permitted": true,
+      "torque_enable_post_ok": true,
+      "torque_enable_pre": 0
+    }
+  },
+  "confirmation_string": "SOURCE_SURVEY_NEW01",
+  "discovered_source_id": 1,
+  "finished_utc": "2026-08-26T19:31:25.757293+00:00",
+  "frozen_firmware": {
+    "binary": {
+      "actual_sha256": "89ce2a5178b663d7a19b01275ad65662856ce7b7bc114198b5a3e535464f6a12",
+      "expected_sha256": "89ce2a5178b663d7a19b01275ad65662856ce7b7bc114198b5a3e535464f6a12",
+      "match": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_source_survey_v1/build_freeze_20260826/matdog_st3215_source_survey_v1.ino.bin"
+    },
+    "source": {
+      "actual_sha256": "f37fa85a11e333634c18b4abbd991e24797b1891ec5d2e5432b1e4787e5a0c86",
+      "expected_sha256": "f37fa85a11e333634c18b4abbd991e24797b1891ec5d2e5432b1e4787e5a0c86",
+      "match": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_source_survey_v1/matdog_st3215_source_survey_v1.ino"
+    }
+  },
+  "future_target_id": 23,
+  "physical_label": "NEW01",
+  "port": "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00",
+  "post_snapshot_1": {
+    "anomalies": {
+      "position_offset_out_of_range": false,
+      "present_position_out_of_range": false
+    },
+    "eeprom": {
+      "angular_resolution_0x1E": 1,
+      "ccw_dead_0x1B": 1,
+      "cw_dead_0x1A": 1,
+      "d_0x16": 32,
+      "i_0x17": 0,
+      "led_alarm_0x13": 44,
+      "max_angle_0x0B": 4095,
+      "max_temperature_0x0D": 70,
+      "max_torque_0x10": 1000,
+      "max_voltage_0x0E": 140,
+      "min_angle_0x09": 0,
+      "min_startup_force_0x18": 16,
+      "min_voltage_0x0F": 40,
+      "mode_0x21": 0,
+      "over_current_protection_time_0x26": 200,
+      "overload_torque_0x24": 80,
+      "p_0x15": 32,
+      "position_offset_0x1F_raw16": 85,
+      "position_offset_0x1F_signed": 85,
+      "protection_current_0x1C": 310,
+      "protection_time_0x23": 200,
+      "protection_torque_0x22": 20,
+      "speed_closed_loop_p_0x25": 10,
+      "unload_condition_0x12": 12,
+      "velocity_closed_loop_i_0x27": 200
+    },
+    "firmware_reported": {
+      "BAUD_REGISTER": "0",
+      "EEPROM_LOCK": "1",
+      "ID_REGISTER": "1",
+      "POSITION_OFFSET_SIGNED": "85",
+      "PRESENT_POSITION_RAW16": "254",
+      "RESPONSE_STATUS": "1",
+      "TORQUE_ENABLE": "0",
+      "TORQUE_LIMIT": "1000"
+    },
+    "identity": {
+      "baud_register_0x06": 0,
+      "id_register_0x05": 1,
+      "model_0x03": 777,
+      "response_status_0x08": 1,
+      "return_delay_0x07": 0
+    },
+    "physical_raw": 339,
+    "physical_raw_formula": "(present_position + signed_position_offset) % 4096",
+    "ram": {
+      "acc_0x29": 0,
+      "goal_position_0x2A": 0,
+      "goal_speed_0x2E": 0,
+      "goal_time_0x2C": 0,
+      "lock_0x37": 1,
+      "torque_enable_0x28": 0,
+      "torque_limit_0x30": 1000
+    },
+    "raw_artifact": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/source_survey_v1/NEW01__20260826_193057Z__02_post_safeoff_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-26T19:31:25.736675+00:00",
+      "sha256": "0d7b73ff08b85a7e1517054e585ba167d1414060bf7a8498dd113fd837f7b222"
+    },
+    "raw_hex": "030A000903010000010000FF0F468C28E8030C2C2F2020001000010136010155000014C8500AC8C80000000000000000E803000000000001FE0000000000701F000000FE000000",
+    "raw_length": 71,
+    "raw_sha256": "0d7b73ff08b85a7e1517054e585ba167d1414060bf7a8498dd113fd837f7b222",
+    "telemetry": {
+      "moving_0x42": 0,
+      "present_current_0x45_signed": 0,
+      "present_load_0x3C_signed": 0,
+      "present_position_0x38_raw16": 254,
+      "present_speed_0x3A_signed": 0,
+      "present_temperature_0x3F": 31,
+      "present_voltage_0x3E": 112,
+      "status_0x40": 0
+    }
+  },
+  "post_snapshot_2": {
+    "anomalies": {
+      "position_offset_out_of_range": false,
+      "present_position_out_of_range": false
+    },
+    "eeprom": {
+      "angular_resolution_0x1E": 1,
+      "ccw_dead_0x1B": 1,
+      "cw_dead_0x1A": 1,
+      "d_0x16": 32,
+      "i_0x17": 0,
+      "led_alarm_0x13": 44,
+      "max_angle_0x0B": 4095,
+      "max_temperature_0x0D": 70,
+      "max_torque_0x10": 1000,
+      "max_voltage_0x0E": 140,
+      "min_angle_0x09": 0,
+      "min_startup_force_0x18": 16,
+      "min_voltage_0x0F": 40,
+      "mode_0x21": 0,
+      "over_current_protection_time_0x26": 200,
+      "overload_torque_0x24": 80,
+      "p_0x15": 32,
+      "position_offset_0x1F_raw16": 85,
+      "position_offset_0x1F_signed": 85,
+      "protection_current_0x1C": 310,
+      "protection_time_0x23": 200,
+      "protection_torque_0x22": 20,
+      "speed_closed_loop_p_0x25": 10,
+      "unload_condition_0x12": 12,
+      "velocity_closed_loop_i_0x27": 200
+    },
+    "firmware_reported": {
+      "BAUD_REGISTER": "0",
+      "EEPROM_LOCK": "1",
+      "ID_REGISTER": "1",
+      "POSITION_OFFSET_SIGNED": "85",
+      "PRESENT_POSITION_RAW16": "254",
+      "RESPONSE_STATUS": "1",
+      "TORQUE_ENABLE": "0",
+      "TORQUE_LIMIT": "1000"
+    },
+    "identity": {
+      "baud_register_0x06": 0,
+      "id_register_0x05": 1,
+      "model_0x03": 777,
+      "response_status_0x08": 1,
+      "return_delay_0x07": 0
+    },
+    "physical_raw": 339,
+    "physical_raw_formula": "(present_position + signed_position_offset) % 4096",
+    "ram": {
+      "acc_0x29": 0,
+      "goal_position_0x2A": 0,
+      "goal_speed_0x2E": 0,
+      "goal_time_0x2C": 0,
+      "lock_0x37": 1,
+      "torque_enable_0x28": 0,
+      "torque_limit_0x30": 1000
+    },
+    "raw_artifact": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/source_survey_v1/NEW01__20260826_193057Z__03_repeat_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-26T19:31:25.753448+00:00",
+      "sha256": "0d7b73ff08b85a7e1517054e585ba167d1414060bf7a8498dd113fd837f7b222"
+    },
+    "raw_hex": "030A000903010000010000FF0F468C28E8030C2C2F2020001000010136010155000014C8500AC8C80000000000000000E803000000000001FE0000000000701F000000FE000000",
+    "raw_length": 71,
+    "raw_sha256": "0d7b73ff08b85a7e1517054e585ba167d1414060bf7a8498dd113fd837f7b222",
+    "telemetry": {
+      "moving_0x42": 0,
+      "present_current_0x45_signed": 0,
+      "present_load_0x3C_signed": 0,
+      "present_position_0x38_raw16": 254,
+      "present_speed_0x3A_signed": 0,
+      "present_temperature_0x3F": 31,
+      "present_voltage_0x3E": 112,
+      "status_0x40": 0
+    }
+  },
+  "pre_snapshot": {
+    "anomalies": {
+      "position_offset_out_of_range": false,
+      "present_position_out_of_range": false
+    },
+    "eeprom": {
+      "angular_resolution_0x1E": 1,
+      "ccw_dead_0x1B": 1,
+      "cw_dead_0x1A": 1,
+      "d_0x16": 32,
+      "i_0x17": 0,
+      "led_alarm_0x13": 44,
+      "max_angle_0x0B": 4095,
+      "max_temperature_0x0D": 70,
+      "max_torque_0x10": 1000,
+      "max_voltage_0x0E": 140,
+      "min_angle_0x09": 0,
+      "min_startup_force_0x18": 16,
+      "min_voltage_0x0F": 40,
+      "mode_0x21": 0,
+      "over_current_protection_time_0x26": 200,
+      "overload_torque_0x24": 80,
+      "p_0x15": 32,
+      "position_offset_0x1F_raw16": 85,
+      "position_offset_0x1F_signed": 85,
+      "protection_current_0x1C": 310,
+      "protection_time_0x23": 200,
+      "protection_torque_0x22": 20,
+      "speed_closed_loop_p_0x25": 10,
+      "unload_condition_0x12": 12,
+      "velocity_closed_loop_i_0x27": 200
+    },
+    "firmware_reported": {
+      "BAUD_REGISTER": "0",
+      "EEPROM_LOCK": "1",
+      "ID_REGISTER": "1",
+      "POSITION_OFFSET_SIGNED": "85",
+      "PRESENT_POSITION_RAW16": "254",
+      "RESPONSE_STATUS": "1",
+      "TORQUE_ENABLE": "0",
+      "TORQUE_LIMIT": "1000"
+    },
+    "identity": {
+      "baud_register_0x06": 0,
+      "id_register_0x05": 1,
+      "model_0x03": 777,
+      "response_status_0x08": 1,
+      "return_delay_0x07": 0
+    },
+    "physical_raw": 339,
+    "physical_raw_formula": "(present_position + signed_position_offset) % 4096",
+    "ram": {
+      "acc_0x29": 0,
+      "goal_position_0x2A": 0,
+      "goal_speed_0x2E": 0,
+      "goal_time_0x2C": 0,
+      "lock_0x37": 1,
+      "torque_enable_0x28": 0,
+      "torque_limit_0x30": 1000
+    },
+    "raw_artifact": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/source_survey_v1/NEW01__20260826_193057Z__01_pre_safeoff_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-26T19:31:25.692399+00:00",
+      "sha256": "0d7b73ff08b85a7e1517054e585ba167d1414060bf7a8498dd113fd837f7b222"
+    },
+    "raw_hex": "030A000903010000010000FF0F468C28E8030C2C2F2020001000010136010155000014C8500AC8C80000000000000000E803000000000001FE0000000000701F000000FE000000",
+    "raw_length": 71,
+    "raw_sha256": "0d7b73ff08b85a7e1517054e585ba167d1414060bf7a8498dd113fd837f7b222",
+    "telemetry": {
+      "moving_0x42": 0,
+      "present_current_0x45_signed": 0,
+      "present_load_0x3C_signed": 0,
+      "present_position_0x38_raw16": 254,
+      "present_speed_0x3A_signed": 0,
+      "present_temperature_0x3F": 31,
+      "present_voltage_0x3E": 112,
+      "status_0x40": 0
+    }
+  },
+  "profile_classification": "PENDING_OFFLINE_REVIEW",
+  "qc_runner_transport_reference_sha256": "a143958034be46c9a36ce89fca2fb27fab2371e1af730abe2e3eaf265bc1245e",
+  "raw_artifacts": {
+    "POST1": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/source_survey_v1/NEW01__20260826_193057Z__02_post_safeoff_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-26T19:31:25.736675+00:00",
+      "sha256": "0d7b73ff08b85a7e1517054e585ba167d1414060bf7a8498dd113fd837f7b222"
+    },
+    "POST2": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/source_survey_v1/NEW01__20260826_193057Z__03_repeat_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-26T19:31:25.753448+00:00",
+      "sha256": "0d7b73ff08b85a7e1517054e585ba167d1414060bf7a8498dd113fd837f7b222"
+    },
+    "PRE": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/source_survey_v1/NEW01__20260826_193057Z__01_pre_safeoff_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-26T19:31:25.692399+00:00",
+      "sha256": "0d7b73ff08b85a7e1517054e585ba167d1414060bf7a8498dd113fd837f7b222"
+    }
+  },
+  "reason": "read-only survey complete; single permitted write verified",
+  "runner_sha256": "7cc77149cde24fe6bf0e8b0f6fef2c6b1bf42c1c45bad09cfb2075859cd05489",
+  "safe_off": {
+    "SAFE_OFF_READBACK": 0,
+    "SAFE_OFF_READ_STATUS": 0,
+    "SAFE_OFF_WRITE_RESULT": 1,
+    "SAFE_OFF_WRITE_STATUS": 0
+  },
+  "scan": {
+    "responders": [
+      {
+        "id": 1,
+        "model": 777,
+        "model_status": 0,
+        "ping_status": 0
+      }
+    ]
+  },
+  "schema": "MATDOG_ST3215_SOURCE_SURVEY_V1",
+  "started_utc": "2026-08-26T19:30:57.912134+00:00",
+  "survey_result": "SOURCE_SIGNATURE_CAPTURED",
+  "tool": "matdog_st3215_source_survey_v1",
+  "tool_version": "1.0.0",
+  "verdict": "PASS"
+}

@@ -1,0 +1,23 @@
+sess	label	verdict	fw	tgt_id	joint	W	S	reason
+ELR01__20260827_135044Z	ELR01	FAIL	V5	12	LF_UPPER	0	20	ProvisionError: EXECUTE_RESULT PASS missing
+ELR01__20260827_140449Z	ELR01	PASS	V6	12	LF_UPPER	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+ELR02__20260827_132834Z	ELR02	PASS	V5	32	RH_UPPER	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+ELR03__20260827_124856Z	ELR03	FAIL	V4	22	RF_UPPER	0	20	ProvisionError: EXECUTE_RESULT PASS missing
+ELR03__20260827_130419Z	ELR03	PASS	V5	22	RF_UPPER	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+ELR04__20260827_134707Z	ELR04	PASS	V5	55	JAW	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+M11__20260827_134139Z	M11	PASS	V5	52	NECK_PITCH	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+M22__20260827_134852Z	M22	PASS	V5	13	LF_HIP	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+M31__20260827_133936Z	M31	PASS	V5	51	NECK_ROTATION	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+M33__20260827_140704Z	M33	PASS	V6	11	LF_LOWER	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+M41__20260827_133737Z	M41	PASS	V5	41	LH_LOWER	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+M42__20260827_133526Z	M42	PASS	V5	42	LH_UPPER	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+M43__20260827_133313Z	M43	PASS	V5	43	LH_HIP	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+NEW01__20260827_100521Z	NEW01	FAIL	V1	23	RF_HIP	0	20	ProvisionError: EXECUTE_RESULT PASS missing
+NEW01__20260827_110858Z	NEW01	FAIL	V2	23	RF_HIP	0	20	ProvisionError: EXECUTE_RESULT PASS missing
+NEW01__20260827_115248Z	NEW01	FAIL	V3	23	RF_HIP	0	20	ProvisionError: EXECUTE_RESULT PASS missing
+NEW01__20260827_122920Z	NEW01	PASS	V4	23	RF_HIP	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+NEW02__20260827_134520Z	NEW02	PASS	V5	54	HEAD_PITCH	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+NEW03__20260827_131754Z	NEW03	PASS	V5	21	RF_LOWER	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+NEW04__20260827_134334Z	NEW04	PASS	V5	53	HEAD_ROTATION	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+NEW05__20260827_133055Z	NEW05	PASS	V5	31	RH_LOWER	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete
+NEW06__20260827_132535Z	NEW06	PASS	V5	33	RH_HIP	0	20	canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete

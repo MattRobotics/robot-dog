@@ -1,0 +1,858 @@
+{
+  "before_state": {
+    "identity": {
+      "baud_register_0x06": 0,
+      "id_register_0x05": 1,
+      "model_0x03": 777,
+      "response_status_0x08": 1,
+      "return_delay_0x07": 0
+    },
+    "physical_raw": 2449,
+    "physical_raw_formula": "(present_position + signed_position_offset) mod 4096",
+    "position_offset_raw16": 63636,
+    "position_offset_signed": -1900,
+    "preserve_only_fields": {
+      "AngularResolution_0x1E": 1,
+      "BaudRate_0x06": 0,
+      "LedAlarm_0x13": 44,
+      "ResponseStatus_0x08": 1,
+      "ReturnDelay_0x07": 0,
+      "UnloadCondition_0x12": 12
+    },
+    "profile_fields": {
+      "CCWDead_0x1B": 1,
+      "CWDead_0x1A": 1,
+      "D_0x16": 32,
+      "I_0x17": 0,
+      "MaxAngle_0x0B": 4095,
+      "MaxTemperature_0x0D": 70,
+      "MaxTorque_0x10": 1000,
+      "MaxVoltage_0x0E": 140,
+      "MinAngle_0x09": 0,
+      "MinStartupForce_0x18": 16,
+      "MinVoltage_0x0F": 40,
+      "Mode_0x21": 0,
+      "OverCurrentProtectionTime_0x26": 200,
+      "OverloadTorque_0x24": 80,
+      "P_0x15": 32,
+      "ProtectionCurrent_0x1C": 310,
+      "ProtectionTime_0x23": 200,
+      "ProtectionTorque_0x22": 20,
+      "SpeedClosedLoopP_0x25": 10,
+      "VelocityClosedLoopI_0x27": 200
+    },
+    "ram": {
+      "lock_0x37": 1,
+      "torque_enable_0x28": 0,
+      "torque_limit_0x30": 1000
+    },
+    "raw_artifact": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/ELR02__20260827_132834Z/01_before_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T13:29:02.620936+00:00",
+      "sha256": "e5af4272d8b697b7b57d4243c1c6bdb091970d52e4b11c2d97a1e4d223c24cbf"
+    },
+    "raw_hex": "030A000903010000010000FF0F468C28E8030C2C2F2020001000010136010194F80014C8500AC8C80000000000000000E803000000000001FD00000000006F1D000000FD000000",
+    "raw_length": 71,
+    "raw_sha256": "e5af4272d8b697b7b57d4243c1c6bdb091970d52e4b11c2d97a1e4d223c24cbf",
+    "slot": "BEFORE",
+    "telemetry": {
+      "moving_0x42": 0,
+      "present_current_0x45_signed": 0,
+      "present_load_0x3C_signed": 0,
+      "present_position_0x38_raw16": 253,
+      "present_speed_0x3A_signed": 0,
+      "present_temperature_0x3F": 29,
+      "present_voltage_0x3E": 111,
+      "status_0x40": 0
+    }
+  },
+  "canonical_delta": [
+    {
+      "action": "SKIP",
+      "address": "0x09",
+      "current": 0,
+      "name": "MinAngle",
+      "target": 0,
+      "width": 2
+    },
+    {
+      "action": "SKIP",
+      "address": "0x0B",
+      "current": 4095,
+      "name": "MaxAngle",
+      "target": 4095,
+      "width": 2
+    },
+    {
+      "action": "SKIP",
+      "address": "0x0D",
+      "current": 70,
+      "name": "MaxTemperature",
+      "target": 70,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x0E",
+      "current": 140,
+      "name": "MaxVoltage",
+      "target": 140,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x0F",
+      "current": 40,
+      "name": "MinVoltage",
+      "target": 40,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x10",
+      "current": 1000,
+      "name": "MaxTorque",
+      "target": 1000,
+      "width": 2
+    },
+    {
+      "action": "SKIP",
+      "address": "0x15",
+      "current": 32,
+      "name": "P",
+      "target": 32,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x16",
+      "current": 32,
+      "name": "D",
+      "target": 32,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x17",
+      "current": 0,
+      "name": "I",
+      "target": 0,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x18",
+      "current": 16,
+      "name": "MinStartupForce",
+      "target": 16,
+      "width": 2
+    },
+    {
+      "action": "SKIP",
+      "address": "0x1A",
+      "current": 1,
+      "name": "CWDead",
+      "target": 1,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x1B",
+      "current": 1,
+      "name": "CCWDead",
+      "target": 1,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x1C",
+      "current": 310,
+      "name": "ProtectionCurrent",
+      "target": 310,
+      "width": 2
+    },
+    {
+      "action": "SKIP",
+      "address": "0x21",
+      "current": 0,
+      "name": "Mode",
+      "target": 0,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x22",
+      "current": 20,
+      "name": "ProtectionTorque",
+      "target": 20,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x23",
+      "current": 200,
+      "name": "ProtectionTime",
+      "target": 200,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x24",
+      "current": 80,
+      "name": "OverloadTorque",
+      "target": 80,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x25",
+      "current": 10,
+      "name": "SpeedClosedLoopP",
+      "target": 10,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x26",
+      "current": 200,
+      "name": "OverCurrentProtectionTime",
+      "target": 200,
+      "width": 1
+    },
+    {
+      "action": "SKIP",
+      "address": "0x27",
+      "current": 200,
+      "name": "VelocityClosedLoopI",
+      "target": 200,
+      "width": 1
+    }
+  ],
+  "center_goal_displayed": 3948,
+  "cold_cycles_required": 1,
+  "cold_states": [
+    {
+      "cycle": 1,
+      "power_cycle_model": {
+        "events": [
+          "PRESENT",
+          "ABSENT_CANDIDATE",
+          "ABSENT_CONFIRMED",
+          "RETURNED",
+          "STABLE"
+        ],
+        "invalidated": false,
+        "observed_torque_limit": 1000,
+        "passed": true,
+        "reason": null,
+        "slot": "COLD1",
+        "state": "STABLE",
+        "torque_limit_policy": "OBSERVED_NOT_ASSERTED"
+      },
+      "state": {
+        "identity": {
+          "baud_register_0x06": 0,
+          "id_register_0x05": 32,
+          "model_0x03": 777,
+          "response_status_0x08": 1,
+          "return_delay_0x07": 0
+        },
+        "physical_raw": 2049,
+        "physical_raw_formula": "(present_position + signed_position_offset) mod 4096",
+        "position_offset_raw16": 0,
+        "position_offset_signed": 0,
+        "preserve_only_fields": {
+          "AngularResolution_0x1E": 1,
+          "BaudRate_0x06": 0,
+          "LedAlarm_0x13": 44,
+          "ResponseStatus_0x08": 1,
+          "ReturnDelay_0x07": 0,
+          "UnloadCondition_0x12": 12
+        },
+        "profile_fields": {
+          "CCWDead_0x1B": 1,
+          "CWDead_0x1A": 1,
+          "D_0x16": 32,
+          "I_0x17": 0,
+          "MaxAngle_0x0B": 4095,
+          "MaxTemperature_0x0D": 70,
+          "MaxTorque_0x10": 1000,
+          "MaxVoltage_0x0E": 140,
+          "MinAngle_0x09": 0,
+          "MinStartupForce_0x18": 16,
+          "MinVoltage_0x0F": 40,
+          "Mode_0x21": 0,
+          "OverCurrentProtectionTime_0x26": 200,
+          "OverloadTorque_0x24": 80,
+          "P_0x15": 32,
+          "ProtectionCurrent_0x1C": 310,
+          "ProtectionTime_0x23": 200,
+          "ProtectionTorque_0x22": 20,
+          "SpeedClosedLoopP_0x25": 10,
+          "VelocityClosedLoopI_0x27": 200
+        },
+        "ram": {
+          "lock_0x37": 1,
+          "torque_enable_0x28": 0,
+          "torque_limit_0x30": 1000
+        },
+        "raw_artifact": {
+          "bytes": 71,
+          "exclusive_create": true,
+          "flushed_and_fsynced": true,
+          "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/ELR02__20260827_132834Z/06_after_cold_state71.bin",
+          "persisted_before_decode": true,
+          "persisted_utc": "2026-08-27T13:29:23.781238+00:00",
+          "sha256": "c86abb3802d218b61d79e21cb31c04bb6d3cc426b24ca2ea960d552198ac0100"
+        },
+        "raw_hex": "030A000903200000010000FF0F468C28E8030C2C2F2020001000010136010100000014C8500AC8C80000000000000000E8030000000000010108000000006F1E00000001080000",
+        "raw_length": 71,
+        "raw_sha256": "c86abb3802d218b61d79e21cb31c04bb6d3cc426b24ca2ea960d552198ac0100",
+        "slot": "COLD1",
+        "telemetry": {
+          "moving_0x42": 0,
+          "present_current_0x45_signed": 0,
+          "present_load_0x3C_signed": 0,
+          "present_position_0x38_raw16": 2049,
+          "present_speed_0x3A_signed": 0,
+          "present_temperature_0x3F": 30,
+          "present_voltage_0x3E": 111,
+          "status_0x40": 0
+        }
+      }
+    }
+  ],
+  "command_surface": {
+    "allowed_examples": [
+      "@BEGIN NEW01",
+      "@EXECUTE 1A2B3C4D",
+      "@HELP"
+    ],
+    "allowed_patterns": [
+      "^@BEGIN (?:[A-Z0-9]{1,15})$",
+      "^@EXECUTE (?:[0-9A-F]{8})$",
+      "^@HELP$"
+    ],
+    "arbitrary_goal_position": "NOT IMPLEMENTED",
+    "arbitrary_id_write": "NOT IMPLEMENTED",
+    "baud_write": "NOT IMPLEMENTED (verification only)",
+    "begin_performs_servo_writes": "NO",
+    "broadcast_write": "NOT IMPLEMENTED",
+    "calibration_ofs": "NOT IMPLEMENTED",
+    "confirmation_string": "NONE (evidence contract is the gate)",
+    "factory_reset": "NOT IMPLEMENTED",
+    "forbidden_tokens_rejected": [
+      "@NORMALIZE_MATDOG",
+      "@QC_FAST",
+      "@READ",
+      "@DUMP_RAW",
+      "@BENCH",
+      "@CAPTURE",
+      "@RAMTEST",
+      "@PING",
+      "@SCAN",
+      "@SNAPSHOT71",
+      "@SAFE_OFF",
+      "@WRITE",
+      "@SETID",
+      "@GOAL",
+      "@TORQUE",
+      "@RESET",
+      "@CALIBRATE"
+    ],
+    "generic_eeprom_write": "NOT IMPLEMENTED",
+    "host_exposed_torque_on": "NOT IMPLEMENTED",
+    "host_supplies_source_id": "NO (firmware discovers it)",
+    "host_supplies_target_id": "NO (firmware owns the allocation map)"
+  },
+  "commands_sent": [
+    "@BEGIN ELR02",
+    "@EXECUTE 5DCF40F8"
+  ],
+  "eeprom_writes": [
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 0,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 0,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x30",
+      "expected": 300,
+      "name": "TorqueLimit",
+      "read_status": 0,
+      "readback": 300,
+      "result": "OK",
+      "width": 2,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 0,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 1,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 1,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 0,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 1,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 1,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 0,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 1,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 1,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 0,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 1,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 1,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 0,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 1,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 1,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 0,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 0,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x37",
+      "expected": 0,
+      "name": "Lock",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x1F",
+      "expected": 0,
+      "name": "PositionOffset",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 2,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x37",
+      "expected": 1,
+      "name": "Lock",
+      "read_status": 0,
+      "readback": 1,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x28",
+      "expected": 0,
+      "name": "TorqueEnable",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x37",
+      "expected": 0,
+      "name": "Lock",
+      "read_status": 0,
+      "readback": 0,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    },
+    {
+      "ack": 1,
+      "address": "0x37",
+      "expected": 1,
+      "name": "Lock",
+      "read_status": 0,
+      "readback": 1,
+      "result": "OK",
+      "width": 1,
+      "write_status": 0
+    }
+  ],
+  "finished_utc": "2026-08-27T13:29:23.781851+00:00",
+  "firmware": {
+    "binary": {
+      "actual_sha256": "1e0a7555c892c471fc191eafa33ce148b522a5f6019c11007062d1f0883f7484",
+      "expected_sha256": "1e0a7555c892c471fc191eafa33ce148b522a5f6019c11007062d1f0883f7484",
+      "match": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/build/esp32.esp32.esp32s3/matdog_st3215_provisioner_v1.ino.bin"
+    },
+    "fqbn": "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,DebugLevel=none,PSRAM=opi",
+    "source": {
+      "actual_sha256": "838a06fb30e027066ff0de52e652fcb94acf53b0d0996ea62cf7b77d724de92c",
+      "expected_sha256": "838a06fb30e027066ff0de52e652fcb94acf53b0d0996ea62cf7b77d724de92c",
+      "match": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/matdog_st3215_provisioner_v1.ino"
+    }
+  },
+  "firmware_unresolved_constants": [],
+  "hardware_freeze": "CLEARED",
+  "id_recode_proof": {
+    "ack_authority": "ADVISORY",
+    "outcome": "RECODED",
+    "reason": "target responds, old ID silent, state verified",
+    "source_id": 1,
+    "target_id": 32,
+    "write_performed": true
+  },
+  "initial_physical_raw": 2449,
+  "initial_present_position": 253,
+  "motion_telemetry": {
+    "MOTION_SUMMARY": "MOTION_SUMMARY VOLTAGE_RANGE=111..112 MAX_TEMP_RAW=49 WORST_STATUS=0x00"
+  },
+  "offset_zero_proof": {
+    "center_error_ticks": 1,
+    "displayed": 2049,
+    "lock": 1,
+    "physical_raw": 2049,
+    "position_offset_signed": 0,
+    "torque_enable": 0
+  },
+  "old_position_offset": -1900,
+  "physical_label": "ELR02",
+  "port": "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00",
+  "profile": "MATDOG_C018_V1",
+  "profile_fingerprint_before": "ae3ae5ce6ddda1c003fcde9f8ce12fed7f1272639b183e1ba23e27eae0cc5b4d",
+  "profile_fingerprint_final": "ae3ae5ce6ddda1c003fcde9f8ce12fed7f1272639b183e1ba23e27eae0cc5b4d",
+  "profile_fingerprint_target": "ae3ae5ce6ddda1c003fcde9f8ce12fed7f1272639b183e1ba23e27eae0cc5b4d",
+  "raw_artifacts": {
+    "BEFORE": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/ELR02__20260827_132834Z/01_before_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T13:29:02.620936+00:00",
+      "sha256": "e5af4272d8b697b7b57d4243c1c6bdb091970d52e4b11c2d97a1e4d223c24cbf"
+    },
+    "CENTERED": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/ELR02__20260827_132834Z/03_centered_old_offset_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T13:29:23.770735+00:00",
+      "sha256": "b4b11f7f7bdcbe758f680048092145a443e5392c383f684e4c2815f89e6a0bc4"
+    },
+    "COLD1": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/ELR02__20260827_132834Z/06_after_cold_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T13:29:23.781238+00:00",
+      "sha256": "c86abb3802d218b61d79e21cb31c04bb6d3cc426b24ca2ea960d552198ac0100"
+    },
+    "OFFSET_ZERO": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/ELR02__20260827_132834Z/04_offset_zero_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T13:29:23.774305+00:00",
+      "sha256": "6f0ed43666f603a28dee78e9bde507982a1808abbb8da8e5530f4b4b6cb5fe82"
+    },
+    "PROFILE": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/ELR02__20260827_132834Z/02_profile_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T13:29:23.766428+00:00",
+      "sha256": "e5af4272d8b697b7b57d4243c1c6bdb091970d52e4b11c2d97a1e4d223c24cbf"
+    },
+    "WARM": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/ELR02__20260827_132834Z/05_after_recode_warm_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T13:29:23.777819+00:00",
+      "sha256": "fceeee4e1eef40747a50684f92fd130df70a16b7111e31bef55b1bb8a37f72e5"
+    }
+  },
+  "reason": "canonical profile, physical center 2048, offset 0, target ID, warm and cold verification complete",
+  "runner_sha256": "818922297307d0b3d87ab58a57d36c3ac5700bf30add655b5ba7c92b7da62a87",
+  "schema": "MATDOG_ST3215_PROVISIONER_V1",
+  "session_dir": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/ELR02__20260827_132834Z",
+  "session_token_accepted": "5DCF40F8",
+  "source_id": 1,
+  "started_utc": "2026-08-27T13:28:34.807875+00:00",
+  "static_write_audit": {
+    "checks": {
+      "allocation_matches_host": true,
+      "baud_not_in_write_allowlist": true,
+      "begin_declares_no_writes": true,
+      "every_write_site_approved": true,
+      "late_stage_registers_not_in_profile": true,
+      "no_forbidden_patterns": true,
+      "preserve_only_never_written": true,
+      "profile_table_matches_host": true,
+      "write_allowlist_is_enforced": true
+    },
+    "firmware_source": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/matdog_st3215_provisioner_v1.ino",
+    "forbidden_pattern_hits": [],
+    "hardware_freeze_blocked": false,
+    "late_stage_violations": [],
+    "ok": true,
+    "preserve_only_violations": [],
+    "primitives_with_zero_call_sites": [
+      "CalibrationOfs",
+      "EnableTorque",
+      "LockEprom",
+      "RegWriteAction",
+      "SyncWritePosEx",
+      "WheelMode",
+      "WriteSpe",
+      "genWrite",
+      "regWrite",
+      "syncWrite",
+      "unLockEprom"
+    ],
+    "unapproved_write_sites": [],
+    "unresolved_constants": [],
+    "write_sites": [
+      {
+        "approved": true,
+        "function": "provWrite",
+        "line": 565,
+        "primitive": "writeWord",
+        "why": "word writes, gated by writeAllowed() and verified by readback"
+      },
+      {
+        "approved": true,
+        "function": "provWrite",
+        "line": 566,
+        "primitive": "writeByte",
+        "why": "byte writes, gated by writeAllowed() and verified by readback"
+      },
+      {
+        "approved": true,
+        "function": "provWritePosEx",
+        "line": 609,
+        "primitive": "WritePosEx",
+        "why": "the only motion primitive; position domain 0..4095 checked first, speed/acc pinned to the canonical centering constants"
+      },
+      {
+        "approved": true,
+        "function": "provWriteIdAdvisory",
+        "line": 633,
+        "primitive": "writeByte",
+        "why": "ID recode; still gated by writeAllowed(), ACK advisory because the servo may already answer under the new ID"
+      }
+    ]
+  },
+  "target_id": 32,
+  "target_joint": "RH_UPPER",
+  "tool": "matdog_st3215_provisioner_v1",
+  "tool_version": "1.0.0",
+  "verdict": "PASS",
+  "warm_state": {
+    "identity": {
+      "baud_register_0x06": 0,
+      "id_register_0x05": 32,
+      "model_0x03": 777,
+      "response_status_0x08": 1,
+      "return_delay_0x07": 0
+    },
+    "physical_raw": 2049,
+    "physical_raw_formula": "(present_position + signed_position_offset) mod 4096",
+    "position_offset_raw16": 0,
+    "position_offset_signed": 0,
+    "preserve_only_fields": {
+      "AngularResolution_0x1E": 1,
+      "BaudRate_0x06": 0,
+      "LedAlarm_0x13": 44,
+      "ResponseStatus_0x08": 1,
+      "ReturnDelay_0x07": 0,
+      "UnloadCondition_0x12": 12
+    },
+    "profile_fields": {
+      "CCWDead_0x1B": 1,
+      "CWDead_0x1A": 1,
+      "D_0x16": 32,
+      "I_0x17": 0,
+      "MaxAngle_0x0B": 4095,
+      "MaxTemperature_0x0D": 70,
+      "MaxTorque_0x10": 1000,
+      "MaxVoltage_0x0E": 140,
+      "MinAngle_0x09": 0,
+      "MinStartupForce_0x18": 16,
+      "MinVoltage_0x0F": 40,
+      "Mode_0x21": 0,
+      "OverCurrentProtectionTime_0x26": 200,
+      "OverloadTorque_0x24": 80,
+      "P_0x15": 32,
+      "ProtectionCurrent_0x1C": 310,
+      "ProtectionTime_0x23": 200,
+      "ProtectionTorque_0x22": 20,
+      "SpeedClosedLoopP_0x25": 10,
+      "VelocityClosedLoopI_0x27": 200
+    },
+    "ram": {
+      "lock_0x37": 1,
+      "torque_enable_0x28": 0,
+      "torque_limit_0x30": 300
+    },
+    "raw_artifact": {
+      "bytes": 71,
+      "exclusive_create": true,
+      "flushed_and_fsynced": true,
+      "path": "/home/matteo-manicardi/MATDOG/runtime/esp32/matdog_st3215_provisioner_v1/sessions/ELR02__20260827_132834Z/05_after_recode_warm_state71.bin",
+      "persisted_before_decode": true,
+      "persisted_utc": "2026-08-27T13:29:23.777819+00:00",
+      "sha256": "fceeee4e1eef40747a50684f92fd130df70a16b7111e31bef55b1bb8a37f72e5"
+    },
+    "raw_hex": "030A000903200000010000FF0F468C28E8030C2C2F2020001000010136010100000014C8500AC8C800326E0F00006D012C010000000000010108000000006F1E00000001080000",
+    "raw_length": 71,
+    "raw_sha256": "fceeee4e1eef40747a50684f92fd130df70a16b7111e31bef55b1bb8a37f72e5",
+    "slot": "WARM",
+    "telemetry": {
+      "moving_0x42": 0,
+      "present_current_0x45_signed": 0,
+      "present_load_0x3C_signed": 0,
+      "present_position_0x38_raw16": 2049,
+      "present_speed_0x3A_signed": 0,
+      "present_temperature_0x3F": 30,
+      "present_voltage_0x3E": 111,
+      "status_0x40": 0
+    }
+  }
+}

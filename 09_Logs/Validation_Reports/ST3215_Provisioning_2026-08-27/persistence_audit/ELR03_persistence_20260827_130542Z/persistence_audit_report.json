@@ -1,0 +1,377 @@
+{
+  "byte_differences": [
+    {
+      "address": "0x3F",
+      "post": 34,
+      "pre": 35,
+      "region": "RAM_TELEMETRY"
+    }
+  ],
+  "checks": [
+    {
+      "actual": 777,
+      "expected": 777,
+      "group": "IDENTITY",
+      "pass": true,
+      "requirement": "model_0x03"
+    },
+    {
+      "actual": 22,
+      "expected": 22,
+      "group": "IDENTITY",
+      "pass": true,
+      "requirement": "id_0x05"
+    },
+    {
+      "actual": 0,
+      "expected": 0,
+      "group": "IDENTITY",
+      "pass": true,
+      "requirement": "baud_0x06"
+    },
+    {
+      "actual": 1,
+      "expected": 1,
+      "group": "IDENTITY",
+      "pass": true,
+      "requirement": "response_status_0x08"
+    },
+    {
+      "actual": 0,
+      "expected": 0,
+      "group": "IDENTITY",
+      "pass": true,
+      "requirement": "position_offset_0x1F"
+    },
+    {
+      "actual": 0,
+      "expected": 0,
+      "group": "SAFETY",
+      "pass": true,
+      "requirement": "torque_enable_0x28"
+    },
+    {
+      "actual": 1,
+      "expected": 1,
+      "group": "SAFETY",
+      "pass": true,
+      "requirement": "lock_0x37"
+    },
+    {
+      "actual": 0,
+      "expected": 0,
+      "group": "SAFETY",
+      "pass": true,
+      "requirement": "status_0x40"
+    },
+    {
+      "actual": 1000,
+      "expected": 1000,
+      "group": "SAFETY",
+      "pass": true,
+      "requirement": "torque_limit_0x30_after_reboot"
+    },
+    {
+      "actual": 0,
+      "expected": 0,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x09 MinAngle"
+    },
+    {
+      "actual": 4095,
+      "expected": 4095,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x0B MaxAngle"
+    },
+    {
+      "actual": 70,
+      "expected": 70,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x0D MaxTemperature"
+    },
+    {
+      "actual": 140,
+      "expected": 140,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x0E MaxVoltage"
+    },
+    {
+      "actual": 40,
+      "expected": 40,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x0F MinVoltage"
+    },
+    {
+      "actual": 1000,
+      "expected": 1000,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x10 MaxTorque"
+    },
+    {
+      "actual": 32,
+      "expected": 32,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x15 P"
+    },
+    {
+      "actual": 32,
+      "expected": 32,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x16 D"
+    },
+    {
+      "actual": 0,
+      "expected": 0,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x17 I"
+    },
+    {
+      "actual": 16,
+      "expected": 16,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x18 MinStartupForce"
+    },
+    {
+      "actual": 1,
+      "expected": 1,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x1A CWDead"
+    },
+    {
+      "actual": 1,
+      "expected": 1,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x1B CCWDead"
+    },
+    {
+      "actual": 310,
+      "expected": 310,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x1C ProtectionCurrent"
+    },
+    {
+      "actual": 0,
+      "expected": 0,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x21 Mode"
+    },
+    {
+      "actual": 20,
+      "expected": 20,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x22 ProtectionTorque"
+    },
+    {
+      "actual": 200,
+      "expected": 200,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x23 ProtectionTime"
+    },
+    {
+      "actual": 80,
+      "expected": 80,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x24 OverloadTorque"
+    },
+    {
+      "actual": 10,
+      "expected": 10,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x25 SpeedClosedLoopP"
+    },
+    {
+      "actual": 200,
+      "expected": 200,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x26 OverCurrentProtectionTime"
+    },
+    {
+      "actual": 200,
+      "expected": 200,
+      "group": "PROFILE",
+      "pass": true,
+      "requirement": "0x27 VelocityClosedLoopI"
+    },
+    {
+      "actual": 2049,
+      "expected": 2049,
+      "group": "CENTER",
+      "pass": true,
+      "requirement": "physical_raw equals PresentPosition (offset is 0)"
+    },
+    {
+      "actual": "2049 (error +1)",
+      "expected": "2048 +/-1",
+      "group": "CENTER",
+      "pass": true,
+      "requirement": "physical_raw 2048 +/-1"
+    },
+    {
+      "actual": 1,
+      "expected": 1,
+      "group": "BUS",
+      "pass": true,
+      "requirement": "exactly one responder on 0..253"
+    },
+    {
+      "actual": [
+        22
+      ],
+      "expected": [
+        22
+      ],
+      "group": "BUS",
+      "pass": true,
+      "requirement": "the responder is ID 22"
+    },
+    {
+      "actual": [
+        22
+      ],
+      "expected": [
+        22
+      ],
+      "group": "BUS",
+      "pass": true,
+      "requirement": "exactly one model 777 on the bus"
+    },
+    {
+      "actual": [
+        22
+      ],
+      "expected": "absent from scan",
+      "group": "BUS",
+      "pass": true,
+      "requirement": "old ID 7 is silent"
+    },
+    {
+      "actual": 0,
+      "expected": 0,
+      "group": "BUS",
+      "pass": true,
+      "requirement": "ID 22 ping status clean"
+    },
+    {
+      "actual": 0,
+      "expected": 0,
+      "group": "BUS",
+      "pass": true,
+      "requirement": "ID 22 model status clean"
+    },
+    {
+      "actual": "0 differences",
+      "expected": "0 differences",
+      "group": "PERSISTENCE",
+      "pass": true,
+      "requirement": "every EEPROM byte 0x00..0x27 identical across the power cycle"
+    }
+  ],
+  "checks_failed": 0,
+  "checks_total": 38,
+  "commands_this_tool_can_send": [
+    "^@BEGIN [A-Z0-9]{1,15}$",
+    "^@HELP$"
+  ],
+  "decoded_post_cold": {
+    "baud_0x06": 0,
+    "id_0x05": 22,
+    "lock_0x37": 1,
+    "model_0x03": 777,
+    "physical_raw": 2049,
+    "position_offset_0x1F": 0,
+    "present_position_0x38": 2049,
+    "profile_CCWDead_0x1B": 1,
+    "profile_CWDead_0x1A": 1,
+    "profile_D_0x16": 32,
+    "profile_I_0x17": 0,
+    "profile_MaxAngle_0x0B": 4095,
+    "profile_MaxTemperature_0x0D": 70,
+    "profile_MaxTorque_0x10": 1000,
+    "profile_MaxVoltage_0x0E": 140,
+    "profile_MinAngle_0x09": 0,
+    "profile_MinStartupForce_0x18": 16,
+    "profile_MinVoltage_0x0F": 40,
+    "profile_Mode_0x21": 0,
+    "profile_OverCurrentProtectionTime_0x26": 200,
+    "profile_OverloadTorque_0x24": 80,
+    "profile_P_0x15": 32,
+    "profile_ProtectionCurrent_0x1C": 310,
+    "profile_ProtectionTime_0x23": 200,
+    "profile_ProtectionTorque_0x22": 20,
+    "profile_SpeedClosedLoopP_0x25": 10,
+    "profile_VelocityClosedLoopI_0x27": 200,
+    "response_status_0x08": 1,
+    "status_0x40": 0,
+    "temperature_0x3F": 34,
+    "torque_enable_0x28": 0,
+    "torque_limit_0x30": 1000,
+    "voltage_0x3E": 111
+  },
+  "decoded_pre_cold": {
+    "baud_0x06": 0,
+    "id_0x05": 22,
+    "lock_0x37": 1,
+    "model_0x03": 777,
+    "physical_raw": 2049,
+    "position_offset_0x1F": 0,
+    "present_position_0x38": 2049,
+    "profile_CCWDead_0x1B": 1,
+    "profile_CWDead_0x1A": 1,
+    "profile_D_0x16": 32,
+    "profile_I_0x17": 0,
+    "profile_MaxAngle_0x0B": 4095,
+    "profile_MaxTemperature_0x0D": 70,
+    "profile_MaxTorque_0x10": 1000,
+    "profile_MaxVoltage_0x0E": 140,
+    "profile_MinAngle_0x09": 0,
+    "profile_MinStartupForce_0x18": 16,
+    "profile_MinVoltage_0x0F": 40,
+    "profile_Mode_0x21": 0,
+    "profile_OverCurrentProtectionTime_0x26": 200,
+    "profile_OverloadTorque_0x24": 80,
+    "profile_P_0x15": 32,
+    "profile_ProtectionCurrent_0x1C": 310,
+    "profile_ProtectionTime_0x23": 200,
+    "profile_ProtectionTorque_0x22": 20,
+    "profile_SpeedClosedLoopP_0x25": 10,
+    "profile_VelocityClosedLoopI_0x27": 200,
+    "response_status_0x08": 1,
+    "status_0x40": 0,
+    "temperature_0x3F": 35,
+    "torque_enable_0x28": 0,
+    "torque_limit_0x30": 1000,
+    "voltage_0x3E": 111
+  },
+  "generated_utc": "2026-08-27T13:08:15.534213+00:00",
+  "label": "ELR03",
+  "old_id_expected_silent": 7,
+  "persistent_differences": [],
+  "port": "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00",
+  "raw_post_cold_hex": "030A000903160000010000FF0F468C28E8030C2C2F2020001000010136010100000014C8500AC8C80000000000000000E8030000000000010108000000006F2200000001080000",
+  "raw_post_cold_sha256": "31a3d988a541cfceed9368bcfc4de4b45466aaf4ac77b8e8c9659839b93864fb",
+  "raw_pre_cold_hex": "030A000903160000010000FF0F468C28E8030C2C2F2020001000010136010100000014C8500AC8C80000000000000000E8030000000000010108000000006F2300000001080000",
+  "raw_pre_cold_sha256": "0c2c2dc7b1fd8186761cbc63524bd0af79b264cf76c52e2dd9664e8eebcc08b8",
+  "servo_writes_performed": "NONE",
+  "target_id": 22,
+  "tool": "matdog_st3215_persistence_audit_v1",
+  "verdict": "ELR03 POST-PROVISION PERSISTENCE AUDIT: PASS"
+}
