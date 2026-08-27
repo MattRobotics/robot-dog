@@ -3,13 +3,13 @@
 > **Nothing indexed here is current operational truth.**
 > Current architecture: [`01_Docs/02_Architecture/ARCHITECTURE.md`](../../01_Docs/02_Architecture/ARCHITECTURE.md)
 
-MATDOG has been through one major architectural change and one physical rebuild. Both invalidated
-large amounts of previously-correct documentation. Rather than rewrite history, this index records
-what is superseded, why, and where the current truth lives.
+MATDOG has been through a major architectural change, a physical rebuild, and a round of
+hardware-decision freezes. All three invalidated previously-correct documentation. Rather than
+rewrite history, this index records what is superseded, why, and where the current truth lives.
 
 ---
 
-## The two events
+## The three events
 
 ### 1. Architecture change — Station → ESP32-S3 (2026-08-27)
 
@@ -31,6 +31,21 @@ date describes an installation that no longer exists.
 
 → [Calibration reset](../Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md)
 
+### 3. Hardware decisions frozen (2026-08-27)
+
+The host↔coprocessor transport, the servo-bus driver board, the compute responsibility split and
+the onboard host were subsequently frozen:
+
+| Was | Now |
+|---|---|
+| host ↔ ESP32 transport TBD | **native USB 2.0 Full-Speed / USB CDC**, D− = GPIO19, D+ = GPIO20 |
+| Waveshare Bus Servo Adapter | **Seeed Bus Servo Driver** (Waveshare = bench/historical) |
+| gait / IK split TBD | **decided** — motion, gait, IK, IMU, watchdog on the ESP32-S3 |
+| "Jetson-class" onboard host | **Jetson Orin Nano Super** |
+
+**Consequence:** documents describing the transport as undecided, naming Waveshare as the current
+production interface, or leaving the compute split open are superseded.
+
 ---
 
 ## Classification of Station-era material
@@ -47,12 +62,17 @@ classified. Nothing was deleted.
 | `04_Electronics/README.md` | rewritten — control chain and 17-servo mapping |
 | `06_Software/Matdog_Core/kinematics/MATDOG_HARDWARE_SAFE_MODE_PREFLIGHT.md` | bus-ownership corrected; safety reasoning preserved; superseded banner |
 | `01_Docs/01_Analysis/ST3215_Quadruped_3S_Power_Load_Analysis.md` | 17-servo re-evaluation caveat added |
+| `01_Docs/02_Architecture/CURRENT_STATE.md` | superseded — reduced to a pointer + change table, so only one current-state description exists |
+| `04_Electronics/Servo_Mapping/MATDOG_SERVO_MAPPING.yaml` | `current_backend` corrected; historical backend retained |
+| `05_Firmware/README.md` | control chain corrected; motion firmware marked decided-not-written |
+| `06_Software/Matdog_Core/README.md` | actuator backend corrected |
 
 ### SUPERSEDED_DOCUMENTATION — banner added, content preserved
 
 Unmistakably marked, never rewritten:
 
 ```text
+09_Logs/Architecture_Decisions/ADR-001_Quadruped_Control_Architecture.md
 06_Software/Matdog_Core/calibration/MATDOG_DIGITAL_ZERO_CALIBRATION.md
 06_Software/Matdog_Core/calibration/MATDOG_MECHANICAL_ENDSTOP_CALIBRATION_PLAN.md
 06_Software/Matdog_Core/calibration/MATDOG_MECHANICAL_ENDSTOP_GEOMETRY_CHECKPOINT_2026-07-20.md

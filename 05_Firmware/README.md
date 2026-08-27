@@ -20,12 +20,14 @@ assembled robot under power for motion.
 
 The current locomotion-development stack is:
 
-    Asus Ubuntu
-    → NormaCore Station
-    → Waveshare Bus Servo Adapter
-    → ST3215 serial-bus servos
+    ASUS Ubuntu (dev) / Jetson Orin Nano Super (final)
+    → native USB 2.0 Full-Speed / USB CDC
+    → ESP32-S3 motion coprocessor        ← owns the ST3215 bus
+    → UART GPIO17/GPIO18
+    → Seeed Bus Servo Driver
+    → 17 × ST3215 serial-bus servos
 
-The official NormaCore ST3215 driver remains the only owner of the servo serial bus.
+The ESP32-S3 is the operational owner of the servo serial bus.
 
 ## Future Scope
 
@@ -53,7 +55,7 @@ Those belong in:
 
     06_Software/
 
-**Robot flight firmware** will be introduced only after MATDOG has achieved validated stand,
-inverse kinematics and initial walking with the current Station and Waveshare architecture. That
-rule governs the onboard motion controller; it does not apply to the frozen bench tools above,
-which are qualification instruments rather than robot runtime.
+The **operational motion firmware** — deterministic servo control, gait execution, operational IK,
+IMU, power telemetry and watchdog/safety — is **decided to live on the ESP32-S3 but is not yet
+written**. It is distinct from the frozen bench tools above, which are qualification instruments
+rather than robot runtime.

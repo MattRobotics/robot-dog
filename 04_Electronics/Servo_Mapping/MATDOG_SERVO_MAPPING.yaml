@@ -5,7 +5,13 @@ status: UNCALIBRATED
 servo_model: ST3215
 
 transport:
-  current_backend: NormaCore Station + Waveshare Bus Servo Adapter
+  current_backend: ESP32-S3 motion coprocessor (USB CDC host link) + Seeed Bus Servo Driver
+  historical_backend: NormaCore Station + Waveshare Bus Servo Adapter  # superseded 2026-08-27
+  authoritative_allocation: 06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml
+  note: >
+    This file records the historical 12-servo mapping. The robot now has 17 servos and 14 of them
+    were recoded to new bus IDs on 2026-08-27. Use MATDOG_SERVO_ALLOCATION.yaml as the current
+    unit -> joint -> bus ID source.
   future_backend: ESP32 motion controller
   raw_servo_protocol_owner: NormaCore ST3215 driver
 

@@ -1,44 +1,34 @@
 # MATDOG Current State
 
-## Confirmed
+> **This document is superseded.** It described the Station-mediated, 12-servo architecture and a
+> runtime chain (`Station → Waveshare → ST3215`) that is no longer MATDOG's architecture.
+>
+> Current state now lives in exactly two places, so there is no third competing description:
 
-- Twelve ST3215 servos are detected and responsive through the Waveshare Bus Servo Adapter.
-- The custom distribution board and branch wiring are validated for the current development phase.
-- The current runtime architecture remains `Station → Waveshare → ST3215`.
-- ESP32 integration is deferred until the robot has completed stand, IK and walking validation.
-- The canonical leg order is `[LF, RF, RH, LH]`.
-- Trot diagonal pairs are `[LF, RH]` and `[RF, LH]`.
+| For | Read |
+|---|---|
+| **Current architecture** — hardware, compute split, transport, validation scope | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| **Current project state** — what is validated, what is next | [root `README.md`](../../README.md) |
 
-## Canonical Servo Mapping
+---
 
-| Leg | Hip | Upper | Lower |
-|---|---:|---:|---:|
-| LF — Front Left | M13 | M12 | M11 |
-| RF — Front Right | M23 | M22 | M21 |
-| RH — Rear Right | M33 | M32 | M31 |
-| LH — Rear Left | M43 | M42 | M41 |
+## What changed
 
-## Geometry Known Today
+| This document said | Reality as of 2026-08-27 |
+|---|---|
+| Twelve ST3215 servos | **17** — 12 leg + 5 head/jaw |
+| Through the Waveshare Bus Servo Adapter | **Seeed Bus Servo Driver**; Waveshare was bench/historical |
+| Runtime is `Station → Waveshare → ST3215` | **host → USB CDC → ESP32-S3 → UART → Seeed → ST3215** |
+| ESP32 integration deferred until after stand/IK/walking | **ESP32-S3 is the operational bus owner today** — it provisioned all 17 servos |
+| Servo mapping `LF: M13/M12/M11`, … | superseded — 14 of 17 units recoded, see [`MATDOG_SERVO_ALLOCATION.yaml`](../../06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml) |
+| Encoder zeros / joint directions "not yet validated" | still true, and now **reset** — see [calibration reset](../../09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md) |
 
-- Front-to-rear hip-axis spacing: `225 mm`
-- Left-to-right hip-axis spacing: `95 mm`
-- Hip-to-knee nominal segment: `90 mm`
-- Knee-to-foot nominal segment: `110 mm`
-- Target body height in stand: `150 mm`
+The geometry figures it recorded (225 / 95 / 90 / 110 mm, ~150 mm stand height) remain correct and
+are carried in [`ARCHITECTURE.md`](ARCHITECTURE.md) and the root README.
 
-## Not Yet Validated
+Its safety rule also still holds, and is now machine-enforced:
 
-- Final CAD-derived hip-axis height relative to `base_link`.
-- Final URDF mesh geometry and each joint origin.
-- Foot-contact frame offsets caused by the eccentric rubber feet.
-- Encoder zero values for the mechanical zero pose.
-- Joint direction signs and software motion limits.
-- Stand pose, leg IK, gait generation and MATDOG Station integration.
+> No automated multi-servo pose, gait or body-velocity command may be enabled until calibration and
+> joint limits are documented and validated.
 
-## Next Single Technical Objective
-
-Create and validate the first CAD-derived MATDOG URDF with the canonical joint tree and names.
-
-## Safety Rule
-
-No automated multi-servo pose, gait or body-velocity command may be enabled until calibration and joint limits are documented and validated.
+→ [Historical index](../../09_Logs/Historical/README.md)

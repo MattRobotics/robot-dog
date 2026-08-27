@@ -31,24 +31,35 @@ kinematics, locomotion and evidence.
 ```text
 ┌──────────────────────────────────────────────────────────────┐
 │ HIGH-LEVEL HOST                                              │
-│   ASUS workstation during development          ✅ current    │
-│   Jetson-class onboard computer later          🟦 decided    │
+│   ASUS Ubuntu workstation during development   ✅ current    │
+│   Jetson Orin Nano Super onboard (final)       🟦 decided    │
 │                                                              │
-│   ROS 2 / MoveIt 2 integration                 🟦 decided    │
-│   AI, vision, planning, UI, behaviours         🟦 decided    │
+│   ROS 2 / MoveIt 2 high-level stack            🟦 decided    │
+│   AI · vision · voice · planning · dashboard   🟦 decided    │
 └──────────────────────────────────────────────────────────────┘
-             ↓  high-level / joint / motion commands
-             ↓  transport: ⬜ TBD (not frozen)
+             ↓  native USB 2.0 Full-Speed / USB CDC   ✅ in use
+             ↓  ESP32-S3 D− = GPIO19, D+ = GPIO20
+             ↓  packet/command protocol over CDC      ⬜ TBD
 ┌──────────────────────────────────────────────────────────────┐
-│ DEDICATED MATDOG ESP32-S3 COPROCESSOR                        │
-│   operational owner of the ST3215 bus          ✅ validated  │
+│ DEDICATED MATDOG ESP32-S3 MOTION COPROCESSOR                 │
+│   ST3215 bus ownership                         ✅ validated  │
 │   direct / native ST3215 driver path           ✅ validated  │
 │   provisioning / commissioning / QC utilities  ✅ validated  │
-│   deterministic motion execution               🟦 decided    │
+│   deterministic servo control                  🟦 decided    │
+│   gait execution                               🟦 decided    │
+│   operational IK                               🟦 decided    │
+│   IMU acquisition                              🟦 decided    │
+│   battery / power telemetry                    🟦 decided    │
 │   watchdog and safety                          🟦 decided    │
-│   IMU / power / battery telemetry              🟦 decided    │
-│   joint-to-servo conversion                    🟦 decided    │
-│   operational gait / IK responsibilities       ⬜ TBD split  │
+│   real-time motion execution                   🟦 decided    │
+└──────────────────────────────────────────────────────────────┘
+             ↓  UART   GPIO17 TX → driver RX
+             ↓         GPIO18 RX ← driver TX
+             ↓         shared GND
+┌──────────────────────────────────────────────────────────────┐
+│ Seeed Bus Servo Driver                         🟦 selected   │
+│   provides the servo-bus electrical layer                    │
+│   ESP32-S3 owns the ST3215 protocol and control              │
 └──────────────────────────────────────────────────────────────┘
              ↓  Feetech serial bus, 1 Mbps
 ┌──────────────────────────────────────────────────────────────┐
@@ -58,6 +69,24 @@ kinematics, locomotion and evidence.
 └──────────────────────────────────────────────────────────────┘
 ```
 
+### Host ↔ coprocessor link — decided
+
+| Property | Value |
+|---|---|
+| Physical transport | **native USB 2.0 Full-Speed / USB CDC** — decided, and already in use |
+| ESP32-S3 USB pins | **D− = GPIO19**, **D+ = GPIO20** |
+| Theoretical rate | 12 Mbit/s (USB 2.0 Full-Speed) |
+| USB 3.x | neither required nor available on ESP32-S3 |
+| Secondary channel | Wi-Fi command/diagnostic link — planned |
+| Higher-level packet/command protocol | ⬜ **TBD** — the physical transport is frozen, the protocol carried over it is not |
+
+The frozen bench tools already run over this link: the provisioning campaign used
+`USBMode=hwcdc,CDCOnBoot=cdc` and enumerated as
+`/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_…`.
+
+> **Distinguish physical transport from protocol.** The transport is decided. The application-level
+> packet format, command set and telemetry schema carried over USB CDC are still open.
+
 ---
 
 ## Ownership rules
@@ -65,8 +94,10 @@ kinematics, locomotion and evidence.
 1. ✅ The **ESP32-S3 coprocessor is the operational owner of the ST3215 serial bus.**
 2. 🟦 The high-level host issues joint/motion intent; it does not drive the servo bus directly.
 3. 🟦 The host never sends raw encoder targets in normal operation.
-4. ⬜ Whether joint→actuator conversion, IK and gait execution live host-side or ESP32-side is the
-   **embedded split**, and it is not frozen. Conversion is currently expected on the ESP32-S3.
+4. 🟦 The **compute responsibility split is decided**: joint→actuator conversion, operational IK,
+   gait execution, IMU, power telemetry, watchdog/safety and real-time motion execution reside on
+   the **ESP32-S3**. The high-level host owns ROS 2 / MoveIt 2, AI, vision, voice, planning, UI and
+   semantic behaviours.
 5. ✅ `GoalPosition` is unsigned `0..4095`; signed wrap is forbidden.
 6. ✅ `PositionOffset = 0` is the baseline on all 17 servos and stays that way. Mechanical mounting
    error is corrected mechanically, never by rewriting `PositionOffset`.
@@ -76,6 +107,25 @@ kinematics, locomotion and evidence.
 10. ✅ Only hardware-validated calibration results may become persistent operational profiles.
 11. 🟦 No hardware motion may be commanded from stale calibration — enforced by a machine gate, see
     [calibration reset](../../09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md).
+
+---
+
+## Compute responsibility split — decided
+
+| Jetson Orin Nano Super / high-level host | ESP32-S3 motion coprocessor |
+|---|---|
+| ROS 2 / MoveIt 2 high-level robotics stack | ST3215 bus ownership |
+| AI | deterministic servo control |
+| vision | gait execution |
+| voice | operational IK |
+| planning | IMU acquisition |
+| dashboard / UI | battery / power telemetry |
+| semantic and high-level behaviours | watchdog / safety |
+|  | real-time motion execution |
+
+**Implementation status is not the same as the decision.** Direct ST3215 ownership is
+hardware-demonstrated. The runtime motion / gait / IK / watchdog stack is **decided but not yet
+implemented** — see [validation scope](#validation-scope--precise-wording).
 
 ---
 
@@ -116,6 +166,29 @@ Full transition record: [NormaCore MATDOG archive](../../09_Logs/Historical/Norm
 
 ---
 
+## Validation scope — precise wording
+
+**VALIDATED** — implemented and exercised on real hardware:
+
+- the ESP32-S3 can **exclusively own and directly operate** the ST3215 bus;
+- the native/direct driver path is proven by the QC and provisioning campaigns;
+- **17 servos were provisioned without Station** in the loop.
+
+**DECIDED** — current architectural decision, implementation partial or absent:
+
+- the ESP32-S3 is the **definitive operational servo-bus owner and motion coprocessor**;
+- runtime motion, gait/IK, IMU, power telemetry and watchdog/safety responsibilities reside there;
+- USB CDC is the primary host↔coprocessor link; Jetson Orin Nano Super is the final onboard host.
+
+**NOT YET IMPLEMENTED**:
+
+- the complete operational motion firmware;
+- the final ROS 2 / MoveIt 2 integration;
+- the complete Jetson onboard integration.
+
+> The complete ESP32 operational runtime is **not** validated. Only bus ownership and the direct
+> driver path are.
+
 ## What is implemented and hardware-validated today
 
 | Capability | Evidence |
@@ -131,17 +204,29 @@ Full transition record: [NormaCore MATDOG archive](../../09_Logs/Historical/Norm
 
 | Item | Status |
 |---|---|
-| Host ↔ ESP32-S3 transport | ⬜ **TBD — not frozen.** Physical layer and protocol undecided |
+| Host ↔ ESP32-S3 **protocol** | ⬜ **TBD** — packet format, command set and telemetry schema. The **physical transport (USB CDC) is decided and in use** |
 | ROS 2 / MoveIt 2 integration | 🟦 intended high-level stack; **no integration exists yet** |
 | Deterministic motion execution firmware | 🟦 decided; not written |
 | Watchdog / safety firmware | 🟦 decided; not written |
 | IMU / power / battery telemetry | 🟦 decided; not written |
-| Gait / IK embedded split | ⬜ TBD |
-| Jetson-class onboard host | 🟦 decided; not procured or integrated |
+| Gait / IK / motion firmware | 🟦 decided to live on the ESP32-S3; **not written** |
+| Jetson Orin Nano Super onboard host | 🟦 selected; not yet integrated |
 | Robot joint calibration | ⚠️ **RESET** — must be redone from zero |
 
 > ROS 2 and MoveIt 2 are the **intended** high-level robotics stack. They are not integrated,
 > and nothing in this repository currently depends on them.
+
+---
+
+## Electronics
+
+Current hardware decisions — servo-bus driver, power distribution, protection and cabling — are
+recorded in [`04_Electronics/README.md`](../../04_Electronics/README.md).
+
+Summary: **Seeed Bus Servo Driver** for the servo-bus electrical layer · **no CAN transceiver** ·
+no dedicated Jetson DC/DC · no separate 5 V logic DC/DC · one removable external ATO main fuse ·
+custom motor power busbar · locking 3D-printed cable housings · no bulk servo capacitor initially ·
+no TVS initially.
 
 ---
 
@@ -163,12 +248,12 @@ active truth. Full recalibration must complete before any stand, gait or load-be
 2. **Full recalibration from zero** on the new installation; q0 measured, never imported.
 3. Verify mapping and directions on all 17 joints.
 4. Controlled bring-up: read-only FK → supervised suspended motion → gradual load transfer.
-5. Freeze the host ↔ ESP32-S3 transport and the embedded split.
+5. Freeze the host ↔ ESP32-S3 **protocol** carried over the already-decided USB CDC transport.
 6. Build the ESP32-S3 motion/safety/watchdog layer.
 7. Recompute four-leg FK; regenerate and audit stand poses.
 8. Single-foot trajectories, gait, walking.
 9. ROS 2 / MoveIt 2 integration.
-10. Jetson-class onboard host, IMU, estimator, perception and autonomy.
+10. Jetson Orin Nano Super onboard host, IMU, estimator, perception and autonomy.
 
 ---
 

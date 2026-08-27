@@ -21,24 +21,39 @@ repository is the **single active engineering source of truth** for the whole ro
 ## Current hardware
 
 ```text
-17 × Feetech ST-3215-C018          12 leg  +  5 head/jaw
-    ↑ serial bus, 1 Mbps
-dedicated MATDOG ESP32-S3 coprocessor      ← operational owner of the ST3215 bus
-    ↑ transport: TBD (not frozen)
-high-level host                            ASUS now · Jetson-class onboard later
+high-level host      ASUS Ubuntu (dev) · Jetson Orin Nano Super (final onboard)
+    ↓ native USB 2.0 Full-Speed / USB CDC        D− = GPIO19, D+ = GPIO20
+ESP32-S3 motion coprocessor                      ← owns the ST3215 bus
+    ↓ UART  GPIO17 TX → driver RX, GPIO18 RX ← driver TX, shared GND
+Seeed Bus Servo Driver                           ← servo-bus electrical layer
+    ↓ Feetech serial bus, 1 Mbps
+17 × Feetech ST-3215-C018                        12 leg + 5 head/jaw
 ```
 
-The **ESP32-S3 coprocessor is the operational owner of the servo bus** — this is validated in
+The **ESP32-S3 coprocessor exclusively owns and directly operates the servo bus** — demonstrated in
 practice, not aspirational. The high-level host issues joint/motion intent; it does not drive the
 bus directly.
+
+**Compute split (decided):** the host owns ROS 2 / MoveIt 2, AI, vision, voice, planning and UI;
+the ESP32-S3 owns bus control, deterministic servo control, gait execution, operational IK, IMU,
+power telemetry, watchdog/safety and real-time motion execution.
+
+Electronics decisions (Seeed driver, no CAN, single ATO main fuse, custom busbar, …):
+[`04_Electronics/README.md`](04_Electronics/README.md).
 
 ## Current software direction
 
 | Layer | Direction | Status |
 |---|---|---|
-| High-level | **ROS 2 / MoveIt 2**, AI, vision, planning, UI | intended stack — **not yet integrated** |
-| Coprocessor | ESP32-S3 deterministic servo/motion/safety/telemetry layer | bus ownership validated; motion & safety firmware not yet written |
+| High-level | **ROS 2 / MoveIt 2**, AI, vision, voice, planning, UI | decided stack — **not yet integrated** |
+| Coprocessor | ESP32-S3 deterministic servo/motion/gait/IK/safety/telemetry layer | **bus ownership validated**; motion & safety firmware **decided but not written** |
+| Host link | native USB 2.0 Full-Speed / USB CDC | **decided and in use**; packet protocol still TBD |
 | NormaCore Station | **optional / legacy / reference** | **not** a required actuation owner |
+
+**Validated:** the ESP32-S3 can exclusively own and directly operate the ST3215 bus; the direct
+driver path is proven by QC and provisioning; 17 servos were provisioned without Station.
+**Decided but not implemented:** the complete operational motion firmware, the final
+ROS 2 / MoveIt 2 integration, and the complete Jetson onboard integration.
 
 Station was formerly designated sole owner of the ST3215 bus. It no longer is, and no current
 MATDOG operation depends on it. Reusing good upstream NormaCore code remains fine.
@@ -63,7 +78,9 @@ Geometry is unaffected by the rebuild: it describes the design, not the build.
 
 - **Profile EEPROM write path is NOT hardware-exercised** (`WRITE=0 SKIP=20` on all 22 sessions).
 - Only 2 of 17 units were provisioned by the final V6 firmware (14 × V5, 1 × V4).
-- Host ↔ ESP32-S3 transport is **TBD**. ROS 2 / MoveIt 2 is **not** integrated.
+- Host ↔ ESP32-S3 **packet protocol** is TBD (the USB CDC transport itself is decided and in use).
+- ROS 2 / MoveIt 2 is **not** integrated; the operational motion firmware is **not** written.
+- The 3S power-load analysis covers 12 servos; the 17-servo budget needs re-evaluation.
 - Parking / path-safety gate still `passed=False` on all four legs (pre-existing).
 - Three LF geometric endpoints remain `HARDWARE_CONTRADICTED`; RF/RH/LH endpoints are model
   candidates, never hardware-confirmed.
