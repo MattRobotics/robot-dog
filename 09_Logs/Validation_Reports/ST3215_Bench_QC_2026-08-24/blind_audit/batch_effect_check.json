@@ -1,0 +1,74 @@
+{
+  "groupA": [
+    "M43",
+    "M11",
+    "M13",
+    "M23",
+    "M22",
+    "M41",
+    "M42",
+    "M33",
+    "M32",
+    "M12",
+    "M31",
+    "M21"
+  ],
+  "groupB": [
+    "NEW06",
+    "NEW03",
+    "NEW01",
+    "NEW04",
+    "NEW02",
+    "NEW05"
+  ],
+  "comparison": [
+    {
+      "metric": "MAX speed (tick/s)",
+      "groupA": 2829.0652006030687,
+      "groupB": 2831.3702591368483,
+      "delta": 2.305058533779629
+    },
+    {
+      "metric": "precision MAE",
+      "groupA": 2.46875,
+      "groupB": 2.4375,
+      "delta": -0.03125
+    },
+    {
+      "metric": "hysteresis median",
+      "groupA": 5.0,
+      "groupB": 5.0,
+      "delta": 0.0
+    },
+    {
+      "metric": "min travel median",
+      "groupA": 42.0,
+      "groupB": 41.25,
+      "delta": -0.75
+    },
+    {
+      "metric": "bus voltage median",
+      "groupA": 111.0,
+      "groupB": 111.0,
+      "delta": 0.0
+    },
+    {
+      "metric": "start temperature",
+      "groupA": 28.0,
+      "groupB": 29.5,
+      "delta": 1.5
+    },
+    {
+      "metric": "temp rise",
+      "groupA": 4.0,
+      "groupB": 4.0,
+      "delta": 0.0
+    },
+    {
+      "metric": "elapsed s",
+      "groupA": 140.31,
+      "groupB": 153.2215,
+      "delta": 12.91149999999999
+    }
+  ]
+}

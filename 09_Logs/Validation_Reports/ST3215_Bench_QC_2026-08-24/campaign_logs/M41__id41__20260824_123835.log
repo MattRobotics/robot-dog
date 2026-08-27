@@ -1,0 +1,372 @@
+Safety precheck: forcing torque OFF on ID 41
+====================================
+SAFE TORQUE OFF — ID 41
+====================================
+SAFE TORQUE_OFF     : COMMAND
+SAFE TORQUE_READBACK: 0
+SAFE TORQUE_OFF     : CONFIRMED
+SAFE_OFF_RESULT    : PASS
+
+Starting authorized QC_FAST on ID 41
+====================================
+MATDOG QC_FAST FULL-ANGLE — ID 41
+====================================
+HARD MOTION LIMIT : 175 s + cleanup
+ABSOLUTE LIMIT    : <180 s
+QC PROTOCOL       : V6.1
+QC BINARY VERSION : 61
+RAW RATE          : 500 Hz
+EEPROM WRITES     : NONE
+RAW SAMPLE SIZE   : 27 bytes
+RAW BUFFER MAX    : 90000 samples / 2430000 bytes
+MODE             : 0
+TORQUE PRE       : 0
+LIMITS           : 0 .. 4095
+START POSITION   : 1
+START TEMP       : 28
+START VOLTAGE    : 110
+START STATUS     : 0x00
+PRIME RESULT     : 1
+PRIME TORQUE     : 1
+QC_PRIME TORQUE_OFF     : COMMAND
+QC_PRIME TORQUE_READBACK: 0
+QC_PRIME TORQUE_OFF     : CONFIRMED
+TORQUE ON        : CONFIRMED
+QC_MODE          : CHARACTERIZATION
+PERFORMANCE_FAIL : NEVER GLOBAL ABORT
+FEETECH C018 REF : 0.222s/60deg +/-10% @12V
+FEETECH C018 REF : I_no_load=180mA I_rated=900mA I_stall=2700mA
+FEETECH C018 REF : backlash<=0.5deg, voltage=4..14V
+CURRENT RAW REF  : no_load~28 rated~139 overcurrent~308 stall~416
+PHASE: RANGE DISCOVERY -> LOW END
+MEASURE_BEGIN phase=2 start=1 target=0 speed=300 acc=20 window_ms=2207
+MEASURE_END phase=2 outcome=REACHED start=1 target=0 final=1 error=1 range=1..1 peak_speed=0 peak_load=0 peak_current=1 first_motion_ms=-1.000 elapsed_ms=478.685
+PHASE: SLOW FULL RANGE UP
+MEASURE_BEGIN phase=4 start=1 target=512 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=4 outcome=REACHED start=1 target=512 final=510 error=-2 range=1..510 peak_speed=200 peak_load=84 peak_current=2 first_motion_ms=90.671 elapsed_ms=4174.678
+MEASURE_BEGIN phase=4 start=510 target=1024 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=4 outcome=REACHED start=510 target=1024 final=1022 error=-2 range=510..1022 peak_speed=200 peak_load=72 peak_current=2 first_motion_ms=78.690 elapsed_ms=4190.676
+MEASURE_BEGIN phase=4 start=1022 target=1536 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=4 outcome=REACHED start=1022 target=1536 final=1535 error=-1 range=1022..1535 peak_speed=200 peak_load=84 peak_current=3 first_motion_ms=86.680 elapsed_ms=4230.683
+MEASURE_BEGIN phase=4 start=1535 target=2048 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=4 outcome=REACHED start=1535 target=2048 final=2046 error=-2 range=1535..2046 peak_speed=150 peak_load=72 peak_current=2 first_motion_ms=84.672 elapsed_ms=4188.689
+MEASURE_BEGIN phase=4 start=2046 target=2560 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=4 outcome=REACHED start=2046 target=2560 final=2558 error=-2 range=2046..2558 peak_speed=150 peak_load=72 peak_current=2 first_motion_ms=84.687 elapsed_ms=4188.697
+MEASURE_BEGIN phase=4 start=2558 target=3072 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=4 outcome=REACHED start=2558 target=3072 final=3070 error=-2 range=2558..3070 peak_speed=200 peak_load=80 peak_current=2 first_motion_ms=86.680 elapsed_ms=4190.682
+MEASURE_BEGIN phase=4 start=3070 target=3584 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=4 outcome=REACHED start=3070 target=3584 final=3582 error=-2 range=3070..3582 peak_speed=200 peak_load=68 peak_current=2 first_motion_ms=66.680 elapsed_ms=4188.690
+MEASURE_BEGIN phase=4 start=3582 target=4095 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=4 outcome=REACHED start=3582 target=4095 final=4093 error=-2 range=3582..4093 peak_speed=200 peak_load=84 peak_current=3 first_motion_ms=88.683 elapsed_ms=4188.678
+PHASE: SLOW FULL RANGE DOWN
+MEASURE_BEGIN phase=3 start=4093 target=3584 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=3 outcome=REACHED start=4093 target=3584 final=3585 error=1 range=3585..4093 peak_speed=150 peak_load=84 peak_current=2 first_motion_ms=12.674 elapsed_ms=4148.692
+MEASURE_BEGIN phase=3 start=3585 target=3072 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=3 outcome=REACHED start=3585 target=3072 final=3074 error=2 range=3074..3585 peak_speed=150 peak_load=72 peak_current=2 first_motion_ms=78.693 elapsed_ms=4168.696
+MEASURE_BEGIN phase=3 start=3074 target=2560 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=3 outcome=REACHED start=3074 target=2560 final=2562 error=2 range=2562..3074 peak_speed=150 peak_load=72 peak_current=2 first_motion_ms=64.685 elapsed_ms=4188.689
+MEASURE_BEGIN phase=3 start=2562 target=2048 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=3 outcome=REACHED start=2562 target=2048 final=2050 error=2 range=2050..2562 peak_speed=200 peak_load=72 peak_current=3 first_motion_ms=68.680 elapsed_ms=4168.681
+MEASURE_BEGIN phase=3 start=2050 target=1536 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=3 outcome=REACHED start=2050 target=1536 final=1537 error=1 range=1537..2050 peak_speed=200 peak_load=72 peak_current=2 first_motion_ms=62.687 elapsed_ms=4188.679
+MEASURE_BEGIN phase=3 start=1537 target=1024 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=3 outcome=REACHED start=1537 target=1024 final=1025 error=1 range=1025..1537 peak_speed=150 peak_load=72 peak_current=2 first_motion_ms=72.675 elapsed_ms=4188.683
+MEASURE_BEGIN phase=3 start=1025 target=512 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=3 outcome=REACHED start=1025 target=512 final=514 error=2 range=514..1025 peak_speed=200 peak_load=72 peak_current=2 first_motion_ms=76.687 elapsed_ms=4168.688
+MEASURE_BEGIN phase=3 start=514 target=0 speed=128 acc=10 window_ms=6000
+MEASURE_END phase=3 outcome=REACHED start=514 target=0 final=2 error=2 range=2..514 peak_speed=150 peak_load=68 peak_current=2 first_motion_ms=58.704 elapsed_ms=4168.694
+MEASURED_ENVELOPE after_slow=1..4093 coverage=4092 ticks
+PHASE: 45-DEG MEDIUM STEP UP/DOWN
+STEP45_REFERENCE ticks=512 degrees~=45 safe_envelope=1..4093
+MEASURE_BEGIN phase=10 start=2 target=1 speed=600 acc=25 window_ms=2204
+MEASURE_END phase=10 outcome=REACHED start=2 target=1 final=2 error=1 range=2..2 peak_speed=0 peak_load=20 peak_current=0 first_motion_ms=-1.000 elapsed_ms=328.685
+STEP45_DIRECTION: UP
+MEASURE_BEGIN phase=11 start=2 target=512 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=2 target=512 final=510 error=-2 range=2..510 peak_speed=650 peak_load=220 peak_current=5 first_motion_ms=70.692 elapsed_ms=1208.677
+STEP45_RESULT dir=UP target=512 final=510 error=-2 outcome=REACHED
+MEASURE_BEGIN phase=11 start=510 target=1024 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=510 target=1024 final=1022 error=-2 range=510..1022 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=66.694 elapsed_ms=1284.690
+STEP45_RESULT dir=UP target=1024 final=1022 error=-2 outcome=REACHED
+MEASURE_BEGIN phase=11 start=1022 target=1536 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=1022 target=1536 final=1534 error=-2 range=1021..1534 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=2.686 elapsed_ms=1244.666
+STEP45_RESULT dir=UP target=1536 final=1534 error=-2 outcome=REACHED
+MEASURE_BEGIN phase=11 start=1534 target=2048 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=1534 target=2048 final=2046 error=-2 range=1534..2046 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=54.675 elapsed_ms=1186.676
+STEP45_RESULT dir=UP target=2048 final=2046 error=-2 outcome=REACHED
+MEASURE_BEGIN phase=11 start=2046 target=2560 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=2046 target=2560 final=2557 error=-3 range=2046..2557 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=70.687 elapsed_ms=1184.691
+STEP45_RESULT dir=UP target=2560 final=2557 error=-3 outcome=REACHED
+MEASURE_BEGIN phase=11 start=2557 target=3072 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=2557 target=3072 final=3070 error=-2 range=2557..3070 peak_speed=650 peak_load=216 peak_current=4 first_motion_ms=58.676 elapsed_ms=1226.665
+STEP45_RESULT dir=UP target=3072 final=3070 error=-2 outcome=REACHED
+MEASURE_BEGIN phase=11 start=3070 target=3584 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=3070 target=3584 final=3581 error=-3 range=3070..3581 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=60.679 elapsed_ms=1204.670
+STEP45_RESULT dir=UP target=3584 final=3581 error=-3 outcome=REACHED
+MEASURE_BEGIN phase=11 start=3581 target=4095 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=3581 target=4095 final=4092 error=-3 range=3581..4092 peak_speed=600 peak_load=216 peak_current=4 first_motion_ms=50.685 elapsed_ms=1186.667
+STEP45_RESULT dir=UP target=4095 final=4092 error=-3 outcome=REACHED
+STEP45_DIRECTION: DOWN
+MEASURE_BEGIN phase=11 start=4092 target=3584 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=4092 target=3584 final=3585 error=1 range=3585..4092 peak_speed=600 peak_load=220 peak_current=5 first_motion_ms=74.667 elapsed_ms=1244.678
+STEP45_RESULT dir=DOWN target=3584 final=3585 error=1 outcome=REACHED
+MEASURE_BEGIN phase=11 start=3585 target=3072 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=3585 target=3072 final=3074 error=2 range=3074..3585 peak_speed=650 peak_load=212 peak_current=4 first_motion_ms=66.666 elapsed_ms=1204.677
+STEP45_RESULT dir=DOWN target=3072 final=3074 error=2 outcome=REACHED
+MEASURE_BEGIN phase=11 start=3074 target=2560 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=3074 target=2560 final=2562 error=2 range=2562..3074 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=58.688 elapsed_ms=1206.667
+STEP45_RESULT dir=DOWN target=2560 final=2562 error=2 outcome=REACHED
+MEASURE_BEGIN phase=11 start=2562 target=2048 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=2562 target=2048 final=2050 error=2 range=2050..2562 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=56.677 elapsed_ms=1204.682
+STEP45_RESULT dir=DOWN target=2048 final=2050 error=2 outcome=REACHED
+MEASURE_BEGIN phase=11 start=2050 target=1536 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=2050 target=1536 final=1539 error=3 range=1539..2050 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=56.670 elapsed_ms=1186.676
+STEP45_RESULT dir=DOWN target=1536 final=1539 error=3 outcome=REACHED
+MEASURE_BEGIN phase=11 start=1539 target=1024 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=1539 target=1024 final=1026 error=2 range=1026..1539 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=52.682 elapsed_ms=1224.679
+STEP45_RESULT dir=DOWN target=1024 final=1026 error=2 outcome=REACHED
+MEASURE_BEGIN phase=11 start=1026 target=512 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=1026 target=512 final=514 error=2 range=514..1026 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=54.672 elapsed_ms=1204.674
+STEP45_RESULT dir=DOWN target=512 final=514 error=2 outcome=REACHED
+MEASURE_BEGIN phase=11 start=514 target=0 speed=600 acc=25 window_ms=2500
+MEASURE_END phase=11 outcome=REACHED start=514 target=0 final=2 error=2 range=2..514 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=54.693 elapsed_ms=1226.695
+STEP45_RESULT dir=DOWN target=0 final=2 error=2 outcome=REACHED
+PHASE: ADAPTIVE MIN SPEED — 8 SECTORS
+MEASURE_BEGIN phase=10 start=2 target=256 speed=600 acc=25 window_ms=3047
+MEASURE_END phase=10 outcome=REACHED start=2 target=256 final=254 error=-2 range=2..254 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=70.667 elapsed_ms=786.683
+MIN_ZONE nominal=256 actual=254
+MEASURE_BEGIN phase=5 start=254 target=318 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=296 elapsed_ms=150
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=254 target=318 final=294 error=-24 range=254..294 peak_speed=150 peak_load=60 peak_current=2 first_motion_ms=126.675 elapsed_ms=900.687
+MIN_RESULT zone=256 dir=+1 cmd_speed=1 travel=40 first_motion_ms=126.675 peak_present_speed=150 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=256 dir=+1 speed=1 travel=40
+MEASURE_BEGIN phase=5 start=296 target=230 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=251 elapsed_ms=116
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=296 target=230 final=252 error=22 range=252..296 peak_speed=100 peak_load=68 peak_current=2 first_motion_ms=86.675 elapsed_ms=900.680
+MIN_RESULT zone=256 dir=-1 cmd_speed=1 travel=44 first_motion_ms=86.675 peak_present_speed=100 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=256 dir=-1 speed=1 travel=44
+MEASURE_BEGIN phase=10 start=251 target=768 speed=600 acc=25 window_ms=3924
+MEASURE_END phase=10 outcome=REACHED start=251 target=768 final=766 error=-2 range=251..766 peak_speed=650 peak_load=216 peak_current=4 first_motion_ms=68.686 elapsed_ms=1228.687
+MIN_ZONE nominal=768 actual=766
+MEASURE_BEGIN phase=5 start=766 target=830 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=809 elapsed_ms=138
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=766 target=830 final=807 error=-23 range=766..807 peak_speed=100 peak_load=60 peak_current=2 first_motion_ms=124.686 elapsed_ms=900.698
+MIN_RESULT zone=768 dir=+1 cmd_speed=1 travel=41 first_motion_ms=124.686 peak_present_speed=100 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=768 dir=+1 speed=1 travel=41
+MEASURE_BEGIN phase=5 start=809 target=743 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=764 elapsed_ms=100
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=809 target=743 final=764 error=21 range=764..809 peak_speed=150 peak_load=68 peak_current=2 first_motion_ms=86.676 elapsed_ms=900.685
+MIN_RESULT zone=768 dir=-1 cmd_speed=1 travel=45 first_motion_ms=86.676 peak_present_speed=150 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=768 dir=-1 speed=1 travel=45
+MEASURE_BEGIN phase=10 start=764 target=1280 speed=600 acc=25 window_ms=3920
+MEASURE_END phase=10 outcome=REACHED start=764 target=1280 final=1278 error=-2 range=764..1278 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=70.681 elapsed_ms=1218.684
+MIN_ZONE nominal=1280 actual=1278
+MEASURE_BEGIN phase=5 start=1278 target=1342 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=1320 elapsed_ms=124
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=1278 target=1342 final=1320 error=-22 range=1278..1320 peak_speed=100 peak_load=60 peak_current=2 first_motion_ms=126.692 elapsed_ms=900.691
+MIN_RESULT zone=1280 dir=+1 cmd_speed=1 travel=42 first_motion_ms=126.692 peak_present_speed=100 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=1280 dir=+1 speed=1 travel=42
+MEASURE_BEGIN phase=5 start=1320 target=1256 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=1277 elapsed_ms=116
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=1320 target=1256 final=1278 error=22 range=1278..1320 peak_speed=100 peak_load=60 peak_current=2 first_motion_ms=118.681 elapsed_ms=900.696
+MIN_RESULT zone=1280 dir=-1 cmd_speed=1 travel=42 first_motion_ms=118.681 peak_present_speed=100 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=1280 dir=-1 speed=1 travel=42
+MEASURE_BEGIN phase=10 start=1277 target=1792 speed=600 acc=25 window_ms=3917
+MEASURE_END phase=10 outcome=REACHED start=1277 target=1792 final=1790 error=-2 range=1277..1790 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=68.677 elapsed_ms=1254.675
+MIN_ZONE nominal=1792 actual=1790
+MEASURE_BEGIN phase=5 start=1790 target=1854 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=1833 elapsed_ms=124
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=1790 target=1854 final=1832 error=-22 range=1790..1832 peak_speed=100 peak_load=60 peak_current=2 first_motion_ms=116.682 elapsed_ms=900.677
+MIN_RESULT zone=1792 dir=+1 cmd_speed=1 travel=42 first_motion_ms=116.682 peak_present_speed=100 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=1792 dir=+1 speed=1 travel=42
+MEASURE_BEGIN phase=5 start=1833 target=1768 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=1789 elapsed_ms=130
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=1833 target=1768 final=1791 error=23 range=1791..1833 peak_speed=100 peak_load=60 peak_current=2 first_motion_ms=82.685 elapsed_ms=900.686
+MIN_RESULT zone=1792 dir=-1 cmd_speed=1 travel=42 first_motion_ms=82.685 peak_present_speed=100 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=1792 dir=-1 speed=1 travel=42
+MEASURE_BEGIN phase=10 start=1789 target=2304 speed=600 acc=25 window_ms=3917
+MEASURE_END phase=10 outcome=REACHED start=1789 target=2304 final=2301 error=-3 range=1789..2301 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=56.682 elapsed_ms=1200.696
+MIN_ZONE nominal=2304 actual=2301
+MEASURE_BEGIN phase=5 start=2301 target=2365 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=2341 elapsed_ms=136
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=2301 target=2365 final=2339 error=-26 range=2301..2339 peak_speed=100 peak_load=60 peak_current=2 first_motion_ms=180.681 elapsed_ms=900.684
+MIN_RESULT zone=2304 dir=+1 cmd_speed=1 travel=38 first_motion_ms=180.681 peak_present_speed=100 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=2304 dir=+1 speed=1 travel=38
+MEASURE_BEGIN phase=5 start=2341 target=2275 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=2296 elapsed_ms=116
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=2341 target=2275 final=2297 error=22 range=2297..2341 peak_speed=100 peak_load=68 peak_current=2 first_motion_ms=92.692 elapsed_ms=900.683
+MIN_RESULT zone=2304 dir=-1 cmd_speed=1 travel=44 first_motion_ms=92.692 peak_present_speed=100 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=2304 dir=-1 speed=1 travel=44
+MEASURE_BEGIN phase=10 start=2296 target=2816 speed=600 acc=25 window_ms=3934
+MEASURE_END phase=10 outcome=REACHED start=2296 target=2816 final=2814 error=-2 range=2296..2814 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=76.679 elapsed_ms=1222.694
+MIN_ZONE nominal=2816 actual=2814
+MEASURE_BEGIN phase=5 start=2814 target=2878 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=2855 elapsed_ms=138
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=2814 target=2878 final=2855 error=-23 range=2814..2855 peak_speed=150 peak_load=60 peak_current=2 first_motion_ms=128.687 elapsed_ms=900.692
+MIN_RESULT zone=2816 dir=+1 cmd_speed=1 travel=41 first_motion_ms=128.687 peak_present_speed=150 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=2816 dir=+1 speed=1 travel=41
+MEASURE_BEGIN phase=5 start=2855 target=2791 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=2813 elapsed_ms=146
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=2855 target=2791 final=2813 error=22 range=2813..2855 peak_speed=100 peak_load=60 peak_current=2 first_motion_ms=112.678 elapsed_ms=900.682
+MIN_RESULT zone=2816 dir=-1 cmd_speed=1 travel=42 first_motion_ms=112.678 peak_present_speed=100 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=2816 dir=-1 speed=1 travel=42
+MEASURE_BEGIN phase=10 start=2813 target=3328 speed=600 acc=25 window_ms=3917
+MEASURE_END phase=10 outcome=REACHED start=2813 target=3328 final=3327 error=-1 range=2813..3327 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=74.692 elapsed_ms=1248.685
+MIN_ZONE nominal=3328 actual=3327
+MEASURE_BEGIN phase=5 start=3327 target=3391 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=3369 elapsed_ms=130
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=3327 target=3391 final=3368 error=-23 range=3327..3368 peak_speed=100 peak_load=60 peak_current=2 first_motion_ms=128.691 elapsed_ms=900.694
+MIN_RESULT zone=3328 dir=+1 cmd_speed=1 travel=41 first_motion_ms=128.691 peak_present_speed=100 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=3328 dir=+1 speed=1 travel=41
+MEASURE_BEGIN phase=5 start=3369 target=3304 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=3325 elapsed_ms=116
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=3369 target=3304 final=3326 error=22 range=3326..3369 peak_speed=150 peak_load=68 peak_current=2 first_motion_ms=110.677 elapsed_ms=900.679
+MIN_RESULT zone=3328 dir=-1 cmd_speed=1 travel=43 first_motion_ms=110.677 peak_present_speed=150 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=3328 dir=-1 speed=1 travel=43
+MEASURE_BEGIN phase=10 start=3325 target=3840 speed=600 acc=25 window_ms=3917
+MEASURE_END phase=10 outcome=REACHED start=3325 target=3840 final=3837 error=-3 range=3325..3837 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=78.691 elapsed_ms=1190.679
+MIN_ZONE nominal=3840 actual=3837
+MEASURE_BEGIN phase=5 start=3837 target=3901 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=3876 elapsed_ms=122
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=3837 target=3901 final=3876 error=-25 range=3837..3876 peak_speed=150 peak_load=60 peak_current=2 first_motion_ms=174.674 elapsed_ms=900.702
+MIN_RESULT zone=3840 dir=+1 cmd_speed=1 travel=39 first_motion_ms=174.674 peak_present_speed=150 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=3840 dir=+1 speed=1 travel=39
+MEASURE_BEGIN phase=5 start=3876 target=3812 speed=1 acc=1 window_ms=900
+MIN_SETTLE_CONFIRMED pos=3833 elapsed_ms=116
+MEASURE_END phase=5 outcome=OBSERVATION_COMPLETE start=3876 target=3812 final=3834 error=22 range=3834..3876 peak_speed=100 peak_load=68 peak_current=2 first_motion_ms=134.677 elapsed_ms=900.691
+MIN_RESULT zone=3840 dir=-1 cmd_speed=1 travel=42 first_motion_ms=134.677 peak_present_speed=100 outcome=OBSERVATION_COMPLETE
+MIN_EFFECTIVE_COMMAND_CANDIDATE zone=3840 dir=-1 speed=1 travel=42
+PHASE: MAX SPEED — BOTH DIRECTIONS
+MAX_TEST_ENVELOPE=0..4095 span=4095
+MEASURE_BEGIN phase=10 start=3833 target=4095 speed=600 acc=30 window_ms=3074
+MEASURE_END phase=10 outcome=REACHED start=3833 target=4095 final=4092 error=-3 range=3833..4092 peak_speed=600 peak_load=220 peak_current=4 first_motion_ms=72.671 elapsed_ms=738.666
+MAX_DIRECTION: 4092 -> 0
+MEASURE_BEGIN phase=6 start=4092 target=0 speed=0 acc=50 window_ms=7000
+MEASURE_END phase=6 outcome=REACHED start=4092 target=0 final=2 error=2 range=2..4092 peak_speed=3000 peak_load=1000 peak_current=34 first_motion_ms=66.682 elapsed_ms=2060.675
+MAX_DIRECTION: 2 -> 4095
+MEASURE_BEGIN phase=7 start=2 target=4095 speed=0 acc=50 window_ms=7000
+MEASURE_END phase=7 outcome=REACHED start=2 target=4095 final=4092 error=-3 range=2..4092 peak_speed=3050 peak_load=1000 peak_current=34 first_motion_ms=68.675 elapsed_ms=2080.690
+PHASE: MAX SPEED PRECISION / REVERSAL
+MEASURE_BEGIN phase=10 start=4092 target=3872 speed=600 acc=30 window_ms=2934
+MEASURE_END phase=10 outcome=REACHED start=4092 target=3872 final=3874 error=2 range=3874..4092 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=72.674 elapsed_ms=688.673
+MEASURE_BEGIN phase=8 start=3874 target=3840 speed=0 acc=50 window_ms=2576
+MEASURE_END phase=8 outcome=REACHED start=3874 target=3840 final=3843 error=3 range=3843..3874 peak_speed=350 peak_load=140 peak_current=3 first_motion_ms=50.693 elapsed_ms=290.693
+MEASURE_BEGIN phase=10 start=3843 target=3808 speed=600 acc=30 window_ms=2317
+MEASURE_END phase=10 outcome=REACHED start=3843 target=3808 final=3809 error=1 range=3809..3843 peak_speed=300 peak_load=112 peak_current=2 first_motion_ms=46.679 elapsed_ms=370.680
+MEASURE_BEGIN phase=8 start=3809 target=3840 speed=0 acc=50 window_ms=2569
+MEASURE_END phase=8 outcome=REACHED start=3809 target=3840 final=3837 error=-3 range=3809..3837 peak_speed=350 peak_load=156 peak_current=4 first_motion_ms=66.685 elapsed_ms=290.686
+MEASURE_BEGIN phase=10 start=3837 target=3360 speed=600 acc=30 window_ms=3790
+MEASURE_END phase=10 outcome=REACHED start=3837 target=3360 final=3363 error=3 range=3363..3837 peak_speed=650 peak_load=216 peak_current=4 first_motion_ms=80.695 elapsed_ms=1084.694
+MEASURE_BEGIN phase=8 start=3363 target=3328 speed=0 acc=50 window_ms=2578
+MEASURE_END phase=8 outcome=REACHED start=3363 target=3328 final=3331 error=3 range=3331..3363 peak_speed=350 peak_load=136 peak_current=3 first_motion_ms=44.680 elapsed_ms=290.682
+MEASURE_BEGIN phase=10 start=3331 target=3296 speed=600 acc=30 window_ms=2317
+MEASURE_END phase=10 outcome=REACHED start=3331 target=3296 final=3297 error=1 range=3297..3331 peak_speed=250 peak_load=108 peak_current=2 first_motion_ms=38.693 elapsed_ms=370.696
+MEASURE_BEGIN phase=8 start=3297 target=3328 speed=0 acc=50 window_ms=2569
+MEASURE_END phase=8 outcome=REACHED start=3297 target=3328 final=3325 error=-3 range=3297..3325 peak_speed=350 peak_load=160 peak_current=4 first_motion_ms=68.683 elapsed_ms=290.668
+MEASURE_BEGIN phase=10 start=3325 target=2848 speed=600 acc=30 window_ms=3790
+MEASURE_END phase=10 outcome=REACHED start=3325 target=2848 final=2850 error=2 range=2850..3325 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=78.688 elapsed_ms=1106.687
+MEASURE_BEGIN phase=8 start=2850 target=2816 speed=0 acc=50 window_ms=2576
+MEASURE_END phase=8 outcome=REACHED start=2850 target=2816 final=2819 error=3 range=2819..2850 peak_speed=300 peak_load=132 peak_current=3 first_motion_ms=52.684 elapsed_ms=290.674
+MEASURE_BEGIN phase=10 start=2819 target=2784 speed=600 acc=30 window_ms=2317
+MEASURE_END phase=10 outcome=REACHED start=2819 target=2784 final=2786 error=2 range=2786..2819 peak_speed=300 peak_load=108 peak_current=3 first_motion_ms=56.685 elapsed_ms=330.676
+MEASURE_BEGIN phase=8 start=2786 target=2816 speed=0 acc=50 window_ms=2567
+MEASURE_END phase=8 outcome=REACHED start=2786 target=2816 final=2814 error=-2 range=2786..2814 peak_speed=350 peak_load=152 peak_current=4 first_motion_ms=72.682 elapsed_ms=310.684
+MEASURE_BEGIN phase=10 start=2814 target=2336 speed=600 acc=30 window_ms=3794
+MEASURE_END phase=10 outcome=REACHED start=2814 target=2336 final=2339 error=3 range=2339..2814 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=70.684 elapsed_ms=1104.682
+MEASURE_BEGIN phase=8 start=2339 target=2304 speed=0 acc=50 window_ms=2578
+MEASURE_END phase=8 outcome=REACHED start=2339 target=2304 final=2307 error=3 range=2307..2339 peak_speed=350 peak_load=132 peak_current=3 first_motion_ms=44.679 elapsed_ms=290.678
+MEASURE_BEGIN phase=10 start=2307 target=2272 speed=600 acc=30 window_ms=2317
+MEASURE_END phase=10 outcome=REACHED start=2307 target=2272 final=2274 error=2 range=2274..2307 peak_speed=300 peak_load=112 peak_current=3 first_motion_ms=52.684 elapsed_ms=330.689
+MEASURE_BEGIN phase=8 start=2274 target=2304 speed=0 acc=50 window_ms=2567
+MEASURE_END phase=8 outcome=REACHED start=2274 target=2304 final=2301 error=-3 range=2274..2301 peak_speed=350 peak_load=164 peak_current=5 first_motion_ms=74.678 elapsed_ms=290.680
+MEASURE_BEGIN phase=10 start=2301 target=1824 speed=600 acc=30 window_ms=3790
+MEASURE_END phase=10 outcome=REACHED start=2301 target=1824 final=1826 error=2 range=1826..2301 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=78.689 elapsed_ms=1126.684
+MEASURE_BEGIN phase=8 start=1826 target=1792 speed=0 acc=50 window_ms=2576
+MEASURE_END phase=8 outcome=REACHED start=1826 target=1792 final=1794 error=2 range=1794..1826 peak_speed=350 peak_load=128 peak_current=4 first_motion_ms=52.684 elapsed_ms=310.691
+MEASURE_BEGIN phase=10 start=1794 target=1760 speed=600 acc=30 window_ms=2314
+MEASURE_END phase=10 outcome=REACHED start=1794 target=1760 final=1762 error=2 range=1762..1794 peak_speed=300 peak_load=112 peak_current=3 first_motion_ms=54.686 elapsed_ms=330.686
+MEASURE_BEGIN phase=8 start=1762 target=1792 speed=0 acc=50 window_ms=2567
+MEASURE_END phase=8 outcome=REACHED start=1762 target=1792 final=1790 error=-2 range=1762..1790 peak_speed=350 peak_load=152 peak_current=5 first_motion_ms=70.679 elapsed_ms=310.694
+MEASURE_BEGIN phase=10 start=1790 target=1312 speed=600 acc=30 window_ms=3794
+MEASURE_END phase=10 outcome=REACHED start=1790 target=1312 final=1314 error=2 range=1314..1790 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=64.997 elapsed_ms=1124.676
+MEASURE_BEGIN phase=8 start=1314 target=1280 speed=0 acc=50 window_ms=2576
+MEASURE_END phase=8 outcome=REACHED start=1314 target=1280 final=1282 error=2 range=1282..1314 peak_speed=350 peak_load=132 peak_current=3 first_motion_ms=52.690 elapsed_ms=310.695
+MEASURE_BEGIN phase=10 start=1282 target=1248 speed=600 acc=30 window_ms=2314
+MEASURE_END phase=10 outcome=REACHED start=1282 target=1248 final=1250 error=2 range=1250..1282 peak_speed=300 peak_load=116 peak_current=3 first_motion_ms=56.671 elapsed_ms=350.696
+MEASURE_BEGIN phase=8 start=1250 target=1280 speed=0 acc=50 window_ms=2567
+MEASURE_END phase=8 outcome=REACHED start=1250 target=1280 final=1278 error=-2 range=1250..1278 peak_speed=350 peak_load=164 peak_current=5 first_motion_ms=70.683 elapsed_ms=310.687
+MEASURE_BEGIN phase=10 start=1278 target=800 speed=600 acc=30 window_ms=3794
+MEASURE_END phase=10 outcome=REACHED start=1278 target=800 final=803 error=3 range=803..1278 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=74.674 elapsed_ms=1086.688
+MEASURE_BEGIN phase=8 start=803 target=768 speed=0 acc=50 window_ms=2578
+MEASURE_END phase=8 outcome=REACHED start=803 target=768 final=770 error=2 range=770..803 peak_speed=300 peak_load=132 peak_current=2 first_motion_ms=42.689 elapsed_ms=310.683
+MEASURE_BEGIN phase=10 start=770 target=736 speed=600 acc=30 window_ms=2314
+MEASURE_END phase=10 outcome=REACHED start=770 target=736 final=739 error=3 range=739..770 peak_speed=250 peak_load=112 peak_current=3 first_motion_ms=56.687 elapsed_ms=328.680
+MEASURE_BEGIN phase=8 start=739 target=768 speed=0 acc=50 window_ms=2565
+MEASURE_END phase=8 outcome=REACHED start=739 target=768 final=765 error=-3 range=739..765 peak_speed=350 peak_load=152 peak_current=4 first_motion_ms=66.692 elapsed_ms=292.686
+MEASURE_BEGIN phase=10 start=765 target=288 speed=600 acc=30 window_ms=3790
+MEASURE_END phase=10 outcome=REACHED start=765 target=288 final=291 error=3 range=291..765 peak_speed=650 peak_load=220 peak_current=4 first_motion_ms=12.685 elapsed_ms=1084.684
+MEASURE_BEGIN phase=8 start=291 target=256 speed=0 acc=50 window_ms=2578
+MEASURE_END phase=8 outcome=REACHED start=291 target=256 final=258 error=2 range=258..291 peak_speed=350 peak_load=136 peak_current=3 first_motion_ms=48.692 elapsed_ms=310.680
+MEASURE_BEGIN phase=10 start=258 target=224 speed=600 acc=30 window_ms=2314
+MEASURE_END phase=10 outcome=REACHED start=258 target=224 final=226 error=2 range=226..258 peak_speed=300 peak_load=112 peak_current=2 first_motion_ms=50.691 elapsed_ms=330.690
+MEASURE_BEGIN phase=8 start=226 target=256 speed=0 acc=50 window_ms=2567
+MEASURE_END phase=8 outcome=REACHED start=226 target=256 final=254 error=-2 range=226..254 peak_speed=350 peak_load=156 peak_current=5 first_motion_ms=70.693 elapsed_ms=310.679
+===== QC CLEANUP =====
+QC_FINAL TORQUE_OFF     : COMMAND
+QC_FINAL TORQUE_READBACK: 0
+QC_FINAL TORQUE_OFF     : CONFIRMED
+===== QC SUMMARY =====
+RESULT            : EXECUTION_COMPLETE
+REASON            : NONE
+ELAPSED_US        : 139438084
+RAW_SAMPLES       : 68571
+RAW_BYTES         : 1851417
+THERMAL_TRANSIENTS: 0
+THERMAL_CONFIRMED : 0
+PERFORMANCE_EVENTS: 0
+PROTECTIVE_STOPS  : 0
+NO_MOTION_EVENTS  : 0
+NO_PROGRESS_EVENTS: 0
+SETTLED_RESIDUALS : 0
+WINDOW_END_EVENTS : 0
+SKIPPED_TESTS     : 0
+MIN_ATTEMPTS      : 16
+MIN_RESPONSES     : 16
+OBSERVED_ENVELOPE : 1 .. 4093
+PHASE 1: n=1001 pos=1..1 speed=0..0 max|load|=0 max|current|=1 temp=26..29 protoOR=0x00 servoOR=0x00
+PHASE 2: n=243 pos=1..1 speed=0..0 max|load|=0 max|current|=1 temp=27..28 protoOR=0x00 servoOR=0x00
+PHASE 3: n=16708 pos=2..4093 speed=-200..0 max|load|=84 max|current|=3 temp=28..31 protoOR=0x00 servoOR=0x00
+PHASE 4: n=16784 pos=1..4093 speed=0..200 max|load|=84 max|current|=3 temp=27..72 protoOR=0x00 servoOR=0x00
+PHASE 5: n=7232 pos=252..3876 speed=-150..150 max|load|=68 max|current|=2 temp=29..47 protoOR=0x00 servoOR=0x00
+PHASE 6: n=1032 pos=2..4092 speed=-3000..0 max|load|=1000 max|current|=34 temp=29..32 protoOR=0x00 servoOR=0x00
+PHASE 7: n=1042 pos=2..4092 speed=0..3050 max|load|=1000 max|current|=34 temp=30..60 protoOR=0x00 servoOR=0x00
+PHASE 8: n=2433 pos=226..3874 speed=-350..350 max|load|=164 max|current|=5 temp=30..135 protoOR=0x00 servoOR=0x00
+PHASE 9: n=501 pos=254..254 speed=0..0 max|load|=0 max|current|=1 temp=30..31 protoOR=0x00 servoOR=0x00
+PHASE 10: n=11853 pos=2..4092 speed=-650..650 max|load|=220 max|current|=4 temp=29..106 protoOR=0x00 servoOR=0x00
+PHASE 11: n=9742 pos=2..4092 speed=-650..650 max|load|=220 max|current|=5 temp=28..71 protoOR=0x00 servoOR=0x00
+RAW_STORAGE        : PSRAM_RETAINED
+RAW_RETAINED_BYTES : 1851417
+FINAL_TORQUE      : 0
+EEPROM_WRITES     : NONE
+QC_EXECUTION      : COMPLETE
+RAW_AVAILABLE     : YES
+QC_FAST_COMPLETE
+
+Torque OFF confirmed; downloading RAW without reopening serial port...
+RAW_DUMP_BEGIN payload=1851501 header=84 samples=68571 sample_size=27 raw_fnv=0x127BCE1C
+
+===== RAW SAVED =====
+FILE          : /home/matteo-manicardi/MATDOG/runtime/esp32/qc_raw/qc_fast_id41_20260824_124100.bin
+MAGIC         : b'MATQC01\x00'
+SERVO ID      : 41
+SAMPLE HZ     : 500
+SAMPLES       : 68571
+SAMPLE SIZE   : 27
+ELAPSED US    : 139438084
+RESULT CODE   : 0
+ABORT REASON  : 
+FNV ESP32     : 0x127BCE1C
+FNV ASUS      : 0x127BCE1C
+CHECKSUM      : PASS
+
+QC + RAW transfer complete:
+/home/matteo-manicardi/MATDOG/runtime/esp32/qc_raw/qc_fast_id41_20260824_124100.bin
