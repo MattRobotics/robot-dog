@@ -87,6 +87,110 @@ class TestMotionGate(unittest.TestCase):
         )
 
 
+class TestParameterClassification(unittest.TestCase):
+    """The H3 deadlock fix: classify by WHEN a value can be known."""
+
+    def test_every_characterization_parameter_has_a_class(self):
+        for value in policy.CHARACTERIZATION_REQUIRED:
+            with self.subTest(name=value.name):
+                self.assertIsNotNone(value.parameter_class)
+
+    def test_only_class_a_can_block_first_motion(self):
+        blockers = {v.name for v in policy.pre_motion_blockers()}
+        class_a = {v.name for v in
+                   policy.parameters_in_class(policy.ParameterClass.A_PRE_MOTION)}
+        self.assertEqual(blockers, class_a)
+
+    def test_acceptance_tolerances_are_not_pre_motion_blockers(self):
+        """A tolerance that judges a measurement cannot gate taking it."""
+        blockers = {v.name for v in policy.pre_motion_blockers()}
+        for value in policy.parameters_in_class(policy.ParameterClass.D_ACCEPTANCE):
+            with self.subTest(name=value.name):
+                self.assertNotIn(value.name, blockers)
+
+    def test_the_three_named_deadlock_parameters_are_acceptance_gates(self):
+        """Exactly the parameters the handoff flagged as misclassified."""
+        acceptance = {v.name for v in
+                      policy.parameters_in_class(policy.ParameterClass.D_ACCEPTANCE)}
+        self.assertIn("ENDPOINT_VS_URDF_TOLERANCE_TICKS", acceptance)
+        self.assertIn("MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS", acceptance)
+        self.assertIn("CONTACT_REPEATABILITY_TOLERANCE_TICKS", acceptance)
+
+    def test_contact_current_threshold_is_derived_not_a_global_constant(self):
+        value = policy.policy_value("CONTACT_CURRENT_THRESHOLD_RAW")
+        self.assertIs(value.parameter_class, policy.ParameterClass.C_DERIVED)
+        self.assertIn("median/MAD", value.evidence)
+
+    def test_retreat_distance_is_measured_during_h3(self):
+        value = policy.policy_value("CONTACT_RETREAT_TICKS")
+        self.assertIs(value.parameter_class, policy.ParameterClass.B_MEASURED_H3)
+
+
+class TestBootstrapPolicy(unittest.TestCase):
+    def test_bootstrap_is_not_a_measurement_and_never_canonical(self):
+        env = policy.BOOTSTRAP_ENVELOPE
+        self.assertFalse(env["is_measurement"])
+        self.assertFalse(env["may_become_canonical"])
+        self.assertIs(env["origin"], policy.ParameterOrigin.H3_BOOTSTRAP_OPERATOR_APPROVED)
+
+    def test_bootstrap_is_gentler_than_every_historical_envelope(self):
+        env = policy.BOOTSTRAP_ENVELOPE
+        self.assertLess(env["torque_limit"],
+                        policy.policy_value("PROVISIONER_CENTER_TORQUE_LIMIT").value)
+        self.assertLess(env["torque_limit"],
+                        policy.policy_value("LF_V25_TORQUE_LIMIT").value)
+        self.assertLess(env["goal_speed"],
+                        policy.policy_value("LF_V25_GOAL_SPEED").value)
+
+    def test_bootstrap_requires_both_a_build_flag_and_session_confirmation(self):
+        env = policy.BOOTSTRAP_ENVELOPE
+        self.assertIn("FLC_H3_BOOTSTRAP_APPROVED", env["requires_build_flag"])
+        self.assertIn("APPROVE_BOOTSTRAP", env["requires_session_confirmation"])
+
+    def test_bootstrap_stays_within_the_absolute_ceilings(self):
+        env = policy.BOOTSTRAP_ENVELOPE
+        self.assertLessEqual(env["torque_limit"],
+                             policy.ABSOLUTE_CEILINGS["torque_limit"])
+        self.assertLessEqual(env["goal_speed"], policy.ABSOLUTE_CEILINGS["goal_speed"])
+        self.assertLessEqual(env["acceleration"],
+                             policy.ABSOLUTE_CEILINGS["acceleration"])
+
+    def test_travel_ceiling_stays_below_half_a_revolution(self):
+        """Above 2048 the circular direction of travel becomes ambiguous."""
+        self.assertLess(policy.ABSOLUTE_CEILINGS["travel_budget_ticks"], 2048)
+
+
+class TestStageGate(unittest.TestCase):
+    def test_h3_is_the_lowest_stage_that_can_move_anything(self):
+        self.assertFalse(policy.motion_authorized(
+            policy.HardwareStage.H2_MANUAL_Q0, bootstrap_approved=True))
+        self.assertTrue(policy.motion_authorized(
+            policy.HardwareStage.H3_JOINT_CHARACTERIZE, bootstrap_approved=True))
+
+    def test_raising_the_stage_alone_does_not_unlock_motion(self):
+        """Explicit requirement: stage is not a bypass."""
+        self.assertFalse(policy.motion_authorized(
+            policy.HardwareStage.H7_FREEZE, bootstrap_approved=False))
+
+    def test_an_authorized_h3_is_not_blocked_by_what_h3_measures(self):
+        """The other half: a correctly authorized H3 must be able to run."""
+        self.assertTrue(policy.motion_authorized(
+            policy.HardwareStage.H3_JOINT_CHARACTERIZE, bootstrap_approved=True))
+        policy.require_motion_authorized(
+            "CHARACTERIZE_JOINT", policy.HardwareStage.H3_JOINT_CHARACTERIZE,
+            bootstrap_approved=True)
+
+    def test_calibration_requires_a_characterized_joint(self):
+        with self.assertRaises(policy.CalibrationPolicyError) as ctx:
+            policy.require_calibration_authorized(
+                "CALIBRATE_JOINT", policy.HardwareStage.H4_JOINT_CALIBRATE,
+                characterized_joints=0)
+        self.assertIn("characterized", str(ctx.exception))
+        policy.require_calibration_authorized(
+            "CALIBRATE_JOINT", policy.HardwareStage.H4_JOINT_CALIBRATE,
+            characterized_joints=1)
+
+
 class TestJointSpecs(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:

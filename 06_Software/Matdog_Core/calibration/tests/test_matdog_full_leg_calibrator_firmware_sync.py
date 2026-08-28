@@ -122,9 +122,42 @@ class TestFirmwareStructure(unittest.TestCase):
         # The STATUS banner must still positively declare the absence.
         self.assertIn("STATION_IN_CONTROL_PATH=NO", self.raw)
 
-    def test_only_the_scservo_and_arduino_headers_are_included(self):
+    def test_only_expected_headers_are_included(self):
         includes = set(re.findall(r'#include\s+[<"]([^>"]+)[>"]', self.code))
-        self.assertEqual(includes, {"Arduino.h", "SCServo.h", "flc_contact_detector.h"})
+        self.assertEqual(includes, {
+            "Arduino.h", "SCServo.h", "flc_stage_config.h",
+            "flc_contact_detector.h", "flc_calibration_engine.h",
+        })
+
+    def test_engine_is_actually_used_by_the_firmware(self):
+        """The detector/engine must be on the real firmware path, not just built."""
+        for symbol in ("flcCharacterizeJoint", "flcCalibrateJoint", "flcCalibrateLeg",
+                       "flcEndMotion", "flcBootstrapEnvelope"):
+            with self.subTest(symbol=symbol):
+                self.assertIn(symbol + "(", self.code)
+
+    def test_engine_reaches_the_detector(self):
+        engine = strip_comments(
+            (SKETCH.parent / "flc_calibration_engine.h").read_text(encoding="utf-8")
+        )
+        for symbol in ("flcDetectorInit", "flcDetectorObserve", "flcEvaluateRepeatability"):
+            with self.subTest(symbol=symbol):
+                self.assertIn(symbol + "(", engine)
+
+    def test_engine_has_no_arduino_dependency(self):
+        engine = strip_comments(
+            (SKETCH.parent / "flc_calibration_engine.h").read_text(encoding="utf-8")
+        )
+        for token in ("Arduino.h", "SCServo", "Serial.", "delay("):
+            with self.subTest(token=token):
+                self.assertNotIn(token, engine)
+
+    def test_no_per_leg_state_machines(self):
+        """One generic engine + data, not four copied leg programs."""
+        for forbidden in ("LfStateMachine", "RfStateMachine", "RhStateMachine",
+                          "LhStateMachine", "calibrateLF", "calibrateRF"):
+            with self.subTest(symbol=forbidden):
+                self.assertNotIn(forbidden, self.code)
 
     def test_motion_primitive_enforces_unsigned_domain(self):
         match = re.search(r"bool flcWritePosEx\(.*?\n\}", self.code, re.DOTALL)
@@ -134,14 +167,50 @@ class TestFirmwareStructure(unittest.TestCase):
         self.assertIn("ENCODER_MAX", body)
         self.assertIn("STAGE_MOTION", body)
         self.assertIn("AUTHORIZED_STAGE", body)
-        self.assertIn("characterizationOutstanding", body)
+        # Motion requires either resolved pre-motion parameters or an explicitly
+        # approved bootstrap envelope — never a historical value.
+        self.assertIn("preMotionOutstanding", body)
+        self.assertIn("bootstrapUsable", body)
 
-    def test_authorized_stage_is_h0(self):
+    def test_authorized_stage_defaults_to_h0(self):
+        """The single stage switch must be fail-closed when no flag is given."""
+        config = strip_comments(
+            (SKETCH.parent / "flc_stage_config.h").read_text(encoding="utf-8")
+        )
         match = re.search(
-            r"AUTHORIZED_STAGE\s*=\s*(H\d_[A-Z0-9_]+)", self.code
+            r"#ifndef FLC_AUTHORIZED_STAGE\s*#define FLC_AUTHORIZED_STAGE\s+(\S+)",
+            config,
+        )
+        self.assertIsNotNone(match, "default stage not found")
+        self.assertEqual(match.group(1), "FLC_STAGE_H0_ESP32_ONLY")
+        # The sketch must take the stage from that one place, not redefine it.
+        self.assertIn("AUTHORIZED_STAGE = FLC_AUTHORIZED_STAGE", self.code)
+
+    def test_bootstrap_defaults_to_denied(self):
+        config = strip_comments(
+            (SKETCH.parent / "flc_stage_config.h").read_text(encoding="utf-8")
+        )
+        match = re.search(
+            r"#ifndef FLC_H3_BOOTSTRAP_APPROVED\s*#define FLC_H3_BOOTSTRAP_APPROVED\s+(\S+)",
+            config,
         )
         self.assertIsNotNone(match)
-        self.assertEqual(match.group(1), "H0_ESP32_ONLY")
+        self.assertEqual(match.group(1), "0")
+
+    def test_bootstrap_envelope_is_gentler_than_every_historical_value(self):
+        """The first motion on the rebuilt robot must be the gentlest ever run."""
+        config = strip_comments(
+            (SKETCH.parent / "flc_stage_config.h").read_text(encoding="utf-8")
+        )
+
+        def value(name: str) -> int:
+            m = re.search(rf"#define {name}\s+(\d+)", config)
+            self.assertIsNotNone(m, f"{name} not found")
+            return int(m.group(1))
+
+        self.assertLess(value("FLC_BOOTSTRAP_TORQUE_LIMIT"), 300)   # provisioner
+        self.assertLess(value("FLC_BOOTSTRAP_TORQUE_LIMIT"), 500)   # LF V25
+        self.assertLess(value("FLC_BOOTSTRAP_GOAL_SPEED"), 160)     # LF V25
 
     def test_detector_uses_euclidean_modulo(self):
         """Regression guard: C++ '%' truncates, which breaks wrap-boundary math."""
@@ -210,10 +279,49 @@ class TestFirmwareHostPolicySync(unittest.TestCase):
                 self.assertEqual(self._constant(name), expected)
 
     def test_characterization_list_matches_policy(self):
-        """The firmware and host must agree on what is still unvalidated."""
-        firmware_names = set(re.findall(r'\{"([A-Z0-9_]+)", UNRESOLVED_U16', self.code))
-        policy_names = {v.name for v in policy.CHARACTERIZATION_REQUIRED}
-        self.assertEqual(firmware_names, policy_names)
+        """The firmware and host must agree on the parameters AND their classes."""
+        firmware = dict(re.findall(
+            r'\{"([A-Z0-9_]+)",\s*(?:UNRESOLVED_U16|\d+),\s*(CLASS_[A-Z0-9_]+)', self.code
+        ))
+        expected = {
+            v.name: {
+                policy.ParameterClass.A_PRE_MOTION: "CLASS_A_PRE_MOTION",
+                policy.ParameterClass.B_MEASURED_H3: "CLASS_B_MEASURED_H3",
+                policy.ParameterClass.C_DERIVED: "CLASS_C_DERIVED",
+                policy.ParameterClass.D_ACCEPTANCE: "CLASS_D_ACCEPTANCE",
+            }[v.parameter_class]
+            for v in policy.CHARACTERIZATION_REQUIRED
+        }
+        self.assertEqual(firmware, expected)
+
+    def test_only_class_a_can_block_first_motion(self):
+        """A tolerance that judges a measurement must not gate taking it."""
+        match = re.search(r"static size_t preMotionOutstanding\(\).*?\n\}",
+                          self.code, re.DOTALL)
+        self.assertIsNotNone(match)
+        self.assertIn("CLASS_A_PRE_MOTION", match.group(0))
+        self.assertNotIn("CLASS_D_ACCEPTANCE", match.group(0))
+
+    def test_bootstrap_constants_match_policy(self):
+        config = strip_comments(
+            (SKETCH.parent / "flc_stage_config.h").read_text(encoding="utf-8")
+        )
+
+        def value(name: str) -> int:
+            m = re.search(rf"#define {name}\s+(\d+)", config)
+            self.assertIsNotNone(m, f"{name} not found")
+            return int(m.group(1))
+
+        self.assertEqual(value("FLC_BOOTSTRAP_TORQUE_LIMIT"),
+                         policy.BOOTSTRAP_ENVELOPE["torque_limit"])
+        self.assertEqual(value("FLC_BOOTSTRAP_GOAL_SPEED"),
+                         policy.BOOTSTRAP_ENVELOPE["goal_speed"])
+        self.assertEqual(value("FLC_BOOTSTRAP_ACCELERATION"),
+                         policy.BOOTSTRAP_ENVELOPE["acceleration"])
+        self.assertEqual(value("FLC_ABSOLUTE_MAX_TORQUE_LIMIT"),
+                         policy.ABSOLUTE_CEILINGS["torque_limit"])
+        self.assertEqual(value("FLC_ABSOLUTE_MAX_TRAVEL_BUDGET_TICKS"),
+                         policy.ABSOLUTE_CEILINGS["travel_budget_ticks"])
 
     def test_expected_leg_ids_match_policy(self):
         firmware_ids = set(

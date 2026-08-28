@@ -223,51 +223,138 @@ class TestManualQ0Mode(unittest.TestCase):
             self.assertEqual(entry["promotion"], "NOT_FINAL_Q0")
 
 
-class TestMotionModesAreLocked(unittest.TestCase):
-    def _ready_firmware(self, stage=HardwareStage.H7_FREEZE):
+class TestMotionGating(unittest.TestCase):
+    """Motion modes are gated, not stubbed.
+
+    The earlier suite could only show that CALIBRATE_* refused. Now that the
+    modes can actually succeed, the refusals mean something — so both halves are
+    tested: refused when a precondition is missing, accepted when all are met.
+    """
+
+    def _ready_firmware(self, stage=HardwareStage.H6_FOUR_LEGS):
         bus = make_healthy_leg_bus()
         firmware = MockCalibratorFirmware(bus, stage=stage)
         firmware.census()
         return bus, firmware
 
-    def test_calibrate_joint_refused_even_at_h7(self):
-        """Stage alone must never unlock motion while parameters are unvalidated."""
+    # -- refusals ----------------------------------------------------------
+    def test_characterize_refused_without_bootstrap_approval(self):
+        """H3 may not move on an unapproved envelope, even at a high stage."""
         bus, firmware = self._ready_firmware()
+        result = firmware.characterize_joint(13)
+        self.assertFalse(result.accepted)
+        self.assertTrue(any("pre-motion" in r for r in result.reasons))
+        self.assertEqual(bus.write_log, [])
+
+    def test_characterize_refused_below_h3(self):
+        bus, firmware = self._ready_firmware(stage=HardwareStage.H2_MANUAL_Q0)
+        firmware.approve_bootstrap()
+        result = firmware.characterize_joint(13)
+        self.assertFalse(result.accepted)
+        self.assertTrue(any("H3_JOINT_CHARACTERIZE" in r for r in result.reasons))
+
+    def test_bootstrap_approval_refused_below_h3(self):
+        _, firmware = self._ready_firmware(stage=HardwareStage.H2_MANUAL_Q0)
+        self.assertFalse(firmware.approve_bootstrap().accepted)
+
+    def test_calibrate_joint_refused_without_characterization(self):
+        """H4 needs evidence from H3 in THIS session, not merely a high stage."""
+        bus, firmware = self._ready_firmware()
+        firmware.approve_bootstrap()
         result = firmware.calibrate_joint(13)
         self.assertFalse(result.accepted)
-        self.assertTrue(any("CHARACTERIZATION_REQUIRED" in r for r in result.reasons))
+        self.assertTrue(any("characterized" in r for r in result.reasons))
         self.assertEqual(bus.write_log, [])
 
-    def test_calibrate_leg_refused(self):
-        bus, firmware = self._ready_firmware()
-        self.assertFalse(firmware.calibrate_leg("LF").accepted)
-        self.assertEqual(bus.write_log, [])
+    def test_calibrate_joint_refused_below_h4(self):
+        _, firmware = self._ready_firmware(stage=HardwareStage.H3_JOINT_CHARACTERIZE)
+        firmware.approve_bootstrap()
+        firmware.characterize_joint(13)
+        result = firmware.calibrate_joint(13)
+        self.assertFalse(result.accepted)
+        self.assertTrue(any("H4_JOINT_CALIBRATE" in r for r in result.reasons))
 
-    def test_calibrate_all_refused(self):
-        bus, firmware = self._ready_firmware()
-        self.assertFalse(firmware.calibrate_all_legs().accepted)
-        self.assertEqual(bus.write_log, [])
-
-    def test_all_modes_cite_unmeasured_direction(self):
-        _, firmware = self._ready_firmware()
-        for result in (
-            firmware.calibrate_joint(13),
-            firmware.calibrate_leg("LF"),
-            firmware.calibrate_all_legs(),
-        ):
-            self.assertTrue(any("direction is unmeasured" in r for r in result.reasons))
+    def test_all_modes_refused_without_a_census(self):
+        bus = make_healthy_leg_bus()
+        firmware = MockCalibratorFirmware(bus, stage=HardwareStage.H6_FOUR_LEGS)
+        for result in (firmware.characterize_joint(13), firmware.calibrate_joint(13),
+                       firmware.calibrate_leg("LF"), firmware.calibrate_all_legs()):
+            self.assertFalse(result.accepted)
+            self.assertTrue(any("fresh successful census" in r for r in result.reasons))
 
     def test_non_leg_bus_id_is_refused(self):
         _, firmware = self._ready_firmware()
-        result = firmware.calibrate_joint(51)
+        firmware.approve_bootstrap()
+        result = firmware.characterize_joint(51)
         self.assertFalse(result.accepted)
         self.assertTrue(any("not a leg bus id" in r for r in result.reasons))
 
-    def test_modes_are_refused_without_a_census_at_every_stage(self):
-        bus = make_healthy_leg_bus()
-        firmware = MockCalibratorFirmware(bus, stage=HardwareStage.H7_FREEZE)
+    # -- successful fully-gated execution ---------------------------------
+    def test_characterize_succeeds_once_every_gate_is_satisfied(self):
+        _, firmware = self._ready_firmware()
+        self.assertTrue(firmware.approve_bootstrap().accepted)
+        result = firmware.characterize_joint(13)
+        self.assertTrue(result.accepted)
+        self.assertEqual(result.payload["origin"], "CHARACTERIZED_CURRENT_HARDWARE")
+
+    def test_calibrate_joint_succeeds_after_characterization(self):
+        _, firmware = self._ready_firmware()
+        firmware.approve_bootstrap()
+        firmware.characterize_joint(13)
         result = firmware.calibrate_joint(13)
-        self.assertTrue(any("fresh successful census" in r for r in result.reasons))
+        self.assertTrue(result.accepted)
+        self.assertEqual(result.payload["promotion"], "REQUIRES_EXPLICIT_GATE")
+
+    def test_calibrate_leg_succeeds_when_all_three_joints_characterized(self):
+        _, firmware = self._ready_firmware()
+        firmware.approve_bootstrap()
+        for bus_id in (11, 12, 13):
+            firmware.characterize_joint(bus_id)
+        result = firmware.calibrate_leg("LF")
+        self.assertTrue(result.accepted)
+        self.assertEqual(sorted(result.payload["joints"]), [11, 12, 13])
+
+    def test_calibrate_leg_refused_when_one_joint_is_missing_evidence(self):
+        _, firmware = self._ready_firmware()
+        firmware.approve_bootstrap()
+        for bus_id in (11, 12):
+            firmware.characterize_joint(bus_id)
+        result = firmware.calibrate_leg("LF")
+        self.assertFalse(result.accepted)
+        self.assertTrue(any("13" in r for r in result.reasons))
+
+    def test_calibrate_all_succeeds_only_with_twelve_characterized_joints(self):
+        _, firmware = self._ready_firmware()
+        firmware.approve_bootstrap()
+        for bus_id in EXPECTED_LEG_IDS:
+            firmware.characterize_joint(bus_id)
+        result = firmware.calibrate_all_legs()
+        self.assertTrue(result.accepted)
+        self.assertEqual(result.payload["joints"], 12)
+        self.assertEqual(result.payload["promotion"], "REQUIRES_EXPLICIT_GATE")
+
+    # -- session scoping ---------------------------------------------------
+    def test_a_new_census_invalidates_characterization_and_bootstrap(self):
+        """Evidence belongs to the physical setup verified when it was taken."""
+        _, firmware = self._ready_firmware()
+        firmware.approve_bootstrap()
+        firmware.characterize_joint(13)
+        self.assertTrue(firmware.calibrate_joint(13).accepted)
+
+        firmware.census()
+        self.assertFalse(firmware.bootstrap_approved)
+        result = firmware.calibrate_joint(13)
+        self.assertFalse(result.accepted)
+        self.assertTrue(any("characterized" in r for r in result.reasons))
+
+    def test_acceptance_tolerances_never_block_measurement(self):
+        """CLASS_D parameters are unresolved, yet H3/H4 still run."""
+        from matdog_full_leg_calibrator_policy import acceptance_gates_unresolved
+        self.assertTrue(acceptance_gates_unresolved())
+        _, firmware = self._ready_firmware()
+        firmware.approve_bootstrap()
+        self.assertTrue(firmware.characterize_joint(13).accepted)
+        self.assertTrue(firmware.calibrate_joint(13).accepted)
 
 
 class TestSafeOff(unittest.TestCase):
