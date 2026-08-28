@@ -1,0 +1,458 @@
+{
+  "session": {
+    "mode": "h0_smoke",
+    "port": "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00",
+    "started_utc": "2026-08-28T06:29:19Z",
+    "finished_utc": "2026-08-28T06:29:36Z",
+    "result": "PASS"
+  },
+  "provenance": {
+    "git_commit": "fcc1dbd1367d5d8c860a873c62a31b2620695aba",
+    "firmware_source_sha256": "50220e4f73fc3a2b32052a9c5c8d5419201012e29f0ec40cb4963ad901d2b3d4",
+    "firmware_detector_sha256": "04e4af48dd0c6e4bdd06eee05424a4abcd2458d86fdc1c0d7604a002e5156709",
+    "firmware_binary_sha256": "10d97a06faaf3436a00ce876bc3c9599eee279e148254fcb86d7f115384470d6",
+    "firmware_binary_path": "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-full-leg-calibrator/05_Firmware/Full_Leg_Calibrator_V1/matdog_full_leg_calibrator_v1/build/esp32.esp32.esp32s3/matdog_full_leg_calibrator_v1.ino.bin",
+    "runner_sha256": "51b336dd66cd756dc6ce189529683a71ca49b6b7002dd7769f98cbcec46b942f",
+    "policy_sha256": "324e32579862953ebf95a2e8e6ded3848cdf4adca243dfddc735de8a161899c7",
+    "fqbn": "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,DebugLevel=none,PSRAM=opi",
+    "servo_allocation_path": "06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml",
+    "servo_allocation_sha256": "574dfd6e4cf88034655eea6b5f3505da06a4b2fc9cb198ac34cdd0398315b234",
+    "geometry_endpoint_profile_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4_ENDPOINT_PROFILE.json",
+    "geometry_endpoint_profile_sha256": "dd8cb42c3b916d067f97a321c5ffcdfb013dde1f2f2a6ba71f73becff360dc0f",
+    "protocol_id": "FLC1",
+    "protocol_scope": "CALIBRATOR_LOCAL_NOT_FINAL_RUNTIME_PROTOCOL",
+    "authorized_hardware_stage": "H0_ESP32_ONLY",
+    "expected_leg_ids": [
+      11,
+      12,
+      13,
+      21,
+      22,
+      23,
+      31,
+      32,
+      33,
+      41,
+      42,
+      43
+    ],
+    "joint_specs": [
+      {
+        "bus_id": 11,
+        "joint": "lf_lower_leg_joint",
+        "unit": "M33",
+        "direction": null
+      },
+      {
+        "bus_id": 12,
+        "joint": "lf_upper_leg_joint",
+        "unit": "ELR01",
+        "direction": null
+      },
+      {
+        "bus_id": 13,
+        "joint": "lf_hip_joint",
+        "unit": "M22",
+        "direction": null
+      },
+      {
+        "bus_id": 21,
+        "joint": "rf_lower_leg_joint",
+        "unit": "NEW03",
+        "direction": null
+      },
+      {
+        "bus_id": 22,
+        "joint": "rf_upper_leg_joint",
+        "unit": "ELR03",
+        "direction": null
+      },
+      {
+        "bus_id": 23,
+        "joint": "rf_hip_joint",
+        "unit": "NEW01",
+        "direction": null
+      },
+      {
+        "bus_id": 31,
+        "joint": "rh_lower_leg_joint",
+        "unit": "NEW05",
+        "direction": null
+      },
+      {
+        "bus_id": 32,
+        "joint": "rh_upper_leg_joint",
+        "unit": "ELR02",
+        "direction": null
+      },
+      {
+        "bus_id": 33,
+        "joint": "rh_hip_joint",
+        "unit": "NEW06",
+        "direction": null
+      },
+      {
+        "bus_id": 41,
+        "joint": "lh_lower_leg_joint",
+        "unit": "M41",
+        "direction": null
+      },
+      {
+        "bus_id": 42,
+        "joint": "lh_upper_leg_joint",
+        "unit": "M42",
+        "direction": null
+      },
+      {
+        "bus_id": 43,
+        "joint": "lh_hip_joint",
+        "unit": "M43",
+        "direction": null
+      }
+    ],
+    "motion_blockers": [
+      {
+        "name": "CONTACT_TORQUE_LIMIT",
+        "reason": "assembled-leg endstop contact torque never measured on this installation; provisioner 300 was bench free-shaft centering, LF V25 500 was the previous build"
+      },
+      {
+        "name": "CONTACT_GOAL_SPEED",
+        "reason": "approach speed against a mechanical endstop not characterized on this build"
+      },
+      {
+        "name": "CONTACT_ACCELERATION",
+        "reason": "approach acceleration not characterized on this build"
+      },
+      {
+        "name": "CONTACT_CURRENT_THRESHOLD_RAW",
+        "reason": "free-motion current baseline of the reassembled leg is unmeasured, so no contact current threshold can be derived yet"
+      },
+      {
+        "name": "CONTACT_RETREAT_TICKS",
+        "reason": "safe retreat distance depends on the corrected HIP_MAX carrier geometry"
+      },
+      {
+        "name": "CONTACT_REPEATABILITY_TOLERANCE_TICKS",
+        "reason": "repeatability band must come from this installation, not LF V25"
+      },
+      {
+        "name": "ENDPOINT_VS_URDF_TOLERANCE_TICKS",
+        "reason": "acceptance band between measured contact and URDF geometric contact requires first-joint evidence"
+      },
+      {
+        "name": "MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS",
+        "reason": "manual square/reference pose uncertainty has never been quantified"
+      }
+    ]
+  },
+  "gates": [
+    {
+      "gate": "firmware_identity",
+      "result": "PASS",
+      "detail": "name=matdog_full_leg_calibrator_v1 version=1.0.0 built=Aug 28 2026 08:28:42"
+    },
+    {
+      "gate": "protocol_labelled_calibrator_local",
+      "result": "PASS",
+      "detail": "FLC1 / CALIBRATOR_LOCAL_NOT_FINAL_RUNTIME_PROTOCOL"
+    },
+    {
+      "gate": "station_absent_from_control_path",
+      "result": "PASS",
+      "detail": "firmware reports Station is not in the control path"
+    },
+    {
+      "gate": "no_eeprom_write_surface",
+      "result": "PASS",
+      "detail": "firmware reports no EEPROM write surface"
+    },
+    {
+      "gate": "no_broadcast_write",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "single_goal_position_authority",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "unsigned_domain_enforced",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "authorized_stage_is_h0",
+      "result": "PASS",
+      "detail": "stage=H0"
+    },
+    {
+      "gate": "motion_locked",
+      "result": "PASS",
+      "detail": "outstanding characterization parameters=8"
+    },
+    {
+      "gate": "head_absence_expected",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "no_unexpected_responder",
+      "result": "PASS",
+      "detail": "bus silent, as expected"
+    },
+    {
+      "gate": "census_correctly_reports_no_responders",
+      "result": "PASS",
+      "detail": "present=0/12 reason=NO_RESPONDERS"
+    },
+    {
+      "gate": "census_refuses_to_pass",
+      "result": "PASS",
+      "detail": "expected FAIL with no servos; refusing to proceed is the correct behaviour"
+    },
+    {
+      "gate": "motion_refused_calibrate_joint_13",
+      "result": "PASS",
+      "detail": "refused=True no_motion_line=True"
+    },
+    {
+      "gate": "motion_refused_calibrate_leg_lf",
+      "result": "PASS",
+      "detail": "refused=True no_motion_line=True"
+    },
+    {
+      "gate": "motion_refused_calibrate_all",
+      "result": "PASS",
+      "detail": "refused=True no_motion_line=True"
+    },
+    {
+      "gate": "manual_q0_refused_without_census",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "safe_off_passes_with_no_responders",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "safe_off_is_idempotent",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "safe_off_saw_no_responders",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "safe_off_issued_no_writes",
+      "result": "PASS",
+      "detail": "no WRITE line emitted, because no servo answered"
+    },
+    {
+      "gate": "host_policy_blocks_motion",
+      "result": "PASS",
+      "detail": "MOTION BLOCKED \u2014 CALIBRATE_ALL"
+    }
+  ],
+  "commands": [
+    {
+      "command": "@STATUS",
+      "response": [
+        "STATUS_BEGIN",
+        "FIRMWARE_NAME=matdog_full_leg_calibrator_v1",
+        "FIRMWARE_VERSION=1.0.0",
+        "BUILD_DATE=Aug 28 2026",
+        "BUILD_TIME=08:28:42",
+        "PROTOCOL_ID=FLC1",
+        "PROTOCOL_SCOPE=CALIBRATOR_LOCAL_NOT_FINAL_RUNTIME_PROTOCOL",
+        "PROFILE_ID=MATDOG_C018_V1",
+        "STATION_IN_CONTROL_PATH=NO",
+        "EEPROM_WRITE_SURFACE=NONE",
+        "BROADCAST_WRITE=NEVER",
+        "GOAL_POSITION_AUTHORITY=flcWritePosEx",
+        "GOAL_POSITION_DOMAIN=0..4095",
+        "SERVO_UART_BAUD=1000000",
+        "SERVO_TX_GPIO=17",
+        "SERVO_RX_GPIO=18",
+        "EXPECTED_LEG_SERVOS=12",
+        "HEAD_SERVOS_EXPECTED_PRESENT=NO",
+        "AUTHORIZED_HARDWARE_STAGE=H0",
+        "SESSION_STATE=0",
+        "CENSUS_FRESH=NO",
+        "CENSUS_EPOCH=0",
+        "LAST_FAULT=NONE",
+        "CHARACTERIZATION_OUTSTANDING=8",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_TORQUE_LIMIT WHY=assembled-leg endstop contact torque never measured on this installation; provisioner 300 was bench free-shaft centering, LF V25 500 was the previous build",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_GOAL_SPEED WHY=approach speed against a mechanical endstop not characterized on this build",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_ACCELERATION WHY=approach acceleration not characterized on this build",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_CURRENT_THRESHOLD_RAW WHY=free-motion current baseline of the reassembled leg is unmeasured, so no contact current threshold can be derived yet",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_RETREAT_TICKS WHY=safe retreat distance depends on the corrected HIP_MAX carrier geometry",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_REPEATABILITY_TOLERANCE_TICKS WHY=repeatability band must come from this installation, not LF V25",
+        "CHARACTERIZATION_REQUIRED NAME=ENDPOINT_VS_URDF_TOLERANCE_TICKS WHY=acceptance band between measured contact and URDF geometric contact requires first-joint evidence",
+        "CHARACTERIZATION_REQUIRED NAME=MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS WHY=manual square/reference pose uncertainty has never been quantified",
+        "MOTION_UNLOCKED=NO",
+        "STATUS_RESULT PASS",
+        "STATUS_END"
+      ]
+    },
+    {
+      "command": "@CENSUS",
+      "response": [
+        "CENSUS_BEGIN",
+        "CENSUS_EXPECTED_IDS=11,12,13,21,22,23,31,32,33,41,42,43",
+        "CENSUS_SERVO ID=13 JOINT=lf_hip_joint UNIT=M22 RESULT=MISSING",
+        "CENSUS_SERVO ID=12 JOINT=lf_upper_leg_joint UNIT=ELR01 RESULT=MISSING",
+        "CENSUS_SERVO ID=11 JOINT=lf_lower_leg_joint UNIT=M33 RESULT=MISSING",
+        "CENSUS_SERVO ID=23 JOINT=rf_hip_joint UNIT=NEW01 RESULT=MISSING",
+        "CENSUS_SERVO ID=22 JOINT=rf_upper_leg_joint UNIT=ELR03 RESULT=MISSING",
+        "CENSUS_SERVO ID=21 JOINT=rf_lower_leg_joint UNIT=NEW03 RESULT=MISSING",
+        "CENSUS_SERVO ID=33 JOINT=rh_hip_joint UNIT=NEW06 RESULT=MISSING",
+        "CENSUS_SERVO ID=32 JOINT=rh_upper_leg_joint UNIT=ELR02 RESULT=MISSING",
+        "CENSUS_SERVO ID=31 JOINT=rh_lower_leg_joint UNIT=NEW05 RESULT=MISSING",
+        "CENSUS_SERVO ID=43 JOINT=lh_hip_joint UNIT=M43 RESULT=MISSING",
+        "CENSUS_SERVO ID=42 JOINT=lh_upper_leg_joint UNIT=M42 RESULT=MISSING",
+        "CENSUS_SERVO ID=41 JOINT=lh_lower_leg_joint UNIT=M41 RESULT=MISSING",
+        "CENSUS_PRESENT=0/12",
+        "CENSUS_IDENTITY_OK=0/12",
+        "CENSUS_UNEXPECTED=0",
+        "CENSUS_HEAD_ABSENCE_EXPECTED=YES",
+        "CENSUS_FAIL_REASON=NO_RESPONDERS",
+        "CENSUS_RESULT FAIL",
+        "CENSUS_END"
+      ]
+    },
+    {
+      "command": "@CALIBRATE_JOINT 13",
+      "response": [
+        "CALIBRATE_JOINT_TARGET ID=13 JOINT=lf_hip_joint UNIT=M22",
+        "CALIBRATE_JOINT_BEGIN",
+        "CALIBRATE_JOINT_REFUSED REASON=HARDWARE_STAGE_LOCKED NEEDS=H4 AUTHORIZED=H0",
+        "CALIBRATE_JOINT_REFUSED REASON=NO_FRESH_CENSUS_IN_THIS_SESSION",
+        "CALIBRATE_JOINT_REFUSED REASON=CHARACTERIZATION_REQUIRED COUNT=8",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=CONTACT_TORQUE_LIMIT",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=CONTACT_GOAL_SPEED",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=CONTACT_ACCELERATION",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=CONTACT_CURRENT_THRESHOLD_RAW",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=CONTACT_RETREAT_TICKS",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=CONTACT_REPEATABILITY_TOLERANCE_TICKS",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=ENDPOINT_VS_URDF_TOLERANCE_TICKS",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=JOINT_DIRECTION_UNMEASURED",
+        "CALIBRATE_JOINT_NOTE=LF_V25_NUMERIC_RESULTS_CANNOT_AUTHORIZE_CURRENT_HARDWARE",
+        "CALIBRATE_JOINT_STAGE_OK=NO CENSUS_OK=NO CHARACTERIZATION_OK=NO",
+        "CALIBRATE_JOINT_RESULT REFUSED",
+        "CALIBRATE_JOINT_END"
+      ]
+    },
+    {
+      "command": "@CALIBRATE_LEG LF",
+      "response": [
+        "CALIBRATE_LEG_TARGET LEG=LF",
+        "CALIBRATE_LEG_BEGIN",
+        "CALIBRATE_LEG_REFUSED REASON=HARDWARE_STAGE_LOCKED NEEDS=H5 AUTHORIZED=H0",
+        "CALIBRATE_LEG_REFUSED REASON=NO_FRESH_CENSUS_IN_THIS_SESSION",
+        "CALIBRATE_LEG_REFUSED REASON=CHARACTERIZATION_REQUIRED COUNT=8",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=CONTACT_TORQUE_LIMIT",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=CONTACT_GOAL_SPEED",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=CONTACT_ACCELERATION",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=CONTACT_CURRENT_THRESHOLD_RAW",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=CONTACT_RETREAT_TICKS",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=CONTACT_REPEATABILITY_TOLERANCE_TICKS",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=ENDPOINT_VS_URDF_TOLERANCE_TICKS",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=JOINT_DIRECTION_UNMEASURED",
+        "CALIBRATE_LEG_NOTE=LF_V25_NUMERIC_RESULTS_CANNOT_AUTHORIZE_CURRENT_HARDWARE",
+        "CALIBRATE_LEG_STAGE_OK=NO CENSUS_OK=NO CHARACTERIZATION_OK=NO",
+        "CALIBRATE_LEG_RESULT REFUSED",
+        "CALIBRATE_LEG_END"
+      ]
+    },
+    {
+      "command": "@CALIBRATE_ALL",
+      "response": [
+        "CALIBRATE_ALL_TARGET LEGS=LF,RF,RH,LH JOINTS=12",
+        "CALIBRATE_ALL_BEGIN",
+        "CALIBRATE_ALL_REFUSED REASON=HARDWARE_STAGE_LOCKED NEEDS=H6 AUTHORIZED=H0",
+        "CALIBRATE_ALL_REFUSED REASON=NO_FRESH_CENSUS_IN_THIS_SESSION",
+        "CALIBRATE_ALL_REFUSED REASON=CHARACTERIZATION_REQUIRED COUNT=8",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=CONTACT_TORQUE_LIMIT",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=CONTACT_GOAL_SPEED",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=CONTACT_ACCELERATION",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=CONTACT_CURRENT_THRESHOLD_RAW",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=CONTACT_RETREAT_TICKS",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=CONTACT_REPEATABILITY_TOLERANCE_TICKS",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=ENDPOINT_VS_URDF_TOLERANCE_TICKS",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=JOINT_DIRECTION_UNMEASURED",
+        "CALIBRATE_ALL_NOTE=LF_V25_NUMERIC_RESULTS_CANNOT_AUTHORIZE_CURRENT_HARDWARE",
+        "CALIBRATE_ALL_STAGE_OK=NO CENSUS_OK=NO CHARACTERIZATION_OK=NO",
+        "CALIBRATE_ALL_RESULT REFUSED",
+        "CALIBRATE_ALL_END"
+      ]
+    },
+    {
+      "command": "@CAPTURE_Q0 32",
+      "response": [
+        "CAPTURE_Q0_BEGIN",
+        "CAPTURE_Q0_REFUSED REASON=HARDWARE_STAGE_LOCKED NEEDS=H2 AUTHORIZED=H0",
+        "CAPTURE_Q0_RESULT REFUSED",
+        "CAPTURE_Q0_END"
+      ]
+    },
+    {
+      "command": "@SAFE_OFF",
+      "response": [
+        "SAFE_OFF_BEGIN",
+        "SAFE_OFF ID=13 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=12 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=11 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=23 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=22 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=21 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=33 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=32 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=31 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=43 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=42 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=41 RESULT=NO_RESPONDER",
+        "SAFE_OFF_RESPONDERS_SEEN=NO",
+        "SAFE_OFF_RESULT PASS",
+        "SAFE_OFF_END"
+      ]
+    },
+    {
+      "command": "@SAFE_OFF (idempotency)",
+      "response": [
+        "SAFE_OFF_BEGIN",
+        "SAFE_OFF ID=13 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=12 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=11 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=23 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=22 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=21 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=33 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=32 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=31 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=43 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=42 RESULT=NO_RESPONDER",
+        "SAFE_OFF ID=41 RESULT=NO_RESPONDER",
+        "SAFE_OFF_RESPONDERS_SEEN=NO",
+        "SAFE_OFF_RESULT PASS",
+        "SAFE_OFF_END"
+      ]
+    }
+  ],
+  "notes": [],
+  "hardware_validation_scope": {
+    "stage_exercised": "H0_ESP32_ONLY",
+    "servos_connected": false,
+    "servo_rail_energized": false,
+    "motion_commanded": false,
+    "eeprom_written": false,
+    "h1_plus_validated": false,
+    "statement": "No servo was connected and no servo power was present. Nothing about H1 or later is validated by this session."
+  }
+}

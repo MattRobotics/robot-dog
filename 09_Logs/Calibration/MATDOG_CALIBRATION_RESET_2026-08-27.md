@@ -173,6 +173,10 @@ without updating its consumers is exactly what the freeze policy forbids.
 
 ## Related
 
+- [Leg reassembly calibration premise 2026-08-28](MATDOG_LEG_REASSEMBLY_CALIBRATION_PREMISE_2026-08-28.md)
+  — the 12 leg servos are now installed. Records that the current mechanics match the
+  existing URDF, that the HIP_MAX endstop carrier was corrected, and that LF V25 is
+  therefore an **algorithmic** oracle only, not a numeric one for this build
 - [ST3215 provisioning campaign 17/17](../Validation_Reports/ST3215_Provisioning_2026-08-27/README.md)
 - [MATDOG_C018_V1 canonical profile](../../01_Docs/02_Architecture/MATDOG_ST3215_C018_V1_PROFILE.md)
 - [Servo allocation](../../06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml)

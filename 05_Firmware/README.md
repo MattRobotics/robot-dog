@@ -16,6 +16,17 @@ ESP32-S3 tools that have run on real hardware and are archived byte-for-byte:
 These are **bench** tools: they run on a bench rig with a single servo attached, never on the
 assembled robot under power for motion.
 
+**Calibration firmware for the assembled robot exists and is stage-gated.**
+
+| Tool | Purpose | Status |
+|---|---|---|
+| [Full Leg Calibrator V1](Full_Leg_Calibrator_V1/) | 12-leg-servo census, manual q0 capture, endpoint calibration | H0 passed — **H1+ not validated, motion locked** |
+
+Unlike the bench tools it targets the assembled robot, so it is not frozen: it will be
+extended as each hardware stage H1..H7 is validated. It is EEPROM-write-free by design,
+has a single GoalPosition authority, never broadcasts, and refuses all motion while any
+contact parameter remains uncharacterized.
+
 **No robot flight firmware is active.** No onboard motion-controller firmware exists yet.
 
 The current locomotion-development stack is:
