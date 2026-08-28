@@ -5,3 +5,8 @@ __pycache__/
 
 # Local rollback snapshot created when applying visual-zero calibration.
 06_Software/Matdog_Core/calibration/*.before_visual_zero_backup
+
+# Arduino build artifacts. The firmware binary SHA256 is recorded in each
+# session report under 09_Logs/Validation_Reports/Full_Leg_Calibrator_V1/,
+# which is the durable evidence; the 32 MB build tree itself is reproducible.
+05_Firmware/**/build/
