@@ -57,14 +57,26 @@
 #include <Arduino.h>
 #include <SCServo.h>
 
+// Build-stage authorization. Single source of truth, fail-closed by default.
+#include "flc_stage_config.h"
+
 // The bounded contact/endpoint state machine. Pure C++, no Arduino dependency,
 // so tests/flc_detector_harness.cpp compiles the identical logic on the host and
 // the offline fault-injection suite exercises the real engine.
 #include "flc_contact_detector.h"
 
+// The H3/H4 calibration state machine: baseline, probe, contact, retreat,
+// re-approach, repeatability, abort/recovery. Also pure C++ and also compiled
+// by the host harness, so the firmware and the fault-injection tests run the
+// SAME motion decision logic. There is no second implementation.
+#include "flc_calibration_engine.h"
+
 // Declared here, ahead of every function, because the Arduino builder inserts
-// generated prototypes immediately after the includes. A function returning
-// this type would otherwise be prototyped before the type exists.
+// generated prototypes immediately after the includes. A function taking or
+// returning one of these types would otherwise be prototyped before the type
+// exists. Their definitions stay minimal; the tables that use them live in
+// their own sections below.
+
 struct WriteOutcome {
   bool allowed;
   int ack;
@@ -72,6 +84,52 @@ struct WriteOutcome {
   int readback;
   uint8_t readStatus;
   bool ok;
+};
+
+//: One row of the 12-joint table. See the JOINT SPEC TABLE section for the data
+//: and for why direction is deliberately left unmeasured.
+struct JointSpec {
+  uint8_t busId;
+  const char *jointName;
+  const char *unitLabel;
+  uint8_t leg;
+  uint8_t kind;
+  int8_t direction;            // 0 = UNMEASURED, must be characterized
+  float declaredMinRad;
+  float declaredMaxRad;
+  float geomContactMinRad;
+  float geomContactMaxRad;
+};
+
+//: Per-joint census result for the CURRENT physical session.
+struct CensusEntry {
+  bool present;
+  bool identityOk;
+  uint16_t model;
+  int16_t positionOffset;
+  uint8_t torqueEnable;
+  uint16_t torqueLimit;
+  uint16_t presentPosition;
+  uint8_t voltage;
+  uint8_t temperature;
+  uint8_t statusByte;
+  uint8_t responseStatus;
+  bool profileMatch;
+};
+
+//: What H3 measured about one joint, valid only for the census epoch that was
+//: current when it was measured.
+struct JointCharacterization {
+  bool valid;
+  uint32_t censusEpoch;
+  int8_t direction;
+  FlcBaseline baseline;
+  uint16_t contactThresholdRaw;
+  uint16_t retreatTicks;
+  uint16_t repeatabilityToleranceTicks;
+  uint16_t observedSpreadTicks;
+  int restTick;
+  int origin;
 };
 
 // ==========================================================================
@@ -106,6 +164,7 @@ static constexpr uint8_t REG_BAUD = 0x06;
 static constexpr uint8_t REG_RESPONSE_STATUS = 0x08;
 static constexpr uint8_t REG_POSITION_OFFSET = 0x1F;  // 2 bytes, EEPROM
 static constexpr uint8_t REG_TORQUE_ENABLE = 0x28;
+static constexpr uint8_t REG_GOAL_POSITION = 0x2A;    // 2 bytes, RAM (read back)
 static constexpr uint8_t REG_TORQUE_LIMIT = 0x30;     // 2 bytes, RAM
 static constexpr uint8_t REG_LOCK = 0x37;             // EEPROM lock
 static constexpr uint8_t REG_PRESENT_POSITION = 0x38; // 2 bytes
@@ -177,20 +236,25 @@ static inline int signedTickDelta(int presentTick, int referenceTick) {
 // ==========================================================================
 
 enum HardwareStage : uint8_t {
-  H0_ESP32_ONLY = 0,        // no servos attached
-  H1_CENSUS_READONLY = 1,   // 12-servo read-only census
-  H2_MANUAL_Q0 = 2,         // manual-pose q0 capture, torque OFF
-  H3_JOINT_CHARACTERIZE = 3,// one joint runtime/contact characterization
-  H4_JOINT_CALIBRATE = 4,
-  H5_LEG = 5,
-  H6_FOUR_LEGS = 6,
-  H7_FREEZE = 7,
+  H0_ESP32_ONLY = FLC_STAGE_H0_ESP32_ONLY,
+  H1_CENSUS_READONLY = FLC_STAGE_H1_CENSUS_READONLY,
+  H2_MANUAL_Q0 = FLC_STAGE_H2_MANUAL_Q0,
+  H3_JOINT_CHARACTERIZE = FLC_STAGE_H3_JOINT_CHARACTERIZE,
+  H4_JOINT_CALIBRATE = FLC_STAGE_H4_JOINT_CALIBRATE,
+  H5_LEG = FLC_STAGE_H5_LEG,
+  H6_FOUR_LEGS = FLC_STAGE_H6_FOUR_LEGS,
+  H7_FREEZE = FLC_STAGE_H7_FREEZE,
 };
 
-// The highest stage this firmware build is authorized to execute.
-// H0: no servos are connected today and no contact parameter has current
-// hardware evidence. Read-only modes still refuse cleanly rather than crash.
-static constexpr uint8_t AUTHORIZED_STAGE = H0_ESP32_ONLY;
+// The highest stage this build is authorized to execute. Single source:
+// flc_stage_config.h, default H0, overridable only by an explicit build flag.
+// Raising it widens which named operation may be attempted; it does NOT bypass
+// identity, census, direction or any hard servo guard.
+static constexpr uint8_t AUTHORIZED_STAGE = FLC_AUTHORIZED_STAGE;
+
+// Whether this build may use the conservative H3 bootstrap envelope. Still
+// requires the operator to confirm it in the live session.
+static constexpr bool H3_BOOTSTRAP_BUILD_APPROVED = (FLC_H3_BOOTSTRAP_APPROVED != 0);
 
 // ==========================================================================
 // CALIBRATION RUNTIME POLICY — centralized, provenance-labelled
@@ -212,6 +276,14 @@ static constexpr int MON_VOLTAGE_MAX = 140;                // [VALIDATED] MaxVol
 static constexpr uint32_t MON_VOLTAGE_SAMPLES = 50;        // [GENERIC] QC V6.1, 100 ms
 static constexpr uint32_t MON_TELEMETRY_LOSS_SAMPLES = 25; // [GENERIC] QC V6.1, 50 ms
 static constexpr int MON_STATIONARY_SPEED = 10;            // [GENERIC] QC V6.1
+
+// Hard overcurrent abort. [VALIDATED] derived from the servo's own EEPROM
+// ProtectionCurrent (0x1C = 310) in the frozen MATDOG_C018_V1 profile: the
+// firmware aborts strictly BELOW the level at which the servo would protect
+// itself, so the calibrator stops first. This is a protection ceiling, not a
+// contact-detection threshold — contact is decided from the per-joint
+// median/MAD baseline measured by H3.
+static constexpr uint16_t MON_OVERCURRENT_HARD_RAW = 250;
 
 // ---- Manual q0 capture (read-only, torque OFF) ---------------------------
 static constexpr uint16_t Q0_SAMPLES_DEFAULT = 64;         // [GENERIC]
@@ -241,39 +313,90 @@ static constexpr uint8_t HIST_CONTACT_PERSISTENCE_SAMPLES = 3;// [HISTORICAL] LF
 static constexpr uint16_t HIST_MAX_PROGRESS_TICKS = 2;     // [HISTORICAL] LF V25
 static constexpr uint16_t HIST_REPEATABILITY_TOLERANCE_TICKS = 16; // [HISTORICAL] LF V25
 
-// ---- Parameters that REQUIRE new hardware characterization ---------------
-// Sentinel = unresolved. Motion stays blocked while any of these is unset.
+// ---- Parameters requiring new hardware evidence, CLASSIFIED ---------------
+//
+// The first version of this firmware treated all eight as pre-motion blockers.
+// That was a deadlock: H4 needed them, H3 was supposed to measure them, and H3
+// was blocked by them. The fix is to classify each by WHEN it can be known,
+// rather than pretending a value measurable only by moving can gate the move.
+//
+//   CLASS_A_PRE_MOTION   must be known BEFORE any H3 motion. Cannot be measured
+//                        first, so it is supplied by the explicitly-approved,
+//                        deliberately conservative H3 bootstrap envelope
+//                        (flc_stage_config.h) and refuted/refined by H3.
+//   CLASS_B_MEASURED_H3  measured DURING H3 on this build.
+//   CLASS_C_DERIVED      computed from H3/H4 data; never a standalone constant.
+//   CLASS_D_ACCEPTANCE   post-measure gate. Decides whether a result is
+//                        ACCEPTED. Must NEVER block acquiring the measurement,
+//                        which is exactly what it exists to judge.
+//
+// Only CLASS_A can gate motion, and only while the bootstrap is unapproved.
 static constexpr uint16_t UNRESOLVED_U16 = 0xFFFF;
+
+enum ParamClass : uint8_t {
+  CLASS_A_PRE_MOTION = 0,
+  CLASS_B_MEASURED_H3,
+  CLASS_C_DERIVED,
+  CLASS_D_ACCEPTANCE,
+};
+
+static const char *paramClassLabel(uint8_t c) {
+  switch (c) {
+    case CLASS_A_PRE_MOTION: return "A_PRE_MOTION";
+    case CLASS_B_MEASURED_H3: return "B_MEASURED_H3";
+    case CLASS_C_DERIVED: return "C_DERIVED";
+    case CLASS_D_ACCEPTANCE: return "D_ACCEPTANCE";
+    default: return "UNKNOWN";
+  }
+}
 
 struct CharacterizationParam {
   const char *name;
   uint16_t value;
+  uint8_t paramClass;
   const char *why;
 };
 
 static constexpr CharacterizationParam CHARACTERIZATION[] = {
-  {"CONTACT_TORQUE_LIMIT", UNRESOLVED_U16,
-   "assembled-leg endstop contact torque never measured on this installation; "
-   "provisioner 300 was bench free-shaft centering, LF V25 500 was the previous build"},
-  {"CONTACT_GOAL_SPEED", UNRESOLVED_U16,
-   "approach speed against a mechanical endstop not characterized on this build"},
-  {"CONTACT_ACCELERATION", UNRESOLVED_U16,
-   "approach acceleration not characterized on this build"},
-  {"CONTACT_CURRENT_THRESHOLD_RAW", UNRESOLVED_U16,
-   "free-motion current baseline of the reassembled leg is unmeasured, so no "
-   "contact current threshold can be derived yet"},
-  {"CONTACT_RETREAT_TICKS", UNRESOLVED_U16,
-   "safe retreat distance depends on the corrected HIP_MAX carrier geometry"},
-  {"CONTACT_REPEATABILITY_TOLERANCE_TICKS", UNRESOLVED_U16,
-   "repeatability band must come from this installation, not LF V25"},
-  {"ENDPOINT_VS_URDF_TOLERANCE_TICKS", UNRESOLVED_U16,
-   "acceptance band between measured contact and URDF geometric contact "
-   "requires first-joint evidence"},
-  {"MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS", UNRESOLVED_U16,
-   "manual square/reference pose uncertainty has never been quantified"},
+  {"CONTACT_TORQUE_LIMIT", UNRESOLVED_U16, CLASS_A_PRE_MOTION,
+   "needed to move at all; supplied by the approved H3 bootstrap envelope, "
+   "which is deliberately below both the provisioner bench value (300) and "
+   "LF V25 (500), and is refined by H3"},
+  {"CONTACT_GOAL_SPEED", UNRESOLVED_U16, CLASS_A_PRE_MOTION,
+   "needed to move at all; bootstrap 60 is far below LF V25 160"},
+  {"CONTACT_ACCELERATION", UNRESOLVED_U16, CLASS_A_PRE_MOTION,
+   "needed to move at all; bootstrap matches the slowest historical value"},
+  {"CONTACT_CURRENT_THRESHOLD_RAW", 0, CLASS_C_DERIVED,
+   "NOT a global constant. The detector derives the contact threshold from the "
+   "per-joint free-motion median/MAD baseline that H3 measures, so no fleet-wide "
+   "current threshold is needed or wanted"},
+  {"CONTACT_RETREAT_TICKS", UNRESOLVED_U16, CLASS_B_MEASURED_H3,
+   "H3 retreats with the bootstrap distance and reports what was actually "
+   "achieved; H4 uses the measured value"},
+  {"CONTACT_REPEATABILITY_TOLERANCE_TICKS", UNRESOLVED_U16, CLASS_D_ACCEPTANCE,
+   "judges whether two contacts agree. Post-measure: it cannot gate the "
+   "approaches whose spread it evaluates"},
+  {"ENDPOINT_VS_URDF_TOLERANCE_TICKS", UNRESOLVED_U16, CLASS_D_ACCEPTANCE,
+   "judges measured span against URDF geometry. Post-measure only: an unknown "
+   "band leaves the result CANDIDATE rather than blocking the measurement"},
+  {"MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS", UNRESOLVED_U16, CLASS_D_ACCEPTANCE,
+   "judges manual pose against derived q0. It must never prevent acquiring the "
+   "data needed to derive q0 in the first place"},
 };
 static constexpr size_t CHARACTERIZATION_COUNT =
     sizeof(CHARACTERIZATION) / sizeof(CHARACTERIZATION[0]);
+
+//: Unresolved CLASS_A parameters — the only ones that can block first motion.
+static size_t preMotionOutstanding() {
+  size_t n = 0;
+  for (size_t i = 0; i < CHARACTERIZATION_COUNT; ++i) {
+    if (CHARACTERIZATION[i].paramClass == CLASS_A_PRE_MOTION &&
+        CHARACTERIZATION[i].value == UNRESOLVED_U16) {
+      ++n;
+    }
+  }
+  return n;
+}
 
 static size_t characterizationOutstanding() {
   size_t n = 0;
@@ -311,19 +434,6 @@ enum JointKind : uint8_t { KIND_HIP = 0, KIND_UPPER, KIND_LOWER };
 
 static const char *LEG_LABEL[LEG_COUNT] = {"LF", "RF", "RH", "LH"};
 static const char *KIND_LABEL[3] = {"HIP", "UPPER", "LOWER"};
-
-struct JointSpec {
-  uint8_t busId;
-  const char *jointName;
-  const char *unitLabel;
-  uint8_t leg;
-  uint8_t kind;
-  int8_t direction;            // 0 = UNMEASURED, must be characterized
-  float declaredMinRad;
-  float declaredMaxRad;
-  float geomContactMinRad;
-  float geomContactMaxRad;
-};
 
 static constexpr JointSpec JOINTS[] = {
   // LF
@@ -382,25 +492,39 @@ static SessionState sessionState = SESSION_IDLE;
 static Stage stage = STAGE_NONE;
 static char lastFault[160] = "NONE";
 
-// Per-joint census result for the CURRENT physical session.
-struct CensusEntry {
-  bool present;
-  bool identityOk;
-  uint16_t model;
-  int16_t positionOffset;
-  uint8_t torqueEnable;
-  uint16_t torqueLimit;
-  uint16_t presentPosition;
-  uint8_t voltage;
-  uint8_t temperature;
-  uint8_t statusByte;
-  uint8_t responseStatus;
-  bool profileMatch;
-};
-
 static CensusEntry census[JOINT_COUNT];
 static bool censusFresh = false;
 static uint32_t censusEpoch = 0;
+
+// --------------------------------------------------------------------------
+// Per-session characterization store
+//
+// H3 writes it; H4/H5/H6 read it. RAM only, and tied to the census epoch: a
+// reset or a fresh census clears it, so a later stage can never run on evidence
+// gathered from a physical setup that is no longer the verified one.
+// --------------------------------------------------------------------------
+
+static JointCharacterization characterization[JOINT_COUNT];
+
+//: Operator confirmation of the bootstrap envelope, for the CURRENT session.
+static bool bootstrapSessionApproved = false;
+
+static void clearCharacterization(const char *why) {
+  for (size_t i = 0; i < JOINT_COUNT; ++i) characterization[i] = JointCharacterization();
+  if (why != nullptr) Serial.printf("CHARACTERIZATION_CLEARED WHY=%s\n", why);
+}
+
+static bool characterizationUsable(size_t index) {
+  return index < JOINT_COUNT && characterization[index].valid &&
+         characterization[index].censusEpoch == censusEpoch &&
+         (characterization[index].direction == 1 || characterization[index].direction == -1);
+}
+
+//: Bootstrap is usable only when the BUILD allows it AND the operator confirmed
+//: it in this session. Neither alone is sufficient.
+static bool bootstrapUsable() {
+  return H3_BOOTSTRAP_BUILD_APPROVED && bootstrapSessionApproved;
+}
 
 static void invalidateCensus(const char *why) {
   censusFresh = false;
@@ -503,13 +627,19 @@ static bool flcWritePosEx(uint8_t id, int32_t position, uint16_t speed,
     Serial.printf("MOTION_REFUSED POSITION_OUT_OF_DOMAIN=%ld\n", (long)position);
     return false;
   }
-  if (AUTHORIZED_STAGE < H4_JOINT_CALIBRATE) {
+  // H3 is the lowest stage at which anything may move at all.
+  if (AUTHORIZED_STAGE < H3_JOINT_CHARACTERIZE) {
     Serial.printf("MOTION_REFUSED HARDWARE_STAGE_LOCKED AUTHORIZED=H%u\n",
                   (unsigned)AUTHORIZED_STAGE);
     return false;
   }
-  if (characterizationOutstanding() > 0) {
-    Serial.println("MOTION_REFUSED CHARACTERIZATION_REQUIRED");
+  // The pre-motion parameters must come from somewhere. Either they are
+  // resolved outright, or the operator has explicitly approved the conservative
+  // bootstrap envelope for this session. Post-measure acceptance tolerances
+  // (CLASS_D) deliberately do NOT gate here — they judge results, not motion.
+  if (preMotionOutstanding() > 0 && !bootstrapUsable()) {
+    Serial.printf("MOTION_REFUSED PRE_MOTION_PARAMS_UNRESOLVED=%u BOOTSTRAP_APPROVED=NO\n",
+                  (unsigned)preMotionOutstanding());
     return false;
   }
 
@@ -579,6 +709,24 @@ static bool safeOffOne(uint8_t id, bool &sawResponder) {
   return true;
 }
 
+//: Torque OFF every known leg servo without the full command framing. Used as
+//: the unconditional exit of every multi-joint orchestration.
+static bool runSafeOffQuiet() {
+  bool allOk = true;
+  bool sawResponder = false;
+  for (size_t i = 0; i < JOINT_COUNT; ++i) {
+    if (!safeOffOne(JOINTS[i].busId, sawResponder)) allOk = false;
+  }
+  stage = STAGE_NONE;
+  Serial.printf("SAFE_OFF_SWEEP RESULT=%s RESPONDERS_SEEN=%s\n",
+                allOk ? "PASS" : "FAIL", sawResponder ? "YES" : "NO");
+  if (!allOk) {
+    setFault("SAFE_OFF_SWEEP_FAILED");
+    Serial.println("CUT_SERVO_POWER_NOW");
+  }
+  return allOk;
+}
+
 static void runSafeOff() {
   Serial.println("SAFE_OFF_BEGIN");
 
@@ -631,14 +779,55 @@ static void runStatus() {
 
   size_t outstanding = characterizationOutstanding();
   Serial.printf("CHARACTERIZATION_OUTSTANDING=%u\n", (unsigned)outstanding);
+  Serial.printf("PRE_MOTION_OUTSTANDING=%u\n", (unsigned)preMotionOutstanding());
   for (size_t i = 0; i < CHARACTERIZATION_COUNT; ++i) {
     if (CHARACTERIZATION[i].value == UNRESOLVED_U16) {
-      Serial.printf("CHARACTERIZATION_REQUIRED NAME=%s WHY=%s\n",
-                    CHARACTERIZATION[i].name, CHARACTERIZATION[i].why);
+      Serial.printf("CHARACTERIZATION_REQUIRED NAME=%s CLASS=%s WHY=%s\n",
+                    CHARACTERIZATION[i].name,
+                    paramClassLabel(CHARACTERIZATION[i].paramClass),
+                    CHARACTERIZATION[i].why);
     }
   }
+
+  // Bootstrap visibility: a session can never silently be running on the
+  // conservative first-motion envelope rather than measured values.
+  Serial.printf("H3_BOOTSTRAP_BUILD_APPROVED=%s\n",
+                H3_BOOTSTRAP_BUILD_APPROVED ? "YES" : "NO");
+  Serial.printf("H3_BOOTSTRAP_SESSION_APPROVED=%s\n",
+                bootstrapSessionApproved ? "YES" : "NO");
+  Serial.printf("H3_BOOTSTRAP_ACTIVE=%s\n", bootstrapUsable() ? "YES" : "NO");
+  if (bootstrapUsable()) {
+    const FlcMotionEnvelope envelope = flcBootstrapEnvelope();
+    Serial.printf("H3_BOOTSTRAP_ENVELOPE ORIGIN=%s TORQUE_LIMIT=%u SPEED=%u ACC=%u "
+                  "RETREAT=%u\n",
+                  flcParameterOriginLabel(envelope.origin), envelope.torqueLimit,
+                  envelope.goalSpeed, envelope.acceleration, envelope.retreatTicks);
+  }
+
+  size_t characterized = 0;
+  for (size_t i = 0; i < JOINT_COUNT; ++i) {
+    if (characterizationUsable(i)) {
+      ++characterized;
+      Serial.printf("JOINT_CHARACTERIZED ID=%u JOINT=%s ORIGIN=%s DIRECTION=%d "
+                    "CONTACT_THRESHOLD_RAW=%u RETREAT_TICKS=%u\n",
+                    JOINTS[i].busId, JOINTS[i].jointName,
+                    flcParameterOriginLabel(characterization[i].origin),
+                    (int)characterization[i].direction,
+                    characterization[i].contactThresholdRaw,
+                    characterization[i].retreatTicks);
+    }
+  }
+  Serial.printf("JOINTS_CHARACTERIZED=%u/%u\n", (unsigned)characterized,
+                (unsigned)JOINT_COUNT);
+
   Serial.printf("MOTION_UNLOCKED=%s\n",
-                (AUTHORIZED_STAGE >= H4_JOINT_CALIBRATE && outstanding == 0) ? "YES" : "NO");
+                (AUTHORIZED_STAGE >= H3_JOINT_CHARACTERIZE &&
+                 (preMotionOutstanding() == 0 || bootstrapUsable()))
+                    ? "YES" : "NO");
+  Serial.printf("CALIBRATE_JOINT_AVAILABLE=%s\n",
+                (AUTHORIZED_STAGE >= H4_JOINT_CALIBRATE && characterized > 0)
+                    ? "YES" : "NO");
+  Serial.println("PROMOTION_TO_CANONICAL=REQUIRES_EXPLICIT_SEPARATE_GATE");
   Serial.println("STATUS_RESULT PASS");
   Serial.println("STATUS_END");
 }
@@ -653,6 +842,11 @@ static void runCensus() {
 
   invalidateCensus(nullptr);
   ++censusEpoch;
+  // A new census means a new physical session epoch. Characterization evidence
+  // and the operator's bootstrap approval belong to the setup that was verified
+  // when they were granted, so both are dropped here rather than carried across.
+  clearCharacterization("NEW_CENSUS_EPOCH");
+  bootstrapSessionApproved = false;
 
   size_t presentCount = 0;
   size_t identityOkCount = 0;
@@ -793,14 +987,19 @@ static bool requireFreshCensus(const char *mode) {
   return false;
 }
 
-static bool requireCharacterizationComplete(const char *mode) {
-  size_t outstanding = characterizationOutstanding();
-  if (outstanding == 0) return true;
-  Serial.printf("%s_REFUSED REASON=CHARACTERIZATION_REQUIRED COUNT=%u\n",
+//: Pre-motion parameter gate. Only CLASS_A can block, and only while the
+//: bootstrap envelope is unapproved — see the classification table above.
+static bool requirePreMotionParameters(const char *mode) {
+  const size_t outstanding = preMotionOutstanding();
+  if (outstanding == 0 || bootstrapUsable()) return true;
+  Serial.printf("%s_REFUSED REASON=PRE_MOTION_PARAMS_UNRESOLVED COUNT=%u\n",
                 mode, (unsigned)outstanding);
   for (size_t i = 0; i < CHARACTERIZATION_COUNT; ++i) {
-    if (CHARACTERIZATION[i].value == UNRESOLVED_U16) {
-      Serial.printf("%s_BLOCKED_BY NAME=%s\n", mode, CHARACTERIZATION[i].name);
+    if (CHARACTERIZATION[i].paramClass == CLASS_A_PRE_MOTION &&
+        CHARACTERIZATION[i].value == UNRESOLVED_U16) {
+      Serial.printf("%s_BLOCKED_BY NAME=%s CLASS=%s\n", mode,
+                    CHARACTERIZATION[i].name,
+                    paramClassLabel(CHARACTERIZATION[i].paramClass));
     }
   }
   return false;
@@ -907,53 +1106,525 @@ static void runCaptureManualQ0(uint16_t samples) {
 // stage gate or the characterization gate refuses.
 // ==========================================================================
 
-static void refuseMotionMode(const char *mode, uint8_t neededStage) {
-  Serial.printf("%s_BEGIN\n", mode);
+// --------------------------------------------------------------------------
+// ST3215 hardware adapter — the bridge between the generic engine and the bus.
+//
+// The engine holds no Arduino or SCServo dependency; these callbacks are the
+// only place the two meet. commandPosition routes to flcWritePosEx(), which
+// remains the single GoalPosition authority in this firmware.
+// --------------------------------------------------------------------------
 
-  bool stageOk = requireStage(neededStage, mode);
-  bool censusOk = requireFreshCensus(mode);
-  bool charOk = requireCharacterizationComplete(mode);
+static bool portReadTelemetry(void *ctx, uint8_t id, FlcObservation *out) {
+  (void)ctx;
+  if (out == nullptr) return false;
 
-  // Direction is unmeasured by policy on this installation.
-  Serial.printf("%s_BLOCKED_BY NAME=JOINT_DIRECTION_UNMEASURED\n", mode);
-  Serial.printf("%s_NOTE=LF_V25_NUMERIC_RESULTS_CANNOT_AUTHORIZE_CURRENT_HARDWARE\n", mode);
+  // One FeedBack() pulls the whole RAM telemetry block, so every field below
+  // belongs to the SAME sample of the SAME servo rather than to a mix of reads.
+  if (st.FeedBack((int)id) == -1 || st.Error != 0) return false;
 
-  Serial.printf("%s_STAGE_OK=%s CENSUS_OK=%s CHARACTERIZATION_OK=%s\n",
-                mode, stageOk ? "YES" : "NO", censusOk ? "YES" : "NO",
-                charOk ? "YES" : "NO");
-  Serial.printf("%s_RESULT REFUSED\n", mode);
-  Serial.printf("%s_END\n", mode);
+  const int position = st.ReadPos(-1);
+  const int speed = st.ReadSpeed(-1);
+  const int current = st.ReadCurrent(-1);
+  const int voltage = st.ReadVoltage(-1);
+  const int temperature = st.ReadTemper(-1);
+  if (position < 0 || position > ENCODER_MAX) return false;
+
+  const int torqueEnable = st.readByte(id, REG_TORQUE_ENABLE);
+  if (torqueEnable < 0 || st.Error != 0) return false;
+  const int torqueLimit = st.readWord(id, REG_TORQUE_LIMIT);
+  if (torqueLimit < 0 || st.Error != 0) return false;
+  const int goal = st.readWord(id, REG_GOAL_POSITION);
+  if (goal < 0 || st.Error != 0) return false;
+  const int statusByte = st.readByte(id, REG_STATUS);
+  if (statusByte < 0 || st.Error != 0) return false;
+
+  out->telemetryValid = true;
+  out->driverError = false;
+  out->statusByte = (uint8_t)statusByte;
+  out->torqueEnabled = (torqueEnable != 0);
+  out->torqueLimit = (uint16_t)torqueLimit;
+  out->goalPosition = (uint16_t)goal;
+  out->position = (uint16_t)position;
+  out->velocity = (int16_t)speed;
+  out->current = (uint16_t)(current < 0 ? 0 : current);
+  out->temperature = (uint8_t)(temperature < 0 ? 0 : temperature);
+  out->voltage = (uint8_t)(voltage < 0 ? 0 : voltage);
+  out->elapsedMs = 0;   // filled in by the engine against its own budget clock
+  return true;
+}
+
+static bool portCommandPosition(void *ctx, uint8_t id, int position, uint16_t speed,
+                                uint8_t acc) {
+  (void)ctx;
+  return flcWritePosEx(id, position, speed, acc, "engine");
+}
+
+static bool portSetTorqueLimit(void *ctx, uint8_t id, uint16_t limit) {
+  (void)ctx;
+  Stage saved = stage;
+  stage = STAGE_MOTION_PREP;
+  const bool ok = flcWrite(id, REG_TORQUE_LIMIT, 2, limit, "TorqueLimit").ok;
+  stage = saved;
+  return ok;
+}
+
+static bool portSetTorqueEnable(void *ctx, uint8_t id, bool enable) {
+  (void)ctx;
+  Stage saved = stage;
+  // Torque ON only inside an authorized motion transaction; torque OFF is
+  // always permitted, which is what makes recovery paths safe.
+  stage = enable ? STAGE_MOTION : STAGE_TORQUE_SAFETY;
+  const bool ok = flcWrite(id, REG_TORQUE_ENABLE, 1, enable ? 1 : 0, "TorqueEnable").ok;
+  stage = saved;
+  return ok;
+}
+
+static uint32_t portNowMs(void *ctx) {
+  (void)ctx;
+  return millis();
+}
+
+static void portIdle(void *ctx, uint32_t ms) {
+  (void)ctx;
+  delay(ms);
+}
+
+static void portTrace(void *ctx, const char *line) {
+  (void)ctx;
+  Serial.printf("ENGINE %s\n", line);
+}
+
+static FlcServoPort makeServoPort() {
+  FlcServoPort port;
+  port.readTelemetry = portReadTelemetry;
+  port.commandPosition = portCommandPosition;
+  port.setTorqueLimit = portSetTorqueLimit;
+  port.setTorqueEnable = portSetTorqueEnable;
+  port.nowMs = portNowMs;
+  port.idle = portIdle;
+  port.trace = portTrace;
+  port.ctx = nullptr;
+  return port;
+}
+
+// Generic guard set shared by every motion path. Joint-specific travel limits
+// come from the envelope and the joint spec, not from here.
+static FlcContactConfig makeGuards() {
+  FlcContactConfig guards;
+  guards.maxProgressTicks = 2;
+  guards.maxVelocityRaw = MON_STATIONARY_SPEED;
+  guards.targetReachedToleranceTicks = 10;
+  guards.minTravelTicks = 24;
+  guards.persistenceSamples = 3;
+  guards.startupGraceSamples = 4;
+  guards.hardCurrentAbortRaw = MON_OVERCURRENT_HARD_RAW;
+  guards.expectedTorqueLimit = 0;   // set per transaction by the engine
+  guards.thermalLimitC = MON_THERMAL_LIMIT_C;
+  guards.voltageMin = MON_VOLTAGE_MIN;
+  guards.voltageMax = MON_VOLTAGE_MAX;
+  guards.travelBudgetTicks = 0;     // set per transaction by the engine
+  guards.timeBudgetMs = 0;          // set per transaction by the engine
+  guards.probeSign = 0;             // measured, never assumed
+  return guards;
+}
+
+
+// --------------------------------------------------------------------------
+// Acceptance gates — POST-MEASURE, never pre-motion
+//
+// These decide whether a measurement is ACCEPTED. They must never prevent the
+// measurement itself: a tolerance that is unknown leaves the result CANDIDATE.
+// --------------------------------------------------------------------------
+
+static FlcAcceptanceGates makeAcceptanceGates(const JointSpec &spec) {
+  FlcAcceptanceGates gates;
+  // Repeatability band is characterized per build. Until H3 has run we use the
+  // measured spread from characterization; absent that, the result is refused
+  // rather than accepted on a guessed band.
+  gates.repeatabilityToleranceKnown = false;
+  gates.repeatabilityToleranceTicks = 0;
+  gates.endpointVsUrdfToleranceKnown = false;
+  gates.endpointVsUrdfToleranceTicks = 0;
+
+  const float spanRad = spec.geomContactMaxRad - spec.geomContactMinRad;
+  gates.expectedSpanTicks = (int)(spanRad * (float)ENCODER_MODULUS / 6.283185307f + 0.5f);
+  return gates;
+}
+
+static int angleToTicks(float rad) {
+  const float ticks = rad * (float)ENCODER_MODULUS / 6.283185307f;
+  return (int)(ticks >= 0.0f ? ticks + 0.5f : ticks - 0.5f);
+}
+
+// --------------------------------------------------------------------------
+// Shared preflight for every motion mode
+// --------------------------------------------------------------------------
+
+static bool motionPreflight(const char *mode, uint8_t neededStage, int jointIndex,
+                            bool requireCharacterized) {
+  bool ok = true;
+  if (!requireStage(neededStage, mode)) ok = false;
+  if (!requireFreshCensus(mode)) ok = false;
+  if (!requirePreMotionParameters(mode)) ok = false;
+
+  if (jointIndex >= 0) {
+    const CensusEntry &entry = census[jointIndex];
+    if (!entry.present || !entry.identityOk) {
+      Serial.printf("%s_REFUSED REASON=JOINT_IDENTITY_NOT_VERIFIED\n", mode);
+      ok = false;
+    }
+    if (requireCharacterized && !characterizationUsable((size_t)jointIndex)) {
+      Serial.printf("%s_REFUSED REASON=JOINT_NOT_CHARACTERIZED_IN_THIS_SESSION\n", mode);
+      Serial.printf("%s_HINT=RUN @CHARACTERIZE_JOINT FIRST\n", mode);
+      ok = false;
+    }
+  }
+  if (!ok) {
+    Serial.printf("%s_NOTE=LF_V25_NUMERIC_RESULTS_CANNOT_AUTHORIZE_CURRENT_HARDWARE\n", mode);
+  }
+  return ok;
+}
+
+// --------------------------------------------------------------------------
+// H3 — @CHARACTERIZE_JOINT
+//
+// Measures direction, free-motion baseline and one supervised bounded contact
+// with retreat. This is what resolves the parameters H4 needs, and it is
+// deliberately NOT blocked by the acceptance tolerances it exists to inform.
+// --------------------------------------------------------------------------
+
+static void runCharacterizeJoint(int id) {
+  Serial.println("CHARACTERIZE_JOINT_BEGIN");
+
+  if (!validLegId(id)) {
+    Serial.printf("CHARACTERIZE_JOINT_REFUSED REASON=NOT_A_LEG_ID ID=%d\n", id);
+    Serial.println("CHARACTERIZE_JOINT_RESULT REFUSED");
+    Serial.println("CHARACTERIZE_JOINT_END");
+    return;
+  }
+  const int index = jointIndexForId(id);
+  const JointSpec &spec = JOINTS[index];
+  Serial.printf("CHARACTERIZE_JOINT_TARGET ID=%u JOINT=%s UNIT=%s\n",
+                spec.busId, spec.jointName, spec.unitLabel);
+
+  if (!motionPreflight("CHARACTERIZE_JOINT", H3_JOINT_CHARACTERIZE, index, false)) {
+    Serial.println("CHARACTERIZE_JOINT_RESULT REFUSED");
+    Serial.println("CHARACTERIZE_JOINT_END");
+    return;
+  }
+  if (!bootstrapUsable()) {
+    Serial.println("CHARACTERIZE_JOINT_REFUSED REASON=H3_BOOTSTRAP_NOT_APPROVED");
+    Serial.printf("CHARACTERIZE_JOINT_BOOTSTRAP_BUILD_APPROVED=%s SESSION_APPROVED=%s\n",
+                  H3_BOOTSTRAP_BUILD_APPROVED ? "YES" : "NO",
+                  bootstrapSessionApproved ? "YES" : "NO");
+    Serial.println("CHARACTERIZE_JOINT_HINT=@APPROVE_BOOTSTRAP CONFIRM");
+    Serial.println("CHARACTERIZE_JOINT_RESULT REFUSED");
+    Serial.println("CHARACTERIZE_JOINT_END");
+    return;
+  }
+
+  const FlcMotionEnvelope envelope = flcBootstrapEnvelope();
+  Serial.printf("CHARACTERIZE_JOINT_ENVELOPE ORIGIN=%s TORQUE_LIMIT=%u SPEED=%u ACC=%u "
+                "STEP=%u RETREAT=%u TRAVEL_BUDGET=%u TIME_BUDGET=%lu\n",
+                flcParameterOriginLabel(envelope.origin), envelope.torqueLimit,
+                envelope.goalSpeed, envelope.acceleration, envelope.stepTicks,
+                envelope.retreatTicks, envelope.travelBudgetTicks,
+                (unsigned long)envelope.timeBudgetMs);
+
+  const int startTick = census[index].presentPosition;
+  FlcServoPort port = makeServoPort();
+  const FlcContactConfig guards = makeGuards();
+
+  const FlcCharacterizationResult result =
+      flcCharacterizeJoint(port, (uint8_t)id, startTick, 0, envelope, guards, 48, 96);
+
+  Serial.printf("CHARACTERIZE_JOINT_STATUS=%s REASON=%s\n",
+                flcEngineStatusLabel(result.status),
+                flcAbortReasonLabel(result.abortReason));
+  Serial.printf("CHARACTERIZE_JOINT_DIRECTION MEASURED=%d TRAVEL=%d START=%d END=%d\n",
+                (int)result.direction.encoderSign, result.direction.observedTravel,
+                result.direction.startTick, result.direction.endTick);
+  Serial.printf("CHARACTERIZE_JOINT_BASELINE SAMPLES=%d MEDIAN_CURRENT=%u MAD=%u "
+                "MIN=%u MAX=%u PEAK_SPEED=%u\n",
+                result.baseline.samples, result.baseline.baseline.medianCurrent,
+                result.baseline.baseline.madCurrent, result.baseline.minCurrent,
+                result.baseline.maxCurrent, result.baseline.peakSpeed);
+  Serial.printf("CHARACTERIZE_JOINT_CONTACT TICK=%d TRAVEL=%d PEAK_CURRENT=%u "
+                "CURRENT_SUPPORTED=%d\n",
+                result.probeContact.contactTick, result.probeContact.travelTicks,
+                result.probeContact.peakCurrent,
+                result.probeContact.currentSupportedContact ? 1 : 0);
+  Serial.printf("CHARACTERIZE_JOINT_RETREAT ACHIEVED=%d TRACKING_RECOVERED=%d "
+                "CURRENT_RECOVERED=%d REST_CURRENT=%u\n",
+                result.probeRetreat.achievedTicks,
+                result.probeRetreat.trackingRecovered ? 1 : 0,
+                result.probeRetreat.currentRecovered ? 1 : 0,
+                result.probeRetreat.restCurrent);
+  Serial.printf("CHARACTERIZE_JOINT_CONTACT2 TICK=%d SPREAD=%u REPEATABILITY_BAND=%u\n",
+                result.probeContact2.contactTick, result.observedContactSpreadTicks,
+                result.characterizedRepeatabilityToleranceTicks);
+
+  // Whatever happened, this joint must end released.
+  const bool released = flcEndMotion(port, (uint8_t)id);
+  Serial.printf("CHARACTERIZE_JOINT_TORQUE_OFF_VERIFIED=%s\n", released ? "YES" : "NO");
+  if (!released) {
+    setFault("CHARACTERIZE_JOINT_TORQUE_OFF_FAILED");
+    Serial.println("CUT_SERVO_POWER_NOW");
+  }
+
+  if (result.status == FLC_ENGINE_OK && result.complete && released) {
+    JointCharacterization &store = characterization[index];
+    store.valid = true;
+    store.censusEpoch = censusEpoch;
+    store.direction = result.direction.encoderSign;
+    store.baseline = result.baseline.baseline;
+    store.contactThresholdRaw = result.characterizedContactThresholdRaw;
+    store.retreatTicks = result.characterizedRetreatTicks;
+    store.repeatabilityToleranceTicks = result.characterizedRepeatabilityToleranceTicks;
+    store.observedSpreadTicks = result.observedContactSpreadTicks;
+    store.restTick = result.finalRetreat.toTick;
+    store.origin = FLC_ORIGIN_CHARACTERIZED_CURRENT_HARDWARE;
+
+    Serial.printf("CHARACTERIZE_JOINT_OUTPUT ORIGIN=%s DIRECTION=%d "
+                  "CONTACT_THRESHOLD_RAW=%u RETREAT_TICKS=%u OBSERVED_SPREAD=%u "
+                  "REPEATABILITY_BAND=%u REST_TICK=%d\n",
+                  flcParameterOriginLabel(store.origin), (int)store.direction,
+                  store.contactThresholdRaw, store.retreatTicks,
+                  store.observedSpreadTicks, store.repeatabilityToleranceTicks,
+                  store.restTick);
+    Serial.println("CHARACTERIZE_JOINT_RESULT PASS");
+  } else {
+    Serial.println("CHARACTERIZE_JOINT_RESULT FAIL");
+  }
+  Serial.println("CHARACTERIZE_JOINT_END");
+}
+
+// --------------------------------------------------------------------------
+// H4 — @CALIBRATE_JOINT: both endpoints, span, direction, q0 candidate
+// --------------------------------------------------------------------------
+
+//: H4 single-joint path. Builds the same FlcJointPlan H5/H6 build and runs the
+//: same flcCalibrateJoint; the only difference is that it calibrates one joint.
+static bool calibrateOneJoint(int index, const char *mode) {
+  const JointSpec &spec = JOINTS[index];
+
+  FlcJointPlan plan;
+  if (!buildJointPlan(index, plan)) {
+    Serial.printf("%s_JOINT_REFUSED ID=%u REASON=NOT_CHARACTERIZED_IN_THIS_SESSION\n",
+                  mode, spec.busId);
+    return false;
+  }
+
+  FlcServoPort port = makeServoPort();
+  const FlcContactConfig guards = makeGuards();
+  const FlcJointCalibrationResult result = flcCalibrateJoint(
+      port, plan.busId, plan.startTick, plan.direction, plan.minAngleTicksFromZero,
+      plan.maxAngleTicksFromZero, plan.envelope, guards, plan.baseline, plan.gates);
+
+  reportJointResult(mode, spec, result);
+
+  const bool released = flcEndMotion(port, plan.busId);
+  Serial.printf("%s_JOINT_TORQUE_OFF_VERIFIED=%s\n", mode, released ? "YES" : "NO");
+  if (!released) {
+    setFault("CALIBRATE_JOINT_TORQUE_OFF_FAILED");
+    Serial.println("CUT_SERVO_POWER_NOW");
+  }
+  return result.status == FLC_ENGINE_OK && released;
 }
 
 static void runCalibrateJoint(int id) {
+  Serial.println("CALIBRATE_JOINT_BEGIN");
+
   if (!validLegId(id)) {
-    Serial.println("CALIBRATE_JOINT_BEGIN");
     Serial.printf("CALIBRATE_JOINT_REFUSED REASON=NOT_A_LEG_ID ID=%d\n", id);
     Serial.println("CALIBRATE_JOINT_RESULT REFUSED");
     Serial.println("CALIBRATE_JOINT_END");
     return;
   }
-  const JointSpec &spec = JOINTS[jointIndexForId(id)];
-  Serial.printf("CALIBRATE_JOINT_TARGET ID=%u JOINT=%s UNIT=%s\n",
-                spec.busId, spec.jointName, spec.unitLabel);
-  refuseMotionMode("CALIBRATE_JOINT", H4_JOINT_CALIBRATE);
+  const int index = jointIndexForId(id);
+  const JointSpec &spec = JOINTS[index];
+  Serial.printf("CALIBRATE_JOINT_TARGET ID=%u JOINT=%s UNIT=%s\n", spec.busId,
+                spec.jointName, spec.unitLabel);
+
+  if (!motionPreflight("CALIBRATE_JOINT", H4_JOINT_CALIBRATE, index, true)) {
+    Serial.println("CALIBRATE_JOINT_RESULT REFUSED");
+    Serial.println("CALIBRATE_JOINT_END");
+    return;
+  }
+
+  const bool ok = calibrateOneJoint(index, "CALIBRATE_JOINT");
+  Serial.printf("CALIBRATE_JOINT_RESULT %s\n", ok ? "PASS" : "FAIL");
+  Serial.println("CALIBRATE_JOINT_END");
+}
+
+// --------------------------------------------------------------------------
+// H5 — @CALIBRATE_LEG: real orchestration over the SAME generic engine
+//
+// One calibrator + JointSpec + leg plan. There is no LfStateMachine.
+// --------------------------------------------------------------------------
+
+//: Build the engine plan for one joint from its spec and this session's
+//: characterization. Returns false when the joint has no usable evidence.
+static bool buildJointPlan(int index, FlcJointPlan &plan) {
+  const JointSpec &spec = JOINTS[index];
+  const JointCharacterization &store = characterization[index];
+
+  plan.busId = spec.busId;
+  plan.characterized = characterizationUsable((size_t)index);
+  plan.direction = store.direction;
+  plan.startTick = store.restTick;
+  plan.minAngleTicksFromZero = angleToTicks(spec.geomContactMinRad);
+  plan.maxAngleTicksFromZero = angleToTicks(spec.geomContactMaxRad);
+  plan.baseline = store.baseline;
+
+  FlcMotionEnvelope envelope = flcBootstrapEnvelope();
+  if (store.retreatTicks > 0) envelope.retreatTicks = store.retreatTicks;
+  plan.envelope = flcClampEnvelope(envelope);
+
+  plan.gates = makeAcceptanceGates(spec);
+  if (store.repeatabilityToleranceTicks > 0) {
+    plan.gates.repeatabilityToleranceKnown = true;
+    plan.gates.repeatabilityToleranceTicks = store.repeatabilityToleranceTicks;
+  }
+  return plan.characterized;
+}
+
+//: Distal first: calibrating LOWER before HIP keeps the limb folded and the
+//: swept volume small while the proximal joints are still uncalibrated.
+static int legJointIndices(int leg, int *indices) {
+  const uint8_t order[FLC_JOINTS_PER_LEG] = {KIND_LOWER, KIND_UPPER, KIND_HIP};
+  int found = 0;
+  for (int slot = 0; slot < FLC_JOINTS_PER_LEG; ++slot) {
+    for (size_t i = 0; i < JOINT_COUNT; ++i) {
+      if (JOINTS[i].leg == (uint8_t)leg && JOINTS[i].kind == order[slot]) {
+        indices[found++] = (int)i;
+      }
+    }
+  }
+  return found;
+}
+
+static void reportJointResult(const char *mode, const JointSpec &spec,
+                              const FlcJointCalibrationResult &r) {
+  Serial.printf("%s_JOINT_BEGIN ID=%u JOINT=%s UNIT=%s\n", mode, spec.busId,
+                spec.jointName, spec.unitLabel);
+  Serial.printf("%s_JOINT_STATUS=%s REASON=%s TIER=%s\n", mode,
+                flcEngineStatusLabel(r.status), flcAbortReasonLabel(r.abortReason),
+                flcResultTierLabel(r.tier));
+  Serial.printf("%s_JOINT_MIN_ENDPOINT TICK=%d SPREAD=%d ACCEPTED=%d\n", mode,
+                r.minEndpoint.contactTick, r.minEndpoint.repeatability.spreadTicks,
+                r.minEndpoint.accepted ? 1 : 0);
+  Serial.printf("%s_JOINT_MAX_ENDPOINT TICK=%d SPREAD=%d ACCEPTED=%d\n", mode,
+                r.maxEndpoint.contactTick, r.maxEndpoint.repeatability.spreadTicks,
+                r.maxEndpoint.accepted ? 1 : 0);
+  Serial.printf("%s_JOINT_SPAN MEASURED=%d EXPECTED=%d ERROR=%d\n", mode,
+                r.measuredSpanTicks, r.expectedSpanTicks, r.spanErrorTicks);
+  Serial.printf("%s_JOINT_DERIVED_Q0 TICK=%d DIRECTION=%d\n", mode, r.q0Tick,
+                (int)r.direction);
+  Serial.printf("%s_JOINT_PROMOTION=REQUIRES_EXPLICIT_SEPARATE_GATE\n", mode);
+  Serial.printf("%s_JOINT_RESULT %s\n", mode,
+                r.status == FLC_ENGINE_OK ? "PASS" : "FAIL");
+  Serial.printf("%s_JOINT_END ID=%u\n", mode, spec.busId);
+}
+
+//: H5 for one leg, delegated to the SAME generic engine used by H4 and H6.
+static bool calibrateLegJoints(int leg, const char *mode) {
+  int indices[FLC_JOINTS_PER_LEG];
+  const int count = legJointIndices(leg, indices);
+  if (count != FLC_JOINTS_PER_LEG) {
+    Serial.printf("%s_LEG_REFUSED REASON=INCOMPLETE_LEG_PLAN LEG=%s\n", mode,
+                  LEG_LABEL[leg]);
+    return false;
+  }
+
+  FlcJointPlan plans[FLC_JOINTS_PER_LEG];
+  for (int i = 0; i < count; ++i) {
+    if (!buildJointPlan(indices[i], plans[i])) {
+      Serial.printf("%s_JOINT_SKIPPED ID=%u REASON=NOT_CHARACTERIZED_IN_THIS_SESSION\n",
+                    mode, JOINTS[indices[i]].busId);
+    }
+  }
+
+  FlcServoPort port = makeServoPort();
+  const FlcContactConfig guards = makeGuards();
+  const FlcLegResult result = flcCalibrateLeg(port, guards, plans, count);
+
+  for (int i = 0; i < result.jointsOk; ++i) {
+    reportJointResult(mode, JOINTS[indices[i]], result.joints[i]);
+  }
+  if (result.status != FLC_ENGINE_OK) {
+    Serial.printf("%s_LEG_ABORTED_AT ID=%u STATUS=%s\n", mode, result.failedBusId,
+                  flcEngineStatusLabel(result.status));
+    if (result.jointsOk < count) {
+      reportJointResult(mode, JOINTS[indices[result.jointsOk]],
+                        result.joints[result.jointsOk]);
+    }
+  }
+  Serial.printf("%s_LEG_JOINTS_OK=%d/%d\n", mode, result.jointsOk, count);
+  return result.status == FLC_ENGINE_OK && result.jointsOk == count;
 }
 
 static void runCalibrateLeg(int leg) {
+  Serial.println("CALIBRATE_LEG_BEGIN");
+
   if (leg < 0 || leg >= LEG_COUNT) {
-    Serial.println("CALIBRATE_LEG_BEGIN");
     Serial.println("CALIBRATE_LEG_REFUSED REASON=UNKNOWN_LEG");
     Serial.println("CALIBRATE_LEG_RESULT REFUSED");
     Serial.println("CALIBRATE_LEG_END");
     return;
   }
   Serial.printf("CALIBRATE_LEG_TARGET LEG=%s\n", LEG_LABEL[leg]);
-  refuseMotionMode("CALIBRATE_LEG", H5_LEG);
+
+  if (!motionPreflight("CALIBRATE_LEG", H5_LEG, -1, false)) {
+    Serial.println("CALIBRATE_LEG_RESULT REFUSED");
+    Serial.println("CALIBRATE_LEG_END");
+    return;
+  }
+
+  const bool ok = calibrateLegJoints(leg, "CALIBRATE_LEG");
+
+  // Whole-leg safe state, whatever happened.
+  runSafeOffQuiet();
+  Serial.printf("CALIBRATE_LEG_RESULT %s\n", ok ? "PASS" : "FAIL");
+  Serial.println("CALIBRATE_LEG_END");
 }
 
+// --------------------------------------------------------------------------
+// H6 — @CALIBRATE_ALL: four legs, one session result
+// --------------------------------------------------------------------------
+
 static void runCalibrateAll() {
+  Serial.println("CALIBRATE_ALL_BEGIN");
   Serial.println("CALIBRATE_ALL_TARGET LEGS=LF,RF,RH,LH JOINTS=12");
-  refuseMotionMode("CALIBRATE_ALL", H6_FOUR_LEGS);
+
+  if (!motionPreflight("CALIBRATE_ALL", H6_FOUR_LEGS, -1, false)) {
+    Serial.println("CALIBRATE_ALL_RESULT REFUSED");
+    Serial.println("CALIBRATE_ALL_END");
+    return;
+  }
+
+  // Canonical order from MATDOG_GEOMETRY.yaml gait_convention.
+  const uint8_t sequence[LEG_COUNT] = {LEG_LF, LEG_RF, LEG_RH, LEG_LH};
+  int legsOk = 0;
+
+  for (int i = 0; i < LEG_COUNT; ++i) {
+    const int leg = sequence[i];
+    Serial.printf("CALIBRATE_ALL_LEG_BEGIN LEG=%s\n", LEG_LABEL[leg]);
+    const bool ok = calibrateLegJoints(leg, "CALIBRATE_ALL");
+    Serial.printf("CALIBRATE_ALL_LEG_RESULT LEG=%s %s\n", LEG_LABEL[leg],
+                  ok ? "PASS" : "FAIL");
+    if (ok) ++legsOk;
+    else {
+      Serial.println("CALIBRATE_ALL_SEQUENCE_ABORTED");
+      break;
+    }
+  }
+
+  runSafeOffQuiet();
+  Serial.printf("CALIBRATE_ALL_LEGS_OK=%d/%d\n", legsOk, (int)LEG_COUNT);
+  Serial.println("CALIBRATE_ALL_PROMOTION=REQUIRES_EXPLICIT_SEPARATE_GATE");
+  Serial.printf("CALIBRATE_ALL_RESULT %s\n", legsOk == LEG_COUNT ? "PASS" : "FAIL");
+  Serial.println("CALIBRATE_ALL_END");
 }
 
 // ==========================================================================
@@ -966,12 +1637,43 @@ static void printHelp() {
   Serial.println("  @STATUS");
   Serial.println("  @CENSUS");
   Serial.println("  @CAPTURE_Q0 <samples>");
+  Serial.println("  @APPROVE_BOOTSTRAP CONFIRM");
+  Serial.println("  @CHARACTERIZE_JOINT <bus_id>");
   Serial.println("  @CALIBRATE_JOINT <bus_id>");
   Serial.println("  @CALIBRATE_LEG <LF|RF|RH|LH>");
   Serial.println("  @CALIBRATE_ALL");
   Serial.println("  @SAFE_OFF");
   Serial.println("  @HELP");
   Serial.println();
+}
+
+// Operator confirmation that the conservative bootstrap envelope may be used
+// for H3 in THIS session. Requires the build flag as well; neither alone is
+// sufficient, and a census invalidation clears it.
+static void runApproveBootstrap() {
+  Serial.println("APPROVE_BOOTSTRAP_BEGIN");
+  if (!H3_BOOTSTRAP_BUILD_APPROVED) {
+    Serial.println("APPROVE_BOOTSTRAP_REFUSED REASON=BUILD_NOT_COMPILED_WITH_BOOTSTRAP");
+    Serial.println("APPROVE_BOOTSTRAP_RESULT REFUSED");
+    Serial.println("APPROVE_BOOTSTRAP_END");
+    return;
+  }
+  if (AUTHORIZED_STAGE < H3_JOINT_CHARACTERIZE) {
+    Serial.printf("APPROVE_BOOTSTRAP_REFUSED REASON=STAGE_BELOW_H3 AUTHORIZED=H%u\n",
+                  (unsigned)AUTHORIZED_STAGE);
+    Serial.println("APPROVE_BOOTSTRAP_RESULT REFUSED");
+    Serial.println("APPROVE_BOOTSTRAP_END");
+    return;
+  }
+  bootstrapSessionApproved = true;
+  const FlcMotionEnvelope envelope = flcBootstrapEnvelope();
+  Serial.printf("APPROVE_BOOTSTRAP_ENVELOPE ORIGIN=%s TORQUE_LIMIT=%u SPEED=%u ACC=%u "
+                "RETREAT=%u\n",
+                flcParameterOriginLabel(envelope.origin), envelope.torqueLimit,
+                envelope.goalSpeed, envelope.acceleration, envelope.retreatTicks);
+  Serial.println("APPROVE_BOOTSTRAP_NOTE=NOT_A_MEASUREMENT_NEVER_CANONICAL");
+  Serial.println("APPROVE_BOOTSTRAP_RESULT PASS");
+  Serial.println("APPROVE_BOOTSTRAP_END");
 }
 
 static int legFromLabel(const char *s) {
@@ -1030,9 +1732,15 @@ void loop() {
   if (cmd == "@CENSUS") { runCensus(); return; }
   if (cmd == "@SAFE_OFF") { runSafeOff(); return; }
   if (cmd == "@CALIBRATE_ALL") { runCalibrateAll(); return; }
+  if (cmd == "@APPROVE_BOOTSTRAP CONFIRM") { runApproveBootstrap(); return; }
 
   int value = -1;
   char extra = '\0';
+
+  if (sscanf(cmd.c_str(), "@CHARACTERIZE_JOINT %d %c", &value, &extra) == 1) {
+    runCharacterizeJoint(value);
+    return;
+  }
 
   if (sscanf(cmd.c_str(), "@CAPTURE_Q0 %d %c", &value, &extra) == 1) {
     runCaptureManualQ0((uint16_t)constrain(value, 0, (int)Q0_SAMPLES_MAX));
