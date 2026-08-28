@@ -1,6 +1,6 @@
 # Full Leg Calibrator V1 — validation evidence
 
-**Date:** 2026-08-28
+**Date:** 2026-08-28 (updated after H3–H6 implementation)
 **Base commit:** `fcc1dbd1367d5d8c860a873c62a31b2620695aba`
 **Tool:** [MATDOG Full Leg Calibrator V1](../../../05_Firmware/Full_Leg_Calibrator_V1/README.md)
 
@@ -8,66 +8,95 @@
 
 ## ⚠️ Hardware validation scope
 
-> **Only stage H0 was exercised.**
+> **Only stage H0 was exercised, and against the previous firmware image.**
 > No servo was connected. No servo power was present. No motion was commanded.
 > No EEPROM was written. **Nothing about H1 or later is validated by this work.**
+> The current image, which adds H3–H6, has been compiled and offline-tested but
+> **never flashed**.
 
 | Stage | Meaning | Status |
 |---|---|---|
 | H0 | ESP32-S3 only, no servos attached | ✅ **PASSED 2026-08-28** |
 | H1 | 12-servo read-only census | ⬜ not attempted — requires user present |
 | H2 | manual-pose q0 capture, torque OFF | ⬜ not attempted |
-| H3 | one joint runtime/contact characterization | 🔒 **LOCKED** |
-| H4 | one joint full calibration | 🔒 LOCKED |
-| H5 | one complete leg | 🔒 LOCKED |
-| H6 | four legs sequentially | 🔒 LOCKED |
-| H7 | final 12/12 freeze | 🔒 LOCKED |
+| H3 | one joint runtime/contact characterization | ⬜ implemented, **not executed** |
+| H4 | one joint full calibration | ⬜ implemented, **not executed** |
+| H5 | one complete leg | ⬜ implemented, **not executed** |
+| H6 | four legs sequentially | ⬜ implemented, **not executed** |
+| H7 | separate freeze/promotion gate | ⬜ not part of the calibrator |
 
-H3+ is locked by **two independent gates**: `AUTHORIZED_STAGE = H0_ESP32_ONLY`, and eight
-unresolved `CHARACTERIZATION_REQUIRED` parameters. Raising the stage alone does not
-unlock motion — a test asserts this at H7.
+H3–H6 are now **real code paths**, offline-validated end to end. They ship
+disabled: the default build is H0 and the bootstrap envelope is denied.
+
+Motion is protected by **two independent gates** — the build stage
+(`FLC_AUTHORIZED_STAGE`, default H0) and the pre-motion parameter gate
+(resolved values, or an explicitly approved bootstrap envelope requiring both a
+build flag and a live session confirmation). Raising the stage alone does not
+unlock motion; a test asserts this at H7.
+
+See the [hardware validation handoff](MATDOG_FULL_LEG_CALIBRATOR_V1_HARDWARE_VALIDATION_HANDOFF.md)
+for the procedure and the parameter classification that resolved the old H3
+deadlock.
 
 ---
 
-## Offline validation — 140 tests, all passing
+## Offline validation — 206 tests, all passing
 
 | Suite | Tests | What it proves |
 |---|---|---|
-| `test_matdog_full_leg_calibrator_detector.py` | 32 | contact state machine, driven through the **real C++ engine** |
-| `test_matdog_full_leg_calibrator_sim.py` | 34 | census, q0 capture, mode gates, SAFE_OFF against a mock ST3215 bus |
+| `test_matdog_full_leg_calibrator_engine.py` | 35 | **H3/H4/H5/H6 happy paths and faults through the real C++ engine** |
+| `test_matdog_full_leg_calibrator_sim.py` | 42 | census, q0 capture, stage/bootstrap/characterization gates, SAFE_OFF |
+| `test_matdog_full_leg_calibrator_policy.py` | 39 | provenance gating, parameter classification, bootstrap policy, joint specs |
+| `test_matdog_full_leg_calibrator_detector.py` | 32 | per-sample contact decision via the real C++ detector |
+| `test_matdog_full_leg_calibrator_firmware_sync.py` | 31 | static firmware audit, firmware/host constant sync, frozen-evidence integrity |
 | `test_matdog_full_leg_calibrator_derive.py` | 27 | q0 derivation, affine solve, cross-check |
-| `test_matdog_full_leg_calibrator_policy.py` | 24 | provenance gating, joint specs, allocation validation |
-| `test_matdog_full_leg_calibrator_firmware_sync.py` | 23 | static firmware audit + firmware/host constant sync + frozen-evidence integrity |
 
-Full calibration suite after the change: **460 passed**, no regressions.
+Full calibration suite after the change: **526 passed**, no regressions.
 
-### The detector tests exercise real firmware code
+### Both halves are tested
 
-`flc_contact_detector.h` is compiled into both the ESP32-S3 firmware and a host harness
-(`tests/flc_detector_harness.cpp`, built with `-Wall -Wextra -Werror`). The fault
-injection therefore runs the same translation unit that would drive servos — not a Python
-re-implementation.
+The earlier suite could only show that `CALIBRATE_*` **refused**. Now that the
+modes can genuinely succeed, the refusals mean something. The suite contains:
 
-**Two real defects were found and fixed during this work. Both were encoder-wrap bugs.**
+- **successful fully-gated execution** — H3 characterizes a joint (direction,
+  baseline, contact, retreat, second contact, measured spread); H4 measures both
+  endpoints and derives a q0 candidate; H5 calibrates three joints; H6
+  calibrates twelve across four legs — all reaching a real success state;
+- **refusals** — every gate refusing when its precondition is missing;
+- **fail-closed faults** — with `EEPROM writes == 0`, `broadcast writes == 0`
+  and `all torque OFF` asserted after every single one.
 
-1. **Truncating modulo in the tick math** — caught by the harness on its first run.
-   C++ `%` truncates toward zero, so `flcSignedTickDelta(0, 4095)` returned **−4095**
-   where the canonical `matdog_joint_math.signed_tick_delta` returns **+1**. Every
-   wrap-boundary decision in the contact state machine would have been wrong. Fixed with
-   an explicit Euclidean `flcMod()`; a regression test now pins ten vectors against the
-   canonical Python implementation.
+### The engine tests exercise real firmware code
 
-2. **Linear mean in the manual-q0 summary** — caught by self-review of the diff, not by a
-   test. The firmware summarized q0 samples with an arithmetic mean and a linear
-   min/max. A joint resting near the 4095/0 boundary would have reported a centre of
-   ~2047 and a spread of ~4095: a nonsense q0 and a false instability verdict. Fixed by
-   moving the summary into the shared header as `flcSummarizeTicks()`, which accumulates
-   signed deltas from the first sample; five new tests now cover it, including a direct
-   comparison against `circular_tick_summary`.
+`flc_contact_detector.h` and `flc_calibration_engine.h` are compiled into both
+the ESP32-S3 firmware and host harnesses (`-Wall -Wextra -Werror`), driven
+against a simulated ST3215 servo with a real mechanical endstop. There is no
+Python re-implementation of the motion decision path.
 
-The second defect is the reason the q0 summary now lives in the shared, host-compiled
-header rather than in the `.ino`: logic that only exists in the sketch cannot be tested
-offline.
+**Three real defects were found and fixed this way.**
+
+1. **Truncating modulo in the tick math** — caught by the detector harness on its
+   first run. C++ `%` truncates toward zero, so `flcSignedTickDelta(0, 4095)`
+   returned **−4095** where canonical `matdog_joint_math.signed_tick_delta`
+   returns **+1**. Every wrap-boundary decision would have been wrong. Fixed with
+   an explicit Euclidean `flcMod()`.
+
+2. **Linear mean in the manual-q0 summary** — caught by self-review. A joint
+   resting near the 4095/0 boundary would have reported a centre of ~2047 and a
+   spread of ~4095. Moved into the shared header as `flcSummarizeTicks()`, which
+   accumulates signed deltas.
+
+3. **Joint left jammed against the endstop** — caught by the first H4 happy-path
+   test. `flcMeasureEndpoint` returned immediately after the second approach,
+   leaving the joint loaded against the mechanical stop and giving the next
+   endpoint a start position that did not match reality; the MAX traversal then
+   aborted with `WRONG_DIRECTION`. Fixed with a mandatory final retreat and an
+   explicit `restTick`. This was both a correctness bug and a physical-safety
+   bug, and only a test that reaches a real contact could have exposed it.
+
+A fourth issue surfaced the same way: a fixed travel budget could not cover a
+full-span traversal on a real joint. Each endpoint is now approached **from
+neutral** with a budget sized from that endpoint's own geometry.
 
 ### Fault coverage (specification section 13)
 
@@ -109,6 +138,26 @@ offline.
 
 **Session:** [`sessions/20260828T062919Z_h0_smoke/`](sessions/20260828T062919Z_h0_smoke/)
 **Result: PASS — 22/22 gates.**
+
+> ### ⚠️ This evidence predates the H3–H6 implementation
+>
+> The session below was run against the firmware image at commit `98a965f`, whose
+> hashes are recorded in it. The current source adds the calibration engine and
+> the H3–H6 command paths.
+>
+> **The current image has NOT been flashed and NOT been smoke-tested on
+> hardware.** No reflash was performed in this work: the handoff withholds
+> hardware authorization, and re-flashing would have been a hardware action taken
+> without it.
+>
+> What the current source HAS satisfied: it compiles clean at every stage H0–H6,
+> passes 206 offline tests including full H3–H6 happy paths through the real
+> engine, and passes the static safety audit. What it has NOT satisfied: any
+> hardware execution whatsoever.
+>
+> **Re-run `h0-smoke` on the new image before H1**, since the H0 gates verify the
+> firmware's own reported safety state and that state now includes the bootstrap
+> and characterization reporting.
 
 ### Environment
 
@@ -203,12 +252,18 @@ immediately without issuing writes and left torque untouched.
 
 ## What is NOT validated
 
-- the 12-servo census against real servos (H1);
-- manual q0 capture against real encoders (H2);
-- every contact/endpoint parameter — all eight remain `CHARACTERIZATION_REQUIRED`;
-- joint encoder **direction**, which is deliberately unmeasured for all 12 joints;
+- **H1** — the 12-servo census against real servos;
+- **H2** — manual q0 capture against real encoders;
+- **H3–H6** — implemented and offline-validated, but **never executed on hardware**;
+- every contact parameter measured on this build: the bootstrap envelope is a
+  conservative starting point, not a measurement;
+- joint encoder **direction** for all 12 joints — the engine measures it, but no
+  joint has been measured yet;
 - the servo-power rail, which was never energized;
-- any claim that the reassembled robot matches the URDF — that is what H1–H7 will test.
+- any claim that the reassembled robot matches the URDF — that is what H1–H6 will test.
+
+Offline validation demonstrates that the software **can** perform these stages.
+It is not evidence about the physical robot.
 
 ## Related
 

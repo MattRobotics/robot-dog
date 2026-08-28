@@ -4,8 +4,14 @@ ESP32-S3-native calibration engine for the 12 MATDOG leg servos. First
 current-architecture, **Station-free** calibrator: the ESP32-S3 owns the ST3215 bus and
 every motion-safety decision.
 
-**Status:** implemented, offline-validated, H0 hardware smoke test passed.
-**Hardware motion (H3+) is LOCKED.** See [Safety gates](#safety-gates).
+**Status:** implementation complete, offline validated, H0 hardware smoke test
+passed. **H1 and later have NOT been executed on hardware.**
+
+The calibrator is functionally complete: H3 characterization, H4 joint
+calibration, H5 leg and H6 four-leg orchestration are real code paths driving
+the shared C++ engine, not refusal stubs. Default builds ship at H0; raising the
+stage is one explicit build flag. See
+[hardware validation handoff](../../09_Logs/Validation_Reports/Full_Leg_Calibrator_V1/MATDOG_FULL_LEG_CALIBRATOR_V1_HARDWARE_VALIDATION_HANDOFF.md).
 
 ---
 
@@ -31,13 +37,26 @@ named operation and records the result.
 
 | File | Role |
 |---|---|
-| `matdog_full_leg_calibrator_v1/matdog_full_leg_calibrator_v1.ino` | firmware: command surface, census, q0 capture, write choke point, gates |
-| `matdog_full_leg_calibrator_v1/flc_contact_detector.h` | bounded contact/endpoint state machine — pure C++, no Arduino dependency |
-| `tests/flc_detector_harness.cpp` | host harness compiling the **same** header for offline fault injection |
+| `matdog_full_leg_calibrator_v1/matdog_full_leg_calibrator_v1.ino` | ST3215 transport, hardware adapter, command parser, runtime safety |
+| `matdog_full_leg_calibrator_v1/flc_stage_config.h` | the single build-stage / bootstrap switch, fail-closed by default |
+| `matdog_full_leg_calibrator_v1/flc_contact_detector.h` | per-sample contact decision — pure C++ |
+| `matdog_full_leg_calibrator_v1/flc_calibration_engine.h` | H3/H4/H5/H6 state machine: baseline, probe, contact, retreat, re-approach, repeatability, orchestration — pure C++ |
+| `tests/flc_detector_harness.cpp` | host harness for the detector |
+| `tests/flc_engine_harness.cpp` | host harness for the engine, driving a simulated servo with a real mechanical endstop |
+| `tools/build_stage.sh` | the supported way to produce a stage-authorized image |
 
-`flc_contact_detector.h` is compiled twice — into the firmware and into the host test
-harness — so the offline suite exercises the real engine rather than a Python model of
-it. There is exactly one implementation of the contact state machine.
+Both headers are compiled twice — into the firmware and into the host harnesses —
+so the offline suite exercises the real motion logic rather than a Python model
+of it. **There is exactly one implementation of the motion decision path.** The
+Python simulator covers policy, census and session bookkeeping only.
+
+### Layering
+
+```text
+flc_contact_detector.h    elementary per-sample contact decision
+flc_calibration_engine.h  the state machine + leg/four-leg orchestration
+matdog_..._v1.ino         transport, adapter, parser, runtime safety
+```
 
 ## Command surface
 
@@ -47,14 +66,19 @@ Line protocol over USB CDC. Protocol id `FLC1`, scope
 
 | Command | Stage | Writes | Purpose |
 |---|---|---|---|
-| `@STATUS` | H0 | none | version, build, gates, safety state, outstanding characterization |
+| `@STATUS` | H0 | none | version, build, gates, bootstrap state, per-joint characterization |
 | `@CENSUS` | H1 | none | verify the 12 leg ids and every identity/profile invariant |
 | `@CAPTURE_Q0 <n>` | H2 | none | `manual_pose_q0_candidate`, torque OFF, multi-sample |
-| `@CALIBRATE_JOINT <id>` | H4 | gated | one joint, bounded endpoint search |
-| `@CALIBRATE_LEG <LF\|RF\|RH\|LH>` | H5 | gated | three joints of one leg |
-| `@CALIBRATE_ALL` | H6 | gated | LF, RF, RH, LH — 12 joints |
+| `@APPROVE_BOOTSTRAP CONFIRM` | H3 | none | arm the conservative first-motion envelope for this session |
+| `@CHARACTERIZE_JOINT <id>` | H3 | RAM only | measure direction, baseline, contact, retreat, repeatability |
+| `@CALIBRATE_JOINT <id>` | H4 | RAM only | both endpoints, span, derived q0 candidate |
+| `@CALIBRATE_LEG <LF\|RF\|RH\|LH>` | H5 | RAM only | three joints, distal first |
+| `@CALIBRATE_ALL` | H6 | RAM only | LF, RF, RH, LH — 12 joints, one session result |
 | `@SAFE_OFF` | any | TorqueEnable=0 | unicast torque OFF + readback, idempotent |
 | `@HELP` | — | none | command list |
+
+"Writes: RAM only" means TorqueEnable (0x28), TorqueLimit (0x30) and the
+`WritePosEx` RAM block. No EEPROM address is reachable from any of them.
 
 ## Safety gates
 
@@ -93,35 +117,74 @@ would cross the 0/4095 boundary is **refused**, not wrapped.
 ### Progressive hardware stages
 
 ```text
-H0  ESP32 only, no servos          ← shipped, exercised 2026-08-28
-H1  12-servo read-only census      ← later, user present
-H2  manual-pose q0 capture         ← later, user present
-H3  one joint characterization     ← explicit authorization required
+H0  ESP32 only, no servos          ← default build, exercised 2026-08-28
+H1  12-servo read-only census      ← later, operator present
+H2  manual-pose q0 capture         ← later, operator present
+H3  one joint characterization     ← explicit authorization + bootstrap approval
 H4  one joint full calibration
 H5  one complete leg
 H6  four legs sequentially
-H7  final 12/12 freeze
+H7  separate freeze/promotion gate — NOT part of this calibrator
 ```
 
-`AUTHORIZED_STAGE = H0_ESP32_ONLY`. Raising it is a deliberate source change.
+The stage comes from one place, `flc_stage_config.h`, default `H0`. Produce a
+validation image with `tools/build_stage.sh <stage> [--bootstrap]` rather than
+editing sources.
 
-### Characterization gate — why H3+ is locked
+### Two independent gates protect first motion
 
-Motion additionally requires **every** safety-critical contact parameter to be resolved.
-Eight are currently `UNRESOLVED`:
+**Gate 1 — build stage.** `FLC_AUTHORIZED_STAGE` in `flc_stage_config.h`,
+default `H0`. H3 is the lowest stage at which anything may move.
 
-`CONTACT_TORQUE_LIMIT`, `CONTACT_GOAL_SPEED`, `CONTACT_ACCELERATION`,
-`CONTACT_CURRENT_THRESHOLD_RAW`, `CONTACT_RETREAT_TICKS`,
-`CONTACT_REPEATABILITY_TOLERANCE_TICKS`, `ENDPOINT_VS_URDF_TOLERANCE_TICKS`,
-`MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS`.
+**Gate 2 — pre-motion parameters.** Satisfied either by resolved values or by an
+explicitly approved bootstrap envelope, which needs **both** the build flag
+`FLC_H3_BOOTSTRAP_APPROVED=1` and the live `@APPROVE_BOOTSTRAP CONFIRM`. A fresh
+`@CENSUS` clears the session approval.
 
-None of these can be filled from history. The LF V25 values describe the previous
-installation; the Provisioner V6 centering values (TorqueLimit 300, speed 365, acc 50)
-were validated for **bench free-shaft centering with no mechanical load**, which says
-nothing about driving an assembled leg into a mechanical endstop.
-
-The stage gate and the characterization gate are **independent**: raising the stage to H7
+Raising the stage is **not** a bypass: identity, fresh census, measured direction
+and every hard servo guard are enforced independently. A test asserts that H7
 alone still refuses motion.
+
+### How the H3 deadlock was resolved
+
+Treating all eight contact parameters as pre-motion blockers was circular — H4
+needed them, H3 was meant to measure them, H3 was blocked by them. They are now
+classified by *when* a value can exist:
+
+| Class | Meaning | May block motion |
+|---|---|---|
+| **A** pre-motion | needed to move at all | yes, unless bootstrap approved |
+| **B** measured in H3 | H3 produces it | no |
+| **C** derived | computed from H3/H4 data | no |
+| **D** acceptance | judges a result post-measure | **never** |
+
+`CONTACT_CURRENT_THRESHOLD_RAW` is **C**: the detector derives its threshold from
+the per-joint free-motion median/MAD baseline H3 measures, so no fleet-wide
+current constant exists. `ENDPOINT_VS_URDF_TOLERANCE_TICKS`,
+`MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS` and
+`CONTACT_REPEATABILITY_TOLERANCE_TICKS` are **D**: an unknown band leaves a
+result `CANDIDATE` rather than blocking the measurement.
+
+### The bootstrap envelope is not a measurement
+
+| | Value | Comparison |
+|---|---|---|
+| TorqueLimit | 200 | below provisioner bench 300 and LF V25 500 |
+| GoalSpeed | 60 | far below LF V25 160 |
+| Acceleration | 8 | matches the slowest historical value |
+
+Tagged `H3_BOOTSTRAP_OPERATOR_APPROVED`, never
+`CHARACTERIZED_CURRENT_HARDWARE`. Reported by `@STATUS`, never canonical, never
+written to EEPROM, and clamped by absolute ceilings a build flag cannot widen.
+
+### Result tiers
+
+```text
+MEASURED -> CANDIDATE -> ACCEPTED -> PROMOTED
+```
+
+The calibrator can reach `ACCEPTED`. **`PROMOTED` is never reached here**:
+writing into `MATDOG_JOINT_CALIBRATION.yaml` is a separate explicit gate.
 
 ## Constant provenance
 
@@ -161,12 +224,15 @@ every LF V25 numeric hardware result.
 ## Build and flash
 
 ```bash
-FQBN='esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,DebugLevel=none,PSRAM=opi'
-PORT=/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00
-
-arduino-cli compile --fqbn "$FQBN" --export-binaries matdog_full_leg_calibrator_v1
-arduino-cli upload -p "$PORT" --fqbn "$FQBN" matdog_full_leg_calibrator_v1
+./tools/build_stage.sh                  # H0, bootstrap denied (default, safe)
+./tools/build_stage.sh 1 --upload       # H1 census image
+./tools/build_stage.sh 3 --bootstrap --upload   # H3 characterization image
+./tools/build_stage.sh 6 --bootstrap --upload   # H6 four-leg image
 ```
+
+`build_stage.sh` is the only supported way to raise the stage: one flag, one
+place, fail-closed by default. It refuses `--bootstrap` below H3 and prints a
+warning for any image that can command motion.
 
 Toolchain used: `arduino-cli 1.5.1`, `esp32:esp32 3.3.11`, `SCServo 1.0.2`.
 
@@ -174,8 +240,15 @@ Toolchain used: `arduino-cli 1.5.1`, `esp32:esp32 3.3.11`, `SCServo 1.0.2`.
 
 ```bash
 cd 06_Software/Matdog_Core/calibration
-python3 -m pytest tests/ -k full_leg_calibrator -q          # 135 offline tests
-python3 matdog_full_leg_calibrator_runner.py h0-smoke       # ESP32-only hardware test
+python3 -m pytest tests/ -k full_leg_calibrator -q     # 206 offline tests
+python3 -m pytest tests/ -q                            # 526, full calibration suite
+
+python3 matdog_full_leg_calibrator_runner.py h0-smoke  # ESP32-only hardware test
 ```
+
+The runner exposes named operations only — `status`, `census`, `capture-q0`,
+`approve-bootstrap`, `characterize-joint`, `calibrate-joint`, `calibrate-leg`,
+`calibrate-all`, `safe-off`, `h0-smoke`. There is deliberately no `--register`,
+`--address` or `--raw-goal-position`: the host cannot compose a servo write.
 
 Evidence: [Full_Leg_Calibrator_V1 validation reports](../../09_Logs/Validation_Reports/Full_Leg_Calibrator_V1/README.md).
