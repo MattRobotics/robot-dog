@@ -83,6 +83,36 @@ class Provenance(Enum):
     CHARACTERIZATION_REQUIRED = "CHARACTERIZATION_REQUIRED"
 
 
+class ParameterClass(Enum):
+    """WHEN a parameter can be known — which decides what it may gate.
+
+    The first version of this policy treated all eight contact parameters as
+    pre-motion blockers. That was a deadlock: H4 needed them, H3 was supposed to
+    measure them, and H3 was blocked by them. Classifying by *when* a value can
+    exist breaks the circle without inventing numbers.
+    """
+
+    #: Must be known BEFORE any H3 motion. Cannot be measured first, so it comes
+    #: from the explicitly approved, deliberately conservative bootstrap envelope.
+    A_PRE_MOTION = "A_PRE_MOTION"
+    #: Measured DURING H3 on this build.
+    B_MEASURED_H3 = "B_MEASURED_H3"
+    #: Computed from H3/H4 data; never a standalone constant.
+    C_DERIVED = "C_DERIVED"
+    #: Post-measure acceptance gate. Decides whether a result is ACCEPTED, and
+    #: must NEVER block acquiring the measurement it exists to judge.
+    D_ACCEPTANCE = "D_ACCEPTANCE"
+
+
+class ParameterOrigin(Enum):
+    """Where a runtime number came from. A bootstrap value and a measured value
+    are different things and must never be readable as one another."""
+
+    NONE = "NONE"
+    H3_BOOTSTRAP_OPERATOR_APPROVED = "H3_BOOTSTRAP_OPERATOR_APPROVED"
+    CHARACTERIZED_CURRENT_HARDWARE = "CHARACTERIZED_CURRENT_HARDWARE"
+
+
 class HardwareStage(Enum):
     """Progressive hardware validation gates. See section 9 of the V1 spec."""
 
@@ -114,6 +144,7 @@ class PolicyValue:
     provenance: Provenance
     evidence: str
     unit: str = ""
+    parameter_class: ParameterClass | None = None
 
     @property
     def resolved(self) -> bool:
@@ -265,40 +296,91 @@ HISTORICAL_CANDIDATES = (
 CHARACTERIZATION_REQUIRED = (
     PolicyValue(
         "CONTACT_TORQUE_LIMIT", None, Provenance.CHARACTERIZATION_REQUIRED,
-        "assembled-leg endstop contact torque never measured on this installation; "
-        "provisioner 300 was bench free-shaft centering, LF V25 500 was the previous build",
+        "needed to move at all, so it cannot be measured first. Supplied by the "
+        "approved H3 bootstrap envelope, which is deliberately below both the "
+        "provisioner bench value (300) and LF V25 (500), and refined by H3",
+        parameter_class=ParameterClass.A_PRE_MOTION,
     ),
     PolicyValue(
         "CONTACT_GOAL_SPEED", None, Provenance.CHARACTERIZATION_REQUIRED,
-        "approach speed against a mechanical endstop not characterized on this build",
+        "needed to move at all; bootstrap 60 is far below LF V25 160",
+        parameter_class=ParameterClass.A_PRE_MOTION,
     ),
     PolicyValue(
         "CONTACT_ACCELERATION", None, Provenance.CHARACTERIZATION_REQUIRED,
-        "approach acceleration not characterized on this build",
-    ),
-    PolicyValue(
-        "CONTACT_CURRENT_THRESHOLD_RAW", None, Provenance.CHARACTERIZATION_REQUIRED,
-        "free-motion current baseline of the reassembled leg is unmeasured, so no "
-        "contact current threshold can be derived yet",
+        "needed to move at all; bootstrap matches the slowest historical value",
+        parameter_class=ParameterClass.A_PRE_MOTION,
     ),
     PolicyValue(
         "CONTACT_RETREAT_TICKS", None, Provenance.CHARACTERIZATION_REQUIRED,
-        "safe retreat distance depends on the corrected HIP_MAX carrier geometry",
+        "H3 retreats with the bootstrap distance and reports what was actually "
+        "achieved; H4 then uses the measured value",
+        parameter_class=ParameterClass.B_MEASURED_H3,
+    ),
+    PolicyValue(
+        "CONTACT_CURRENT_THRESHOLD_RAW", None, Provenance.CHARACTERIZATION_REQUIRED,
+        "NOT a global constant. The detector derives its contact threshold from "
+        "the per-joint free-motion median/MAD baseline H3 measures, so no "
+        "fleet-wide current threshold is needed or wanted",
+        parameter_class=ParameterClass.C_DERIVED,
     ),
     PolicyValue(
         "CONTACT_REPEATABILITY_TOLERANCE_TICKS", None, Provenance.CHARACTERIZATION_REQUIRED,
-        "repeatability band must come from this installation, not LF V25",
+        "judges whether two contacts agree. Post-measure: it cannot gate the "
+        "approaches whose spread it evaluates. H3 measures the spread and derives "
+        "the band from it",
+        parameter_class=ParameterClass.D_ACCEPTANCE,
     ),
     PolicyValue(
         "ENDPOINT_VS_URDF_TOLERANCE_TICKS", None, Provenance.CHARACTERIZATION_REQUIRED,
-        "acceptance band between measured contact and URDF geometric contact "
-        "requires first-joint evidence",
+        "judges measured span against URDF geometry. Post-measure only: an "
+        "unknown band leaves the result CANDIDATE rather than blocking the "
+        "measurement",
+        parameter_class=ParameterClass.D_ACCEPTANCE,
     ),
     PolicyValue(
         "MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS", None, Provenance.CHARACTERIZATION_REQUIRED,
-        "manual square/reference pose uncertainty has never been quantified",
+        "judges manual pose against derived q0. It must never prevent acquiring "
+        "the data needed to derive q0 in the first place",
+        parameter_class=ParameterClass.D_ACCEPTANCE,
     ),
 )
+
+# ---------------------------------------------------------------------------
+# H3 bootstrap envelope
+#
+# The honest answer to "how do you move a joint you have not characterized yet".
+# Deliberately gentler than every historical envelope, separate from any
+# characterized result, inert unless explicitly approved, and never canonical.
+# Mirrors flc_stage_config.h; a test pins the two together.
+# ---------------------------------------------------------------------------
+
+BOOTSTRAP_ENVELOPE = {
+    "origin": ParameterOrigin.H3_BOOTSTRAP_OPERATOR_APPROVED,
+    "torque_limit": 200,
+    "goal_speed": 60,
+    "acceleration": 8,
+    "retreat_ticks": 96,
+    "is_measurement": False,
+    "may_become_canonical": False,
+    "requires_build_flag": "FLC_H3_BOOTSTRAP_APPROVED=1",
+    "requires_session_confirmation": "@APPROVE_BOOTSTRAP CONFIRM",
+    "evidence": (
+        "NOT a measurement of this build and NOT inherited from LF V25. Chosen "
+        "strictly below every historical envelope so the first motion on the "
+        "reassembled robot is the gentlest anyone has run: torque 200 < "
+        "provisioner 300 < LF V25 500; speed 60 << LF V25 160."
+    ),
+}
+
+#: Hard ceilings no envelope may exceed. Mirrors flc_stage_config.h.
+ABSOLUTE_CEILINGS = {
+    "torque_limit": 500,
+    "goal_speed": 400,
+    "acceleration": 50,
+    "travel_budget_ticks": 1800,
+    "time_budget_ms": 30000,
+}
 
 ALL_POLICY_VALUES = (
     SERVO_IDENTITY + GENERIC_GUARDS + HISTORICAL_CANDIDATES + CHARACTERIZATION_REQUIRED
@@ -312,33 +394,91 @@ def policy_value(name: str) -> PolicyValue:
     raise KeyError(f"unknown policy value: {name}")
 
 
+def parameters_in_class(cls: ParameterClass) -> list[PolicyValue]:
+    return [v for v in CHARACTERIZATION_REQUIRED if v.parameter_class is cls]
+
+
+def pre_motion_blockers() -> list[PolicyValue]:
+    """Unresolved CLASS_A parameters — the only ones that may block first motion.
+
+    CLASS_D acceptance tolerances deliberately do NOT appear here: a tolerance
+    that judges a measurement cannot be a precondition of taking it.
+    """
+    return [
+        v for v in parameters_in_class(ParameterClass.A_PRE_MOTION)
+        if not v.may_authorize_motion
+    ]
+
+
 def motion_blockers() -> list[PolicyValue]:
-    """Every safety-critical parameter that currently forbids hardware motion."""
-    return [v for v in CHARACTERIZATION_REQUIRED if not v.may_authorize_motion]
+    """Backwards-compatible name for the pre-motion gate."""
+    return pre_motion_blockers()
 
 
-def motion_authorized(stage: HardwareStage = AUTHORIZED_STAGE) -> bool:
-    """True only when the stage gate AND every parameter gate agree."""
-    return stage.value >= HardwareStage.H4_JOINT_CALIBRATE.value and not motion_blockers()
+def acceptance_gates_unresolved() -> list[PolicyValue]:
+    """CLASS_D tolerances still unknown. These cap a result at CANDIDATE; they
+    never prevent measuring."""
+    return [
+        v for v in parameters_in_class(ParameterClass.D_ACCEPTANCE)
+        if not v.resolved
+    ]
 
 
-def require_motion_authorized(mode: str, stage: HardwareStage = AUTHORIZED_STAGE) -> None:
+def motion_authorized(
+    stage: HardwareStage = AUTHORIZED_STAGE,
+    bootstrap_approved: bool = False,
+) -> bool:
+    """True only when the stage gate AND the pre-motion parameter gate agree.
+
+    H3 is the lowest stage at which anything may move. The pre-motion parameters
+    are satisfied either by being resolved outright or by an explicitly approved
+    bootstrap envelope — never by promoting a historical value.
+    """
+    if stage.value < HardwareStage.H3_JOINT_CHARACTERIZE.value:
+        return False
+    return not pre_motion_blockers() or bootstrap_approved
+
+
+def require_motion_authorized(
+    mode: str,
+    stage: HardwareStage = AUTHORIZED_STAGE,
+    bootstrap_approved: bool = False,
+) -> None:
     """Fail closed before any hardware-motion operation."""
-    blockers = motion_blockers()
     reasons: list[str] = []
-    if stage.value < HardwareStage.H4_JOINT_CALIBRATE.value:
+    if stage.value < HardwareStage.H3_JOINT_CHARACTERIZE.value:
         reasons.append(
-            f"hardware stage {stage.name} is below H4_JOINT_CALIBRATE"
+            f"hardware stage {stage.name} is below H3_JOINT_CHARACTERIZE"
         )
-    if blockers:
+    blockers = pre_motion_blockers()
+    if blockers and not bootstrap_approved:
         reasons.append(
-            "unvalidated safety-critical parameters: "
+            "unresolved pre-motion parameters and no approved bootstrap envelope: "
             + ", ".join(b.name for b in blockers)
         )
     if reasons:
         raise CalibrationPolicyError(
             f"MOTION BLOCKED — {mode}\n  " + "\n  ".join(reasons) +
             "\n  No LF V25 numeric result may authorize current hardware."
+        )
+
+
+def require_calibration_authorized(
+    mode: str,
+    stage: HardwareStage = AUTHORIZED_STAGE,
+    characterized_joints: int = 0,
+) -> None:
+    """H4+ additionally requires at least one joint characterized this session."""
+    if stage.value < HardwareStage.H4_JOINT_CALIBRATE.value:
+        raise CalibrationPolicyError(
+            f"CALIBRATION BLOCKED — {mode}\n"
+            f"  hardware stage {stage.name} is below H4_JOINT_CALIBRATE"
+        )
+    if characterized_joints <= 0:
+        raise CalibrationPolicyError(
+            f"CALIBRATION BLOCKED — {mode}\n"
+            "  no joint has been characterized in this physical session; "
+            "run CHARACTERIZE_JOINT first"
         )
 
 

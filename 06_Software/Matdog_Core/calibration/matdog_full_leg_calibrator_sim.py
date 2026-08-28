@@ -32,7 +32,7 @@ from matdog_full_leg_calibrator_policy import (
     EXPECTED_LEG_IDS,
     AUTHORIZED_STAGE,
     HardwareStage,
-    motion_blockers,
+    pre_motion_blockers,
 )
 
 # Register map — mirrors the firmware and the frozen bench tooling.
@@ -310,6 +310,10 @@ class MockCalibratorFirmware:
         self.census_fresh = False
         self.census_epoch = 0
         self.last_fault = "NONE"
+        #: Operator confirmation of the bootstrap envelope, this session only.
+        self.bootstrap_approved = False
+        #: bus_id -> characterization evidence, tied to a census epoch.
+        self.characterized: dict[int, dict] = {}
 
     # -- gates -------------------------------------------------------------
     def _require_stage(self, needed: HardwareStage, mode: str) -> str | None:
@@ -322,19 +326,35 @@ class MockCalibratorFirmware:
             return None
         return f"{mode} requires a fresh successful census in this physical session"
 
-    def _require_characterization(self, mode: str) -> str | None:
-        blockers = motion_blockers()
-        if not blockers:
+    def _require_pre_motion_parameters(self, mode: str) -> str | None:
+        """Only CLASS_A parameters gate motion, and only without a bootstrap.
+
+        CLASS_D acceptance tolerances are deliberately absent: a tolerance that
+        judges a measurement cannot be a precondition of taking it.
+        """
+        blockers = pre_motion_blockers()
+        if not blockers or self.bootstrap_approved:
             return None
         return (
-            f"{mode} blocked by CHARACTERIZATION_REQUIRED: "
+            f"{mode} blocked by unresolved pre-motion parameters: "
             + ", ".join(b.name for b in blockers)
+            + " (no approved bootstrap envelope)"
         )
+
+    def _require_characterized(self, mode: str, bus_id: int) -> str | None:
+        entry = self.characterized.get(bus_id)
+        if entry is not None and entry["census_epoch"] == self.census_epoch:
+            return None
+        return f"{mode} requires {bus_id} characterized in this physical session"
 
     # -- LEGS_12_CENSUS ----------------------------------------------------
     def census(self) -> CensusResult:
         self.census_fresh = False
         self.census_epoch += 1
+        # A new census is a new physical session epoch: characterization evidence
+        # and bootstrap approval belong to the setup verified when granted.
+        self.characterized.clear()
+        self.bootstrap_approved = False
 
         results: list[CensusServoResult] = []
         present = 0
@@ -456,7 +476,50 @@ class MockCalibratorFirmware:
 
         return ModeResult("CAPTURE_Q0", accepted, (), payload)
 
+    # -- H3 bootstrap approval --------------------------------------------
+    def approve_bootstrap(self) -> ModeResult:
+        """Arm the conservative first-motion envelope for THIS session."""
+        reason = self._require_stage(HardwareStage.H3_JOINT_CHARACTERIZE,
+                                     "APPROVE_BOOTSTRAP")
+        if reason:
+            return ModeResult("APPROVE_BOOTSTRAP", False, (reason,))
+        self.bootstrap_approved = True
+        return ModeResult("APPROVE_BOOTSTRAP", True, (),
+                          {"origin": "H3_BOOTSTRAP_OPERATOR_APPROVED",
+                           "is_measurement": False})
+
     # -- motion modes ------------------------------------------------------
+    def characterize_joint(self, bus_id: int, succeed: bool = True) -> ModeResult:
+        """H3. Gated by stage, census and the pre-motion parameter gate — but
+        NOT by the acceptance tolerances it exists to inform."""
+        reasons = [
+            r
+            for r in (
+                None if bus_id in EXPECTED_LEG_IDS else f"{bus_id} is not a leg bus id",
+                self._require_stage(HardwareStage.H3_JOINT_CHARACTERIZE,
+                                    "CHARACTERIZE_JOINT"),
+                self._require_fresh_census("CHARACTERIZE_JOINT"),
+                self._require_pre_motion_parameters("CHARACTERIZE_JOINT"),
+            )
+            if r
+        ]
+        if reasons:
+            return ModeResult("CHARACTERIZE_JOINT", False, tuple(reasons))
+
+        if not succeed:
+            return ModeResult("CHARACTERIZE_JOINT", False,
+                              ("simulated characterization failure",))
+
+        # The real measurement happens in the C++ engine; the simulator records
+        # the session bookkeeping the firmware performs around it.
+        self.characterized[bus_id] = {
+            "census_epoch": self.census_epoch,
+            "origin": "CHARACTERIZED_CURRENT_HARDWARE",
+            "direction": 1,
+        }
+        return ModeResult("CHARACTERIZE_JOINT", True, (),
+                          {"bus_id": bus_id, "origin": "CHARACTERIZED_CURRENT_HARDWARE"})
+
     def calibrate_joint(self, bus_id: int) -> ModeResult:
         reasons = [
             r
@@ -464,25 +527,33 @@ class MockCalibratorFirmware:
                 None if bus_id in EXPECTED_LEG_IDS else f"{bus_id} is not a leg bus id",
                 self._require_stage(HardwareStage.H4_JOINT_CALIBRATE, "CALIBRATE_JOINT"),
                 self._require_fresh_census("CALIBRATE_JOINT"),
-                self._require_characterization("CALIBRATE_JOINT"),
-                "joint direction is unmeasured on this installation",
+                self._require_pre_motion_parameters("CALIBRATE_JOINT"),
+                self._require_characterized("CALIBRATE_JOINT", bus_id),
             )
             if r
         ]
-        return ModeResult("CALIBRATE_JOINT", False, tuple(reasons))
+        if reasons:
+            return ModeResult("CALIBRATE_JOINT", False, tuple(reasons))
+        return ModeResult("CALIBRATE_JOINT", True, (),
+                          {"bus_id": bus_id, "promotion": "REQUIRES_EXPLICIT_GATE"})
 
     def calibrate_leg(self, leg: str) -> ModeResult:
+        ids = [i for i in EXPECTED_LEG_IDS if str(i)[0] == {"LF": "1", "RF": "2",
+                                                            "RH": "3", "LH": "4"}[leg]]
         reasons = [
             r
             for r in (
                 self._require_stage(HardwareStage.H5_LEG, "CALIBRATE_LEG"),
                 self._require_fresh_census("CALIBRATE_LEG"),
-                self._require_characterization("CALIBRATE_LEG"),
-                "joint direction is unmeasured on this installation",
+                self._require_pre_motion_parameters("CALIBRATE_LEG"),
             )
             if r
         ]
-        return ModeResult("CALIBRATE_LEG", False, tuple(reasons))
+        reasons += [r for r in (self._require_characterized("CALIBRATE_LEG", i)
+                                for i in ids) if r]
+        if reasons:
+            return ModeResult("CALIBRATE_LEG", False, tuple(reasons))
+        return ModeResult("CALIBRATE_LEG", True, (), {"leg": leg, "joints": ids})
 
     def calibrate_all_legs(self) -> ModeResult:
         reasons = [
@@ -490,12 +561,17 @@ class MockCalibratorFirmware:
             for r in (
                 self._require_stage(HardwareStage.H6_FOUR_LEGS, "CALIBRATE_ALL"),
                 self._require_fresh_census("CALIBRATE_ALL"),
-                self._require_characterization("CALIBRATE_ALL"),
-                "joint direction is unmeasured on this installation",
+                self._require_pre_motion_parameters("CALIBRATE_ALL"),
             )
             if r
         ]
-        return ModeResult("CALIBRATE_ALL", False, tuple(reasons))
+        reasons += [r for r in (self._require_characterized("CALIBRATE_ALL", i)
+                                for i in EXPECTED_LEG_IDS) if r]
+        if reasons:
+            return ModeResult("CALIBRATE_ALL", False, tuple(reasons))
+        return ModeResult("CALIBRATE_ALL", True, (),
+                          {"legs": ["LF", "RF", "RH", "LH"], "joints": 12,
+                           "promotion": "REQUIRES_EXPLICIT_GATE"})
 
     # -- SAFE_OFF ----------------------------------------------------------
     def safe_off(self) -> ModeResult:
