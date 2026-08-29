@@ -216,11 +216,22 @@ class TestJointSpecs(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def test_direction_is_unmeasured_on_this_installation(self):
-        """Stale pre-reassembly directions must not leak in as current truth."""
+        """Stale signs and tautological raw-following must not become q truth."""
         for spec in self.specs:
             with self.subTest(joint=spec.joint_name):
                 self.assertIsNone(spec.direction)
                 self.assertFalse(spec.direction_known)
+
+    def test_every_geometry_provenance_input_exists(self):
+        for target in (
+            policy.GEOMETRY_ENDPOINT_PROFILE_PATH,
+            policy.GEOMETRY_PARKING_PATH,
+            policy.GEOMETRY_SAFETY_POLICY_PATH,
+            policy.GEOMETRY_PLAN_GENERATOR,
+            policy.FIRMWARE_GEOMETRY_PLAN,
+        ):
+            with self.subTest(path=target):
+                self.assertTrue(target.is_file())
 
     def test_hip_endpoints_are_not_assumed_symmetric(self):
         """Derived from the endpoint profile: hips genuinely differ per leg."""

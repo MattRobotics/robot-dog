@@ -30,6 +30,8 @@ SKETCH = (
     / "matdog_full_leg_calibrator_v1.ino"
 )
 DETECTOR = SKETCH.parent / "flc_contact_detector.h"
+ENGINE = SKETCH.parent / "flc_calibration_engine.h"
+GEOMETRY_PLAN = SKETCH.parent / "flc_leg_plan.h"
 FROZEN_DIR = REPO_ROOT / "05_Firmware" / "ST3215_Bench_Tools"
 
 import matdog_full_leg_calibrator_policy as policy  # noqa: E402
@@ -55,7 +57,9 @@ class TestFirmwareStructure(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.raw = SKETCH.read_text(encoding="utf-8")
         cls.code = strip_comments(cls.raw)
+        cls.executable = strip_string_literals(cls.code)
         cls.detector_code = strip_comments(DETECTOR.read_text(encoding="utf-8"))
+        cls.engine_code = strip_comments(ENGINE.read_text(encoding="utf-8"))
 
     def test_sketch_and_detector_exist(self):
         self.assertTrue(SKETCH.is_file())
@@ -64,10 +68,19 @@ class TestFirmwareStructure(unittest.TestCase):
     def test_no_eeprom_unlock_or_lock_call(self):
         for forbidden in ("unLockEprom", "LockEprom"):
             with self.subTest(call=forbidden):
-                self.assertNotIn(forbidden, self.code)
+                self.assertIsNone(
+                    re.search(rf"\b{forbidden}\s*\(", self.executable)
+                )
 
     def test_calibration_ofs_is_never_called(self):
-        self.assertNotIn("CalibrationOfs(", self.code)
+        self.assertIsNone(re.search(r"\bCalibrationOfs\s*\(", self.executable))
+
+    def test_no_factory_reset_call(self):
+        for forbidden in ("factoryReset", "FactoryReset", "resetServo", "Reset"):
+            with self.subTest(call=forbidden):
+                self.assertIsNone(
+                    re.search(rf"(?:\.|\b){forbidden}\s*\(", self.executable)
+                )
 
     def test_no_write_to_any_eeprom_register(self):
         """PositionOffset, ID, Lock and the 20 profile registers are read-only."""
@@ -96,13 +109,15 @@ class TestFirmwareStructure(unittest.TestCase):
 
     def test_exactly_one_goal_position_authority(self):
         """WritePosEx may be called from exactly one function in the firmware."""
-        occurrences = re.findall(r"st\.WritePosEx\s*\(", self.code)
+        occurrences = re.findall(r"st\.WritePosEx\s*\(", self.executable)
         self.assertEqual(len(occurrences), 1, "more than one GoalPosition writer")
 
     def test_no_alternative_motion_primitives(self):
         for forbidden in ("RegWritePosEx", "SyncWritePosEx", "WheelMode", "WriteSpe"):
             with self.subTest(call=forbidden):
-                self.assertNotIn(forbidden, self.code)
+                self.assertIsNone(
+                    re.search(rf"(?:\.|\b){forbidden}\s*\(", self.executable)
+                )
 
     def test_no_broadcast_id_anywhere(self):
         # Word-bounded so digits inside geometry float literals (0.666361254f)
@@ -125,32 +140,118 @@ class TestFirmwareStructure(unittest.TestCase):
     def test_only_expected_headers_are_included(self):
         includes = set(re.findall(r'#include\s+[<"]([^>"]+)[>"]', self.code))
         self.assertEqual(includes, {
-            "Arduino.h", "SCServo.h", "flc_stage_config.h",
-            "flc_contact_detector.h", "flc_calibration_engine.h",
+            "Arduino.h", "SCServo.h", "esp_system.h", "flc_stage_config.h",
+            "flc_contact_detector.h", "flc_calibration_engine.h", "flc_leg_plan.h",
         })
+
+    def test_session_authorization_is_ram_only_and_reset_detectable(self):
+        """A USB reset must invalidate authorization; no NVS/EEPROM restoration."""
+        for required in (
+            "bootSessionId", "activeHostSessionId", "sessionGeneration",
+            "censusEpoch", "@SESSION_BEGIN", "@SESSION_END",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.raw)
+        for forbidden in ("Preferences.h", "nvs_flash", "EEPROM.h", "RTC_DATA_ATTR"):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, self.executable)
+
+    def test_geometry_plan_is_on_the_production_path(self):
+        self.assertTrue(GEOMETRY_PLAN.is_file())
+        self.assertIn('#include "flc_leg_plan.h"', self.raw)
+        plan = strip_comments(GEOMETRY_PLAN.read_text(encoding="utf-8"))
+        for provenance in (
+            "FLC_GEOMETRY_PARKING_FILE_SHA256",
+            "FLC_GEOMETRY_PARKING_SEMANTIC_SHA256",
+            "FLC_GEOMETRY_ARTIFACT_GRANTS_MOTION_AUTHORIZATION",
+        ):
+            with self.subTest(provenance=provenance):
+                self.assertIn(provenance, plan)
 
     def test_engine_is_actually_used_by_the_firmware(self):
         """The detector/engine must be on the real firmware path, not just built."""
-        for symbol in ("flcCharacterizeJoint", "flcCalibrateJoint", "flcCalibrateLeg",
+        for symbol in ("flcCharacterizeJoint", "flcRunCalibrationPlan",
                        "flcEndMotion", "flcBootstrapEnvelope"):
             with self.subTest(symbol=symbol):
                 self.assertIn(symbol + "(", self.code)
 
+    def test_h4_h5_and_h6_share_one_orchestration_entry_point(self):
+        """The tested orchestration must be the executed orchestration.
+
+        H4, H5 and H6 may differ only in their selection mask. A firmware-local
+        leg loop would mean the offline suite proves nothing about H6.
+        """
+        self.assertEqual(self.code.count("flcRunCalibrationPlan("), 1)
+        for legacy in ("flcCalibrateJoint(", "flcCalibrateLeg(",
+                       "flcCalibrateAllLegs("):
+            with self.subTest(symbol=legacy):
+                self.assertNotIn(legacy, self.code)
+        for mode in ("runCalibrateJoint", "runCalibrateLeg", "runCalibrateAll"):
+            with self.subTest(mode=mode):
+                self.assertIn("runCalibrationSelection(", self.code)
+
+    def test_the_engine_port_validates_session_context(self):
+        """Every read and motion-capable write is gated on session validity."""
+        self.assertIn("port.validateContext = portValidateContext", self.code)
+
+    def test_acceptance_gates_are_value_initialised(self):
+        """An unassigned gate must read UNKNOWN, never uninitialised stack.
+
+        FlcAcceptanceGates carries `...ToleranceKnown` booleans. If the struct
+        were default-initialised, an indeterminate byte could make the engine
+        treat an uncharacterised tolerance as validated and promote a result to
+        ACCEPTED — the one tier this firmware may never fabricate.
+        """
+        body = self._function_body("makeAcceptanceGates")
+        self.assertIn("FlcAcceptanceGates gates = FlcAcceptanceGates()", body)
+        for field in ("repeatabilityToleranceKnown", "endpointVsUrdfToleranceKnown",
+                      "manualVsDerivedQ0ToleranceKnown"):
+            with self.subTest(field=field):
+                self.assertIn(f"gates.{field} = false", body)
+
+    def test_the_manual_q0_agreement_tolerance_is_declared_uncharacterised(self):
+        """No build has characterised it, so H4 must stay BLOCKED, not ACCEPTED."""
+        body = self._function_body("makeAcceptanceGates")
+        self.assertIn("gates.manualVsDerivedQ0ToleranceKnown = false", body)
+        self.assertNotIn("gates.manualVsDerivedQ0ToleranceKnown = true", body)
+
+    def test_guard_config_assigns_every_detector_field(self):
+        """A guard left uninitialised is a guard that may silently not fire."""
+        struct = re.search(r"struct FlcContactConfig\s*\{(.*?)\n\};",
+                           DETECTOR.read_text(encoding="utf-8"), flags=re.DOTALL)
+        self.assertIsNotNone(struct)
+        fields = re.findall(r"\b(?:u?int(?:8|16|32)_t|int|bool|float)\s+(\w+)\s*;",
+                            strip_comments(struct.group(1)))
+        self.assertGreaterEqual(len(fields), 10)
+        body = self._function_body("makeGuards")
+        for field in fields:
+            with self.subTest(field=field):
+                self.assertIn(f"guards.{field} =", body)
+
+    def _function_body(self, name: str) -> str:
+        """Source of one firmware function, comments stripped."""
+        start = self.code.index(f"{name}(")
+        open_brace = self.code.index("{", start)
+        depth, i = 0, open_brace
+        while i < len(self.code):
+            if self.code[i] == "{":
+                depth += 1
+            elif self.code[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    return self.code[open_brace:i + 1]
+            i += 1
+        raise AssertionError(f"unterminated function {name}")
+
     def test_engine_reaches_the_detector(self):
-        engine = strip_comments(
-            (SKETCH.parent / "flc_calibration_engine.h").read_text(encoding="utf-8")
-        )
         for symbol in ("flcDetectorInit", "flcDetectorObserve", "flcEvaluateRepeatability"):
             with self.subTest(symbol=symbol):
-                self.assertIn(symbol + "(", engine)
+                self.assertIn(symbol + "(", self.engine_code)
 
     def test_engine_has_no_arduino_dependency(self):
-        engine = strip_comments(
-            (SKETCH.parent / "flc_calibration_engine.h").read_text(encoding="utf-8")
-        )
         for token in ("Arduino.h", "SCServo", "Serial.", "delay("):
             with self.subTest(token=token):
-                self.assertNotIn(token, engine)
+                self.assertNotIn(token, self.engine_code)
 
     def test_no_per_leg_state_machines(self):
         """One generic engine + data, not four copied leg programs."""

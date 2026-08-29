@@ -33,14 +33,29 @@ from matdog_full_leg_calibrator_sim import (  # noqa: E402
     EepromWriteError,
     MockCalibratorFirmware,
     MockST3215Bus,
+    SessionState,
     SimServo,
     make_healthy_leg_bus,
 )
 
 
+HOST_SESSION_A = "A1B2C3D4"
+HOST_SESSION_B = "B1C2D3E4"
+
+
+def begin(firmware, host_session_id=HOST_SESSION_A):
+    result = firmware.begin_session(host_session_id)
+    if not result.accepted:
+        raise AssertionError(result.reasons)
+    return firmware
+
+
 class TestCensus(unittest.TestCase):
+    def _firmware(self, bus=None):
+        return begin(MockCalibratorFirmware(bus or make_healthy_leg_bus()))
+
     def test_healthy_twelve_servo_bus_passes(self):
-        firmware = MockCalibratorFirmware(make_healthy_leg_bus())
+        firmware = self._firmware()
         result = firmware.census()
         self.assertTrue(result.passed)
         self.assertEqual(result.present_count, 12)
@@ -49,7 +64,7 @@ class TestCensus(unittest.TestCase):
 
     def test_zero_responders_fails_and_blocks(self):
         """Today's H0 condition: no servos connected at all."""
-        firmware = MockCalibratorFirmware(MockST3215Bus())
+        firmware = self._firmware(MockST3215Bus())
         result = firmware.census()
         self.assertFalse(result.passed)
         self.assertEqual(result.present_count, 0)
@@ -59,7 +74,7 @@ class TestCensus(unittest.TestCase):
     def test_one_missing_expected_servo_fails(self):
         bus = make_healthy_leg_bus()
         bus.servos[22].fault = BusFault.NO_RESPONDER
-        result = MockCalibratorFirmware(bus).census()
+        result = self._firmware(bus).census()
         self.assertFalse(result.passed)
         self.assertEqual(result.present_count, 11)
         missing = [s for s in result.servos if s.bus_id == 22]
@@ -68,7 +83,7 @@ class TestCensus(unittest.TestCase):
     def test_unexpected_extra_servo_on_the_leg_bus_fails(self):
         bus = make_healthy_leg_bus()
         bus.servos[99] = SimServo(servo_id=99)
-        result = MockCalibratorFirmware(bus).census()
+        result = self._firmware(bus).census()
         self.assertFalse(result.passed)
         self.assertIn(99, result.unexpected_responders)
         self.assertEqual(result.fail_reason, "UNEXPECTED_RESPONDER")
@@ -77,19 +92,19 @@ class TestCensus(unittest.TestCase):
         """The head is not built; a responder at 51 means something is wrong."""
         bus = make_healthy_leg_bus()
         bus.servos[51] = SimServo(servo_id=51)
-        result = MockCalibratorFirmware(bus).census()
+        result = self._firmware(bus).census()
         self.assertFalse(result.passed)
         self.assertIn(51, result.unexpected_responders)
 
     def test_head_absence_alone_is_not_a_failure(self):
         """A leg-only session must pass with head ids 51..55 absent."""
-        result = MockCalibratorFirmware(make_healthy_leg_bus()).census()
+        result = self._firmware().census()
         self.assertTrue(result.passed)
 
     def test_wrong_model_is_rejected(self):
         bus = make_healthy_leg_bus()
         bus.servos[13].model = 999
-        result = MockCalibratorFirmware(bus).census()
+        result = self._firmware(bus).census()
         self.assertFalse(result.passed)
         entry = next(s for s in result.servos if s.bus_id == 13)
         self.assertIn("WRONG_MODEL", entry.reasons)
@@ -97,7 +112,7 @@ class TestCensus(unittest.TestCase):
     def test_nonzero_position_offset_is_rejected(self):
         bus = make_healthy_leg_bus()
         bus.servos[11].position_offset = -505
-        result = MockCalibratorFirmware(bus).census()
+        result = self._firmware(bus).census()
         self.assertFalse(result.passed)
         entry = next(s for s in result.servos if s.bus_id == 11)
         self.assertIn("NONZERO_POSITION_OFFSET", entry.reasons)
@@ -105,15 +120,17 @@ class TestCensus(unittest.TestCase):
     def test_profile_mismatch_is_rejected(self):
         bus = make_healthy_leg_bus()
         bus.servos[41].profile[0x1C] = 500  # ProtectionCurrent drifted
-        result = MockCalibratorFirmware(bus).census()
+        result = self._firmware(bus).census()
         self.assertFalse(result.passed)
         entry = next(s for s in result.servos if s.bus_id == 41)
         self.assertTrue(any(r.startswith("PROFILE_MISMATCH") for r in entry.reasons))
 
     def test_torque_unexpectedly_on_at_census_is_rejected(self):
         bus = make_healthy_leg_bus()
+        firmware = self._firmware(bus)
+        # SESSION_BEGIN performs SAFE_OFF first; inject the anomaly afterward.
         bus.servos[33].torque_enable = 1
-        result = MockCalibratorFirmware(bus).census()
+        result = firmware.census()
         self.assertFalse(result.passed)
         entry = next(s for s in result.servos if s.bus_id == 33)
         self.assertIn("TORQUE_UNEXPECTEDLY_ON", entry.reasons)
@@ -122,7 +139,7 @@ class TestCensus(unittest.TestCase):
         """Duplicate/ambiguous identity must not pass silently."""
         bus = make_healthy_leg_bus()
         bus.servos[32].stored_id = 42
-        result = MockCalibratorFirmware(bus).census()
+        result = self._firmware(bus).census()
         self.assertFalse(result.passed)
         entry = next(s for s in result.servos if s.bus_id == 32)
         self.assertIn("ID_REGISTER_MISMATCH", entry.reasons)
@@ -132,7 +149,7 @@ class TestCensus(unittest.TestCase):
         bus.servos[21].present_position = 9000
         bus.servos[23].voltage = 200
         bus.servos[31].temperature = 85
-        result = MockCalibratorFirmware(bus).census()
+        result = self._firmware(bus).census()
         self.assertFalse(result.passed)
         self.assertIn(
             "IMPOSSIBLE_POSITION",
@@ -149,13 +166,13 @@ class TestCensus(unittest.TestCase):
     def test_bus_read_failure_is_reported_as_missing(self):
         bus = make_healthy_leg_bus()
         bus.servos[12].fault = BusFault.READ_TIMEOUT
-        result = MockCalibratorFirmware(bus).census()
+        result = self._firmware(bus).census()
         self.assertFalse(result.passed)
 
     def test_census_is_invalidated_by_a_later_failing_census(self):
         """Freshness must not survive a subsequent failure."""
         bus = make_healthy_leg_bus()
-        firmware = MockCalibratorFirmware(bus)
+        firmware = self._firmware(bus)
         self.assertTrue(firmware.census().passed)
         self.assertTrue(firmware.census_fresh)
         bus.servos[13].fault = BusFault.NO_RESPONDER
@@ -164,14 +181,14 @@ class TestCensus(unittest.TestCase):
 
     def test_census_performs_no_writes_at_all(self):
         bus = make_healthy_leg_bus()
-        MockCalibratorFirmware(bus).census()
+        self._firmware(bus).census()
         self.assertEqual(bus.write_log, [])
 
 
 class TestManualQ0Mode(unittest.TestCase):
     def _firmware(self, stage=HardwareStage.H2_MANUAL_Q0):
         bus = make_healthy_leg_bus()
-        firmware = MockCalibratorFirmware(bus, stage=stage)
+        firmware = begin(MockCalibratorFirmware(bus, stage=stage))
         firmware.census()
         return bus, firmware
 
@@ -183,7 +200,9 @@ class TestManualQ0Mode(unittest.TestCase):
 
     def test_requires_a_fresh_census(self):
         bus = make_healthy_leg_bus()
-        firmware = MockCalibratorFirmware(bus, stage=HardwareStage.H2_MANUAL_Q0)
+        firmware = begin(
+            MockCalibratorFirmware(bus, stage=HardwareStage.H2_MANUAL_Q0)
+        )
         result = firmware.capture_manual_q0()
         self.assertFalse(result.accepted)
         self.assertTrue(any("fresh successful census" in r for r in result.reasons))
@@ -194,6 +213,8 @@ class TestManualQ0Mode(unittest.TestCase):
             servo.position_sequence = [2050, 2051, 2050, 2052]
         result = firmware.capture_manual_q0(samples=32)
         self.assertTrue(result.accepted)
+        self.assertEqual(set(firmware.manual_q0), set(EXPECTED_LEG_IDS))
+        self.assertEqual(firmware.status().payload["manual_q0_candidates"], 12)
         self.assertEqual(bus.write_log, [])
         self.assertTrue(bus.all_torque_off())
 
@@ -204,6 +225,7 @@ class TestManualQ0Mode(unittest.TestCase):
         bus.servos[13].position_sequence = [2000, 2100, 2010, 2090]
         result = firmware.capture_manual_q0(samples=32)
         self.assertFalse(result.accepted)
+        self.assertEqual(firmware.manual_q0, {})
         self.assertEqual(result.payload["13"]["status"], "UNSTABLE_SAMPLES")
 
     def test_torque_on_refuses_capture_for_that_joint(self):
@@ -233,8 +255,10 @@ class TestMotionGating(unittest.TestCase):
 
     def _ready_firmware(self, stage=HardwareStage.H6_FOUR_LEGS):
         bus = make_healthy_leg_bus()
-        firmware = MockCalibratorFirmware(bus, stage=stage)
-        firmware.census()
+        firmware = begin(MockCalibratorFirmware(bus, stage=stage))
+        self.assertTrue(firmware.census().passed)
+        if stage.value >= HardwareStage.H2_MANUAL_Q0.value:
+            self.assertTrue(firmware.capture_manual_q0(samples=32).accepted)
         return bus, firmware
 
     # -- refusals ----------------------------------------------------------
@@ -269,6 +293,7 @@ class TestMotionGating(unittest.TestCase):
     def test_calibrate_joint_refused_below_h4(self):
         _, firmware = self._ready_firmware(stage=HardwareStage.H3_JOINT_CHARACTERIZE)
         firmware.approve_bootstrap()
+        firmware.witness_direction(13, "Q_PLUS_RAW_INCREASES")
         firmware.characterize_joint(13)
         result = firmware.calibrate_joint(13)
         self.assertFalse(result.accepted)
@@ -276,7 +301,9 @@ class TestMotionGating(unittest.TestCase):
 
     def test_all_modes_refused_without_a_census(self):
         bus = make_healthy_leg_bus()
-        firmware = MockCalibratorFirmware(bus, stage=HardwareStage.H6_FOUR_LEGS)
+        firmware = begin(
+            MockCalibratorFirmware(bus, stage=HardwareStage.H6_FOUR_LEGS)
+        )
         for result in (firmware.characterize_joint(13), firmware.calibrate_joint(13),
                        firmware.calibrate_leg("LF"), firmware.calibrate_all_legs()):
             self.assertFalse(result.accepted)
@@ -300,15 +327,19 @@ class TestMotionGating(unittest.TestCase):
     def test_calibrate_joint_succeeds_after_characterization(self):
         _, firmware = self._ready_firmware()
         firmware.approve_bootstrap()
+        firmware.witness_direction(13, "Q_PLUS_RAW_DECREASES")
         firmware.characterize_joint(13)
         result = firmware.calibrate_joint(13)
         self.assertTrue(result.accepted)
+        self.assertEqual(result.payload["direction"], -1)
+        self.assertEqual(result.payload["acceptance"], "BLOCKED_TOLERANCE_UNVALIDATED")
         self.assertEqual(result.payload["promotion"], "REQUIRES_EXPLICIT_GATE")
 
     def test_calibrate_leg_succeeds_when_all_three_joints_characterized(self):
         _, firmware = self._ready_firmware()
         firmware.approve_bootstrap()
         for bus_id in (11, 12, 13):
+            firmware.witness_direction(bus_id, "Q_PLUS_RAW_INCREASES")
             firmware.characterize_joint(bus_id)
         result = firmware.calibrate_leg("LF")
         self.assertTrue(result.accepted)
@@ -318,6 +349,7 @@ class TestMotionGating(unittest.TestCase):
         _, firmware = self._ready_firmware()
         firmware.approve_bootstrap()
         for bus_id in (11, 12):
+            firmware.witness_direction(bus_id, "Q_PLUS_RAW_INCREASES")
             firmware.characterize_joint(bus_id)
         result = firmware.calibrate_leg("LF")
         self.assertFalse(result.accepted)
@@ -327,6 +359,7 @@ class TestMotionGating(unittest.TestCase):
         _, firmware = self._ready_firmware()
         firmware.approve_bootstrap()
         for bus_id in EXPECTED_LEG_IDS:
+            firmware.witness_direction(bus_id, "Q_PLUS_RAW_INCREASES")
             firmware.characterize_joint(bus_id)
         result = firmware.calibrate_all_legs()
         self.assertTrue(result.accepted)
@@ -338,11 +371,18 @@ class TestMotionGating(unittest.TestCase):
         """Evidence belongs to the physical setup verified when it was taken."""
         _, firmware = self._ready_firmware()
         firmware.approve_bootstrap()
+        firmware.witness_direction(13, "Q_PLUS_RAW_INCREASES")
         firmware.characterize_joint(13)
         self.assertTrue(firmware.calibrate_joint(13).accepted)
 
-        firmware.census()
+        previous_epoch = firmware.census_epoch
+        self.assertTrue(firmware.census().passed)
+        self.assertEqual(firmware.census_epoch, previous_epoch + 1)
+        self.assertEqual(firmware.manual_q0, {})
+        self.assertEqual(firmware.direction_witnesses, {})
         self.assertFalse(firmware.bootstrap_approved)
+        self.assertEqual(firmware.characterized, {})
+        self.assertEqual(firmware.calibrated, {})
         result = firmware.calibrate_joint(13)
         self.assertFalse(result.accepted)
         self.assertTrue(any("characterized" in r for r in result.reasons))
@@ -353,8 +393,216 @@ class TestMotionGating(unittest.TestCase):
         self.assertTrue(acceptance_gates_unresolved())
         _, firmware = self._ready_firmware()
         firmware.approve_bootstrap()
+        firmware.witness_direction(13, "Q_PLUS_RAW_INCREASES")
         self.assertTrue(firmware.characterize_joint(13).accepted)
         self.assertTrue(firmware.calibrate_joint(13).accepted)
+
+
+class TestPersistentSessionSemantics(unittest.TestCase):
+    def _h4_session(self):
+        bus = make_healthy_leg_bus()
+        firmware = begin(
+            MockCalibratorFirmware(
+                bus,
+                stage=HardwareStage.H4_JOINT_CALIBRATE,
+                boot_session_id="01020304",
+            )
+        )
+        self.assertTrue(firmware.census().passed)
+        self.assertTrue(firmware.capture_manual_q0(samples=32).accepted)
+        self.assertTrue(
+            firmware.witness_direction(
+                13, "Q_PLUS_RAW_DECREASES"
+            ).accepted
+        )
+        self.assertTrue(firmware.approve_bootstrap().accepted)
+        characterization = firmware.characterize_joint(13, raw_probe_sign=1)
+        self.assertTrue(characterization.accepted)
+        calibration = firmware.calibrate_joint(13, derived_q0_tick=2051)
+        self.assertTrue(calibration.accepted)
+        return bus, firmware, characterization, calibration
+
+    def test_same_boot_and_host_session_h1_through_h4_succeeds(self):
+        bus, firmware, characterization, calibration = self._h4_session()
+
+        self.assertEqual(firmware.boot_session_id, "01020304")
+        self.assertEqual(firmware.active_host_session_id, HOST_SESSION_A)
+        self.assertEqual(firmware.session_generation, 1)
+        self.assertEqual(firmware.census_epoch, 1)
+        self.assertEqual(len(firmware.manual_q0), 12)
+        self.assertTrue(firmware.bootstrap_approved)
+        self.assertEqual(characterization.payload["raw_probe_sign"], 1)
+        self.assertIsNone(characterization.payload["semantic_direction"])
+        self.assertEqual(calibration.payload["direction"], -1)
+        self.assertEqual(
+            calibration.payload["direction_origin"],
+            "EXPLICIT_CURRENT_BUILD_SEMANTIC_WITNESS",
+        )
+        self.assertEqual(calibration.payload["manual_q0_candidate_tick"], 2048)
+        self.assertEqual(calibration.payload["derived_q0_tick"], 2051)
+
+        current = firmware.manual_q0[13].binding
+        for evidence in (
+            firmware.direction_witnesses[13],
+            firmware.bootstrap,
+            firmware.characterized[13],
+            firmware.calibrated[13],
+        ):
+            self.assertEqual(evidence.binding, current)
+        self.assertEqual(bus.write_log, [])
+
+    def test_characterization_does_not_invent_semantic_direction(self):
+        bus = make_healthy_leg_bus()
+        firmware = begin(
+            MockCalibratorFirmware(bus, stage=HardwareStage.H4_JOINT_CALIBRATE)
+        )
+        firmware.census()
+        firmware.capture_manual_q0(samples=32)
+        firmware.approve_bootstrap()
+
+        result = firmware.characterize_joint(13, raw_probe_sign=-1)
+        self.assertTrue(result.accepted)
+        self.assertNotIn(13, firmware.direction_witnesses)
+        self.assertIsNone(result.payload["semantic_direction"])
+        refused = firmware.calibrate_joint(13)
+        self.assertFalse(refused.accepted)
+        self.assertTrue(any("semantic direction witness" in r for r in refused.reasons))
+
+    def test_failed_q0_recapture_invalidates_every_downstream_object(self):
+        bus, firmware, _, _ = self._h4_session()
+        bus.servos[13].position_sequence = [1900, 2200]
+
+        result = firmware.capture_manual_q0(samples=32)
+
+        self.assertFalse(result.accepted)
+        self.assertEqual(firmware.manual_q0, {})
+        self.assertEqual(firmware.direction_witnesses, {})
+        self.assertIsNone(firmware.bootstrap)
+        self.assertEqual(firmware.characterized, {})
+        self.assertEqual(firmware.calibrated, {})
+        self.assertEqual(bus.eeprom_writes, [])
+
+    def test_reset_changes_boot_identity_and_drops_all_authorization(self):
+        _, firmware, _, _ = self._h4_session()
+        old_boot = firmware.boot_session_id
+
+        reset = firmware.reset()
+
+        self.assertTrue(reset.accepted)
+        self.assertNotEqual(firmware.boot_session_id, old_boot)
+        self.assertIsNone(firmware.active_host_session_id)
+        self.assertEqual(firmware.session_generation, 0)
+        self.assertEqual(firmware.census_epoch, 0)
+        self.assertFalse(firmware.census_fresh)
+        self.assertEqual(firmware.manual_q0, {})
+        self.assertEqual(firmware.direction_witnesses, {})
+        self.assertIsNone(firmware.bootstrap)
+        self.assertEqual(firmware.characterized, {})
+        self.assertEqual(firmware.calibrated, {})
+        refused = firmware.calibrate_joint(13)
+        self.assertFalse(refused.accepted)
+        self.assertTrue(any("active persistent host session" in r for r in refused.reasons))
+
+    def test_reconnect_is_a_new_boot_and_cannot_resume_h4(self):
+        _, firmware, _, _ = self._h4_session()
+        old_boot = firmware.boot_session_id
+
+        result = firmware.reconnect(HOST_SESSION_B)
+
+        self.assertTrue(result.accepted)
+        self.assertNotEqual(firmware.boot_session_id, old_boot)
+        self.assertEqual(firmware.active_host_session_id, HOST_SESSION_B)
+        self.assertEqual(firmware.census_epoch, 0)
+        self.assertEqual(firmware.status().payload["manual_q0_candidates"], 0)
+        refused = firmware.calibrate_joint(13)
+        self.assertFalse(refused.accepted)
+        self.assertTrue(any("fresh successful census" in r for r in refused.reasons))
+
+    def test_new_host_lease_same_boot_invalidates_prior_evidence(self):
+        _, firmware, _, _ = self._h4_session()
+        boot = firmware.boot_session_id
+        generation = firmware.session_generation
+
+        result = firmware.begin_session(HOST_SESSION_B)
+
+        self.assertTrue(result.accepted)
+        self.assertEqual(firmware.boot_session_id, boot)
+        self.assertEqual(firmware.session_generation, generation + 1)
+        self.assertEqual(firmware.active_host_session_id, HOST_SESSION_B)
+        self.assertFalse(firmware.census_fresh)
+        self.assertEqual(firmware.manual_q0, {})
+        self.assertEqual(firmware.direction_witnesses, {})
+        self.assertIsNone(firmware.bootstrap)
+        self.assertEqual(firmware.characterized, {})
+        self.assertEqual(firmware.calibrated, {})
+
+    def test_host_evidence_file_is_never_firmware_authorization(self):
+        _, original, _, _ = self._h4_session()
+        saved_report = {
+            "status": original.status().payload,
+            "claimed_calibrated_ids": sorted(original.calibrated),
+        }
+        bus = make_healthy_leg_bus()
+        fresh = begin(
+            MockCalibratorFirmware(
+                bus,
+                stage=HardwareStage.H4_JOINT_CALIBRATE,
+                host_evidence=saved_report,
+            )
+        )
+        self.assertTrue(fresh.census().passed)
+
+        status = fresh.status()
+        self.assertFalse(status.payload["host_evidence_authoritative"])
+        self.assertEqual(status.payload["manual_q0_candidates"], 0)
+        self.assertEqual(status.payload["joints_characterized"], 0)
+        self.assertEqual(status.payload["calibration_candidates"], 0)
+        refused = fresh.calibrate_joint(13)
+        self.assertFalse(refused.accepted)
+        self.assertTrue(any("manual q0" in r for r in refused.reasons))
+
+    def test_session_fault_latches_and_only_status_safe_off_remain_callable(self):
+        bus, firmware, _, _ = self._h4_session()
+        bus.servos[13].torque_enable = 1
+        bus.servos[13].fault = BusFault.WRITE_REJECTED
+
+        failed_safe_off = firmware.safe_off()
+        self.assertFalse(failed_safe_off.accepted)
+        self.assertIs(firmware.session_state, SessionState.SESSION_FAULT)
+        self.assertEqual(firmware.last_fault, "SAFE_OFF_FAILED")
+
+        # SAFE_OFF stays callable so an operator can retry, but success cannot
+        # unlatch the fault or recreate authorization.
+        bus.servos[13].fault = BusFault.NONE
+        self.assertTrue(firmware.safe_off().accepted)
+        status = firmware.status()
+        self.assertTrue(status.accepted)
+        self.assertEqual(status.payload["session_state"], "SESSION_FAULT")
+
+        census = firmware.census()
+        self.assertFalse(census.passed)
+        self.assertIn("SESSION_FAULT_LATCHED", census.fail_reason)
+        stateful_results = (
+            firmware.begin_session(HOST_SESSION_B),
+            firmware.end_session(),
+            firmware.capture_manual_q0(samples=32),
+            firmware.witness_direction(13, "Q_PLUS_RAW_INCREASES"),
+            firmware.approve_bootstrap(),
+            firmware.characterize_joint(13),
+            firmware.calibrate_joint(13),
+            firmware.calibrate_leg("LF"),
+            firmware.calibrate_all_legs(),
+        )
+        for result in stateful_results:
+            self.assertFalse(result.accepted, result.mode)
+            self.assertTrue(
+                any("SESSION_FAULT_LATCHED" in reason for reason in result.reasons),
+                (result.mode, result.reasons),
+            )
+
+        self.assertTrue(firmware.reset().accepted)
+        self.assertIs(firmware.session_state, SessionState.SESSION_IDLE)
+        self.assertTrue(firmware.begin_session(HOST_SESSION_B).accepted)
 
 
 class TestSafeOff(unittest.TestCase):
@@ -400,6 +648,7 @@ class TestSafeOff(unittest.TestCase):
         self.assertFalse(result.accepted)
         self.assertFalse(bus.all_torque_off())
         self.assertEqual(firmware.last_fault, "SAFE_OFF_FAILED")
+        self.assertIs(firmware.session_state, SessionState.SESSION_FAULT)
 
 
 class TestAbsoluteProhibitions(unittest.TestCase):
@@ -415,18 +664,28 @@ class TestAbsoluteProhibitions(unittest.TestCase):
         with self.assertRaises(BroadcastWriteError):
             bus.write(BROADCAST_ID, REG_TORQUE_ENABLE, 1, 0)
 
-    def test_a_full_session_touches_no_eeprom_address(self):
+    def test_a_full_h1_through_h6_session_uses_no_eeprom_or_broadcast(self):
         bus = make_healthy_leg_bus()
         for servo in bus.servos.values():
             servo.position_sequence = [2050, 2051]
-        firmware = MockCalibratorFirmware(bus, stage=HardwareStage.H2_MANUAL_Q0)
-        firmware.census()
-        firmware.capture_manual_q0(samples=32)
-        firmware.calibrate_joint(13)
-        firmware.calibrate_leg("LF")
-        firmware.calibrate_all_legs()
-        firmware.safe_off()
+        firmware = begin(
+            MockCalibratorFirmware(bus, stage=HardwareStage.H6_FOUR_LEGS)
+        )
+        self.assertTrue(firmware.census().passed)
+        self.assertTrue(firmware.capture_manual_q0(samples=32).accepted)
+        self.assertTrue(firmware.approve_bootstrap().accepted)
+        for bus_id in EXPECTED_LEG_IDS:
+            semantic = (
+                "Q_PLUS_RAW_INCREASES"
+                if bus_id % 2
+                else "Q_PLUS_RAW_DECREASES"
+            )
+            self.assertTrue(firmware.witness_direction(bus_id, semantic).accepted)
+            self.assertTrue(firmware.characterize_joint(bus_id).accepted)
+        self.assertTrue(firmware.calibrate_all_legs().accepted)
+        self.assertTrue(firmware.safe_off().accepted)
         self.assertEqual(bus.eeprom_writes, [])
+        self.assertTrue(all(w.servo_id != BROADCAST_ID for w in bus.write_log))
         self.assertTrue(bus.all_torque_off())
 
 
