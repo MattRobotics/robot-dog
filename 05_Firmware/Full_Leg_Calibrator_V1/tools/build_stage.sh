@@ -61,7 +61,21 @@ else
   WORKTREE_DIRTY=0
 fi
 
-EXTRA="-DFLC_AUTHORIZED_STAGE=${STAGE} -DFLC_H3_BOOTSTRAP_APPROVED=${BOOTSTRAP} -DFLC_BUILD_GIT_SHA_TOKEN=${GIT_SHA} -DFLC_BUILD_WORKTREE_DIRTY=${WORKTREE_DIRTY}"
+# Commit timestamp, NOT the wall clock. The firmware used to print __DATE__ and
+# __TIME__, which baked the compile instant into the image and made the binary
+# SHA256 change on every rebuild of the same source. Two clean builds of one
+# commit must produce the same bytes, so build metadata is derived from the
+# commit itself. Pure digits, so it passes through -D without quoting.
+GIT_COMMIT_EPOCH="$(git -C "$REPO_ROOT" show -s --format=%ct HEAD)"
+
+# Reproducible builds. GCC honours SOURCE_DATE_EPOCH for __DATE__/__TIME__, so
+# exporting the COMMIT time makes every translation unit — including the Arduino
+# ESP32 core, which embeds its own "Compile Date" string — expand those macros
+# identically for a given commit. Without this, two clean builds of one commit
+# differ and the binary SHA256 cannot serve as a pre-flash integrity check.
+export SOURCE_DATE_EPOCH="${GIT_COMMIT_EPOCH}"
+
+EXTRA="-DFLC_AUTHORIZED_STAGE=${STAGE} -DFLC_H3_BOOTSTRAP_APPROVED=${BOOTSTRAP} -DFLC_BUILD_GIT_SHA_TOKEN=${GIT_SHA} -DFLC_BUILD_WORKTREE_DIRTY=${WORKTREE_DIRTY} -DFLC_BUILD_SOURCE_EPOCH=${GIT_COMMIT_EPOCH}"
 
 echo "=============================================="
 echo " MATDOG Full Leg Calibrator V1 — stage build"
@@ -70,6 +84,7 @@ echo "stage      : H${STAGE} (${STAGE_NAMES[$STAGE]})"
 echo "bootstrap  : $([[ "$BOOTSTRAP" == "1" ]] && echo "BUILD-APPROVED (session confirmation still required)" || echo "DENIED")"
 echo "flags      : ${EXTRA}"
 echo "git sha    : ${GIT_SHA}"
+echo "src epoch  : ${GIT_COMMIT_EPOCH} (commit time; build is wall-clock independent)"
 echo "dirty      : ${WORKTREE_DIRTY}"
 echo "fqbn       : ${FQBN}"
 echo

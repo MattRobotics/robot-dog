@@ -80,6 +80,14 @@
 #define FLC_BUILD_WORKTREE_DIRTY 1
 #endif
 
+// Commit timestamp of the source, stamped by the supported build script. It is
+// deliberately NOT __DATE__/__TIME__: a wall-clock stamp makes the application
+// binary differ on every rebuild of identical source, which destroys the only
+// cheap integrity check an operator has before flashing. 0 means UNSTAMPED.
+#ifndef FLC_BUILD_SOURCE_EPOCH
+#define FLC_BUILD_SOURCE_EPOCH 0
+#endif
+
 // Conservative first-motion envelope for an assembled, unloaded leg joint.
 //
 // PROVENANCE: NOT a measurement of this build, and NOT inherited from LF V25.

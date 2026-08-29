@@ -32,6 +32,7 @@ SKETCH = (
 DETECTOR = SKETCH.parent / "flc_contact_detector.h"
 ENGINE = SKETCH.parent / "flc_calibration_engine.h"
 GEOMETRY_PLAN = SKETCH.parent / "flc_leg_plan.h"
+FIRMWARE_TOOLS = SKETCH.parent.parent / "tools"
 FROZEN_DIR = REPO_ROOT / "05_Firmware" / "ST3215_Bench_Tools"
 
 import matdog_full_leg_calibrator_policy as policy  # noqa: E402
@@ -193,6 +194,42 @@ class TestFirmwareStructure(unittest.TestCase):
     def test_the_engine_port_validates_session_context(self):
         """Every read and motion-capable write is gated on session validity."""
         self.assertIn("port.validateContext = portValidateContext", self.code)
+
+    def test_firmware_reports_no_wall_clock_build_stamp(self):
+        """__DATE__/__TIME__ would make the image differ on every rebuild.
+
+        A binary hash that changes without the source changing cannot be used as
+        a pre-flash integrity check, and a hash published for a commit becomes
+        unattainable minutes later. Build metadata must come from the commit.
+        """
+        for macro in ("__DATE__", "__TIME__", "__TIMESTAMP__"):
+            with self.subTest(macro=macro):
+                self.assertNotIn(macro, self.executable)
+        self.assertIn("BUILD_SOURCE_EPOCH=", self.raw)
+        self.assertIn("FLC_BUILD_SOURCE_EPOCH", self.code)
+
+    def test_build_script_pins_source_date_epoch_and_commit_stamp(self):
+        """Reproducibility needs BOTH: our stamp and GCC's __DATE__ override.
+
+        The Arduino ESP32 core embeds its own "Compile Date" string, so removing
+        the macros from this sketch alone is not enough — two clean builds still
+        differed until SOURCE_DATE_EPOCH pinned the core's expansion too.
+        """
+        script = (FIRMWARE_TOOLS / "build_stage.sh").read_text(encoding="utf-8")
+        self.assertIn("GIT_COMMIT_EPOCH=", script)
+        self.assertIn("export SOURCE_DATE_EPOCH=", script)
+        self.assertIn("-DFLC_BUILD_SOURCE_EPOCH=", script)
+        self.assertIn("-DFLC_BUILD_GIT_SHA_TOKEN=", script)
+        self.assertIn("-DFLC_BUILD_WORKTREE_DIRTY=", script)
+
+    def test_a_reproducible_build_checker_exists_and_forces_a_cold_cache(self):
+        checker = FIRMWARE_TOOLS / "check_reproducible_build.sh"
+        self.assertTrue(checker.is_file())
+        text = checker.read_text(encoding="utf-8")
+        # A cached object would hide the very nondeterminism this proves absent.
+        self.assertIn("--clean", text)
+        self.assertIn("export SOURCE_DATE_EPOCH=", text)
+        self.assertIn("REPRODUCIBLE_BUILD=PASS", text)
 
     def test_acceptance_gates_are_value_initialised(self):
         """An unassigned gate must read UNKNOWN, never uninitialised stack.

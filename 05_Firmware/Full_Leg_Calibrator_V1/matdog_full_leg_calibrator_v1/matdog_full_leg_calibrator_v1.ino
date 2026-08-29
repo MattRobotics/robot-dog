@@ -943,8 +943,15 @@ static void runStatus() {
   Serial.printf("BUILD_GIT_SHA=%s\n", FLC_BUILD_GIT_SHA);
   Serial.printf("BUILD_WORKTREE_DIRTY=%s\n",
                 FLC_BUILD_WORKTREE_DIRTY ? "YES" : "NO");
-  Serial.printf("BUILD_DATE=%s\n", __DATE__);
-  Serial.printf("BUILD_TIME=%s\n", __TIME__);
+  // Deterministic build metadata. __DATE__/__TIME__ are deliberately NOT used:
+  // a wall-clock stamp changes the application binary on every rebuild of
+  // identical source, so two clean builds of one commit produced different
+  // SHA256s and the hash could not be used as a pre-flash integrity check.
+  // The commit timestamp is a property of the source, so it is stable.
+  Serial.printf("BUILD_SOURCE_EPOCH=%lu\n",
+                (unsigned long)FLC_BUILD_SOURCE_EPOCH);
+  Serial.printf("BUILD_PROVENANCE=%s\n",
+                FLC_BUILD_SOURCE_EPOCH == 0 ? "UNSTAMPED" : "COMMIT_STAMPED");
   Serial.printf("PROTOCOL_ID=%s\n", PROTOCOL_ID);
   Serial.printf("PROTOCOL_SCOPE=%s\n", PROTOCOL_SCOPE);
   Serial.printf("PROFILE_ID=%s\n", PROFILE_ID);
