@@ -144,7 +144,7 @@ class HardwareStage(Enum):
 
 #: The stage this build is authorized to execute. Raising it is a deliberate
 #: source change made only once the evidence for the next stage exists.
-AUTHORIZED_STAGE = HardwareStage.H0_ESP32_ONLY
+AUTHORIZED_STAGE = HardwareStage.H1_CENSUS_READONLY
 
 
 class CalibrationPolicyError(RuntimeError):

@@ -73,8 +73,8 @@ class TestMotionGate(unittest.TestCase):
         with self.assertRaises(policy.CalibrationPolicyError):
             policy.require_motion_authorized("CALIBRATE_ALL", policy.HardwareStage.H7_FREEZE)
 
-    def test_shipped_stage_is_h0(self):
-        self.assertIs(policy.AUTHORIZED_STAGE, policy.HardwareStage.H0_ESP32_ONLY)
+    def test_authorized_host_stage_is_h1(self):
+        self.assertIs(policy.AUTHORIZED_STAGE, policy.HardwareStage.H1_CENSUS_READONLY)
 
     def test_read_only_stages_are_ordered_below_motion(self):
         self.assertLess(
