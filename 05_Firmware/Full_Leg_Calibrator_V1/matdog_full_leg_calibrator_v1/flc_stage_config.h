@@ -67,6 +67,19 @@
 #define FLC_H3_BOOTSTRAP_APPROVED 0
 #endif
 
+// Build identity reported by @STATUS. The supported build script stamps the
+// exact Git commit. A hand-written compile remains visibly UNSTAMPED rather
+// than claiming provenance it does not have.
+#define FLC_STRINGIFY_INNER(value) #value
+#define FLC_STRINGIFY(value) FLC_STRINGIFY_INNER(value)
+#ifndef FLC_BUILD_GIT_SHA_TOKEN
+#define FLC_BUILD_GIT_SHA_TOKEN UNSTAMPED
+#endif
+#define FLC_BUILD_GIT_SHA FLC_STRINGIFY(FLC_BUILD_GIT_SHA_TOKEN)
+#ifndef FLC_BUILD_WORKTREE_DIRTY
+#define FLC_BUILD_WORKTREE_DIRTY 1
+#endif
+
 // Conservative first-motion envelope for an assembled, unloaded leg joint.
 //
 // PROVENANCE: NOT a measurement of this build, and NOT inherited from LF V25.

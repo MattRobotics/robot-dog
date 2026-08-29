@@ -60,6 +60,7 @@ struct SimServo {
   bool stalled = false;
 
   // Fault injection
+  bool contextInvalid = false;   // session/identity drift for THIS servo
   bool telemetryFails = false;
   bool driverError = false;
   int failTelemetryAfter = -1;
@@ -85,8 +86,19 @@ struct SimBus {
 
 static SimBus g_bus;
 
-//: Joint plans for the H5/H6 orchestration tests, filled by PLAN.
-static FlcJointPlan g_plans[FLC_LEG_COUNT * FLC_JOINTS_PER_LEG];
+//: The full generated catalog. flcRunCalibrationPlan() requires all 12 rows,
+//: because un-selected joints must still be held and watched at q0 and a
+//: cross-leg parking auxiliary must be expressible in raw ticks.
+static FlcJointPlan g_plans[FLC_CALIBRATION_JOINT_COUNT];
+
+//: Per-joint runtime calibration seeded into the plan catalog (a joint
+//: calibrated in an earlier operation of the same session).
+static void resetPlans() {
+  for (int i = 0; i < FLC_CALIBRATION_JOINT_COUNT; ++i) {
+    g_plans[i] = FlcJointPlan();
+    g_plans[i].geometryJoint = (FlcGeometryJoint)i;
+  }
+}
 
 static void simAdvance(SimServo &s, uint32_t ms) {
   int steps = (int)(ms / 5);
@@ -122,6 +134,19 @@ static void simAdvance(SimServo &s, uint32_t ms) {
       s.position = next;
     }
   }
+}
+
+//: Mirrors the firmware's portValidateContext: the session that authorized the
+//: motion must still be the session executing it. Injectable so the tests can
+//: prove the engine stops mid-motion on drift rather than at the next command.
+static bool g_contextValid = true;
+
+static bool portValidateContext(void *ctx, uint8_t id) {
+  (void)ctx;
+  if (!g_contextValid) return false;
+  auto it = g_bus.servos.find((int)id);
+  if (it == g_bus.servos.end()) return false;
+  return !it->second.contextInvalid;
 }
 
 static bool portReadTelemetry(void *ctx, uint8_t id, FlcObservation *out) {
@@ -198,6 +223,7 @@ static void portIdle(void *ctx, uint32_t ms) {
 
 static FlcServoPort makePort() {
   FlcServoPort port;
+  port.validateContext = portValidateContext;
   port.readTelemetry = portReadTelemetry;
   port.commandPosition = portCommandPosition;
   port.setTorqueLimit = portSetTorqueLimit;
@@ -246,7 +272,8 @@ int main() {
 
     if (strcmp(verb, "RESET") == 0) {
       g_bus = SimBus();
-      for (auto &plan : g_plans) plan = FlcJointPlan();
+      g_contextValid = true;
+      resetPlans();
       printf("OK RESET\n"); fflush(stdout); continue;
     }
 
@@ -284,6 +311,7 @@ int main() {
       else if (strcmp(name, "VOLTAGE") == 0) s.voltage = (uint8_t)value;
       else if (strcmp(name, "STALL_CURRENT") == 0) s.stallCurrent = (uint16_t)value;
       else if (strcmp(name, "FREE_CURRENT") == 0) s.freeCurrent = (uint16_t)value;
+      else if (strcmp(name, "CONTEXT_INVALID") == 0) s.contextInvalid = (value != 0);
       else if (strcmp(name, "ENDSTOP_MIN") == 0) s.endstopMin = value;
       else if (strcmp(name, "ENDSTOP_MAX") == 0) s.endstopMax = value;
       else { printf("ERROR UNKNOWN_FAULT\n"); fflush(stdout); continue; }
@@ -301,11 +329,13 @@ int main() {
       const FlcContactConfig guards = makeGuards();
       const FlcCharacterizationResult r = flcCharacterizeJoint(
           port, (uint8_t)id, startTick, (int8_t)plannedSign, envelope, guards, 48, 96);
-      printf("STATUS=%s REASON=%s COMPLETE=%d DIRECTION=%d BASELINE_MEDIAN=%u "
+      printf("STATUS=%s REASON=%s COMPLETE=%d RESPONDS=%d RAW_PROBE_SIGN=%d "
+             "BASELINE_MEDIAN=%u "
              "BASELINE_MAD=%u BASELINE_SAMPLES=%d CONTACT_TICK=%d RETREAT_ACHIEVED=%d "
              "THRESHOLD=%u RETREAT_TICKS=%u SPREAD=%u REPEAT_BAND=%u TORQUE_OFF=%d\n",
              flcEngineStatusLabel(r.status), flcAbortReasonLabel(r.abortReason),
-             r.complete ? 1 : 0, (int)r.direction.encoderSign,
+             r.complete ? 1 : 0, r.encoderResponse.responds ? 1 : 0,
+             (int)r.encoderResponse.rawProbeSign,
              r.baseline.baseline.medianCurrent, r.baseline.baseline.madCurrent,
              r.baseline.samples, r.probeContact.contactTick,
              r.probeRetreat.achievedTicks, r.characterizedContactThresholdRaw,
@@ -314,124 +344,176 @@ int main() {
       fflush(stdout); continue;
     }
 
-    if (strcmp(verb, "CALIBRATE") == 0) {
-      int id, startTick, direction, minAngleTicks, maxAngleTicks, expectedSpan;
-      int repeatTol, urdfTol, urdfKnown;
-      if (sscanf(line.c_str(), "CALIBRATE %d %d %d %d %d %d %d %d %d", &id, &startTick,
-                 &direction, &minAngleTicks, &maxAngleTicks, &expectedSpan, &repeatTol,
-                 &urdfTol, &urdfKnown) != 9) {
-        printf("ERROR BAD_CALIBRATE\n"); fflush(stdout); continue;
-      }
-      FlcServoPort port = makePort();
-      FlcMotionEnvelope envelope = flcBootstrapEnvelope();
-      const FlcContactConfig guards = makeGuards();
-
-      // A calibration run needs the free-motion baseline H3 would have measured.
-      FlcBaseline baseline;
-      baseline.medianCurrent = 20;
-      baseline.madCurrent = 3;
-      baseline.valid = true;
-
-      FlcAcceptanceGates gates;
-      gates.repeatabilityToleranceKnown = repeatTol > 0;
-      gates.repeatabilityToleranceTicks = (uint16_t)repeatTol;
-      gates.endpointVsUrdfToleranceKnown = (urdfKnown != 0);
-      gates.endpointVsUrdfToleranceTicks = (uint16_t)urdfTol;
-      gates.expectedSpanTicks = expectedSpan;
-
-      const FlcJointCalibrationResult r = flcCalibrateJoint(
-          port, (uint8_t)id, startTick, (int8_t)direction, minAngleTicks, maxAngleTicks,
-          envelope, guards, baseline, gates);
-
-      printf("STATUS=%s REASON=%s TIER=%s MIN_TICK=%d MAX_TICK=%d MIN_SPREAD=%d "
-             "MAX_SPREAD=%d SPAN=%d EXPECTED_SPAN=%d SPAN_ERROR=%d Q0=%d "
-             "DIRECTION=%d ACCEPTED=%d TORQUE_OFF=%d\n",
-             flcEngineStatusLabel(r.status), flcAbortReasonLabel(r.abortReason),
-             flcResultTierLabel(r.tier), r.minContactTick, r.maxContactTick,
-             r.minEndpoint.repeatability.spreadTicks,
-             r.maxEndpoint.repeatability.spreadTicks, r.measuredSpanTicks,
-             r.expectedSpanTicks, r.spanErrorTicks, r.q0Tick, (int)r.direction,
-             r.accepted ? 1 : 0, allTorqueOff() ? 1 : 0);
-      fflush(stdout); continue;
-    }
-
+    // PLAN <slot> <busId> <characterized> <startTick> <q0WatchTick>
+    //      <q0Tol> <witness> <qMinTicks> <qMaxTicks> <expectedSpan>
+    //      <repeatTol> <urdfTol> <urdfKnown> <manualQ0Known> <manualQ0Tick>
+    //      <q0XcheckTol> <q0XcheckKnown> <calKnown> <knownDirection> <knownQ0>
     if (strcmp(verb, "PLAN") == 0) {
-      // PLAN <slot> <busId> <characterized> <direction> <startTick>
-      //      <minAngleTicks> <maxAngleTicks> <expectedSpan> <repeatTol>
-      //      <urdfTol> <urdfKnown>
-      int slot, busId, characterized, direction, startTick, minA, maxA, span;
-      int repeatTol, urdfTol, urdfKnown;
-      if (sscanf(line.c_str(), "PLAN %d %d %d %d %d %d %d %d %d %d %d", &slot, &busId,
-                 &characterized, &direction, &startTick, &minA, &maxA, &span,
-                 &repeatTol, &urdfTol, &urdfKnown) != 11) {
+      int slot, busId, characterized, startTick, q0Watch, q0Tol, witness;
+      int qMin, qMax, span, repeatTol, urdfTol, urdfKnown;
+      int manualKnown, manualTick, xcheckTol, xcheckKnown;
+      int calKnown, knownDir, knownQ0;
+      if (sscanf(line.c_str(),
+                 "PLAN %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+                 &slot, &busId, &characterized, &startTick, &q0Watch, &q0Tol,
+                 &witness, &qMin, &qMax, &span, &repeatTol, &urdfTol, &urdfKnown,
+                 &manualKnown, &manualTick, &xcheckTol, &xcheckKnown,
+                 &calKnown, &knownDir, &knownQ0) != 20) {
         printf("ERROR BAD_PLAN\n"); fflush(stdout); continue;
       }
-      if (slot < 0 || slot >= FLC_LEG_COUNT * FLC_JOINTS_PER_LEG) {
+      if (slot < 0 || slot >= FLC_CALIBRATION_JOINT_COUNT) {
         printf("ERROR SLOT_RANGE\n"); fflush(stdout); continue;
       }
       FlcJointPlan &plan = g_plans[slot];
+      plan = FlcJointPlan();
+      plan.geometryJoint = (FlcGeometryJoint)slot;
       plan.busId = (uint8_t)busId;
       plan.characterized = (characterized != 0);
-      plan.direction = (int8_t)direction;
       plan.startTick = startTick;
-      plan.minAngleTicksFromZero = minA;
-      plan.maxAngleTicksFromZero = maxA;
+      plan.q0WatchKnown = true;
+      plan.q0WatchTick = q0Watch;
+      plan.q0WatchToleranceTicks = (uint16_t)q0Tol;
+      plan.calibrationKnown = (calKnown != 0);
+      plan.knownDirection = (int8_t)knownDir;
+      plan.knownQ0Tick = knownQ0;
+
+      plan.directionEvidence.rawLoTick = -1;
+      plan.directionEvidence.rawHiTick = -1;
+      plan.directionEvidence.qMinTicks = qMin;
+      plan.directionEvidence.qMaxTicks = qMax;
+      plan.directionEvidence.manualQ0Known = (manualKnown != 0);
+      plan.directionEvidence.manualQ0Tick = manualTick;
+      plan.directionEvidence.manualQ0PoseUncertaintyKnown = false;
+      plan.directionEvidence.manualQ0PoseUncertaintyTicks = 0;
+      plan.directionEvidence.operatorWitness = (int8_t)witness;
+
       plan.baseline.medianCurrent = 20;
       plan.baseline.madCurrent = 3;
       plan.baseline.valid = true;
       plan.envelope = flcBootstrapEnvelope();
+
       plan.gates.repeatabilityToleranceKnown = repeatTol > 0;
       plan.gates.repeatabilityToleranceTicks = (uint16_t)repeatTol;
       plan.gates.endpointVsUrdfToleranceKnown = (urdfKnown != 0);
       plan.gates.endpointVsUrdfToleranceTicks = (uint16_t)urdfTol;
       plan.gates.expectedSpanTicks = span;
+      plan.gates.manualVsDerivedQ0ToleranceKnown = (xcheckKnown != 0);
+      plan.gates.manualVsDerivedQ0ToleranceTicks = (uint16_t)xcheckTol;
       printf("OK PLAN SLOT=%d ID=%d\n", slot, busId);
       fflush(stdout); continue;
     }
 
-    if (strcmp(verb, "LEG") == 0) {
-      int count;
-      if (sscanf(line.c_str(), "LEG %d", &count) != 1) {
-        printf("ERROR BAD_LEG\n"); fflush(stdout); continue;
+    // RUN <selectionMaskHex> — the SAME entry point H4, H5 and H6 use.
+    if (strcmp(verb, "RUN") == 0) {
+      unsigned mask;
+      if (sscanf(line.c_str(), "RUN %x", &mask) != 1) {
+        printf("ERROR BAD_RUN\n"); fflush(stdout); continue;
       }
       FlcServoPort port = makePort();
       const FlcContactConfig guards = makeGuards();
-      const FlcLegResult r = flcCalibrateLeg(port, guards, g_plans, count);
-      printf("STATUS=%s JOINTS_OK=%d/%d FAILED_ID=%d TORQUE_OFF=%d\n",
-             flcEngineStatusLabel(r.status), r.jointsOk, r.jointCount,
-             r.failedBusId, allTorqueOff() ? 1 : 0);
-      for (int i = 0; i < r.jointsOk; ++i) {
-        printf("  JOINT ID=%u TIER=%s Q0=%d SPAN=%d DIRECTION=%d ACCEPTED=%d\n",
-               r.joints[i].busId, flcResultTierLabel(r.joints[i].tier),
-               r.joints[i].q0Tick, r.joints[i].measuredSpanTicks,
-               (int)r.joints[i].direction, r.joints[i].accepted ? 1 : 0);
+      const FlcCalibrationRunResult r = flcRunCalibrationPlan(
+          port, guards, g_plans, FLC_CALIBRATION_JOINT_COUNT, (uint16_t)mask);
+      printf("STATUS=%s REASON=%s SELECTION=%04X REQUESTED=%d JOINTS_OK=%d "
+             "EXEC_COUNT=%d FAILED_JOINT=%d FAILED_ID=%d PARKING_REQUIRED=%d "
+             "NO_PARKING=%d PARKING_RESTORED=%d SAFE_OFF=%d CUT_POWER=%d "
+             "TORQUE_OFF=%d\n",
+             flcEngineStatusLabel(r.status), flcAbortReasonLabel(r.abortReason),
+             r.selectionMask, r.jointsRequested, r.jointsOk, r.executionCount,
+             (int)r.failedJoint, r.failedBusId, r.parkingRequiredCount,
+             r.noParkingCount, r.parkingRestoreCount,
+             r.safeOffVerified ? 1 : 0, r.hardFaultCutPowerNow ? 1 : 0,
+             allTorqueOff() ? 1 : 0);
+      for (int i = 0; i < r.executionCount; ++i) {
+        printf("  ORDER %d=%d\n", i, (int)r.executionOrder[i]);
       }
-      printf("LEG_END\n");
+      for (int j = 0; j < FLC_CALIBRATION_JOINT_COUNT; ++j) {
+        if (!r.resultPresent[j]) continue;
+        const FlcJointCalibrationResult &jr = r.joints[j];
+        printf("  JOINT SLOT=%d ID=%u STATUS=%s REASON=%s TIER=%s DIRECTION=%d "
+               "METHOD=%s MIN_TICK=%d MAX_TICK=%d SPAN=%d EXPECTED_SPAN=%d "
+               "SPAN_ERROR=%d MANUAL_Q0=%d DERIVED_Q0=%d Q0_XCHECK=%s "
+               "Q0_ERROR=%d ACCEPTED=%d MIN_PARK=%d MAX_PARK=%d "
+               "MIN_RESTORE=%d MAX_RESTORE=%d MIN_NOPARK_PROV=%d "
+               "MAX_NOPARK_PROV=%d\n",
+               j, jr.busId, flcEngineStatusLabel(jr.status),
+               flcAbortReasonLabel(jr.abortReason), flcResultTierLabel(jr.tier),
+               (int)jr.direction, flcDirectionMethodLabel(jr.directionMethod),
+               jr.minContactTick, jr.maxContactTick, jr.measuredSpanTicks,
+               jr.expectedSpanTicks, jr.spanErrorTicks,
+               jr.manualPoseQ0CandidateTick, jr.derivedQ0FinalTick,
+               flcQ0CrosscheckStatusLabel(jr.q0CrosscheckStatus),
+               jr.manualVsDerivedQ0ErrorTicks, jr.accepted ? 1 : 0,
+               (int)jr.minExecution.parkingOutcome,
+               (int)jr.maxExecution.parkingOutcome,
+               jr.minExecution.parking.restoreVerified ? 1 : 0,
+               jr.maxExecution.parking.restoreVerified ? 1 : 0,
+               jr.minExecution.parking.noParkingProvenanceVerified ? 1 : 0,
+               jr.maxExecution.parking.noParkingProvenanceVerified ? 1 : 0);
+      }
+      for (int j = 0; j < FLC_CALIBRATION_JOINT_COUNT; ++j) {
+        printf("  FINAL SLOT=%d USABLE=%d DIRECTION=%d Q0=%d HOLD=%d\n", j,
+               r.finalCalibration[j].calibrationUsable ? 1 : 0,
+               (int)r.finalCalibration[j].direction,
+               r.finalCalibration[j].q0Tick,
+               r.finalCalibration[j].holdTick);
+      }
+      printf("RUN_END\n");
       fflush(stdout); continue;
     }
 
-    if (strcmp(verb, "ALLLEGS") == 0) {
-      int legCount;
-      if (sscanf(line.c_str(), "ALLLEGS %d", &legCount) != 1) {
-        printf("ERROR BAD_ALLLEGS\n"); fflush(stdout); continue;
+    // CONTEXT <0|1> — global session validity, drives fail-closed drift tests.
+    if (strcmp(verb, "CONTEXT") == 0) {
+      int value;
+      if (sscanf(line.c_str(), "CONTEXT %d", &value) != 1) {
+        printf("ERROR BAD_CONTEXT\n"); fflush(stdout); continue;
       }
-      FlcServoPort port = makePort();
-      const FlcContactConfig guards = makeGuards();
-      const FlcAllLegsResult r = flcCalibrateAllLegs(port, guards, g_plans, legCount);
-      printf("STATUS=%s LEGS_OK=%d/%d JOINTS_OK=%d FAILED_LEG=%d TORQUE_OFF=%d\n",
-             flcEngineStatusLabel(r.status), r.legsOk, legCount, r.jointsOk,
-             r.failedLegIndex, allTorqueOff() ? 1 : 0);
-      for (int leg = 0; leg < r.legsOk; ++leg) {
-        for (int j = 0; j < r.legs[leg].jointsOk; ++j) {
-          printf("  JOINT LEG=%d ID=%u TIER=%s Q0=%d SPAN=%d ACCEPTED=%d\n", leg,
-                 r.legs[leg].joints[j].busId,
-                 flcResultTierLabel(r.legs[leg].joints[j].tier),
-                 r.legs[leg].joints[j].q0Tick,
-                 r.legs[leg].joints[j].measuredSpanTicks,
-                 r.legs[leg].joints[j].accepted ? 1 : 0);
+      g_contextValid = (value != 0);
+      printf("OK CONTEXT=%d\n", value ? 1 : 0);
+      fflush(stdout); continue;
+    }
+
+    // GEOMETRY — the generated 24-row plan as the engine itself validates it.
+    if (strcmp(verb, "GEOMETRY") == 0) {
+      int noParking = 0, parking = 0;
+      const bool summaryOk = flcGeometryPlanSummary(noParking, parking);
+      FlcGeometryJoint order[FLC_CALIBRATION_JOINT_COUNT];
+      const bool orderOk = flcBuildDependencyOrder(
+          FLC_GEOMETRY_DEPENDENCIES, FLC_GEOMETRY_DEPENDENCY_COUNT, order,
+          FLC_CALIBRATION_JOINT_COUNT);
+      printf("SUMMARY_OK=%d NO_PARKING=%d PARKING=%d ROWS=%d ORDER_OK=%d "
+             "DEPENDENCIES=%d\n",
+             summaryOk ? 1 : 0, noParking, parking,
+             FLC_ENDPOINT_GEOMETRY_PLAN_COUNT, orderOk ? 1 : 0,
+             FLC_GEOMETRY_DEPENDENCY_COUNT);
+      if (orderOk) {
+        for (int i = 0; i < FLC_CALIBRATION_JOINT_COUNT; ++i) {
+          printf("  ORDER %d=%d\n", i, (int)order[i]);
         }
       }
-      printf("ALLLEGS_END\n");
+      for (int i = 0; i < FLC_ENDPOINT_GEOMETRY_PLAN_COUNT; ++i) {
+        const FlcEndpointGeometryPlan &row = FLC_ENDPOINT_GEOMETRY_PLANS[i];
+        printf("  ROW %d ID=%s TARGET=%d SIDE=%s PARKING=%d AUX=%d "
+               "Q0_START=%04X Q0_HELD=%04X\n",
+               row.canonicalEndpointIndex, row.endpointId, (int)row.targetJoint,
+               row.limitSide, (int)row.parkingOutcome, (int)row.auxiliaryJoint,
+               row.q0StartMask, row.q0HeldDuringTaskMask);
+      }
+      printf("GEOMETRY_END\n");
+      fflush(stdout); continue;
+    }
+
+    // CYCLE — proves the production Kahn walk rejects an injected cycle rather
+    // than trusting the checked-in order.
+    if (strcmp(verb, "CYCLE") == 0) {
+      FlcGeometryDependency injected[] = {
+        {FLC_GEOMETRY_JOINT_LF_HIP, FLC_GEOMETRY_JOINT_LF_UPPER_LEG, 0},
+        {FLC_GEOMETRY_JOINT_LF_UPPER_LEG, FLC_GEOMETRY_JOINT_LF_HIP, 0},
+      };
+      FlcGeometryJoint order[FLC_CALIBRATION_JOINT_COUNT];
+      const bool ok = flcBuildDependencyOrder(
+          injected, (int)(sizeof(injected) / sizeof(injected[0])), order,
+          FLC_CALIBRATION_JOINT_COUNT);
+      printf("CYCLE_ACCEPTED=%d\n", ok ? 1 : 0);
       fflush(stdout); continue;
     }
 

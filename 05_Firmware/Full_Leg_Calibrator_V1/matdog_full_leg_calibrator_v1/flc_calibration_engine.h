@@ -29,6 +29,7 @@
 #include <stdint.h>
 
 #include "flc_contact_detector.h"
+#include "flc_leg_plan.h"
 #include "flc_stage_config.h"
 
 // --------------------------------------------------------------------------
@@ -105,6 +106,10 @@ inline FlcMotionEnvelope flcBootstrapEnvelope() {
 // --------------------------------------------------------------------------
 
 struct FlcServoPort {
+  //: Current host session/generation/census and servo identity are still valid.
+  //: This is checked immediately before every read and every motion-capable
+  //: write. Torque-OFF remains callable even after context loss.
+  bool (*validateContext)(void *ctx, uint8_t id);
   //: Fresh telemetry for `id`. False on transport failure or stale data.
   bool (*readTelemetry)(void *ctx, uint8_t id, FlcObservation *out);
   //: The ONLY way the engine can move anything. Domain-checked by the caller.
@@ -119,7 +124,8 @@ struct FlcServoPort {
 };
 
 inline bool flcPortUsable(const FlcServoPort &port) {
-  return port.readTelemetry != 0 && port.commandPosition != 0 &&
+  return port.validateContext != 0 && port.readTelemetry != 0 &&
+         port.commandPosition != 0 &&
          port.setTorqueLimit != 0 && port.setTorqueEnable != 0 && port.nowMs != 0;
 }
 
@@ -140,6 +146,14 @@ enum FlcEngineStatus {
   FLC_ENGINE_DIRECTION_UNRESOLVED,
   FLC_ENGINE_BASELINE_FAILED,
   FLC_ENGINE_PREREQUISITE_DRIFT,
+  FLC_ENGINE_TORQUE_OFF_FAILED,
+  FLC_ENGINE_INVALID_PLAN,
+  FLC_ENGINE_DEPENDENCY_CYCLE,
+  FLC_ENGINE_Q0_CROSSCHECK_FAILED,
+  FLC_ENGINE_GEOMETRY_INCONSISTENT,
+  FLC_ENGINE_PARKING_FAILED,
+  FLC_ENGINE_RESTORE_FAILED,
+  FLC_ENGINE_CONTEXT_DRIFT,
 };
 
 inline const char *flcEngineStatusLabel(int status) {
@@ -156,8 +170,136 @@ inline const char *flcEngineStatusLabel(int status) {
     case FLC_ENGINE_DIRECTION_UNRESOLVED: return "DIRECTION_UNRESOLVED";
     case FLC_ENGINE_BASELINE_FAILED: return "BASELINE_FAILED";
     case FLC_ENGINE_PREREQUISITE_DRIFT: return "PREREQUISITE_DRIFT";
+    case FLC_ENGINE_TORQUE_OFF_FAILED: return "TORQUE_OFF_FAILED";
+    case FLC_ENGINE_INVALID_PLAN: return "INVALID_PLAN";
+    case FLC_ENGINE_DEPENDENCY_CYCLE: return "DEPENDENCY_CYCLE";
+    case FLC_ENGINE_Q0_CROSSCHECK_FAILED: return "Q0_CROSSCHECK_FAILED";
+    case FLC_ENGINE_GEOMETRY_INCONSISTENT: return "GEOMETRY_INCONSISTENT";
+    case FLC_ENGINE_PARKING_FAILED: return "PARKING_FAILED";
+    case FLC_ENGINE_RESTORE_FAILED: return "RESTORE_FAILED";
+    case FLC_ENGINE_CONTEXT_DRIFT: return "IDENTITY_OR_SESSION_DRIFT";
     default: return "UNKNOWN";
   }
+}
+
+// --------------------------------------------------------------------------
+// SHARED GUARD CHECK
+//
+// Every segment that commands motion — direction probe, free-motion baseline,
+// contact approach, retreat, return-to-neutral, parking and restore — routes
+// its per-sample safety decision through this ONE function. Previously each
+// segment repeated a slightly different subset, which is exactly how a guard
+// goes missing from the path nobody looked at.
+//
+// `expectTorqueLimit` is 0 when the caller is not inside a torque transaction
+// that pinned a specific limit (e.g. before flcBeginMotion has run).
+// --------------------------------------------------------------------------
+
+inline int flcCheckGuards(const FlcObservation &o, const FlcContactConfig &guards,
+                          uint32_t elapsedMs, uint32_t timeBudgetMs,
+                          uint16_t expectTorqueLimit, bool requireTorqueOn,
+                          int commandedTarget) {
+  return flcCheckObservationGuards(o, guards, elapsedMs, timeBudgetMs,
+                                   expectTorqueLimit,
+                                   requireTorqueOn ? (int8_t)1 : (int8_t)-1,
+                                   commandedTarget);
+}
+
+inline int flcEngineStatusForAbort(int abortReason) {
+  if (abortReason == FLC_ABORT_TELEMETRY_TIMEOUT) return FLC_ENGINE_TELEMETRY_FAILED;
+  if (abortReason == FLC_ABORT_PREREQUISITE_DRIFT)
+    return FLC_ENGINE_PREREQUISITE_DRIFT;
+  if (abortReason == FLC_ABORT_INVALID_PLAN) return FLC_ENGINE_INVALID_PLAN;
+  if (abortReason == FLC_ABORT_DEPENDENCY_CYCLE) return FLC_ENGINE_DEPENDENCY_CYCLE;
+  if (abortReason == FLC_ABORT_TORQUE_OFF_UNVERIFIED)
+    return FLC_ENGINE_TORQUE_OFF_FAILED;
+  if (abortReason == FLC_ABORT_CONTEXT_DRIFT)
+    return FLC_ENGINE_CONTEXT_DRIFT;
+  return FLC_ENGINE_ABORTED;
+}
+
+inline int flcReadFreshTelemetry(const FlcServoPort &port, uint8_t id,
+                                 FlcObservation *out) {
+  if (port.validateContext == 0 ||
+      !port.validateContext(port.ctx, id)) return FLC_ABORT_CONTEXT_DRIFT;
+  if (port.readTelemetry == 0 || !port.readTelemetry(port.ctx, id, out))
+    return FLC_ABORT_TELEMETRY_TIMEOUT;
+  return FLC_ABORT_NONE;
+}
+
+inline bool flcCommandPositionChecked(const FlcServoPort &port, uint8_t id,
+                                      int position, uint16_t speed,
+                                      uint8_t acceleration) {
+  return port.validateContext != 0 &&
+         port.validateContext(port.ctx, id) &&
+         port.commandPosition(port.ctx, id, position, speed, acceleration);
+}
+
+#define FLC_MAX_WATCHED_JOINTS 12
+
+struct FlcWatchJoint {
+  uint8_t busId;
+  int expectedTick;
+  uint16_t toleranceTicks;
+  int8_t expectedTorqueState;  // -1 unconstrained, 0 OFF, 1 ON
+  uint16_t expectedTorqueLimit;
+  int expectedGoalTick;        // -1 means do not compare GoalPosition
+};
+
+struct FlcMotionWatch {
+  int count;
+  FlcWatchJoint joints[FLC_MAX_WATCHED_JOINTS];
+};
+
+inline int flcCheckMotionWatch(const FlcServoPort &port,
+                               const FlcMotionWatch *watch,
+                               const FlcContactConfig &guards,
+                               uint8_t *failedBusId) {
+  if (failedBusId != 0) *failedBusId = 0;
+  if (watch == 0 || watch->count == 0) return FLC_ABORT_NONE;
+  if (watch->count < 0 || watch->count > FLC_MAX_WATCHED_JOINTS)
+    return FLC_ABORT_INVALID_PLAN;
+
+  for (int i = 0; i < watch->count; ++i) {
+    const FlcWatchJoint &expected = watch->joints[i];
+    FlcObservation o = {};
+    const int readFault = flcReadFreshTelemetry(port, expected.busId, &o);
+    if (readFault != FLC_ABORT_NONE) {
+      if (failedBusId != 0) *failedBusId = expected.busId;
+      return readFault;
+    }
+    const int fault = flcCheckObservationGuards(
+        o, guards, 0, 0, expected.expectedTorqueLimit,
+        expected.expectedTorqueState, expected.expectedGoalTick);
+    if (fault != FLC_ABORT_NONE) {
+      if (failedBusId != 0) *failedBusId = expected.busId;
+      return fault;
+    }
+    if (expected.expectedTick < 0 || expected.expectedTick > FLC_ENCODER_MAX ||
+        flcCircularDistance(o.position, expected.expectedTick) >
+            (int)expected.toleranceTicks) {
+      if (failedBusId != 0) *failedBusId = expected.busId;
+      return FLC_ABORT_PREREQUISITE_DRIFT;
+    }
+  }
+  return FLC_ABORT_NONE;
+}
+
+inline int flcCheckGuardsAndWatch(const FlcServoPort &port,
+                                  const FlcObservation &o,
+                                  const FlcContactConfig &guards,
+                                  uint32_t elapsedMs,
+                                  uint32_t timeBudgetMs,
+                                  uint16_t expectedTorqueLimit,
+                                  bool requireTorqueOn,
+                                  int commandedTarget,
+                                  const FlcMotionWatch *watch,
+                                  uint8_t *failedBusId = 0) {
+  const int ownFault = flcCheckGuards(o, guards, elapsedMs, timeBudgetMs,
+                                      expectedTorqueLimit, requireTorqueOn,
+                                      commandedTarget);
+  if (ownFault != FLC_ABORT_NONE) return ownFault;
+  return flcCheckMotionWatch(port, watch, guards, failedBusId);
 }
 
 // --------------------------------------------------------------------------
@@ -166,25 +308,166 @@ inline const char *flcEngineStatusLabel(int status) {
 // --------------------------------------------------------------------------
 
 inline bool flcEndMotion(const FlcServoPort &port, uint8_t id) {
-  if (port.setTorqueEnable == 0) return false;
-  bool ok = port.setTorqueEnable(port.ctx, id, false);
-  FlcObservation o;
-  if (port.readTelemetry != 0 && port.readTelemetry(port.ctx, id, &o)) {
-    // Readback is authoritative: a servo that still reports torque on has NOT
-    // been released, whatever the write acknowledged.
-    if (o.torqueEnabled) return false;
-  }
-  return ok;
+  if (port.setTorqueEnable == 0 || port.readTelemetry == 0) return false;
+  if (!port.setTorqueEnable(port.ctx, id, false)) return false;
+  FlcObservation o = {};
+  if (!port.readTelemetry(port.ctx, id, &o)) return false;
+  // A transport acknowledgement is not proof of release. Fresh readable
+  // telemetry must explicitly report torque OFF.
+  return o.telemetryValid && !o.driverError && !o.torqueEnabled;
 }
 
-inline int flcBeginMotion(const FlcServoPort &port, uint8_t id,
-                          const FlcMotionEnvelope &envelope) {
-  if (!flcPortUsable(port)) return FLC_ENGINE_REFUSED_PORT;
-  if (!envelope.valid) return FLC_ENGINE_REFUSED_ENVELOPE;
-  if (!port.setTorqueLimit(port.ctx, id, envelope.torqueLimit))
-    return FLC_ENGINE_TORQUE_SETUP_FAILED;
-  if (!port.setTorqueEnable(port.ctx, id, true)) return FLC_ENGINE_TORQUE_SETUP_FAILED;
-  return FLC_ENGINE_OK;
+inline void flcRequireTorqueOff(const FlcServoPort &port, uint8_t id,
+                                int &status, int &abortReason) {
+  if (!flcEndMotion(port, id)) {
+    status = FLC_ENGINE_TORQUE_OFF_FAILED;
+    abortReason = FLC_ABORT_TORQUE_OFF_UNVERIFIED;
+  }
+}
+
+struct FlcBeginMotionResult {
+  int status;
+  int abortReason;
+  int actualStartTick;
+  bool holdGoalVerified;
+  bool torqueOnVerified;
+};
+
+inline FlcBeginMotionResult flcBeginMotion(
+    const FlcServoPort &port, uint8_t id, int expectedStartTick,
+    uint16_t startToleranceTicks, const FlcMotionEnvelope &envelope,
+    const FlcContactConfig &guards, const FlcMotionWatch *watch = 0) {
+  FlcBeginMotionResult r = {};
+  r.status = FLC_ENGINE_OK;
+  r.abortReason = FLC_ABORT_NONE;
+  r.actualStartTick = -1;
+
+  if (!flcPortUsable(port)) { r.status = FLC_ENGINE_REFUSED_PORT; return r; }
+  if (!envelope.valid) { r.status = FLC_ENGINE_REFUSED_ENVELOPE; return r; }
+  if (expectedStartTick < 0 || expectedStartTick > FLC_ENCODER_MAX) {
+    r.status = FLC_ENGINE_REFUSED_DOMAIN;
+    r.abortReason = FLC_ABORT_POSITION_OUT_OF_DOMAIN;
+    return r;
+  }
+
+  // First observe with torque OFF. This catches a stale/foreign transaction and
+  // establishes the real start position instead of trusting an old RAM value.
+  FlcObservation before = {};
+  int readFault = flcReadFreshTelemetry(port, id, &before);
+  if (readFault != FLC_ABORT_NONE) {
+    r.status = flcEngineStatusForAbort(readFault);
+    r.abortReason = readFault;
+    return r;
+  }
+  int fault = flcCheckObservationGuards(before, guards, 0, 0, 0, 0, -1);
+  if (fault != FLC_ABORT_NONE) {
+    r.status = flcEngineStatusForAbort(fault);
+    r.abortReason = fault;
+    flcEndMotion(port, id);
+    return r;
+  }
+  r.actualStartTick = before.position;
+  if (flcCircularDistance(r.actualStartTick, expectedStartTick) >
+      (int)startToleranceTicks) {
+    r.status = FLC_ENGINE_PREREQUISITE_DRIFT;
+    r.abortReason = FLC_ABORT_PREREQUISITE_DRIFT;
+    return r;
+  }
+
+  // TorqueLimit is a RAM safety bound. Set it while torque is still OFF, before
+  // touching GoalPosition or TorqueEnable. A failed write cannot create motion.
+  if (!port.validateContext(port.ctx, id)) {
+    r.status = FLC_ENGINE_CONTEXT_DRIFT;
+    r.abortReason = FLC_ABORT_CONTEXT_DRIFT;
+    return r;
+  }
+  if (!port.setTorqueLimit(port.ctx, id, envelope.torqueLimit)) {
+    r.status = FLC_ENGINE_TORQUE_SETUP_FAILED;
+    return r;
+  }
+
+  // Critical ordering: preload GoalPosition to the PRESENT position while
+  // torque is still OFF. Enabling torque against a stale retained goal can move
+  // a joint before the first guarded segment has even started.
+  if (!flcCommandPositionChecked(port, id, r.actualStartTick,
+                                 envelope.goalSpeed,
+                                 envelope.acceleration)) {
+    r.status = FLC_ENGINE_ABORTED;
+    r.abortReason = FLC_ABORT_DRIVER_ERROR;
+    return r;
+  }
+  FlcObservation held = {};
+  readFault = flcReadFreshTelemetry(port, id, &held);
+  if (readFault != FLC_ABORT_NONE) {
+    r.status = flcEngineStatusForAbort(readFault);
+    r.abortReason = readFault;
+    return r;
+  }
+  fault = flcCheckObservationGuards(held, guards, 0, 0,
+                                    envelope.torqueLimit, 0,
+                                    r.actualStartTick);
+  if (fault != FLC_ABORT_NONE ||
+      flcCircularDistance(held.position, r.actualStartTick) >
+          (int)startToleranceTicks) {
+    r.status = flcEngineStatusForAbort(
+        fault == FLC_ABORT_NONE ? FLC_ABORT_PREREQUISITE_DRIFT : fault);
+    r.abortReason =
+        fault == FLC_ABORT_NONE ? FLC_ABORT_PREREQUISITE_DRIFT : fault;
+    return r;
+  }
+  r.holdGoalVerified = true;
+
+  fault = flcCheckMotionWatch(port, watch, guards, 0);
+  if (fault != FLC_ABORT_NONE) {
+    r.status = flcEngineStatusForAbort(fault);
+    r.abortReason = fault;
+    return r;
+  }
+
+  if (!port.validateContext(port.ctx, id)) {
+    r.status = FLC_ENGINE_CONTEXT_DRIFT;
+    r.abortReason = FLC_ABORT_CONTEXT_DRIFT;
+    return r;
+  }
+  if (!port.setTorqueEnable(port.ctx, id, true)) {
+    r.status = FLC_ENGINE_TORQUE_SETUP_FAILED;
+    if (!flcEndMotion(port, id)) {
+      r.status = FLC_ENGINE_TORQUE_OFF_FAILED;
+      r.abortReason = FLC_ABORT_TORQUE_OFF_UNVERIFIED;
+    }
+    return r;
+  }
+
+  FlcObservation armed = {};
+  readFault = flcReadFreshTelemetry(port, id, &armed);
+  if (readFault != FLC_ABORT_NONE) {
+    r.status = flcEngineStatusForAbort(readFault);
+    r.abortReason = readFault;
+  } else {
+    fault = flcCheckObservationGuards(armed, guards, 0, 0, envelope.torqueLimit,
+                                      1, r.actualStartTick);
+    if (fault != FLC_ABORT_NONE ||
+        flcCircularDistance(armed.position, r.actualStartTick) >
+            (int)startToleranceTicks) {
+      r.status = flcEngineStatusForAbort(
+          fault == FLC_ABORT_NONE ? FLC_ABORT_PREREQUISITE_DRIFT : fault);
+      r.abortReason =
+          fault == FLC_ABORT_NONE ? FLC_ABORT_PREREQUISITE_DRIFT : fault;
+    } else {
+      r.torqueOnVerified = true;
+      fault = flcCheckMotionWatch(port, watch, guards, 0);
+      if (fault != FLC_ABORT_NONE) {
+        r.status = flcEngineStatusForAbort(fault);
+        r.abortReason = fault;
+      }
+    }
+  }
+
+  if (r.status != FLC_ENGINE_OK && !flcEndMotion(port, id)) {
+    r.status = FLC_ENGINE_TORQUE_OFF_FAILED;
+    r.abortReason = FLC_ABORT_TORQUE_OFF_UNVERIFIED;
+  }
+  return r;
 }
 
 // --------------------------------------------------------------------------
@@ -223,7 +506,7 @@ inline uint16_t flcMedianU16(uint16_t *values, int count) {
 inline FlcBaselineResult flcMeasureFreeMotionBaseline(
     const FlcServoPort &port, uint8_t id, int startTick, int8_t probeSign,
     const FlcMotionEnvelope &envelope, const FlcContactConfig &guards,
-    uint16_t excursionTicks) {
+    uint16_t excursionTicks, const FlcMotionWatch *watch = 0) {
   FlcBaselineResult result;
   result.status = FLC_ENGINE_OK;
   result.baseline.medianCurrent = 0;
@@ -251,7 +534,8 @@ inline FlcBaselineResult flcMeasureFreeMotionBaseline(
   }
 
   const int target = startTick + probeSign * (int)excursionTicks;
-  if (!port.commandPosition(port.ctx, id, target, envelope.goalSpeed, envelope.acceleration)) {
+  if (!flcCommandPositionChecked(port, id, target, envelope.goalSpeed,
+                                 envelope.acceleration)) {
     result.status = FLC_ENGINE_ABORTED;
     result.abortReason = FLC_ABORT_DRIVER_ERROR;
     return result;
@@ -259,29 +543,63 @@ inline FlcBaselineResult flcMeasureFreeMotionBaseline(
 
   uint16_t currents[64];
   int count = 0;
+  int previousPosition = startTick;
+  int stagnantSamples = 0;
   const uint32_t began = port.nowMs(port.ctx);
 
   while (count < 64) {
     const uint32_t now = port.nowMs(port.ctx);
     const uint32_t elapsed = now - began;
-    if (elapsed > envelope.timeBudgetMs) break;
-
-    FlcObservation o;
-    if (!port.readTelemetry(port.ctx, id, &o)) {
-      result.status = FLC_ENGINE_TELEMETRY_FAILED;
-      result.abortReason = FLC_ABORT_TELEMETRY_TIMEOUT;
+    if (elapsed > envelope.timeBudgetMs) {
+      result.status = FLC_ENGINE_ABORTED;
+      result.abortReason = FLC_ABORT_TIME_BUDGET_EXCEEDED;
       return result;
     }
-    // The independent hard guards apply during baseline exactly as during a
-    // contact approach: a thermal or voltage excursion here is still a fault.
-    if (o.statusByte != 0) { result.abortReason = FLC_ABORT_STATUS_ERROR; result.status = FLC_ENGINE_ABORTED; return result; }
-    if ((int)o.temperature >= guards.thermalLimitC) { result.abortReason = FLC_ABORT_THERMAL; result.status = FLC_ENGINE_ABORTED; return result; }
-    if ((int)o.voltage < guards.voltageMin || (int)o.voltage > guards.voltageMax) { result.abortReason = FLC_ABORT_VOLTAGE; result.status = FLC_ENGINE_ABORTED; return result; }
-    if (o.current >= guards.hardCurrentAbortRaw) { result.abortReason = FLC_ABORT_OVERCURRENT; result.status = FLC_ENGINE_ABORTED; return result; }
+
+    FlcObservation o;
+    const int readFault = flcReadFreshTelemetry(port, id, &o);
+    if (readFault != FLC_ABORT_NONE) {
+      result.status = flcEngineStatusForAbort(readFault);
+      result.abortReason = readFault;
+      return result;
+    }
+    // Same guard set as every other motion segment — see flcCheckGuards.
+    const int guardFault = flcCheckGuardsAndWatch(
+        port, o, guards, elapsed, envelope.timeBudgetMs, envelope.torqueLimit,
+        true, target, watch);
+    if (guardFault != FLC_ABORT_NONE) {
+      result.abortReason = guardFault;
+      result.status = (guardFault == FLC_ABORT_TELEMETRY_TIMEOUT)
+                          ? FLC_ENGINE_TELEMETRY_FAILED : FLC_ENGINE_ABORTED;
+      return result;
+    }
 
     const int travel = flcDirectionalProgress(o.position, startTick, probeSign);
+    const int reverse = flcDirectionalProgress(o.position, startTick,
+                                                (int8_t)-probeSign);
+    if (reverse > (int)guards.targetReachedToleranceTicks) {
+      result.status = FLC_ENGINE_ABORTED;
+      result.abortReason = FLC_ABORT_WRONG_DIRECTION;
+      return result;
+    }
     if (travel > result.travelTicks) result.travelTicks = travel;
     result.endTick = o.position;
+
+    if (flcCircularDistance(o.position, previousPosition) <=
+            (int)guards.maxProgressTicks &&
+        flcCircularDistance(o.position, target) >
+            (int)guards.targetReachedToleranceTicks) {
+      ++stagnantSamples;
+    } else {
+      stagnantSamples = 0;
+    }
+    previousPosition = o.position;
+    if (stagnantSamples >=
+        (int)guards.startupGraceSamples + (int)guards.persistenceSamples) {
+      result.status = FLC_ENGINE_BASELINE_FAILED;
+      result.abortReason = FLC_ABORT_TARGET_DID_NOT_MOVE;
+      return result;
+    }
 
     const int speedMag = o.velocity < 0 ? -(int)o.velocity : (int)o.velocity;
     if (speedMag > (int)result.peakSpeed) result.peakSpeed = (uint16_t)speedMag;
@@ -341,7 +659,7 @@ struct FlcApproachResult {
 inline FlcApproachResult flcRunApproach(
     const FlcServoPort &port, uint8_t id, int startTick, int8_t probeSign,
     const FlcMotionEnvelope &envelope, const FlcContactConfig &guardsIn,
-    const FlcBaseline &baseline) {
+    const FlcBaseline &baseline, const FlcMotionWatch *watch = 0) {
   FlcApproachResult result;
   result.status = FLC_ENGINE_OK;
   result.abortReason = FLC_ABORT_NONE;
@@ -409,8 +727,9 @@ inline FlcApproachResult flcRunApproach(
         result.abortReason = FLC_ABORT_POSITION_OUT_OF_DOMAIN;
         return result;
       }
-      if (!port.commandPosition(port.ctx, id, commandedTarget, envelope.goalSpeed,
-                                envelope.acceleration)) {
+      if (!flcCommandPositionChecked(port, id, commandedTarget,
+                                     envelope.goalSpeed,
+                                     envelope.acceleration)) {
         result.status = FLC_ENGINE_ABORTED;
         result.abortReason = FLC_ABORT_DRIVER_ERROR;
         return result;
@@ -419,9 +738,10 @@ inline FlcApproachResult flcRunApproach(
     }
 
     FlcObservation o;
-    if (!port.readTelemetry(port.ctx, id, &o)) {
-      result.status = FLC_ENGINE_TELEMETRY_FAILED;
-      result.abortReason = FLC_ABORT_TELEMETRY_TIMEOUT;
+    const int readFault = flcReadFreshTelemetry(port, id, &o);
+    if (readFault != FLC_ABORT_NONE) {
+      result.status = flcEngineStatusForAbort(readFault);
+      result.abortReason = readFault;
       return result;
     }
     o.elapsedMs = elapsed;
@@ -435,6 +755,12 @@ inline FlcApproachResult flcRunApproach(
     if (state == FLC_HARD_ABORT) {
       result.status = FLC_ENGINE_ABORTED;
       result.abortReason = detector.abortReason;
+      return result;
+    }
+    const int watchFault = flcCheckMotionWatch(port, watch, guards, 0);
+    if (watchFault != FLC_ABORT_NONE) {
+      result.status = flcEngineStatusForAbort(watchFault);
+      result.abortReason = watchFault;
       return result;
     }
     if (state == FLC_CONTACT_CONFIRMED) {
@@ -470,7 +796,7 @@ struct FlcRetreatResult {
 inline FlcRetreatResult flcRetreatAndVerify(
     const FlcServoPort &port, uint8_t id, int contactTick, int8_t probeSign,
     const FlcMotionEnvelope &envelope, const FlcContactConfig &guards,
-    const FlcBaseline &baseline) {
+    const FlcBaseline &baseline, const FlcMotionWatch *watch = 0) {
   FlcRetreatResult result;
   result.status = FLC_ENGINE_OK;
   result.abortReason = FLC_ABORT_NONE;
@@ -489,13 +815,16 @@ inline FlcRetreatResult flcRetreatAndVerify(
   }
 
   const int target = contactTick + retreatSign * (int)envelope.retreatTicks;
-  if (!port.commandPosition(port.ctx, id, target, envelope.goalSpeed, envelope.acceleration)) {
+  if (!flcCommandPositionChecked(port, id, target, envelope.goalSpeed,
+                                 envelope.acceleration)) {
     result.status = FLC_ENGINE_ABORTED;
     result.abortReason = FLC_ABORT_DRIVER_ERROR;
     return result;
   }
 
   const uint32_t began = port.nowMs(port.ctx);
+  int previousPosition = contactTick;
+  int stagnantSamples = 0;
   while (true) {
     const uint32_t elapsed = port.nowMs(port.ctx) - began;
     if (elapsed > envelope.timeBudgetMs) {
@@ -505,19 +834,47 @@ inline FlcRetreatResult flcRetreatAndVerify(
     }
 
     FlcObservation o;
-    if (!port.readTelemetry(port.ctx, id, &o)) {
-      result.status = FLC_ENGINE_TELEMETRY_FAILED;
-      result.abortReason = FLC_ABORT_TELEMETRY_TIMEOUT;
+    const int readFault = flcReadFreshTelemetry(port, id, &o);
+    if (readFault != FLC_ABORT_NONE) {
+      result.status = flcEngineStatusForAbort(readFault);
+      result.abortReason = readFault;
       return result;
     }
-    if (o.statusByte != 0) { result.status = FLC_ENGINE_ABORTED; result.abortReason = FLC_ABORT_STATUS_ERROR; return result; }
-    if (!o.torqueEnabled) { result.status = FLC_ENGINE_ABORTED; result.abortReason = FLC_ABORT_TORQUE_UNEXPECTEDLY_OFF; return result; }
-    if (o.current >= guards.hardCurrentAbortRaw) { result.status = FLC_ENGINE_ABORTED; result.abortReason = FLC_ABORT_OVERCURRENT; return result; }
-    if ((int)o.temperature >= guards.thermalLimitC) { result.status = FLC_ENGINE_ABORTED; result.abortReason = FLC_ABORT_THERMAL; return result; }
+    const int guardFault = flcCheckGuardsAndWatch(
+        port, o, guards, elapsed, envelope.timeBudgetMs, envelope.torqueLimit,
+        true, target, watch);
+    if (guardFault != FLC_ABORT_NONE) {
+      result.status = (guardFault == FLC_ABORT_TELEMETRY_TIMEOUT)
+                          ? FLC_ENGINE_TELEMETRY_FAILED : FLC_ENGINE_ABORTED;
+      result.abortReason = guardFault;
+      return result;
+    }
 
     result.toTick = o.position;
     result.achievedTicks = flcDirectionalProgress(o.position, contactTick, retreatSign);
     result.restCurrent = o.current;
+
+    const int reverse = flcDirectionalProgress(o.position, contactTick, probeSign);
+    if (reverse > (int)guards.targetReachedToleranceTicks) {
+      result.status = FLC_ENGINE_RETREAT_FAILED;
+      result.abortReason = FLC_ABORT_WRONG_DIRECTION;
+      return result;
+    }
+    if (flcCircularDistance(o.position, previousPosition) <=
+            (int)guards.maxProgressTicks &&
+        flcCircularDistance(o.position, target) >
+            (int)guards.targetReachedToleranceTicks) {
+      ++stagnantSamples;
+    } else {
+      stagnantSamples = 0;
+    }
+    previousPosition = o.position;
+    if (stagnantSamples >=
+        (int)guards.startupGraceSamples + (int)guards.persistenceSamples) {
+      result.status = FLC_ENGINE_RETREAT_FAILED;
+      result.abortReason = FLC_ABORT_TARGET_DID_NOT_MOVE;
+      return result;
+    }
 
     if (flcCircularDistance(o.position, target) <= (int)guards.targetReachedToleranceTicks) {
       // Tracking recovered: the joint followed the retreat command to within
@@ -534,9 +891,10 @@ inline FlcRetreatResult flcRetreatAndVerify(
 
   // A retreat that moved a token amount has not actually cleared the endstop.
   const int required = (int)envelope.retreatTicks / 2;
-  if (result.achievedTicks < required || !result.trackingRecovered) {
+  if (result.achievedTicks < required || !result.trackingRecovered ||
+      !result.currentRecovered) {
     result.status = FLC_ENGINE_RETREAT_FAILED;
-    result.abortReason = FLC_ABORT_NONE;
+    result.abortReason = FLC_ABORT_TRACKING_FAILURE;
   }
   return result;
 }
@@ -566,7 +924,8 @@ struct FlcEndpointResult {
 inline FlcEndpointResult flcMeasureEndpoint(
     const FlcServoPort &port, uint8_t id, int startTick, int8_t probeSign,
     const FlcMotionEnvelope &envelope, const FlcContactConfig &guards,
-    const FlcBaseline &baseline, uint16_t repeatabilityToleranceTicks) {
+    const FlcBaseline &baseline, uint16_t repeatabilityToleranceTicks,
+    const FlcMotionWatch *watch = 0) {
   FlcEndpointResult result;
   result.status = FLC_ENGINE_OK;
   result.abortReason = FLC_ABORT_NONE;
@@ -579,7 +938,8 @@ inline FlcEndpointResult flcMeasureEndpoint(
   result.repeatability.contactTick = -1;
   result.repeatability.accepted = false;
 
-  result.first = flcRunApproach(port, id, startTick, probeSign, envelope, guards, baseline);
+  result.first = flcRunApproach(port, id, startTick, probeSign, envelope, guards,
+                                baseline, watch);
   if (result.first.status != FLC_ENGINE_OK) {
     result.status = result.first.status;
     result.abortReason = result.first.abortReason;
@@ -587,7 +947,7 @@ inline FlcEndpointResult flcMeasureEndpoint(
   }
 
   result.retreat = flcRetreatAndVerify(port, id, result.first.contactTick, probeSign,
-                                       envelope, guards, baseline);
+                                       envelope, guards, baseline, watch);
   if (result.retreat.status != FLC_ENGINE_OK) {
     result.status = result.retreat.status;
     result.abortReason = result.retreat.abortReason;
@@ -597,7 +957,7 @@ inline FlcEndpointResult flcMeasureEndpoint(
   // Second approach starts from where the retreat actually ended, so it is a
   // genuinely independent traversal rather than a replay of the first.
   result.second = flcRunApproach(port, id, result.retreat.toTick, probeSign, envelope,
-                                 guards, baseline);
+                                 guards, baseline, watch);
   if (result.second.status != FLC_ENGINE_OK) {
     result.status = result.second.status;
     result.abortReason = result.second.abortReason;
@@ -609,7 +969,8 @@ inline FlcEndpointResult flcMeasureEndpoint(
   // hold torque against the structure for an unbounded time, and would give the
   // next endpoint a start position that does not match where the joint is.
   result.finalRetreat = flcRetreatAndVerify(port, id, result.second.contactTick,
-                                            probeSign, envelope, guards, baseline);
+                                            probeSign, envelope, guards, baseline,
+                                            watch);
   result.restTick = result.finalRetreat.toTick;
   if (result.finalRetreat.status != FLC_ENGINE_OK) {
     result.status = result.finalRetreat.status;
@@ -648,7 +1009,8 @@ struct FlcReturnResult {
 
 inline FlcReturnResult flcReturnTo(const FlcServoPort &port, uint8_t id, int targetTick,
                                    const FlcMotionEnvelope &envelope,
-                                   const FlcContactConfig &guards) {
+                                   const FlcContactConfig &guards,
+                                   const FlcMotionWatch *watch = 0) {
   FlcReturnResult result;
   result.status = FLC_ENGINE_OK;
   result.abortReason = FLC_ABORT_NONE;
@@ -661,8 +1023,8 @@ inline FlcReturnResult flcReturnTo(const FlcServoPort &port, uint8_t id, int tar
     result.abortReason = FLC_ABORT_POSITION_OUT_OF_DOMAIN;
     return result;
   }
-  if (!port.commandPosition(port.ctx, id, targetTick, envelope.goalSpeed,
-                            envelope.acceleration)) {
+  if (!flcCommandPositionChecked(port, id, targetTick, envelope.goalSpeed,
+                                 envelope.acceleration)) {
     result.status = FLC_ENGINE_ABORTED;
     result.abortReason = FLC_ABORT_DRIVER_ERROR;
     return result;
@@ -676,15 +1038,21 @@ inline FlcReturnResult flcReturnTo(const FlcServoPort &port, uint8_t id, int tar
       return result;
     }
     FlcObservation o;
-    if (!port.readTelemetry(port.ctx, id, &o)) {
-      result.status = FLC_ENGINE_TELEMETRY_FAILED;
-      result.abortReason = FLC_ABORT_TELEMETRY_TIMEOUT;
+    const int readFault = flcReadFreshTelemetry(port, id, &o);
+    if (readFault != FLC_ABORT_NONE) {
+      result.status = flcEngineStatusForAbort(readFault);
+      result.abortReason = readFault;
       return result;
     }
-    if (o.statusByte != 0) { result.status = FLC_ENGINE_ABORTED; result.abortReason = FLC_ABORT_STATUS_ERROR; return result; }
-    if (!o.torqueEnabled) { result.status = FLC_ENGINE_ABORTED; result.abortReason = FLC_ABORT_TORQUE_UNEXPECTEDLY_OFF; return result; }
-    if (o.current >= guards.hardCurrentAbortRaw) { result.status = FLC_ENGINE_ABORTED; result.abortReason = FLC_ABORT_OVERCURRENT; return result; }
-    if ((int)o.temperature >= guards.thermalLimitC) { result.status = FLC_ENGINE_ABORTED; result.abortReason = FLC_ABORT_THERMAL; return result; }
+    const int guardFault = flcCheckGuardsAndWatch(
+        port, o, guards, port.nowMs(port.ctx) - began, envelope.timeBudgetMs,
+        envelope.torqueLimit, true, targetTick, watch);
+    if (guardFault != FLC_ABORT_NONE) {
+      result.status = (guardFault == FLC_ABORT_TELEMETRY_TIMEOUT)
+                          ? FLC_ENGINE_TELEMETRY_FAILED : FLC_ENGINE_ABORTED;
+      result.abortReason = guardFault;
+      return result;
+    }
 
     result.achievedTick = o.position;
     result.errorTicks = flcCircularDistance(o.position, targetTick);
@@ -707,40 +1075,105 @@ inline uint16_t flcTravelBudgetForDistance(int expectedTicks) {
 }
 
 // --------------------------------------------------------------------------
-// Direction measurement — MEASURED, never inherited from the leg label
+// ENCODER RESPONSE vs KINEMATIC DIRECTION — two different things
+//
+// A position-controlled ST3215 will, by construction, move its raw encoder
+// toward whatever raw target it is given. So commanding `startTick + N` and
+// observing that raw went up proves only that the servo is alive and in
+// position mode. It says NOTHING about the MATDOG joint convention
+//
+//     q = direction * signed_tick_delta(raw, q0)
+//
+// because `direction` is a property of how the horn and linkage were physically
+// mounted, not of the servo's control loop. Treating the probe result as the
+// kinematic direction would be tautological — it would always return +1.
+//
+// This file therefore separates:
+//
+//   flcVerifyEncoderResponse()  sanity: does raw track the commanded target?
+//   flcResolveJointDirection()  the real question, resolved from evidence
+//
+// The kinematic direction is resolved from the ASYMMETRY of the URDF limits.
+// Both endpoints are measured direction-agnostically, giving raw_lo and raw_hi.
+// Two hypotheses remain:
+//
+//   direction = +1  ->  raw_lo is the q_min stop, q0 = raw_lo + |q_min|
+//   direction = -1  ->  raw_lo is the q_max stop, q0 = raw_lo + |q_max|
+//
+// The two hypotheses place q0 ||q_min| - |q_max|| ticks apart. For the MATDOG
+// upper and lower joints that separation is large (about 793 and 613 ticks) and
+// the manual q0 witness discriminates decisively. For the hips it is only about
+// 9 ticks — far inside the manual-pose uncertainty — so geometry ALONE CANNOT
+// resolve a hip, and this code says so instead of guessing.
 // --------------------------------------------------------------------------
 
-struct FlcDirectionResult {
+enum FlcDirectionMethod {
+  FLC_DIRECTION_UNRESOLVED = 0,
+  //: resolved from URDF limit asymmetry cross-checked against the manual q0
+  FLC_DIRECTION_GEOMETRY_AND_MANUAL_Q0,
+  //: declared by the operator after physically observing the joint move
+  FLC_DIRECTION_OPERATOR_WITNESS,
+  //: operator declared it AND geometry independently agreed
+  FLC_DIRECTION_OPERATOR_AND_GEOMETRY_AGREE,
+};
+
+inline const char *flcDirectionMethodLabel(int method) {
+  switch (method) {
+    case FLC_DIRECTION_GEOMETRY_AND_MANUAL_Q0: return "GEOMETRY_AND_MANUAL_Q0";
+    case FLC_DIRECTION_OPERATOR_WITNESS: return "OPERATOR_WITNESS";
+    case FLC_DIRECTION_OPERATOR_AND_GEOMETRY_AGREE: return "OPERATOR_AND_GEOMETRY_AGREE";
+    default: return "UNRESOLVED";
+  }
+}
+
+//: Sanity check only. Confirms the servo follows a commanded raw target; it is
+//: NOT the kinematic direction. Named so it cannot be mistaken for one.
+struct FlcEncoderResponseResult {
   int status;
   int abortReason;
-  int8_t encoderSign;   //: raw tick sign produced by a positive commanded step
+  bool responds;
   int observedTravel;
   int startTick;
   int endTick;
+  int8_t rawProbeSign;
 };
 
-inline FlcDirectionResult flcMeasureDirection(
+inline FlcEncoderResponseResult flcVerifyEncoderResponse(
     const FlcServoPort &port, uint8_t id, int startTick,
     const FlcMotionEnvelope &envelope, const FlcContactConfig &guards,
-    uint16_t probeTicks) {
-  FlcDirectionResult result;
+    uint16_t probeTicks, int8_t requestedRawProbeSign = 0,
+    const FlcMotionWatch *watch = 0) {
+  FlcEncoderResponseResult result;
   result.status = FLC_ENGINE_OK;
   result.abortReason = FLC_ABORT_NONE;
-  result.encoderSign = 0;
+  result.responds = false;
   result.observedTravel = 0;
   result.startTick = startTick;
   result.endTick = startTick;
+  result.rawProbeSign = 0;
 
   if (!flcPortUsable(port)) { result.status = FLC_ENGINE_REFUSED_PORT; return result; }
   if (!envelope.valid) { result.status = FLC_ENGINE_REFUSED_ENVELOPE; return result; }
-  if (!flcPlanStaysInDomain(startTick, probeTicks, +1)) {
+
+  // Probe toward whichever side has room, so a joint already near a boundary is
+  // not pushed out of the unsigned domain. An EXPLICIT semantic choice is never
+  // silently reversed: that could turn a generated no-parking endpoint into a
+  // parking-required one.
+  int8_t probeSign = requestedRawProbeSign;
+  const bool explicitSign = probeSign == 1 || probeSign == -1;
+  if (!explicitSign) probeSign = +1;
+  if (!flcPlanStaysInDomain(startTick, probeTicks, probeSign) && !explicitSign)
+    probeSign = (int8_t)-probeSign;
+  if (!flcPlanStaysInDomain(startTick, probeTicks, probeSign)) {
     result.status = FLC_ENGINE_REFUSED_DOMAIN;
     result.abortReason = FLC_ABORT_WRAP_BOUNDARY;
     return result;
   }
+  result.rawProbeSign = probeSign;
 
-  const int target = startTick + (int)probeTicks;
-  if (!port.commandPosition(port.ctx, id, target, envelope.goalSpeed, envelope.acceleration)) {
+  const int target = startTick + probeSign * (int)probeTicks;
+  if (!flcCommandPositionChecked(port, id, target, envelope.goalSpeed,
+                                 envelope.acceleration)) {
     result.status = FLC_ENGINE_ABORTED;
     result.abortReason = FLC_ABORT_DRIVER_ERROR;
     return result;
@@ -752,14 +1185,21 @@ inline FlcDirectionResult flcMeasureDirection(
     if (elapsed > envelope.timeBudgetMs) break;
 
     FlcObservation o;
-    if (!port.readTelemetry(port.ctx, id, &o)) {
-      result.status = FLC_ENGINE_TELEMETRY_FAILED;
-      result.abortReason = FLC_ABORT_TELEMETRY_TIMEOUT;
+    const int readFault = flcReadFreshTelemetry(port, id, &o);
+    if (readFault != FLC_ABORT_NONE) {
+      result.status = flcEngineStatusForAbort(readFault);
+      result.abortReason = readFault;
       return result;
     }
-    if (o.statusByte != 0) { result.status = FLC_ENGINE_ABORTED; result.abortReason = FLC_ABORT_STATUS_ERROR; return result; }
-    if (o.current >= guards.hardCurrentAbortRaw) { result.status = FLC_ENGINE_ABORTED; result.abortReason = FLC_ABORT_OVERCURRENT; return result; }
-    if ((int)o.temperature >= guards.thermalLimitC) { result.status = FLC_ENGINE_ABORTED; result.abortReason = FLC_ABORT_THERMAL; return result; }
+    const int guardFault = flcCheckGuardsAndWatch(
+        port, o, guards, elapsed, envelope.timeBudgetMs, envelope.torqueLimit,
+        true, target, watch);
+    if (guardFault != FLC_ABORT_NONE) {
+      result.status = (guardFault == FLC_ABORT_TELEMETRY_TIMEOUT)
+                          ? FLC_ENGINE_TELEMETRY_FAILED : FLC_ENGINE_ABORTED;
+      result.abortReason = guardFault;
+      return result;
+    }
 
     result.endTick = o.position;
     if (flcCircularDistance(o.position, target) <= (int)guards.targetReachedToleranceTicks) break;
@@ -768,22 +1208,182 @@ inline FlcDirectionResult flcMeasureDirection(
 
   const int delta = flcSignedTickDelta(result.endTick, startTick);
   result.observedTravel = delta < 0 ? -delta : delta;
-  // Require a decisive excursion: a couple of ticks of noise is not a direction.
+
+  // The encoder must follow the commanded side. If it moved the OTHER way the
+  // servo is miswired or not in position mode — a hard fault, not a direction.
+  if (delta * probeSign < 0 && result.observedTravel > (int)guards.targetReachedToleranceTicks) {
+    result.status = FLC_ENGINE_ABORTED;
+    result.abortReason = FLC_ABORT_WRONG_DIRECTION;
+    return result;
+  }
   if (result.observedTravel < (int)probeTicks / 2) {
     result.status = FLC_ENGINE_DIRECTION_UNRESOLVED;
     result.abortReason = FLC_ABORT_TARGET_DID_NOT_MOVE;
     return result;
   }
-  result.encoderSign = delta > 0 ? (int8_t)1 : (int8_t)-1;
+  result.responds = true;
   return result;
+}
+
+// --------------------------------------------------------------------------
+// Kinematic direction resolution
+// --------------------------------------------------------------------------
+
+struct FlcDirectionEvidence {
+  //: measured contacts, direction-agnostic: rawLo < rawHi along the encoder
+  int rawLoTick;
+  int rawHiTick;
+  //: URDF/Geometry Compiler angles in ticks; qMin is negative, qMax positive
+  int qMinTicks;
+  int qMaxTicks;
+  //: manual-pose q0 candidate, if H2 produced a usable one for this joint
+  bool manualQ0Known;
+  int manualQ0Tick;
+  //: Physical pose accuracy, established independently of encoder stability.
+  //: H2 sample spread MUST NOT populate this field.
+  bool manualQ0PoseUncertaintyKnown;
+  uint16_t manualQ0PoseUncertaintyTicks;
+  //: operator-declared sign after physically watching the joint move
+  int8_t operatorWitness;   // 0 = none
+};
+
+struct FlcDirectionResolution {
+  int status;
+  int method;
+  int8_t direction;
+  int q0IfPositive;
+  int q0IfNegative;
+  int q0PositiveFromMin;
+  int q0PositiveFromMax;
+  int q0NegativeFromMin;
+  int q0NegativeFromMax;
+  int endpointQ0DisagreementTicks;
+  int separationTicks;      //: how far apart the two hypotheses place q0
+  int errorIfPositive;
+  int errorIfNegative;
+  int marginTicks;          //: how decisively the manual q0 favours the winner
+  bool geometryDecisive;
+  const char *diagnosis;
+};
+
+inline int flcCircularMidpoint(int a, int b) {
+  return flcNormalizeTick(a + flcSignedTickDelta(b, a) / 2);
+}
+
+inline FlcDirectionResolution flcResolveJointDirection(const FlcDirectionEvidence &e) {
+  FlcDirectionResolution r;
+  r.status = FLC_ENGINE_DIRECTION_UNRESOLVED;
+  r.method = FLC_DIRECTION_UNRESOLVED;
+  r.direction = 0;
+  r.errorIfPositive = 0;
+  r.errorIfNegative = 0;
+  r.marginTicks = 0;
+  r.geometryDecisive = false;
+  r.diagnosis = "";
+  r.q0IfPositive = -1;
+  r.q0IfNegative = -1;
+  r.q0PositiveFromMin = -1;
+  r.q0PositiveFromMax = -1;
+  r.q0NegativeFromMin = -1;
+  r.q0NegativeFromMax = -1;
+  r.endpointQ0DisagreementTicks = 0;
+
+  if (e.rawLoTick < 0 || e.rawLoTick > FLC_ENCODER_MAX ||
+      e.rawHiTick < 0 || e.rawHiTick > FLC_ENCODER_MAX ||
+      e.rawHiTick <= e.rawLoTick || e.qMinTicks >= 0 || e.qMaxTicks <= 0 ||
+      (e.operatorWitness != 0 && e.operatorWitness != 1 &&
+       e.operatorWitness != -1)) {
+    r.diagnosis = "invalid endpoint, URDF-limit, or operator-witness evidence";
+    return r;
+  }
+
+  // Each hypothesis derives q0 independently from BOTH physical endpoints.
+  // Their disagreement is also the endpoint-span/URDF inconsistency residual.
+  r.q0PositiveFromMin = flcNormalizeTick(e.rawLoTick - e.qMinTicks);
+  r.q0PositiveFromMax = flcNormalizeTick(e.rawHiTick - e.qMaxTicks);
+  r.q0IfPositive = flcCircularMidpoint(r.q0PositiveFromMin,
+                                       r.q0PositiveFromMax);
+  r.q0NegativeFromMin = flcNormalizeTick(e.rawHiTick + e.qMinTicks);
+  r.q0NegativeFromMax = flcNormalizeTick(e.rawLoTick + e.qMaxTicks);
+  r.q0IfNegative = flcCircularMidpoint(r.q0NegativeFromMin,
+                                       r.q0NegativeFromMax);
+  const int positiveResidual = flcCircularDistance(r.q0PositiveFromMin,
+                                                    r.q0PositiveFromMax);
+  const int negativeResidual = flcCircularDistance(r.q0NegativeFromMin,
+                                                    r.q0NegativeFromMax);
+  r.endpointQ0DisagreementTicks =
+      positiveResidual > negativeResidual ? positiveResidual : negativeResidual;
+  r.separationTicks = flcCircularDistance(r.q0IfPositive, r.q0IfNegative);
+
+  // Geometry can only discriminate if the two hypotheses put q0 meaningfully
+  // further apart than the manual pose could plausibly be wrong by.
+  const int required = 2 * (int)e.manualQ0PoseUncertaintyTicks;
+  int8_t geometryDirection = 0;
+
+  if (e.manualQ0Known && e.manualQ0PoseUncertaintyKnown &&
+      r.separationTicks > required) {
+    const int errPos = flcCircularDistance(r.q0IfPositive, e.manualQ0Tick);
+    const int errNeg = flcCircularDistance(r.q0IfNegative, e.manualQ0Tick);
+    r.errorIfPositive = errPos;
+    r.errorIfNegative = errNeg;
+    r.marginTicks = errPos > errNeg ? errPos - errNeg : errNeg - errPos;
+
+    // The winner must also be plausible in absolute terms, not merely better.
+    const int winnerError = errPos < errNeg ? errPos : errNeg;
+    if (r.marginTicks > required &&
+        winnerError <= (int)e.manualQ0PoseUncertaintyTicks) {
+      geometryDirection = (errPos < errNeg) ? (int8_t)1 : (int8_t)-1;
+      r.geometryDecisive = true;
+    }
+  }
+
+  const bool haveOperator = (e.operatorWitness == 1 || e.operatorWitness == -1);
+
+  if (haveOperator && r.geometryDecisive) {
+    if (e.operatorWitness != geometryDirection) {
+      r.status = FLC_ENGINE_DIRECTION_UNRESOLVED;
+      r.diagnosis =
+          "operator witness and geometry disagree; refusing rather than picking one";
+      return r;
+    }
+    r.direction = geometryDirection;
+    r.method = FLC_DIRECTION_OPERATOR_AND_GEOMETRY_AGREE;
+    r.status = FLC_ENGINE_OK;
+    r.diagnosis = "operator witness confirmed by URDF limit asymmetry";
+    return r;
+  }
+  if (haveOperator) {
+    r.direction = e.operatorWitness;
+    r.method = FLC_DIRECTION_OPERATOR_WITNESS;
+    r.status = FLC_ENGINE_OK;
+    r.diagnosis =
+        "operator witness only; joint limits too symmetric for geometry to confirm";
+    return r;
+  }
+  if (r.geometryDecisive) {
+    r.direction = geometryDirection;
+    r.method = FLC_DIRECTION_GEOMETRY_AND_MANUAL_Q0;
+    r.status = FLC_ENGINE_OK;
+    r.diagnosis = "resolved from URDF limit asymmetry against the manual q0 candidate";
+    return r;
+  }
+
+  r.diagnosis =
+      "no operator witness, and the joint limits are too symmetric for the manual "
+      "q0 candidate to discriminate; direction cannot be inferred";
+  return r;
 }
 
 // --------------------------------------------------------------------------
 // H3 — characterize one joint
 //
-// Produces the evidence that resolves the parameters H4 needs. This is the
-// operation that breaks the old deadlock: it may run on a bootstrap envelope,
-// and it is NOT blocked by the acceptance tolerances it exists to inform.
+// Produces the evidence H4 needs. It may run on a bootstrap envelope, and it is
+// deliberately NOT blocked by the acceptance tolerances it exists to inform.
+//
+// H3 does NOT resolve the kinematic direction: that needs BOTH endpoints, which
+// only H4 measures. H3 verifies the encoder responds, measures the free-motion
+// baseline, and proves the joint can be driven into a real stop and released
+// twice — which is what yields a measured repeatability band.
 // --------------------------------------------------------------------------
 
 struct FlcCharacterizationResult {
@@ -791,12 +1391,13 @@ struct FlcCharacterizationResult {
   int abortReason;
   uint8_t busId;
   int startTick;
-  FlcDirectionResult direction;
+  FlcEncoderResponseResult encoderResponse;
   FlcBaselineResult baseline;
   FlcApproachResult probeContact;
   FlcRetreatResult probeRetreat;
   FlcApproachResult probeContact2;
   FlcRetreatResult finalRetreat;
+  FlcReturnResult returnToStart;
   //: characterized outputs, origin CHARACTERIZED_CURRENT_HARDWARE on success
   uint16_t characterizedContactThresholdRaw;
   uint16_t characterizedRetreatTicks;
@@ -804,6 +1405,7 @@ struct FlcCharacterizationResult {
   uint16_t observedContactSpreadTicks;
   uint16_t peakCurrent;
   uint8_t peakTemperature;
+  int restTick;
   bool complete;
 };
 
@@ -819,9 +1421,11 @@ inline uint16_t flcRepeatabilityBandFromSpread(uint16_t observedSpreadTicks) {
 }
 
 inline FlcCharacterizationResult flcCharacterizeJoint(
-    const FlcServoPort &port, uint8_t id, int startTick, int8_t plannedProbeSign,
+    const FlcServoPort &port, uint8_t id, int startTick,
+    int8_t requestedRawProbeSign,
     const FlcMotionEnvelope &envelope, const FlcContactConfig &guards,
-    uint16_t directionProbeTicks, uint16_t baselineExcursionTicks) {
+    uint16_t responseProbeTicks, uint16_t baselineExcursionTicks,
+    const FlcMotionWatch *watch = 0) {
   FlcCharacterizationResult result;
   result.status = FLC_ENGINE_OK;
   result.abortReason = FLC_ABORT_NONE;
@@ -829,128 +1433,149 @@ inline FlcCharacterizationResult flcCharacterizeJoint(
   result.startTick = startTick;
   result.characterizedContactThresholdRaw = 0;
   result.characterizedRetreatTicks = 0;
+  result.characterizedRepeatabilityToleranceTicks = 0;
   result.observedContactSpreadTicks = 0;
   result.peakCurrent = 0;
   result.peakTemperature = 0;
+  result.restTick = startTick;
   result.complete = false;
 
-  const int begun = flcBeginMotion(port, id, envelope);
-  if (begun != FLC_ENGINE_OK) {
-    result.status = begun;
-    flcEndMotion(port, id);
-    return result;
-  }
-
-  // H3A — measure which way the encoder moves for a positive commanded step.
-  result.direction = flcMeasureDirection(port, id, startTick, envelope, guards,
-                                         directionProbeTicks);
-  if (result.direction.status != FLC_ENGINE_OK) {
-    result.status = result.direction.status;
-    result.abortReason = result.direction.abortReason;
-    flcEndMotion(port, id);
-    return result;
-  }
-  // The measurement must agree with the direction the caller intended to probe;
-  // if it does not, the plan and the physical joint disagree.
-  if (plannedProbeSign != 0 && result.direction.encoderSign != plannedProbeSign) {
+  if (requestedRawProbeSign != 0 && requestedRawProbeSign != 1 &&
+      requestedRawProbeSign != -1) {
     result.status = FLC_ENGINE_DIRECTION_UNRESOLVED;
     result.abortReason = FLC_ABORT_WRONG_DIRECTION;
-    flcEndMotion(port, id);
     return result;
   }
-  const int8_t probeSign = result.direction.encoderSign;
+
+  const FlcBeginMotionResult begun = flcBeginMotion(
+      port, id, startTick, guards.targetReachedToleranceTicks, envelope, guards,
+      watch);
+  if (begun.status != FLC_ENGINE_OK) {
+    result.status = begun.status;
+    result.abortReason = begun.abortReason;
+    return result;
+  }
+
+  // H3A — encoder response sanity. This deliberately reports RAW probe sign,
+  // never MATDOG kinematic direction.
+  result.encoderResponse = flcVerifyEncoderResponse(port, id, startTick, envelope,
+                                                    guards, responseProbeTicks,
+                                                    requestedRawProbeSign, watch);
+  if (result.encoderResponse.status != FLC_ENGINE_OK) {
+    result.status = result.encoderResponse.status;
+    result.abortReason = result.encoderResponse.abortReason;
+    flcRequireTorqueOff(port, id, result.status, result.abortReason);
+    return result;
+  }
+
+  const int8_t rawProbeSign = result.encoderResponse.rawProbeSign;
 
   // H3B — free-motion baseline, from which the contact threshold is derived.
-  result.baseline = flcMeasureFreeMotionBaseline(port, id, result.direction.endTick,
-                                                 probeSign, envelope, guards,
-                                                 baselineExcursionTicks);
+  result.baseline = flcMeasureFreeMotionBaseline(port, id, result.encoderResponse.endTick,
+                                                 rawProbeSign, envelope, guards,
+                                                 baselineExcursionTicks, watch);
   if (result.baseline.status != FLC_ENGINE_OK) {
     result.status = result.baseline.status;
     result.abortReason = result.baseline.abortReason;
-    flcEndMotion(port, id);
+    flcRequireTorqueOff(port, id, result.status, result.abortReason);
     return result;
   }
 
-  // H3C — one supervised bounded approach to a real contact, plus retreat, to
-  // prove the joint can be approached and released safely on this build.
-  result.probeContact = flcRunApproach(port, id, result.baseline.endTick, probeSign,
-                                       envelope, guards, result.baseline.baseline);
+  // H3C — one supervised bounded approach to a real contact, plus retreat.
+  result.probeContact = flcRunApproach(
+      port, id, result.baseline.endTick, rawProbeSign, envelope, guards,
+      result.baseline.baseline, watch);
   if (result.probeContact.status != FLC_ENGINE_OK) {
     result.status = result.probeContact.status;
     result.abortReason = result.probeContact.abortReason;
-    flcEndMotion(port, id);
+    flcRequireTorqueOff(port, id, result.status, result.abortReason);
     return result;
   }
   result.peakCurrent = result.probeContact.peakCurrent;
   result.peakTemperature = result.probeContact.peakTemperature;
 
   result.probeRetreat = flcRetreatAndVerify(port, id, result.probeContact.contactTick,
-                                            probeSign, envelope, guards,
-                                            result.baseline.baseline);
+                                            rawProbeSign, envelope, guards,
+                                            result.baseline.baseline, watch);
   if (result.probeRetreat.status != FLC_ENGINE_OK) {
     result.status = result.probeRetreat.status;
     result.abortReason = result.probeRetreat.abortReason;
-    flcEndMotion(port, id);
+    flcRequireTorqueOff(port, id, result.status, result.abortReason);
     return result;
   }
 
-  // H3D — a SECOND independent approach to the same stop. Without this, H3
-  // could not report a repeatability spread, and H4 would have to inherit a
-  // tolerance from somewhere else. This measures it on this build instead.
-  result.probeContact2 = flcRunApproach(port, id, result.probeRetreat.toTick, probeSign,
-                                        envelope, guards, result.baseline.baseline);
+  // H3D — a SECOND independent approach, so the repeatability band is MEASURED
+  // on this build rather than inherited from somewhere else.
+  result.probeContact2 = flcRunApproach(
+      port, id, result.probeRetreat.toTick, rawProbeSign, envelope, guards,
+      result.baseline.baseline, watch);
   if (result.probeContact2.status != FLC_ENGINE_OK) {
     result.status = result.probeContact2.status;
     result.abortReason = result.probeContact2.abortReason;
-    flcEndMotion(port, id);
+    flcRequireTorqueOff(port, id, result.status, result.abortReason);
     return result;
   }
   if (result.probeContact2.peakCurrent > result.peakCurrent)
     result.peakCurrent = result.probeContact2.peakCurrent;
 
-  const int spread = flcCircularDistance(result.probeContact.contactTick,
-                                         result.probeContact2.contactTick);
-  result.observedContactSpreadTicks = (uint16_t)spread;
+  result.observedContactSpreadTicks = (uint16_t)flcCircularDistance(
+      result.probeContact.contactTick, result.probeContact2.contactTick);
 
-  // Release the stop again so the joint does not end characterization loaded.
+  // Release the stop so the joint does not end characterization loaded.
   result.finalRetreat = flcRetreatAndVerify(port, id, result.probeContact2.contactTick,
-                                            probeSign, envelope, guards,
-                                            result.baseline.baseline);
+                                            rawProbeSign, envelope, guards,
+                                            result.baseline.baseline, watch);
   if (result.finalRetreat.status != FLC_ENGINE_OK) {
     result.status = result.finalRetreat.status;
     result.abortReason = result.finalRetreat.abortReason;
-    flcEndMotion(port, id);
+    flcRequireTorqueOff(port, id, result.status, result.abortReason);
     return result;
   }
+  result.restTick = result.finalRetreat.toTick;
+
+  // H3 ends at its known start pose, not merely clear of the contact. This is
+  // required before a different joint may move under the generated q=0 plan.
+  result.returnToStart = flcReturnTo(port, id, startTick, envelope, guards, watch);
+  if (result.returnToStart.status != FLC_ENGINE_OK) {
+    result.status = result.returnToStart.status;
+    result.abortReason = result.returnToStart.abortReason;
+    flcRequireTorqueOff(port, id, result.status, result.abortReason);
+    return result;
+  }
+  result.restTick = result.returnToStart.achievedTick;
 
   result.characterizedContactThresholdRaw =
       flcBaselineContactThreshold(result.baseline.baseline);
   result.characterizedRetreatTicks = (uint16_t)result.probeRetreat.achievedTicks;
-  // Repeatability band derived from the spread this joint actually produced:
-  // twice the observed spread, with an 8-tick floor so a lucky pair of
-  // identical contacts cannot yield a band no real joint could satisfy.
   result.characterizedRepeatabilityToleranceTicks =
       flcRepeatabilityBandFromSpread(result.observedContactSpreadTicks);
   result.complete = true;
 
-  // Characterization always ends with the joint released.
-  if (!flcEndMotion(port, id)) {
-    result.status = FLC_ENGINE_TORQUE_SETUP_FAILED;
-    result.complete = false;
-  }
+  flcRequireTorqueOff(port, id, result.status, result.abortReason);
+  if (result.status != FLC_ENGINE_OK) result.complete = false;
   return result;
 }
 
 // --------------------------------------------------------------------------
-// H4 — calibrate one joint: both endpoints, span, direction, q0 candidate
+// H4 / H5 / H6 — dependency-aware calibration over the generated geometry plan
+//
+// One implementation, one entry point. H4, H5 and H6 are the same
+// flcRunCalibrationPlan() call under different selection masks, so the
+// orchestration exercised offline is the orchestration the firmware executes.
 // --------------------------------------------------------------------------
 
-//: How far a result has travelled toward becoming canonical calibration.
+#define FLC_JOINTS_PER_LEG 3
+#define FLC_LEG_COUNT 4
+#define FLC_CALIBRATION_JOINT_COUNT FLC_GEOMETRY_JOINT_COUNT
+#define FLC_ALL_GEOMETRY_JOINTS_MASK ((uint16_t)0x0FFFu)
+
+// A result is never promoted by this firmware. ACCEPTED means only that every
+// explicitly characterized acceptance gate passed in the current session.
 enum FlcResultTier {
-  FLC_TIER_MEASURED = 0,   //: hardware produced numbers
-  FLC_TIER_CANDIDATE,      //: internally consistent, derivation succeeded
-  FLC_TIER_ACCEPTED,       //: passed the post-measure acceptance gates
-  FLC_TIER_PROMOTED,       //: written into canonical calibration — NEVER here
+  FLC_TIER_MEASURED = 0,
+  FLC_TIER_CANDIDATE,
+  FLC_TIER_ACCEPTED,
+  FLC_TIER_PROMOTED,
 };
 
 inline const char *flcResultTierLabel(int tier) {
@@ -963,271 +1588,888 @@ inline const char *flcResultTierLabel(int tier) {
   }
 }
 
+enum FlcQ0CrosscheckStatus {
+  FLC_Q0_CROSSCHECK_NOT_RUN = 0,
+  FLC_Q0_CROSSCHECK_MATCH,
+  FLC_Q0_CROSSCHECK_MISMATCH,
+  FLC_Q0_BLOCKED_TOLERANCE_UNVALIDATED,
+  FLC_Q0_BLOCKED_MANUAL_CANDIDATE_MISSING,
+};
+
+inline const char *flcQ0CrosscheckStatusLabel(int status) {
+  switch (status) {
+    case FLC_Q0_CROSSCHECK_MATCH: return "MATCH";
+    case FLC_Q0_CROSSCHECK_MISMATCH: return "MISMATCH";
+    case FLC_Q0_BLOCKED_TOLERANCE_UNVALIDATED:
+      return "BLOCKED_TOLERANCE_UNVALIDATED";
+    case FLC_Q0_BLOCKED_MANUAL_CANDIDATE_MISSING:
+      return "BLOCKED_MANUAL_Q0_MISSING";
+    default: return "NOT_RUN";
+  }
+}
+
 struct FlcAcceptanceGates {
   bool repeatabilityToleranceKnown;
   uint16_t repeatabilityToleranceTicks;
   bool endpointVsUrdfToleranceKnown;
   uint16_t endpointVsUrdfToleranceTicks;
-  //: expected span between the two geometric contacts, in ticks
   int expectedSpanTicks;
+  bool manualVsDerivedQ0ToleranceKnown;
+  uint16_t manualVsDerivedQ0ToleranceTicks;
+};
+
+// One row per generated geometry joint, indexed by FlcGeometryJoint. H2 and H3
+// evidence stay distinct; a manual q0 candidate is never silently promoted to
+// a derived calibration and the two values are never averaged.
+struct FlcJointPlan {
+  FlcGeometryJoint geometryJoint;
+  uint8_t busId;
+  bool characterized;
+  int startTick;
+  bool q0WatchKnown;
+  int q0WatchTick;
+  uint16_t q0WatchToleranceTicks;
+  bool calibrationKnown;
+  int8_t knownDirection;
+  int knownQ0Tick;
+  FlcDirectionEvidence directionEvidence;
+  FlcBaseline baseline;
+  FlcMotionEnvelope envelope;
+  FlcAcceptanceGates gates;
+};
+
+struct FlcRuntimeCalibration {
+  bool holdKnown;
+  int holdTick;
+  uint16_t holdToleranceTicks;
+  bool calibrationUsable;
+  int8_t direction;
+  int q0Tick;
+};
+
+struct FlcParkingTransaction {
+  int status;
+  int abortReason;
+  bool required;
+  bool noParkingProvenanceVerified;
+  bool prerequisiteVerified;
+  bool entered;
+  bool trackingVerified;
+  bool restoreAttempted;
+  bool restoreVerified;
+  uint8_t auxiliaryBusId;
+  FlcGeometryJoint auxiliaryJoint;
+  int savedTick;
+  int parkingTick;
+  int achievedTick;
+  int restoredTick;
+};
+
+struct FlcEndpointExecution {
+  int status;
+  int abortReason;
+  uint8_t geometryEndpointIndex;
+  FlcParkingOutcome parkingOutcome;
+  bool q0WatchVerified;
+  bool targetHoldGoalVerified;
+  bool targetReturnedToQ0;
+  bool targetTorqueOffVerified;
+  FlcParkingTransaction parking;
+  FlcEndpointResult measurement;
+  FlcReturnResult returnToQ0;
 };
 
 struct FlcJointCalibrationResult {
   int status;
   int abortReason;
   uint8_t busId;
+  FlcGeometryJoint geometryJoint;
   int8_t direction;
+  int directionMethod;
+  FlcDirectionResolution directionResolution;
   FlcEndpointResult minEndpoint;
-  FlcReturnResult returnToNeutral;
   FlcEndpointResult maxEndpoint;
+  FlcEndpointExecution minExecution;
+  FlcEndpointExecution maxExecution;
+  int rawLoTick;
+  int rawHiTick;
   int minContactTick;
   int maxContactTick;
   int measuredSpanTicks;
   int expectedSpanTicks;
   int spanErrorTicks;
-  int q0Tick;
+  int manualPoseQ0CandidateTick;
+  int derivedQ0FinalTick;
+  int q0Tick;  // compatibility alias for derivedQ0FinalTick
+  int manualVsDerivedQ0ErrorTicks;
+  int q0CrosscheckStatus;
   int tier;
   bool accepted;
 };
 
-//: q = direction * signed_tick_delta(raw, q0) — so q0 sits `-qMin` from the min
-//: contact along the probe direction. Solved in ticks to stay integer-exact.
-inline int flcDeriveQ0Tick(int minContactTick, int8_t direction,
-                           int minAngleTicksFromZero) {
-  // minAngleTicksFromZero is negative for a min endpoint below zero.
-  return flcNormalizeTick(minContactTick - direction * minAngleTicksFromZero);
+struct FlcCalibrationRunResult {
+  int status;
+  int abortReason;
+  uint16_t selectionMask;
+  int jointsRequested;
+  int jointsOk;
+  int executionCount;
+  FlcGeometryJoint executionOrder[FLC_CALIBRATION_JOINT_COUNT];
+  bool resultPresent[FLC_CALIBRATION_JOINT_COUNT];
+  FlcJointCalibrationResult joints[FLC_CALIBRATION_JOINT_COUNT];
+  FlcRuntimeCalibration finalCalibration[FLC_CALIBRATION_JOINT_COUNT];
+  FlcGeometryJoint failedJoint;
+  uint8_t failedBusId;
+  int parkingRequiredCount;
+  int noParkingCount;
+  int parkingRestoreCount;
+  bool safeOffVerified;
+  bool hardFaultCutPowerNow;
+};
+
+inline int flcAbsInt(int value) { return value < 0 ? -value : value; }
+
+inline bool flcGeometryPlanSummary(int &noParking, int &parking) {
+  noParking = 0;
+  parking = 0;
+  if (FLC_ENDPOINT_GEOMETRY_PLAN_COUNT != 24) return false;
+  bool seen[24] = {false};
+  for (int i = 0; i < FLC_ENDPOINT_GEOMETRY_PLAN_COUNT; ++i) {
+    const FlcEndpointGeometryPlan &row = FLC_ENDPOINT_GEOMETRY_PLANS[i];
+    if (row.canonicalEndpointIndex >= 24 ||
+        seen[row.canonicalEndpointIndex] ||
+        (int)row.targetJoint != i / 2 ||
+        row.motionAuthorizationProvenance !=
+            FLC_MOTION_NOT_GRANTED_OFFLINE_EVIDENCE_ONLY ||
+        row.q0StartMask != FLC_ALL_GEOMETRY_JOINTS_MASK) return false;
+    seen[row.canonicalEndpointIndex] = true;
+    if (row.parkingOutcome == FLC_NO_PARKING_REQUIRED) {
+      if (row.auxiliaryJoint != FLC_GEOMETRY_JOINT_NONE) return false;
+      ++noParking;
+    } else if (row.parkingOutcome == FLC_PARKING_REQUIRED_1DOF) {
+      if ((int)row.auxiliaryJoint >= FLC_CALIBRATION_JOINT_COUNT ||
+          row.auxiliaryJoint == row.targetJoint) return false;
+      ++parking;
+    } else {
+      return false;
+    }
+  }
+  return noParking == 18 && parking == 6;
 }
 
-inline FlcJointCalibrationResult flcCalibrateJoint(
-    const FlcServoPort &port, uint8_t id, int startTick, int8_t measuredDirection,
-    int minAngleTicksFromZero, int maxAngleTicksFromZero,
-    const FlcMotionEnvelope &envelope, const FlcContactConfig &guards,
-    const FlcBaseline &baseline, const FlcAcceptanceGates &gates) {
-  FlcJointCalibrationResult result;
+// Generic Kahn implementation used by production and by the cycle-injection
+// test. This prevents a checked-in order from masking a newly introduced cycle.
+inline bool flcBuildDependencyOrder(const FlcGeometryDependency *dependencies,
+                                    int dependencyCount,
+                                    FlcGeometryJoint *order,
+                                    int capacity) {
+  if (dependencies == 0 || dependencyCount < 0 || order == 0 ||
+      capacity < FLC_CALIBRATION_JOINT_COUNT) return false;
+  uint8_t indegree[FLC_CALIBRATION_JOINT_COUNT] = {0};
+  bool emitted[FLC_CALIBRATION_JOINT_COUNT] = {false};
+  for (int i = 0; i < dependencyCount; ++i) {
+    const int prerequisite = (int)dependencies[i].prerequisiteJoint;
+    const int target = (int)dependencies[i].targetJoint;
+    if (prerequisite < 0 || prerequisite >= FLC_CALIBRATION_JOINT_COUNT ||
+        target < 0 || target >= FLC_CALIBRATION_JOINT_COUNT ||
+        prerequisite == target || indegree[target] == 255) return false;
+    ++indegree[target];
+  }
+  for (int output = 0; output < FLC_CALIBRATION_JOINT_COUNT; ++output) {
+    int ready = -1;
+    for (int joint = 0; joint < FLC_CALIBRATION_JOINT_COUNT; ++joint) {
+      if (!emitted[joint] && indegree[joint] == 0) {
+        ready = joint;
+        break;
+      }
+    }
+    if (ready < 0) return false;
+    emitted[ready] = true;
+    order[output] = (FlcGeometryJoint)ready;
+    for (int edge = 0; edge < dependencyCount; ++edge) {
+      if ((int)dependencies[edge].prerequisiteJoint != ready) continue;
+      const int target = (int)dependencies[edge].targetJoint;
+      if (indegree[target] == 0) return false;
+      --indegree[target];
+    }
+  }
+  return true;
+}
+
+inline bool flcPlanCatalogValid(const FlcJointPlan *plans, int planCount) {
+  if (plans == 0 || planCount != FLC_CALIBRATION_JOINT_COUNT) return false;
+  bool busIdSeen[254] = {false};
+  for (int i = 0; i < planCount; ++i) {
+    const FlcJointPlan &plan = plans[i];
+    if ((int)plan.geometryJoint != i || plan.busId == 0 || plan.busId >= 254 ||
+        busIdSeen[plan.busId] || !plan.q0WatchKnown ||
+        plan.q0WatchTick < 0 || plan.q0WatchTick > FLC_ENCODER_MAX ||
+        plan.q0WatchToleranceTicks == 0 || !plan.envelope.valid) return false;
+    busIdSeen[plan.busId] = true;
+  }
+  return true;
+}
+
+inline bool flcAnglePicoRadToTicks(int64_t anglePicoRad, int *ticksOut) {
+  if (ticksOut == 0) return false;
+  static const int64_t TWO_PI_PICORAD = 6283185307179LL;
+  const int64_t numerator = anglePicoRad * (int64_t)FLC_ENCODER_MODULUS;
+  int64_t rounded;
+  if (numerator >= 0)
+    rounded = (numerator + TWO_PI_PICORAD / 2) / TWO_PI_PICORAD;
+  else
+    rounded = (numerator - TWO_PI_PICORAD / 2) / TWO_PI_PICORAD;
+  if (rounded <= -FLC_HALF_ENCODER_RANGE ||
+      rounded >= FLC_HALF_ENCODER_RANGE) return false;
+  *ticksOut = (int)rounded;
+  return true;
+}
+
+inline bool flcRawTickForQ(const FlcRuntimeCalibration &calibration,
+                           int qTicks, int *rawTickOut) {
+  if (rawTickOut == 0 || !calibration.calibrationUsable ||
+      (calibration.direction != 1 && calibration.direction != -1) ||
+      calibration.q0Tick < 0 || calibration.q0Tick > FLC_ENCODER_MAX) return false;
+  const long raw = (long)calibration.q0Tick +
+                   (long)calibration.direction * (long)qTicks;
+  if (raw < 0 || raw > FLC_ENCODER_MAX) return false;
+  *rawTickOut = (int)raw;
+  return true;
+}
+
+inline bool flcBuildQ0Watch(const FlcJointPlan *plans,
+                            const FlcRuntimeCalibration *runtime,
+                            uint16_t mask, FlcMotionWatch &watch) {
+  watch.count = 0;
+  if ((mask & (uint16_t)~FLC_ALL_GEOMETRY_JOINTS_MASK) != 0) return false;
+  for (int joint = 0; joint < FLC_CALIBRATION_JOINT_COUNT; ++joint) {
+    if ((mask & (uint16_t)(1U << joint)) == 0) continue;
+    if (!runtime[joint].holdKnown || watch.count >= FLC_MAX_WATCHED_JOINTS)
+      return false;
+    FlcWatchJoint &entry = watch.joints[watch.count++];
+    entry.busId = plans[joint].busId;
+    entry.expectedTick = runtime[joint].holdTick;
+    entry.toleranceTicks = runtime[joint].holdToleranceTicks;
+    entry.expectedTorqueState = 0;
+    entry.expectedTorqueLimit = 0;
+    entry.expectedGoalTick = runtime[joint].holdTick;
+  }
+  return true;
+}
+
+inline bool flcAddArmedWatch(FlcMotionWatch &watch, uint8_t busId,
+                             int expectedTick, uint16_t toleranceTicks,
+                             uint16_t torqueLimit) {
+  if (watch.count < 0 || watch.count >= FLC_MAX_WATCHED_JOINTS ||
+      expectedTick < 0 || expectedTick > FLC_ENCODER_MAX) return false;
+  FlcWatchJoint &entry = watch.joints[watch.count++];
+  entry.busId = busId;
+  entry.expectedTick = expectedTick;
+  entry.toleranceTicks = toleranceTicks;
+  entry.expectedTorqueState = 1;
+  entry.expectedTorqueLimit = torqueLimit;
+  entry.expectedGoalTick = expectedTick;
+  return true;
+}
+
+inline bool flcSafeOffAll(const FlcServoPort &port,
+                          const FlcJointPlan *plans, int planCount,
+                          uint8_t *failedBusId = 0) {
+  bool allVerified = true;
+  if (failedBusId != 0) *failedBusId = 0;
+  for (int i = 0; i < planCount; ++i) {
+    if (!flcEndMotion(port, plans[i].busId)) {
+      allVerified = false;
+      if (failedBusId != 0 && *failedBusId == 0)
+        *failedBusId = plans[i].busId;
+    }
+  }
+  return allVerified;
+}
+
+// Establishes a coherent q=0 watch state while torque remains OFF. The
+// GoalPosition write cannot move the servo, but removes every stale retained
+// goal before later torque transactions and makes watched-goal checks exact.
+inline int flcPrepareQ0WatchState(const FlcServoPort &port,
+                                  const FlcJointPlan *plans,
+                                  FlcRuntimeCalibration *runtime,
+                                  const FlcContactConfig &guards,
+                                  uint8_t *failedBusId) {
+  if (failedBusId != 0) *failedBusId = 0;
+  for (int joint = 0; joint < FLC_CALIBRATION_JOINT_COUNT; ++joint) {
+    const FlcJointPlan &plan = plans[joint];
+    FlcObservation before = {};
+    int readFault = flcReadFreshTelemetry(port, plan.busId, &before);
+    if (readFault != FLC_ABORT_NONE) {
+      if (failedBusId != 0) *failedBusId = plan.busId;
+      return readFault;
+    }
+    int fault = flcCheckObservationGuards(before, guards, 0, 0, 0, 0, -1);
+    if (fault != FLC_ABORT_NONE ||
+        flcCircularDistance(before.position, plan.q0WatchTick) >
+            (int)plan.q0WatchToleranceTicks) {
+      if (failedBusId != 0) *failedBusId = plan.busId;
+      return fault == FLC_ABORT_NONE ? FLC_ABORT_PREREQUISITE_DRIFT : fault;
+    }
+    if (!flcCommandPositionChecked(port, plan.busId, plan.q0WatchTick,
+                                   plan.envelope.goalSpeed,
+                                   plan.envelope.acceleration)) {
+      if (failedBusId != 0) *failedBusId = plan.busId;
+      return port.validateContext(port.ctx, plan.busId)
+                 ? FLC_ABORT_DRIVER_ERROR
+                 : FLC_ABORT_CONTEXT_DRIFT;
+    }
+    FlcObservation held = {};
+    readFault = flcReadFreshTelemetry(port, plan.busId, &held);
+    if (readFault != FLC_ABORT_NONE) {
+      if (failedBusId != 0) *failedBusId = plan.busId;
+      return readFault;
+    }
+    fault = flcCheckObservationGuards(held, guards, 0, 0, 0, 0,
+                                      plan.q0WatchTick);
+    if (fault != FLC_ABORT_NONE ||
+        flcCircularDistance(held.position, plan.q0WatchTick) >
+            (int)plan.q0WatchToleranceTicks) {
+      if (failedBusId != 0) *failedBusId = plan.busId;
+      return fault == FLC_ABORT_NONE ? FLC_ABORT_PREREQUISITE_DRIFT : fault;
+    }
+    runtime[joint].holdKnown = true;
+    runtime[joint].holdTick = plan.q0WatchTick;
+    runtime[joint].holdToleranceTicks = plan.q0WatchToleranceTicks;
+  }
+  return FLC_ABORT_NONE;
+}
+
+inline FlcParkingTransaction flcEnterEndpointParking(
+    const FlcServoPort &port, const FlcEndpointGeometryPlan &geometry,
+    const FlcJointPlan *plans, const FlcRuntimeCalibration *runtime,
+    const FlcContactConfig &guards) {
+  FlcParkingTransaction tx = {};
+  tx.status = FLC_ENGINE_OK;
+  tx.abortReason = FLC_ABORT_NONE;
+  tx.auxiliaryJoint = FLC_GEOMETRY_JOINT_NONE;
+  tx.savedTick = -1;
+  tx.parkingTick = -1;
+  tx.achievedTick = -1;
+  tx.restoredTick = -1;
+
+  if (geometry.parkingOutcome == FLC_NO_PARKING_REQUIRED) {
+    tx.noParkingProvenanceVerified =
+        geometry.auxiliaryJoint == FLC_GEOMETRY_JOINT_NONE;
+    tx.restoreVerified = tx.noParkingProvenanceVerified;
+    if (!tx.noParkingProvenanceVerified) {
+      tx.status = FLC_ENGINE_INVALID_PLAN;
+      tx.abortReason = FLC_ABORT_INVALID_PLAN;
+    }
+    return tx;
+  }
+  if (geometry.parkingOutcome != FLC_PARKING_REQUIRED_1DOF) {
+    tx.status = FLC_ENGINE_INVALID_PLAN;
+    tx.abortReason = FLC_ABORT_INVALID_PLAN;
+    return tx;
+  }
+
+  tx.required = true;
+  const int auxiliary = (int)geometry.auxiliaryJoint;
+  if (auxiliary < 0 || auxiliary >= FLC_CALIBRATION_JOINT_COUNT ||
+      !runtime[auxiliary].calibrationUsable) {
+    tx.status = FLC_ENGINE_PREREQUISITE_DRIFT;
+    tx.abortReason = FLC_ABORT_PREREQUISITE_DRIFT;
+    return tx;
+  }
+  tx.prerequisiteVerified = true;
+  tx.auxiliaryJoint = geometry.auxiliaryJoint;
+  tx.auxiliaryBusId = plans[auxiliary].busId;
+  tx.savedTick = runtime[auxiliary].holdTick;
+
+  int parkingQTicks = 0;
+  if (!flcAnglePicoRadToTicks(geometry.auxiliaryAnglePicoRad,
+                              &parkingQTicks) ||
+      !flcRawTickForQ(runtime[auxiliary], parkingQTicks, &tx.parkingTick)) {
+    tx.status = FLC_ENGINE_REFUSED_DOMAIN;
+    tx.abortReason = FLC_ABORT_POSITION_OUT_OF_DOMAIN;
+    return tx;
+  }
+
+  FlcMotionWatch watch = {};
+  const uint16_t auxiliaryMask = flcGeometryJointMask(geometry.auxiliaryJoint);
+  if (!flcBuildQ0Watch(plans, runtime,
+                       (uint16_t)(FLC_ALL_GEOMETRY_JOINTS_MASK &
+                                  (uint16_t)~auxiliaryMask), watch)) {
+    tx.status = FLC_ENGINE_INVALID_PLAN;
+    tx.abortReason = FLC_ABORT_INVALID_PLAN;
+    return tx;
+  }
+
+  const FlcJointPlan &auxPlan = plans[auxiliary];
+  const FlcBeginMotionResult begun = flcBeginMotion(
+      port, auxPlan.busId, tx.savedTick, runtime[auxiliary].holdToleranceTicks,
+      auxPlan.envelope, guards, &watch);
+  if (begun.status != FLC_ENGINE_OK) {
+    tx.status = begun.status;
+    tx.abortReason = begun.abortReason;
+    return tx;
+  }
+  tx.entered = true;
+  const FlcReturnResult moved = flcReturnTo(
+      port, auxPlan.busId, tx.parkingTick, auxPlan.envelope, guards, &watch);
+  tx.achievedTick = moved.achievedTick;
+  if (moved.status != FLC_ENGINE_OK) {
+    tx.status = FLC_ENGINE_PARKING_FAILED;
+    tx.abortReason = moved.abortReason;
+    flcRequireTorqueOff(port, auxPlan.busId, tx.status, tx.abortReason);
+    return tx;
+  }
+  tx.trackingVerified =
+      flcCircularDistance(tx.achievedTick, tx.parkingTick) <=
+      (int)guards.targetReachedToleranceTicks;
+  if (!tx.trackingVerified) {
+    tx.status = FLC_ENGINE_PARKING_FAILED;
+    tx.abortReason = FLC_ABORT_TRACKING_FAILURE;
+    flcRequireTorqueOff(port, auxPlan.busId, tx.status, tx.abortReason);
+  }
+  return tx;
+}
+
+inline bool flcExitEndpointParking(
+    const FlcServoPort &port, const FlcEndpointGeometryPlan &geometry,
+    const FlcJointPlan *plans, const FlcRuntimeCalibration *runtime,
+    const FlcContactConfig &guards, bool allowRestoreMotion,
+    bool targetAtQ0, FlcParkingTransaction &tx) {
+  if (!tx.required) return tx.restoreVerified;
+  if (!tx.entered) return false;
+  const int auxiliary = (int)tx.auxiliaryJoint;
+  const FlcJointPlan &auxPlan = plans[auxiliary];
+  bool ok = true;
+
+  if (allowRestoreMotion) {
+    tx.restoreAttempted = true;
+    FlcMotionWatch watch = {};
+    uint16_t mask = geometry.q0HeldDuringTaskMask;
+    if (targetAtQ0)
+      mask = (uint16_t)(FLC_ALL_GEOMETRY_JOINTS_MASK &
+                        (uint16_t)~flcGeometryJointMask(tx.auxiliaryJoint));
+    if (!flcBuildQ0Watch(plans, runtime, mask, watch)) {
+      tx.status = FLC_ENGINE_RESTORE_FAILED;
+      tx.abortReason = FLC_ABORT_INVALID_PLAN;
+      ok = false;
+    } else {
+      const FlcReturnResult restored = flcReturnTo(
+          port, auxPlan.busId, tx.savedTick, auxPlan.envelope, guards, &watch);
+      tx.restoredTick = restored.achievedTick;
+      if (restored.status != FLC_ENGINE_OK ||
+          flcCircularDistance(tx.restoredTick, tx.savedTick) >
+              (int)runtime[auxiliary].holdToleranceTicks) {
+        tx.status = FLC_ENGINE_RESTORE_FAILED;
+        tx.abortReason = restored.abortReason == FLC_ABORT_NONE
+                             ? FLC_ABORT_RESTORE_FAILED
+                             : restored.abortReason;
+        ok = false;
+      }
+    }
+  } else {
+    tx.status = FLC_ENGINE_RESTORE_FAILED;
+    tx.abortReason = FLC_ABORT_RESTORE_FAILED;
+    ok = false;
+  }
+
+  if (!flcEndMotion(port, auxPlan.busId)) {
+    tx.status = FLC_ENGINE_TORQUE_OFF_FAILED;
+    tx.abortReason = FLC_ABORT_TORQUE_OFF_UNVERIFIED;
+    ok = false;
+  }
+  tx.restoreVerified = ok && tx.restoreAttempted;
+  return tx.restoreVerified;
+}
+
+inline FlcEndpointExecution flcExecutePlannedEndpoint(
+    const FlcServoPort &port, const FlcJointPlan &targetPlan,
+    const FlcEndpointGeometryPlan &geometry, int8_t rawProbeSign,
+    const FlcMotionEnvelope &endpointEnvelope,
+    const FlcJointPlan *plans, const FlcRuntimeCalibration *runtime,
+    const FlcContactConfig &guards) {
+  FlcEndpointExecution execution = {};
+  execution.status = FLC_ENGINE_OK;
+  execution.abortReason = FLC_ABORT_NONE;
+  execution.geometryEndpointIndex = geometry.canonicalEndpointIndex;
+  execution.parkingOutcome = geometry.parkingOutcome;
+
+  execution.parking = flcEnterEndpointParking(
+      port, geometry, plans, runtime, guards);
+  if (execution.parking.status != FLC_ENGINE_OK) {
+    execution.status = execution.parking.status;
+    execution.abortReason = execution.parking.abortReason;
+    return execution;
+  }
+
+  FlcMotionWatch taskWatch = {};
+  if (!flcBuildQ0Watch(plans, runtime, geometry.q0HeldDuringTaskMask,
+                       taskWatch)) {
+    execution.status = FLC_ENGINE_INVALID_PLAN;
+    execution.abortReason = FLC_ABORT_INVALID_PLAN;
+  } else if (execution.parking.required &&
+             !flcAddArmedWatch(taskWatch,
+                               execution.parking.auxiliaryBusId,
+                               execution.parking.parkingTick,
+                               guards.targetReachedToleranceTicks,
+                               plans[(int)execution.parking.auxiliaryJoint]
+                                   .envelope.torqueLimit)) {
+    execution.status = FLC_ENGINE_INVALID_PLAN;
+    execution.abortReason = FLC_ABORT_INVALID_PLAN;
+  } else {
+    execution.q0WatchVerified = true;
+  }
+
+  bool targetArmed = false;
+  bool targetOff = true;
+  if (execution.status == FLC_ENGINE_OK) {
+    const int targetIndex = (int)targetPlan.geometryJoint;
+    const FlcBeginMotionResult begun = flcBeginMotion(
+        port, targetPlan.busId, runtime[targetIndex].holdTick,
+        runtime[targetIndex].holdToleranceTicks, endpointEnvelope, guards,
+        &taskWatch);
+    execution.targetHoldGoalVerified = begun.holdGoalVerified;
+    if (begun.status != FLC_ENGINE_OK) {
+      execution.status = begun.status;
+      execution.abortReason = begun.abortReason;
+      targetOff = flcEndMotion(port, targetPlan.busId);
+    } else {
+      targetArmed = true;
+      execution.measurement = flcMeasureEndpoint(
+          port, targetPlan.busId, runtime[targetIndex].holdTick, rawProbeSign,
+          endpointEnvelope, guards, targetPlan.baseline,
+          targetPlan.gates.repeatabilityToleranceTicks, &taskWatch);
+      if (execution.measurement.status != FLC_ENGINE_OK) {
+        execution.status = execution.measurement.status;
+        execution.abortReason = execution.measurement.abortReason;
+      } else {
+        execution.returnToQ0 = flcReturnTo(
+            port, targetPlan.busId, runtime[targetIndex].holdTick,
+            endpointEnvelope, guards, &taskWatch);
+        if (execution.returnToQ0.status != FLC_ENGINE_OK) {
+          execution.status = execution.returnToQ0.status;
+          execution.abortReason = execution.returnToQ0.abortReason;
+        } else {
+          execution.targetReturnedToQ0 = true;
+        }
+      }
+      targetOff = flcEndMotion(port, targetPlan.busId);
+    }
+  }
+
+  (void)targetArmed;
+  execution.targetTorqueOffVerified = targetOff;
+  if (!targetOff) {
+    execution.status = FLC_ENGINE_TORQUE_OFF_FAILED;
+    execution.abortReason = FLC_ABORT_TORQUE_OFF_UNVERIFIED;
+  }
+
+  const bool restored = flcExitEndpointParking(
+      port, geometry, plans, runtime, guards,
+      targetOff, execution.targetReturnedToQ0, execution.parking);
+  if (!restored && execution.parking.required) {
+    if (execution.parking.status == FLC_ENGINE_TORQUE_OFF_FAILED ||
+        execution.status == FLC_ENGINE_OK) {
+      execution.status = execution.parking.status;
+      execution.abortReason = execution.parking.abortReason;
+    }
+  }
+  return execution;
+}
+
+inline FlcJointCalibrationResult flcCalibratePlannedJoint(
+    const FlcServoPort &port, const FlcJointPlan *plans,
+    const FlcRuntimeCalibration *runtime, FlcGeometryJoint targetJoint,
+    const FlcContactConfig &guards) {
+  FlcJointCalibrationResult result = {};
   result.status = FLC_ENGINE_OK;
   result.abortReason = FLC_ABORT_NONE;
-  result.busId = id;
-  result.direction = measuredDirection;
+  result.geometryJoint = targetJoint;
+  result.direction = 0;
+  result.directionMethod = FLC_DIRECTION_UNRESOLVED;
+  result.rawLoTick = -1;
+  result.rawHiTick = -1;
   result.minContactTick = -1;
   result.maxContactTick = -1;
-  result.measuredSpanTicks = 0;
-  result.expectedSpanTicks = gates.expectedSpanTicks;
-  result.spanErrorTicks = 0;
+  result.manualPoseQ0CandidateTick = -1;
+  result.derivedQ0FinalTick = -1;
   result.q0Tick = -1;
+  result.q0CrosscheckStatus = FLC_Q0_CROSSCHECK_NOT_RUN;
   result.tier = FLC_TIER_MEASURED;
-  result.accepted = false;
 
-  if (measuredDirection != 1 && measuredDirection != -1) {
-    result.status = FLC_ENGINE_DIRECTION_UNRESOLVED;
-    result.abortReason = FLC_ABORT_WRONG_DIRECTION;
+  const int target = (int)targetJoint;
+  if (target < 0 || target >= FLC_CALIBRATION_JOINT_COUNT) {
+    result.status = FLC_ENGINE_INVALID_PLAN;
+    result.abortReason = FLC_ABORT_INVALID_PLAN;
     return result;
   }
-  if (!gates.repeatabilityToleranceKnown) {
-    // Without a repeatability band there is no way to decide whether two
-    // contacts agree, so the measurement itself is not meaningful.
+  const FlcJointPlan &plan = plans[target];
+  result.busId = plan.busId;
+  result.expectedSpanTicks = plan.gates.expectedSpanTicks;
+  if (!plan.characterized || !plan.baseline.valid || !plan.envelope.valid) {
+    result.status = FLC_ENGINE_PREREQUISITE_DRIFT;
+    result.abortReason = FLC_ABORT_PREREQUISITE_DRIFT;
+    return result;
+  }
+  if (!plan.gates.repeatabilityToleranceKnown ||
+      plan.gates.repeatabilityToleranceTicks == 0) {
     result.status = FLC_ENGINE_REPEATABILITY_FAILED;
     return result;
   }
 
-  const int begun = flcBeginMotion(port, id, envelope);
-  if (begun != FLC_ENGINE_OK) {
-    result.status = begun;
-    flcEndMotion(port, id);
+  // Endpoint-specific geometry prerequisites must be selected BEFORE moving.
+  // Therefore H4 requires an explicit current-build semantic witness. It is not
+  // a stale numeric direction and is later cross-checked against both measured
+  // endpoints plus the H2 manual q0 evidence.
+  const int8_t witness = plan.directionEvidence.operatorWitness;
+  if (witness != 1 && witness != -1) {
+    result.status = FLC_ENGINE_DIRECTION_UNRESOLVED;
+    result.abortReason = FLC_ABORT_WRONG_DIRECTION;
     return result;
   }
 
-  // Each endpoint is sized from ITS OWN expected distance from q0, so a joint
-  // with a wide range does not inherit a budget meant for a narrow one.
-  FlcMotionEnvelope minEnvelope = envelope;
-  minEnvelope.travelBudgetTicks = flcTravelBudgetForDistance(minAngleTicksFromZero);
-  minEnvelope = flcClampEnvelope(minEnvelope);
+  const FlcEndpointGeometryPlan *minGeometry =
+      flcGeometryPlanFor(flcGeometryJointName(targetJoint), "min");
+  const FlcEndpointGeometryPlan *maxGeometry =
+      flcGeometryPlanFor(flcGeometryJointName(targetJoint), "max");
+  if (minGeometry == 0 || maxGeometry == 0 ||
+      minGeometry->targetJoint != targetJoint ||
+      maxGeometry->targetJoint != targetJoint) {
+    result.status = FLC_ENGINE_INVALID_PLAN;
+    result.abortReason = FLC_ABORT_INVALID_PLAN;
+    return result;
+  }
 
-  FlcMotionEnvelope maxEnvelope = envelope;
-  maxEnvelope.travelBudgetTicks = flcTravelBudgetForDistance(maxAngleTicksFromZero);
+  FlcMotionEnvelope minEnvelope = plan.envelope;
+  minEnvelope.travelBudgetTicks =
+      flcTravelBudgetForDistance(plan.directionEvidence.qMinTicks);
+  minEnvelope = flcClampEnvelope(minEnvelope);
+  FlcMotionEnvelope maxEnvelope = plan.envelope;
+  maxEnvelope.travelBudgetTicks =
+      flcTravelBudgetForDistance(plan.directionEvidence.qMaxTicks);
   maxEnvelope = flcClampEnvelope(maxEnvelope);
 
-  // The min endpoint lies at negative q, i.e. against the -direction probe.
-  const int8_t minProbeSign = (int8_t)-measuredDirection;
-  result.minEndpoint = flcMeasureEndpoint(port, id, startTick, minProbeSign, minEnvelope,
-                                          guards, baseline,
-                                          gates.repeatabilityToleranceTicks);
-  if (result.minEndpoint.status != FLC_ENGINE_OK) {
-    result.status = result.minEndpoint.status;
-    result.abortReason = result.minEndpoint.abortReason;
-    flcEndMotion(port, id);
+  result.minExecution = flcExecutePlannedEndpoint(
+      port, plan, *minGeometry, (int8_t)-witness, minEnvelope, plans,
+      runtime, guards);
+  result.minEndpoint = result.minExecution.measurement;
+  if (result.minExecution.status != FLC_ENGINE_OK) {
+    result.status = result.minExecution.status;
+    result.abortReason = result.minExecution.abortReason;
     return result;
   }
   result.minContactTick = result.minEndpoint.contactTick;
 
-  // Return to neutral before the opposite endpoint. Approaching MAX straight
-  // from the MIN rest would make one traversal as long as the whole joint span.
-  result.returnToNeutral = flcReturnTo(port, id, startTick, minEnvelope, guards);
-  if (result.returnToNeutral.status != FLC_ENGINE_OK) {
-    result.status = result.returnToNeutral.status;
-    result.abortReason = result.returnToNeutral.abortReason;
-    flcEndMotion(port, id);
-    return result;
-  }
-
-  const int8_t maxProbeSign = measuredDirection;
-  result.maxEndpoint = flcMeasureEndpoint(port, id, result.returnToNeutral.achievedTick,
-                                          maxProbeSign, maxEnvelope, guards, baseline,
-                                          gates.repeatabilityToleranceTicks);
-  if (result.maxEndpoint.status != FLC_ENGINE_OK) {
-    result.status = result.maxEndpoint.status;
-    result.abortReason = result.maxEndpoint.abortReason;
-    flcEndMotion(port, id);
+  result.maxExecution = flcExecutePlannedEndpoint(
+      port, plan, *maxGeometry, witness, maxEnvelope, plans, runtime, guards);
+  result.maxEndpoint = result.maxExecution.measurement;
+  if (result.maxExecution.status != FLC_ENGINE_OK) {
+    result.status = result.maxExecution.status;
+    result.abortReason = result.maxExecution.abortReason;
     return result;
   }
   result.maxContactTick = result.maxEndpoint.contactTick;
 
-  // Every calibration path ends torque OFF, success or not.
-  if (!flcEndMotion(port, id)) {
-    result.status = FLC_ENGINE_TORQUE_SETUP_FAILED;
+  result.rawLoTick = result.minContactTick < result.maxContactTick
+                         ? result.minContactTick
+                         : result.maxContactTick;
+  result.rawHiTick = result.minContactTick > result.maxContactTick
+                         ? result.minContactTick
+                         : result.maxContactTick;
+  result.measuredSpanTicks = result.rawHiTick - result.rawLoTick;
+  result.spanErrorTicks =
+      result.measuredSpanTicks - plan.gates.expectedSpanTicks;
+  if (result.measuredSpanTicks <= 0 ||
+      result.measuredSpanTicks >= FLC_HALF_ENCODER_RANGE) {
+    result.status = FLC_ENGINE_GEOMETRY_INCONSISTENT;
+    result.abortReason = FLC_ABORT_ENDPOINT_ORDER_CONTRADICTION;
     return result;
   }
 
-  const int span = flcSignedTickDelta(result.maxContactTick, result.minContactTick);
-  const int signedSpan = span * measuredDirection;
-  if (signedSpan <= 0) {
-    // MAX did not end up beyond MIN along the measured direction.
-    result.status = FLC_ENGINE_ABORTED;
+  FlcDirectionEvidence evidence = plan.directionEvidence;
+  evidence.rawLoTick = result.rawLoTick;
+  evidence.rawHiTick = result.rawHiTick;
+  result.directionResolution = flcResolveJointDirection(evidence);
+  if (result.directionResolution.status != FLC_ENGINE_OK ||
+      result.directionResolution.direction != witness) {
+    result.status = FLC_ENGINE_DIRECTION_UNRESOLVED;
     result.abortReason = FLC_ABORT_WRONG_DIRECTION;
     return result;
   }
-  result.measuredSpanTicks = signedSpan;
-  result.spanErrorTicks = signedSpan - gates.expectedSpanTicks;
-
-  result.q0Tick = flcDeriveQ0Tick(result.minContactTick, measuredDirection,
-                                  minAngleTicksFromZero);
+  result.direction = result.directionResolution.direction;
+  result.directionMethod = result.directionResolution.method;
+  result.derivedQ0FinalTick = result.direction > 0
+                                  ? result.directionResolution.q0IfPositive
+                                  : result.directionResolution.q0IfNegative;
+  result.q0Tick = result.derivedQ0FinalTick;
   result.tier = FLC_TIER_CANDIDATE;
 
-  // Post-measure acceptance. An unknown tolerance cannot certify agreement, so
-  // the result stays CANDIDATE rather than being forced to ACCEPTED.
-  if (gates.endpointVsUrdfToleranceKnown) {
-    const int error = result.spanErrorTicks < 0 ? -result.spanErrorTicks : result.spanErrorTicks;
-    if (error <= (int)gates.endpointVsUrdfToleranceTicks) {
-      result.tier = FLC_TIER_ACCEPTED;
-      result.accepted = true;
+  if (plan.directionEvidence.manualQ0Known) {
+    result.manualPoseQ0CandidateTick = plan.directionEvidence.manualQ0Tick;
+    result.manualVsDerivedQ0ErrorTicks = flcCircularDistance(
+        result.manualPoseQ0CandidateTick, result.derivedQ0FinalTick);
+    if (!plan.gates.manualVsDerivedQ0ToleranceKnown) {
+      result.q0CrosscheckStatus = FLC_Q0_BLOCKED_TOLERANCE_UNVALIDATED;
+    } else if (result.manualVsDerivedQ0ErrorTicks <=
+               (int)plan.gates.manualVsDerivedQ0ToleranceTicks) {
+      result.q0CrosscheckStatus = FLC_Q0_CROSSCHECK_MATCH;
+    } else {
+      result.q0CrosscheckStatus = FLC_Q0_CROSSCHECK_MISMATCH;
+      result.status = FLC_ENGINE_Q0_CROSSCHECK_FAILED;
+      result.abortReason = FLC_ABORT_Q0_CROSSCHECK_FAILED;
+      return result;
     }
+  } else {
+    result.q0CrosscheckStatus = FLC_Q0_BLOCKED_MANUAL_CANDIDATE_MISSING;
   }
-  (void)maxAngleTicksFromZero;
+
+  if (plan.gates.endpointVsUrdfToleranceKnown &&
+      flcAbsInt(result.spanErrorTicks) >
+          (int)plan.gates.endpointVsUrdfToleranceTicks) {
+    result.status = FLC_ENGINE_GEOMETRY_INCONSISTENT;
+    result.abortReason = FLC_ABORT_ENDPOINT_GEOMETRY_MISMATCH;
+    return result;
+  }
+
+  if (plan.gates.endpointVsUrdfToleranceKnown &&
+      result.q0CrosscheckStatus == FLC_Q0_CROSSCHECK_MATCH) {
+    result.tier = FLC_TIER_ACCEPTED;
+    result.accepted = true;
+  }
   return result;
 }
 
-// --------------------------------------------------------------------------
-// H5 / H6 — leg and four-leg orchestration
-//
-// ONE generic calibrator + per-joint plans. There is deliberately no
-// LfStateMachine / RfStateMachine / RhStateMachine / LhStateMachine: a leg is
-// just an ordered list of FlcJointPlan rows, and four legs is an ordered list
-// of legs. Both live here rather than in the .ino so the offline suite drives
-// the same orchestration the firmware runs.
-// --------------------------------------------------------------------------
+inline FlcCalibrationRunResult flcRunCalibrationPlan(
+    const FlcServoPort &port, const FlcContactConfig &guards,
+    const FlcJointPlan *plans, int planCount, uint16_t selectionMask) {
+  FlcCalibrationRunResult run = {};
+  run.status = FLC_ENGINE_OK;
+  run.abortReason = FLC_ABORT_NONE;
+  run.selectionMask = selectionMask;
+  run.failedJoint = FLC_GEOMETRY_JOINT_NONE;
 
-#define FLC_JOINTS_PER_LEG 3
-#define FLC_LEG_COUNT 4
-
-struct FlcJointPlan {
-  uint8_t busId;
-  bool characterized;
-  int8_t direction;
-  int startTick;
-  int minAngleTicksFromZero;
-  int maxAngleTicksFromZero;
-  FlcBaseline baseline;
-  FlcMotionEnvelope envelope;
-  FlcAcceptanceGates gates;
-};
-
-struct FlcLegResult {
-  int status;
-  int jointCount;
-  int jointsOk;
-  int failedBusId;
-  FlcJointCalibrationResult joints[FLC_JOINTS_PER_LEG];
-};
-
-//: Calibrate the joints of one leg in the given order, stopping at the first
-//: failure. Ordering is the caller's: the firmware runs distal-first so the
-//: limb stays folded while proximal joints are still uncalibrated.
-inline FlcLegResult flcCalibrateLeg(const FlcServoPort &port,
-                                    const FlcContactConfig &guards,
-                                    const FlcJointPlan *plans, int count) {
-  FlcLegResult result;
-  result.status = FLC_ENGINE_OK;
-  result.jointCount = count;
-  result.jointsOk = 0;
-  result.failedBusId = 0;
-
-  if (count > FLC_JOINTS_PER_LEG) count = FLC_JOINTS_PER_LEG;
-
-  for (int i = 0; i < count; ++i) {
-    const FlcJointPlan &plan = plans[i];
-    if (!plan.characterized) {
-      result.status = FLC_ENGINE_PREREQUISITE_DRIFT;
-      result.failedBusId = plan.busId;
-      break;
-    }
-    result.joints[i] = flcCalibrateJoint(
-        port, plan.busId, plan.startTick, plan.direction, plan.minAngleTicksFromZero,
-        plan.maxAngleTicksFromZero, plan.envelope, guards, plan.baseline, plan.gates);
-
-    if (result.joints[i].status != FLC_ENGINE_OK) {
-      result.status = result.joints[i].status;
-      result.failedBusId = plan.busId;
-      // Stop the leg: continuing would move a limb whose neighbouring joint is
-      // in an unverified state.
-      break;
-    }
-    ++result.jointsOk;
+  int sourceNoParking = 0;
+  int sourceParking = 0;
+  FlcGeometryJoint dependencyOrder[FLC_CALIBRATION_JOINT_COUNT];
+  if (!flcPortUsable(port) ||
+      !flcPlanCatalogValid(plans, planCount) ||
+      !flcGeometryPlanSummary(sourceNoParking, sourceParking)) {
+    run.status = !flcPortUsable(port) ? FLC_ENGINE_REFUSED_PORT
+                                     : FLC_ENGINE_INVALID_PLAN;
+    run.abortReason = FLC_ABORT_INVALID_PLAN;
+    return run;
+  }
+  if (!flcBuildDependencyOrder(FLC_GEOMETRY_DEPENDENCIES,
+                               FLC_GEOMETRY_DEPENDENCY_COUNT,
+                               dependencyOrder,
+                               FLC_CALIBRATION_JOINT_COUNT)) {
+    run.status = FLC_ENGINE_DEPENDENCY_CYCLE;
+    run.abortReason = FLC_ABORT_DEPENDENCY_CYCLE;
+    return run;
+  }
+  selectionMask &= FLC_ALL_GEOMETRY_JOINTS_MASK;
+  run.selectionMask = selectionMask;
+  if (selectionMask == 0) {
+    run.status = FLC_ENGINE_INVALID_PLAN;
+    run.abortReason = FLC_ABORT_INVALID_PLAN;
+    return run;
   }
 
-  // Whole-leg release, whatever happened.
-  for (int i = 0; i < count; ++i) flcEndMotion(port, plans[i].busId);
-  return result;
-}
+  FlcRuntimeCalibration runtime[FLC_CALIBRATION_JOINT_COUNT] = {};
+  for (int joint = 0; joint < FLC_CALIBRATION_JOINT_COUNT; ++joint) {
+    runtime[joint].holdKnown = plans[joint].q0WatchKnown;
+    runtime[joint].holdTick = plans[joint].q0WatchTick;
+    runtime[joint].holdToleranceTicks = plans[joint].q0WatchToleranceTicks;
+    runtime[joint].calibrationUsable =
+        plans[joint].calibrationKnown &&
+        (plans[joint].knownDirection == 1 ||
+         plans[joint].knownDirection == -1) &&
+        plans[joint].knownQ0Tick >= 0 &&
+        plans[joint].knownQ0Tick <= FLC_ENCODER_MAX;
+    runtime[joint].direction = plans[joint].knownDirection;
+    runtime[joint].q0Tick = plans[joint].knownQ0Tick;
+    if ((selectionMask & (uint16_t)(1U << joint)) != 0)
+      ++run.jointsRequested;
+  }
 
-struct FlcAllLegsResult {
-  int status;
-  int legsOk;
-  int jointsOk;
-  int failedLegIndex;
-  FlcLegResult legs[FLC_LEG_COUNT];
-};
+  uint8_t preflightFailedId = 0;
+  const int preflightFault = flcPrepareQ0WatchState(
+      port, plans, runtime, guards, &preflightFailedId);
+  if (preflightFault != FLC_ABORT_NONE) {
+    run.status = flcEngineStatusForAbort(preflightFault);
+    run.abortReason = preflightFault;
+    run.failedBusId = preflightFailedId;
+  }
 
-//: Calibrate four legs in the supplied order. `plans` is a flat array of
-//: legCount * FLC_JOINTS_PER_LEG rows. One session result, no promotion.
-inline FlcAllLegsResult flcCalibrateAllLegs(const FlcServoPort &port,
-                                            const FlcContactConfig &guards,
-                                            const FlcJointPlan *plans, int legCount) {
-  FlcAllLegsResult result;
-  result.status = FLC_ENGINE_OK;
-  result.legsOk = 0;
-  result.jointsOk = 0;
-  result.failedLegIndex = -1;
+  for (int ordinal = 0;
+       ordinal < FLC_CALIBRATION_JOINT_COUNT && run.status == FLC_ENGINE_OK;
+       ++ordinal) {
+    const FlcGeometryJoint joint = dependencyOrder[ordinal];
+    const int jointIndex = (int)joint;
+    if ((selectionMask & (uint16_t)(1U << jointIndex)) == 0) continue;
+    run.executionOrder[run.executionCount++] = joint;
 
-  if (legCount > FLC_LEG_COUNT) legCount = FLC_LEG_COUNT;
+    // Every generated predecessor must already have usable current-session
+    // calibration (or explicit prior evidence when outside this selection).
+    for (int edge = 0; edge < FLC_GEOMETRY_DEPENDENCY_COUNT; ++edge) {
+      if (FLC_GEOMETRY_DEPENDENCIES[edge].targetJoint != joint) continue;
+      const int prerequisite =
+          (int)FLC_GEOMETRY_DEPENDENCIES[edge].prerequisiteJoint;
+      if (!runtime[prerequisite].calibrationUsable) {
+        run.status = FLC_ENGINE_PREREQUISITE_DRIFT;
+        run.abortReason = FLC_ABORT_PREREQUISITE_DRIFT;
+        run.failedJoint = joint;
+        run.failedBusId = plans[jointIndex].busId;
+        break;
+      }
+    }
+    if (run.status != FLC_ENGINE_OK) break;
 
-  for (int leg = 0; leg < legCount; ++leg) {
-    result.legs[leg] =
-        flcCalibrateLeg(port, guards, plans + leg * FLC_JOINTS_PER_LEG,
-                        FLC_JOINTS_PER_LEG);
-    result.jointsOk += result.legs[leg].jointsOk;
+    FlcJointCalibrationResult jointResult = flcCalibratePlannedJoint(
+        port, plans, runtime, joint, guards);
+    run.resultPresent[jointIndex] = true;
+    run.joints[jointIndex] = jointResult;
+    if (jointResult.minExecution.parkingOutcome == FLC_PARKING_REQUIRED_1DOF)
+      ++run.parkingRequiredCount;
+    else
+      ++run.noParkingCount;
+    if (jointResult.maxExecution.parkingOutcome == FLC_PARKING_REQUIRED_1DOF)
+      ++run.parkingRequiredCount;
+    else
+      ++run.noParkingCount;
+    if (jointResult.minExecution.parking.restoreVerified &&
+        jointResult.minExecution.parking.required)
+      ++run.parkingRestoreCount;
+    if (jointResult.maxExecution.parking.restoreVerified &&
+        jointResult.maxExecution.parking.required)
+      ++run.parkingRestoreCount;
 
-    if (result.legs[leg].status != FLC_ENGINE_OK) {
-      result.status = result.legs[leg].status;
-      result.failedLegIndex = leg;
+    if (jointResult.status != FLC_ENGINE_OK) {
+      run.status = jointResult.status;
+      run.abortReason = jointResult.abortReason;
+      run.failedJoint = joint;
+      run.failedBusId = plans[jointIndex].busId;
       break;
     }
-    ++result.legsOk;
+
+    runtime[jointIndex].calibrationUsable = true;
+    runtime[jointIndex].direction = jointResult.direction;
+    runtime[jointIndex].q0Tick = jointResult.derivedQ0FinalTick;
+    ++run.jointsOk;
   }
 
-  // Global release across every joint mentioned in the plan.
-  for (int i = 0; i < legCount * FLC_JOINTS_PER_LEG; ++i) {
-    flcEndMotion(port, plans[i].busId);
+  uint8_t safeOffFailedId = 0;
+  run.safeOffVerified = flcSafeOffAll(port, plans, planCount,
+                                      &safeOffFailedId);
+  if (!run.safeOffVerified) {
+    run.status = FLC_ENGINE_TORQUE_OFF_FAILED;
+    run.abortReason = FLC_ABORT_TORQUE_OFF_UNVERIFIED;
+    run.hardFaultCutPowerNow = true;
+    if (run.failedBusId == 0) run.failedBusId = safeOffFailedId;
   }
-  return result;
+  for (int joint = 0; joint < FLC_CALIBRATION_JOINT_COUNT; ++joint)
+    run.finalCalibration[joint] = runtime[joint];
+  return run;
 }
 
 #endif  // FLC_CALIBRATION_ENGINE_H

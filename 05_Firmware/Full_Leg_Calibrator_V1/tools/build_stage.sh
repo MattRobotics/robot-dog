@@ -22,6 +22,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKETCH_DIR="$(dirname "$HERE")/matdog_full_leg_calibrator_v1"
+REPO_ROOT="$(git -C "$HERE" rev-parse --show-toplevel)"
 
 ARDUINO_CLI="${ARDUINO_CLI:-$HOME/.local/bin/arduino-cli}"
 PORT="${PORT:-/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00}"
@@ -53,7 +54,14 @@ fi
 STAGE_NAMES=(H0_ESP32_ONLY H1_CENSUS_READONLY H2_MANUAL_Q0 H3_JOINT_CHARACTERIZE \
              H4_JOINT_CALIBRATE H5_LEG H6_FOUR_LEGS H7_FREEZE)
 
-EXTRA="-DFLC_AUTHORIZED_STAGE=${STAGE} -DFLC_H3_BOOTSTRAP_APPROVED=${BOOTSTRAP}"
+GIT_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+if [[ -n "$(git -C "$REPO_ROOT" status --porcelain=v1)" ]]; then
+  WORKTREE_DIRTY=1
+else
+  WORKTREE_DIRTY=0
+fi
+
+EXTRA="-DFLC_AUTHORIZED_STAGE=${STAGE} -DFLC_H3_BOOTSTRAP_APPROVED=${BOOTSTRAP} -DFLC_BUILD_GIT_SHA_TOKEN=${GIT_SHA} -DFLC_BUILD_WORKTREE_DIRTY=${WORKTREE_DIRTY}"
 
 echo "=============================================="
 echo " MATDOG Full Leg Calibrator V1 — stage build"
@@ -61,6 +69,8 @@ echo "=============================================="
 echo "stage      : H${STAGE} (${STAGE_NAMES[$STAGE]})"
 echo "bootstrap  : $([[ "$BOOTSTRAP" == "1" ]] && echo "BUILD-APPROVED (session confirmation still required)" || echo "DENIED")"
 echo "flags      : ${EXTRA}"
+echo "git sha    : ${GIT_SHA}"
+echo "dirty      : ${WORKTREE_DIRTY}"
 echo "fqbn       : ${FQBN}"
 echo
 

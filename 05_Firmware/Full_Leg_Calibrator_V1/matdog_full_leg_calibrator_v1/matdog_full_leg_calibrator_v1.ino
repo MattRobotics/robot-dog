@@ -56,6 +56,7 @@
 
 #include <Arduino.h>
 #include <SCServo.h>
+#include <esp_system.h>
 
 // Build-stage authorization. Single source of truth, fail-closed by default.
 #include "flc_stage_config.h"
@@ -70,6 +71,10 @@
 // by the host harness, so the firmware and the fault-injection tests run the
 // SAME motion decision logic. There is no second implementation.
 #include "flc_calibration_engine.h"
+
+// Generated, explicit Geometry Compiler V5 endpoint/parking evidence and the
+// dependency-aware H5/H6 plan shared with the native harness.
+#include "flc_leg_plan.h"
 
 // Declared here, ahead of every function, because the Arduino builder inserts
 // generated prototypes immediately after the includes. A function taking or
@@ -94,7 +99,6 @@ struct JointSpec {
   const char *unitLabel;
   uint8_t leg;
   uint8_t kind;
-  int8_t direction;            // 0 = UNMEASURED, must be characterized
   float declaredMinRad;
   float declaredMaxRad;
   float geomContactMinRad;
@@ -121,8 +125,9 @@ struct CensusEntry {
 //: current when it was measured.
 struct JointCharacterization {
   bool valid;
+  uint32_t sessionGeneration;
   uint32_t censusEpoch;
-  int8_t direction;
+  int8_t rawProbeSign;
   FlcBaseline baseline;
   uint16_t contactThresholdRaw;
   uint16_t retreatTicks;
@@ -130,6 +135,45 @@ struct JointCharacterization {
   uint16_t observedSpreadTicks;
   int restTick;
   int origin;
+};
+
+// H2 evidence is kept in RAM and bound to one boot/session/census generation.
+// Sample spread proves encoder stability only. It is deliberately NOT treated
+// as a characterized physical-pose accuracy tolerance.
+struct ManualQ0Evidence {
+  bool valid;
+  uint32_t sessionGeneration;
+  uint32_t censusEpoch;
+  int centreTick;
+  int minTick;
+  int maxTick;
+  int spreadTicks;
+  uint16_t samples;
+};
+
+// Explicit semantic operator witness. The number is the MATDOG kinematic
+// mapping in q = direction * signed_tick_delta(raw, q0), never the tautological
+// fact that a position servo follows a larger raw target with a larger raw
+// encoder value.
+struct JointDirectionWitness {
+  bool valid;
+  uint32_t sessionGeneration;
+  uint32_t censusEpoch;
+  int8_t direction;
+};
+
+// Candidate calibration produced in this RAM session. It is sufficient to
+// express a geometry parking angle in raw ticks, but is never promoted to the
+// canonical calibration by this firmware.
+struct JointCalibrationEvidence {
+  bool valid;
+  uint32_t sessionGeneration;
+  uint32_t censusEpoch;
+  int8_t direction;
+  int derivedQ0Tick;
+  int minContactTick;
+  int maxContactTick;
+  int tier;
 };
 
 // ==========================================================================
@@ -145,7 +189,7 @@ HardwareSerial ServoUART(1);
 SMS_STS st;
 
 static const char *FIRMWARE_NAME = "matdog_full_leg_calibrator_v1";
-static const char *FIRMWARE_VERSION = "1.0.0";
+static const char *FIRMWARE_VERSION = "1.1.0";
 static const char *PROTOCOL_ID = "FLC1";
 static const char *PROTOCOL_SCOPE = "CALIBRATOR_LOCAL_NOT_FINAL_RUNTIME_PROTOCOL";
 static const char *PROFILE_ID = "MATDOG_C018_V1";
@@ -437,23 +481,51 @@ static const char *KIND_LABEL[3] = {"HIP", "UPPER", "LOWER"};
 
 static constexpr JointSpec JOINTS[] = {
   // LF
-  {13, "lf_hip_joint",       "M22",   LEG_LF, KIND_HIP,   0, -0.785398163397f,  0.785398163397f, -0.803055986689f,  0.789284248f},
-  {12, "lf_upper_leg_joint", "ELR01", LEG_LF, KIND_UPPER, 0, -0.916297857297f,  2.138028333693f, -0.909889226f,     2.127120026f},
-  {11, "lf_lower_leg_joint", "M33",   LEG_LF, KIND_LOWER, 0, -1.605702911835f,  0.654498469498f, -1.606998273f,     0.666361254f},
+  {13, "lf_hip_joint",       "M22",   LEG_LF, KIND_HIP,   -0.785398163397f,  0.785398163397f, -0.803055986689f,  0.789284248f},
+  {12, "lf_upper_leg_joint", "ELR01", LEG_LF, KIND_UPPER, -0.916297857297f,  2.138028333693f, -0.909889226f,     2.127120026f},
+  {11, "lf_lower_leg_joint", "M33",   LEG_LF, KIND_LOWER, -1.605702911835f,  0.654498469498f, -1.606998273f,     0.666361254f},
   // RF
-  {23, "rf_hip_joint",       "NEW01", LEG_RF, KIND_HIP,   0, -0.785398163397f,  0.785398163397f, -0.789284248f,     0.803055986689f},
-  {22, "rf_upper_leg_joint", "ELR03", LEG_RF, KIND_UPPER, 0, -0.916297857297f,  2.138028333693f, -0.909889226f,     2.127120026f},
-  {21, "rf_lower_leg_joint", "NEW03", LEG_RF, KIND_LOWER, 0, -1.605702911835f,  0.654498469498f, -1.606998273f,     0.666361254f},
+  {23, "rf_hip_joint",       "NEW01", LEG_RF, KIND_HIP,   -0.785398163397f,  0.785398163397f, -0.789284248f,     0.803055986689f},
+  {22, "rf_upper_leg_joint", "ELR03", LEG_RF, KIND_UPPER, -0.916297857297f,  2.138028333693f, -0.909889226f,     2.127120026f},
+  {21, "rf_lower_leg_joint", "NEW03", LEG_RF, KIND_LOWER, -1.605702911835f,  0.654498469498f, -1.606998273f,     0.666361254f},
   // RH
-  {33, "rh_hip_joint",       "NEW06", LEG_RH, KIND_HIP,   0, -0.785398163397f,  0.785398163397f, -0.788125240f,     0.803055986689f},
-  {32, "rh_upper_leg_joint", "ELR02", LEG_RH, KIND_UPPER, 0, -0.916297857297f,  2.138028333693f, -0.909889226f,     2.127120026f},
-  {31, "rh_lower_leg_joint", "NEW05", LEG_RH, KIND_LOWER, 0, -1.605702911835f,  0.654498469498f, -1.606998273f,     0.666361254f},
+  {33, "rh_hip_joint",       "NEW06", LEG_RH, KIND_HIP,   -0.785398163397f,  0.785398163397f, -0.788125240f,     0.803055986689f},
+  {32, "rh_upper_leg_joint", "ELR02", LEG_RH, KIND_UPPER, -0.916297857297f,  2.138028333693f, -0.909889226f,     2.127120026f},
+  {31, "rh_lower_leg_joint", "NEW05", LEG_RH, KIND_LOWER, -1.605702911835f,  0.654498469498f, -1.606998273f,     0.666361254f},
   // LH
-  {43, "lh_hip_joint",       "M43",   LEG_LH, KIND_HIP,   0, -0.785398163397f,  0.785398163397f, -0.803055986689f,  0.788125240f},
-  {42, "lh_upper_leg_joint", "M42",   LEG_LH, KIND_UPPER, 0, -0.916297857297f,  2.138028333693f, -0.909889226f,     2.127120026f},
-  {41, "lh_lower_leg_joint", "M41",   LEG_LH, KIND_LOWER, 0, -1.605702911835f,  0.654498469498f, -1.606998273f,     0.666361254f},
+  {43, "lh_hip_joint",       "M43",   LEG_LH, KIND_HIP,   -0.785398163397f,  0.785398163397f, -0.803055986689f,  0.788125240f},
+  {42, "lh_upper_leg_joint", "M42",   LEG_LH, KIND_UPPER, -0.916297857297f,  2.138028333693f, -0.909889226f,     2.127120026f},
+  {41, "lh_lower_leg_joint", "M41",   LEG_LH, KIND_LOWER, -1.605702911835f,  0.654498469498f, -1.606998273f,     0.666361254f},
 };
 static constexpr size_t JOINT_COUNT = sizeof(JOINTS) / sizeof(JOINTS[0]);
+
+static bool geometryPlanUsable() {
+  if (FLC_GEOMETRY_JOINT_COUNT != (int)JOINT_COUNT ||
+      FLC_ENDPOINT_GEOMETRY_PLAN_COUNT != (int)(JOINT_COUNT * 2) ||
+      !flcGeometryDependencyGraphAcyclic() ||
+      !flcGeometryGeneratedTopologicalOrderValid()) {
+    return false;
+  }
+  int noParking = 0;
+  int parking = 0;
+  for (int i = 0; i < FLC_ENDPOINT_GEOMETRY_PLAN_COUNT; ++i) {
+    const FlcEndpointGeometryPlan &row = FLC_ENDPOINT_GEOMETRY_PLANS[i];
+    if ((int)row.targetJoint >= (int)JOINT_COUNT ||
+        row.motionAuthorizationProvenance !=
+            FLC_MOTION_NOT_GRANTED_OFFLINE_EVIDENCE_ONLY) {
+      return false;
+    }
+    if (row.parkingOutcome == FLC_NO_PARKING_REQUIRED) {
+      ++noParking;
+    } else if (row.parkingOutcome == FLC_PARKING_REQUIRED_1DOF &&
+               row.auxiliaryJoint != FLC_GEOMETRY_JOINT_NONE) {
+      ++parking;
+    } else {
+      return false;
+    }
+  }
+  return noParking == 18 && parking == 6;
+}
 
 // Head ids 51..55 are allocated in the repository but the head is not built.
 // A LEGS_12 session must expect them ABSENT and must not require them.
@@ -492,6 +564,14 @@ static SessionState sessionState = SESSION_IDLE;
 static Stage stage = STAGE_NONE;
 static char lastFault[160] = "NONE";
 
+// Volatile connection/session identity. `bootSessionId` changes on every ESP32
+// reset and is never persisted. `activeHostSessionId` comes from an explicit
+// @SESSION_BEGIN lease held by one open USB CDC connection. A host evidence
+// file can record these values but cannot restore either one after reset.
+static uint32_t bootSessionId = 0;
+static uint32_t activeHostSessionId = 0;
+static uint32_t sessionGeneration = 0;
+
 static CensusEntry census[JOINT_COUNT];
 static bool censusFresh = false;
 static uint32_t censusEpoch = 0;
@@ -505,25 +585,118 @@ static uint32_t censusEpoch = 0;
 // --------------------------------------------------------------------------
 
 static JointCharacterization characterization[JOINT_COUNT];
+static ManualQ0Evidence manualQ0[JOINT_COUNT];
+static JointDirectionWitness directionWitness[JOINT_COUNT];
+static JointCalibrationEvidence calibrationEvidence[JOINT_COUNT];
 
 //: Operator confirmation of the bootstrap envelope, for the CURRENT session.
 static bool bootstrapSessionApproved = false;
+static uint32_t bootstrapSessionGeneration = 0;
+static uint32_t bootstrapCensusEpoch = 0;
 
 static void clearCharacterization(const char *why) {
   for (size_t i = 0; i < JOINT_COUNT; ++i) characterization[i] = JointCharacterization();
   if (why != nullptr) Serial.printf("CHARACTERIZATION_CLEARED WHY=%s\n", why);
 }
 
+static void clearManualQ0(const char *why) {
+  for (size_t i = 0; i < JOINT_COUNT; ++i) manualQ0[i] = ManualQ0Evidence();
+  if (why != nullptr) Serial.printf("MANUAL_Q0_CLEARED WHY=%s\n", why);
+}
+
+static void clearDirectionWitnesses(const char *why) {
+  for (size_t i = 0; i < JOINT_COUNT; ++i) {
+    directionWitness[i] = JointDirectionWitness();
+  }
+  if (why != nullptr) Serial.printf("DIRECTION_WITNESSES_CLEARED WHY=%s\n", why);
+}
+
+static void clearCalibrationEvidence(const char *why) {
+  for (size_t i = 0; i < JOINT_COUNT; ++i) {
+    calibrationEvidence[i] = JointCalibrationEvidence();
+  }
+  if (why != nullptr) Serial.printf("CALIBRATION_EVIDENCE_CLEARED WHY=%s\n", why);
+}
+
+static void clearBootstrapApproval() {
+  bootstrapSessionApproved = false;
+  bootstrapSessionGeneration = 0;
+  bootstrapCensusEpoch = 0;
+}
+
+static void clearSessionEvidence(const char *why) {
+  clearCharacterization(why);
+  clearManualQ0(why);
+  clearDirectionWitnesses(why);
+  clearCalibrationEvidence(why);
+  clearBootstrapApproval();
+}
+
+static bool activeSessionUsable() {
+  return activeHostSessionId != 0 && sessionState != SESSION_FAULT;
+}
+
+static bool requireActiveSession(const char *mode) {
+  if (sessionState == SESSION_FAULT) {
+    Serial.printf("%s_REFUSED REASON=SESSION_FAULT_LATCHED FAULT=%s\n", mode,
+                  lastFault);
+    Serial.println("CUT_SERVO_POWER_NOW");
+    return false;
+  }
+  if (activeHostSessionId == 0) {
+    Serial.printf("%s_REFUSED REASON=NO_ACTIVE_PERSISTENT_SESSION\n", mode);
+    Serial.printf("%s_HINT=@SESSION_BEGIN_<HOST_NONCE>\n", mode);
+    return false;
+  }
+  return true;
+}
+
 static bool characterizationUsable(size_t index) {
-  return index < JOINT_COUNT && characterization[index].valid &&
-         characterization[index].censusEpoch == censusEpoch &&
-         (characterization[index].direction == 1 || characterization[index].direction == -1);
+  return activeSessionUsable() && censusFresh && index < JOINT_COUNT &&
+         characterization[index].valid &&
+         characterization[index].sessionGeneration == sessionGeneration &&
+         characterization[index].censusEpoch == censusEpoch;
+}
+
+static bool manualQ0Usable(size_t index) {
+  return activeSessionUsable() && censusFresh && index < JOINT_COUNT &&
+         manualQ0[index].valid &&
+         manualQ0[index].sessionGeneration == sessionGeneration &&
+         manualQ0[index].censusEpoch == censusEpoch;
+}
+
+static bool allManualQ0Usable() {
+  for (size_t i = 0; i < JOINT_COUNT; ++i) {
+    if (!manualQ0Usable(i)) return false;
+  }
+  return true;
+}
+
+static bool directionWitnessUsable(size_t index) {
+  return activeSessionUsable() && censusFresh && index < JOINT_COUNT &&
+         directionWitness[index].valid &&
+         directionWitness[index].sessionGeneration == sessionGeneration &&
+         directionWitness[index].censusEpoch == censusEpoch &&
+         (directionWitness[index].direction == 1 ||
+          directionWitness[index].direction == -1);
+}
+
+static bool calibrationEvidenceUsable(size_t index) {
+  return activeSessionUsable() && censusFresh && index < JOINT_COUNT &&
+         calibrationEvidence[index].valid &&
+         calibrationEvidence[index].sessionGeneration == sessionGeneration &&
+         calibrationEvidence[index].censusEpoch == censusEpoch &&
+         (calibrationEvidence[index].direction == 1 ||
+          calibrationEvidence[index].direction == -1);
 }
 
 //: Bootstrap is usable only when the BUILD allows it AND the operator confirmed
 //: it in this session. Neither alone is sufficient.
 static bool bootstrapUsable() {
-  return H3_BOOTSTRAP_BUILD_APPROVED && bootstrapSessionApproved;
+  return H3_BOOTSTRAP_BUILD_APPROVED && bootstrapSessionApproved &&
+         activeSessionUsable() && censusFresh &&
+         bootstrapSessionGeneration == sessionGeneration &&
+         bootstrapCensusEpoch == censusEpoch;
 }
 
 static void invalidateCensus(const char *why) {
@@ -537,6 +710,8 @@ static void invalidateCensus(const char *why) {
 static void setFault(const char *reason) {
   snprintf(lastFault, sizeof(lastFault), "%s", reason);
   sessionState = SESSION_FAULT;
+  censusFresh = false;
+  clearBootstrapApproval();
 }
 
 // ==========================================================================
@@ -686,8 +861,17 @@ static bool safeOffOne(uint8_t id, bool &sawResponder) {
   int probe = st.readByte(id, REG_TORQUE_ENABLE);
   if (probe < 0 || st.Error != 0) {
     stage = saved;
-    Serial.printf("SAFE_OFF ID=%u RESULT=NO_RESPONDER\n", id);
-    return true;   // absent servo cannot hold torque
+    const int index = jointIndexForId(id);
+    // Before a successful census an absent servo cannot hold torque. Once the
+    // session has positively identified this unit, losing it during SAFE_OFF is
+    // not proof of torque OFF: fail loudly and require physical power removal.
+    if (index >= 0 && census[index].present) {
+      Serial.printf("SAFE_OFF ID=%u RESULT=FAIL_KNOWN_RESPONDER_LOST\n", id);
+      return false;
+    }
+    Serial.printf("SAFE_OFF ID=%u RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED\n",
+                  id);
+    return true;
   }
 
   sawResponder = true;
@@ -756,6 +940,9 @@ static void runStatus() {
   Serial.println("STATUS_BEGIN");
   Serial.printf("FIRMWARE_NAME=%s\n", FIRMWARE_NAME);
   Serial.printf("FIRMWARE_VERSION=%s\n", FIRMWARE_VERSION);
+  Serial.printf("BUILD_GIT_SHA=%s\n", FLC_BUILD_GIT_SHA);
+  Serial.printf("BUILD_WORKTREE_DIRTY=%s\n",
+                FLC_BUILD_WORKTREE_DIRTY ? "YES" : "NO");
   Serial.printf("BUILD_DATE=%s\n", __DATE__);
   Serial.printf("BUILD_TIME=%s\n", __TIME__);
   Serial.printf("PROTOCOL_ID=%s\n", PROTOCOL_ID);
@@ -772,6 +959,34 @@ static void runStatus() {
   Serial.printf("EXPECTED_LEG_SERVOS=%u\n", (unsigned)JOINT_COUNT);
   Serial.printf("HEAD_SERVOS_EXPECTED_PRESENT=NO\n");
   Serial.printf("AUTHORIZED_HARDWARE_STAGE=H%u\n", (unsigned)AUTHORIZED_STAGE);
+  int noParkingPlans = 0;
+  int parkingPlans = 0;
+  for (int i = 0; i < FLC_ENDPOINT_GEOMETRY_PLAN_COUNT; ++i) {
+    if (FLC_ENDPOINT_GEOMETRY_PLANS[i].parkingOutcome ==
+        FLC_NO_PARKING_REQUIRED) {
+      ++noParkingPlans;
+    } else {
+      ++parkingPlans;
+    }
+  }
+  Serial.printf("GEOMETRY_ENDPOINT_PLANS=%d\n", FLC_ENDPOINT_GEOMETRY_PLAN_COUNT);
+  Serial.printf("GEOMETRY_NO_PARKING_REQUIRED=%d\n", noParkingPlans);
+  Serial.printf("GEOMETRY_PARKING_REQUIRED_1DOF=%d\n", parkingPlans);
+  Serial.printf("GEOMETRY_DEPENDENCIES=%d\n", FLC_GEOMETRY_DEPENDENCY_COUNT);
+  Serial.printf("GEOMETRY_PARKING_FILE_SHA256=%s\n",
+                FLC_GEOMETRY_PARKING_FILE_SHA256);
+  Serial.printf("GEOMETRY_PARKING_SEMANTIC_SHA256=%s\n",
+                FLC_GEOMETRY_PARKING_SEMANTIC_SHA256);
+  Serial.printf("GEOMETRY_SAFETY_POLICY_FILE_SHA256=%s\n",
+                FLC_GEOMETRY_SAFETY_POLICY_FILE_SHA256);
+  Serial.printf("GEOMETRY_ARTIFACT_MOTION_AUTHORIZATION=%s\n",
+                FLC_GEOMETRY_ARTIFACT_GRANTS_MOTION_AUTHORIZATION ? "YES" : "NO");
+  Serial.printf("GEOMETRY_PLAN_SELF_CHECK=%s\n",
+                geometryPlanUsable() ? "PASS" : "FAIL");
+  Serial.printf("BOOT_SESSION_ID=%08lX\n", (unsigned long)bootSessionId);
+  Serial.printf("ACTIVE_HOST_SESSION_ID=%08lX\n",
+                (unsigned long)activeHostSessionId);
+  Serial.printf("SESSION_GENERATION=%lu\n", (unsigned long)sessionGeneration);
   Serial.printf("SESSION_STATE=%u\n", (unsigned)sessionState);
   Serial.printf("CENSUS_FRESH=%s\n", censusFresh ? "YES" : "NO");
   Serial.printf("CENSUS_EPOCH=%lu\n", (unsigned long)censusEpoch);
@@ -805,27 +1020,46 @@ static void runStatus() {
   }
 
   size_t characterized = 0;
+  size_t manualQ0Count = 0;
+  size_t witnessCount = 0;
+  size_t calibratedCount = 0;
+  bool anyJointCalibrationReady = false;
   for (size_t i = 0; i < JOINT_COUNT; ++i) {
+    if (manualQ0Usable(i)) ++manualQ0Count;
+    if (directionWitnessUsable(i)) ++witnessCount;
+    if (calibrationEvidenceUsable(i)) ++calibratedCount;
+    if (manualQ0Usable(i) && directionWitnessUsable(i) &&
+        characterizationUsable(i)) {
+      anyJointCalibrationReady = true;
+    }
     if (characterizationUsable(i)) {
       ++characterized;
-      Serial.printf("JOINT_CHARACTERIZED ID=%u JOINT=%s ORIGIN=%s DIRECTION=%d "
+      Serial.printf("JOINT_CHARACTERIZED ID=%u JOINT=%s ORIGIN=%s RAW_PROBE_SIGN=%d "
                     "CONTACT_THRESHOLD_RAW=%u RETREAT_TICKS=%u\n",
                     JOINTS[i].busId, JOINTS[i].jointName,
                     flcParameterOriginLabel(characterization[i].origin),
-                    (int)characterization[i].direction,
+                    (int)characterization[i].rawProbeSign,
                     characterization[i].contactThresholdRaw,
                     characterization[i].retreatTicks);
     }
   }
   Serial.printf("JOINTS_CHARACTERIZED=%u/%u\n", (unsigned)characterized,
                 (unsigned)JOINT_COUNT);
+  Serial.printf("MANUAL_Q0_CANDIDATES=%u/%u\n", (unsigned)manualQ0Count,
+                (unsigned)JOINT_COUNT);
+  Serial.printf("DIRECTION_WITNESSES=%u/%u\n", (unsigned)witnessCount,
+                (unsigned)JOINT_COUNT);
+  Serial.printf("CALIBRATION_CANDIDATES=%u/%u\n", (unsigned)calibratedCount,
+                (unsigned)JOINT_COUNT);
 
   Serial.printf("MOTION_UNLOCKED=%s\n",
-                (AUTHORIZED_STAGE >= H3_JOINT_CHARACTERIZE &&
+                (activeSessionUsable() && censusFresh &&
+                 AUTHORIZED_STAGE >= H3_JOINT_CHARACTERIZE &&
                  (preMotionOutstanding() == 0 || bootstrapUsable()))
                     ? "YES" : "NO");
   Serial.printf("CALIBRATE_JOINT_AVAILABLE=%s\n",
-                (AUTHORIZED_STAGE >= H4_JOINT_CALIBRATE && characterized > 0)
+                (AUTHORIZED_STAGE >= H4_JOINT_CALIBRATE &&
+                 anyJointCalibrationReady)
                     ? "YES" : "NO");
   Serial.println("PROMOTION_TO_CANONICAL=REQUIRES_EXPLICIT_SEPARATE_GATE");
   Serial.println("STATUS_RESULT PASS");
@@ -838,15 +1072,18 @@ static void runStatus() {
 
 static void runCensus() {
   Serial.println("CENSUS_BEGIN");
+  if (!requireActiveSession("CENSUS")) {
+    Serial.println("CENSUS_RESULT REFUSED");
+    Serial.println("CENSUS_END");
+    return;
+  }
   Serial.printf("CENSUS_EXPECTED_IDS=11,12,13,21,22,23,31,32,33,41,42,43\n");
 
   invalidateCensus(nullptr);
   ++censusEpoch;
-  // A new census means a new physical session epoch. Characterization evidence
-  // and the operator's bootstrap approval belong to the setup that was verified
-  // when they were granted, so both are dropped here rather than carried across.
-  clearCharacterization("NEW_CENSUS_EPOCH");
-  bootstrapSessionApproved = false;
+  // A new census means a new physical session epoch. Every dependent evidence
+  // object is dropped; no host-side file can recreate any of it.
+  clearSessionEvidence("NEW_CENSUS_EPOCH");
 
   size_t presentCount = 0;
   size_t identityOkCount = 0;
@@ -1014,6 +1251,11 @@ static bool requirePreMotionParameters(const char *mode) {
 static void runCaptureManualQ0(uint16_t samples) {
   Serial.println("CAPTURE_Q0_BEGIN");
 
+  if (!requireActiveSession("CAPTURE_Q0")) {
+    Serial.println("CAPTURE_Q0_RESULT REFUSED");
+    Serial.println("CAPTURE_Q0_END");
+    return;
+  }
   if (!requireStage(H2_MANUAL_Q0, "CAPTURE_Q0")) {
     Serial.println("CAPTURE_Q0_RESULT REFUSED");
     Serial.println("CAPTURE_Q0_END");
@@ -1033,6 +1275,7 @@ static void runCaptureManualQ0(uint16_t samples) {
   Serial.printf("CAPTURE_Q0_PROMOTION=NOT_FINAL_Q0\n");
 
   bool allOk = true;
+  ManualQ0Evidence staged[JOINT_COUNT] = {};
 
   for (size_t i = 0; i < JOINT_COUNT; ++i) {
     const JointSpec &spec = JOINTS[i];
@@ -1092,10 +1335,82 @@ static void runCaptureManualQ0(uint16_t samples) {
         (stable && plausible) ? "OK" : "FAIL");
 
     if (!stable || !plausible) allOk = false;
+    if (stable && plausible) {
+      staged[i].valid = true;
+      staged[i].sessionGeneration = sessionGeneration;
+      staged[i].censusEpoch = censusEpoch;
+      staged[i].centreTick = centre;
+      staged[i].minTick = minTick;
+      staged[i].maxTick = maxTick;
+      staged[i].spreadTicks = spread;
+      staged[i].samples = got;
+    }
+  }
+
+  if (allOk) {
+    for (size_t i = 0; i < JOINT_COUNT; ++i) manualQ0[i] = staged[i];
+    // Any downstream evidence belonged to the previous physical q0 capture.
+    clearDirectionWitnesses("NEW_MANUAL_Q0_CAPTURE");
+    clearCharacterization("NEW_MANUAL_Q0_CAPTURE");
+    clearCalibrationEvidence("NEW_MANUAL_Q0_CAPTURE");
+    clearBootstrapApproval();
+  } else {
+    clearManualQ0("CAPTURE_Q0_INCOMPLETE");
+    clearDirectionWitnesses("CAPTURE_Q0_INCOMPLETE");
+    clearCharacterization("CAPTURE_Q0_INCOMPLETE");
+    clearCalibrationEvidence("CAPTURE_Q0_INCOMPLETE");
+    clearBootstrapApproval();
   }
 
   Serial.printf("CAPTURE_Q0_RESULT %s\n", allOk ? "PASS" : "FAIL");
   Serial.println("CAPTURE_Q0_END");
+}
+
+// --------------------------------------------------------------------------
+// DIRECTION WITNESS — semantic current-build evidence, no servo write
+// --------------------------------------------------------------------------
+
+static void runWitnessDirection(int id, int8_t direction, const char *semantic) {
+  Serial.println("WITNESS_DIRECTION_BEGIN");
+  if (!requireActiveSession("WITNESS_DIRECTION") ||
+      !requireStage(H2_MANUAL_Q0, "WITNESS_DIRECTION") ||
+      !requireFreshCensus("WITNESS_DIRECTION")) {
+    Serial.println("WITNESS_DIRECTION_RESULT REFUSED");
+    Serial.println("WITNESS_DIRECTION_END");
+    return;
+  }
+  if (!validLegId(id) || (direction != 1 && direction != -1)) {
+    Serial.printf("WITNESS_DIRECTION_REFUSED REASON=INVALID_SEMANTIC_WITNESS ID=%d\n",
+                  id);
+    Serial.println("WITNESS_DIRECTION_RESULT REFUSED");
+    Serial.println("WITNESS_DIRECTION_END");
+    return;
+  }
+  const int index = jointIndexForId(id);
+  if (!manualQ0Usable((size_t)index)) {
+    Serial.println("WITNESS_DIRECTION_REFUSED REASON=NO_CURRENT_MANUAL_Q0_CANDIDATE");
+    Serial.println("WITNESS_DIRECTION_RESULT REFUSED");
+    Serial.println("WITNESS_DIRECTION_END");
+    return;
+  }
+
+  JointDirectionWitness &witness = directionWitness[index];
+  witness.valid = true;
+  witness.sessionGeneration = sessionGeneration;
+  witness.censusEpoch = censusEpoch;
+  witness.direction = direction;
+
+  // Changing the semantic mapping invalidates evidence interpreted under an
+  // earlier witness.
+  characterization[index] = JointCharacterization();
+  calibrationEvidence[index] = JointCalibrationEvidence();
+
+  Serial.printf("WITNESS_DIRECTION ID=%u JOINT=%s SEMANTIC=%s DIRECTION=%d "
+                "MEANING=q_equals_direction_times_signed_raw_delta\n",
+                JOINTS[index].busId, JOINTS[index].jointName, semantic,
+                (int)direction);
+  Serial.println("WITNESS_DIRECTION_RESULT PASS");
+  Serial.println("WITNESS_DIRECTION_END");
 }
 
 // ==========================================================================
@@ -1113,6 +1428,22 @@ static void runCaptureManualQ0(uint16_t samples) {
 // only place the two meet. commandPosition routes to flcWritePosEx(), which
 // remains the single GoalPosition authority in this firmware.
 // --------------------------------------------------------------------------
+
+//: The engine calls this immediately before every read and every
+//: motion-capable write. It is the single place where "the session that
+//: authorized this motion is still the session executing it" is decided, so a
+//: reset, a reconnect, a new census or a latched fault stops motion in-flight
+//: rather than at the next command boundary. Torque-OFF stays reachable
+//: because flcEndMotion() does not route through here.
+static bool portValidateContext(void *ctx, uint8_t id) {
+  (void)ctx;
+  if (sessionState == SESSION_FAULT) return false;
+  if (!activeSessionUsable() || !censusFresh) return false;
+  const int index = jointIndexForId((int)id);
+  if (index < 0) return false;
+  const CensusEntry &entry = census[index];
+  return entry.present && entry.identityOk && entry.profileMatch;
+}
 
 static bool portReadTelemetry(void *ctx, uint8_t id, FlcObservation *out) {
   (void)ctx;
@@ -1156,7 +1487,14 @@ static bool portReadTelemetry(void *ctx, uint8_t id, FlcObservation *out) {
 static bool portCommandPosition(void *ctx, uint8_t id, int position, uint16_t speed,
                                 uint8_t acc) {
   (void)ctx;
-  return flcWritePosEx(id, position, speed, acc, "engine");
+  // Each adapter callback owns its write-stage lifetime. TorqueEnable's
+  // callback must not leave a hidden global stage armed, and restoring its
+  // stage must not make the following position command spuriously fail.
+  const Stage saved = stage;
+  stage = STAGE_MOTION;
+  const bool ok = flcWritePosEx(id, position, speed, acc, "engine");
+  stage = saved;
+  return ok;
 }
 
 static bool portSetTorqueLimit(void *ctx, uint8_t id, uint16_t limit) {
@@ -1196,6 +1534,7 @@ static void portTrace(void *ctx, const char *line) {
 
 static FlcServoPort makeServoPort() {
   FlcServoPort port;
+  port.validateContext = portValidateContext;
   port.readTelemetry = portReadTelemetry;
   port.commandPosition = portCommandPosition;
   port.setTorqueLimit = portSetTorqueLimit;
@@ -1228,6 +1567,27 @@ static FlcContactConfig makeGuards() {
   return guards;
 }
 
+// Build the fresh-telemetry watch used while one or more explicitly excluded
+// joints move. Every other joint must remain at its H2 q0 candidate with torque
+// OFF. GoalPosition is intentionally unconstrained for those torque-off joints:
+// it may contain a stale RAM value, but their actual position may not drift.
+static bool makeQ0MotionWatch(uint16_t excludedMask, FlcMotionWatch &watch) {
+  watch = FlcMotionWatch();
+  if (!allManualQ0Usable()) return false;
+  for (size_t i = 0; i < JOINT_COUNT; ++i) {
+    if ((excludedMask & (uint16_t)(1U << i)) != 0) continue;
+    if (watch.count >= FLC_MAX_WATCHED_JOINTS) return false;
+    FlcWatchJoint &entry = watch.joints[watch.count++];
+    entry.busId = JOINTS[i].busId;
+    entry.expectedTick = manualQ0[i].centreTick;
+    entry.toleranceTicks = Q0_MAX_SPREAD_TICKS;
+    entry.expectedTorqueState = 0;
+    entry.expectedTorqueLimit = 0;
+    entry.expectedGoalTick = -1;
+  }
+  return true;
+}
+
 
 // --------------------------------------------------------------------------
 // Acceptance gates — POST-MEASURE, never pre-motion
@@ -1237,7 +1597,12 @@ static FlcContactConfig makeGuards() {
 // --------------------------------------------------------------------------
 
 static FlcAcceptanceGates makeAcceptanceGates(const JointSpec &spec) {
-  FlcAcceptanceGates gates;
+  // Value-initialised: an acceptance gate that is never assigned must read as
+  // UNKNOWN, never as whatever the stack happened to contain. An indeterminate
+  // "tolerance known" byte could otherwise promote a result to ACCEPTED, which
+  // is the one outcome this firmware may never fabricate.
+  FlcAcceptanceGates gates = FlcAcceptanceGates();
+
   // Repeatability band is characterized per build. Until H3 has run we use the
   // measured spread from characterization; absent that, the result is refused
   // rather than accepted on a guessed band.
@@ -1245,6 +1610,12 @@ static FlcAcceptanceGates makeAcceptanceGates(const JointSpec &spec) {
   gates.repeatabilityToleranceTicks = 0;
   gates.endpointVsUrdfToleranceKnown = false;
   gates.endpointVsUrdfToleranceTicks = 0;
+
+  // The manual-vs-derived q0 agreement tolerance has NOT been characterized on
+  // this build. Leaving it explicitly unknown is what makes H4 report
+  // BLOCKED_TOLERANCE_UNVALIDATED instead of inventing an acceptance.
+  gates.manualVsDerivedQ0ToleranceKnown = false;
+  gates.manualVsDerivedQ0ToleranceTicks = 0;
 
   const float spanRad = spec.geomContactMaxRad - spec.geomContactMinRad;
   gates.expectedSpanTicks = (int)(spanRad * (float)ENCODER_MODULUS / 6.283185307f + 0.5f);
@@ -1256,6 +1627,33 @@ static int angleToTicks(float rad) {
   return (int)(ticks >= 0.0f ? ticks + 0.5f : ticks - 0.5f);
 }
 
+// H3 must not unknowingly drive through one of the six geometry-obstructed
+// endpoint paths. The semantic q<->raw witness lets us select an endpoint that
+// the canonical table explicitly marks NO_PARKING_REQUIRED. This is still only
+// raw encoder response/contact characterization; it does not "measure"
+// kinematic direction by watching a position servo follow its raw command.
+static int8_t h3NoParkingRawProbeSign(int jointIndex) {
+  if (jointIndex < 0 || jointIndex >= (int)JOINT_COUNT ||
+      !directionWitnessUsable((size_t)jointIndex)) {
+    return 0;
+  }
+  const JointSpec &spec = JOINTS[jointIndex];
+  const FlcEndpointGeometryPlan *minPlan =
+      flcGeometryPlanFor(spec.jointName, "min");
+  const FlcEndpointGeometryPlan *maxPlan =
+      flcGeometryPlanFor(spec.jointName, "max");
+  const int8_t direction = directionWitness[jointIndex].direction;
+  if (minPlan != nullptr &&
+      minPlan->parkingOutcome == FLC_NO_PARKING_REQUIRED) {
+    return (int8_t)-direction;
+  }
+  if (maxPlan != nullptr &&
+      maxPlan->parkingOutcome == FLC_NO_PARKING_REQUIRED) {
+    return direction;
+  }
+  return 0;
+}
+
 // --------------------------------------------------------------------------
 // Shared preflight for every motion mode
 // --------------------------------------------------------------------------
@@ -1263,9 +1661,49 @@ static int angleToTicks(float rad) {
 static bool motionPreflight(const char *mode, uint8_t neededStage, int jointIndex,
                             bool requireCharacterized) {
   bool ok = true;
+  if (!geometryPlanUsable()) {
+    Serial.printf("%s_REFUSED REASON=INVALID_GEOMETRY_PLAN\n", mode);
+    setFault("INVALID_GEOMETRY_PLAN");
+    ok = false;
+  }
+  if (!requireActiveSession(mode)) ok = false;
   if (!requireStage(neededStage, mode)) ok = false;
   if (!requireFreshCensus(mode)) ok = false;
   if (!requirePreMotionParameters(mode)) ok = false;
+
+  if (jointIndex < 0) {
+    if (!allManualQ0Usable()) {
+      Serial.printf("%s_REFUSED REASON=INCOMPLETE_MANUAL_Q0_EVIDENCE\n", mode);
+      ok = false;
+    }
+    // A whole-leg or whole-robot run needs a semantic witness for EVERY joint
+    // it may touch, including a cross-leg parking auxiliary. Checking here means
+    // the operator is refused before anything moves rather than part-way in.
+    if (neededStage >= H3_JOINT_CHARACTERIZE) {
+      for (size_t i = 0; i < JOINT_COUNT; ++i) {
+        if (directionWitnessUsable(i)) continue;
+        Serial.printf("%s_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=%u\n",
+                      mode, JOINTS[i].busId);
+        ok = false;
+      }
+      if (!ok) {
+        Serial.printf("%s_HINT=@WITNESS_DIRECTION_<ID>_<Q_PLUS_RAW_...>_CONFIRM\n",
+                      mode);
+      }
+    }
+  } else if (!manualQ0Usable((size_t)jointIndex)) {
+    Serial.printf("%s_REFUSED REASON=NO_CURRENT_MANUAL_Q0_CANDIDATE\n", mode);
+    ok = false;
+  }
+
+  if (jointIndex >= 0 && neededStage >= H3_JOINT_CHARACTERIZE &&
+      !directionWitnessUsable((size_t)jointIndex)) {
+    Serial.printf("%s_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS\n",
+                  mode);
+    Serial.printf("%s_HINT=@WITNESS_DIRECTION_<ID>_<Q_PLUS_RAW_...>_CONFIRM\n",
+                  mode);
+    ok = false;
+  }
 
   if (jointIndex >= 0) {
     const CensusEntry &entry = census[jointIndex];
@@ -1331,19 +1769,45 @@ static void runCharacterizeJoint(int id) {
                 envelope.retreatTicks, envelope.travelBudgetTicks,
                 (unsigned long)envelope.timeBudgetMs);
 
+  // H3 drives a real contact. Choosing the probe side from the canonical table
+  // is what keeps it off the six geometry-obstructed endpoint paths, which no
+  // amount of current limiting would make safe.
+  const int8_t rawProbeSign = h3NoParkingRawProbeSign(index);
+  if (rawProbeSign != 1 && rawProbeSign != -1) {
+    Serial.println("CHARACTERIZE_JOINT_REFUSED REASON=NO_NO_PARKING_ENDPOINT_FOR_PROBE");
+    Serial.println("CHARACTERIZE_JOINT_RESULT REFUSED");
+    Serial.println("CHARACTERIZE_JOINT_END");
+    return;
+  }
+  Serial.printf("CHARACTERIZE_JOINT_RAW_PROBE_SIGN=%d PROVENANCE=NO_PARKING_REQUIRED\n",
+                (int)rawProbeSign);
+
+  FlcMotionWatch watch;
+  if (!makeQ0MotionWatch((uint16_t)(1U << index), watch)) {
+    Serial.println("CHARACTERIZE_JOINT_REFUSED REASON=INCOMPLETE_MANUAL_Q0_EVIDENCE");
+    Serial.println("CHARACTERIZE_JOINT_RESULT REFUSED");
+    Serial.println("CHARACTERIZE_JOINT_END");
+    return;
+  }
+
   const int startTick = census[index].presentPosition;
   FlcServoPort port = makeServoPort();
   const FlcContactConfig guards = makeGuards();
 
-  const FlcCharacterizationResult result =
-      flcCharacterizeJoint(port, (uint8_t)id, startTick, 0, envelope, guards, 48, 96);
+  const FlcCharacterizationResult result = flcCharacterizeJoint(
+      port, (uint8_t)id, startTick, rawProbeSign, envelope, guards, 48, 96, &watch);
 
   Serial.printf("CHARACTERIZE_JOINT_STATUS=%s REASON=%s\n",
                 flcEngineStatusLabel(result.status),
                 flcAbortReasonLabel(result.abortReason));
-  Serial.printf("CHARACTERIZE_JOINT_DIRECTION MEASURED=%d TRAVEL=%d START=%d END=%d\n",
-                (int)result.direction.encoderSign, result.direction.observedTravel,
-                result.direction.startTick, result.direction.endTick);
+  // Deliberately NOT called DIRECTION: a position servo following its own raw
+  // command proves the encoder responds, not the MATDOG kinematic mapping.
+  Serial.printf("CHARACTERIZE_JOINT_ENCODER_RESPONSE RESPONDS=%d RAW_PROBE_SIGN=%d "
+                "TRAVEL=%d START=%d END=%d\n",
+                result.encoderResponse.responds ? 1 : 0,
+                (int)result.encoderResponse.rawProbeSign,
+                result.encoderResponse.observedTravel,
+                result.encoderResponse.startTick, result.encoderResponse.endTick);
   Serial.printf("CHARACTERIZE_JOINT_BASELINE SAMPLES=%d MEDIAN_CURRENT=%u MAD=%u "
                 "MIN=%u MAX=%u PEAK_SPEED=%u\n",
                 result.baseline.samples, result.baseline.baseline.medianCurrent,
@@ -1375,8 +1839,9 @@ static void runCharacterizeJoint(int id) {
   if (result.status == FLC_ENGINE_OK && result.complete && released) {
     JointCharacterization &store = characterization[index];
     store.valid = true;
+    store.sessionGeneration = sessionGeneration;
     store.censusEpoch = censusEpoch;
-    store.direction = result.direction.encoderSign;
+    store.rawProbeSign = result.encoderResponse.rawProbeSign;
     store.baseline = result.baseline.baseline;
     store.contactThresholdRaw = result.characterizedContactThresholdRaw;
     store.retreatTicks = result.characterizedRetreatTicks;
@@ -1385,10 +1850,10 @@ static void runCharacterizeJoint(int id) {
     store.restTick = result.finalRetreat.toTick;
     store.origin = FLC_ORIGIN_CHARACTERIZED_CURRENT_HARDWARE;
 
-    Serial.printf("CHARACTERIZE_JOINT_OUTPUT ORIGIN=%s DIRECTION=%d "
+    Serial.printf("CHARACTERIZE_JOINT_OUTPUT ORIGIN=%s RAW_PROBE_SIGN=%d "
                   "CONTACT_THRESHOLD_RAW=%u RETREAT_TICKS=%u OBSERVED_SPREAD=%u "
                   "REPEATABILITY_BAND=%u REST_TICK=%d\n",
-                  flcParameterOriginLabel(store.origin), (int)store.direction,
+                  flcParameterOriginLabel(store.origin), (int)store.rawProbeSign,
                   store.contactThresholdRaw, store.retreatTicks,
                   store.observedSpreadTicks, store.repeatabilityToleranceTicks,
                   store.restTick);
@@ -1400,36 +1865,229 @@ static void runCharacterizeJoint(int id) {
 }
 
 // --------------------------------------------------------------------------
-// H4 — @CALIBRATE_JOINT: both endpoints, span, direction, q0 candidate
+// H4 / H5 / H6 — ONE shared production orchestration
+//
+// H4, H5 and H6 differ ONLY in which joints their selection mask names. All
+// three build the identical 12-row plan catalog and execute the identical
+// flcRunCalibrationPlan() in flc_calibration_engine.h — the same translation
+// unit the offline harness drives. There is no firmware-local calibration
+// loop, so the code that is tested is the code that moves the robot.
+//
+// Dependency order, parking and restore come from the generated geometry plan
+// inside the engine, never from a leg-local distal-first heuristic here.
 // --------------------------------------------------------------------------
 
-//: H4 single-joint path. Builds the same FlcJointPlan H5/H6 build and runs the
-//: same flcCalibrateJoint; the only difference is that it calibrates one joint.
-static bool calibrateOneJoint(int index, const char *mode) {
+//: Build one engine plan row. Every row is filled for all 12 joints because
+//: the engine needs the whole catalog to hold un-selected joints at q0 and to
+//: express a cross-leg parking angle in raw ticks.
+static bool buildJointPlan(int index, FlcJointPlan &plan) {
   const JointSpec &spec = JOINTS[index];
+  const JointCharacterization &store = characterization[index];
 
-  FlcJointPlan plan;
-  if (!buildJointPlan(index, plan)) {
-    Serial.printf("%s_JOINT_REFUSED ID=%u REASON=NOT_CHARACTERIZED_IN_THIS_SESSION\n",
-                  mode, spec.busId);
+  plan = FlcJointPlan();
+  plan.geometryJoint = (FlcGeometryJoint)index;
+  plan.busId = spec.busId;
+  plan.characterized = characterizationUsable((size_t)index);
+  plan.startTick = store.restTick;
+  plan.baseline = store.baseline;
+
+  // The q0 watch is the H2 manual pose candidate. It is evidence about where
+  // the joint physically is, and is never treated as a derived calibration.
+  plan.q0WatchKnown = manualQ0Usable((size_t)index);
+  plan.q0WatchTick = plan.q0WatchKnown ? manualQ0[index].centreTick : -1;
+  plan.q0WatchToleranceTicks = Q0_MAX_SPREAD_TICKS;
+
+  // Prior calibration in THIS session only. A joint calibrated earlier in the
+  // run can serve as a parking auxiliary; nothing historical may.
+  plan.calibrationKnown = calibrationEvidenceUsable((size_t)index);
+  plan.knownDirection = plan.calibrationKnown ? calibrationEvidence[index].direction : 0;
+  plan.knownQ0Tick = plan.calibrationKnown ? calibrationEvidence[index].derivedQ0Tick : -1;
+
+  FlcDirectionEvidence &evidence = plan.directionEvidence;
+  evidence.rawLoTick = -1;          // filled by the engine from measurement
+  evidence.rawHiTick = -1;
+  evidence.qMinTicks = angleToTicks(spec.geomContactMinRad);
+  evidence.qMaxTicks = angleToTicks(spec.geomContactMaxRad);
+  evidence.manualQ0Known = plan.q0WatchKnown;
+  evidence.manualQ0Tick = plan.q0WatchTick;
+  // H2 sample spread proves encoder stability, NOT physical pose accuracy, so
+  // it must not become a pose-uncertainty tolerance.
+  evidence.manualQ0PoseUncertaintyKnown = false;
+  evidence.manualQ0PoseUncertaintyTicks = 0;
+  evidence.operatorWitness =
+      directionWitnessUsable((size_t)index) ? directionWitness[index].direction : 0;
+
+  FlcMotionEnvelope envelope = flcBootstrapEnvelope();
+  if (store.retreatTicks > 0) envelope.retreatTicks = store.retreatTicks;
+  plan.envelope = flcClampEnvelope(envelope);
+
+  plan.gates = makeAcceptanceGates(spec);
+  if (plan.characterized && store.repeatabilityToleranceTicks > 0) {
+    plan.gates.repeatabilityToleranceKnown = true;
+    plan.gates.repeatabilityToleranceTicks = store.repeatabilityToleranceTicks;
+  }
+  return plan.characterized;
+}
+
+//: Fill the whole catalog. Returns the mask of joints that are ready to be
+//: calibrated; callers intersect it with what they were asked to do.
+static uint16_t buildPlanCatalog(FlcJointPlan *plans) {
+  uint16_t ready = 0;
+  for (size_t i = 0; i < JOINT_COUNT; ++i) {
+    if (buildJointPlan((int)i, plans[i])) ready |= (uint16_t)(1U << i);
+  }
+  return ready;
+}
+
+static void reportParking(const char *mode, const JointSpec &spec,
+                          const char *side, const FlcEndpointExecution &e) {
+  if (e.parkingOutcome == FLC_NO_PARKING_REQUIRED) {
+    Serial.printf("%s_JOINT_%s_PARKING ID=%u OUTCOME=NO_PARKING_REQUIRED "
+                  "PROVENANCE_VERIFIED=%d ENDPOINT_INDEX=%u\n",
+                  mode, side, spec.busId,
+                  e.parking.noParkingProvenanceVerified ? 1 : 0,
+                  e.geometryEndpointIndex);
+    return;
+  }
+  const char *auxName = flcGeometryJointName(e.parking.auxiliaryJoint);
+  Serial.printf("%s_JOINT_%s_PARKING ID=%u OUTCOME=PARKING_REQUIRED_1DOF AUX=%s "
+                "AUX_ID=%u PREREQ_VERIFIED=%d ENTERED=%d TRACKING_VERIFIED=%d "
+                "SAVED=%d PARK=%d ACHIEVED=%d RESTORE_ATTEMPTED=%d "
+                "RESTORE_VERIFIED=%d RESTORED=%d ENDPOINT_INDEX=%u\n",
+                mode, side, spec.busId, auxName != 0 ? auxName : "NONE",
+                e.parking.auxiliaryBusId,
+                e.parking.prerequisiteVerified ? 1 : 0,
+                e.parking.entered ? 1 : 0,
+                e.parking.trackingVerified ? 1 : 0,
+                e.parking.savedTick, e.parking.parkingTick,
+                e.parking.achievedTick,
+                e.parking.restoreAttempted ? 1 : 0,
+                e.parking.restoreVerified ? 1 : 0,
+                e.parking.restoredTick, e.geometryEndpointIndex);
+}
+
+static void reportJointResult(const char *mode, const JointSpec &spec,
+                              const FlcJointCalibrationResult &r) {
+  Serial.printf("%s_JOINT_BEGIN ID=%u JOINT=%s UNIT=%s\n", mode, spec.busId,
+                spec.jointName, spec.unitLabel);
+  Serial.printf("%s_JOINT_STATUS=%s REASON=%s TIER=%s\n", mode,
+                flcEngineStatusLabel(r.status), flcAbortReasonLabel(r.abortReason),
+                flcResultTierLabel(r.tier));
+  reportParking(mode, spec, "MIN", r.minExecution);
+  reportParking(mode, spec, "MAX", r.maxExecution);
+  Serial.printf("%s_JOINT_MIN_ENDPOINT TICK=%d SPREAD=%d ACCEPTED=%d "
+                "RETURNED_TO_Q0=%d TORQUE_OFF_VERIFIED=%d\n", mode,
+                r.minEndpoint.contactTick, r.minEndpoint.repeatability.spreadTicks,
+                r.minEndpoint.accepted ? 1 : 0,
+                r.minExecution.targetReturnedToQ0 ? 1 : 0,
+                r.minExecution.targetTorqueOffVerified ? 1 : 0);
+  Serial.printf("%s_JOINT_MAX_ENDPOINT TICK=%d SPREAD=%d ACCEPTED=%d "
+                "RETURNED_TO_Q0=%d TORQUE_OFF_VERIFIED=%d\n", mode,
+                r.maxEndpoint.contactTick, r.maxEndpoint.repeatability.spreadTicks,
+                r.maxEndpoint.accepted ? 1 : 0,
+                r.maxExecution.targetReturnedToQ0 ? 1 : 0,
+                r.maxExecution.targetTorqueOffVerified ? 1 : 0);
+  Serial.printf("%s_JOINT_SPAN MEASURED=%d EXPECTED=%d ERROR=%d RAW_LO=%d RAW_HI=%d\n",
+                mode, r.measuredSpanTicks, r.expectedSpanTicks, r.spanErrorTicks,
+                r.rawLoTick, r.rawHiTick);
+  Serial.printf("%s_JOINT_DIRECTION RESOLVED=%d METHOD=%s GEOMETRY_DECISIVE=%d "
+                "MARGIN=%d SEPARATION=%d\n", mode, (int)r.direction,
+                flcDirectionMethodLabel(r.directionMethod),
+                r.directionResolution.geometryDecisive ? 1 : 0,
+                r.directionResolution.marginTicks,
+                r.directionResolution.separationTicks);
+  // The two q0 concepts stay separate and are never averaged.
+  Serial.printf("%s_JOINT_MANUAL_POSE_Q0_CANDIDATE TICK=%d\n", mode,
+                r.manualPoseQ0CandidateTick);
+  Serial.printf("%s_JOINT_DERIVED_Q0_CANDIDATE TICK=%d\n", mode,
+                r.derivedQ0FinalTick);
+  Serial.printf("%s_JOINT_Q0_CROSSCHECK STATUS=%s ERROR_TICKS=%d\n", mode,
+                flcQ0CrosscheckStatusLabel(r.q0CrosscheckStatus),
+                r.manualVsDerivedQ0ErrorTicks);
+  Serial.printf("%s_JOINT_PROMOTION=REQUIRES_EXPLICIT_SEPARATE_GATE\n", mode);
+  Serial.printf("%s_JOINT_RESULT %s\n", mode,
+                r.status == FLC_ENGINE_OK ? "PASS" : "FAIL");
+  Serial.printf("%s_JOINT_END ID=%u\n", mode, spec.busId);
+}
+
+//: The ONE calibration entry point behind H4, H5 and H6.
+static bool runCalibrationSelection(uint16_t requestedMask, const char *mode) {
+  static FlcJointPlan plans[JOINT_COUNT];
+  const uint16_t readyMask = buildPlanCatalog(plans);
+
+  for (size_t i = 0; i < JOINT_COUNT; ++i) {
+    const uint16_t bit = (uint16_t)(1U << i);
+    if ((requestedMask & bit) != 0 && (readyMask & bit) == 0) {
+      Serial.printf("%s_JOINT_REFUSED ID=%u REASON=NOT_CHARACTERIZED_IN_THIS_SESSION\n",
+                    mode, JOINTS[i].busId);
+    }
+  }
+  const uint16_t selection = (uint16_t)(requestedMask & readyMask);
+  if (selection != requestedMask) {
+    Serial.printf("%s_REFUSED REASON=INCOMPLETE_CHARACTERIZATION REQUESTED=%04X READY=%04X\n",
+                  mode, requestedMask, readyMask);
     return false;
   }
 
   FlcServoPort port = makeServoPort();
   const FlcContactConfig guards = makeGuards();
-  const FlcJointCalibrationResult result = flcCalibrateJoint(
-      port, plan.busId, plan.startTick, plan.direction, plan.minAngleTicksFromZero,
-      plan.maxAngleTicksFromZero, plan.envelope, guards, plan.baseline, plan.gates);
+  const FlcCalibrationRunResult run =
+      flcRunCalibrationPlan(port, guards, plans, (int)JOINT_COUNT, selection);
 
-  reportJointResult(mode, spec, result);
-
-  const bool released = flcEndMotion(port, plan.busId);
-  Serial.printf("%s_JOINT_TORQUE_OFF_VERIFIED=%s\n", mode, released ? "YES" : "NO");
-  if (!released) {
-    setFault("CALIBRATE_JOINT_TORQUE_OFF_FAILED");
-    Serial.println("CUT_SERVO_POWER_NOW");
+  Serial.printf("%s_PLAN SELECTION=%04X REQUESTED=%d EXECUTION_ORDER_COUNT=%d\n",
+                mode, run.selectionMask, run.jointsRequested, run.executionCount);
+  for (int i = 0; i < run.executionCount; ++i) {
+    const char *name = flcGeometryJointName(run.executionOrder[i]);
+    Serial.printf("%s_PLAN_ORDER %d=%s\n", mode, i, name != 0 ? name : "UNKNOWN");
   }
-  return result.status == FLC_ENGINE_OK && released;
+  Serial.printf("%s_PLAN_PARKING REQUIRED=%d NO_PARKING=%d RESTORED=%d\n", mode,
+                run.parkingRequiredCount, run.noParkingCount,
+                run.parkingRestoreCount);
+
+  for (size_t i = 0; i < JOINT_COUNT; ++i) {
+    if (!run.resultPresent[i]) continue;
+    reportJointResult(mode, JOINTS[i], run.joints[i]);
+
+    // Chaining WITHIN a run is the engine's own business; this stores the
+    // result so a LATER command in the same physical session can use the joint
+    // as a parking prerequisite. Only a fully OK joint qualifies, and a failed
+    // one clears any evidence it previously had rather than leaving it stale.
+    const FlcJointCalibrationResult &r = run.joints[i];
+    JointCalibrationEvidence &store = calibrationEvidence[i];
+    if (r.status == FLC_ENGINE_OK &&
+        (r.direction == 1 || r.direction == -1) && r.derivedQ0FinalTick >= 0) {
+      store.valid = true;
+      store.sessionGeneration = sessionGeneration;
+      store.censusEpoch = censusEpoch;
+      store.direction = r.direction;
+      store.derivedQ0Tick = r.derivedQ0FinalTick;
+      store.minContactTick = r.minContactTick;
+      store.maxContactTick = r.maxContactTick;
+      store.tier = r.tier;
+    } else {
+      store = JointCalibrationEvidence();
+    }
+  }
+
+  if (run.status != FLC_ENGINE_OK) {
+    const char *failed = flcGeometryJointName(run.failedJoint);
+    Serial.printf("%s_ABORTED_AT JOINT=%s ID=%u STATUS=%s REASON=%s\n", mode,
+                  failed != 0 ? failed : "NONE", run.failedBusId,
+                  flcEngineStatusLabel(run.status),
+                  flcAbortReasonLabel(run.abortReason));
+  }
+  Serial.printf("%s_SAFE_OFF_VERIFIED=%s\n", mode,
+                run.safeOffVerified ? "YES" : "NO");
+  Serial.printf("%s_JOINTS_OK=%d/%d\n", mode, run.jointsOk, run.jointsRequested);
+
+  // A run that cannot prove torque is released is a latched hard fault: no
+  // further motion command may be accepted until the operator intervenes.
+  if (run.hardFaultCutPowerNow || !run.safeOffVerified) {
+    setFault("CALIBRATION_SAFE_OFF_UNVERIFIED");
+    Serial.println("CUT_SERVO_POWER_NOW");
+    return false;
+  }
+  return run.status == FLC_ENGINE_OK && run.jointsOk == run.jointsRequested;
 }
 
 static void runCalibrateJoint(int id) {
@@ -1452,116 +2110,21 @@ static void runCalibrateJoint(int id) {
     return;
   }
 
-  const bool ok = calibrateOneJoint(index, "CALIBRATE_JOINT");
+  const bool ok =
+      runCalibrationSelection((uint16_t)(1U << index), "CALIBRATE_JOINT");
   Serial.printf("CALIBRATE_JOINT_RESULT %s\n", ok ? "PASS" : "FAIL");
   Serial.println("CALIBRATE_JOINT_END");
 }
 
-// --------------------------------------------------------------------------
-// H5 — @CALIBRATE_LEG: real orchestration over the SAME generic engine
-//
-// One calibrator + JointSpec + leg plan. There is no LfStateMachine.
-// --------------------------------------------------------------------------
-
-//: Build the engine plan for one joint from its spec and this session's
-//: characterization. Returns false when the joint has no usable evidence.
-static bool buildJointPlan(int index, FlcJointPlan &plan) {
-  const JointSpec &spec = JOINTS[index];
-  const JointCharacterization &store = characterization[index];
-
-  plan.busId = spec.busId;
-  plan.characterized = characterizationUsable((size_t)index);
-  plan.direction = store.direction;
-  plan.startTick = store.restTick;
-  plan.minAngleTicksFromZero = angleToTicks(spec.geomContactMinRad);
-  plan.maxAngleTicksFromZero = angleToTicks(spec.geomContactMaxRad);
-  plan.baseline = store.baseline;
-
-  FlcMotionEnvelope envelope = flcBootstrapEnvelope();
-  if (store.retreatTicks > 0) envelope.retreatTicks = store.retreatTicks;
-  plan.envelope = flcClampEnvelope(envelope);
-
-  plan.gates = makeAcceptanceGates(spec);
-  if (store.repeatabilityToleranceTicks > 0) {
-    plan.gates.repeatabilityToleranceKnown = true;
-    plan.gates.repeatabilityToleranceTicks = store.repeatabilityToleranceTicks;
+//: Mask of the three joints of one leg. Ordering inside the leg is NOT decided
+//: here — the engine derives it from the generated dependency graph, which is
+//: why a naive LOWER->UPPER->HIP rule cannot creep back in.
+static uint16_t legJointMask(int leg) {
+  uint16_t mask = 0;
+  for (size_t i = 0; i < JOINT_COUNT; ++i) {
+    if (JOINTS[i].leg == (uint8_t)leg) mask |= (uint16_t)(1U << i);
   }
-  return plan.characterized;
-}
-
-//: Distal first: calibrating LOWER before HIP keeps the limb folded and the
-//: swept volume small while the proximal joints are still uncalibrated.
-static int legJointIndices(int leg, int *indices) {
-  const uint8_t order[FLC_JOINTS_PER_LEG] = {KIND_LOWER, KIND_UPPER, KIND_HIP};
-  int found = 0;
-  for (int slot = 0; slot < FLC_JOINTS_PER_LEG; ++slot) {
-    for (size_t i = 0; i < JOINT_COUNT; ++i) {
-      if (JOINTS[i].leg == (uint8_t)leg && JOINTS[i].kind == order[slot]) {
-        indices[found++] = (int)i;
-      }
-    }
-  }
-  return found;
-}
-
-static void reportJointResult(const char *mode, const JointSpec &spec,
-                              const FlcJointCalibrationResult &r) {
-  Serial.printf("%s_JOINT_BEGIN ID=%u JOINT=%s UNIT=%s\n", mode, spec.busId,
-                spec.jointName, spec.unitLabel);
-  Serial.printf("%s_JOINT_STATUS=%s REASON=%s TIER=%s\n", mode,
-                flcEngineStatusLabel(r.status), flcAbortReasonLabel(r.abortReason),
-                flcResultTierLabel(r.tier));
-  Serial.printf("%s_JOINT_MIN_ENDPOINT TICK=%d SPREAD=%d ACCEPTED=%d\n", mode,
-                r.minEndpoint.contactTick, r.minEndpoint.repeatability.spreadTicks,
-                r.minEndpoint.accepted ? 1 : 0);
-  Serial.printf("%s_JOINT_MAX_ENDPOINT TICK=%d SPREAD=%d ACCEPTED=%d\n", mode,
-                r.maxEndpoint.contactTick, r.maxEndpoint.repeatability.spreadTicks,
-                r.maxEndpoint.accepted ? 1 : 0);
-  Serial.printf("%s_JOINT_SPAN MEASURED=%d EXPECTED=%d ERROR=%d\n", mode,
-                r.measuredSpanTicks, r.expectedSpanTicks, r.spanErrorTicks);
-  Serial.printf("%s_JOINT_DERIVED_Q0 TICK=%d DIRECTION=%d\n", mode, r.q0Tick,
-                (int)r.direction);
-  Serial.printf("%s_JOINT_PROMOTION=REQUIRES_EXPLICIT_SEPARATE_GATE\n", mode);
-  Serial.printf("%s_JOINT_RESULT %s\n", mode,
-                r.status == FLC_ENGINE_OK ? "PASS" : "FAIL");
-  Serial.printf("%s_JOINT_END ID=%u\n", mode, spec.busId);
-}
-
-//: H5 for one leg, delegated to the SAME generic engine used by H4 and H6.
-static bool calibrateLegJoints(int leg, const char *mode) {
-  int indices[FLC_JOINTS_PER_LEG];
-  const int count = legJointIndices(leg, indices);
-  if (count != FLC_JOINTS_PER_LEG) {
-    Serial.printf("%s_LEG_REFUSED REASON=INCOMPLETE_LEG_PLAN LEG=%s\n", mode,
-                  LEG_LABEL[leg]);
-    return false;
-  }
-
-  FlcJointPlan plans[FLC_JOINTS_PER_LEG];
-  for (int i = 0; i < count; ++i) {
-    if (!buildJointPlan(indices[i], plans[i])) {
-      Serial.printf("%s_JOINT_SKIPPED ID=%u REASON=NOT_CHARACTERIZED_IN_THIS_SESSION\n",
-                    mode, JOINTS[indices[i]].busId);
-    }
-  }
-
-  FlcServoPort port = makeServoPort();
-  const FlcContactConfig guards = makeGuards();
-  const FlcLegResult result = flcCalibrateLeg(port, guards, plans, count);
-
-  for (int i = 0; i < result.jointsOk; ++i) {
-    reportJointResult(mode, JOINTS[indices[i]], result.joints[i]);
-  }
-  if (result.status != FLC_ENGINE_OK) {
-    Serial.printf("%s_LEG_ABORTED_AT ID=%u STATUS=%s\n", mode, result.failedBusId,
-                  flcEngineStatusLabel(result.status));
-    if (result.jointsOk < count) {
-      reportJointResult(mode, JOINTS[indices[result.jointsOk]],
-                        result.joints[result.jointsOk]);
-    }
-  }
-  Serial.printf("%s_LEG_JOINTS_OK=%d/%d\n", mode, result.jointsOk, count);
-  return result.status == FLC_ENGINE_OK && result.jointsOk == count;
+  return mask;
 }
 
 static void runCalibrateLeg(int leg) {
@@ -1575,23 +2138,27 @@ static void runCalibrateLeg(int leg) {
   }
   Serial.printf("CALIBRATE_LEG_TARGET LEG=%s\n", LEG_LABEL[leg]);
 
+  const uint16_t mask = legJointMask(leg);
+  if (mask == 0 || __builtin_popcount(mask) != FLC_JOINTS_PER_LEG) {
+    Serial.println("CALIBRATE_LEG_REFUSED REASON=INCOMPLETE_LEG_PLAN");
+    Serial.println("CALIBRATE_LEG_RESULT REFUSED");
+    Serial.println("CALIBRATE_LEG_END");
+    return;
+  }
+
   if (!motionPreflight("CALIBRATE_LEG", H5_LEG, -1, false)) {
     Serial.println("CALIBRATE_LEG_RESULT REFUSED");
     Serial.println("CALIBRATE_LEG_END");
     return;
   }
 
-  const bool ok = calibrateLegJoints(leg, "CALIBRATE_LEG");
-
-  // Whole-leg safe state, whatever happened.
-  runSafeOffQuiet();
+  // A leg whose parking auxiliary lives on ANOTHER leg cannot be calibrated in
+  // isolation unless that auxiliary already has current-session calibration.
+  // The engine enforces this; naming it here makes the refusal legible.
+  const bool ok = runCalibrationSelection(mask, "CALIBRATE_LEG");
   Serial.printf("CALIBRATE_LEG_RESULT %s\n", ok ? "PASS" : "FAIL");
   Serial.println("CALIBRATE_LEG_END");
 }
-
-// --------------------------------------------------------------------------
-// H6 — @CALIBRATE_ALL: four legs, one session result
-// --------------------------------------------------------------------------
 
 static void runCalibrateAll() {
   Serial.println("CALIBRATE_ALL_BEGIN");
@@ -1603,27 +2170,12 @@ static void runCalibrateAll() {
     return;
   }
 
-  // Canonical order from MATDOG_GEOMETRY.yaml gait_convention.
-  const uint8_t sequence[LEG_COUNT] = {LEG_LF, LEG_RF, LEG_RH, LEG_LH};
-  int legsOk = 0;
-
-  for (int i = 0; i < LEG_COUNT; ++i) {
-    const int leg = sequence[i];
-    Serial.printf("CALIBRATE_ALL_LEG_BEGIN LEG=%s\n", LEG_LABEL[leg]);
-    const bool ok = calibrateLegJoints(leg, "CALIBRATE_ALL");
-    Serial.printf("CALIBRATE_ALL_LEG_RESULT LEG=%s %s\n", LEG_LABEL[leg],
-                  ok ? "PASS" : "FAIL");
-    if (ok) ++legsOk;
-    else {
-      Serial.println("CALIBRATE_ALL_SEQUENCE_ABORTED");
-      break;
-    }
-  }
-
-  runSafeOffQuiet();
-  Serial.printf("CALIBRATE_ALL_LEGS_OK=%d/%d\n", legsOk, (int)LEG_COUNT);
+  // H6 is H4 with every bit set. There is no separate four-leg loop, so the
+  // orchestration the offline suite exercises is exactly this one.
+  const bool ok =
+      runCalibrationSelection(FLC_ALL_GEOMETRY_JOINTS_MASK, "CALIBRATE_ALL");
   Serial.println("CALIBRATE_ALL_PROMOTION=REQUIRES_EXPLICIT_SEPARATE_GATE");
-  Serial.printf("CALIBRATE_ALL_RESULT %s\n", legsOk == LEG_COUNT ? "PASS" : "FAIL");
+  Serial.printf("CALIBRATE_ALL_RESULT %s\n", ok ? "PASS" : "FAIL");
   Serial.println("CALIBRATE_ALL_END");
 }
 
@@ -1631,12 +2183,79 @@ static void runCalibrateAll() {
 // Command surface
 // ==========================================================================
 
+static void runSessionBegin(uint32_t hostSessionId) {
+  Serial.println("SESSION_BEGIN_BEGIN");
+  if (hostSessionId == 0) {
+    Serial.println("SESSION_BEGIN_REFUSED REASON=ZERO_HOST_SESSION_ID");
+    Serial.println("SESSION_BEGIN_RESULT REFUSED");
+    Serial.println("SESSION_BEGIN_END");
+    return;
+  }
+  if (sessionState == SESSION_FAULT) {
+    Serial.printf("SESSION_BEGIN_REFUSED REASON=SESSION_FAULT_LATCHED FAULT=%s\n",
+                  lastFault);
+    Serial.println("CUT_SERVO_POWER_NOW");
+    Serial.println("SESSION_BEGIN_RESULT REFUSED");
+    Serial.println("SESSION_BEGIN_END");
+    return;
+  }
+  if (activeHostSessionId == hostSessionId) {
+    Serial.printf("SESSION_BEGIN_ACTIVE_HOST_SESSION_ID=%08lX\n",
+                  (unsigned long)activeHostSessionId);
+    Serial.println("SESSION_BEGIN_RESULT PASS");
+    Serial.println("SESSION_BEGIN_END");
+    return;
+  }
+
+  // A new lease never inherits state from a previous host process.
+  if (!runSafeOffQuiet()) {
+    setFault("SESSION_BEGIN_SAFE_OFF_FAILED");
+    Serial.println("SESSION_BEGIN_RESULT FAIL");
+    Serial.println("SESSION_BEGIN_END");
+    return;
+  }
+  invalidateCensus(nullptr);
+  clearSessionEvidence("NEW_HOST_SESSION");
+  activeHostSessionId = hostSessionId;
+  ++sessionGeneration;
+  sessionState = SESSION_IDLE;
+  snprintf(lastFault, sizeof(lastFault), "%s", "NONE");
+
+  Serial.printf("SESSION_BEGIN_BOOT_SESSION_ID=%08lX\n",
+                (unsigned long)bootSessionId);
+  Serial.printf("SESSION_BEGIN_ACTIVE_HOST_SESSION_ID=%08lX\n",
+                (unsigned long)activeHostSessionId);
+  Serial.printf("SESSION_BEGIN_GENERATION=%lu\n",
+                (unsigned long)sessionGeneration);
+  Serial.println("SESSION_BEGIN_RESULT PASS");
+  Serial.println("SESSION_BEGIN_END");
+}
+
+static void runSessionEnd() {
+  Serial.println("SESSION_END_BEGIN");
+  const bool safe = runSafeOffQuiet();
+  invalidateCensus(nullptr);
+  clearSessionEvidence("HOST_SESSION_ENDED");
+  activeHostSessionId = 0;
+  const bool endOk = safe && sessionState != SESSION_FAULT;
+  if (endOk) sessionState = SESSION_IDLE;
+  Serial.printf("SESSION_END_SAFE_OFF_VERIFIED=%s\n", safe ? "YES" : "NO");
+  Serial.printf("SESSION_END_FAULT_LATCHED=%s\n",
+                sessionState == SESSION_FAULT ? "YES" : "NO");
+  Serial.printf("SESSION_END_RESULT %s\n", endOk ? "PASS" : "FAIL");
+  if (!endOk) Serial.println("CUT_SERVO_POWER_NOW");
+  Serial.println("SESSION_END_END");
+}
+
 static void printHelp() {
   Serial.println();
   Serial.println("Commands:");
+  Serial.println("  @SESSION_BEGIN <8-hex-host-id>");
+  Serial.println("  @SESSION_END");
   Serial.println("  @STATUS");
   Serial.println("  @CENSUS");
   Serial.println("  @CAPTURE_Q0 <samples>");
+  Serial.println("  @WITNESS_DIRECTION <bus_id> <Q_PLUS_RAW_INCREASES|Q_PLUS_RAW_DECREASES> CONFIRM");
   Serial.println("  @APPROVE_BOOTSTRAP CONFIRM");
   Serial.println("  @CHARACTERIZE_JOINT <bus_id>");
   Serial.println("  @CALIBRATE_JOINT <bus_id>");
@@ -1652,6 +2271,18 @@ static void printHelp() {
 // sufficient, and a census invalidation clears it.
 static void runApproveBootstrap() {
   Serial.println("APPROVE_BOOTSTRAP_BEGIN");
+  if (!requireActiveSession("APPROVE_BOOTSTRAP") ||
+      !requireFreshCensus("APPROVE_BOOTSTRAP")) {
+    Serial.println("APPROVE_BOOTSTRAP_RESULT REFUSED");
+    Serial.println("APPROVE_BOOTSTRAP_END");
+    return;
+  }
+  if (!allManualQ0Usable()) {
+    Serial.println("APPROVE_BOOTSTRAP_REFUSED REASON=MANUAL_Q0_CAPTURE_REQUIRED");
+    Serial.println("APPROVE_BOOTSTRAP_RESULT REFUSED");
+    Serial.println("APPROVE_BOOTSTRAP_END");
+    return;
+  }
   if (!H3_BOOTSTRAP_BUILD_APPROVED) {
     Serial.println("APPROVE_BOOTSTRAP_REFUSED REASON=BUILD_NOT_COMPILED_WITH_BOOTSTRAP");
     Serial.println("APPROVE_BOOTSTRAP_RESULT REFUSED");
@@ -1666,6 +2297,8 @@ static void runApproveBootstrap() {
     return;
   }
   bootstrapSessionApproved = true;
+  bootstrapSessionGeneration = sessionGeneration;
+  bootstrapCensusEpoch = censusEpoch;
   const FlcMotionEnvelope envelope = flcBootstrapEnvelope();
   Serial.printf("APPROVE_BOOTSTRAP_ENVELOPE ORIGIN=%s TORQUE_LIMIT=%u SPEED=%u ACC=%u "
                 "RETREAT=%u\n",
@@ -1688,6 +2321,9 @@ void setup() {
   Serial.setTimeout(100);
   delay(1500);
 
+  bootSessionId = esp_random();
+  if (bootSessionId == 0) bootSessionId = 1;
+
   ServoUART.begin(SERVO_BAUD, SERIAL_8N1, SERVO_RX_PIN, SERVO_TX_PIN);
   st.pSerial = &ServoUART;
 
@@ -1698,6 +2334,8 @@ void setup() {
   Serial.println(" MATDOG FULL LEG CALIBRATOR V1");
   Serial.println("====================================");
   Serial.printf("Firmware         : %s %s\n", FIRMWARE_NAME, FIRMWARE_VERSION);
+  Serial.printf("Build Git SHA    : %s\n", FLC_BUILD_GIT_SHA);
+  Serial.printf("Boot session id  : %08lX\n", (unsigned long)bootSessionId);
   Serial.printf("Protocol         : %s (%s)\n", PROTOCOL_ID, PROTOCOL_SCOPE);
   Serial.printf("Servo UART       : %lu baud\n", (unsigned long)SERVO_BAUD);
   Serial.printf("TX               : GPIO%d\n", SERVO_TX_PIN);
@@ -1729,13 +2367,37 @@ void loop() {
 
   if (cmd == "@HELP") { printHelp(); return; }
   if (cmd == "@STATUS") { runStatus(); return; }
-  if (cmd == "@CENSUS") { runCensus(); return; }
   if (cmd == "@SAFE_OFF") { runSafeOff(); return; }
+  if (cmd == "@SESSION_END") { runSessionEnd(); return; }
+  if (cmd == "@CENSUS") { runCensus(); return; }
   if (cmd == "@CALIBRATE_ALL") { runCalibrateAll(); return; }
   if (cmd == "@APPROVE_BOOTSTRAP CONFIRM") { runApproveBootstrap(); return; }
 
   int value = -1;
   char extra = '\0';
+
+  unsigned long hostSession = 0;
+  if (sscanf(cmd.c_str(), "@SESSION_BEGIN %lx %c", &hostSession, &extra) == 1) {
+    runSessionBegin((uint32_t)hostSession);
+    return;
+  }
+
+  int witnessId = -1;
+  char witnessSemantic[32] = {0};
+  char confirm[16] = {0};
+  if (sscanf(cmd.c_str(), "@WITNESS_DIRECTION %d %31s %15s %c", &witnessId,
+             witnessSemantic, confirm, &extra) == 3) {
+    if (strcmp(confirm, "CONFIRM") != 0) {
+      runWitnessDirection(witnessId, 0, witnessSemantic);
+    } else if (strcmp(witnessSemantic, "Q_PLUS_RAW_INCREASES") == 0) {
+      runWitnessDirection(witnessId, 1, witnessSemantic);
+    } else if (strcmp(witnessSemantic, "Q_PLUS_RAW_DECREASES") == 0) {
+      runWitnessDirection(witnessId, -1, witnessSemantic);
+    } else {
+      runWitnessDirection(witnessId, 0, witnessSemantic);
+    }
+    return;
+  }
 
   if (sscanf(cmd.c_str(), "@CHARACTERIZE_JOINT %d %c", &value, &extra) == 1) {
     runCharacterizeJoint(value);

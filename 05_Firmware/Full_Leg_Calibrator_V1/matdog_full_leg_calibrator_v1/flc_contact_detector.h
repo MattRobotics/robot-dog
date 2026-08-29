@@ -154,6 +154,17 @@ enum FlcAbortReason {
   FLC_ABORT_CONTACT_TOO_EARLY,
   FLC_ABORT_TARGET_DID_NOT_MOVE,
   FLC_ABORT_WRONG_DIRECTION,
+  FLC_ABORT_ENDPOINT_ORDER_CONTRADICTION,
+  FLC_ABORT_TORQUE_UNEXPECTEDLY_ON,
+  FLC_ABORT_TRACKING_FAILURE,
+  FLC_ABORT_PREREQUISITE_DRIFT,
+  FLC_ABORT_TORQUE_OFF_UNVERIFIED,
+  FLC_ABORT_INVALID_PLAN,
+  FLC_ABORT_DEPENDENCY_CYCLE,
+  FLC_ABORT_Q0_CROSSCHECK_FAILED,
+  FLC_ABORT_ENDPOINT_GEOMETRY_MISMATCH,
+  FLC_ABORT_RESTORE_FAILED,
+  FLC_ABORT_CONTEXT_DRIFT,
 };
 
 inline const char *flcAbortReasonLabel(int reason) {
@@ -175,6 +186,17 @@ inline const char *flcAbortReasonLabel(int reason) {
     case FLC_ABORT_CONTACT_TOO_EARLY: return "CONTACT_TOO_EARLY";
     case FLC_ABORT_TARGET_DID_NOT_MOVE: return "TARGET_DID_NOT_MOVE";
     case FLC_ABORT_WRONG_DIRECTION: return "WRONG_DIRECTION";
+    case FLC_ABORT_ENDPOINT_ORDER_CONTRADICTION: return "ENDPOINT_ORDER_CONTRADICTION";
+    case FLC_ABORT_TORQUE_UNEXPECTEDLY_ON: return "TORQUE_UNEXPECTEDLY_ON";
+    case FLC_ABORT_TRACKING_FAILURE: return "TRACKING_FAILURE";
+    case FLC_ABORT_PREREQUISITE_DRIFT: return "PREREQUISITE_DRIFT";
+    case FLC_ABORT_TORQUE_OFF_UNVERIFIED: return "TORQUE_OFF_UNVERIFIED";
+    case FLC_ABORT_INVALID_PLAN: return "INVALID_PLAN";
+    case FLC_ABORT_DEPENDENCY_CYCLE: return "DEPENDENCY_CYCLE";
+    case FLC_ABORT_Q0_CROSSCHECK_FAILED: return "Q0_CROSSCHECK_FAILED";
+    case FLC_ABORT_ENDPOINT_GEOMETRY_MISMATCH: return "ENDPOINT_GEOMETRY_MISMATCH";
+    case FLC_ABORT_RESTORE_FAILED: return "RESTORE_FAILED";
+    case FLC_ABORT_CONTEXT_DRIFT: return "IDENTITY_OR_SESSION_DRIFT";
     default: return "UNKNOWN";
   }
 }
@@ -237,6 +259,42 @@ struct FlcObservation {
   uint32_t elapsedMs;
 };
 
+// One shared observation guard for every motion segment. `expectedTorqueState`
+// is -1 when torque state is intentionally not constrained, 0 for OFF and 1 for
+// ON. A negative `commandedTarget` disables GoalPosition comparison; every
+// segment that has issued a goal passes the exact expected unsigned tick.
+inline int flcCheckObservationGuards(const FlcObservation &o,
+                                     const FlcContactConfig &config,
+                                     uint32_t elapsedMs,
+                                     uint32_t timeBudgetMs,
+                                     uint16_t expectedTorqueLimit,
+                                     int8_t expectedTorqueState,
+                                     int commandedTarget) {
+  if (!o.telemetryValid) return FLC_ABORT_TELEMETRY_TIMEOUT;
+  if (o.driverError) return FLC_ABORT_DRIVER_ERROR;
+  if (o.position > FLC_ENCODER_MAX) return FLC_ABORT_POSITION_OUT_OF_DOMAIN;
+  if (o.statusByte != 0) return FLC_ABORT_STATUS_ERROR;
+  if (expectedTorqueState == 1 && !o.torqueEnabled)
+    return FLC_ABORT_TORQUE_UNEXPECTEDLY_OFF;
+  if (expectedTorqueState == 0 && o.torqueEnabled)
+    return FLC_ABORT_TORQUE_UNEXPECTEDLY_ON;
+  if (expectedTorqueLimit != 0 && o.torqueLimit != expectedTorqueLimit)
+    return FLC_ABORT_TORQUE_LIMIT_MISMATCH;
+  if (commandedTarget >= 0) {
+    if (commandedTarget > FLC_ENCODER_MAX)
+      return FLC_ABORT_POSITION_OUT_OF_DOMAIN;
+    if (o.goalPosition != (uint16_t)commandedTarget)
+      return FLC_ABORT_GOAL_MISMATCH;
+  }
+  if (o.current >= config.hardCurrentAbortRaw) return FLC_ABORT_OVERCURRENT;
+  if ((int)o.temperature >= config.thermalLimitC) return FLC_ABORT_THERMAL;
+  if ((int)o.voltage < config.voltageMin || (int)o.voltage > config.voltageMax)
+    return FLC_ABORT_VOLTAGE;
+  if (timeBudgetMs != 0 && elapsedMs > timeBudgetMs)
+    return FLC_ABORT_TIME_BUDGET_EXCEEDED;
+  return FLC_ABORT_NONE;
+}
+
 // --------------------------------------------------------------------------
 // The detector
 // --------------------------------------------------------------------------
@@ -277,18 +335,6 @@ inline void flcDetectorInit(FlcContactDetector &d, const FlcContactConfig &confi
 inline int flcDetectorObserve(FlcContactDetector &d, const FlcObservation &o,
                               int commandedTarget) {
   // --- Channel 0: is the observation itself usable? ---
-  if (!o.telemetryValid) {
-    d.abortReason = FLC_ABORT_TELEMETRY_TIMEOUT;
-    return FLC_HARD_ABORT;
-  }
-  if (o.driverError) {
-    d.abortReason = FLC_ABORT_DRIVER_ERROR;
-    return FLC_HARD_ABORT;
-  }
-  if (o.position > FLC_ENCODER_MAX) {
-    d.abortReason = FLC_ABORT_POSITION_OUT_OF_DOMAIN;
-    return FLC_HARD_ABORT;
-  }
   if (commandedTarget < 0 || commandedTarget > FLC_ENCODER_MAX) {
     d.abortReason = FLC_ABORT_POSITION_OUT_OF_DOMAIN;
     return FLC_HARD_ABORT;
@@ -301,33 +347,12 @@ inline int flcDetectorObserve(FlcContactDetector &d, const FlcObservation &o,
   if (o.current > d.peakCurrent) d.peakCurrent = o.current;
   if (o.temperature > d.peakTemperature) d.peakTemperature = o.temperature;
 
-  // --- Channel 1: hard servo/state guards, checked before any contact logic ---
-  if (o.statusByte != 0) {
-    d.abortReason = FLC_ABORT_STATUS_ERROR;
-    return FLC_HARD_ABORT;
-  }
-  if (!o.torqueEnabled) {
-    d.abortReason = FLC_ABORT_TORQUE_UNEXPECTEDLY_OFF;
-    return FLC_HARD_ABORT;
-  }
-  if (o.torqueLimit != d.config.expectedTorqueLimit) {
-    d.abortReason = FLC_ABORT_TORQUE_LIMIT_MISMATCH;
-    return FLC_HARD_ABORT;
-  }
-  if (o.goalPosition != (uint16_t)commandedTarget) {
-    d.abortReason = FLC_ABORT_GOAL_MISMATCH;
-    return FLC_HARD_ABORT;
-  }
-  if (o.current >= d.config.hardCurrentAbortRaw) {
-    d.abortReason = FLC_ABORT_OVERCURRENT;
-    return FLC_HARD_ABORT;
-  }
-  if ((int)o.temperature >= d.config.thermalLimitC) {
-    d.abortReason = FLC_ABORT_THERMAL;
-    return FLC_HARD_ABORT;
-  }
-  if ((int)o.voltage < d.config.voltageMin || (int)o.voltage > d.config.voltageMax) {
-    d.abortReason = FLC_ABORT_VOLTAGE;
+  // --- Channel 1: shared hard guards, checked before any contact logic ---
+  const int guardFault = flcCheckObservationGuards(
+      o, d.config, o.elapsedMs, d.config.timeBudgetMs,
+      d.config.expectedTorqueLimit, 1, commandedTarget);
+  if (guardFault != FLC_ABORT_NONE) {
+    d.abortReason = guardFault;
     return FLC_HARD_ABORT;
   }
 
@@ -335,10 +360,6 @@ inline int flcDetectorObserve(FlcContactDetector &d, const FlcObservation &o,
   int travel = flcDirectionalProgress(o.position, d.startPosition, d.config.probeSign);
   if (travel > (int)d.config.travelBudgetTicks) {
     d.abortReason = FLC_ABORT_TRAVEL_BUDGET_EXCEEDED;
-    return FLC_HARD_ABORT;
-  }
-  if (o.elapsedMs > d.config.timeBudgetMs) {
-    d.abortReason = FLC_ABORT_TIME_BUDGET_EXCEEDED;
     return FLC_HARD_ABORT;
   }
   // Motion away from the probe direction beyond the settle tolerance means the
