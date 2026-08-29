@@ -1,0 +1,219 @@
+{
+  "session": {
+    "mode": "h0-smoke",
+    "port": "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00",
+    "host_session_id": "3da4b210",
+    "firmware_boot_session_id": "",
+    "firmware_session_generation": "",
+    "connection_open_count": 0,
+    "continuity_state": "FAULT",
+    "started_utc": "2026-08-29T06:56:40Z",
+    "finished_utc": "2026-08-29T06:56:48Z",
+    "result": "FAIL"
+  },
+  "stage": {
+    "requested_stage": "H0_ESP32_ONLY",
+    "firmware_authorized_stage": "",
+    "host_policy_authorized_stage": "H0_ESP32_ONLY",
+    "mode_can_command_motion": false
+  },
+  "observed": {
+    "servos_responded": false,
+    "motion_actually_attempted": false,
+    "servo_ids_involved": [],
+    "writes_by_register_class": {
+      "torque_enable": 0,
+      "torque_limit": 0,
+      "goal_position": 0,
+      "eeprom": 0,
+      "broadcast": 0,
+      "refused": 0
+    },
+    "eeprom_writes": 0,
+    "broadcast_writes": 0,
+    "final_torque_state": "NEVER_ENABLED",
+    "fault_reason": "",
+    "candidate_outputs": []
+  },
+  "provenance": {
+    "git_commit": "ceb5e445ef03280983838870e789ba626c9c8944",
+    "git_working_tree_dirty": true,
+    "firmware_source_sha256": "ecc20b8189fc1cd4d6bb901cce73abf9d7ed20f23043f29e5bba408099f9bb6a",
+    "firmware_detector_sha256": "2af6f79797574836fb89c86e0a759d5a381026f5406791b06a0e835ce4a06d55",
+    "firmware_engine_sha256": "f7891d3b175982bb3c39e53f2636a41beed43bcb697b29a335b21587bf1294d0",
+    "firmware_plan_path": "05_Firmware/Full_Leg_Calibrator_V1/matdog_full_leg_calibrator_v1/flc_leg_plan.h",
+    "firmware_plan_sha256": "271ce438955db963144c10560798fceab61e4bafcd023a150006fdd6c0f31780",
+    "geometry_plan_generator_path": "06_Software/Matdog_Core/calibration/generate_flc_leg_plan.py",
+    "geometry_plan_generator_sha256": "66aae4417c8d81075700215871aadf7e30f5d5628b5acab318e4014c41ec80c0",
+    "geometry_parking_source_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4_PATH_PARKING.json",
+    "geometry_parking_source_sha256": "e561e7fb98880843e590f4676e8559374c51d0e641102f89a803b3619722c4d7",
+    "geometry_safety_policy_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_132758_MATDOG_GEOMETRY_V5_G12_FINAL_EXTERNAL_SAFETY_POLICY.json",
+    "geometry_safety_policy_sha256": "82f00a9414df06676babed1101a73e1a9d7bfa126592cdd7a425f66d5f01f1cc",
+    "firmware_stage_config_sha256": "b41e92dbb5eef12a9cc5624b90298e6bf0a0d266b10ed43bb588863c4e8bd0ba",
+    "firmware_binary_sha256": "ebee9d2f203be7ab165b0647d289208c63687db82a7b9329691df25af7a64cc0",
+    "firmware_binary_path": "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-full-leg-calibrator/05_Firmware/Full_Leg_Calibrator_V1/matdog_full_leg_calibrator_v1/build/esp32.esp32.esp32s3/matdog_full_leg_calibrator_v1.ino.bin",
+    "runner_sha256": "2acf10b088592cb7ed8d63ba34a4ded870d4815a26aea1d37cb46f4da2a175b7",
+    "policy_sha256": "2562d8b7d375f5bb203239788d95a4651bdbb0c1fa4a08a660839c389ebba63f",
+    "fqbn": "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,DebugLevel=none,PSRAM=opi",
+    "servo_allocation_path": "06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml",
+    "servo_allocation_sha256": "574dfd6e4cf88034655eea6b5f3505da06a4b2fc9cb198ac34cdd0398315b234",
+    "geometry_endpoint_profile_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4_ENDPOINT_PROFILE.json",
+    "geometry_endpoint_profile_sha256": "dd8cb42c3b916d067f97a321c5ffcdfb013dde1f2f2a6ba71f73becff360dc0f",
+    "protocol_id": "FLC1",
+    "protocol_scope": "CALIBRATOR_LOCAL_NOT_FINAL_RUNTIME_PROTOCOL",
+    "host_policy_authorized_stage": "H0_ESP32_ONLY",
+    "firmware_reported_identity": {},
+    "firmware_build_matches_local_git": false,
+    "expected_leg_ids": [
+      11,
+      12,
+      13,
+      21,
+      22,
+      23,
+      31,
+      32,
+      33,
+      41,
+      42,
+      43
+    ],
+    "joint_specs": [
+      {
+        "bus_id": 11,
+        "joint": "lf_lower_leg_joint",
+        "unit": "M33",
+        "direction": null
+      },
+      {
+        "bus_id": 12,
+        "joint": "lf_upper_leg_joint",
+        "unit": "ELR01",
+        "direction": null
+      },
+      {
+        "bus_id": 13,
+        "joint": "lf_hip_joint",
+        "unit": "M22",
+        "direction": null
+      },
+      {
+        "bus_id": 21,
+        "joint": "rf_lower_leg_joint",
+        "unit": "NEW03",
+        "direction": null
+      },
+      {
+        "bus_id": 22,
+        "joint": "rf_upper_leg_joint",
+        "unit": "ELR03",
+        "direction": null
+      },
+      {
+        "bus_id": 23,
+        "joint": "rf_hip_joint",
+        "unit": "NEW01",
+        "direction": null
+      },
+      {
+        "bus_id": 31,
+        "joint": "rh_lower_leg_joint",
+        "unit": "NEW05",
+        "direction": null
+      },
+      {
+        "bus_id": 32,
+        "joint": "rh_upper_leg_joint",
+        "unit": "ELR02",
+        "direction": null
+      },
+      {
+        "bus_id": 33,
+        "joint": "rh_hip_joint",
+        "unit": "NEW06",
+        "direction": null
+      },
+      {
+        "bus_id": 41,
+        "joint": "lh_lower_leg_joint",
+        "unit": "M41",
+        "direction": null
+      },
+      {
+        "bus_id": 42,
+        "joint": "lh_upper_leg_joint",
+        "unit": "M42",
+        "direction": null
+      },
+      {
+        "bus_id": 43,
+        "joint": "lh_hip_joint",
+        "unit": "M43",
+        "direction": null
+      }
+    ],
+    "pre_motion_blockers": [
+      {
+        "name": "CONTACT_TORQUE_LIMIT",
+        "class": "A_PRE_MOTION",
+        "reason": "needed to move at all, so it cannot be measured first. Supplied by the approved H3 bootstrap envelope, which is deliberately below both the provisioner bench value (300) and LF V25 (500), and refined by H3"
+      },
+      {
+        "name": "CONTACT_GOAL_SPEED",
+        "class": "A_PRE_MOTION",
+        "reason": "needed to move at all; bootstrap 60 is far below LF V25 160"
+      },
+      {
+        "name": "CONTACT_ACCELERATION",
+        "class": "A_PRE_MOTION",
+        "reason": "needed to move at all; bootstrap matches the slowest historical value"
+      }
+    ],
+    "acceptance_gates_unresolved": [
+      {
+        "name": "CONTACT_REPEATABILITY_TOLERANCE_TICKS",
+        "class": "D_ACCEPTANCE"
+      },
+      {
+        "name": "ENDPOINT_VS_URDF_TOLERANCE_TICKS",
+        "class": "D_ACCEPTANCE"
+      },
+      {
+        "name": "MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS",
+        "class": "D_ACCEPTANCE"
+      }
+    ],
+    "bootstrap_envelope": {
+      "origin": "H3_BOOTSTRAP_OPERATOR_APPROVED",
+      "torque_limit": 200,
+      "goal_speed": 60,
+      "acceleration": 8,
+      "retreat_ticks": 96,
+      "is_measurement": false,
+      "may_become_canonical": false,
+      "requires_build_flag": "FLC_H3_BOOTSTRAP_APPROVED=1",
+      "requires_session_confirmation": "@APPROVE_BOOTSTRAP CONFIRM",
+      "evidence": "NOT a measurement of this build and NOT inherited from LF V25. Chosen strictly below every historical envelope so the first motion on the reassembled robot is the gentlest anyone has run: torque 200 < provisioner 300 < LF V25 500; speed 60 << LF V25 160."
+    }
+  },
+  "gates": [
+    {
+      "gate": "host_stage_authorizes_h0-smoke",
+      "result": "PASS",
+      "detail": "host=H0_ESP32_ONLY required=H0_ESP32_ONLY"
+    },
+    {
+      "gate": "physical_session_continuity",
+      "result": "FAIL",
+      "detail": "firmware READY marker was not received"
+    }
+  ],
+  "commands": [],
+  "notes": [
+    "Physical session continuity was lost. No reconnect or evidence restoration was attempted; all prerequisites must be re-established."
+  ],
+  "hardware_validation_scope": {
+    "highest_stage_exercised_in_this_session": "H0_ESP32_ONLY",
+    "statement": "This block reports what this session observed. It makes no claim about stages not exercised here."
+  }
+}

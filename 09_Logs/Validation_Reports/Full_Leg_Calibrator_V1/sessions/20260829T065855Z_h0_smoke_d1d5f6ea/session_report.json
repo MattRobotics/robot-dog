@@ -1,0 +1,888 @@
+{
+  "session": {
+    "mode": "h0-smoke",
+    "port": "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00",
+    "host_session_id": "d1d5f6ea",
+    "firmware_boot_session_id": "862d3c58",
+    "firmware_session_generation": "1",
+    "connection_open_count": 1,
+    "continuity_state": "CLOSED_SAFE_OFF",
+    "started_utc": "2026-08-29T06:58:55Z",
+    "finished_utc": "2026-08-29T06:59:08Z",
+    "result": "PASS"
+  },
+  "stage": {
+    "requested_stage": "H0_ESP32_ONLY",
+    "firmware_authorized_stage": "H0",
+    "host_policy_authorized_stage": "H0_ESP32_ONLY",
+    "mode_can_command_motion": false
+  },
+  "observed": {
+    "servos_responded": false,
+    "motion_actually_attempted": false,
+    "servo_ids_involved": [],
+    "writes_by_register_class": {
+      "torque_enable": 0,
+      "torque_limit": 0,
+      "goal_position": 0,
+      "eeprom": 0,
+      "broadcast": 0,
+      "refused": 0
+    },
+    "eeprom_writes": 0,
+    "broadcast_writes": 0,
+    "final_torque_state": "OFF_VERIFIED",
+    "fault_reason": "CENSUS_FAIL_REASON=NO_RESPONDERS",
+    "candidate_outputs": [
+      "CHARACTERIZATION_REQUIRED NAME=MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges manual pose against derived q0. It must never prevent acquiring the data needed to derive q0 in the first place",
+      "CHARACTERIZATION_REQUIRED NAME=MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges manual pose against derived q0. It must never prevent acquiring the data needed to derive q0 in the first place",
+      "CHARACTERIZATION_REQUIRED NAME=MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges manual pose against derived q0. It must never prevent acquiring the data needed to derive q0 in the first place"
+    ]
+  },
+  "provenance": {
+    "git_commit": "ceb5e445ef03280983838870e789ba626c9c8944",
+    "git_working_tree_dirty": true,
+    "firmware_source_sha256": "ecc20b8189fc1cd4d6bb901cce73abf9d7ed20f23043f29e5bba408099f9bb6a",
+    "firmware_detector_sha256": "2af6f79797574836fb89c86e0a759d5a381026f5406791b06a0e835ce4a06d55",
+    "firmware_engine_sha256": "f7891d3b175982bb3c39e53f2636a41beed43bcb697b29a335b21587bf1294d0",
+    "firmware_plan_path": "05_Firmware/Full_Leg_Calibrator_V1/matdog_full_leg_calibrator_v1/flc_leg_plan.h",
+    "firmware_plan_sha256": "271ce438955db963144c10560798fceab61e4bafcd023a150006fdd6c0f31780",
+    "geometry_plan_generator_path": "06_Software/Matdog_Core/calibration/generate_flc_leg_plan.py",
+    "geometry_plan_generator_sha256": "66aae4417c8d81075700215871aadf7e30f5d5628b5acab318e4014c41ec80c0",
+    "geometry_parking_source_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4_PATH_PARKING.json",
+    "geometry_parking_source_sha256": "e561e7fb98880843e590f4676e8559374c51d0e641102f89a803b3619722c4d7",
+    "geometry_safety_policy_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_132758_MATDOG_GEOMETRY_V5_G12_FINAL_EXTERNAL_SAFETY_POLICY.json",
+    "geometry_safety_policy_sha256": "82f00a9414df06676babed1101a73e1a9d7bfa126592cdd7a425f66d5f01f1cc",
+    "firmware_stage_config_sha256": "b41e92dbb5eef12a9cc5624b90298e6bf0a0d266b10ed43bb588863c4e8bd0ba",
+    "firmware_binary_sha256": "ebee9d2f203be7ab165b0647d289208c63687db82a7b9329691df25af7a64cc0",
+    "firmware_binary_path": "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-full-leg-calibrator/05_Firmware/Full_Leg_Calibrator_V1/matdog_full_leg_calibrator_v1/build/esp32.esp32.esp32s3/matdog_full_leg_calibrator_v1.ino.bin",
+    "runner_sha256": "2acf10b088592cb7ed8d63ba34a4ded870d4815a26aea1d37cb46f4da2a175b7",
+    "policy_sha256": "2562d8b7d375f5bb203239788d95a4651bdbb0c1fa4a08a660839c389ebba63f",
+    "fqbn": "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,DebugLevel=none,PSRAM=opi",
+    "servo_allocation_path": "06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml",
+    "servo_allocation_sha256": "574dfd6e4cf88034655eea6b5f3505da06a4b2fc9cb198ac34cdd0398315b234",
+    "geometry_endpoint_profile_path": "09_Logs/Validation_Reports/Geometry_Compiler/2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4_ENDPOINT_PROFILE.json",
+    "geometry_endpoint_profile_sha256": "dd8cb42c3b916d067f97a321c5ffcdfb013dde1f2f2a6ba71f73becff360dc0f",
+    "protocol_id": "FLC1",
+    "protocol_scope": "CALIBRATOR_LOCAL_NOT_FINAL_RUNTIME_PROTOCOL",
+    "host_policy_authorized_stage": "H0_ESP32_ONLY",
+    "firmware_reported_identity": {
+      "FIRMWARE_NAME": "matdog_full_leg_calibrator_v1",
+      "FIRMWARE_VERSION": "1.1.0",
+      "BUILD_GIT_SHA": "ceb5e445ef03280983838870e789ba626c9c8944",
+      "BUILD_WORKTREE_DIRTY": "NO",
+      "BUILD_DATE": "Aug 29 2026",
+      "BUILD_TIME": "08:24:25",
+      "PROTOCOL_ID": "FLC1",
+      "PROTOCOL_SCOPE": "CALIBRATOR_LOCAL_NOT_FINAL_RUNTIME_PROTOCOL",
+      "AUTHORIZED_HARDWARE_STAGE": "H0",
+      "BOOT_SESSION_ID": "862D3C58",
+      "ACTIVE_HOST_SESSION_ID": "D1D5F6EA",
+      "SESSION_GENERATION": "1",
+      "SESSION_STATE": "0",
+      "CENSUS_FRESH": "NO",
+      "CENSUS_EPOCH": "0",
+      "LAST_FAULT": "NONE",
+      "H3_BOOTSTRAP_BUILD_APPROVED": "NO",
+      "H3_BOOTSTRAP_SESSION_APPROVED": "NO",
+      "H3_BOOTSTRAP_ACTIVE": "NO",
+      "MOTION_UNLOCKED": "NO",
+      "PRE_MOTION_OUTSTANDING": "3",
+      "JOINTS_CHARACTERIZED": "0/12",
+      "MANUAL_Q0_CANDIDATES": "0/12",
+      "DIRECTION_WITNESSES": "0/12",
+      "CALIBRATION_CANDIDATES": "0/12",
+      "STATION_IN_CONTROL_PATH": "NO",
+      "EEPROM_WRITE_SURFACE": "NONE",
+      "BROADCAST_WRITE": "NEVER",
+      "GOAL_POSITION_AUTHORITY": "flcWritePosEx",
+      "GOAL_POSITION_DOMAIN": "0..4095",
+      "HEAD_SERVOS_EXPECTED_PRESENT": "NO"
+    },
+    "firmware_build_matches_local_git": true,
+    "expected_leg_ids": [
+      11,
+      12,
+      13,
+      21,
+      22,
+      23,
+      31,
+      32,
+      33,
+      41,
+      42,
+      43
+    ],
+    "joint_specs": [
+      {
+        "bus_id": 11,
+        "joint": "lf_lower_leg_joint",
+        "unit": "M33",
+        "direction": null
+      },
+      {
+        "bus_id": 12,
+        "joint": "lf_upper_leg_joint",
+        "unit": "ELR01",
+        "direction": null
+      },
+      {
+        "bus_id": 13,
+        "joint": "lf_hip_joint",
+        "unit": "M22",
+        "direction": null
+      },
+      {
+        "bus_id": 21,
+        "joint": "rf_lower_leg_joint",
+        "unit": "NEW03",
+        "direction": null
+      },
+      {
+        "bus_id": 22,
+        "joint": "rf_upper_leg_joint",
+        "unit": "ELR03",
+        "direction": null
+      },
+      {
+        "bus_id": 23,
+        "joint": "rf_hip_joint",
+        "unit": "NEW01",
+        "direction": null
+      },
+      {
+        "bus_id": 31,
+        "joint": "rh_lower_leg_joint",
+        "unit": "NEW05",
+        "direction": null
+      },
+      {
+        "bus_id": 32,
+        "joint": "rh_upper_leg_joint",
+        "unit": "ELR02",
+        "direction": null
+      },
+      {
+        "bus_id": 33,
+        "joint": "rh_hip_joint",
+        "unit": "NEW06",
+        "direction": null
+      },
+      {
+        "bus_id": 41,
+        "joint": "lh_lower_leg_joint",
+        "unit": "M41",
+        "direction": null
+      },
+      {
+        "bus_id": 42,
+        "joint": "lh_upper_leg_joint",
+        "unit": "M42",
+        "direction": null
+      },
+      {
+        "bus_id": 43,
+        "joint": "lh_hip_joint",
+        "unit": "M43",
+        "direction": null
+      }
+    ],
+    "pre_motion_blockers": [
+      {
+        "name": "CONTACT_TORQUE_LIMIT",
+        "class": "A_PRE_MOTION",
+        "reason": "needed to move at all, so it cannot be measured first. Supplied by the approved H3 bootstrap envelope, which is deliberately below both the provisioner bench value (300) and LF V25 (500), and refined by H3"
+      },
+      {
+        "name": "CONTACT_GOAL_SPEED",
+        "class": "A_PRE_MOTION",
+        "reason": "needed to move at all; bootstrap 60 is far below LF V25 160"
+      },
+      {
+        "name": "CONTACT_ACCELERATION",
+        "class": "A_PRE_MOTION",
+        "reason": "needed to move at all; bootstrap matches the slowest historical value"
+      }
+    ],
+    "acceptance_gates_unresolved": [
+      {
+        "name": "CONTACT_REPEATABILITY_TOLERANCE_TICKS",
+        "class": "D_ACCEPTANCE"
+      },
+      {
+        "name": "ENDPOINT_VS_URDF_TOLERANCE_TICKS",
+        "class": "D_ACCEPTANCE"
+      },
+      {
+        "name": "MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS",
+        "class": "D_ACCEPTANCE"
+      }
+    ],
+    "bootstrap_envelope": {
+      "origin": "H3_BOOTSTRAP_OPERATOR_APPROVED",
+      "torque_limit": 200,
+      "goal_speed": 60,
+      "acceleration": 8,
+      "retreat_ticks": 96,
+      "is_measurement": false,
+      "may_become_canonical": false,
+      "requires_build_flag": "FLC_H3_BOOTSTRAP_APPROVED=1",
+      "requires_session_confirmation": "@APPROVE_BOOTSTRAP CONFIRM",
+      "evidence": "NOT a measurement of this build and NOT inherited from LF V25. Chosen strictly below every historical envelope so the first motion on the reassembled robot is the gentlest anyone has run: torque 200 < provisioner 300 < LF V25 500; speed 60 << LF V25 160."
+    }
+  },
+  "gates": [
+    {
+      "gate": "host_stage_authorizes_h0-smoke",
+      "result": "PASS",
+      "detail": "host=H0_ESP32_ONLY required=H0_ESP32_ONLY"
+    },
+    {
+      "gate": "firmware_identity",
+      "result": "PASS",
+      "detail": "name=matdog_full_leg_calibrator_v1 protocol=FLC1"
+    },
+    {
+      "gate": "physical_session_started",
+      "result": "PASS",
+      "detail": "d1d5f6ea"
+    },
+    {
+      "gate": "firmware_identity",
+      "result": "PASS",
+      "detail": "name=matdog_full_leg_calibrator_v1 version=1.1.0 built=Aug 29 2026 08:24:25"
+    },
+    {
+      "gate": "protocol_labelled_calibrator_local",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "station_absent_from_control_path",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "no_eeprom_write_surface",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "no_broadcast_write",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "single_goal_position_authority",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "unsigned_domain_enforced",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "authorized_stage_is_h0",
+      "result": "PASS",
+      "detail": "stage=H0"
+    },
+    {
+      "gate": "motion_locked",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "bootstrap_inactive",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "head_absence_expected",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "no_unexpected_responder",
+      "result": "PASS",
+      "detail": "bus silent, as expected"
+    },
+    {
+      "gate": "census_correctly_reports_no_responders",
+      "result": "PASS",
+      "detail": "present=0/12 reason=NO_RESPONDERS"
+    },
+    {
+      "gate": "census_refuses_to_pass",
+      "result": "PASS",
+      "detail": "refusing to proceed with no servos is the correct behaviour"
+    },
+    {
+      "gate": "motion_refused_characterize_joint_13",
+      "result": "PASS",
+      "detail": "refused=True no_motion_line=True"
+    },
+    {
+      "gate": "motion_refused_calibrate_joint_13",
+      "result": "PASS",
+      "detail": "refused=True no_motion_line=True"
+    },
+    {
+      "gate": "motion_refused_calibrate_leg_lf",
+      "result": "PASS",
+      "detail": "refused=True no_motion_line=True"
+    },
+    {
+      "gate": "motion_refused_calibrate_all",
+      "result": "PASS",
+      "detail": "refused=True no_motion_line=True"
+    },
+    {
+      "gate": "manual_q0_refused_without_census",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "bootstrap_refused_on_h0_build",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "safe_off_passes_with_no_responders",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "safe_off_is_idempotent",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "safe_off_saw_no_responders",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "safe_off_issued_no_writes",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "gate": "host_policy_blocks_motion",
+      "result": "PASS",
+      "detail": "MOTION BLOCKED \u2014 CALIBRATE_ALL"
+    },
+    {
+      "gate": "safe_off_session_final",
+      "result": "PASS",
+      "detail": ""
+    }
+  ],
+  "commands": [
+    {
+      "command": "<FIRMWARE_BOOT>",
+      "response": [
+        "",
+        "====================================",
+        " MATDOG FULL LEG CALIBRATOR V1",
+        "====================================",
+        "Firmware         : matdog_full_leg_calibrator_v1 1.1.0",
+        "Build Git SHA    : ceb5e445ef03280983838870e789ba626c9c8944",
+        "Boot session id  : 862D3C58",
+        "Protocol         : FLC1 (CALIBRATOR_LOCAL_NOT_FINAL_RUNTIME_PROTOCOL)",
+        "Servo UART       : 1000000 baud",
+        "TX               : GPIO17",
+        "RX               : GPIO18",
+        "Authorized stage : H0",
+        "",
+        "Startup motion   : IMPOSSIBLE BY DESIGN",
+        "EEPROM writes    : NOT IMPLEMENTED",
+        "CalibrationOfs   : NOT IMPLEMENTED",
+        "Factory reset    : NOT IMPLEMENTED",
+        "ID change        : NOT IMPLEMENTED",
+        "Broadcast writes : NOT IMPLEMENTED",
+        "Station in path  : NO",
+        "",
+        "FULL_LEG_CALIBRATOR_READY",
+        "",
+        "Commands:",
+        "  @SESSION_BEGIN <8-hex-host-id>",
+        "  @SESSION_END",
+        "  @STATUS",
+        "  @CENSUS",
+        "  @CAPTURE_Q0 <samples>",
+        "  @WITNESS_DIRECTION <bus_id> <Q_PLUS_RAW_INCREASES|Q_PLUS_RAW_DECREASES> CONFIRM",
+        "  @APPROVE_BOOTSTRAP CONFIRM",
+        "  @CHARACTERIZE_JOINT <bus_id>",
+        "  @CALIBRATE_JOINT <bus_id>",
+        "  @CALIBRATE_LEG <LF|RF|RH|LH>",
+        "  @CALIBRATE_ALL",
+        "  @SAFE_OFF",
+        "  @HELP"
+      ]
+    },
+    {
+      "command": "@STATUS",
+      "response": [
+        "STATUS_BEGIN",
+        "FIRMWARE_NAME=matdog_full_leg_calibrator_v1",
+        "FIRMWARE_VERSION=1.1.0",
+        "BUILD_GIT_SHA=ceb5e445ef03280983838870e789ba626c9c8944",
+        "BUILD_WORKTREE_DIRTY=NO",
+        "BUILD_DATE=Aug 29 2026",
+        "BUILD_TIME=08:24:25",
+        "PROTOCOL_ID=FLC1",
+        "PROTOCOL_SCOPE=CALIBRATOR_LOCAL_NOT_FINAL_RUNTIME_PROTOCOL",
+        "PROFILE_ID=MATDOG_C018_V1",
+        "STATION_IN_CONTROL_PATH=NO",
+        "EEPROM_WRITE_SURFACE=NONE",
+        "BROADCAST_WRITE=NEVER",
+        "GOAL_POSITION_AUTHORITY=flcWritePosEx",
+        "GOAL_POSITION_DOMAIN=0..4095",
+        "SERVO_UART_BAUD=1000000",
+        "SERVO_TX_GPIO=17",
+        "SERVO_RX_GPIO=18",
+        "EXPECTED_LEG_SERVOS=12",
+        "HEAD_SERVOS_EXPECTED_PRESENT=NO",
+        "AUTHORIZED_HARDWARE_STAGE=H0",
+        "GEOMETRY_ENDPOINT_PLANS=24",
+        "GEOMETRY_NO_PARKING_REQUIRED=18",
+        "GEOMETRY_PARKING_REQUIRED_1DOF=6",
+        "GEOMETRY_DEPENDENCIES=6",
+        "GEOMETRY_PARKING_FILE_SHA256=e561e7fb98880843e590f4676e8559374c51d0e641102f89a803b3619722c4d7",
+        "GEOMETRY_PARKING_SEMANTIC_SHA256=67c58430e78241af1a636cdcc22092ff855371713fc7f26bc56412f7c7181139",
+        "GEOMETRY_SAFETY_POLICY_FILE_SHA256=82f00a9414df06676babed1101a73e1a9d7bfa126592cdd7a425f66d5f01f1cc",
+        "GEOMETRY_ARTIFACT_MOTION_AUTHORIZATION=NO",
+        "GEOMETRY_PLAN_SELF_CHECK=PASS",
+        "BOOT_SESSION_ID=862D3C58",
+        "ACTIVE_HOST_SESSION_ID=00000000",
+        "SESSION_GENERATION=0",
+        "SESSION_STATE=0",
+        "CENSUS_FRESH=NO",
+        "CENSUS_EPOCH=0",
+        "LAST_FAULT=NONE",
+        "CHARACTERIZATION_OUTSTANDING=7",
+        "PRE_MOTION_OUTSTANDING=3",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_TORQUE_LIMIT CLASS=A_PRE_MOTION WHY=needed to move at all; supplied by the approved H3 bootstrap envelope, which is deliberately below both the provisioner bench value (300) and LF V25 (500), and is refined by H3",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_GOAL_SPEED CLASS=A_PRE_MOTION WHY=needed to move at all; bootstrap 60 is far below LF V25 160",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_ACCELERATION CLASS=A_PRE_MOTION WHY=needed to move at all; bootstrap matches the slowest historical value",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_RETREAT_TICKS CLASS=B_MEASURED_H3 WHY=H3 retreats with the bootstrap distance and reports what was actually achieved; H4 uses the measured value",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_REPEATABILITY_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges whether two contacts agree. Post-measure: it cannot gate the approaches whose spread it evaluates",
+        "CHARACTERIZATION_REQUIRED NAME=ENDPOINT_VS_URDF_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges measured span against URDF geometry. Post-measure only: an unknown band leaves the result CANDIDATE rather than blocking the measurement",
+        "CHARACTERIZATION_REQUIRED NAME=MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges manual pose against derived q0. It must never prevent acquiring the data needed to derive q0 in the first place",
+        "H3_BOOTSTRAP_BUILD_APPROVED=NO",
+        "H3_BOOTSTRAP_SESSION_APPROVED=NO",
+        "H3_BOOTSTRAP_ACTIVE=NO",
+        "JOINTS_CHARACTERIZED=0/12",
+        "MANUAL_Q0_CANDIDATES=0/12",
+        "DIRECTION_WITNESSES=0/12",
+        "CALIBRATION_CANDIDATES=0/12",
+        "MOTION_UNLOCKED=NO",
+        "CALIBRATE_JOINT_AVAILABLE=NO",
+        "PROMOTION_TO_CANONICAL=REQUIRES_EXPLICIT_SEPARATE_GATE",
+        "STATUS_RESULT PASS",
+        "STATUS_END"
+      ]
+    },
+    {
+      "command": "@SESSION_BEGIN d1d5f6ea",
+      "response": [
+        "SESSION_BEGIN_BEGIN",
+        "SAFE_OFF ID=13 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=12 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=11 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=23 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=22 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=21 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=33 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=32 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=31 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=43 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=42 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=41 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF_SWEEP RESULT=PASS RESPONDERS_SEEN=NO",
+        "CHARACTERIZATION_CLEARED WHY=NEW_HOST_SESSION",
+        "MANUAL_Q0_CLEARED WHY=NEW_HOST_SESSION",
+        "DIRECTION_WITNESSES_CLEARED WHY=NEW_HOST_SESSION",
+        "CALIBRATION_EVIDENCE_CLEARED WHY=NEW_HOST_SESSION",
+        "SESSION_BEGIN_BOOT_SESSION_ID=862D3C58",
+        "SESSION_BEGIN_ACTIVE_HOST_SESSION_ID=D1D5F6EA",
+        "SESSION_BEGIN_GENERATION=1",
+        "SESSION_BEGIN_RESULT PASS",
+        "SESSION_BEGIN_END"
+      ]
+    },
+    {
+      "command": "@STATUS",
+      "response": [
+        "STATUS_BEGIN",
+        "FIRMWARE_NAME=matdog_full_leg_calibrator_v1",
+        "FIRMWARE_VERSION=1.1.0",
+        "BUILD_GIT_SHA=ceb5e445ef03280983838870e789ba626c9c8944",
+        "BUILD_WORKTREE_DIRTY=NO",
+        "BUILD_DATE=Aug 29 2026",
+        "BUILD_TIME=08:24:25",
+        "PROTOCOL_ID=FLC1",
+        "PROTOCOL_SCOPE=CALIBRATOR_LOCAL_NOT_FINAL_RUNTIME_PROTOCOL",
+        "PROFILE_ID=MATDOG_C018_V1",
+        "STATION_IN_CONTROL_PATH=NO",
+        "EEPROM_WRITE_SURFACE=NONE",
+        "BROADCAST_WRITE=NEVER",
+        "GOAL_POSITION_AUTHORITY=flcWritePosEx",
+        "GOAL_POSITION_DOMAIN=0..4095",
+        "SERVO_UART_BAUD=1000000",
+        "SERVO_TX_GPIO=17",
+        "SERVO_RX_GPIO=18",
+        "EXPECTED_LEG_SERVOS=12",
+        "HEAD_SERVOS_EXPECTED_PRESENT=NO",
+        "AUTHORIZED_HARDWARE_STAGE=H0",
+        "GEOMETRY_ENDPOINT_PLANS=24",
+        "GEOMETRY_NO_PARKING_REQUIRED=18",
+        "GEOMETRY_PARKING_REQUIRED_1DOF=6",
+        "GEOMETRY_DEPENDENCIES=6",
+        "GEOMETRY_PARKING_FILE_SHA256=e561e7fb98880843e590f4676e8559374c51d0e641102f89a803b3619722c4d7",
+        "GEOMETRY_PARKING_SEMANTIC_SHA256=67c58430e78241af1a636cdcc22092ff855371713fc7f26bc56412f7c7181139",
+        "GEOMETRY_SAFETY_POLICY_FILE_SHA256=82f00a9414df06676babed1101a73e1a9d7bfa126592cdd7a425f66d5f01f1cc",
+        "GEOMETRY_ARTIFACT_MOTION_AUTHORIZATION=NO",
+        "GEOMETRY_PLAN_SELF_CHECK=PASS",
+        "BOOT_SESSION_ID=862D3C58",
+        "ACTIVE_HOST_SESSION_ID=D1D5F6EA",
+        "SESSION_GENERATION=1",
+        "SESSION_STATE=0",
+        "CENSUS_FRESH=NO",
+        "CENSUS_EPOCH=0",
+        "LAST_FAULT=NONE",
+        "CHARACTERIZATION_OUTSTANDING=7",
+        "PRE_MOTION_OUTSTANDING=3",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_TORQUE_LIMIT CLASS=A_PRE_MOTION WHY=needed to move at all; supplied by the approved H3 bootstrap envelope, which is deliberately below both the provisioner bench value (300) and LF V25 (500), and is refined by H3",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_GOAL_SPEED CLASS=A_PRE_MOTION WHY=needed to move at all; bootstrap 60 is far below LF V25 160",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_ACCELERATION CLASS=A_PRE_MOTION WHY=needed to move at all; bootstrap matches the slowest historical value",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_RETREAT_TICKS CLASS=B_MEASURED_H3 WHY=H3 retreats with the bootstrap distance and reports what was actually achieved; H4 uses the measured value",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_REPEATABILITY_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges whether two contacts agree. Post-measure: it cannot gate the approaches whose spread it evaluates",
+        "CHARACTERIZATION_REQUIRED NAME=ENDPOINT_VS_URDF_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges measured span against URDF geometry. Post-measure only: an unknown band leaves the result CANDIDATE rather than blocking the measurement",
+        "CHARACTERIZATION_REQUIRED NAME=MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges manual pose against derived q0. It must never prevent acquiring the data needed to derive q0 in the first place",
+        "H3_BOOTSTRAP_BUILD_APPROVED=NO",
+        "H3_BOOTSTRAP_SESSION_APPROVED=NO",
+        "H3_BOOTSTRAP_ACTIVE=NO",
+        "JOINTS_CHARACTERIZED=0/12",
+        "MANUAL_Q0_CANDIDATES=0/12",
+        "DIRECTION_WITNESSES=0/12",
+        "CALIBRATION_CANDIDATES=0/12",
+        "MOTION_UNLOCKED=NO",
+        "CALIBRATE_JOINT_AVAILABLE=NO",
+        "PROMOTION_TO_CANONICAL=REQUIRES_EXPLICIT_SEPARATE_GATE",
+        "STATUS_RESULT PASS",
+        "STATUS_END"
+      ]
+    },
+    {
+      "command": "@STATUS",
+      "response": [
+        "STATUS_BEGIN",
+        "FIRMWARE_NAME=matdog_full_leg_calibrator_v1",
+        "FIRMWARE_VERSION=1.1.0",
+        "BUILD_GIT_SHA=ceb5e445ef03280983838870e789ba626c9c8944",
+        "BUILD_WORKTREE_DIRTY=NO",
+        "BUILD_DATE=Aug 29 2026",
+        "BUILD_TIME=08:24:25",
+        "PROTOCOL_ID=FLC1",
+        "PROTOCOL_SCOPE=CALIBRATOR_LOCAL_NOT_FINAL_RUNTIME_PROTOCOL",
+        "PROFILE_ID=MATDOG_C018_V1",
+        "STATION_IN_CONTROL_PATH=NO",
+        "EEPROM_WRITE_SURFACE=NONE",
+        "BROADCAST_WRITE=NEVER",
+        "GOAL_POSITION_AUTHORITY=flcWritePosEx",
+        "GOAL_POSITION_DOMAIN=0..4095",
+        "SERVO_UART_BAUD=1000000",
+        "SERVO_TX_GPIO=17",
+        "SERVO_RX_GPIO=18",
+        "EXPECTED_LEG_SERVOS=12",
+        "HEAD_SERVOS_EXPECTED_PRESENT=NO",
+        "AUTHORIZED_HARDWARE_STAGE=H0",
+        "GEOMETRY_ENDPOINT_PLANS=24",
+        "GEOMETRY_NO_PARKING_REQUIRED=18",
+        "GEOMETRY_PARKING_REQUIRED_1DOF=6",
+        "GEOMETRY_DEPENDENCIES=6",
+        "GEOMETRY_PARKING_FILE_SHA256=e561e7fb98880843e590f4676e8559374c51d0e641102f89a803b3619722c4d7",
+        "GEOMETRY_PARKING_SEMANTIC_SHA256=67c58430e78241af1a636cdcc22092ff855371713fc7f26bc56412f7c7181139",
+        "GEOMETRY_SAFETY_POLICY_FILE_SHA256=82f00a9414df06676babed1101a73e1a9d7bfa126592cdd7a425f66d5f01f1cc",
+        "GEOMETRY_ARTIFACT_MOTION_AUTHORIZATION=NO",
+        "GEOMETRY_PLAN_SELF_CHECK=PASS",
+        "BOOT_SESSION_ID=862D3C58",
+        "ACTIVE_HOST_SESSION_ID=D1D5F6EA",
+        "SESSION_GENERATION=1",
+        "SESSION_STATE=0",
+        "CENSUS_FRESH=NO",
+        "CENSUS_EPOCH=0",
+        "LAST_FAULT=NONE",
+        "CHARACTERIZATION_OUTSTANDING=7",
+        "PRE_MOTION_OUTSTANDING=3",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_TORQUE_LIMIT CLASS=A_PRE_MOTION WHY=needed to move at all; supplied by the approved H3 bootstrap envelope, which is deliberately below both the provisioner bench value (300) and LF V25 (500), and is refined by H3",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_GOAL_SPEED CLASS=A_PRE_MOTION WHY=needed to move at all; bootstrap 60 is far below LF V25 160",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_ACCELERATION CLASS=A_PRE_MOTION WHY=needed to move at all; bootstrap matches the slowest historical value",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_RETREAT_TICKS CLASS=B_MEASURED_H3 WHY=H3 retreats with the bootstrap distance and reports what was actually achieved; H4 uses the measured value",
+        "CHARACTERIZATION_REQUIRED NAME=CONTACT_REPEATABILITY_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges whether two contacts agree. Post-measure: it cannot gate the approaches whose spread it evaluates",
+        "CHARACTERIZATION_REQUIRED NAME=ENDPOINT_VS_URDF_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges measured span against URDF geometry. Post-measure only: an unknown band leaves the result CANDIDATE rather than blocking the measurement",
+        "CHARACTERIZATION_REQUIRED NAME=MANUAL_Q0_VS_DERIVED_Q0_TOLERANCE_TICKS CLASS=D_ACCEPTANCE WHY=judges manual pose against derived q0. It must never prevent acquiring the data needed to derive q0 in the first place",
+        "H3_BOOTSTRAP_BUILD_APPROVED=NO",
+        "H3_BOOTSTRAP_SESSION_APPROVED=NO",
+        "H3_BOOTSTRAP_ACTIVE=NO",
+        "JOINTS_CHARACTERIZED=0/12",
+        "MANUAL_Q0_CANDIDATES=0/12",
+        "DIRECTION_WITNESSES=0/12",
+        "CALIBRATION_CANDIDATES=0/12",
+        "MOTION_UNLOCKED=NO",
+        "CALIBRATE_JOINT_AVAILABLE=NO",
+        "PROMOTION_TO_CANONICAL=REQUIRES_EXPLICIT_SEPARATE_GATE",
+        "STATUS_RESULT PASS",
+        "STATUS_END"
+      ]
+    },
+    {
+      "command": "@CENSUS",
+      "response": [
+        "CENSUS_BEGIN",
+        "CENSUS_EXPECTED_IDS=11,12,13,21,22,23,31,32,33,41,42,43",
+        "CHARACTERIZATION_CLEARED WHY=NEW_CENSUS_EPOCH",
+        "MANUAL_Q0_CLEARED WHY=NEW_CENSUS_EPOCH",
+        "DIRECTION_WITNESSES_CLEARED WHY=NEW_CENSUS_EPOCH",
+        "CALIBRATION_EVIDENCE_CLEARED WHY=NEW_CENSUS_EPOCH",
+        "CENSUS_SERVO ID=13 JOINT=lf_hip_joint UNIT=M22 RESULT=MISSING",
+        "CENSUS_SERVO ID=12 JOINT=lf_upper_leg_joint UNIT=ELR01 RESULT=MISSING",
+        "CENSUS_SERVO ID=11 JOINT=lf_lower_leg_joint UNIT=M33 RESULT=MISSING",
+        "CENSUS_SERVO ID=23 JOINT=rf_hip_joint UNIT=NEW01 RESULT=MISSING",
+        "CENSUS_SERVO ID=22 JOINT=rf_upper_leg_joint UNIT=ELR03 RESULT=MISSING",
+        "CENSUS_SERVO ID=21 JOINT=rf_lower_leg_joint UNIT=NEW03 RESULT=MISSING",
+        "CENSUS_SERVO ID=33 JOINT=rh_hip_joint UNIT=NEW06 RESULT=MISSING",
+        "CENSUS_SERVO ID=32 JOINT=rh_upper_leg_joint UNIT=ELR02 RESULT=MISSING",
+        "CENSUS_SERVO ID=31 JOINT=rh_lower_leg_joint UNIT=NEW05 RESULT=MISSING",
+        "CENSUS_SERVO ID=43 JOINT=lh_hip_joint UNIT=M43 RESULT=MISSING",
+        "CENSUS_SERVO ID=42 JOINT=lh_upper_leg_joint UNIT=M42 RESULT=MISSING",
+        "CENSUS_SERVO ID=41 JOINT=lh_lower_leg_joint UNIT=M41 RESULT=MISSING",
+        "CENSUS_PRESENT=0/12",
+        "CENSUS_IDENTITY_OK=0/12",
+        "CENSUS_UNEXPECTED=0",
+        "CENSUS_HEAD_ABSENCE_EXPECTED=YES",
+        "CENSUS_FAIL_REASON=NO_RESPONDERS",
+        "CENSUS_RESULT FAIL",
+        "CENSUS_END"
+      ]
+    },
+    {
+      "command": "@CHARACTERIZE_JOINT 13",
+      "response": [
+        "CHARACTERIZE_JOINT_BEGIN",
+        "CHARACTERIZE_JOINT_TARGET ID=13 JOINT=lf_hip_joint UNIT=M22",
+        "CHARACTERIZE_JOINT_REFUSED REASON=HARDWARE_STAGE_LOCKED NEEDS=H3 AUTHORIZED=H0",
+        "CHARACTERIZE_JOINT_REFUSED REASON=NO_FRESH_CENSUS_IN_THIS_SESSION",
+        "CHARACTERIZE_JOINT_REFUSED REASON=PRE_MOTION_PARAMS_UNRESOLVED COUNT=3",
+        "CHARACTERIZE_JOINT_BLOCKED_BY NAME=CONTACT_TORQUE_LIMIT CLASS=A_PRE_MOTION",
+        "CHARACTERIZE_JOINT_BLOCKED_BY NAME=CONTACT_GOAL_SPEED CLASS=A_PRE_MOTION",
+        "CHARACTERIZE_JOINT_BLOCKED_BY NAME=CONTACT_ACCELERATION CLASS=A_PRE_MOTION",
+        "CHARACTERIZE_JOINT_REFUSED REASON=NO_CURRENT_MANUAL_Q0_CANDIDATE",
+        "CHARACTERIZE_JOINT_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS",
+        "CHARACTERIZE_JOINT_HINT=@WITNESS_DIRECTION_<ID>_<Q_PLUS_RAW_...>_CONFIRM",
+        "CHARACTERIZE_JOINT_REFUSED REASON=JOINT_IDENTITY_NOT_VERIFIED",
+        "CHARACTERIZE_JOINT_NOTE=LF_V25_NUMERIC_RESULTS_CANNOT_AUTHORIZE_CURRENT_HARDWARE",
+        "CHARACTERIZE_JOINT_RESULT REFUSED",
+        "CHARACTERIZE_JOINT_END"
+      ]
+    },
+    {
+      "command": "@CALIBRATE_JOINT 13",
+      "response": [
+        "CALIBRATE_JOINT_BEGIN",
+        "CALIBRATE_JOINT_TARGET ID=13 JOINT=lf_hip_joint UNIT=M22",
+        "CALIBRATE_JOINT_REFUSED REASON=HARDWARE_STAGE_LOCKED NEEDS=H4 AUTHORIZED=H0",
+        "CALIBRATE_JOINT_REFUSED REASON=NO_FRESH_CENSUS_IN_THIS_SESSION",
+        "CALIBRATE_JOINT_REFUSED REASON=PRE_MOTION_PARAMS_UNRESOLVED COUNT=3",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=CONTACT_TORQUE_LIMIT CLASS=A_PRE_MOTION",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=CONTACT_GOAL_SPEED CLASS=A_PRE_MOTION",
+        "CALIBRATE_JOINT_BLOCKED_BY NAME=CONTACT_ACCELERATION CLASS=A_PRE_MOTION",
+        "CALIBRATE_JOINT_REFUSED REASON=NO_CURRENT_MANUAL_Q0_CANDIDATE",
+        "CALIBRATE_JOINT_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS",
+        "CALIBRATE_JOINT_HINT=@WITNESS_DIRECTION_<ID>_<Q_PLUS_RAW_...>_CONFIRM",
+        "CALIBRATE_JOINT_REFUSED REASON=JOINT_IDENTITY_NOT_VERIFIED",
+        "CALIBRATE_JOINT_REFUSED REASON=JOINT_NOT_CHARACTERIZED_IN_THIS_SESSION",
+        "CALIBRATE_JOINT_HINT=RUN @CHARACTERIZE_JOINT FIRST",
+        "CALIBRATE_JOINT_NOTE=LF_V25_NUMERIC_RESULTS_CANNOT_AUTHORIZE_CURRENT_HARDWARE",
+        "CALIBRATE_JOINT_RESULT REFUSED",
+        "CALIBRATE_JOINT_END"
+      ]
+    },
+    {
+      "command": "@CALIBRATE_LEG LF",
+      "response": [
+        "CALIBRATE_LEG_BEGIN",
+        "CALIBRATE_LEG_TARGET LEG=LF",
+        "CALIBRATE_LEG_REFUSED REASON=HARDWARE_STAGE_LOCKED NEEDS=H5 AUTHORIZED=H0",
+        "CALIBRATE_LEG_REFUSED REASON=NO_FRESH_CENSUS_IN_THIS_SESSION",
+        "CALIBRATE_LEG_REFUSED REASON=PRE_MOTION_PARAMS_UNRESOLVED COUNT=3",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=CONTACT_TORQUE_LIMIT CLASS=A_PRE_MOTION",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=CONTACT_GOAL_SPEED CLASS=A_PRE_MOTION",
+        "CALIBRATE_LEG_BLOCKED_BY NAME=CONTACT_ACCELERATION CLASS=A_PRE_MOTION",
+        "CALIBRATE_LEG_REFUSED REASON=INCOMPLETE_MANUAL_Q0_EVIDENCE",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=13",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=12",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=11",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=23",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=22",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=21",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=33",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=32",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=31",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=43",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=42",
+        "CALIBRATE_LEG_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=41",
+        "CALIBRATE_LEG_HINT=@WITNESS_DIRECTION_<ID>_<Q_PLUS_RAW_...>_CONFIRM",
+        "CALIBRATE_LEG_NOTE=LF_V25_NUMERIC_RESULTS_CANNOT_AUTHORIZE_CURRENT_HARDWARE",
+        "CALIBRATE_LEG_RESULT REFUSED",
+        "CALIBRATE_LEG_END"
+      ]
+    },
+    {
+      "command": "@CALIBRATE_ALL",
+      "response": [
+        "CALIBRATE_ALL_BEGIN",
+        "CALIBRATE_ALL_TARGET LEGS=LF,RF,RH,LH JOINTS=12",
+        "CALIBRATE_ALL_REFUSED REASON=HARDWARE_STAGE_LOCKED NEEDS=H6 AUTHORIZED=H0",
+        "CALIBRATE_ALL_REFUSED REASON=NO_FRESH_CENSUS_IN_THIS_SESSION",
+        "CALIBRATE_ALL_REFUSED REASON=PRE_MOTION_PARAMS_UNRESOLVED COUNT=3",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=CONTACT_TORQUE_LIMIT CLASS=A_PRE_MOTION",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=CONTACT_GOAL_SPEED CLASS=A_PRE_MOTION",
+        "CALIBRATE_ALL_BLOCKED_BY NAME=CONTACT_ACCELERATION CLASS=A_PRE_MOTION",
+        "CALIBRATE_ALL_REFUSED REASON=INCOMPLETE_MANUAL_Q0_EVIDENCE",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=13",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=12",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=11",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=23",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=22",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=21",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=33",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=32",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=31",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=43",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=42",
+        "CALIBRATE_ALL_REFUSED REASON=NO_CURRENT_SEMANTIC_DIRECTION_WITNESS ID=41",
+        "CALIBRATE_ALL_HINT=@WITNESS_DIRECTION_<ID>_<Q_PLUS_RAW_...>_CONFIRM",
+        "CALIBRATE_ALL_NOTE=LF_V25_NUMERIC_RESULTS_CANNOT_AUTHORIZE_CURRENT_HARDWARE",
+        "CALIBRATE_ALL_RESULT REFUSED",
+        "CALIBRATE_ALL_END"
+      ]
+    },
+    {
+      "command": "@CAPTURE_Q0 32",
+      "response": [
+        "CAPTURE_Q0_BEGIN",
+        "CAPTURE_Q0_REFUSED REASON=HARDWARE_STAGE_LOCKED NEEDS=H2 AUTHORIZED=H0",
+        "CAPTURE_Q0_RESULT REFUSED",
+        "CAPTURE_Q0_END"
+      ]
+    },
+    {
+      "command": "@APPROVE_BOOTSTRAP CONFIRM",
+      "response": [
+        "APPROVE_BOOTSTRAP_BEGIN",
+        "APPROVE_BOOTSTRAP_REFUSED REASON=NO_FRESH_CENSUS_IN_THIS_SESSION",
+        "APPROVE_BOOTSTRAP_RESULT REFUSED",
+        "APPROVE_BOOTSTRAP_END"
+      ]
+    },
+    {
+      "command": "@SAFE_OFF",
+      "response": [
+        "SAFE_OFF_BEGIN",
+        "SAFE_OFF ID=13 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=12 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=11 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=23 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=22 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=21 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=33 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=32 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=31 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=43 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=42 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=41 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF_RESPONDERS_SEEN=NO",
+        "SAFE_OFF_RESULT PASS",
+        "SAFE_OFF_END"
+      ]
+    },
+    {
+      "command": "@SAFE_OFF (idempotency)",
+      "response": [
+        "SAFE_OFF_BEGIN",
+        "SAFE_OFF ID=13 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=12 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=11 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=23 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=22 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=21 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=33 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=32 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=31 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=43 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=42 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=41 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF_RESPONDERS_SEEN=NO",
+        "SAFE_OFF_RESULT PASS",
+        "SAFE_OFF_END"
+      ]
+    },
+    {
+      "command": "@SAFE_OFF (session_final)",
+      "response": [
+        "SAFE_OFF_BEGIN",
+        "SAFE_OFF ID=13 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=12 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=11 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=23 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=22 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=21 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=33 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=32 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=31 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=43 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=42 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=41 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF_RESPONDERS_SEEN=NO",
+        "SAFE_OFF_RESULT PASS",
+        "SAFE_OFF_END"
+      ]
+    },
+    {
+      "command": "@SESSION_END",
+      "response": [
+        "SESSION_END_BEGIN",
+        "SAFE_OFF ID=13 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=12 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=11 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=23 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=22 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=21 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=33 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=32 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=31 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=43 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=42 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF ID=41 RESULT=NO_RESPONDER EVIDENCE=NOT_PREVIOUSLY_IDENTIFIED",
+        "SAFE_OFF_SWEEP RESULT=PASS RESPONDERS_SEEN=NO",
+        "CHARACTERIZATION_CLEARED WHY=HOST_SESSION_ENDED",
+        "MANUAL_Q0_CLEARED WHY=HOST_SESSION_ENDED",
+        "DIRECTION_WITNESSES_CLEARED WHY=HOST_SESSION_ENDED",
+        "CALIBRATION_EVIDENCE_CLEARED WHY=HOST_SESSION_ENDED",
+        "SESSION_END_SAFE_OFF_VERIFIED=YES",
+        "SESSION_END_FAULT_LATCHED=NO",
+        "SESSION_END_RESULT PASS",
+        "SESSION_END_END"
+      ]
+    }
+  ],
+  "notes": [],
+  "hardware_validation_scope": {
+    "highest_stage_exercised_in_this_session": "H0_ESP32_ONLY",
+    "statement": "This block reports what this session observed. It makes no claim about stages not exercised here."
+  }
+}

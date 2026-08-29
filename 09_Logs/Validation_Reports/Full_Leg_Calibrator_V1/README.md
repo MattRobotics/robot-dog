@@ -1,22 +1,27 @@
 # Full Leg Calibrator V1 — validation evidence
 
-**Date:** 2026-08-28 (updated after H3–H6 implementation)
-**Base commit:** `fcc1dbd1367d5d8c860a873c62a31b2620695aba`
+**Date:** 2026-08-29 (updated after the H0 run on the shared-orchestration build)
+**Base commit:** `ceb5e445ef03280983838870e789ba626c9c8944`
 **Tool:** [MATDOG Full Leg Calibrator V1](../../../05_Firmware/Full_Leg_Calibrator_V1/README.md)
 
 ---
 
 ## ⚠️ Hardware validation scope
 
-> **Only stage H0 was exercised, and against the previous firmware image.**
-> No servo was connected. No servo power was present. No motion was commanded.
-> No EEPROM was written. **Nothing about H1 or later is validated by this work.**
-> The current image, which adds H3–H6, has been compiled and offline-tested but
-> **never flashed**.
+> **Only stage H0 was exercised.** No servo was connected. No servo power was
+> present. No motion was commanded. No EEPROM was written.
+> **Nothing about H1 or later is validated by this work.**
+>
+> H0 has now been run against the **current** shared-orchestration image at
+> `ceb5e445ef03280983838870e789ba626c9c8944` — **29/29 gates PASS**, flashed
+> binary `sha256:ebee9d2f…`. See
+> [the session](sessions/20260829T065855Z_h0_smoke_d1d5f6ea/FLASH_PROVENANCE.md).
+> H3–H6 remain implemented and offline-validated but **never executed on
+> hardware**.
 
 | Stage | Meaning | Status |
 |---|---|---|
-| H0 | ESP32-S3 only, no servos attached | ✅ **PASSED 2026-08-28** |
+| H0 | ESP32-S3 only, no servos attached | ✅ **PASSED 2026-08-29** at `ceb5e44` (29/29); earlier pass 2026-08-28 on the previous image |
 | H1 | 12-servo read-only census | ⬜ not attempted — requires user present |
 | H2 | manual-pose q0 capture, torque OFF | ⬜ not attempted |
 | H3 | one joint runtime/contact characterization | ⬜ implemented, **not executed** |
@@ -39,6 +44,18 @@ for the procedure and the parameter classification that resolved the old H3
 deadlock.
 
 ---
+
+## H0 sessions on this branch
+
+| Session | Commit | Result | Note |
+|---|---|---|---|
+| `20260828T062919Z_h0_smoke` | `fcc1dbd` | PASS | previous firmware image |
+| `20260829T065640Z_h0_smoke_3da4b210` | `ceb5e44` | **FAIL** | kept on purpose: `firmware READY marker was not received` — the runner assumed the ESP32-S3 resets on port open, which native USB CDC does not do |
+| `20260829T065855Z_h0_smoke_d1d5f6ea` | `ceb5e44` | **PASS 29/29** | flashed `sha256:ebee9d2f…`, servo power OFF, 0 motion / 0 EEPROM / 0 broadcast writes, torque `OFF_VERIFIED` |
+
+The FAIL is preserved because it is the evidence that found a real host-link
+defect. The connect path has since been changed to a deterministic `@STATUS`
+handshake, so it no longer depends on catching a one-shot boot banner.
 
 ## Offline validation — 206 tests, all passing
 
