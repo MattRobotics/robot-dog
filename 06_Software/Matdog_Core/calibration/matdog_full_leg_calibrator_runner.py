@@ -99,6 +99,11 @@ END_MARKERS = (
 
 BEGIN_MARKERS = tuple(marker.removesuffix("_END") + "_BEGIN" for marker in END_MARKERS)
 
+#: The only firmware this runner will talk to. The handshake confirms it
+#: positively rather than inferring identity from a banner that may never come.
+EXPECTED_FIRMWARE_NAME = "matdog_full_leg_calibrator_v1"
+
+
 _SEMANTIC_COMMAND_PATTERNS = tuple(
     re.compile(pattern)
     for pattern in (
@@ -628,8 +633,30 @@ class CalibratorLink:
         self.serial_factory = serial_factory
         self.open_count = 0
         self.banner: list[str] = []
+        #: Startup text observed before the handshake. Recorded, never dropped.
+        self.preamble: list[str] = []
+        self.status_lines: list[str] = []
+        self.identity: dict[str, str] = {}
+        self.boot_session_id: str | None = None
+        self.handshake_complete = False
 
     def __enter__(self) -> "CalibratorLink":
+        """Open the link and establish identity with a deterministic handshake.
+
+        This deliberately does NOT wait for ``FULL_LEG_CALIBRATOR_READY``.
+
+        The supported FQBN uses native USB CDC (``USBMode=hwcdc,CDCOnBoot=cdc``),
+        and hardware evidence from the 2026-08-29 H0 session proves that opening
+        the port does NOT reset the ESP32-S3: two consecutive opens both reported
+        the same ``BOOT_SESSION_ID`` and emitted nothing at all. The firmware
+        prints its banner once in ``setup()`` and never waits for a host, so a
+        connect path that requires the banner can only succeed inside the ~1.5 s
+        window after a physical reset. That is not a protocol; it is a race.
+
+        Instead: drain whatever is already buffered (recording it as evidence,
+        never discarding it silently), then ask a framed ``@STATUS`` and require
+        a well-formed answer. Identity comes from the answer, not from timing.
+        """
         if self.serial is not None:
             raise CalibratorProtocolError("the calibration link is already open")
         factory = self.serial_factory or _default_serial_factory()
@@ -638,37 +665,73 @@ class CalibratorLink:
         except Exception as exc:
             raise CalibratorLinkLost(f"could not open {self.port}: {exc}") from exc
         self.open_count += 1
-        # The ESP32-S3 resets on port open; wait for the banner rather than sleep.
         try:
-            self.banner = self.read_until("FULL_LEG_CALIBRATOR_READY", timeout=8.0)
+            # Anything already in the buffer belongs to a boot that happened
+            # BEFORE this link existed. A READY here is ordinary startup text,
+            # not reset evidence: there is no session yet for it to invalidate.
+            self.preamble = self._drain_preamble()
+            self.banner = list(self.preamble)
+            self.identity = self._handshake_status()
         except Exception:
             self.serial.close()
             self.serial = None
             raise
-        if not any(line == "FULL_LEG_CALIBRATOR_READY" for line in self.banner):
-            self.serial.close()
-            self.serial = None
-            raise CalibratorProtocolError("firmware READY marker was not received")
-        # Current firmware prints its semantic help immediately after READY.
-        # Consume that known startup tail so the first command can require its
-        # BEGIN marker as the first non-empty response line. No RX reset is used:
-        # an unexpected later READY remains observable reset evidence.
-        startup_tail = self.read_until("  @HELP", timeout=2.0)
-        if startup_tail and not any(line == "  @HELP" for line in startup_tail):
-            self.serial.close()
-            self.serial = None
-            raise CalibratorProtocolError("truncated firmware startup help")
-        self.banner.extend(startup_tail)
+        # From here on the link is live. `send()` treats any READY as a reset.
+        self.handshake_complete = True
         return self
 
-    def __exit__(self, *exc) -> None:
-        if self.serial is not None:
-            self.serial.close()
-            self.serial = None
+    def _drain_preamble(self, quiet_seconds: float = 0.35,
+                        limit_seconds: float = 3.0) -> list[str]:
+        """Read already-buffered startup text until the link goes quiet.
 
-    def read_until(self, marker: str, timeout: float = 15.0) -> list[str]:
+        Returns every line read so it can be recorded in the session evidence.
+        Nothing is discarded: `reset_input_buffer()` is never used, because a
+        banner that is thrown away cannot later be reasoned about.
+        """
         assert self.serial is not None
         lines: list[str] = []
+        deadline = time.monotonic() + limit_seconds
+        last = time.monotonic()
+        while time.monotonic() < deadline:
+            try:
+                raw = self.serial.readline()
+            except Exception as exc:
+                raise CalibratorLinkLost(f"serial read failed: {exc}") from exc
+            if not raw:
+                if time.monotonic() - last >= quiet_seconds:
+                    break
+                continue
+            last = time.monotonic()
+            try:
+                line = raw.decode("utf-8", errors="strict").rstrip("\r\n")
+            except UnicodeDecodeError as exc:
+                raise CalibratorProtocolError(
+                    "non-UTF-8 data on calibrator link"
+                ) from exc
+            lines.append(line)
+        return lines
+
+    def _handshake_status(self, timeout: float = 15.0) -> dict[str, str]:
+        """Send @STATUS and require a complete, well-formed STATUS frame.
+
+        Tolerates late startup text arriving before ``STATUS_BEGIN`` — the board
+        may still have been mid-banner when the port opened — but records every
+        such line in `self.preamble`. Absent or malformed STATUS fails closed.
+        """
+        assert self.serial is not None
+        command = "@STATUS"
+        if not semantic_command_allowed(command):
+            raise CalibratorProtocolError("handshake command is not semantic")
+        try:
+            self.serial.write((command + "\n").encode("ascii"))
+            self.serial.flush()
+        except Exception as exc:
+            raise CalibratorLinkLost(f"serial write failed: {exc}") from exc
+
+        fields: dict[str, str] = {}
+        body: list[str] = []
+        saw_begin = False
+        saw_end = False
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             try:
@@ -680,11 +743,63 @@ class CalibratorLink:
             try:
                 line = raw.decode("utf-8", errors="strict").rstrip("\r\n")
             except UnicodeDecodeError as exc:
-                raise CalibratorProtocolError("non-UTF-8 data on calibrator link") from exc
-            lines.append(line)
-            if line == marker:
+                raise CalibratorProtocolError(
+                    "non-UTF-8 data on calibrator link"
+                ) from exc
+            if not line:
+                continue
+            if not saw_begin:
+                if line == "STATUS_BEGIN":
+                    saw_begin = True
+                    continue
+                # Pre-handshake startup text. Recorded, never dropped.
+                self.preamble.append(line)
+                self.banner.append(line)
+                continue
+            body.append(line)
+            if line in BEGIN_MARKERS:
+                raise CalibratorProtocolError(
+                    f"unexpected frame begin {line} during STATUS handshake"
+                )
+            if line == "STATUS_END":
+                saw_end = True
                 break
-        return lines
+            if line in END_MARKERS:
+                raise CalibratorProtocolError(
+                    f"unexpected frame end {line} during STATUS handshake"
+                )
+            if "=" in line:
+                key, _, value = line.partition("=")
+                fields.setdefault(key, value)
+        if not saw_begin or not saw_end:
+            raise CalibratorProtocolError(
+                "firmware did not answer the @STATUS handshake with a complete frame"
+            )
+        self.status_lines = body
+
+        # Identity must be positively confirmed, never assumed from silence.
+        name = fields.get("FIRMWARE_NAME")
+        if name != EXPECTED_FIRMWARE_NAME:
+            raise CalibratorProtocolError(
+                f"unexpected firmware on the link: {name!r}"
+            )
+        if fields.get("PROTOCOL_ID") != PROTOCOL_ID:
+            raise CalibratorProtocolError(
+                f"unexpected protocol id: {fields.get('PROTOCOL_ID')!r}"
+            )
+        boot_id = fields.get("BOOT_SESSION_ID")
+        if not boot_id or not re.fullmatch(r"[0-9A-Fa-f]{8}", boot_id) or \
+                int(boot_id, 16) == 0:
+            raise CalibratorProtocolError(
+                f"firmware reported no usable BOOT_SESSION_ID: {boot_id!r}"
+            )
+        self.boot_session_id = boot_id
+        return fields
+
+    def __exit__(self, *exc) -> None:
+        if self.serial is not None:
+            self.serial.close()
+            self.serial = None
 
     def send(self, command: str, timeout: float = 30.0,
              *, expected_begin: str, expected_end: str) -> list[str]:
@@ -769,7 +884,10 @@ def parse_fields(lines: list[str]) -> dict[str, str]:
 
 IDENTITY_KEYS = (
     "FIRMWARE_NAME", "FIRMWARE_VERSION", "FIRMWARE_BUILD_ID",
-    "BUILD_GIT_SHA", "BUILD_WORKTREE_DIRTY", "BUILD_DATE", "BUILD_TIME",
+    "BUILD_GIT_SHA", "BUILD_WORKTREE_DIRTY",
+    # Commit-derived, wall-clock independent. Replaces BUILD_DATE/BUILD_TIME,
+    # which made the binary hash change on every rebuild of the same source.
+    "BUILD_SOURCE_EPOCH", "BUILD_PROVENANCE",
     "PROTOCOL_ID", "PROTOCOL_SCOPE", "AUTHORIZED_HARDWARE_STAGE",
     "FIRMWARE_BUILD_ID", "BOOT_SESSION_ID", "ACTIVE_HOST_SESSION_ID",
     "SESSION_GENERATION", "SESSION_STATE", "CENSUS_FRESH", "CENSUS_EPOCH",
@@ -1022,11 +1140,27 @@ class CalibrationSessionController:
             self.started = True
             self.session.connection_open_count = self.link.open_count
             self.session.continuity_state = "CONNECTED"
-            self.session.record("<FIRMWARE_BOOT>", list(self.link.banner))
+            # Startup text that happened to be buffered when the port opened.
+            # Usually empty: with native USB CDC the board does not reset on
+            # open, so there is normally no banner to catch. Recorded either way.
+            self.session.record("<PRE_HANDSHAKE_RX>", list(self.link.preamble))
+            self.session.record(
+                "<HANDSHAKE_STATUS>",
+                [f"BOOT_SESSION_ID={self.link.boot_session_id}"]
+                + list(self.link.status_lines),
+            )
 
             status = self._status(require_active=False)
+            # The handshake and this first framed STATUS must describe the SAME
+            # boot. A different id here means the board reset between them, and
+            # nothing observed before that reset may be carried forward.
+            if status.get("BOOT_SESSION_ID") != self.link.boot_session_id:
+                raise CalibratorResetDetected(
+                    "BOOT_SESSION_ID changed between the connect handshake and "
+                    "the first framed STATUS"
+                )
             identity_ok = (
-                status.get("FIRMWARE_NAME") == "matdog_full_leg_calibrator_v1"
+                status.get("FIRMWARE_NAME") == EXPECTED_FIRMWARE_NAME
                 and status.get("PROTOCOL_ID") == PROTOCOL_ID
                 and status.get("PROTOCOL_SCOPE") == PROTOCOL_SCOPE
             )
@@ -1507,9 +1641,10 @@ def run_h0_smoke(session: Session, link: CalibratorLink) -> None:
 
     session.gate(
         "firmware_identity",
-        status.get("FIRMWARE_NAME") == "matdog_full_leg_calibrator_v1",
+        status.get("FIRMWARE_NAME") == EXPECTED_FIRMWARE_NAME,
         f"name={status.get('FIRMWARE_NAME')} version={status.get('FIRMWARE_VERSION')} "
-        f"built={status.get('BUILD_DATE')} {status.get('BUILD_TIME')}",
+        f"src_epoch={status.get('BUILD_SOURCE_EPOCH')} "
+        f"provenance={status.get('BUILD_PROVENANCE')}",
     )
     session.gate(
         "protocol_labelled_calibrator_local",

@@ -23,8 +23,14 @@ SPEC.loader.exec_module(runner)
 class FakeFirmware:
     """Small stateful implementation of the firmware's framed host protocol."""
 
-    def __init__(self, *, stage: int = 6) -> None:
+    def __init__(self, *, stage: int = 6, resets_on_open: bool = True,
+                 emit_banner_on_open: bool = True) -> None:
         self.stage = stage
+        #: The supported FQBN uses native USB CDC and does NOT reset on open.
+        #: Default True keeps the older power-cycle scenarios; the connect
+        #: contract tests set both False to model the real hardware.
+        self.resets_on_open = resets_on_open
+        self.emit_banner_on_open = emit_banner_on_open
         self.open_count = 0
         self.boot_counter = 0
         self.boot_id = "00000001"
@@ -60,7 +66,8 @@ class FakeFirmware:
     def serial_factory(self, port: str, baud: int, *, timeout: float) -> "FakeSerial":
         del port, baud, timeout
         self.open_count += 1
-        self._reset_for_open()
+        if self.resets_on_open:
+            self._reset_for_open()
         connection = FakeSerial(self)
         self.connections.append(connection)
         return connection
@@ -73,8 +80,8 @@ class FakeFirmware:
             "FIRMWARE_VERSION=1.0.0-test",
             f"BUILD_GIT_SHA={runner.git_commit()}",
             "BUILD_WORKTREE_DIRTY=NO",
-            "BUILD_DATE=Aug 29 2026",
-            "BUILD_TIME=12:00:00",
+            "BUILD_SOURCE_EPOCH=1787982838",
+            "BUILD_PROVENANCE=COMMIT_STAMPED",
             f"PROTOCOL_ID={runner.PROTOCOL_ID}",
             f"PROTOCOL_SCOPE={runner.PROTOCOL_SCOPE}",
             f"AUTHORIZED_HARDWARE_STAGE=H{self.stage}",
@@ -218,15 +225,16 @@ class FakeSerial:
         self.firmware = firmware
         self.closed = False
         self.rx: deque[bytes] = deque()
-        self._queue(
-            "MATDOG FULL LEG CALIBRATOR V1",
-            "FULL_LEG_CALIBRATOR_READY",
-            "",
-            "Commands:",
-            "  @SESSION_BEGIN <8-hex-host-id>",
-            "  @HELP",
-            "",
-        )
+        if firmware.emit_banner_on_open:
+            self._queue(
+                "MATDOG FULL LEG CALIBRATOR V1",
+                "FULL_LEG_CALIBRATOR_READY",
+                "",
+                "Commands:",
+                "  @SESSION_BEGIN <8-hex-host-id>",
+                "  @HELP",
+                "",
+            )
 
     def _queue(self, *lines: str) -> None:
         self.rx.extend((line + "\n").encode("utf-8") for line in lines)
@@ -248,26 +256,52 @@ class FakeSerial:
         self.closed = True
 
 
-class ScriptedSerial:
-    """Minimal serial endpoint used for transport framing fault tests."""
+#: A STATUS frame good enough to satisfy the connect handshake.
+HANDSHAKE_STATUS = [
+    "STATUS_BEGIN",
+    "FIRMWARE_NAME=matdog_full_leg_calibrator_v1",
+    f"PROTOCOL_ID={runner.PROTOCOL_ID}",
+    f"PROTOCOL_SCOPE={runner.PROTOCOL_SCOPE}",
+    "BOOT_SESSION_ID=0BADC0DE",
+    "STATUS_RESULT PASS",
+    "STATUS_END",
+]
 
-    def __init__(self, responses: list[str]) -> None:
-        self.rx: deque[bytes] = deque(
-            (line + "\n").encode("utf-8")
-            for line in [
-                "FULL_LEG_CALIBRATOR_READY",
-                "  @HELP",
-                *responses,
-            ]
-        )
+
+class ScriptedSerial:
+    """Minimal serial endpoint used for transport framing fault tests.
+
+    Answers the connect handshake once, then replays `responses` for the command
+    the test actually cares about. `answer_handshake=False` models a device that
+    never responds, which must fail closed.
+    """
+
+    def __init__(self, responses: list[str], *, answer_handshake: bool = True,
+                 emit_banner: bool = False) -> None:
+        self.rx: deque[bytes] = deque()
+        self.responses = responses
+        self.answer_handshake = answer_handshake
+        self.handshake_done = not answer_handshake
         self.writes: list[bytes] = []
+        self.command_writes: list[bytes] = []
         self.closed = False
+        if emit_banner:
+            self._queue("FULL_LEG_CALIBRATOR_READY", "  @HELP")
+
+    def _queue(self, *lines: str) -> None:
+        self.rx.extend((line + "\n").encode("utf-8") for line in lines)
 
     def readline(self) -> bytes:
         return self.rx.popleft() if self.rx else b""
 
     def write(self, data: bytes) -> int:
         self.writes.append(data)
+        if not self.handshake_done:
+            self.handshake_done = True
+            self._queue(*HANDSHAKE_STATUS)
+        else:
+            self.command_writes.append(data)
+            self._queue(*self.responses)
         return len(data)
 
     def flush(self) -> None:
@@ -316,7 +350,9 @@ class TestSemanticSurfaceAndFraming(unittest.TestCase):
             lines = link.send(
                 "@STATUS", expected_begin="STATUS_BEGIN", expected_end="STATUS_END"
             )
-        self.assertEqual(serial.writes, [b"@STATUS\n"])
+        # writes[0] is the connect handshake; writes[1] is the command itself.
+        self.assertEqual(serial.writes, [b"@STATUS\n", b"@STATUS\n"])
+        self.assertEqual(serial.command_writes, [b"@STATUS\n"])
         self.assertEqual(lines[0], "STATUS_BEGIN")
         self.assertEqual(lines[-1], "STATUS_END")
 
@@ -578,6 +614,193 @@ class TestPersistentPhysicalSession(unittest.TestCase):
         self.assertIn("CUT_SERVO_POWER_NOW", session.all_lines)
         controller.finish(aborted=True)
         self.assertNotIn("@SESSION_END", firmware.commands)
+
+
+class TestUsbCdcConnectContract(unittest.TestCase):
+    """Connecting must not depend on catching the one-shot boot banner.
+
+    Hardware evidence from the 2026-08-29 H0 session: with the supported FQBN
+    (``USBMode=hwcdc,CDCOnBoot=cdc``) the ESP32-S3 does NOT reset when the host
+    opens the port. Two consecutive opens both reported BOOT_SESSION_ID=BAFA9902
+    and emitted nothing. The firmware prints FULL_LEG_CALIBRATOR_READY once in
+    setup() and never waits for a host, so requiring that banner made the first
+    connect a race that only a freshly reset board could win.
+
+    Identity now comes from a framed @STATUS handshake, which is answerable at
+    any time. The banner keeps its OTHER meaning untouched: seen during an
+    active session it is still proof the board reset underneath us.
+    """
+
+    def _link(self, firmware) -> "runner.CalibratorLink":
+        return runner.CalibratorLink("FAKE", serial_factory=firmware.serial_factory)
+
+    # 1 -----------------------------------------------------------------
+    def test_connects_to_an_already_booted_board_that_emits_no_banner(self) -> None:
+        firmware = FakeFirmware(resets_on_open=False, emit_banner_on_open=False)
+        link = self._link(firmware)
+        with link:
+            self.assertTrue(link.handshake_complete)
+            self.assertEqual(link.preamble, [])          # nothing was emitted
+            self.assertEqual(link.identity["FIRMWARE_NAME"],
+                             runner.EXPECTED_FIRMWARE_NAME)
+            self.assertEqual(link.boot_session_id, firmware.boot_id)
+        self.assertIn("@STATUS", firmware.commands)
+
+    def test_a_second_connect_to_the_same_boot_still_succeeds(self) -> None:
+        """The real board keeps running; connecting again must just work."""
+        firmware = FakeFirmware(resets_on_open=False, emit_banner_on_open=False)
+        with self._link(firmware) as first:
+            first_boot = first.boot_session_id
+        with self._link(firmware) as second:
+            self.assertEqual(second.boot_session_id, first_boot)
+        self.assertEqual(firmware.open_count, 2)
+
+    # 2 -----------------------------------------------------------------
+    def test_a_buffered_banner_at_connect_is_recorded_not_fatal(self) -> None:
+        """A board that DID just reset leaves READY+help in the buffer."""
+        firmware = FakeFirmware(resets_on_open=False, emit_banner_on_open=True)
+        link = self._link(firmware)
+        with link:
+            self.assertTrue(link.handshake_complete)
+            # Recorded as evidence rather than silently discarded.
+            self.assertIn("FULL_LEG_CALIBRATOR_READY", link.preamble)
+            self.assertIn("  @HELP", link.preamble)
+            self.assertEqual(link.identity["PROTOCOL_ID"], runner.PROTOCOL_ID)
+
+    def test_the_preamble_reaches_the_session_evidence(self) -> None:
+        firmware = FakeFirmware(resets_on_open=False, emit_banner_on_open=True)
+        session = make_session()
+        controller = runner.CalibrationSessionController(
+            session, self._link(firmware),
+            host_stage=runner.HardwareStage.H6_FOUR_LEGS,
+            host_session_id="a1b2c3d4", evidence_root=None,
+        )
+        with controller:
+            pass
+        recorded = [c["command"] for c in session.commands]
+        self.assertIn("<PRE_HANDSHAKE_RX>", recorded)
+        self.assertIn("<HANDSHAKE_STATUS>", recorded)
+        preamble = next(c for c in session.commands
+                        if c["command"] == "<PRE_HANDSHAKE_RX>")
+        self.assertIn("FULL_LEG_CALIBRATOR_READY", preamble["response"])
+
+    # 3 -----------------------------------------------------------------
+    def test_unexpected_ready_during_an_active_session_is_reset_evidence(self) -> None:
+        firmware = FakeFirmware(resets_on_open=False, emit_banner_on_open=False)
+        session = make_session()
+        controller = runner.CalibrationSessionController(
+            session, self._link(firmware),
+            host_stage=runner.HardwareStage.H6_FOUR_LEGS,
+            host_session_id="a1b2c3d4", evidence_root=None,
+        )
+        with controller:
+            self.assertTrue(controller.execute("census").passed)
+            firmware.reset_during = "@CENSUS"
+            with self.assertRaises(runner.CalibratorResetDetected):
+                controller.execute("census")
+
+    def test_ready_mid_session_does_not_become_a_new_preamble(self) -> None:
+        """A reset must fail closed, never be absorbed as ordinary startup."""
+        firmware = FakeFirmware(resets_on_open=False, emit_banner_on_open=False)
+        link = self._link(firmware)
+        with link:
+            firmware.reset_during = "@STATUS"
+            with self.assertRaises(runner.CalibratorResetDetected):
+                link.send("@STATUS", expected_begin="STATUS_BEGIN",
+                          expected_end="STATUS_END")
+
+    # 4 -----------------------------------------------------------------
+    def test_silent_firmware_fails_closed(self) -> None:
+        link = runner.CalibratorLink(
+            "FAKE",
+            serial_factory=lambda *a, **k: ScriptedSerial(
+                [], answer_handshake=False))
+        with self.assertRaises(runner.CalibratorProtocolError):
+            link.__enter__()
+
+    def test_truncated_status_frame_fails_closed(self) -> None:
+        link = runner.CalibratorLink(
+            "FAKE",
+            serial_factory=lambda *a, **k: ScriptedSerial(
+                ["STATUS_BEGIN", "FIRMWARE_NAME=matdog_full_leg_calibrator_v1"],
+                answer_handshake=False),
+        )
+        with self.assertRaises(runner.CalibratorProtocolError):
+            link.__enter__()
+
+    def test_wrong_firmware_on_the_link_is_refused(self) -> None:
+        link = runner.CalibratorLink(
+            "FAKE",
+            serial_factory=lambda *a, **k: ScriptedSerial([
+                "STATUS_BEGIN",
+                "FIRMWARE_NAME=some_other_tool",
+                f"PROTOCOL_ID={runner.PROTOCOL_ID}",
+                "BOOT_SESSION_ID=12345678",
+                "STATUS_END",
+            ], answer_handshake=False),
+        )
+        with self.assertRaises(runner.CalibratorProtocolError):
+            link.__enter__()
+
+    def test_missing_boot_session_id_is_refused(self) -> None:
+        """Without a boot id there is no continuity anchor, so no session."""
+        link = runner.CalibratorLink(
+            "FAKE",
+            serial_factory=lambda *a, **k: ScriptedSerial([
+                "STATUS_BEGIN",
+                "FIRMWARE_NAME=matdog_full_leg_calibrator_v1",
+                f"PROTOCOL_ID={runner.PROTOCOL_ID}",
+                "BOOT_SESSION_ID=00000000",
+                "STATUS_END",
+            ], answer_handshake=False),
+        )
+        with self.assertRaises(runner.CalibratorProtocolError):
+            link.__enter__()
+
+    def test_a_failed_handshake_closes_the_port(self) -> None:
+        scripted = ScriptedSerial([], answer_handshake=False)
+        link = runner.CalibratorLink("FAKE", serial_factory=lambda *a, **k: scripted)
+        with self.assertRaises(runner.CalibratorProtocolError):
+            link.__enter__()
+        self.assertTrue(scripted.closed)
+        self.assertIsNone(link.serial)
+
+    # 5 -----------------------------------------------------------------
+    def test_reconnect_to_the_same_boot_cannot_restore_calibration_state(self) -> None:
+        """The board never reset, so its RAM evidence may still be there.
+
+        The host must still refuse to reuse it: authorization belongs to one
+        physical session, and SESSION_BEGIN starts a new generation.
+        """
+        firmware = FakeFirmware(resets_on_open=False, emit_banner_on_open=False)
+        first_session = make_session()
+        first = runner.CalibrationSessionController(
+            first_session, self._link(firmware),
+            host_stage=runner.HardwareStage.H6_FOUR_LEGS,
+            host_session_id="a1b2c3d4", evidence_root=None,
+        )
+        with first:
+            self.assertTrue(first.execute("census").passed)
+            self.assertTrue(first.execute("capture-q0").passed)
+        first_boot = first.boot_session_id
+
+        second_session = make_session()
+        second = runner.CalibrationSessionController(
+            second_session, self._link(firmware),
+            host_stage=runner.HardwareStage.H6_FOUR_LEGS,
+            host_session_id="a1b2c3d4", evidence_root=None,
+        )
+        with second:
+            before = list(firmware.commands)
+            outcome = second.execute("capture-q0")
+            self.assertEqual(outcome.status, "REFUSED")
+            self.assertEqual(outcome.reason, "HOST_EVIDENCE_MISSING")
+            self.assertNotIn("@CAPTURE_Q0 64", firmware.commands[len(before):])
+            self.assertIsNone(second.manual_q0_epoch)
+            self.assertFalse(second.census_valid)
+        # Same physical boot, yet nothing carried over.
+        self.assertEqual(first_boot, second.boot_session_id)
+        self.assertEqual(firmware.open_count, 2)
 
 
 class TestFirmwareOutputContract(unittest.TestCase):
