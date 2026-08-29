@@ -77,11 +77,36 @@ new lease and census.
 | `tests/flc_detector_harness.cpp` | native detector harness |
 | `tests/flc_engine_harness.cpp` | native shared-engine harness with simulated endstops/faults |
 | `tools/build_stage.sh` | supported offline H0–H6 image builder; upload is a distinct hardware action |
+| `tools/check_reproducible_build.sh` | proves two cold-cache builds of one commit are byte-identical |
 
 The detector and engine headers compile into both the firmware and native host
 harnesses. H6 calls the same production orchestrator exercised by the harness;
 there is no separate H6 motion implementation and no Python reimplementation
 of its safety decisions.
+
+## Host connect contract
+
+The host does **not** wait for the `FULL_LEG_CALIBRATOR_READY` banner to decide
+it is connected. With the supported FQBN (`USBMode=hwcdc,CDCOnBoot=cdc`) the
+ESP32-S3 does not reset when the port is opened — hardware evidence: two
+consecutive opens reported the same `BOOT_SESSION_ID` and emitted nothing — and
+the firmware prints its banner once in `setup()` without waiting for a host. A
+connect path that required the banner could therefore only succeed inside the
+~1.5 s window after a physical reset.
+
+Connecting instead does:
+
+```text
+open port → drain and RECORD any buffered startup text
+          → framed @STATUS handshake
+          → verify FIRMWARE_NAME / PROTOCOL_ID / BOOT_SESSION_ID
+          → @SESSION_BEGIN
+```
+
+The banner keeps its other meaning intact: observed *during* an active session
+it is still proof the board reset underneath the host, and the session fails
+closed. Buffered startup text is recorded in the session evidence, never
+discarded — a banner that was thrown away cannot later be reasoned about.
 
 ## Protocol and evidence lifecycle
 
@@ -309,11 +334,26 @@ H0–H6 compile matrix, every configuration clean:
 | `H6` | APPROVED | PASS | 0 |
 | `H3` | DENIED | PASS | 0 |
 
-The binary SHA256 is not pinned here on purpose. `build_stage.sh` stamps the
-current git SHA and worktree-dirty flag into the image, so the hash of a build
-made *before* a commit cannot describe the committed tree. The authoritative
-H0 hash is the one printed by `./tools/build_stage.sh 0` at the reviewed commit
-and recorded in that H0 session report.
+### Build reproducibility
+
+Two cold-cache builds of the same commit now produce a **byte-identical**
+application binary, so the SHA256 is usable as a pre-flash integrity check:
+
+```bash
+./tools/check_reproducible_build.sh 0
+```
+
+This was not true before 2026-08-29. The firmware printed `BUILD_DATE=__DATE__`
+and `BUILD_TIME=__TIME__`, and the Arduino ESP32 core embeds its own
+`Compile Date` string, so the compile instant leaked into the image and every
+rebuild of identical source produced a different hash. Both halves are fixed:
+the firmware now reports `BUILD_SOURCE_EPOCH` derived from the commit, and
+`build_stage.sh` exports `SOURCE_DATE_EPOCH` so the toolchain expands those
+macros identically everywhere, including inside the core.
+
+Runtime provenance stays `BUILD_GIT_SHA` + `BUILD_WORKTREE_DIRTY`, read back
+from the running firmware. A hand build with no stamp reports
+`BUILD_PROVENANCE=UNSTAMPED` rather than claiming provenance it does not have.
 
 Status: **IMPLEMENTATION COMPLETE — OFFLINE TESTED — HARDWARE H1+ NOT EXECUTED.**
 No USB port was opened, no image was flashed and no servo was energised to
