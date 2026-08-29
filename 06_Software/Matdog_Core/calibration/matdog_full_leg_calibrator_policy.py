@@ -46,6 +46,20 @@ GEOMETRY_ENDPOINT_PROFILE_PATH = (
     / "Geometry_Compiler"
     / "2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4_ENDPOINT_PROFILE.json"
 )
+GEOMETRY_PARKING_PATH = (
+    REPO_ROOT
+    / "09_Logs"
+    / "Validation_Reports"
+    / "Geometry_Compiler"
+    / "2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4_PATH_PARKING.json"
+)
+GEOMETRY_SAFETY_POLICY_PATH = (
+    REPO_ROOT
+    / "09_Logs"
+    / "Validation_Reports"
+    / "Geometry_Compiler"
+    / "2026-08-11_132758_MATDOG_GEOMETRY_V5_G12_FINAL_EXTERNAL_SAFETY_POLICY.json"
+)
 
 #: Calibrator-local host<->ESP32 protocol. Deliberately NOT the final MATDOG
 #: runtime protocol, which remains TBD in 01_Docs/02_Architecture/ARCHITECTURE.md.
@@ -59,6 +73,8 @@ FIRMWARE_SKETCH = (
     / "matdog_full_leg_calibrator_v1"
     / "matdog_full_leg_calibrator_v1.ino"
 )
+FIRMWARE_GEOMETRY_PLAN = FIRMWARE_SKETCH.parent / "flc_leg_plan.h"
+GEOMETRY_PLAN_GENERATOR = CALIBRATION_DIR / "generate_flc_leg_plan.py"
 
 ENCODER_MODULUS = 4096
 ENCODER_MAX = 4095
@@ -496,7 +512,9 @@ class JointSpec:
 
     ``direction`` is deliberately ``None``. The pre-2026-08-27 directions in
     ``MATDOG_JOINT_CALIBRATION.yaml`` describe an installation that no longer
-    exists; encoder sign must be measured on this build before it may be used.
+    exists. The current-build MATDOG mapping must be resolved from explicit
+    semantic/geometric evidence before it may be used; following a commanded
+    raw target is not evidence of the sign of ``q``.
     """
 
     bus_id: int

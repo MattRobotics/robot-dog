@@ -24,6 +24,8 @@ header into a host harness, so there is exactly one implementation of it.
 
 from __future__ import annotations
 
+import copy
+import itertools
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Iterable
@@ -297,25 +299,318 @@ class ModeResult:
     payload: dict | None = None
 
 
+class SessionState(Enum):
+    """Volatile firmware session state; a fault stays latched until reset."""
+
+    SESSION_IDLE = 0
+    SESSION_CENSUS_OK = 1
+    SESSION_FAULT = 2
+
+
+@dataclass(frozen=True)
+class EvidenceBinding:
+    """Identity shared by every RAM-only authorization/evidence object."""
+
+    boot_session_id: str
+    host_session_id: str
+    session_generation: int
+    census_epoch: int
+
+
+@dataclass(frozen=True)
+class ManualQ0Evidence:
+    binding: EvidenceBinding
+    centre_tick: int
+    min_tick: int
+    max_tick: int
+    spread_ticks: int
+    samples: int
+
+
+@dataclass(frozen=True)
+class DirectionWitness:
+    """Current-build semantic meaning of positive MATDOG joint motion."""
+
+    binding: EvidenceBinding
+    direction: int
+    semantic: str
+
+
+@dataclass(frozen=True)
+class BootstrapApproval:
+    binding: EvidenceBinding
+    origin: str = "H3_BOOTSTRAP_OPERATOR_APPROVED"
+
+
+@dataclass(frozen=True)
+class CharacterizationEvidence:
+    """H3 physical observations, deliberately excluding kinematic direction."""
+
+    binding: EvidenceBinding
+    raw_probe_sign: int
+    origin: str = "CHARACTERIZED_CURRENT_HARDWARE"
+
+
+@dataclass(frozen=True)
+class CalibrationEvidence:
+    binding: EvidenceBinding
+    direction: int
+    manual_q0_tick: int
+    derived_q0_tick: int
+    tier: str = "CANDIDATE_BLOCKED_TOLERANCE_UNVALIDATED"
+
+
 class MockCalibratorFirmware:
-    """Mirrors the decision logic of matdog_full_leg_calibrator_v1.ino."""
+    """Mirrors the volatile policy state of the ESP32 calibrator firmware.
+
+    The optional ``host_evidence`` object represents a report loaded by a host
+    process after reconnect.  It is retained only so a test can prove that such
+    a file has no authority: no gate below consults it.
+    """
+
+    _boot_ids = itertools.count(1)
 
     def __init__(
         self,
         bus: MockST3215Bus,
         stage: HardwareStage = AUTHORIZED_STAGE,
+        *,
+        boot_session_id: str | int | None = None,
+        bootstrap_build_approved: bool | None = None,
+        host_evidence: dict | None = None,
     ) -> None:
         self.bus = bus
         self.stage = stage
+        self.bootstrap_build_approved = (
+            stage.value >= HardwareStage.H3_JOINT_CHARACTERIZE.value
+            if bootstrap_build_approved is None
+            else bool(bootstrap_build_approved)
+        )
+        self.host_evidence = copy.deepcopy(host_evidence)
+        self.boot_session_id = self._normalize_session_id(
+            self._next_boot_id() if boot_session_id is None else boot_session_id,
+            allow_zero=False,
+        )
+        self.active_host_session_id: str | None = None
+        self.session_generation = 0
+        self.session_state = SessionState.SESSION_IDLE
         self.census_fresh = False
         self.census_epoch = 0
         self.last_fault = "NONE"
-        #: Operator confirmation of the bootstrap envelope, this session only.
-        self.bootstrap_approved = False
-        #: bus_id -> characterization evidence, tied to a census epoch.
-        self.characterized: dict[int, dict] = {}
+        self.manual_q0: dict[int, ManualQ0Evidence] = {}
+        self.direction_witnesses: dict[int, DirectionWitness] = {}
+        self.bootstrap: BootstrapApproval | None = None
+        self.characterized: dict[int, CharacterizationEvidence] = {}
+        self.calibrated: dict[int, CalibrationEvidence] = {}
+
+    # -- lifecycle / identity ---------------------------------------------
+    @classmethod
+    def _next_boot_id(cls) -> int:
+        value = next(cls._boot_ids) & 0xFFFFFFFF
+        return value or next(cls._boot_ids) & 0xFFFFFFFF
+
+    @staticmethod
+    def _normalize_session_id(value: str | int, *, allow_zero: bool) -> str:
+        if isinstance(value, int):
+            number = value
+        elif isinstance(value, str):
+            raw = value.strip()
+            if raw.lower().startswith("0x"):
+                raw = raw[2:]
+            if (
+                not raw
+                or len(raw) > 8
+                or any(c not in "0123456789abcdefABCDEF" for c in raw)
+            ):
+                raise ValueError("session id must contain one to eight hexadecimal digits")
+            number = int(raw, 16)
+        else:
+            raise TypeError("session id must be an integer or hexadecimal string")
+        if not 0 <= number <= 0xFFFFFFFF or (number == 0 and not allow_zero):
+            raise ValueError("session id must be a non-zero uint32")
+        return f"{number:08X}"
+
+    @property
+    def fault_latched(self) -> bool:
+        return self.session_state is SessionState.SESSION_FAULT
+
+    @property
+    def bootstrap_approved(self) -> bool:
+        return self.bootstrap is not None and self._binding_is_current(
+            self.bootstrap.binding
+        )
+
+    def _current_binding(self) -> EvidenceBinding:
+        if self.active_host_session_id is None:
+            raise RuntimeError("cannot bind evidence without an active host session")
+        return EvidenceBinding(
+            boot_session_id=self.boot_session_id,
+            host_session_id=self.active_host_session_id,
+            session_generation=self.session_generation,
+            census_epoch=self.census_epoch,
+        )
+
+    def _binding_is_current(self, binding: EvidenceBinding) -> bool:
+        return (
+            self.active_host_session_id is not None
+            and binding.boot_session_id == self.boot_session_id
+            and binding.host_session_id == self.active_host_session_id
+            and binding.session_generation == self.session_generation
+            and binding.census_epoch == self.census_epoch
+        )
+
+    def _clear_session_evidence(self) -> None:
+        self.manual_q0.clear()
+        self.direction_witnesses.clear()
+        self.bootstrap = None
+        self.characterized.clear()
+        self.calibrated.clear()
+
+    def _invalidate_census(self) -> None:
+        self.census_fresh = False
+
+    def _latch_fault(self, reason: str) -> None:
+        self.last_fault = reason
+        self.session_state = SessionState.SESSION_FAULT
+        self._invalidate_census()
+        self.bootstrap = None
+
+    def reset(self, boot_session_id: str | int | None = None) -> ModeResult:
+        """Model an ESP32 reset; no host evidence or authorization survives."""
+        old_boot = self.boot_session_id
+        self.boot_session_id = self._normalize_session_id(
+            self._next_boot_id() if boot_session_id is None else boot_session_id,
+            allow_zero=False,
+        )
+        self.active_host_session_id = None
+        self.session_generation = 0
+        self.session_state = SessionState.SESSION_IDLE
+        self.census_epoch = 0
+        self._invalidate_census()
+        self._clear_session_evidence()
+        self.last_fault = "NONE"
+        return ModeResult(
+            "RESET",
+            True,
+            (),
+            {"old_boot_session_id": old_boot, "boot_session_id": self.boot_session_id},
+        )
+
+    def reconnect(
+        self,
+        host_session_id: str | int,
+        *,
+        boot_session_id: str | int | None = None,
+    ) -> ModeResult:
+        """Opening a new simulated USB link resets the ESP32, then leases it."""
+        old_boot = self.boot_session_id
+        self.reset(boot_session_id)
+        result = self.begin_session(host_session_id)
+        if result.payload is not None:
+            result.payload["reconnected_from_boot_session_id"] = old_boot
+        return result
+
+    def begin_session(self, host_session_id: str | int) -> ModeResult:
+        mode = "SESSION_BEGIN"
+        fault = self._require_not_faulted(mode)
+        if fault:
+            return ModeResult(mode, False, (fault,))
+        try:
+            normalized = self._normalize_session_id(host_session_id, allow_zero=False)
+        except (TypeError, ValueError) as exc:
+            return ModeResult(mode, False, (str(exc),))
+
+        if self.active_host_session_id == normalized:
+            return ModeResult(
+                mode,
+                True,
+                (),
+                {
+                    "boot_session_id": self.boot_session_id,
+                    "active_host_session_id": normalized,
+                    "session_generation": self.session_generation,
+                    "idempotent": True,
+                },
+            )
+
+        safe = self.safe_off()
+        if not safe.accepted:
+            return ModeResult(mode, False, ("SESSION_BEGIN_SAFE_OFF_FAILED",))
+
+        self._invalidate_census()
+        self._clear_session_evidence()
+        self.active_host_session_id = normalized
+        self.session_generation += 1
+        self.session_state = SessionState.SESSION_IDLE
+        self.last_fault = "NONE"
+        return ModeResult(
+            mode,
+            True,
+            (),
+            {
+                "boot_session_id": self.boot_session_id,
+                "active_host_session_id": normalized,
+                "session_generation": self.session_generation,
+                "idempotent": False,
+            },
+        )
+
+    def end_session(self) -> ModeResult:
+        mode = "SESSION_END"
+        fault = self._require_not_faulted(mode)
+        if fault:
+            return ModeResult(mode, False, (fault,))
+        active = self._require_active_session(mode)
+        if active:
+            return ModeResult(mode, False, (active,))
+        safe = self.safe_off()
+        if not safe.accepted:
+            return ModeResult(mode, False, ("SESSION_END_SAFE_OFF_FAILED",))
+        self._invalidate_census()
+        self._clear_session_evidence()
+        self.active_host_session_id = None
+        self.session_state = SessionState.SESSION_IDLE
+        return ModeResult(mode, True, (), {"safe_off_verified": True})
+
+    def status(self) -> ModeResult:
+        """Read volatile identity even when SESSION_FAULT is latched."""
+        payload = {
+            "boot_session_id": self.boot_session_id,
+            "active_host_session_id": self.active_host_session_id,
+            "session_generation": self.session_generation,
+            "session_state": self.session_state.name,
+            "census_fresh": self.census_fresh,
+            "census_epoch": self.census_epoch,
+            "last_fault": self.last_fault,
+            "manual_q0_candidates": sum(
+                self._binding_is_current(e.binding) for e in self.manual_q0.values()
+            ),
+            "direction_witnesses": sum(
+                self._binding_is_current(e.binding)
+                for e in self.direction_witnesses.values()
+            ),
+            "bootstrap_active": self.bootstrap_approved,
+            "joints_characterized": sum(
+                self._binding_is_current(e.binding) for e in self.characterized.values()
+            ),
+            "calibration_candidates": sum(
+                self._binding_is_current(e.binding) for e in self.calibrated.values()
+            ),
+            "host_evidence_authoritative": False,
+        }
+        return ModeResult("STATUS", True, (), payload)
 
     # -- gates -------------------------------------------------------------
+    def _require_not_faulted(self, mode: str) -> str | None:
+        if not self.fault_latched:
+            return None
+        return f"{mode} refused: SESSION_FAULT_LATCHED ({self.last_fault})"
+
+    def _require_active_session(self, mode: str) -> str | None:
+        if self.active_host_session_id is not None:
+            return None
+        return f"{mode} requires an active persistent host session"
+
     def _require_stage(self, needed: HardwareStage, mode: str) -> str | None:
         if self.stage.value >= needed.value:
             return None
@@ -343,18 +638,62 @@ class MockCalibratorFirmware:
 
     def _require_characterized(self, mode: str, bus_id: int) -> str | None:
         entry = self.characterized.get(bus_id)
-        if entry is not None and entry["census_epoch"] == self.census_epoch:
+        if entry is not None and self._binding_is_current(entry.binding):
             return None
         return f"{mode} requires {bus_id} characterized in this physical session"
 
+    def _require_manual_q0(self, mode: str, bus_id: int) -> str | None:
+        entry = self.manual_q0.get(bus_id)
+        if entry is not None and self._binding_is_current(entry.binding):
+            return None
+        return f"{mode} requires a current manual q0 candidate for {bus_id}"
+
+    def _require_all_manual_q0(self, mode: str) -> str | None:
+        if all(
+            self._require_manual_q0(mode, bus_id) is None
+            for bus_id in EXPECTED_LEG_IDS
+        ):
+            return None
+        return f"{mode} requires stored manual q0 evidence for all 12 joints"
+
+    def _require_direction_witness(self, mode: str, bus_id: int) -> str | None:
+        entry = self.direction_witnesses.get(bus_id)
+        if (
+            entry is not None
+            and self._binding_is_current(entry.binding)
+            and entry.direction in (-1, 1)
+        ):
+            return None
+        return f"{mode} requires a semantic direction witness for {bus_id}"
+
+    def _stateful_reasons(
+        self,
+        mode: str,
+        *,
+        stage: HardwareStage | None = None,
+        fresh_census: bool = False,
+    ) -> list[str]:
+        fault = self._require_not_faulted(mode)
+        if fault:
+            return [fault]
+        reasons = [self._require_active_session(mode)]
+        if stage is not None:
+            reasons.append(self._require_stage(stage, mode))
+        if fresh_census:
+            reasons.append(self._require_fresh_census(mode))
+        return [reason for reason in reasons if reason]
+
     # -- LEGS_12_CENSUS ----------------------------------------------------
     def census(self) -> CensusResult:
-        self.census_fresh = False
+        reasons = self._stateful_reasons("CENSUS")
+        if reasons:
+            return CensusResult(False, 0, 0, (), (), reasons[0])
+
+        self._invalidate_census()
         self.census_epoch += 1
-        # A new census is a new physical session epoch: characterization evidence
-        # and bootstrap approval belong to the setup verified when granted.
-        self.characterized.clear()
-        self.bootstrap_approved = False
+        # A new census is a new physical setup epoch. No dependent evidence,
+        # including H2 q0 or H4 candidates, survives even when this census fails.
+        self._clear_session_evidence()
 
         results: list[CensusServoResult] = []
         present = 0
@@ -418,6 +757,9 @@ class MockCalibratorFirmware:
                 fail_reason = "EXPECTED_LEG_INVARIANTS_NOT_SATISFIED"
 
         self.census_fresh = passed
+        self.session_state = (
+            SessionState.SESSION_CENSUS_OK if passed else SessionState.SESSION_IDLE
+        )
         return CensusResult(
             passed=passed,
             present_count=present,
@@ -429,20 +771,21 @@ class MockCalibratorFirmware:
 
     # -- CAPTURE_MANUAL_Q0 -------------------------------------------------
     def capture_manual_q0(self, samples: int = 64) -> ModeResult:
-        reasons = [
-            r
-            for r in (
-                self._require_stage(HardwareStage.H2_MANUAL_Q0, "CAPTURE_Q0"),
-                self._require_fresh_census("CAPTURE_Q0"),
-            )
-            if r
-        ]
+        mode = "CAPTURE_Q0"
+        reasons = self._stateful_reasons(
+            mode, stage=HardwareStage.H2_MANUAL_Q0, fresh_census=True
+        )
         if reasons:
-            return ModeResult("CAPTURE_Q0", False, tuple(reasons))
+            return ModeResult(mode, False, tuple(reasons))
 
         from matdog_full_leg_calibrator_derive import capture_manual_q0
 
+        # The capture is atomic. Starting a replacement capture invalidates the
+        # old q0-dependent authorization even if the replacement later fails.
+        self._clear_session_evidence()
+        binding = self._current_binding()
         payload: dict[str, dict] = {}
+        staged: dict[int, ManualQ0Evidence] = {}
         accepted = True
         for bus_id in EXPECTED_LEG_IDS:
             torque = self.bus.read_byte(bus_id, REG_TORQUE_ENABLE)
@@ -473,104 +816,250 @@ class MockCalibratorFirmware:
             payload[str(bus_id)] = candidate.as_dict()
             if not candidate.ok:
                 accepted = False
+                continue
+            staged[bus_id] = ManualQ0Evidence(
+                binding=binding,
+                centre_tick=candidate.median_tick,
+                min_tick=candidate.min_tick,
+                max_tick=candidate.max_tick,
+                spread_ticks=candidate.spread_ticks,
+                samples=candidate.sample_count,
+            )
 
-        return ModeResult("CAPTURE_Q0", accepted, (), payload)
+        if accepted and len(staged) == len(EXPECTED_LEG_IDS):
+            self.manual_q0.update(staged)
+        else:
+            self.manual_q0.clear()
+        return ModeResult(mode, accepted, (), payload)
+
+    # -- semantic direction witness ---------------------------------------
+    def witness_direction(self, bus_id: int, semantic: str) -> ModeResult:
+        mode = "WITNESS_DIRECTION"
+        reasons = self._stateful_reasons(
+            mode, stage=HardwareStage.H2_MANUAL_Q0, fresh_census=True
+        )
+        if bus_id not in EXPECTED_LEG_IDS:
+            reasons.append(f"{bus_id} is not a leg bus id")
+        elif not reasons:
+            manual_reason = self._require_manual_q0(mode, bus_id)
+            if manual_reason:
+                reasons.append(manual_reason)
+
+        semantic_map = {
+            "Q_PLUS_RAW_INCREASES": 1,
+            "Q_PLUS_RAW_DECREASES": -1,
+            "increases": 1,
+            "decreases": -1,
+        }
+        direction = semantic_map.get(semantic)
+        if direction is None:
+            reasons.append(
+                "semantic witness must be Q_PLUS_RAW_INCREASES or "
+                "Q_PLUS_RAW_DECREASES"
+            )
+        if reasons:
+            return ModeResult(mode, False, tuple(reasons))
+
+        canonical = (
+            "Q_PLUS_RAW_INCREASES" if direction == 1 else "Q_PLUS_RAW_DECREASES"
+        )
+        self.direction_witnesses[bus_id] = DirectionWitness(
+            binding=self._current_binding(),
+            direction=direction,
+            semantic=canonical,
+        )
+        # Evidence interpreted under an older semantic mapping is unusable.
+        self.characterized.pop(bus_id, None)
+        self.calibrated.pop(bus_id, None)
+        return ModeResult(
+            mode,
+            True,
+            (),
+            {
+                "bus_id": bus_id,
+                "semantic": canonical,
+                "direction": direction,
+                "meaning": "q=direction*signed_tick_delta(raw,q0)",
+            },
+        )
 
     # -- H3 bootstrap approval --------------------------------------------
     def approve_bootstrap(self) -> ModeResult:
         """Arm the conservative first-motion envelope for THIS session."""
-        reason = self._require_stage(HardwareStage.H3_JOINT_CHARACTERIZE,
-                                     "APPROVE_BOOTSTRAP")
-        if reason:
-            return ModeResult("APPROVE_BOOTSTRAP", False, (reason,))
-        self.bootstrap_approved = True
-        return ModeResult("APPROVE_BOOTSTRAP", True, (),
+        mode = "APPROVE_BOOTSTRAP"
+        reasons = self._stateful_reasons(
+            mode, stage=HardwareStage.H3_JOINT_CHARACTERIZE, fresh_census=True
+        )
+        if not reasons:
+            manual_reason = self._require_all_manual_q0(mode)
+            if manual_reason:
+                reasons.append(manual_reason)
+        if not self.bootstrap_build_approved:
+            reasons.append("APPROVE_BOOTSTRAP requires a bootstrap-enabled H3+ build")
+        if reasons:
+            return ModeResult(mode, False, tuple(reasons))
+        self.bootstrap = BootstrapApproval(self._current_binding())
+        return ModeResult(mode, True, (),
                           {"origin": "H3_BOOTSTRAP_OPERATOR_APPROVED",
                            "is_measurement": False})
 
     # -- motion modes ------------------------------------------------------
-    def characterize_joint(self, bus_id: int, succeed: bool = True) -> ModeResult:
+    def characterize_joint(
+        self,
+        bus_id: int,
+        succeed: bool = True,
+        *,
+        raw_probe_sign: int = 1,
+    ) -> ModeResult:
         """H3. Gated by stage, census and the pre-motion parameter gate — but
-        NOT by the acceptance tolerances it exists to inform."""
-        reasons = [
-            r
-            for r in (
-                None if bus_id in EXPECTED_LEG_IDS else f"{bus_id} is not a leg bus id",
-                self._require_stage(HardwareStage.H3_JOINT_CHARACTERIZE,
-                                    "CHARACTERIZE_JOINT"),
-                self._require_fresh_census("CHARACTERIZE_JOINT"),
-                self._require_pre_motion_parameters("CHARACTERIZE_JOINT"),
-            )
-            if r
-        ]
+        NOT by acceptance tolerances or a semantic direction value.  The raw
+        probe sign records which encoder search direction found a useful path;
+        it is not the MATDOG ``q`` direction."""
+        mode = "CHARACTERIZE_JOINT"
+        reasons = self._stateful_reasons(
+            mode, stage=HardwareStage.H3_JOINT_CHARACTERIZE, fresh_census=True
+        )
+        if bus_id not in EXPECTED_LEG_IDS:
+            reasons.append(f"{bus_id} is not a leg bus id")
+        elif not reasons:
+            for reason in (
+                self._require_manual_q0(mode, bus_id),
+                self._require_pre_motion_parameters(mode),
+            ):
+                if reason:
+                    reasons.append(reason)
+        if raw_probe_sign not in (-1, 1):
+            reasons.append("raw_probe_sign must be -1 or +1")
         if reasons:
-            return ModeResult("CHARACTERIZE_JOINT", False, tuple(reasons))
+            return ModeResult(mode, False, tuple(reasons))
 
         if not succeed:
-            return ModeResult("CHARACTERIZE_JOINT", False,
+            self.characterized.pop(bus_id, None)
+            self.calibrated.pop(bus_id, None)
+            return ModeResult(mode, False,
                               ("simulated characterization failure",))
 
         # The real measurement happens in the C++ engine; the simulator records
         # the session bookkeeping the firmware performs around it.
-        self.characterized[bus_id] = {
-            "census_epoch": self.census_epoch,
-            "origin": "CHARACTERIZED_CURRENT_HARDWARE",
-            "direction": 1,
-        }
-        return ModeResult("CHARACTERIZE_JOINT", True, (),
-                          {"bus_id": bus_id, "origin": "CHARACTERIZED_CURRENT_HARDWARE"})
+        self.characterized[bus_id] = CharacterizationEvidence(
+            binding=self._current_binding(), raw_probe_sign=raw_probe_sign
+        )
+        self.calibrated.pop(bus_id, None)
+        return ModeResult(
+            mode,
+            True,
+            (),
+            {
+                "bus_id": bus_id,
+                "origin": "CHARACTERIZED_CURRENT_HARDWARE",
+                "raw_probe_sign": raw_probe_sign,
+                "semantic_direction": None,
+            },
+        )
 
-    def calibrate_joint(self, bus_id: int) -> ModeResult:
-        reasons = [
-            r
-            for r in (
-                None if bus_id in EXPECTED_LEG_IDS else f"{bus_id} is not a leg bus id",
-                self._require_stage(HardwareStage.H4_JOINT_CALIBRATE, "CALIBRATE_JOINT"),
-                self._require_fresh_census("CALIBRATE_JOINT"),
-                self._require_pre_motion_parameters("CALIBRATE_JOINT"),
-                self._require_characterized("CALIBRATE_JOINT", bus_id),
-            )
-            if r
-        ]
+    def _calibration_reasons(self, mode: str, bus_id: int) -> list[str]:
+        reasons = self._stateful_reasons(mode, fresh_census=True)
+        if bus_id not in EXPECTED_LEG_IDS:
+            reasons.append(f"{bus_id} is not a leg bus id")
+            return reasons
         if reasons:
-            return ModeResult("CALIBRATE_JOINT", False, tuple(reasons))
-        return ModeResult("CALIBRATE_JOINT", True, (),
-                          {"bus_id": bus_id, "promotion": "REQUIRES_EXPLICIT_GATE"})
+            return reasons
+        for reason in (
+            self._require_pre_motion_parameters(mode),
+            self._require_manual_q0(mode, bus_id),
+            self._require_direction_witness(mode, bus_id),
+            self._require_characterized(mode, bus_id),
+        ):
+            if reason:
+                reasons.append(reason)
+        return reasons
+
+    def _store_calibration(
+        self, bus_id: int, derived_q0_tick: int | None = None
+    ) -> CalibrationEvidence:
+        manual = self.manual_q0[bus_id]
+        witness = self.direction_witnesses[bus_id]
+        derived = manual.centre_tick if derived_q0_tick is None else derived_q0_tick
+        if not 0 <= derived <= ENCODER_MAX:
+            raise ValueError("derived q0 must be in unsigned raw domain 0..4095")
+        evidence = CalibrationEvidence(
+            binding=self._current_binding(),
+            direction=witness.direction,
+            manual_q0_tick=manual.centre_tick,
+            derived_q0_tick=derived,
+        )
+        self.calibrated[bus_id] = evidence
+        return evidence
+
+    @staticmethod
+    def _calibration_payload(bus_id: int, evidence: CalibrationEvidence) -> dict:
+        return {
+            "bus_id": bus_id,
+            "manual_q0_candidate_tick": evidence.manual_q0_tick,
+            "derived_q0_tick": evidence.derived_q0_tick,
+            "direction": evidence.direction,
+            "direction_origin": "EXPLICIT_CURRENT_BUILD_SEMANTIC_WITNESS",
+            "tier": evidence.tier,
+            "acceptance": "BLOCKED_TOLERANCE_UNVALIDATED",
+            "promotion": "REQUIRES_EXPLICIT_GATE",
+        }
+
+    def calibrate_joint(
+        self, bus_id: int, *, derived_q0_tick: int | None = None
+    ) -> ModeResult:
+        mode = "CALIBRATE_JOINT"
+        reasons = self._stateful_reasons(
+            mode, stage=HardwareStage.H4_JOINT_CALIBRATE, fresh_census=True
+        )
+        if not reasons:
+            reasons.extend(self._calibration_reasons(mode, bus_id))
+        if reasons:
+            return ModeResult(mode, False, tuple(dict.fromkeys(reasons)))
+        try:
+            evidence = self._store_calibration(bus_id, derived_q0_tick)
+        except ValueError as exc:
+            return ModeResult(mode, False, (str(exc),))
+        return ModeResult(mode, True, (), self._calibration_payload(bus_id, evidence))
 
     def calibrate_leg(self, leg: str) -> ModeResult:
-        ids = [i for i in EXPECTED_LEG_IDS if str(i)[0] == {"LF": "1", "RF": "2",
-                                                            "RH": "3", "LH": "4"}[leg]]
-        reasons = [
-            r
-            for r in (
-                self._require_stage(HardwareStage.H5_LEG, "CALIBRATE_LEG"),
-                self._require_fresh_census("CALIBRATE_LEG"),
-                self._require_pre_motion_parameters("CALIBRATE_LEG"),
-            )
-            if r
-        ]
-        reasons += [r for r in (self._require_characterized("CALIBRATE_LEG", i)
-                                for i in ids) if r]
+        mode = "CALIBRATE_LEG"
+        reasons = self._stateful_reasons(
+            mode, stage=HardwareStage.H5_LEG, fresh_census=True
+        )
         if reasons:
-            return ModeResult("CALIBRATE_LEG", False, tuple(reasons))
-        return ModeResult("CALIBRATE_LEG", True, (), {"leg": leg, "joints": ids})
+            return ModeResult(mode, False, tuple(reasons))
+        prefix = {"LF": 1, "RF": 2, "RH": 3, "LH": 4}.get(leg)
+        if prefix is None:
+            return ModeResult(mode, False, (f"unknown leg {leg!r}",))
+        ids = [i for i in EXPECTED_LEG_IDS if i // 10 == prefix]
+        for bus_id in ids:
+            reasons.extend(self._calibration_reasons(mode, bus_id))
+        if reasons:
+            return ModeResult(mode, False, tuple(dict.fromkeys(reasons)))
+        candidates = {
+            str(bus_id): self._calibration_payload(
+                bus_id, self._store_calibration(bus_id)
+            )
+            for bus_id in ids
+        }
+        return ModeResult(mode, True, (), {"leg": leg, "joints": ids,
+                                           "candidates": candidates})
 
     def calibrate_all_legs(self) -> ModeResult:
-        reasons = [
-            r
-            for r in (
-                self._require_stage(HardwareStage.H6_FOUR_LEGS, "CALIBRATE_ALL"),
-                self._require_fresh_census("CALIBRATE_ALL"),
-                self._require_pre_motion_parameters("CALIBRATE_ALL"),
-            )
-            if r
-        ]
-        reasons += [r for r in (self._require_characterized("CALIBRATE_ALL", i)
-                                for i in EXPECTED_LEG_IDS) if r]
+        mode = "CALIBRATE_ALL"
+        reasons = self._stateful_reasons(
+            mode, stage=HardwareStage.H6_FOUR_LEGS, fresh_census=True
+        )
+        if not reasons:
+            for bus_id in EXPECTED_LEG_IDS:
+                reasons.extend(self._calibration_reasons(mode, bus_id))
         if reasons:
-            return ModeResult("CALIBRATE_ALL", False, tuple(reasons))
-        return ModeResult("CALIBRATE_ALL", True, (),
+            return ModeResult(mode, False, tuple(dict.fromkeys(reasons)))
+        for bus_id in EXPECTED_LEG_IDS:
+            self._store_calibration(bus_id)
+        return ModeResult(mode, True, (),
                           {"legs": ["LF", "RF", "RH", "LH"], "joints": 12,
+                           "tier": "CANDIDATE_BLOCKED_TOLERANCE_UNVALIDATED",
                            "promotion": "REQUIRES_EXPLICIT_GATE"})
 
     # -- SAFE_OFF ----------------------------------------------------------
@@ -591,7 +1080,7 @@ class MockCalibratorFirmware:
                 failures.append(f"id {bus_id} did not confirm torque off")
 
         if failures:
-            self.last_fault = "SAFE_OFF_FAILED"
+            self._latch_fault("SAFE_OFF_FAILED")
         return ModeResult(
             "SAFE_OFF",
             not failures,
