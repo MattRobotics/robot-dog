@@ -1,0 +1,31 @@
+{
+  "name": "matdog-bno085-fullbody-viewer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Standalone local browser viewer: full-body MATDOG collision geometry driven by the BNO085 SH2_ROTATION_VECTOR over Web Serial.",
+  "scripts": {
+    "sync:assets": "node scripts/sync_canonical_assets.mjs",
+    "predev": "npm run sync:assets",
+    "dev": "vite",
+    "prebuild": "npm run sync:assets",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "pretest": "npm run sync:assets",
+    "test": "vitest run",
+    "verify": "npm run sync:assets && npm run typecheck && vitest run && vite build"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "@types/three": "^0.185.0",
+    "@types/w3c-web-serial": "^1.0.7",
+    "@xmldom/xmldom": "^0.9.12",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.0",
+    "vitest": "^3.2.4"
+  }
+}

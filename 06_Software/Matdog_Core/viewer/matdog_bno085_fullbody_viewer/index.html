@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MATDOG — BNO085 full-body viewer</title>
+  </head>
+  <body>
+    <div id="app">
+      <aside id="panel">
+        <header>
+          <h1>MATDOG BNO085</h1>
+          <p class="subtitle">full-body collision viewer · IMU phase</p>
+        </header>
+
+        <section class="block">
+          <div class="row">
+            <span class="label">Serial</span>
+            <span id="serial-state" class="badge state-disconnected">DISCONNECTED</span>
+          </div>
+          <p id="serial-detail" class="detail"></p>
+          <div class="buttons">
+            <button id="btn-connect" type="button">Connect BNO085</button>
+            <button id="btn-disconnect" type="button" disabled>Disconnect</button>
+            <button id="btn-recenter" type="button">Recenter</button>
+            <button id="btn-clear-reference" type="button">Clear recenter</button>
+          </div>
+        </section>
+
+        <section class="block">
+          <h2>Orientation</h2>
+          <dl id="orientation-readout">
+            <dt>viewer q (w x y z)</dt>
+            <dd id="q-viewer">1.000000 0.000000 0.000000 0.000000</dd>
+            <dt>raw SH2 q (w x y z)</dt>
+            <dd id="q-raw">1.000000 0.000000 0.000000 0.000000</dd>
+            <dt>viewer roll / pitch / yaw</dt>
+            <dd id="rpy-viewer">0.0° / 0.0° / 0.0°</dd>
+            <dt>recentered</dt>
+            <dd id="recenter-state">no (raw sensor frame)</dd>
+          </dl>
+        </section>
+
+        <section class="block">
+          <h2>Sensor status</h2>
+          <dl>
+            <dt>RV accuracy</dt>
+            <dd id="rv-accuracy">—</dd>
+            <dt>RV status</dt>
+            <dd id="rv-status">—</dd>
+            <dt>RV count / rate / age</dt>
+            <dd id="rv-flow">—</dd>
+            <dt>MAG |B| / status</dt>
+            <dd id="mag-readout">—</dd>
+            <dt>runtime resets</dt>
+            <dd id="runtime-resets">—</dd>
+          </dl>
+        </section>
+
+        <section class="block" id="sim-block" hidden>
+          <h2>Synthetic orientation (no hardware)</h2>
+          <p class="detail">
+            Feeds generated RV lines through the real parser. Nothing is sent to any device.
+          </p>
+          <label class="slider">
+            <span>+roll <output id="sim-roll-out">0°</output></span>
+            <input id="sim-roll" type="range" min="-90" max="90" step="1" value="0" />
+          </label>
+          <label class="slider">
+            <span>+pitch <output id="sim-pitch-out">0°</output></span>
+            <input id="sim-pitch" type="range" min="-90" max="90" step="1" value="0" />
+          </label>
+          <label class="slider">
+            <span>+yaw <output id="sim-yaw-out">0°</output></span>
+            <input id="sim-yaw" type="range" min="-180" max="180" step="1" value="0" />
+          </label>
+          <div id="sim-presets" class="buttons"></div>
+          <p id="sim-expectation" class="detail"></p>
+        </section>
+
+        <section class="block">
+          <h2>Model</h2>
+          <dl>
+            <dt>source of truth</dt>
+            <dd class="mono" id="model-source">—</dd>
+            <dt>links / joints / collision meshes</dt>
+            <dd id="model-counts">—</dd>
+            <dt>world axes</dt>
+            <dd id="model-legend" class="legend"></dd>
+          </dl>
+          <p class="detail">
+            World is Z-up and identical to base_link. The robot uses one neutral material;
+            orientation is read from the coloured world axes and the forward/left arrows.
+          </p>
+        </section>
+
+        <footer>
+          <p class="detail">
+            Read-only viewer. No firmware flashing, no DCD write, no servo bus, no battery control.
+          </p>
+        </footer>
+      </aside>
+
+      <main id="stage">
+        <div id="canvas-host"></div>
+        <div id="overlay" class="overlay">Loading canonical MATDOG collision geometry…</div>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
