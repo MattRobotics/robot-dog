@@ -1143,3 +1143,287 @@ host-side logic (Findings A and B), and documented without deleting or
 rewriting Session 2/2.1's evidence. No new functionality was added; no
 forbidden hardware action occurred this session. Merge decision and
 execution remain with the operator.
+
+## Session 2.3 — 2026-09-15, Final Consistency Fix
+
+Three consistency findings from a final review of Session 2.2, fixed before
+merge — no new functionality, no gait/IK/motion/Wi-Fi/OTA-manager/
+DALY-write/servo-calibration work. Same USB_ONLY hardware configuration
+throughout.
+
+### Provenance
+
+```text
+FIRMWARE_SOURCE_COMMIT (before this session) = cb53c63206b0ccad68055ecc993a0a9e03f5b545
+FINAL_BRANCH_HEAD (before this session)      = 5f36afb9c0023147273b09c6d30190cfe19334f7
+FIRMWARE_SOURCE_COMMIT (this session)        = 5b371da5482f9b0bd2df1c37ed361250ea54ae8f
+  (clean tree; compiled, application-only flashed and hardware-validated
+   this session — build id 5b371da5482f visible in the boot banner/@STATUS)
+```
+
+Four commits created this session on `feat/matdog-controller-v01`, none of
+which is a merge and none of which touches `main`:
+
+```text
+816cda3  fix(controller): split servo bus timeout into diagnostic/operational categories
+f962b12  fix(controller): fail-closed sdkconfig tri-state + contiguous OTA slot requirement
+60a818d  test(controller): extend OTA offline suite for Session 2.3 findings
+5b371da  test(controller): extend static audit for Session 2.3 findings
+```
+
+`FIRMWARE_SOURCE_COMMIT = 5b371da5482f9b0bd2df1c37ed361250ea54ae8f` is the
+last of these four — the docs commit that records this section is
+necessarily later still and changes nothing that is running on the device.
+
+### Finding 1 — the diagnostic/operational timeout split was not actually true in code
+
+Session 2.2 Finding C scoped the 20ms diagnostic timeout to a per-transaction
+RAII guard (`ScopedPingTimeout`) instead of a standing global override — a
+real fix, but it applied that **same** 20ms value to every transaction,
+including `safeOff()` and `readRuntimeState()`. The handoff's own stated
+policy ("operational timeout = 100ms, diagnostic timeout = 20ms") was
+documented but not actually implemented: nothing in the code used a 100ms
+timeout anywhere.
+
+Fixed by splitting into two named constants and requiring every call site to
+name its choice explicitly — there is no longer an implicit "whatever it's
+currently set to" case:
+
+```text
+kDiagnosticTimeoutMs = 20   ping(), readModel(), the scan's per-ID probe —
+                             bounded absence-detection only, MAINTENANCE-only today
+kOperationalTimeoutMs = 100 safeOff() (the safety de-escalation write, reachable
+                             from any OperatingMode) and readRuntimeState() (the
+                             primitive behind @SERVO READ today, which a future
+                             motion controller will naturally reuse)
+```
+
+`kOperationalTimeoutMs` is simply SCServo's own untouched library default
+(100ms) here — not a value MATDOG has validated/optimized as final for a
+powered 17-servo bus, and the handoff was explicit that it must not be tied
+to the diagnostic constant. `ScopedPingTimeout` is renamed `ScopedIOTimeout`
+(same mechanics — saves/restores `SCSerial::IOTimeOut` on every exit path,
+non-copyable/non-movable) to reflect that it now guards two categories, not
+one. No vendored SCServo file was touched.
+
+**Live confirmation, servo bus completely unpowered** — `safeOff()` now
+performs an `EnableTorque` write bounded by `kOperationalTimeoutMs` (no
+ACK, unpowered) followed by an independent `TorqueEnable` readback also
+bounded by `kOperationalTimeoutMs` (no response) — five back-to-back trials:
+
+```text
+trial 1: SERVO_SAFE_OFF id=11 result=UNVERIFIED_NO_RESPONSE  elapsed=204.71 ms
+trial 2: SERVO_SAFE_OFF id=11 result=UNVERIFIED_NO_RESPONSE  elapsed=209.99 ms
+trial 3: SERVO_SAFE_OFF id=11 result=UNVERIFIED_NO_RESPONSE  elapsed=207.07 ms
+trial 4: SERVO_SAFE_OFF id=11 result=UNVERIFIED_NO_RESPONSE  elapsed=208.33 ms
+trial 5: SERVO_SAFE_OFF id=11 result=UNVERIFIED_NO_RESPONSE  elapsed=204.31 ms
+```
+
+~205-210ms consistently — evidence, not a claim: this is the two
+now-conservative 100ms operational-timeout waits (write + readback) plus
+USB-serial round-trip overhead, exactly as expected from a bus with nothing
+attached. Never `VERIFIED_OFF`, never a bare `OK`.
+
+### Finding 2 — an absent sdkconfig symbol was silently treated as disabled
+
+`parse_sdkconfig_ota_flags()` returned `False` both when it found
+`# CONFIG_X is not set` (genuinely, positively disabled) and when it found
+neither that line nor `CONFIG_X=y` at all (Kconfig produced no opinion this
+tool could read). Both cases collapsed to the same boolean — not
+fail-closed, since a silently-missing symbol was treated exactly like a
+confirmed-safe one. Proven by the test this session removes,
+`test_flags_absent_entirely_defaults_to_disabled`, which asserted precisely
+that conflation as correct behaviour.
+
+`parse_sdkconfig_flag()` now returns a three-way `SdkconfigFlag`
+(`ENABLED`/`DISABLED`/`UNKNOWN`); `resolve_application_partition()` REFUSEs
+on `UNKNOWN` for either symbol, with the same REFUSE wording style as every
+other check in this module:
+
+```text
+REFUSE: sdkconfig does not explicitly define CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+        (neither 'CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y' nor
+        '# CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set' found) — cannot
+        confirm otadata state stability. Refusing; see handoff Session 2.3 Finding 2.
+```
+
+**The real device's actual sdkconfig, re-read this session (not assumed)**:
+
+```text
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=ENABLED
+CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=DISABLED
+```
+
+Both symbols are explicitly present in the real build's sdkconfig (neither
+is `UNKNOWN`), so this session's flash proceeded correctly — the tri-state
+change is additive fail-closed behaviour, not a regression against the real
+configuration. `verify_application_partition.py`'s printed format changed
+from `y`/`n` to the enum's `.value` (`ENABLED`/`DISABLED`/`UNKNOWN`);
+`flash_app_only.sh` needed no change, since it only greps whatever string
+follows `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=`/`CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=`
+regardless of format. 6 new dedicated `UNKNOWN` tests plus a corrected
+`parse_sdkconfig_ota_flags()` test — all PASS.
+
+### Finding 3 — OTA slot index sets were not required to be contiguous
+
+`ota_app_partitions()` accepted any set of OTA slot indices found in the
+partition table, including sparse ones like `{0, 2}` (a `subtype=0x12`
+`ota_2` partition with no `ota_1`). MATDOG has no use for a sparse OTA
+layout in V0.1; the goal is avoiding ambiguity between raw OTA subtype
+numbers and the bootloader's `app_count`/modulo slot-selection logic ahead
+of any future OTA subsystem, not supporting sparse tables.
+
+Fixed with a direct set-equality check after the existing duplicate-index
+check: `set(result.keys()) != set(range(len(result)))` raises
+`OtaAmbiguous`. 7 new offline tests: `{0}`, `{0,1}`, `{0,1,2}` accept;
+`{1}`, `{0,2}`, `{1,2}`, `{0,1,3}` REFUSE — all PASS. The real device's
+table (`app0`/`ota_0`, `app1`/`ota_1` → `{0,1}`) is unaffected.
+
+### H0 — Offline gates (Session 2.3)
+
+| Gate | Result |
+|---|---|
+| Git state re-audited: branch, HEAD (`5f36afb9c0023147273b09c6d30190cfe19334f7`, matched exactly), frozen-source hashes | PASS — unchanged |
+| Compile (pinned FQBN, clean `FIRMWARE_SOURCE_COMMIT`) | **PASS** — 384252 bytes flash (12%), 28232 bytes RAM (8%), only pre-existing vendored SCServo warnings |
+| Static audit (extended) | **PASS** — 23 source files, 0 findings, includes 40/40 OTA parser tests (27 Session 2.2 baseline + 13 new this session; see totals below) |
+| OTA parser offline test suite | **PASS** — 40/40 |
+| Existing BNO085 viewer test suite | **PASS** — 59/59, unmodified |
+| Application binary provenance | `MATDOG_Controller.ino.bin`, 384,400 bytes, SHA256 `6e6d92f898dbe95000b53dbb252c7eb5d3deaa9a4b161e2b1934436a76b29364`, embeds build id `5b371da5482f` matching `FIRMWARE_SOURCE_COMMIT` |
+
+### Application-only flash
+
+```text
+SDKCONFIG_ROLLBACK      = CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=ENABLED
+SDKCONFIG_ANTI_ROLLBACK = CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=DISABLED
+DEVICE                  = /dev/serial/.../usb-Espressif_USB_JTAG_...-if00 (MAC 14:c1:9f:22:75:94)
+APPLICATION_BINARY      = build/esp32.esp32.esp32s3/MATDOG_Controller.ino.bin
+APPLICATION_SHA256      = 6e6d92f898dbe95000b53dbb252c7eb5d3deaa9a4b161e2b1934436a76b29364
+APPLICATION_OFFSET      = 0x010000 (partition 'app0')
+APPLICATION_SIZE        = 384400 bytes
+MAX_PARTITION_SIZE      = 3145728 bytes
+SOURCE_COMMIT           = 5b371da5482f9b0bd2df1c37ed361250ea54ae8f
+```
+
+Write result: esptool's post-write hash check passed ("Hash of data
+verified"); independent `esptool verify-flash` reported "Verification
+successful (digest matched)". **Non-application regions re-verified
+unchanged**: bootloader (0x0, 20,480 B), partition table (0x8000, 4,096 B)
+and otadata (0xe000, 8,192 B) were each extracted from the same verified
+Session 2 full-flash backup (`matdog_esp32s3_fullflash_2026-09-10.bin`,
+re-confirmed this session: size 16,777,216 bytes, SHA256
+`5cbba0b9c5500d0c95247b9b7e7173a29f934b8b13f6800cc9f583374d67fd32`) and
+independently compared against the live device with `esptool verify-flash`
+— all three reported "Verification successful (digest matched)".
+
+### H1 — Boot — **PASS**
+
+```text
+build          : 5b371da5482f
+board          : YD-ESP32-S3 N16R8
+profile        : USB_ONLY
+partition      : app0 @ 0x010000 (size 0x300000)
+reset_reason   : OTHER
+operating_mode : MAINTENANCE
+IMU_INIT=PASS
+SYSTEM_BOOT_COMPLETE health=READY power_state=RUN
+EXPECTED_STARTUP_RESET=YES
+```
+
+### H2 — BNO085 — **PASS**
+
+`runtime_resets=0` across every capture this session, including the
+dedicated 60s soak below.
+
+### H3 — USB_ONLY classification — **PASS**, unchanged from Session 2.2
+
+```text
+SYSTEM health=READY power_state=RUN mode=MAINTENANCE profile=USB_ONLY
+BNO085 init=OK       detected=ONLINE      expected=REQUIRED  result=PASS
+DALY   init=OK       detected=NO_RESPONSE expected=OFFLINE   result=PASS
+SERVO  init=OK       detected=NO_RESPONSE expected=OFFLINE   result=PASS
+LED    init=DEFERRED detected=UNPOWERED   expected=UNPOWERED result=PASS
+```
+
+### H4/H5 — SAFE_OFF timing and OperatingMode regression — **PASS**
+
+See Finding 1 above for the full five-trial SAFE_OFF timing transcript.
+OperatingMode regression, live:
+
+```text
+@MODE RUN                    -> MODE=RUN
+@SERVO SCAN 11 55             -> SERVO_SCAN=BLOCKED  REASON=NOT_IN_MAINTENANCE_MODE  MODE=RUN
+@SERVO READ 11                -> SERVO_READ=BLOCKED  REASON=NOT_IN_MAINTENANCE_MODE  MODE=RUN
+@SERVO SAFE_OFF 11            -> SERVO_SAFE_OFF id=11 result=UNVERIFIED_NO_RESPONSE (still allowed)
+@MODE MAINTENANCE             -> MODE=MAINTENANCE
+```
+
+Identical behaviour to Session 2.2 — this session touched only the
+timeout value SAFE_OFF uses internally, never its MAINTENANCE/RUN
+reachability.
+
+### H6 — Soak — **PASS**
+
+Dedicated 60s window after the mode-regression test, plus the interactive
+validation above: 715 serial lines observed, `runtime_resets=0` throughout
+(`COUNTS acc=771 gyr=741 mag=3706 game=3694 rv=3694 runtime_resets=0` at the
+end of the window), classification stable, no fatal/panic events.
+
+### Frozen/standalone source hashes — re-verified unchanged
+
+```text
+matdog_servo_commissioning.ino     74656fb9187fd2024f8251276b49676d8be9c6455f542c49500cfb30d25630cd
+matdog_bno085_dcd_phase_c3.ino     51bb3016ac20226b812e1e892328768495348278cb19c320de34930cccd103e6
+matdog_daly_rs485_probe_v2.ino     4fd7fd3982ab57376ad9a5ade7ed497fb2515234465612a59aac22f756acb81c
+```
+
+(all four candidate locations checked, including both copies of the frozen
+bench QC source — see `SOURCE_PROVENANCE.md`)
+
+### OTA parser test totals
+
+```text
+Session 2.2 baseline                          27 tests
+Session 2.3 Finding 2 (sdkconfig UNKNOWN)      6 tests
+Session 2.3 Finding 3 (slot contiguity)        7 tests
+                                               ----
+TOTAL                                         40 tests, 40 PASS
+```
+
+### Session 2.3 completion checklist
+
+- [x] `kDiagnosticTimeoutMs`(20ms)/`kOperationalTimeoutMs`(100ms) are two
+      separately named constants; every call site states its choice explicitly
+- [x] `safeOff()`/`readRuntimeState()` use `kOperationalTimeoutMs`, never `kDiagnosticTimeoutMs`
+- [x] `ping()`/`readModel()`/scan's per-ID probe still use `kDiagnosticTimeoutMs`, unchanged
+- [x] live SAFE_OFF timing measured with servo unpowered (~205-210ms, 5 trials) — evidence, not a claim
+- [x] `parse_sdkconfig_flag()` returns `UNKNOWN` when a symbol is present in neither form
+- [x] `resolve_application_partition()` REFUSEs on `UNKNOWN` for both rollback and anti-rollback
+- [x] real build's sdkconfig re-verified: `ROLLBACK_ENABLE=ENABLED`, `ANTI_ROLLBACK=DISABLED` — flash proceeded correctly
+- [x] `test_flags_absent_entirely_defaults_to_disabled` removed; replaced with `UNKNOWN`-asserting coverage
+- [x] OTA slot sets must be contiguous starting at 0; `{1}`/`{0,2}`/`{1,2}`/`{0,1,3}` REFUSE, `{0}`/`{0,1}`/`{0,1,2}` accept
+- [x] compile PASS
+- [x] static audit PASS (23 files, 0 findings, includes 40/40 OTA tests)
+- [x] viewer 59/59 PASS
+- [x] frozen hashes unchanged (4/4)
+- [x] application-only flash PASS
+- [x] non-application flash regions unchanged (bootloader/partition-table/otadata all re-verified against Session 2 baseline)
+- [x] boot banner, BNO085 PASS, 0 runtime resets, USB_ONLY classification correct
+- [x] OperatingMode regression re-confirmed live (SCAN/READ blocked in RUN, SAFE_OFF allowed)
+- [x] 60s soak PASS
+- [x] git working tree clean
+- [ ] merge to `main` — explicitly NOT done this session
+
+### Judgement
+
+```text
+READY_FOR_MAIN_MERGE
+```
+
+All three findings are fixed, hardware-validated where the fix touches
+runtime behaviour (Finding 1), offline-tested where the fix is pure
+host-side logic (Findings 2 and 3), and documented without deleting or
+rewriting any prior session's evidence. No new functionality was added; no
+forbidden hardware action occurred this session (battery, servo power, LED
+5V rail and DALY remained absent/off throughout; only read-only diagnostics
+and the pre-approved `EnableTorque(id, 0)` SAFE_OFF write were exercised).
+Merge decision and execution remain with the operator.

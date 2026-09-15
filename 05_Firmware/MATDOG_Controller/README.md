@@ -55,11 +55,15 @@ determines that partition's real offset/size by reading the device's own partiti
 table and otadata (the `app3M_fat9M_16MB` scheme has two OTA slots; this never assumes
 which one is active, and recognizes OTA slots by the real ESP-IDF bitmask
 `(subtype & 0xF0) == PART_SUBTYPE_OTA_FLAG`, not a numeric threshold that would also
-match TEST/TEE partitions). It also reads the real build's `sdkconfig` and refuses if
-`CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK` is enabled, or if `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`
-is enabled *and* the selected otadata entry is in a state (`NEW`/`PENDING_VERIFY`) the
-bootloader can autonomously rewrite on the next boot — see `scripts/ota_partition_logic.py`
-and `VALIDATION.md` Session 2.2. Refuses to run unless: the working tree is clean and the
+match TEST/TEE partitions, and must be a contiguous set `{0, ..., N-1}` — a sparse OTA
+layout like `{0, 2}` refuses rather than resolving). It also reads the real build's
+`sdkconfig` as a three-way `SdkconfigFlag` (`ENABLED`/`DISABLED`/`UNKNOWN`) and refuses if
+`CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK` is `ENABLED` or `UNKNOWN`, or if
+`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` is `UNKNOWN`, or if it is `ENABLED` *and* the
+selected otadata entry is in a state (`NEW`/`PENDING_VERIFY`) the bootloader can
+autonomously rewrite on the next boot — a symbol absent from the sdkconfig text entirely
+is `UNKNOWN`, never silently treated as `DISABLED`. See `scripts/ota_partition_logic.py`
+and `VALIDATION.md` Session 2.3. Refuses to run unless: the working tree is clean and the
 compiled binary's embedded build id matches `HEAD`, the 16 MiB full-flash backup
 verifies, the static audit passes, and the connected device's MAC matches the expected
 one. Prints `SDKCONFIG_ROLLBACK`/`SDKCONFIG_ANTI_ROLLBACK`/`DEVICE`/`APPLICATION_BINARY`/
@@ -89,10 +93,13 @@ being driven while `kLedRailPowered` is false, `scripts/flash_app_only.sh` regre
 to reference the bootloader/partition-table/boot_app0 artifacts it must never write,
 the OTA partition verifier's fail-closed validity checks regressing (it also runs
 that verifier's own offline test suite as part of the audit), the OTA subtype filter
-regressing to a numeric threshold instead of the real bitmask, the rollback/anti-rollback
+regressing to a numeric threshold instead of the real bitmask, an OTA slot set losing
+its contiguous-starting-at-0 requirement, the sdkconfig parser losing its `UNKNOWN`
+case (silently treating an absent symbol as `DISABLED` again), the rollback/anti-rollback
 parameters gaining an unsafe default, `ServoBus::begin()` assigning `IOTimeOut` directly
-again instead of via `ScopedPingTimeout`, or `safeOff()` classifying success from
-`EnableTorque()`'s own return value instead of an independent readback.
+again instead of via `ScopedIOTimeout`, `safeOff()`/`readRuntimeState()` using the
+diagnostic timeout instead of the operational one, or `safeOff()` classifying success
+from `EnableTorque()`'s own return value instead of an independent readback.
 
 ## USB diagnostic command surface
 
@@ -119,7 +126,7 @@ at all — confirmed live with the servo bus unpowered), or `VERIFY_FAILED` (rea
 responded but is non-zero). `@SERVO SCAN`/`@SERVO READ`
 are **incremental with bounded per-ID blocking, not non-blocking**: `ServoBus::update()`
 still calls `SCServo::Ping()` synchronously, which carries its own bounded per-call
-timeout (`kPingTimeoutMs`, 20ms — see Operating mode below). `@SERVO SCAN` replies
+timeout (`kDiagnosticTimeoutMs`, 20ms — see Operating mode below). `@SERVO SCAN` replies
 `SERVO_SCAN=STARTED` immediately and the router reports `SERVO_SCAN=COMPLETE
 elapsed_ms=.. max_ping_us=..` asynchronously once the scan's one-`Ping()`-per-tick state
 machine finishes; that duration is measured, not assumed. Because a scan/read call can
@@ -166,19 +173,33 @@ default to `RUN`** and require an explicit, reviewed transition into `MAINTENANC
 (with torque confirmed off) before servo diagnostics are reachable again — this is
 called out directly in `OperatingMode.h` so it cannot be missed.
 
-`ServoBus::kPingTimeoutMs` (20ms) is a **diagnostic absence-detection timeout**, not a
-validated operational timeout for a future powered 17-servo bus — justified by real
-hardware measurement rather than an assumed value: the NEW01 characterization campaign
+The servo bus has two explicitly named timeouts, and every method states which one it
+uses — there is no "default/untouched" case to trust implicitly (Session 2.3 Finding 1
+corrected Session 2.2, where a single 20ms timeout was silently applied to every
+transaction including `safeOff()`/`readRuntimeState()`, making the "100ms
+operational / 20ms diagnostic" split not actually true in code):
+
+```text
+ServoBus::kDiagnosticTimeoutMs = 20   ping(), readModel(), the scan's per-ID probe —
+                                       bounded absence-detection only, MAINTENANCE-only today
+ServoBus::kOperationalTimeoutMs = 100 safeOff() (the safety de-escalation write, reachable
+                                       from any OperatingMode) and readRuntimeState() (the
+                                       primitive behind @SERVO READ today, which a future
+                                       motion controller will naturally reuse)
+```
+
+`kDiagnosticTimeoutMs` is justified by real hardware measurement rather than an assumed
+value: the NEW01 characterization campaign
 (`09_Logs/Validation_Reports/ST3215_Provisioning_2026-08-27/characterization_sessions/`)
 timed a live powered ST3215 at 1 Mbaud and recorded Ping+register-read round trips of
-593-620us — 20ms is roughly 32x that measured worst case. It is applied via
-`ServoBus::ScopedPingTimeout`, an RAII guard around each individual bus transaction
-(`ping()`/the scan's per-ID probe/`readModel()`/`safeOff()`/`readRuntimeState()`) that
-saves `SCSerial::IOTimeOut` (a public field, set at runtime — the vendored library is
-never edited), applies the diagnostic timeout, and restores the previous value on every
-exit path. `begin()` never assigns `IOTimeOut` directly — it stays at the library's own
-100ms default outside of a diagnostic transaction, so this can never silently become a
-standing global override for some future, unrelated operational use of the bus.
+593-620us — 20ms is roughly 32x that measured worst case. `kOperationalTimeoutMs` is
+simply SCServo's own untouched library default (100ms) — not a value MATDOG has
+validated/optimized as final for a powered 17-servo bus. Both are applied via
+`ServoBus::ScopedIOTimeout`, a generic RAII guard around each individual bus transaction
+that saves `SCSerial::IOTimeOut` (a public field, set at runtime — the vendored library is
+never edited), applies the named timeout for that call site, and restores the previous
+value on every exit path. `begin()` never assigns `IOTimeOut` directly, so neither timeout
+can silently become a standing global override for some other call site.
 
 ## Anti-back-power (LED ring)
 

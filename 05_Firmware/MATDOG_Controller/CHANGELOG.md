@@ -149,3 +149,51 @@ new functionality. Flashed and hardware-validated as commit
 See `VALIDATION.md` Session 2.2 for the full measurement evidence, the
 ESP-IDF rollback source citations, and H1/H3/H4/H5/H6 hardware
 re-validation including live SAFE_OFF and OperatingMode transcripts.
+
+## 0.1.0 — Session 2.3 final consistency fix — 2026-09-15
+
+Three consistency findings from a final review of Session 2.2, fixed before
+merge — no new functionality. Flashed and hardware-validated as commit
+`5b371da5482f9b0bd2df1c37ed361250ea54ae8f` (`FIRMWARE_SOURCE_COMMIT`; see
+`VALIDATION.md` Session 2.3).
+
+- `servo/ServoBus` (Finding 1): Session 2.2's fix still applied the 20ms
+  diagnostic timeout to *every* transaction, including `safeOff()` and
+  `readRuntimeState()` — so the documented "operational timeout = 100ms,
+  diagnostic timeout = 20ms" split was not actually true in code.
+  `ScopedPingTimeout` is renamed `ScopedIOTimeout` and now takes an explicit
+  timeout argument at every call site; `kDiagnosticTimeoutMs` (20ms, still
+  `ping()`/`readModel()`/the scan's per-ID probe) and `kOperationalTimeoutMs`
+  (100ms, new: `safeOff()`/`readRuntimeState()` — the safety de-escalation
+  path and the primitive a future motion controller will reuse) are now two
+  separately named constants.
+- `scripts/ota_partition_logic.py` (Finding 2): `parse_sdkconfig_ota_flags()`
+  treated a Kconfig symbol completely absent from the sdkconfig text the
+  same as one explicitly disabled (both → `False`) — not fail-closed.
+  `parse_sdkconfig_flag()` now returns a three-way `SdkconfigFlag`
+  (`ENABLED`/`DISABLED`/`UNKNOWN`); `resolve_application_partition()`
+  REFUSEs on `UNKNOWN` for either `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` or
+  `CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK`, exactly like it does on `ENABLED`.
+  The real build's config (`ROLLBACK_ENABLE=y`, `ANTI_ROLLBACK` not set)
+  still resolves correctly — re-verified against the actual device.
+- `scripts/ota_partition_logic.py` (Finding 3): `ota_app_partitions()` now
+  requires OTA slot indices to be exactly `{0, ..., N-1}`; a sparse set
+  (`{1}`, `{0,2}`, `{0,1,3}`, ...) raises `OtaAmbiguous` instead of
+  resolving. MATDOG has no use for a sparse OTA layout in V0.1; this avoids
+  ambiguity between raw OTA subtype numbers and the bootloader's own
+  `app_count`/modulo slot selection ahead of any future OTA subsystem.
+- `scripts/tests/test_ota_partition_logic.py`: removed
+  `test_flags_absent_entirely_defaults_to_disabled`, which encoded the
+  non-fail-closed policy Finding 2 corrects; added coverage for
+  symbol-absent → `UNKNOWN`, `UNKNOWN` → REFUSE (both symbols,
+  independently and together), and the four contiguity scenarios above.
+  27 → 40 tests, all PASS.
+- `scripts/static_audit.py`: fixed references broken by the Finding 1
+  rename and the Finding 2/3 API changes; added a check that
+  `safeOff()`/`readRuntimeState()` use `kOperationalTimeoutMs` and never
+  `kDiagnosticTimeoutMs`, and extended the OTA fail-closed check to require
+  `SdkconfigFlag.UNKNOWN` handling and the slot-contiguity check.
+
+See `VALIDATION.md` Session 2.3 for the full measurement evidence
+(including live `@SERVO SAFE_OFF` timing with the servo bus unpowered) and
+H1/H2/H3/H4/H5/H6 hardware re-validation.
