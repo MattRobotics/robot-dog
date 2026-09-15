@@ -25,3 +25,34 @@ baseline.
 
 See `SOURCE_PROVENANCE.md` for exact source hashes and `VALIDATION.md` for what has
 and has not been exercised on real hardware.
+
+## 0.1.0 — Session 2 hardening — 2026-09-15
+
+Corrective/procedural hardening on top of the same 0.1.0 scope above — no new
+firmware functionality, no motion/gait/IK/DALY-write/KEY work. Flashed and
+hardware-validated as commit `04dfa52d1b5ab37ac4099792bb8c874c5ee4842a`
+(`FIRMWARE_SOURCE_COMMIT`; see `VALIDATION.md` Session 2 for why this document's
+own commit is necessarily later and must not be confused with it).
+
+- `core`: adds `Availability` (`InitializationState`/`DetectedState`/
+  `ExpectedState` → `Classification`), fixing `@STATUS` reporting a module as
+  `OK` merely because its driver initialized rather than because the hardware
+  was actually detected. `Controller::update()` now drives `ServoBus::update()`
+  every tick.
+- `status/LedRing`: no longer initializes the NeoPixel transport or transmits
+  any WS2812 frame while `build::kLedRailPowered` is false (current `USB_ONLY`
+  profile) — GPIO47 is left in a defined `INPUT` state instead. `@LED TEST`
+  now refuses explicitly rather than driving an unpowered rail.
+- `servo/ServoBus`: `@SERVO SCAN` is now a non-blocking one-`Ping()`-per-tick
+  state machine instead of a synchronous loop that could monopolize `loop()`
+  for seconds against an unresponsive ID range.
+- `scripts/`: adds `flash_app_only.sh` (writes only the verified active
+  application/OTA partition, never bootloader/partition-table/boot_app0) and
+  `verify_application_partition.py` (reads the device's own partition table +
+  otadata rather than assuming an offset). Corrects `upload.sh`'s header
+  comment, which had incorrectly described a full Arduino upload as
+  application-only.
+- `scripts/static_audit.py`: four new regression checks for the above.
+
+See `VALIDATION.md` Session 2 for the full read-only flash audit, the
+application-only flash provenance record, and H1–H6 hardware results.

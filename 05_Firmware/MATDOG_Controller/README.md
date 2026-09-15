@@ -43,6 +43,29 @@ esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,F
 
 Board: YD-ESP32-S3 N16R8 (16 MB flash, 8 MB OPI PSRAM, 240 MHz).
 
+## Application-only flashing
+
+```bash
+scripts/flash_app_only.sh
+```
+
+Writes **only** the currently-active OTA application partition — never the
+bootloader, partition table or boot_app0/otadata. `scripts/verify_application_partition.py`
+determines that partition's real offset/size by reading the device's own partition
+table and otadata (the `app3M_fat9M_16MB` scheme has two OTA slots; this never assumes
+which one is active). Refuses to run unless: the working tree is clean and the
+compiled binary's embedded build id matches `HEAD`, the 16 MiB full-flash backup
+verifies, the static audit passes, and the connected device's MAC matches the expected
+one. Prints `DEVICE`/`APPLICATION_BINARY`/`APPLICATION_SHA256`/`APPLICATION_OFFSET`/
+`APPLICATION_SIZE`/`MAX_PARTITION_SIZE`/`FQBN`/`SOURCE_COMMIT` before writing anything,
+and independently re-verifies the write afterward with `esptool verify-flash`.
+
+`scripts/upload.sh` (full Arduino upload — bootloader + partition table + boot_app0 +
+application, every time) is kept for the legitimate full-image case (e.g. bring-up on
+a replacement board) but is **not** the routine flashing path; see `VALIDATION.md`
+Session 2 for why its earlier "application-only" framing was wrong and how that was
+confirmed harmless in practice.
+
 ## Static safety audit
 
 ```bash
@@ -52,8 +75,10 @@ python3 scripts/static_audit.py
 Regression tripwire (not a formal verifier) that fails the build if forbidden
 functionality leaks in: `CalibrationOfs`, EEPROM ID/offset writes, automatic
 torque-on, `GoalPosition`/motion primitives, automatic BNO085 DCD save, any DALY
-write, duplicate GPIO ownership, or a UART peripheral collision between ServoBus and
-DalyBms.
+write, duplicate GPIO ownership, a UART peripheral collision between ServoBus and
+DalyBms, a blocking multi-ID servo scan, the LED transport being driven while
+`kLedRailPowered` is false, or `scripts/flash_app_only.sh` regressing to reference the
+bootloader/partition-table/boot_app0 artifacts it must never write.
 
 ## USB diagnostic command surface
 
@@ -67,12 +92,39 @@ DalyBms.
 @SYSTEM SHUTDOWN
 ```
 
-`@SERVO SAFE_OFF` can only disable torque, never enable it. `@SYSTEM SHUTDOWN` walks
-the power-state machine through its shutdown sequence but always resolves to
-`POWER_CUT_FAILED` in V0.1, because the DALY K-Series `Discharge MOS OFF` write
-protocol has not been identified or bench-verified (see `VALIDATION.md` and handoff
-section 8A.8). No command in this surface can write servo EEPROM, recode an ID, save
-the BNO085 DCD, or write DALY configuration/MOS state.
+`@SERVO SAFE_OFF` can only disable torque, never enable it. `@SERVO SCAN` is
+non-blocking: it replies `SERVO_SCAN=STARTED` immediately and the router reports
+`SERVO_SCAN=COMPLETE` asynchronously once the scan's one-ID-per-tick state machine
+finishes, without ever stalling BNO085 acquisition or the command router itself.
+`@LED TEST`/`@LED OFF` are refused/no-op under the current `USB_ONLY` profile — see
+Anti-back-power below. `@SYSTEM SHUTDOWN` walks the power-state machine through its
+shutdown sequence but always resolves to `POWER_CUT_FAILED` in V0.1, because the DALY
+K-Series `Discharge MOS OFF` write protocol has not been identified or bench-verified
+(see `VALIDATION.md` and handoff section 8A.8). No command in this surface can write
+servo EEPROM, recode an ID, save the BNO085 DCD, or write DALY configuration/MOS state.
+
+`@STATUS` (and the per-module `@IMU`/`@BMS`/`@LED` variants) report each module as
+`init=.. detected=.. expected=.. result=..` — separating "did the driver initialize"
+from "was the hardware actually detected" from "was it expected to be reachable right
+now" from "is that a problem". See `src/core/Availability.h`; under `USB_ONLY`:
+
+```text
+BNO085 init=OK       detected=ONLINE      expected=REQUIRED  result=PASS
+DALY   init=OK       detected=NO_RESPONSE expected=OFFLINE   result=PASS
+SERVO  init=OK       detected=UNKNOWN     expected=OFFLINE   result=PASS
+LED    init=DEFERRED detected=UNPOWERED   expected=UNPOWERED result=PASS
+```
+
+## Anti-back-power (LED ring)
+
+The WS2812B ring's 5V rail is physically absent under `USB_ONLY`
+(`build::kLedRailPowered == false`). `LedRing::begin()` sets GPIO47 to `INPUT` and
+never calls into `Adafruit_NeoPixel` — no WS2812 frame is ever transmitted toward the
+unpowered ring, including via `@LED TEST` (refused with `REASON=LED_RAIL_UNPOWERED`).
+`LedRing::dataPinDriven()` lets `@LED STATUS`/tests confirm this held for the whole
+session. Flipping `kLedRailPowered` (and the two other profile flags in
+`BuildConfig.h`) to move to a future `ROBOT_POWERED` profile is a deliberate, reviewed
+change — `static_audit.py` currently asserts all three read `false`.
 
 ## Power architecture
 
@@ -100,12 +152,16 @@ cover, and handoff section 7A for the full matrix.
 ├── MATDOG_Controller.ino     thin entry point (setup/loop only)
 ├── src/
 │   ├── config/                Pins.h (central GPIO ownership), BuildConfig.h
-│   ├── core/                  Controller, SystemState, PowerState, CommandRouter
+│   ├── core/                  Controller, SystemState, PowerState, CommandRouter,
+│   │                          Availability (init/detected/expected/result model)
 │   ├── servo/                 ServoBus
 │   ├── imu/                   Bno085Imu
 │   ├── power/                 DalyBms
 │   └── status/                LedRing
 └── scripts/
     ├── build.sh
-    └── static_audit.py
+    ├── static_audit.py
+    ├── upload.sh                        full Arduino upload (not routine — see above)
+    ├── flash_app_only.sh                application-only flash (routine path)
+    └── verify_application_partition.py  read-only offset/size verifier used by the above
 ```
