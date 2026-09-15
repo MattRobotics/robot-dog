@@ -107,9 +107,15 @@ DEVICE_MAC="$("$ESPTOOL" --chip esp32s3 --port "$PORT" read-mac 2>/dev/null \
 unexpected board"
 
 # --- Gate: verified application partition offset/size, read from the ------
-# --- device's own partition table + otadata (never assumed) ---------------
+# --- device's own partition table + otadata (never assumed), AND the ------
+# --- real rollback/anti-rollback config of the build being flashed --------
+SDKCONFIG="$BUILD_DIR/sdkconfig"
+[ -f "$SDKCONFIG" ] || refuse "sdkconfig not found: $SDKCONFIG (run scripts/build.sh first)"
+
 PARTITION_INFO="$(python3 "$SCRIPT_DIR/verify_application_partition.py" \
-  --port "$PORT" --esptool "$ESPTOOL")"
+  --port "$PORT" --esptool "$ESPTOOL" --sdkconfig "$SDKCONFIG")"
+ROLLBACK_ENABLE="$(echo "$PARTITION_INFO" | grep '^CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=' | cut -d= -f2)"
+ANTI_ROLLBACK="$(echo "$PARTITION_INFO" | grep '^CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=' | cut -d= -f2)"
 APPLICATION_OFFSET="$(echo "$PARTITION_INFO" | grep '^APPLICATION_OFFSET=' | cut -d= -f2)"
 MAX_PARTITION_SIZE="$(echo "$PARTITION_INFO" | grep '^APPLICATION_PARTITION_SIZE=' | cut -d= -f2)"
 ACTIVE_PARTITION_LABEL="$(echo "$PARTITION_INFO" | grep '^ACTIVE_PARTITION_LABEL=' | cut -d= -f2)"
@@ -121,6 +127,8 @@ ACTIVE_PARTITION_LABEL="$(echo "$PARTITION_INFO" | grep '^ACTIVE_PARTITION_LABEL
 ($MAX_PARTITION_SIZE bytes)"
 
 # --- Print every required field before writing anything --------------------
+echo "SDKCONFIG_ROLLBACK    = CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=$ROLLBACK_ENABLE"
+echo "SDKCONFIG_ANTI_ROLLBACK = CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=$ANTI_ROLLBACK"
 echo "DEVICE                = $PORT (MAC $DEVICE_MAC)"
 echo "APPLICATION_BINARY    = $APPLICATION_BINARY"
 echo "APPLICATION_SHA256    = $APPLICATION_SHA256"

@@ -57,10 +57,41 @@ core package):
   (raw accumulator; callers invert only when they want the fully-finalized
   standard CRC32, which bootloader_common_ota_select_crc does not do).
 
+SESSION 2.2, FINDING A — OTA subtype recognition corrected. Session 2.1's
+filter was `subtype >= 0x10`, which is too permissive: it would also match
+PART_SUBTYPE_TEST (0x20) and PART_SUBTYPE_TEE_0/1 (0x30/0x31) — real,
+non-OTA app subtypes defined in the SAME esp_flash_partitions.h header.
+The real convention (matches ESP-IDF's own partition-table tooling) is a
+bitmask, not a threshold: an app partition is an OTA slot iff
+`(subtype & 0xF0) == PART_SUBTYPE_OTA_FLAG (0x10)`, and its slot index is
+`subtype & PART_SUBTYPE_OTA_MASK (0x0F)`. This correctly matches ota_0..
+ota_15 (0x10..0x1F) and correctly excludes TEST/TEE_0/TEE_1, which are
+numerically >= 0x10 but not in the 0x10-0x1F band.
+
+SESSION 2.2, FINDING B — rollback/anti-rollback awareness. The real,
+installed MATDOG_Controller build has
+`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` (confirmed by reading the actual
+build's sdkconfig, not assumed — see parse_sdkconfig_ota_flags() and
+VALIDATION.md Session 2.2). With that enabled, bootloader_utility.c's
+get_selected_boot_partition() autonomously WRITES to otadata during normal
+boot: any sector currently ESP_OTA_IMG_PENDING_VERIFY is marked ABORTED
+unconditionally at the start of every boot, and the winning sector is
+marked PENDING_VERIFY if its prior state was NEW. That means an
+ota_state of NEW or PENDING_VERIFY is not stable across a read -> a
+following boot can change it before this tool's read-only snapshot is
+still accurate. is_invalid()/is_valid() already correctly exclude
+ABORTED (and INVALID), which are stable; NEW/PENDING_VERIFY need an
+explicit additional refusal, gated on whether rollback is actually
+enabled in the build that produced the binary being flashed.
+CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK introduces secure_version/eFuse
+comparison this tool does not implement at all — if that is ever enabled,
+refuse unconditionally rather than approximate it.
+
 This module performs NO device I/O and writes nothing. See
 scripts/verify_application_partition.py for the device-facing wrapper and
 scripts/tests/test_ota_partition_logic.py for the offline test suite.
 """
+import re
 import struct
 import zlib
 from dataclasses import dataclass, field
@@ -70,10 +101,23 @@ PARTITION_ENTRY_MAGIC = b"\xaa\x50"
 PARTITION_TABLE_END_MAGIC = b"\xeb\xeb"
 
 APP_TYPE = 0x00
-OTA_SUBTYPE_BASE = 0x10  # ota_0 = 0x10, ota_1 = 0x11, ...
 
+# esp_flash_partitions.h — real bitmask convention, not a `>= 0x10` threshold
+# (Session 2.1 used the latter, which wrongly matched TEST/TEE_0/TEE_1 too).
+PART_SUBTYPE_OTA_FLAG = 0x10
+PART_SUBTYPE_OTA_MASK = 0x0F
+PART_SUBTYPE_TEST = 0x20
+PART_SUBTYPE_TEE_0 = 0x30
+PART_SUBTYPE_TEE_1 = 0x31
+
+# esp_ota_img_states_t (esp_flash_partitions.h).
+OTA_STATE_NEW = 0
+OTA_STATE_PENDING_VERIFY = 1
+OTA_STATE_VALID = 2
 OTA_STATE_INVALID = 3
 OTA_STATE_ABORTED = 4
+OTA_STATE_UNDEFINED = 0xFFFFFFFF
+
 BLANK_SEQ = 0xFFFFFFFF
 
 OTADATA_SECTOR_SIZE = 0x1000
@@ -82,7 +126,9 @@ OTA_SELECT_ENTRY_SIZE = 32
 
 class OtaAmbiguous(Exception):
     """Raised whenever the real bootloader's rule does not deterministically
-    select a slot. Callers must REFUSE, not guess, on this."""
+    select a slot, or the build's rollback configuration is not one this
+    read-only tool can safely reason about. Callers must REFUSE, not
+    guess, on this."""
 
 
 @dataclass
@@ -112,6 +158,27 @@ class OtaSelectEntry:
     def is_valid(self) -> bool:
         """bootloader_common_ota_select_valid — full check including CRC."""
         return (not self.is_invalid()) and self.crc_stored == self.crc_expected()
+
+    def is_rollback_unstable(self) -> bool:
+        """True for the two states get_selected_boot_partition() can
+        autonomously rewrite on the very next boot when
+        CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y (see Finding B in the
+        module docstring). A read-only single-snapshot tool cannot safely
+        treat these as a stable answer."""
+        return self.ota_state in (OTA_STATE_NEW, OTA_STATE_PENDING_VERIFY)
+
+
+def parse_sdkconfig_ota_flags(sdkconfig_text: str):
+    """Parses the two facts Session 2.2 Finding B requires be read from the
+    real build, not assumed. Arduino's sdkconfig uses the standard
+    Kconfig text format: `CONFIG_X=y` when set, `# CONFIG_X is not set`
+    (or the line simply absent) when not. Returns
+    (rollback_enabled: bool, anti_rollback_enabled: bool)."""
+    rollback_enabled = bool(re.search(
+        r"^CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y\s*$", sdkconfig_text, re.MULTILINE))
+    anti_rollback_enabled = bool(re.search(
+        r"^CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y\s*$", sdkconfig_text, re.MULTILINE))
+    return rollback_enabled, anti_rollback_enabled
 
 
 def parse_partition_table(data: bytes) -> List[PartitionEntry]:
@@ -147,12 +214,27 @@ def parse_otadata(data: bytes) -> List[OtaSelectEntry]:
 
 
 def ota_app_partitions(entries: List[PartitionEntry]) -> Dict[int, PartitionEntry]:
-    """Maps ota slot index (0, 1, ...) -> its PartitionEntry."""
-    return {
-        e.subtype - OTA_SUBTYPE_BASE: e
-        for e in entries
-        if e.type == APP_TYPE and e.subtype >= OTA_SUBTYPE_BASE
-    }
+    """Maps ota slot index (0..15) -> its PartitionEntry, using the real
+    bitmask convention (Finding A): an app partition is an OTA slot iff
+    (subtype & 0xF0) == PART_SUBTYPE_OTA_FLAG, never a `>= 0x10` threshold
+    (which would also match PART_SUBTYPE_TEST=0x20, TEE_0=0x30, TEE_1=0x31).
+    Raises OtaAmbiguous if two entries claim the same slot index — that is
+    itself an ambiguous table, not something to silently pick one of."""
+    result: Dict[int, PartitionEntry] = {}
+    for e in entries:
+        if e.type != APP_TYPE:
+            continue
+        if (e.subtype & 0xF0) != PART_SUBTYPE_OTA_FLAG:
+            continue
+        slot = e.subtype & PART_SUBTYPE_OTA_MASK
+        if slot in result:
+            raise OtaAmbiguous(
+                f"duplicate OTA slot index {slot}: both {result[slot].label!r} "
+                f"(subtype 0x{result[slot].subtype:02x}) and {e.label!r} "
+                f"(subtype 0x{e.subtype:02x}) claim it — ambiguous partition table."
+            )
+        result[slot] = e
+    return result
 
 
 def select_active_otadata(two_otadata: List[OtaSelectEntry]) -> OtaSelectEntry:
@@ -194,10 +276,29 @@ def select_active_otadata(two_otadata: List[OtaSelectEntry]) -> OtaSelectEntry:
 
 
 def resolve_application_partition(
-    partition_table: bytes, otadata: bytes
+    partition_table: bytes,
+    otadata: bytes,
+    *,
+    rollback_enabled: bool,
+    anti_rollback_enabled: bool,
 ) -> "ResolvedPartition":
     """End-to-end: parse both dumps and return the verified active
-    application partition, or raise OtaAmbiguous."""
+    application partition, or raise OtaAmbiguous.
+
+    rollback_enabled/anti_rollback_enabled are REQUIRED (no default) —
+    Finding B: callers must read them from the real build's sdkconfig
+    (parse_sdkconfig_ota_flags()) rather than let this function assume a
+    value, since a future FQBN/sdkconfig change enabling either must not
+    silently pass through unnoticed.
+    """
+    if anti_rollback_enabled:
+        raise OtaAmbiguous(
+            "CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y in the build's sdkconfig — this "
+            "introduces secure_version/eFuse-gated slot selection this tool does not "
+            "implement at all. Refusing rather than approximate it; see handoff "
+            "Session 2.2 Finding B."
+        )
+
     entries = parse_partition_table(partition_table)
     ota_apps = ota_app_partitions(entries)
     if not ota_apps:
@@ -205,6 +306,16 @@ def resolve_application_partition(
 
     otadata_entries = parse_otadata(otadata)
     active_entry = select_active_otadata(otadata_entries)
+
+    if rollback_enabled and active_entry.is_rollback_unstable():
+        raise OtaAmbiguous(
+            f"CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y in the build's sdkconfig and the "
+            f"selected otadata entry has ota_state={active_entry.ota_state} "
+            f"(NEW/PENDING_VERIFY) — the real bootloader can autonomously rewrite this "
+            f"on the very next boot (mark PENDING_VERIFY, or abort it), so this "
+            f"read-only snapshot cannot be trusted as stable. Refusing; see handoff "
+            f"Session 2.2 Finding B."
+        )
 
     slot_index = (active_entry.ota_seq - 1) % len(ota_apps)
     if slot_index not in ota_apps:

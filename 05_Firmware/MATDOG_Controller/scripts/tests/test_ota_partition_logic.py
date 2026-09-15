@@ -8,12 +8,22 @@ or directly:
 
     python3 scripts/tests/test_ota_partition_logic.py
 
-Covers the scenarios required by the Session 2.1 hardening handoff:
-current real device state, slot-0-only-valid, slot-1-only-valid, a CRC-
-invalid entry (the exact case Session 2's parser could have mis-selected),
-an unacceptable ota_state (INVALID/ABORTED), both entries blank, an
-ambiguous CRC-invalid-on-both state, and a partition table missing the
-computed slot.
+Covers the scenarios required by the Session 2.1 hardening handoff (basic
+selection: current real device state, slot-0/1-only-valid, a CRC-invalid
+entry, an unacceptable ota_state, both entries blank, an ambiguous
+CRC-invalid-on-both state, a partition table missing the computed slot)
+plus the Session 2.2 findings:
+
+  Finding A — OTA subtype recognition must use the real bitmask
+  (subtype & 0xF0 == 0x10), not a `>= 0x10` threshold, so PART_SUBTYPE_TEST
+  (0x20) and PART_SUBTYPE_TEE_0/1 (0x30/0x31) are never mistaken for OTA
+  app slots.
+
+  Finding B — when the real build has
+  CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y, an otadata entry whose ota_state
+  is NEW or PENDING_VERIFY must be refused (the bootloader can rewrite it
+  on the very next boot); CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y must refuse
+  unconditionally; both disabled must behave exactly like Session 2.1.
 """
 import struct
 import sys
@@ -26,13 +36,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from ota_partition_logic import (  # noqa: E402
     OTA_STATE_ABORTED,
     OTA_STATE_INVALID,
+    OTA_STATE_NEW,
+    OTA_STATE_PENDING_VERIFY,
+    OTA_STATE_VALID,
     OtaAmbiguous,
+    ota_app_partitions,
+    parse_partition_table,
+    parse_sdkconfig_ota_flags,
     resolve_application_partition,
 )
 
 OTA_UNDEFINED = 0xFFFFFFFF
 BLANK_SEQ = 0xFFFFFFFF
 SECTOR_SIZE = 0x1000
+
+# Session 2.1's tests all predate the rollback-awareness parameters; every
+# call here is explicit about them so nothing relies on a hidden default.
+NO_ROLLBACK = dict(rollback_enabled=False, anti_rollback_enabled=False)
 
 
 def build_ota_sector(seq, state=OTA_UNDEFINED, crc=None, corrupt_crc=False):
@@ -85,7 +105,7 @@ class TestOtaPartitionLogic(unittest.TestCase):
         # OTADATA_SECTOR_SEQS=[1, 0], active=app0. Also matches the known
         # boot_app0.bin seed file byte-for-byte (see module docstring).
         otadata = build_ota_sector(1) + build_ota_sector(0)
-        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata)
+        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata, **NO_ROLLBACK)
         self.assertEqual(resolved.label, "app0")
         self.assertEqual(resolved.offset, 0x10000)
         self.assertEqual(resolved.size, 0x300000)
@@ -93,13 +113,13 @@ class TestOtaPartitionLogic(unittest.TestCase):
 
     def test_slot_0_valid_slot_1_blank(self):
         otadata = build_ota_sector(1) + build_blank_sector()
-        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata)
+        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata, **NO_ROLLBACK)
         self.assertEqual(resolved.label, "app0")
         self.assertEqual(resolved.slot_index, 0)
 
     def test_slot_1_valid_slot_0_blank(self):
         otadata = build_blank_sector() + build_ota_sector(2)  # (2-1)%2 == 1
-        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata)
+        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata, **NO_ROLLBACK)
         self.assertEqual(resolved.label, "app1")
         self.assertEqual(resolved.slot_index, 1)
 
@@ -109,7 +129,7 @@ class TestOtaPartitionLogic(unittest.TestCase):
         # naively look "newer") has a corrupted CRC; seq=2 is the only
         # genuinely valid entry and must be the one selected.
         otadata = build_ota_sector(9, corrupt_crc=True) + build_ota_sector(2)
-        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata)
+        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata, **NO_ROLLBACK)
         self.assertEqual(resolved.active_seq, 2)
         self.assertEqual(resolved.slot_index, (2 - 1) % 2)
         self.assertEqual(resolved.label, "app1")
@@ -119,7 +139,7 @@ class TestOtaPartitionLogic(unittest.TestCase):
             build_ota_sector(7, state=OTA_STATE_INVALID)
             + build_ota_sector(8)
         )
-        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata)
+        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata, **NO_ROLLBACK)
         self.assertEqual(resolved.active_seq, 8)
         self.assertEqual(resolved.label, "app1")
 
@@ -128,14 +148,14 @@ class TestOtaPartitionLogic(unittest.TestCase):
             build_ota_sector(3)
             + build_ota_sector(4, state=OTA_STATE_ABORTED)
         )
-        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata)
+        resolved = resolve_application_partition(TWO_SLOT_TABLE, otadata, **NO_ROLLBACK)
         self.assertEqual(resolved.active_seq, 3)
         self.assertEqual(resolved.label, "app0")
 
     def test_both_blank_refuses(self):
         otadata = build_blank_sector() + build_blank_sector()
         with self.assertRaises(OtaAmbiguous) as ctx:
-            resolve_application_partition(TWO_SLOT_TABLE, otadata)
+            resolve_application_partition(TWO_SLOT_TABLE, otadata, **NO_ROLLBACK)
         self.assertIn("both otadata sectors are invalid", str(ctx.exception))
 
     def test_both_crc_invalid_is_ambiguous_refuses(self):
@@ -146,7 +166,7 @@ class TestOtaPartitionLogic(unittest.TestCase):
             + build_ota_sector(6, corrupt_crc=True)
         )
         with self.assertRaises(OtaAmbiguous) as ctx:
-            resolve_application_partition(TWO_SLOT_TABLE, otadata)
+            resolve_application_partition(TWO_SLOT_TABLE, otadata, **NO_ROLLBACK)
         self.assertIn("neither otadata sector passes", str(ctx.exception))
 
     def test_partition_table_missing_computed_slot_refuses(self):
@@ -160,7 +180,7 @@ class TestOtaPartitionLogic(unittest.TestCase):
         ])
         otadata = build_ota_sector(1) + build_blank_sector()
         with self.assertRaises(OtaAmbiguous) as ctx:
-            resolve_application_partition(one_slot_table, otadata)
+            resolve_application_partition(one_slot_table, otadata, **NO_ROLLBACK)
         self.assertIn("no matching ota_", str(ctx.exception))
 
     def test_no_ota_partitions_in_table_refuses(self):
@@ -169,8 +189,175 @@ class TestOtaPartitionLogic(unittest.TestCase):
         ])
         otadata = build_ota_sector(1) + build_blank_sector()
         with self.assertRaises(OtaAmbiguous) as ctx:
-            resolve_application_partition(empty_table, otadata)
+            resolve_application_partition(empty_table, otadata, **NO_ROLLBACK)
         self.assertIn("no ota_N app partitions", str(ctx.exception))
+
+
+class TestOtaSubtypeRecognitionFindingA(unittest.TestCase):
+    """PART_SUBTYPE_TEST (0x20) and PART_SUBTYPE_TEE_0/1 (0x30/0x31) are
+    real, defined, non-OTA app subtypes in the exact same header. Session
+    2.1's `subtype >= 0x10` filter wrongly matched them; the fix is the
+    real ESP-IDF bitmask (subtype & 0xF0) == 0x10."""
+
+    def test_ota_0_and_ota_1_recognized(self):
+        entries = parse_partition_table(TWO_SLOT_TABLE)
+        apps = ota_app_partitions(entries)
+        self.assertEqual(set(apps.keys()), {0, 1})
+        self.assertEqual(apps[0].label, "app0")
+        self.assertEqual(apps[1].label, "app1")
+
+    def test_test_subtype_does_not_count_as_a_third_ota_slot(self):
+        table = build_partition_table([
+            ("app0", 0x00, 0x10, 0x10000, 0x300000),
+            ("app1", 0x00, 0x11, 0x310000, 0x300000),
+            ("test", 0x00, 0x20, 0x610000, 0x100000),  # PART_SUBTYPE_TEST
+        ])
+        apps = ota_app_partitions(parse_partition_table(table))
+        self.assertEqual(set(apps.keys()), {0, 1})
+
+    def test_tee_subtypes_do_not_count_as_ota_slots(self):
+        table = build_partition_table([
+            ("app0", 0x00, 0x10, 0x10000, 0x300000),
+            ("app1", 0x00, 0x11, 0x310000, 0x300000),
+            ("tee_0", 0x00, 0x30, 0x610000, 0x40000),  # PART_SUBTYPE_TEE_0
+            ("tee_1", 0x00, 0x31, 0x650000, 0x40000),  # PART_SUBTYPE_TEE_1
+        ])
+        apps = ota_app_partitions(parse_partition_table(table))
+        self.assertEqual(set(apps.keys()), {0, 1})
+
+    def test_test_subtype_alone_gives_app_count_ota_of_one_not_two(self):
+        # Regression case for the exact bug: `subtype >= 0x10` would have
+        # matched PART_SUBTYPE_TEST (0x20) as if it were ota_16.
+        table = build_partition_table([
+            ("app0", 0x00, 0x10, 0x10000, 0x300000),
+            ("test", 0x00, 0x20, 0x610000, 0x100000),
+        ])
+        apps = ota_app_partitions(parse_partition_table(table))
+        self.assertEqual(set(apps.keys()), {0})
+        self.assertEqual(len(apps), 1)
+
+    def test_test_and_tee_without_any_ota_slot_finds_none(self):
+        table = build_partition_table([
+            ("test", 0x00, 0x20, 0x610000, 0x100000),
+            ("tee_0", 0x00, 0x30, 0x650000, 0x40000),
+        ])
+        apps = ota_app_partitions(parse_partition_table(table))
+        self.assertEqual(apps, {})
+        otadata = build_ota_sector(1) + build_blank_sector()
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            resolve_application_partition(table, otadata, **NO_ROLLBACK)
+        self.assertIn("no ota_N app partitions", str(ctx.exception))
+
+    def test_duplicate_ota_slot_index_refuses(self):
+        # Two entries both claiming subtype 0x10 (ota_0) is a corrupt/
+        # ambiguous table, not something to silently pick one of.
+        table = build_partition_table([
+            ("app0a", 0x00, 0x10, 0x10000, 0x300000),
+            ("app0b", 0x00, 0x10, 0x310000, 0x300000),
+        ])
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            ota_app_partitions(parse_partition_table(table))
+        self.assertIn("duplicate OTA slot index", str(ctx.exception))
+
+
+class TestRollbackAwarenessFindingB(unittest.TestCase):
+    """CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y (the real, confirmed setting
+    of this project's build) means the bootloader can autonomously rewrite
+    an otadata entry whose state is NEW or PENDING_VERIFY on the very next
+    boot. A read-only snapshot cannot treat those as stable."""
+
+    def test_rollback_disabled_new_state_is_fine(self):
+        # Matches Session 2.1 behaviour exactly when rollback is off.
+        otadata = build_ota_sector(1, state=OTA_STATE_NEW) + build_blank_sector()
+        resolved = resolve_application_partition(
+            TWO_SLOT_TABLE, otadata, rollback_enabled=False, anti_rollback_enabled=False)
+        self.assertEqual(resolved.label, "app0")
+
+    def test_rollback_enabled_new_state_refuses(self):
+        otadata = build_ota_sector(1, state=OTA_STATE_NEW) + build_blank_sector()
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            resolve_application_partition(
+                TWO_SLOT_TABLE, otadata, rollback_enabled=True, anti_rollback_enabled=False)
+        self.assertIn("ROLLBACK_ENABLE", str(ctx.exception))
+
+    def test_rollback_enabled_pending_verify_state_refuses(self):
+        otadata = build_ota_sector(1, state=OTA_STATE_PENDING_VERIFY) + build_blank_sector()
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            resolve_application_partition(
+                TWO_SLOT_TABLE, otadata, rollback_enabled=True, anti_rollback_enabled=False)
+        self.assertIn("ROLLBACK_ENABLE", str(ctx.exception))
+
+    def test_rollback_enabled_undefined_state_is_fine(self):
+        # The real, current, repeatedly-reverified state of the actual
+        # MATDOG device this session: ota_state=UNDEFINED on the active
+        # entry. UNDEFINED is not NEW/PENDING_VERIFY, so it is stable even
+        # with rollback enabled - the bootloader never autonomously
+        # rewrites it. Matches the live verify_application_partition.py
+        # run against the real hardware this session.
+        otadata = build_ota_sector(1, state=OTA_UNDEFINED) + build_ota_sector(0, state=OTA_UNDEFINED)
+        resolved = resolve_application_partition(
+            TWO_SLOT_TABLE, otadata, rollback_enabled=True, anti_rollback_enabled=False)
+        self.assertEqual(resolved.label, "app0")
+
+    def test_rollback_enabled_valid_state_is_fine(self):
+        # VALID is the "confirmed, bootloader will never rewrite it" state
+        # - also stable regardless of rollback being enabled.
+        otadata = build_ota_sector(1, state=OTA_STATE_VALID) + build_blank_sector()
+        resolved = resolve_application_partition(
+            TWO_SLOT_TABLE, otadata, rollback_enabled=True, anti_rollback_enabled=False)
+        self.assertEqual(resolved.label, "app0")
+
+    def test_anti_rollback_enabled_always_refuses_even_with_stable_state(self):
+        # Anti-rollback introduces secure_version/eFuse semantics this tool
+        # does not implement at all - refuse unconditionally, regardless of
+        # how clean the otadata itself looks.
+        otadata = build_ota_sector(1, state=OTA_STATE_VALID) + build_blank_sector()
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            resolve_application_partition(
+                TWO_SLOT_TABLE, otadata, rollback_enabled=True, anti_rollback_enabled=True)
+        self.assertIn("ANTI_ROLLBACK", str(ctx.exception))
+
+    def test_anti_rollback_enabled_refuses_even_with_rollback_disabled(self):
+        otadata = build_ota_sector(1, state=OTA_STATE_VALID) + build_blank_sector()
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            resolve_application_partition(
+                TWO_SLOT_TABLE, otadata, rollback_enabled=False, anti_rollback_enabled=True)
+        self.assertIn("ANTI_ROLLBACK", str(ctx.exception))
+
+
+class TestParseSdkconfigOtaFlags(unittest.TestCase):
+    def test_both_disabled(self):
+        text = (
+            "# CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set\n"
+            "# CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK is not set\n"
+        )
+        rollback, anti = parse_sdkconfig_ota_flags(text)
+        self.assertFalse(rollback)
+        self.assertFalse(anti)
+
+    def test_rollback_enabled_anti_rollback_disabled(self):
+        # The real, confirmed content of this project's actual build sdkconfig.
+        text = (
+            "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y\n"
+            "# CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK is not set\n"
+        )
+        rollback, anti = parse_sdkconfig_ota_flags(text)
+        self.assertTrue(rollback)
+        self.assertFalse(anti)
+
+    def test_both_enabled(self):
+        text = (
+            "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y\n"
+            "CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y\n"
+        )
+        rollback, anti = parse_sdkconfig_ota_flags(text)
+        self.assertTrue(rollback)
+        self.assertTrue(anti)
+
+    def test_flags_absent_entirely_defaults_to_disabled(self):
+        rollback, anti = parse_sdkconfig_ota_flags("CONFIG_SOMETHING_ELSE=y\n")
+        self.assertFalse(rollback)
+        self.assertFalse(anti)
 
 
 if __name__ == "__main__":

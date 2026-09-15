@@ -16,6 +16,14 @@ scripts/tests/test_ota_partition_logic.py). This script is only the
 device-I/O wrapper: read two flash regions, hand the bytes to the pure
 logic, print the verified result or refuse.
 
+--sdkconfig is REQUIRED (Session 2.2 Finding B): this script reads the
+REAL sdkconfig produced by the build that made the binary being flashed
+(not an assumption) to determine whether
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE / CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK
+are set, and passes that into ota_partition_logic's fail-closed checks. A
+future FQBN/sdkconfig change that enables either cannot silently pass
+through this tool.
+
 Never writes anything. Exits non-zero with a clear message on any
 ambiguity (OtaAmbiguous) — callers must not guess past that.
 """
@@ -25,7 +33,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-from ota_partition_logic import OtaAmbiguous, resolve_application_partition
+from ota_partition_logic import (
+    OtaAmbiguous,
+    parse_sdkconfig_ota_flags,
+    resolve_application_partition,
+)
 
 PARTITION_TABLE_OFFSET = 0x8000
 PARTITION_TABLE_SIZE = 0x1000
@@ -50,7 +62,17 @@ def main():
     ap.add_argument("--port", required=True)
     ap.add_argument("--chip", default="esp32s3")
     ap.add_argument("--esptool", required=True)
+    ap.add_argument("--sdkconfig", required=True,
+                     help="path to the sdkconfig produced by the build being flashed")
     args = ap.parse_args()
+
+    sdkconfig_path = Path(args.sdkconfig)
+    if not sdkconfig_path.is_file():
+        raise SystemExit(f"REFUSE: sdkconfig not found: {sdkconfig_path}")
+    rollback_enabled, anti_rollback_enabled = parse_sdkconfig_ota_flags(
+        sdkconfig_path.read_text(encoding="utf-8"))
+    print(f"CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE={'y' if rollback_enabled else 'n'}")
+    print(f"CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK={'y' if anti_rollback_enabled else 'n'}")
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
@@ -64,7 +86,9 @@ def main():
 
         try:
             resolved = resolve_application_partition(
-                part_bin.read_bytes(), ota_bin.read_bytes()
+                part_bin.read_bytes(), ota_bin.read_bytes(),
+                rollback_enabled=rollback_enabled,
+                anti_rollback_enabled=anti_rollback_enabled,
             )
         except OtaAmbiguous as exc:
             raise SystemExit(f"REFUSE: {exc}")
