@@ -17,6 +17,13 @@
 # which fails the build if this file is ever edited to reference those
 # artifact filenames again.
 #
+# SESSION 2.1: verify_application_partition.py's slot-selection logic was
+# corrected to match the real installed bootloader algorithm exactly
+# (esp_ota_select_entry_t CRC + ota_state validation, not just a raw
+# ota_seq comparison) and now fails closed — REFUSE, not a guess — on any
+# ambiguous/invalid/unverifiable OTA state. See scripts/ota_partition_logic.py
+# and scripts/tests/test_ota_partition_logic.py.
+#
 # scripts/upload.sh remains in the repository, with its documentation
 # corrected, as the (still occasionally legitimate — e.g. bring-up on a
 # replacement board) full-image path. It is NOT what this script runs and
