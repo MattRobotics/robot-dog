@@ -18,6 +18,20 @@ namespace core {
 // nothing but diagnostics against nothing but itself. The point is that it
 // already exists, so a future motion-loop integration cannot silently
 // inherit @SERVO SCAN/@SERVO READ as callable from inside RUN.
+//
+// NOT the same concept as core::PowerState::RUN (PowerState.h) — the two
+// are orthogonal and the shared name "RUN" is coincidental:
+//   - PowerState is about the power-on lifecycle: BOOTING -> POWER_CHECK ->
+//     RUN -> SHUTDOWN_REQUESTED -> ... . Its RUN means "the controller has
+//     finished booting and is operating normally"; it says nothing about
+//     which servo diagnostics are currently safe to run.
+//   - OperatingMode is about whether potentially-blocking servo diagnostics
+//     are safe to run right now. Its RUN means "a deterministic motion
+//     loop may be active; do not block it with a diagnostic".
+// A running controller is normally PowerState::RUN *and*
+// OperatingMode::MAINTENANCE at the same time in V0.1 (see boot banner /
+// @STATUS, which prints both) — that is expected, not a naming collision
+// to "resolve".
 enum class OperatingMode : uint8_t {
   MAINTENANCE = 0,  // servo scan/read diagnostics allowed; no motion allowed (none exists yet)
   RUN         = 1,  // future deterministic motion loop; blocking diagnostics refused

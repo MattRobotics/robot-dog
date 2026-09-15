@@ -17,6 +17,13 @@ namespace core {
 // state machine can reach SHUTTING_DOWN and attempt the cut, but the cut
 // itself always fails closed into POWER_CUT_FAILED in V0.1 — the firmware
 // must never report OFF, since it cannot know or cause that transition.
+//
+// PowerState::RUN is NOT the same concept as core::OperatingMode::RUN
+// (OperatingMode.h, Session 2.1) despite the shared name — see that
+// header's comment for the full distinction. In short: PowerState is
+// about the power-on lifecycle (has the controller finished booting?);
+// OperatingMode is about whether blocking servo diagnostics are safe to
+// run right now (is a motion loop active?). They vary independently.
 enum class PowerState : uint8_t {
   BOOTING              = 0,
   POWER_CHECK          = 1,
