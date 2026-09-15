@@ -129,18 +129,22 @@ echo "Writing application partition only (no bootloader/partition-table/boot_app
 "$ESPTOOL" --chip esp32s3 --port "$PORT" write-flash \
   "$APPLICATION_OFFSET" "$APPLICATION_BINARY"
 
-# --- Post-write read-back verification (read-only) --------------------------
+# --- Post-write verification ------------------------------------------------
+# esptool's dedicated verify-flash (device-side digest compare) rather than
+# read-flash into a file: raw multi-packet read-flash proved unreliable
+# immediately after a write+reset in this environment (intermittent
+# "Packet content transfer stopped" around the same byte offset on repeat
+# attempts, root-caused to a USB-Serial-JTAG re-enumeration timing quirk,
+# not a flash content problem — write-flash's own post-write hash check
+# had already passed). verify-flash reads the device again independently
+# and reports a clear pass/fail without staging a local copy.
 echo
-echo "Verifying written application partition by reading it back..."
-READBACK="$(mktemp)"
-trap 'rm -f "$READBACK"' EXIT
-"$ESPTOOL" --chip esp32s3 --port "$PORT" read-flash \
-  "$APPLICATION_OFFSET" "$APPLICATION_SIZE" "$READBACK" >/dev/null
-READBACK_SHA256="$(sha256sum "$READBACK" | cut -d' ' -f1)"
-if [ "$READBACK_SHA256" != "$APPLICATION_SHA256" ]; then
-  refuse "post-write read-back sha256 $READBACK_SHA256 != written $APPLICATION_SHA256 — \
-flash may be corrupted, investigate before trusting this device"
+echo "Verifying written application partition (esptool verify-flash)..."
+sleep 2  # let the device finish its post-write reset/re-enumeration
+if ! "$ESPTOOL" --chip esp32s3 --port "$PORT" verify-flash \
+    "$APPLICATION_OFFSET" "$APPLICATION_BINARY"; then
+  refuse "post-write verify-flash failed — flash may be corrupted, investigate before \
+trusting this device"
 fi
 
 echo "APPLICATION_ONLY_FLASH = PASS"
-echo "READBACK_SHA256        = $READBACK_SHA256 (matches)"
