@@ -14,6 +14,10 @@ bool ServoBus::begin() {
 
   st_.pSerial = &servo_uart_;
 
+  // Public SCSerial field, not a vendored-library edit — see kPingTimeoutMs
+  // in ServoBus.h for the hardware-measured justification.
+  st_.IOTimeOut = ServoBus::kPingTimeoutMs;
+
   // No automatic ping/scan/torque on boot — matches the frozen bench
   // source's own stated invariant ("Automatic ping : DISABLED") and the
   // handoff's "no automatic motion at boot" rule. detected_ therefore
@@ -65,6 +69,7 @@ bool ServoBus::startScan(int lo, int hi) {
   scan_result_.hi = hi;
   scan_next_id_ = lo;
   scan_state_ = ScanState::RUNNING;
+  scan_started_ms_ = millis();
   return true;
 }
 
@@ -72,10 +77,20 @@ void ServoBus::update(uint32_t now_ms) {
   (void)now_ms;
   if (scan_state_ != ScanState::RUNNING) return;
 
-  // Exactly one Ping() per tick — the whole reason this is non-blocking.
-  // See the ScanState comment in ServoBus.h.
+  // Exactly one Ping() per tick — see the ScanState comment in ServoBus.h
+  // for why this is "incremental with bounded per-ID blocking", not
+  // non-blocking. Measures its own duration (micros()) so the actual
+  // per-ID and total cost is evidence, not a claim — see
+  // ScanResult::max_ping_us / elapsed_ms.
   const int id = scan_next_id_;
-  if (st_.Ping(static_cast<uint8_t>(id)) >= 0) {
+  const uint32_t ping_start_us = micros();
+  const bool responded = st_.Ping(static_cast<uint8_t>(id)) >= 0;
+  const uint32_t ping_us = micros() - ping_start_us;
+  if (ping_us > scan_result_.max_ping_us) {
+    scan_result_.max_ping_us = ping_us;
+  }
+
+  if (responded) {
     if (scan_result_.found_count < kMaxScanIds) {
       scan_result_.found_ids[scan_result_.found_count] = id;
     }
@@ -85,6 +100,7 @@ void ServoBus::update(uint32_t now_ms) {
   scan_next_id_++;
   if (scan_next_id_ > scan_result_.hi) {
     scan_state_ = ScanState::COMPLETE;
+    scan_result_.elapsed_ms = millis() - scan_started_ms_;
     last_detected_ = (scan_result_.found_count > 0) ? core::DetectedState::ONLINE
                                                        : core::DetectedState::NO_RESPONSE;
   }
