@@ -7,6 +7,13 @@ firmware: EEPROM/ID/CalibrationOfs writes, automatic torque-on, signed
 GoalPosition, automatic BNO085 DCD save, DALY configuration writes, UART
 peripheral collisions, and duplicate GPIO ownership.
 
+Session 2 (hardening) additions: a synchronous multi-ID servo scan loop
+(must stay a one-Ping()-per-tick state machine), LED transport driven while
+the rail is unpowered (USB_ONLY profile), the three power-availability
+profile flags drifting from their current USB_ONLY values, and the
+application-only flash script regressing to reference the
+bootloader/partition-table/boot_app0 artifacts it must never write.
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
@@ -151,8 +158,82 @@ def check_no_auto_scan_on_boot(files):
     for path, code in files:
         if path.name == "ServoBus.cpp":
             begin_match = re.search(r"bool ServoBus::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
-            if begin_match and ("scan(" in begin_match.group(1) or ".Ping(" in begin_match.group(1)):
+            if begin_match and ("startScan(" in begin_match.group(1) or ".Ping(" in begin_match.group(1)):
                 fail(f"{path}: ServoBus::begin() must not automatically ping/scan the bus")
+
+
+def check_servo_scan_non_blocking(files):
+    # Session 2 regression tripwire: Session 1's scan() pinged an entire ID
+    # range synchronously in one call (each Ping() carries ~100ms IOTimeOut),
+    # which could monopolize loop() for seconds. Fail if a `for` loop and a
+    # `.Ping(` call ever end up back inside the same brace-free block again -
+    # the non-blocking design calls at most one Ping() per update() tick,
+    # never inside a loop over an ID range.
+    pattern = re.compile(r"for\s*\([^)]*\)\s*\{[^{}]*\.Ping\(", re.DOTALL)
+    for path, code in files:
+        if path.name != "ServoBus.cpp":
+            continue
+        if pattern.search(code):
+            fail(f"{path}: found a `for` loop calling .Ping() — servo scanning must probe "
+                 f"exactly one ID per update() tick (non-blocking), not loop over a range "
+                 f"synchronously")
+        if "startScan(" not in code or "ScanState::RUNNING" not in code:
+            fail(f"{path}: expected non-blocking startScan()/ScanState state machine not found")
+
+
+def check_led_anti_back_power(files):
+    # Session 2 hardening: under USB_ONLY (build::kLedRailPowered == false)
+    # the WS2812 transport must never be initialized or driven — no
+    # pixels_.begin()/show() may execute before the kLedRailPowered guard.
+    for path, code in files:
+        if path.name != "LedRing.cpp":
+            continue
+        begin_match = re.search(r"bool LedRing::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not begin_match:
+            fail(f"{path}: could not locate LedRing::begin() to audit anti-back-power guard")
+            continue
+        body = begin_match.group(1)
+        guard_pos = body.find("if (!build::kLedRailPowered)")
+        pixels_begin_pos = body.find("pixels_.begin()")
+        if guard_pos == -1:
+            fail(f"{path}: LedRing::begin() is missing the kLedRailPowered guard")
+        elif pixels_begin_pos != -1 and pixels_begin_pos < guard_pos:
+            fail(f"{path}: pixels_.begin() appears before the kLedRailPowered guard in begin()")
+
+    for path, code in files:
+        if path.name != "BuildConfig.h":
+            continue
+        # This session is exclusively USB_ONLY hardening (see handoff
+        # Session 2). These three flags must read false right now; flipping
+        # any of them is a deliberate future ROBOT_POWERED change, not
+        # something that should happen silently in this codebase's history.
+        for flag in ("kServoPowerAvailable", "kBatteryAvailable", "kLedRailPowered"):
+            m = re.search(rf"constexpr bool {flag}\s*=\s*(\w+);", code)
+            if not m:
+                fail(f"{path}: could not locate {flag} to audit its value")
+            elif m.group(1) != "false":
+                fail(f"{path}: {flag} = {m.group(1)}, expected false for the current "
+                     f"USB_ONLY-only session (flip deliberately for ROBOT_POWERED work)")
+
+
+def check_app_only_script_never_targets_other_partitions(sketch_dir):
+    # Not a C++ source check: audits the application-only flashing script
+    # itself so it can never be edited into silently writing the
+    # bootloader/partition-table/boot_app0/otadata regions again.
+    forbidden_names = ("bootloader.bin", "partitions.bin", "boot_app0.bin")
+    scripts_dir = sketch_dir / "scripts"
+    target = scripts_dir / "flash_app_only.sh"
+    if not target.exists():
+        fail(f"{target}: application-only flash script not found")
+        return
+    text = target.read_text(encoding="utf-8")
+    for name in forbidden_names:
+        if name in text:
+            fail(f"{target}: references {name!r} — the application-only flasher must never "
+                 f"name the bootloader/partition-table/boot_app0 artifacts")
+    for required in ("APPLICATION_OFFSET", "APPLICATION_SHA256", "MAX_PARTITION_SIZE"):
+        if required not in text:
+            fail(f"{target}: missing required safety-gate output {required!r}")
 
 
 def main():
@@ -168,6 +249,9 @@ def main():
     check_pin_collisions(files)
     check_uart_peripheral_separation(files)
     check_no_auto_scan_on_boot(files)
+    check_servo_scan_non_blocking(files)
+    check_led_anti_back_power(files)
+    check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
 
     print(f"Scanned {len(files)} source files under {SKETCH_DIR}")
 
