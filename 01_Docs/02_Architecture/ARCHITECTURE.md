@@ -1,266 +1,246 @@
 # MATDOG Architecture
 
-**Canonical as of 2026-08-27.** This document describes the **current** architecture only.
-For the superseded Station-mediated phase see
-[NormaCore MATDOG archive](../../09_Logs/Historical/NormaCore_MATDOG_Archive/README.md).
+**Canonical architecture decisions as of 2026-09-15.**
 
----
+This document owns system contracts and target direction. It does not own the changing physical
+population or next milestone; those live in the [root project snapshot](../../README.md).
+Implementation wiring lives in [electronics](../../04_Electronics/README.md), and exact firmware
+evidence lives in [Controller validation](../../05_Firmware/MATDOG_Controller/VALIDATION.md).
 
-## Reading this document
+## Status notation
 
-Every claim below is tagged. Nothing is presented as built when it is not.
-
-| Tag | Meaning |
+| Label | Architectural use |
 |---|---|
-| ✅ **VALIDATED** | implemented **and** exercised on real hardware |
-| 🟦 **DECIDED** | current architectural decision; implementation partial or not started |
-| ⬜ **TBD** | not yet decided or frozen |
+| **VALIDATED** | Implemented and exercised on real hardware within the linked scope. |
+| **IMPLEMENTED** | Present, but not fully exercised in the relevant hardware configuration. |
+| **DECIDED** | Approved contract or direction; implementation may be partial or absent. |
+| **TO_TEST** | The implementation or connection still needs its defined validation gate. |
+| **TO_DESIGN** | The detailed contract is not frozen. |
+| **FROZEN** | Immutable release, tool, or evidence source. |
 
----
+The complete repository vocabulary, including **SUPERSEDED** and **HISTORICAL**, is defined by the
+[root README](../../README.md#status-vocabulary).
 
-## Purpose
-
-MATDOG is a custom 17-DOF quadruped with a head. This repository is the single active engineering
-source of truth for the whole robot: mechanics, electronics, geometry, firmware, calibration,
-kinematics, locomotion and evidence.
-
----
-
-## Runtime layers
+## System architecture
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│ HIGH-LEVEL HOST                                              │
-│   ASUS Ubuntu workstation during development   ✅ current    │
-│   Jetson Orin Nano Super onboard (final)       🟦 decided    │
-│                                                              │
-│   ROS 2 / MoveIt 2 high-level stack            🟦 decided    │
-│   AI · vision · voice · planning · dashboard   🟦 decided    │
-└──────────────────────────────────────────────────────────────┘
-             ↓  native USB 2.0 Full-Speed / USB CDC   ✅ in use
-             ↓  ESP32-S3 D− = GPIO19, D+ = GPIO20
-             ↓  packet/command protocol over CDC      ⬜ TBD
-┌──────────────────────────────────────────────────────────────┐
-│ DEDICATED MATDOG ESP32-S3 MOTION COPROCESSOR                 │
-│   ST3215 bus ownership                         ✅ validated  │
-│   direct / native ST3215 driver path           ✅ validated  │
-│   provisioning / commissioning / QC utilities  ✅ validated  │
-│   deterministic servo control                  🟦 decided    │
-│   gait execution                               🟦 decided    │
-│   operational IK                               🟦 decided    │
-│   IMU acquisition                              ✅ validated  │
-│   battery / power telemetry (read-only)        🟦 decided    │
-│   watchdog and safety                          🟦 decided    │
-│   real-time motion execution                   🟦 decided    │
-└──────────────────────────────────────────────────────────────┘
-             ↓  UART   GPIO17 TX → driver RX
-             ↓         GPIO18 RX ← driver TX
-             ↓         shared GND
-┌──────────────────────────────────────────────────────────────┐
-│ Seeed Bus Servo Driver                         🟦 selected   │
-│   provides the servo-bus electrical layer                    │
-│   ESP32-S3 owns the ST3215 protocol and control              │
-└──────────────────────────────────────────────────────────────┘
-             ↓  Feetech serial bus, 1 Mbps
-┌──────────────────────────────────────────────────────────────┐
-│ 17 × Feetech ST-3215-C018                      ✅ validated  │
-│   12 leg  +  5 head/jaw                                      │
-│   profile MATDOG_C018_V1, PositionOffset = 0                 │
-└──────────────────────────────────────────────────────────────┘
+HIGH-LEVEL HOST
+  ASUS Ubuntu workstation                         current development host
+  Jetson Orin Nano Super                          DECIDED future onboard host
+  ROS 2 / MoveIt 2, AI, vision, voice, planning   TO_DESIGN / not integrated
+          |
+          | native USB 2.0 Full-Speed / USB CDC
+          | GPIO19 = D-, GPIO20 = D+
+          v
+PERMANENT MATDOG CONTROLLER — ESP32-S3
+  Controller V0.1 platform                        official baseline
+  core / USB diagnostics / BNO085                 VALIDATED in USB_ONLY scope
+  ServoBus / DALY / LED / power-state baseline    IMPLEMENTED; ROBOT_POWERED TO_TEST
+  maintenance / service / calibration modules     TO_DESIGN
+  motion / IK / gait / stabilization              TO_DESIGN, later
+          |
+          | UART: GPIO17 TX -> driver RX
+          |       GPIO18 RX <- driver TX
+          |       shared GND, 1 Mbps
+          v
+SEEED BUS SERVO DRIVER
+          |
+          v
+FEETECH ST-3215-C018 BUS
+  17 canonical allocation slots
+  13 servos physically installed today
 ```
 
-### Host ↔ coprocessor link — decided
+The Controller is a permanent runtime, not a disposable bring-up sketch. New operational
+capabilities are integrated behind reviewed module and safety boundaries.
 
-| Property | Value |
+## Responsibility split
+
+| High-level host | ESP32-S3 MATDOG Controller |
 |---|---|
-| Physical transport | **native USB 2.0 Full-Speed / USB CDC** — decided, and already in use |
-| ESP32-S3 USB pins | **D− = GPIO19**, **D+ = GPIO20** |
-| Theoretical rate | 12 Mbit/s (USB 2.0 Full-Speed) |
-| USB 3.x | neither required nor available on ESP32-S3 |
-| Secondary channel | Wi-Fi command/diagnostic link — planned |
-| Higher-level packet/command protocol | ⬜ **TBD** — the physical transport is frozen, the protocol carried over it is not |
+| ROS 2 / MoveIt 2 integration | sole ST3215 bus ownership |
+| AI, vision, voice, and planning | joint-to-actuator conversion |
+| UI and semantic behavior | deterministic real-time execution |
+| high-level motion intent | IMU acquisition and future stabilization |
+| logging and fleet/user workflows | battery telemetry, health, watchdog, and safety |
+|  | future diagnostics, maintenance, service, QC, provisioning, and calibration |
 
-The frozen bench tools already run over this link: the provisioning campaign used
-`USBMode=hwcdc,CDCOnBoot=cdc` and enumerated as
-`/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_…`.
+The high-level host sends semantic intent. In normal operation it does not send raw encoder targets
+or own the ST3215 protocol. The application-level host command/telemetry protocol is **TO_DESIGN**.
 
-> **Distinguish physical transport from protocol.** The transport is decided. The application-level
-> packet format, command set and telemetry schema carried over USB CDC are still open.
+## Permanent Controller direction
 
----
+One MATDOG Controller firmware will integrate, in reviewed stages:
 
-## Ownership rules
+1. Diagnostics
+2. Maintenance
+3. Service
+4. Servo QC
+5. Provisioning
+6. Full Leg Calibration
+7. Wi-Fi / OTA
+8. host transport
+9. later Motion / IK / Gait / Stabilization
 
-1. ✅ The **ESP32-S3 coprocessor is the operational owner of the ST3215 serial bus.**
-2. 🟦 The high-level host issues joint/motion intent; it does not drive the servo bus directly.
-3. 🟦 The host never sends raw encoder targets in normal operation.
-4. 🟦 The **compute responsibility split is decided**: joint→actuator conversion, operational IK,
-   gait execution, IMU, power telemetry, watchdog/safety and real-time motion execution reside on
-   the **ESP32-S3**. The high-level host owns ROS 2 / MoveIt 2, AI, vision, voice, planning, UI and
-   semantic behaviours.
-5. ✅ `GoalPosition` is unsigned `0..4095`; signed wrap is forbidden.
-6. ✅ `PositionOffset = 0` is the baseline on all 17 servos and stays that way. Mechanical mounting
-   error is corrected mechanically, never by rewriting `PositionOffset`.
-7. ✅ `CalibrationOfs`, one-key-middle, factory reset and broadcast write are permanently forbidden.
-8. ✅ The C018 model word is read from register `0x03` (expected `777`), never from `0x00`.
-9. ✅ Digital-home commissioning and mechanical endpoint calibration remain separate programs.
-10. ✅ Only hardware-validated calibration results may become persistent operational profiles.
-11. 🟦 No hardware motion may be commanded from stale calibration — enforced by a machine gate, see
-    [calibration reset](../../09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md).
+Controller V0.1 is the platform baseline, not a motion controller. It already implements the
+module boundaries and read-only/safety surfaces documented in the
+[Controller README](../../05_Firmware/MATDOG_Controller/README.md). A listed target capability is
+not validated merely because its precursor or standalone tool exists.
 
----
+## Servo allocation versus installation
 
-## Compute responsibility split — decided
+These are separate facts with separate owners:
 
-| Jetson Orin Nano Super / high-level host | ESP32-S3 motion coprocessor |
-|---|---|
-| ROS 2 / MoveIt 2 high-level robotics stack | ST3215 bus ownership |
-| AI | deterministic servo control |
-| vision | gait execution |
-| voice | operational IK |
-| planning | IMU acquisition |
-| dashboard / UI | battery / power telemetry |
-| semantic and high-level behaviours | watchdog / safety |
-|  | real-time motion execution |
+- The canonical allocation is **17** unit/joint/bus-ID slots, owned by
+  [`MATDOG_SERVO_ALLOCATION.yaml`](../../06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml).
+- The current installed population is owned by the [root README](../../README.md#physical-hardware-today):
+  12 leg servos plus `NECK_ROTATION` ID 51, for **13 installed**.
+- IDs 52 `NECK_PITCH`, 53 `HEAD_ROTATION`, 54 `HEAD_PITCH`, and 55 `JAW` remain allocated
+  but are intentionally absent today.
 
-**Implementation status is not the same as the decision.** Direct ST3215 ownership is
-hardware-demonstrated. The runtime motion / gait / IK / watchdog stack is **decided but not yet
-implemented** — see [validation scope](#validation-scope--precise-wording).
+Physical absence never authorizes deletion or reassignment of a canonical allocation entry.
 
----
+## Servo-bus and calibration contracts
 
-## Where NormaCore Station stands now
+1. The ESP32-S3 is the sole operational owner of the ST3215 serial bus.
+2. Exactly one bus owner may exist at a time.
+3. `GoalPosition` uses the unsigned `0..4095` domain; signed wrap is forbidden.
+4. `PositionOffset = 0` is the persistent baseline for all 17 allocated units.
+5. Mechanical mounting error is corrected mechanically, never hidden by rewriting
+   `PositionOffset`.
+6. `CalibrationOfs`, one-key-middle, factory reset, and broadcast writes are forbidden.
+7. The C018 model word is read at register `0x03` (expected `777`), never `0x00`.
+8. Allocation, physical installation, servo persistent state, and joint calibration remain
+   separate layers.
+9. Only current-installation calibration can authorize motion.
 
-> **Station is NOT the canonical servo-control requirement.**
-> It is **not** a mandatory ST3215 owner, **not** a required calibration path, **not** a required
-> provisioning path, and **not** the definitive MATDOG control architecture.
+The machine-readable calibration state remains
+`CALIBRATION_RESET_PENDING_FULL_RECALIBRATION` with hardware motion unauthorized in
+[`MATDOG_JOINT_CALIBRATION.yaml`](../../06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml).
+Dated calibration results remain evidence of earlier installations.
 
-Station **may** remain, entirely optionally:
+## Host transport, service, and recovery
 
-- historical development and reference technology;
-- an optional telemetry / observation / inference / logging / replay component;
-- transitional tooling where it is still convenient.
+### Native USB
 
-This is **not** a ban on reusing good upstream or native NormaCore code. The rule is narrower:
-MATDOG-specific ownership and development no longer live there, and no current MATDOG operation
-depends on Station being present.
+- **DECIDED:** native USB 2.0 Full-Speed / USB CDC is the wired host/service transport.
+- **VALIDATED:** Controller V0.1 communicates through the ESP32-S3's native onboard USB connection
+  in the `USB_ONLY` validation profile.
+- **DECIDED:** GPIO19 = USB D- and GPIO20 = USB D+.
+- **SUPERSEDED:** the historical use of GPIO19/GPIO20 as a Jetson UART.
+- The higher-level command/telemetry protocol over CDC remains **TO_DESIGN**.
 
-### Why the premise changed
+An existing external four-pin connector carries GPIO19, GPIO20, ESP32 GND, and an unconnected 5 V
+position. It is a USB-data/service predisposition, **TO_TEST** on the physical connector. The
+onboard native-USB validation does not validate that external wiring.
 
-Station was originally designated sole bus owner, which forced MATDOG calibration development into
-`MattRobotics/norma-core`. Direct ESP32-S3 ST3215 operation has since been demonstrated in
-practice — the bench QC, source-signature survey and provisioner stack drove real servos with no
-Station in the loop, ending in **17/17 units provisioned**. That removed the constraint.
+### Update policy
 
-Full transition record: [NormaCore MATDOG archive](../../09_Logs/Historical/NormaCore_MATDOG_Archive/README.md).
+- **DECIDED:** Wi-Fi/OTA is the normal future firmware-update path.
+- **DECIDED:** native USB CDC/USB-C remains available for wired service and recovery.
+- OTA must never remove or make wired recovery dependent on a working application image.
+- Controller V0.1's application-partition USB flashing procedure is not a Wi-Fi/OTA
+  implementation.
 
----
+Detailed service/update semantics belong to the
+[Controller README](../../05_Firmware/MATDOG_Controller/README.md).
+
+## Power and wake contract
+
+```text
+battery B+
+   -> DALY-protected power domain
+   -> 5 V step-down
+   -> ESP32-S3 / logic
+
+system return = DALY P-
+never use B- as the protected-load return
+
+bistable pushbutton under the MATDOG logo
+   -> DALY KEY directly
+   -> no ESP32 GPIO
+```
+
+The Controller cannot be the primary wake source because it is powered downstream of the DALY
+protected domain. The hardware button is the primary ON/OFF/wake interface. Electronics owns the
+detailed implementation record and validation state.
+
+## Validation boundary
+
+### VALIDATED
+
+- Direct ESP32-S3 operation and ownership of the ST3215 bus in the frozen bench campaigns.
+- Bench QC and provisioning of all 17 allocated units.
+- Controller V0.1 boot, USB CDC, live BNO085 acquisition, viewer-compatible output,
+  expected-offline classification, and soak under `USB_ONLY`.
+
+### IMPLEMENTED but not ROBOT_POWERED-validated
+
+- Read-only DALY decode/polling.
+- LED-ring module and anti-back-power behavior.
+- Servo scan/read diagnostics.
+- Independent readback classification after `@SERVO SAFE_OFF`.
+- Multi-module health and power-state baseline.
+
+### TO_TEST next
+
+The immediate no-motion `ROBOT_POWERED` validation is owned by the
+[root milestone](../../README.md#immediate-milestone-to_test-no-motion) and detailed in
+[`VALIDATION.md`](../../05_Firmware/MATDOG_Controller/VALIDATION.md). It covers live read-only
+DALY, live LED, all 13 expected servos read-only, real SAFE_OFF readback, and concurrent soak.
+
+No document may promote the powered configuration to **VALIDATED** before that evidence exists.
+
+## Frozen tools and calibration oracle
+
+The following ST3215 tools are **FROZEN** immutable evidence:
+
+- Bench QC V6.1
+- Source Signature Survey V1
+- Provisioner V6
+
+They remain qualification instruments, not editable Controller modules. Equivalent future
+maintenance/service features must be integrated without rewriting their source or historical
+evidence.
+
+The branch `matdog/full-leg-calibrator-v1` is preserved as an oracle/evidence branch. It is not
+the final runtime architecture. Selected calibration-engine, safety, and evidence logic may be
+migrated later into the permanent Controller; the branch must not be rebased, deleted, or merged
+wholesale for that purpose.
 
 ## Repository responsibilities
 
-| Repository | Responsibility |
+| Location | Responsibility |
 |---|---|
-| **`MattRobotics/robot-dog`** | **Sole active MATDOG repository** — mechanics, CAD/URDF, electronics, ESP32-S3 firmware and bench tools, ST3215 QC/provisioning, calibration, geometry, kinematics, locomotion, ROS 2 integration, high-level software, evidence, historical archive |
-| `MattRobotics/norma-core` | Reference/upstream fork only. `main` retained; **no active MATDOG development branches**; no new MATDOG feature development |
-| `norma-core/norma-core` | Official upstream reference |
+| `MattRobotics/robot-dog` | sole active MATDOG engineering repository |
+| `README.md` | current project/physical snapshot and immediate milestone |
+| `01_Docs/02_Architecture/ARCHITECTURE.md` | architecture contracts and target direction |
+| `04_Electronics/README.md` | power, wiring, connectors, and their validation state |
+| `05_Firmware/MATDOG_Controller/` | permanent Controller firmware, design, and validation |
+| `05_Firmware/ST3215_Bench_Tools/` | frozen qualification tools |
+| `06_Software/Matdog_Core/` | robot-specific configuration, calibration, geometry, kinematics, and host tools |
+| `09_Logs/` | evidence, decisions, chronological records, and historical archives |
+| `MattRobotics/norma-core` | upstream/reference repository only; no active MATDOG ownership |
 
----
+## Superseded architecture
 
-## Validation scope — precise wording
+The Station-mediated runtime, Waveshare-as-production-driver path, GPIO19/20 Jetson UART, and
+Generic V25 as the immediate project milestone are **SUPERSEDED**. Their evidence remains
+**HISTORICAL** under [`09_Logs/Historical/`](../../09_Logs/Historical/README.md) and dated logs.
 
-**VALIDATED** — implemented and exercised on real hardware:
+[`CURRENT_STATE.md`](CURRENT_STATE.md) is retained only as a compatibility tombstone. It is not a
+third source of current truth.
 
-- the ESP32-S3 can **exclusively own and directly operate** the ST3215 bus;
-- the native/direct driver path is proven by the QC and provisioning campaigns;
-- **17 servos were provisioned without Station** in the loop.
+## Development order
 
-**DECIDED** — current architectural decision, implementation partial or absent:
+1. Complete the no-motion `ROBOT_POWERED` validation gate.
+2. Design and integrate permanent diagnostics/maintenance/service capabilities without modifying
+   frozen evidence.
+3. Migrate selected full-leg calibration logic into the Controller through a reviewed,
+   fail-closed design.
+4. Recalibrate the installed robot before any motion, then establish safe motion primitives.
+5. Add host protocol, Wi-Fi/OTA, motion, IK, gait, stabilization, and high-level integration in
+   independently validated stages.
 
-- the ESP32-S3 is the **definitive operational servo-bus owner and motion coprocessor**;
-- runtime motion, gait/IK, IMU, power telemetry and watchdog/safety responsibilities reside there;
-- USB CDC is the primary host↔coprocessor link; Jetson Orin Nano Super is the final onboard host.
-
-**NOT YET IMPLEMENTED**:
-
-- the complete operational motion firmware;
-- the final ROS 2 / MoveIt 2 integration;
-- the complete Jetson onboard integration.
-
-> The complete ESP32 operational runtime is **not** validated. Only bus ownership and the direct
-> driver path are.
-
-## What is implemented and hardware-validated today
-
-| Capability | Evidence |
-|---|---|
-| Direct ESP32-S3 ↔ ST3215 serial operation | [Bench QC V6.1](../../09_Logs/Validation_Reports/ST3215_Bench_QC_2026-08-24/README.md) |
-| Servo quality audit, 26 runs | same |
-| Read-only 71-byte full-state survey | [frozen tools](../../05_Firmware/ST3215_Bench_Tools/README.md) |
-| Persistent profile `MATDOG_C018_V1` | [profile](MATDOG_ST3215_C018_V1_PROFILE.md) |
-| Provisioning 17/17 — centre, offset→0, ID recode, cold verify | [campaign](../../09_Logs/Validation_Reports/ST3215_Provisioning_2026-08-27/README.md) |
-| Offline geometry compiler, URDF/collision pipeline | Geometry Compiler V5 / Phase 1B |
-| BNO085 IMU acquisition, unified runtime, USB-only bench | [MATDOG Controller V0.1](../../05_Firmware/MATDOG_Controller/VALIDATION.md) |
-
-### Explicitly NOT yet implemented
-
-| Item | Status |
-|---|---|
-| Host ↔ ESP32-S3 **protocol** | ⬜ **TBD** — packet format, command set and telemetry schema. The **physical transport (USB CDC) is decided and in use** |
-| ROS 2 / MoveIt 2 integration | 🟦 intended high-level stack; **no integration exists yet** |
-| Deterministic motion execution firmware | 🟦 decided; not written |
-| Watchdog / safety firmware | 🟦 decided; health aggregation exists in [MATDOG Controller V0.1](../../05_Firmware/MATDOG_Controller/); not the final safety state machine |
-| Battery telemetry (DALY, live) | 🟦 read-only decode implemented in MATDOG Controller V0.1; **not yet hardware-validated** — no battery connected in the USB-only bench session |
-| Gait / IK / motion firmware | 🟦 decided to live on the ESP32-S3; **not written** |
-| Jetson Orin Nano Super onboard host | 🟦 selected; not yet integrated |
-| Robot joint calibration | ⚠️ **RESET** — must be redone from zero |
-
-> ROS 2 and MoveIt 2 are the **intended** high-level robotics stack. They are not integrated,
-> and nothing in this repository currently depends on them.
-
----
-
-## Electronics
-
-Current hardware decisions — servo-bus driver, power distribution, protection and cabling — are
-recorded in [`04_Electronics/README.md`](../../04_Electronics/README.md).
-
-Summary: **Seeed Bus Servo Driver** for the servo-bus electrical layer · **no CAN transceiver** ·
-no dedicated Jetson DC/DC · no separate 5 V logic DC/DC · one removable external ATO main fuse ·
-custom motor power busbar · locking 3D-printed cable housings · no bulk servo capacitor initially ·
-no TVS initially.
-
----
-
-## Current physical state
-
-**Reassembly in progress.** All 17 servos were bench-provisioned and are being remounted — 12 leg
-servos, then 5 head/jaw servos.
-
-**All robot calibration is RESET.** Old digital zero and q0 values are historical evidence, not
-active truth. Full recalibration must complete before any stand, gait or load-bearing attempt.
-
-→ [Calibration reset](../../09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md)
-
----
-
-## Development sequence
-
-1. Finish assembly — 12 leg servos, then 5 head/jaw servos.
-2. **Full recalibration from zero** on the new installation; q0 measured, never imported.
-3. Verify mapping and directions on all 17 joints.
-4. Controlled bring-up: read-only FK → supervised suspended motion → gradual load transfer.
-5. Freeze the host ↔ ESP32-S3 **protocol** carried over the already-decided USB CDC transport.
-6. Build the ESP32-S3 motion/safety/watchdog layer.
-7. Recompute four-leg FK; regenerate and audit stand poses.
-8. Single-foot trajectories, gait, walking.
-9. ROS 2 / MoveIt 2 integration.
-10. Jetson Orin Nano Super onboard host, IMU, estimator, perception and autonomy.
-
----
-
-## Historical
-
-The Station-mediated phase (Phases A–F, including the hardware-validated LF V25 oracle) is
-preserved and indexed at
-[`09_Logs/Historical/NormaCore_MATDOG_Archive/`](../../09_Logs/Historical/NormaCore_MATDOG_Archive/README.md).
-None of it is current runtime or current calibration.
+Phase A changes documentation only. It neither performs these stages nor authorizes hardware
+activity.

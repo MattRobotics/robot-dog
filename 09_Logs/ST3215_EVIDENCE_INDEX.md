@@ -6,6 +6,10 @@ on the ASUS canonical archive.
 
 **Phase closed:** 2026-08-27 · **Units provisioned:** 17/17 PASS · **Profile:** `MATDOG_C018_V1`
 
+> **Scope:** `17/17` means the complete allocated bench cohort was provisioned and verified. It is
+> not a claim that all 17 servos are physically installed today. Current physical population is
+> owned by the [root README](../README.md).
+
 ---
 
 ## Documents
@@ -20,7 +24,7 @@ on the ASUS canonical archive.
 | [Frozen bench tools](../05_Firmware/ST3215_Bench_Tools/README.md) | freeze policy, hashes, command surfaces, validation scope |
 | [RAW capture schema](../05_Firmware/ST3215_Bench_Tools/Bench_QC_V6_1/RAW_SCHEMA.md) | QC `.bin` binary format |
 | [⚠️ Calibration reset](Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md) | why all calibration must be redone |
-| [Handoff 2026-08-27](Development_Log/2026-08-27_ST3215_CANONICAL_ARCHIVE_HANDOFF.md) | current state and next steps |
+| [Historical bench-phase closeout — 2026-08-27](Development_Log/2026-08-27_ST3215_CANONICAL_ARCHIVE_HANDOFF.md) | dated closeout and the next steps recorded then; not current project state |
 
 ---
 
@@ -120,7 +124,7 @@ BEFORE/AFTER both matching proves the blind audit was read-only.
 | 12 | `postimpact_definitive_v2` — M-series only, **separate earlier campaign** | 2026-08-14 |
 | 18 | Bench QC blind audit cohort (12 M + 6 NEW) | 2026-08-24 |
 | 22 | Total Bench QC units (18 + 4 ELR); 26 runs incl. 4 `_NORM` | 2026-08-24/25 |
-| 17 | Allocated and provisioned into the robot | 2026-08-27 |
+| 17 | Allocated and provisioned for MATDOG; not a current installed-population count | 2026-08-27 |
 
 Not allocated: **M12, M13, M21, M23, M32**. Full explanation in the
 [QC campaign report](Validation_Reports/ST3215_Bench_QC_2026-08-24/README.md#count-reconciliation--12-18-22-17).

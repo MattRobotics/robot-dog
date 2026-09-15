@@ -8,6 +8,62 @@ fully — hardware-exercised), **DECIDED** (architectural decision, not yet buil
 This document will be updated in place as hardware sessions progress; it is not
 rewritten per session.
 
+## Present-day baseline and next gate
+
+The official Controller baseline is now merged and tagged. The session records below preserve the
+state and merge judgements that were true when each session ended; their historical "not merged"
+checkboxes are not current project status and are intentionally not rewritten.
+
+| Identity | Value |
+|---|---|
+| Official release tag | `matdog-controller-v0.1.0` |
+| Tagged repository commit | `c54862f38a9cbd5e46d6b1770a6d109cc99b5c02` |
+| Exact validated firmware source | `5b371da5482f9b0bd2df1c37ed361250ea54ae8f` |
+| Validated application SHA256 | `6e6d92f898dbe95000b53dbb252c7eb5d3deaa9a4b161e2b1934436a76b29364` |
+
+### VALIDATED
+
+- `USB_ONLY` boot on the real ESP32-S3, native USB CDC and live BNO085 acquisition;
+- viewer protocol compatibility, expected-offline classification and USB-only soak behavior;
+- unpowered servo diagnostics and honest `SAFE_OFF=UNVERIFIED_NO_RESPONSE` classification;
+- the exact source/application provenance recorded above.
+
+### IMPLEMENTED, NOT YET ROBOT-POWERED-VALIDATED
+
+- DALY read-only telemetry integration;
+- LED-ring output path;
+- powered ST3215 read/scan and `SAFE_OFF` readback paths;
+- Controller scheduling paths for concurrent DALY, LED and servo operation.
+
+The official V0.1 source remains configured for `USB_ONLY`; its power-availability flags are false.
+A future `ROBOT_POWERED` build/configuration is a deliberate firmware change and is not performed by
+this documentation patch.
+
+### Immediate milestone — TO_TEST
+
+```text
+MATDOG Controller V0.1
+→ ROBOT_POWERED Hardware Validation
+→ no motion
+→ DALY live read-only
+→ LED live
+→ 13 expected servos read-only
+→ SAFE_OFF real readback
+→ concurrent soak
+```
+
+The expected installed servo IDs are `11,12,13,21,22,23,31,32,33,41,42,43,51`: 12 legs plus
+`NECK_ROTATION` ID51. IDs 52 `NECK_PITCH`, 53 `HEAD_ROTATION`, 54 `HEAD_PITCH` and 55 `JAW` remain
+canonically allocated but are intentionally absent today; their absence is not a failed census.
+The allocation authority is
+[`MATDOG_SERVO_ALLOCATION.yaml`](../../06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml),
+while the root [`README.md`](../../README.md) owns the current physical-population snapshot.
+
+This gate requires separate hardware authorization. It permits read-only inspection plus the
+existing torque-off-only `SAFE_OFF` command and forbids motion, torque-on, servo EEPROM/ID writes,
+BNO085 DCD writes and DALY writes. Passing earlier single-device bench campaigns does not constitute
+passing this assembled, concurrent ROBOT_POWERED gate.
+
 ## Session 1 — 2026-09-15, USB-only bench state
 
 Hardware configuration for this session, per the REV3 handoff:

@@ -1,33 +1,33 @@
 # MATDOG Core
 
-MATDOG Core will contain robot-specific control logic that is independent from NormaCore Station transport and ST3215 serial-bus details.
+MATDOG Core contains robot-specific configuration, offline calibration and geometry tools,
+kinematics and safety-policy code, retained hardware-development utilities, tests, and host-side
+visualization.
 
-## Current Contents
+## Contents
 
-- config/
-  Canonical software configuration derived from the approved CAD and URDF baseline.
+- [`config/`](config/) — canonical machine-readable allocation and engineering configuration.
+- [`calibration/`](calibration/) — calibration contracts, validators, Geometry Compiler code, and
+  preserved historical Station-era procedures and handoffs.
+- [`kinematics/`](kinematics/) — FK/IK, contact, stance, trajectory, and offline safety tooling.
+- [`hardware/`](hardware/) — retained hardware-facing development utilities; not current motion
+  authorization.
+- [`viewer/`](viewer/) — the BNO085 full-body viewer and related host tooling.
 
-## Planned Modules
+Current project status lives in the [root README](../../README.md). Runtime ownership and target
+direction live in [`ARCHITECTURE.md`](../../01_Docs/02_Architecture/ARCHITECTURE.md).
 
-- calibration/
-- kinematics/
-- gait/
-- safety/
-- simulation/
-- tests/
+## Controller boundary
 
-## Design Rule
+The ESP32-S3 [MATDOG Controller](../../05_Firmware/MATDOG_Controller/README.md) is the permanent
+operational actuator boundary and sole ST3215 bus owner. Host-side and offline code in this area
+must not create a second bus owner. The eventual host-to-Controller application protocol remains a
+separate architecture contract; preserved Station-based code and documents are historical or
+transitional references, not the current control flow.
 
-The control flow must remain modular:
+## Full-leg calibration oracle
 
-    gait generator
-    → leg inverse kinematics
-    → joint targets in radians
-    → actuator adapter
-
-The actuator backend is the **ESP32-S3 motion coprocessor** over native USB CDC, driving the
-Seeed Bus Servo Driver. NormaCore Station and the Waveshare Bus Servo Adapter were the historical
-bench/development path and are no longer required — see
-[ARCHITECTURE.md](../../01_Docs/02_Architecture/ARCHITECTURE.md).
-
-A future ESP32 motion controller may replace only the actuator layer, without rewriting gait, IK or calibration logic.
+The branch `matdog/full-leg-calibrator-v1` is preserved as an engineering oracle and evidence
+source. It is **not** the final runtime architecture and must not be merged wholesale into the
+Controller. Its useful calibration engine, safety gates, and evidence logic are candidates for a
+later deliberate migration into the unified Controller architecture.
