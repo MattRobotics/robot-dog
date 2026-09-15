@@ -48,8 +48,8 @@ kinematics, locomotion and evidence.
 │   deterministic servo control                  🟦 decided    │
 │   gait execution                               🟦 decided    │
 │   operational IK                               🟦 decided    │
-│   IMU acquisition                              🟦 decided    │
-│   battery / power telemetry                    🟦 decided    │
+│   IMU acquisition                              ✅ validated  │
+│   battery / power telemetry (read-only)        🟦 decided    │
 │   watchdog and safety                          🟦 decided    │
 │   real-time motion execution                   🟦 decided    │
 └──────────────────────────────────────────────────────────────┘
@@ -199,6 +199,7 @@ Full transition record: [NormaCore MATDOG archive](../../09_Logs/Historical/Norm
 | Persistent profile `MATDOG_C018_V1` | [profile](MATDOG_ST3215_C018_V1_PROFILE.md) |
 | Provisioning 17/17 — centre, offset→0, ID recode, cold verify | [campaign](../../09_Logs/Validation_Reports/ST3215_Provisioning_2026-08-27/README.md) |
 | Offline geometry compiler, URDF/collision pipeline | Geometry Compiler V5 / Phase 1B |
+| BNO085 IMU acquisition, unified runtime, USB-only bench | [MATDOG Controller V0.1](../../05_Firmware/MATDOG_Controller/VALIDATION.md) |
 
 ### Explicitly NOT yet implemented
 
@@ -207,8 +208,8 @@ Full transition record: [NormaCore MATDOG archive](../../09_Logs/Historical/Norm
 | Host ↔ ESP32-S3 **protocol** | ⬜ **TBD** — packet format, command set and telemetry schema. The **physical transport (USB CDC) is decided and in use** |
 | ROS 2 / MoveIt 2 integration | 🟦 intended high-level stack; **no integration exists yet** |
 | Deterministic motion execution firmware | 🟦 decided; not written |
-| Watchdog / safety firmware | 🟦 decided; not written |
-| IMU / power / battery telemetry | 🟦 decided; not written |
+| Watchdog / safety firmware | 🟦 decided; health aggregation exists in [MATDOG Controller V0.1](../../05_Firmware/MATDOG_Controller/); not the final safety state machine |
+| Battery telemetry (DALY, live) | 🟦 read-only decode implemented in MATDOG Controller V0.1; **not yet hardware-validated** — no battery connected in the USB-only bench session |
 | Gait / IK / motion firmware | 🟦 decided to live on the ESP32-S3; **not written** |
 | Jetson Orin Nano Super onboard host | 🟦 selected; not yet integrated |
 | Robot joint calibration | ⚠️ **RESET** — must be redone from zero |
