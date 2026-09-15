@@ -56,3 +56,46 @@ own commit is necessarily later and must not be confused with it).
 
 See `VALIDATION.md` Session 2 for the full read-only flash audit, the
 application-only flash provenance record, and H1–H6 hardware results.
+
+## 0.1.0 — Session 2.1 final pre-merge hardening — 2026-09-15
+
+Two findings from an independent review of Session 2, fixed before merge —
+no new functionality. Flashed and hardware-validated as commit
+`07592b9d7f284eb6a24d18d69b57351281676e14` (`FIRMWARE_SOURCE_COMMIT`; see
+`VALIDATION.md` Session 2.1).
+
+- **Terminology correction**: Session 2's `@SERVO SCAN` was described as
+  "non-blocking". `SCServo::Ping()` is still a synchronous call with its own
+  bounded per-call timeout, so the accurate description is "incremental
+  scan with bounded per-ID blocking". Corrected everywhere it was live
+  documentation; Session 2's own record is preserved with a correction
+  note, not rewritten.
+- `core`: adds `OperatingMode` (`MAINTENANCE`/`RUN`) — a deliberately tiny
+  boundary, not a state machine. `@SERVO SCAN`/`@SERVO READ` now refuse
+  outside `MAINTENANCE`; `@SERVO SAFE_OFF` stays reachable in every mode
+  (it can only remove torque). Default is `MAINTENANCE` (no motion loop
+  exists yet); the future motion controller must flip the default to `RUN`.
+- `servo/ServoBus`: `kPingTimeoutMs` reduces SCServo's 100ms default
+  `IOTimeOut` to 20ms, justified by real hardware measurement (NEW01
+  characterization campaign, ~600us measured round trip) rather than an
+  assumed value — a public library field, not a vendored-source edit.
+  `ScanResult` now reports measured `elapsed_ms`/`max_ping_us` instead of
+  asserting scan cost. Measured this session: 45-ID scan in 1218ms
+  (was ~4.5s), max single probe 20.815ms; BNO085 RV rate ~48.8Hz baseline
+  vs ~47.3Hz during a scan.
+- `scripts/ota_partition_logic.py` (new): replaces Session 2's OTA
+  slot-selection logic, which compared raw `ota_seq` numbers and mislabeled
+  the struct's `ota_state` field as `crc`, never validating the real CRC.
+  Rewritten against the exact installed ESP-IDF v5.5.5 source
+  (`bootloader_common_loader.c`/`bootloader_utility.c`), fails closed
+  (`OtaAmbiguous`) on every state the real bootloader does not
+  deterministically resolve. `scripts/tests/test_ota_partition_logic.py`:
+  10/10 offline tests pass, including the exact regression case (a
+  CRC-invalid entry with a higher raw sequence number than the valid one).
+- `scripts/static_audit.py`: three new checks — MAINTENANCE-mode gating on
+  servo scan/read (and that SAFE_OFF never gains one), the OTA parser's
+  fail-closed primitives, and runs the OTA parser's own offline test suite
+  as part of the audit.
+
+See `VALIDATION.md` Session 2.1 for the full measurement evidence, the ESP-IDF
+source citations, and H1/H2/H3/H4/H6 hardware re-validation.

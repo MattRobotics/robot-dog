@@ -334,6 +334,16 @@ responding could monopolize `loop()` for ~4.5s. `ServoBus` now runs
 `startScan()`/`update()`/`scanState()`: one `Ping()` per tick, result reported
 asynchronously.
 
+> **Correction recorded in Session 2.1 (2026-09-15):** calling this
+> "non-blocking" was imprecise and has been corrected. `SCServo::Ping()` is
+> still a synchronous call with its own bounded per-call timeout — one
+> `update()` tick can still block the caller for up to that long. The
+> accurate description is "incremental scan with bounded per-ID blocking".
+> Session 2.1 additionally confines `@SERVO SCAN`/`@SERVO READ` to a new
+> `MAINTENANCE` operating mode so this can never be reachable from a future
+> motion `RUN` loop, and reduces the per-ID timeout from 100ms to a
+> hardware-measurement-justified 20ms. See "Session 2.1" below.
+
 ### H0 — Offline gates (Session 2)
 
 | Gate | Result |
@@ -520,3 +530,323 @@ validated behaviour (BNO085 SPI/RV/MAG/GYR/SAVE_GATE, viewer protocol, USB CDC,
 DALY non-blocking polling, ServoBus/DalyBms pin/baud mapping, LED GPIO47
 mapping, power-state architecture) and frozen sources re-confirmed unchanged.
 Not merged to `main` — that remains a separate, explicit decision.
+
+---
+
+## Session 2.1 — 2026-09-15, Final Pre-Merge Hardening
+
+An independent review of Session 2 raised two findings before merge. Same
+USB_ONLY hardware configuration throughout; no new functionality.
+
+### Provenance
+
+```text
+FIRMWARE_SOURCE_COMMIT = 07592b9d7f284eb6a24d18d69b57351281676e14
+  (clean tree; compiled, application-only flashed and hardware-validated
+   this session — build id 07592b9d7f28 visible in the boot banner/@STATUS)
+FINAL_BRANCH_HEAD       = <the commit that adds this section plus the
+   accompanying README/CHANGELOG updates — created AFTER
+   FIRMWARE_SOURCE_COMMIT and after the device was already flashed and
+   validated; changes nothing that is running on the device>
+```
+
+### Review finding 1 — the Session 2 servo scan was not truly non-blocking
+
+Accurate: `ServoBus::update()` still calls `SCServo::Ping()` synchronously,
+and that call carries its own bounded per-call timeout — one `update()` tick
+can still block for up to that long. "Non-blocking" was imprecise. Fixed by:
+
+1. **Terminology corrected** everywhere it was live documentation (not a
+   historical Session 2 record, which is preserved with a correction note
+   instead — see Finding 5 above): "incremental scan with bounded per-ID
+   blocking", not "non-blocking". Source comments, README, static audit
+   messages, USB diagnostic text (`@SERVO SCAN` help line) all updated.
+2. **Architectural boundary introduced**: `core::OperatingMode`
+   (`MAINTENANCE`/`RUN`) — deliberately just an enum and a two-line manager
+   class. `@SERVO SCAN`/`@SERVO READ` now refuse outside `MAINTENANCE`
+   (`SERVO_SCAN=BLOCKED`/`REASON=NOT_IN_MAINTENANCE_MODE`). `@SERVO SAFE_OFF`
+   is deliberately **not** gated — it can only remove torque and must stay
+   reachable in every mode as the safety de-escalation path. Default is
+   `MAINTENANCE` (no motion loop exists yet to protect); whoever adds the
+   motion controller must flip the default to `RUN` and require an explicit,
+   reviewed transition into `MAINTENANCE` first — documented directly in
+   `OperatingMode.h` so it cannot be missed.
+3. **`IOTimeOut` audited, not assumed, and reduced with cited evidence**:
+   `SCSerial::IOTimeOut` (`SCSerial.h`) is a public field, default 100ms
+   (`SCSerial.cpp`, three constructors) — a generic library-wide margin, not
+   an ST3215-specific figure. Real hardware measurement exists for this
+   exact servo/bus combination: the NEW01 characterization campaign
+   (`09_Logs/Validation_Reports/ST3215_Provisioning_2026-08-27/characterization_sessions/`,
+   firmware `matdog_st3215_characterize_v1.ino`) timed a live powered ST3215
+   at 1 Mbaud with `micros()` and recorded Ping+register-read round trips
+   clustering at 593-620us (hundreds of samples) and a dedicated
+   register-read timing of 334-358us. `ServoBus::kPingTimeoutMs = 20`
+   (milliseconds) is set at runtime in `begin()` — the vendored SCServo
+   library file is never edited — chosen as roughly 32x that measured worst
+   case: enough margin for this session's different bus topology (through
+   the Seeed driver, not the characterization rig's point-to-point wiring)
+   while cutting the USB_ONLY no-response worst case 5x per ID versus the
+   100ms library default.
+4. **Real behaviour measured, not asserted**: `ScanResult` gained
+   `elapsed_ms`/`max_ping_us`, computed with `micros()`/`millis()` inside
+   `ServoBus::update()` and reported in `SERVO_SCAN=COMPLETE`.
+
+**Measured evidence (real hardware, this session, servos unpowered as
+designed):**
+
+```text
+SERVO_SCAN=COMPLETE lo=11 hi=55 found=0 elapsed_ms=1218 max_ping_us=20815
+```
+
+- Full 45-ID scan (the canonical allocation range): **1218 ms total**
+  (vs. Session 2's ~4.5s estimate at the 100ms default — ~3.7x faster).
+- **Single slowest probe: 20.815ms** — consistent with the configured 20ms
+  `kPingTimeoutMs` (small overhead above the nominal timeout is UART framing,
+  not unexpected).
+
+**RV rate: baseline vs. during scan** (both measured from real `COUNTS`
+telemetry, not inferred from "RV kept advancing"):
+
+```text
+baseline (no scan running)   : ~48.8 Hz  (708 RV samples / ~14.5s)
+during a scan (scan overlaps
+  the middle of the capture)  : ~47.3 Hz  (662 RV samples / ~14.0s)
+```
+
+The ~3% difference is within normal sample-window jitter, not a measurable
+stall. **This does not mean BNO085 acquisition is guaranteed unaffected
+during MAINTENANCE-mode scanning under different conditions** — it means
+that under this session's real measurement, the degradation was small and,
+more importantly, **is now architecturally confined to `MAINTENANCE` and
+explicitly not permitted to coexist with a future motion `RUN` loop**,
+which is the actual requirement this finding asked for.
+
+**USB behaviour during scan:** the command router remained responsive
+throughout every scan performed this session (immediate `SERVO_SCAN=STARTED`
+reply, subsequent commands like `@STATUS` handled normally mid-scan in
+earlier interactive tests) — no lockup, no dropped input observed.
+
+**Which servo commands are gated:**
+
+```text
+MAINTENANCE mode required : @SERVO SCAN, @SERVO READ
+Always allowed (any mode)  : @SERVO SAFE_OFF  (torque-off only, never adds risk)
+```
+
+Live confirmation, `@MODE RUN` then each command:
+
+```text
+MODE=RUN
+SERVO_SCAN=BLOCKED
+REASON=NOT_IN_MAINTENANCE_MODE
+MODE=RUN
+
+MODE=RUN
+SERVO_READ=BLOCKED
+REASON=NOT_IN_MAINTENANCE_MODE
+MODE=RUN
+
+MODE=RUN
+SERVO_SAFE_OFF id=11 result=OK          <- still allowed in RUN
+
+MODE=MAINTENANCE                          <- switched back
+SYSTEM health=READY power_state=RUN mode=MAINTENANCE uptime_ms=59840 profile=USB_ONLY
+```
+
+### Review finding 2 — OTA slot selection did not match the real bootloader
+
+Session 2's `verify_application_partition.py` picked whichever otadata
+sector had the numerically higher `ota_seq` among any non-blank sector, and
+mislabeled the struct's `ota_state` field as `crc` — it never validated the
+real CRC field at all. On the real device this session
+(`OTADATA_SECTOR_SEQS=[1, 0]`) that happened to produce the correct answer,
+but the algorithm itself could in principle have selected a slot the actual
+bootloader would refuse to boot.
+
+**Ground truth, verified against the exact installed framework, not
+memory or generic examples:** the arduino-esp32 3.3.11 core bundles
+ESP-IDF **v5.5.5, commit `b774170ff46`** (`versions.txt` in the installed
+esp32-libs package). The real `esp_ota_select_entry_t` struct
+(`esp_flash_partitions.h`) is 32 bytes: `ota_seq`(4) + `seq_label`(20) +
+**`ota_state`(4)** + `crc`(4) — Session 2's parser read the `ota_state`
+offset and called it `crc`; the real `crc` field is 4 bytes further in.
+The real selection algorithm
+(`bootloader_support/src/bootloader_common_loader.c`,
+`bootloader_common_ota_select_crc`/`_invalid`/`_valid`/`get_active_otadata`/
+`select_otadata`, and the seq→slot mapping in `bootloader_utility.c`):
+
+```text
+crc(entry)     = crc32(entry.ota_seq_bytes, init=0xFFFFFFFF)
+invalid(entry) = entry.ota_seq == 0xFFFFFFFF
+                 or entry.ota_state in {INVALID(3), ABORTED(4)}
+valid(entry)   = not invalid(entry) and entry.crc == crc(entry)
+
+both entries invalid (ignoring crc) -> no deterministic answer -> REFUSE
+  (real bootloader falls back to a factory partition, which this table
+   has none of, or a first-boot ota_0-init path)
+both valid    -> pick larger ota_seq (tie -> index 0)
+one valid     -> pick that one
+neither valid -> REFUSE (ambiguous)
+
+slot_index = (winning_entry.ota_seq - 1) % ota_app_count
+```
+
+The CRC32 variant (`esp_rom_crc32_le` semantics) was **verified
+empirically**, not assumed: the stored `crc` field of both otadata sectors
+in the real, known-good `boot_app0.bin` seed file shipped with this exact
+core matches `zlib.crc32(ota_seq_bytes, 0xFFFFFFFF)` (Python's `zlib.crc32`
+called with a custom starting value, no additional inversion) exactly —
+confirmed against real bytes, four other candidate CRC formulations
+rejected by the same test.
+
+**Fix:** logic split into `scripts/ota_partition_logic.py` (pure, no device
+I/O, fully offline-testable) implementing the algorithm above exactly, and
+`scripts/verify_application_partition.py` (thin device-I/O wrapper).
+Fails closed — raises `OtaAmbiguous`, refuses to write — on every case the
+real bootloader does not deterministically resolve.
+
+**Offline test suite** (`scripts/tests/test_ota_partition_logic.py`, no
+hardware, no flash writes): **10/10 PASS**, covering every required
+scenario:
+
+| Test | Result |
+|---|---|
+| Current real device state (`[1, 0]`, matches actual hardware) | PASS — resolves to `app0 @ 0x10000` |
+| Slot 0 valid, slot 1 blank | PASS — `app0` |
+| Slot 1 valid, slot 0 blank | PASS — `app1` |
+| CRC-invalid entry with a **higher raw seq** than the valid one (the exact Session 2 regression case) | PASS — correctly picks the CRC-valid entry, ignoring the higher-but-corrupt seq |
+| `ota_state = INVALID` | PASS — entry excluded |
+| `ota_state = ABORTED` | PASS — entry excluded |
+| Both entries blank | PASS — `OtaAmbiguous` raised |
+| Both entries CRC-invalid (ambiguous) | PASS — `OtaAmbiguous` raised |
+| Partition table missing the computed slot | PASS — `OtaAmbiguous` raised |
+| No `ota_N` partitions in table at all | PASS — `OtaAmbiguous` raised |
+
+**Re-run read-only against the real device** after the fix — identical
+result to Session 2, now backed by the verified algorithm:
+
+```text
+OTADATA_SECTOR_SEQS=[1, 0]
+OTADATA_ACTIVE_SECTOR=0
+OTADATA_ACTIVE_SEQ=1
+ACTIVE_OTA_SLOT_INDEX=0
+ACTIVE_PARTITION_LABEL=app0
+APPLICATION_OFFSET=0x010000
+APPLICATION_PARTITION_SIZE=3145728
+```
+
+`static_audit.py` now runs this offline test suite as part of the audit
+itself (`check_ota_partition_verifier_fail_closed`), so a regression here
+fails the same gate `flash_app_only.sh` already requires PASS before any
+write — this utility explicitly does **not** replace a future MATDOG OTA
+manager; it is a conservative, fail-closed, read-only-verification helper
+for the current application-only flashing path only.
+
+### H0 — Offline gates (Session 2.1)
+
+| Gate | Result |
+|---|---|
+| Git state re-audited: branch, HEAD, Session 2 commit log, frozen-source hashes | PASS — unchanged |
+| Compile (pinned FQBN, clean `FIRMWARE_SOURCE_COMMIT`) | **PASS** — 383988 bytes flash (12%), 28232 bytes RAM (9%), zero warnings from MATDOG_Controller sources |
+| Static audit (extended) | **PASS** — 23 source files, 0 findings, includes 10/10 OTA parser tests |
+| Existing BNO085 viewer test suite | **PASS** — 59/59, unmodified |
+| Application binary provenance | `MATDOG_Controller.ino.bin`, 384,128 bytes, SHA256 `158cd25254ef0cfdc4b7e88cb147563214aafc317c5860f3789e228084c1853a`, embeds build id `07592b9d7f28` matching `FIRMWARE_SOURCE_COMMIT` |
+
+### Application-only flash
+
+```text
+DEVICE               = /dev/serial/.../usb-Espressif_USB_JTAG_...-if00 (MAC 14:c1:9f:22:75:94)
+APPLICATION_BINARY   = build/esp32.esp32.esp32s3/MATDOG_Controller.ino.bin
+APPLICATION_SHA256   = 158cd25254ef0cfdc4b7e88cb147563214aafc317c5860f3789e228084c1853a
+APPLICATION_OFFSET   = 0x010000 (partition 'app0' / ota_0, re-verified with the corrected algorithm)
+APPLICATION_SIZE     = 384128 bytes
+MAX_PARTITION_SIZE   = 3145728 bytes
+SOURCE_COMMIT        = 07592b9d7f284eb6a24d18d69b57351281676e14
+```
+
+Write result: esptool's post-write hash check passed ("Hash of data
+verified"); independent `esptool verify-flash` reported "Verification
+successful (digest matched)". **Non-application regions re-verified
+unchanged** after this write via `esptool verify-flash` against the exact
+reference files captured during Session 2's original audit: bootloader
+(0x0), partition table (0x8000) and otadata (0xe000) all reported
+"Verification successful (digest matched)".
+
+### H1 — Boot — **PASS**
+
+```text
+build        : 07592b9d7f28
+partition    : app0 @ 0x010000 (size 0x300000)
+operating_mode : MAINTENANCE
+reset_reason : OTHER
+IMU_INIT=PASS
+SYSTEM_BOOT_COMPLETE health=READY power_state=RUN
+EXPECTED_STARTUP_RESET=YES
+```
+
+### H2 — BNO085 — **PASS**
+
+`runtime_resets=0` across every capture this session, including through
+mode switches and a servo scan. See RV baseline-vs-scan measurement above.
+
+### H3 — USB_ONLY classification — **PASS**, unchanged from Session 2
+
+```text
+BNO085 init=OK       detected=ONLINE      expected=REQUIRED  result=PASS
+DALY   init=OK       detected=NO_RESPONSE expected=OFFLINE   result=PASS
+SERVO  init=OK       detected=NO_RESPONSE expected=OFFLINE   result=PASS   (after a scan)
+LED    init=DEFERRED detected=UNPOWERED   expected=UNPOWERED result=PASS
+```
+
+### H4 — LED anti-back-power — **PASS**, unchanged from Session 2
+
+```text
+LED_TEST=BLOCKED
+REASON=LED_RAIL_UNPOWERED
+```
+
+Re-confirmed after all Session 2.1 changes — `data_pin_driven` behaviour
+untouched by this session's work.
+
+### H6 — Soak — **PASS**
+
+Extended, interactive soak across the whole session (MAINTENANCE/RUN mode
+switches, a servo scan, repeated `@STATUS`): `runtime_resets=0` throughout,
+including a final dedicated 55s window immediately before closing out the
+session. No fatal/panic/watchdog events observed.
+
+### Frozen/standalone source hashes — re-verified unchanged
+
+```text
+matdog_servo_commissioning.ino     74656fb9187fd2024f8251276b49676d8be9c6455f542c49500cfb30d25630cd
+matdog_bno085_dcd_phase_c3.ino     51bb3016ac20226b812e1e892328768495348278cb19c320de34930cccd103e6
+matdog_daly_rs485_probe_v2.ino     4fd7fd3982ab57376ad9a5ade7ed497fb2515234465612a59aac22f756acb81c
+```
+
+### Session 2.1 completion checklist
+
+- [x] blocking nature of `SCServo::Ping()` measured and documented (max 20.815ms single-probe, 1218ms full 45-ID scan)
+- [x] no documentation calls the scan falsely non-blocking (Session 2 record preserved with a correction note, not rewritten)
+- [x] potentially-blocking servo diagnostics confined to `MAINTENANCE`, refused in `RUN`
+- [x] SCServo timeout audited from real library source (public field, 100ms default) and reduced with cited hardware evidence, not assumed
+- [x] baseline vs. during-scan BNO085 RV rate documented (~48.8Hz vs ~47.3Hz)
+- [x] OTA partition selection follows the real installed bootloader algorithm (verified against ESP-IDF v5.5.5 source) or REFUSEs
+- [x] OTA parser has fail-closed offline tests — 10/10 PASS
+- [x] static audit PASS (includes the above as gates)
+- [x] viewer tests PASS (59/59, unmodified)
+- [x] frozen source hashes unchanged
+- [x] git working tree clean
+- [ ] merge to `main` — explicitly NOT done this session
+
+### Judgement
+
+```text
+READY_FOR_MAIN_MERGE
+```
+
+Both review findings are fixed, tested (offline where possible, hardware
+where required) and documented without deleting or silently rewriting
+Session 2's evidence. No new functionality was added; no forbidden hardware
+action (battery, 5V, torque-on, GoalPosition, EEPROM, DALY write, MOS write,
+bootloader/partition-table write, NVS erase, full-image upload) occurred
+this session. Merge decision and execution remain with the operator.

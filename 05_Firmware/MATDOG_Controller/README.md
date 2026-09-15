@@ -76,9 +76,12 @@ Regression tripwire (not a formal verifier) that fails the build if forbidden
 functionality leaks in: `CalibrationOfs`, EEPROM ID/offset writes, automatic
 torque-on, `GoalPosition`/motion primitives, automatic BNO085 DCD save, any DALY
 write, duplicate GPIO ownership, a UART peripheral collision between ServoBus and
-DalyBms, a blocking multi-ID servo scan, the LED transport being driven while
-`kLedRailPowered` is false, or `scripts/flash_app_only.sh` regressing to reference the
-bootloader/partition-table/boot_app0 artifacts it must never write.
+DalyBms, a synchronous multi-ID servo scan loop, `@SERVO SCAN`/`@SERVO READ` losing
+their `MAINTENANCE`-mode guard (or `@SERVO SAFE_OFF` gaining one), the LED transport
+being driven while `kLedRailPowered` is false, `scripts/flash_app_only.sh` regressing
+to reference the bootloader/partition-table/boot_app0 artifacts it must never write,
+or the OTA partition verifier's fail-closed validity checks regressing (it also runs
+that verifier's own offline test suite as part of the audit).
 
 ## USB diagnostic command surface
 
@@ -88,20 +91,29 @@ bootloader/partition-table/boot_app0 artifacts it must never write.
 @IMU STATUS | @IMU STREAM ON|OFF
 @BMS STATUS | @BMS STREAM ON|OFF
 @LED STATUS | @LED OFF | @LED TEST
-@SERVO SCAN <lo> <hi> | @SERVO READ <id> | @SERVO SAFE_OFF <id>
+@SERVO SCAN <lo> <hi> | @SERVO READ <id>   (MAINTENANCE mode only)
+@SERVO SAFE_OFF <id>                        (always allowed, any mode)
+@MODE STATUS | @MODE MAINTENANCE | @MODE RUN
 @SYSTEM SHUTDOWN
 ```
 
-`@SERVO SAFE_OFF` can only disable torque, never enable it. `@SERVO SCAN` is
-non-blocking: it replies `SERVO_SCAN=STARTED` immediately and the router reports
-`SERVO_SCAN=COMPLETE` asynchronously once the scan's one-ID-per-tick state machine
-finishes, without ever stalling BNO085 acquisition or the command router itself.
-`@LED TEST`/`@LED OFF` are refused/no-op under the current `USB_ONLY` profile — see
-Anti-back-power below. `@SYSTEM SHUTDOWN` walks the power-state machine through its
-shutdown sequence but always resolves to `POWER_CUT_FAILED` in V0.1, because the DALY
-K-Series `Discharge MOS OFF` write protocol has not been identified or bench-verified
-(see `VALIDATION.md` and handoff section 8A.8). No command in this surface can write
-servo EEPROM, recode an ID, save the BNO085 DCD, or write DALY configuration/MOS state.
+`@SERVO SAFE_OFF` can only disable torque, never enable it, and stays reachable in
+every operating mode — it is the safety de-escalation path. `@SERVO SCAN`/`@SERVO READ`
+are **incremental with bounded per-ID blocking, not non-blocking**: `ServoBus::update()`
+still calls `SCServo::Ping()` synchronously, which carries its own bounded per-call
+timeout (`kPingTimeoutMs`, 20ms — see Operating mode below). `@SERVO SCAN` replies
+`SERVO_SCAN=STARTED` immediately and the router reports `SERVO_SCAN=COMPLETE
+elapsed_ms=.. max_ping_us=..` asynchronously once the scan's one-`Ping()`-per-tick state
+machine finishes; that duration is measured, not assumed. Because a scan/read call can
+still block for a bounded-but-real amount of time, both commands refuse outside
+`MAINTENANCE` mode (`SERVO_SCAN=BLOCKED` / `REASON=NOT_IN_MAINTENANCE_MODE`) — see
+Operating mode below. `@LED TEST`/`@LED OFF` are refused/no-op under the current
+`USB_ONLY` profile — see Anti-back-power below. `@SYSTEM SHUTDOWN` walks the
+power-state machine through its shutdown sequence but always resolves to
+`POWER_CUT_FAILED` in V0.1, because the DALY K-Series `Discharge MOS OFF` write
+protocol has not been identified or bench-verified (see `VALIDATION.md` and handoff
+section 8A.8). No command in this surface can write servo EEPROM, recode an ID, save
+the BNO085 DCD, or write DALY configuration/MOS state.
 
 `@STATUS` (and the per-module `@IMU`/`@BMS`/`@LED` variants) report each module as
 `init=.. detected=.. expected=.. result=..` — separating "did the driver initialize"
@@ -114,6 +126,35 @@ DALY   init=OK       detected=NO_RESPONSE expected=OFFLINE   result=PASS
 SERVO  init=OK       detected=UNKNOWN     expected=OFFLINE   result=PASS
 LED    init=DEFERRED detected=UNPOWERED   expected=UNPOWERED result=PASS
 ```
+
+## Operating mode (MAINTENANCE / RUN)
+
+`core::OperatingMode` (`src/core/OperatingMode.h`) is a deliberately tiny boundary —
+an enum and a two-line manager class, not a state machine — between potentially
+blocking servo diagnostics and a future deterministic motion loop:
+
+```text
+MAINTENANCE  servo scan/read diagnostics allowed; no motion allowed (none exists yet)
+RUN          future motion loop; @SERVO SCAN/@SERVO READ refuse
+```
+
+V0.1 has no motion execution at all, so today this boundary gates diagnostics against
+nothing but itself. The point is that it already exists, so a future motion-controller
+integration cannot silently inherit `@SERVO SCAN`/`@SERVO READ` as callable from
+inside a real-time `RUN` loop. Default is `MAINTENANCE` — there is no motion loop yet
+to protect, and Session 2's already hardware-validated diagnostic workflow should not
+regress for no protective benefit. **Whoever adds the motion controller must flip the
+default to `RUN`** and require an explicit, reviewed transition into `MAINTENANCE`
+(with torque confirmed off) before servo diagnostics are reachable again — this is
+called out directly in `OperatingMode.h` so it cannot be missed.
+
+`ServoBus::kPingTimeoutMs` (20ms) replaces SCServo's generic 100ms `IOTimeOut`
+default (a public `SCSerial` field, set at runtime — the vendored library is never
+edited), justified by real hardware measurement rather than an assumed value: the
+NEW01 characterization campaign
+(`09_Logs/Validation_Reports/ST3215_Provisioning_2026-08-27/characterization_sessions/`)
+timed a live powered ST3215 at 1 Mbaud and recorded Ping+register-read round trips of
+593-620us — 20ms is roughly 32x that measured worst case.
 
 ## Anti-back-power (LED ring)
 
@@ -153,7 +194,8 @@ cover, and handoff section 7A for the full matrix.
 ├── src/
 │   ├── config/                Pins.h (central GPIO ownership), BuildConfig.h
 │   ├── core/                  Controller, SystemState, PowerState, CommandRouter,
-│   │                          Availability (init/detected/expected/result model)
+│   │                          Availability (init/detected/expected/result model),
+│   │                          OperatingMode (MAINTENANCE/RUN)
 │   ├── servo/                 ServoBus
 │   ├── imu/                   Bno085Imu
 │   ├── power/                 DalyBms
@@ -163,5 +205,8 @@ cover, and handoff section 7A for the full matrix.
     ├── static_audit.py
     ├── upload.sh                        full Arduino upload (not routine — see above)
     ├── flash_app_only.sh                application-only flash (routine path)
-    └── verify_application_partition.py  read-only offset/size verifier used by the above
+    ├── verify_application_partition.py  device-I/O wrapper used by the above
+    ├── ota_partition_logic.py           pure OTA slot-selection logic (offline-testable)
+    └── tests/
+        └── test_ota_partition_logic.py  offline unit tests, no device/flash required
 ```
