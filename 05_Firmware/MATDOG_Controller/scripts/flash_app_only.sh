@@ -61,7 +61,13 @@ SOURCE_COMMIT_SHORT="$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD)"
 [ -f "$APPLICATION_BINARY" ] || refuse "application binary not found: $APPLICATION_BINARY \
 (run scripts/build.sh from this clean commit first)"
 
-if ! strings "$APPLICATION_BINARY" | grep -q "$SOURCE_COMMIT_SHORT"; then
+
+# Captured into a variable rather than piped straight into `grep -q`: under
+# `pipefail`, grep -q's early exit on first match sends strings SIGPIPE,
+# which pipefail then reports as a pipeline failure even though grep did
+# match — this avoids that.
+BINARY_STRINGS="$(strings "$APPLICATION_BINARY")"
+if ! grep -q "$SOURCE_COMMIT_SHORT" <<< "$BINARY_STRINGS"; then
   refuse "application binary does not appear to embed build id '$SOURCE_COMMIT_SHORT' \
 (current HEAD). It was likely built from a different commit or before the tree was \
 cleaned — rebuild with scripts/build.sh from this exact clean commit."
