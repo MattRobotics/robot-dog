@@ -32,25 +32,39 @@ bool Bno085Imu::begin() {
 
   if (!SPI.begin(pins::kBnoSck, pins::kBnoMiso, pins::kBnoMosi, pins::kBnoCs)) {
     Serial.println("IMU_INIT_FAIL=SPI_BEGIN");
-    health_ = core::ModuleHealth::FAULT;
+    init_ = core::InitializationState::INIT_FAILED;
+    detected_ = core::DetectedState::UNKNOWN;  // host-side SPI setup, not a chip handshake
     return false;
   }
 
   if (!bno08x_.begin_SPI(pins::kBnoCs, pins::kBnoInt, &SPI)) {
     Serial.println("IMU_INIT_FAIL=BNO08X_BEGIN_SPI");
-    health_ = core::ModuleHealth::FAULT;
+    init_ = core::InitializationState::INIT_FAILED;
+    detected_ = core::DetectedState::NO_RESPONSE;  // chip handshake itself failed
     return false;
   }
 
   if (!configureCalibrationSession()) {
     Serial.println("IMU_INIT_FAIL=CALIBRATION_SESSION");
-    health_ = core::ModuleHealth::FAULT;
+    init_ = core::InitializationState::INIT_FAILED;
+    detected_ = core::DetectedState::NO_RESPONSE;
     return false;
   }
 
   Serial.println("IMU_INIT=PASS");
-  health_ = core::ModuleHealth::OK;
+  // begin_SPI() already performed a real SHTP handshake with the physical
+  // chip — that is genuine hardware detection, not just "driver ready".
+  init_ = core::InitializationState::INITIALIZED;
+  detected_ = core::DetectedState::ONLINE;
   return true;
+}
+
+core::AvailabilityStatus Bno085Imu::availability() const {
+  core::AvailabilityStatus a;
+  a.init = init_;
+  a.detected = detected_;
+  a.expected = core::ExpectedState::REQUIRED;  // 3V3-powered; always expected reachable
+  return a;
 }
 
 bool Bno085Imu::configureCalibrationSession() {
@@ -76,7 +90,8 @@ bool Bno085Imu::configureCalibrationSession() {
 }
 
 void Bno085Imu::update(uint32_t now_ms) {
-  if (health_ == core::ModuleHealth::FAULT || health_ == core::ModuleHealth::NOT_INITIALIZED) {
+  if (init_ == core::InitializationState::INIT_FAILED ||
+      init_ == core::InitializationState::NOT_INITIALIZED) {
     return;
   }
 
@@ -148,7 +163,8 @@ void Bno085Imu::update(uint32_t now_ms) {
       // Degrade the IMU module only; the rest of the controller continues
       // (handoff section 33 — no peripheral failure may hang the firmware).
       Serial.println("IMU_RECONFIG_FAIL=CALIBRATION_SESSION");
-      health_ = core::ModuleHealth::FAULT;
+      init_ = core::InitializationState::INIT_FAILED;
+      detected_ = core::DetectedState::NO_RESPONSE;
       return;
     }
   }

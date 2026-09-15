@@ -6,6 +6,7 @@
 #include <Adafruit_BNO08x.h>
 
 #include "../config/Pins.h"
+#include "../core/Availability.h"
 #include "../core/SystemState.h"
 
 namespace matdog {
@@ -36,7 +37,8 @@ class Bno085Imu {
  public:
   bool begin();
   void update(uint32_t now_ms);
-  core::ModuleHealth health() const { return health_; }
+  core::ModuleHealth health() const { return core::toModuleHealth(core::classify(availability())); }
+  core::AvailabilityStatus availability() const;
 
   bool streamEnabled() const { return stream_enabled_; }
   void setStreamEnabled(bool enabled) { stream_enabled_ = enabled; }
@@ -52,7 +54,8 @@ class Bno085Imu {
   Adafruit_BNO08x bno08x_{pins::kBnoRst};
   sh2_SensorValue_t sensor_value_{};
 
-  core::ModuleHealth health_ = core::ModuleHealth::NOT_INITIALIZED;
+  core::InitializationState init_ = core::InitializationState::NOT_INITIALIZED;
+  core::DetectedState detected_ = core::DetectedState::UNKNOWN;
   bool stream_enabled_ = true;  // must default true: the viewer sends no commands.
 
   uint32_t mag_count_ = 0;

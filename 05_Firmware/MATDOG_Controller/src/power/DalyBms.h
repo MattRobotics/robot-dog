@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+#include "../config/BuildConfig.h"
+#include "../core/Availability.h"
 #include "../core/SystemState.h"
 
 namespace matdog {
@@ -74,7 +76,8 @@ class DalyBms {
  public:
   bool begin();
   void update(uint32_t now_ms);
-  core::ModuleHealth health() const { return health_; }
+  core::ModuleHealth health() const { return core::toModuleHealth(core::classify(availability())); }
+  core::AvailabilityStatus availability() const;
 
   DalyCommResult lastCommResult() const { return last_result_; }
   uint32_t lastResultAgeMs(uint32_t now_ms) const { return now_ms - last_result_ms_; }
@@ -97,7 +100,8 @@ class DalyBms {
   void handleResponse();
 
   HardwareSerial bms_uart_{2};
-  core::ModuleHealth health_ = core::ModuleHealth::NOT_INITIALIZED;
+  core::InitializationState init_ = core::InitializationState::NOT_INITIALIZED;
+  core::DetectedState detected_ = core::DetectedState::UNKNOWN;
 
   PollState poll_state_ = PollState::IDLE;
   uint32_t request_sent_ms_ = 0;

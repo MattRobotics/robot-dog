@@ -63,8 +63,17 @@ bool DalyBms::begin() {
       pins::kDalyTx);
 
   poll_state_ = PollState::IDLE;
-  health_ = core::ModuleHealth::DEGRADED;  // upgraded to OK/OFFLINE by first poll outcome.
+  init_ = core::InitializationState::INITIALIZED;  // transport ready; detected_ stays UNKNOWN until first poll
   return true;
+}
+
+core::AvailabilityStatus DalyBms::availability() const {
+  core::AvailabilityStatus a;
+  a.init = init_;
+  a.detected = detected_;
+  a.expected = build::kBatteryAvailable ? core::ExpectedState::REQUIRED
+                                          : core::ExpectedState::EXPECTED_OFFLINE;
+  return a;
 }
 
 void DalyBms::sendQuery() {
@@ -84,13 +93,15 @@ void DalyBms::handleResponse() {
 
   if (rx_len_ != kExpectedResponseLen) {
     last_result_ = DalyCommResult::TIMEOUT;
-    health_ = core::ModuleHealth::OFFLINE;
+    detected_ = core::DetectedState::NO_RESPONSE;
     return;
   }
 
   if (rx_buf_[0] != 0xD2 || rx_buf_[1] != 0x03 || rx_buf_[2] != 0x7C) {
     last_result_ = DalyCommResult::BAD_HEADER;
-    health_ = core::ModuleHealth::DEGRADED;
+    // Bytes were received but malformed — closest fit in the 4-state
+    // DetectedState model is still "not a clean detection".
+    detected_ = core::DetectedState::NO_RESPONSE;
     return;
   }
 
@@ -101,7 +112,7 @@ void DalyBms::handleResponse() {
 
   if (crc_calc != crc_wire) {
     last_result_ = DalyCommResult::CRC_FAIL;
-    health_ = core::ModuleHealth::DEGRADED;
+    detected_ = core::DetectedState::NO_RESPONSE;
     return;
   }
 
@@ -150,7 +161,7 @@ void DalyBms::handleResponse() {
 
   sample_ = s;
   last_result_ = DalyCommResult::OK;
-  health_ = core::ModuleHealth::OK;
+  detected_ = core::DetectedState::ONLINE;
 }
 
 void DalyBms::update(uint32_t now_ms) {
