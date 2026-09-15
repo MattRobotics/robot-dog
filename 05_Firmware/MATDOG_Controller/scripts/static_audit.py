@@ -22,6 +22,18 @@ and the OTA partition verifier's fail-closed validity checks (CRC/state,
 not just raw sequence-number comparison) regressing or its offline test
 suite failing.
 
+Session 2.2 (final merge gate) additions: the OTA subtype filter
+regressing to a numeric threshold instead of the real
+(subtype & 0xF0) == PART_SUBTYPE_OTA_FLAG bitmask (which would again match
+PART_SUBTYPE_TEST/TEE_0/TEE_1), the rollback/anti-rollback parameters
+gaining an unsafe default or the flasher no longer reading them from the
+real build's sdkconfig, ServoBus::begin() turning the diagnostic servo
+timeout back into a standing global override instead of a scoped
+per-transaction one, and @SERVO SAFE_OFF classifying success from
+EnableTorque()'s own return value again instead of an independent
+TorqueEnable readback (SCS::Ack() returns 0 on failure, not -1, so a
+naive `>= 0` check can never observe failure).
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
@@ -227,6 +239,14 @@ def check_ota_partition_verifier_fail_closed(sketch_dir):
     # installed ESP-IDF bootloader algorithm - see
     # scripts/ota_partition_logic.py's module docstring for the exact
     # source citation.
+    #
+    # Session 2.2 additions: (Finding A) OTA subtype recognition must use
+    # the real (subtype & 0xF0) == 0x10 bitmask, never a `>= 0x10`
+    # threshold that would also match PART_SUBTYPE_TEST/TEE_0/TEE_1.
+    # (Finding B) the selector must require the caller to supply
+    # rollback_enabled/anti_rollback_enabled explicitly (no silent default)
+    # and refuse when the real build's sdkconfig has either enabled in a
+    # way this tool cannot safely reason about.
     logic_path = sketch_dir / "scripts" / "ota_partition_logic.py"
     if not logic_path.exists():
         fail(f"{logic_path}: OTA partition selection logic module not found")
@@ -235,10 +255,37 @@ def check_ota_partition_verifier_fail_closed(sketch_dir):
     required_tokens = [
         "OtaAmbiguous", "crc_expected", "is_invalid", "is_valid",
         "OTA_STATE_INVALID", "OTA_STATE_ABORTED", "BLANK_SEQ",
+        "PART_SUBTYPE_OTA_FLAG", "PART_SUBTYPE_OTA_MASK",
+        "is_rollback_unstable", "parse_sdkconfig_ota_flags",
+        "anti_rollback_enabled", "rollback_enabled",
     ]
     for token in required_tokens:
         if token not in text:
             fail(f"{logic_path}: missing required fail-closed OTA validity primitive {token!r}")
+
+    # Forbid the specific regressions found this session: a bare numeric
+    # subtype threshold instead of the real bitmask, and a defaulted
+    # rollback flag that would silently assume "safe".
+    # `\.subtype` (attribute access) so this only matches real code like
+    # `e.subtype >= OTA_SUBTYPE_BASE`, not this file's own docstring prose
+    # quoting that exact bad pattern as an example of the bug it fixed.
+    if re.search(r"\.subtype\s*>=\s*(?:OTA_SUBTYPE_BASE|0x10)", text):
+        fail(f"{logic_path}: found a `subtype >= ...` threshold check - OTA slot "
+             f"recognition must use the (subtype & 0xF0) == PART_SUBTYPE_OTA_FLAG bitmask, "
+             f"which also excludes PART_SUBTYPE_TEST/TEE_0/TEE_1")
+    if re.search(r"rollback_enabled\s*:\s*bool\s*=\s*False", text) or \
+       re.search(r"rollback_enabled\s*=\s*False\s*,\s*anti_rollback_enabled\s*=\s*False\s*\)", text):
+        fail(f"{logic_path}: rollback_enabled/anti_rollback_enabled must not have a "
+             f"default value in resolve_application_partition() - callers must read the "
+             f"real sdkconfig and pass them explicitly")
+
+    flash_script_path = sketch_dir / "scripts" / "flash_app_only.sh"
+    if flash_script_path.exists():
+        flash_script_text = flash_script_path.read_text(encoding="utf-8")
+        if "--sdkconfig" not in flash_script_text:
+            fail(f"{flash_script_path}: must pass --sdkconfig to "
+                 f"verify_application_partition.py so rollback/anti-rollback are read from "
+                 f"the real build, not assumed")
 
     tests_path = sketch_dir / "scripts" / "tests" / "test_ota_partition_logic.py"
     if not tests_path.exists():
@@ -285,6 +332,70 @@ def check_led_anti_back_power(files):
                      f"USB_ONLY-only session (flip deliberately for ROBOT_POWERED work)")
 
 
+def check_servo_timeout_not_global(files):
+    # Session 2.2, Finding C: kPingTimeoutMs must never become a standing
+    # global override of SCServo's own conservative default. Fails if
+    # ServoBus::begin() assigns st_.IOTimeOut directly (Session 2.1's
+    # pattern) instead of leaving it alone and relying on ScopedPingTimeout
+    # per-transaction.
+    for path, code in files:
+        if path.name != "ServoBus.cpp":
+            continue
+        begin_match = re.search(r"bool ServoBus::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if begin_match and re.search(r"st_\.IOTimeOut\s*=", begin_match.group(1)):
+            fail(f"{path}: ServoBus::begin() assigns st_.IOTimeOut directly - this makes "
+                 f"the diagnostic timeout a standing global override instead of a scoped, "
+                 f"per-transaction one (see ScopedPingTimeout)")
+        if "ScopedPingTimeout" not in code:
+            fail(f"{path}: expected ScopedPingTimeout guard usage not found")
+
+    for path, code in files:
+        if path.name != "ServoBus.h":
+            continue
+        if "class ScopedPingTimeout" not in code:
+            fail(f"{path}: ScopedPingTimeout RAII guard not found")
+
+
+def check_safe_off_verifies_readback(files):
+    # Session 2.2, Finding D: SCS::Ack() (used by EnableTorque/writeByte)
+    # returns 0 on failure, not -1 like Ping()/readByte()/readWord() - a
+    # `result >= 0` check on it can never observe failure. safeOff() must
+    # classify strictly from an independent TorqueEnable readback, not from
+    # the write's own return value, and must never be a bare bool.
+    for path, code in files:
+        if path.name != "ServoBus.cpp":
+            continue
+        safe_off_match = re.search(
+            r"SafeOffResult ServoBus::safeOff\(int id\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not safe_off_match:
+            fail(f"{path}: ServoBus::safeOff() not found, or no longer returns SafeOffResult "
+                 f"(a bare bool cannot distinguish VERIFIED_OFF from an unverifiable write)")
+            continue
+        body = safe_off_match.group(1)
+        if re.search(r"EnableTorque\([^)]*\)\s*(?:>=|==)\s*0", body):
+            fail(f"{path}: safeOff() still branches on EnableTorque()'s own return value - "
+                 f"SCS::Ack() returns 0 on failure (not -1), so `>= 0` is always true and "
+                 f"`== 0` would invert success/failure; classification must come from the "
+                 f"TorqueEnable readback instead")
+        if "SMS_STS_TORQUE_ENABLE" not in body or "readByte" not in body:
+            fail(f"{path}: safeOff() must read back SMS_STS_TORQUE_ENABLE to verify the "
+                 f"write, not just trust the write's own ACK")
+
+    for path, code in files:
+        if path.name != "ServoBus.h":
+            continue
+        for token in ("VERIFIED_OFF", "UNVERIFIED_NO_RESPONSE", "VERIFY_FAILED"):
+            if token not in code:
+                fail(f"{path}: SafeOffResult is missing required state {token!r}")
+
+    for path, code in files:
+        if path.name != "CommandRouter.cpp":
+            continue
+        if re.search(r'"OK"\s*:\s*"NO_RESPONSE"', code):
+            fail(f"{path}: found the old bare OK/NO_RESPONSE SAFE_OFF reply - must print "
+                 f"servo::toString(SafeOffResult) instead")
+
+
 def check_app_only_script_never_targets_other_partitions(sketch_dir):
     # Not a C++ source check: audits the application-only flashing script
     # itself so it can never be edited into silently writing the
@@ -323,6 +434,8 @@ def main():
     check_led_anti_back_power(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)
+    check_servo_timeout_not_global(files)
+    check_safe_off_verifies_readback(files)
 
     print(f"Scanned {len(files)} source files under {SKETCH_DIR}")
 
