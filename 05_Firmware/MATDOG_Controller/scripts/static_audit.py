@@ -14,10 +14,19 @@ profile flags drifting from their current USB_ONLY values, and the
 application-only flash script regressing to reference the
 bootloader/partition-table/boot_app0 artifacts it must never write.
 
+Session 2.1 (final pre-merge hardening) additions: @SERVO SCAN/@SERVO READ
+reachable outside core::OperatingMode::MAINTENANCE (both can block for a
+bounded but real per-ID timeout - see ServoBus.h), @SERVO SAFE_OFF
+regressing to require MAINTENANCE (it must stay reachable in every mode),
+and the OTA partition verifier's fail-closed validity checks (CRC/state,
+not just raw sequence-number comparison) regressing or its offline test
+suite failing.
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -162,23 +171,83 @@ def check_no_auto_scan_on_boot(files):
                 fail(f"{path}: ServoBus::begin() must not automatically ping/scan the bus")
 
 
-def check_servo_scan_non_blocking(files):
-    # Session 2 regression tripwire: Session 1's scan() pinged an entire ID
-    # range synchronously in one call (each Ping() carries ~100ms IOTimeOut),
-    # which could monopolize loop() for seconds. Fail if a `for` loop and a
-    # `.Ping(` call ever end up back inside the same brace-free block again -
-    # the non-blocking design calls at most one Ping() per update() tick,
-    # never inside a loop over an ID range.
+def check_servo_scan_bounded_incremental(files):
+    # Session 2 regression tripwire, terminology corrected in Session 2.1:
+    # Session 1's scan() pinged an entire ID range synchronously in one call
+    # (each Ping() carries a per-call IOTimeOut), which could monopolize
+    # loop() for the whole range. Fail if a `for` loop and a `.Ping(` call
+    # ever end up back inside the same brace-free block again - the
+    # incremental design calls at most one Ping() per update() tick, never
+    # inside a loop over an ID range. This is "bounded per-ID blocking", not
+    # non-blocking — see ServoBus.h. Session 2.1 additionally requires that
+    # usage be confined to MAINTENANCE mode; see
+    # check_servo_diagnostics_require_maintenance_mode below.
     pattern = re.compile(r"for\s*\([^)]*\)\s*\{[^{}]*\.Ping\(", re.DOTALL)
     for path, code in files:
         if path.name != "ServoBus.cpp":
             continue
         if pattern.search(code):
             fail(f"{path}: found a `for` loop calling .Ping() — servo scanning must probe "
-                 f"exactly one ID per update() tick (non-blocking), not loop over a range "
-                 f"synchronously")
+                 f"exactly one ID per update() tick (bounded per-ID blocking), not loop over "
+                 f"a range synchronously")
         if "startScan(" not in code or "ScanState::RUNNING" not in code:
-            fail(f"{path}: expected non-blocking startScan()/ScanState state machine not found")
+            fail(f"{path}: expected incremental startScan()/ScanState state machine not found")
+
+
+def check_servo_diagnostics_require_maintenance_mode(files):
+    # Session 2.1: @SERVO SCAN and @SERVO READ can each block for up to one
+    # SCServo IOTimeOut per ID (see ServoBus.h kPingTimeoutMs) - acceptable
+    # for a diagnostic tool, not for a future deterministic motion loop.
+    # Both must refuse outside core::OperatingMode::MAINTENANCE.
+    for path, code in files:
+        if path.name != "CommandRouter.cpp":
+            continue
+        guard = "modules_.operating_mode->mode() != OperatingMode::MAINTENANCE"
+        count = code.count(guard)
+        if count < 2:
+            fail(f"{path}: expected the MAINTENANCE-mode guard on both @SERVO SCAN and "
+                 f"@SERVO READ, found it protecting only {count} command(s)")
+
+        # @SERVO SAFE_OFF is the one servo write that can only decrease risk
+        # (torque off) and must stay reachable in every mode - it must never
+        # gain this guard.
+        safe_off_branch = re.search(
+            r'upper\.startsWith\("@SERVO SAFE_OFF"\)\)\s*\{(.*?)\}\s*else if',
+            code, re.DOTALL)
+        if safe_off_branch and "OperatingMode::MAINTENANCE" in safe_off_branch.group(1):
+            fail(f"{path}: @SERVO SAFE_OFF must remain reachable regardless of operating "
+                 f"mode (handoff: 'SAFE_OFF resta l'unico torque write consentito') - found "
+                 f"a MAINTENANCE-mode gate on it")
+
+
+def check_ota_partition_verifier_fail_closed(sketch_dir):
+    # Session 2.1: the OTA partition selection logic must validate the real
+    # esp_ota_select_entry_t CRC/state fields (not just compare raw seq
+    # numbers) and refuse on every ambiguous case, matching the actual
+    # installed ESP-IDF bootloader algorithm - see
+    # scripts/ota_partition_logic.py's module docstring for the exact
+    # source citation.
+    logic_path = sketch_dir / "scripts" / "ota_partition_logic.py"
+    if not logic_path.exists():
+        fail(f"{logic_path}: OTA partition selection logic module not found")
+        return
+    text = logic_path.read_text(encoding="utf-8")
+    required_tokens = [
+        "OtaAmbiguous", "crc_expected", "is_invalid", "is_valid",
+        "OTA_STATE_INVALID", "OTA_STATE_ABORTED", "BLANK_SEQ",
+    ]
+    for token in required_tokens:
+        if token not in text:
+            fail(f"{logic_path}: missing required fail-closed OTA validity primitive {token!r}")
+
+    tests_path = sketch_dir / "scripts" / "tests" / "test_ota_partition_logic.py"
+    if not tests_path.exists():
+        fail(f"{tests_path}: OTA partition parser offline test suite not found")
+        return
+    result = subprocess.run([sys.executable, str(tests_path)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{tests_path}: OTA partition parser offline tests FAILED "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
 
 
 def check_led_anti_back_power(files):
@@ -249,9 +318,11 @@ def main():
     check_pin_collisions(files)
     check_uart_peripheral_separation(files)
     check_no_auto_scan_on_boot(files)
-    check_servo_scan_non_blocking(files)
+    check_servo_scan_bounded_incremental(files)
+    check_servo_diagnostics_require_maintenance_mode(files)
     check_led_anti_back_power(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
+    check_ota_partition_verifier_fail_closed(SKETCH_DIR)
 
     print(f"Scanned {len(files)} source files under {SKETCH_DIR}")
 
