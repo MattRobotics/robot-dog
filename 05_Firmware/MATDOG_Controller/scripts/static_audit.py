@@ -34,6 +34,16 @@ EnableTorque()'s own return value again instead of an independent
 TorqueEnable readback (SCS::Ack() returns 0 on failure, not -1, so a
 naive `>= 0` check can never observe failure).
 
+Session 2.3 (final consistency fix) additions: safeOff()/readRuntimeState()
+regressing to use kDiagnosticTimeoutMs (the 20ms MAINTENANCE-only
+absence-detection budget) instead of kOperationalTimeoutMs (Finding 1 - both
+are operational/safety primitives reachable outside MAINTENANCE, or reused
+by a future motion controller); the sdkconfig rollback/anti-rollback parser
+losing its three-way SdkconfigFlag.UNKNOWN case and going back to treating
+"symbol absent" the same as "symbol explicitly disabled" (Finding 2); and
+ota_app_partitions() losing its contiguous-slot-index requirement, letting a
+sparse OTA layout (e.g. {0, 2}) resolve instead of refusing (Finding 3).
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
@@ -257,7 +267,7 @@ def check_ota_partition_verifier_fail_closed(sketch_dir):
         "OTA_STATE_INVALID", "OTA_STATE_ABORTED", "BLANK_SEQ",
         "PART_SUBTYPE_OTA_FLAG", "PART_SUBTYPE_OTA_MASK",
         "is_rollback_unstable", "parse_sdkconfig_ota_flags",
-        "anti_rollback_enabled", "rollback_enabled",
+        "SdkconfigFlag", "parse_sdkconfig_flag",
     ]
     for token in required_tokens:
         if token not in text:
@@ -273,11 +283,33 @@ def check_ota_partition_verifier_fail_closed(sketch_dir):
         fail(f"{logic_path}: found a `subtype >= ...` threshold check - OTA slot "
              f"recognition must use the (subtype & 0xF0) == PART_SUBTYPE_OTA_FLAG bitmask, "
              f"which also excludes PART_SUBTYPE_TEST/TEE_0/TEE_1")
-    if re.search(r"rollback_enabled\s*:\s*bool\s*=\s*False", text) or \
-       re.search(r"rollback_enabled\s*=\s*False\s*,\s*anti_rollback_enabled\s*=\s*False\s*\)", text):
-        fail(f"{logic_path}: rollback_enabled/anti_rollback_enabled must not have a "
-             f"default value in resolve_application_partition() - callers must read the "
-             f"real sdkconfig and pass them explicitly")
+    if re.search(r"rollback\s*:\s*SdkconfigFlag\s*=", text) or \
+       re.search(r"anti_rollback\s*:\s*SdkconfigFlag\s*=", text):
+        fail(f"{logic_path}: rollback/anti_rollback must not have a default value in "
+             f"resolve_application_partition() - callers must read the real sdkconfig "
+             f"and pass them explicitly")
+
+    # Session 2.3, Finding 2: a symbol absent from the sdkconfig text
+    # entirely must resolve to SdkconfigFlag.UNKNOWN (not silently treated
+    # as DISABLED), and resolve_application_partition() must REFUSE on
+    # UNKNOWN for both symbols exactly like it does on ENABLED.
+    if "SdkconfigFlag.UNKNOWN" not in text:
+        fail(f"{logic_path}: missing SdkconfigFlag.UNKNOWN handling (Session 2.3 Finding 2) "
+             f"- an absent sdkconfig symbol must not be conflated with an explicitly "
+             f"disabled one")
+    if not re.search(r"rollback\s+is\s+SdkconfigFlag\.UNKNOWN", text):
+        fail(f"{logic_path}: resolve_application_partition() does not appear to REFUSE on "
+             f"rollback is SdkconfigFlag.UNKNOWN (Session 2.3 Finding 2)")
+    if not re.search(r"anti_rollback\s+is\s+SdkconfigFlag\.UNKNOWN", text):
+        fail(f"{logic_path}: resolve_application_partition() does not appear to REFUSE on "
+             f"anti_rollback is SdkconfigFlag.UNKNOWN (Session 2.3 Finding 2)")
+
+    # Session 2.3, Finding 3: OTA slot index sets must be contiguous
+    # starting at 0 - a sparse layout ({0,2}, {1}, {0,1,3}, ...) must
+    # REFUSE, not silently resolve.
+    if "not contiguous" not in text or "set(range(" not in text:
+        fail(f"{logic_path}: missing OTA slot contiguity check (Session 2.3 Finding 3) - "
+             f"ota_app_partitions() must refuse a non-contiguous OTA slot index set")
 
     flash_script_path = sketch_dir / "scripts" / "flash_app_only.sh"
     if flash_script_path.exists():
@@ -333,27 +365,69 @@ def check_led_anti_back_power(files):
 
 
 def check_servo_timeout_not_global(files):
-    # Session 2.2, Finding C: kPingTimeoutMs must never become a standing
-    # global override of SCServo's own conservative default. Fails if
-    # ServoBus::begin() assigns st_.IOTimeOut directly (Session 2.1's
-    # pattern) instead of leaving it alone and relying on ScopedPingTimeout
-    # per-transaction.
+    # Session 2.2, Finding C: no servo bus timeout may ever become a
+    # standing global override of SCServo's own conservative default. Fails
+    # if ServoBus::begin() assigns st_.IOTimeOut directly (Session 2.1's
+    # pattern) instead of leaving it alone and relying on the scoped guard
+    # per-transaction. Renamed ScopedPingTimeout -> ScopedIOTimeout in
+    # Session 2.3 Finding 1, once it started guarding two named timeout
+    # categories (kDiagnosticTimeoutMs/kOperationalTimeoutMs) instead of one.
     for path, code in files:
         if path.name != "ServoBus.cpp":
             continue
         begin_match = re.search(r"bool ServoBus::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
         if begin_match and re.search(r"st_\.IOTimeOut\s*=", begin_match.group(1)):
             fail(f"{path}: ServoBus::begin() assigns st_.IOTimeOut directly - this makes "
-                 f"the diagnostic timeout a standing global override instead of a scoped, "
-                 f"per-transaction one (see ScopedPingTimeout)")
-        if "ScopedPingTimeout" not in code:
-            fail(f"{path}: expected ScopedPingTimeout guard usage not found")
+                 f"the servo bus timeout a standing global override instead of a scoped, "
+                 f"per-transaction one (see ScopedIOTimeout)")
+        if "ScopedIOTimeout" not in code:
+            fail(f"{path}: expected ScopedIOTimeout guard usage not found")
 
     for path, code in files:
         if path.name != "ServoBus.h":
             continue
-        if "class ScopedPingTimeout" not in code:
-            fail(f"{path}: ScopedPingTimeout RAII guard not found")
+        if "class ScopedIOTimeout" not in code:
+            fail(f"{path}: ScopedIOTimeout RAII guard not found")
+
+
+def check_servo_timeout_categories_finding1(files):
+    # Session 2.3, Finding 1: Session 2.2's fix still applied the single
+    # diagnostic timeout to every transaction, including safeOff() and
+    # readRuntimeState() - so the documented "operational timeout = 100ms,
+    # diagnostic timeout = 20ms" split was not actually true in code. Both
+    # are operational/safety primitives (SAFE_OFF is reachable from any
+    # OperatingMode; readRuntimeState() is what a future motion controller
+    # will naturally reuse) and must use kOperationalTimeoutMs, never
+    # kDiagnosticTimeoutMs, absent a future explicit documented decision to
+    # reunify them.
+    for path, code in files:
+        if path.name != "ServoBus.cpp":
+            continue
+        for fn_name, signature in (
+            ("safeOff", r"SafeOffResult ServoBus::safeOff\(int id\)\s*\{(.*?)\n\}"),
+            ("readRuntimeState", r"bool ServoBus::readRuntimeState\([^)]*\)\s*\{(.*?)\n\}"),
+        ):
+            m = re.search(signature, code, re.DOTALL)
+            if not m:
+                fail(f"{path}: {fn_name}() not found to audit its timeout category")
+                continue
+            body = m.group(1)
+            if "kDiagnosticTimeoutMs" in body:
+                fail(f"{path}: {fn_name}() uses kDiagnosticTimeoutMs - this is an "
+                     f"operational/safety primitive and must use kOperationalTimeoutMs "
+                     f"instead (Session 2.3 Finding 1)")
+            if "kOperationalTimeoutMs" not in body:
+                fail(f"{path}: {fn_name}() does not use kOperationalTimeoutMs - expected "
+                     f"an explicit ScopedIOTimeout(st_, kOperationalTimeoutMs) guard "
+                     f"(Session 2.3 Finding 1)")
+
+    for path, code in files:
+        if path.name != "ServoBus.h":
+            continue
+        if "kDiagnosticTimeoutMs" not in code or "kOperationalTimeoutMs" not in code:
+            fail(f"{path}: expected both kDiagnosticTimeoutMs and kOperationalTimeoutMs "
+                 f"as separately named constants (Session 2.3 Finding 1) - a single shared "
+                 f"timeout constant is no longer sufficient")
 
 
 def check_safe_off_verifies_readback(files):
@@ -435,6 +509,7 @@ def main():
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)
     check_servo_timeout_not_global(files)
+    check_servo_timeout_categories_finding1(files)
     check_safe_off_verifies_readback(files)
 
     print(f"Scanned {len(files)} source files under {SKETCH_DIR}")
