@@ -1,9 +1,11 @@
 # MATDOG Controller V0.1 — Validation
 
-Vocabulary follows the repository convention: **VALIDATED** (implemented and
-exercised on real hardware), **IMPLEMENTED** (built, compiles, not yet — or not
-fully — hardware-exercised), **DECIDED** (architectural decision, not yet built),
-**NOT YET VALIDATED**, **TBD**.
+Current-facing status vocabulary follows the canonical meanings in the root
+[`README.md`](../../README.md#status-vocabulary): **VALIDATED**, **IMPLEMENTED**,
+**DECIDED**, **TO_TEST**, **TO_DESIGN**, **FROZEN**, **SUPERSEDED**, and
+**HISTORICAL**. Dated session evidence below preserves the status language that
+was used when each session was recorded; it is not rewritten into present-day
+terminology.
 
 This document will be updated in place as hardware sessions progress; it is not
 rewritten per session.
@@ -28,7 +30,7 @@ checkboxes are not current project status and are intentionally not rewritten.
 - unpowered servo diagnostics and honest `SAFE_OFF=UNVERIFIED_NO_RESPONSE` classification;
 - the exact source/application provenance recorded above.
 
-### IMPLEMENTED, NOT YET ROBOT-POWERED-VALIDATED
+### IMPLEMENTED — ROBOT_POWERED validation remains TO_TEST
 
 - DALY read-only telemetry integration;
 - LED-ring output path;

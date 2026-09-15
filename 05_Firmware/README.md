@@ -36,7 +36,7 @@ The current hardware/control chain is:
 
     ASUS Ubuntu (dev) / Jetson Orin Nano Super (final)
     → native USB 2.0 Full-Speed / USB CDC
-    → ESP32-S3 motion coprocessor        ← owns the ST3215 bus
+    → ESP32-S3 MATDOG Controller         ← owns the ST3215 bus
     → UART GPIO17/GPIO18
     → Seeed Bus Servo Driver
     → 13 installed ST3215 servos        12 legs + NECK_ROTATION ID51

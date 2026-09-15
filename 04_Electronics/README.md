@@ -16,7 +16,7 @@ high-level host
   ASUS Ubuntu (development)  /  Jetson Orin Nano Super (final onboard)
         ↓  native USB 2.0 Full-Speed / USB CDC
         ↓  ESP32-S3 D− = GPIO19, D+ = GPIO20
-ESP32-S3 motion coprocessor          ← owns the ST3215 protocol and control
+ESP32-S3 MATDOG Controller           ← owns the ST3215 protocol and control
         ↓  UART
         ↓  GPIO17 TX → driver RX
         ↓  GPIO18 RX ← driver TX
@@ -86,7 +86,7 @@ multi-servo robot test.
 
 ### VALIDATED — proven on real hardware
 
-- **ESP32-S3 direct ST3215 bus operation** — the coprocessor exclusively owned and drove the bus.
+- **ESP32-S3 direct ST3215 bus operation** — the ESP32-S3 exclusively owned and drove the bus.
 - **Direct bus-control path**, to the extent covered by real bring-up evidence.
 - **QC and provisioning** — 26 QC runs and 17/17 units provisioned.
 
