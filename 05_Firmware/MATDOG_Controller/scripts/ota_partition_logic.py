@@ -87,15 +87,49 @@ CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK introduces secure_version/eFuse
 comparison this tool does not implement at all — if that is ever enabled,
 refuse unconditionally rather than approximate it.
 
+SESSION 2.3, FINDING 2 — an sdkconfig symbol being absent from the text is
+NOT the same fact as it being explicitly disabled, and Session 2.2's
+parser conflated them: `parse_sdkconfig_ota_flags()` returned `False` both
+when it found `# CONFIG_X is not set` (genuinely, positively disabled) and
+when it found neither that line nor `CONFIG_X=y` at all (Kconfig produced
+no opinion this tool could read — e.g. a stale/truncated/hand-edited
+sdkconfig, or a future Kconfig default that stops emitting the negative
+form). That is not fail-closed: a silently-missing symbol was treated
+exactly like a confirmed-safe one. `parse_sdkconfig_flag()` now returns a
+three-way `SdkconfigFlag` (ENABLED / DISABLED / UNKNOWN), and
+`resolve_application_partition()` REFUSEs on UNKNOWN for either symbol,
+with the same one-line clarity as every other refusal here.
+
+SESSION 2.3, FINDING 3 — OTA slot index sets must be contiguous starting
+at 0 (`{0}`, `{0,1}`, `{0,1,2}`, ...), never sparse (`{1}`, `{0,2}`,
+`{0,1,3}`, ...). MATDOG has no use for a sparse OTA layout in V0.1, and a
+sparse one is exactly the shape of table that could desynchronize the raw
+OTA subtype number from the bootloader's own `app_count`/modulo slot
+selection once a future OTA subsystem starts reasoning about slot counts
+more actively. `ota_app_partitions()` now refuses on a non-contiguous slot
+set, not just on an outright duplicate.
+
 This module performs NO device I/O and writes nothing. See
 scripts/verify_application_partition.py for the device-facing wrapper and
 scripts/tests/test_ota_partition_logic.py for the offline test suite.
 """
+import enum
 import re
 import struct
 import zlib
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
+
+
+class SdkconfigFlag(enum.Enum):
+    """Tri-state result of looking for one Kconfig boolean in a real
+    sdkconfig file — see parse_sdkconfig_flag(). Deliberately NOT a plain
+    bool: Session 2.2's parser treated "symbol absent from the text" and
+    "symbol explicitly negated" as the same thing (both -> False), which is
+    not fail-closed (Session 2.3 Finding 2)."""
+    ENABLED = "ENABLED"
+    DISABLED = "DISABLED"
+    UNKNOWN = "UNKNOWN"
 
 PARTITION_ENTRY_MAGIC = b"\xaa\x50"
 PARTITION_TABLE_END_MAGIC = b"\xeb\xeb"
@@ -168,17 +202,28 @@ class OtaSelectEntry:
         return self.ota_state in (OTA_STATE_NEW, OTA_STATE_PENDING_VERIFY)
 
 
+def parse_sdkconfig_flag(sdkconfig_text: str, name: str) -> SdkconfigFlag:
+    """Looks for one Kconfig boolean `name` in real sdkconfig text.
+    Arduino's sdkconfig uses the standard Kconfig text format:
+    `NAME=y` when explicitly set, `# NAME is not set` when explicitly
+    unset. Session 2.3 Finding 2: if NEITHER form is present, that is not
+    the same fact as "unset" — it means this tool cannot determine the
+    real build's intent at all, and must say so (UNKNOWN) rather than
+    silently default to the same result as a confirmed-disabled symbol."""
+    if re.search(rf"^{re.escape(name)}=y\s*$", sdkconfig_text, re.MULTILINE):
+        return SdkconfigFlag.ENABLED
+    if re.search(rf"^# {re.escape(name)} is not set\s*$", sdkconfig_text, re.MULTILINE):
+        return SdkconfigFlag.DISABLED
+    return SdkconfigFlag.UNKNOWN
+
+
 def parse_sdkconfig_ota_flags(sdkconfig_text: str):
     """Parses the two facts Session 2.2 Finding B requires be read from the
-    real build, not assumed. Arduino's sdkconfig uses the standard
-    Kconfig text format: `CONFIG_X=y` when set, `# CONFIG_X is not set`
-    (or the line simply absent) when not. Returns
-    (rollback_enabled: bool, anti_rollback_enabled: bool)."""
-    rollback_enabled = bool(re.search(
-        r"^CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y\s*$", sdkconfig_text, re.MULTILINE))
-    anti_rollback_enabled = bool(re.search(
-        r"^CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y\s*$", sdkconfig_text, re.MULTILINE))
-    return rollback_enabled, anti_rollback_enabled
+    real build, not assumed. Returns
+    (rollback: SdkconfigFlag, anti_rollback: SdkconfigFlag)."""
+    rollback = parse_sdkconfig_flag(sdkconfig_text, "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE")
+    anti_rollback = parse_sdkconfig_flag(sdkconfig_text, "CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK")
+    return rollback, anti_rollback
 
 
 def parse_partition_table(data: bytes) -> List[PartitionEntry]:
@@ -219,7 +264,13 @@ def ota_app_partitions(entries: List[PartitionEntry]) -> Dict[int, PartitionEntr
     (subtype & 0xF0) == PART_SUBTYPE_OTA_FLAG, never a `>= 0x10` threshold
     (which would also match PART_SUBTYPE_TEST=0x20, TEE_0=0x30, TEE_1=0x31).
     Raises OtaAmbiguous if two entries claim the same slot index — that is
-    itself an ambiguous table, not something to silently pick one of."""
+    itself an ambiguous table, not something to silently pick one of.
+
+    Session 2.3 Finding 3: also raises OtaAmbiguous if the resulting slot
+    indices are not exactly {0, 1, ..., N-1} for N slots found — MATDOG has
+    no use for a sparse OTA layout in V0.1, and a sparse one is exactly the
+    shape of table that could desynchronize the raw subtype number from the
+    bootloader's own app_count/modulo slot selection."""
     result: Dict[int, PartitionEntry] = {}
     for e in entries:
         if e.type != APP_TYPE:
@@ -234,6 +285,15 @@ def ota_app_partitions(entries: List[PartitionEntry]) -> Dict[int, PartitionEntr
                 f"(subtype 0x{e.subtype:02x}) claim it — ambiguous partition table."
             )
         result[slot] = e
+
+    if result and set(result.keys()) != set(range(len(result))):
+        raise OtaAmbiguous(
+            f"OTA slot indices {sorted(result.keys())} are not contiguous starting at "
+            f"0 (expected {sorted(range(len(result)))}) — sparse OTA layouts are not "
+            f"supported; refusing to guess how app_count/modulo slot selection would "
+            f"behave against a gap."
+        )
+
     return result
 
 
@@ -279,24 +339,42 @@ def resolve_application_partition(
     partition_table: bytes,
     otadata: bytes,
     *,
-    rollback_enabled: bool,
-    anti_rollback_enabled: bool,
+    rollback: SdkconfigFlag,
+    anti_rollback: SdkconfigFlag,
 ) -> "ResolvedPartition":
     """End-to-end: parse both dumps and return the verified active
     application partition, or raise OtaAmbiguous.
 
-    rollback_enabled/anti_rollback_enabled are REQUIRED (no default) —
-    Finding B: callers must read them from the real build's sdkconfig
-    (parse_sdkconfig_ota_flags()) rather than let this function assume a
-    value, since a future FQBN/sdkconfig change enabling either must not
-    silently pass through unnoticed.
+    rollback/anti_rollback are REQUIRED (no default), and REQUIRED to be an
+    actual SdkconfigFlag (not a bool) — Finding B: callers must read them
+    from the real build's sdkconfig (parse_sdkconfig_ota_flags()) rather
+    than let this function assume a value. Finding 2 (Session 2.3):
+    SdkconfigFlag.UNKNOWN for either — the symbol was found in neither its
+    enabled nor its explicitly-disabled form — REFUSEs exactly like
+    ENABLED does; a sdkconfig this tool cannot read is not the same fact as
+    a build with rollback confirmed off.
     """
-    if anti_rollback_enabled:
+    if anti_rollback is SdkconfigFlag.UNKNOWN:
+        raise OtaAmbiguous(
+            "sdkconfig does not explicitly define CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK "
+            "(neither 'CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y' nor "
+            "'# CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK is not set' found) — cannot confirm "
+            "it is safe to proceed. Refusing; see handoff Session 2.3 Finding 2."
+        )
+    if anti_rollback is SdkconfigFlag.ENABLED:
         raise OtaAmbiguous(
             "CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y in the build's sdkconfig — this "
             "introduces secure_version/eFuse-gated slot selection this tool does not "
             "implement at all. Refusing rather than approximate it; see handoff "
             "Session 2.2 Finding B."
+        )
+
+    if rollback is SdkconfigFlag.UNKNOWN:
+        raise OtaAmbiguous(
+            "sdkconfig does not explicitly define CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE "
+            "(neither 'CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y' nor "
+            "'# CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set' found) — cannot "
+            "confirm otadata state stability. Refusing; see handoff Session 2.3 Finding 2."
         )
 
     entries = parse_partition_table(partition_table)
@@ -307,7 +385,7 @@ def resolve_application_partition(
     otadata_entries = parse_otadata(otadata)
     active_entry = select_active_otadata(otadata_entries)
 
-    if rollback_enabled and active_entry.is_rollback_unstable():
+    if rollback is SdkconfigFlag.ENABLED and active_entry.is_rollback_unstable():
         raise OtaAmbiguous(
             f"CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y in the build's sdkconfig and the "
             f"selected otadata entry has ota_state={active_entry.ota_state} "

@@ -69,10 +69,10 @@ def main():
     sdkconfig_path = Path(args.sdkconfig)
     if not sdkconfig_path.is_file():
         raise SystemExit(f"REFUSE: sdkconfig not found: {sdkconfig_path}")
-    rollback_enabled, anti_rollback_enabled = parse_sdkconfig_ota_flags(
+    rollback, anti_rollback = parse_sdkconfig_ota_flags(
         sdkconfig_path.read_text(encoding="utf-8"))
-    print(f"CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE={'y' if rollback_enabled else 'n'}")
-    print(f"CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK={'y' if anti_rollback_enabled else 'n'}")
+    print(f"CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE={rollback.value}")
+    print(f"CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK={anti_rollback.value}")
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
@@ -87,8 +87,8 @@ def main():
         try:
             resolved = resolve_application_partition(
                 part_bin.read_bytes(), ota_bin.read_bytes(),
-                rollback_enabled=rollback_enabled,
-                anti_rollback_enabled=anti_rollback_enabled,
+                rollback=rollback,
+                anti_rollback=anti_rollback,
             )
         except OtaAmbiguous as exc:
             raise SystemExit(f"REFUSE: {exc}")
