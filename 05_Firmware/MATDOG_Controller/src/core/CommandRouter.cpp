@@ -35,6 +35,16 @@ void CommandRouter::update(uint32_t now_ms) {
     last_bms_stream_ms_ = now_ms;
     printBmsStatus();
   }
+
+  // The scan itself advances inside ServoBus::update() (called from
+  // Controller::update() before this router runs); this just notices the
+  // RUNNING -> COMPLETE transition and reports the result exactly once,
+  // without the command handler having to block waiting for it.
+  if (servo_scan_result_pending_ &&
+      modules_.servo_bus->scanState() == servo::ScanState::COMPLETE) {
+    servo_scan_result_pending_ = false;
+    printServoScanResult();
+  }
 }
 
 void CommandRouter::handleLine(String line) {
@@ -67,15 +77,30 @@ void CommandRouter::handleLine(String line) {
   } else if (upper == "@LED STATUS") {
     printLedStatus();
   } else if (upper == "@LED OFF") {
-    modules_.led->off();
-    Serial.println("LED=OFF");
+    if (!build::kLedRailPowered) {
+      Serial.println("LED_OFF=NOOP");
+      Serial.println("REASON=LED_RAIL_UNPOWERED (nothing is ever driven in this profile)");
+    } else {
+      modules_.led->off();
+      Serial.println("LED=OFF");
+    }
   } else if (upper == "@LED TEST") {
-    modules_.led->startTest();
-    Serial.println("LED_TEST=STARTED");
+    if (modules_.led->startTest()) {
+      Serial.println("LED_TEST=STARTED");
+    } else {
+      Serial.println("LED_TEST=BLOCKED");
+      Serial.printf("REASON=%s\n", status::LedRing::blockedReason());
+      Serial.printf("PROFILE=%s\n", build::kTestProfile);
+    }
   } else if (upper.startsWith("@SERVO SCAN")) {
     int lo = -1, hi = -1;
     if (sscanf(upper.c_str(), "@SERVO SCAN %d %d", &lo, &hi) == 2) {
-      printServoScan(lo, hi);
+      if (modules_.servo_bus->startScan(lo, hi)) {
+        servo_scan_result_pending_ = true;
+        Serial.printf("SERVO_SCAN=STARTED lo=%d hi=%d\n", lo, hi);
+      } else {
+        Serial.println("ERROR=SCAN_ALREADY_RUNNING");
+      }
     } else {
       Serial.println("ERROR=USAGE @SERVO SCAN <lo> <hi>");
     }
@@ -118,10 +143,17 @@ void CommandRouter::printHelp() {
   Serial.println("  @LED STATUS");
   Serial.println("  @LED OFF");
   Serial.println("  @LED TEST");
-  Serial.println("  @SERVO SCAN <lo> <hi>");
+  Serial.println("  @SERVO SCAN <lo> <hi>   (non-blocking; result follows asynchronously)");
   Serial.println("  @SERVO READ <id>");
   Serial.println("  @SERVO SAFE_OFF <id>");
   Serial.println("  @SYSTEM SHUTDOWN");
+}
+
+// static
+void CommandRouter::printAvailabilityLine(const char* label, const AvailabilityStatus& a) {
+  Serial.printf("%s init=%s detected=%s expected=%s result=%s\n",
+                label, toString(a.init), toString(a.detected), toString(a.expected),
+                toString(classify(a)));
 }
 
 void CommandRouter::printStatus() {
@@ -131,18 +163,23 @@ void CommandRouter::printStatus() {
                 toString(modules_.power_state->state()),
                 (unsigned long)s->uptimeMillis(millis()),
                 build::kTestProfile);
-  Serial.printf("  imu=%s servo=%s bms=%s led=%s\n",
-                toString(s->imuHealth()),
-                toString(s->servoHealth()),
-                toString(s->bmsHealth()),
-                toString(s->ledHealth()));
+
+  // Distinguishes "driver initialized" from "hardware physically detected"
+  // from "was it even expected to be reachable right now" — see
+  // core/Availability.h. This replaces the earlier imu=/servo=/bms=/led=
+  // single-word summary, which could not express that.
+  printAvailabilityLine("BNO085", modules_.imu->availability());
+  printAvailabilityLine("DALY  ", modules_.daly->availability());
+  printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
+  printAvailabilityLine("LED   ", modules_.led->availability());
+
   Serial.printf("  heap_free=%u heap_min_free=%u\n",
                 (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap());
 }
 
 void CommandRouter::printImuStatus() {
-  Serial.printf("IMU_STATUS health=%s stream=%s rv_count=%lu runtime_resets=%lu\n",
-                toString(modules_.imu->health()),
+  printAvailabilityLine("BNO085", modules_.imu->availability());
+  Serial.printf("  stream=%s rv_count=%lu runtime_resets=%lu\n",
                 modules_.imu->streamEnabled() ? "ON" : "OFF",
                 (unsigned long)modules_.imu->rvCount(),
                 (unsigned long)modules_.imu->runtimeResetCount());
@@ -150,19 +187,10 @@ void CommandRouter::printImuStatus() {
 
 void CommandRouter::printBmsStatus() {
   power::DalyBms* daly = modules_.daly;
-  Serial.printf("BMS_STATUS health=%s comm=%s age_ms=%lu\n",
-                toString(daly->health()),
+  printAvailabilityLine("DALY  ", daly->availability());
+  Serial.printf("  comm=%s age_ms=%lu\n",
                 power::toString(daly->lastCommResult()),
                 (unsigned long)daly->lastResultAgeMs(millis()));
-
-  if (daly->lastCommResult() == power::DalyCommResult::TIMEOUT ||
-      daly->lastCommResult() == power::DalyCommResult::NEVER_POLLED) {
-    Serial.println("DALY_DETECTED=NO_RESPONSE");
-    Serial.printf("PROFILE=%s\n", build::kTestProfile);
-    Serial.println("EXPECTED=OFFLINE");
-    Serial.println("CLASSIFICATION=OFFLINE_EXPECTED/PASS");
-    return;
-  }
 
   if (daly->hasValidSample()) {
     const power::DalySample& sample = daly->sample();
@@ -180,27 +208,20 @@ void CommandRouter::printBmsStatus() {
 }
 
 void CommandRouter::printLedStatus() {
-  Serial.printf("LED_STATUS health=%s pixels=%u pin=%d brightness_max=%u test_running=%s\n",
-                toString(modules_.led->health()),
+  printAvailabilityLine("LED   ", modules_.led->availability());
+  Serial.printf("  pixels=%u pin=%d brightness_max=%u test_running=%s data_pin_driven=%s\n",
                 status::LedRing::kNumPixels,
                 pins::kLedRingDin,
                 status::LedRing::kMaxBrightness,
-                modules_.led->testRunning() ? "YES" : "NO");
-  Serial.printf("PROFILE=%s\n", build::kTestProfile);
-  Serial.println("EXPECTED=UNPOWERED (5V rail absent)");
-  Serial.println("CLASSIFICATION=OFFLINE_EXPECTED/UNPOWERED");
+                modules_.led->testRunning() ? "YES" : "NO",
+                modules_.led->dataPinDriven() ? "YES" : "NO");
 }
 
-void CommandRouter::printServoScan(int lo, int hi) {
-  servo::ScanResult result = modules_.servo_bus->scan(lo, hi);
-  Serial.printf("SERVO_SCAN lo=%d hi=%d found=%d\n", result.lo, result.hi, result.found_count);
-
-  if (result.found_count == 0) {
-    Serial.printf("PROFILE=%s\n", build::kTestProfile);
-    Serial.println("EXPECTED=OFFLINE (servo power rail absent)");
-    Serial.println("CLASSIFICATION=OFFLINE_EXPECTED/PASS");
-    return;
-  }
+void CommandRouter::printServoScanResult() {
+  const servo::ScanResult& result = modules_.servo_bus->lastScanResult();
+  Serial.printf("SERVO_SCAN=COMPLETE lo=%d hi=%d found=%d\n",
+                result.lo, result.hi, result.found_count);
+  printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
 
   int listed = result.found_count < servo::ServoBus::kMaxScanIds
                    ? result.found_count
@@ -214,8 +235,7 @@ void CommandRouter::printServoRead(int id) {
   servo::ServoBus::RuntimeState state;
   if (!modules_.servo_bus->readRuntimeState(id, &state)) {
     Serial.printf("SERVO_READ id=%d result=NO_RESPONSE\n", id);
-    Serial.printf("PROFILE=%s\n", build::kTestProfile);
-    Serial.println("CLASSIFICATION=OFFLINE_EXPECTED/PASS");
+    printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
     return;
   }
 

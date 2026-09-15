@@ -7,6 +7,7 @@
 #include "../power/DalyBms.h"
 #include "../servo/ServoBus.h"
 #include "../status/LedRing.h"
+#include "Availability.h"
 #include "PowerState.h"
 #include "SystemState.h"
 
@@ -38,13 +39,15 @@ class CommandRouter {
   void printImuStatus();
   void printBmsStatus();
   void printLedStatus();
-  void printServoScan(int lo, int hi);
+  void printServoScanResult();
   void printServoRead(int id);
   void printServoSafeOff(int id);
+  static void printAvailabilityLine(const char* label, const AvailabilityStatus& a);
 
   Modules modules_{};
   bool bms_stream_enabled_ = false;
   uint32_t last_bms_stream_ms_ = 0;
+  bool servo_scan_result_pending_ = false;
 
   static constexpr size_t kLineBufSize = 96;
   char line_buf_[kLineBufSize] = {0};

@@ -1,5 +1,6 @@
 #include "Controller.h"
 
+#include <esp_ota_ops.h>
 #include <esp_system.h>
 
 #include "../config/BuildConfig.h"
@@ -79,6 +80,13 @@ void Controller::printBootBanner() {
                 pins::kBnoSck, pins::kBnoMiso, pins::kBnoMosi, pins::kBnoCs,
                 pins::kBnoInt, pins::kBnoRst, pins::kBnoPs0);
   Serial.printf("led        : GPIO%d / %u px\n", pins::kLedRingDin, status::LedRing::kNumPixels);
+
+  const esp_partition_t* running = esp_ota_get_running_partition();
+  if (running != nullptr) {
+    Serial.printf("partition  : %s @ 0x%06x (size 0x%06x)\n",
+                  running->label, (unsigned)running->address, (unsigned)running->size);
+  }
+
   Serial.printf("reset_reason : %s\n", resetReasonName(esp_reset_reason()));
   Serial.println("startup_motion   : DISABLED");
   Serial.println("startup_torque   : DISABLED");
@@ -98,6 +106,9 @@ void Controller::update(uint32_t now_ms) {
   led_.update(now_ms);
   system_state_.setLedHealth(led_.health());
 
+  // Advances at most one servo Ping() per tick when a scan is RUNNING —
+  // see ServoBus::update() / ScanState for why this must never be skipped.
+  servo_bus_.update(now_ms);
   system_state_.setServoHealth(servo_bus_.health());
 
   system_state_.update();
