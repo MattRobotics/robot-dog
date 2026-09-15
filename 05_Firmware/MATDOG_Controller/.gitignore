@@ -1,0 +1,3 @@
+# Compiled binaries are not committed — reproducible from source + the FQBN
+# recorded in README.md, matching the convention in ST3215_Bench_Tools/.
+build/

@@ -16,7 +16,15 @@ ESP32-S3 tools that have run on real hardware and are archived byte-for-byte:
 These are **bench** tools: they run on a bench rig with a single servo attached, never on the
 assembled robot under power for motion.
 
-**No robot flight firmware is active.** No onboard motion-controller firmware exists yet.
+**MATDOG Controller V0.1 integration runtime is implemented.**
+[`MATDOG_Controller/`](MATDOG_Controller/) is the first unified operational ESP32-S3 firmware:
+one deployable image with modular ServoBus / BNO085 / DALY BMS / LED ring / USB diagnostics,
+adapted from the hardware-proven bench and bring-up sources above rather than rewritten from
+scratch. USB-only bench validation (boot, BNO085 live acquisition, existing viewer compatibility,
+expected-offline classification for DALY/ST3215/LED) is recorded in
+[`MATDOG_Controller/VALIDATION.md`](MATDOG_Controller/VALIDATION.md). **Motion, gait and
+operational IK remain not implemented** — V0.1 is an integration and platform milestone, not a
+motion controller.
 
 The current locomotion-development stack is:
 
@@ -31,15 +39,15 @@ The ESP32-S3 is the operational owner of the servo serial bus.
 
 ## Future Scope
 
-This directory may later contain:
+`MATDOG_Controller/` already implements IMU acquisition, read-only battery telemetry, a USB
+diagnostic surface and a power-state-machine baseline (see above). It may later grow:
 
-- ESP32 motion-controller firmware
-- IMU acquisition and filtering
-- battery monitoring
-- watchdog logic
-- safety interlocks
-- low-level ST3215 actuator adapter
-- communication protocol between Jetson or host and motion controller
+- deterministic servo motion / operational IK / gait execution
+- closed-loop BNO085 stabilization
+- watchdog / safety interlocks beyond the current health aggregation
+- verified DALY write support (Discharge MOS OFF), once the K-Series protocol is identified
+- Wi-Fi / OTA (separate future integration; not part of V0.1)
+- Jetson onboard host integration
 
 ## Architecture Rule
 
@@ -55,7 +63,10 @@ Those belong in:
 
     06_Software/
 
-The **operational motion firmware** — deterministic servo control, gait execution, operational IK,
-IMU, power telemetry and watchdog/safety — is **decided to live on the ESP32-S3 but is not yet
-written**. It is distinct from the frozen bench tools above, which are qualification instruments
-rather than robot runtime.
+**Deterministic servo motion, gait execution and operational IK are decided to live on the
+ESP32-S3 but are not yet written.** IMU acquisition, read-only power telemetry and a USB
+diagnostic/health surface **are** written, as of `MATDOG_Controller` V0.1 — see
+[`MATDOG_Controller/VALIDATION.md`](MATDOG_Controller/VALIDATION.md) for exactly what has been
+exercised on real hardware versus what remains software-only. `MATDOG_Controller` is distinct
+from the frozen bench tools above, which remain qualification instruments rather than robot
+runtime.

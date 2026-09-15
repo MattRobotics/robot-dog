@@ -46,7 +46,7 @@ Electronics decisions (Seeed driver, no CAN, single ATO main fuse, custom busbar
 | Layer | Direction | Status |
 |---|---|---|
 | High-level | **ROS 2 / MoveIt 2**, AI, vision, voice, planning, UI | decided stack — **not yet integrated** |
-| Coprocessor | ESP32-S3 deterministic servo/motion/gait/IK/safety/telemetry layer | **bus ownership validated**; motion & safety firmware **decided but not written** |
+| Coprocessor | ESP32-S3 deterministic servo/motion/gait/IK/safety/telemetry layer | **bus ownership and BNO085 IMU acquisition validated** (MATDOG Controller V0.1); motion & gait/IK **decided but not written** |
 | Host link | native USB 2.0 Full-Speed / USB CDC | **decided and in use**; packet protocol still TBD |
 | NormaCore Station | **optional / legacy / reference** | **not** a required actuation owner |
 
@@ -71,6 +71,7 @@ every claim tagged validated / decided / TBD.
 | [Provisioner V6 + frozen bench tools](05_Firmware/ST3215_Bench_Tools/README.md) | self-test 450/450, static audit PASS |
 | [Servo allocation](06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml) | unit → joint → bus ID fixed for all 17 |
 | Geometry Compiler V5 / Phase 1B | CLOSED — URDF, meshes and geometric endpoints remain valid |
+| [MATDOG Controller V0.1](05_Firmware/MATDOG_Controller/VALIDATION.md) | unified ESP32-S3 runtime — USB boot, live BNO085 acquisition and existing viewer compatibility validated on real hardware (USB-only bench); DALY/LED/ST3215 correctly classified `OFFLINE_EXPECTED` with no battery connected |
 
 Geometry is unaffected by the rebuild: it describes the design, not the build.
 
