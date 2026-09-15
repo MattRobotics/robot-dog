@@ -86,27 +86,39 @@ class ServoBus {
   // ST3215_Provisioning_2026-08-27/characterization_sessions/), timing a
   // live powered ST3215 at 1 Mbaud with micros(), recorded Ping+register-read
   // round trips clustering at 593-620us (hundreds of samples) and a
-  // dedicated register-read timing of 334-358us. kPingTimeoutMs below is set
-  // to roughly 32x that measured worst case (20ms vs ~0.62ms) — enough
-  // margin for a different bench topology (this session's bus runs through
-  // the Seeed driver, not the characterization rig's point-to-point wiring)
-  // while still bounding the USB_ONLY no-response worst case far tighter
-  // than the 100ms library default.
+  // dedicated register-read timing of 334-358us. kDiagnosticTimeoutMs below
+  // is set to roughly 32x that measured worst case (20ms vs ~0.62ms) —
+  // enough margin for a different bench topology (this session's bus runs
+  // through the Seeed driver, not the characterization rig's point-to-point
+  // wiring) while still bounding the USB_ONLY no-response worst case far
+  // tighter than the 100ms library default.
   //
   // SESSION 2.2, FINDING C: this is a DIAGNOSTIC absence-detection timeout,
   // NOT a validated operational ServoBus timeout for a future powered
   // 17-servo bus. Session 2.1 set it globally, once, in begin() — every
-  // subsequent SCServo call for the rest of the session (including any
-  // future register-read/telemetry call unrelated to MAINTENANCE-mode
-  // scanning) would silently inherit 20ms whether that was appropriate for
-  // it or not. begin() no longer touches IOTimeOut at all: it stays at the
-  // library's own 100ms default (still a public SCSerial field — the
-  // vendored library file is never edited) except for the exact duration of
-  // a diagnostic transaction, via ScopedPingTimeout below. Every public
-  // method that talks to the bus applies this guard around its own
-  // transaction and lets it restore the previous value on every exit path,
-  // including early returns.
-  static constexpr unsigned long kPingTimeoutMs = 20;
+  // subsequent SCServo call for the rest of the session would silently
+  // inherit 20ms whether appropriate or not. begin() no longer touches
+  // IOTimeOut at all.
+  //
+  // SESSION 2.3, FINDING 1: Session 2.2's fix still applied
+  // kDiagnosticTimeoutMs to EVERY transaction, including safeOff() and
+  // readRuntimeState() — so the documented "operational timeout = 100ms,
+  // diagnostic timeout = 20ms" split was not actually true in code. Two
+  // named constants now exist and every method states, explicitly, via
+  // ScopedIOTimeout, which one it uses — there is no "default/untouched"
+  // case to trust implicitly:
+  //   kDiagnosticTimeoutMs (20ms) — @SERVO SCAN's per-ID probe, ping(),
+  //     readModel(): bounded absence-detection only, MAINTENANCE-only today.
+  //   kOperationalTimeoutMs (100ms) — safeOff() (the safety de-escalation
+  //     write, reachable from any OperatingMode) and readRuntimeState()
+  //     (the primitive behind @SERVO READ today, which a future motion
+  //     controller will naturally reuse for operational state reads — it
+  //     must not silently inherit a timeout tuned for absence detection).
+  //     100ms is simply SCServo's own untouched library default here, not
+  //     a value MATDOG has validated/optimized as final for a powered
+  //     17-servo bus.
+  static constexpr unsigned long kDiagnosticTimeoutMs = 20;
+  static constexpr unsigned long kOperationalTimeoutMs = 100;
 
   bool begin();
   void update(uint32_t now_ms);
@@ -114,7 +126,7 @@ class ServoBus {
   core::AvailabilityStatus availability() const;
 
   // Pings a single ID. Returns true and fills model/present if it answers.
-  // Bounded to one SCServo IOTimeOut (kPingTimeoutMs) — fine for an
+  // Bounded to one SCServo IOTimeOut (kDiagnosticTimeoutMs) — fine for an
   // on-demand single-ID diagnostic, unlike a range scan. Like all servo
   // diagnostics that can block for that long, only meaningful/reachable
   // during core::OperatingMode::MAINTENANCE.
@@ -122,10 +134,11 @@ class ServoBus {
 
   // Reads the C018 model word (register 0x03). Expected value is 777 but
   // this module does not enforce that — it is a read-only diagnostic.
+  // Uses kDiagnosticTimeoutMs — diagnostic discovery, not an operational read.
   bool readModel(int id, int* model_out);
 
   // Starts an incremental scan across [lo, hi] (clamped to 0..253 and to
-  // kMaxScanRange): bounded per-ID blocking (see kPingTimeoutMs), not
+  // kMaxScanRange): bounded per-ID blocking (see kDiagnosticTimeoutMs), not
   // non-blocking — see the ScanState comment above. Returns false without
   // effect if a scan is already RUNNING or the range is invalid. Call
   // update() every loop tick to advance it; poll scanState()/
@@ -137,11 +150,20 @@ class ServoBus {
   // TorqueEnable = 0. The only servo write exposed in V0.1: it can only
   // remove torque, never add it, and it never touches EEPROM. Returns a
   // verified outcome (see SafeOffResult above) — never a bare bool that
-  // could be mistaken for "confirmed off".
+  // could be mistaken for "confirmed off". Uses kOperationalTimeoutMs, NOT
+  // the diagnostic timeout (Session 2.3 Finding 1) — this is the safety
+  // de-escalation path and must not inherit a timeout tuned for
+  // MAINTENANCE-only absence detection.
   SafeOffResult safeOff(int id);
 
   // Read-only runtime snapshot (present position/speed/load/voltage/temp).
   // Returns false if the servo does not answer within the bounded timeout.
+  // Uses kOperationalTimeoutMs, NOT the diagnostic timeout (Session 2.3
+  // Finding 1): this is the primitive behind @SERVO READ today, and a
+  // future motion controller will naturally reuse it for operational state
+  // reads — it must not silently inherit a timeout tuned for
+  // MAINTENANCE-only absence detection just because @SERVO READ happens to
+  // be MAINTENANCE-gated today.
   struct RuntimeState {
     int present_position = -1;
     int present_speed = -1;
@@ -154,21 +176,23 @@ class ServoBus {
 
  private:
   // RAII guard: saves SMS_STS::IOTimeOut (a plain public field, not a
-  // vendored-library edit), sets it to the given diagnostic timeout for the
-  // guard's scope, and restores the saved value on every exit path
-  // (destructor runs on early `return` too, not just fall-through) — see
-  // kPingTimeoutMs above for why this must never become a standing global
-  // change. Deliberately not copyable/movable: exactly one guard per
-  // transaction, matching "no overengineering" from the handoff.
-  class ScopedPingTimeout {
+  // vendored-library edit), sets it to the given timeout for the guard's
+  // scope, and restores the saved value on every exit path (destructor
+  // runs on early `return` too, not just fall-through). Generic over which
+  // of the two named timeouts above it applies — every call site names its
+  // choice explicitly (Session 2.3 Finding 1), there is no implicit
+  // "leave it at whatever it already was" case. Deliberately not
+  // copyable/movable: exactly one guard per transaction, matching "no
+  // overengineering" from the handoff.
+  class ScopedIOTimeout {
    public:
-    ScopedPingTimeout(SMS_STS& st, unsigned long diagnostic_timeout_ms)
+    ScopedIOTimeout(SMS_STS& st, unsigned long timeout_ms)
         : st_(st), previous_ms_(st.IOTimeOut) {
-      st_.IOTimeOut = diagnostic_timeout_ms;
+      st_.IOTimeOut = timeout_ms;
     }
-    ~ScopedPingTimeout() { st_.IOTimeOut = previous_ms_; }
-    ScopedPingTimeout(const ScopedPingTimeout&) = delete;
-    ScopedPingTimeout& operator=(const ScopedPingTimeout&) = delete;
+    ~ScopedIOTimeout() { st_.IOTimeOut = previous_ms_; }
+    ScopedIOTimeout(const ScopedIOTimeout&) = delete;
+    ScopedIOTimeout& operator=(const ScopedIOTimeout&) = delete;
 
    private:
     SMS_STS& st_;
