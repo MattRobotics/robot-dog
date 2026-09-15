@@ -53,12 +53,19 @@ Writes **only** the currently-active OTA application partition — never the
 bootloader, partition table or boot_app0/otadata. `scripts/verify_application_partition.py`
 determines that partition's real offset/size by reading the device's own partition
 table and otadata (the `app3M_fat9M_16MB` scheme has two OTA slots; this never assumes
-which one is active). Refuses to run unless: the working tree is clean and the
+which one is active, and recognizes OTA slots by the real ESP-IDF bitmask
+`(subtype & 0xF0) == PART_SUBTYPE_OTA_FLAG`, not a numeric threshold that would also
+match TEST/TEE partitions). It also reads the real build's `sdkconfig` and refuses if
+`CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK` is enabled, or if `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`
+is enabled *and* the selected otadata entry is in a state (`NEW`/`PENDING_VERIFY`) the
+bootloader can autonomously rewrite on the next boot — see `scripts/ota_partition_logic.py`
+and `VALIDATION.md` Session 2.2. Refuses to run unless: the working tree is clean and the
 compiled binary's embedded build id matches `HEAD`, the 16 MiB full-flash backup
 verifies, the static audit passes, and the connected device's MAC matches the expected
-one. Prints `DEVICE`/`APPLICATION_BINARY`/`APPLICATION_SHA256`/`APPLICATION_OFFSET`/
-`APPLICATION_SIZE`/`MAX_PARTITION_SIZE`/`FQBN`/`SOURCE_COMMIT` before writing anything,
-and independently re-verifies the write afterward with `esptool verify-flash`.
+one. Prints `SDKCONFIG_ROLLBACK`/`SDKCONFIG_ANTI_ROLLBACK`/`DEVICE`/`APPLICATION_BINARY`/
+`APPLICATION_SHA256`/`APPLICATION_OFFSET`/`APPLICATION_SIZE`/`MAX_PARTITION_SIZE`/`FQBN`/
+`SOURCE_COMMIT` before writing anything, and independently re-verifies the write
+afterward with `esptool verify-flash`.
 
 `scripts/upload.sh` (full Arduino upload — bootloader + partition table + boot_app0 +
 application, every time) is kept for the legitimate full-image case (e.g. bring-up on
@@ -80,8 +87,12 @@ DalyBms, a synchronous multi-ID servo scan loop, `@SERVO SCAN`/`@SERVO READ` los
 their `MAINTENANCE`-mode guard (or `@SERVO SAFE_OFF` gaining one), the LED transport
 being driven while `kLedRailPowered` is false, `scripts/flash_app_only.sh` regressing
 to reference the bootloader/partition-table/boot_app0 artifacts it must never write,
-or the OTA partition verifier's fail-closed validity checks regressing (it also runs
-that verifier's own offline test suite as part of the audit).
+the OTA partition verifier's fail-closed validity checks regressing (it also runs
+that verifier's own offline test suite as part of the audit), the OTA subtype filter
+regressing to a numeric threshold instead of the real bitmask, the rollback/anti-rollback
+parameters gaining an unsafe default, `ServoBus::begin()` assigning `IOTimeOut` directly
+again instead of via `ScopedPingTimeout`, or `safeOff()` classifying success from
+`EnableTorque()`'s own return value instead of an independent readback.
 
 ## USB diagnostic command surface
 
@@ -98,7 +109,14 @@ that verifier's own offline test suite as part of the audit).
 ```
 
 `@SERVO SAFE_OFF` can only disable torque, never enable it, and stays reachable in
-every operating mode — it is the safety de-escalation path. `@SERVO SCAN`/`@SERVO READ`
+every operating mode — it is the safety de-escalation path. Its reply is never a bare
+`OK`: `SCS::Ack()` (which `EnableTorque()` returns) gives `0` on any failure/timeout,
+not `-1` like `Ping()`/`readByte()` — a naive `result >= 0` check is therefore always
+true and can never observe a failure. `safeOff()` now always performs an independent,
+read-only `TorqueEnable` readback after the write and classifies strictly from that:
+`VERIFIED_OFF` (readback confirms `0`), `UNVERIFIED_NO_RESPONSE` (no readback response
+at all — confirmed live with the servo bus unpowered), or `VERIFY_FAILED` (readback
+responded but is non-zero). `@SERVO SCAN`/`@SERVO READ`
 are **incremental with bounded per-ID blocking, not non-blocking**: `ServoBus::update()`
 still calls `SCServo::Ping()` synchronously, which carries its own bounded per-call
 timeout (`kPingTimeoutMs`, 20ms — see Operating mode below). `@SERVO SCAN` replies
@@ -148,13 +166,19 @@ default to `RUN`** and require an explicit, reviewed transition into `MAINTENANC
 (with torque confirmed off) before servo diagnostics are reachable again — this is
 called out directly in `OperatingMode.h` so it cannot be missed.
 
-`ServoBus::kPingTimeoutMs` (20ms) replaces SCServo's generic 100ms `IOTimeOut`
-default (a public `SCSerial` field, set at runtime — the vendored library is never
-edited), justified by real hardware measurement rather than an assumed value: the
-NEW01 characterization campaign
+`ServoBus::kPingTimeoutMs` (20ms) is a **diagnostic absence-detection timeout**, not a
+validated operational timeout for a future powered 17-servo bus — justified by real
+hardware measurement rather than an assumed value: the NEW01 characterization campaign
 (`09_Logs/Validation_Reports/ST3215_Provisioning_2026-08-27/characterization_sessions/`)
 timed a live powered ST3215 at 1 Mbaud and recorded Ping+register-read round trips of
-593-620us — 20ms is roughly 32x that measured worst case.
+593-620us — 20ms is roughly 32x that measured worst case. It is applied via
+`ServoBus::ScopedPingTimeout`, an RAII guard around each individual bus transaction
+(`ping()`/the scan's per-ID probe/`readModel()`/`safeOff()`/`readRuntimeState()`) that
+saves `SCSerial::IOTimeOut` (a public field, set at runtime — the vendored library is
+never edited), applies the diagnostic timeout, and restores the previous value on every
+exit path. `begin()` never assigns `IOTimeOut` directly — it stays at the library's own
+100ms default outside of a diagnostic transaction, so this can never silently become a
+standing global override for some future, unrelated operational use of the bus.
 
 ## Anti-back-power (LED ring)
 

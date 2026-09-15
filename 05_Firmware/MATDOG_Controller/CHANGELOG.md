@@ -99,3 +99,53 @@ no new functionality. Flashed and hardware-validated as commit
 
 See `VALIDATION.md` Session 2.1 for the full measurement evidence, the ESP-IDF
 source citations, and H1/H2/H3/H4/H6 hardware re-validation.
+
+## 0.1.0 — Session 2.2 final merge gate — 2026-09-15
+
+Four findings from a final review of Session 2.1, fixed before merge — no
+new functionality. Flashed and hardware-validated as commit
+`cb53c63206b0ccad68055ecc993a0a9e03f5b545` (`FIRMWARE_SOURCE_COMMIT`; see
+`VALIDATION.md` Session 2.2).
+
+- `scripts/ota_partition_logic.py` (Finding A): OTA subtype recognition
+  corrected from a `subtype >= 0x10` threshold to the real ESP-IDF bitmask
+  `(subtype & 0xF0) == PART_SUBTYPE_OTA_FLAG` — the old check wrongly
+  matched `PART_SUBTYPE_TEST`(0x20) and `PART_SUBTYPE_TEE_0/1`(0x30/0x31)
+  as if they were OTA app slots. Also refuses on duplicate OTA slot
+  indices instead of silently picking one.
+- `scripts/ota_partition_logic.py` (Finding B): the real, installed build
+  has `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` (confirmed by reading the
+  actual sdkconfig, not assumed). `resolve_application_partition()` now
+  takes required `rollback_enabled`/`anti_rollback_enabled` parameters
+  (no default) and refuses when anti-rollback is enabled at all, or when
+  rollback is enabled and the selected otadata entry's state is
+  `NEW`/`PENDING_VERIFY` (states the bootloader can autonomously rewrite
+  on the next boot). `verify_application_partition.py` now requires
+  `--sdkconfig`; `flash_app_only.sh` passes it and prints both flags
+  before writing. The real device's state (`ota_state=UNDEFINED`) is
+  stable regardless, so flashing proceeded correctly this session.
+- `servo/ServoBus` (Finding C): `kPingTimeoutMs` (20ms) is no longer set
+  globally in `begin()` — it was silently becoming a standing override for
+  every future SCServo call. `ScopedPingTimeout` (RAII) now brackets each
+  individual bus transaction and restores the library's own 100ms default
+  afterward, on every exit path.
+- `servo/ServoBus` (Finding D): `safeOff()` returned `bool` based on
+  `EnableTorque()`'s own return value, which is `SCS::Ack()` — `0` on any
+  failure, not `-1` like `Ping()`/`readByte()`, so `result >= 0` was always
+  true and could never observe a failure. Confirmed live last session:
+  `@SERVO SAFE_OFF 11` reported `OK` with the servo bus completely
+  unpowered. `safeOff()` now returns `SafeOffResult`
+  (`VERIFIED_OFF`/`UNVERIFIED_NO_RESPONSE`/`VERIFY_FAILED`), classified
+  strictly from an independent `TorqueEnable` readback taken after the
+  write, never from the write's own ACK. Re-tested live this session:
+  `UNVERIFIED_NO_RESPONSE`, correctly.
+- `core/OperatingMode.h`, `core/PowerState.h`: cross-reference comments
+  clarifying `OperatingMode::RUN` and `PowerState::RUN` are orthogonal
+  concepts that share a name coincidentally. `OperatingMode`'s approved
+  MAINTENANCE/RUN boundary itself is unchanged.
+- `scripts/static_audit.py`: five new regression checks for the above;
+  27/27 OTA parser offline tests (17 new this session).
+
+See `VALIDATION.md` Session 2.2 for the full measurement evidence, the
+ESP-IDF rollback source citations, and H1/H3/H4/H5/H6 hardware
+re-validation including live SAFE_OFF and OperatingMode transcripts.

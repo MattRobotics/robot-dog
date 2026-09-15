@@ -538,6 +538,13 @@ Not merged to `main` — that remains a separate, explicit decision.
 An independent review of Session 2 raised two findings before merge. Same
 USB_ONLY hardware configuration throughout; no new functionality.
 
+> **Documentation correction recorded in Session 2.2:** the chat-only final
+> report at the end of this session stated "10 commits" created; the actual
+> number is **5** (`60e3097`, `6fb654c`, `f184881`, `07592b9`, `647dba8`,
+> all after `82e0aa7`). That report text was never written to this file or
+> any other, so there was nothing to correct in-repo — this note exists
+> only so the miscount is not repeated. Not a firmware finding.
+
 ### Provenance
 
 ```text
@@ -850,3 +857,289 @@ Session 2's evidence. No new functionality was added; no forbidden hardware
 action (battery, 5V, torque-on, GoalPosition, EEPROM, DALY write, MOS write,
 bootloader/partition-table write, NVS erase, full-image upload) occurred
 this session. Merge decision and execution remain with the operator.
+
+---
+
+## Session 2.2 — 2026-09-15, Final Merge Gate
+
+Four findings from a final review of Session 2.1, fixed before merge — no
+new functionality. Same USB_ONLY hardware configuration throughout.
+
+### Provenance
+
+```text
+FIRMWARE_SOURCE_COMMIT = cb53c63206b0ccad68055ecc993a0a9e03f5b545
+  (clean tree; compiled, application-only flashed and hardware-validated
+   this session — build id cb53c63206b0 visible in the boot banner/@STATUS)
+FINAL_BRANCH_HEAD       = <the commit that adds this section plus the
+   accompanying README/CHANGELOG updates — created AFTER
+   FIRMWARE_SOURCE_COMMIT and after the device was already flashed and
+   validated; changes nothing that is running on the device>
+```
+
+### Finding A — OTA subtype filter was too permissive
+
+`ota_app_partitions()` used `subtype >= 0x10`. The same
+`esp_flash_partitions.h` header already cited in Session 2.1 also defines
+`PART_SUBTYPE_TEST = 0x20` and `PART_SUBTYPE_TEE_0/1 = 0x30/0x31` — all
+numerically `>= 0x10` but not OTA app slots. Fixed to the real ESP-IDF
+bitmask: `(subtype & 0xF0) == PART_SUBTYPE_OTA_FLAG(0x10)`, slot index
+`= subtype & PART_SUBTYPE_OTA_MASK(0x0F)`. Also now refuses on a duplicate
+OTA slot index instead of silently picking one. 5 new offline tests added
+(ota_0+ota_1 recognized; TEST alone does not add a third slot; TEE_0/1
+excluded; TEST-and-TEE-with-no-OTA-slot correctly finds none; duplicate
+slot index refuses) — all PASS.
+
+### Finding B — rollback configuration was never checked against the real build
+
+Verified, not assumed, by reading the actual build's `sdkconfig`
+(`build/esp32.esp32.esp32s3/sdkconfig`):
+
+```text
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK is not set
+```
+
+Rollback **is** enabled in the real, installed toolchain — this was not
+assumed to be off. With it enabled, `bootloader_utility.c`'s
+`get_selected_boot_partition()` autonomously rewrites otadata during normal
+boot: any sector in `ESP_OTA_IMG_PENDING_VERIFY` is marked `ABORTED`
+unconditionally at the start of every boot; the winning sector is marked
+`PENDING_VERIFY` if its prior state was `NEW`. A read-only single snapshot
+cannot treat those two states as stable.
+
+`resolve_application_partition()` now takes required (no-default)
+`rollback_enabled`/`anti_rollback_enabled` parameters — a caller cannot
+silently assume "safe". Policy implemented exactly as specified:
+
+```text
+anti_rollback enabled              -> REFUSE unconditionally (secure_version/
+                                       eFuse semantics this tool does not implement)
+rollback enabled + NEW/PENDING_VERIFY selected -> REFUSE (bootloader can
+                                       rewrite this on the next boot)
+rollback enabled + UNDEFINED/VALID selected     -> proceed (bootloader
+                                       never autonomously rewrites these)
+both disabled                      -> proceeds exactly as Session 2.1
+```
+
+This is a read-only, minimal extension of the existing validity check — not
+an OTA manager, no write path, no confirmation/rollback-cancel logic added.
+`verify_application_partition.py` now requires `--sdkconfig` and reads the
+real flags from the build that produced the binary being flashed;
+`flash_app_only.sh` passes it automatically and prints both flags before
+writing anything. `static_audit.py` forbids the parameters from ever
+regaining a default value and requires `--sdkconfig` to remain wired in.
+
+**The real device's actual state, re-verified this session:**
+`OTADATA_SECTOR_SEQS=[1, 0]`, active entry `ota_state=UNDEFINED` — not
+`NEW`/`PENDING_VERIFY`, so stable regardless of rollback being enabled.
+`flash_app_only.sh` printed `SDKCONFIG_ROLLBACK = ...=y` /
+`SDKCONFIG_ANTI_ROLLBACK = ...=n` and proceeded correctly; resolved
+`app0 @ 0x010000`, identical to Session 2.1. 9 new offline tests cover
+every enabled/disabled × state combination — all PASS.
+
+### Finding C — the 20ms diagnostic timeout had become a standing global override
+
+Session 2.1 set `st_.IOTimeOut = kPingTimeoutMs` once in `ServoBus::begin()`
+— every subsequent SCServo call for the rest of the session, including any
+future register-read/telemetry call unrelated to `MAINTENANCE`-mode
+scanning, would silently inherit 20ms whether appropriate or not. `20ms` is
+a diagnostic absence-detection timeout justified by real measurement; it
+was never validated as an operational timeout for a future powered
+17-servo bus, and was not supposed to become one by default.
+
+Fixed with `ServoBus::ScopedPingTimeout`, a small RAII guard: saves the
+current `IOTimeOut`, sets the diagnostic value, restores the saved value in
+its destructor (fires on every exit path, including early `return`).
+`begin()` no longer touches `IOTimeOut` at all — it stays at the library's
+own 100ms default except for the exact duration of a diagnostic
+transaction. Applied around every bus transaction: `ping()`, the scan's
+per-ID probe, `readModel()`, `safeOff()`, `readRuntimeState()`. No vendored
+SCServo file was edited — `IOTimeOut` is a public `SCSerial` field.
+
+### Finding D — SAFE_OFF could report false success
+
+**Root cause, confirmed by reading the real, installed SCServo library**
+(`SCServo/src/SCS.cpp`): `EnableTorque()`/`writeByte()` return
+`SCS::Ack()`'s result, which is **0 on any failure/timeout/no-response and
+1 on a validated ACK — never negative**, unlike `Ping()`/`readByte()`/
+`readWord()` (`-1` on failure, documented in-source: "timeout returns
+-1"). Session 2.1's `safeOff()` checked `result >= 0`, which is true for
+**both** possible outcomes of `Ack()` (0 and 1) — it could never observe a
+failure, regardless of whether a servo was even present.
+
+Fixed by never trusting the write's own return value for the safety claim:
+`safeOff()` issues the torque-off write, then **always** performs an
+independent, read-only `TorqueEnable` readback regardless of what the
+write's ACK reported, and classifies strictly from that readback:
+
+```text
+VERIFIED_OFF            readback responded, TorqueEnable == 0
+UNVERIFIED_NO_RESPONSE  no readback response at all
+VERIFY_FAILED           readback responded, TorqueEnable != 0
+```
+
+No bare bool, no "OK" reply anywhere in this path.
+
+**Live confirmation, servo bus completely unpowered (USB_ONLY, as this
+whole session's hardware configuration requires):**
+
+```text
+SERVO_SAFE_OFF id=11 result=UNVERIFIED_NO_RESPONSE
+SERVO_SAFE_OFF id=99 result=UNVERIFIED_NO_RESPONSE
+```
+
+— correctly no longer `OK`/`VERIFIED_OFF`. Re-confirmed with
+`OperatingMode::RUN` active (`@SERVO SAFE_OFF` remains reachable there by
+design, honestly classified either way):
+
+```text
+MODE=RUN
+SERVO_SCAN=BLOCKED
+REASON=NOT_IN_MAINTENANCE_MODE
+MODE=RUN
+SERVO_READ=BLOCKED
+REASON=NOT_IN_MAINTENANCE_MODE
+MODE=RUN
+SERVO_SAFE_OFF id=11 result=UNVERIFIED_NO_RESPONSE
+MODE=MAINTENANCE
+SYSTEM health=READY power_state=RUN mode=MAINTENANCE uptime_ms=52396 profile=USB_ONLY
+```
+
+### Section 6 — OperatingMode vs PowerState clarified, not redesigned
+
+`core::OperatingMode`'s approved `MAINTENANCE`/`RUN` boundary is unchanged
+(the handoff explicitly asked for clarification, not a redesign).
+`OperatingMode.h` and `PowerState.h` now cross-reference each other: the
+two `RUN` values are orthogonal and the shared name is coincidental — a
+running V0.1 controller is normally `PowerState::RUN` **and**
+`OperatingMode::MAINTENANCE` simultaneously (visible together in every
+`@STATUS`/boot banner capture this session), which is expected, not a
+naming collision.
+
+### H0 — Offline gates (Session 2.2)
+
+| Gate | Result |
+|---|---|
+| Git state re-audited: branch, HEAD (`647dba87cbfd654230ab13f301f8708c41771222`, matched exactly), frozen-source hashes | PASS — unchanged |
+| Real sdkconfig read (not assumed) | `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y`, `CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK` not set |
+| Compile (pinned FQBN, clean `FIRMWARE_SOURCE_COMMIT`) | **PASS** — 384248 bytes flash (12%), 28232 bytes RAM (9%), zero warnings from MATDOG_Controller sources |
+| Static audit (extended) | **PASS** — 23 source files, 0 findings, includes 27/27 OTA parser tests (10 Session 2.1 baseline + 17 new this session; see totals below) |
+| Existing BNO085 viewer test suite | **PASS** — 59/59, unmodified |
+| Application binary provenance | `MATDOG_Controller.ino.bin`, 384,400 bytes, SHA256 `9cae184d65c46cf0e9c1735e69843affd4a9bdd4199282c097c16df13aa678b3`, embeds build id `cb53c63206b0` matching `FIRMWARE_SOURCE_COMMIT` |
+
+### Application-only flash
+
+```text
+SDKCONFIG_ROLLBACK      = CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+SDKCONFIG_ANTI_ROLLBACK = CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=n
+DEVICE                  = /dev/serial/.../usb-Espressif_USB_JTAG_...-if00 (MAC 14:c1:9f:22:75:94)
+APPLICATION_BINARY      = build/esp32.esp32.esp32s3/MATDOG_Controller.ino.bin
+APPLICATION_SHA256      = 9cae184d65c46cf0e9c1735e69843affd4a9bdd4199282c097c16df13aa678b3
+APPLICATION_OFFSET      = 0x010000 (partition 'app0', re-verified with the rollback-aware algorithm)
+APPLICATION_SIZE        = 384400 bytes
+MAX_PARTITION_SIZE      = 3145728 bytes
+SOURCE_COMMIT           = cb53c63206b0ccad68055ecc993a0a9e03f5b545
+```
+
+Write result: esptool's post-write hash check passed ("Hash of data
+verified"); independent `esptool verify-flash` reported "Verification
+successful (digest matched)". **Non-application regions re-verified
+unchanged** via `esptool verify-flash` against the same reference files
+captured in Session 2's original audit: bootloader (0x0), partition table
+(0x8000) and otadata (0xe000) all reported "Verification successful
+(digest matched)".
+
+### H1 — Boot — **PASS**
+
+```text
+build          : cb53c63206b0
+partition      : app0 @ 0x010000 (size 0x300000)
+operating_mode : MAINTENANCE
+IMU_INIT=PASS
+SYSTEM_BOOT_COMPLETE health=READY power_state=RUN
+EXPECTED_STARTUP_RESET=YES
+```
+
+### H2 — BNO085 — **PASS**
+
+`runtime_resets=0` across every capture this session.
+
+### H3 — USB_ONLY classification — **PASS**, unchanged from Session 2.1
+
+```text
+BNO085 init=OK       detected=ONLINE      expected=REQUIRED  result=PASS
+DALY   init=OK       detected=NO_RESPONSE expected=OFFLINE   result=PASS
+SERVO  init=OK       detected=NO_RESPONSE expected=OFFLINE   result=PASS
+LED    init=DEFERRED detected=UNPOWERED   expected=UNPOWERED result=PASS
+```
+
+### H4/H5 — SAFE_OFF and OperatingMode regression — **PASS**
+
+See Finding D above for the full live transcript. Summary:
+
+```text
+@SERVO SAFE_OFF 11 (servo bus unpowered)      -> UNVERIFIED_NO_RESPONSE (was: OK)
+@MODE RUN; @SERVO SCAN                        -> BLOCKED / NOT_IN_MAINTENANCE_MODE
+@MODE RUN; @SERVO READ                        -> BLOCKED / NOT_IN_MAINTENANCE_MODE
+@MODE RUN; @SERVO SAFE_OFF                    -> still allowed, honestly classified
+@MODE MAINTENANCE                             -> switches back correctly
+```
+
+### H6 — Soak — **PASS**
+
+~45s dedicated window post-flash plus the interactive validation above:
+`runtime_resets=0` throughout, classification stable, no fatal/panic events.
+
+### Frozen/standalone source hashes — re-verified unchanged
+
+```text
+matdog_servo_commissioning.ino     74656fb9187fd2024f8251276b49676d8be9c6455f542c49500cfb30d25630cd
+matdog_bno085_dcd_phase_c3.ino     51bb3016ac20226b812e1e892328768495348278cb19c320de34930cccd103e6
+matdog_daly_rs485_probe_v2.ino     4fd7fd3982ab57376ad9a5ade7ed497fb2515234465612a59aac22f756acb81c
+```
+
+### OTA parser test totals
+
+```text
+Session 2.1 baseline                        10 tests
+Session 2.2 Finding A (subtype recognition)   6 tests
+Session 2.2 Finding B (rollback awareness)    7 tests
+Session 2.2 sdkconfig flag parsing            4 tests
+                                              ----
+TOTAL                                        27 tests, 27 PASS
+```
+
+### Session 2.2 completion checklist
+
+- [x] OTA subtype recognition uses the real bitmask; TEST/TEE never counted as OTA slots
+- [x] new OTA subtype tests PASS (6/6)
+- [x] real build's rollback/anti-rollback config verified (not assumed): rollback ON, anti-rollback OFF
+- [x] flasher REFUSEs on anti-rollback-enabled or rollback-enabled-with-unstable-state (11/11 rollback+parsing tests PASS)
+- [x] 20ms confined to diagnostic transactions via `ScopedPingTimeout`; `begin()` no longer sets it globally
+- [x] operational (non-diagnostic) timeout unchanged from the library's own 100ms default
+- [x] SAFE_OFF can no longer report verified success on an absent servo — confirmed live (`UNVERIFIED_NO_RESPONSE`)
+- [x] USB_ONLY SAFE_OFF test returns an honest result
+- [x] SCAN/READ remain blocked in RUN (re-confirmed live)
+- [x] SAFE_OFF remains available in RUN (re-confirmed live, honestly classified)
+- [x] compile PASS
+- [x] static audit PASS (23 files, 0 findings, includes 27/27 OTA tests)
+- [x] viewer 59/59 PASS
+- [x] frozen hashes unchanged
+- [x] application-only flash PASS
+- [x] non-application flash regions unchanged (bootloader/partition-table/otadata all re-verified)
+- [x] git working tree clean
+- [ ] merge to `main` — explicitly NOT done this session
+
+### Judgement
+
+```text
+READY_FOR_MAIN_MERGE
+```
+
+All four findings are fixed, hardware-validated where the fix touches
+runtime behaviour (Findings C and D), offline-tested where the fix is pure
+host-side logic (Findings A and B), and documented without deleting or
+rewriting Session 2/2.1's evidence. No new functionality was added; no
+forbidden hardware action occurred this session. Merge decision and
+execution remain with the operator.
