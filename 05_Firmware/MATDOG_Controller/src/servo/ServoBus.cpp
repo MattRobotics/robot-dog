@@ -1,6 +1,5 @@
 #include "ServoBus.h"
 
-#include "../config/BuildConfig.h"
 #include "../config/Pins.h"
 
 namespace matdog {
@@ -17,14 +16,25 @@ bool ServoBus::begin() {
 
   // No automatic ping/scan/torque on boot — matches the frozen bench
   // source's own stated invariant ("Automatic ping : DISABLED") and the
-  // handoff's "no automatic motion at boot" rule.
-  health_ = core::ModuleHealth::OK;
+  // handoff's "no automatic motion at boot" rule. detected_ therefore
+  // stays UNKNOWN until an explicit @SERVO SCAN/READ runs.
+  init_ = core::InitializationState::INITIALIZED;
   return true;
+}
+
+core::AvailabilityStatus ServoBus::availability() const {
+  core::AvailabilityStatus a;
+  a.init = init_;
+  a.detected = last_detected_;
+  a.expected = build::kServoPowerAvailable ? core::ExpectedState::REQUIRED
+                                             : core::ExpectedState::EXPECTED_OFFLINE;
+  return a;
 }
 
 bool ServoBus::ping(int id) {
   if (id < 0 || id > 253) return false;
   int result = st_.Ping(static_cast<uint8_t>(id));
+  last_detected_ = (result >= 0) ? core::DetectedState::ONLINE : core::DetectedState::NO_RESPONSE;
   return result >= 0;
 }
 
@@ -36,8 +46,8 @@ bool ServoBus::readModel(int id, int* model_out) {
   return true;
 }
 
-ScanResult ServoBus::scan(int lo, int hi) {
-  ScanResult result;
+bool ServoBus::startScan(int lo, int hi) {
+  if (scan_state_ == ScanState::RUNNING) return false;
 
   if (lo > hi) {
     int tmp = lo;
@@ -50,19 +60,34 @@ ScanResult ServoBus::scan(int lo, int hi) {
     hi = lo + kMaxScanRange - 1;
   }
 
-  result.lo = lo;
-  result.hi = hi;
+  scan_result_ = ScanResult{};
+  scan_result_.lo = lo;
+  scan_result_.hi = hi;
+  scan_next_id_ = lo;
+  scan_state_ = ScanState::RUNNING;
+  return true;
+}
 
-  for (int id = lo; id <= hi; ++id) {
-    if (st_.Ping(static_cast<uint8_t>(id)) >= 0) {
-      if (result.found_count < kMaxScanIds) {
-        result.found_ids[result.found_count] = id;
-      }
-      result.found_count++;
+void ServoBus::update(uint32_t now_ms) {
+  (void)now_ms;
+  if (scan_state_ != ScanState::RUNNING) return;
+
+  // Exactly one Ping() per tick — the whole reason this is non-blocking.
+  // See the ScanState comment in ServoBus.h.
+  const int id = scan_next_id_;
+  if (st_.Ping(static_cast<uint8_t>(id)) >= 0) {
+    if (scan_result_.found_count < kMaxScanIds) {
+      scan_result_.found_ids[scan_result_.found_count] = id;
     }
+    scan_result_.found_count++;
   }
 
-  return result;
+  scan_next_id_++;
+  if (scan_next_id_ > scan_result_.hi) {
+    scan_state_ = ScanState::COMPLETE;
+    last_detected_ = (scan_result_.found_count > 0) ? core::DetectedState::ONLINE
+                                                       : core::DetectedState::NO_RESPONSE;
+  }
 }
 
 bool ServoBus::safeOff(int id) {
@@ -75,7 +100,11 @@ bool ServoBus::readRuntimeState(int id, RuntimeState* out) {
   if (id < 0 || id > 253 || out == nullptr) return false;
 
   int ping = st_.Ping(static_cast<uint8_t>(id));
-  if (ping < 0) return false;
+  if (ping < 0) {
+    last_detected_ = core::DetectedState::NO_RESPONSE;
+    return false;
+  }
+  last_detected_ = core::DetectedState::ONLINE;
 
   out->present_position    = st_.readWord(static_cast<uint8_t>(id), SMS_STS_PRESENT_POSITION_L);
   out->present_speed       = st_.readWord(static_cast<uint8_t>(id), SMS_STS_PRESENT_SPEED_L);
