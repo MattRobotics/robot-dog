@@ -93,6 +93,12 @@ void CommandRouter::handleLine(String line) {
       Serial.printf("PROFILE=%s\n", build::kTestProfile);
     }
   } else if (upper.startsWith("@SERVO SCAN")) {
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
+      Serial.println("SERVO_SCAN=BLOCKED");
+      Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
+      Serial.printf("MODE=%s\n", toString(modules_.operating_mode->mode()));
+      return;
+    }
     int lo = -1, hi = -1;
     if (sscanf(upper.c_str(), "@SERVO SCAN %d %d", &lo, &hi) == 2) {
       if (modules_.servo_bus->startScan(lo, hi)) {
@@ -105,6 +111,12 @@ void CommandRouter::handleLine(String line) {
       Serial.println("ERROR=USAGE @SERVO SCAN <lo> <hi>");
     }
   } else if (upper.startsWith("@SERVO READ")) {
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
+      Serial.println("SERVO_READ=BLOCKED");
+      Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
+      Serial.printf("MODE=%s\n", toString(modules_.operating_mode->mode()));
+      return;
+    }
     int id = -1;
     if (sscanf(upper.c_str(), "@SERVO READ %d", &id) == 1) {
       printServoRead(id);
@@ -112,12 +124,23 @@ void CommandRouter::handleLine(String line) {
       Serial.println("ERROR=USAGE @SERVO READ <id>");
     }
   } else if (upper.startsWith("@SERVO SAFE_OFF")) {
+    // Deliberately NOT gated by operating mode: this is the one write that
+    // can only make things safer (torque off), so it must stay reachable
+    // regardless of MAINTENANCE/RUN — see OperatingMode.h.
     int id = -1;
     if (sscanf(upper.c_str(), "@SERVO SAFE_OFF %d", &id) == 1) {
       printServoSafeOff(id);
     } else {
       Serial.println("ERROR=USAGE @SERVO SAFE_OFF <id>");
     }
+  } else if (upper == "@MODE STATUS") {
+    printModeStatus();
+  } else if (upper == "@MODE MAINTENANCE") {
+    modules_.operating_mode->setMode(OperatingMode::MAINTENANCE);
+    printModeStatus();
+  } else if (upper == "@MODE RUN") {
+    modules_.operating_mode->setMode(OperatingMode::RUN);
+    printModeStatus();
   } else if (upper == "@SYSTEM SHUTDOWN") {
     modules_.power_state->requestShutdown();
     Serial.println("SHUTDOWN_REQUESTED=YES");
@@ -143,9 +166,11 @@ void CommandRouter::printHelp() {
   Serial.println("  @LED STATUS");
   Serial.println("  @LED OFF");
   Serial.println("  @LED TEST");
-  Serial.println("  @SERVO SCAN <lo> <hi>   (non-blocking; result follows asynchronously)");
-  Serial.println("  @SERVO READ <id>");
-  Serial.println("  @SERVO SAFE_OFF <id>");
+  Serial.println("  @SERVO SCAN <lo> <hi>   (MAINTENANCE mode only; incremental, bounded");
+  Serial.println("                           per-ID blocking, result follows asynchronously)");
+  Serial.println("  @SERVO READ <id>        (MAINTENANCE mode only)");
+  Serial.println("  @SERVO SAFE_OFF <id>    (always allowed, any mode)");
+  Serial.println("  @MODE STATUS|MAINTENANCE|RUN");
   Serial.println("  @SYSTEM SHUTDOWN");
 }
 
@@ -156,11 +181,16 @@ void CommandRouter::printAvailabilityLine(const char* label, const AvailabilityS
                 toString(classify(a)));
 }
 
+void CommandRouter::printModeStatus() {
+  Serial.printf("MODE=%s\n", toString(modules_.operating_mode->mode()));
+}
+
 void CommandRouter::printStatus() {
   SystemState* s = modules_.system_state;
-  Serial.printf("SYSTEM health=%s power_state=%s uptime_ms=%lu profile=%s\n",
+  Serial.printf("SYSTEM health=%s power_state=%s mode=%s uptime_ms=%lu profile=%s\n",
                 toString(s->systemHealth()),
                 toString(modules_.power_state->state()),
+                toString(modules_.operating_mode->mode()),
                 (unsigned long)s->uptimeMillis(millis()),
                 build::kTestProfile);
 
@@ -219,8 +249,9 @@ void CommandRouter::printLedStatus() {
 
 void CommandRouter::printServoScanResult() {
   const servo::ScanResult& result = modules_.servo_bus->lastScanResult();
-  Serial.printf("SERVO_SCAN=COMPLETE lo=%d hi=%d found=%d\n",
-                result.lo, result.hi, result.found_count);
+  Serial.printf("SERVO_SCAN=COMPLETE lo=%d hi=%d found=%d elapsed_ms=%lu max_ping_us=%lu\n",
+                result.lo, result.hi, result.found_count,
+                (unsigned long)result.elapsed_ms, (unsigned long)result.max_ping_us);
   printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
 
   int listed = result.found_count < servo::ServoBus::kMaxScanIds

@@ -51,7 +51,7 @@ void Controller::begin() {
   system_state_.setLedHealth(led_.health());
 
   CommandRouter::Modules modules{
-      &servo_bus_, &imu_, &daly_, &led_, &system_state_, &power_state_,
+      &servo_bus_, &imu_, &daly_, &led_, &system_state_, &power_state_, &operating_mode_,
   };
   command_router_.begin(modules);
 
@@ -91,6 +91,7 @@ void Controller::printBootBanner() {
   Serial.println("startup_motion   : DISABLED");
   Serial.println("startup_torque   : DISABLED");
   Serial.println("daly_write       : NOT_IMPLEMENTED (protocol unverified)");
+  Serial.printf("operating_mode   : %s\n", toString(operating_mode_.mode()));
   Serial.println();
 }
 

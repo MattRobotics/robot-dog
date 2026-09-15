@@ -8,6 +8,7 @@
 #include "../servo/ServoBus.h"
 #include "../status/LedRing.h"
 #include "Availability.h"
+#include "OperatingMode.h"
 #include "PowerState.h"
 #include "SystemState.h"
 
@@ -27,6 +28,7 @@ class CommandRouter {
     status::LedRing* led;
     SystemState* system_state;
     PowerStateMachine* power_state;
+    OperatingModeManager* operating_mode;
   };
 
   void begin(const Modules& modules);
@@ -42,6 +44,7 @@ class CommandRouter {
   void printServoScanResult();
   void printServoRead(int id);
   void printServoSafeOff(int id);
+  void printModeStatus();
   static void printAvailabilityLine(const char* label, const AvailabilityStatus& a);
 
   Modules modules_{};

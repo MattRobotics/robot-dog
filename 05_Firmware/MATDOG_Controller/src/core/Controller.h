@@ -8,6 +8,7 @@
 #include "../servo/ServoBus.h"
 #include "../status/LedRing.h"
 #include "CommandRouter.h"
+#include "OperatingMode.h"
 #include "PowerState.h"
 #include "SystemState.h"
 
@@ -32,6 +33,7 @@ class Controller {
 
   SystemState system_state_;
   PowerStateMachine power_state_;
+  OperatingModeManager operating_mode_;
   CommandRouter command_router_;
 };
 
