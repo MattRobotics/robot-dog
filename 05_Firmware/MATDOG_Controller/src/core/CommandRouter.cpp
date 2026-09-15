@@ -276,8 +276,11 @@ void CommandRouter::printServoRead(int id) {
 }
 
 void CommandRouter::printServoSafeOff(int id) {
-  bool ok = modules_.servo_bus->safeOff(id);
-  Serial.printf("SERVO_SAFE_OFF id=%d result=%s\n", id, ok ? "OK" : "NO_RESPONSE");
+  // Never prints a bare "OK" — see ServoBus::SafeOffResult (Session 2.2
+  // Finding D) for why that previously gave a false safety guarantee with
+  // no servo even connected.
+  servo::SafeOffResult result = modules_.servo_bus->safeOff(id);
+  Serial.printf("SERVO_SAFE_OFF id=%d result=%s\n", id, servo::toString(result));
 }
 
 }  // namespace core

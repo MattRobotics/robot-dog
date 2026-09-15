@@ -5,6 +5,15 @@
 namespace matdog {
 namespace servo {
 
+const char* toString(SafeOffResult result) {
+  switch (result) {
+    case SafeOffResult::VERIFIED_OFF:           return "VERIFIED_OFF";
+    case SafeOffResult::UNVERIFIED_NO_RESPONSE: return "UNVERIFIED_NO_RESPONSE";
+    case SafeOffResult::VERIFY_FAILED:          return "VERIFY_FAILED";
+  }
+  return "UNKNOWN";
+}
+
 bool ServoBus::begin() {
   servo_uart_.begin(
       build::kServoBusBaud,
@@ -14,9 +23,10 @@ bool ServoBus::begin() {
 
   st_.pSerial = &servo_uart_;
 
-  // Public SCSerial field, not a vendored-library edit — see kPingTimeoutMs
-  // in ServoBus.h for the hardware-measured justification.
-  st_.IOTimeOut = ServoBus::kPingTimeoutMs;
+  // IOTimeOut is deliberately NOT touched here — see kPingTimeoutMs and
+  // ScopedPingTimeout in ServoBus.h (Session 2.2 Finding C). It stays at
+  // the library's own conservative default; each diagnostic method below
+  // applies the shorter diagnostic timeout only for its own transaction.
 
   // No automatic ping/scan/torque on boot — matches the frozen bench
   // source's own stated invariant ("Automatic ping : DISABLED") and the
@@ -37,6 +47,7 @@ core::AvailabilityStatus ServoBus::availability() const {
 
 bool ServoBus::ping(int id) {
   if (id < 0 || id > 253) return false;
+  ScopedPingTimeout guard(st_, kPingTimeoutMs);
   int result = st_.Ping(static_cast<uint8_t>(id));
   last_detected_ = (result >= 0) ? core::DetectedState::ONLINE : core::DetectedState::NO_RESPONSE;
   return result >= 0;
@@ -44,6 +55,7 @@ bool ServoBus::ping(int id) {
 
 bool ServoBus::readModel(int id, int* model_out) {
   if (id < 0 || id > 253 || model_out == nullptr) return false;
+  ScopedPingTimeout guard(st_, kPingTimeoutMs);
   int model = st_.readWord(static_cast<uint8_t>(id), SMS_STS_MODEL_L);
   if (model < 0) return false;
   *model_out = model;
@@ -81,10 +93,16 @@ void ServoBus::update(uint32_t now_ms) {
   // for why this is "incremental with bounded per-ID blocking", not
   // non-blocking. Measures its own duration (micros()) so the actual
   // per-ID and total cost is evidence, not a claim — see
-  // ScanResult::max_ping_us / elapsed_ms.
+  // ScanResult::max_ping_us / elapsed_ms. ScopedPingTimeout bounds this
+  // single Ping() to the diagnostic timeout and restores the previous
+  // value immediately after, every tick.
   const int id = scan_next_id_;
   const uint32_t ping_start_us = micros();
-  const bool responded = st_.Ping(static_cast<uint8_t>(id)) >= 0;
+  bool responded;
+  {
+    ScopedPingTimeout guard(st_, kPingTimeoutMs);
+    responded = st_.Ping(static_cast<uint8_t>(id)) >= 0;
+  }
   const uint32_t ping_us = micros() - ping_start_us;
   if (ping_us > scan_result_.max_ping_us) {
     scan_result_.max_ping_us = ping_us;
@@ -106,14 +124,36 @@ void ServoBus::update(uint32_t now_ms) {
   }
 }
 
-bool ServoBus::safeOff(int id) {
-  if (id < 0 || id > 253) return false;
-  int result = st_.EnableTorque(static_cast<uint8_t>(id), 0);
-  return result >= 0;
+SafeOffResult ServoBus::safeOff(int id) {
+  if (id < 0 || id > 253) return SafeOffResult::UNVERIFIED_NO_RESPONSE;
+
+  ScopedPingTimeout guard(st_, kPingTimeoutMs);
+
+  // The write's own ACK (SCS::Ack(), via EnableTorque -> writeByte) is
+  // informational only — see the SafeOffResult comment in ServoBus.h for
+  // why it must never be the safety claim by itself. Issue it, then always
+  // verify with an independent, read-only TorqueEnable readback regardless
+  // of what the write's ACK reported.
+  st_.EnableTorque(static_cast<uint8_t>(id), 0);
+
+  int torque_enable = st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE);
+
+  if (torque_enable < 0) {
+    // No readback response at all: we cannot prove anything, so we must
+    // not claim success — regardless of whether the write itself ACKed.
+    last_detected_ = core::DetectedState::NO_RESPONSE;
+    return SafeOffResult::UNVERIFIED_NO_RESPONSE;
+  }
+
+  last_detected_ = core::DetectedState::ONLINE;  // readback proves the servo is present
+
+  return (torque_enable == 0) ? SafeOffResult::VERIFIED_OFF : SafeOffResult::VERIFY_FAILED;
 }
 
 bool ServoBus::readRuntimeState(int id, RuntimeState* out) {
   if (id < 0 || id > 253 || out == nullptr) return false;
+
+  ScopedPingTimeout guard(st_, kPingTimeoutMs);
 
   int ping = st_.Ping(static_cast<uint8_t>(id));
   if (ping < 0) {

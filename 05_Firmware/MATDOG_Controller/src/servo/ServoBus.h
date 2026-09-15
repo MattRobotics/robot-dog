@@ -43,6 +43,28 @@ struct ScanResult {
 // reachable from a future deterministic motion RUN loop.
 enum class ScanState : uint8_t { IDLE, RUNNING, COMPLETE };
 
+// SESSION 2.2, FINDING D: `SCServo::EnableTorque()`/`writeByte()` return
+// `SCS::Ack()`'s result, which is 1 on a validated ACK packet and **0**
+// on any failure/timeout/no-response — NOT -1 like Ping()/readByte()/
+// readWord() (see SCS.cpp: Ack() has no negative return path at all).
+// Session 2.1's `safeOff()` checked `result >= 0`, which is true for
+// BOTH outcomes (0 and 1) — it could never observe a failure, regardless
+// of whether a servo was even present. Confirmed live: with the servo bus
+// completely unpowered, `@SERVO SAFE_OFF 11` still reported "result=OK".
+//
+// Fixed by never trusting the write's own return value for the safety
+// claim at all: safeOff() now performs the write, then always attempts a
+// read-only TorqueEnable readback, and classifies purely on whether that
+// readback responds and what it reports. A write ACK/NACK is informational
+// only, not authoritative — the readback is the actual proof.
+enum class SafeOffResult : uint8_t {
+  VERIFIED_OFF            = 0,  // readback responded and confirms TorqueEnable == 0
+  UNVERIFIED_NO_RESPONSE  = 1,  // no readback response at all — cannot verify anything
+  VERIFY_FAILED           = 2,  // readback responded but TorqueEnable != 0
+};
+
+const char* toString(SafeOffResult result);
+
 // Lean operational transport around the hardware-proven ST3215 / SCServo
 // path (05_Firmware/ST3215_Bench_Tools/Bench_QC_V6_1/matdog_servo_commissioning.ino,
 // SHA256 74656fb9187fd2024f8251276b49676d8be9c6455f542c49500cfb30d25630cd).
@@ -69,11 +91,21 @@ class ServoBus {
   // margin for a different bench topology (this session's bus runs through
   // the Seeed driver, not the characterization rig's point-to-point wiring)
   // while still bounding the USB_ONLY no-response worst case far tighter
-  // than the 100ms library default. SCSerial::IOTimeOut (SCSerial.h) is
-  // compared against millis()-measured elapsed time inside the library, so
-  // this constant is in milliseconds, matching that unit exactly. It is a
-  // public field — setting it in begin() does not modify the vendored
-  // library file.
+  // than the 100ms library default.
+  //
+  // SESSION 2.2, FINDING C: this is a DIAGNOSTIC absence-detection timeout,
+  // NOT a validated operational ServoBus timeout for a future powered
+  // 17-servo bus. Session 2.1 set it globally, once, in begin() — every
+  // subsequent SCServo call for the rest of the session (including any
+  // future register-read/telemetry call unrelated to MAINTENANCE-mode
+  // scanning) would silently inherit 20ms whether that was appropriate for
+  // it or not. begin() no longer touches IOTimeOut at all: it stays at the
+  // library's own 100ms default (still a public SCSerial field — the
+  // vendored library file is never edited) except for the exact duration of
+  // a diagnostic transaction, via ScopedPingTimeout below. Every public
+  // method that talks to the bus applies this guard around its own
+  // transaction and lets it restore the previous value on every exit path,
+  // including early returns.
   static constexpr unsigned long kPingTimeoutMs = 20;
 
   bool begin();
@@ -103,8 +135,10 @@ class ServoBus {
   const ScanResult& lastScanResult() const { return scan_result_; }
 
   // TorqueEnable = 0. The only servo write exposed in V0.1: it can only
-  // remove torque, never add it, and it never touches EEPROM.
-  bool safeOff(int id);
+  // remove torque, never add it, and it never touches EEPROM. Returns a
+  // verified outcome (see SafeOffResult above) — never a bare bool that
+  // could be mistaken for "confirmed off".
+  SafeOffResult safeOff(int id);
 
   // Read-only runtime snapshot (present position/speed/load/voltage/temp).
   // Returns false if the servo does not answer within the bounded timeout.
@@ -119,6 +153,28 @@ class ServoBus {
   bool readRuntimeState(int id, RuntimeState* out);
 
  private:
+  // RAII guard: saves SMS_STS::IOTimeOut (a plain public field, not a
+  // vendored-library edit), sets it to the given diagnostic timeout for the
+  // guard's scope, and restores the saved value on every exit path
+  // (destructor runs on early `return` too, not just fall-through) — see
+  // kPingTimeoutMs above for why this must never become a standing global
+  // change. Deliberately not copyable/movable: exactly one guard per
+  // transaction, matching "no overengineering" from the handoff.
+  class ScopedPingTimeout {
+   public:
+    ScopedPingTimeout(SMS_STS& st, unsigned long diagnostic_timeout_ms)
+        : st_(st), previous_ms_(st.IOTimeOut) {
+      st_.IOTimeOut = diagnostic_timeout_ms;
+    }
+    ~ScopedPingTimeout() { st_.IOTimeOut = previous_ms_; }
+    ScopedPingTimeout(const ScopedPingTimeout&) = delete;
+    ScopedPingTimeout& operator=(const ScopedPingTimeout&) = delete;
+
+   private:
+    SMS_STS& st_;
+    unsigned long previous_ms_;
+  };
+
   HardwareSerial servo_uart_{1};  // matches frozen bench source's UART index.
   SMS_STS st_;
   core::InitializationState init_ = core::InitializationState::NOT_INITIALIZED;
