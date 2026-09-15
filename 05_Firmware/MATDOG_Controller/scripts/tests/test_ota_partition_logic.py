@@ -24,6 +24,16 @@ plus the Session 2.2 findings:
   is NEW or PENDING_VERIFY must be refused (the bootloader can rewrite it
   on the very next boot); CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y must refuse
   unconditionally; both disabled must behave exactly like Session 2.1.
+
+plus the Session 2.3 findings:
+
+  Finding 2 — an sdkconfig symbol absent from the text entirely (neither
+  its enabled nor its explicitly-disabled form found) must resolve to
+  SdkconfigFlag.UNKNOWN, which resolve_application_partition() must REFUSE
+  on, exactly like ENABLED — not silently treated as DISABLED.
+
+  Finding 3 — OTA slot index sets must be exactly {0, ..., N-1}; any
+  sparse set (a gap, or slots not starting at 0) must REFUSE.
 """
 import struct
 import sys
@@ -40,8 +50,10 @@ from ota_partition_logic import (  # noqa: E402
     OTA_STATE_PENDING_VERIFY,
     OTA_STATE_VALID,
     OtaAmbiguous,
+    SdkconfigFlag,
     ota_app_partitions,
     parse_partition_table,
+    parse_sdkconfig_flag,
     parse_sdkconfig_ota_flags,
     resolve_application_partition,
 )
@@ -50,9 +62,10 @@ OTA_UNDEFINED = 0xFFFFFFFF
 BLANK_SEQ = 0xFFFFFFFF
 SECTOR_SIZE = 0x1000
 
-# Session 2.1's tests all predate the rollback-awareness parameters; every
-# call here is explicit about them so nothing relies on a hidden default.
-NO_ROLLBACK = dict(rollback_enabled=False, anti_rollback_enabled=False)
+# Every call in this file is explicit about rollback/anti_rollback so
+# nothing relies on a hidden default (there isn't one — both are
+# required keyword-only parameters).
+NO_ROLLBACK = dict(rollback=SdkconfigFlag.DISABLED, anti_rollback=SdkconfigFlag.DISABLED)
 
 
 def build_ota_sector(seq, state=OTA_UNDEFINED, crc=None, corrupt_crc=False):
@@ -181,7 +194,15 @@ class TestOtaPartitionLogic(unittest.TestCase):
         otadata = build_ota_sector(1) + build_blank_sector()
         with self.assertRaises(OtaAmbiguous) as ctx:
             resolve_application_partition(one_slot_table, otadata, **NO_ROLLBACK)
-        self.assertIn("no matching ota_", str(ctx.exception))
+        # ota_1 alone is itself non-contiguous (slot index {1} != {0}), so
+        # this now refuses earlier, inside ota_app_partitions() — see
+        # Finding 3. Either message is an acceptable REFUSE; assert on the
+        # exception type only (already checked above) plus a substring that
+        # is true for both possible reasons.
+        self.assertTrue(
+            "no matching ota_" in str(ctx.exception)
+            or "not contiguous" in str(ctx.exception)
+        )
 
     def test_no_ota_partitions_in_table_refuses(self):
         empty_table = build_partition_table([
@@ -260,6 +281,63 @@ class TestOtaSubtypeRecognitionFindingA(unittest.TestCase):
         self.assertIn("duplicate OTA slot index", str(ctx.exception))
 
 
+class TestOtaSlotContiguityFinding3(unittest.TestCase):
+    """MATDOG has no use for a sparse OTA layout in V0.1 — every slot
+    index set must be exactly {0, ..., N-1}."""
+
+    def test_single_slot_0_accepted(self):
+        table = build_partition_table([("app0", 0x00, 0x10, 0x10000, 0x300000)])
+        apps = ota_app_partitions(parse_partition_table(table))
+        self.assertEqual(set(apps.keys()), {0})
+
+    def test_two_slots_0_1_accepted(self):
+        apps = ota_app_partitions(parse_partition_table(TWO_SLOT_TABLE))
+        self.assertEqual(set(apps.keys()), {0, 1})
+
+    def test_three_slots_0_1_2_accepted(self):
+        table = build_partition_table([
+            ("app0", 0x00, 0x10, 0x10000, 0x300000),
+            ("app1", 0x00, 0x11, 0x310000, 0x300000),
+            ("app2", 0x00, 0x12, 0x610000, 0x300000),
+        ])
+        apps = ota_app_partitions(parse_partition_table(table))
+        self.assertEqual(set(apps.keys()), {0, 1, 2})
+
+    def test_slot_1_only_refuses(self):
+        table = build_partition_table([("app1", 0x00, 0x11, 0x10000, 0x300000)])
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            ota_app_partitions(parse_partition_table(table))
+        self.assertIn("not contiguous", str(ctx.exception))
+
+    def test_slots_0_2_gap_refuses(self):
+        table = build_partition_table([
+            ("app0", 0x00, 0x10, 0x10000, 0x300000),
+            ("app2", 0x00, 0x12, 0x610000, 0x300000),
+        ])
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            ota_app_partitions(parse_partition_table(table))
+        self.assertIn("not contiguous", str(ctx.exception))
+
+    def test_slots_1_2_refuses(self):
+        table = build_partition_table([
+            ("app1", 0x00, 0x11, 0x10000, 0x300000),
+            ("app2", 0x00, 0x12, 0x310000, 0x300000),
+        ])
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            ota_app_partitions(parse_partition_table(table))
+        self.assertIn("not contiguous", str(ctx.exception))
+
+    def test_slots_0_1_3_gap_refuses(self):
+        table = build_partition_table([
+            ("app0", 0x00, 0x10, 0x10000, 0x300000),
+            ("app1", 0x00, 0x11, 0x310000, 0x300000),
+            ("app3", 0x00, 0x13, 0x610000, 0x300000),
+        ])
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            ota_app_partitions(parse_partition_table(table))
+        self.assertIn("not contiguous", str(ctx.exception))
+
+
 class TestRollbackAwarenessFindingB(unittest.TestCase):
     """CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y (the real, confirmed setting
     of this project's build) means the bootloader can autonomously rewrite
@@ -270,21 +348,24 @@ class TestRollbackAwarenessFindingB(unittest.TestCase):
         # Matches Session 2.1 behaviour exactly when rollback is off.
         otadata = build_ota_sector(1, state=OTA_STATE_NEW) + build_blank_sector()
         resolved = resolve_application_partition(
-            TWO_SLOT_TABLE, otadata, rollback_enabled=False, anti_rollback_enabled=False)
+            TWO_SLOT_TABLE, otadata,
+            rollback=SdkconfigFlag.DISABLED, anti_rollback=SdkconfigFlag.DISABLED)
         self.assertEqual(resolved.label, "app0")
 
     def test_rollback_enabled_new_state_refuses(self):
         otadata = build_ota_sector(1, state=OTA_STATE_NEW) + build_blank_sector()
         with self.assertRaises(OtaAmbiguous) as ctx:
             resolve_application_partition(
-                TWO_SLOT_TABLE, otadata, rollback_enabled=True, anti_rollback_enabled=False)
+                TWO_SLOT_TABLE, otadata,
+                rollback=SdkconfigFlag.ENABLED, anti_rollback=SdkconfigFlag.DISABLED)
         self.assertIn("ROLLBACK_ENABLE", str(ctx.exception))
 
     def test_rollback_enabled_pending_verify_state_refuses(self):
         otadata = build_ota_sector(1, state=OTA_STATE_PENDING_VERIFY) + build_blank_sector()
         with self.assertRaises(OtaAmbiguous) as ctx:
             resolve_application_partition(
-                TWO_SLOT_TABLE, otadata, rollback_enabled=True, anti_rollback_enabled=False)
+                TWO_SLOT_TABLE, otadata,
+                rollback=SdkconfigFlag.ENABLED, anti_rollback=SdkconfigFlag.DISABLED)
         self.assertIn("ROLLBACK_ENABLE", str(ctx.exception))
 
     def test_rollback_enabled_undefined_state_is_fine(self):
@@ -296,7 +377,8 @@ class TestRollbackAwarenessFindingB(unittest.TestCase):
         # run against the real hardware this session.
         otadata = build_ota_sector(1, state=OTA_UNDEFINED) + build_ota_sector(0, state=OTA_UNDEFINED)
         resolved = resolve_application_partition(
-            TWO_SLOT_TABLE, otadata, rollback_enabled=True, anti_rollback_enabled=False)
+            TWO_SLOT_TABLE, otadata,
+            rollback=SdkconfigFlag.ENABLED, anti_rollback=SdkconfigFlag.DISABLED)
         self.assertEqual(resolved.label, "app0")
 
     def test_rollback_enabled_valid_state_is_fine(self):
@@ -304,7 +386,8 @@ class TestRollbackAwarenessFindingB(unittest.TestCase):
         # - also stable regardless of rollback being enabled.
         otadata = build_ota_sector(1, state=OTA_STATE_VALID) + build_blank_sector()
         resolved = resolve_application_partition(
-            TWO_SLOT_TABLE, otadata, rollback_enabled=True, anti_rollback_enabled=False)
+            TWO_SLOT_TABLE, otadata,
+            rollback=SdkconfigFlag.ENABLED, anti_rollback=SdkconfigFlag.DISABLED)
         self.assertEqual(resolved.label, "app0")
 
     def test_anti_rollback_enabled_always_refuses_even_with_stable_state(self):
@@ -314,15 +397,66 @@ class TestRollbackAwarenessFindingB(unittest.TestCase):
         otadata = build_ota_sector(1, state=OTA_STATE_VALID) + build_blank_sector()
         with self.assertRaises(OtaAmbiguous) as ctx:
             resolve_application_partition(
-                TWO_SLOT_TABLE, otadata, rollback_enabled=True, anti_rollback_enabled=True)
+                TWO_SLOT_TABLE, otadata,
+                rollback=SdkconfigFlag.ENABLED, anti_rollback=SdkconfigFlag.ENABLED)
         self.assertIn("ANTI_ROLLBACK", str(ctx.exception))
 
     def test_anti_rollback_enabled_refuses_even_with_rollback_disabled(self):
         otadata = build_ota_sector(1, state=OTA_STATE_VALID) + build_blank_sector()
         with self.assertRaises(OtaAmbiguous) as ctx:
             resolve_application_partition(
-                TWO_SLOT_TABLE, otadata, rollback_enabled=False, anti_rollback_enabled=True)
+                TWO_SLOT_TABLE, otadata,
+                rollback=SdkconfigFlag.DISABLED, anti_rollback=SdkconfigFlag.ENABLED)
         self.assertIn("ANTI_ROLLBACK", str(ctx.exception))
+
+
+class TestSdkconfigUnknownFinding2(unittest.TestCase):
+    """Session 2.3 Finding 2: a symbol absent from the sdkconfig text
+    entirely is UNKNOWN, not DISABLED, and resolve_application_partition()
+    must REFUSE on UNKNOWN exactly like it does on ENABLED."""
+
+    STABLE_OTADATA = None  # set below; state=VALID, rollback-stable regardless
+
+    @classmethod
+    def setUpClass(cls):
+        cls.STABLE_OTADATA = build_ota_sector(1, state=OTA_STATE_VALID) + build_blank_sector()
+
+    def test_rollback_symbol_absent_is_unknown(self):
+        flag = parse_sdkconfig_flag("CONFIG_SOMETHING_ELSE=y\n",
+                                     "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE")
+        self.assertEqual(flag, SdkconfigFlag.UNKNOWN)
+
+    def test_anti_rollback_symbol_absent_is_unknown(self):
+        flag = parse_sdkconfig_flag("CONFIG_SOMETHING_ELSE=y\n",
+                                     "CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK")
+        self.assertEqual(flag, SdkconfigFlag.UNKNOWN)
+
+    def test_both_symbols_absent_resolve_to_unknown(self):
+        rollback, anti = parse_sdkconfig_ota_flags("CONFIG_SOMETHING_ELSE=y\n")
+        self.assertEqual(rollback, SdkconfigFlag.UNKNOWN)
+        self.assertEqual(anti, SdkconfigFlag.UNKNOWN)
+
+    def test_rollback_unknown_refuses_even_with_stable_otadata(self):
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            resolve_application_partition(
+                TWO_SLOT_TABLE, self.STABLE_OTADATA,
+                rollback=SdkconfigFlag.UNKNOWN, anti_rollback=SdkconfigFlag.DISABLED)
+        self.assertIn("does not explicitly define", str(ctx.exception))
+        self.assertIn("ROLLBACK_ENABLE", str(ctx.exception))
+
+    def test_anti_rollback_unknown_refuses_even_with_stable_otadata(self):
+        with self.assertRaises(OtaAmbiguous) as ctx:
+            resolve_application_partition(
+                TWO_SLOT_TABLE, self.STABLE_OTADATA,
+                rollback=SdkconfigFlag.DISABLED, anti_rollback=SdkconfigFlag.UNKNOWN)
+        self.assertIn("does not explicitly define", str(ctx.exception))
+        self.assertIn("ANTI_ROLLBACK", str(ctx.exception))
+
+    def test_both_unknown_refuses(self):
+        with self.assertRaises(OtaAmbiguous):
+            resolve_application_partition(
+                TWO_SLOT_TABLE, self.STABLE_OTADATA,
+                rollback=SdkconfigFlag.UNKNOWN, anti_rollback=SdkconfigFlag.UNKNOWN)
 
 
 class TestParseSdkconfigOtaFlags(unittest.TestCase):
@@ -332,8 +466,8 @@ class TestParseSdkconfigOtaFlags(unittest.TestCase):
             "# CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK is not set\n"
         )
         rollback, anti = parse_sdkconfig_ota_flags(text)
-        self.assertFalse(rollback)
-        self.assertFalse(anti)
+        self.assertEqual(rollback, SdkconfigFlag.DISABLED)
+        self.assertEqual(anti, SdkconfigFlag.DISABLED)
 
     def test_rollback_enabled_anti_rollback_disabled(self):
         # The real, confirmed content of this project's actual build sdkconfig.
@@ -342,8 +476,8 @@ class TestParseSdkconfigOtaFlags(unittest.TestCase):
             "# CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK is not set\n"
         )
         rollback, anti = parse_sdkconfig_ota_flags(text)
-        self.assertTrue(rollback)
-        self.assertFalse(anti)
+        self.assertEqual(rollback, SdkconfigFlag.ENABLED)
+        self.assertEqual(anti, SdkconfigFlag.DISABLED)
 
     def test_both_enabled(self):
         text = (
@@ -351,13 +485,16 @@ class TestParseSdkconfigOtaFlags(unittest.TestCase):
             "CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y\n"
         )
         rollback, anti = parse_sdkconfig_ota_flags(text)
-        self.assertTrue(rollback)
-        self.assertTrue(anti)
+        self.assertEqual(rollback, SdkconfigFlag.ENABLED)
+        self.assertEqual(anti, SdkconfigFlag.ENABLED)
 
-    def test_flags_absent_entirely_defaults_to_disabled(self):
+    def test_flags_absent_entirely_is_unknown_not_disabled(self):
+        # Session 2.3 Finding 2: this used to assert both were falsy
+        # (silently treated as disabled). A missing symbol is not the same
+        # fact as a confirmed-disabled one - it must be UNKNOWN.
         rollback, anti = parse_sdkconfig_ota_flags("CONFIG_SOMETHING_ELSE=y\n")
-        self.assertFalse(rollback)
-        self.assertFalse(anti)
+        self.assertEqual(rollback, SdkconfigFlag.UNKNOWN)
+        self.assertEqual(anti, SdkconfigFlag.UNKNOWN)
 
 
 if __name__ == "__main__":
