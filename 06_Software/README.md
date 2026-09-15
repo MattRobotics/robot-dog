@@ -1,45 +1,37 @@
 # MATDOG Software
 
-This directory contains MATDOG-specific host-side software.
+This area contains MATDOG-specific host-side tools, machine-readable configuration, offline
+geometry and kinematics code, validation utilities, and visualization software.
 
-## Scope
+It does not own the current project milestone or the robot's runtime architecture:
 
-- joint calibration tools
-- encoder-to-radian conversion
-- forward kinematics
-- inverse kinematics
-- stand-pose logic
-- gait generation
-- safety and motion limits
-- future Station integration adapters
-- simulation and validation utilities
+| Need | Canonical owner |
+|---|---|
+| Current project snapshot and immediate milestone | [Root `README.md`](../README.md) |
+| Runtime architecture and responsibility boundaries | [`ARCHITECTURE.md`](../01_Docs/02_Architecture/ARCHITECTURE.md) |
+| Operational ESP32-S3 firmware | [MATDOG Controller](../05_Firmware/MATDOG_Controller/README.md) |
 
-## Current Structure
+## Contents
 
-- Matdog_Core/
-  Robot-specific software configuration and future reusable control modules.
+- [`Matdog_Core/config/`](Matdog_Core/config/) — machine-readable allocation, servo-profile, and
+  geometry configuration.
+- [`Matdog_Core/calibration/`](Matdog_Core/calibration/) — calibration data contracts, offline
+  geometry tooling, validators, and preserved calibration-development records.
+- [`Matdog_Core/kinematics/`](Matdog_Core/kinematics/) — kinematic models, offline safety policies,
+  and associated tests.
+- [`Matdog_Core/hardware/`](Matdog_Core/hardware/) — retained hardware-facing development tools;
+  they are not current motion authorization.
+- [`Matdog_Core/viewer/`](Matdog_Core/viewer/) — host-side visualization tools.
 
-## Current Development Rule
+## Current boundary
 
-MATDOG software must remain independent from:
+The permanent operational actuator boundary is the ESP32-S3 MATDOG Controller. New host-side
+software may express semantic robot intent, but it must not become an independent owner of the
+ST3215 serial bus or redefine Controller responsibilities. The host protocol carried over the
+selected transport remains an architecture-level contract.
 
-- direct serial-port access
-- raw ST3215 protocol details
-- NormaCore internal queues and protobuf definitions
-
-The MATDOG core will produce semantic joint targets in radians.
-
-The Station integration layer will later convert those targets into official ST3215 commands.
-
-## Current Priority
-
-The immediate software sequence is:
-
-    mechanical zero calibration
-    → encoder-to-radian mapping
-    → single-leg FK
-    → single-leg IK
-    → stand pose
-    → gait generation
-
-Do not add gait or IK code until the mechanical zero, joint direction and safe limits of all 12 joints are measured and recorded.
+The calibration directory deliberately contains both reusable offline engineering work and dated
+Station-era procedures, handoffs, and evidence. A historical document remains evidence for its
+recorded phase; it is not current runtime, current calibration, a current milestone, or permission
+to operate hardware. Follow each file's status banner and the
+[historical index](../09_Logs/Historical/README.md).

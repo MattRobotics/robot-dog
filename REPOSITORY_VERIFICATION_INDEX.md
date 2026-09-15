@@ -1,9 +1,19 @@
-# MATDOG repository verification index
+# MATDOG Geometry Compiler V5 verification record
 
-**Current status:** Phase 2A0 CLOSED / Geometry Compiler V5 merged.  
-**Current next milestone:** Phase 2A — Generic V25-derived full-leg calibration engine.
+> **HISTORICAL / REFERENCE — 2026-08-11 snapshot.**
+>
+> This file preserves the Phase 2A0 / Geometry Compiler V5 verification record. It does not define
+> today's project status, physical population, immediate milestone, repository topology, or
+> operational entry point. For those, use the [root `README.md`](README.md) and
+> [`ARCHITECTURE.md`](01_Docs/02_Architecture/ARCHITECTURE.md).
 
-## Current sources of truth
+**Recorded status on 2026-08-11:** Phase 2A0 CLOSED / Geometry Compiler V5 merged.
+
+**Recorded next step on 2026-08-11:** Phase 2A — Generic V25-derived full-leg calibration engine.
+
+These labels are retained as historical phase evidence, not as current instructions.
+
+## Repository and source snapshot — 2026-08-11
 
 ```text
 MattRobotics/robot-dog
@@ -25,21 +35,21 @@ immutable LF V25 release:
 
 Always re-verify live remote/local state before implementation. The SHAs above are entry checkpoints, not permission to ignore newer legitimate commits.
 
-## Phase state
+## Phase state recorded on 2026-08-11
 
 ```text
 Phase 1     CLOSED / historical endpoint-metrology candidate
 Phase 1B    CLOSED
 Phase 2A0   CLOSED / Geometry Compiler V5 merged via PR #19
-Phase 2A    NEXT / generic V25-derived full-leg engine
+Phase 2A    RECORDED NEXT (2026-08-11) / generic V25-derived full-leg engine
 Phase 2B    pending / final path-parking safety integration
 Phase 2C    pending / complete offline validation
 hardware    later: RF -> RH -> LH
 ```
 
-## Current operational entry point
+## Historical Phase 2A operational entry point
 
-Read first:
+Recorded entry document:
 
 ```text
 06_Software/Matdog_Core/calibration/
@@ -59,9 +69,10 @@ Geometry Compiler artifact index:
 09_Logs/Validation_Reports/Geometry_Compiler/README.md
 ```
 
-The older Phase1B-closed and 2026-08-07 calibration handoffs remain historical/architectural references but are no longer the current milestone entry point.
+Within this snapshot, the older Phase1B-closed and 2026-08-07 calibration handoffs were
+historical/architectural references rather than its Phase 2A milestone entry point.
 
-## Geometry Compiler V5 canonical record
+## Geometry Compiler V5 canonical evidence record
 
 Merged PR:
 
@@ -173,7 +184,7 @@ GEOMETRIC CONTACT as MOTION AUTHORIZATION
 
 These eight unresolved lower bounds remain explicit Phase 2B/2C inputs.
 
-## Hardware calibration truth
+## Hardware calibration evidence in this historical snapshot
 
 Only LF V25 is mechanically hardware validated.
 
@@ -187,7 +198,7 @@ RF/RH/LH remain geometry-only until future hardware validation.
 
 LF V25 must remain immutable. Older V28–V42 and duplicated all-leg/RF experiments are historical development evidence, not active programs.
 
-## Phase 2A architecture contract
+## Recorded Phase 2A architecture contract — historical
 
 Target:
 
@@ -208,9 +219,10 @@ C — global ST3215 hardware/safety parameter
 D — historical LF-only evidence
 ```
 
-Phase 2A is offline software foundation work. No physical movement, Station probing, direct serial work or EEPROM writes are authorized by the phase.
+In this dated plan, Phase 2A was offline software foundation work. It authorized no physical
+movement, Station probing, direct serial work, or EEPROM writes.
 
-## Known next-phase issues that must remain visible
+## Issues recorded for the planned next phase
 
 1. Pre-existing live-FK calibration-status mismatch:
    `DIGITAL_ZERO_CALIBRATED_AND_VERIFIED` vs `VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION`.
@@ -221,9 +233,9 @@ Phase 2A is offline software foundation work. No physical movement, Station prob
 6. FRONT/HIND geometry is not interchangeable by convention.
 7. A fitted affine diagnostic must never erase raw model-vs-hardware discrepancy.
 
-## Canonical records
+## Records for this 2026-08-11 verification snapshot
 
-Current:
+Primary records at the time:
 
 ```text
 README.md
@@ -234,7 +246,7 @@ REPOSITORY_VERIFICATION_INDEX.md
 06_Software/Matdog_Core/calibration/MATDOG_LF_CALIBRATION_V25_FINAL.md
 ```
 
-Historical references retained:
+Earlier historical references retained at the time:
 
 ```text
 06_Software/Matdog_Core/calibration/MATDOG_CALIBRATION_CANONICAL_HANDOFF_2026-08-07.md
@@ -244,7 +256,7 @@ Historical references retained:
 
 Superseded Geometry Compiler candidate evidence remains preserved in its original validation-artifact locations and clearly labelled as superseded.
 
-## Repository hygiene
+## Repository hygiene recorded at closeout
 
 - Active development must start from verified current `main`, never from a merged historical branch.
 - Merged/retired development branches may be deleted after their unique state is preserved by merged commits, PR history and a closeout log.

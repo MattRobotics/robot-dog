@@ -1,5 +1,13 @@
 # MATDOG C5-R — Digital-Zero Calibration Record
 
+> ## ⚠️ HISTORICAL / SUPERSEDED EVIDENCE — NO HARDWARE AUTHORIZATION
+>
+> This records the 2026-07-10, pre-reassembly 12-servo installation. Its offsets and joint
+> associations are **not active calibration**, must not be imported as current state, and must not
+> be used to command hardware. See the
+> [2026-08-27 calibration reset](../MATDOG_CALIBRATION_RESET_2026-08-27.md) and the
+> [root README](../../../README.md) for current project state.
+
 ## Result
 
 ```text

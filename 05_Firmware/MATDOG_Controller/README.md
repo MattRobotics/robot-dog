@@ -1,9 +1,9 @@
 # MATDOG Controller
 
-The first unified operational ESP32-S3 runtime for MATDOG. Replaces the previous
+The first unified operational ESP32-S3 runtime for MATDOG. It replaces the previous
 one-sketch-per-peripheral workflow (ST3215 bench tools, BNO085 Phase C3, DALY probes)
-with one modular, deployable firmware image that boots every installed subsystem
-together.
+with one modular, deployable firmware image that initializes each subsystem module
+together and reports whether its hardware is detected, expected or unavailable.
 
 ```text
 MATDOG Controller
@@ -18,6 +18,32 @@ MATDOG Controller
 This is an **integration and platform milestone**, not a motion controller. No gait,
 IK, closed-loop stabilization, ROS 2/MoveIt 2, Wi-Fi/OTA or autonomous behaviour is
 implemented here — see `VALIDATION.md` for the precise scope.
+
+## Official baseline
+
+| Identity | Value |
+|---|---|
+| Official release tag | `matdog-controller-v0.1.0` |
+| Tagged repository commit | `c54862f38a9cbd5e46d6b1770a6d109cc99b5c02` |
+| Exact validated firmware source | `5b371da5482f9b0bd2df1c37ed361250ea54ae8f` |
+| Validated application SHA256 | `6e6d92f898dbe95000b53dbb252c7eb5d3deaa9a4b161e2b1934436a76b29364` |
+| Validated profile | `USB_ONLY` |
+
+The tag identifies the official repository baseline; the source commit identifies the exact code
+compiled, flashed and exercised. They are intentionally different because validation documentation
+was committed after the firmware source. See [`VALIDATION.md`](VALIDATION.md) for the evidence and
+scope.
+
+## Permanent runtime direction
+
+`MATDOG_Controller` is the permanent firmware architecture. Future reviewed stages are expected to
+integrate Diagnostics, Maintenance, Service, Servo QC, Provisioning, Full Leg Calibration,
+Wi-Fi/OTA and host transport here, followed later by Motion, IK, Gait and Stabilization.
+
+The preserved branch `matdog/full-leg-calibrator-v1` is an oracle for calibration-engine, safety
+and evidence logic, not a replacement runtime and not a branch to merge wholesale. Likewise, the
+frozen [`ST3215_Bench_Tools`](../ST3215_Bench_Tools/README.md) remain immutable evidence even when
+equivalent service capabilities are later integrated here.
 
 ## Standalone sources remain the evidence trail
 
@@ -42,6 +68,17 @@ esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,F
 ```
 
 Board: YD-ESP32-S3 N16R8 (16 MB flash, 8 MB OPI PSRAM, 240 MHz).
+
+## Update and recovery policy
+
+- **DECIDED — future normal update path:** Wi-Fi / OTA. It is not implemented in V0.1.
+- **DECIDED — permanent wired service/recovery:** native USB CDC / USB-C remains available even
+  after OTA is implemented. OTA must never remove the wired recovery path.
+- **VALIDATED for the V0.1 baseline:** the application-only flashing workflow below operates over
+  the wired USB service connection.
+
+The phrase "OTA application partition" below names the ESP-IDF partition type. Writing that
+partition with the current USB script is not an implementation of Wi-Fi/OTA.
 
 ## Application-only flashing
 
@@ -194,7 +231,8 @@ value: the NEW01 characterization campaign
 timed a live powered ST3215 at 1 Mbaud and recorded Ping+register-read round trips of
 593-620us — 20ms is roughly 32x that measured worst case. `kOperationalTimeoutMs` is
 simply SCServo's own untouched library default (100ms) — not a value MATDOG has
-validated/optimized as final for a powered 17-servo bus. Both are applied via
+validated/optimized as final for the powered multi-servo bus (13 installed today, with 17
+canonical allocation slots). Both are applied via
 `ServoBus::ScopedIOTimeout`, a generic RAII guard around each individual bus transaction
 that saves `SCSerial::IOTimeOut` (a public field, set at runtime — the vendored library is
 never edited), applies the named timeout for that call site, and restores the previous
@@ -214,13 +252,11 @@ change — `static_audit.py` currently asserts all three read `false`.
 
 ## Power architecture
 
-ESP32-S3 and its 5 V step-down live behind the DALY's protection MOS: positive supply
-is **B+**, return is **P−**, never **B−**. DALY `KEY` is hardware-only — a momentary
-switch wired directly to the BMS, mechanically latched by the MATDOG logo — and is
-never wired to an ESP32 GPIO. Normal power-on is hardware-first (KEY → DALY enables
-P− → step-down powers the ESP32 → the ESP32 boots); the firmware cannot be the primary
-wake controller because it is itself downstream of the domain it would need to
-control. Full baseline in the integration handoff sections 8A/21A.
+Canonical power and wiring details live in
+[`04_Electronics/README.md`](../../04_Electronics/README.md). The firmware consequence is that
+DALY `KEY` is controlled directly by the bistable logo pushbutton, not by an ESP32 GPIO. Power-on is
+therefore hardware-first, and firmware cannot be the primary wake controller because the ESP32 is
+downstream of the DALY-protected supply it would need to enable.
 
 ## Bench test profile
 
