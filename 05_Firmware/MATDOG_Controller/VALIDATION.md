@@ -1658,3 +1658,171 @@ ROBOT_POWERED software support is implemented, offline-tested and compile-verifi
 is **not** validated against powered hardware and must not be described as such. Powered
 validation requires separate hardware authorization per
 [`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md).
+
+---
+
+## G2 — PRE-G3 HARDENING AMENDMENT — 2026-09-16
+
+Amendment to the G2 gate above, resolving two issues raised by an independent review of
+commit `34afbc7808e276d7483de9f2c817750683a65088`. This is a **G2 software/offline
+amendment, not G3 execution**.
+
+```text
+G2 SOFTWARE / OFFLINE SCOPE      = VALIDATED (revised gates re-run, all PASS)
+ROBOT_POWERED PROFILE            = IMPLEMENTED (compile-tested only)
+ROBOT_POWERED HARDWARE OPERATION = TO_TEST
+
+G3 NOT EXECUTED
+```
+
+No firmware was flashed. No external rail was energized. The compiled-in default profile
+remains `USB_ONLY`, and the exported build artifact was restored to `USB_ONLY` after the
+`ROBOT_POWERED` compile check.
+
+### Finding 1 — build profile was not bound to the flashed artifact
+
+`build.sh` can emit a `USB_ONLY` or a `ROBOT_POWERED` image from the same commit to the
+same path. The pre-existing gate proved the binary embedded the current build id — but
+that id is identical for both profiles, so it could not distinguish them. A stale image
+of the wrong profile could have been written under the wrong assumption, in either
+direction.
+
+The gap was concrete, not theoretical: the two profiles produce genuinely different
+artifacts.
+
+```text
+USB_ONLY       387312 bytes  sha256 a62f6d72ad38a1e8...
+ROBOT_POWERED  387776 bytes  sha256 6ec5c714d11d9cf3...
+```
+
+Resolution — a build manifest, written by `build.sh` into the gitignored build directory
+adjacent to the binary (never committed), binding:
+
+```text
+MATDOG_MANIFEST_VERSION  SOURCE_COMMIT  BUILD_ID  SOURCE_STATE
+HARDWARE_PROFILE  FQBN
+APPLICATION_BINARY  APPLICATION_SIZE  APPLICATION_SHA256
+```
+
+`flash_app_only.sh` verifies it before any device write, fail-closed, and the operator
+must name the profile they intend via `MATDOG_FLASH_PROFILE` (default `USB_ONLY`). The
+verified profile is printed in a banner immediately before the write.
+
+Refusal matrix, exercised against the two REAL binaries built this session:
+
+| Manifest | Requested | Result |
+|---|---|---|
+| `USB_ONLY` | `USB_ONLY` (default) | ALLOW |
+| `ROBOT_POWERED` | `ROBOT_POWERED` (explicit) | ALLOW |
+| `ROBOT_POWERED` | default, no authorization | REFUSE `PROFILE_MISMATCH` |
+| `USB_ONLY` | `ROBOT_POWERED` | REFUSE `PROFILE_MISMATCH` |
+| `USB_ONLY` manifest beside a `ROBOT_POWERED` binary | `USB_ONLY` | REFUSE `BINARY_SIZE_MISMATCH` |
+| profile is an unrecognized string | any | REFUSE `PROFILE_UNKNOWN` |
+| manifest file absent | any | REFUSE `MANIFEST_MISSING` |
+| commit != HEAD | any | REFUSE `SOURCE_COMMIT_MISMATCH` |
+| tree dirty (at build time or now) | any | REFUSE `TREE_NOT_CLEAN` |
+
+Also refused (offline tests): unparseable manifest, incomplete manifest (each required
+key removed individually), unknown manifest schema version, SHA256 mismatch at equal
+size, missing binary, unknown requested profile.
+
+**No pre-existing application-only protection was weakened.** Backup size and digest,
+device MAC, verified application partition offset/size, partition-fit check,
+rollback/anti-rollback state, the static-audit gate, the single-partition write and the
+independent post-write `verify-flash` are all retained, and each is now individually
+asserted by `static_audit.py` against its actual comparison (not merely token presence).
+
+### Finding 2 — `SystemHealth::READY` was unreachable under `ROBOT_POWERED`
+
+`classify()` turned `DetectedState::UNKNOWN` into a verdict, treating "nothing has
+established anything" identically to "we asked and it did not answer". Under `USB_ONLY`
+this was invisible (both non-`REQUIRED` cases return `PASS` either way); under
+`ROBOT_POWERED` it produced two wrong answers:
+
+```text
+LED   OPTIONAL + UNKNOWN -> DEGRADED   (WS2812 has no readback path at all, so its
+                                        detected state is permanently UNKNOWN when
+                                        powered -> READY was unreachable)
+SERVO REQUIRED + UNKNOWN -> FAULT      (nothing probes the bus at boot, so a healthy
+                                        powered robot reported FAULT before anything
+                                        had been asked of it)
+```
+
+The second case was found while evaluating the first across both profiles, as the review
+required. Both are resolved by one rule rather than two special cases:
+
+```text
+UNKNOWN     + REQUIRED            -> UNKNOWN   (not proven; system reports BOOTING)
+UNKNOWN     + OPTIONAL            -> PASS
+UNKNOWN     + EXPECTED_OFFLINE    -> PASS
+UNKNOWN     + EXPECTED_UNPOWERED  -> PASS
+
+NO_RESPONSE + REQUIRED            -> FAULT     unchanged
+NO_RESPONSE + OPTIONAL            -> DEGRADED  unchanged
+NO_RESPONSE + OFFLINE/UNPOWERED   -> PASS      unchanged
+UNPOWERED   + <as above>                       unchanged
+ONLINE      + anything            -> PASS      unchanged
+INIT_FAILED + anything            -> FAULT     unchanged
+```
+
+No physical detection is faked. The LED ring still reports `detected=UNKNOWN` in
+`@STATUS`, and `static_audit.py` now fails the build if `detectedStateForLedRail()` ever
+returns `ONLINE`. An observed failure still escalates: a probed-and-silent servo bus is
+still `FAULT`, and an observed optional-module failure is still `DEGRADED`.
+
+`USB_ONLY` semantics are bit-for-bit unchanged — a test reproduces the hardware-validated
+Session 2 / H3 table exactly and asserts it still aggregates to `READY`.
+
+`SystemHealth::READY` is now reachable under a healthy `ROBOT_POWERED` state without
+pretending WS2812 detection:
+
+```text
+BNO085 init=OK detected=ONLINE  expected=REQUIRED result=PASS
+DALY   init=OK detected=ONLINE  expected=REQUIRED result=PASS
+SERVO  init=OK detected=ONLINE  expected=REQUIRED result=PASS   (after the P4 census)
+LED    init=OK detected=UNKNOWN expected=OPTIONAL result=PASS   (never claimed ONLINE)
+                                                  -> SystemHealth::READY
+```
+
+Before the P4 census the servo bus is honestly unproven, so the system reports `BOOTING`
+— a visible gap, neither a false alarm nor false health. The G3 plan's P1 and P6
+acceptance criteria were updated to state exactly this, so code and plan now agree.
+
+Supporting change: `SystemState::beginBoot()` takes `now_ms` instead of calling
+`millis()`, so the translation unit is Arduino-free and the offline tests link the real
+aggregation rather than a reimplementation.
+
+### Revised offline acceptance — re-run in full after both fixes
+
+| Gate | Result |
+|---|---|
+| Servo population / profile / availability host tests | **PASS** — 18 cases / 313 checks / 0 failures |
+| Build manifest provenance tests | **PASS** — 36/36 |
+| Static safety audit | **PASS** — 29 source files, 0 findings |
+| OTA partition logic suite | **PASS** — 40/40 |
+| Compile, `USB_ONLY` (pinned FQBN) | **PASS** — 387156 bytes flash, 28344 bytes RAM |
+| Compile-only check, `ROBOT_POWERED` | **PASS** — 387624 bytes flash, 28344 bytes RAM |
+| BNO085 viewer `npm run verify` | **PASS** — 59/59 tests, typecheck PASS, production build PASS |
+| `git diff --check` | clean |
+
+All 15 new static-audit tripwires were mutation-tested and confirmed to fire, including
+three that an earlier iteration of this amendment failed to catch (they matched text in
+comments or in refuse messages rather than real code, and were tightened until they
+detected the deletion of the gate they protect).
+
+### Unchanged by this amendment
+
+Servo population model (canonical 17 / expected-now 13 / absent-by-design 52-55), census
+classification and its fail-closed verdicts, transport independence, the `USB_ONLY`
+source default and its static-audit gate, and every safety invariant recorded in the G2
+section above: no Torque ON, no `GoalPosition`, no servo EEPROM/ID/`CalibrationOfs`/
+factory-reset/broadcast write, no DALY write, no BNO085 DCD write, `SAFE_OFF` independent
+readback unchanged, timeout split unchanged, one `ServoBus` owner, no automatic
+census/scan at boot, no startup motion.
+
+### Judgement
+
+```text
+G2 SOFTWARE/OFFLINE = PASS
+G3 ROBOT_POWERED LIVE = NOT EXECUTED / TO_TEST
+```

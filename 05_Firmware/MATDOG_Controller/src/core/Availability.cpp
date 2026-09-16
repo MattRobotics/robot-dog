@@ -55,10 +55,51 @@ Classification classify(const AvailabilityStatus& s) {
   // init is INITIALIZED or DEFERRED from here.
   if (s.detected == DetectedState::ONLINE) return Classification::PASS;
 
-  // Not online (NO_RESPONSE / UNPOWERED / UNKNOWN): whether that is fine
-  // depends entirely on what was expected under the current profile. This
-  // is the one branch a future ROBOT_POWERED profile changes by flipping
-  // ExpectedState values in the modules — not by touching this function.
+  // G2 pre-G3 hardening (review Finding 2, and a second case found while
+  // evaluating it across both profiles).
+  //
+  // DetectedState::UNKNOWN means "no probe has established anything" — it
+  // is the ABSENCE OF EVIDENCE, not evidence of absence. V0.1 collapsed it
+  // together with NO_RESPONSE/UNPOWERED and manufactured a verdict from a
+  // probe that never happened. Under USB_ONLY that was harmless (both
+  // non-REQUIRED cases return PASS either way), so it never showed up; under
+  // ROBOT_POWERED it produced two wrong answers:
+  //
+  //   LED, OPTIONAL + UNKNOWN -> DEGRADED
+  //     A WS2812 chain has no readback path at all, so its DetectedState is
+  //     permanently UNKNOWN when powered. Calling that DEGRADED made
+  //     SystemHealth::READY unreachable on a perfectly healthy robot.
+  //
+  //   ServoBus, REQUIRED + UNKNOWN -> FAULT
+  //     Nothing probes the bus at boot (no automatic scan/census is allowed),
+  //     so a freshly booted powered robot reported SystemHealth::FAULT before
+  //     anyone had asked it a single question.
+  //
+  // Both are fixed by the same rule rather than by two special cases, and
+  // neither fix invents a physical observation: the module still reports
+  // detected=UNKNOWN honestly, and @STATUS still shows it.
+  if (s.detected == DetectedState::UNKNOWN) {
+    switch (s.expected) {
+      // "Must be reachable, but nothing has looked yet." Not a fault (no
+      // failure was observed) and not a pass (nothing was proven). UNKNOWN
+      // maps to ModuleHealth::NOT_INITIALIZED, so the system reports
+      // BOOTING rather than READY until a real probe happens — the gap
+      // stays visible and cannot be mistaken for health.
+      case ExpectedState::REQUIRED:           return Classification::UNKNOWN;
+      // An OPTIONAL module's absence would not even be a fault, so "not yet
+      // observed" cannot be a problem. This is what a non-probeable status
+      // device (the LED ring) reports for its entire powered lifetime.
+      case ExpectedState::OPTIONAL:           return Classification::PASS;
+      case ExpectedState::EXPECTED_OFFLINE:   return Classification::PASS;
+      case ExpectedState::EXPECTED_UNPOWERED: return Classification::PASS;
+    }
+    return Classification::UNKNOWN;
+  }
+
+  // NO_RESPONSE or UNPOWERED: absence was actually observed or is asserted
+  // by the profile. Unchanged from V0.1 — a real failure still escalates,
+  // and ExpectedState::OPTIONAL still means "absence degrades but never
+  // faults".
   switch (s.expected) {
     case ExpectedState::REQUIRED:           return Classification::FAULT;
     case ExpectedState::OPTIONAL:           return Classification::DEGRADED;

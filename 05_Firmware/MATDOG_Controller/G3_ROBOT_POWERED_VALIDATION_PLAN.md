@@ -41,10 +41,37 @@ Software:
   overridden for one build** — via the build-time `-D`, not by editing the source
   default, so the repository default remains `USB_ONLY` and the audit keeps protecting
   `main`. `build.sh` echoes `profile : ROBOT_POWERED (OVERRIDE — requires G3
-  authorization)` and the boot banner reports the same, so such an image cannot be
-  produced or flashed silently. Confirm both before energizing anything.
-- Flashed with `scripts/flash_app_only.sh` only. No full upload, no erase, no partition
-  rewrite.
+  authorization)`. Confirm that line before continuing.
+
+- Confirm the build manifest records what you expect:
+
+  ```bash
+  cat 05_Firmware/MATDOG_Controller/build/esp32.esp32.esp32s3/matdog_build_manifest.txt
+  ```
+
+  `HARDWARE_PROFILE` must read `ROBOT_POWERED`, `SOURCE_STATE` must read `CLEAN`, and
+  `SOURCE_COMMIT` must equal the commit being validated.
+
+- Flashed with the explicit powered authorization, and **only** this command:
+
+  ```bash
+  MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh
+  ```
+
+  Omitting `MATDOG_FLASH_PROFILE` makes the flash REFUSE (the default is `USB_ONLY`, and
+  the manifest says `ROBOT_POWERED`) — that refusal is the gate working, not a fault to
+  work around. The script prints a banner with the verified profile immediately before
+  the write:
+
+  ```text
+  ############################################################
+  #  HARDWARE PROFILE   = ROBOT_POWERED
+  #  (verified against the build manifest, not assumed)
+  ############################################################
+  ```
+
+  **Read that banner before letting the write proceed.** No full upload, no erase, no
+  partition rewrite.
 
 Physical:
 - Robot mechanically supported/suspended; legs cannot bear load or reach a surface.
@@ -69,6 +96,12 @@ Energize battery → DALY → P- → step-down → ESP32.
 Expect: clean single boot; banner shows `profile : ROBOT_POWERED (servo_power=YES
 battery=YES led_rail=YES)`; `reset_reason : POWERON`; `startup_motion/startup_torque/
 startup_servo_scan : DISABLED`; no servo twitch of any kind at power-on.
+
+Expect `SYSTEM_BOOT_COMPLETE health=BOOTING`, **not** `READY`. This is correct and
+deliberate: nothing probes the servo bus at boot, so `SERVO` is honestly
+`detected=UNKNOWN expected=REQUIRED result=UNKNOWN` until the P4 census runs. `READY`
+becomes reachable at P6, once the bus has actually answered. A `health=FAULT` here is a
+real problem — investigate, do not proceed.
 
 Fail → cut power. Do not proceed.
 
@@ -130,6 +163,22 @@ Monitor: heap free / min free, reset reason unchanged, sample freshness for all 
 buses, `max_ping_us` stability, no serial collisions, no watchdog events, no module
 starvation, no unexpected torque, and the aggregated system health staying `READY`.
 
+The expected `@STATUS` availability block under a healthy powered robot at this point —
+this is what `READY` is made of, and the LED line is the one to read carefully:
+
+```text
+BNO085 init=OK detected=ONLINE  expected=REQUIRED result=PASS
+DALY   init=OK detected=ONLINE  expected=REQUIRED result=PASS
+SERVO  init=OK detected=ONLINE  expected=REQUIRED result=PASS
+LED    init=OK detected=UNKNOWN expected=OPTIONAL result=PASS
+```
+
+The LED ring reports `detected=UNKNOWN` and always will: a WS2812 chain has no readback
+path, so the firmware does not claim to have detected it. `OPTIONAL + UNKNOWN` resolves
+to `PASS` because an optional module's absence would not even be a fault — not because
+anything was observed. Do **not** accept a run where the LED reports `detected=ONLINE`;
+that would mean something is asserting a physical observation that cannot exist.
+
 ### P7 — power-down
 Return to a known-safe state, SAFE_OFF confirmed, then hardware power off via `KEY`.
 Observe and record actual `KEY` behaviour — do not assert `KEY` equals discharge-MOS
@@ -137,10 +186,14 @@ control until measured.
 
 ## 3. PASS criteria
 
-All of: clean boot, no resets, DALY live and plausible, LED validated without timing
-interference, census exactly `PASS` (13 present / 4 absent by design / 0 unexpected /
-0 missing) and stable across repeats, `VERIFIED_OFF` on all 13, soak stable, and **no
-motion of any kind observed at any point**.
+All of: clean boot (`health=BOOTING` at P1, before any probe), no resets, DALY live and
+plausible, LED validated without timing interference, census exactly `PASS` (13 present /
+4 absent by design / 0 unexpected / 0 missing) and stable across repeats, `VERIFIED_OFF`
+on all 13, aggregated system health `READY` during the P6 soak, and **no motion of any
+kind observed at any point**.
+
+The flashed image's `HARDWARE_PROFILE` must have been verified as `ROBOT_POWERED` by the
+build-manifest gate, and that banner recorded in the session evidence.
 
 ## 4. Explicitly out of scope for G3
 

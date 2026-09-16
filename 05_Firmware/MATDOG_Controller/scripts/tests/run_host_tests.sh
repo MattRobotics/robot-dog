@@ -24,6 +24,7 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_servo_population" \
   "$SCRIPT_DIR/test_servo_population.cpp" \
   "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \
-  "$SKETCH_DIR/src/core/Availability.cpp"
+  "$SKETCH_DIR/src/core/Availability.cpp" \
+  "$SKETCH_DIR/src/core/SystemState.cpp"
 
 "$OUT/test_servo_population"

@@ -28,6 +28,14 @@
 # corrected, as the (still occasionally legitimate — e.g. bring-up on a
 # replacement board) full-image path. It is NOT what this script runs and
 # is NOT authorized by Session 2 for routine use.
+# G2 PRE-G3 HARDENING (review Finding 1): build.sh can produce either a
+# USB_ONLY or a ROBOT_POWERED image from the same commit, at the same path.
+# The commit/build-id gate below cannot tell them apart — the build id is
+# identical for both. Every write is therefore now additionally gated on a
+# build manifest (scripts/build_manifest.py) that binds the hardware profile
+# and the binary's exact size/sha256 to the source commit, and on the
+# operator naming the profile they intend to flash via MATDOG_FLASH_PROFILE.
+# Fail-closed: a missing, stale, unparseable or mismatched manifest REFUSES.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,6 +54,17 @@ EXPECTED_BACKUP_SIZE=16777216
 EXPECTED_BACKUP_SHA256="5cbba0b9c5500d0c95247b9b7e7173a29f934b8b13f6800cc9f583374d67fd32"
 
 APPLICATION_BINARY="$BUILD_DIR/MATDOG_Controller.ino.bin"
+BUILD_MANIFEST="$BUILD_DIR/matdog_build_manifest.txt"
+
+# Backwards-safe default: an omitted MATDOG_FLASH_PROFILE means USB_ONLY,
+# preserving the existing USB workflow with no new ceremony. Because the
+# verifier requires manifest profile == requested profile, a ROBOT_POWERED
+# manifest is then REFUSED unless the operator explicitly asks for it:
+#
+#   MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh
+#
+# There is no path by which a powered image is written implicitly.
+REQUESTED_FLASH_PROFILE="${MATDOG_FLASH_PROFILE:-USB_ONLY}"
 
 refuse() {
   echo "REFUSE: $1" >&2
@@ -82,6 +101,28 @@ fi
 
 APPLICATION_SHA256="$(sha256sum "$APPLICATION_BINARY" | cut -d' ' -f1)"
 APPLICATION_SIZE="$(stat -c%s "$APPLICATION_BINARY")"
+
+# --- Gate: build manifest proves WHICH hardware profile this binary is ----
+# Verifies, fail-closed: manifest exists and parses; its schema version is
+# known; its source commit == HEAD; the tree was clean at build time and is
+# clean now; the binary exists and its size AND sha256 equal the recorded
+# ones; the manifest profile is recognized; and it equals the profile the
+# operator asked to flash. Any failure REFUSES — see
+# scripts/build_manifest.py and scripts/tests/test_build_manifest.py.
+TREE_STATE="CLEAN"  # proven by the working-tree gate above
+MANIFEST_INFO="$(python3 "$SCRIPT_DIR/build_manifest.py" verify \
+  --manifest "$BUILD_MANIFEST" \
+  --binary "$APPLICATION_BINARY" \
+  --head "$SOURCE_COMMIT" \
+  --tree-state "$TREE_STATE" \
+  --requested-profile "$REQUESTED_FLASH_PROFILE")" || \
+  refuse "build manifest verification failed (see REFUSED=... above) — the binary in \
+$BUILD_DIR cannot be proven to be a $REQUESTED_FLASH_PROFILE build of $SOURCE_COMMIT. \
+Rebuild with the intended profile: MATDOG_PROFILE=$REQUESTED_FLASH_PROFILE scripts/build.sh"
+
+VERIFIED_HARDWARE_PROFILE="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_HARDWARE_PROFILE=' | cut -d= -f2-)"
+[ -n "$VERIFIED_HARDWARE_PROFILE" ] || \
+  refuse "manifest verification produced no VERIFIED_HARDWARE_PROFILE"
 
 # --- Gate: backup exists, correct size and hash ----------------------------
 [ -f "$BACKUP" ] || refuse "full-flash backup not found: $BACKUP"
@@ -137,6 +178,12 @@ echo "APPLICATION_SIZE      = $APPLICATION_SIZE"
 echo "MAX_PARTITION_SIZE    = $MAX_PARTITION_SIZE"
 echo "FQBN                  = $FQBN"
 echo "SOURCE_COMMIT         = $SOURCE_COMMIT"
+echo "BUILD_MANIFEST        = $BUILD_MANIFEST"
+echo
+echo "############################################################"
+echo "#  HARDWARE PROFILE   = $VERIFIED_HARDWARE_PROFILE"
+echo "#  (verified against the build manifest, not assumed)"
+echo "############################################################"
 echo
 
 # --- The one and only write: exactly one <offset> <file> pair -------------
@@ -163,3 +210,4 @@ trusting this device"
 fi
 
 echo "APPLICATION_ONLY_FLASH = PASS"
+echo "FLASHED_HARDWARE_PROFILE = $VERIFIED_HARDWARE_PROFILE"

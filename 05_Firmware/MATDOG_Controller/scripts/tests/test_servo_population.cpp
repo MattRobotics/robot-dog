@@ -18,6 +18,7 @@
 
 #include "../../src/config/HardwareProfile.h"
 #include "../../src/core/Availability.h"
+#include "../../src/core/SystemState.h"
 #include "../../src/servo/ServoPopulation.h"
 
 using namespace matdog;
@@ -343,7 +344,191 @@ static void test_robot_powered_expectations() {
   CHECK(core::classify(servo_bus) == core::Classification::PASS);
 }
 
-// --- 13. fail-closed: a partial scan can never report PASS ----------------
+// --- 13. Availability: "not observed" is not a verdict --------------------
+// G2 pre-G3 hardening, review Finding 2 (and the REQUIRED+UNKNOWN case
+// found while evaluating it across both profiles).
+static void test_unknown_detection_is_not_a_verdict() {
+  g_case = "unknown_detection_is_not_a_verdict";
+
+  auto classifyOf = [](core::InitializationState init, core::DetectedState det,
+                       core::ExpectedState exp) {
+    core::AvailabilityStatus a;
+    a.init = init;
+    a.detected = det;
+    a.expected = exp;
+    return core::classify(a);
+  };
+  const auto INIT = core::InitializationState::INITIALIZED;
+
+  // UNKNOWN == "nothing has established anything". It must never be
+  // converted into a pass/fail claim about hardware nobody probed.
+  CHECK(classifyOf(INIT, core::DetectedState::UNKNOWN,
+                   core::ExpectedState::REQUIRED) == core::Classification::UNKNOWN);
+  CHECK(classifyOf(INIT, core::DetectedState::UNKNOWN,
+                   core::ExpectedState::OPTIONAL) == core::Classification::PASS);
+  CHECK(classifyOf(INIT, core::DetectedState::UNKNOWN,
+                   core::ExpectedState::EXPECTED_OFFLINE) == core::Classification::PASS);
+  CHECK(classifyOf(INIT, core::DetectedState::UNKNOWN,
+                   core::ExpectedState::EXPECTED_UNPOWERED) == core::Classification::PASS);
+
+  // NO_RESPONSE == "we asked and it did not answer". Escalation here is
+  // UNCHANGED from V0.1 — the fix must not mute a real observed failure.
+  CHECK(classifyOf(INIT, core::DetectedState::NO_RESPONSE,
+                   core::ExpectedState::REQUIRED) == core::Classification::FAULT);
+  CHECK(classifyOf(INIT, core::DetectedState::NO_RESPONSE,
+                   core::ExpectedState::OPTIONAL) == core::Classification::DEGRADED);
+  CHECK(classifyOf(INIT, core::DetectedState::NO_RESPONSE,
+                   core::ExpectedState::EXPECTED_OFFLINE) == core::Classification::PASS);
+  CHECK(classifyOf(INIT, core::DetectedState::NO_RESPONSE,
+                   core::ExpectedState::EXPECTED_UNPOWERED) == core::Classification::PASS);
+
+  // UNPOWERED is an asserted absence, so it behaves like NO_RESPONSE.
+  CHECK(classifyOf(INIT, core::DetectedState::UNPOWERED,
+                   core::ExpectedState::OPTIONAL) == core::Classification::DEGRADED);
+  CHECK(classifyOf(INIT, core::DetectedState::UNPOWERED,
+                   core::ExpectedState::EXPECTED_UNPOWERED) == core::Classification::PASS);
+
+  // ONLINE always passes; driver-level failure always faults; never-begun
+  // is always UNKNOWN. All unchanged.
+  for (core::ExpectedState exp : {core::ExpectedState::REQUIRED,
+                                  core::ExpectedState::OPTIONAL,
+                                  core::ExpectedState::EXPECTED_OFFLINE,
+                                  core::ExpectedState::EXPECTED_UNPOWERED}) {
+    CHECK(classifyOf(INIT, core::DetectedState::ONLINE, exp) == core::Classification::PASS);
+    CHECK(classifyOf(core::InitializationState::INIT_FAILED,
+                     core::DetectedState::ONLINE, exp) == core::Classification::FAULT);
+    CHECK(classifyOf(core::InitializationState::NOT_INITIALIZED,
+                     core::DetectedState::UNKNOWN, exp) == core::Classification::UNKNOWN);
+  }
+}
+
+// --- 14. USB_ONLY boot table is byte-for-byte the V0.1 validated one ------
+static void test_usb_only_boot_table_unchanged() {
+  g_case = "usb_only_boot_table_unchanged";
+  constexpr config::ProfileExpectations usb =
+      config::expectationsFor(config::HardwareProfile::USB_ONLY);
+
+  // Reproduces the exact hardware-validated Session 2 / H3 table.
+  core::AvailabilityStatus bno;
+  bno.init = core::InitializationState::INITIALIZED;
+  bno.detected = core::DetectedState::ONLINE;
+  bno.expected = core::ExpectedState::REQUIRED;
+
+  core::AvailabilityStatus daly;
+  daly.init = core::InitializationState::INITIALIZED;
+  daly.detected = core::DetectedState::NO_RESPONSE;
+  daly.expected = core::expectedStateForBattery(usb);
+
+  core::AvailabilityStatus servo;
+  servo.init = core::InitializationState::INITIALIZED;
+  servo.detected = core::DetectedState::UNKNOWN;  // no auto-scan at boot
+  servo.expected = core::expectedStateForServoBus(usb);
+
+  core::AvailabilityStatus led;
+  led.init = core::InitializationState::DEFERRED;
+  led.detected = core::detectedStateForLedRail(usb);
+  led.expected = core::expectedStateForLedRail(usb);
+
+  CHECK(core::classify(bno) == core::Classification::PASS);
+  CHECK(core::classify(daly) == core::Classification::PASS);
+  CHECK(core::classify(servo) == core::Classification::PASS);
+  CHECK(core::classify(led) == core::Classification::PASS);
+
+  core::SystemState state;
+  state.beginBoot(0);
+  state.setImuHealth(core::toModuleHealth(core::classify(bno)));
+  state.setBmsHealth(core::toModuleHealth(core::classify(daly)));
+  state.setServoHealth(core::toModuleHealth(core::classify(servo)));
+  state.setLedHealth(core::toModuleHealth(core::classify(led)));
+  CHECK(state.update() == core::SystemHealth::READY);
+}
+
+// --- 15. ROBOT_POWERED: SystemHealth::READY is reachable ------------------
+// The G3 P6 acceptance criterion. Before this fix it was unreachable: the
+// LED reported DEGRADED (OPTIONAL + permanently UNKNOWN) and the servo bus
+// reported FAULT (REQUIRED + not-yet-probed).
+static void test_robot_powered_ready_is_reachable() {
+  g_case = "robot_powered_ready_is_reachable";
+  constexpr config::ProfileExpectations pwr =
+      config::expectationsFor(config::HardwareProfile::ROBOT_POWERED);
+
+  core::AvailabilityStatus bno;
+  bno.init = core::InitializationState::INITIALIZED;
+  bno.detected = core::DetectedState::ONLINE;
+  bno.expected = core::ExpectedState::REQUIRED;
+
+  core::AvailabilityStatus daly;
+  daly.init = core::InitializationState::INITIALIZED;
+  daly.detected = core::DetectedState::ONLINE;  // DALY polls automatically
+  daly.expected = core::expectedStateForBattery(pwr);
+
+  core::AvailabilityStatus servo;
+  servo.init = core::InitializationState::INITIALIZED;
+  servo.detected = core::DetectedState::ONLINE;  // after the P4 census
+  servo.expected = core::expectedStateForServoBus(pwr);
+
+  core::AvailabilityStatus led;
+  led.init = core::InitializationState::INITIALIZED;
+  led.detected = core::detectedStateForLedRail(pwr);
+  led.expected = core::expectedStateForLedRail(pwr);
+
+  // The LED is NOT claimed to be physically present: it is still UNKNOWN.
+  CHECK(led.detected == core::DetectedState::UNKNOWN);
+  CHECK(led.detected != core::DetectedState::ONLINE);
+  CHECK(led.expected == core::ExpectedState::OPTIONAL);
+  CHECK(core::classify(led) == core::Classification::PASS);
+
+  core::SystemState state;
+  state.beginBoot(0);
+  state.setImuHealth(core::toModuleHealth(core::classify(bno)));
+  state.setBmsHealth(core::toModuleHealth(core::classify(daly)));
+  state.setServoHealth(core::toModuleHealth(core::classify(servo)));
+  state.setLedHealth(core::toModuleHealth(core::classify(led)));
+  CHECK(state.update() == core::SystemHealth::READY);
+
+  // At boot, BEFORE any census, the servo bus is honestly unproven: the
+  // system is BOOTING (a visible gap), not READY and not FAULT.
+  servo.detected = core::DetectedState::UNKNOWN;
+  CHECK(core::classify(servo) == core::Classification::UNKNOWN);
+  state.setServoHealth(core::toModuleHealth(core::classify(servo)));
+  CHECK(state.update() == core::SystemHealth::BOOTING);
+
+  // A servo bus that was probed and did not answer is still a real FAULT.
+  servo.detected = core::DetectedState::NO_RESPONSE;
+  CHECK(core::classify(servo) == core::Classification::FAULT);
+  state.setServoHealth(core::toModuleHealth(core::classify(servo)));
+  CHECK(state.update() == core::SystemHealth::FAULT);
+}
+
+// --- 16. a real optional-module failure still degrades --------------------
+static void test_real_optional_failure_still_degrades() {
+  g_case = "real_optional_failure_still_degrades";
+  constexpr config::ProfileExpectations pwr =
+      config::expectationsFor(config::HardwareProfile::ROBOT_POWERED);
+
+  // If a future LED path ever gains real failure detection, an OBSERVED
+  // failure must still degrade the system - the fix must not have made
+  // OPTIONAL modules unconditionally green.
+  core::AvailabilityStatus led;
+  led.init = core::InitializationState::INITIALIZED;
+  led.detected = core::DetectedState::NO_RESPONSE;
+  led.expected = core::expectedStateForLedRail(pwr);
+  CHECK(core::classify(led) == core::Classification::DEGRADED);
+
+  core::SystemState state;
+  state.beginBoot(0);
+  state.setImuHealth(core::ModuleHealth::OK);
+  state.setBmsHealth(core::ModuleHealth::OK);
+  state.setServoHealth(core::ModuleHealth::OK);
+  state.setLedHealth(core::toModuleHealth(core::classify(led)));
+  CHECK(state.update() == core::SystemHealth::DEGRADED);
+
+  // And a driver-level LED init failure still faults.
+  led.init = core::InitializationState::INIT_FAILED;
+  CHECK(core::classify(led) == core::Classification::FAULT);
+}
+
+// --- 17. fail-closed: a partial scan can never report PASS ----------------
 static void test_partial_scan_is_fail_closed() {
   g_case = "partial_scan_is_fail_closed";
   // Only the left-front leg was probed. Every other canonical ID was never
@@ -370,7 +555,7 @@ static void test_partial_scan_is_fail_closed() {
   CHECK(s.verdict == CensusVerdict::PROFILE_MISMATCH);
 }
 
-// --- 14. fail-closed: a truncated responder list can never report PASS ----
+// --- 18. fail-closed: a truncated responder list can never report PASS ----
 static void test_truncated_scan_is_fail_closed() {
   g_case = "truncated_scan_is_fail_closed";
   const std::vector<int> observed = installedNow();
@@ -411,6 +596,10 @@ int main() {
   test_canonical_and_expected_now_remain_distinct();
   test_usb_only_semantics_unchanged();
   test_robot_powered_expectations();
+  test_unknown_detection_is_not_a_verdict();
+  test_usb_only_boot_table_unchanged();
+  test_robot_powered_ready_is_reachable();
+  test_real_optional_failure_still_degrades();
   test_partial_scan_is_fail_closed();
   test_truncated_scan_is_fail_closed();
 

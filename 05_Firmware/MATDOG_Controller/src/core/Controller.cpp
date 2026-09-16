@@ -32,7 +32,7 @@ void Controller::begin() {
   Serial.begin(build::kUsbSerialBaud);
   delay(1500);  // let native USB CDC enumerate, matching every proven bring-up sketch.
 
-  system_state_.beginBoot();
+  system_state_.beginBoot(millis());
   printBootBanner();
 
   // Init order: transports that cannot interfere with each other first.

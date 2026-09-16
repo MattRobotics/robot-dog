@@ -41,8 +41,14 @@ enum class InitializationState : uint8_t {
                          // avoid driving an unpowered rail)
 };
 
+// NOTE (G2): the distinction between UNKNOWN and NO_RESPONSE is
+// load-bearing in classify(), not cosmetic. UNKNOWN means "nothing has
+// established anything"; NO_RESPONSE means "we asked and it did not
+// answer". A module that cannot be probed at all (WS2812) stays UNKNOWN
+// forever and must never be reported as NO_RESPONSE to force a verdict,
+// nor as ONLINE to make a status green.
 enum class DetectedState : uint8_t {
-  UNKNOWN     = 0,  // no probe attempted yet
+  UNKNOWN     = 0,  // no probe attempted, or hardware inherently non-probeable
   ONLINE      = 1,  // last probe got a valid response
   NO_RESPONSE = 2,  // last probe timed out / got no or invalid response
   UNPOWERED   = 3,  // known-absent by profile, not by a failed probe

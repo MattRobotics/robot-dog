@@ -33,7 +33,12 @@ const char* toString(SystemHealth health);
 // it never faults it. FAULT only propagates from a module that reports FAULT.
 class SystemState {
  public:
-  void beginBoot();
+  // Takes the current time rather than calling millis() itself (G2): it
+  // keeps this whole translation unit free of the Arduino runtime, so the
+  // offline host tests can link the REAL aggregation in update() instead
+  // of a reimplementation. Controller already threads now_ms everywhere
+  // else, so this matches the surrounding style.
+  void beginBoot(uint32_t now_ms);
 
   void setImuHealth(ModuleHealth health)   { imu_health_ = health; }
   void setServoHealth(ModuleHealth health) { servo_health_ = health; }

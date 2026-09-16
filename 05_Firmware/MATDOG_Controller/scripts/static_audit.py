@@ -62,6 +62,15 @@ servo scan/census at boot; and a direct network-handler -> servo-primitive
 path (no network subsystem exists yet — this is a tripwire armed in
 advance, not a test of invented code).
 
+G2 pre-G3 hardening additions (independent review findings 1 and 2): the
+build-manifest profile-provenance gate being removed, neutralized, given a
+permissive default, or moved after the device write (build.sh must record
+the hardware profile + binary digest it produced; flash_app_only.sh must
+verify them and require MATDOG_FLASH_PROFILE before writing, without
+weakening any pre-existing backup/MAC/partition/rollback/verify gate); and
+classify() collapsing DetectedState::UNKNOWN back into an observed absence,
+or a module faking a physical WS2812 detection to make a status green.
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
@@ -751,6 +760,205 @@ def check_host_tests(sketch_dir):
              f"(stdout={result.stdout!r} stderr={result.stderr!r})")
 
 
+def strip_shell_comments(text):
+    """Drops whole-line shell comments. The provenance checks below must
+    match REAL invocations, not the prose describing them - an early
+    version of this audit passed a mutation that deleted the manifest gate
+    entirely, because the words 'build_manifest.py' still appeared in this
+    script's own header comment."""
+    return "\n".join(line for line in text.splitlines()
+                     if not line.lstrip().startswith("#"))
+
+
+def check_build_profile_provenance(sketch_dir):
+    """G2 pre-G3 hardening (review Finding 1): the flashed image's hardware
+    profile must be PROVEN, never assumed.
+
+    build.sh can emit a USB_ONLY or a ROBOT_POWERED image from the same
+    commit to the same path, so the commit/build-id gate cannot tell them
+    apart. The manifest closes that hole; this check makes its removal or
+    neutralization a build failure rather than a silent regression.
+    """
+    scripts_dir = sketch_dir / "scripts"
+    logic = scripts_dir / "build_manifest.py"
+    build_sh = scripts_dir / "build.sh"
+    flash_sh = scripts_dir / "flash_app_only.sh"
+    tests = scripts_dir / "tests" / "test_build_manifest.py"
+
+    if not logic.exists():
+        fail(f"{logic}: build manifest logic module not found - the flash path would "
+             f"have no way to prove which hardware profile a binary came from")
+        return
+    logic_text = logic.read_text(encoding="utf-8")
+
+    for token in ("KNOWN_PROFILES", "MANIFEST_VERSION", "verify_manifest",
+                  "render_manifest", "parse_manifest",
+                  "PROFILE_MISMATCH", "PROFILE_UNKNOWN", "MANIFEST_MISSING",
+                  "BINARY_SHA256_MISMATCH", "BINARY_SIZE_MISMATCH",
+                  "SOURCE_COMMIT_MISMATCH", "TREE_NOT_CLEAN"):
+        if token not in logic_text:
+            fail(f"{logic}: missing required manifest/provenance primitive {token!r}")
+
+    # verify_manifest() must not acquire a permissive default for the
+    # profile it compares against - a caller that forgot the argument must
+    # be an error, never a silent "allow".
+    if re.search(r"def verify_manifest\([^)]*requested_profile\s*=", logic_text, re.DOTALL):
+        fail(f"{logic}: verify_manifest() gained a default for requested_profile - the "
+             f"caller must always state the profile it intends to flash")
+    if re.search(r'add_argument\("--requested-profile"[^)]*default=', logic_text):
+        fail(f"{logic}: --requested-profile gained a default - flash_app_only.sh must "
+             f"pass it explicitly")
+
+    if not build_sh.exists():
+        fail(f"{build_sh}: build script not found")
+        return
+    build_text = strip_shell_comments(build_sh.read_text(encoding="utf-8"))
+    if not re.search(r'build_manifest\.py"?\s+write', build_text):
+        fail(f"{build_sh}: does not invoke `build_manifest.py write` - every build must "
+             f"record the hardware profile and binary digest it produced")
+    if "--profile" not in build_text:
+        fail(f"{build_sh}: does not pass --profile to the manifest writer")
+    if "--source-state" not in build_text:
+        fail(f"{build_sh}: does not record the clean/dirty source state in the manifest")
+
+    if not flash_sh.exists():
+        fail(f"{flash_sh}: application-only flash script not found")
+        return
+    flash_text = strip_shell_comments(flash_sh.read_text(encoding="utf-8"))
+
+    verify_match = re.search(r'build_manifest\.py"?\s+verify', flash_text)
+    if not verify_match:
+        fail(f"{flash_sh}: does not invoke `build_manifest.py verify` - a binary of "
+             f"unknown hardware profile could be written to the device")
+    if "--requested-profile" not in flash_text:
+        fail(f"{flash_sh}: does not pass --requested-profile to the manifest verifier")
+    # The parameter expansion, not just the name in prose: the operator
+    # authorization input must actually be readable from the environment.
+    if "MATDOG_FLASH_PROFILE:-" not in flash_text:
+        fail(f"{flash_sh}: lost the MATDOG_FLASH_PROFILE operator authorization input "
+             f"(expected a ${{MATDOG_FLASH_PROFILE:-...}} expansion)")
+
+    write_match = re.search(r"write-flash", flash_text)
+
+    # The gate must run BEFORE the device write, not after it.
+    if verify_match is None or write_match is None or \
+            verify_match.start() > write_match.start():
+        fail(f"{flash_sh}: the build-manifest verification must appear before the "
+             f"esptool write-flash invocation")
+
+    # The verification must not be neutralized into a warning. Scans the
+    # whole verify command (it spans continuation lines) for a swallowed
+    # failure - `|| refuse ...` is correct, `|| true` / `|| :` is not.
+    if verify_match is not None:
+        lines = flash_text.splitlines()
+        start = flash_text[:verify_match.start()].count("\n")
+        block = []
+        for line in lines[start:start + 12]:
+            block.append(line)
+            if not line.rstrip().endswith("\\"):
+                break
+        if re.search(r"\|\|\s*(true|:|echo|warn)\b", "\n".join(block)):
+            fail(f"{flash_sh}: the manifest verification swallows its own failure "
+                 f"('|| true'/'|| :'/'|| echo') - it must REFUSE, not warn")
+
+    # Anti-weakening: every pre-existing flash gate must still be ENFORCED,
+    # not merely mentioned. Counting token occurrences is not enough - each
+    # of these constants also appears in its own refuse() message, so a
+    # deleted comparison still leaves two mentions behind. These patterns
+    # match the actual comparison that does the gating.
+    for pattern, description in (
+            (r'\[\s*"\$BACKUP_SIZE"\s*-eq\s*"\$EXPECTED_BACKUP_SIZE"\s*\]',
+             "full-flash backup size comparison"),
+            (r'\[\s*"\$BACKUP_SHA256"\s*=\s*"\$EXPECTED_BACKUP_SHA256"\s*\]',
+             "full-flash backup digest comparison"),
+            (r'\[\s*"\$DEVICE_MAC"\s*=\s*"\$EXPECTED_MAC"\s*\]',
+             "device identity (MAC) comparison"),
+            (r'\[\s*-n\s*"\$(APPLICATION_OFFSET|MAX_PARTITION_SIZE)"\s*\]',
+             "verified application offset/size check"),
+            (r'"\$APPLICATION_SIZE"\s*-le\s*"\$MAX_PARTITION_SIZE"',
+             "application-fits-in-partition check"),
+            (r'python3 "\$SCRIPT_DIR/verify_application_partition\.py"',
+             "verified application partition gate"),
+            (r"--sdkconfig", "rollback/anti-rollback state gate"),
+            (r'python3 "\$SCRIPT_DIR/static_audit\.py"', "static safety audit gate"),
+            # Anchored to the esptool invocation: 'verify-flash' also appears
+            # in this script's own refuse() message, so a bare token match
+            # would survive the command itself being deleted.
+            (r'"\$ESPTOOL"[^\n]*verify-flash', "independent post-write verification")):
+        if not re.search(pattern, flash_text):
+            fail(f"{flash_sh}: lost the {description} - G2 hardening must not weaken "
+                 f"any pre-existing application-only protection")
+
+    # The operator must SEE the verified profile prominently before the
+    # write. Anchored to the echo that actually prints the value, not to
+    # any mention of the variable (the assignment and the post-write
+    # summary both mention it and would otherwise satisfy a loose check).
+    banner = None
+    for idx, line in enumerate(flash_text.splitlines()):
+        if "echo" in line and "HARDWARE PROFILE" in line and \
+                "$VERIFIED_HARDWARE_PROFILE" in line:
+            banner = flash_text.index(line)
+            break
+    if banner is None:
+        fail(f"{flash_sh}: does not print the verified hardware profile prominently "
+             f"before writing (expected an echo of $VERIFIED_HARDWARE_PROFILE)")
+    elif write_match is not None and banner > write_match.start():
+        fail(f"{flash_sh}: prints the verified hardware profile only after the write - "
+             f"the operator must see it beforehand")
+
+    if not tests.exists():
+        fail(f"{tests}: build manifest offline test suite not found")
+        return
+    result = subprocess.run([sys.executable, str(tests)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{tests}: build manifest offline tests FAILED "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
+def check_unknown_detection_is_not_a_verdict(files):
+    """G2 pre-G3 hardening (review Finding 2): classify() must keep
+    DetectedState::UNKNOWN ('nothing has established anything') distinct
+    from NO_RESPONSE ('we asked and it did not answer').
+
+    Collapsing them again would re-break two things at once: the LED ring
+    (non-probeable, therefore permanently UNKNOWN when powered) would make
+    SystemHealth::READY unreachable, and the servo bus (REQUIRED but never
+    probed at boot) would report FAULT on a healthy powered robot.
+    """
+    for path, code in files:
+        if path.name != "Availability.cpp":
+            continue
+        m = re.search(r"Classification classify\(const AvailabilityStatus& s\)\s*\{(.*?)\n\}",
+                      code, re.DOTALL)
+        if not m:
+            fail(f"{path}: classify() not found to audit its UNKNOWN handling")
+            continue
+        body = m.group(1)
+        if "DetectedState::UNKNOWN" not in body:
+            fail(f"{path}: classify() no longer distinguishes DetectedState::UNKNOWN from "
+                 f"an observed absence - 'not probed' must not be turned into a verdict "
+                 f"(G2 review Finding 2)")
+        # An observed failure must still escalate: both escalation arms
+        # must survive somewhere in the function.
+        if "Classification::FAULT" not in body or "Classification::DEGRADED" not in body:
+            fail(f"{path}: classify() lost its FAULT/DEGRADED escalation for an observed "
+                 f"absence - the UNKNOWN fix must not mute real failures")
+
+    # And the modules must not have been "fixed" by faking a physical
+    # observation instead.
+    for path, code in files:
+        if path.name != "Availability.cpp":
+            continue
+        m = re.search(r"DetectedState detectedStateForLedRail\([^)]*\)\s*\{(.*?)\n\}",
+                      code, re.DOTALL)
+        if not m:
+            fail(f"{path}: detectedStateForLedRail() not found")
+            continue
+        if "DetectedState::ONLINE" in m.group(1):
+            fail(f"{path}: detectedStateForLedRail() reports ONLINE - a WS2812 chain "
+                 f"cannot be interrogated, so claiming physical detection to make a "
+                 f"status green is forbidden (G2 review Finding 2)")
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -778,6 +986,8 @@ def main():
     check_no_startup_servo_traffic(files)
     check_no_network_to_servo_path(files)
     check_host_tests(SKETCH_DIR)
+    check_build_profile_provenance(SKETCH_DIR)
+    check_unknown_detection_is_not_a_verdict(files)
 
     print(f"Scanned {len(files)} source files under {SKETCH_DIR}")
 

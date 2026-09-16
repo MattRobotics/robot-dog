@@ -1,5 +1,65 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — G2 pre-G3 hardening amendment — 2026-09-16
+
+Resolves two issues raised by an independent review of commit `34afbc7`. Both are
+pre-G3 corrections to the G2 software scope. **No hardware was flashed, no rail was
+energized, and G3 was not executed.** The compiled-in default profile remains `USB_ONLY`.
+
+**Finding 1 — the build profile was not bound to the flashed artifact.**
+`build.sh` can emit a `USB_ONLY` or a `ROBOT_POWERED` image from the same commit to the
+same path, and the build id is identical for both — so the pre-existing flash gate could
+not tell them apart. A stale image of the wrong profile could have been written under the
+wrong assumption. (Confirmed concrete: the two profiles really do produce different
+binaries — 387312 vs 387776 bytes, different digests.)
+
+- `scripts/build_manifest.py`: new. Writes and verifies a build manifest binding source
+  commit, build id, clean/dirty source state, hardware profile, FQBN, and the binary's
+  filename/size/SHA256. Pure logic plus a thin CLI; no device I/O.
+- `build.sh`: emits `build/esp32.esp32.esp32s3/matdog_build_manifest.txt` after every
+  successful compile, and removes any stale manifest if no binary was produced. The
+  manifest lives in the gitignored build directory and is never committed.
+- `flash_app_only.sh`: fail-closed manifest gate before any device write. Requires
+  manifest present/parseable/known-version, commit == `HEAD`, tree clean at build time
+  *and* now, binary present with matching size **and** SHA256, recognized profile, and
+  manifest profile == requested profile. Profile is named via `MATDOG_FLASH_PROFILE`
+  (default `USB_ONLY`), so a `ROBOT_POWERED` image is refused unless explicitly asked
+  for. The verified profile is printed in a banner immediately before the write.
+- No pre-existing protection was weakened: backup size/digest, device MAC, verified
+  application partition, rollback/anti-rollback, static audit, single-partition write and
+  post-write `verify-flash` are all retained and now individually audited.
+
+**Finding 2 — `SystemHealth::READY` was unreachable under `ROBOT_POWERED`.**
+`classify()` converted `DetectedState::UNKNOWN` into a verdict, treating "nothing has
+established anything" the same as "we asked and it did not answer".
+
+- `core/Availability.cpp`: `UNKNOWN` is now handled separately from `NO_RESPONSE`/
+  `UNPOWERED`. `UNKNOWN + OPTIONAL -> PASS`; `UNKNOWN + REQUIRED -> UNKNOWN` (system
+  reports `BOOTING`, a visible gap, not a false alarm). Observed-absence escalation is
+  unchanged: `NO_RESPONSE + REQUIRED -> FAULT`, `NO_RESPONSE + OPTIONAL -> DEGRADED`.
+- This fixed two defects with one rule: the LED ring (non-probeable, so permanently
+  `UNKNOWN` when powered) no longer degrades the system, and the servo bus (`REQUIRED`
+  but deliberately never probed at boot) no longer reports `FAULT` before anything has
+  been asked of it. The second case was found while evaluating the first across both
+  profiles, as the review instructed.
+- No physical detection is faked: the LED still reports `detected=UNKNOWN`, and the
+  static audit forbids `detectedStateForLedRail()` from ever returning `ONLINE`.
+- `USB_ONLY` classification is bit-for-bit unchanged — verified by a test that reproduces
+  the hardware-validated Session 2 / H3 table exactly.
+- `core/SystemState`: `beginBoot()` takes `now_ms` instead of calling `millis()`, making
+  the translation unit Arduino-free so the offline tests link the real aggregation.
+
+Tests and tooling:
+
+- `scripts/tests/test_build_manifest.py`: new, 36 offline tests covering every refusal
+  reason by exact code, the full authorization matrix, and write→verify round trips.
+- `scripts/tests/test_servo_population.cpp`: +4 cases / +39 checks for the Availability
+  truth table, the unchanged `USB_ONLY` boot table, `READY` reachability under
+  `ROBOT_POWERED`, and a real optional-module failure still degrading.
+- `static_audit.py`: two new check groups for profile provenance and the `UNKNOWN`
+  distinction, plus anti-weakening assertions anchored to the actual comparisons in
+  `flash_app_only.sh` rather than to token presence. All 15 new tripwires mutation-tested.
+
 ## Unreleased — G2 ROBOT_POWERED configuration support — 2026-09-16
 
 Software preparation for the powered robot. **No powered hardware validation was
