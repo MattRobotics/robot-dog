@@ -1,0 +1,266 @@
+# MATDOG Controller — Development Gates
+
+**Canonical owner of the technical pass/fail authorization criteria for each Controller
+development gate.** Last updated 2026-09-16.
+
+This file answers *what must be true before this stage may begin, what it may and may not do, and
+what proves it passed*. It is not a narrative roadmap and not an evidence log:
+
+| For | Read |
+|---|---|
+| Where the project stands and why stages are ordered | [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md) |
+| Permanent system contracts and forbidden architectures | [`ARCHITECTURE.md`](../../01_Docs/02_Architecture/ARCHITECTURE.md) |
+| What was actually validated, with dated evidence | [`VALIDATION.md`](VALIDATION.md) |
+| Current snapshot and immediate milestone | [Root `README.md`](../../README.md) |
+
+## Rules that apply to every gate
+
+1. A gate's existence in this file is **not** authorization to execute it. Hardware gates require
+   explicit operator authorization for that specific session.
+2. **IMPLEMENTED ≠ VALIDATED.** A gate may only be marked PASS on the evidence its PASS CRITERIA
+   name. Passing a precursor, or a standalone bench tool, never transfers.
+3. A failed prerequisite is never bypassed to finish a session. Stop, preserve evidence, report.
+4. `SAFE_OFF` must remain reachable in every mode, at every gate, forever.
+5. No gate may weaken a protection established by an earlier gate.
+
+**Status values:** `PASS` · `CURRENT` · `TO_TEST` · `TO_DESIGN` · `BLOCKED` · `PARTIAL`.
+
+---
+
+## G0 — Post-cleanup entry audit
+
+- **PURPOSE** — establish the exact post-cleanup source of truth before any firmware edit.
+- **ENTRY** — repository-cleanup PR merged to `main`.
+- **ALLOWED** — read-only inspection of Git state, source, tests, tags, branches, worktrees.
+- **FORBIDDEN** — any file modification; branch creation.
+- **PASS CRITERIA** — written report; no ambiguity about the development base.
+- **NEXT** — G1.
+- **STATUS** — **PASS** (not rerun since; accepted base `1a8c5bc3ced4f49ea36902526f232b2785a7ab70`).
+
+## G1 — V0.1 regression freeze
+
+- **PURPOSE** — prove post-cleanup `main` still reproduces the V0.1 software baseline.
+- **ENTRY** — G0 PASS.
+- **ALLOWED** — compile, offline tests, static audit, viewer regression.
+- **FORBIDDEN** — feature work; hardware action.
+- **PASS CRITERIA** — compile PASS, static audit PASS, OTA tests PASS, viewer PASS, clean tree.
+- **NEXT** — G2.
+- **STATUS** — **PASS** (not rerun since).
+
+## G2 — ROBOT_POWERED configuration support
+
+- **PURPOSE** — prepare the firmware for the real current robot, in software only, without motion.
+- **ENTRY** — G0 + G1 PASS.
+- **ALLOWED** — hardware-profile authority; canonical-17 / expected-now-13 / absent-by-design-4
+  population model; structured census classification; profile-derived module expectations;
+  transport-independent state; offline tests; static-audit extension.
+- **FORBIDDEN** — Torque ON; `GoalPosition`; servo EEPROM/ID/`CalibrationOfs`/factory-reset/
+  broadcast writes; DALY writes; BNO085 DCD writes; automatic scan/census at boot; energizing any
+  external rail; flashing; Web/Wi-Fi implementation; ActuatorAuthority framework; motion.
+- **PASS CRITERIA** — census/profile host tests PASS; build-manifest provenance tests PASS; static
+  audit PASS; OTA tests PASS; `USB_ONLY` compile PASS; `ROBOT_POWERED` compile-only PASS; viewer
+  PASS; `USB_ONLY` semantics unchanged; source default remains `USB_ONLY`.
+- **NEXT** — G3, and only with explicit powered-session authorization.
+- **STATUS** — **PASS** (software/offline scope only). ROBOT_POWERED remains **IMPLEMENTED**, not
+  **VALIDATED**.
+- **EVIDENCE** — [`VALIDATION.md` § G2](VALIDATION.md) and § G2 pre-G3 hardening amendment.
+
+## G3 — ROBOT_POWERED live validation, no motion
+
+- **PURPOSE** — first powered session; prove the powered robot's read-only behaviour and safe-state
+  semantics.
+- **ENTRY** — G2 PASS; robot mechanically supported so no load-bearing motion is possible;
+  accessible disconnect/`KEY`; fuse and polarity verified; full-flash backup verified; image built
+  with `MATDOG_PROFILE=ROBOT_POWERED` and flashed only via the manifest-verified
+  `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`; **explicit operator
+  authorization for that session**.
+- **ALLOWED** — protected-domain boot; DALY read-only; conservative LED test; ST3215 read-only
+  census and register reads; `SAFE_OFF` with readback; concurrent soak.
+- **FORBIDDEN** — Torque ON; `GoalPosition`; any motion; servo EEPROM/ID writes; DALY writes; BNO085
+  DCD writes; partition rewrite; full erase.
+- **PASS CRITERIA** — clean boot (`health=BOOTING` before any probe, by design); no resets; DALY
+  live and plausible; LED validated without disturbing bus timing; census exactly `PASS`
+  (13 present-expected, 4 absent-by-design, 0 missing, 0 unexpected) and stable across repeats;
+  `VERIFIED_OFF` on all 13; `READY` during soak; **no motion observed at any point**.
+- **NEXT** — Diagnostics / Maintenance gate.
+- **STATUS** — **CURRENT / TO_TEST — NOT EXECUTED.**
+- **EVIDENCE** — procedure in [`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md).
+
+## Diagnostics / Maintenance
+
+- **PURPOSE** — permanent read-only maintenance capability over the single shared `ServoBus`.
+- **ENTRY** — G3 PASS.
+- **ALLOWED** — `SYSTEM_SELF_TEST`, consolidated servo health, source-signature read, profile audit;
+  extension of the existing census/read/`SAFE_OFF` surface.
+- **FORBIDDEN** — any new persistent write path; any transport→register access; motion.
+- **PASS CRITERIA** — all operations read-only; no new write path; classification correct for
+  expected/absent/missing/unexpected; reachable over USB CDC.
+- **NEXT** — Authority model.
+- **STATUS** — **PARTIAL.** Already implemented: `@STATUS` availability, `@SERVO SCAN`,
+  `@SERVO READ`, `@SERVO CENSUS`, `@SERVO SAFE_OFF`, `@IMU`/`@BMS`/`@LED` status. Not implemented:
+  `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated health summary.
+
+## Authority model — OperatingMode / ActuatorAuthority
+
+- **PURPOSE** — central arbitration so at most one subsystem may own actuator-write authority.
+- **ENTRY** — Diagnostics/Maintenance foundation present.
+- **ALLOWED** — explicit mode set (`MAINTENANCE`/`CALIBRATION`/`SERVICE`/`RUN`) and actuator
+  authority (`NONE`/`DIAGNOSTICS`/`CALIBRATION`/`QC`/`PROVISIONING`/`MOTION`).
+- **FORBIDDEN** — two simultaneous actuator owners; implicit authority survival across reset or
+  host disconnect; any gate that makes `SAFE_OFF` unreachable.
+- **PASS CRITERIA** — failure-injection tests for illegal cross-mode operations; reset clears write
+  authority; host disconnect leaves no armed write transaction.
+- **NEXT** — Service / Provisioning / QC.
+- **STATUS** — **PARTIAL.** `OperatingMode{MAINTENANCE, RUN}` exists and gates blocking servo
+  diagnostics. Full `ActuatorAuthority` is **TO_DESIGN**.
+
+## Service / Provisioning
+
+- **PURPOSE** — tightly gated servo replacement and canonical provisioning without reflashing a
+  specialist tool.
+- **ENTRY** — Authority model PASS.
+- **ALLOWED** — `SERVICE` mode only: source snapshot, model/profile gate, explicit register
+  allowlist, ordered persistent writes, readback, cold-persistence verification.
+- **FORBIDDEN** — generic host arbitrary EEPROM/register write; broadcast write; `CalibrationOfs`;
+  factory reset; blind ID-change retry; provisioning from an unknown source signature.
+- **PASS CRITERIA** — a successful provisioning marks the joint `JOINT_CALIBRATION_REQUIRED`, never
+  motion-ready.
+- **NEXT** — QC.
+- **STATUS** — **TO_DESIGN.** Provisioner V6 remains a **FROZEN** oracle, not runtime source.
+
+## QC
+
+- **PURPOSE** — servo health characterization, in situ and on the bench.
+- **ENTRY** — Service foundation PASS.
+- **ALLOWED** — `QC_IN_SITU`: conservative telemetry/stability/profile/fault checks.
+  `QC_FULL_BENCH`: service-only, isolated-servo context.
+- **FORBIDDEN** — full bench QC motion reachable from normal `RUN`; dormant EEPROM normalization
+  copied in by accident.
+- **PASS CRITERIA** — normal `RUN` cannot trigger bench QC motion; in-situ checks add no write path.
+- **NEXT** — Calibration integration.
+- **STATUS** — **TO_DESIGN.** Bench QC V6.1 remains a **FROZEN** oracle.
+
+## Calibration — Full Leg Calibration integration and formal H1+
+
+- **PURPOSE** — make calibration a permanent Controller capability and recalibrate the installed
+  robot.
+- **ENTRY** — G3 PASS; Authority model PASS; powered bus health proven.
+- **ALLOWED** — H1 census semantics, q0 evidence capture, direction witnesses, characterization,
+  then staged calibration motion **each with its own session authorization**.
+- **FORBIDDEN** — merging `matdog/full-leg-calibrator-v1` wholesale; duplicating `ServoBus`/UART/
+  scheduler/`SAFE_OFF`; auto-promoting measurements; assuming `q0 = 2048`; any H2+ motion before a
+  formal H1 PASS.
+- **PASS CRITERIA** — formal H1 satisfied for all 12 leg servos (ID 51 is not in Full-Leg H1); the
+  evidence lifecycle `MEASURED → CANDIDATE → ACCEPTED → PROMOTED` is preserved.
+- **NEXT** — motion may be considered, behind the Safe Actuator Layer.
+- **STATUS** — **BLOCKED** by `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION`. Last formal H1 was
+  6/12 and is **not** superseded by a Controller census.
+
+## HostLink semantic layer
+
+- **PURPOSE** — one semantic command/service contract independent of transport.
+- **ENTRY** — Diagnostics/Maintenance foundation present.
+- **ALLOWED** — transport adapters over one Controller service implementation; structured state and
+  telemetry snapshots.
+- **FORBIDDEN** — duplicate command semantics per transport; transport owning hardware; any
+  business logic reachable only inside a parser or printer.
+- **PASS CRITERIA** — a second transport can consume the same semantic state without
+  reimplementation or a duplicate hardware transaction.
+- **NEXT** — Wi-Fi runtime.
+- **STATUS** — **PARTIAL.** `CommandRouter` is a USB CDC adapter; G2 made the census layer
+  transport-independent (no `Serial`, no `<Arduino.h>`, structured `CensusResult`), which is the
+  precondition. A formal Controller Service Layer and schema are **TO_DESIGN**.
+
+## Wi-Fi runtime
+
+- **PURPOSE** — bounded network connectivity for the dashboard and OTA.
+- **ENTRY** — HostLink semantic contract defined.
+- **ALLOWED** — connection management, bounded client count, bounded queues, non-blocking I/O.
+- **FORBIDDEN** — network callbacks calling servo primitives; network traffic starving
+  BNO085/DALY/ServoBus/motion; Wi-Fi loss destabilizing low-level control.
+- **PASS CRITERIA** — reconnect cycles stable; no heap leak; no scheduler starvation; no bus timing
+  degradation.
+- **NEXT** — UI-0/UI-1 and OTA.
+- **STATUS** — **TO_DESIGN.** No network code exists in the Controller.
+
+## OTA
+
+- **PURPOSE** — make wireless update the normal path while wired recovery remains mandatory.
+- **ENTRY** — Wi-Fi runtime PASS; partition verifier PASS; full-flash recovery verified; USB
+  recovery proven; authority model exists.
+- **ALLOWED** — upload to the inactive slot, validation, reboot, version confirmation, rollback
+  handling.
+- **FORBIDDEN** — OTA during motion, calibration motion or an active service write transaction;
+  weakening partition/rollback checks; removing USB recovery.
+- **PASS CRITERIA** — update + reboot + identity confirmation + rollback behaviour all demonstrated;
+  refused in unsafe states.
+- **NEXT** — UI-9.
+- **STATUS** — **PARTIAL.** Partition-selection logic **IMPLEMENTED** and offline-tested (40/40) and
+  already used by the application-only flash workflow; OTA transport/runtime does **not** exist.
+
+## Safe Actuator Layer
+
+- **PURPOSE** — the single legal path from joint-level commands to `ServoBus` writes.
+- **ENTRY** — Authority model PASS; valid calibration available.
+- **ALLOWED** — enforcement of authority, mode, calibration validity and transform, joint limits,
+  unsigned `0..4095` domain, goal validity, telemetry/fault guards, watchdog/deadman, safe stop.
+- **FORBIDDEN** — any other code path writing a servo target; a gait engine owning `ServoBus`.
+- **PASS CRITERIA** — no direct-to-`ServoBus` write path exists outside this layer; static audit
+  enforces it.
+- **NEXT** — first motion.
+- **STATUS** — **TO_DESIGN.** No motion primitive exists in the firmware today.
+
+## First motion
+
+- **PURPOSE** — first commanded joint movement, bounded and suspended.
+- **ENTRY** — G3 PASS; formal calibration valid; Safe Actuator Layer PASS; robot suspended.
+- **ALLOWED** — one bounded calibrated joint, then controlled multi-joint pose, then suspended
+  behaviour, then fault injection.
+- **FORBIDDEN** — load-bearing stand; unbounded travel/velocity; motion from stale calibration.
+- **PASS CRITERIA** — commanded motion matches expectation within bounds; safe-stop and fault
+  injection behave as designed.
+- **NEXT** — UI-4, then poses and IK.
+- **STATUS** — **BLOCKED** (G3, authority model, calibration, Safe Actuator).
+
+## IK · Gait · Stabilization
+
+- **IK** — operational inverse kinematics on the Controller. Entry: controlled poses PASS.
+  Forbidden: converting browser XYZ directly to raw servo values. **STATUS — FUTURE.**
+- **Gait** — progression stand → walk → trot, each within a validated dynamic envelope, always
+  through the Safe Actuator Layer. **STATUS — FUTURE.**
+- **Stabilization** — BNO085 closed loop. Entry: stable gait baseline, deterministic actuator
+  timing, verified IMU frame. Corrections flow through the same authority layer; the browser never
+  computes a correction. **STATUS — FUTURE.**
+
+---
+
+## Embedded Web UI gates
+
+Architecture contract: [`ARCHITECTURE.md`](../../01_Docs/02_Architecture/ARCHITECTURE.md#embedded-matdog-web-ui--control--service-dashboard).
+Sequencing: [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md#embedded-web-ui-placement-in-the-sequence).
+
+**Global UI rules, applicable to every UI gate:**
+
+1. STOP / `SAFE_OFF` visible on every write-capable page.
+2. Enable/disable state comes from authoritative Controller state, never frontend assumption.
+3. Browser reconnect never restores actuator ownership automatically.
+4. Continuous commands always expire (firmware-side lease/deadman).
+5. Write-capable service operations carry transaction IDs.
+6. No raw EEPROM/register access, ever.
+7. Frontend convenience never weakens Controller safety.
+8. Wi-Fi loss cannot destabilize low-level control.
+9. Network traffic cannot starve BNO085/DALY/ServoBus/motion.
+10. UI limits derive from MATDOG canonical data, never from XGO/DOGZILLA reference material.
+
+| Gate | Purpose | Entry | Pass criteria | Status |
+|---|---|---|---|---|
+| **UI-0** | Web architecture contract: frontend/backend boundary, typed semantic command model, telemetry snapshot schema, session identity, bounded clients, static-asset storage plan | none — designable offline now | proves `Web → Controller Services → Authority/Safety → hardware` with **no** direct web→`ServoBus` path | **TO_DESIGN** (may start) |
+| **UI-1** | Read-only dashboard: overview, BNO085 3D, BMS, servo census/health, mode/authority/fault | Wi-Fi runtime PASS | reconnect cycles stable; no heap leak; no scheduler starvation; no bus timing degradation; **no actuator command from web** | **BLOCKED** (Wi-Fi) |
+| **UI-2** | Maintenance controls: self-test, census, health, profile audit, source signature, `SAFE_OFF`, logs | Diagnostics/Maintenance PASS + UI-1 | no EEPROM write, no motor motion | **BLOCKED** |
+| **UI-3** | Calibration / service workflow UI | Authority model PASS + backend workflows | firmware owns the transaction state machine; refresh/reconnect never silently resumes a dangerous transaction | **BLOCKED** |
+| **UI-4** | Joint test: bounded single-joint command | Safe Actuator PASS + first motion PASS | mandatory command lease/watchdog; no raw slider; no EEPROM | **BLOCKED** |
+| **UI-5** | Body pose / single-leg XYZ | operational IK + reachability gates | all commands semantic/model-based | **BLOCKED** |
+| **UI-6** | Manual teleoperation joystick (`vx`, `vy`, `yaw_rate`) | safe multi-joint motion + manual-motion authority + proven safe stop | mandatory firmware-side lease; Wi-Fi loss / browser close / phone sleep / stale sequence expire the command and trigger safe stop | **BLOCKED** |
+| **UI-7** | Gait selection / preset actions | validated gaits and actions only | operator controls stay simple; engineering parameters bounded and separate | **BLOCKED** |
+| **UI-8** | Stabilization ON/OFF and status | closed-loop stabilization hardware-validated | browser requests a mode; never computes actuator corrections | **BLOCKED** |
+| **UI-9** | OTA UI and future extensions | OTA safety policy validated | rejects OTA in unsafe modes; USB recovery remains mandatory | **BLOCKED** |

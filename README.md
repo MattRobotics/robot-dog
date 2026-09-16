@@ -47,6 +47,9 @@ Every current-facing document uses these meanings:
   `VERIFIED_OFF` result is still **TO_TEST**.
 - DALY, LED, and servo modules coexist in firmware; their powered-robot behavior is not yet
   validated.
+- The `ROBOT_POWERED` hardware profile, servo population model (canonical 17 / expected-now 13 /
+  absent-by-design 52-55) and structured census classification exist and are offline-tested on
+  branch `feat/controller-robot-powered-v02`. The powered configuration itself remains **TO_TEST**.
 
 ### DECIDED
 
@@ -127,29 +130,61 @@ The tag identifies the official merged repository release. The earlier source SH
 exact firmware exercised in the final hardware session; subsequent differences in the tagged
 Controller tree are documentation only. Neither identifier proves `ROBOT_POWERED` validation.
 
-## Immediate milestone: TO_TEST, no motion
+## Where we are, and the next gate
 
 ```text
-MATDOG Controller V0.1
+COMPLETE   Controller V0.1 baseline              VALIDATED (USB_ONLY hardware)
+COMPLETE   G2 ROBOT_POWERED preparation          PASS (software/offline only, 2026-09-16)
+
+NEXT GATE  G3 ROBOT_POWERED no-motion validation TO_TEST — never executed
+```
+
+`ROBOT_POWERED` **software** support exists on branch `feat/controller-robot-powered-v02`:
+one hardware-profile authority, the canonical-17 / expected-now-13 / absent-by-design-4 servo
+population model, structured census classification, and a fail-closed build-manifest gate that
+proves which profile a binary was built for before it can be flashed. It is **IMPLEMENTED**, not
+**VALIDATED** — the powered robot has never been energized.
+
+### Immediate milestone: TO_TEST, no motion
+
+```text
+MATDOG Controller
 -> ROBOT_POWERED Hardware Validation
 -> no motion
 -> DALY live read-only
 -> LED live
--> 13 expected servos read-only
+-> 13 expected servos read-only (13 present + 4 absent by design = PASS)
 -> SAFE_OFF real readback
 -> concurrent soak
 ```
 
-This sequence has not been performed by Phase A. It must not include robot motion, servo EEPROM
-writes, ID changes, calibration writes, or hardware reflashing as an incidental documentation
-step. Detailed validation ownership lives in the Controller
+This sequence has not been performed. It must not include robot motion, servo EEPROM writes, ID
+changes, calibration writes, or hardware reflashing as an incidental documentation step. The
+procedure is designed in
+[`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](05_Firmware/MATDOG_Controller/G3_ROBOT_POWERED_VALIDATION_PLAN.md);
+detailed validation ownership lives in the Controller
 [`VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md).
+
+### Everything after that
+
+The full development sequence, its hard dependencies and what is blocked by what are owned by
+[`ROADMAP.md`](01_Docs/02_Architecture/ROADMAP.md). Per-gate entry conditions and pass/fail
+criteria are owned by
+[`DEVELOPMENT_GATES.md`](05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md). They are
+deliberately not duplicated here.
 
 ## Target architecture
 
 The permanent MATDOG Controller is the integration point for future Diagnostics, Maintenance,
 Service, Servo QC, Provisioning, Full Leg Calibration, Wi-Fi/OTA, and host transport. Motion, IK,
 gait, and stabilization come later, behind explicit safety and calibration gates.
+
+**DECIDED (2026-09-16):** MATDOG will also host a permanent **Embedded Web UI / Control & Service
+Dashboard** served by the ESP32-S3 and reached from a phone, tablet, the ASUS or a future Jetson.
+It is a staged, safety-gated target and none of it exists in firmware yet. Every browser command
+must travel `Browser -> CommandRouter -> Controller services -> authority -> Safe Actuator ->
+ServoBus`; a direct browser-to-`ServoBus` path is permanently forbidden. Contract in
+[`ARCHITECTURE.md`](01_Docs/02_Architecture/ARCHITECTURE.md#embedded-matdog-web-ui--control--service-dashboard).
 
 The branch `matdog/full-leg-calibrator-v1` is a preserved oracle/evidence branch. Its useful
 calibration engine, safety, and evidence patterns may later be migrated selectively into the
@@ -164,6 +199,8 @@ capabilities are integrated into the Controller.
 |---|---|
 | What exists and what happens next? | This `README.md` |
 | What are the architecture contracts and target direction? | [`ARCHITECTURE.md`](01_Docs/02_Architecture/ARCHITECTURE.md) |
+| What is the development sequence, and what blocks what? | [`ROADMAP.md`](01_Docs/02_Architecture/ROADMAP.md) |
+| What must be true before a stage may begin? | [`DEVELOPMENT_GATES.md`](05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md) |
 | How are power, wiring, and connectors implemented? | [`04_Electronics/README.md`](04_Electronics/README.md) |
 | What firmware exists? | [`05_Firmware/README.md`](05_Firmware/README.md) |
 | What is the Controller baseline and service model? | [Controller README](05_Firmware/MATDOG_Controller/README.md) |
