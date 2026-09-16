@@ -18,6 +18,7 @@ The authorization matrix under test:
     manifest ROBOT_POWERED + default (no authorization)     -> REFUSE
     manifest USB_ONLY      + requested ROBOT_POWERED        -> REFUSE
     manifest profile unknown/missing                        -> REFUSE
+    manifest FQBN != flasher's pinned FQBN                  -> REFUSE
     binary size or sha256 mismatch                          -> REFUSE
     manifest commit != HEAD                                 -> REFUSE
     tree dirty (at build time or now)                       -> REFUSE
@@ -49,6 +50,14 @@ HEAD = "34afbc7808e276d7483de9f2c817750683a65088"
 OTHER_COMMIT = "1a8c5bc3ced4f49ea36902526f232b2785a7ab70"
 SHA = "6e6d92f898dbe95000b53dbb252c7eb5d3deaa9a4b161e2b1934436a76b29364"
 
+# The real pinned FQBN used by scripts/build.sh and scripts/flash_app_only.sh.
+# Kept verbatim so these tests exercise the actual string, not a stand-in.
+CANONICAL_FQBN = (
+    "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,"
+    "CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,"
+    "DebugLevel=none,PSRAM=opi"
+)
+
 
 def manifest(**overrides):
     base = {
@@ -57,7 +66,7 @@ def manifest(**overrides):
         "BUILD_ID": "34afbc7808e2",
         "SOURCE_STATE": "CLEAN",
         "HARDWARE_PROFILE": "USB_ONLY",
-        "FQBN": "esp32:esp32:esp32s3:PartitionScheme=app3M_fat9M_16MB",
+        "FQBN": CANONICAL_FQBN,
         "APPLICATION_BINARY": "MATDOG_Controller.ino.bin",
         "APPLICATION_SIZE": "387164",
         "APPLICATION_SHA256": SHA,
@@ -66,11 +75,13 @@ def manifest(**overrides):
     return base
 
 
-def verify(m=None, *, head=HEAD, tree_state="CLEAN", binary_exists=True,
-           binary_size=387164, binary_sha256=SHA, requested_profile="USB_ONLY"):
+def verify(m=None, *, head=HEAD, expected_fqbn=CANONICAL_FQBN, tree_state="CLEAN",
+           binary_exists=True, binary_size=387164, binary_sha256=SHA,
+           requested_profile="USB_ONLY"):
     return verify_manifest(
         manifest() if m is None else m,
         head_commit=head,
+        expected_fqbn=expected_fqbn,
         tree_state=tree_state,
         binary_exists=binary_exists,
         binary_size=binary_size,
@@ -170,6 +181,105 @@ class TestBinaryBinding(unittest.TestCase):
         self.assertEqual(v.reason, Refusal.BINARY_SHA256_MISMATCH)
 
 
+class TestFqbnBinding(unittest.TestCase):
+    """The manifest recorded FQBN from the start, but nothing compared it.
+    The right source compiled with the wrong toolchain configuration is
+    still the wrong artifact: the FQBN carries the partition scheme, flash
+    size/mode, PSRAM mode, USB/CDC mode and CPU frequency."""
+
+    def test_canonical_fqbn_passes(self):
+        v = verify(expected_fqbn=CANONICAL_FQBN)
+        self.assertTrue(v.ok, v.detail)
+
+    def test_different_fqbn_refuses(self):
+        v = verify(expected_fqbn="esp32:esp32:esp32s3:FlashSize=8M")
+        self.assertFalse(v.ok)
+        self.assertEqual(v.reason, Refusal.FQBN_MISMATCH)
+
+    def test_refusal_detail_names_both_values(self):
+        other = "esp32:esp32:esp32s3:FlashSize=8M"
+        v = verify(expected_fqbn=other)
+        self.assertIn(other, v.detail)
+        self.assertIn(CANONICAL_FQBN, v.detail)
+
+    def test_single_option_difference_refuses(self):
+        # The realistic failure: one option drifts. A partition-scheme
+        # change silently relocates the application partition.
+        for wrong in (
+                CANONICAL_FQBN.replace("PartitionScheme=app3M_fat9M_16MB",
+                                       "PartitionScheme=default"),
+                CANONICAL_FQBN.replace("FlashSize=16M", "FlashSize=8M"),
+                CANONICAL_FQBN.replace("PSRAM=opi", "PSRAM=disabled"),
+                CANONICAL_FQBN.replace("CPUFreq=240", "CPUFreq=160"),
+                CANONICAL_FQBN.replace("FlashMode=qio", "FlashMode=dio"),
+                CANONICAL_FQBN.replace("CDCOnBoot=cdc", "CDCOnBoot=default")):
+            v = verify(expected_fqbn=wrong)
+            self.assertFalse(v.ok, wrong)
+            self.assertEqual(v.reason, Refusal.FQBN_MISMATCH, wrong)
+
+    def test_comparison_is_exact_not_substring(self):
+        # A prefix, a suffix and a reordering must all refuse: this is an
+        # exact equality check, never a pattern match.
+        for wrong in (CANONICAL_FQBN[:-4],
+                      CANONICAL_FQBN + ",ExtraOption=1",
+                      "esp32:esp32:esp32s3",
+                      CANONICAL_FQBN.upper()):
+            v = verify(expected_fqbn=wrong)
+            self.assertFalse(v.ok, wrong)
+            self.assertEqual(v.reason, Refusal.FQBN_MISMATCH, wrong)
+
+    def test_modified_manifest_fqbn_with_identical_everything_else_refuses(self):
+        # Same commit, same profile, same binary size and digest — only the
+        # manifest's recorded FQBN was altered.
+        v = verify(manifest(FQBN="esp32:esp32:esp32s3:PartitionScheme=default"))
+        self.assertFalse(v.ok)
+        self.assertEqual(v.reason, Refusal.FQBN_MISMATCH)
+
+    def test_empty_fqbn_is_incomplete_not_fqbn_mismatch(self):
+        # An empty field is a broken manifest, reported as such upstream of
+        # the comparison.
+        v = verify(manifest(FQBN=""))
+        self.assertFalse(v.ok)
+        self.assertEqual(v.reason, Refusal.MANIFEST_INCOMPLETE)
+
+    def test_missing_fqbn_key_is_incomplete(self):
+        m = manifest()
+        del m["FQBN"]
+        v = verify(m)
+        self.assertFalse(v.ok)
+        self.assertEqual(v.reason, Refusal.MANIFEST_INCOMPLETE)
+
+    def test_fqbn_checked_before_tree_state_and_binary(self):
+        # Ordering: a wrong build configuration is reported as such even
+        # when later checks would also fail, so the operator sees the most
+        # upstream cause.
+        v = verify(expected_fqbn="esp32:esp32:esp32s3:FlashSize=8M",
+                   tree_state="DIRTY", binary_sha256="0" * 64)
+        self.assertEqual(v.reason, Refusal.FQBN_MISMATCH)
+
+    def test_commit_mismatch_still_outranks_fqbn(self):
+        v = verify(manifest(SOURCE_COMMIT=OTHER_COMMIT),
+                   expected_fqbn="esp32:esp32:esp32s3:FlashSize=8M")
+        self.assertEqual(v.reason, Refusal.SOURCE_COMMIT_MISMATCH)
+
+    def test_both_profiles_pass_with_canonical_fqbn(self):
+        # A valid artifact of either profile, under its own authorization,
+        # passes once the FQBN matches.
+        for profile in KNOWN_PROFILES:
+            v = verify(manifest(HARDWARE_PROFILE=profile),
+                       requested_profile=profile, expected_fqbn=CANONICAL_FQBN)
+            self.assertTrue(v.ok, f"{profile}: {v.detail}")
+            self.assertEqual(v.profile, profile)
+
+    def test_both_profiles_refuse_with_wrong_fqbn(self):
+        for profile in KNOWN_PROFILES:
+            v = verify(manifest(HARDWARE_PROFILE=profile),
+                       requested_profile=profile,
+                       expected_fqbn="esp32:esp32:esp32s3:FlashSize=8M")
+            self.assertFalse(v.ok, profile)
+            self.assertEqual(v.reason, Refusal.FQBN_MISMATCH, profile)
+
+
 class TestSourceBinding(unittest.TestCase):
     def test_commit_mismatch_refuses(self):
         v = verify(manifest(SOURCE_COMMIT=OTHER_COMMIT))
@@ -201,9 +311,10 @@ class TestSourceBinding(unittest.TestCase):
 
 class TestManifestIntegrity(unittest.TestCase):
     def test_missing_manifest_refuses(self):
-        v = verify_manifest(None, head_commit=HEAD, tree_state="CLEAN",
-                            binary_exists=True, binary_size=387164,
-                            binary_sha256=SHA, requested_profile="USB_ONLY")
+        v = verify_manifest(None, head_commit=HEAD, expected_fqbn=CANONICAL_FQBN,
+                            tree_state="CLEAN", binary_exists=True,
+                            binary_size=387164, binary_sha256=SHA,
+                            requested_profile="USB_ONLY")
         self.assertFalse(v.ok)
         self.assertEqual(v.reason, Refusal.MANIFEST_MISSING)
 
@@ -241,7 +352,7 @@ class TestManifestIntegrity(unittest.TestCase):
     def test_render_then_parse_roundtrip(self):
         text = render_manifest(
             source_commit=HEAD, build_id="34afbc7808e2", source_state="CLEAN",
-            profile="ROBOT_POWERED", fqbn="esp32:esp32:esp32s3:FlashSize=16M",
+            profile="ROBOT_POWERED", fqbn=CANONICAL_FQBN,
             application_binary="MATDOG_Controller.ino.bin",
             application_size=387632, application_sha256=SHA)
         m = parse_manifest(text)
@@ -250,9 +361,10 @@ class TestManifestIntegrity(unittest.TestCase):
         self.assertEqual(m["SOURCE_COMMIT"], HEAD)
         # Every key the verifier requires must be produced by the writer —
         # otherwise a freshly built tree would refuse its own manifest.
-        v = verify_manifest(m, head_commit=HEAD, tree_state="CLEAN",
-                            binary_exists=True, binary_size=387632,
-                            binary_sha256=SHA, requested_profile="ROBOT_POWERED")
+        v = verify_manifest(m, head_commit=HEAD, expected_fqbn=CANONICAL_FQBN,
+                            tree_state="CLEAN", binary_exists=True,
+                            binary_size=387632, binary_sha256=SHA,
+                            requested_profile="ROBOT_POWERED")
         self.assertTrue(v.ok, v.detail)
 
 
@@ -269,20 +381,22 @@ class TestCliEndToEnd(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             return fn(*args, **kwargs)
 
-    def _build(self, tmp, profile, content=b"firmware-bytes"):
+    def _build(self, tmp, profile, content=b"firmware-bytes", fqbn=CANONICAL_FQBN):
         binary = Path(tmp) / "MATDOG_Controller.ino.bin"
         binary.write_bytes(content)
         out = Path(tmp) / "matdog_build_manifest.txt"
         rc = self._quiet(main, ["write", "--output", str(out), "--binary", str(binary),
                                  "--source-commit", HEAD, "--build-id", "34afbc7808e2",
                                  "--source-state", "CLEAN", "--profile", profile,
-                                 "--fqbn", "esp32:esp32:esp32s3:FlashSize=16M"])
+                                 "--fqbn", fqbn])
         self.assertEqual(rc, 0)
         return binary, out
 
-    def _verify(self, binary, out, requested, head=HEAD, tree="CLEAN"):
+    def _verify(self, binary, out, requested, head=HEAD, tree="CLEAN",
+                expected_fqbn=CANONICAL_FQBN):
         return self._quiet(main, ["verify", "--manifest", str(out), "--binary", str(binary),
-                                  "--head", head, "--tree-state", tree,
+                                  "--head", head, "--expected-fqbn", expected_fqbn,
+                                  "--tree-state", tree,
                                   "--requested-profile", requested])
 
     def test_write_then_verify_usb_only(self):
@@ -326,7 +440,7 @@ class TestCliEndToEnd(unittest.TestCase):
             rc = self._quiet(main, ["write", "--output", str(Path(tmp) / "m.txt"),
                                     "--binary", str(binary), "--source-commit", HEAD,
                                     "--build-id", "x", "--source-state", "CLEAN",
-                                    "--profile", "SOMETHING_ELSE", "--fqbn", "f"])
+                                    "--profile", "SOMETHING_ELSE", "--fqbn", CANONICAL_FQBN])
             self.assertEqual(rc, 1)
 
     def test_write_refuses_missing_binary(self):
@@ -335,8 +449,30 @@ class TestCliEndToEnd(unittest.TestCase):
                                     "--binary", str(Path(tmp) / "nope.bin"),
                                     "--source-commit", HEAD, "--build-id", "x",
                                     "--source-state", "CLEAN", "--profile", "USB_ONLY",
-                                    "--fqbn", "f"])
+                                    "--fqbn", CANONICAL_FQBN])
             self.assertEqual(rc, 1)
+
+    def test_fqbn_mismatch_via_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            binary, out = self._build(tmp, "USB_ONLY")
+            self.assertEqual(self._verify(binary, out, "USB_ONLY"), 0)
+            self.assertEqual(
+                self._verify(binary, out, "USB_ONLY",
+                             expected_fqbn="esp32:esp32:esp32s3:FlashSize=8M"), 1)
+
+    def test_artifact_built_with_wrong_fqbn_refuses_via_cli(self):
+        # End to end: a build genuinely recorded under a different FQBN,
+        # verified against the flasher's pinned one.
+        with tempfile.TemporaryDirectory() as tmp:
+            binary, out = self._build(tmp, "USB_ONLY",
+                                      fqbn="esp32:esp32:esp32s3:PartitionScheme=default")
+            self.assertEqual(self._verify(binary, out, "USB_ONLY"), 1)
+
+    def test_both_profiles_end_to_end_with_canonical_fqbn(self):
+        for profile in KNOWN_PROFILES:
+            with tempfile.TemporaryDirectory() as tmp:
+                binary, out = self._build(tmp, profile)
+                self.assertEqual(self._verify(binary, out, profile), 0, profile)
 
     def test_commit_mismatch_via_cli(self):
         with tempfile.TemporaryDirectory() as tmp:

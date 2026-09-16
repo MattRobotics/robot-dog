@@ -102,18 +102,21 @@ fi
 APPLICATION_SHA256="$(sha256sum "$APPLICATION_BINARY" | cut -d' ' -f1)"
 APPLICATION_SIZE="$(stat -c%s "$APPLICATION_BINARY")"
 
-# --- Gate: build manifest proves WHICH hardware profile this binary is ----
+# --- Gate: build manifest proves WHAT this binary actually is -------------
 # Verifies, fail-closed: manifest exists and parses; its schema version is
-# known; its source commit == HEAD; the tree was clean at build time and is
-# clean now; the binary exists and its size AND sha256 equal the recorded
-# ones; the manifest profile is recognized; and it equals the profile the
-# operator asked to flash. Any failure REFUSES — see
+# known; its source commit == HEAD; its FQBN == this script's own pinned
+# $FQBN (the right source built with the wrong partition scheme / flash
+# size / PSRAM mode is still the wrong artifact); the tree was clean at
+# build time and is clean now; the binary exists and its size AND sha256
+# equal the recorded ones; the manifest profile is recognized; and it
+# equals the profile the operator asked to flash. Any failure REFUSES — see
 # scripts/build_manifest.py and scripts/tests/test_build_manifest.py.
 TREE_STATE="CLEAN"  # proven by the working-tree gate above
 MANIFEST_INFO="$(python3 "$SCRIPT_DIR/build_manifest.py" verify \
   --manifest "$BUILD_MANIFEST" \
   --binary "$APPLICATION_BINARY" \
   --head "$SOURCE_COMMIT" \
+  --expected-fqbn "$FQBN" \
   --tree-state "$TREE_STATE" \
   --requested-profile "$REQUESTED_FLASH_PROFILE")" || \
   refuse "build manifest verification failed (see REFUSED=... above) — the binary in \
@@ -123,6 +126,8 @@ Rebuild with the intended profile: MATDOG_PROFILE=$REQUESTED_FLASH_PROFILE scrip
 VERIFIED_HARDWARE_PROFILE="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_HARDWARE_PROFILE=' | cut -d= -f2-)"
 [ -n "$VERIFIED_HARDWARE_PROFILE" ] || \
   refuse "manifest verification produced no VERIFIED_HARDWARE_PROFILE"
+VERIFIED_FQBN="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_FQBN=' | cut -d= -f2-)"
+[ -n "$VERIFIED_FQBN" ] || refuse "manifest verification produced no VERIFIED_FQBN"
 
 # --- Gate: backup exists, correct size and hash ----------------------------
 [ -f "$BACKUP" ] || refuse "full-flash backup not found: $BACKUP"
@@ -176,7 +181,7 @@ echo "APPLICATION_SHA256    = $APPLICATION_SHA256"
 echo "APPLICATION_OFFSET    = $APPLICATION_OFFSET (partition '$ACTIVE_PARTITION_LABEL')"
 echo "APPLICATION_SIZE      = $APPLICATION_SIZE"
 echo "MAX_PARTITION_SIZE    = $MAX_PARTITION_SIZE"
-echo "FQBN                  = $FQBN"
+echo "FQBN                  = $FQBN (verified against the build manifest)"
 echo "SOURCE_COMMIT         = $SOURCE_COMMIT"
 echo "BUILD_MANIFEST        = $BUILD_MANIFEST"
 echo

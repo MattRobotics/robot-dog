@@ -1826,3 +1826,124 @@ census/scan at boot, no startup motion.
 G2 SOFTWARE/OFFLINE = PASS
 G3 ROBOT_POWERED LIVE = NOT EXECUTED / TO_TEST
 ```
+
+---
+
+## G2 — PRE-G3 PROVENANCE CLOSURE — 2026-09-16
+
+Final pre-G3 closure amendment on top of the G2 gate and its hardening amendment above.
+Software/offline only.
+
+```text
+G2 SOFTWARE / OFFLINE SCOPE      = VALIDATED (revised gates re-run, all PASS)
+ROBOT_POWERED PROFILE            = IMPLEMENTED (compile-tested only)
+ROBOT_POWERED HARDWARE OPERATION = TO_TEST
+
+G3 ROBOT_POWERED LIVE = NOT EXECUTED / TO_TEST
+```
+
+No firmware was flashed. No external rail was energized. No hardware interaction of any
+kind occurred. The compiled-in default profile remains `USB_ONLY`, and the final build
+artifact and manifest were restored to `USB_ONLY`.
+
+### Finding A — the recorded build FQBN was never compared
+
+The build manifest recorded `FQBN` from the moment it was introduced, but the verifier
+never checked it. Binding the commit, profile and exact bytes still left the *toolchain
+configuration* unverified: the FQBN carries the partition scheme, flash size and mode,
+PSRAM mode, USB/CDC mode and CPU frequency. A binary of the correct commit and correct
+profile, built under a different partition scheme, would have passed every gate while
+targeting a different application-partition layout.
+
+Closed fail-closed:
+
+- `verify_manifest()` takes a **required** `expected_fqbn` keyword with no default and
+  refuses on exact inequality with the stable reason `FQBN_MISMATCH`. The refusal detail
+  names both the manifest value and the expected value.
+- The CLI requires `--expected-fqbn` (no default) and prints `VERIFIED_FQBN` on success.
+- `flash_app_only.sh` passes its own pinned `"$FQBN"`. The FQBN string itself is
+  unchanged; see the pinned value in
+  [the Controller README](README.md#build).
+
+A successful verification now positively proves that **all** of the following belong to
+the artifact being authorized:
+
+```text
+source commit + clean build state + clean current tree
++ application filename + exact binary size + exact binary SHA256
++ hardware profile + FQBN
+```
+
+Refusal matrix, exercised against the two REAL binaries built this session
+(`USB_ONLY` 387312 bytes `503735ca…`, `ROBOT_POWERED` 387776 bytes `6abbe734…`):
+
+| Artifact | Requested profile | Expected FQBN | Result |
+|---|---|---|---|
+| `USB_ONLY` | `USB_ONLY` | canonical | ALLOW |
+| `ROBOT_POWERED` | `ROBOT_POWERED` (explicit) | canonical | ALLOW |
+| `ROBOT_POWERED` | default, no authorization | canonical | REFUSE `PROFILE_MISMATCH` |
+| `USB_ONLY` | `USB_ONLY` | `PartitionScheme=default` | REFUSE `FQBN_MISMATCH` |
+| `USB_ONLY` | `USB_ONLY` | `FlashSize=8M` | REFUSE `FQBN_MISMATCH` |
+| `USB_ONLY` | `USB_ONLY` | `PSRAM=disabled` | REFUSE `FQBN_MISMATCH` |
+| `ROBOT_POWERED` | `ROBOT_POWERED` | `CPUFreq=160` | REFUSE `FQBN_MISMATCH` |
+| manifest FQBN tampered, binary/profile/commit identical | `USB_ONLY` | canonical | REFUSE `FQBN_MISMATCH` |
+| manifest FQBN empty | `USB_ONLY` | canonical | REFUSE `MANIFEST_INCOMPLETE` |
+| manifest FQBN key absent | `USB_ONLY` | canonical | REFUSE `MANIFEST_INCOMPLETE` |
+
+Additionally covered by the offline suite: per-option drift (`FlashMode`, `CDCOnBoot`),
+exact-not-substring comparison (prefix, suffix, case change, bare `esp32:esp32:esp32s3`),
+refusal ordering (`SOURCE_COMMIT_MISMATCH` outranks `FQBN_MISMATCH`; `FQBN_MISMATCH`
+outranks tree-state and binary checks), and both profiles passing under their own
+authorization with the canonical FQBN.
+
+**No pre-existing flash protection was weakened.** Backup size and digest, device MAC,
+verified application partition offset/size, partition-fit, rollback/anti-rollback state,
+the static-audit gate, the single application-partition write and the independent
+post-write `verify-flash` are all retained and still individually asserted by
+`static_audit.py`.
+
+### Finding B — Development Gates could be read as reordering the roadmap
+
+The HostLink gate's ENTRY condition read "Diagnostics/Maintenance foundation present",
+which could be read as authorizing HostLink immediately after Diagnostics — ahead of
+Service/Provisioning/QC, Full Leg Calibration integration and formal recalibration in the
+canonical sequence.
+
+Corrected in [`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md): HostLink ENTRY now requires
+all preceding [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md) stages through
+formal recalibration, plus the Diagnostics/Maintenance foundation as a technical
+prerequisite rather than an authorization. A new global rule states that a gate's
+technical prerequisites never override roadmap sequencing, and that reordering requires
+an explicit reviewed roadmap change. The roadmap sequence itself was not altered and no
+HostLink implementation was started.
+
+### Finding C — architecture document date
+
+`ARCHITECTURE.md` header corrected from 2026-09-15 to **2026-09-16**, the date of the
+approved permanent Embedded Web UI decision it now contains. No other architecture change.
+
+### Final offline acceptance — re-run after implementation
+
+| Gate | Result |
+|---|---|
+| Servo population / profile / availability host tests | **PASS** — 18 cases / 313 checks / 0 failures |
+| Build manifest provenance tests (incl. FQBN cases) | **PASS** — 51/51 |
+| Static safety audit | **PASS** — 29 source files, 0 findings |
+| Mutation check, new FQBN tripwires | **PASS** — 6/6 fire |
+| OTA partition logic suite | **PASS** — 40/40 |
+| Compile, `USB_ONLY` (pinned FQBN) | **PASS** — 387156 bytes flash, 28344 bytes RAM |
+| Compile-only check, `ROBOT_POWERED` | **PASS** — 387624 bytes flash, 28344 bytes RAM |
+| BNO085 viewer `npm run verify` | **PASS** — 59/59 tests, typecheck PASS, production build PASS |
+| `git diff --check` | clean |
+
+### Judgement
+
+```text
+G2 SOFTWARE/OFFLINE = FROZEN PASS
+FINAL DOCUMENTATION / ROADMAP GATE = PASS
+G3 ROBOT_POWERED LIVE = NOT EXECUTED / TO_TEST
+```
+
+`ROBOT_POWERED` remains **IMPLEMENTED**, never **VALIDATED**. Powered validation requires
+separate hardware authorization per
+[`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md).

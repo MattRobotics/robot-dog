@@ -71,6 +71,13 @@ weakening any pre-existing backup/MAC/partition/rollback/verify gate); and
 classify() collapsing DetectedState::UNKNOWN back into an observed absence,
 or a module faking a physical WS2812 detection to make a status green.
 
+Pre-G3 closure addition (review Finding A): the recorded build FQBN going
+unverified again. The manifest carried FQBN from the start but nothing
+compared it, leaving the partition scheme, flash size/mode, PSRAM mode,
+USB/CDC mode and CPU frequency unchecked at flash time. verify_manifest()
+must take an explicit expected_fqbn with no default, compare it for exact
+equality, and flash_app_only.sh must pass its own pinned "$FQBN".
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
@@ -794,6 +801,7 @@ def check_build_profile_provenance(sketch_dir):
     for token in ("KNOWN_PROFILES", "MANIFEST_VERSION", "verify_manifest",
                   "render_manifest", "parse_manifest",
                   "PROFILE_MISMATCH", "PROFILE_UNKNOWN", "MANIFEST_MISSING",
+                  "FQBN_MISMATCH",
                   "BINARY_SHA256_MISMATCH", "BINARY_SIZE_MISMATCH",
                   "SOURCE_COMMIT_MISMATCH", "TREE_NOT_CLEAN"):
         if token not in logic_text:
@@ -808,6 +816,23 @@ def check_build_profile_provenance(sketch_dir):
     if re.search(r'add_argument\("--requested-profile"[^)]*default=', logic_text):
         fail(f"{logic}: --requested-profile gained a default - flash_app_only.sh must "
              f"pass it explicitly")
+
+    # Build-configuration provenance: the recorded FQBN must be COMPARED,
+    # not merely recorded. The manifest carried FQBN from the start while
+    # nothing checked it, which left the partition scheme / flash size /
+    # PSRAM mode unverified at flash time.
+    if re.search(r"def verify_manifest\([^)]*expected_fqbn\s*=", logic_text, re.DOTALL):
+        fail(f"{logic}: verify_manifest() gained a default for expected_fqbn - the "
+             f"caller must always state the FQBN it expects")
+    if "expected_fqbn" not in logic_text:
+        fail(f"{logic}: verify_manifest() no longer takes expected_fqbn - the recorded "
+             f"FQBN would be unverified again")
+    if re.search(r'add_argument\("--expected-fqbn"[^)]*default=', logic_text):
+        fail(f"{logic}: --expected-fqbn gained a default - flash_app_only.sh must pass "
+             f"its own pinned FQBN explicitly")
+    if not re.search(r'manifest\["FQBN"\]\s*!=\s*expected_fqbn', logic_text):
+        fail(f"{logic}: the FQBN equality comparison against expected_fqbn is missing - "
+             f"recording the FQBN without comparing it proves nothing")
 
     if not build_sh.exists():
         fail(f"{build_sh}: build script not found")
@@ -832,6 +857,9 @@ def check_build_profile_provenance(sketch_dir):
              f"unknown hardware profile could be written to the device")
     if "--requested-profile" not in flash_text:
         fail(f"{flash_sh}: does not pass --requested-profile to the manifest verifier")
+    if not re.search(r'--expected-fqbn\s+"\$FQBN"', flash_text):
+        fail(f"{flash_sh}: does not pass --expected-fqbn \"$FQBN\" to the manifest "
+             f"verifier - the recorded build FQBN would go unverified")
     # The parameter expansion, not just the name in prose: the operator
     # authorization input must actually be readable from the environment.
     if "MATDOG_FLASH_PROFILE:-" not in flash_text:

@@ -1,6 +1,6 @@
 # MATDOG Architecture
 
-**Canonical architecture decisions as of 2026-09-15.**
+**Canonical architecture decisions as of 2026-09-16.**
 
 This document owns system contracts and target direction. It does not own the changing physical
 population or next milestone; those live in the [root project snapshot](../../README.md). The

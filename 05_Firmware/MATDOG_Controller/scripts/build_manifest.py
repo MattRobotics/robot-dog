@@ -40,8 +40,9 @@ FAIL-CLOSED CONTRACT
 positively prove. It never has a permissive default, never infers a profile
 and never treats "absent" as "fine". The only path to OK is: manifest
 present and parseable, its schema version known, its commit equal to HEAD,
-tree clean, binary present, binary size AND sha256 equal to the recorded
-ones, manifest profile recognized, and the requested profile equal to the
+its FQBN equal to the caller's pinned FQBN, tree clean at build time and
+now, binary present, binary size AND sha256 equal to the recorded ones,
+manifest profile recognized, and the requested profile equal to the
 manifest profile.
 
 Usage:
@@ -49,7 +50,7 @@ Usage:
                              --build-id ID --source-state CLEAN|DIRTY|NO_GIT \\
                              --profile USB_ONLY|ROBOT_POWERED --fqbn FQBN
     build_manifest.py verify --manifest P --binary P --head SHA \\
-                             --tree-state CLEAN|DIRTY \\
+                             --expected-fqbn FQBN --tree-state CLEAN|DIRTY \\
                              --requested-profile USB_ONLY|ROBOT_POWERED
 
 Exit code 0 = OK, 1 = REFUSE (reason printed as REFUSED=<CODE>).
@@ -96,6 +97,7 @@ class Refusal:
     MANIFEST_INCOMPLETE = "MANIFEST_INCOMPLETE"
     MANIFEST_VERSION_UNKNOWN = "MANIFEST_VERSION_UNKNOWN"
     SOURCE_COMMIT_MISMATCH = "SOURCE_COMMIT_MISMATCH"
+    FQBN_MISMATCH = "FQBN_MISMATCH"
     TREE_NOT_CLEAN = "TREE_NOT_CLEAN"
     BINARY_MISSING = "BINARY_MISSING"
     BINARY_SIZE_MISMATCH = "BINARY_SIZE_MISMATCH"
@@ -168,14 +170,27 @@ def parse_manifest(text):
     return result
 
 
-def verify_manifest(manifest, *, head_commit, tree_state, binary_exists,
-                    binary_size, binary_sha256, requested_profile):
+def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
+                    binary_exists, binary_size, binary_sha256, requested_profile):
     """The fail-closed gate. Pure: every observation is passed in.
 
     `manifest` is a parsed dict (or None when the file was missing).
     Order of checks is deliberate: cheapest/most fundamental first, so the
     reported refusal names the most upstream problem rather than a
-    downstream symptom of it.
+    downstream symptom of it — manifest integrity, then build identity
+    (commit + FQBN), then tree state, then the binary's exact bytes, then
+    profile authorization.
+
+    A successful verdict positively proves that ALL of the following belong
+    to the artifact being authorized: source commit, clean build state,
+    clean current tree, application filename, exact binary size, exact
+    binary SHA256, hardware profile, and FQBN. Nothing is assumed and
+    nothing is inferred from one field to another.
+
+    `expected_fqbn` is deliberately a required keyword argument with no
+    default: the caller (flash_app_only.sh) pins its own FQBN and must
+    state it. A default here would let a caller that forgot the argument
+    silently skip a build-configuration check.
     """
     if manifest is None:
         return Verdict(False, Refusal.MANIFEST_MISSING,
@@ -195,6 +210,18 @@ def verify_manifest(manifest, *, head_commit, tree_state, binary_exists,
         return Verdict(False, Refusal.SOURCE_COMMIT_MISMATCH,
                        detail=f"manifest built from {manifest['SOURCE_COMMIT']}, "
                               f"HEAD is {head_commit}")
+
+    # The right source compiled with the wrong toolchain configuration is
+    # still the wrong artifact: the FQBN carries the partition scheme, flash
+    # size/mode, PSRAM mode, USB/CDC mode and CPU frequency. An image built
+    # under a different partition scheme can be a valid binary of the right
+    # commit and still be wrong for this device's flash layout. Compared in
+    # full, exactly — never pattern-matched, never merely checked for
+    # presence.
+    if manifest["FQBN"] != expected_fqbn:
+        return Verdict(False, Refusal.FQBN_MISMATCH,
+                       detail=f"manifest FQBN {manifest['FQBN']!r} != expected "
+                              f"{expected_fqbn!r}")
 
     # Both the recorded build state and the live tree must be clean. The
     # manifest's own SOURCE_STATE catches "built dirty, then committed",
@@ -297,6 +324,7 @@ def _cmd_verify(args):
     verdict = verify_manifest(
         manifest,
         head_commit=args.head,
+        expected_fqbn=args.expected_fqbn,
         tree_state=args.tree_state,
         binary_exists=binary_exists,
         binary_size=binary.stat().st_size if binary_exists else 0,
@@ -311,6 +339,7 @@ def _cmd_verify(args):
 
     print(f"VERIFIED_HARDWARE_PROFILE={verdict.profile}")
     print(f"VERIFIED_SOURCE_COMMIT={manifest['SOURCE_COMMIT']}")
+    print(f"VERIFIED_FQBN={manifest['FQBN']}")
     print(f"VERIFIED_APPLICATION_SHA256={manifest['APPLICATION_SHA256']}")
     print(f"VERIFIED_APPLICATION_SIZE={manifest['APPLICATION_SIZE']}")
     return 0
@@ -340,6 +369,10 @@ def main(argv=None):
     # states it explicitly. A default in this module would mean a caller
     # that forgot to pass the flag silently got a permissive answer.
     v.add_argument("--requested-profile", required=True)
+    # Also required with no default, for the same reason: flash_app_only.sh
+    # pins the FQBN and must state it, so a caller that forgets cannot
+    # silently skip the build-configuration check.
+    v.add_argument("--expected-fqbn", required=True)
     v.set_defaults(func=_cmd_verify)
 
     args = parser.parse_args(argv)

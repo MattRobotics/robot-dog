@@ -1,5 +1,54 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — pre-G3 provenance closure — 2026-09-16
+
+Final pre-G3 closure amendment. **No hardware was flashed, no rail energized, G3 not
+executed.** The compiled-in default profile remains `USB_ONLY`.
+
+**Finding A — the recorded build FQBN went unverified.**
+The build manifest has recorded `FQBN` since it was introduced, but `build_manifest.py
+verify` never compared it against the FQBN `flash_app_only.sh` pins. The right source
+compiled with the wrong toolchain configuration is still the wrong artifact: the FQBN
+carries the partition scheme, flash size/mode, PSRAM mode, USB/CDC mode and CPU
+frequency, and a partition-scheme change silently relocates the application partition.
+
+- `scripts/build_manifest.py`: `verify_manifest()` now takes a required `expected_fqbn`
+  keyword (no default) and refuses on exact inequality with the new stable reason
+  `FQBN_MISMATCH`, whose detail names both the manifest value and the expected value.
+  The CLI gains a required `--expected-fqbn` and reports `VERIFIED_FQBN` on success.
+- `scripts/flash_app_only.sh`: passes its own pinned `"$FQBN"` into the verifier and
+  surfaces the verified value in the pre-write report. The FQBN itself is unchanged.
+- A successful verification now positively proves source commit + clean build state +
+  clean current tree + application filename + exact binary size + exact binary SHA256 +
+  hardware profile + FQBN all belong to the artifact being authorized.
+- No existing flash protection was weakened: backup size/digest, device MAC,
+  partition/otadata verification, rollback/anti-rollback, static audit, single
+  application-partition write and post-write `verify-flash` are all retained.
+- `scripts/tests/test_build_manifest.py`: 36 → **51 tests**, adding canonical-FQBN PASS,
+  differing-FQBN `FQBN_MISMATCH`, per-option drift (partition scheme, flash size, PSRAM,
+  CPU frequency, flash mode, CDC mode), exact-not-substring comparison, empty/missing
+  FQBN falling to `MANIFEST_INCOMPLETE`, refusal ordering, and both profiles passing
+  under their own authorization with the canonical FQBN.
+- `scripts/static_audit.py`: new tripwires for a deleted FQBN comparison, a permissive
+  `expected_fqbn` default, a defaulted `--expected-fqbn`, a removed `FQBN_MISMATCH`
+  reason, and `flash_app_only.sh` no longer passing its pinned `"$FQBN"`. All six
+  mutation-tested.
+
+**Finding B — Development Gates could be read as reordering the roadmap.**
+The HostLink gate's ENTRY read "Diagnostics/Maintenance foundation present", which could
+be taken as authorizing HostLink immediately after Diagnostics, ahead of Service/
+Provisioning/QC, calibration integration and formal recalibration.
+
+- [`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md): HostLink ENTRY now requires all
+  preceding roadmap stages through formal recalibration, and a new global rule 6 states
+  that a gate's technical prerequisites never override
+  [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md) sequencing — reordering
+  requires an explicit reviewed roadmap change. The roadmap sequence itself is unchanged
+  and no HostLink implementation was started.
+
+**Finding C** — `ARCHITECTURE.md` header date corrected to 2026-09-16, the date of the
+approved Embedded Web UI decision it now contains.
+
 ## Unreleased — G2 pre-G3 hardening amendment — 2026-09-16
 
 Resolves two issues raised by an independent review of commit `34afbc7`. Both are

@@ -22,6 +22,11 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 3. A failed prerequisite is never bypassed to finish a session. Stop, preserve evidence, report.
 4. `SAFE_OFF` must remain reachable in every mode, at every gate, forever.
 5. No gate may weaken a protection established by an earlier gate.
+6. **A gate's technical prerequisites do not override
+   [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md) sequencing.** Satisfying a gate's ENTRY
+   conditions early means the gate is technically *ready*, not that it is *authorized*. A stage may
+   only begin when the roadmap sequence has reached it. Reordering requires an explicit, reviewed
+   change to the roadmap itself — never a local reading of one gate's entry list.
 
 **Status values:** `PASS` · `CURRENT` · `TO_TEST` · `TO_DESIGN` · `BLOCKED` · `PARTIAL`.
 
@@ -159,7 +164,11 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 ## HostLink semantic layer
 
 - **PURPOSE** — one semantic command/service contract independent of transport.
-- **ENTRY** — Diagnostics/Maintenance foundation present.
+- **ENTRY** — all preceding [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md) stages through
+  **formal recalibration** completed, plus the Diagnostics/Maintenance foundation required by the
+  semantic service layer. The Diagnostics/Maintenance foundation alone is a technical prerequisite,
+  **not** an authorization: HostLink follows Service/Provisioning/QC and Full Leg Calibration in
+  the canonical sequence and must not be pulled forward ahead of them (see rule 6 above).
 - **ALLOWED** — transport adapters over one Controller service implementation; structured state and
   telemetry snapshots.
 - **FORBIDDEN** — duplicate command semantics per transport; transport owning hardware; any
