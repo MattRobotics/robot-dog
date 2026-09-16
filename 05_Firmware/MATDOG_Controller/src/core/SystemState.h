@@ -1,7 +1,7 @@
 #ifndef MATDOG_CORE_SYSTEM_STATE_H
 #define MATDOG_CORE_SYSTEM_STATE_H
 
-#include <Arduino.h>
+#include <stdint.h>
 
 namespace matdog {
 namespace core {

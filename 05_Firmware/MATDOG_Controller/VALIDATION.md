@@ -1485,3 +1485,176 @@ forbidden hardware action occurred this session (battery, servo power, LED
 5V rail and DALY remained absent/off throughout; only read-only diagnostics
 and the pre-approved `EnableTorque(id, 0)` SAFE_OFF write were exercised).
 Merge decision and execution remain with the operator.
+
+---
+
+## G2 — ROBOT_POWERED CONFIGURATION SUPPORT — 2026-09-16
+
+Software-preparation gate. This section records an **offline/software** result only.
+
+```text
+G2 SOFTWARE / OFFLINE SCOPE     = VALIDATED
+ROBOT_POWERED PROFILE           = IMPLEMENTED (compile-tested only)
+ROBOT_POWERED HARDWARE OPERATION = TO_TEST
+
+G3 NOT EXECUTED
+```
+
+Nothing in this session validates ROBOT_POWERED hardware operation. No external robot
+rail was energized at any point and no firmware was flashed. The powered no-motion
+validation is gate G3, designed during G2 in
+[`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md) and
+authorized separately.
+
+### Provenance and entry state
+
+| Item | Value |
+|---|---|
+| Development branch | `feat/controller-robot-powered-v02` |
+| Accepted starting base | `1a8c5bc3ced4f49ea36902526f232b2785a7ab70` |
+| `main` / `origin/main` at entry | `1a8c5bc3ced4f49ea36902526f232b2785a7ab70` (unmoved) |
+| Immutable V0.1 tag | `matdog-controller-v0.1.0` → `c54862f38a9cbd5e46d6b1770a6d109cc99b5c02` (unchanged) |
+
+Prior gates, accepted as facts and **not rerun** this session:
+
+```text
+G0 POST-CLEANUP ENTRY AUDIT   = PASS (not rerun)
+G1 V0.1 REGRESSION FREEZE     = PASS (not rerun)
+V2 ARCHITECTURE DELTA AUDIT   = PASS
+```
+
+### VALIDATED — G2 software/offline scope
+
+Hardware-profile architecture:
+
+- `src/config/HardwareProfile.h` added as the single profile authority: one enum
+  (`USB_ONLY` / `ROBOT_POWERED`) and one `expectationsFor()` mapping table.
+- `BuildConfig.h` now **derives** `kServoPowerAvailable`, `kBatteryAvailable`,
+  `kLedRailPowered` and `kTestProfile` from the selected profile. V0.1 stated the same
+  configuration four times over as independently editable values; a profile name
+  contradicting its own rail facts is no longer expressible.
+- Module `ExpectedState` derives from one shared rule
+  (`core::expectedStateForServoBus`/`Battery`/`LedRail`) instead of a ternary repeated
+  per module. `core::classify()` itself is unchanged.
+- **The source default remains `USB_ONLY`**, and `static_audit.py` fails the build if it
+  is anything else — this is the G3 authorization gate. A powered build requires an
+  explicit, announced override (`MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh`).
+
+Servo population model (`src/servo/ServoPopulation.h/.cpp`):
+
+```text
+canonical allocated                 = 17
+expected in current configuration   = 13
+absent by design                    = 52 NECK_PITCH, 53 HEAD_ROTATION,
+                                      54 HEAD_PITCH, 55 JAW
+```
+
+Healthy census semantics for the current robot:
+
+```text
+present_expected = 13
+absent_by_design = 4
+missing_expected = 0
+unexpected_id    = 0
+verdict          = PASS
+```
+
+The three populations (canonical allocation / expected current configuration / live
+observed) are kept explicitly distinct. "17 responders = PASS" is false for this robot
+and is not encoded anywhere; the static audit fails the build if such a threshold
+reappears. Classification is fail-closed: a scan not covering every canonical ID, or a
+truncated responder list, can never report `PASS`.
+
+Transport independence:
+
+- `ServoPopulation` and `ServoCensus` contain no `Serial` and no `<Arduino.h>`
+  (audit-enforced). `ServoCensus` is a Controller-owned service holding a structured,
+  fixed-size `CensusResult`; `CommandRouter` only formats it.
+- No G2 domain logic exists solely inside Serial parsing or Serial printing. A future
+  transport adapter can consume the same `CensusResult` without re-scanning the bus or
+  reimplementing the classification.
+
+Offline results (all run on the final G2 source):
+
+| Gate | Result |
+|---|---|
+| New host census/profile tests | **PASS** — 14 cases / 274 checks / 0 failures |
+| Static safety audit | **PASS** — 29 source files, 0 findings |
+| OTA partition logic suite | **PASS** — 40/40 |
+| BNO085 viewer `npm run verify` | **PASS** — 59/59 tests, typecheck PASS, production build PASS |
+| Compile, `USB_ONLY` (pinned FQBN) | **PASS** — 387164 bytes flash, 28344 bytes RAM |
+| Compile-only check, `ROBOT_POWERED` | **PASS** — 387632 bytes flash, 28344 bytes RAM |
+
+The host suite links the real firmware translation units (`ServoPopulation.cpp`,
+`Availability.cpp`) rather than a host-side copy, and exercises **both** profiles in one
+run — which is what demonstrates the `USB_ONLY` expected-hardware semantics did not
+regress while `ROBOT_POWERED` was added. Every new static-audit tripwire was
+mutation-tested and confirmed to fire.
+
+The `ROBOT_POWERED` compile check produced a temporary artifact only. **The default
+build artifact was restored to `USB_ONLY` afterwards** and the exported binary was
+re-checked to contain the `USB_ONLY` profile string and no `ROBOT_POWERED` string.
+
+### Not implemented in this gate
+
+No Web UI, Wi-Fi, HTTP/WebSocket/REST or OTA transport was added. No ActuatorAuthority
+framework, Safe Actuator layer, motion, IK, gait, pose, teleoperation or command
+lease/deadman was added. No provisioning, QC, source-signature or calibration
+integration was added. Awareness of the V2 target architecture shaped the interfaces;
+it did not turn this gate into a refactor.
+
+### TO_TEST — G3 ROBOT_POWERED live hardware validation
+
+Not performed. `ROBOT_POWERED` is **IMPLEMENTED**, not **VALIDATED**: offline tests and
+a clean compile only. Specifically **not** done this session:
+
+- no firmware flash of any kind;
+- no external robot power enabled;
+- no servo power;
+- no DALY powered validation;
+- no powered LED validation;
+- no powered census;
+- no hardware SAFE_OFF campaign;
+- no motion.
+
+The ESP32-S3 was connected over USB throughout and the full-flash recovery backup was
+verified locally against its known size and digest
+(`16777216` bytes, SHA256 `5cbba0b9c5500d0c95247b9b7e7173a29f934b8b13f6800cc9f583374d67fd32`),
+but the optional `USB_ONLY` on-device regression was **deliberately not performed**: it
+added no material evidence (the derived `USB_ONLY` values are provably identical to
+V0.1, and a census over an unpowered bus can only report all-missing), and the
+application-only flash workflow correctly refused a dirty working tree. That refusal was
+respected, not bypassed.
+
+Under `USB_ONLY` a `SAFE_OFF` can only ever return `UNVERIFIED_NO_RESPONSE`; G3 P5 is
+the first opportunity to observe `VERIFIED_OFF` on real powered hardware.
+
+### Safety invariants preserved
+
+- [x] no Torque ON
+- [x] no `GoalPosition` / motion primitive
+- [x] no servo EEPROM / ID / `CalibrationOfs` / factory-reset / broadcast write
+- [x] no DALY write
+- [x] no BNO085 DCD write
+- [x] `SAFE_OFF` independent `TorqueEnable` readback semantics unchanged, and it remains
+      reachable in every operating mode
+- [x] `kDiagnosticTimeoutMs` (20ms) / `kOperationalTimeoutMs` (100ms) split unchanged
+- [x] one `ServoBus` owner — no second `HardwareSerial`, no second `SMS_STS`, no
+      duplicate UART setup
+- [x] no automatic census/scan at boot (now reported as `startup_servo_scan : DISABLED`
+      and enforced by the static audit against `Controller::begin()`)
+- [x] no startup motion, no startup torque
+- [x] pin map unchanged; frozen ST3215 tools and `matdog/full-leg-calibrator-v1` untouched
+- [x] joint calibration untouched and still `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION`
+
+### Judgement
+
+```text
+G2 SOFTWARE/OFFLINE = PASS
+G3 ROBOT_POWERED LIVE = NOT EXECUTED / TO_TEST
+```
+
+ROBOT_POWERED software support is implemented, offline-tested and compile-verified. It
+is **not** validated against powered hardware and must not be described as such. Powered
+validation requires separate hardware authorization per
+[`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md).

@@ -41,6 +41,12 @@ void Controller::begin() {
   servo_bus_.begin();
   system_state_.setServoHealth(servo_bus_.health());
 
+  // Binds the census service to the ONE ServoBus. Deliberately does not
+  // start a census: no bus traffic whatsoever happens at boot (handoff
+  // "no startup torque / no startup motion"), and scripts/static_audit.py
+  // fails the build if Controller::begin() ever starts one.
+  servo_census_.begin(&servo_bus_);
+
   imu_.begin();
   system_state_.setImuHealth(imu_.health());
 
@@ -51,7 +57,8 @@ void Controller::begin() {
   system_state_.setLedHealth(led_.health());
 
   CommandRouter::Modules modules{
-      &servo_bus_, &imu_, &daly_, &led_, &system_state_, &power_state_, &operating_mode_,
+      &servo_bus_, &servo_census_, &imu_, &daly_, &led_, &system_state_, &power_state_,
+      &operating_mode_,
   };
   command_router_.begin(modules);
 
@@ -71,7 +78,18 @@ void Controller::printBootBanner() {
   Serial.println("====================================");
   Serial.printf("build      : %s\n", build::kBuildId);
   Serial.printf("board      : %s\n", build::kBoardName);
-  Serial.printf("profile    : %s\n", build::kTestProfile);
+  // Profile name and rail facts printed together: both are derived from
+  // the same authority (config/HardwareProfile.h), so they can no longer
+  // disagree — and the evidence of that is on the boot record.
+  Serial.printf("profile    : %s (servo_power=%s battery=%s led_rail=%s)\n",
+                build::kTestProfile,
+                build::kServoPowerAvailable ? "YES" : "NO",
+                build::kBatteryAvailable ? "YES" : "NO",
+                build::kLedRailPowered ? "YES" : "NO");
+  Serial.printf("servo_pop  : canonical=%u expected_now=%u absent_by_design=%u\n",
+                (unsigned)servo::canonicalAllocatedCount(),
+                (unsigned)servo::expectedNowCount(),
+                (unsigned)servo::absentByDesignCount());
   Serial.printf("servo      : GPIO%d/%d @ %lu\n", pins::kServoTx, pins::kServoRx,
                 (unsigned long)build::kServoBusBaud);
   Serial.printf("bms        : GPIO%d/%d @ %lu\n", pins::kDalyTx, pins::kDalyRx,
@@ -90,6 +108,7 @@ void Controller::printBootBanner() {
   Serial.printf("reset_reason : %s\n", resetReasonName(esp_reset_reason()));
   Serial.println("startup_motion   : DISABLED");
   Serial.println("startup_torque   : DISABLED");
+  Serial.println("startup_servo_scan : DISABLED");
   Serial.println("daly_write       : NOT_IMPLEMENTED (protocol unverified)");
   Serial.printf("operating_mode   : %s\n", toString(operating_mode_.mode()));
   Serial.println();
@@ -110,6 +129,9 @@ void Controller::update(uint32_t now_ms) {
   // Advances at most one servo Ping() per tick when a scan is RUNNING —
   // see ServoBus::update() / ScanState for why this must never be skipped.
   servo_bus_.update(now_ms);
+  // Strictly after servo_bus_.update(): it observes that call's
+  // RUNNING -> COMPLETE edge and classifies the raw scan exactly once.
+  servo_census_.update();
   system_state_.setServoHealth(servo_bus_.health());
 
   system_state_.update();

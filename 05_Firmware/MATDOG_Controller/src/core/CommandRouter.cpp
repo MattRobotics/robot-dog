@@ -45,6 +45,16 @@ void CommandRouter::update(uint32_t now_ms) {
     servo_scan_result_pending_ = false;
     printServoScanResult();
   }
+
+  // Same pattern for the census, but it waits on the SERVICE's state, not
+  // the bus's: Controller::update() runs ServoCensus::update() after
+  // ServoBus::update(), so COMPLETE here means the structured result has
+  // already been classified and stored.
+  if (servo_census_result_pending_ &&
+      modules_.servo_census->state() == servo::ServoCensus::State::COMPLETE) {
+    servo_census_result_pending_ = false;
+    printServoCensusResult();
+  }
 }
 
 void CommandRouter::handleLine(String line) {
@@ -110,6 +120,22 @@ void CommandRouter::handleLine(String line) {
     } else {
       Serial.println("ERROR=USAGE @SERVO SCAN <lo> <hi>");
     }
+  } else if (upper == "@SERVO CENSUS") {
+    // Same bounded per-ID blocking as @SERVO SCAN (it drives the same
+    // ServoBus scan), so it carries the same MAINTENANCE-mode gate.
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
+      Serial.println("SERVO_CENSUS=BLOCKED");
+      Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
+      Serial.printf("MODE=%s\n", toString(modules_.operating_mode->mode()));
+      return;
+    }
+    if (modules_.servo_census->start()) {
+      servo_census_result_pending_ = true;
+      Serial.printf("SERVO_CENSUS=STARTED lo=%d hi=%d\n",
+                    servo::kCanonicalScanLo, servo::kCanonicalScanHi);
+    } else {
+      Serial.println("ERROR=SCAN_ALREADY_RUNNING");
+    }
   } else if (upper.startsWith("@SERVO READ")) {
     if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
       Serial.println("SERVO_READ=BLOCKED");
@@ -168,6 +194,8 @@ void CommandRouter::printHelp() {
   Serial.println("  @LED TEST");
   Serial.println("  @SERVO SCAN <lo> <hi>   (MAINTENANCE mode only; incremental, bounded");
   Serial.println("                           per-ID blocking, result follows asynchronously)");
+  Serial.println("  @SERVO CENSUS           (MAINTENANCE mode only; canonical 11-55 scan,");
+  Serial.println("                           classified against the current servo configuration)");
   Serial.println("  @SERVO READ <id>        (MAINTENANCE mode only)");
   Serial.println("  @SERVO SAFE_OFF <id>    (always allowed, any mode)");
   Serial.println("  @MODE STATUS|MAINTENANCE|RUN");
@@ -202,6 +230,16 @@ void CommandRouter::printStatus() {
   printAvailabilityLine("DALY  ", modules_.daly->availability());
   printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
   printAvailabilityLine("LED   ", modules_.led->availability());
+
+  // Declared servo configuration (compile-time facts) plus the verdict of
+  // the last census, if one was run. NOT_RUN is the honest answer after a
+  // boot with no census — @STATUS must never imply a population was
+  // verified when no bus transaction ever happened.
+  Serial.printf("SERVO_POP canonical=%u expected_now=%u absent_by_design=%u last_census=%s\n",
+                (unsigned)servo::canonicalAllocatedCount(),
+                (unsigned)servo::expectedNowCount(),
+                (unsigned)servo::absentByDesignCount(),
+                servo::toString(modules_.servo_census->result().verdict));
 
   Serial.printf("  heap_free=%u heap_min_free=%u\n",
                 (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap());
@@ -260,6 +298,42 @@ void CommandRouter::printServoScanResult() {
   for (int i = 0; i < listed; ++i) {
     Serial.printf("  FOUND id=%d\n", result.found_ids[i]);
   }
+}
+
+void CommandRouter::printServoCensusResult() {
+  // Formatting ONLY. Every number below is read from the stored
+  // CensusResult; none of it is computed here, and no servo transaction is
+  // issued to render it.
+  const servo::CensusResult& c = modules_.servo_census->result();
+
+  Serial.printf("SERVO_CENSUS=%s lo=%d hi=%d\n",
+                servo::toString(c.verdict), c.scan_lo, c.scan_hi);
+  Serial.printf("  canonical_allocated=%u expected_now=%u\n",
+                (unsigned)c.canonical_allocated, (unsigned)c.expected_now);
+  Serial.printf("  present_expected=%u missing_expected=%u absent_by_design=%u\n",
+                (unsigned)c.present_expected, (unsigned)c.missing_expected,
+                (unsigned)c.absent_by_design);
+  Serial.printf("  absent_by_design_present=%u unexpected_id=%u not_probed=%u truncated=%s\n",
+                (unsigned)c.absent_by_design_present, (unsigned)c.unexpected_id,
+                (unsigned)c.not_probed, c.truncated ? "YES" : "NO");
+
+  for (uint8_t i = 0; i < c.missing_id_count; ++i) {
+    const servo::CanonicalServo* e = servo::findCanonical(c.missing_ids[i]);
+    Serial.printf("  MISSING_EXPECTED id=%u joint=%s\n",
+                  (unsigned)c.missing_ids[i], e != nullptr ? e->joint : "?");
+  }
+  for (uint8_t i = 0; i < c.absent_by_design_present_id_count; ++i) {
+    const servo::CanonicalServo* e =
+        servo::findCanonical(c.absent_by_design_present_ids[i]);
+    Serial.printf("  ABSENT_BY_DESIGN_PRESENT id=%u joint=%s\n",
+                  (unsigned)c.absent_by_design_present_ids[i],
+                  e != nullptr ? e->joint : "?");
+  }
+  for (uint8_t i = 0; i < c.unexpected_id_count; ++i) {
+    Serial.printf("  UNEXPECTED_ID id=%u\n", (unsigned)c.unexpected_ids[i]);
+  }
+
+  printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
 }
 
 void CommandRouter::printServoRead(int id) {

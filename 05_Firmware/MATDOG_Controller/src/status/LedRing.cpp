@@ -26,10 +26,11 @@ bool LedRing::begin() {
 core::AvailabilityStatus LedRing::availability() const {
   core::AvailabilityStatus a;
   a.init = init_;
-  a.detected = build::kLedRailPowered ? core::DetectedState::UNKNOWN
-                                       : core::DetectedState::UNPOWERED;
-  a.expected = build::kLedRailPowered ? core::ExpectedState::OPTIONAL
-                                        : core::ExpectedState::EXPECTED_UNPOWERED;
+  // G2: derived from the active hardware profile (core/Availability.h).
+  // The ring stays OPTIONAL even when powered — LED state must never be
+  // able to fault an otherwise healthy robot.
+  a.detected = core::detectedStateForLedRail(build::kProfileExpectations);
+  a.expected = core::expectedStateForLedRail(build::kProfileExpectations);
   return a;
 }
 

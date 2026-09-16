@@ -1,5 +1,55 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — G2 ROBOT_POWERED configuration support — 2026-09-16
+
+Software preparation for the powered robot. **No powered hardware validation was
+performed** — that is gate G3 and is authorized separately. The compiled-in default
+hardware profile deliberately remains `USB_ONLY`.
+
+Release identity is intentionally unchanged (`kFirmwareVersion` stays `0.1.0`): the
+`0.2.x` number is decided at the release gate, not by a development branch name.
+Development builds are distinguished by the git-SHA build id.
+
+- `config`: new `HardwareProfile.h` — one enum (`USB_ONLY` / `ROBOT_POWERED`), one
+  `expectationsFor()` mapping table. `BuildConfig.h` now *derives*
+  `kServoPowerAvailable`/`kBatteryAvailable`/`kLedRailPowered`/`kTestProfile` from the
+  selected profile instead of storing four independently editable facts that could
+  contradict each other. Switching profiles is a one-symbol change.
+- `core`: `Availability` gains `expectedStateForServoBus`/`Battery`/`LedRail` and
+  `detectedStateForLedRail` — the profile → `ExpectedState` rule stated once instead of
+  inlined per module. `classify()` itself is unchanged: the same `NO_RESPONSE` becomes
+  `PASS` under `USB_ONLY` and `FAULT` under `ROBOT_POWERED`, which is what the V0.1
+  model was designed for. `Availability.h`/`SystemState.h` now include `<stdint.h>`
+  rather than `<Arduino.h>` so the offline host tests link the shipped logic.
+- `servo`: new `ServoPopulation` — canonical 17 / expected-now 13 / absent-by-design 4
+  (52-55) kept explicitly distinct, with pure per-ID and whole-census classification
+  (`PRESENT_EXPECTED` / `MISSING_EXPECTED` / `ABSENT_BY_DESIGN` /
+  `ABSENT_BY_DESIGN_PRESENT` / `UNEXPECTED_ID` / `NOT_PROBED`, verdict `PASS` /
+  `PROFILE_MISMATCH` / `RANGE_INCOMPLETE` / `NOT_RUN`). Fail-closed: a partial or
+  truncated scan can never report `PASS`. A healthy powered census is 13 present + 4
+  absent by design — "17 = PASS" is never encoded anywhere.
+- `servo`: new `ServoCensus` — Controller-owned service that drives the existing
+  `ServoBus` scan state machine and holds the structured `CensusResult`. No second bus
+  owner, no duplicate UART, no `Serial`, never auto-started.
+- `core`: `@SERVO CENSUS` added to the USB command surface (MAINTENANCE-gated, like
+  `@SERVO SCAN`). `CommandRouter` only formats the stored result — no G2 domain logic
+  lives inside Serial parsing or printing, so a future Web UI / HostLink adapter can
+  consume the same `CensusResult` without re-scanning the bus.
+- Boot banner reports the profile with its rail facts, the declared servo population,
+  and `startup_servo_scan : DISABLED` alongside the existing motion/torque lines.
+- `scripts`: static audit extended with six G2 checks (profile authority + the
+  `USB_ONLY`-default G3 gate, population model + YAML provenance cross-check, transport
+  independence, no startup bus traffic, network→servo tripwire, host test suite). All
+  pre-existing checks retained; every new tripwire was mutation-tested.
+- `scripts/tests`: new offline C++ suite (`test_servo_population.cpp` +
+  `run_host_tests.sh`) covering the required census classification cases and both
+  profiles' expected-hardware semantics.
+
+Explicitly NOT in this gate: Wi-Fi, HTTP/WebSocket/REST, Web UI, OTA transport, command
+lease/deadman, teleoperation, IK/gait/pose, Safe Actuator, the full ActuatorAuthority
+framework, provisioning/QC/source-signature/calibration integration, DALY writes, servo
+EEPROM/ID writes, and any motion.
+
 ## 0.1.0 — 2026-09-15
 
 First unified operational ESP32-S3 runtime. Integration milestone: brings ST3215

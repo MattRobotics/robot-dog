@@ -1,5 +1,7 @@
 #include "SystemState.h"
 
+#include <Arduino.h>  // millis() — the header itself stays Arduino-free (G2)
+
 namespace matdog {
 namespace core {
 

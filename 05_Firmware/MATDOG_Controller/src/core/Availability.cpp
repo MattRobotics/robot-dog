@@ -68,6 +68,29 @@ Classification classify(const AvailabilityStatus& s) {
   return Classification::UNKNOWN;
 }
 
+ExpectedState expectedStateForServoBus(const config::ProfileExpectations& profile) {
+  return profile.servo_power_available ? ExpectedState::REQUIRED
+                                       : ExpectedState::EXPECTED_OFFLINE;
+}
+
+ExpectedState expectedStateForBattery(const config::ProfileExpectations& profile) {
+  return profile.battery_available ? ExpectedState::REQUIRED
+                                   : ExpectedState::EXPECTED_OFFLINE;
+}
+
+ExpectedState expectedStateForLedRail(const config::ProfileExpectations& profile) {
+  // OPTIONAL, never REQUIRED — see the header comment: LED state must not
+  // be able to fault an otherwise healthy robot.
+  return profile.led_rail_powered ? ExpectedState::OPTIONAL
+                                  : ExpectedState::EXPECTED_UNPOWERED;
+}
+
+DetectedState detectedStateForLedRail(const config::ProfileExpectations& profile) {
+  // UNKNOWN when powered: a WS2812 chain cannot be probed, so the honest
+  // answer is "not observed", not "ONLINE".
+  return profile.led_rail_powered ? DetectedState::UNKNOWN : DetectedState::UNPOWERED;
+}
+
 ModuleHealth toModuleHealth(Classification c) {
   switch (c) {
     case Classification::PASS:     return ModuleHealth::OK;

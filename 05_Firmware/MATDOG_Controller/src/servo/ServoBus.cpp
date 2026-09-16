@@ -41,8 +41,11 @@ core::AvailabilityStatus ServoBus::availability() const {
   core::AvailabilityStatus a;
   a.init = init_;
   a.detected = last_detected_;
-  a.expected = build::kServoPowerAvailable ? core::ExpectedState::REQUIRED
-                                             : core::ExpectedState::EXPECTED_OFFLINE;
+  // G2: one profile authority, one derivation (core/Availability.h).
+  // Under ROBOT_POWERED this becomes REQUIRED and the SAME classify() turns
+  // an unchanged NO_RESPONSE into FAULT — exactly what the V0.1 Availability
+  // model was designed for. No logic here changed shape.
+  a.expected = core::expectedStateForServoBus(build::kProfileExpectations);
   return a;
 }
 

@@ -44,6 +44,24 @@ losing its three-way SdkconfigFlag.UNKNOWN case and going back to treating
 ota_app_partitions() losing its contiguous-slot-index requirement, letting a
 sparse OTA layout (e.g. {0, 2}) resolve instead of refusing (Finding 3).
 
+G2 (ROBOT_POWERED configuration support) additions: the three rail
+availability flags regressing from DERIVED values back to independently
+editable literals (they must come from config/HardwareProfile.h's single
+expectationsFor() table, so a profile name can never contradict its own
+rail facts); the profile table itself mismapping USB_ONLY/ROBOT_POWERED;
+the compiled-in DEFAULT profile being anything other than USB_ONLY (G3 —
+powered hardware validation — is not authorized, so a ROBOT_POWERED image
+must never be producible by an unreviewed edit); the servo population model
+losing the canonical-17 / expected-now-13 / absent-by-design-4 distinction
+or drifting from MATDOG_SERVO_ALLOCATION.yaml; a "17 responders = PASS"
+rule reappearing (false for the current robot); the population/census
+translation units gaining a Serial or Arduino dependency (they must stay
+pure so a future telemetry snapshot and Web UI can reuse the SAME
+classification without re-scanning the bus); Controller::begin() starting a
+servo scan/census at boot; and a direct network-handler -> servo-primitive
+path (no network subsystem exists yet — this is a tripwire armed in
+advance, not a test of invented code).
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
@@ -348,20 +366,12 @@ def check_led_anti_back_power(files):
         elif pixels_begin_pos != -1 and pixels_begin_pos < guard_pos:
             fail(f"{path}: pixels_.begin() appears before the kLedRailPowered guard in begin()")
 
-    for path, code in files:
-        if path.name != "BuildConfig.h":
-            continue
-        # This session is exclusively USB_ONLY hardening (see handoff
-        # Session 2). These three flags must read false right now; flipping
-        # any of them is a deliberate future ROBOT_POWERED change, not
-        # something that should happen silently in this codebase's history.
-        for flag in ("kServoPowerAvailable", "kBatteryAvailable", "kLedRailPowered"):
-            m = re.search(rf"constexpr bool {flag}\s*=\s*(\w+);", code)
-            if not m:
-                fail(f"{path}: could not locate {flag} to audit its value")
-            elif m.group(1) != "false":
-                fail(f"{path}: {flag} = {m.group(1)}, expected false for the current "
-                     f"USB_ONLY-only session (flip deliberately for ROBOT_POWERED work)")
+    # The BuildConfig rail-flag audit that used to live here moved to
+    # check_hardware_profile_authority() in G2: the three flags are no
+    # longer independently editable literals, so auditing their literal
+    # value is no longer the right question. What replaced it is strictly
+    # stronger - it checks that they are DERIVED from one profile authority
+    # AND that the active profile is still USB_ONLY.
 
 
 def check_servo_timeout_not_global(files):
@@ -490,6 +500,257 @@ def check_app_only_script_never_targets_other_partitions(sketch_dir):
             fail(f"{target}: missing required safety-gate output {required!r}")
 
 
+def check_hardware_profile_authority(files, sketch_dir):
+    """G2: one profile authority -> consistent expected hardware semantics.
+
+    V0.1 stated the bench configuration four times over (a kTestProfile
+    string plus three independent `constexpr bool` literals) with nothing
+    tying them together, so a partial edit could produce a firmware whose
+    printed profile name contradicted its own rail expectations. This check
+    enforces the replacement invariant and keeps the original protection's
+    teeth: the DEFAULT profile compiled into source must remain USB_ONLY
+    until G3 is authorized.
+    """
+    build_config = None
+    profile_header = None
+    for path, code in files:
+        if path.name == "BuildConfig.h":
+            build_config = (path, code)
+        if path.name == "HardwareProfile.h":
+            profile_header = (path, code)
+
+    if profile_header is None:
+        fail("config/HardwareProfile.h not found - the hardware profile authority "
+             "must exist as a single mapping table (G2)")
+    else:
+        path, code = profile_header
+        for token in ("USB_ONLY", "ROBOT_POWERED", "ProfileExpectations", "expectationsFor"):
+            if token not in code:
+                fail(f"{path}: missing required profile authority symbol {token!r}")
+        # The mapping table itself: ROBOT_POWERED powers all three rails,
+        # anything else powers none. A silent edit here would flip every
+        # module's expectations at once, so its exact shape is audited.
+        if not re.search(
+                r"HardwareProfile::ROBOT_POWERED\)\s*\?\s*"
+                r"ProfileExpectations\{true,\s*true,\s*true\}\s*:\s*"
+                r"ProfileExpectations\{false,\s*false,\s*false\}", code):
+            fail(f"{path}: expectationsFor() no longer maps ROBOT_POWERED -> "
+                 f"(servo+battery+led all true) and USB_ONLY -> (all false); the profile "
+                 f"table must not be reshaped without review")
+        if "#include <Arduino.h>" in code:
+            fail(f"{path}: must stay Arduino-free so the offline host tests can link the "
+                 f"real profile table instead of a copy")
+
+    if build_config is None:
+        fail("config/BuildConfig.h not found")
+        return
+
+    path, code = build_config
+
+    # (a) The three rail flags must be DERIVED, never literals again.
+    for flag, field in (("kServoPowerAvailable", "servo_power_available"),
+                        ("kBatteryAvailable", "battery_available"),
+                        ("kLedRailPowered", "led_rail_powered")):
+        m = re.search(rf"constexpr bool {flag}\s*=\s*([^;]+);", code)
+        if not m:
+            fail(f"{path}: could not locate {flag} to audit its derivation")
+            continue
+        rhs = m.group(1).strip()
+        if rhs in ("true", "false"):
+            fail(f"{path}: {flag} is a bare literal {rhs!r} again - it must be derived "
+                 f"from kProfileExpectations so the three rail facts and the profile "
+                 f"name cannot drift apart (G2)")
+        elif f"kProfileExpectations.{field}" not in rhs:
+            fail(f"{path}: {flag} is not derived from kProfileExpectations.{field} "
+                 f"(found {rhs!r})")
+
+    # (b) The profile name must be derived too, not typed independently.
+    m = re.search(r"constexpr const char\* kTestProfile\s*=\s*([^;]+);", code)
+    if not m:
+        fail(f"{path}: could not locate kTestProfile")
+    elif "toString(kHardwareProfile)" not in m.group(1):
+        fail(f"{path}: kTestProfile must be derived via config::toString(kHardwareProfile), "
+             f"not written as an independent string literal (found {m.group(1).strip()!r})")
+
+    # (c) THE G3 GATE. This is the direct successor to Session 2's
+    # "all three flags must be false" check: the source default must stay
+    # USB_ONLY, so no ROBOT_POWERED image can be built by an unreviewed
+    # edit. Powered hardware validation is a separately authorized gate.
+    m = re.search(r"#define\s+MATDOG_ACTIVE_HARDWARE_PROFILE\s+(.+)", code)
+    if not m:
+        fail(f"{path}: could not locate the MATDOG_ACTIVE_HARDWARE_PROFILE default")
+    elif not m.group(1).strip().endswith("HardwareProfile::USB_ONLY"):
+        fail(f"{path}: the default hardware profile is {m.group(1).strip()!r}, expected "
+             f"HardwareProfile::USB_ONLY - ROBOT_POWERED must not be the compiled-in "
+             f"default until the G3 powered validation gate is explicitly authorized")
+
+
+def check_servo_population_model(files, sketch_dir):
+    """G2: canonical 17 / expected-now 13 / absent-by-design 4 stay distinct.
+
+    The handoff is explicit that "17 servos must respond for PASS" is FALSE
+    for the current robot, and that an absent-by-design servo must never be
+    classified as a failure. Both are easy to regress with a one-line edit,
+    so both are audited.
+    """
+    population = None
+    for path, code in files:
+        if path.name == "ServoPopulation.h":
+            population = (path, code)
+    if population is None:
+        fail("servo/ServoPopulation.h not found - the G2 population model must exist")
+        return
+
+    path, code = population
+
+    for token in ("kCanonicalServos", "canonical_allocated", "expected_now",
+                  "PRESENT_EXPECTED", "MISSING_EXPECTED", "ABSENT_BY_DESIGN",
+                  "ABSENT_BY_DESIGN_PRESENT", "UNEXPECTED_ID", "PROFILE_MISMATCH"):
+        if token not in code:
+            fail(f"{path}: missing required population semantic {token!r}")
+
+    # kCanonicalServoCount must be COMPUTED from the table, never a literal
+    # that could silently disagree with it.
+    if not re.search(r"kCanonicalServoCount\s*=\s*[^;]*sizeof\(kCanonicalServos\)", code):
+        fail(f"{path}: kCanonicalServoCount must be derived with sizeof(kCanonicalServos), "
+             f"not written as a literal")
+
+    rows = re.findall(r'\{\s*(\d+),\s*"(\w+)",\s*CurrentConfig::(\w+)\s*\}', code)
+    if len(rows) != 17:
+        fail(f"{path}: canonical servo table has {len(rows)} entries, expected 17 "
+             f"(MATDOG canonical allocation)")
+    installed = [r for r in rows if r[2] == "INSTALLED"]
+    absent = [r for r in rows if r[2] == "ABSENT_BY_DESIGN"]
+    if len(installed) != 13:
+        fail(f"{path}: {len(installed)} servos marked INSTALLED, expected 13 for the "
+             f"current physical configuration")
+    absent_ids = sorted(int(r[0]) for r in absent)
+    if absent_ids != [52, 53, 54, 55]:
+        fail(f"{path}: ABSENT_BY_DESIGN ids are {absent_ids}, expected [52, 53, 54, 55] "
+             f"(NECK_PITCH/HEAD_ROTATION/HEAD_PITCH/JAW are allocated but not installed)")
+
+    # No "17 responders = PASS" rule anywhere in the classification or its
+    # presentation.
+    for p2, c2 in files:
+        if p2.name not in ("ServoPopulation.cpp", "ServoCensus.cpp", "CommandRouter.cpp"):
+            continue
+        if re.search(r"(==|>=)\s*17\b", c2) or re.search(r"\b17\s*(==|<=)", c2):
+            fail(f"{p2}: found a hardcoded comparison against 17 - a healthy census for "
+                 f"the current robot is 13 present + 4 absent by design, so 17 must never "
+                 f"be a PASS threshold")
+
+    # Provenance: the embedded table must not drift from the canonical YAML.
+    yaml_path = sketch_dir.parents[1] / "06_Software" / "Matdog_Core" / "config" / \
+        "MATDOG_SERVO_ALLOCATION.yaml"
+    if not yaml_path.exists():
+        fail(f"{yaml_path}: canonical servo allocation not found - the firmware table's "
+             f"provenance cannot be verified")
+        return
+    yaml_ids = sorted(int(m) for m in re.findall(r"^\s*bus_id:\s*(\d+)\s*$",
+                                                 yaml_path.read_text(encoding="utf-8"),
+                                                 re.MULTILINE))
+    table_ids = sorted(int(r[0]) for r in rows)
+    if yaml_ids != table_ids:
+        fail(f"{path}: embedded canonical table {table_ids} disagrees with "
+             f"{yaml_path.name} {yaml_ids} - the YAML is the canonical project "
+             f"authority; fix the firmware table, not the YAML")
+
+
+def check_g2_state_is_transport_independent(files):
+    """G2 handoff sections 7/8/9: new domain logic must not live inside a
+    transport. If the ONLY representation of the census were Serial.printf()
+    output, the future Web UI / HostLink would have to either reimplement
+    the classification or re-scan the bus to render a page - both are
+    explicitly forbidden architectures.
+    """
+    for path, code in files:
+        if path.name not in ("ServoPopulation.h", "ServoPopulation.cpp",
+                             "ServoCensus.h", "ServoCensus.cpp"):
+            continue
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the G2 population/census layer must "
+                 f"stay transport-independent so USB CDC and a future Web UI can both "
+                 f"consume the same structured result")
+        if "#include <Arduino.h>" in code:
+            fail(f"{path}: includes <Arduino.h> directly - keep this layer host-linkable "
+                 f"so the offline tests exercise the shipped logic, not a copy")
+
+    # These carry the classification rules the host tests link against.
+    for path, code in files:
+        if path.name in ("Availability.h", "Availability.cpp", "SystemState.h",
+                         "HardwareProfile.h"):
+            if "#include <Arduino.h>" in code:
+                fail(f"{path}: includes <Arduino.h> - this translation unit is linked by "
+                     f"the offline host test suite and must stay Arduino-free (G2)")
+
+    # The census result must be a plain copyable struct, not something a
+    # snapshot would have to re-derive.
+    for path, code in files:
+        if path.name != "ServoPopulation.h":
+            continue
+        if "struct CensusResult" not in code:
+            fail(f"{path}: CensusResult struct not found - the census must produce "
+                 f"structured state, not formatted text")
+
+
+def check_no_startup_servo_traffic(files):
+    """No bus traffic of any kind at boot - extends the existing
+    ServoBus::begin() rule to the Controller, which now owns a census
+    service that must never be auto-started."""
+    for path, code in files:
+        if path.name != "Controller.cpp":
+            continue
+        begin_match = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not begin_match:
+            fail(f"{path}: could not locate Controller::begin() to audit startup behaviour")
+            continue
+        body = begin_match.group(1)
+        for forbidden in ("startScan(", "servo_census_.start(", ".ping(", "EnableTorque("):
+            if forbidden in body:
+                fail(f"{path}: Controller::begin() calls {forbidden!r} - boot must issue no "
+                     f"servo bus traffic, torque or scan at all")
+
+
+def check_no_network_to_servo_path(files):
+    """V2 permanent invariant: network callback != servo command authority.
+
+    No network subsystem exists yet and none is invented here (the G2
+    handoff forbids that). This is a tripwire armed in advance: the day a
+    Wi-Fi/HTTP/WebSocket handler is added, it must route through
+    CommandRouter -> Controller services -> authority, never call a servo
+    primitive directly.
+    """
+    network_markers = ("WiFi.h", "WebServer.h", "AsyncWebServer", "esp_http_server",
+                       "WebSocketsServer", "ESPAsyncWebServer", "HTTPClient")
+    servo_primitives = ("ServoBus", "EnableTorque(", "WritePos", "SMS_STS", "st_.")
+    for path, code in files:
+        if not any(marker in code for marker in network_markers):
+            continue
+        hits = [prim for prim in servo_primitives if prim in code]
+        if hits:
+            fail(f"{path}: a network transport translation unit also references servo "
+                 f"primitives {hits} - the browser/network path must go through "
+                 f"CommandRouter and the Controller service layer, never directly to "
+                 f"ServoBus (V2 architecture, forbidden path)")
+
+
+def check_host_tests(sketch_dir):
+    """Runs the offline C++ census/profile suite, the same way the OTA
+    parser's Python suite is already run from here: one gate command."""
+    runner = sketch_dir / "scripts" / "tests" / "run_host_tests.sh"
+    suite = sketch_dir / "scripts" / "tests" / "test_servo_population.cpp"
+    if not suite.exists():
+        fail(f"{suite}: G2 servo population/profile offline test suite not found")
+        return
+    if not runner.exists():
+        fail(f"{runner}: host test runner not found")
+        return
+    result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{runner}: servo population/profile offline tests FAILED "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -511,6 +772,12 @@ def main():
     check_servo_timeout_not_global(files)
     check_servo_timeout_categories_finding1(files)
     check_safe_off_verifies_readback(files)
+    check_hardware_profile_authority(files, SKETCH_DIR)
+    check_servo_population_model(files, SKETCH_DIR)
+    check_g2_state_is_transport_independent(files)
+    check_no_startup_servo_traffic(files)
+    check_no_network_to_servo_path(files)
+    check_host_tests(SKETCH_DIR)
 
     print(f"Scanned {len(files)} source files under {SKETCH_DIR}")
 
