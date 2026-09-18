@@ -213,6 +213,13 @@ runs the OTA parser's Python suite.
 @SYSTEM SHUTDOWN
 ```
 
+USB CDC transmit can never stall the Controller loop (G3.1): `Controller::begin()` sets the
+HWCDC TX timeout to 0 and the TX ring to 3 KB before `Serial.begin()`, so output nobody
+drains is dropped instead of waited for. Command replies are expected complete while a host
+is reading and draining; right after reopening a port that was closed for a long time, a
+stale backlog can still occupy the ring and a reply may short-write rather than block. That
+best-effort delivery belongs to this diagnostic surface only; a future HostLink defines its own framing, acknowledgement and reliability.
+
 `@SERVO SAFE_OFF` can only disable torque, never enable it, and stays reachable in
 every operating mode — it is the safety de-escalation path. Its reply is never a bare
 `OK`: `SCS::Ack()` (which `EnableTorque()` returns) gives `0` on any failure/timeout,

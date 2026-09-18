@@ -1,5 +1,38 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — G3.1 CDC-independent Controller loop — 2026-09-18
+
+Fix for a regression found **live after the G3 powered session**. **Not flashed; live re-test TO_TEST.**
+No servo, BMS, LED, KEY or power state was changed to produce it.
+
+**Finding.** Zero-TX passive A/B on one boot, USB cable attached throughout: with the host's
+CDC port closed, BNO085 rotation-vector processing fell to **0.68 Hz**; with it open,
+**50.07 Hz** (configured 50 Hz). `runtime_resets` stayed 0. Autonomous Controller execution
+depended on a host keeping the port open.
+
+**Root cause (installed `esp32:esp32 3.3.11` `cores/esp32/HWCDC.cpp`).** HWCDC latches
+`connected = true` on the first host transfer and clears it only on a USB bus reset or SOF
+loss; closing the host tty is neither. In that state `HWCDC::write()` waits up to
+`tx_timeout_ms` (100 ms) × 20 attempts ≈ 2 s per call on a full 256-byte TX ring.
+`operator bool()` reports the same latched flag, so `if (Serial)` cannot guard it. The IMU
+services one SH2 event per loop pass, so the stalls were lost acquisition.
+
+- `src/core/Controller.cpp`: `Controller::begin()` calls `Serial.setTxBufferSize(3072)` and
+  `Serial.setTxTimeoutMs(0)` before `Serial.begin()`. With timeout 0 every wait in
+  `HWCDC::write()` becomes an immediate drop, so USB CDC transmit cannot stall the
+  Controller. The ring holds the largest single loop-pass burst (2395 bytes): replies are
+  expected complete while a host is reading and draining. Right after reopening a port that
+  was closed for a long time, a stale backlog may still occupy the ring and a reply may
+  short-write instead of block — accepted for this diagnostic surface, **not** a HostLink
+  guarantee. `#error` guards pin hwcdc + CDC-on-boot and core 3.3.11.
+- `src/config/BuildConfig.h`: `kUsbTxTimeoutMs = 0`, `kUsbTxRingBytes = 3072`.
+- `scripts/static_audit.py`: `check_usb_cdc_tx_never_blocks` — timeout exactly 0, ring
+  ≥ 2560, both set before `Serial.begin()` and any output, exactly one call each, guards
+  present, no `Serial.flush()` / debug-output routing. 11/11 regression mutations caught.
+- Docs: G3 powered no-motion evidence PASS, formal census-repeat criterion outstanding; G3.1
+  gate added (`FAIL → FIX UNDER VALIDATION`); stage 4 onward and all motion `BLOCKED` until
+  G3.1 PASS.
+
 ## Unreleased — pre-G3 provenance closure — 2026-09-16
 
 Final pre-G3 closure amendment. **No hardware was flashed, no rail energized, G3 not

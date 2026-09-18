@@ -1,7 +1,7 @@
 # MATDOG Roadmap
 
 **Canonical owner of the MATDOG development sequence, its dependencies, and where the project
-currently stands.** Last updated 2026-09-16.
+currently stands.** Last updated 2026-09-18.
 
 This file answers *where are we, what is next, and why a stage cannot be skipped*. It does not
 duplicate other owners:
@@ -51,13 +51,22 @@ COMPLETE   G0 post-cleanup entry audit            PASS
 COMPLETE   G1 V0.1 regression freeze              PASS
 COMPLETE   V2 architecture delta audit            PASS
 COMPLETE   G2 ROBOT_POWERED preparation           PASS (software/offline only)
+EVIDENCE   G3 ROBOT_POWERED no-motion evidence    PASS (operator-accepted, 2026-09-17)
+OPEN       G3 formal census-repeat criterion      OUTSTANDING (one more read-only @SERVO CENSUS)
 
-CURRENT    G3 ROBOT_POWERED no-motion validation  TO_TEST — awaiting hardware authorization
+CURRENT    G3.1 CDC-independent Controller loop   FAIL -> FIX UNDER VALIDATION (live re-test TO_TEST)
+BLOCKED    Stage 4 onward, including all motion   until G3 census repeat + G3.1 PASS
 ```
 
-The `ROBOT_POWERED` **software** support exists, is offline-tested and compiles cleanly for both
-profiles. The `ROBOT_POWERED` **hardware configuration has never been powered or exercised**. No
-document may describe it as VALIDATED until G3 produces evidence.
+`ROBOT_POWERED` is **VALIDATED for no-motion operation** (G3): DALY live read-only, LED live,
+13/13 expected servos with 4 absent by design, `VERIFIED_OFF` on all 13, `torque=0` on all 13
+(the formal "census stable across repeats" criterion still needs one more census run).
+After G3 a live zero-TX experiment showed the Controller loop **starving while no USB CDC host
+holds the port open** (BNO085 RV 0.68 Hz closed vs 50.07 Hz open, cable attached). Root cause
+is in the installed HWCDC transport; the fix is implemented and offline-validated, and its live
+re-test is gate G3.1. Nothing beyond G3 may proceed until the G3 census repeat is run and
+G3.1 passes — any autonomous
+behaviour, and all motion, needs a loop that does not depend on a host.
 
 G2 currently lives on branch `feat/controller-robot-powered-v02` and is not merged to `main`.
 
@@ -73,13 +82,13 @@ Each row's *Blocks* column states what it gates. Arrows are hard dependencies, n
 |---|---|---|---|
 | 1 | **MATDOG Controller baseline** | **COMPLETE** | V0.1 unified runtime, **FROZEN** at tag `matdog-controller-v0.1.0`. **VALIDATED** on real hardware in the `USB_ONLY` profile only. |
 | 2 | **ROBOT_POWERED preparation** | **COMPLETE** | `HardwareProfile` authority (`USB_ONLY` / `ROBOT_POWERED`), profile-derived module expectations, canonical-17 / expected-13 / absent-by-design-4 servo population model, structured census classification, build-manifest flash provenance. **IMPLEMENTED + offline-tested; not hardware-validated.** |
-| 3 | **ROBOT_POWERED no-motion validation** | **CURRENT** | **TO_TEST.** Procedure designed in [`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](../../05_Firmware/MATDOG_Controller/G3_ROBOT_POWERED_VALIDATION_PLAN.md). Requires explicit operator authorization to energize the robot. Blocks everything powered below. |
+| 3 | **ROBOT_POWERED no-motion validation** | **EVIDENCE PASS — CENSUS REPEAT OUTSTANDING** | **PASS** (operator-accepted evidence), live, 2026-09-17; formal census-repeat criterion: one repeat outstanding — evidence in [`VALIDATION.md` § G3](../../05_Firmware/MATDOG_Controller/VALIDATION.md). Follow-up **G3.1 CDC-independent Controller loop: FAIL → fix under validation**; blocks stage 4 onward. |
 
 ### Phase 2 — Maintenance, authority, service
 
 | # | Stage | Status | Reality in this repository |
 |---|---|---|---|
-| 4 | **Diagnostics / Maintenance** | **PARTIAL → NEXT** | Already exist: `@STATUS` module availability, `@SERVO SCAN`, `@SERVO READ`, `@SERVO CENSUS` (structured population classification), `@SERVO SAFE_OFF` with independent readback, `@IMU`/`@BMS`/`@LED` status. Do **not** exist: `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated servo health summary. |
+| 4 | **Diagnostics / Maintenance** | **PARTIAL — BLOCKED by G3.1** | Already exist: `@STATUS` module availability, `@SERVO SCAN`, `@SERVO READ`, `@SERVO CENSUS` (structured population classification), `@SERVO SAFE_OFF` with independent readback, `@IMU`/`@BMS`/`@LED` status. Do **not** exist: `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated servo health summary. |
 | 5 | **OperatingMode / ActuatorAuthority** | **PARTIAL** | `OperatingMode{MAINTENANCE, RUN}` exists and gates blocking servo diagnostics — deliberately minimal. The full `ActuatorAuthority` model (`NONE`/`DIAGNOSTICS`/`CALIBRATION`/`QC`/`PROVISIONING`/`MOTION`, one owner at a time) is **TO_DESIGN**. Required before any write-capable service or motion. |
 | 6 | **Service / Provisioning / QC** | **FUTURE** | Frozen bench tools (Bench QC V6.1, Source Signature Survey V1, Provisioner V6) remain **FROZEN** oracles; nothing is integrated into the Controller. Blocked by stage 5. |
 | 7 | **Full Leg Calibration integration** | **FUTURE** | Branch `matdog/full-leg-calibrator-v1` preserved as an oracle. Not merged, not ported. Blocked by stages 3 and 5. |
@@ -166,7 +175,8 @@ authoritative Controller state, never from frontend assumptions.
 
 | Blocker | Blocks | Cleared by |
 |---|---|---|
-| Powered hardware never exercised | stages 3 onward | G3 session, explicit operator authorization |
+| G3 formal census-repeat criterion outstanding (one census run) | stage 4 onward, all motion | one read-only `@SERVO CENSUS`, planned inside the G3.1 session |
+| G3.1: Controller loop starves while no USB CDC host holds the port open | stage 4 onward, all motion | G3.1 live re-test of the offline-validated fix |
 | `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION` | all motion (15, 17, 20, 23) | stages 7 + 8 |
 | No `ActuatorAuthority` model | write-capable service, QC, calibration, motion | stage 5 |
 | No Safe Actuator Layer | all motion | stage 14 |

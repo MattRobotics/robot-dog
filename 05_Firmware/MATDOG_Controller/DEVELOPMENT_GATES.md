@@ -1,7 +1,7 @@
 # MATDOG Controller — Development Gates
 
 **Canonical owner of the technical pass/fail authorization criteria for each Controller
-development gate.** Last updated 2026-09-16.
+development gate.** Last updated 2026-09-18.
 
 This file answers *what must be true before this stage may begin, what it may and may not do, and
 what proves it passed*. It is not a narrative roadmap and not an evidence log:
@@ -87,14 +87,54 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   live and plausible; LED validated without disturbing bus timing; census exactly `PASS`
   (13 present-expected, 4 absent-by-design, 0 missing, 0 unexpected) and stable across repeats;
   `VERIFIED_OFF` on all 13; `READY` during soak; **no motion observed at any point**.
-- **NEXT** — Diagnostics / Maintenance gate.
-- **STATUS** — **CURRENT / TO_TEST — NOT EXECUTED.**
-- **EVIDENCE** — procedure in [`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md).
+- **NEXT** — G3.1, then Diagnostics / Maintenance.
+- **STATUS** — powered no-motion evidence **PASS** (live, 2026-09-17, operator-accepted).
+  Formal criterion "census … stable across repeats": **OUTSTANDING** — one census executed;
+  one additional read-only `@SERVO CENSUS` at the next authorized live session closes it.
+  The criterion is unchanged. A Controller-loop regression found afterwards is tracked as
+  G3.1; it does not invalidate the servo/DALY/LED evidence, each item of which was measured
+  per transaction.
+- **EVIDENCE** — [`VALIDATION.md` § G3](VALIDATION.md); procedure in
+  [`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md).
+
+## G3.1 — CDC-independent Controller loop
+
+- **PURPOSE** — prove Controller execution does not depend on a USB CDC host keeping the
+  port open. Regression found live after G3: with the cable attached and the host port
+  closed, BNO085 RV processing fell to 0.68 Hz (50.07 Hz with the port open, same boot).
+- **INVARIANT** — no USB CDC transmit condition may block `Controller::update()`.
+- **DELIVERY** — best effort. Command replies are expected complete under normal
+  connected/draining conditions with adequate TX-ring free space; after a long closed-port
+  interval a stale backlog may occupy the ring at reopen, and a reply emitted before it
+  drains may short-write rather than block. Accepted for the diagnostic USB surface; **not**
+  part of any HostLink contract.
+- **ENTRY** — G3 powered no-motion evidence PASS (the outstanding census repeat is run
+  inside this session); patched image built from a **clean commit** with
+  `MATDOG_PROFILE=ROBOT_POWERED` and flashed only via
+  `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`; explicit operator
+  authorization for that session.
+- **ALLOWED** — application-only flash of the patched image; zero-TX passive serial
+  observation; the read-only replies already used in G3 (`@STATUS`, `@MODE STATUS`,
+  `@IMU STATUS`, `@BMS STATUS`, `@LED STATUS`, `@HELP`); `@BMS STREAM ON|OFF` for the stream
+  case; **one** read-only `@SERVO CENSUS`, which also closes the outstanding G3 census repeat.
+- **FORBIDDEN** — everything G3 forbids; any other servo command; LED TEST; mode change.
+- **PASS CRITERIA** — zero-TX A/B on one boot: RV rate **≥ 45 Hz with the port closed for
+  ≥ 60 s** (including after a host has opened and closed it) and 45–55 Hz with it open;
+  the same with `@BMS STREAM ON` enabled before closing; `runtime_resets` unchanged; no
+  reset/brownout/panic; every line syntactically valid on reopen; the viewer receives
+  telemetry with zero commands; command replies complete when issued with the host reading
+  and the reconnect backlog drained.
+- **NEXT** — Diagnostics / Maintenance (roadmap stage 4). **Every later stage, and all
+  motion, is BLOCKED until G3.1 PASS.**
+- **STATUS** — **FAIL → FIX UNDER VALIDATION.** Root cause confirmed in the installed
+  `esp32:esp32 3.3.11` HWCDC; fix (native HWCDC TX timeout 0 + 3 KB TX ring) implemented and
+  offline-validated; live re-test **TO_TEST**.
+- **EVIDENCE** — [`VALIDATION.md` § G3.1](VALIDATION.md).
 
 ## Diagnostics / Maintenance
 
 - **PURPOSE** — permanent read-only maintenance capability over the single shared `ServoBus`.
-- **ENTRY** — G3 PASS.
+- **ENTRY** — G3 formal PASS (including the census repeat); **G3.1 PASS**.
 - **ALLOWED** — `SYSTEM_SELF_TEST`, consolidated servo health, source-signature read, profile audit;
   extension of the existing census/read/`SAFE_OFF` surface.
 - **FORBIDDEN** — any new persistent write path; any transport→register access; motion.
@@ -149,7 +189,8 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 
 - **PURPOSE** — make calibration a permanent Controller capability and recalibrate the installed
   robot.
-- **ENTRY** — G3 PASS; Authority model PASS; powered bus health proven.
+- **ENTRY** — G3 formal PASS (including the census repeat); G3.1 PASS; Authority model PASS;
+  powered bus health proven.
 - **ALLOWED** — H1 census semantics, q0 evidence capture, direction witnesses, characterization,
   then staged calibration motion **each with its own session authorization**.
 - **FORBIDDEN** — merging `matdog/full-leg-calibrator-v1` wholesale; duplicating `ServoBus`/UART/
@@ -171,6 +212,9 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   the canonical sequence and must not be pulled forward ahead of them (see rule 6 above).
 - **ALLOWED** — transport adapters over one Controller service implementation; structured state and
   telemetry snapshots.
+- **NOTE (G3.1)** — the USB CDC diagnostic surface's best-effort delivery (timeout 0, short writes
+  possible after a stale backlog) is not inherited as a HostLink guarantee. HostLink defines its
+  own framing, acknowledgement and reliability semantics.
 - **FORBIDDEN** — duplicate command semantics per transport; transport owning hardware; any
   business logic reachable only inside a parser or printer.
 - **PASS CRITERIA** — a second transport can consume the same semantic state without
@@ -222,14 +266,15 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 ## First motion
 
 - **PURPOSE** — first commanded joint movement, bounded and suspended.
-- **ENTRY** — G3 PASS; formal calibration valid; Safe Actuator Layer PASS; robot suspended.
+- **ENTRY** — G3 formal PASS (including the census repeat); G3.1 PASS; formal calibration
+  valid; Safe Actuator Layer PASS; robot suspended.
 - **ALLOWED** — one bounded calibrated joint, then controlled multi-joint pose, then suspended
   behaviour, then fault injection.
 - **FORBIDDEN** — load-bearing stand; unbounded travel/velocity; motion from stale calibration.
 - **PASS CRITERIA** — commanded motion matches expectation within bounds; safe-stop and fault
   injection behave as designed.
 - **NEXT** — UI-4, then poses and IK.
-- **STATUS** — **BLOCKED** (G3, authority model, calibration, Safe Actuator).
+- **STATUS** — **BLOCKED** (G3 census repeat, G3.1, authority model, calibration, Safe Actuator).
 
 ## IK · Gait · Stabilization
 

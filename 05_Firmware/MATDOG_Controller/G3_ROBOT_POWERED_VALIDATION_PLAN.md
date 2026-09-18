@@ -1,6 +1,9 @@
 # G3 — ROBOT_POWERED live validation plan
 
-**Status:** `TO_TEST` — designed during G2, **NOT EXECUTED**.
+**Status:** `EXECUTED` 2026-09-17 — powered no-motion evidence **PASS** (operator-accepted); formal census-repeat criterion
+**outstanding** (one more census run); evidence in
+[`VALIDATION.md` § G3](VALIDATION.md). A regression found afterwards is gate **G3.1**
+([`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md)). The procedure below is the original G2 design.
 **Authorization:** requires explicit operator authorization for a powered session. G2
 authorized software preparation only.
 

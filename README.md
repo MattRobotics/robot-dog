@@ -135,35 +135,30 @@ Controller tree are documentation only. Neither identifier proves `ROBOT_POWERED
 ```text
 COMPLETE   Controller V0.1 baseline              VALIDATED (USB_ONLY hardware)
 COMPLETE   G2 ROBOT_POWERED preparation          PASS (software/offline only, 2026-09-16)
+EVIDENCE   G3 ROBOT_POWERED no-motion evidence   PASS (operator-accepted, 2026-09-17)
+OPEN       G3 formal census-repeat criterion     OUTSTANDING (one more read-only @SERVO CENSUS)
 
-NEXT GATE  G3 ROBOT_POWERED no-motion validation TO_TEST — never executed
+NEXT GATE  G3.1 CDC-independent Controller loop  FAIL -> FIX UNDER VALIDATION
+BLOCKED    everything after G3, incl. all motion until G3 census repeat + G3.1 PASS
 ```
 
-`ROBOT_POWERED` **software** support exists on branch `feat/controller-robot-powered-v02`:
-one hardware-profile authority, the canonical-17 / expected-now-13 / absent-by-design-4 servo
-population model, structured census classification, and a fail-closed build-manifest gate that
-proves which profile a binary was built for before it can be flashed. It is **IMPLEMENTED**, not
-**VALIDATED** — the powered robot has never been energized.
+`ROBOT_POWERED` has **operator-accepted no-motion evidence** (formal census-repeat criterion
+still outstanding) on branch
+`feat/controller-robot-powered-v02`: DALY live read-only, LED live, 13/13 expected servos
+present with 4 absent by design, `SAFE_OFF` `VERIFIED_OFF` on all 13, `torque=0` on all 13, no
+motion at any point.
 
-### Immediate milestone: TO_TEST, no motion
+### Immediate milestone: G3.1, no motion
 
-```text
-MATDOG Controller
--> ROBOT_POWERED Hardware Validation
--> no motion
--> DALY live read-only
--> LED live
--> 13 expected servos read-only (13 present + 4 absent by design = PASS)
--> SAFE_OFF real readback
--> concurrent soak
-```
-
-This sequence has not been performed. It must not include robot motion, servo EEPROM writes, ID
-changes, calibration writes, or hardware reflashing as an incidental documentation step. The
-procedure is designed in
-[`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](05_Firmware/MATDOG_Controller/G3_ROBOT_POWERED_VALIDATION_PLAN.md);
-detailed validation ownership lives in the Controller
-[`VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md).
+A live zero-TX experiment after G3 showed the Controller loop starving whenever no USB CDC host
+holds the port open (BNO085 rotation-vector processing 0.68 Hz with the port closed vs 50.07 Hz
+open, same boot, cable attached). The root cause is in the installed `esp32:esp32 3.3.11` HWCDC
+transport; the fix (native HWCDC configuration: TX timeout 0 and a 3 KB TX ring, set before
+`Serial.begin()`) is implemented and offline-validated. Its live
+re-test is the next gate; nothing that needs an autonomous loop may proceed before it passes.
+Criteria are owned by the Controller
+[`DEVELOPMENT_GATES.md`](05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md); evidence by the
+Controller [`VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md).
 
 ### Everything after that
 

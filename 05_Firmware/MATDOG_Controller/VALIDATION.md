@@ -1947,3 +1947,229 @@ G3 ROBOT_POWERED LIVE = NOT EXECUTED / TO_TEST
 `ROBOT_POWERED` remains **IMPLEMENTED**, never **VALIDATED**. Powered validation requires
 separate hardware authorization per
 [`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md).
+
+---
+
+## G3 — ROBOT_POWERED LIVE, NO MOTION — 2026-09-17
+
+First powered session. Executed step by step under explicit operator authorization, each
+step independently reviewed and accepted by the operator.
+
+```text
+G3 PREFLIGHT READ-ONLY                 = PASS
+G3-A ROBOT_POWERED BUILD/PROVENANCE    = PASS
+G3-B APPLICATION-ONLY FLASH            = PASS
+G3-P2 DALY LIVE READ-ONLY              = PASS
+G3-P3 LED LIVE                         = PASS
+G3-P4A0 SINGLE ID51 PING               = PASS
+G3-P4A SERVO CENSUS                    = PASS
+G3-P4B0/B1 ID51 READ + SAFE_OFF PILOT  = PASS
+G3 POWERED NO-MOTION EVIDENCE          = PASS  (operator-accepted)
+G3 FORMAL CENSUS-REPEAT CRITERION      = OUTSTANDING (1 census run; 1 repeat required)
+```
+
+Robot mechanically suspended throughout. Fused battery disconnect was the established
+emergency power-removal path. **No motion, no Torque ON, no GoalPosition, no EEPROM, DALY
+or DCD write at any point.**
+
+| Item | Evidence |
+|---|---|
+| Device | ESP32-S3 MAC `14:c1:9f:22:75:94`, native USB-Serial/JTAG `303a:1001` |
+| Recovery backup | 16777216 bytes, sha256 `5cbba0b9…4d67fd32` — verified |
+| Flashed image | `6065d86c2da4`, `SOURCE_STATE=CLEAN`, `ROBOT_POWERED`, 387776 bytes, sha256 `0454345808a6aac46ec79fc711f48904c3a80008738b485918060801e4a99442` |
+| Flash path | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`: one write to `app0 @ 0x010000` (erase `0x10000–0x6efff`), rollback ENABLED / anti-rollback DISABLED, `verify-flash` digest matched |
+| First boot | `profile: ROBOT_POWERED (servo_power=YES battery=YES led_rail=YES)`, `operating_mode: MAINTENANCE`, `IMU_INIT=PASS`, `health=BOOTING` (SERVO `UNKNOWN` before any probe, by design), `runtime_resets=0` |
+| DALY | `ONLINE / REQUIRED / PASS`, `comm=OK`, fresh (`age_ms` < 2 s poll), pack 11.2 V 3S, no alarms, `charge_mos=ON discharge_mos=ON` |
+| LED | `@LED TEST` → `LED_TEST=STARTED`; chase visually confirmed by the operator; ring returned to OFF autonomously; `test_running=NO` |
+| ID51 ping | `found=1`, `max_ping_us=356` |
+| Census | `SERVO_CENSUS=PASS lo=11 hi=55`: `present_expected=13 missing_expected=0 absent_by_design=4 absent_by_design_present=0 unexpected_id=0 not_probed=0 truncated=NO` |
+| `SAFE_OFF` | `VERIFIED_OFF` on all 13 installed servos (write ACK ignored; independent `TorqueEnable` readback) |
+| Runtime read | 13/13 respond, `torque=0` on all, `speed=0 load=0`, voltage 112–113 (11.2–11.3 V), temp 33–36 °C |
+| Soak | 60 s passive, 600/600 telemetry lines valid, `runtime_resets=0`, `health=READY`, heap stable |
+| Cold power cycle (2026-09-18) | came back `ROBOT_POWERED` / `MAINTENANCE` — application-only flash persistent, no rollback |
+
+Recorded for completeness, not as regressions:
+
+- **Census repeat-stability — OUTSTANDING.** The formal G3 PASS criterion requires the
+  census to be "stable across repeats"; one complete census was executed. The 13
+  subsequent `@SERVO READ` transactions and 12 `SAFE_OFF` readbacks each re-confirmed every
+  expected ID, but they are not a census and do not substitute for one. The criterion is
+  unchanged; one additional read-only `@SERVO CENSUS` at the next authorized live session
+  closes it.
+- **Boot banner** — the first-boot capture lost two blocks of the banner to a USB CDC
+  transmit drop (the host opened the port mid-banner; the 256-byte TX ring overwrote them).
+  `startup_motion` / `startup_torque` / `startup_servo_scan` were therefore established
+  behaviourally (`SERVO detected=UNKNOWN`, `last_census=NOT_RUN` at 80 s uptime) and by the
+  static audit, not read off the banner.
+- **Soak scope** — observed with the CDC port open, the only way to observe it. G3.1 below
+  shows that is the healthy condition; the soak's IMU conclusion holds for port-open only.
+- **DALY KEY** — both switch positions produced byte-identical DALY state
+  (`discharge_mos=ON` in both). The readings cannot distinguish "KEY does not gate the
+  MOSFETs" from "KEY circuit not effective". `requestDischargeOff()` transmits nothing. The
+  fused disconnect is the only demonstrated power-removal path.
+
+---
+
+## G3.1 — CDC-INDEPENDENT CONTROLLER LOOP — 2026-09-18
+
+Regression found live **after** the G3 powered session. It does not invalidate the G3 servo/DALY/LED
+evidence above, every item of which was measured transaction by transaction.
+
+```text
+G3 POWERED NO-MOTION EVIDENCE         = PASS
+G3 FORMAL CENSUS-REPEAT CRITERION     = OUTSTANDING
+G3.1 CDC-INDEPENDENT CONTROLLER LOOP  = FAIL -> FIX UNDER VALIDATION
+Stage 4 onward (incl. all motion)     = BLOCKED until G3 census repeat + G3.1 PASS
+```
+
+### Finding — zero-TX passive A/B, same boot, cable attached throughout
+
+| Condition | Δ `rv_count` | Elapsed | BNO085 RV rate |
+|---|---:|---:|---:|
+| Host CDC port **closed** | 41 | 60.218 s | **0.68 Hz** |
+| Host CDC port **open** (same fd, immediately after) | 480 | 9.587 s | **50.07 Hz** |
+| Configured (`SH2_ROTATION_VECTOR`, 20000 µs) | | | 50 Hz |
+
+`runtime_resets` stayed 0; no boot, brownout, panic or malformed line. The reading port
+was opened `O_RDONLY` — zero bytes transmitted. Endpoint staleness was bounded on the
+device clock (`SAVE_GATE still_ms`): the closed-interval rate is **≤ 0.68 Hz** whenever the
+buffered lines were printed. Recovery to ~50 Hz was immediate on reopen, and 19
+consecutive open cycles ran at 49.5–51.3 Hz. Retrospectively, the same collapse explains
+the G3-B `rv_count` values (580 at 86 s; 3942 at 41 min — ~1.4 Hz between them), and
+it began each time a host process *closed* the port. Boots in which no host had opened
+the port ran at 47–48 Hz.
+
+### Root cause — confirmed in the installed core, not upstream
+
+Core `esp32:esp32 3.3.11` (the only one installed), FQBN `USBMode=hwcdc` →
+`-DARDUINO_USB_MODE=1`, `CDCOnBoot=cdc` → `-DARDUINO_USB_CDC_ON_BOOT=1`, so
+`cores/esp32/HardwareSerial.h:441-444` maps `Serial` to `HWCDCSerial` (`HWCDC`).
+In `~/.arduino15/packages/esp32/hardware/esp32/3.3.11/cores/esp32/HWCDC.cpp`:
+
+1. `static volatile bool connected` is set `true` by the ISR on the first host IN pickup
+   (`:148`) or OUT packet (`:239`), and cleared only by `BUS_RESET` (`:248`) or
+   `!isPlugged()` (`:273-276`).
+2. `isPlugged()` is `usb_serial_jtag_is_connected()`, which the ESP-IDF header documents
+   as true "so long as it is receiving SOF packets from the host, even if … the serial
+   port is not opened". Closing the host tty produces neither a bus reset nor SOF loss, so
+   **`connected` stays latched true after the host closes the port.**
+3. `HWCDC::write()` (`:540-623`), when `connected`, blocks in `xRingbufferSend(…,
+   tx_timeout_ms)` with `tx_timeout_ms = 100` (`:105`, `FREERTOS_HZ=1000`) and retries up
+   to `max_consec_timeouts = 20` (`:582`): **up to ~2 s per `Serial.print*()`** once the
+   256-byte TX ring (`:421-422`) is full and nothing drains it.
+4. `operator bool()` (`:375-377`) returns that same latched state, so `if (Serial)` is
+   **true in exactly the failing state** and cannot be the guard.
+5. `Bno085Imu::update()` services at most **one** SH2 event per loop pass, so every
+   loop stall is directly lost acquisition.
+
+Host condition on the ASUS: `power/control=auto` with a 2000 ms autosuspend delay, yet
+the device stays `runtime_status=active` with the port closed (SOFs continue). A host
+that did suspend the device would mask the bug — the firmware must not depend on host USB
+power policy. `ModemManager` is active on the ASUS: any transient open of the port by any
+process is enough to latch the failing state.
+
+### Fix — native HWCDC configuration in `Controller::begin()`
+
+Invariant: **no USB CDC transmit condition may block `Controller::update()`.**
+
+Two core calls before `Serial.begin()`, values in `config/BuildConfig.h`:
+
+```cpp
+Serial.setTxBufferSize(build::kUsbTxRingBytes);   // 3072
+Serial.setTxTimeoutMs(build::kUsbTxTimeoutMs);    // 0
+Serial.begin(build::kUsbSerialBaud);
+```
+
+With `tx_timeout_ms = 0` every wait in the installed `HWCDC.cpp` becomes non-blocking: the
+TX mutex is only try-locked (`xSemaphoreTake(…, 0)`, `:544`), each `xRingbufferSend(…, 0)`
+(`:590`) returns immediately, and the `max_consec_timeouts = 20` loop (`:582`) is at most
+20 immediate retries per chunk before a short write. No `delay()`, blocking semaphore or
+flush remains on the write path (`delay(1)` exists only in `flush()`, never called). The
+worst case for one `Serial.printf()` is formatting (plus `Print::vprintf`'s `malloc` above
+63 bytes) and ≤ 20 lock-free ring attempts — bounded, CPU-only, independent of any host.
+Output that does not fit is dropped whole per write call: each `printf` line is one write;
+`println` is two, so under saturation a line can lose its CRLF.
+
+Ring size from measured bursts (exact format strings, worst-case field widths):
+
+| Burst | Bytes |
+|---|---:|
+| IMU telemetry block, live / worst | 407 / 510 |
+| `@BMS STREAM` block, worst | 307 |
+| Boot banner | 779 |
+| `@STATUS` worst / `@HELP` | 561 / 628 |
+| `@SERVO CENSUS` PASS / worst (13 missing + 4 absent-by-design + 24 unexpected) | 263 / 1578 |
+| `@SERVO SCAN` worst (64 found) | 1125 |
+| **Largest single loop pass** (worst census + IMU + BMS) | **2395** |
+
+With timeout 0 nothing absorbs a burst, so even a host that is reading loses whatever
+exceeds the free ring at the moment of the write (formatting outpaces USB drain). The
+256-byte default is smaller than one IMU block, the banner, `@STATUS` and even a PASS
+census reply. 3072 covers the 2395-byte worst case with 28 % margin (2560 is the strict
+minimum at 512-byte granularity). Heap +2816 bytes; static RAM unchanged.
+
+`#error` guards pin hwcdc + CDC-on-boot and core 3.3.11. `DebugLevel=none`, pinned in the
+FQBN the manifest verifies, keeps `printBeforeSetupInfo()` out of the build — it would
+begin `Serial` before `setup()` and route debug output through a second, per-character
+transmit path.
+
+Accepted behaviour:
+
+- **Host opened, then closed or stopped reading** (flag latched): the ring keeps the oldest
+  ≤ 3 KB and new output is dropped; on reopen the host first receives that backlog (~4 s of
+  telemetry), then live data. A reply emitted before that backlog has drained may
+  short-write rather than block.
+- **Port never opened since boot**: the core overwrites the oldest bytes, so the boot banner
+  stays in the ring for ~4 s after reset (~2.8 s of telemetry after it). A host must open
+  the port within that window to read it.
+- **ESP-IDF secondary console** (`CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=y`) writes to
+  the same hardware outside HWCDC, only on IDF error logs or panics. Pre-existing and
+  unchanged; not verifiable from local source (IDF sources are not installed). No such
+  output has been observed in any capture.
+
+**Delivery semantics.** The timeout-0 guarantee is that USB CDC transmit cannot stall
+Controller progress; it is not a delivery guarantee. Command replies are expected complete
+under normal connected/draining conditions with adequate TX-ring free space. After a long
+closed-port interval a stale TX backlog may still occupy the ring immediately after reopen,
+and a reply emitted before enough space has drained may short-write rather than block. This
+is acceptable for the current diagnostic USB command surface and is **not** promoted into the
+future HostLink contract, which remains responsible for its own framing, acknowledgement and
+reliability.
+
+Alternative evaluated and not adopted: a `SerialTransport` channel abstraction gating
+unsolicited output on `availableForWrite()` with a response reserve. It satisfied the same
+invariant but changed 5 firmware files, added 2 more and ~430 lines of tests; the native
+configuration satisfies it in 2 firmware files.
+
+### Offline acceptance
+
+| Gate | Result |
+|---|---|
+| New audit rule `check_usb_cdc_tx_never_blocks` | **PASS**; mutation check **11/11 caught** (timeout ≠ 0, ring < 2560, ring or timeout after `begin()`, timeout call removed, output before `begin()`, either guard removed, a second `setTxTimeoutMs()`, `Serial.flush()`, `setDebugOutput()`) |
+| Static safety audit | **PASS** — 29 source files, 0 findings |
+| Servo population / profile host tests | **PASS** — 313 checks / 0 failures |
+| Build manifest provenance tests | **PASS** — 51/51 |
+| OTA partition logic suite | **PASS** — 40/40 |
+| BNO085 viewer `npm run verify` | **PASS** — 59/59 tests, typecheck, production build |
+| Compile, `USB_ONLY` (pinned FQBN) | **PASS** — 387188 bytes flash, 28344 bytes static RAM |
+| Compile, `ROBOT_POWERED` (pinned FQBN) | **PASS** — 387656 bytes flash, 28344 bytes static RAM |
+
+Only the two pre-existing third-party SCServo warnings appear; none in MATDOG source.
+
+### Live validation — TO_TEST (requires a clean commit, rebuild and separate authorization)
+
+1. Commit; `MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh`; verify manifest `CLEAN`;
+   `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`.
+2. Open a passive (zero-TX) listener **immediately** after the flash script returns: the
+   full banner is expected, including `startup_*`, `partition` and `reset_reason` (closes the
+   G3 boot-banner gap).
+3. Close the port (the flag is now latched — the failing case). Zero-TX A/B: closed ≥ 60 s,
+   then open 10 s. **PASS: closed ≥ 45 Hz and open 45–55 Hz**, `runtime_resets` unchanged,
+   every line valid.
+4. `@BMS STREAM ON`, close the port 60 s, reopen: rate as in 3; the stream resumes.
+5. The viewer (zero commands) connects after a closed interval and receives live telemetry.
+6. With the host reading and the reconnect backlog drained (wait ≥ 1 s after opening),
+   `@STATUS`, `@IMU STATUS`, `@BMS STATUS`, `@LED STATUS`, `@HELP`: every reply complete.
+7. **One read-only `@SERVO CENSUS`** — closes the outstanding G3 census-repeat criterion
+   (expect `PASS`, 13 present, 4 absent by design); issued after the backlog has drained, it
+   also shows a census reply arrives complete under timeout 0.

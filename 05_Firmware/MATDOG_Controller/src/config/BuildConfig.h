@@ -72,6 +72,15 @@ constexpr uint32_t kUsbSerialBaud = 115200;   // USB CDC ignores baud; kept for 
 constexpr uint32_t kServoBusBaud  = 1000000;  // ST3215 / Seeed driver, hardware-proven.
 constexpr uint32_t kDalyBusBaud   = 9600;     // DALY XY-017 RS485, hardware-proven.
 
+// G3.1 USB CDC transmit policy, applied in Controller::begin(). Timeout 0
+// makes HWCDC drop, instead of wait for, output no host is draining. The
+// ring holds the largest single Controller::update() burst (worst census
+// reply + IMU block + BMS block = 2395 B), so replies are expected complete
+// while a host drains the port - best effort, see VALIDATION.md § G3.1.
+// The core default is 256 B.
+constexpr uint32_t kUsbTxTimeoutMs = 0;
+constexpr uint32_t kUsbTxRingBytes = 3072;
+
 }  // namespace build
 }  // namespace matdog
 

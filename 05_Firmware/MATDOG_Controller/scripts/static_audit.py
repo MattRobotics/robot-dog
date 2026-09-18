@@ -78,6 +78,15 @@ USB/CDC mode and CPU frequency unchecked at flash time. verify_manifest()
 must take an explicit expected_fqbn with no default, compare it for exact
 equality, and flash_app_only.sh must pass its own pinned "$FQBN".
 
+G3.1 (live regression found after G3, 2026-09-18) addition: USB CDC
+transmit regaining the ability to block the Controller loop. The installed
+HWCDC (esp32:esp32 3.3.11) keeps a host "connected" after it closes the
+port and, with its default 100 ms TX timeout, waits up to ~2 s per print on
+a full ring (BNO085 RV fell from 50.07 Hz to 0.68 Hz). The TX timeout must
+be explicitly 0 and set, with the ring size, before Serial.begin() and any
+output; nothing may set it again; Serial.flush() (discards or waits) and
+debug-output routing (a second per-character transmit path) are forbidden.
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
@@ -987,6 +996,56 @@ def check_unknown_detection_is_not_a_verdict(files):
                  f"status green is forbidden (G2 review Finding 2)")
 
 
+def check_usb_cdc_tx_never_blocks(files):
+    """G3.1: no USB CDC transmit condition may block Controller::update().
+
+    With tx_timeout_ms = 0 every wait in HWCDC::write() (3.3.11) becomes an
+    immediate drop. That guarantee holds only if the timeout is 0 before the
+    first byte and nothing raises it again.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+
+    cfg_path, cfg = by_name.get("BuildConfig.h", (None, ""))
+    m = re.search(r"kUsbTxTimeoutMs\s*=\s*(\d+)\s*;", cfg)
+    if not m or int(m.group(1)) != 0:
+        fail(f"{cfg_path}: kUsbTxTimeoutMs must be exactly 0 - any non-zero value lets "
+             f"HWCDC::write() wait on a host that is not reading (G3.1)")
+    m = re.search(r"kUsbTxRingBytes\s*=\s*(\d+)\s*;", cfg)
+    if not m or int(m.group(1)) < 2560:
+        fail(f"{cfg_path}: kUsbTxRingBytes must be >= 2560 - the largest single loop-pass "
+             f"burst is 2395 B and with timeout 0 anything beyond the ring is dropped even "
+             f"while a host is reading (G3.1)")
+
+    ctl_path, ctl = by_name.get("Controller.cpp", (None, ""))
+    body = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", ctl, re.DOTALL)
+    body = body.group(1) if body else ""
+    ring = body.find("Serial.setTxBufferSize(build::kUsbTxRingBytes)")
+    tout = body.find("Serial.setTxTimeoutMs(build::kUsbTxTimeoutMs)")
+    begin = body.find("Serial.begin(")
+    first_out = min([i for i in (body.find("Serial.print"), body.find("printBootBanner("))
+                     if i != -1] or [len(body)])
+    if -1 in (ring, tout, begin) or not (ring < begin and tout < begin < first_out):
+        fail(f"{ctl_path}: Controller::begin() must set the TX ring and the 0 ms TX "
+             f"timeout before Serial.begin(), and Serial.begin() before any output (G3.1)")
+    for guard in ("ARDUINO_USB_MODE && ARDUINO_USB_CDC_ON_BOOT",
+                  "ESP_ARDUINO_VERSION_VAL(3, 3, 11)"):
+        if guard not in ctl:
+            fail(f"{ctl_path}: compile-time guard {guard!r} missing - the non-blocking "
+                 f"guarantee was audited against HWCDC in esp32:esp32 3.3.11 only")
+
+    for token, why in (("setTxTimeoutMs(", "exactly one TX timeout, set in Controller::begin()"),
+                       ("setTxBufferSize(", "exactly one TX ring size, set in Controller::begin()")):
+        hits = [str(p) for p, code in files for _ in range(code.count(token))]
+        if len(hits) != 1:
+            fail(f"{token} appears {len(hits)} time(s) {hits} - {why} (G3.1)")
+    for path, code in files:
+        for token in ("Serial.flush(", "setDebugOutput(", "shouldPrintChipDebugReport"):
+            if token in code:
+                fail(f"{path}: {token} is forbidden - flush() with timeout 0 discards the TX "
+                     f"ring (and waits otherwise); debug output adds a second per-character "
+                     f"transmit path and begins Serial before setup() (G3.1)")
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -1016,6 +1075,7 @@ def main():
     check_host_tests(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
     check_unknown_detection_is_not_a_verdict(files)
+    check_usb_cdc_tx_never_blocks(files)
 
     print(f"Scanned {len(files)} source files under {SKETCH_DIR}")
 

@@ -6,6 +6,16 @@
 #include "../config/BuildConfig.h"
 #include "../config/Pins.h"
 
+// G3.1: the non-blocking USB CDC guarantee in Controller::begin() rests on
+// HWCDC::write() as shipped in esp32:esp32 3.3.11, where Serial == HWCDCSerial
+// under USBMode=hwcdc + CDCOnBoot=cdc. Re-audit HWCDC.cpp before changing either.
+#if !(ARDUINO_USB_MODE && ARDUINO_USB_CDC_ON_BOOT)
+#error "G3.1: USB CDC transmit policy audited for USBMode=hwcdc + CDCOnBoot=cdc only"
+#endif
+#if ESP_ARDUINO_VERSION != ESP_ARDUINO_VERSION_VAL(3, 3, 11)
+#error "G3.1: HWCDC transmit semantics audited against esp32:esp32 3.3.11 only"
+#endif
+
 namespace matdog {
 namespace core {
 
@@ -29,6 +39,15 @@ const char* resetReasonName(esp_reset_reason_t reason) {
 }  // namespace
 
 void Controller::begin() {
+  // G3.1: USB CDC output must never block this loop. HWCDC keeps treating a
+  // host as connected after it closes the port, and with its default 100 ms
+  // TX timeout each print then waits up to ~2 s on a full ring (BNO085 fell
+  // from 50 Hz to 0.68 Hz). With timeout 0 every such wait becomes an
+  // immediate drop. Ring before begin(): the core has not started Serial
+  // yet on hwcdc builds, so it is created at its final size before any ISR,
+  // byte or host exists. See build::kUsbTxRingBytes for the sizing.
+  Serial.setTxBufferSize(build::kUsbTxRingBytes);
+  Serial.setTxTimeoutMs(build::kUsbTxTimeoutMs);
   Serial.begin(build::kUsbSerialBaud);
   delay(1500);  // let native USB CDC enumerate, matching every proven bring-up sketch.
 
