@@ -87,13 +87,11 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   live and plausible; LED validated without disturbing bus timing; census exactly `PASS`
   (13 present-expected, 4 absent-by-design, 0 missing, 0 unexpected) and stable across repeats;
   `VERIFIED_OFF` on all 13; `READY` during soak; **no motion observed at any point**.
-- **NEXT** — G3.1, then Diagnostics / Maintenance.
-- **STATUS** — powered no-motion evidence **PASS** (live, 2026-09-17, operator-accepted).
-  Formal criterion "census … stable across repeats": **OUTSTANDING** — one census executed;
-  one additional read-only `@SERVO CENSUS` at the next authorized live session closes it.
-  The criterion is unchanged. A Controller-loop regression found afterwards is tracked as
-  G3.1; it does not invalidate the servo/DALY/LED evidence, each item of which was measured
-  per transaction.
+- **NEXT** — G3.1 (PASS), then the DALY KEY investigation, then G4 — Diagnostics / Maintenance.
+- **STATUS** — **PASS (formal).** Powered no-motion evidence live 2026-09-17; a second census on
+  2026-09-18 matched the first exactly, satisfying "census … stable across repeats" (criterion
+  unchanged). A Controller-loop regression found in between is tracked as G3.1, now PASS; it did
+  not invalidate the servo/DALY/LED evidence, each item of which was measured per transaction.
 - **EVIDENCE** — [`VALIDATION.md` § G3](VALIDATION.md); procedure in
   [`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md).
 
@@ -124,17 +122,28 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   reset/brownout/panic; every line syntactically valid on reopen; the viewer receives
   telemetry with zero commands; command replies complete when issued with the host reading
   and the reconnect backlog drained.
-- **NEXT** — Diagnostics / Maintenance (roadmap stage 4). **Every later stage, and all
-  motion, is BLOCKED until G3.1 PASS.**
-- **STATUS** — **FAIL → FIX UNDER VALIDATION.** Root cause confirmed in the installed
-  `esp32:esp32 3.3.11` HWCDC; fix (native HWCDC TX timeout 0 + 3 KB TX ring) implemented and
-  offline-validated; live re-test **TO_TEST**.
+- **NEXT** — DALY KEY investigation, then G4 — Diagnostics / Maintenance (roadmap stage 4).
+- **STATUS** — **PASS** (live, 2026-09-18). Fix: native HWCDC TX timeout 0 + 3 KB TX ring
+  (`e2fc605`). BNO085 RV 50.10 Hz with the port closed 62 s after a host had opened and closed
+  it (0.68 Hz before the fix), 50.13 Hz open, 50.11 Hz with `@BMS STREAM` enabled;
+  `runtime_resets` 0; every command reply complete once the backlog had drained.
 - **EVIDENCE** — [`VALIDATION.md` § G3.1](VALIDATION.md).
 
-## Diagnostics / Maintenance
+## Open hardware item — DALY KEY (before G4)
+
+- **FINDING** — during G3 both positions of the physical KEY switch produced identical
+  DALY-reported state (`discharge_mos=ON` in both).
+- **STATUS** — **OPEN.** KEY is not a validated shutdown or safety barrier. The DALY's actual KEY
+  configuration and function must be inspected before any setting is changed; the investigation
+  needs its own session authorization. `requestDischargeOff()` remains a fail-closed stub that
+  transmits nothing, and no DALY write exists.
+- **INTERIM RULE** — the fused disconnect is the trusted physical isolation method.
+
+## G4 — Diagnostics / Maintenance
 
 - **PURPOSE** — permanent read-only maintenance capability over the single shared `ServoBus`.
-- **ENTRY** — G3 formal PASS (including the census repeat); **G3.1 PASS**.
+- **ENTRY** — G3 formal PASS (including the census repeat); **G3.1 PASS**. Both satisfied
+  2026-09-18; the roadmap puts the DALY KEY investigation first.
 - **ALLOWED** — `SYSTEM_SELF_TEST`, consolidated servo health, source-signature read, profile audit;
   extension of the existing census/read/`SAFE_OFF` surface.
 - **FORBIDDEN** — any new persistent write path; any transport→register access; motion.
@@ -274,7 +283,7 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — commanded motion matches expectation within bounds; safe-stop and fault
   injection behave as designed.
 - **NEXT** — UI-4, then poses and IK.
-- **STATUS** — **BLOCKED** (G3 census repeat, G3.1, authority model, calibration, Safe Actuator).
+- **STATUS** — **BLOCKED** (authority model, calibration, Safe Actuator).
 
 ## IK · Gait · Stabilization
 

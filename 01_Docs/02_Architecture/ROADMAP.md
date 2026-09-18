@@ -50,25 +50,32 @@ COMPLETE   Controller V0.1 baseline               VALIDATED (USB_ONLY hardware)
 COMPLETE   G0 post-cleanup entry audit            PASS
 COMPLETE   G1 V0.1 regression freeze              PASS
 COMPLETE   V2 architecture delta audit            PASS
-COMPLETE   G2 ROBOT_POWERED preparation           PASS (software/offline only)
-EVIDENCE   G3 ROBOT_POWERED no-motion evidence    PASS (operator-accepted, 2026-09-17)
-OPEN       G3 formal census-repeat criterion      OUTSTANDING (one more read-only @SERVO CENSUS)
+COMPLETE   G2 ROBOT_POWERED software              PASS / FROZEN
+COMPLETE   G3 ROBOT_POWERED no-motion             PASS (formal, 2026-09-18)
+COMPLETE   G3.1 CDC-independent Controller loop   PASS (2026-09-18)
 
-CURRENT    G3.1 CDC-independent Controller loop   FAIL -> FIX UNDER VALIDATION (live re-test TO_TEST)
-BLOCKED    Stage 4 onward, including all motion   until G3 census repeat + G3.1 PASS
+NEXT       DALY KEY investigation
+THEN       G4 Diagnostics / Maintenance
 ```
 
-`ROBOT_POWERED` is **VALIDATED for no-motion operation** (G3): DALY live read-only, LED live,
-13/13 expected servos with 4 absent by design, `VERIFIED_OFF` on all 13, `torque=0` on all 13
-(the formal "census stable across repeats" criterion still needs one more census run).
-After G3 a live zero-TX experiment showed the Controller loop **starving while no USB CDC host
-holds the port open** (BNO085 RV 0.68 Hz closed vs 50.07 Hz open, cable attached). Root cause
-is in the installed HWCDC transport; the fix is implemented and offline-validated, and its live
-re-test is gate G3.1. Nothing beyond G3 may proceed until the G3 census repeat is run and
-G3.1 passes — any autonomous
-behaviour, and all motion, needs a loop that does not depend on a host.
+`ROBOT_POWERED` is **VALIDATED for no-motion operation** (G3, formal): DALY live read-only, LED
+live, 13/13 expected servos with 4 absent by design in two identical censuses, `VERIFIED_OFF` and
+`torque=0` on all 13. G3.1 closed a regression found after the first powered session — the
+Controller loop starved while no USB CDC host held the port open (0.68 Hz); with the native HWCDC
+fix it runs at 50.1 Hz with the port closed. No motion or calibration capability exists yet.
 
-G2 currently lives on branch `feat/controller-robot-powered-v02` and is not merged to `main`.
+G2 through G3.1 were developed on branch `feat/controller-robot-powered-v02` and merged to `main`
+by the G3/G3.1 closeout pull request.
+
+### Open hardware notes
+
+- **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
+  DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
+  or safety barrier; the DALY's actual KEY configuration and function must be inspected before any
+  setting is changed. The fused disconnect remains the trusted physical isolation method.
+- **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
+  19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
+  electrical and signal-integrity validation.
 
 ---
 
@@ -81,17 +88,17 @@ Each row's *Blocks* column states what it gates. Arrows are hard dependencies, n
 | # | Stage | Status | Reality in this repository |
 |---|---|---|---|
 | 1 | **MATDOG Controller baseline** | **COMPLETE** | V0.1 unified runtime, **FROZEN** at tag `matdog-controller-v0.1.0`. **VALIDATED** on real hardware in the `USB_ONLY` profile only. |
-| 2 | **ROBOT_POWERED preparation** | **COMPLETE** | `HardwareProfile` authority (`USB_ONLY` / `ROBOT_POWERED`), profile-derived module expectations, canonical-17 / expected-13 / absent-by-design-4 servo population model, structured census classification, build-manifest flash provenance. **IMPLEMENTED + offline-tested; not hardware-validated.** |
-| 3 | **ROBOT_POWERED no-motion validation** | **EVIDENCE PASS — CENSUS REPEAT OUTSTANDING** | **PASS** (operator-accepted evidence), live, 2026-09-17; formal census-repeat criterion: one repeat outstanding — evidence in [`VALIDATION.md` § G3](../../05_Firmware/MATDOG_Controller/VALIDATION.md). Follow-up **G3.1 CDC-independent Controller loop: FAIL → fix under validation**; blocks stage 4 onward. |
+| 2 | **ROBOT_POWERED preparation** | **COMPLETE** | `HardwareProfile` authority (`USB_ONLY` / `ROBOT_POWERED`), profile-derived module expectations, canonical-17 / expected-13 / absent-by-design-4 servo population model, structured census classification, build-manifest flash provenance. Software **FROZEN**; hardware-validated by stage 3. |
+| 3 | **ROBOT_POWERED no-motion validation** | **COMPLETE** | **G3 PASS (formal)**, live 2026-09-17 / 2026-09-18, two identical censuses. **G3.1 CDC-independent Controller loop PASS**, 2026-09-18. Evidence in [`VALIDATION.md`](../../05_Firmware/MATDOG_Controller/VALIDATION.md). Open hardware item: DALY `KEY` (see above). |
 
 ### Phase 2 — Maintenance, authority, service
 
 | # | Stage | Status | Reality in this repository |
 |---|---|---|---|
-| 4 | **Diagnostics / Maintenance** | **PARTIAL — BLOCKED by G3.1** | Already exist: `@STATUS` module availability, `@SERVO SCAN`, `@SERVO READ`, `@SERVO CENSUS` (structured population classification), `@SERVO SAFE_OFF` with independent readback, `@IMU`/`@BMS`/`@LED` status. Do **not** exist: `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated servo health summary. |
+| 4 | **G4 — Diagnostics / Maintenance** | **PARTIAL — NEXT after the DALY KEY investigation** | Already exist: `@STATUS` module availability, `@SERVO SCAN`, `@SERVO READ`, `@SERVO CENSUS` (structured population classification), `@SERVO SAFE_OFF` with independent readback, `@IMU`/`@BMS`/`@LED` status. Do **not** exist: `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated servo health summary. |
 | 5 | **OperatingMode / ActuatorAuthority** | **PARTIAL** | `OperatingMode{MAINTENANCE, RUN}` exists and gates blocking servo diagnostics — deliberately minimal. The full `ActuatorAuthority` model (`NONE`/`DIAGNOSTICS`/`CALIBRATION`/`QC`/`PROVISIONING`/`MOTION`, one owner at a time) is **TO_DESIGN**. Required before any write-capable service or motion. |
 | 6 | **Service / Provisioning / QC** | **FUTURE** | Frozen bench tools (Bench QC V6.1, Source Signature Survey V1, Provisioner V6) remain **FROZEN** oracles; nothing is integrated into the Controller. Blocked by stage 5. |
-| 7 | **Full Leg Calibration integration** | **FUTURE** | Branch `matdog/full-leg-calibrator-v1` preserved as an oracle. Not merged, not ported. Blocked by stages 3 and 5. |
+| 7 | **Full Leg Calibration integration** | **FUTURE** | Branch `matdog/full-leg-calibrator-v1` preserved as an oracle. Not merged, not ported. Blocked by stage 5. |
 | 8 | **Formal recalibration of the installed robot** | **BLOCKED** | Blocker: `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION`. Last formal Full-Leg H1 result was 6/12 and has not been superseded. A Controller census finding 13 servos proves bus visibility, **not** calibration H1. Blocks all motion. |
 
 ### Phase 3 — Host transport, network, Web UI, OTA
@@ -175,13 +182,11 @@ authoritative Controller state, never from frontend assumptions.
 
 | Blocker | Blocks | Cleared by |
 |---|---|---|
-| G3 formal census-repeat criterion outstanding (one census run) | stage 4 onward, all motion | one read-only `@SERVO CENSUS`, planned inside the G3.1 session |
-| G3.1: Controller loop starves while no USB CDC host holds the port open | stage 4 onward, all motion | G3.1 live re-test of the offline-validated fix |
+| DALY `KEY` not validated as a shutdown or safety barrier | any reliance on KEY for power-off or isolation | DALY KEY investigation (fused disconnect is the trusted isolation meanwhile) |
 | `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION` | all motion (15, 17, 20, 23) | stages 7 + 8 |
 | No `ActuatorAuthority` model | write-capable service, QC, calibration, motion | stage 5 |
 | No Safe Actuator Layer | all motion | stage 14 |
 | No Wi-Fi runtime | all Web UI and OTA runtime | stage 10 |
-| G2 not merged to `main` | nothing technically, but `main` does not yet contain ROBOT_POWERED support | reviewed merge of `feat/controller-robot-powered-v02` |
 
 ---
 

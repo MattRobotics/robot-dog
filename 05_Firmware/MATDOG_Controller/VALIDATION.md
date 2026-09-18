@@ -28,31 +28,41 @@ checkboxes are not current project status and are intentionally not rewritten.
 - `USB_ONLY` boot on the real ESP32-S3, native USB CDC and live BNO085 acquisition;
 - viewer protocol compatibility, expected-offline classification and USB-only soak behavior;
 - unpowered servo diagnostics and honest `SAFE_OFF=UNVERIFIED_NO_RESPONSE` classification;
-- the exact source/application provenance recorded above.
+- the exact source/application provenance recorded above;
+- **`ROBOT_POWERED` no-motion operation — G3 formal PASS (2026-09-17 / 2026-09-18):** live
+  read-only DALY, live LED, 13/13 expected servos with 4 absent by design in two identical
+  censuses, `VERIFIED_OFF` and `torque=0` on all 13, concurrent soak;
+- **CDC-independent Controller loop — G3.1 PASS (2026-09-18):** BNO085 acquisition at 50.1 Hz with
+  the USB CDC port closed, open, and with `@BMS STREAM` enabled.
 
-### IMPLEMENTED — ROBOT_POWERED validation remains TO_TEST
+Powered build currently on the robot:
 
-- DALY read-only telemetry integration;
-- LED-ring output path;
-- powered ST3215 read/scan and `SAFE_OFF` readback paths;
-- Controller scheduling paths for concurrent DALY, LED and servo operation.
+| Identity | Value |
+|---|---|
+| Source commit | `e2fc60531b28351472a2bfa5105a2170147610bb` |
+| Hardware profile | `ROBOT_POWERED` build override; the source default remains `USB_ONLY` |
+| Application | 387808 bytes, SHA256 `e2b474b5c07e98649fbaf31d3d08970d022ffbdb5f1212d6b606dc28cac065d2` |
+| Flash path | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`, `app0 @ 0x010000` |
 
-The official V0.1 source remains configured for `USB_ONLY`; its power-availability flags are false.
-A future `ROBOT_POWERED` build/configuration is a deliberate firmware change and is not performed by
-this documentation patch.
+### OPEN
 
-### Immediate milestone — TO_TEST
+- **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
+  DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
+  or safety barrier; the DALY's actual KEY configuration and function must be inspected before any
+  setting is changed. The fused disconnect remains the trusted physical isolation method.
+- **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
+  19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
+  electrical and signal-integrity validation.
+
+### Next
 
 ```text
-MATDOG Controller V0.1
-→ ROBOT_POWERED Hardware Validation
-→ no motion
-→ DALY live read-only
-→ LED live
-→ 13 expected servos read-only
-→ SAFE_OFF real readback
-→ concurrent soak
+DALY KEY investigation
+→ G4 Diagnostics / Maintenance
 ```
+
+No motion, calibration or write-capable service capability exists in the firmware. Every later
+stage has its own gate in [`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md).
 
 The expected installed servo IDs are `11,12,13,21,22,23,31,32,33,41,42,43,51`: 12 legs plus
 `NECK_ROTATION` ID51. IDs 52 `NECK_PITCH`, 53 `HEAD_ROTATION`, 54 `HEAD_PITCH` and 55 `JAW` remain
@@ -1968,6 +1978,9 @@ G3 POWERED NO-MOTION EVIDENCE          = PASS  (operator-accepted)
 G3 FORMAL CENSUS-REPEAT CRITERION      = OUTSTANDING (1 census run; 1 repeat required)
 ```
 
+> **Closed 2026-09-18** — the second census matched the first; G3 formal PASS. See
+> § G3 / G3.1 live closure below. The block above is the record as it stood on 2026-09-17.
+
 Robot mechanically suspended throughout. Fused battery disconnect was the established
 emergency power-removal path. **No motion, no Torque ON, no GoalPosition, no EEPROM, DALY
 or DCD write at any point.**
@@ -2021,6 +2034,9 @@ G3 FORMAL CENSUS-REPEAT CRITERION     = OUTSTANDING
 G3.1 CDC-INDEPENDENT CONTROLLER LOOP  = FAIL -> FIX UNDER VALIDATION
 Stage 4 onward (incl. all motion)     = BLOCKED until G3 census repeat + G3.1 PASS
 ```
+
+> **Closed 2026-09-18** — G3.1 PASS live. See § G3 / G3.1 live closure below. The blocks in
+> this section are the record as it stood before the live re-test.
 
 ### Finding — zero-TX passive A/B, same boot, cable attached throughout
 
@@ -2158,6 +2174,8 @@ Only the two pre-existing third-party SCServo warnings appear; none in MATDOG so
 
 ### Live validation — TO_TEST (requires a clean commit, rebuild and separate authorization)
 
+> Executed 2026-09-18 — results in § G3 / G3.1 live closure below.
+
 1. Commit; `MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh`; verify manifest `CLEAN`;
    `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`.
 2. Open a passive (zero-TX) listener **immediately** after the flash script returns: the
@@ -2173,3 +2191,109 @@ Only the two pre-existing third-party SCServo warnings appear; none in MATDOG so
 7. **One read-only `@SERVO CENSUS`** — closes the outstanding G3 census-repeat criterion
    (expect `PASS`, 13 present, 4 absent by design); issued after the backlog has drained, it
    also shows a census reply arrives complete under timeout 0.
+
+---
+
+## G3 / G3.1 LIVE CLOSURE — 2026-09-18
+
+```text
+G3 FORMAL CENSUS-REPEAT                      = PASS
+G3.1 CDC CLOSED-PORT INDEPENDENCE            = PASS
+G3.1 BMS STREAM ROBUSTNESS                   = PASS
+
+G3 FORMAL ROBOT_POWERED NO-MOTION VALIDATION = PASS
+G3.1 CDC-INDEPENDENT CONTROLLER LOOP         = PASS
+```
+
+Robot mechanically suspended, fused disconnect accessible, operator present throughout.
+No commanded servo motion occurred and no robot motion was observed during validation.
+
+### G3.1-L1 — clean application-only flash and first boot
+
+| Item | Evidence |
+|---|---|
+| Source | `e2fc60531b28351472a2bfa5105a2170147610bb`; manifest `SOURCE_STATE=CLEAN`, `HARDWARE_PROFILE=ROBOT_POWERED` |
+| Application | 387808 bytes, SHA256 `e2b474b5c07e98649fbaf31d3d08970d022ffbdb5f1212d6b606dc28cac065d2` |
+| Flash | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh` — MAC `14:c1:9f:22:75:94`; one write, erase `0x10000–0x6efff` inside `app0`; bootloader, partition table, otadata and NVS untouched; `verify-flash` digest matched; `APPLICATION_ONLY_FLASH = PASS` |
+| First boot (passive, zero bytes sent) | complete banner: `build e2fc60531b28`, `ROBOT_POWERED (servo_power=YES battery=YES led_rail=YES)`, `partition app0 @ 0x010000`, `reset_reason OTHER` (the USB-JTAG RTS reset has no named entry), `startup_motion` / `startup_torque` / `startup_servo_scan : DISABLED`, `daly_write : NOT_IMPLEMENTED`, `operating_mode MAINTENANCE`, `IMU_INIT=PASS`, `SYSTEM_BOOT_COMPLETE health=BOOTING` |
+| First telemetry | BNO085 RV 50.12 Hz, `runtime_resets=0`, every line valid |
+
+The complete banner closes the G3 boot-banner gap: the `startup_*` lines are now directly observed.
+
+### CDC independence
+
+Zero-TX passive A/B. A host had already opened and closed the port after boot, so HWCDC was in the
+latched state that failed before the fix.
+
+| | Value |
+|---|---|
+| Pre-close (`still_ms` / `rv` / `runtime_resets`) | S0 = 471826 ms, R0 = 23644, Z0 = 0 |
+| Host closed interval | 62.121 s |
+| First fresh post-close | S1 = 534345 ms, R1 = 26776, Z1 = 0 |
+| Device interval S1 − S0 | 62.519 s (host clock 62.520 s) |
+| **Closed-port RV rate** | **50.10 Hz** (0.68 Hz before the fix) |
+| Open recovery RV rate | 50.13 Hz (21 fresh blocks, 10.07 s) |
+| `runtime_resets` | 0 |
+
+Backlog on reopen: 7 stale complete IMU blocks, 3131 bytes before the first fresh block, stale
+`still_ms` offsets +0.503 … +3.524 s after S0 — the 3 KB ring holding ~3.5 s of post-close
+telemetry, as designed. No `still_ms` reset. Fresh blocks were identified by the `still_ms`
+discontinuity and by counter consistency within each block (`RV count` = `COUNTS rv`).
+
+### Second servo census
+
+```text
+SERVO_CENSUS=STARTED lo=11 hi=55
+SERVO_CENSUS=PASS lo=11 hi=55
+  canonical_allocated=17 expected_now=13
+  present_expected=13 missing_expected=0 absent_by_design=4
+  absent_by_design_present=0 unexpected_id=0 not_probed=0 truncated=NO
+SERVO  init=OK detected=ONLINE expected=REQUIRED result=PASS
+```
+
+Identical, line for line, to the first census (G3-P4A, 2026-09-17).
+**CENSUS STABLE ACROSS REPEATS = PASS.** The runs used firmware `6065d86` and `e2fc605`; the census
+code path is identical in both. The census covers IDs 11..55 only; nothing is claimed about IDs
+outside that range. Telemetry continued during and after it.
+
+### Diagnostic replies
+
+With the host reading and the reconnect backlog drained: `@STATUS`, `@IMU STATUS`, `@BMS STATUS`,
+`@LED STATUS` and `@HELP` each returned a complete, syntactically valid reply (7, 2, 5, 2 and 18
+lines); none was re-issued.
+
+### BMS stream robustness
+
+| | Value |
+|---|---|
+| `@BMS STREAM ON` | `BMS_STREAM=ON`; 3 stream blocks before close |
+| Pre-close | S2 = 553514 ms, R2 = 27706, Z2 = 0 |
+| Host closed interval | 62.119 s |
+| First fresh post-close | S3 = 616057 ms, R3 = 30840, Z3 = 0 |
+| Device interval | 62.543 s (host clock 62.544 s) |
+| **Closed-port RV rate, stream enabled** | **50.11 Hz** |
+| After reopen | 4 fresh stream blocks: DALY `comm=OK`, `charge_mos=ON`, `discharge_mos=ON`, alarms all zero |
+| `@BMS STREAM OFF` | `BMS_STREAM=OFF`; zero stream blocks in the following 4.5 s |
+| `runtime_resets` | 0 |
+
+### Final state
+
+```text
+SYSTEM health=READY power_state=RUN mode=MAINTENANCE profile=ROBOT_POWERED
+BNO085 REQUIRED/PASS   DALY REQUIRED/PASS   SERVO REQUIRED/PASS   LED OPTIONAL/PASS
+runtime_resets=0
+```
+
+Final passive window 50.11 Hz. No brownout, panic, reboot or FAULT at any point. The BNO085
+stillness timer never reset across the 632 s batch (gyro magnitude 0.000000 rad/s). Pack 11.0 V,
+SOC 41.4 %, cell Δ12–13 mV, no alarms.
+
+### Still open
+
+- **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
+  DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
+  or safety barrier; the DALY's actual KEY configuration and function must be inspected before any
+  setting is changed. The fused disconnect remains the trusted physical isolation method.
+- **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
+  19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
+  electrical and signal-integrity validation.

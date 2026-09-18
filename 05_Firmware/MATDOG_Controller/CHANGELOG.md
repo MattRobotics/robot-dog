@@ -1,5 +1,19 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — G3 / G3.1 live closure — 2026-09-18
+
+Documentation only; no firmware change. Records the live validation of `e2fc605`.
+
+- **G3 formal PASS:** a second read-only `@SERVO CENSUS` matched the first exactly — census stable
+  across repeats. The complete first-boot banner now shows `startup_motion` / `startup_torque` /
+  `startup_servo_scan : DISABLED` directly.
+- **G3.1 PASS:** with the host port closed 62 s after a host had opened and closed it, BNO085 RV
+  ran at 50.10 Hz (0.68 Hz before the fix); 50.13 Hz open; 50.11 Hz with `@BMS STREAM` enabled;
+  `runtime_resets` 0; every command reply complete once the backlog had drained.
+- No commanded servo motion occurred and no robot motion was observed during validation.
+- DALY `KEY` recorded as OPEN (not a validated shutdown barrier); GPIO19/20 stay native USB D−/D+.
+- Next: DALY KEY investigation, then G4 — Diagnostics / Maintenance.
+
 ## Unreleased — G3.1 CDC-independent Controller loop — 2026-09-18
 
 Fix for a regression found **live after the G3 powered session**. **Not flashed; live re-test TO_TEST.**

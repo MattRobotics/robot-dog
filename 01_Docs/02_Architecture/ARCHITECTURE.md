@@ -1,6 +1,6 @@
 # MATDOG Architecture
 
-**Canonical architecture decisions as of 2026-09-16.**
+**Canonical architecture decisions as of 2026-09-18.**
 
 This document owns system contracts and target direction. It does not own the changing physical
 population or next milestone; those live in the [root project snapshot](../../README.md). The
@@ -38,7 +38,7 @@ HIGH-LEVEL HOST
 PERMANENT MATDOG CONTROLLER — ESP32-S3
   Controller V0.1 platform                        official baseline
   core / USB diagnostics / BNO085                 VALIDATED in USB_ONLY scope
-  ServoBus / DALY / LED / power-state baseline    IMPLEMENTED; ROBOT_POWERED TO_TEST
+  ServoBus / DALY / LED / power-state baseline    VALIDATED no-motion in ROBOT_POWERED (G3/G3.1)
   maintenance / service / calibration modules     TO_DESIGN
   motion / IK / gait / stabilization              TO_DESIGN, later
           |
@@ -165,6 +165,9 @@ bistable pushbutton under the MATDOG logo
    -> no ESP32 GPIO
 ```
 
+The KEY path itself is **OPEN**: in G3 the physical KEY switch produced no observed DALY state
+change, so it is not yet a validated shutdown or safety barrier.
+
 The Controller cannot be the primary wake source because it is powered downstream of the DALY
 protected domain. The hardware button is the primary ON/OFF/wake interface. Electronics owns the
 detailed implementation record and validation state.
@@ -178,7 +181,7 @@ detailed implementation record and validation state.
 - Controller V0.1 boot, USB CDC, live BNO085 acquisition, viewer-compatible output,
   expected-offline classification, and soak under `USB_ONLY`.
 
-### IMPLEMENTED but not ROBOT_POWERED-validated
+### VALIDATED no-motion in ROBOT_POWERED (G3 / G3.1, 2026-09-18)
 
 - Read-only DALY decode/polling.
 - LED-ring module and anti-back-power behavior.
@@ -188,16 +191,15 @@ detailed implementation record and validation state.
 - **The `ROBOT_POWERED` hardware profile itself** (2026-09-16, gate G2): one profile authority with
   profile-derived module expectations, the canonical-17 / expected-now-13 / absent-by-design-4
   servo population model, structured census classification, and the build-manifest flash-profile
-  provenance gate. Offline-tested and compiled for both profiles; **never powered**.
+  provenance gate. Validated no-motion on the powered robot, together with a Controller loop that
+  does not depend on USB CDC host presence (G3.1). Evidence in
+  [`VALIDATION.md`](../../05_Firmware/MATDOG_Controller/VALIDATION.md).
 
-### TO_TEST next
+### OPEN
 
-The immediate no-motion `ROBOT_POWERED` validation is owned by the
-[root milestone](../../README.md#immediate-milestone-to_test-no-motion) and detailed in
-[`VALIDATION.md`](../../05_Firmware/MATDOG_Controller/VALIDATION.md). It covers live read-only
-DALY, live LED, all 13 expected servos read-only, real SAFE_OFF readback, and concurrent soak.
-
-No document may promote the powered configuration to **VALIDATED** before that evidence exists.
+- DALY `KEY` function — not a validated shutdown or safety barrier; the fused disconnect is the
+  trusted isolation method until the KEY investigation. Next steps are owned by the
+  [root snapshot](../../README.md#where-we-are-and-the-next-gate).
 
 ## Embedded MATDOG Web UI / Control & Service Dashboard
 

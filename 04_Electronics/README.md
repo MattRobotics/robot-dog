@@ -46,7 +46,9 @@ allocates 17 units, but only 13 are installed today.
 
 Historical Jetson-UART use of GPIO19/GPIO20 is **SUPERSEDED**. Their current canonical meaning is
 native USB D−/D+. The existing external connector has not yet been physically validated as a USB
-service link; the validated onboard/native USB path does not prove that connector.
+service link; the validated onboard/native USB path does not prove that connector. It remains a
+future USB service-port candidate — not a UART — pending electrical and signal-integrity
+validation.
 
 ---
 
@@ -58,8 +60,8 @@ Lean by design. Each item below is a deliberate decision, not an omission.
 |---|---|
 | **Seeed Bus Servo Driver** for the servo-bus electrical layer | selected |
 | **No CAN transceiver** | decided — not part of the current architecture |
-| **ESP32-S3 power**: DALY-protected B+/P− domain → 5 V step-down | **DECIDED**; ROBOT_POWERED validation pending |
-| **Primary hardware ON/OFF/wake**: bistable pushbutton under the robot logo → DALY `KEY` directly | **DECIDED**; no ESP32 GPIO required |
+| **ESP32-S3 power**: DALY-protected B+/P− domain → 5 V step-down | **DECIDED**; validated no-motion in ROBOT_POWERED (G3, 2026-09-18) |
+| **Primary hardware ON/OFF/wake**: bistable pushbutton under the robot logo → DALY `KEY` directly | **DECIDED**; no ESP32 GPIO required. Function **OPEN** — in G3 the KEY switch produced no observed DALY state change; not a validated shutdown/safety barrier |
 | **One removable, externally accessible ATO main fuse** | decided — rating **TBD** |
 | **Custom motor power busbar** | decided — dimensions and material **TBD** |
 | **Locking 3D-printed cable housings** | decided |
@@ -102,7 +104,8 @@ Evidence: [Bench QC V6.1](../09_Logs/Validation_Reports/ST3215_Bench_QC_2026-08-
 - the **ATO protection implementation** (rating TBD);
 - the installed **13-servo wiring**;
 - the installed **13-servo power budget** and any later 17-unit expansion;
-- the B+/P− → 5 V step-down controller supply and DALY `KEY` power/wake sequence;
+- the DALY `KEY` power/wake/shutdown function (the step-down controller supply itself ran the
+  whole G3 session; the fused disconnect remains the trusted isolation method);
 - the GPIO19/GPIO20 external USB-data/service connector.
 
 Protection is deliberately minimal in the current revision: one externally accessible ATO main

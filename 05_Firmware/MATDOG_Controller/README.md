@@ -461,14 +461,15 @@ Canonical power and wiring details live in
 [`04_Electronics/README.md`](../../04_Electronics/README.md). The firmware consequence is that
 DALY `KEY` is controlled directly by the bistable logo pushbutton, not by an ESP32 GPIO. Power-on is
 therefore hardware-first, and firmware cannot be the primary wake controller because the ESP32 is
-downstream of the DALY-protected supply it would need to enable.
+downstream of the DALY-protected supply it would need to enable. The KEY function itself is
+**OPEN**: in G3 the physical KEY switch produced no observed DALY state change, so it is not a
+validated shutdown or safety barrier; the fused disconnect is.
 
 ## Bench test profile
 
-This firmware currently ships validated only against the **USB_ONLY** bench profile.
-`ROBOT_POWERED` is **IMPLEMENTED, NOT VALIDATED**: the software support exists and is
-covered by offline tests, but no powered hardware validation has been performed — that
-is gate G3, authorized separately. See `G3_ROBOT_POWERED_VALIDATION_PLAN.md`.
+The source default remains the **USB_ONLY** bench profile. `ROBOT_POWERED` is **VALIDATED
+no-motion** on the real robot (G3 formal PASS and G3.1 PASS, 2026-09-18; build `e2fc605`) —
+see `VALIDATION.md`. Each powered session still needs its own authorization.
 
 Under `USB_ONLY`:
 ESP32-S3 powered solely from the host USB link, battery/step-down/servo-power/LED-5V

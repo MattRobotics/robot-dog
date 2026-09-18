@@ -38,18 +38,16 @@ Every current-facing document uses these meanings:
   expected-offline classification, and concurrent soak passed on the real ESP32-S3 under the
   `USB_ONLY` profile.
 - Direct ESP32-S3 ownership of the ST3215 bus was demonstrated by the frozen bench tools.
+- `ROBOT_POWERED` no-motion operation on the real robot (G3 formal PASS and G3.1 PASS,
+  2026-09-18): the hardware profile, the servo population model (canonical 17 / expected-now 13 /
+  absent-by-design 52-55) and structured census, live read-only DALY, live LED, two identical
+  censuses, `SAFE_OFF` `VERIFIED_OFF` and `torque=0` on all 13, and a Controller loop independent
+  of USB CDC host presence. No motion or calibration capability exists yet.
 
 ### IMPLEMENTED
 
 - One modular Controller image contains ServoBus diagnostics, BNO085 acquisition, read-only DALY
   telemetry, LED-ring control, USB diagnostics, health aggregation, and a power-state baseline.
-- `@SERVO SAFE_OFF` performs an independent torque-state readback, but a real powered-servo
-  `VERIFIED_OFF` result is still **TO_TEST**.
-- DALY, LED, and servo modules coexist in firmware; their powered-robot behavior is not yet
-  validated.
-- The `ROBOT_POWERED` hardware profile, servo population model (canonical 17 / expected-now 13 /
-  absent-by-design 52-55) and structured census classification exist and are offline-tested on
-  branch `feat/controller-robot-powered-v02`. The powered configuration itself remains **TO_TEST**.
 
 ### DECIDED
 
@@ -61,14 +59,15 @@ Every current-facing document uses these meanings:
   service and recovery path.
 - GPIO19/GPIO20 mean native USB D-/D+; their historical Jetson-UART use is **SUPERSEDED**.
 - The ESP32-S3 is powered from the DALY-protected B+/P− domain through the 5 V step-down. The
-  bistable logo pushbutton connects directly to DALY `KEY`; no ESP32 KEY GPIO is required.
+  bistable logo pushbutton connects directly to DALY `KEY`; no ESP32 KEY GPIO is required. Its
+  actual function is **OPEN**: in G3 the KEY switch produced no observed DALY state change, so it
+  is not a validated shutdown or safety barrier — the fused disconnect is.
 
 ### TO_TEST
 
-- The exact `ROBOT_POWERED` no-motion gate described below.
-- The external four-pin connector (GPIO19, GPIO20, GND, 5 V not connected) as a USB-data/service
-  connection.
-- Full powered-system coexistence and the 13 installed servos as a population.
+- The DALY `KEY` function (see *Where we are* below).
+- The external four-pin connector (GPIO19, GPIO20, GND, 5 V not connected) as a future USB
+  service port — not a UART — pending electrical and signal-integrity validation.
 
 ### TO_DESIGN
 
@@ -134,28 +133,29 @@ Controller tree are documentation only. Neither identifier proves `ROBOT_POWERED
 
 ```text
 COMPLETE   Controller V0.1 baseline              VALIDATED (USB_ONLY hardware)
-COMPLETE   G2 ROBOT_POWERED preparation          PASS (software/offline only, 2026-09-16)
-EVIDENCE   G3 ROBOT_POWERED no-motion evidence   PASS (operator-accepted, 2026-09-17)
-OPEN       G3 formal census-repeat criterion     OUTSTANDING (one more read-only @SERVO CENSUS)
+COMPLETE   G2 ROBOT_POWERED software             PASS / FROZEN
+COMPLETE   G3 ROBOT_POWERED no-motion            PASS (formal, 2026-09-18)
+COMPLETE   G3.1 CDC-independent Controller loop  PASS (2026-09-18)
 
-NEXT GATE  G3.1 CDC-independent Controller loop  FAIL -> FIX UNDER VALIDATION
-BLOCKED    everything after G3, incl. all motion until G3 census repeat + G3.1 PASS
+NEXT       DALY KEY investigation
+THEN       G4 Diagnostics / Maintenance
 ```
 
-`ROBOT_POWERED` has **operator-accepted no-motion evidence** (formal census-repeat criterion
-still outstanding) on branch
-`feat/controller-robot-powered-v02`: DALY live read-only, LED live, 13/13 expected servos
-present with 4 absent by design, `SAFE_OFF` `VERIFIED_OFF` on all 13, `torque=0` on all 13, no
-motion at any point.
+`ROBOT_POWERED` is **VALIDATED for no-motion operation**: DALY live read-only, LED live, 13/13
+expected servos present with 4 absent by design in two identical censuses, `SAFE_OFF`
+`VERIFIED_OFF` and `torque=0` on all 13. The Controller loop is independent of USB CDC host
+presence: BNO085 acquisition runs at 50.1 Hz with the port closed (G3.1). No commanded servo motion occurred and no robot motion was observed during validation.
 
-### Immediate milestone: G3.1, no motion
+### Open hardware notes
 
-A live zero-TX experiment after G3 showed the Controller loop starving whenever no USB CDC host
-holds the port open (BNO085 rotation-vector processing 0.68 Hz with the port closed vs 50.07 Hz
-open, same boot, cable attached). The root cause is in the installed `esp32:esp32 3.3.11` HWCDC
-transport; the fix (native HWCDC configuration: TX timeout 0 and a 3 KB TX ring, set before
-`Serial.begin()`) is implemented and offline-validated. Its live
-re-test is the next gate; nothing that needs an autonomous loop may proceed before it passes.
+- **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
+  DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
+  or safety barrier; the DALY's actual KEY configuration and function must be inspected before any
+  setting is changed. The fused disconnect remains the trusted physical isolation method.
+- **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
+  19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
+  electrical and signal-integrity validation.
+
 Criteria are owned by the Controller
 [`DEVELOPMENT_GATES.md`](05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md); evidence by the
 Controller [`VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md).
