@@ -25,8 +25,8 @@ const char* toString(SystemHealth health) {
   return "UNKNOWN";
 }
 
-void SystemState::beginBoot() {
-  boot_millis_ = millis();
+void SystemState::beginBoot(uint32_t now_ms) {
+  boot_millis_ = now_ms;
   system_health_ = SystemHealth::BOOTING;
 }
 

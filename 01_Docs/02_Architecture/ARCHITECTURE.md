@@ -1,9 +1,12 @@
 # MATDOG Architecture
 
-**Canonical architecture decisions as of 2026-09-15.**
+**Canonical architecture decisions as of 2026-09-18.**
 
 This document owns system contracts and target direction. It does not own the changing physical
-population or next milestone; those live in the [root project snapshot](../../README.md).
+population or next milestone; those live in the [root project snapshot](../../README.md). The
+development sequence and its dependencies are owned by [`ROADMAP.md`](ROADMAP.md), the technical
+pass/fail authorization criteria by
+[`DEVELOPMENT_GATES.md`](../../05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md).
 Implementation wiring lives in [electronics](../../04_Electronics/README.md), and exact firmware
 evidence lives in [Controller validation](../../05_Firmware/MATDOG_Controller/VALIDATION.md).
 
@@ -35,7 +38,7 @@ HIGH-LEVEL HOST
 PERMANENT MATDOG CONTROLLER — ESP32-S3
   Controller V0.1 platform                        official baseline
   core / USB diagnostics / BNO085                 VALIDATED in USB_ONLY scope
-  ServoBus / DALY / LED / power-state baseline    IMPLEMENTED; ROBOT_POWERED TO_TEST
+  ServoBus / DALY / LED / power-state baseline    VALIDATED no-motion in ROBOT_POWERED (G3/G3.1)
   maintenance / service / calibration modules     TO_DESIGN
   motion / IK / gait / stabilization              TO_DESIGN, later
           |
@@ -80,7 +83,8 @@ One MATDOG Controller firmware will integrate, in reviewed stages:
 6. Full Leg Calibration
 7. Wi-Fi / OTA
 8. host transport
-9. later Motion / IK / Gait / Stabilization
+9. Embedded Web UI / Control & Service Dashboard (see the dedicated section below)
+10. later Motion / IK / Gait / Stabilization
 
 Controller V0.1 is the platform baseline, not a motion controller. It already implements the
 module boundaries and read-only/safety surfaces documented in the
@@ -161,6 +165,9 @@ bistable pushbutton under the MATDOG logo
    -> no ESP32 GPIO
 ```
 
+The KEY path itself is **OPEN**: in G3 the physical KEY switch produced no observed DALY state
+change, so it is not yet a validated shutdown or safety barrier.
+
 The Controller cannot be the primary wake source because it is powered downstream of the DALY
 protected domain. The hardware button is the primary ON/OFF/wake interface. Electronics owns the
 detailed implementation record and validation state.
@@ -174,22 +181,155 @@ detailed implementation record and validation state.
 - Controller V0.1 boot, USB CDC, live BNO085 acquisition, viewer-compatible output,
   expected-offline classification, and soak under `USB_ONLY`.
 
-### IMPLEMENTED but not ROBOT_POWERED-validated
+### VALIDATED no-motion in ROBOT_POWERED (G3 / G3.1, 2026-09-18)
 
 - Read-only DALY decode/polling.
 - LED-ring module and anti-back-power behavior.
 - Servo scan/read diagnostics.
 - Independent readback classification after `@SERVO SAFE_OFF`.
 - Multi-module health and power-state baseline.
+- **The `ROBOT_POWERED` hardware profile itself** (2026-09-16, gate G2): one profile authority with
+  profile-derived module expectations, the canonical-17 / expected-now-13 / absent-by-design-4
+  servo population model, structured census classification, and the build-manifest flash-profile
+  provenance gate. Validated no-motion on the powered robot, together with a Controller loop that
+  does not depend on USB CDC host presence (G3.1). Evidence in
+  [`VALIDATION.md`](../../05_Firmware/MATDOG_Controller/VALIDATION.md).
 
-### TO_TEST next
+### OPEN
 
-The immediate no-motion `ROBOT_POWERED` validation is owned by the
-[root milestone](../../README.md#immediate-milestone-to_test-no-motion) and detailed in
-[`VALIDATION.md`](../../05_Firmware/MATDOG_Controller/VALIDATION.md). It covers live read-only
-DALY, live LED, all 13 expected servos read-only, real SAFE_OFF readback, and concurrent soak.
+- DALY `KEY` function — not a validated shutdown or safety barrier; the fused disconnect is the
+  trusted isolation method until the KEY investigation. Next steps are owned by the
+  [root snapshot](../../README.md#where-we-are-and-the-next-gate).
 
-No document may promote the powered configuration to **VALIDATED** before that evidence exists.
+## Embedded MATDOG Web UI / Control & Service Dashboard
+
+**DECIDED — permanent architecture. Implementation is staged and safety-gated; none of it exists
+in the firmware today.**
+
+MATDOG shall host a permanent responsive Web UI served by the ESP32-S3 and rendered by the browser
+of a phone, tablet, the ASUS workstation or a future Jetson. This supersedes the narrower idea of
+using Wi-Fi only for OTA and telemetry. It is MATDOG's low-level human interface for the robot
+lifecycle, not merely an IMU debug page.
+
+The ESP32-S3 serves static assets, exposes bounded telemetry, and accepts semantic commands through
+the same Controller service layer used by USB/host transports. The browser performs layout,
+interaction, WebGL rendering and interpolation between telemetry updates. **No 3D computation
+belongs on the ESP32-S3.**
+
+Progressive functional target:
+
+```text
+Overview / system health        Calibration            Body Pose
+BNO085 3D viewer                Service / Provisioning Single Leg XYZ
+Battery / DALY                  QC                     Manual Teleoperation
+Servo census / telemetry        OTA                    Gait Selection
+Diagnostics / Maintenance       Joint Test             Preset Actions
+                                                       Stabilization
+```
+
+### Mandatory command path
+
+Every command origin — USB CDC, Web, or a future host — converges on one safety and ownership
+model. There is exactly one semantic Controller implementation behind all of them.
+
+```text
+Browser
+  -> Web/API transport
+  -> CommandRouter
+  -> Controller Service Layer
+  -> OperatingMode / ActuatorAuthority
+  -> functional subsystem / Safe Actuator
+  -> ServoBus
+```
+
+### Forbidden architectures
+
+These are permanent prohibitions, enforced by review and by
+[`static_audit.py`](../../05_Firmware/MATDOG_Controller/scripts/static_audit.py), which already
+fails the build if a translation unit references both network transport symbols and servo
+primitives:
+
+```text
+Browser -> ServoBus                              FORBIDDEN
+Browser -> raw GoalPosition                      FORBIDDEN
+Browser -> arbitrary servo register/EEPROM write FORBIDDEN
+network callback -> direct actuator primitive    FORBIDDEN
+transport parser -> duplicate hardware path      FORBIDDEN
+```
+
+The permanent rule is `network callback != servo command authority`. Network tasks may parse,
+authenticate, queue high-level commands and expose telemetry. They may not call servo-write
+primitives.
+
+### Telemetry snapshot model
+
+The Web UI must never query physical hardware in response to a browser refresh, REST request or
+WebSocket message. Acquisition rate and browser render rate are independent:
+
+```text
+hardware acquisition -> subsystem state -> Controller-owned telemetry snapshot
+                     -> transport adapters -> USB / Web UI / future host
+```
+
+G2 established the first concrete instance of this: `ServoCensus` holds a structured, copyable
+`CensusResult` with no `Serial` dependency, and `CommandRouter` only formats it. A future Web
+adapter renders the same result without re-scanning the bus.
+
+### Continuous command lease / deadman
+
+A browser joystick must never create an indefinite sticky velocity command. Continuous commands
+require a **firmware-side** lease/deadman — not JavaScript:
+
+```text
+control held      -> periodic semantic command + sequence/timestamp
+                  -> Controller accepts while the lease is fresh
+
+Wi-Fi drop / browser close / phone sleep / tab suspended /
+stale sequence / expired heartbeat / session loss
+                  -> command authority expires
+                  -> Controller executes the defined safe-stop policy
+```
+
+Timeout values are not frozen here; they require real timing measurements first.
+
+### Resource isolation and authorization
+
+Realtime control has priority over the web subsystem: non-blocking networking, bounded client
+count, bounded queues, no unbounded allocation in hot paths, compressed static assets sized against
+the real partition layout. Network failure must not starve `ServoBus`, BNO085, DALY or motion.
+
+Once the dashboard can command the robot, browser access is a control surface. It requires session
+identity, explicit service/calibration authorization, command-origin tracking, transaction IDs,
+rejection of stale/replayed continuous commands, and read-only versus write-capable separation.
+**Network presence alone never grants provisioning, calibration or motion authority.**
+
+### Reference research boundary
+
+XGO Lite and Yahboom DOGZILLA-Lite are used as **control-surface and operator-contract references
+only**. MATDOG must never import their joint/servo limits, body geometry, translation ranges, gait
+tuning constants or joint-zero definitions. MATDOG uses its own URDF, calibration, hardware profile,
+actuator limits and safety envelope.
+
+```text
+COPY THE CONTROL-SURFACE CONCEPTS
+DO NOT COPY ROBOT-SPECIFIC NUMBERS OR HIDDEN MOTION ASSUMPTIONS
+```
+
+### Relationship to the existing engineering viewer
+
+The host-side BNO085 full-body viewer under `06_Software/Matdog_Core/viewer/` is an engineering
+tool and is **not** the embedded dashboard. Both are kept: the ESP32 dashboard for status, mobile
+access, maintenance, calibration, service and OTA; the ASUS/Jetson tools for high-rate logging,
+plots, replay, ROS 2, RViz/MoveIt and camera/AI visualization. Low-level maintenance and
+calibration must never depend on Jetson availability.
+
+### Staging
+
+UI gate sequence and per-gate criteria live in
+[`DEVELOPMENT_GATES.md`](../../05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md#embedded-web-ui-gates).
+Software-only UI scaffolding may be prepared early, but **write-capable controls remain disabled
+until the corresponding firmware gate passes**, and the UI derives its enable/disable state from
+authoritative Controller state.
 
 ## Frozen tools and calibration oracle
 
@@ -215,6 +355,8 @@ wholesale for that purpose.
 | `MattRobotics/robot-dog` | sole active MATDOG engineering repository |
 | `README.md` | current project/physical snapshot and immediate milestone |
 | `01_Docs/02_Architecture/ARCHITECTURE.md` | architecture contracts and target direction |
+| `01_Docs/02_Architecture/ROADMAP.md` | development sequence, dependencies, and current position |
+| `05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md` | per-gate entry conditions and pass/fail criteria |
 | `04_Electronics/README.md` | power, wiring, connectors, and their validation state |
 | `05_Firmware/MATDOG_Controller/` | permanent Controller firmware, design, and validation |
 | `05_Firmware/ST3215_Bench_Tools/` | frozen qualification tools |
@@ -233,14 +375,11 @@ third source of current truth.
 
 ## Development order
 
-1. Complete the no-motion `ROBOT_POWERED` validation gate.
-2. Design and integrate permanent diagnostics/maintenance/service capabilities without modifying
-   frozen evidence.
-3. Migrate selected full-leg calibration logic into the Controller through a reviewed,
-   fail-closed design.
-4. Recalibrate the installed robot before any motion, then establish safe motion primitives.
-5. Add host protocol, Wi-Fi/OTA, motion, IK, gait, stabilization, and high-level integration in
-   independently validated stages.
+The development sequence, its hard dependencies and the current position are owned by
+[`ROADMAP.md`](ROADMAP.md). The per-gate entry conditions, allowed/forbidden operations and pass
+criteria are owned by
+[`DEVELOPMENT_GATES.md`](../../05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md).
 
-Phase A changes documentation only. It neither performs these stages nor authorizes hardware
-activity.
+They are deliberately not restated here: this document owns *contracts*, not *sequence*. No
+document may authorize a hardware stage — only an explicit operator authorization for that
+specific session can.

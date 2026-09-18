@@ -28,31 +28,41 @@ checkboxes are not current project status and are intentionally not rewritten.
 - `USB_ONLY` boot on the real ESP32-S3, native USB CDC and live BNO085 acquisition;
 - viewer protocol compatibility, expected-offline classification and USB-only soak behavior;
 - unpowered servo diagnostics and honest `SAFE_OFF=UNVERIFIED_NO_RESPONSE` classification;
-- the exact source/application provenance recorded above.
+- the exact source/application provenance recorded above;
+- **`ROBOT_POWERED` no-motion operation — G3 formal PASS (2026-09-17 / 2026-09-18):** live
+  read-only DALY, live LED, 13/13 expected servos with 4 absent by design in two identical
+  censuses, `VERIFIED_OFF` and `torque=0` on all 13, concurrent soak;
+- **CDC-independent Controller loop — G3.1 PASS (2026-09-18):** BNO085 acquisition at 50.1 Hz with
+  the USB CDC port closed, open, and with `@BMS STREAM` enabled.
 
-### IMPLEMENTED — ROBOT_POWERED validation remains TO_TEST
+Powered build currently on the robot:
 
-- DALY read-only telemetry integration;
-- LED-ring output path;
-- powered ST3215 read/scan and `SAFE_OFF` readback paths;
-- Controller scheduling paths for concurrent DALY, LED and servo operation.
+| Identity | Value |
+|---|---|
+| Source commit | `e2fc60531b28351472a2bfa5105a2170147610bb` |
+| Hardware profile | `ROBOT_POWERED` build override; the source default remains `USB_ONLY` |
+| Application | 387808 bytes, SHA256 `e2b474b5c07e98649fbaf31d3d08970d022ffbdb5f1212d6b606dc28cac065d2` |
+| Flash path | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`, `app0 @ 0x010000` |
 
-The official V0.1 source remains configured for `USB_ONLY`; its power-availability flags are false.
-A future `ROBOT_POWERED` build/configuration is a deliberate firmware change and is not performed by
-this documentation patch.
+### OPEN
 
-### Immediate milestone — TO_TEST
+- **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
+  DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
+  or safety barrier; the DALY's actual KEY configuration and function must be inspected before any
+  setting is changed. The fused disconnect remains the trusted physical isolation method.
+- **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
+  19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
+  electrical and signal-integrity validation.
+
+### Next
 
 ```text
-MATDOG Controller V0.1
-→ ROBOT_POWERED Hardware Validation
-→ no motion
-→ DALY live read-only
-→ LED live
-→ 13 expected servos read-only
-→ SAFE_OFF real readback
-→ concurrent soak
+DALY KEY investigation
+→ G4 Diagnostics / Maintenance
 ```
+
+No motion, calibration or write-capable service capability exists in the firmware. Every later
+stage has its own gate in [`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md).
 
 The expected installed servo IDs are `11,12,13,21,22,23,31,32,33,41,42,43,51`: 12 legs plus
 `NECK_ROTATION` ID51. IDs 52 `NECK_PITCH`, 53 `HEAD_ROTATION`, 54 `HEAD_PITCH` and 55 `JAW` remain
@@ -1485,3 +1495,805 @@ forbidden hardware action occurred this session (battery, servo power, LED
 5V rail and DALY remained absent/off throughout; only read-only diagnostics
 and the pre-approved `EnableTorque(id, 0)` SAFE_OFF write were exercised).
 Merge decision and execution remain with the operator.
+
+---
+
+## G2 — ROBOT_POWERED CONFIGURATION SUPPORT — 2026-09-16
+
+Software-preparation gate. This section records an **offline/software** result only.
+
+```text
+G2 SOFTWARE / OFFLINE SCOPE     = VALIDATED
+ROBOT_POWERED PROFILE           = IMPLEMENTED (compile-tested only)
+ROBOT_POWERED HARDWARE OPERATION = TO_TEST
+
+G3 NOT EXECUTED
+```
+
+Nothing in this session validates ROBOT_POWERED hardware operation. No external robot
+rail was energized at any point and no firmware was flashed. The powered no-motion
+validation is gate G3, designed during G2 in
+[`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md) and
+authorized separately.
+
+### Provenance and entry state
+
+| Item | Value |
+|---|---|
+| Development branch | `feat/controller-robot-powered-v02` |
+| Accepted starting base | `1a8c5bc3ced4f49ea36902526f232b2785a7ab70` |
+| `main` / `origin/main` at entry | `1a8c5bc3ced4f49ea36902526f232b2785a7ab70` (unmoved) |
+| Immutable V0.1 tag | `matdog-controller-v0.1.0` → `c54862f38a9cbd5e46d6b1770a6d109cc99b5c02` (unchanged) |
+
+Prior gates, accepted as facts and **not rerun** this session:
+
+```text
+G0 POST-CLEANUP ENTRY AUDIT   = PASS (not rerun)
+G1 V0.1 REGRESSION FREEZE     = PASS (not rerun)
+V2 ARCHITECTURE DELTA AUDIT   = PASS
+```
+
+### VALIDATED — G2 software/offline scope
+
+Hardware-profile architecture:
+
+- `src/config/HardwareProfile.h` added as the single profile authority: one enum
+  (`USB_ONLY` / `ROBOT_POWERED`) and one `expectationsFor()` mapping table.
+- `BuildConfig.h` now **derives** `kServoPowerAvailable`, `kBatteryAvailable`,
+  `kLedRailPowered` and `kTestProfile` from the selected profile. V0.1 stated the same
+  configuration four times over as independently editable values; a profile name
+  contradicting its own rail facts is no longer expressible.
+- Module `ExpectedState` derives from one shared rule
+  (`core::expectedStateForServoBus`/`Battery`/`LedRail`) instead of a ternary repeated
+  per module. `core::classify()` itself is unchanged.
+- **The source default remains `USB_ONLY`**, and `static_audit.py` fails the build if it
+  is anything else — this is the G3 authorization gate. A powered build requires an
+  explicit, announced override (`MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh`).
+
+Servo population model (`src/servo/ServoPopulation.h/.cpp`):
+
+```text
+canonical allocated                 = 17
+expected in current configuration   = 13
+absent by design                    = 52 NECK_PITCH, 53 HEAD_ROTATION,
+                                      54 HEAD_PITCH, 55 JAW
+```
+
+Healthy census semantics for the current robot:
+
+```text
+present_expected = 13
+absent_by_design = 4
+missing_expected = 0
+unexpected_id    = 0
+verdict          = PASS
+```
+
+The three populations (canonical allocation / expected current configuration / live
+observed) are kept explicitly distinct. "17 responders = PASS" is false for this robot
+and is not encoded anywhere; the static audit fails the build if such a threshold
+reappears. Classification is fail-closed: a scan not covering every canonical ID, or a
+truncated responder list, can never report `PASS`.
+
+Transport independence:
+
+- `ServoPopulation` and `ServoCensus` contain no `Serial` and no `<Arduino.h>`
+  (audit-enforced). `ServoCensus` is a Controller-owned service holding a structured,
+  fixed-size `CensusResult`; `CommandRouter` only formats it.
+- No G2 domain logic exists solely inside Serial parsing or Serial printing. A future
+  transport adapter can consume the same `CensusResult` without re-scanning the bus or
+  reimplementing the classification.
+
+Offline results (all run on the final G2 source):
+
+| Gate | Result |
+|---|---|
+| New host census/profile tests | **PASS** — 14 cases / 274 checks / 0 failures |
+| Static safety audit | **PASS** — 29 source files, 0 findings |
+| OTA partition logic suite | **PASS** — 40/40 |
+| BNO085 viewer `npm run verify` | **PASS** — 59/59 tests, typecheck PASS, production build PASS |
+| Compile, `USB_ONLY` (pinned FQBN) | **PASS** — 387164 bytes flash, 28344 bytes RAM |
+| Compile-only check, `ROBOT_POWERED` | **PASS** — 387632 bytes flash, 28344 bytes RAM |
+
+The host suite links the real firmware translation units (`ServoPopulation.cpp`,
+`Availability.cpp`) rather than a host-side copy, and exercises **both** profiles in one
+run — which is what demonstrates the `USB_ONLY` expected-hardware semantics did not
+regress while `ROBOT_POWERED` was added. Every new static-audit tripwire was
+mutation-tested and confirmed to fire.
+
+The `ROBOT_POWERED` compile check produced a temporary artifact only. **The default
+build artifact was restored to `USB_ONLY` afterwards** and the exported binary was
+re-checked to contain the `USB_ONLY` profile string and no `ROBOT_POWERED` string.
+
+### Not implemented in this gate
+
+No Web UI, Wi-Fi, HTTP/WebSocket/REST or OTA transport was added. No ActuatorAuthority
+framework, Safe Actuator layer, motion, IK, gait, pose, teleoperation or command
+lease/deadman was added. No provisioning, QC, source-signature or calibration
+integration was added. Awareness of the V2 target architecture shaped the interfaces;
+it did not turn this gate into a refactor.
+
+### TO_TEST — G3 ROBOT_POWERED live hardware validation
+
+Not performed. `ROBOT_POWERED` is **IMPLEMENTED**, not **VALIDATED**: offline tests and
+a clean compile only. Specifically **not** done this session:
+
+- no firmware flash of any kind;
+- no external robot power enabled;
+- no servo power;
+- no DALY powered validation;
+- no powered LED validation;
+- no powered census;
+- no hardware SAFE_OFF campaign;
+- no motion.
+
+The ESP32-S3 was connected over USB throughout and the full-flash recovery backup was
+verified locally against its known size and digest
+(`16777216` bytes, SHA256 `5cbba0b9c5500d0c95247b9b7e7173a29f934b8b13f6800cc9f583374d67fd32`),
+but the optional `USB_ONLY` on-device regression was **deliberately not performed**: it
+added no material evidence (the derived `USB_ONLY` values are provably identical to
+V0.1, and a census over an unpowered bus can only report all-missing), and the
+application-only flash workflow correctly refused a dirty working tree. That refusal was
+respected, not bypassed.
+
+Under `USB_ONLY` a `SAFE_OFF` can only ever return `UNVERIFIED_NO_RESPONSE`; G3 P5 is
+the first opportunity to observe `VERIFIED_OFF` on real powered hardware.
+
+### Safety invariants preserved
+
+- [x] no Torque ON
+- [x] no `GoalPosition` / motion primitive
+- [x] no servo EEPROM / ID / `CalibrationOfs` / factory-reset / broadcast write
+- [x] no DALY write
+- [x] no BNO085 DCD write
+- [x] `SAFE_OFF` independent `TorqueEnable` readback semantics unchanged, and it remains
+      reachable in every operating mode
+- [x] `kDiagnosticTimeoutMs` (20ms) / `kOperationalTimeoutMs` (100ms) split unchanged
+- [x] one `ServoBus` owner — no second `HardwareSerial`, no second `SMS_STS`, no
+      duplicate UART setup
+- [x] no automatic census/scan at boot (now reported as `startup_servo_scan : DISABLED`
+      and enforced by the static audit against `Controller::begin()`)
+- [x] no startup motion, no startup torque
+- [x] pin map unchanged; frozen ST3215 tools and `matdog/full-leg-calibrator-v1` untouched
+- [x] joint calibration untouched and still `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION`
+
+### Judgement
+
+```text
+G2 SOFTWARE/OFFLINE = PASS
+G3 ROBOT_POWERED LIVE = NOT EXECUTED / TO_TEST
+```
+
+ROBOT_POWERED software support is implemented, offline-tested and compile-verified. It
+is **not** validated against powered hardware and must not be described as such. Powered
+validation requires separate hardware authorization per
+[`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md).
+
+---
+
+## G2 — PRE-G3 HARDENING AMENDMENT — 2026-09-16
+
+Amendment to the G2 gate above, resolving two issues raised by an independent review of
+commit `34afbc7808e276d7483de9f2c817750683a65088`. This is a **G2 software/offline
+amendment, not G3 execution**.
+
+```text
+G2 SOFTWARE / OFFLINE SCOPE      = VALIDATED (revised gates re-run, all PASS)
+ROBOT_POWERED PROFILE            = IMPLEMENTED (compile-tested only)
+ROBOT_POWERED HARDWARE OPERATION = TO_TEST
+
+G3 NOT EXECUTED
+```
+
+No firmware was flashed. No external rail was energized. The compiled-in default profile
+remains `USB_ONLY`, and the exported build artifact was restored to `USB_ONLY` after the
+`ROBOT_POWERED` compile check.
+
+### Finding 1 — build profile was not bound to the flashed artifact
+
+`build.sh` can emit a `USB_ONLY` or a `ROBOT_POWERED` image from the same commit to the
+same path. The pre-existing gate proved the binary embedded the current build id — but
+that id is identical for both profiles, so it could not distinguish them. A stale image
+of the wrong profile could have been written under the wrong assumption, in either
+direction.
+
+The gap was concrete, not theoretical: the two profiles produce genuinely different
+artifacts.
+
+```text
+USB_ONLY       387312 bytes  sha256 a62f6d72ad38a1e8...
+ROBOT_POWERED  387776 bytes  sha256 6ec5c714d11d9cf3...
+```
+
+Resolution — a build manifest, written by `build.sh` into the gitignored build directory
+adjacent to the binary (never committed), binding:
+
+```text
+MATDOG_MANIFEST_VERSION  SOURCE_COMMIT  BUILD_ID  SOURCE_STATE
+HARDWARE_PROFILE  FQBN
+APPLICATION_BINARY  APPLICATION_SIZE  APPLICATION_SHA256
+```
+
+`flash_app_only.sh` verifies it before any device write, fail-closed, and the operator
+must name the profile they intend via `MATDOG_FLASH_PROFILE` (default `USB_ONLY`). The
+verified profile is printed in a banner immediately before the write.
+
+Refusal matrix, exercised against the two REAL binaries built this session:
+
+| Manifest | Requested | Result |
+|---|---|---|
+| `USB_ONLY` | `USB_ONLY` (default) | ALLOW |
+| `ROBOT_POWERED` | `ROBOT_POWERED` (explicit) | ALLOW |
+| `ROBOT_POWERED` | default, no authorization | REFUSE `PROFILE_MISMATCH` |
+| `USB_ONLY` | `ROBOT_POWERED` | REFUSE `PROFILE_MISMATCH` |
+| `USB_ONLY` manifest beside a `ROBOT_POWERED` binary | `USB_ONLY` | REFUSE `BINARY_SIZE_MISMATCH` |
+| profile is an unrecognized string | any | REFUSE `PROFILE_UNKNOWN` |
+| manifest file absent | any | REFUSE `MANIFEST_MISSING` |
+| commit != HEAD | any | REFUSE `SOURCE_COMMIT_MISMATCH` |
+| tree dirty (at build time or now) | any | REFUSE `TREE_NOT_CLEAN` |
+
+Also refused (offline tests): unparseable manifest, incomplete manifest (each required
+key removed individually), unknown manifest schema version, SHA256 mismatch at equal
+size, missing binary, unknown requested profile.
+
+**No pre-existing application-only protection was weakened.** Backup size and digest,
+device MAC, verified application partition offset/size, partition-fit check,
+rollback/anti-rollback state, the static-audit gate, the single-partition write and the
+independent post-write `verify-flash` are all retained, and each is now individually
+asserted by `static_audit.py` against its actual comparison (not merely token presence).
+
+### Finding 2 — `SystemHealth::READY` was unreachable under `ROBOT_POWERED`
+
+`classify()` turned `DetectedState::UNKNOWN` into a verdict, treating "nothing has
+established anything" identically to "we asked and it did not answer". Under `USB_ONLY`
+this was invisible (both non-`REQUIRED` cases return `PASS` either way); under
+`ROBOT_POWERED` it produced two wrong answers:
+
+```text
+LED   OPTIONAL + UNKNOWN -> DEGRADED   (WS2812 has no readback path at all, so its
+                                        detected state is permanently UNKNOWN when
+                                        powered -> READY was unreachable)
+SERVO REQUIRED + UNKNOWN -> FAULT      (nothing probes the bus at boot, so a healthy
+                                        powered robot reported FAULT before anything
+                                        had been asked of it)
+```
+
+The second case was found while evaluating the first across both profiles, as the review
+required. Both are resolved by one rule rather than two special cases:
+
+```text
+UNKNOWN     + REQUIRED            -> UNKNOWN   (not proven; system reports BOOTING)
+UNKNOWN     + OPTIONAL            -> PASS
+UNKNOWN     + EXPECTED_OFFLINE    -> PASS
+UNKNOWN     + EXPECTED_UNPOWERED  -> PASS
+
+NO_RESPONSE + REQUIRED            -> FAULT     unchanged
+NO_RESPONSE + OPTIONAL            -> DEGRADED  unchanged
+NO_RESPONSE + OFFLINE/UNPOWERED   -> PASS      unchanged
+UNPOWERED   + <as above>                       unchanged
+ONLINE      + anything            -> PASS      unchanged
+INIT_FAILED + anything            -> FAULT     unchanged
+```
+
+No physical detection is faked. The LED ring still reports `detected=UNKNOWN` in
+`@STATUS`, and `static_audit.py` now fails the build if `detectedStateForLedRail()` ever
+returns `ONLINE`. An observed failure still escalates: a probed-and-silent servo bus is
+still `FAULT`, and an observed optional-module failure is still `DEGRADED`.
+
+`USB_ONLY` semantics are bit-for-bit unchanged — a test reproduces the hardware-validated
+Session 2 / H3 table exactly and asserts it still aggregates to `READY`.
+
+`SystemHealth::READY` is now reachable under a healthy `ROBOT_POWERED` state without
+pretending WS2812 detection:
+
+```text
+BNO085 init=OK detected=ONLINE  expected=REQUIRED result=PASS
+DALY   init=OK detected=ONLINE  expected=REQUIRED result=PASS
+SERVO  init=OK detected=ONLINE  expected=REQUIRED result=PASS   (after the P4 census)
+LED    init=OK detected=UNKNOWN expected=OPTIONAL result=PASS   (never claimed ONLINE)
+                                                  -> SystemHealth::READY
+```
+
+Before the P4 census the servo bus is honestly unproven, so the system reports `BOOTING`
+— a visible gap, neither a false alarm nor false health. The G3 plan's P1 and P6
+acceptance criteria were updated to state exactly this, so code and plan now agree.
+
+Supporting change: `SystemState::beginBoot()` takes `now_ms` instead of calling
+`millis()`, so the translation unit is Arduino-free and the offline tests link the real
+aggregation rather than a reimplementation.
+
+### Revised offline acceptance — re-run in full after both fixes
+
+| Gate | Result |
+|---|---|
+| Servo population / profile / availability host tests | **PASS** — 18 cases / 313 checks / 0 failures |
+| Build manifest provenance tests | **PASS** — 36/36 |
+| Static safety audit | **PASS** — 29 source files, 0 findings |
+| OTA partition logic suite | **PASS** — 40/40 |
+| Compile, `USB_ONLY` (pinned FQBN) | **PASS** — 387156 bytes flash, 28344 bytes RAM |
+| Compile-only check, `ROBOT_POWERED` | **PASS** — 387624 bytes flash, 28344 bytes RAM |
+| BNO085 viewer `npm run verify` | **PASS** — 59/59 tests, typecheck PASS, production build PASS |
+| `git diff --check` | clean |
+
+All 15 new static-audit tripwires were mutation-tested and confirmed to fire, including
+three that an earlier iteration of this amendment failed to catch (they matched text in
+comments or in refuse messages rather than real code, and were tightened until they
+detected the deletion of the gate they protect).
+
+### Unchanged by this amendment
+
+Servo population model (canonical 17 / expected-now 13 / absent-by-design 52-55), census
+classification and its fail-closed verdicts, transport independence, the `USB_ONLY`
+source default and its static-audit gate, and every safety invariant recorded in the G2
+section above: no Torque ON, no `GoalPosition`, no servo EEPROM/ID/`CalibrationOfs`/
+factory-reset/broadcast write, no DALY write, no BNO085 DCD write, `SAFE_OFF` independent
+readback unchanged, timeout split unchanged, one `ServoBus` owner, no automatic
+census/scan at boot, no startup motion.
+
+### Judgement
+
+```text
+G2 SOFTWARE/OFFLINE = PASS
+G3 ROBOT_POWERED LIVE = NOT EXECUTED / TO_TEST
+```
+
+---
+
+## G2 — PRE-G3 PROVENANCE CLOSURE — 2026-09-16
+
+Final pre-G3 closure amendment on top of the G2 gate and its hardening amendment above.
+Software/offline only.
+
+```text
+G2 SOFTWARE / OFFLINE SCOPE      = VALIDATED (revised gates re-run, all PASS)
+ROBOT_POWERED PROFILE            = IMPLEMENTED (compile-tested only)
+ROBOT_POWERED HARDWARE OPERATION = TO_TEST
+
+G3 ROBOT_POWERED LIVE = NOT EXECUTED / TO_TEST
+```
+
+No firmware was flashed. No external rail was energized. No hardware interaction of any
+kind occurred. The compiled-in default profile remains `USB_ONLY`, and the final build
+artifact and manifest were restored to `USB_ONLY`.
+
+### Finding A — the recorded build FQBN was never compared
+
+The build manifest recorded `FQBN` from the moment it was introduced, but the verifier
+never checked it. Binding the commit, profile and exact bytes still left the *toolchain
+configuration* unverified: the FQBN carries the partition scheme, flash size and mode,
+PSRAM mode, USB/CDC mode and CPU frequency. A binary of the correct commit and correct
+profile, built under a different partition scheme, would have passed every gate while
+targeting a different application-partition layout.
+
+Closed fail-closed:
+
+- `verify_manifest()` takes a **required** `expected_fqbn` keyword with no default and
+  refuses on exact inequality with the stable reason `FQBN_MISMATCH`. The refusal detail
+  names both the manifest value and the expected value.
+- The CLI requires `--expected-fqbn` (no default) and prints `VERIFIED_FQBN` on success.
+- `flash_app_only.sh` passes its own pinned `"$FQBN"`. The FQBN string itself is
+  unchanged; see the pinned value in
+  [the Controller README](README.md#build).
+
+A successful verification now positively proves that **all** of the following belong to
+the artifact being authorized:
+
+```text
+source commit + clean build state + clean current tree
++ application filename + exact binary size + exact binary SHA256
++ hardware profile + FQBN
+```
+
+Refusal matrix, exercised against the two REAL binaries built this session
+(`USB_ONLY` 387312 bytes `503735ca…`, `ROBOT_POWERED` 387776 bytes `6abbe734…`):
+
+| Artifact | Requested profile | Expected FQBN | Result |
+|---|---|---|---|
+| `USB_ONLY` | `USB_ONLY` | canonical | ALLOW |
+| `ROBOT_POWERED` | `ROBOT_POWERED` (explicit) | canonical | ALLOW |
+| `ROBOT_POWERED` | default, no authorization | canonical | REFUSE `PROFILE_MISMATCH` |
+| `USB_ONLY` | `USB_ONLY` | `PartitionScheme=default` | REFUSE `FQBN_MISMATCH` |
+| `USB_ONLY` | `USB_ONLY` | `FlashSize=8M` | REFUSE `FQBN_MISMATCH` |
+| `USB_ONLY` | `USB_ONLY` | `PSRAM=disabled` | REFUSE `FQBN_MISMATCH` |
+| `ROBOT_POWERED` | `ROBOT_POWERED` | `CPUFreq=160` | REFUSE `FQBN_MISMATCH` |
+| manifest FQBN tampered, binary/profile/commit identical | `USB_ONLY` | canonical | REFUSE `FQBN_MISMATCH` |
+| manifest FQBN empty | `USB_ONLY` | canonical | REFUSE `MANIFEST_INCOMPLETE` |
+| manifest FQBN key absent | `USB_ONLY` | canonical | REFUSE `MANIFEST_INCOMPLETE` |
+
+Additionally covered by the offline suite: per-option drift (`FlashMode`, `CDCOnBoot`),
+exact-not-substring comparison (prefix, suffix, case change, bare `esp32:esp32:esp32s3`),
+refusal ordering (`SOURCE_COMMIT_MISMATCH` outranks `FQBN_MISMATCH`; `FQBN_MISMATCH`
+outranks tree-state and binary checks), and both profiles passing under their own
+authorization with the canonical FQBN.
+
+**No pre-existing flash protection was weakened.** Backup size and digest, device MAC,
+verified application partition offset/size, partition-fit, rollback/anti-rollback state,
+the static-audit gate, the single application-partition write and the independent
+post-write `verify-flash` are all retained and still individually asserted by
+`static_audit.py`.
+
+### Finding B — Development Gates could be read as reordering the roadmap
+
+The HostLink gate's ENTRY condition read "Diagnostics/Maintenance foundation present",
+which could be read as authorizing HostLink immediately after Diagnostics — ahead of
+Service/Provisioning/QC, Full Leg Calibration integration and formal recalibration in the
+canonical sequence.
+
+Corrected in [`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md): HostLink ENTRY now requires
+all preceding [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md) stages through
+formal recalibration, plus the Diagnostics/Maintenance foundation as a technical
+prerequisite rather than an authorization. A new global rule states that a gate's
+technical prerequisites never override roadmap sequencing, and that reordering requires
+an explicit reviewed roadmap change. The roadmap sequence itself was not altered and no
+HostLink implementation was started.
+
+### Finding C — architecture document date
+
+`ARCHITECTURE.md` header corrected from 2026-09-15 to **2026-09-16**, the date of the
+approved permanent Embedded Web UI decision it now contains. No other architecture change.
+
+### Final offline acceptance — re-run after implementation
+
+| Gate | Result |
+|---|---|
+| Servo population / profile / availability host tests | **PASS** — 18 cases / 313 checks / 0 failures |
+| Build manifest provenance tests (incl. FQBN cases) | **PASS** — 51/51 |
+| Static safety audit | **PASS** — 29 source files, 0 findings |
+| Mutation check, new FQBN tripwires | **PASS** — 6/6 fire |
+| OTA partition logic suite | **PASS** — 40/40 |
+| Compile, `USB_ONLY` (pinned FQBN) | **PASS** — 387156 bytes flash, 28344 bytes RAM |
+| Compile-only check, `ROBOT_POWERED` | **PASS** — 387624 bytes flash, 28344 bytes RAM |
+| BNO085 viewer `npm run verify` | **PASS** — 59/59 tests, typecheck PASS, production build PASS |
+| `git diff --check` | clean |
+
+### Judgement
+
+```text
+G2 SOFTWARE/OFFLINE = FROZEN PASS
+FINAL DOCUMENTATION / ROADMAP GATE = PASS
+G3 ROBOT_POWERED LIVE = NOT EXECUTED / TO_TEST
+```
+
+`ROBOT_POWERED` remains **IMPLEMENTED**, never **VALIDATED**. Powered validation requires
+separate hardware authorization per
+[`G3_ROBOT_POWERED_VALIDATION_PLAN.md`](G3_ROBOT_POWERED_VALIDATION_PLAN.md).
+
+---
+
+## G3 — ROBOT_POWERED LIVE, NO MOTION — 2026-09-17
+
+First powered session. Executed step by step under explicit operator authorization, each
+step independently reviewed and accepted by the operator.
+
+```text
+G3 PREFLIGHT READ-ONLY                 = PASS
+G3-A ROBOT_POWERED BUILD/PROVENANCE    = PASS
+G3-B APPLICATION-ONLY FLASH            = PASS
+G3-P2 DALY LIVE READ-ONLY              = PASS
+G3-P3 LED LIVE                         = PASS
+G3-P4A0 SINGLE ID51 PING               = PASS
+G3-P4A SERVO CENSUS                    = PASS
+G3-P4B0/B1 ID51 READ + SAFE_OFF PILOT  = PASS
+G3 POWERED NO-MOTION EVIDENCE          = PASS  (operator-accepted)
+G3 FORMAL CENSUS-REPEAT CRITERION      = OUTSTANDING (1 census run; 1 repeat required)
+```
+
+> **Closed 2026-09-18** — the second census matched the first; G3 formal PASS. See
+> § G3 / G3.1 live closure below. The block above is the record as it stood on 2026-09-17.
+
+Robot mechanically suspended throughout. Fused battery disconnect was the established
+emergency power-removal path. **No motion, no Torque ON, no GoalPosition, no EEPROM, DALY
+or DCD write at any point.**
+
+| Item | Evidence |
+|---|---|
+| Device | ESP32-S3 MAC `14:c1:9f:22:75:94`, native USB-Serial/JTAG `303a:1001` |
+| Recovery backup | 16777216 bytes, sha256 `5cbba0b9…4d67fd32` — verified |
+| Flashed image | `6065d86c2da4`, `SOURCE_STATE=CLEAN`, `ROBOT_POWERED`, 387776 bytes, sha256 `0454345808a6aac46ec79fc711f48904c3a80008738b485918060801e4a99442` |
+| Flash path | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`: one write to `app0 @ 0x010000` (erase `0x10000–0x6efff`), rollback ENABLED / anti-rollback DISABLED, `verify-flash` digest matched |
+| First boot | `profile: ROBOT_POWERED (servo_power=YES battery=YES led_rail=YES)`, `operating_mode: MAINTENANCE`, `IMU_INIT=PASS`, `health=BOOTING` (SERVO `UNKNOWN` before any probe, by design), `runtime_resets=0` |
+| DALY | `ONLINE / REQUIRED / PASS`, `comm=OK`, fresh (`age_ms` < 2 s poll), pack 11.2 V 3S, no alarms, `charge_mos=ON discharge_mos=ON` |
+| LED | `@LED TEST` → `LED_TEST=STARTED`; chase visually confirmed by the operator; ring returned to OFF autonomously; `test_running=NO` |
+| ID51 ping | `found=1`, `max_ping_us=356` |
+| Census | `SERVO_CENSUS=PASS lo=11 hi=55`: `present_expected=13 missing_expected=0 absent_by_design=4 absent_by_design_present=0 unexpected_id=0 not_probed=0 truncated=NO` |
+| `SAFE_OFF` | `VERIFIED_OFF` on all 13 installed servos (write ACK ignored; independent `TorqueEnable` readback) |
+| Runtime read | 13/13 respond, `torque=0` on all, `speed=0 load=0`, voltage 112–113 (11.2–11.3 V), temp 33–36 °C |
+| Soak | 60 s passive, 600/600 telemetry lines valid, `runtime_resets=0`, `health=READY`, heap stable |
+| Cold power cycle (2026-09-18) | came back `ROBOT_POWERED` / `MAINTENANCE` — application-only flash persistent, no rollback |
+
+Recorded for completeness, not as regressions:
+
+- **Census repeat-stability — OUTSTANDING.** The formal G3 PASS criterion requires the
+  census to be "stable across repeats"; one complete census was executed. The 13
+  subsequent `@SERVO READ` transactions and 12 `SAFE_OFF` readbacks each re-confirmed every
+  expected ID, but they are not a census and do not substitute for one. The criterion is
+  unchanged; one additional read-only `@SERVO CENSUS` at the next authorized live session
+  closes it.
+- **Boot banner** — the first-boot capture lost two blocks of the banner to a USB CDC
+  transmit drop (the host opened the port mid-banner; the 256-byte TX ring overwrote them).
+  `startup_motion` / `startup_torque` / `startup_servo_scan` were therefore established
+  behaviourally (`SERVO detected=UNKNOWN`, `last_census=NOT_RUN` at 80 s uptime) and by the
+  static audit, not read off the banner.
+- **Soak scope** — observed with the CDC port open, the only way to observe it. G3.1 below
+  shows that is the healthy condition; the soak's IMU conclusion holds for port-open only.
+- **DALY KEY** — both switch positions produced byte-identical DALY state
+  (`discharge_mos=ON` in both). The readings cannot distinguish "KEY does not gate the
+  MOSFETs" from "KEY circuit not effective". `requestDischargeOff()` transmits nothing. The
+  fused disconnect is the only demonstrated power-removal path.
+
+---
+
+## G3.1 — CDC-INDEPENDENT CONTROLLER LOOP — 2026-09-18
+
+Regression found live **after** the G3 powered session. It does not invalidate the G3 servo/DALY/LED
+evidence above, every item of which was measured transaction by transaction.
+
+```text
+G3 POWERED NO-MOTION EVIDENCE         = PASS
+G3 FORMAL CENSUS-REPEAT CRITERION     = OUTSTANDING
+G3.1 CDC-INDEPENDENT CONTROLLER LOOP  = FAIL -> FIX UNDER VALIDATION
+Stage 4 onward (incl. all motion)     = BLOCKED until G3 census repeat + G3.1 PASS
+```
+
+> **Closed 2026-09-18** — G3.1 PASS live. See § G3 / G3.1 live closure below. The blocks in
+> this section are the record as it stood before the live re-test.
+
+### Finding — zero-TX passive A/B, same boot, cable attached throughout
+
+| Condition | Δ `rv_count` | Elapsed | BNO085 RV rate |
+|---|---:|---:|---:|
+| Host CDC port **closed** | 41 | 60.218 s | **0.68 Hz** |
+| Host CDC port **open** (same fd, immediately after) | 480 | 9.587 s | **50.07 Hz** |
+| Configured (`SH2_ROTATION_VECTOR`, 20000 µs) | | | 50 Hz |
+
+`runtime_resets` stayed 0; no boot, brownout, panic or malformed line. The reading port
+was opened `O_RDONLY` — zero bytes transmitted. Endpoint staleness was bounded on the
+device clock (`SAVE_GATE still_ms`): the closed-interval rate is **≤ 0.68 Hz** whenever the
+buffered lines were printed. Recovery to ~50 Hz was immediate on reopen, and 19
+consecutive open cycles ran at 49.5–51.3 Hz. Retrospectively, the same collapse explains
+the G3-B `rv_count` values (580 at 86 s; 3942 at 41 min — ~1.4 Hz between them), and
+it began each time a host process *closed* the port. Boots in which no host had opened
+the port ran at 47–48 Hz.
+
+### Root cause — confirmed in the installed core, not upstream
+
+Core `esp32:esp32 3.3.11` (the only one installed), FQBN `USBMode=hwcdc` →
+`-DARDUINO_USB_MODE=1`, `CDCOnBoot=cdc` → `-DARDUINO_USB_CDC_ON_BOOT=1`, so
+`cores/esp32/HardwareSerial.h:441-444` maps `Serial` to `HWCDCSerial` (`HWCDC`).
+In `~/.arduino15/packages/esp32/hardware/esp32/3.3.11/cores/esp32/HWCDC.cpp`:
+
+1. `static volatile bool connected` is set `true` by the ISR on the first host IN pickup
+   (`:148`) or OUT packet (`:239`), and cleared only by `BUS_RESET` (`:248`) or
+   `!isPlugged()` (`:273-276`).
+2. `isPlugged()` is `usb_serial_jtag_is_connected()`, which the ESP-IDF header documents
+   as true "so long as it is receiving SOF packets from the host, even if … the serial
+   port is not opened". Closing the host tty produces neither a bus reset nor SOF loss, so
+   **`connected` stays latched true after the host closes the port.**
+3. `HWCDC::write()` (`:540-623`), when `connected`, blocks in `xRingbufferSend(…,
+   tx_timeout_ms)` with `tx_timeout_ms = 100` (`:105`, `FREERTOS_HZ=1000`) and retries up
+   to `max_consec_timeouts = 20` (`:582`): **up to ~2 s per `Serial.print*()`** once the
+   256-byte TX ring (`:421-422`) is full and nothing drains it.
+4. `operator bool()` (`:375-377`) returns that same latched state, so `if (Serial)` is
+   **true in exactly the failing state** and cannot be the guard.
+5. `Bno085Imu::update()` services at most **one** SH2 event per loop pass, so every
+   loop stall is directly lost acquisition.
+
+Host condition on the ASUS: `power/control=auto` with a 2000 ms autosuspend delay, yet
+the device stays `runtime_status=active` with the port closed (SOFs continue). A host
+that did suspend the device would mask the bug — the firmware must not depend on host USB
+power policy. `ModemManager` is active on the ASUS: any transient open of the port by any
+process is enough to latch the failing state.
+
+### Fix — native HWCDC configuration in `Controller::begin()`
+
+Invariant: **no USB CDC transmit condition may block `Controller::update()`.**
+
+Two core calls before `Serial.begin()`, values in `config/BuildConfig.h`:
+
+```cpp
+Serial.setTxBufferSize(build::kUsbTxRingBytes);   // 3072
+Serial.setTxTimeoutMs(build::kUsbTxTimeoutMs);    // 0
+Serial.begin(build::kUsbSerialBaud);
+```
+
+With `tx_timeout_ms = 0` every wait in the installed `HWCDC.cpp` becomes non-blocking: the
+TX mutex is only try-locked (`xSemaphoreTake(…, 0)`, `:544`), each `xRingbufferSend(…, 0)`
+(`:590`) returns immediately, and the `max_consec_timeouts = 20` loop (`:582`) is at most
+20 immediate retries per chunk before a short write. No `delay()`, blocking semaphore or
+flush remains on the write path (`delay(1)` exists only in `flush()`, never called). The
+worst case for one `Serial.printf()` is formatting (plus `Print::vprintf`'s `malloc` above
+63 bytes) and ≤ 20 lock-free ring attempts — bounded, CPU-only, independent of any host.
+Output that does not fit is dropped whole per write call: each `printf` line is one write;
+`println` is two, so under saturation a line can lose its CRLF.
+
+Ring size from measured bursts (exact format strings, worst-case field widths):
+
+| Burst | Bytes |
+|---|---:|
+| IMU telemetry block, live / worst | 407 / 510 |
+| `@BMS STREAM` block, worst | 307 |
+| Boot banner | 779 |
+| `@STATUS` worst / `@HELP` | 561 / 628 |
+| `@SERVO CENSUS` PASS / worst (13 missing + 4 absent-by-design + 24 unexpected) | 263 / 1578 |
+| `@SERVO SCAN` worst (64 found) | 1125 |
+| **Largest single loop pass** (worst census + IMU + BMS) | **2395** |
+
+With timeout 0 nothing absorbs a burst, so even a host that is reading loses whatever
+exceeds the free ring at the moment of the write (formatting outpaces USB drain). The
+256-byte default is smaller than one IMU block, the banner, `@STATUS` and even a PASS
+census reply. 3072 covers the 2395-byte worst case with 28 % margin (2560 is the strict
+minimum at 512-byte granularity). Heap +2816 bytes; static RAM unchanged.
+
+`#error` guards pin hwcdc + CDC-on-boot and core 3.3.11. `DebugLevel=none`, pinned in the
+FQBN the manifest verifies, keeps `printBeforeSetupInfo()` out of the build — it would
+begin `Serial` before `setup()` and route debug output through a second, per-character
+transmit path.
+
+Accepted behaviour:
+
+- **Host opened, then closed or stopped reading** (flag latched): the ring keeps the oldest
+  ≤ 3 KB and new output is dropped; on reopen the host first receives that backlog (~4 s of
+  telemetry), then live data. A reply emitted before that backlog has drained may
+  short-write rather than block.
+- **Port never opened since boot**: the core overwrites the oldest bytes, so the boot banner
+  stays in the ring for ~4 s after reset (~2.8 s of telemetry after it). A host must open
+  the port within that window to read it.
+- **ESP-IDF secondary console** (`CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=y`) writes to
+  the same hardware outside HWCDC, only on IDF error logs or panics. Pre-existing and
+  unchanged; not verifiable from local source (IDF sources are not installed). No such
+  output has been observed in any capture.
+
+**Delivery semantics.** The timeout-0 guarantee is that USB CDC transmit cannot stall
+Controller progress; it is not a delivery guarantee. Command replies are expected complete
+under normal connected/draining conditions with adequate TX-ring free space. After a long
+closed-port interval a stale TX backlog may still occupy the ring immediately after reopen,
+and a reply emitted before enough space has drained may short-write rather than block. This
+is acceptable for the current diagnostic USB command surface and is **not** promoted into the
+future HostLink contract, which remains responsible for its own framing, acknowledgement and
+reliability.
+
+Alternative evaluated and not adopted: a `SerialTransport` channel abstraction gating
+unsolicited output on `availableForWrite()` with a response reserve. It satisfied the same
+invariant but changed 5 firmware files, added 2 more and ~430 lines of tests; the native
+configuration satisfies it in 2 firmware files.
+
+### Offline acceptance
+
+| Gate | Result |
+|---|---|
+| New audit rule `check_usb_cdc_tx_never_blocks` | **PASS**; mutation check **11/11 caught** (timeout ≠ 0, ring < 2560, ring or timeout after `begin()`, timeout call removed, output before `begin()`, either guard removed, a second `setTxTimeoutMs()`, `Serial.flush()`, `setDebugOutput()`) |
+| Static safety audit | **PASS** — 29 source files, 0 findings |
+| Servo population / profile host tests | **PASS** — 313 checks / 0 failures |
+| Build manifest provenance tests | **PASS** — 51/51 |
+| OTA partition logic suite | **PASS** — 40/40 |
+| BNO085 viewer `npm run verify` | **PASS** — 59/59 tests, typecheck, production build |
+| Compile, `USB_ONLY` (pinned FQBN) | **PASS** — 387188 bytes flash, 28344 bytes static RAM |
+| Compile, `ROBOT_POWERED` (pinned FQBN) | **PASS** — 387656 bytes flash, 28344 bytes static RAM |
+
+Only the two pre-existing third-party SCServo warnings appear; none in MATDOG source.
+
+### Live validation — TO_TEST (requires a clean commit, rebuild and separate authorization)
+
+> Executed 2026-09-18 — results in § G3 / G3.1 live closure below.
+
+1. Commit; `MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh`; verify manifest `CLEAN`;
+   `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`.
+2. Open a passive (zero-TX) listener **immediately** after the flash script returns: the
+   full banner is expected, including `startup_*`, `partition` and `reset_reason` (closes the
+   G3 boot-banner gap).
+3. Close the port (the flag is now latched — the failing case). Zero-TX A/B: closed ≥ 60 s,
+   then open 10 s. **PASS: closed ≥ 45 Hz and open 45–55 Hz**, `runtime_resets` unchanged,
+   every line valid.
+4. `@BMS STREAM ON`, close the port 60 s, reopen: rate as in 3; the stream resumes.
+5. The viewer (zero commands) connects after a closed interval and receives live telemetry.
+6. With the host reading and the reconnect backlog drained (wait ≥ 1 s after opening),
+   `@STATUS`, `@IMU STATUS`, `@BMS STATUS`, `@LED STATUS`, `@HELP`: every reply complete.
+7. **One read-only `@SERVO CENSUS`** — closes the outstanding G3 census-repeat criterion
+   (expect `PASS`, 13 present, 4 absent by design); issued after the backlog has drained, it
+   also shows a census reply arrives complete under timeout 0.
+
+---
+
+## G3 / G3.1 LIVE CLOSURE — 2026-09-18
+
+```text
+G3 FORMAL CENSUS-REPEAT                      = PASS
+G3.1 CDC CLOSED-PORT INDEPENDENCE            = PASS
+G3.1 BMS STREAM ROBUSTNESS                   = PASS
+
+G3 FORMAL ROBOT_POWERED NO-MOTION VALIDATION = PASS
+G3.1 CDC-INDEPENDENT CONTROLLER LOOP         = PASS
+```
+
+Robot mechanically suspended, fused disconnect accessible, operator present throughout.
+No commanded servo motion occurred and no robot motion was observed during validation.
+
+### G3.1-L1 — clean application-only flash and first boot
+
+| Item | Evidence |
+|---|---|
+| Source | `e2fc60531b28351472a2bfa5105a2170147610bb`; manifest `SOURCE_STATE=CLEAN`, `HARDWARE_PROFILE=ROBOT_POWERED` |
+| Application | 387808 bytes, SHA256 `e2b474b5c07e98649fbaf31d3d08970d022ffbdb5f1212d6b606dc28cac065d2` |
+| Flash | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh` — MAC `14:c1:9f:22:75:94`; one write, erase `0x10000–0x6efff` inside `app0`; bootloader, partition table, otadata and NVS untouched; `verify-flash` digest matched; `APPLICATION_ONLY_FLASH = PASS` |
+| First boot (passive, zero bytes sent) | complete banner: `build e2fc60531b28`, `ROBOT_POWERED (servo_power=YES battery=YES led_rail=YES)`, `partition app0 @ 0x010000`, `reset_reason OTHER` (the USB-JTAG RTS reset has no named entry), `startup_motion` / `startup_torque` / `startup_servo_scan : DISABLED`, `daly_write : NOT_IMPLEMENTED`, `operating_mode MAINTENANCE`, `IMU_INIT=PASS`, `SYSTEM_BOOT_COMPLETE health=BOOTING` |
+| First telemetry | BNO085 RV 50.12 Hz, `runtime_resets=0`, every line valid |
+
+The complete banner closes the G3 boot-banner gap: the `startup_*` lines are now directly observed.
+
+### CDC independence
+
+Zero-TX passive A/B. A host had already opened and closed the port after boot, so HWCDC was in the
+latched state that failed before the fix.
+
+| | Value |
+|---|---|
+| Pre-close (`still_ms` / `rv` / `runtime_resets`) | S0 = 471826 ms, R0 = 23644, Z0 = 0 |
+| Host closed interval | 62.121 s |
+| First fresh post-close | S1 = 534345 ms, R1 = 26776, Z1 = 0 |
+| Device interval S1 − S0 | 62.519 s (host clock 62.520 s) |
+| **Closed-port RV rate** | **50.10 Hz** (0.68 Hz before the fix) |
+| Open recovery RV rate | 50.13 Hz (21 fresh blocks, 10.07 s) |
+| `runtime_resets` | 0 |
+
+Backlog on reopen: 7 stale complete IMU blocks, 3131 bytes before the first fresh block, stale
+`still_ms` offsets +0.503 … +3.524 s after S0 — the 3 KB ring holding ~3.5 s of post-close
+telemetry, as designed. No `still_ms` reset. Fresh blocks were identified by the `still_ms`
+discontinuity and by counter consistency within each block (`RV count` = `COUNTS rv`).
+
+### Second servo census
+
+```text
+SERVO_CENSUS=STARTED lo=11 hi=55
+SERVO_CENSUS=PASS lo=11 hi=55
+  canonical_allocated=17 expected_now=13
+  present_expected=13 missing_expected=0 absent_by_design=4
+  absent_by_design_present=0 unexpected_id=0 not_probed=0 truncated=NO
+SERVO  init=OK detected=ONLINE expected=REQUIRED result=PASS
+```
+
+Identical, line for line, to the first census (G3-P4A, 2026-09-17).
+**CENSUS STABLE ACROSS REPEATS = PASS.** The runs used firmware `6065d86` and `e2fc605`; the census
+code path is identical in both. The census covers IDs 11..55 only; nothing is claimed about IDs
+outside that range. Telemetry continued during and after it.
+
+### Diagnostic replies
+
+With the host reading and the reconnect backlog drained: `@STATUS`, `@IMU STATUS`, `@BMS STATUS`,
+`@LED STATUS` and `@HELP` each returned a complete, syntactically valid reply (7, 2, 5, 2 and 18
+lines); none was re-issued.
+
+### BMS stream robustness
+
+| | Value |
+|---|---|
+| `@BMS STREAM ON` | `BMS_STREAM=ON`; 3 stream blocks before close |
+| Pre-close | S2 = 553514 ms, R2 = 27706, Z2 = 0 |
+| Host closed interval | 62.119 s |
+| First fresh post-close | S3 = 616057 ms, R3 = 30840, Z3 = 0 |
+| Device interval | 62.543 s (host clock 62.544 s) |
+| **Closed-port RV rate, stream enabled** | **50.11 Hz** |
+| After reopen | 4 fresh stream blocks: DALY `comm=OK`, `charge_mos=ON`, `discharge_mos=ON`, alarms all zero |
+| `@BMS STREAM OFF` | `BMS_STREAM=OFF`; zero stream blocks in the following 4.5 s |
+| `runtime_resets` | 0 |
+
+### Final state
+
+```text
+SYSTEM health=READY power_state=RUN mode=MAINTENANCE profile=ROBOT_POWERED
+BNO085 REQUIRED/PASS   DALY REQUIRED/PASS   SERVO REQUIRED/PASS   LED OPTIONAL/PASS
+runtime_resets=0
+```
+
+Final passive window 50.11 Hz. No brownout, panic, reboot or FAULT at any point. The BNO085
+stillness timer never reset across the 632 s batch (gyro magnitude 0.000000 rad/s). Pack 11.0 V,
+SOC 41.4 %, cell Δ12–13 mV, no alarms.
+
+### Still open
+
+- **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
+  DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
+  or safety barrier; the DALY's actual KEY configuration and function must be inspected before any
+  setting is changed. The fused disconnect remains the trusted physical isolation method.
+- **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
+  19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
+  electrical and signal-integrity validation.

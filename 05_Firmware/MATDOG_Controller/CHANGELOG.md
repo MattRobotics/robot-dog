@@ -1,5 +1,211 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — G3 / G3.1 live closure — 2026-09-18
+
+Documentation only; no firmware change. Records the live validation of `e2fc605`.
+
+- **G3 formal PASS:** a second read-only `@SERVO CENSUS` matched the first exactly — census stable
+  across repeats. The complete first-boot banner now shows `startup_motion` / `startup_torque` /
+  `startup_servo_scan : DISABLED` directly.
+- **G3.1 PASS:** with the host port closed 62 s after a host had opened and closed it, BNO085 RV
+  ran at 50.10 Hz (0.68 Hz before the fix); 50.13 Hz open; 50.11 Hz with `@BMS STREAM` enabled;
+  `runtime_resets` 0; every command reply complete once the backlog had drained.
+- No commanded servo motion occurred and no robot motion was observed during validation.
+- DALY `KEY` recorded as OPEN (not a validated shutdown barrier); GPIO19/20 stay native USB D−/D+.
+- Next: DALY KEY investigation, then G4 — Diagnostics / Maintenance.
+
+## Unreleased — G3.1 CDC-independent Controller loop — 2026-09-18
+
+Fix for a regression found **live after the G3 powered session**. **Not flashed; live re-test TO_TEST.**
+No servo, BMS, LED, KEY or power state was changed to produce it.
+
+**Finding.** Zero-TX passive A/B on one boot, USB cable attached throughout: with the host's
+CDC port closed, BNO085 rotation-vector processing fell to **0.68 Hz**; with it open,
+**50.07 Hz** (configured 50 Hz). `runtime_resets` stayed 0. Autonomous Controller execution
+depended on a host keeping the port open.
+
+**Root cause (installed `esp32:esp32 3.3.11` `cores/esp32/HWCDC.cpp`).** HWCDC latches
+`connected = true` on the first host transfer and clears it only on a USB bus reset or SOF
+loss; closing the host tty is neither. In that state `HWCDC::write()` waits up to
+`tx_timeout_ms` (100 ms) × 20 attempts ≈ 2 s per call on a full 256-byte TX ring.
+`operator bool()` reports the same latched flag, so `if (Serial)` cannot guard it. The IMU
+services one SH2 event per loop pass, so the stalls were lost acquisition.
+
+- `src/core/Controller.cpp`: `Controller::begin()` calls `Serial.setTxBufferSize(3072)` and
+  `Serial.setTxTimeoutMs(0)` before `Serial.begin()`. With timeout 0 every wait in
+  `HWCDC::write()` becomes an immediate drop, so USB CDC transmit cannot stall the
+  Controller. The ring holds the largest single loop-pass burst (2395 bytes): replies are
+  expected complete while a host is reading and draining. Right after reopening a port that
+  was closed for a long time, a stale backlog may still occupy the ring and a reply may
+  short-write instead of block — accepted for this diagnostic surface, **not** a HostLink
+  guarantee. `#error` guards pin hwcdc + CDC-on-boot and core 3.3.11.
+- `src/config/BuildConfig.h`: `kUsbTxTimeoutMs = 0`, `kUsbTxRingBytes = 3072`.
+- `scripts/static_audit.py`: `check_usb_cdc_tx_never_blocks` — timeout exactly 0, ring
+  ≥ 2560, both set before `Serial.begin()` and any output, exactly one call each, guards
+  present, no `Serial.flush()` / debug-output routing. 11/11 regression mutations caught.
+- Docs: G3 powered no-motion evidence PASS, formal census-repeat criterion outstanding; G3.1
+  gate added (`FAIL → FIX UNDER VALIDATION`); stage 4 onward and all motion `BLOCKED` until
+  G3.1 PASS.
+
+## Unreleased — pre-G3 provenance closure — 2026-09-16
+
+Final pre-G3 closure amendment. **No hardware was flashed, no rail energized, G3 not
+executed.** The compiled-in default profile remains `USB_ONLY`.
+
+**Finding A — the recorded build FQBN went unverified.**
+The build manifest has recorded `FQBN` since it was introduced, but `build_manifest.py
+verify` never compared it against the FQBN `flash_app_only.sh` pins. The right source
+compiled with the wrong toolchain configuration is still the wrong artifact: the FQBN
+carries the partition scheme, flash size/mode, PSRAM mode, USB/CDC mode and CPU
+frequency, and a partition-scheme change silently relocates the application partition.
+
+- `scripts/build_manifest.py`: `verify_manifest()` now takes a required `expected_fqbn`
+  keyword (no default) and refuses on exact inequality with the new stable reason
+  `FQBN_MISMATCH`, whose detail names both the manifest value and the expected value.
+  The CLI gains a required `--expected-fqbn` and reports `VERIFIED_FQBN` on success.
+- `scripts/flash_app_only.sh`: passes its own pinned `"$FQBN"` into the verifier and
+  surfaces the verified value in the pre-write report. The FQBN itself is unchanged.
+- A successful verification now positively proves source commit + clean build state +
+  clean current tree + application filename + exact binary size + exact binary SHA256 +
+  hardware profile + FQBN all belong to the artifact being authorized.
+- No existing flash protection was weakened: backup size/digest, device MAC,
+  partition/otadata verification, rollback/anti-rollback, static audit, single
+  application-partition write and post-write `verify-flash` are all retained.
+- `scripts/tests/test_build_manifest.py`: 36 → **51 tests**, adding canonical-FQBN PASS,
+  differing-FQBN `FQBN_MISMATCH`, per-option drift (partition scheme, flash size, PSRAM,
+  CPU frequency, flash mode, CDC mode), exact-not-substring comparison, empty/missing
+  FQBN falling to `MANIFEST_INCOMPLETE`, refusal ordering, and both profiles passing
+  under their own authorization with the canonical FQBN.
+- `scripts/static_audit.py`: new tripwires for a deleted FQBN comparison, a permissive
+  `expected_fqbn` default, a defaulted `--expected-fqbn`, a removed `FQBN_MISMATCH`
+  reason, and `flash_app_only.sh` no longer passing its pinned `"$FQBN"`. All six
+  mutation-tested.
+
+**Finding B — Development Gates could be read as reordering the roadmap.**
+The HostLink gate's ENTRY read "Diagnostics/Maintenance foundation present", which could
+be taken as authorizing HostLink immediately after Diagnostics, ahead of Service/
+Provisioning/QC, calibration integration and formal recalibration.
+
+- [`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md): HostLink ENTRY now requires all
+  preceding roadmap stages through formal recalibration, and a new global rule 6 states
+  that a gate's technical prerequisites never override
+  [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md) sequencing — reordering
+  requires an explicit reviewed roadmap change. The roadmap sequence itself is unchanged
+  and no HostLink implementation was started.
+
+**Finding C** — `ARCHITECTURE.md` header date corrected to 2026-09-16, the date of the
+approved Embedded Web UI decision it now contains.
+
+## Unreleased — G2 pre-G3 hardening amendment — 2026-09-16
+
+Resolves two issues raised by an independent review of commit `34afbc7`. Both are
+pre-G3 corrections to the G2 software scope. **No hardware was flashed, no rail was
+energized, and G3 was not executed.** The compiled-in default profile remains `USB_ONLY`.
+
+**Finding 1 — the build profile was not bound to the flashed artifact.**
+`build.sh` can emit a `USB_ONLY` or a `ROBOT_POWERED` image from the same commit to the
+same path, and the build id is identical for both — so the pre-existing flash gate could
+not tell them apart. A stale image of the wrong profile could have been written under the
+wrong assumption. (Confirmed concrete: the two profiles really do produce different
+binaries — 387312 vs 387776 bytes, different digests.)
+
+- `scripts/build_manifest.py`: new. Writes and verifies a build manifest binding source
+  commit, build id, clean/dirty source state, hardware profile, FQBN, and the binary's
+  filename/size/SHA256. Pure logic plus a thin CLI; no device I/O.
+- `build.sh`: emits `build/esp32.esp32.esp32s3/matdog_build_manifest.txt` after every
+  successful compile, and removes any stale manifest if no binary was produced. The
+  manifest lives in the gitignored build directory and is never committed.
+- `flash_app_only.sh`: fail-closed manifest gate before any device write. Requires
+  manifest present/parseable/known-version, commit == `HEAD`, tree clean at build time
+  *and* now, binary present with matching size **and** SHA256, recognized profile, and
+  manifest profile == requested profile. Profile is named via `MATDOG_FLASH_PROFILE`
+  (default `USB_ONLY`), so a `ROBOT_POWERED` image is refused unless explicitly asked
+  for. The verified profile is printed in a banner immediately before the write.
+- No pre-existing protection was weakened: backup size/digest, device MAC, verified
+  application partition, rollback/anti-rollback, static audit, single-partition write and
+  post-write `verify-flash` are all retained and now individually audited.
+
+**Finding 2 — `SystemHealth::READY` was unreachable under `ROBOT_POWERED`.**
+`classify()` converted `DetectedState::UNKNOWN` into a verdict, treating "nothing has
+established anything" the same as "we asked and it did not answer".
+
+- `core/Availability.cpp`: `UNKNOWN` is now handled separately from `NO_RESPONSE`/
+  `UNPOWERED`. `UNKNOWN + OPTIONAL -> PASS`; `UNKNOWN + REQUIRED -> UNKNOWN` (system
+  reports `BOOTING`, a visible gap, not a false alarm). Observed-absence escalation is
+  unchanged: `NO_RESPONSE + REQUIRED -> FAULT`, `NO_RESPONSE + OPTIONAL -> DEGRADED`.
+- This fixed two defects with one rule: the LED ring (non-probeable, so permanently
+  `UNKNOWN` when powered) no longer degrades the system, and the servo bus (`REQUIRED`
+  but deliberately never probed at boot) no longer reports `FAULT` before anything has
+  been asked of it. The second case was found while evaluating the first across both
+  profiles, as the review instructed.
+- No physical detection is faked: the LED still reports `detected=UNKNOWN`, and the
+  static audit forbids `detectedStateForLedRail()` from ever returning `ONLINE`.
+- `USB_ONLY` classification is bit-for-bit unchanged — verified by a test that reproduces
+  the hardware-validated Session 2 / H3 table exactly.
+- `core/SystemState`: `beginBoot()` takes `now_ms` instead of calling `millis()`, making
+  the translation unit Arduino-free so the offline tests link the real aggregation.
+
+Tests and tooling:
+
+- `scripts/tests/test_build_manifest.py`: new, 36 offline tests covering every refusal
+  reason by exact code, the full authorization matrix, and write→verify round trips.
+- `scripts/tests/test_servo_population.cpp`: +4 cases / +39 checks for the Availability
+  truth table, the unchanged `USB_ONLY` boot table, `READY` reachability under
+  `ROBOT_POWERED`, and a real optional-module failure still degrading.
+- `static_audit.py`: two new check groups for profile provenance and the `UNKNOWN`
+  distinction, plus anti-weakening assertions anchored to the actual comparisons in
+  `flash_app_only.sh` rather than to token presence. All 15 new tripwires mutation-tested.
+
+## Unreleased — G2 ROBOT_POWERED configuration support — 2026-09-16
+
+Software preparation for the powered robot. **No powered hardware validation was
+performed** — that is gate G3 and is authorized separately. The compiled-in default
+hardware profile deliberately remains `USB_ONLY`.
+
+Release identity is intentionally unchanged (`kFirmwareVersion` stays `0.1.0`): the
+`0.2.x` number is decided at the release gate, not by a development branch name.
+Development builds are distinguished by the git-SHA build id.
+
+- `config`: new `HardwareProfile.h` — one enum (`USB_ONLY` / `ROBOT_POWERED`), one
+  `expectationsFor()` mapping table. `BuildConfig.h` now *derives*
+  `kServoPowerAvailable`/`kBatteryAvailable`/`kLedRailPowered`/`kTestProfile` from the
+  selected profile instead of storing four independently editable facts that could
+  contradict each other. Switching profiles is a one-symbol change.
+- `core`: `Availability` gains `expectedStateForServoBus`/`Battery`/`LedRail` and
+  `detectedStateForLedRail` — the profile → `ExpectedState` rule stated once instead of
+  inlined per module. `classify()` itself is unchanged: the same `NO_RESPONSE` becomes
+  `PASS` under `USB_ONLY` and `FAULT` under `ROBOT_POWERED`, which is what the V0.1
+  model was designed for. `Availability.h`/`SystemState.h` now include `<stdint.h>`
+  rather than `<Arduino.h>` so the offline host tests link the shipped logic.
+- `servo`: new `ServoPopulation` — canonical 17 / expected-now 13 / absent-by-design 4
+  (52-55) kept explicitly distinct, with pure per-ID and whole-census classification
+  (`PRESENT_EXPECTED` / `MISSING_EXPECTED` / `ABSENT_BY_DESIGN` /
+  `ABSENT_BY_DESIGN_PRESENT` / `UNEXPECTED_ID` / `NOT_PROBED`, verdict `PASS` /
+  `PROFILE_MISMATCH` / `RANGE_INCOMPLETE` / `NOT_RUN`). Fail-closed: a partial or
+  truncated scan can never report `PASS`. A healthy powered census is 13 present + 4
+  absent by design — "17 = PASS" is never encoded anywhere.
+- `servo`: new `ServoCensus` — Controller-owned service that drives the existing
+  `ServoBus` scan state machine and holds the structured `CensusResult`. No second bus
+  owner, no duplicate UART, no `Serial`, never auto-started.
+- `core`: `@SERVO CENSUS` added to the USB command surface (MAINTENANCE-gated, like
+  `@SERVO SCAN`). `CommandRouter` only formats the stored result — no G2 domain logic
+  lives inside Serial parsing or printing, so a future Web UI / HostLink adapter can
+  consume the same `CensusResult` without re-scanning the bus.
+- Boot banner reports the profile with its rail facts, the declared servo population,
+  and `startup_servo_scan : DISABLED` alongside the existing motion/torque lines.
+- `scripts`: static audit extended with six G2 checks (profile authority + the
+  `USB_ONLY`-default G3 gate, population model + YAML provenance cross-check, transport
+  independence, no startup bus traffic, network→servo tripwire, host test suite). All
+  pre-existing checks retained; every new tripwire was mutation-tested.
+- `scripts/tests`: new offline C++ suite (`test_servo_population.cpp` +
+  `run_host_tests.sh`) covering the required census classification cases and both
+  profiles' expected-hardware semantics.
+
+Explicitly NOT in this gate: Wi-Fi, HTTP/WebSocket/REST, Web UI, OTA transport, command
+lease/deadman, teleoperation, IK/gait/pose, Safe Actuator, the full ActuatorAuthority
+framework, provisioning/QC/source-signature/calibration integration, DALY writes, servo
+EEPROM/ID writes, and any motion.
+
 ## 0.1.0 — 2026-09-15
 
 First unified operational ESP32-S3 runtime. Integration milestone: brings ST3215

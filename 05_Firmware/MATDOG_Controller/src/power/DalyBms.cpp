@@ -71,8 +71,8 @@ core::AvailabilityStatus DalyBms::availability() const {
   core::AvailabilityStatus a;
   a.init = init_;
   a.detected = detected_;
-  a.expected = build::kBatteryAvailable ? core::ExpectedState::REQUIRED
-                                          : core::ExpectedState::EXPECTED_OFFLINE;
+  // G2: derived from the active hardware profile (core/Availability.h).
+  a.expected = core::expectedStateForBattery(build::kProfileExpectations);
   return a;
 }
 

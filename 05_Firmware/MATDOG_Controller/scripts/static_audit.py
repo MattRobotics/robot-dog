@@ -44,6 +44,49 @@ losing its three-way SdkconfigFlag.UNKNOWN case and going back to treating
 ota_app_partitions() losing its contiguous-slot-index requirement, letting a
 sparse OTA layout (e.g. {0, 2}) resolve instead of refusing (Finding 3).
 
+G2 (ROBOT_POWERED configuration support) additions: the three rail
+availability flags regressing from DERIVED values back to independently
+editable literals (they must come from config/HardwareProfile.h's single
+expectationsFor() table, so a profile name can never contradict its own
+rail facts); the profile table itself mismapping USB_ONLY/ROBOT_POWERED;
+the compiled-in DEFAULT profile being anything other than USB_ONLY (G3 —
+powered hardware validation — is not authorized, so a ROBOT_POWERED image
+must never be producible by an unreviewed edit); the servo population model
+losing the canonical-17 / expected-now-13 / absent-by-design-4 distinction
+or drifting from MATDOG_SERVO_ALLOCATION.yaml; a "17 responders = PASS"
+rule reappearing (false for the current robot); the population/census
+translation units gaining a Serial or Arduino dependency (they must stay
+pure so a future telemetry snapshot and Web UI can reuse the SAME
+classification without re-scanning the bus); Controller::begin() starting a
+servo scan/census at boot; and a direct network-handler -> servo-primitive
+path (no network subsystem exists yet — this is a tripwire armed in
+advance, not a test of invented code).
+
+G2 pre-G3 hardening additions (independent review findings 1 and 2): the
+build-manifest profile-provenance gate being removed, neutralized, given a
+permissive default, or moved after the device write (build.sh must record
+the hardware profile + binary digest it produced; flash_app_only.sh must
+verify them and require MATDOG_FLASH_PROFILE before writing, without
+weakening any pre-existing backup/MAC/partition/rollback/verify gate); and
+classify() collapsing DetectedState::UNKNOWN back into an observed absence,
+or a module faking a physical WS2812 detection to make a status green.
+
+Pre-G3 closure addition (review Finding A): the recorded build FQBN going
+unverified again. The manifest carried FQBN from the start but nothing
+compared it, leaving the partition scheme, flash size/mode, PSRAM mode,
+USB/CDC mode and CPU frequency unchecked at flash time. verify_manifest()
+must take an explicit expected_fqbn with no default, compare it for exact
+equality, and flash_app_only.sh must pass its own pinned "$FQBN".
+
+G3.1 (live regression found after G3, 2026-09-18) addition: USB CDC
+transmit regaining the ability to block the Controller loop. The installed
+HWCDC (esp32:esp32 3.3.11) keeps a host "connected" after it closes the
+port and, with its default 100 ms TX timeout, waits up to ~2 s per print on
+a full ring (BNO085 RV fell from 50.07 Hz to 0.68 Hz). The TX timeout must
+be explicitly 0 and set, with the ring size, before Serial.begin() and any
+output; nothing may set it again; Serial.flush() (discards or waits) and
+debug-output routing (a second per-character transmit path) are forbidden.
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
@@ -348,20 +391,12 @@ def check_led_anti_back_power(files):
         elif pixels_begin_pos != -1 and pixels_begin_pos < guard_pos:
             fail(f"{path}: pixels_.begin() appears before the kLedRailPowered guard in begin()")
 
-    for path, code in files:
-        if path.name != "BuildConfig.h":
-            continue
-        # This session is exclusively USB_ONLY hardening (see handoff
-        # Session 2). These three flags must read false right now; flipping
-        # any of them is a deliberate future ROBOT_POWERED change, not
-        # something that should happen silently in this codebase's history.
-        for flag in ("kServoPowerAvailable", "kBatteryAvailable", "kLedRailPowered"):
-            m = re.search(rf"constexpr bool {flag}\s*=\s*(\w+);", code)
-            if not m:
-                fail(f"{path}: could not locate {flag} to audit its value")
-            elif m.group(1) != "false":
-                fail(f"{path}: {flag} = {m.group(1)}, expected false for the current "
-                     f"USB_ONLY-only session (flip deliberately for ROBOT_POWERED work)")
+    # The BuildConfig rail-flag audit that used to live here moved to
+    # check_hardware_profile_authority() in G2: the three flags are no
+    # longer independently editable literals, so auditing their literal
+    # value is no longer the right question. What replaced it is strictly
+    # stronger - it checks that they are DERIVED from one profile authority
+    # AND that the active profile is still USB_ONLY.
 
 
 def check_servo_timeout_not_global(files):
@@ -490,6 +525,527 @@ def check_app_only_script_never_targets_other_partitions(sketch_dir):
             fail(f"{target}: missing required safety-gate output {required!r}")
 
 
+def check_hardware_profile_authority(files, sketch_dir):
+    """G2: one profile authority -> consistent expected hardware semantics.
+
+    V0.1 stated the bench configuration four times over (a kTestProfile
+    string plus three independent `constexpr bool` literals) with nothing
+    tying them together, so a partial edit could produce a firmware whose
+    printed profile name contradicted its own rail expectations. This check
+    enforces the replacement invariant and keeps the original protection's
+    teeth: the DEFAULT profile compiled into source must remain USB_ONLY
+    until G3 is authorized.
+    """
+    build_config = None
+    profile_header = None
+    for path, code in files:
+        if path.name == "BuildConfig.h":
+            build_config = (path, code)
+        if path.name == "HardwareProfile.h":
+            profile_header = (path, code)
+
+    if profile_header is None:
+        fail("config/HardwareProfile.h not found - the hardware profile authority "
+             "must exist as a single mapping table (G2)")
+    else:
+        path, code = profile_header
+        for token in ("USB_ONLY", "ROBOT_POWERED", "ProfileExpectations", "expectationsFor"):
+            if token not in code:
+                fail(f"{path}: missing required profile authority symbol {token!r}")
+        # The mapping table itself: ROBOT_POWERED powers all three rails,
+        # anything else powers none. A silent edit here would flip every
+        # module's expectations at once, so its exact shape is audited.
+        if not re.search(
+                r"HardwareProfile::ROBOT_POWERED\)\s*\?\s*"
+                r"ProfileExpectations\{true,\s*true,\s*true\}\s*:\s*"
+                r"ProfileExpectations\{false,\s*false,\s*false\}", code):
+            fail(f"{path}: expectationsFor() no longer maps ROBOT_POWERED -> "
+                 f"(servo+battery+led all true) and USB_ONLY -> (all false); the profile "
+                 f"table must not be reshaped without review")
+        if "#include <Arduino.h>" in code:
+            fail(f"{path}: must stay Arduino-free so the offline host tests can link the "
+                 f"real profile table instead of a copy")
+
+    if build_config is None:
+        fail("config/BuildConfig.h not found")
+        return
+
+    path, code = build_config
+
+    # (a) The three rail flags must be DERIVED, never literals again.
+    for flag, field in (("kServoPowerAvailable", "servo_power_available"),
+                        ("kBatteryAvailable", "battery_available"),
+                        ("kLedRailPowered", "led_rail_powered")):
+        m = re.search(rf"constexpr bool {flag}\s*=\s*([^;]+);", code)
+        if not m:
+            fail(f"{path}: could not locate {flag} to audit its derivation")
+            continue
+        rhs = m.group(1).strip()
+        if rhs in ("true", "false"):
+            fail(f"{path}: {flag} is a bare literal {rhs!r} again - it must be derived "
+                 f"from kProfileExpectations so the three rail facts and the profile "
+                 f"name cannot drift apart (G2)")
+        elif f"kProfileExpectations.{field}" not in rhs:
+            fail(f"{path}: {flag} is not derived from kProfileExpectations.{field} "
+                 f"(found {rhs!r})")
+
+    # (b) The profile name must be derived too, not typed independently.
+    m = re.search(r"constexpr const char\* kTestProfile\s*=\s*([^;]+);", code)
+    if not m:
+        fail(f"{path}: could not locate kTestProfile")
+    elif "toString(kHardwareProfile)" not in m.group(1):
+        fail(f"{path}: kTestProfile must be derived via config::toString(kHardwareProfile), "
+             f"not written as an independent string literal (found {m.group(1).strip()!r})")
+
+    # (c) THE G3 GATE. This is the direct successor to Session 2's
+    # "all three flags must be false" check: the source default must stay
+    # USB_ONLY, so no ROBOT_POWERED image can be built by an unreviewed
+    # edit. Powered hardware validation is a separately authorized gate.
+    m = re.search(r"#define\s+MATDOG_ACTIVE_HARDWARE_PROFILE\s+(.+)", code)
+    if not m:
+        fail(f"{path}: could not locate the MATDOG_ACTIVE_HARDWARE_PROFILE default")
+    elif not m.group(1).strip().endswith("HardwareProfile::USB_ONLY"):
+        fail(f"{path}: the default hardware profile is {m.group(1).strip()!r}, expected "
+             f"HardwareProfile::USB_ONLY - ROBOT_POWERED must not be the compiled-in "
+             f"default until the G3 powered validation gate is explicitly authorized")
+
+
+def check_servo_population_model(files, sketch_dir):
+    """G2: canonical 17 / expected-now 13 / absent-by-design 4 stay distinct.
+
+    The handoff is explicit that "17 servos must respond for PASS" is FALSE
+    for the current robot, and that an absent-by-design servo must never be
+    classified as a failure. Both are easy to regress with a one-line edit,
+    so both are audited.
+    """
+    population = None
+    for path, code in files:
+        if path.name == "ServoPopulation.h":
+            population = (path, code)
+    if population is None:
+        fail("servo/ServoPopulation.h not found - the G2 population model must exist")
+        return
+
+    path, code = population
+
+    for token in ("kCanonicalServos", "canonical_allocated", "expected_now",
+                  "PRESENT_EXPECTED", "MISSING_EXPECTED", "ABSENT_BY_DESIGN",
+                  "ABSENT_BY_DESIGN_PRESENT", "UNEXPECTED_ID", "PROFILE_MISMATCH"):
+        if token not in code:
+            fail(f"{path}: missing required population semantic {token!r}")
+
+    # kCanonicalServoCount must be COMPUTED from the table, never a literal
+    # that could silently disagree with it.
+    if not re.search(r"kCanonicalServoCount\s*=\s*[^;]*sizeof\(kCanonicalServos\)", code):
+        fail(f"{path}: kCanonicalServoCount must be derived with sizeof(kCanonicalServos), "
+             f"not written as a literal")
+
+    rows = re.findall(r'\{\s*(\d+),\s*"(\w+)",\s*CurrentConfig::(\w+)\s*\}', code)
+    if len(rows) != 17:
+        fail(f"{path}: canonical servo table has {len(rows)} entries, expected 17 "
+             f"(MATDOG canonical allocation)")
+    installed = [r for r in rows if r[2] == "INSTALLED"]
+    absent = [r for r in rows if r[2] == "ABSENT_BY_DESIGN"]
+    if len(installed) != 13:
+        fail(f"{path}: {len(installed)} servos marked INSTALLED, expected 13 for the "
+             f"current physical configuration")
+    absent_ids = sorted(int(r[0]) for r in absent)
+    if absent_ids != [52, 53, 54, 55]:
+        fail(f"{path}: ABSENT_BY_DESIGN ids are {absent_ids}, expected [52, 53, 54, 55] "
+             f"(NECK_PITCH/HEAD_ROTATION/HEAD_PITCH/JAW are allocated but not installed)")
+
+    # No "17 responders = PASS" rule anywhere in the classification or its
+    # presentation.
+    for p2, c2 in files:
+        if p2.name not in ("ServoPopulation.cpp", "ServoCensus.cpp", "CommandRouter.cpp"):
+            continue
+        if re.search(r"(==|>=)\s*17\b", c2) or re.search(r"\b17\s*(==|<=)", c2):
+            fail(f"{p2}: found a hardcoded comparison against 17 - a healthy census for "
+                 f"the current robot is 13 present + 4 absent by design, so 17 must never "
+                 f"be a PASS threshold")
+
+    # Provenance: the embedded table must not drift from the canonical YAML.
+    yaml_path = sketch_dir.parents[1] / "06_Software" / "Matdog_Core" / "config" / \
+        "MATDOG_SERVO_ALLOCATION.yaml"
+    if not yaml_path.exists():
+        fail(f"{yaml_path}: canonical servo allocation not found - the firmware table's "
+             f"provenance cannot be verified")
+        return
+    yaml_ids = sorted(int(m) for m in re.findall(r"^\s*bus_id:\s*(\d+)\s*$",
+                                                 yaml_path.read_text(encoding="utf-8"),
+                                                 re.MULTILINE))
+    table_ids = sorted(int(r[0]) for r in rows)
+    if yaml_ids != table_ids:
+        fail(f"{path}: embedded canonical table {table_ids} disagrees with "
+             f"{yaml_path.name} {yaml_ids} - the YAML is the canonical project "
+             f"authority; fix the firmware table, not the YAML")
+
+
+def check_g2_state_is_transport_independent(files):
+    """G2 handoff sections 7/8/9: new domain logic must not live inside a
+    transport. If the ONLY representation of the census were Serial.printf()
+    output, the future Web UI / HostLink would have to either reimplement
+    the classification or re-scan the bus to render a page - both are
+    explicitly forbidden architectures.
+    """
+    for path, code in files:
+        if path.name not in ("ServoPopulation.h", "ServoPopulation.cpp",
+                             "ServoCensus.h", "ServoCensus.cpp"):
+            continue
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the G2 population/census layer must "
+                 f"stay transport-independent so USB CDC and a future Web UI can both "
+                 f"consume the same structured result")
+        if "#include <Arduino.h>" in code:
+            fail(f"{path}: includes <Arduino.h> directly - keep this layer host-linkable "
+                 f"so the offline tests exercise the shipped logic, not a copy")
+
+    # These carry the classification rules the host tests link against.
+    for path, code in files:
+        if path.name in ("Availability.h", "Availability.cpp", "SystemState.h",
+                         "HardwareProfile.h"):
+            if "#include <Arduino.h>" in code:
+                fail(f"{path}: includes <Arduino.h> - this translation unit is linked by "
+                     f"the offline host test suite and must stay Arduino-free (G2)")
+
+    # The census result must be a plain copyable struct, not something a
+    # snapshot would have to re-derive.
+    for path, code in files:
+        if path.name != "ServoPopulation.h":
+            continue
+        if "struct CensusResult" not in code:
+            fail(f"{path}: CensusResult struct not found - the census must produce "
+                 f"structured state, not formatted text")
+
+
+def check_no_startup_servo_traffic(files):
+    """No bus traffic of any kind at boot - extends the existing
+    ServoBus::begin() rule to the Controller, which now owns a census
+    service that must never be auto-started."""
+    for path, code in files:
+        if path.name != "Controller.cpp":
+            continue
+        begin_match = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not begin_match:
+            fail(f"{path}: could not locate Controller::begin() to audit startup behaviour")
+            continue
+        body = begin_match.group(1)
+        for forbidden in ("startScan(", "servo_census_.start(", ".ping(", "EnableTorque("):
+            if forbidden in body:
+                fail(f"{path}: Controller::begin() calls {forbidden!r} - boot must issue no "
+                     f"servo bus traffic, torque or scan at all")
+
+
+def check_no_network_to_servo_path(files):
+    """V2 permanent invariant: network callback != servo command authority.
+
+    No network subsystem exists yet and none is invented here (the G2
+    handoff forbids that). This is a tripwire armed in advance: the day a
+    Wi-Fi/HTTP/WebSocket handler is added, it must route through
+    CommandRouter -> Controller services -> authority, never call a servo
+    primitive directly.
+    """
+    network_markers = ("WiFi.h", "WebServer.h", "AsyncWebServer", "esp_http_server",
+                       "WebSocketsServer", "ESPAsyncWebServer", "HTTPClient")
+    servo_primitives = ("ServoBus", "EnableTorque(", "WritePos", "SMS_STS", "st_.")
+    for path, code in files:
+        if not any(marker in code for marker in network_markers):
+            continue
+        hits = [prim for prim in servo_primitives if prim in code]
+        if hits:
+            fail(f"{path}: a network transport translation unit also references servo "
+                 f"primitives {hits} - the browser/network path must go through "
+                 f"CommandRouter and the Controller service layer, never directly to "
+                 f"ServoBus (V2 architecture, forbidden path)")
+
+
+def check_host_tests(sketch_dir):
+    """Runs the offline C++ census/profile suite, the same way the OTA
+    parser's Python suite is already run from here: one gate command."""
+    runner = sketch_dir / "scripts" / "tests" / "run_host_tests.sh"
+    suite = sketch_dir / "scripts" / "tests" / "test_servo_population.cpp"
+    if not suite.exists():
+        fail(f"{suite}: G2 servo population/profile offline test suite not found")
+        return
+    if not runner.exists():
+        fail(f"{runner}: host test runner not found")
+        return
+    result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{runner}: servo population/profile offline tests FAILED "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
+
+def strip_shell_comments(text):
+    """Drops whole-line shell comments. The provenance checks below must
+    match REAL invocations, not the prose describing them - an early
+    version of this audit passed a mutation that deleted the manifest gate
+    entirely, because the words 'build_manifest.py' still appeared in this
+    script's own header comment."""
+    return "\n".join(line for line in text.splitlines()
+                     if not line.lstrip().startswith("#"))
+
+
+def check_build_profile_provenance(sketch_dir):
+    """G2 pre-G3 hardening (review Finding 1): the flashed image's hardware
+    profile must be PROVEN, never assumed.
+
+    build.sh can emit a USB_ONLY or a ROBOT_POWERED image from the same
+    commit to the same path, so the commit/build-id gate cannot tell them
+    apart. The manifest closes that hole; this check makes its removal or
+    neutralization a build failure rather than a silent regression.
+    """
+    scripts_dir = sketch_dir / "scripts"
+    logic = scripts_dir / "build_manifest.py"
+    build_sh = scripts_dir / "build.sh"
+    flash_sh = scripts_dir / "flash_app_only.sh"
+    tests = scripts_dir / "tests" / "test_build_manifest.py"
+
+    if not logic.exists():
+        fail(f"{logic}: build manifest logic module not found - the flash path would "
+             f"have no way to prove which hardware profile a binary came from")
+        return
+    logic_text = logic.read_text(encoding="utf-8")
+
+    for token in ("KNOWN_PROFILES", "MANIFEST_VERSION", "verify_manifest",
+                  "render_manifest", "parse_manifest",
+                  "PROFILE_MISMATCH", "PROFILE_UNKNOWN", "MANIFEST_MISSING",
+                  "FQBN_MISMATCH",
+                  "BINARY_SHA256_MISMATCH", "BINARY_SIZE_MISMATCH",
+                  "SOURCE_COMMIT_MISMATCH", "TREE_NOT_CLEAN"):
+        if token not in logic_text:
+            fail(f"{logic}: missing required manifest/provenance primitive {token!r}")
+
+    # verify_manifest() must not acquire a permissive default for the
+    # profile it compares against - a caller that forgot the argument must
+    # be an error, never a silent "allow".
+    if re.search(r"def verify_manifest\([^)]*requested_profile\s*=", logic_text, re.DOTALL):
+        fail(f"{logic}: verify_manifest() gained a default for requested_profile - the "
+             f"caller must always state the profile it intends to flash")
+    if re.search(r'add_argument\("--requested-profile"[^)]*default=', logic_text):
+        fail(f"{logic}: --requested-profile gained a default - flash_app_only.sh must "
+             f"pass it explicitly")
+
+    # Build-configuration provenance: the recorded FQBN must be COMPARED,
+    # not merely recorded. The manifest carried FQBN from the start while
+    # nothing checked it, which left the partition scheme / flash size /
+    # PSRAM mode unverified at flash time.
+    if re.search(r"def verify_manifest\([^)]*expected_fqbn\s*=", logic_text, re.DOTALL):
+        fail(f"{logic}: verify_manifest() gained a default for expected_fqbn - the "
+             f"caller must always state the FQBN it expects")
+    if "expected_fqbn" not in logic_text:
+        fail(f"{logic}: verify_manifest() no longer takes expected_fqbn - the recorded "
+             f"FQBN would be unverified again")
+    if re.search(r'add_argument\("--expected-fqbn"[^)]*default=', logic_text):
+        fail(f"{logic}: --expected-fqbn gained a default - flash_app_only.sh must pass "
+             f"its own pinned FQBN explicitly")
+    if not re.search(r'manifest\["FQBN"\]\s*!=\s*expected_fqbn', logic_text):
+        fail(f"{logic}: the FQBN equality comparison against expected_fqbn is missing - "
+             f"recording the FQBN without comparing it proves nothing")
+
+    if not build_sh.exists():
+        fail(f"{build_sh}: build script not found")
+        return
+    build_text = strip_shell_comments(build_sh.read_text(encoding="utf-8"))
+    if not re.search(r'build_manifest\.py"?\s+write', build_text):
+        fail(f"{build_sh}: does not invoke `build_manifest.py write` - every build must "
+             f"record the hardware profile and binary digest it produced")
+    if "--profile" not in build_text:
+        fail(f"{build_sh}: does not pass --profile to the manifest writer")
+    if "--source-state" not in build_text:
+        fail(f"{build_sh}: does not record the clean/dirty source state in the manifest")
+
+    if not flash_sh.exists():
+        fail(f"{flash_sh}: application-only flash script not found")
+        return
+    flash_text = strip_shell_comments(flash_sh.read_text(encoding="utf-8"))
+
+    verify_match = re.search(r'build_manifest\.py"?\s+verify', flash_text)
+    if not verify_match:
+        fail(f"{flash_sh}: does not invoke `build_manifest.py verify` - a binary of "
+             f"unknown hardware profile could be written to the device")
+    if "--requested-profile" not in flash_text:
+        fail(f"{flash_sh}: does not pass --requested-profile to the manifest verifier")
+    if not re.search(r'--expected-fqbn\s+"\$FQBN"', flash_text):
+        fail(f"{flash_sh}: does not pass --expected-fqbn \"$FQBN\" to the manifest "
+             f"verifier - the recorded build FQBN would go unverified")
+    # The parameter expansion, not just the name in prose: the operator
+    # authorization input must actually be readable from the environment.
+    if "MATDOG_FLASH_PROFILE:-" not in flash_text:
+        fail(f"{flash_sh}: lost the MATDOG_FLASH_PROFILE operator authorization input "
+             f"(expected a ${{MATDOG_FLASH_PROFILE:-...}} expansion)")
+
+    write_match = re.search(r"write-flash", flash_text)
+
+    # The gate must run BEFORE the device write, not after it.
+    if verify_match is None or write_match is None or \
+            verify_match.start() > write_match.start():
+        fail(f"{flash_sh}: the build-manifest verification must appear before the "
+             f"esptool write-flash invocation")
+
+    # The verification must not be neutralized into a warning. Scans the
+    # whole verify command (it spans continuation lines) for a swallowed
+    # failure - `|| refuse ...` is correct, `|| true` / `|| :` is not.
+    if verify_match is not None:
+        lines = flash_text.splitlines()
+        start = flash_text[:verify_match.start()].count("\n")
+        block = []
+        for line in lines[start:start + 12]:
+            block.append(line)
+            if not line.rstrip().endswith("\\"):
+                break
+        if re.search(r"\|\|\s*(true|:|echo|warn)\b", "\n".join(block)):
+            fail(f"{flash_sh}: the manifest verification swallows its own failure "
+                 f"('|| true'/'|| :'/'|| echo') - it must REFUSE, not warn")
+
+    # Anti-weakening: every pre-existing flash gate must still be ENFORCED,
+    # not merely mentioned. Counting token occurrences is not enough - each
+    # of these constants also appears in its own refuse() message, so a
+    # deleted comparison still leaves two mentions behind. These patterns
+    # match the actual comparison that does the gating.
+    for pattern, description in (
+            (r'\[\s*"\$BACKUP_SIZE"\s*-eq\s*"\$EXPECTED_BACKUP_SIZE"\s*\]',
+             "full-flash backup size comparison"),
+            (r'\[\s*"\$BACKUP_SHA256"\s*=\s*"\$EXPECTED_BACKUP_SHA256"\s*\]',
+             "full-flash backup digest comparison"),
+            (r'\[\s*"\$DEVICE_MAC"\s*=\s*"\$EXPECTED_MAC"\s*\]',
+             "device identity (MAC) comparison"),
+            (r'\[\s*-n\s*"\$(APPLICATION_OFFSET|MAX_PARTITION_SIZE)"\s*\]',
+             "verified application offset/size check"),
+            (r'"\$APPLICATION_SIZE"\s*-le\s*"\$MAX_PARTITION_SIZE"',
+             "application-fits-in-partition check"),
+            (r'python3 "\$SCRIPT_DIR/verify_application_partition\.py"',
+             "verified application partition gate"),
+            (r"--sdkconfig", "rollback/anti-rollback state gate"),
+            (r'python3 "\$SCRIPT_DIR/static_audit\.py"', "static safety audit gate"),
+            # Anchored to the esptool invocation: 'verify-flash' also appears
+            # in this script's own refuse() message, so a bare token match
+            # would survive the command itself being deleted.
+            (r'"\$ESPTOOL"[^\n]*verify-flash', "independent post-write verification")):
+        if not re.search(pattern, flash_text):
+            fail(f"{flash_sh}: lost the {description} - G2 hardening must not weaken "
+                 f"any pre-existing application-only protection")
+
+    # The operator must SEE the verified profile prominently before the
+    # write. Anchored to the echo that actually prints the value, not to
+    # any mention of the variable (the assignment and the post-write
+    # summary both mention it and would otherwise satisfy a loose check).
+    banner = None
+    for idx, line in enumerate(flash_text.splitlines()):
+        if "echo" in line and "HARDWARE PROFILE" in line and \
+                "$VERIFIED_HARDWARE_PROFILE" in line:
+            banner = flash_text.index(line)
+            break
+    if banner is None:
+        fail(f"{flash_sh}: does not print the verified hardware profile prominently "
+             f"before writing (expected an echo of $VERIFIED_HARDWARE_PROFILE)")
+    elif write_match is not None and banner > write_match.start():
+        fail(f"{flash_sh}: prints the verified hardware profile only after the write - "
+             f"the operator must see it beforehand")
+
+    if not tests.exists():
+        fail(f"{tests}: build manifest offline test suite not found")
+        return
+    result = subprocess.run([sys.executable, str(tests)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{tests}: build manifest offline tests FAILED "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
+def check_unknown_detection_is_not_a_verdict(files):
+    """G2 pre-G3 hardening (review Finding 2): classify() must keep
+    DetectedState::UNKNOWN ('nothing has established anything') distinct
+    from NO_RESPONSE ('we asked and it did not answer').
+
+    Collapsing them again would re-break two things at once: the LED ring
+    (non-probeable, therefore permanently UNKNOWN when powered) would make
+    SystemHealth::READY unreachable, and the servo bus (REQUIRED but never
+    probed at boot) would report FAULT on a healthy powered robot.
+    """
+    for path, code in files:
+        if path.name != "Availability.cpp":
+            continue
+        m = re.search(r"Classification classify\(const AvailabilityStatus& s\)\s*\{(.*?)\n\}",
+                      code, re.DOTALL)
+        if not m:
+            fail(f"{path}: classify() not found to audit its UNKNOWN handling")
+            continue
+        body = m.group(1)
+        if "DetectedState::UNKNOWN" not in body:
+            fail(f"{path}: classify() no longer distinguishes DetectedState::UNKNOWN from "
+                 f"an observed absence - 'not probed' must not be turned into a verdict "
+                 f"(G2 review Finding 2)")
+        # An observed failure must still escalate: both escalation arms
+        # must survive somewhere in the function.
+        if "Classification::FAULT" not in body or "Classification::DEGRADED" not in body:
+            fail(f"{path}: classify() lost its FAULT/DEGRADED escalation for an observed "
+                 f"absence - the UNKNOWN fix must not mute real failures")
+
+    # And the modules must not have been "fixed" by faking a physical
+    # observation instead.
+    for path, code in files:
+        if path.name != "Availability.cpp":
+            continue
+        m = re.search(r"DetectedState detectedStateForLedRail\([^)]*\)\s*\{(.*?)\n\}",
+                      code, re.DOTALL)
+        if not m:
+            fail(f"{path}: detectedStateForLedRail() not found")
+            continue
+        if "DetectedState::ONLINE" in m.group(1):
+            fail(f"{path}: detectedStateForLedRail() reports ONLINE - a WS2812 chain "
+                 f"cannot be interrogated, so claiming physical detection to make a "
+                 f"status green is forbidden (G2 review Finding 2)")
+
+
+def check_usb_cdc_tx_never_blocks(files):
+    """G3.1: no USB CDC transmit condition may block Controller::update().
+
+    With tx_timeout_ms = 0 every wait in HWCDC::write() (3.3.11) becomes an
+    immediate drop. That guarantee holds only if the timeout is 0 before the
+    first byte and nothing raises it again.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+
+    cfg_path, cfg = by_name.get("BuildConfig.h", (None, ""))
+    m = re.search(r"kUsbTxTimeoutMs\s*=\s*(\d+)\s*;", cfg)
+    if not m or int(m.group(1)) != 0:
+        fail(f"{cfg_path}: kUsbTxTimeoutMs must be exactly 0 - any non-zero value lets "
+             f"HWCDC::write() wait on a host that is not reading (G3.1)")
+    m = re.search(r"kUsbTxRingBytes\s*=\s*(\d+)\s*;", cfg)
+    if not m or int(m.group(1)) < 2560:
+        fail(f"{cfg_path}: kUsbTxRingBytes must be >= 2560 - the largest single loop-pass "
+             f"burst is 2395 B and with timeout 0 anything beyond the ring is dropped even "
+             f"while a host is reading (G3.1)")
+
+    ctl_path, ctl = by_name.get("Controller.cpp", (None, ""))
+    body = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", ctl, re.DOTALL)
+    body = body.group(1) if body else ""
+    ring = body.find("Serial.setTxBufferSize(build::kUsbTxRingBytes)")
+    tout = body.find("Serial.setTxTimeoutMs(build::kUsbTxTimeoutMs)")
+    begin = body.find("Serial.begin(")
+    first_out = min([i for i in (body.find("Serial.print"), body.find("printBootBanner("))
+                     if i != -1] or [len(body)])
+    if -1 in (ring, tout, begin) or not (ring < begin and tout < begin < first_out):
+        fail(f"{ctl_path}: Controller::begin() must set the TX ring and the 0 ms TX "
+             f"timeout before Serial.begin(), and Serial.begin() before any output (G3.1)")
+    for guard in ("ARDUINO_USB_MODE && ARDUINO_USB_CDC_ON_BOOT",
+                  "ESP_ARDUINO_VERSION_VAL(3, 3, 11)"):
+        if guard not in ctl:
+            fail(f"{ctl_path}: compile-time guard {guard!r} missing - the non-blocking "
+                 f"guarantee was audited against HWCDC in esp32:esp32 3.3.11 only")
+
+    for token, why in (("setTxTimeoutMs(", "exactly one TX timeout, set in Controller::begin()"),
+                       ("setTxBufferSize(", "exactly one TX ring size, set in Controller::begin()")):
+        hits = [str(p) for p, code in files for _ in range(code.count(token))]
+        if len(hits) != 1:
+            fail(f"{token} appears {len(hits)} time(s) {hits} - {why} (G3.1)")
+    for path, code in files:
+        for token in ("Serial.flush(", "setDebugOutput(", "shouldPrintChipDebugReport"):
+            if token in code:
+                fail(f"{path}: {token} is forbidden - flush() with timeout 0 discards the TX "
+                     f"ring (and waits otherwise); debug output adds a second per-character "
+                     f"transmit path and begins Serial before setup() (G3.1)")
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -511,6 +1067,15 @@ def main():
     check_servo_timeout_not_global(files)
     check_servo_timeout_categories_finding1(files)
     check_safe_off_verifies_readback(files)
+    check_hardware_profile_authority(files, SKETCH_DIR)
+    check_servo_population_model(files, SKETCH_DIR)
+    check_g2_state_is_transport_independent(files)
+    check_no_startup_servo_traffic(files)
+    check_no_network_to_servo_path(files)
+    check_host_tests(SKETCH_DIR)
+    check_build_profile_provenance(SKETCH_DIR)
+    check_unknown_detection_is_not_a_verdict(files)
+    check_usb_cdc_tx_never_blocks(files)
 
     print(f"Scanned {len(files)} source files under {SKETCH_DIR}")
 

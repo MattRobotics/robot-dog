@@ -9,7 +9,10 @@ together and reports whether its hardware is detected, expected or unavailable.
 MATDOG Controller
 ├── core/system      boot, version, health aggregation, power-state machine,
 │                    cooperative non-blocking scheduling, USB command router
+├── config/          HardwareProfile — the single USB_ONLY / ROBOT_POWERED authority
 ├── servo/           ServoBus — ST3215 / Seeed bus transport, read-only diagnostics
+│                    ServoPopulation / ServoCensus — canonical 17 vs expected-now 13,
+│                    live census classification (pure, transport-independent)
 ├── imu/             Bno085Imu — SH2_ROTATION_VECTOR acquisition, viewer-compatible
 ├── power/           DalyBms — read-only Modbus RTU battery telemetry
 └── status/          LedRing — WS2812B ring, boots OFF, non-blocking effects
@@ -69,6 +72,19 @@ esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,F
 
 Board: YD-ESP32-S3 N16R8 (16 MB flash, 8 MB OPI PSRAM, 240 MHz).
 
+Every successful build also writes a **build manifest** next to the application
+binary, inside the gitignored build directory:
+
+```text
+build/esp32.esp32.esp32s3/matdog_build_manifest.txt
+```
+
+It records the full source commit, build id, clean/dirty source state, selected
+hardware profile, pinned FQBN, and the application binary's filename, size and SHA256.
+`flash_app_only.sh` refuses to write anything it cannot verify against this file — see
+Application-only flashing below. The manifest is a build artifact and is never
+committed.
+
 ## Update and recovery policy
 
 - **DECIDED — future normal update path:** Wi-Fi / OTA. It is not implemented in V0.1.
@@ -108,6 +124,38 @@ one. Prints `SDKCONFIG_ROLLBACK`/`SDKCONFIG_ANTI_ROLLBACK`/`DEVICE`/`APPLICATION
 `SOURCE_COMMIT` before writing anything, and independently re-verifies the write
 afterward with `esptool verify-flash`.
 
+### Hardware-profile provenance gate
+
+`build.sh` can produce a `USB_ONLY` **or** a `ROBOT_POWERED` image from the same commit,
+at the same path. The commit/build-id gate above cannot tell them apart — the build id
+is identical for both — so a stale image of the wrong profile could be written under the
+wrong assumption. Every flash is therefore additionally gated on the build manifest and
+on the operator naming the profile they intend:
+
+```bash
+scripts/flash_app_only.sh                                 # defaults to USB_ONLY
+MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh
+```
+
+Fail-closed. The write proceeds only if **all** of these hold: the manifest exists and
+parses; its schema version is known; its source commit equals `HEAD`; the tree was clean
+at build time *and* is clean now; the binary exists and its size **and** SHA256 equal the
+recorded ones; the manifest profile is recognized; and it equals the requested profile.
+
+| Manifest | Requested | Result |
+|---|---|---|
+| `USB_ONLY` | `USB_ONLY` (default) | allowed, subject to all other gates |
+| `ROBOT_POWERED` | `ROBOT_POWERED` (explicit) | allowed, subject to all other gates |
+| `ROBOT_POWERED` | default / unspecified | **REFUSE** |
+| `USB_ONLY` | `ROBOT_POWERED` | **REFUSE** |
+| unknown / missing profile | any | **REFUSE** |
+| size or digest mismatch | any | **REFUSE** |
+| commit mismatch, dirty tree, missing/unparseable manifest | any | **REFUSE** |
+
+The verified profile is printed in a banner immediately before the write, so the operator
+sees what is actually going on the device. Logic and refusal reasons live in
+`scripts/build_manifest.py`, with offline tests in `scripts/tests/test_build_manifest.py`.
+
 `scripts/upload.sh` (full Arduino upload — bootloader + partition table + boot_app0 +
 application, every time) is kept for the legitimate full-image case (e.g. bring-up on
 a replacement board) but is **not** the routine flashing path; see `VALIDATION.md`
@@ -138,6 +186,18 @@ again instead of via `ScopedIOTimeout`, `safeOff()`/`readRuntimeState()` using t
 diagnostic timeout instead of the operational one, or `safeOff()` classifying success
 from `EnableTorque()`'s own return value instead of an independent readback.
 
+G2 additions: the three rail flags regressing from derived values back to independently
+editable literals, `expectationsFor()` mismapping a profile, **the compiled-in default
+profile being anything other than `USB_ONLY`** (the G3 authorization gate — a
+`ROBOT_POWERED` image must never be producible by an unreviewed edit), the servo
+population model losing the canonical-17 / expected-now-13 / absent-by-design-4
+distinction or drifting from `MATDOG_SERVO_ALLOCATION.yaml`, a "17 responders = PASS"
+threshold reappearing, `ServoPopulation`/`ServoCensus` gaining a `Serial` or `<Arduino.h>`
+dependency, `Controller::begin()` starting a scan/census at boot, and a direct
+network-handler → servo-primitive path. It also compiles and runs the offline C++ census
+suite (`scripts/tests/run_host_tests.sh`) as part of the audit, the same way it already
+runs the OTA parser's Python suite.
+
 ## USB diagnostic command surface
 
 ```text
@@ -147,10 +207,18 @@ from `EnableTorque()`'s own return value instead of an independent readback.
 @BMS STATUS | @BMS STREAM ON|OFF
 @LED STATUS | @LED OFF | @LED TEST
 @SERVO SCAN <lo> <hi> | @SERVO READ <id>   (MAINTENANCE mode only)
+@SERVO CENSUS                               (MAINTENANCE mode only)
 @SERVO SAFE_OFF <id>                        (always allowed, any mode)
 @MODE STATUS | @MODE MAINTENANCE | @MODE RUN
 @SYSTEM SHUTDOWN
 ```
+
+USB CDC transmit can never stall the Controller loop (G3.1): `Controller::begin()` sets the
+HWCDC TX timeout to 0 and the TX ring to 3 KB before `Serial.begin()`, so output nobody
+drains is dropped instead of waited for. Command replies are expected complete while a host
+is reading and draining; right after reopening a port that was closed for a long time, a
+stale backlog can still occupy the ring and a reply may short-write rather than block. That
+best-effort delivery belongs to this diagnostic surface only; a future HostLink defines its own framing, acknowledgement and reliability.
 
 `@SERVO SAFE_OFF` can only disable torque, never enable it, and stays reachable in
 every operating mode — it is the safety de-escalation path. Its reply is never a bare
@@ -187,7 +255,143 @@ BNO085 init=OK       detected=ONLINE      expected=REQUIRED  result=PASS
 DALY   init=OK       detected=NO_RESPONSE expected=OFFLINE   result=PASS
 SERVO  init=OK       detected=UNKNOWN     expected=OFFLINE   result=PASS
 LED    init=DEFERRED detected=UNPOWERED   expected=UNPOWERED result=PASS
+SERVO_POP canonical=17 expected_now=13 absent_by_design=4 last_census=NOT_RUN
 ```
+
+`last_census=NOT_RUN` is the honest answer after a boot with no census: no servo bus
+transaction ever happens automatically, so `@STATUS` must never imply a population was
+verified.
+
+### "Not observed" is not a verdict
+
+`detected=UNKNOWN` means *nothing has established anything* — it is the absence of
+evidence, not evidence of absence. `detected=NO_RESPONSE` means *we asked and it did not
+answer*. `classify()` keeps these distinct:
+
+```text
+UNKNOWN     + REQUIRED            -> UNKNOWN   (not proven; system reports BOOTING)
+UNKNOWN     + OPTIONAL            -> PASS      (absence would not even be a fault)
+UNKNOWN     + OFFLINE/UNPOWERED   -> PASS
+NO_RESPONSE + REQUIRED            -> FAULT     (a real observed failure)
+NO_RESPONSE + OPTIONAL            -> DEGRADED
+NO_RESPONSE + OFFLINE/UNPOWERED   -> PASS
+```
+
+This matters for two modules under `ROBOT_POWERED`. A WS2812 chain has no readback path
+at all, so the LED ring's `detected` is permanently `UNKNOWN` when powered; treating that
+as `DEGRADED` made `SystemHealth::READY` unreachable on a perfectly healthy robot.
+Separately, nothing probes the servo bus at boot (no automatic scan is allowed), so
+`REQUIRED + UNKNOWN` reported `FAULT` before anyone had asked the bus a single question.
+
+Neither is fixed by faking a physical observation: the LED still reports
+`detected=UNKNOWN` in `@STATUS`, and `detectedStateForLedRail()` is forbidden by the
+static audit from ever returning `ONLINE`. An *observed* failure still escalates exactly
+as before. Under `ROBOT_POWERED` the system therefore reads `BOOTING` until the servo bus
+is actually probed, `READY` once it answers, and `FAULT` if it is probed and does not.
+
+## Hardware profile (USB_ONLY / ROBOT_POWERED)
+
+`src/config/HardwareProfile.h` is the **single authority** for which physical power
+configuration the firmware is built for. V0.1 stated the bench configuration four times
+over — a `kTestProfile` string plus three independent `constexpr bool` rail literals —
+with nothing tying them together, so a partial edit could produce a firmware whose
+printed profile name contradicted its own expectations. Now there is one enum, one
+mapping table, and everything else is derived:
+
+```text
+USB_ONLY       servo_power=NO  battery=NO  led_rail=NO
+ROBOT_POWERED  servo_power=YES battery=YES led_rail=YES
+```
+
+`BuildConfig.h` selects exactly one profile and derives `kServoPowerAvailable`,
+`kBatteryAvailable`, `kLedRailPowered` and `kTestProfile` from it. Each module's
+`ExpectedState` then comes from one shared derivation in `core/Availability.h`
+(`expectedStateForServoBus`/`Battery`/`LedRail`) instead of an inlined ternary repeated
+per module. The V0.1 `Availability` model itself is unchanged: the same `classify()`
+turns an unchanged `NO_RESPONSE` into `PASS` under `USB_ONLY` and `FAULT` under
+`ROBOT_POWERED`, which is exactly what it was designed for. The LED ring is deliberately
+`OPTIONAL` even when powered — a dead status ring must never fault an otherwise healthy
+robot.
+
+Switching profiles is a **one-symbol change**:
+
+```bash
+MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh    # one build, source default untouched
+```
+
+The source default (`MATDOG_ACTIVE_HARDWARE_PROFILE` in `BuildConfig.h`) is `USB_ONLY`
+and `static_audit.py` fails the build if it is anything else, because powered hardware
+validation (G3) is a separately authorized gate. The override is deliberately loud:
+`build.sh` prints the selected profile and the boot banner reports it with its rail
+facts, so a `ROBOT_POWERED` image cannot be produced or flashed silently.
+
+A profile describes the **power/rail** configuration only. Which servos are physically
+installed is an orthogonal fact, owned separately — see below.
+
+## Servo population and census
+
+`src/servo/ServoPopulation.h` keeps three populations explicitly distinct:
+
+```text
+CANONICAL_ALLOCATED               17   every bus ID the MATDOG design allocates
+EXPECTED_IN_CURRENT_CONFIGURATION 13   physically installed today
+ABSENT_BY_DESIGN                   4   52 NECK_PITCH, 53 HEAD_ROTATION,
+                                       54 HEAD_PITCH, 55 JAW — allocated and
+                                       bench-provisioned, not yet mounted
+```
+
+A healthy powered census for the current robot is therefore **13 present + 4 absent by
+design**, not 17. "17 must respond for PASS" is false for this robot and the static
+audit fails the build if such a threshold reappears.
+
+`@SERVO CENSUS` scans the canonical range 11–55 and classifies every ID:
+
+```text
+PRESENT_EXPECTED          installed-now servo answered              healthy
+ABSENT_BY_DESIGN          not-installed servo stayed silent         healthy
+MISSING_EXPECTED          installed-now servo did NOT answer        problem
+ABSENT_BY_DESIGN_PRESENT  not-installed servo ANSWERED              problem, surfaced
+UNEXPECTED_ID             responder outside the canonical table     problem
+NOT_PROBED                canonical ID outside the scanned range    inconclusive
+```
+
+Verdict is `PASS`, `PROFILE_MISMATCH`, `RANGE_INCOMPLETE` or `NOT_RUN`. It is
+fail-closed: a scan that did not cover every canonical ID, or whose responder list
+overflowed, can never report `PASS` — silence only means something where a probe
+actually happened.
+
+The embedded canonical table is a deliberately minimal projection of
+`06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml`, which remains the
+canonical **project** authority (unit identity, provisioning sessions, cold-verify
+evidence). The static audit cross-checks the two so drift cannot pass silently; if they
+ever disagree, the YAML wins.
+
+**Architecture note.** `ServoBus` answers "what did the physical bus observe";
+`ServoPopulation` answers "what does that mean for this robot"; `ServoCensus` is the
+Controller-owned service that runs one and holds the structured result; `CommandRouter`
+only *formats* it. Nothing in the population/census layer includes `<Arduino.h>` or
+touches `Serial`, so the offline host tests link the shipped logic rather than a copy,
+and a future Web UI / HostLink adapter can render the same `CensusResult` without
+re-scanning the bus or reimplementing the classification.
+
+The census is strictly read-only (`Ping()` only) and is **never started automatically** —
+not at boot, not on a timer.
+
+## Offline tests
+
+```bash
+python3 scripts/tests/test_ota_partition_logic.py   # OTA slot selection (40 tests)
+bash scripts/tests/run_host_tests.sh                # servo population / profile
+python3 scripts/static_audit.py                     # runs both, plus the audit
+```
+
+`scripts/tests/test_servo_population.cpp` compiles the **real** firmware translation
+units (`ServoPopulation.cpp`, `Availability.cpp`) on the host with `g++ -Wall -Wextra
+-Werror` — no Arduino runtime, no device, no test framework. It covers the canonical/
+expected-now distinction, every per-ID classification, missing/unexpected/
+absent-but-present cases, the fail-closed partial-scan and truncation paths, and both
+profiles' expected-hardware semantics (proving `USB_ONLY` behaviour did not regress
+while `ROBOT_POWERED` was added).
 
 ## Operating mode (MAINTENANCE / RUN)
 
@@ -246,9 +450,10 @@ The WS2812B ring's 5V rail is physically absent under `USB_ONLY`
 never calls into `Adafruit_NeoPixel` — no WS2812 frame is ever transmitted toward the
 unpowered ring, including via `@LED TEST` (refused with `REASON=LED_RAIL_UNPOWERED`).
 `LedRing::dataPinDriven()` lets `@LED STATUS`/tests confirm this held for the whole
-session. Flipping `kLedRailPowered` (and the two other profile flags in
-`BuildConfig.h`) to move to a future `ROBOT_POWERED` profile is a deliberate, reviewed
-change — `static_audit.py` currently asserts all three read `false`.
+session. Since G2, `kLedRailPowered` is no longer independently editable: it and the two
+other rail flags are derived from the selected hardware profile (see Hardware profile
+above), and `static_audit.py` asserts both that they stay derived and that the
+compiled-in default profile remains `USB_ONLY`.
 
 ## Power architecture
 
@@ -256,11 +461,17 @@ Canonical power and wiring details live in
 [`04_Electronics/README.md`](../../04_Electronics/README.md). The firmware consequence is that
 DALY `KEY` is controlled directly by the bistable logo pushbutton, not by an ESP32 GPIO. Power-on is
 therefore hardware-first, and firmware cannot be the primary wake controller because the ESP32 is
-downstream of the DALY-protected supply it would need to enable.
+downstream of the DALY-protected supply it would need to enable. The KEY function itself is
+**OPEN**: in G3 the physical KEY switch produced no observed DALY state change, so it is not a
+validated shutdown or safety barrier; the fused disconnect is.
 
 ## Bench test profile
 
-This firmware currently ships validated only against the **USB_ONLY** bench profile:
+The source default remains the **USB_ONLY** bench profile. `ROBOT_POWERED` is **VALIDATED
+no-motion** on the real robot (G3 formal PASS and G3.1 PASS, 2026-09-18; build `e2fc605`) —
+see `VALIDATION.md`. Each powered session still needs its own authorization.
+
+Under `USB_ONLY`:
 ESP32-S3 powered solely from the host USB link, battery/step-down/servo-power/LED-5V
 rails all absent by design. `DalyBms`, the ST3215 scan path and `LedRing` all report an
 explicit `OFFLINE_EXPECTED` classification under this profile rather than treating
@@ -273,11 +484,13 @@ cover, and handoff section 7A for the full matrix.
 05_Firmware/MATDOG_Controller/
 ├── MATDOG_Controller.ino     thin entry point (setup/loop only)
 ├── src/
-│   ├── config/                Pins.h (central GPIO ownership), BuildConfig.h
+│   ├── config/                Pins.h (central GPIO ownership), BuildConfig.h,
+│   │                          HardwareProfile.h (USB_ONLY / ROBOT_POWERED authority)
 │   ├── core/                  Controller, SystemState, PowerState, CommandRouter,
 │   │                          Availability (init/detected/expected/result model),
 │   │                          OperatingMode (MAINTENANCE/RUN)
-│   ├── servo/                 ServoBus
+│   ├── servo/                 ServoBus, ServoPopulation (pure policy),
+│   │                          ServoCensus (Controller-owned service)
 │   ├── imu/                   Bno085Imu
 │   ├── power/                 DalyBms
 │   └── status/                LedRing
@@ -289,5 +502,7 @@ cover, and handoff section 7A for the full matrix.
     ├── verify_application_partition.py  device-I/O wrapper used by the above
     ├── ota_partition_logic.py           pure OTA slot-selection logic (offline-testable)
     └── tests/
-        └── test_ota_partition_logic.py  offline unit tests, no device/flash required
+        ├── test_ota_partition_logic.py  offline unit tests, no device/flash required
+        ├── test_servo_population.cpp    offline census/profile tests (host g++)
+        └── run_host_tests.sh            compiles + runs the above
 ```

@@ -6,6 +6,7 @@
 #include "../imu/Bno085Imu.h"
 #include "../power/DalyBms.h"
 #include "../servo/ServoBus.h"
+#include "../servo/ServoCensus.h"
 #include "../status/LedRing.h"
 #include "CommandRouter.h"
 #include "OperatingMode.h"
@@ -27,6 +28,7 @@ class Controller {
   void printBootBanner();
 
   servo::ServoBus servo_bus_;
+  servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-started
   imu::Bno085Imu imu_;
   power::DalyBms daly_;
   status::LedRing led_;

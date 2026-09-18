@@ -38,15 +38,16 @@ Every current-facing document uses these meanings:
   expected-offline classification, and concurrent soak passed on the real ESP32-S3 under the
   `USB_ONLY` profile.
 - Direct ESP32-S3 ownership of the ST3215 bus was demonstrated by the frozen bench tools.
+- `ROBOT_POWERED` no-motion operation on the real robot (G3 formal PASS and G3.1 PASS,
+  2026-09-18): the hardware profile, the servo population model (canonical 17 / expected-now 13 /
+  absent-by-design 52-55) and structured census, live read-only DALY, live LED, two identical
+  censuses, `SAFE_OFF` `VERIFIED_OFF` and `torque=0` on all 13, and a Controller loop independent
+  of USB CDC host presence. No motion or calibration capability exists yet.
 
 ### IMPLEMENTED
 
 - One modular Controller image contains ServoBus diagnostics, BNO085 acquisition, read-only DALY
   telemetry, LED-ring control, USB diagnostics, health aggregation, and a power-state baseline.
-- `@SERVO SAFE_OFF` performs an independent torque-state readback, but a real powered-servo
-  `VERIFIED_OFF` result is still **TO_TEST**.
-- DALY, LED, and servo modules coexist in firmware; their powered-robot behavior is not yet
-  validated.
 
 ### DECIDED
 
@@ -58,14 +59,15 @@ Every current-facing document uses these meanings:
   service and recovery path.
 - GPIO19/GPIO20 mean native USB D-/D+; their historical Jetson-UART use is **SUPERSEDED**.
 - The ESP32-S3 is powered from the DALY-protected B+/P− domain through the 5 V step-down. The
-  bistable logo pushbutton connects directly to DALY `KEY`; no ESP32 KEY GPIO is required.
+  bistable logo pushbutton connects directly to DALY `KEY`; no ESP32 KEY GPIO is required. Its
+  actual function is **OPEN**: in G3 the KEY switch produced no observed DALY state change, so it
+  is not a validated shutdown or safety barrier — the fused disconnect is.
 
 ### TO_TEST
 
-- The exact `ROBOT_POWERED` no-motion gate described below.
-- The external four-pin connector (GPIO19, GPIO20, GND, 5 V not connected) as a USB-data/service
-  connection.
-- Full powered-system coexistence and the 13 installed servos as a population.
+- The DALY `KEY` function (see *Where we are* below).
+- The external four-pin connector (GPIO19, GPIO20, GND, 5 V not connected) as a future USB
+  service port — not a UART — pending electrical and signal-integrity validation.
 
 ### TO_DESIGN
 
@@ -127,29 +129,57 @@ The tag identifies the official merged repository release. The earlier source SH
 exact firmware exercised in the final hardware session; subsequent differences in the tagged
 Controller tree are documentation only. Neither identifier proves `ROBOT_POWERED` validation.
 
-## Immediate milestone: TO_TEST, no motion
+## Where we are, and the next gate
 
 ```text
-MATDOG Controller V0.1
--> ROBOT_POWERED Hardware Validation
--> no motion
--> DALY live read-only
--> LED live
--> 13 expected servos read-only
--> SAFE_OFF real readback
--> concurrent soak
+COMPLETE   Controller V0.1 baseline              VALIDATED (USB_ONLY hardware)
+COMPLETE   G2 ROBOT_POWERED software             PASS / FROZEN
+COMPLETE   G3 ROBOT_POWERED no-motion            PASS (formal, 2026-09-18)
+COMPLETE   G3.1 CDC-independent Controller loop  PASS (2026-09-18)
+
+NEXT       DALY KEY investigation
+THEN       G4 Diagnostics / Maintenance
 ```
 
-This sequence has not been performed by Phase A. It must not include robot motion, servo EEPROM
-writes, ID changes, calibration writes, or hardware reflashing as an incidental documentation
-step. Detailed validation ownership lives in the Controller
-[`VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md).
+`ROBOT_POWERED` is **VALIDATED for no-motion operation**: DALY live read-only, LED live, 13/13
+expected servos present with 4 absent by design in two identical censuses, `SAFE_OFF`
+`VERIFIED_OFF` and `torque=0` on all 13. The Controller loop is independent of USB CDC host
+presence: BNO085 acquisition runs at 50.1 Hz with the port closed (G3.1). No commanded servo motion occurred and no robot motion was observed during validation.
+
+### Open hardware notes
+
+- **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
+  DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
+  or safety barrier; the DALY's actual KEY configuration and function must be inspected before any
+  setting is changed. The fused disconnect remains the trusted physical isolation method.
+- **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
+  19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
+  electrical and signal-integrity validation.
+
+Criteria are owned by the Controller
+[`DEVELOPMENT_GATES.md`](05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md); evidence by the
+Controller [`VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md).
+
+### Everything after that
+
+The full development sequence, its hard dependencies and what is blocked by what are owned by
+[`ROADMAP.md`](01_Docs/02_Architecture/ROADMAP.md). Per-gate entry conditions and pass/fail
+criteria are owned by
+[`DEVELOPMENT_GATES.md`](05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md). They are
+deliberately not duplicated here.
 
 ## Target architecture
 
 The permanent MATDOG Controller is the integration point for future Diagnostics, Maintenance,
 Service, Servo QC, Provisioning, Full Leg Calibration, Wi-Fi/OTA, and host transport. Motion, IK,
 gait, and stabilization come later, behind explicit safety and calibration gates.
+
+**DECIDED (2026-09-16):** MATDOG will also host a permanent **Embedded Web UI / Control & Service
+Dashboard** served by the ESP32-S3 and reached from a phone, tablet, the ASUS or a future Jetson.
+It is a staged, safety-gated target and none of it exists in firmware yet. Every browser command
+must travel `Browser -> CommandRouter -> Controller services -> authority -> Safe Actuator ->
+ServoBus`; a direct browser-to-`ServoBus` path is permanently forbidden. Contract in
+[`ARCHITECTURE.md`](01_Docs/02_Architecture/ARCHITECTURE.md#embedded-matdog-web-ui--control--service-dashboard).
 
 The branch `matdog/full-leg-calibrator-v1` is a preserved oracle/evidence branch. Its useful
 calibration engine, safety, and evidence patterns may later be migrated selectively into the
@@ -164,6 +194,8 @@ capabilities are integrated into the Controller.
 |---|---|
 | What exists and what happens next? | This `README.md` |
 | What are the architecture contracts and target direction? | [`ARCHITECTURE.md`](01_Docs/02_Architecture/ARCHITECTURE.md) |
+| What is the development sequence, and what blocks what? | [`ROADMAP.md`](01_Docs/02_Architecture/ROADMAP.md) |
+| What must be true before a stage may begin? | [`DEVELOPMENT_GATES.md`](05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md) |
 | How are power, wiring, and connectors implemented? | [`04_Electronics/README.md`](04_Electronics/README.md) |
 | What firmware exists? | [`05_Firmware/README.md`](05_Firmware/README.md) |
 | What is the Controller baseline and service model? | [Controller README](05_Firmware/MATDOG_Controller/README.md) |

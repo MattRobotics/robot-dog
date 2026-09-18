@@ -6,6 +6,7 @@
 #include "../imu/Bno085Imu.h"
 #include "../power/DalyBms.h"
 #include "../servo/ServoBus.h"
+#include "../servo/ServoCensus.h"
 #include "../status/LedRing.h"
 #include "Availability.h"
 #include "OperatingMode.h"
@@ -23,6 +24,7 @@ class CommandRouter {
  public:
   struct Modules {
     servo::ServoBus* servo_bus;
+    servo::ServoCensus* servo_census;
     imu::Bno085Imu* imu;
     power::DalyBms* daly;
     status::LedRing* led;
@@ -42,6 +44,11 @@ class CommandRouter {
   void printBmsStatus();
   void printLedStatus();
   void printServoScanResult();
+  // Pure presentation of servo_census->result(). Computes nothing: the
+  // classification lives in servo/ServoPopulation.h so a future Web UI /
+  // HostLink adapter can render the same structured result without
+  // reimplementing it or re-scanning the bus (handoff sections 7/8/9).
+  void printServoCensusResult();
   void printServoRead(int id);
   void printServoSafeOff(int id);
   void printModeStatus();
@@ -51,6 +58,7 @@ class CommandRouter {
   bool bms_stream_enabled_ = false;
   uint32_t last_bms_stream_ms_ = 0;
   bool servo_scan_result_pending_ = false;
+  bool servo_census_result_pending_ = false;
 
   static constexpr size_t kLineBufSize = 96;
   char line_buf_[kLineBufSize] = {0};
