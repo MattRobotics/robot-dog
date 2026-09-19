@@ -131,6 +131,13 @@ nothing and always returns `false`, per handoff 8A.8 — the K-Series write prot
 not been identified or bench-verified. `scripts/static_audit.py` asserts this method's
 body has not been changed to something that transmits.
 
+DALY KEY probe (2026-09-19): the query bytes, CRC and the probe-V2 register decode moved
+unchanged into the Arduino-free `src/power/DalyProtocol.{h,cpp}` so the offline host suite
+links them; `DalyBms` keeps the UART. The second read frame there,
+`81 03 01 00 00 78 5B D4`, and the `0x0115`/`0x0120`/`0x0121`/`0x0122` decode come from static
+inspection of DALY's official BMSTool V1.14.79 (downloaded from dalybms.com, never run), not
+from a MATDOG bench source, and are not yet live-validated (see `VALIDATION.md`).
+
 ### LedRing (`src/status/LedRing.{h,cpp}`)
 
 No prior MATDOG source exists. Built on `Adafruit NeoPixel` (installed for this task,

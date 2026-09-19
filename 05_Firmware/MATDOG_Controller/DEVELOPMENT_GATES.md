@@ -133,10 +133,30 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 
 - **FINDING** — during G3 both positions of the physical KEY switch produced identical
   DALY-reported state (`discharge_mos=ON` in both).
-- **STATUS** — **OPEN.** KEY is not a validated shutdown or safety barrier. The DALY's actual KEY
-  configuration and function must be inspected before any setting is changed; the investigation
-  needs its own session authorization. `requestDischargeOff()` remains a fail-closed stub that
-  transmits nothing, and no DALY write exists.
+- **RESEARCH** — **COMPLETE** (read-only, 2026-09-19). Public DALY K-series documentation does
+  not publish a KEY configuration register. Static inspection (not execution) of DALY's official
+  BMSTool V1.14.79 found a second Modbus personality — request address `0x81`, reply `0x51` —
+  whose parameter block holds KEY logic at `0x0120` (`0x55` DISABLED, `0xA5`
+  DISCHARGE_AND_SLEEP, `0x5A` DISCHARGE, `0xAA` CHARGE_AND_DISCHARGE, `0xA6`
+  CHARGE_DISCHARGE_AND_SLEEP), charge/discharge MOS control at `0x0121`/`0x0122` and sleep time at
+  `0x0115` (shown as raw × 10 s). It uses a different register map from the live-validated `0xD2`
+  telemetry personality. **None of it is live-validated on MATDOG's unit.**
+- **READ PROBE** — **IMPLEMENTED, LIVE VALIDATION PENDING.** `@BMS KEY READ` (MAINTENANCE only)
+  sends the single FC03 frame `81 03 01 00 00 78 5B D4` once and reports KEY logic, both MOS
+  controls and sleep time; `@BMS KEY STATUS` prints the cached result with zero bus traffic.
+  Validated offline only — [`VALIDATION.md` § DALY KEY read probe](VALIDATION.md).
+- **LIVE VALIDATION (read-only, needs its own session authorization)** — robot powered normally,
+  USB connected; `@MODE STATUS` (MAINTENANCE is the boot default), `@BMS STATUS`,
+  `@BMS KEY READ`, capture the complete result, `@BMS KEY STATUS`, `@BMS STATUS`. No KEY toggle,
+  no write. Decision: `key_logic_raw=0x0055` → the candidate future action is a separately
+  authorized `0x0120 = 0x005A`; another recognized value → investigate wiring/firmware semantics
+  before any write; no `0x81` reply → do **not** escalate to writes.
+- **WRITE / CONFIGURATION** — **BLOCKED.** No DALY write exists: the static audit admits only the
+  two whitelisted FC03 read frames and forbids FC06/FC10. Candidate `0x0120 = 0x005A` (KEY OFF →
+  discharge MOS OFF, charge MOS kept) must not be used until the `0x81` read is live-validated and
+  a write is separately authorized. `requestDischargeOff()` remains a fail-closed stub that
+  transmits nothing; `@SYSTEM SHUTDOWN` still resolves to `POWER_CUT_FAILED`.
+- **STATUS** — **OPEN.** KEY is not a validated shutdown or safety barrier.
 - **INTERIM RULE** — the fused disconnect is the trusted physical isolation method.
 
 ## G4 — Diagnostics / Maintenance

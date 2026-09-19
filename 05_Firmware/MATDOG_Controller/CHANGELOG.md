@@ -1,5 +1,27 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — DALY KEY read-only probe — 2026-09-19
+
+**Not flashed; live validation TO_TEST.** No DALY write, KEY toggle or power-state change.
+
+- **Research:** public DALY documents publish no K-series KEY register. DALY's official BMSTool
+  V1.14.79 (static inspection, never run) reveals a second Modbus personality (`0x81` → reply
+  `0x51`) with KEY logic at `0x0120`, charge/discharge MOS control at `0x0121`/`0x0122` and sleep
+  time at `0x0115` — not yet live-validated on MATDOG's unit.
+- **`@BMS KEY READ`** (MAINTENANCE only): one FC03 read `81 03 01 00 00 78 5B D4`, reply validated
+  (245 bytes, `51 03 F0`, CRC), result reported asynchronously. **`@BMS KEY STATUS`**: cached
+  snapshot, zero bus traffic. Neither takes an argument.
+- New Arduino-free `power/DalyProtocol`: the two whitelisted read frames, CRC, validation, the
+  `0xD2` telemetry decoder (moved unchanged), the KEY decoder and `DalyBusScheduler` — one
+  transaction owner, so telemetry and the KEY read never overlap; a KEY read defers at most one
+  telemetry poll and polling resumes on its own.
+- `requestDischargeOff()` unchanged (no-op, `false`); `@SYSTEM SHUTDOWN` still resolves to
+  `POWER_CUT_FAILED`. Candidate `0x0120 = 0x005A` is **not** implemented.
+- Static audit: DALY may transmit only the two whitelisted FC03 frames through one
+  `bms_uart_.write()`; FC06/FC10, any other frame, `bms_uart_` use or UART2 route, and any
+  argument-taking `@BMS` command fail. New mutation suite (24/24) and DALY host suite
+  (214 checks). G3.1 ring floor 2560 → 3072 bytes (largest loop pass now 2588 bytes).
+
 ## Unreleased — G3 / G3.1 live closure — 2026-09-18
 
 Documentation only; no firmware change. Records the live validation of `e2fc605`.

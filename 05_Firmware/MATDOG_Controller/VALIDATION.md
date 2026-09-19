@@ -2297,3 +2297,115 @@ SOC 41.4 %, cell Δ12–13 mV, no alarms.
 - **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
   19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
   electrical and signal-integrity validation.
+
+---
+
+## DALY KEY — RESEARCH AND READ-ONLY PROBE — 2026-09-19
+
+```text
+DALY KEY RESEARCH                 = COMPLETE (read-only; no DALY write, no KEY toggle)
+DALY KEY READ PROBE               = IMPLEMENTED, OFFLINE-VALIDATED — LIVE VALIDATION TO_TEST
+DALY KEY WRITE / CONFIGURATION    = BLOCKED (not implemented; forbidden by the static audit)
+KEY AS SHUTDOWN / SAFETY BARRIER  = NOT VALIDATED — fused disconnect remains trusted isolation
+```
+
+### Research (read-only session, robot powered, 2026-09-19)
+
+Live baseline, `@BMS STATUS` / `@STATUS` only: `comm=OK`, pack 11.0 V, −0.1 A, SOC 39.3 %,
+`charge_mos=ON discharge_mos=ON`, alarms `0000 0000 0000 0000`, `runtime_resets=0`.
+
+- **Public DALY documents** (H/K/M/S operating manual, Smart BMS Control Strategy, Protocols
+  page, UART/485 V1.2): KEY defaults to BMS activation, other KEY functions "can be customized"
+  / "involve customized software"; sleep needs no communication, no current and no wake-up
+  signal, and **leaves both MOS on** except on undervoltage. **No K-series KEY configuration
+  register is published.** The legacy UART/485 protocol has no MOS-control or KEY command.
+- **DALY BMSTool V1.14.79** (official download, internal name `PCMaster`), inspected statically
+  — extracted and its .NET metadata parsed offline, **never run, no BMS access**:
+  - a second Modbus personality: request address `0x80 + board` (default `0x81`), reply
+    `0x50 + board` (`0x51`); its register map differs from the `0xD2` one MATDOG uses (pack
+    voltage `0x38` vs `0x28`), so no register is carried across;
+  - parameter-block read `81 03 01 00 00 78 5B D4` (reply `51 03 F0 …`, 245 bytes);
+  - `0x0120` KEY logic, written by the tool's Set button with FC06: `0x55` DISABLED, `0xA5`
+    DISCHARGE_AND_SLEEP, `0x5A` DISCHARGE, `0xAA` CHARGE_AND_DISCHARGE, `0xA6`
+    CHARGE_DISCHARGE_AND_SLEEP; the tool then asks for a BMS restart;
+  - `0x0121` / `0x0122` charge / discharge MOS control (0/1), from its Engineering page;
+  - `0x0115` sleep time, displayed as raw × 10 s;
+  - fault flags "key turn off chg mos" / "key turn off dsg mos" exist in its fault table.
+- The phone app's "Charge switch" / "Discharge switch" most likely map to `0x0121`/`0x0122` — a
+  software MOS control, **not** the KEY configuration (inference, not verified).
+- MATDOG's target — KEY OFF → discharge MOS OFF, charge MOS kept — corresponds to candidate
+  `0x0120 = 0x005A`. **Not verified on this unit; not implemented.**
+
+### Implementation (offline only; not flashed)
+
+- `src/power/DalyProtocol.{h,cpp}` — new, Arduino-free: the two constant FC03 frames
+  (`static_assert`-checked: address, function, start, count, CRC), `dalyRequestFrame(enum)`,
+  register-based response offsets, CRC-16/MODBUS, response validation (length → header → CRC,
+  the order telemetry already used), the `0xD2` telemetry decoder **moved verbatim** from
+  `DalyBms.cpp`, the `0x81` KEY decoder, and `DalyBusScheduler`.
+- `DalyBusScheduler` is the single transaction owner: one transaction in flight at most, never
+  cancelled; a requested KEY read starts at the next idle boundary ahead of a due poll but
+  defers at most one poll; a 300 ms quiet gap follows every transaction (longer than a whole
+  245-byte reply, never binding for telemetry alone); KEY timeout 1000 ms (245 bytes take
+  255 ms at 9600 8N1), telemetry timeout unchanged at 750 ms; telemetry resumes automatically.
+- `DalyBms` keeps the UART and exactly one `bms_uart_.write(dalyRequestFrame(request),
+  kDalyRequestLen)`. The KEY result is separate from telemetry health: a failed or silent
+  `0x81` read never touches `detected_`/`last_result_` and never replaces the last valid
+  snapshot. `requestDischargeOff()` is unchanged (`{ return false; }`).
+- `@BMS KEY READ` (MAINTENANCE only, no arguments) → `STARTED` / `BUSY` / `BLOCKED`, then
+  `BMS_KEY_READ=COMPLETE result=OK` + `key_logic_raw` / `key_logic` / `charge_mos_control` /
+  `discharge_mos_control` / `sleep_time_raw` / `sleep_time_s`, or
+  `result=TIMEOUT|CRC_FAIL|BAD_HEADER rx_bytes=<n>`. `@BMS KEY STATUS` prints the cached
+  result and snapshot with ages and zero bus traffic (`snapshot=NOT_READ key_logic=UNKNOWN`).
+- Enumerator `DalyKeyLogic::KEY_DISABLED` (printed `DISABLED`): the Arduino-ESP32 core
+  `#define`s `DISABLED` (`esp32-hal-gpio.h`); the host suite now compiles with that macro
+  defined so the clash is caught offline.
+- No PowerState, servo, pin, BNO085, LED, network or boot-banner change.
+
+### USB CDC burst budget (G3.1) — recomputed
+
+| Burst | Bytes |
+|---|---:|
+| `@HELP` (was 628) | 773 |
+| `BMS_KEY_READ=COMPLETE` block, worst | 193 |
+| `@BMS KEY STATUS`, worst | 262 |
+| **Largest single loop pass** (worst census + KEY result + IMU + BMS; was 2395) | **2588** |
+
+The 3072-byte ring still covers it (16 % margin). The audit floor rises from 2560 to 3072
+bytes, the strict minimum for 2588 at 512-byte granularity — a tightening.
+
+### Offline acceptance (uncommitted tree; clean rebuild after commit)
+
+| Gate | Result |
+|---|---|
+| Static safety audit | **PASS** — 32 source files, 0 findings |
+| DALY write-prohibition mutation suite (`test_static_audit_daly.py`) | **PASS** — 24/24: unmutated tree clean; caught KEY FC `0x03→0x06`, `0x03→0x10`, a CRC-valid FC06 write of `0x5A` to `0x0120`, telemetry FC `0x03→0x06`, a third read frame, a second write call, a raw-buffer write, `bms_uart_.print`, `bms_uart_` passed as a stream, a buffer-taking selector, an unlisted frame, `requestDischargeOff()` implemented or called, `@BMS KEY SET`, argument parsing, ungated `@BMS KEY READ`, `@BMS KEY STATUS` transacting, KEY API in PowerState, `Serial2`, an extra `HardwareSerial`, a `0x06` literal, Arduino in the protocol unit, a write frame admitted to the whitelist |
+| DALY protocol host tests (`test_daly_protocol.cpp`) | **PASS** — 214 checks / 0 failures; production mutation check **17/17 killed** (swapped MOS registers, KEY register ±1, sleep ×1, 16-bit sleep wrap, `0x5A` misdecoded, reply `0x81` accepted, byte-count / CRC check dropped, snapshot overwritten on failure, header length, no quiet gap, no fairness, pre-emption, double request, telemetry current / MOS register, KEY timeout) |
+| Servo population / profile host tests | **PASS** — 313 checks / 0 failures |
+| Build manifest provenance tests | **PASS** — 51/51 |
+| OTA partition logic suite | **PASS** — 40/40 |
+| BNO085 viewer `npm run verify` | **PASS** — 59/59 tests, typecheck, production build |
+| Compile, `USB_ONLY` (pinned FQBN) | **PASS** — 389292 bytes flash, 28504 bytes static RAM |
+| Compile, `ROBOT_POWERED` (pinned FQBN) | **PASS** — 389760 bytes flash, 28504 bytes static RAM |
+
+Versus G3.1: +2104 bytes flash, +160 bytes static RAM (mostly the receive buffer growing from
+129 to 245 bytes). Only the pre-existing third-party SCServo warnings appear.
+
+### Live validation — TO_TEST (read-only; needs a clean build, flash and separate authorization)
+
+1. Power the robot normally; connect USB (no-reset method). `@STATUS`, `@MODE STATUS`
+   (MAINTENANCE is the boot default), `@BMS STATUS` — telemetry must be `comm=OK`.
+2. `@BMS KEY READ` once; capture the complete asynchronous result. `@BMS KEY STATUS`.
+3. `@BMS STATUS` again: telemetry must still be `comm=OK` (the KEY read deferred at most one
+   poll and polling resumed).
+4. **No KEY toggle. No write. No mode change beyond reading.**
+
+Decision:
+
+- `result=OK key_logic_raw=0x0055` (DISABLED) — explains the G3 finding; the candidate future
+  action is a **separately authorized** `0x0120 = 0x005A`. Not implemented here.
+- `result=OK` with another recognized value — investigate wiring and firmware semantics before
+  any write.
+- `result=OK key_logic=UNKNOWN` — stop; the register map does not match this unit.
+- `result=TIMEOUT rx_bytes=0` (no `0x81` reply) or any other failure — **do not escalate to
+  writes**; the personality is unconfirmed on this port.

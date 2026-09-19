@@ -53,9 +53,11 @@ COMPLETE   V2 architecture delta audit            PASS
 COMPLETE   G2 ROBOT_POWERED software              PASS / FROZEN
 COMPLETE   G3 ROBOT_POWERED no-motion             PASS (formal, 2026-09-18)
 COMPLETE   G3.1 CDC-independent Controller loop   PASS (2026-09-18)
+COMPLETE   DALY KEY research                      COMPLETE (read-only, 2026-09-19)
 
-NEXT       DALY KEY investigation
-THEN       G4 Diagnostics / Maintenance
+NEXT       DALY KEY read probe                    IMPLEMENTED / LIVE VALIDATION PENDING
+BLOCKED    DALY KEY write / configuration         BLOCKED (no DALY write exists)
+THEN       G4 Diagnostics / Maintenance           NOT STARTED
 ```
 
 `ROBOT_POWERED` is **VALIDATED for no-motion operation** (G3, formal): DALY live read-only, LED
@@ -71,8 +73,11 @@ by the G3/G3.1 closeout pull request.
 
 - **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
   DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
-  or safety barrier; the DALY's actual KEY configuration and function must be inspected before any
-  setting is changed. The fused disconnect remains the trusted physical isolation method.
+  or safety barrier. Research (2026-09-19): public DALY documents publish no K-series KEY
+  register; DALY's own BMSTool V1.14.79 (static inspection) points to KEY logic at `0x0120` on a
+  second Modbus personality (`0x81`), not yet live-validated. A read-only `@BMS KEY READ` probe is
+  implemented and awaits live validation; any KEY write (candidate `0x0120 = 0x005A`) is blocked
+  until then. The fused disconnect remains the trusted physical isolation method.
 - **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
   19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
   electrical and signal-integrity validation.
@@ -95,7 +100,7 @@ Each row's *Blocks* column states what it gates. Arrows are hard dependencies, n
 
 | # | Stage | Status | Reality in this repository |
 |---|---|---|---|
-| 4 | **G4 — Diagnostics / Maintenance** | **PARTIAL — NEXT after the DALY KEY investigation** | Already exist: `@STATUS` module availability, `@SERVO SCAN`, `@SERVO READ`, `@SERVO CENSUS` (structured population classification), `@SERVO SAFE_OFF` with independent readback, `@IMU`/`@BMS`/`@LED` status. Do **not** exist: `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated servo health summary. |
+| 4 | **G4 — Diagnostics / Maintenance** | **PARTIAL — NOT STARTED; after the DALY KEY read-probe live validation** | Already exist: `@STATUS` module availability, `@SERVO SCAN`, `@SERVO READ`, `@SERVO CENSUS` (structured population classification), `@SERVO SAFE_OFF` with independent readback, `@IMU`/`@BMS`/`@LED` status. Do **not** exist: `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated servo health summary. |
 | 5 | **OperatingMode / ActuatorAuthority** | **PARTIAL** | `OperatingMode{MAINTENANCE, RUN}` exists and gates blocking servo diagnostics — deliberately minimal. The full `ActuatorAuthority` model (`NONE`/`DIAGNOSTICS`/`CALIBRATION`/`QC`/`PROVISIONING`/`MOTION`, one owner at a time) is **TO_DESIGN**. Required before any write-capable service or motion. |
 | 6 | **Service / Provisioning / QC** | **FUTURE** | Frozen bench tools (Bench QC V6.1, Source Signature Survey V1, Provisioner V6) remain **FROZEN** oracles; nothing is integrated into the Controller. Blocked by stage 5. |
 | 7 | **Full Leg Calibration integration** | **FUTURE** | Branch `matdog/full-leg-calibrator-v1` preserved as an oracle. Not merged, not ported. Blocked by stage 5. |
@@ -182,7 +187,7 @@ authoritative Controller state, never from frontend assumptions.
 
 | Blocker | Blocks | Cleared by |
 |---|---|---|
-| DALY `KEY` not validated as a shutdown or safety barrier | any reliance on KEY for power-off or isolation | DALY KEY investigation (fused disconnect is the trusted isolation meanwhile) |
+| DALY `KEY` not validated as a shutdown or safety barrier | any reliance on KEY for power-off or isolation | live validation of the read-only `@BMS KEY READ` probe, then a separately authorized configuration step (fused disconnect is the trusted isolation meanwhile) |
 | `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION` | all motion (15, 17, 20, 23) | stages 7 + 8 |
 | No `ActuatorAuthority` model | write-capable service, QC, calibration, motion | stage 5 |
 | No Safe Actuator Layer | all motion | stage 14 |

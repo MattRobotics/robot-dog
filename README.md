@@ -136,9 +136,11 @@ COMPLETE   Controller V0.1 baseline              VALIDATED (USB_ONLY hardware)
 COMPLETE   G2 ROBOT_POWERED software             PASS / FROZEN
 COMPLETE   G3 ROBOT_POWERED no-motion            PASS (formal, 2026-09-18)
 COMPLETE   G3.1 CDC-independent Controller loop  PASS (2026-09-18)
+COMPLETE   DALY KEY research                     COMPLETE (read-only, 2026-09-19)
 
-NEXT       DALY KEY investigation
-THEN       G4 Diagnostics / Maintenance
+NEXT       DALY KEY read probe                   IMPLEMENTED / LIVE VALIDATION PENDING
+BLOCKED    DALY KEY write / configuration        BLOCKED (no DALY write exists)
+THEN       G4 Diagnostics / Maintenance          NOT STARTED
 ```
 
 `ROBOT_POWERED` is **VALIDATED for no-motion operation**: DALY live read-only, LED live, 13/13
@@ -150,8 +152,11 @@ presence: BNO085 acquisition runs at 50.1 Hz with the port closed (G3.1). No com
 
 - **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
   DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
-  or safety barrier; the DALY's actual KEY configuration and function must be inspected before any
-  setting is changed. The fused disconnect remains the trusted physical isolation method.
+  or safety barrier. Research (2026-09-19): no public DALY document publishes a K-series KEY
+  register; DALY's own BMSTool V1.14.79 (static inspection) points to KEY logic at `0x0120` on a
+  second Modbus personality (`0x81`), not yet live-validated. The read-only `@BMS KEY READ` probe
+  is implemented and awaits live validation; any KEY write is blocked until then. The fused
+  disconnect remains the trusted physical isolation method.
 - **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
   19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
   electrical and signal-integrity validation.
