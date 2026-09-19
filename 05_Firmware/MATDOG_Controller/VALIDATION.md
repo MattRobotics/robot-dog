@@ -2588,7 +2588,8 @@ Exceptions (function `0x86`) are dropped by the tool's parser and end as a timeo
   valid KEY snapshot from a successful most-recent read, ≤ 30 s old; KEY logic exactly `0x0055`
   (`0x005A` → `ALREADY_CONFIGURED`, zero TX; anything else → refused, nothing migrates); charge and
   discharge MOS control both `1`. Checked when the command arrives and again at the idle boundary
-  just before transmitting (the mode is checked on arrival).
+  just before transmitting — including the live operating mode since `fix(controller): recheck
+  mode before DALY KEY write` (see below).
 - **Scheduling.** `DalyBusScheduler` now serves one *operator* transaction at a time (KEY read or
   KEY write) plus telemetry; the rest of its invariants are unchanged. The write and its read-back
   each defer at most one telemetry poll; telemetry resumes on its own after success, failure or
@@ -2698,3 +2699,29 @@ must be added as its own reviewed semantic operation with its own audit whitelis
 generic writer. The plausible bad outcomes of the DISCHARGE setting are no effect (the KEY stays
 wake-only, as today) or the load domain switching off (fail-safe); DALY's own BMSTool or app can
 restore `0x0055` meanwhile.
+
+### Pre-transmit mode re-check — review fix (2026-09-19)
+
+Independent review found that the final pre-transmit evaluation in `DalyBms::update()` passed
+MAINTENANCE as a literal `true`, so a switch to `@MODE RUN` between accepting
+`@BMS KEY SET DISCHARGE CONFIRM` and the write reaching the idle bus boundary would not have
+stopped it. Fixed narrowly:
+
+- `DalyBms::update(now_ms, mode)` — `Controller::update()` passes `operating_mode_.mode()` on every
+  loop, after `CommandRouter` has processed that loop's commands.
+- The final check is the pure `dalyKeyWritePreTransmitCheck()` (host-tested), called with
+  `keyWriteInputs(mode == core::OperatingMode::MAINTENANCE, false, now_ms)`; nothing between it and
+  `startTransaction()` can change the mode. If the mode is RUN (or any other precondition fails)
+  the queued write is dropped with zero bytes transmitted, `BMS_KEY_WRITE=REFUSED
+  reason=NOT_IN_MAINTENANCE_MODE tx_bytes=0` is reported, and telemetry carries on.
+- The arrival-time check and OperatingMode semantics are unchanged; no global, task or latched
+  permission.
+- Host regression `test_pre_transmit_mode_recheck` (accepted in MAINTENANCE → RUN at the boundary,
+  also after a deferral; still MAINTENANCE → proceeds; alarm; no write queued → untouched): DALY
+  suite 404 checks / 0 failures; the helper's gate, cancel and record paths each fail it when
+  mutated (3/3 killed).
+- Static audit: `DalyBms::update` must take the live mode, the pre-transmit call must use exactly
+  `mode == core::OperatingMode::MAINTENANCE`, every `keyWriteInputs()` call must derive
+  MAINTENANCE from a live mode, and the Controller must pass `operating_mode_.mode()`. Mutation
+  suite **52/52**: new cases replace the live mode with `true`, with a constant comparison, with
+  `OperatingMode::MAINTENANCE` in the Controller, remove the check, or stop the helper cancelling.

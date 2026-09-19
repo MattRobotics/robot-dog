@@ -139,7 +139,7 @@ void Controller::update(uint32_t now_ms) {
   imu_.update(now_ms);
   system_state_.setImuHealth(imu_.health());
 
-  daly_.update(now_ms);
+  daly_.update(now_ms, operating_mode_.mode());
   system_state_.setBmsHealth(daly_.health());
 
   led_.update(now_ms);

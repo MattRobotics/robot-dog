@@ -114,6 +114,10 @@ exactly one call chain. Still forbidden: FC10 anywhere; FC06 to any other
 register (0x0121/0x0122 MOS control included) or with any other value; a
 second write frame; any caller-supplied address/register/value; raw write
 commands; persistence in the DALY module; any requestDischargeOff() body.
+The write may leave the UART only if the operating mode is STILL MAINTENANCE
+at the final pre-transmit check: DalyBms::update() takes the live mode from
+the Controller on every loop and the check must use it (never `true`, a
+constant, or the mode seen when the command arrived).
 
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
@@ -371,6 +375,45 @@ def check_daly_write(files):
                      r"mode\s*\)\s*;", bms_h):
         fail(f"{bms_h_path}: requestKeyLogicDischarge() must take only (core::OperatingMode "
              f"mode) - no register or value parameter")
+
+    # 2d. The FC06 frame may leave only if the operating mode is STILL
+    #     MAINTENANCE at the pre-transmit check: DalyBms::update() receives
+    #     the live mode from the Controller every loop, and every gate input
+    #     derives MAINTENANCE from a live mode - never `true`, a constant, or
+    #     the mode seen when the command arrived.
+    bms_cpp_path, bms_cpp = by_name["DalyBms.cpp"]
+    if not re.search(r"void\s+DalyBms::update\(\s*uint32_t\s+now_ms\s*,\s*"
+                     r"core::OperatingMode\s+mode\s*\)", bms_cpp):
+        fail(f"{bms_cpp_path}: DalyBms::update() must take the live (core::OperatingMode mode)")
+    precheck = ("dalyKeyWritePreTransmitCheck(&bus_,&key_write_,keyWriteInputs(mode=="
+                "core::OperatingMode::MAINTENANCE,false,now_ms));")
+    if re.sub(r"\s+", "", bms_cpp).count(precheck) != 1:
+        fail(f"{bms_cpp_path}: the pre-transmit write check must be exactly "
+             f"dalyKeyWritePreTransmitCheck(&bus_, &key_write_, keyWriteInputs(mode == "
+             f"core::OperatingMode::MAINTENANCE, false, now_ms)) - the live mode, once")
+    for m in re.finditer(r"keyWriteInputs\(([^,]*),", bms_cpp):
+        if m.group(1).strip() not in ("mode == core::OperatingMode::MAINTENANCE",
+                                      "bool maintenance_mode"):
+            fail(f"{bms_cpp_path}: keyWriteInputs() called with maintenance="
+                 f"{m.group(1).strip()!r} - MAINTENANCE must come from the live operating mode")
+    helper_calls = [p for p, c in files if "dalyKeyWritePreTransmitCheck(" in c and
+                    "scripts" not in p.parts]
+    if sorted(p.name for p in helper_calls) != ["DalyBms.cpp", "DalyProtocol.cpp",
+                                                "DalyProtocol.h"]:
+        fail(f"dalyKeyWritePreTransmitCheck() must be defined in DalyProtocol and called only by "
+             f"DalyBms::update(), found {[str(p) for p in helper_calls]}")
+    proto_cpp = by_name.get("DalyProtocol.cpp", (None, ""))[1]
+    body = re.search(r"bool dalyKeyWritePreTransmitCheck\(.*?\n\}", proto_cpp, re.DOTALL)
+    if not body or not all(t in body.group(0) for t in (
+            "evaluateDalyKeyWrite(live)", "cancelQueuedOperatorRequest()",
+            "cancelBeforeTransmit(gate)")):
+        fail("DalyProtocol.cpp: dalyKeyWritePreTransmitCheck() must evaluate the live inputs and "
+             "cancel (zero TX) a write that no longer passes")
+    ctl = [(p, c) for p, c in files if p.name == "Controller.cpp"]
+    if not ctl or re.findall(r"daly_\.update\(([^;]*)\);", ctl[0][1]) != \
+            ["now_ms, operating_mode_.mode()"]:
+        fail("Controller.cpp: must call daly_.update(now_ms, operating_mode_.mode()) - the DALY "
+             "module needs the operating mode as it is on every loop")
 
     # 3. Exactly one transmit call in the whole firmware, in DalyBms.cpp,
     #    sending only what dalyRequestFrame() selected.

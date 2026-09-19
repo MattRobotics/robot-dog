@@ -133,18 +133,18 @@ void DalyBms::handleKeyLogicWriteResponse() {
   key_write_readback_due_ = true;
 }
 
-void DalyBms::update(uint32_t now_ms) {
+void DalyBms::update(uint32_t now_ms, core::OperatingMode mode) {
   if (!bus_.inFlight()) {
-    // Last look before the one write can leave: every DALY-state
-    // precondition again (the mode was checked when it was accepted).
+    // Last look before the one write can leave: every precondition again,
+    // with the operating mode as it is on THIS update. Nothing below can
+    // change the mode before startTransaction(), so the FC06 frame leaves
+    // only if the system is still in MAINTENANCE.
     DalyRequest queued = DalyRequest::TELEMETRY;
     if (bus_.queuedOperatorRequest(&queued) &&
         queued == DalyRequest::KEY_LOGIC_DISCHARGE_WRITE) {
-      const DalyKeyWriteGate gate = evaluateDalyKeyWrite(keyWriteInputs(true, false, now_ms));
-      if (gate.decision != DalyKeyWriteDecision::START) {
-        bus_.cancelQueuedOperatorRequest();
-        key_write_.cancelBeforeTransmit(gate);
-      }
+      dalyKeyWritePreTransmitCheck(
+          &bus_, &key_write_,
+          keyWriteInputs(mode == core::OperatingMode::MAINTENANCE, false, now_ms));
     }
 
     DalyRequest request = DalyRequest::TELEMETRY;

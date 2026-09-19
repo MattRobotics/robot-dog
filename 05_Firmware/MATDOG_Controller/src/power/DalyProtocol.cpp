@@ -372,6 +372,22 @@ void DalyKeyWriteTracker::onReadback(DalyKeyReadResult read, uint16_t key_logic_
   status_.state = DalyKeyWriteState::COMPLETE;
 }
 
+bool dalyKeyWritePreTransmitCheck(DalyBusScheduler* bus, DalyKeyWriteTracker* tracker,
+                                  const DalyKeyWriteInputs& live) {
+  DalyRequest queued = DalyRequest::TELEMETRY;
+  if (!bus->queuedOperatorRequest(&queued) ||
+      queued != DalyRequest::KEY_LOGIC_DISCHARGE_WRITE) {
+    return true;
+  }
+  const DalyKeyWriteGate gate = evaluateDalyKeyWrite(live);
+  if (gate.decision == DalyKeyWriteDecision::START) {
+    return true;
+  }
+  bus->cancelQueuedOperatorRequest();
+  tracker->cancelBeforeTransmit(gate);
+  return false;
+}
+
 bool DalyBusScheduler::requestOperator(DalyRequest request) {
   if (operatorTransactionOutstanding()) {
     return false;

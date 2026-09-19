@@ -96,6 +96,8 @@ SET_CALL = "modules_.daly->requestKeyLogicDischarge(modules_.operating_mode->mod
 WRITE_STATUS_FN = "void CommandRouter::printBmsKeyWriteStatus() {"
 WRITE_HELP = 'Serial.println("  @BMS KEY WRITE STATUS   (cached write result; no bus transaction)");'
 WRITE_STATUS_BRANCH = '} else if (upper == "@BMS KEY WRITE STATUS") {'
+CTL_UPDATE = "  daly_.update(now_ms, operating_mode_.mode());"
+PRECHECK_INPUTS = "keyWriteInputs(mode == core::OperatingMode::MAINTENANCE, false, now_ms)"
 
 
 def write_payload(old, new):
@@ -174,9 +176,24 @@ MUTATIONS = [
     ("DALY write state persisted",
      lambda: mutate("DalyBms.cpp", TRANSMIT, TRANSMIT + "\n  Preferences prefs;")),
     ("write requested from the Controller",
-     lambda: mutate("Controller.cpp", "  daly_.update(now_ms);",
-                    "  daly_.update(now_ms);\n  daly_.requestKeyLogicDischarge("
+     lambda: mutate("Controller.cpp", CTL_UPDATE,
+                    CTL_UPDATE + "\n  daly_.requestKeyLogicDischarge("
                     "operating_mode_.mode());")),
+    ("pre-transmit check assumes MAINTENANCE (true)",
+     lambda: mutate("DalyBms.cpp", PRECHECK_INPUTS, "keyWriteInputs(true, false, now_ms)")),
+    ("pre-transmit check uses a constant mode",
+     lambda: mutate("DalyBms.cpp", PRECHECK_INPUTS,
+                    "keyWriteInputs(core::OperatingMode::MAINTENANCE == "
+                    "core::OperatingMode::MAINTENANCE, false, now_ms)")),
+    ("Controller passes OperatingMode::MAINTENANCE instead of the live mode",
+     lambda: mutate("Controller.cpp", CTL_UPDATE,
+                    "  daly_.update(now_ms, OperatingMode::MAINTENANCE);")),
+    ("pre-transmit check removed",
+     lambda: mutate("DalyBms.cpp",
+                    "dalyKeyWritePreTransmitCheck(\n          &bus_, &key_write_,\n          "
+                    + PRECHECK_INPUTS + ");", "(void)0;")),
+    ("pre-transmit helper never cancels",
+     lambda: mutate("DalyProtocol.cpp", "  bus->cancelQueuedOperatorRequest();\n", "")),
     # ---- the read-only probe and transport ------------------------------------
     ("KEY request function 0x03 -> 0x06",
      lambda: mutate("DalyProtocol.h", KEY_BYTES, "0x81, 0x06, 0x01, 0x00,")),
@@ -228,8 +245,8 @@ MUTATIONS = [
                     "static const int kLeak = sizeof(power::DalyKeyConfigSnapshot);\n"
                     "void PowerStateMachine::requestShutdown() {")),
     ("second route to UART2",
-     lambda: mutate("Controller.cpp", "  daly_.update(now_ms);",
-                    "  daly_.update(now_ms);\n  Serial2.write(0x06);")),
+     lambda: mutate("Controller.cpp", CTL_UPDATE,
+                    CTL_UPDATE + "\n  Serial2.write(0x06);")),
     ("extra HardwareSerial owner",
      lambda: mutate("DalyBms.h", "HardwareSerial bms_uart_{2};",
                     "HardwareSerial bms_uart_{2};\n  HardwareSerial spare_uart_{2};")),

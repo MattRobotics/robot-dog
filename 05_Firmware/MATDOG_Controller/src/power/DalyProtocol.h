@@ -503,6 +503,15 @@ class DalyBusScheduler {
   uint32_t idle_since_ms_ = 0;
 };
 
+// The last check before the one write can leave the UART, run at every idle
+// bus boundary while it is queued. `live` must describe the system as it is
+// NOW - including the operating mode read on this same update, never the
+// mode seen when the command arrived. If the gate no longer says START, the
+// queued write is dropped (zero bytes transmitted) and the reason recorded;
+// telemetry carries on. Returns false only when it cancelled the write.
+bool dalyKeyWritePreTransmitCheck(DalyBusScheduler* bus, DalyKeyWriteTracker* tracker,
+                                  const DalyKeyWriteInputs& live);
+
 }  // namespace power
 }  // namespace matdog
 

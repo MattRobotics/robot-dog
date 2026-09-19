@@ -1,5 +1,16 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — DALY KEY write: live-mode pre-transmit re-check — 2026-09-19
+
+Review fix; **not flashed at commit time; still no DALY write sent.**
+
+- The FC06 KEY write can now leave the UART only if the operating mode is **still MAINTENANCE at
+  the final pre-transmit check**. `DalyBms::update(now_ms, mode)` receives
+  `operating_mode_.mode()` from the Controller every loop; the pure
+  `dalyKeyWritePreTransmitCheck()` uses it instead of a literal `true`. A switch to RUN after the
+  command was accepted cancels the write with zero bytes sent (`reason=NOT_IN_MAINTENANCE_MODE`).
+- Host regression test added (DALY suite 404 checks); audit rule + 5 new mutation cases (52/52).
+
 ## Unreleased — DALY KEY discharge configuration (guarded write) — 2026-09-19
 
 **Not flashed; never sent to hardware; live validation TO_TEST.**

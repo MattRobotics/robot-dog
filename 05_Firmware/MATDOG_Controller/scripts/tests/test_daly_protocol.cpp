@@ -939,6 +939,99 @@ static void test_scheduler_cancel_queued_write() {
   CHECK(r == DalyRequest::TELEMETRY);           // only telemetry
 }
 
+static void test_pre_transmit_mode_recheck() {
+  g_case = "pre_transmit_mode_recheck";
+  DalyRequest r = DalyRequest::TELEMETRY;
+
+  // Accepted in MAINTENANCE, then the operator switched to RUN before the
+  // write reached the idle bus boundary: it must never leave the UART.
+  {
+    DalyBusScheduler bus;
+    DalyKeyWriteTracker t;
+    DalyKeyWriteInputs live = goodInputs();
+    CHECK(evaluateDalyKeyWrite(live).decision == DalyKeyWriteDecision::START);
+    CHECK(bus.requestKeyLogicDischargeWrite());
+    t.accept();
+
+    live.maintenance_mode = false;  // mode read on the pre-transmit update
+    CHECK(!dalyKeyWritePreTransmitCheck(&bus, &t, live));
+    CHECK_EQ(t.status().state, DalyKeyWriteState::REFUSED);
+    CHECK_EQ(t.status().last_refusal, DalyKeyWriteRefusal::NOT_IN_MAINTENANCE_MODE);
+    CHECK(!t.status().transmitted);
+    CHECK_EQ(t.status().ack, DalyKeyWriteAck::NONE);
+    CHECK(!bus.operatorTransactionOutstanding());
+    CHECK(!bus.startNext(1999, &r));            // nothing at all goes out early
+    CHECK(bus.startNext(2000, &r));
+    CHECK(r == DalyRequest::TELEMETRY);          // telemetry carries on; no write
+    bus.finish(2150);
+    CHECK(!bus.startNext(3999, &r));
+    CHECK(bus.startNext(4000, &r));
+    CHECK(r == DalyRequest::TELEMETRY);
+  }
+
+  // Still MAINTENANCE at the pre-transmit check: the write proceeds.
+  {
+    DalyBusScheduler bus;
+    DalyKeyWriteTracker t;
+    const DalyKeyWriteInputs live = goodInputs();
+    CHECK(bus.requestKeyLogicDischargeWrite());
+    t.accept();
+    CHECK(dalyKeyWritePreTransmitCheck(&bus, &t, live));
+    CHECK_EQ(t.status().state, DalyKeyWriteState::PENDING);
+    CHECK(bus.startNext(1600, &r));
+    CHECK(r == DalyRequest::KEY_LOGIC_DISCHARGE_WRITE);
+  }
+
+  // Deferred behind a due poll, then RUN on the next boundary: the check
+  // runs again and cancels it then.
+  {
+    DalyBusScheduler bus;
+    DalyKeyWriteTracker t;
+    DalyKeyWriteInputs live = goodInputs();
+    CHECK(bus.requestKeyConfigRead());
+    CHECK(bus.startNext(2000, &r));              // a KEY read runs first
+    bus.finish(2300);
+    CHECK(bus.requestKeyLogicDischargeWrite());
+    t.accept();
+    CHECK(dalyKeyWritePreTransmitCheck(&bus, &t, live));
+    CHECK(bus.startNext(4000, &r));              // due poll goes before a 2nd operator txn
+    CHECK(r == DalyRequest::TELEMETRY);
+    bus.finish(4150);
+    live.maintenance_mode = false;
+    CHECK(!dalyKeyWritePreTransmitCheck(&bus, &t, live));
+    CHECK_EQ(t.status().last_refusal, DalyKeyWriteRefusal::NOT_IN_MAINTENANCE_MODE);
+    CHECK(!bus.operatorTransactionOutstanding());
+    CHECK(!bus.startNext(4450, &r));             // nothing queued, poll not due
+    CHECK(bus.startNext(6000, &r));
+    CHECK(r == DalyRequest::TELEMETRY);          // only telemetry ever follows
+    CHECK(!t.status().transmitted);
+  }
+
+  // Any other DALY-state change is caught the same way (here: an alarm).
+  {
+    DalyBusScheduler bus;
+    DalyKeyWriteTracker t;
+    DalyKeyWriteInputs live = goodInputs();
+    CHECK(bus.requestKeyLogicDischargeWrite());
+    t.accept();
+    live.alarms_clear = false;
+    CHECK(!dalyKeyWritePreTransmitCheck(&bus, &t, live));
+    CHECK_EQ(t.status().last_refusal, DalyKeyWriteRefusal::BMS_ALARM_ACTIVE);
+  }
+
+  // No write queued: the check touches nothing (a queued KEY read survives).
+  {
+    DalyBusScheduler bus;
+    DalyKeyWriteTracker t;
+    DalyKeyWriteInputs live = goodInputs();
+    live.maintenance_mode = false;
+    CHECK(bus.requestKeyConfigRead());
+    CHECK(dalyKeyWritePreTransmitCheck(&bus, &t, live));
+    CHECK(bus.operatorTransactionOutstanding());
+    CHECK_EQ(t.status().state, DalyKeyWriteState::NOT_REQUESTED);
+  }
+}
+
 int main() {
   std::printf("MATDOG DALY protocol / KEY probe / KEY write offline tests\n");
 
@@ -971,6 +1064,7 @@ int main() {
   test_scheduler_write_and_readback();
   test_scheduler_write_timeout_then_resumes();
   test_scheduler_cancel_queued_write();
+  test_pre_transmit_mode_recheck();
 
   std::printf("checks_run=%d failures=%d\n", g_checks, g_failures);
   if (g_failures != 0) {

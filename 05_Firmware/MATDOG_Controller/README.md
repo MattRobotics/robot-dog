@@ -305,7 +305,8 @@ It takes no argument and refuses with zero bytes sent (`BMS_KEY_WRITE=REFUSED re
 MAINTENANCE; no write already sent this boot; no DALY transaction in flight or queued; `0xD2`
 telemetry OK and ≤ 5 s old; no alarms; a successful `@BMS KEY READ` ≤ 30 s old showing exactly
 `0x0055` with charge/discharge MOS control `1`/`1` (`0x005A` → `ALREADY_CONFIGURED`). Accepted, it
-replies `BMS_KEY_WRITE=STARTED target=DISCHARGE raw=0x005A`, re-checks the DALY state just before
+replies `BMS_KEY_WRITE=STARTED target=DISCHARGE raw=0x005A`, re-checks every precondition (the
+live operating mode included) just before
 transmitting, then reports `BMS_KEY_WRITE=ACK result=OK|TIMEOUT|CRC_FAIL|BAD_HEADER|BAD_ECHO
 rx_bytes=<n>` (only the exact echo `51 06 01 20 00 5A 05 97` is `OK`) and, after an automatic
 FC03 read-back, `BMS_KEY_WRITE=COMPLETE ack=… readback=VERIFIED|PENDING_RESTART|MISMATCH|READ_FAILED`

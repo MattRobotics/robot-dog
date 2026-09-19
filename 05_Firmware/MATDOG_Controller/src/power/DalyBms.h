@@ -47,7 +47,9 @@ namespace power {
 class DalyBms {
  public:
   bool begin();
-  void update(uint32_t now_ms);
+  // `mode` is the operating mode right now; the one KEY write can only
+  // leave the UART if it is still MAINTENANCE at the pre-transmit check.
+  void update(uint32_t now_ms, core::OperatingMode mode);
   core::ModuleHealth health() const { return core::toModuleHealth(core::classify(availability())); }
   core::AvailabilityStatus availability() const;
 
