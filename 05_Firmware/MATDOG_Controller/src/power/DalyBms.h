@@ -5,6 +5,7 @@
 
 #include "../config/BuildConfig.h"
 #include "../core/Availability.h"
+#include "../core/OperatingMode.h"
 #include "../core/SystemState.h"
 #include "DalyProtocol.h"
 
@@ -37,11 +38,12 @@ namespace power {
 //
 // DALY KEY probe (2026-09-19): the same bus also carries an operator-
 // triggered one-shot read of the 0x81 parameter personality (KEY logic,
-// charge/discharge MOS control, sleep time). Both transactions are FC03
-// reads of constant frames (power/DalyProtocol.h); DalyBusScheduler is the
-// single owner that starts them, so they can never overlap on the bus. The
-// probe's outcome is kept apart from telemetry health: a silent 0x81
-// address never marks the BMS absent.
+// charge/discharge MOS control, sleep time), and exactly ONE guarded write:
+// KEY logic 0x0120 := 0x005A (DISCHARGE), always followed by an FC03
+// read-back. All frames are constants in power/DalyProtocol.h;
+// DalyBusScheduler is the single owner that starts them, so they can never
+// overlap on the bus. KEY outcomes are kept apart from telemetry health: a
+// silent 0x81 address never marks the BMS absent.
 class DalyBms {
  public:
   bool begin();
@@ -74,11 +76,24 @@ class DalyBms {
   // Last VALID snapshot; a failed read never replaces it.
   const DalyKeyConfigSnapshot& keyConfigSnapshot() const { return key_snapshot_; }
 
+  // The ONE DALY write: KEY logic 0x0120 := 0x005A (DISCHARGE). The caller
+  // supplies neither register nor value - only the operating mode, which
+  // the gate checks. Every precondition (power/DalyProtocol.h,
+  // evaluateDalyKeyWrite) is checked now AND again just before the frame
+  // is sent; a refusal transmits nothing. At most one write frame is ever
+  // transmitted per boot. The acknowledgement is always followed by an
+  // FC03 read-back; only a read-back of 0x005A counts as verified.
+  DalyKeyWriteGate requestKeyLogicDischarge(core::OperatingMode mode);
+  const DalyKeyWriteStatus& keyWriteStatus() const { return key_write_.status(); }
+
  private:
   void startTransaction(DalyRequest request);
   void finishTransaction();
   void handleTelemetryResponse();
   void handleKeyConfigResponse();
+  void handleKeyLogicWriteResponse();
+  bool queueKeyConfigRead();
+  DalyKeyWriteInputs keyWriteInputs(bool maintenance_mode, bool bus_busy, uint32_t now_ms) const;
 
   HardwareSerial bms_uart_{2};
   core::InitializationState init_ = core::InitializationState::NOT_INITIALIZED;
@@ -96,6 +111,10 @@ class DalyBms {
   uint32_t key_read_result_ms_ = 0;
   size_t key_read_rx_bytes_ = 0;
   DalyKeyConfigSnapshot key_snapshot_;
+
+  DalyKeyWriteTracker key_write_;
+  bool key_write_readback_due_ = false;      // chain the FC03 read-back next
+  bool key_write_readback_running_ = false;  // the queued/in-flight KEY read is it
 
   DalySample sample_;
 };

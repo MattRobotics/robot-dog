@@ -208,7 +208,16 @@ stays a no-op; `@BMS` commands take no arguments and name no write; `@BMS KEY RE
 into power-state/health logic; `DalyProtocol.*` stays Arduino-free. The audit also runs
 `scripts/tests/test_static_audit_daly.py`, which proves those rules fail on mutation (e.g. the KEY
 request function `0x03 → 0x06`). The G3.1 TX-ring floor rises from 2560 to 3072 bytes because the
-largest single loop pass grew to 2588 bytes (see `VALIDATION.md`).
+largest single loop pass grew (now 2674 bytes; see `VALIDATION.md`).
+
+DALY KEY discharge configuration additions: the one permitted write is spelled out in
+`DALY_THE_ONE_WRITE` (FC06, `0x81`, `0x0120 := 0x005A`). The parameterless
+`dalyKeyLogicDischargeWriteFrame()` must match the reviewed recipe exactly; the selector must map
+each request to its own frame; the write can be requested only through `@BMS KEY SET DISCHARGE
+CONFIRM` (MAINTENANCE-gated, live operating mode) → `DalyBms::requestKeyLogicDischarge(mode)` →
+the scheduler, once each. FC10, any other register (MOS control `0x0121`/`0x0122` included), value,
+address or second write frame, a caller-supplied target, a generic `@BMS` write spelling, DALY
+persistence and any `requestDischargeOff()` body fail the build; the mutation suite proves it.
 
 ## USB diagnostic command surface
 
@@ -219,6 +228,8 @@ largest single loop pass grew to 2588 bytes (see `VALIDATION.md`).
 @BMS STATUS | @BMS STREAM ON|OFF
 @BMS KEY READ                               (MAINTENANCE mode only; read-only)
 @BMS KEY STATUS                             (cached; no bus transaction)
+@BMS KEY SET DISCHARGE CONFIRM              (MAINTENANCE only; the ONE DALY write; once per boot)
+@BMS KEY WRITE STATUS                       (cached; no bus transaction)
 @LED STATUS | @LED OFF | @LED TEST
 @SERVO SCAN <lo> <hi> | @SERVO READ <id>   (MAINTENANCE mode only)
 @SERVO CENSUS                               (MAINTENANCE mode only)
@@ -257,7 +268,8 @@ power-state machine through its shutdown sequence but always resolves to
 `POWER_CUT_FAILED` in V0.1, because the DALY K-Series `Discharge MOS OFF` write
 protocol has not been identified or bench-verified (see `VALIDATION.md` and handoff
 section 8A.8). No command in this surface can write servo EEPROM, recode an ID, save
-the BNO085 DCD, or write DALY configuration/MOS state.
+the BNO085 DCD, or write DALY MOS state; the only DALY configuration write is the single
+semantic KEY setting below.
 
 `@BMS KEY READ` is the read-only DALY KEY probe (implemented and **live-verified read-only**
 2026-09-19; see `VALIDATION.md`). It queues one FC03 read of the DALY's second Modbus personality —
@@ -283,7 +295,25 @@ telemetry, so they never overlap; the KEY read goes first at the next idle bound
 most one 2 s telemetry poll, and telemetry resumes on its own. A failed read never replaces the
 last valid snapshot and never marks the BMS absent. `@BMS KEY STATUS` prints the cached
 result/snapshot and its age with zero bus traffic (`snapshot=NOT_READ key_logic=UNKNOWN` until a
-read succeeds). Nothing is inferred from the live MOS state, and no KEY write exists.
+read succeeds). Nothing is inferred from the live MOS state.
+
+`@BMS KEY SET DISCHARGE CONFIRM` is the **only** DALY write (implemented 2026-09-19, offline
+validated, **never sent to hardware** — live validation pending, see `DEVELOPMENT_GATES.md`). It
+sends FC06 `81 06 01 20 00 5A 16 07`: KEY logic `0x0120 := 0x005A` (DISCHARGE — KEY OFF turns the
+discharge MOS off, charge MOS kept), the exact frame DALY BMSTool V1.14.79 builds for that setting.
+It takes no argument and refuses with zero bytes sent (`BMS_KEY_WRITE=REFUSED reason=…`) unless:
+MAINTENANCE; no write already sent this boot; no DALY transaction in flight or queued; `0xD2`
+telemetry OK and ≤ 5 s old; no alarms; a successful `@BMS KEY READ` ≤ 30 s old showing exactly
+`0x0055` with charge/discharge MOS control `1`/`1` (`0x005A` → `ALREADY_CONFIGURED`). Accepted, it
+replies `BMS_KEY_WRITE=STARTED target=DISCHARGE raw=0x005A`, re-checks the DALY state just before
+transmitting, then reports `BMS_KEY_WRITE=ACK result=OK|TIMEOUT|CRC_FAIL|BAD_HEADER|BAD_ECHO
+rx_bytes=<n>` (only the exact echo `51 06 01 20 00 5A 05 97` is `OK`) and, after an automatic
+FC03 read-back, `BMS_KEY_WRITE=COMPLETE ack=… readback=VERIFIED|PENDING_RESTART|MISMATCH|READ_FAILED`
+with the decoded register. Only `VERIFIED` (`0x005A` read back) means the setting is stored;
+`PENDING_RESTART` means the BMS still reports `0x0055` (BMSTool asks for a BMS restart after every
+setting — MATDOG never restarts the BMS). `@BMS KEY WRITE STATUS` prints the cached record with
+zero bus traffic. Nothing persists on the ESP32: if it loses power after the write, `@BMS KEY
+READ` after reboot shows the real register. No rollback command exists.
 
 `@STATUS` (and the per-module `@IMU`/`@BMS`/`@LED` variants) report each module as
 `init=.. detected=.. expected=.. result=..` — separating "did the driver initialize"
@@ -422,7 +452,7 @@ not at boot, not on a timer.
 ```bash
 python3 scripts/tests/test_ota_partition_logic.py   # OTA slot selection (40 tests)
 bash scripts/tests/run_host_tests.sh                # servo population / profile + DALY protocol
-python3 scripts/tests/test_static_audit_daly.py     # DALY write-prohibition mutation suite
+python3 scripts/tests/test_static_audit_daly.py     # DALY write-whitelist mutation suite
 python3 scripts/static_audit.py                     # runs all of the above, plus the audit
 ```
 
@@ -439,7 +469,11 @@ request frames and their CRCs, the 245-byte `0x81` reply built from BMSTool's li
 positions (proving the register-based offsets), all KEY-logic values, sleep-time width, rejection
 of bad header/CRC/length without replacing the last valid snapshot, the unchanged `0xD2`
 telemetry decoder, and the bus scheduler (no overlap, KEY priority, bounded telemetry deferral,
-automatic resumption).
+automatic resumption). It also covers the one write: its exact bytes and CRC, the acknowledgement
+exactly as BMSTool accepts it (address, function, CRC, register and value echo, length), every
+precondition and its order, `ALREADY_CONFIGURED`, read-back classification (an ACK alone is never
+verification), the status tracker, and scheduling of write → read-back → telemetry after success,
+failure and timeout.
 
 ## Operating mode (MAINTENANCE / RUN)
 
@@ -512,8 +546,9 @@ therefore hardware-first, and firmware cannot be the primary wake controller bec
 downstream of the DALY-protected supply it would need to enable. The KEY function itself is
 **OPEN**: in G3 the physical KEY switch produced no observed DALY state change, so it is not a
 validated shutdown or safety barrier; the fused disconnect is. The DALY's KEY configuration can be
-read (not written) with `@BMS KEY READ` — live 2026-09-19: DISABLED (`0x0055`); see
-`DEVELOPMENT_GATES.md`.
+read with `@BMS KEY READ` — live 2026-09-19: DISABLED (`0x0055`) — and set to DISCHARGE with the
+single guarded `@BMS KEY SET DISCHARGE CONFIRM` (offline-validated, never sent; live validation
+pending); see `DEVELOPMENT_GATES.md`.
 
 ## Bench test profile
 

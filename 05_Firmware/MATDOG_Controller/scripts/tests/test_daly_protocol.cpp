@@ -1,7 +1,10 @@
 // Offline host tests for the DALY wire protocol (src/power/DalyProtocol.*):
 // the two whitelisted FC03 request frames, CRC-16/MODBUS, response
-// validation, the 0xD2 telemetry decoder, the 0x81 KEY/parameter decoder and
-// the single-owner bus scheduler.
+// validation, the 0xD2 telemetry decoder, the 0x81 KEY/parameter decoder,
+// the single-owner bus scheduler, and the ONE permitted write (KEY logic
+// 0x0120 := 0x005A): its exact frame, acknowledgement validation (as DALY
+// BMSTool V1.14.79 accepts it), preconditions, read-back classification and
+// status tracking.
 //
 // Links the REAL firmware translation unit, not a host-side copy. Synthetic
 // responses are assembled from LITERAL byte positions (the ones recovered
@@ -503,7 +506,7 @@ static void test_scheduler_key_waits_for_active_telemetry() {
   CHECK(r == DalyRequest::TELEMETRY);
   CHECK(bus.requestKeyConfigRead());
   CHECK(!bus.requestKeyConfigRead());  // one outstanding at a time
-  CHECK(bus.keyConfigReadOutstanding());
+  CHECK(bus.operatorTransactionOutstanding());
   CHECK(!bus.startNext(2100, &r));     // telemetry not cancelled or overlapped
   CHECK(bus.inFlight());
   CHECK(bus.inFlightRequest() == DalyRequest::TELEMETRY);
@@ -515,7 +518,7 @@ static void test_scheduler_key_waits_for_active_telemetry() {
   CHECK(!bus.requestKeyConfigRead());  // still outstanding while in flight
   bus.markSent(2508);
   bus.finish(2800);
-  CHECK(!bus.keyConfigReadOutstanding());
+  CHECK(!bus.operatorTransactionOutstanding());
 
   CHECK(!bus.startNext(3999, &r));     // telemetry cadence kept
   CHECK(bus.startNext(4000, &r));
@@ -555,7 +558,7 @@ static void test_scheduler_key_timeout_then_resumes() {
   CHECK(!bus.deadlinePassed(2608));
   CHECK(bus.deadlinePassed(2609));     // 1000 ms KEY deadline
   bus.finish(2609);
-  CHECK(!bus.keyConfigReadOutstanding());
+  CHECK(!bus.operatorTransactionOutstanding());
   CHECK(!bus.startNext(2908, &r));
   CHECK(bus.startNext(2909, &r));
   CHECK(r == DalyRequest::TELEMETRY);
@@ -628,8 +631,316 @@ static void test_scheduler_simulated_bus() {
   CHECK(worst_telemetry_gap <= 2000 + 1008 + 2 * 300 + 1000);
 }
 
+
+// ---------------------------------------------------------------------------
+// The one KEY write: frame, acknowledgement, gate, tracker, scheduling
+// ---------------------------------------------------------------------------
+
+// The expected reply, written out from BMSTool's receive path: address
+// 0x50 + board, function 0x06, register and value echoed, CRC-16/MODBUS.
+static const uint8_t kGoodWriteAck[8] = {0x51, 0x06, 0x01, 0x20, 0x00, 0x5A, 0x05, 0x97};
+
+static void test_write_frame_exact() {
+  g_case = "write_frame_exact";
+  const uint8_t expected[8] = {0x81, 0x06, 0x01, 0x20, 0x00, 0x5A, 0x16, 0x07};
+  CHECK(std::memcmp(kDalyKeyLogicDischargeWrite.bytes, expected, 8) == 0);
+  CHECK(dalyRequestFrame(DalyRequest::KEY_LOGIC_DISCHARGE_WRITE) ==
+        kDalyKeyLogicDischargeWrite.bytes);
+  // The CRC really is crc16Modbus of the six payload bytes, low byte first.
+  CHECK_EQ(crc16Modbus(expected, 6), 0x0716);
+  // And the reply's CRC, for the independently written expected ACK.
+  CHECK_EQ(crc16Modbus(kGoodWriteAck, 6), 0x9705);
+  CHECK_EQ(dalyResponseLen(DalyRequest::KEY_LOGIC_DISCHARGE_WRITE), 8);
+  CHECK_EQ(dalyResponseTimeoutMs(DalyRequest::KEY_LOGIC_DISCHARGE_WRITE), 1000);
+  // Only the reads use the FC03 validator.
+  CHECK_EQ(validateDalyResponse(DalyRequest::KEY_LOGIC_DISCHARGE_WRITE, kGoodWriteAck, 8),
+           DalyCommResult::BAD_HEADER);
+}
+
+static void ackWith(uint8_t* buf, size_t index, uint8_t value) {
+  std::memcpy(buf, kGoodWriteAck, 8);
+  buf[index] = value;
+  appendCrc(buf, 8);
+}
+
+static void test_write_ack_validation() {
+  g_case = "write_ack_validation";
+  uint8_t rx[9];
+  CHECK_EQ(parseDalyKeyLogicWriteAck(kGoodWriteAck, 8), DalyKeyWriteAck::OK);
+
+  std::memcpy(rx, kGoodWriteAck, 8); rx[7] ^= 0x01;              // bad CRC
+  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::CRC_FAIL);
+  std::memcpy(rx, kGoodWriteAck, 8); rx[5] ^= 0x01;              // data changed after CRC
+  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::CRC_FAIL);
+
+  // A raw echo of our own request (address 0x81) is not an acknowledgement.
+  CHECK_EQ(parseDalyKeyLogicWriteAck(kDalyKeyLogicDischargeWrite.bytes, 8),
+           DalyKeyWriteAck::BAD_HEADER);
+  ackWith(rx, 0, 0xD2);  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::BAD_HEADER);
+  ackWith(rx, 0, 0x52);  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::BAD_HEADER);
+  ackWith(rx, 1, 0x03);  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::BAD_HEADER);
+  ackWith(rx, 1, 0x86);  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::BAD_HEADER);
+  ackWith(rx, 1, 0x10);  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::BAD_HEADER);
+
+  // Register / value not echoed exactly (CRC valid).
+  ackWith(rx, 2, 0x00);  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::BAD_ECHO);
+  ackWith(rx, 3, 0x21);  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::BAD_ECHO);
+  ackWith(rx, 3, 0x22);  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::BAD_ECHO);
+  ackWith(rx, 5, 0x55);  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::BAD_ECHO);
+  ackWith(rx, 5, 0xAA);  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::BAD_ECHO);
+  ackWith(rx, 4, 0x01);  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 8), DalyKeyWriteAck::BAD_ECHO);
+
+  // Truncated, silent, oversized, or a Modbus exception (5 bytes).
+  CHECK_EQ(parseDalyKeyLogicWriteAck(kGoodWriteAck, 7), DalyKeyWriteAck::TIMEOUT);
+  CHECK_EQ(parseDalyKeyLogicWriteAck(kGoodWriteAck, 0), DalyKeyWriteAck::TIMEOUT);
+  std::memcpy(rx, kGoodWriteAck, 8); rx[8] = 0;
+  CHECK_EQ(parseDalyKeyLogicWriteAck(rx, 9), DalyKeyWriteAck::TIMEOUT);
+  uint8_t exception[5] = {0x51, 0x86, 0x02, 0, 0};
+  appendCrc(exception, 5);
+  CHECK_EQ(parseDalyKeyLogicWriteAck(exception, 5), DalyKeyWriteAck::TIMEOUT);
+}
+
+// A healthy set of gate inputs that START; each test breaks one thing.
+static DalyKeyWriteInputs goodInputs() {
+  DalyKeyWriteInputs in;
+  in.maintenance_mode = true;
+  in.write_already_attempted = false;
+  in.bus_busy = false;
+  in.telemetry_ok = true;
+  in.telemetry_age_ms = 400;
+  in.alarms_clear = true;
+  in.last_key_read_ok = true;
+  in.snapshot.valid = true;
+  in.snapshot.sampled_at_ms = 100000;
+  in.snapshot.key_logic_raw = 0x0055;
+  in.snapshot.key_logic = DalyKeyLogic::KEY_DISABLED;
+  in.snapshot.charge_mos_control = 1;
+  in.snapshot.discharge_mos_control = 1;
+  in.now_ms = 110000;
+  return in;
+}
+
+static void expectRefused(const DalyKeyWriteInputs& in, DalyKeyWriteRefusal reason) {
+  const DalyKeyWriteGate g = evaluateDalyKeyWrite(in);
+  CHECK(g.decision == DalyKeyWriteDecision::REFUSE);
+  CHECK_EQ(g.refusal, reason);
+}
+
+static void test_write_gate() {
+  g_case = "write_gate";
+  DalyKeyWriteInputs in = goodInputs();
+  DalyKeyWriteGate g = evaluateDalyKeyWrite(in);
+  CHECK(g.decision == DalyKeyWriteDecision::START);
+  CHECK_EQ(g.refusal, DalyKeyWriteRefusal::NONE);
+
+  in = goodInputs(); in.maintenance_mode = false;
+  expectRefused(in, DalyKeyWriteRefusal::NOT_IN_MAINTENANCE_MODE);
+  in = goodInputs(); in.write_already_attempted = true;
+  expectRefused(in, DalyKeyWriteRefusal::WRITE_ALREADY_ATTEMPTED);
+  in = goodInputs(); in.bus_busy = true;
+  expectRefused(in, DalyKeyWriteRefusal::BUS_BUSY);
+  in = goodInputs(); in.telemetry_ok = false;
+  expectRefused(in, DalyKeyWriteRefusal::BMS_COMM_NOT_OK);
+  in = goodInputs(); in.telemetry_age_ms = kDalyKeyWriteMaxTelemetryAgeMs + 1;
+  expectRefused(in, DalyKeyWriteRefusal::BMS_COMM_NOT_OK);
+  in = goodInputs(); in.telemetry_age_ms = kDalyKeyWriteMaxTelemetryAgeMs;
+  CHECK(evaluateDalyKeyWrite(in).decision == DalyKeyWriteDecision::START);
+  in = goodInputs(); in.alarms_clear = false;
+  expectRefused(in, DalyKeyWriteRefusal::BMS_ALARM_ACTIVE);
+  in = goodInputs(); in.snapshot.valid = false;
+  expectRefused(in, DalyKeyWriteRefusal::NO_KEY_SNAPSHOT);
+  in = goodInputs(); in.last_key_read_ok = false;  // an older valid snapshot is not enough
+  expectRefused(in, DalyKeyWriteRefusal::NO_KEY_SNAPSHOT);
+  in = goodInputs(); in.now_ms = in.snapshot.sampled_at_ms + kDalyKeyWriteMaxSnapshotAgeMs + 1;
+  expectRefused(in, DalyKeyWriteRefusal::KEY_SNAPSHOT_STALE);
+  in = goodInputs(); in.now_ms = in.snapshot.sampled_at_ms + kDalyKeyWriteMaxSnapshotAgeMs;
+  CHECK(evaluateDalyKeyWrite(in).decision == DalyKeyWriteDecision::START);
+  CHECK_EQ(kDalyKeyWriteMaxSnapshotAgeMs, 30000);
+
+  // Only 0x0055 may be changed; 0x005A is a no-op; everything else refuses.
+  in = goodInputs(); in.snapshot.key_logic_raw = 0x005A;
+  g = evaluateDalyKeyWrite(in);
+  CHECK(g.decision == DalyKeyWriteDecision::ALREADY_CONFIGURED);
+  const uint16_t others[] = {0x00A5, 0x00AA, 0x00A6, 0x0000, 0x00FF, 0x5500, 0x5A00, 0xFFFF};
+  for (uint16_t raw : others) {
+    in = goodInputs(); in.snapshot.key_logic_raw = raw;
+    expectRefused(in, DalyKeyWriteRefusal::KEY_LOGIC_NOT_DISABLED);
+  }
+
+  in = goodInputs(); in.snapshot.charge_mos_control = 0;
+  expectRefused(in, DalyKeyWriteRefusal::MOS_CONTROL_NOT_ENABLED);
+  in = goodInputs(); in.snapshot.discharge_mos_control = 0;
+  expectRefused(in, DalyKeyWriteRefusal::MOS_CONTROL_NOT_ENABLED);
+  in = goodInputs(); in.snapshot.discharge_mos_control = 2;
+  expectRefused(in, DalyKeyWriteRefusal::MOS_CONTROL_NOT_ENABLED);
+
+  // Evaluation order is deterministic: the first failing check is reported.
+  in = goodInputs(); in.maintenance_mode = false; in.bus_busy = true; in.alarms_clear = false;
+  expectRefused(in, DalyKeyWriteRefusal::NOT_IN_MAINTENANCE_MODE);
+  in = goodInputs(); in.bus_busy = true; in.snapshot.key_logic_raw = 0x005A;
+  expectRefused(in, DalyKeyWriteRefusal::BUS_BUSY);
+}
+
+static void test_readback_classification() {
+  g_case = "readback_classification";
+  CHECK_EQ(classifyDalyKeyReadback(DalyKeyReadResult::OK, 0x005A), DalyKeyReadback::VERIFIED);
+  CHECK_EQ(classifyDalyKeyReadback(DalyKeyReadResult::OK, 0x0055),
+           DalyKeyReadback::PENDING_RESTART);
+  CHECK_EQ(classifyDalyKeyReadback(DalyKeyReadResult::OK, 0x00AA), DalyKeyReadback::MISMATCH);
+  CHECK_EQ(classifyDalyKeyReadback(DalyKeyReadResult::OK, 0x0000), DalyKeyReadback::MISMATCH);
+  CHECK_EQ(classifyDalyKeyReadback(DalyKeyReadResult::TIMEOUT, 0x005A),
+           DalyKeyReadback::READ_FAILED);
+  CHECK_EQ(classifyDalyKeyReadback(DalyKeyReadResult::CRC_FAIL, 0x005A),
+           DalyKeyReadback::READ_FAILED);
+  CHECK_EQ(classifyDalyKeyReadback(DalyKeyReadResult::BAD_HEADER, 0x005A),
+           DalyKeyReadback::READ_FAILED);
+}
+
+static void test_write_tracker() {
+  g_case = "write_tracker";
+  DalyKeyWriteTracker t;
+  CHECK_EQ(t.status().state, DalyKeyWriteState::NOT_REQUESTED);
+  CHECK(!t.status().transmitted);
+
+  t.refuse(DalyKeyWriteRefusal::KEY_SNAPSHOT_STALE);
+  CHECK_EQ(t.status().state, DalyKeyWriteState::REFUSED);
+  CHECK_EQ(t.status().last_refusal, DalyKeyWriteRefusal::KEY_SNAPSHOT_STALE);
+
+  t.accept();
+  CHECK_EQ(t.status().state, DalyKeyWriteState::PENDING);
+  CHECK(t.outstanding());
+  CHECK_EQ(t.status().ack, DalyKeyWriteAck::PENDING);
+  // A second command while pending is refused without clobbering the record.
+  t.refuse(DalyKeyWriteRefusal::BUS_BUSY);
+  CHECK_EQ(t.status().state, DalyKeyWriteState::PENDING);
+  CHECK_EQ(t.status().last_refusal, DalyKeyWriteRefusal::BUS_BUSY);
+
+  t.markTransmitted();
+  t.onAck(DalyKeyWriteAck::OK, 8, 5000);
+  // An acknowledgement alone is not verification.
+  CHECK_EQ(t.status().ack, DalyKeyWriteAck::OK);
+  CHECK_EQ(t.status().readback, DalyKeyReadback::PENDING);
+  CHECK_EQ(t.status().state, DalyKeyWriteState::PENDING);
+
+  t.onReadback(DalyKeyReadResult::OK, 0x005A, 5600);
+  CHECK_EQ(t.status().state, DalyKeyWriteState::COMPLETE);
+  CHECK_EQ(t.status().readback, DalyKeyReadback::VERIFIED);
+  CHECK_EQ(t.status().readback_raw, 0x005A);
+  CHECK(!t.outstanding());
+
+  // Later zero-TX outcomes never overwrite the transmitted write's record.
+  t.refuse(DalyKeyWriteRefusal::WRITE_ALREADY_ATTEMPTED);
+  t.alreadyConfigured();
+  CHECK_EQ(t.status().state, DalyKeyWriteState::COMPLETE);
+  CHECK_EQ(t.status().readback, DalyKeyReadback::VERIFIED);
+  CHECK(t.status().transmitted);
+
+  // Read-back of the old value after an OK acknowledgement is not a pass.
+  DalyKeyWriteTracker u;
+  u.accept(); u.markTransmitted(); u.onAck(DalyKeyWriteAck::OK, 8, 1);
+  u.onReadback(DalyKeyReadResult::OK, 0x0055, 2);
+  CHECK_EQ(u.status().readback, DalyKeyReadback::PENDING_RESTART);
+
+  // A failed acknowledgement is still followed by (and reports) the read-back.
+  DalyKeyWriteTracker v;
+  v.accept(); v.markTransmitted(); v.onAck(DalyKeyWriteAck::TIMEOUT, 0, 1);
+  CHECK_EQ(v.status().readback, DalyKeyReadback::PENDING);
+  v.onReadback(DalyKeyReadResult::OK, 0x005A, 2);
+  CHECK_EQ(v.status().ack, DalyKeyWriteAck::TIMEOUT);
+  CHECK_EQ(v.status().readback, DalyKeyReadback::VERIFIED);
+
+  // A failed read-back carries no value (never the previous snapshot's).
+  DalyKeyWriteTracker x;
+  x.accept(); x.markTransmitted(); x.onAck(DalyKeyWriteAck::OK, 8, 1);
+  x.onReadback(DalyKeyReadResult::TIMEOUT, 0x0055, 2);
+  CHECK_EQ(x.status().readback, DalyKeyReadback::READ_FAILED);
+  CHECK_EQ(x.status().readback_raw, 0);
+  CHECK_EQ(x.status().state, DalyKeyWriteState::COMPLETE);
+
+  // Refused by the last check before transmitting: zero TX, REFUSED.
+  DalyKeyWriteTracker w;
+  w.accept();
+  DalyKeyWriteGate gate;
+  gate.refusal = DalyKeyWriteRefusal::BMS_ALARM_ACTIVE;
+  w.cancelBeforeTransmit(gate);
+  CHECK_EQ(w.status().state, DalyKeyWriteState::REFUSED);
+  CHECK_EQ(w.status().last_refusal, DalyKeyWriteRefusal::BMS_ALARM_ACTIVE);
+  CHECK(!w.status().transmitted);
+  CHECK_EQ(w.status().ack, DalyKeyWriteAck::NONE);
+}
+
+static void test_scheduler_write_and_readback() {
+  g_case = "scheduler_write_and_readback";
+  DalyBusScheduler bus;
+  DalyRequest r = DalyRequest::TELEMETRY;
+  DalyRequest q = DalyRequest::TELEMETRY;
+
+  CHECK(bus.startNext(2000, &r));               // telemetry in flight
+  CHECK(r == DalyRequest::TELEMETRY);
+  CHECK(bus.requestKeyLogicDischargeWrite());   // queued behind it
+  CHECK(bus.queuedOperatorRequest(&q));
+  CHECK(q == DalyRequest::KEY_LOGIC_DISCHARGE_WRITE);
+  CHECK(!bus.requestKeyConfigRead());           // one operator transaction at a time
+  CHECK(!bus.requestKeyLogicDischargeWrite());
+  CHECK(!bus.startNext(2100, &r));              // no overlap with the active poll
+  bus.finish(2150);
+  CHECK(!bus.startNext(2449, &r));              // quiet gap
+  CHECK(bus.startNext(2450, &r));
+  CHECK(r == DalyRequest::KEY_LOGIC_DISCHARGE_WRITE);
+  CHECK(!bus.queuedOperatorRequest(&q));
+  bus.markSent(2458);
+  CHECK(!bus.deadlinePassed(3458));
+  CHECK(bus.deadlinePassed(3459));             // 1000 ms write deadline
+  bus.finish(2500);                            // acknowledged
+
+  CHECK(bus.requestKeyConfigRead());           // the chained read-back
+  CHECK(bus.startNext(2800, &r));
+  CHECK(r == DalyRequest::KEY_CONFIG);
+  bus.finish(3100);
+  CHECK(!bus.operatorTransactionOutstanding());
+  CHECK(!bus.startNext(3999, &r));
+  CHECK(bus.startNext(4000, &r));              // telemetry resumes on its own
+  CHECK(r == DalyRequest::TELEMETRY);
+}
+
+static void test_scheduler_write_timeout_then_resumes() {
+  g_case = "scheduler_write_timeout_then_resumes";
+  DalyBusScheduler bus;
+  DalyRequest r = DalyRequest::TELEMETRY;
+
+  CHECK(bus.startNext(2000, &r));
+  bus.finish(2150);
+  CHECK(bus.requestKeyLogicDischargeWrite());
+  CHECK(bus.startNext(4000, &r));              // due poll deferred for the write
+  CHECK(r == DalyRequest::KEY_LOGIC_DISCHARGE_WRITE);
+  bus.markSent(4008);
+  CHECK(bus.deadlinePassed(5009));
+  bus.finish(5009);                            // timed out
+  CHECK(bus.requestKeyConfigRead());           // read-back still requested
+  CHECK(bus.startNext(5309, &r));
+  CHECK(r == DalyRequest::TELEMETRY);          // but the deferred poll goes first
+  bus.finish(5450);
+  CHECK(bus.startNext(5750, &r));
+  CHECK(r == DalyRequest::KEY_CONFIG);
+  bus.finish(6050);
+  CHECK(bus.startNext(7309, &r));              // cadence re-anchored at 5309
+  CHECK(r == DalyRequest::TELEMETRY);
+}
+
+static void test_scheduler_cancel_queued_write() {
+  g_case = "scheduler_cancel_queued_write";
+  DalyBusScheduler bus;
+  DalyRequest r = DalyRequest::TELEMETRY;
+  CHECK(bus.requestKeyLogicDischargeWrite());
+  bus.cancelQueuedOperatorRequest();            // refused at the last check
+  CHECK(!bus.operatorTransactionOutstanding());
+  CHECK(!bus.startNext(1900, &r));              // nothing goes out
+  CHECK(bus.startNext(2000, &r));
+  CHECK(r == DalyRequest::TELEMETRY);           // only telemetry
+}
+
 int main() {
-  std::printf("MATDOG DALY protocol / KEY probe offline tests\n");
+  std::printf("MATDOG DALY protocol / KEY probe / KEY write offline tests\n");
 
   test_crc16_known_vectors();
   test_request_frames_exact();
@@ -652,6 +963,14 @@ int main() {
   test_scheduler_key_timeout_then_resumes();
   test_scheduler_key_cannot_starve_telemetry();
   test_scheduler_simulated_bus();
+  test_write_frame_exact();
+  test_write_ack_validation();
+  test_write_gate();
+  test_readback_classification();
+  test_write_tracker();
+  test_scheduler_write_and_readback();
+  test_scheduler_write_timeout_then_resumes();
+  test_scheduler_cancel_queued_write();
 
   std::printf("checks_run=%d failures=%d\n", g_checks, g_failures);
   if (g_failures != 0) {

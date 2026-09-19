@@ -1,5 +1,30 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — DALY KEY discharge configuration (guarded write) — 2026-09-19
+
+**Not flashed; never sent to hardware; live validation TO_TEST.**
+
+- **One semantic DALY write:** `@BMS KEY SET DISCHARGE CONFIRM` (MAINTENANCE only, no argument,
+  once per boot) sends FC06 `81 06 01 20 00 5A 16 07` — KEY logic `0x0120 := 0x005A` (DISCHARGE) —
+  the exact frame DALY BMSTool V1.14.79 builds (static IL analysis: address `0x81`, big-endian
+  register/value, CRC-16/MODBUS). The acknowledgement must be the exact echo
+  `51 06 01 20 00 5A 05 97`; an FC03 read-back always follows and only `0x005A` read back is
+  `VERIFIED` (`0x0055` → `PENDING_RESTART`, anything else → `MISMATCH`).
+- **Fail-closed preconditions**, checked on arrival and again just before transmitting: MAINTENANCE,
+  no earlier write this boot, idle bus, fresh `0xD2` telemetry, no alarms, a successful KEY read
+  ≤ 30 s old showing exactly `0x0055` with MOS control `1`/`1`. `0x005A` already →
+  `ALREADY_CONFIGURED`, zero TX. `@BMS KEY WRITE STATUS`: cached, zero TX.
+- `DalyBusScheduler` serves one operator transaction (KEY read or write) at a time; telemetry
+  resumes after success, failure or timeout. Nothing persists on the ESP32.
+- Static audit: `DALY_THE_ONE_WRITE` is the only admitted write; FC10, other registers (MOS control
+  included), values, addresses, a second write, caller-supplied targets and persistence fail. 47/47
+  mutation cases; DALY host suite 365 checks. `DalyProtocol.h` no longer calls the live-verified
+  read map unvalidated.
+- Boot banner now reads `daly_write : KEY_LOGIC_DISCHARGE_ONLY (operator command; no MOS/power-cut
+  write)`.
+- Unchanged: `requestDischargeOff()` (no-op), `@SYSTEM SHUTDOWN` → `POWER_CUT_FAILED`. No restart,
+  no rollback command (rollback `0x0055` documented only).
+
 ## Unreleased — DALY KEY live read-only validation — 2026-09-19
 
 Documentation only; no firmware change. Records the live validation of `a57fcdd`

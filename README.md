@@ -137,11 +137,13 @@ COMPLETE   G2 ROBOT_POWERED software             PASS / FROZEN
 COMPLETE   G3 ROBOT_POWERED no-motion            PASS (formal, 2026-09-18)
 COMPLETE   G3.1 CDC-independent Controller loop  PASS (2026-09-18)
 COMPLETE   DALY KEY research                     COMPLETE (read-only, 2026-09-19)
-COMPLETE   DALY KEY read probe                   LIVE VERIFIED READ-ONLY (2026-09-19)
+COMPLETE   DALY 0x81 read                        LIVE VERIFIED (read-only, 2026-09-19)
                                                  current KEY logic = DISABLED (0x0055)
+COMPLETE   Narrow KEY write (0x0120 := 0x005A)   OFFLINE VALIDATED (never sent to hardware)
 
-BLOCKED    DALY KEY write / configuration        BLOCKED (candidate 0x0120 = 0x005A NOT WRITTEN;
-                                                 needs separate write + physical validation)
+NEXT       DALY KEY write live validation        PENDING (needs its own authorization)
+PENDING    physical KEY behaviour with 0x005A    PENDING
+OPEN       physical KEY safety barrier           NOT VALIDATED (fused disconnect = trusted isolation)
 THEN       G4 Diagnostics / Maintenance          NOT STARTED
 ```
 
@@ -157,9 +159,10 @@ presence: BNO085 acquisition runs at 50.1 Hz with the port closed (G3.1). No com
   or safety barrier. Research (2026-09-19): no public DALY document publishes a K-series KEY
   register; DALY's own BMSTool V1.14.79 (static inspection) points to KEY logic at `0x0120` on a
   second Modbus personality (`0x81`). Live-verified read-only the same day with `@BMS KEY READ`:
-  the unit's KEY logic is **DISABLED (`0x0055`)**, consistent with the G3 finding. The candidate
-  `0x0120 = 0x005A` is not written and not validated; any KEY write stays blocked. The fused
-  disconnect remains the trusted physical isolation method.
+  the unit's KEY logic is **DISABLED (`0x0055`)**, consistent with the G3 finding. A single
+  guarded write (`@BMS KEY SET DISCHARGE CONFIRM`, `0x0120 := 0x005A` with read-back) is
+  implemented and offline-validated but has never been sent; its live validation is pending. The
+  fused disconnect remains the trusted physical isolation method.
 - **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
   19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
   electrical and signal-integrity validation.

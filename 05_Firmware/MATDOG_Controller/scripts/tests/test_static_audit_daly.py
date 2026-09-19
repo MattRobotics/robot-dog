@@ -6,10 +6,13 @@ current firmware sources (must pass), then against single, targeted
 mutations of those sources (each must fail). A rule that a mutation slips
 past is a rule that only looks enforced.
 
-The headline case is the one the DALY KEY probe makes plausible: flipping
-the KEY request's function code from 0x03 (read) to 0x06 (write single
-register) - or supplying a well-formed FC06 frame that would write KEY logic
-0x5A to register 0x0120 - must fail the audit.
+Two headline families:
+  - the read-only probe: flipping the KEY read's function code from 0x03 to
+    0x06, or swapping in a well-formed FC06 frame, must fail;
+  - the ONE permitted write (FC06 0x0120 := 0x005A): changing its function
+    (0x06 -> 0x10), register (0x0120 -> 0x0121/0x0122), value (0x005A ->
+    0x00AA/0x0055), letting a caller supply any of them, adding a second
+    write, or making requestDischargeOff() transmit must fail.
 
 No hardware, no device I/O, no files written. Run directly or via
 static_audit.py (check_daly_audit_mutation_suite).
@@ -83,7 +86,98 @@ KEY_STATUS_FN = "void CommandRouter::printBmsKeyStatus() {"
 KEY_WRITE_FRAME = with_crc(bytes([0x81, 0x06, 0x01, 0x20, 0x00, 0x5A]))
 EXTRA_READ_FRAME = with_crc(bytes([0x81, 0x03, 0x01, 0x20, 0x00, 0x01]))
 
+WRITE_BUILDER = ("constexpr DalyFrame dalyKeyLogicDischargeWriteFrame() {\n"
+                 "  DalyFrame f = {{0x81, 0x06, 0x01, 0x20, 0x00, 0x5A, 0x00, 0x00}};")
+WRITE_CONST = "inline constexpr DalyFrame kDalyKeyLogicDischargeWrite = dalyKeyLogicDischargeWriteFrame();"
+DISCHARGE_OFF = "bool requestDischargeOff() { return false; }"
+SET_GUARD = ('if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {\n'
+             '      Serial.println("BMS_KEY_WRITE=REFUSED reason=NOT_IN_MAINTENANCE_MODE");')
+SET_CALL = "modules_.daly->requestKeyLogicDischarge(modules_.operating_mode->mode());"
+WRITE_STATUS_FN = "void CommandRouter::printBmsKeyWriteStatus() {"
+WRITE_HELP = 'Serial.println("  @BMS KEY WRITE STATUS   (cached write result; no bus transaction)");'
+WRITE_STATUS_BRANCH = '} else if (upper == "@BMS KEY WRITE STATUS") {'
+
+
+def write_payload(old, new):
+    return lambda: mutate("DalyProtocol.h", WRITE_BUILDER,
+                          WRITE_BUILDER.replace(old, new))
+
+
 MUTATIONS = [
+    # ---- the ONE permitted write ------------------------------------------
+    ("WRITE function 0x06 -> 0x10 (FC10)",
+     write_payload("0x81, 0x06, 0x01, 0x20", "0x81, 0x10, 0x01, 0x20")),
+    ("WRITE register 0x0120 -> 0x0121 (charge MOS control)",
+     write_payload("0x01, 0x20, 0x00, 0x5A", "0x01, 0x21, 0x00, 0x5A")),
+    ("WRITE register 0x0120 -> 0x0122 (discharge MOS control)",
+     write_payload("0x01, 0x20, 0x00, 0x5A", "0x01, 0x22, 0x00, 0x5A")),
+    ("WRITE value 0x005A -> 0x00AA",
+     write_payload("0x00, 0x5A, 0x00, 0x00", "0x00, 0xAA, 0x00, 0x00")),
+    ("WRITE value 0x005A -> 0x0055 (an unreviewed rollback)",
+     write_payload("0x00, 0x5A, 0x00, 0x00", "0x00, 0x55, 0x00, 0x00")),
+    ("WRITE address 0x81 -> 0xD2",
+     write_payload("{{0x81, 0x06", "{{0xD2, 0x06")),
+    ("WRITE target supplied by a builder argument",
+     lambda: mutate("DalyProtocol.h", WRITE_BUILDER,
+                    WRITE_BUILDER.replace("dalyKeyLogicDischargeWriteFrame()",
+                                          "dalyKeyLogicDischargeWriteFrame(uint16_t value)")
+                                 .replace("0x00, 0x5A, 0x00, 0x00",
+                                          "0x00, static_cast<uint8_t>(value), 0x00, 0x00"))),
+    ("WRITE value supplied through the DalyBms API",
+     lambda: mutate("DalyBms.h", "DalyKeyWriteGate requestKeyLogicDischarge(core::OperatingMode mode);",
+                    "DalyKeyWriteGate requestKeyLogicDischarge(core::OperatingMode mode, uint16_t raw);")),
+    ("WRITE requested with a constant mode instead of the live one",
+     lambda: mutate("CommandRouter.cpp", SET_CALL,
+                    "modules_.daly->requestKeyLogicDischarge(OperatingMode::MAINTENANCE);")),
+    ("WRITE CRC recipe altered",
+     lambda: mutate("DalyProtocol.h", "crc16Modbus(f.bytes, kDalyRequestLen - 2)",
+                    "crc16Modbus(f.bytes, kDalyRequestLen - 3)")),
+    ("second write frame constant",
+     lambda: mutate("DalyProtocol.h", WRITE_CONST,
+                    WRITE_CONST + "\ninline constexpr DalyFrame kDalyKeyLogicSpare = "
+                                  "dalyKeyLogicDischargeWriteFrame();")),
+    ("second write builder (rollback 0x0055)",
+     lambda: mutate("DalyProtocol.h", WRITE_CONST,
+                    "constexpr DalyFrame dalyKeyLogicRollbackFrame() {\n  DalyFrame f = {{0x81, 0x06, "
+                    "0x01, 0x20, 0x00, 0x55, 0x00, 0x00}};\n  return f;\n}\n" + WRITE_CONST)),
+    ("FC10 frame array added",
+     lambda: mutate("DalyProtocol.h", WRITE_CONST,
+                    WRITE_CONST + "\ninline constexpr uint8_t kDalyMultiWrite[kDalyRequestLen] = "
+                                  "{0x81, 0x10, 0x01, 0x20, 0x00, 0x01, 0x00, 0x00};")),
+    ("write frame sent directly from DalyBms",
+     lambda: mutate("DalyBms.cpp", TRANSMIT,
+                    "bms_uart_.write(kDalyKeyLogicDischargeWrite.bytes, kDalyRequestLen);")),
+    ("selector maps the KEY read to the write frame",
+     lambda: mutate("DalyProtocol.h", "? kDalyKeyConfigRequest",
+                    "? kDalyKeyLogicDischargeWrite.bytes")),
+    ("requestDischargeOff() requests the write",
+     lambda: mutate("DalyBms.h", DISCHARGE_OFF,
+                    "bool requestDischargeOff() { return requestKeyLogicDischarge(core::"
+                    "OperatingMode::MAINTENANCE).decision == DalyKeyWriteDecision::START; }")),
+    ("requestDischargeOff() transmits a frame",
+     lambda: mutate("DalyBms.h", DISCHARGE_OFF,
+                    "bool requestDischargeOff() { bms_uart_.write(dalyRequestFrame(DalyRequest::"
+                    "KEY_LOGIC_DISCHARGE_WRITE), kDalyRequestLen); return false; }")),
+    ("@BMS KEY SET DISCHARGE CONFIRM without the MAINTENANCE gate",
+     lambda: mutate("CommandRouter.cpp", SET_GUARD,
+                    SET_GUARD.replace("modules_.operating_mode->mode() != OperatingMode::MAINTENANCE",
+                                      "false"))),
+    ("shorter SET alias",
+     lambda: mutate("CommandRouter.cpp", WRITE_STATUS_BRANCH,
+                    '} else if (upper == "@BMS KEY SET DISCHARGE") {\n  ' + WRITE_STATUS_BRANCH)),
+    ("@BMS KEY WRITE STATUS starts a transaction",
+     lambda: mutate("CommandRouter.cpp", WRITE_STATUS_FN,
+                    WRITE_STATUS_FN + "\n  " + SET_CALL)),
+    ("generic @BMS WRITE text",
+     lambda: mutate("CommandRouter.cpp", WRITE_HELP,
+                    WRITE_HELP + '\n  Serial.println("  @BMS WRITE <reg> <value>");')),
+    ("DALY write state persisted",
+     lambda: mutate("DalyBms.cpp", TRANSMIT, TRANSMIT + "\n  Preferences prefs;")),
+    ("write requested from the Controller",
+     lambda: mutate("Controller.cpp", "  daly_.update(now_ms);",
+                    "  daly_.update(now_ms);\n  daly_.requestKeyLogicDischarge("
+                    "operating_mode_.mode());")),
+    # ---- the read-only probe and transport ------------------------------------
     ("KEY request function 0x03 -> 0x06",
      lambda: mutate("DalyProtocol.h", KEY_BYTES, "0x81, 0x06, 0x01, 0x00,")),
     ("KEY request function 0x03 -> 0x10",

@@ -168,7 +168,9 @@ bistable pushbutton under the MATDOG logo
 The KEY path itself is **OPEN**: in G3 the physical KEY switch produced no observed DALY state
 change, so it is not yet a validated shutdown or safety barrier. The DALY's KEY configuration is
 read-only observable through `@BMS KEY READ` (`0x81` register map from DALY BMSTool V1.14.79,
-live-verified read-only 2026-09-19: KEY logic **DISABLED**, `0x0055`); no DALY write exists.
+live-verified read-only 2026-09-19: KEY logic **DISABLED**, `0x0055`). The only DALY write is the
+guarded `@BMS KEY SET DISCHARGE CONFIRM` (`0x0120 := 0x005A`, with read-back), offline-validated
+and not yet sent to the BMS.
 
 The Controller cannot be the primary wake source because it is powered downstream of the DALY
 protected domain. The hardware button is the primary ON/OFF/wake interface. Electronics owns the

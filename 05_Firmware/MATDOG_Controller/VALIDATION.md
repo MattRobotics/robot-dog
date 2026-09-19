@@ -2529,3 +2529,172 @@ The candidate MATDOG configuration — `0x0120 = 0x005A` (DISCHARGE: KEY OFF →
 charge MOS kept) — is **not written and not validated**. It needs its own authorized session: a
 reviewed write path, BMSTool's post-write BMS restart, a read-back, and a physical KEY test before
 KEY can be considered any kind of power-off or safety barrier.
+
+---
+
+## DALY KEY DISCHARGE CONFIGURATION — OFFLINE IMPLEMENTATION — 2026-09-19
+
+```text
+DALY 0x81 READ                         = LIVE VERIFIED (read-only, 2026-09-19)
+CURRENT KEY LOGIC                      = DISABLED (0x0055)
+NARROW KEY WRITE (0x0120 := 0x005A)    = IMPLEMENTED, OFFLINE VALIDATED — NOT SENT TO HARDWARE
+KEY WRITE LIVE VALIDATION              = PENDING (procedure below; needs its own authorization)
+PHYSICAL KEY BEHAVIOUR WITH 0x005A     = PENDING
+PHYSICAL KEY SAFETY BARRIER            = NOT VALIDATED — fused disconnect remains trusted isolation
+```
+
+Software-only session. **Zero DALY write frames were sent to any hardware**; the robot and the
+ESP32 were not accessed.
+
+### Write semantics — official DALY BMSTool V1.14.79, static IL analysis (never run)
+
+Source: `bmstool-v1-14-79.zip` (SHA-256 `3dbe47e3…516b0f8e`), `BMSTool.exe` (SHA-256
+`99b84abb…1807e32`), decompiled offline with `dnfile`.
+
+| # | Question | Evidence | Result |
+|---|---|---|---|
+| 1 | Function | `FrmProduct::Btn_0x1820Data_Click` enqueues `setItem0x06{RegAddr=288, u16Val, step=61}`; `SerialUpgrade::ProcessRcvMsg` dequeues it into `SendModbusData_Func0x06`, which writes byte 1 = `6` | **FC06** |
+| 2 | Request address | byte 0 = `Msg_BoardNum (1) + ModbusAddrOffset (0x80)` | **`0x81`** |
+| 3 | Register byte order | byte 2 = `reg >> 8`, byte 3 = `reg & 0xFF` | big-endian **`01 20`** |
+| 4 | Value byte order | byte 4 = `val >> 8`, byte 5 = `val & 0xFF`; DISCHARGE = `0x5A` | big-endian **`00 5A`** |
+| 5 | CRC | `ToModbus`: CRC-16/MODBUS (init `0xFFFF`, poly `0xA001`), low byte first | **`16 07`** (independently recomputed) |
+| 6 | Reply address | `SerialPort_ParseModbusRtu` frames only first bytes in `[uart_resp_head + 1, uart_resp_head + BoardMax]`, `uart_resp_head = 0x50` | **`0x51`** (not `0x81`) |
+| 7 | Reply function | the parser accepts function `3`, `6` or `16`; FC06 is framed as register + 2 data bytes | **`0x06`** |
+| 8 | Echo | `CheckModbusResult0x06`: reply function and register must equal the sent frame; then value equal → success (`wParam 1`), different → failure (`wParam 0`); timeout → `wParam 3` | **register and value echoed** |
+| 9 | Reply length | address, function, register (2), value (2), CRC (2); CRC checked before dispatch | **8 bytes**: `51 06 01 20 00 5A 05 97` |
+| 10 | Restart | every Product-page Set handler (55 of them, generic) first shows *"Please restart the BMS after setting parameter successfully"*; the tool never restarts the BMS itself. Its own restart primitive is the Engineering-page "Reset" button, FC06 `0x00F0 := 1` (and "Sleep", FC06 `0x00F1 := 1`) | restart **recommended**; **not implemented** in MATDOG |
+| 11 | Readable before restart | on a successful ACK `ShowResult` clears the KEY label and the normal `0x0100` block polling repopulates it (CAN mode sends an explicit read) — the tool expects the stored value to be readable; whether the BMS reports the new value before a restart cannot be proven statically | **to be observed live** |
+| 12 | Extra writes | the queue sends exactly one FC06 frame after a 45 ms pause (100 ms over Bluetooth) and resumes polling; nothing else is chained. The RTC auto-sync is an unrelated Parameter-page behaviour | **none** |
+
+Exceptions (function `0x86`) are dropped by the tool's parser and end as a timeout.
+
+### Implementation
+
+- **The one frame.** `dalyKeyLogicDischargeWriteFrame()` — parameterless `constexpr`; literal bytes
+  `81 06 01 20 00 5A`, CRC appended by the existing `crc16Modbus()`; `static_assert`s tie it to the
+  named address/register/value constants. Selected only by
+  `dalyRequestFrame(DalyRequest::KEY_LOGIC_DISCHARGE_WRITE)` and sent through the unchanged single
+  `bms_uart_.write(dalyRequestFrame(request), kDalyRequestLen)`.
+- **Acknowledgement.** `parseDalyKeyLogicWriteAck()`: exactly 8 bytes (`TIMEOUT` otherwise),
+  address `0x51` and function `0x06` (`BAD_HEADER`; a raw echo of the request, `0x81`, is
+  rejected), CRC (`CRC_FAIL`), register and value echoed (`BAD_ECHO`). Stricter than BMSTool,
+  which ignores a reply with a wrong register echo rather than failing it.
+- **Read-back.** Every transmitted write — acknowledged or not — is followed by the FC03 KEY read:
+  `VERIFIED` only for `0x005A`; `PENDING_RESTART` for `0x0055`; `MISMATCH` otherwise;
+  `READ_FAILED` if the read fails. An acknowledgement alone never counts as verified.
+- **Preconditions** (`evaluateDalyKeyWrite`, first failing check reported): MAINTENANCE; no write
+  transmitted yet this boot (**at most one write frame per boot**); no DALY transaction in flight or
+  queued — telemetry included; `0xD2` telemetry OK and ≤ 5 s old; all four alarm words zero; a
+  valid KEY snapshot from a successful most-recent read, ≤ 30 s old; KEY logic exactly `0x0055`
+  (`0x005A` → `ALREADY_CONFIGURED`, zero TX; anything else → refused, nothing migrates); charge and
+  discharge MOS control both `1`. Checked when the command arrives and again at the idle boundary
+  just before transmitting (the mode is checked on arrival).
+- **Scheduling.** `DalyBusScheduler` now serves one *operator* transaction at a time (KEY read or
+  KEY write) plus telemetry; the rest of its invariants are unchanged. The write and its read-back
+  each defer at most one telemetry poll; telemetry resumes on its own after success, failure or
+  timeout (1000 ms).
+- **Power loss.** Nothing persists: the write status is RAM-only and the audit forbids
+  `Preferences`/`nvs_`/`EEPROM` in the DALY module. If the ESP32 loses power after the write, the
+  BMS register is the only state; `@BMS KEY READ` recovers it after reboot, and no second write is
+  ever needed to finish the first. `BMS_KEY_WRITE=ACK …` is printed as soon as the reply is
+  classified, before the read-back, so the evidence reaches the USB host first.
+- **Commands.** `@BMS KEY SET DISCHARGE CONFIRM` (exact text, MAINTENANCE only, passes only the live
+  operating mode) → `BMS_KEY_WRITE=STARTED target=DISCHARGE raw=0x005A` /
+  `BMS_KEY_WRITE=ALREADY_CONFIGURED raw=0x005A tx_bytes=0` / `BMS_KEY_WRITE=REFUSED reason=<…>
+  tx_bytes=0`; then `BMS_KEY_WRITE=ACK result=<…> rx_bytes=<n>` and `BMS_KEY_WRITE=COMPLETE ack=<…>
+  readback=<…>` with the decoded register. `@BMS KEY WRITE STATUS` prints the cached record with
+  zero bus traffic.
+- Boot banner: `daly_write : KEY_LOGIC_DISCHARGE_ONLY (operator command; no MOS/power-cut
+  write)` replaces `NOT_IMPLEMENTED (protocol unverified)`, which is no longer true.
+- Unchanged: `requestDischargeOff()` (no-op, `false`), `@SYSTEM SHUTDOWN` → `POWER_CUT_FAILED`,
+  PowerState, servo, pins, BNO085, LED, network. No rollback command (see below).
+
+### USB CDC burst budget (G3.1) — recomputed
+
+| Burst | Bytes |
+|---|---:|
+| `@HELP` (was 773) | 993 |
+| `BMS_KEY_WRITE=COMPLETE` block, worst | 223 |
+| `BMS_KEY_WRITE=ACK` line, worst | 56 |
+| `@BMS KEY WRITE STATUS`, worst | 220 |
+| **Largest single loop pass** (worst census + write ACK + COMPLETE + IMU + BMS; was 2588) | **2674** |
+
+The ACK and COMPLETE lines normally come ≥ 300 ms apart; they share a pass only on the
+fail-closed branch where the read-back cannot be queued. The 3072-byte ring still covers it; the
+audit floor stays 3072.
+
+### Offline acceptance
+
+| Gate | Result |
+|---|---|
+| Static safety audit | **PASS** — 32 source files, 0 findings |
+| DALY audit mutation suite | **PASS 47/47** — new: WRITE function `0x06→0x10`, register `0x0120→0x0121` and `→0x0122`, value `0x005A→0x00AA` and `→0x0055`, address `0x81→0xD2`, target supplied by a builder argument, value supplied through the DalyBms API, constant instead of live mode, CRC recipe altered, second write constant, second write builder, FC10 frame array, frame sent directly from DalyBms, selector remapped, `requestDischargeOff()` requesting the write or transmitting, SET without the MAINTENANCE gate, a shorter SET alias, WRITE STATUS transacting, generic `@BMS WRITE` text, persistence, a write request from the Controller; plus the 24 read-probe/transport cases |
+| DALY protocol host tests | **PASS** — 365 checks / 0 failures; production mutation check **21/21 killed** (echo, reply address, CRC, length, every gate condition, already-configured, ACK-as-verified, old-value-as-verified, failed read-back, refusal clobbering a pending write, write alongside a read, write timeout, frame value, selector) |
+| Servo population / profile host tests | **PASS** — 313 checks / 0 failures |
+| Build manifest provenance tests | **PASS** — 51/51 |
+| OTA partition logic suite | **PASS** — 40/40 |
+| BNO085 viewer `npm run verify` | **PASS** — 59/59 tests, typecheck, production build |
+| Compile, `USB_ONLY` (pinned FQBN) | **PASS** — 392436 bytes flash, 28536 bytes static RAM |
+| Compile, `ROBOT_POWERED` (pinned FQBN) | **PASS** — 392904 bytes flash, 28536 bytes static RAM |
+
+Versus the read-probe image: +3144 bytes flash, +32 bytes static RAM. Only the pre-existing
+third-party SCServo warnings appear. The clean post-commit build is recorded in the session report.
+
+### Live write procedure — TO_TEST (never executed; needs its own explicit authorization)
+
+**Hardware and people**
+
+1. Operator physically present for the whole session.
+2. Fused disconnect immediately accessible; it is the fallback throughout.
+3. Robot mechanically safe: suspended or resting with legs free; nothing may fall or move if the
+   servo rail drops. No servo commands in this session.
+4. **Physical KEY in an explicitly chosen, recorded starting position: the normal ON position**
+   used in G3 and in the read-only validation. Under DISCHARGE logic, ON is expected to keep the
+   discharge MOS on, so the write itself should not change power; if the BMS's KEY polarity is the
+   opposite, the protected domain may drop as soon as the new logic takes effect.
+5. **Decide beforehand how the ESP32 is powered if the protected domain drops.** Its 5 V
+   step-down is on that domain, so with KEY OFF (or an inverted KEY) the ESP32 survives only on
+   USB 5 V, if the board's power path allows it. A ROBOT_POWERED image must not *boot* with the
+   rail removed, and `LedRing` drives GPIO47 under ROBOT_POWERED (anti-back-power). If a USB-only
+   brown-out or reboot is possible, observe the KEY OFF step through the DALY app instead, or
+   accept loss of the USB observation path — do not let the ESP32 reboot into ROBOT_POWERED with
+   the rail off.
+6. USB connected with the no-reset method as the independent observation path.
+7. Clean build of the write commit (`MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh`, manifest
+   `CLEAN`), `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`, passive first-boot
+   capture (expect `daly_write : KEY_LOGIC_DISCHARGE_ONLY …` and no DALY write at boot).
+
+**Sequence (one persistent session)**
+
+8. `@MODE STATUS` (`MAINTENANCE`), `@STATUS`, `@BMS STATUS`: DALY `REQUIRED/PASS`, `comm=OK`,
+   alarms `0000 0000 0000 0000`; record `charge_mos` / `discharge_mos`.
+9. `@BMS KEY READ`: require `result=OK key_logic_raw=0x0055 key_logic=DISABLED`,
+   `charge_mos_control=1`, `discharge_mos_control=1`.
+10. Within 30 s, **exactly one** `@BMS KEY SET DISCHARGE CONFIRM`. Expect
+    `BMS_KEY_WRITE=STARTED target=DISCHARGE raw=0x005A`. A `REFUSED` reply transmitted nothing:
+    after `BUS_BUSY` or `KEY_SNAPSHOT_STALE`, repeat step 9 and the command once; any other reason
+    → STOP.
+11. Capture `BMS_KEY_WRITE=ACK result=OK rx_bytes=8` (the BMS reply `51 06 01 20 00 5A 05 97`).
+    Anything else → STOP; the firmware refuses a second write this boot.
+12. Capture `BMS_KEY_WRITE=COMPLETE ack=OK readback=…`:
+    - `VERIFIED` (`0x005A`) → continue;
+    - `PENDING_RESTART` (`0x0055`) → **STOP**; restart or power-cycle of the BMS only with explicit
+      operator approval, as a separate step (MATDOG implements no restart);
+    - `MISMATCH` or `READ_FAILED` → **STOP**.
+13. `@BMS KEY WRITE STATUS`, `@BMS KEY STATUS`, `@BMS STATUS`: telemetry `comm=OK` (resumed), MOS
+    states with the KEY still ON.
+14. Only after `VERIFIED`: controlled physical KEY test. KEY OFF → expect `discharge_mos=OFF`,
+    `charge_mos=ON`, protected load domain off (servo rail / step-down measured by the operator),
+    battery still chargeable.
+15. KEY ON → expect `discharge_mos=ON` and robot power back normally; capture the ESP32's boot or
+    continuity (`runtime_resets`, `reset_reason`).
+16. Charging with KEY OFF tested separately if needed (charger connected: `charge_mos=ON`, positive
+    current).
+17. Any unexpected power behaviour → open the fused disconnect.
+
+**Rollback candidate — documented, NOT implemented.** `0x0120 := 0x0055` (DISABLED): request
+`81 06 01 20 00 55 56 03`, expected reply `51 06 01 20 00 55 45 93`. If the live gate needs it, it
+must be added as its own reviewed semantic operation with its own audit whitelist entry — never a
+generic writer. The plausible bad outcomes of the DISCHARGE setting are no effect (the KEY stays
+wake-only, as today) or the load domain switching off (fail-safe); DALY's own BMSTool or app can
+restore `0x0055` meanwhile.

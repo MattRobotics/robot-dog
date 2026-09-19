@@ -19,8 +19,10 @@ namespace core {
 // Small, explicit, safe USB CDC diagnostic command surface.
 // See handoff section 22. Deliberately does NOT expose: arbitrary EEPROM
 // write, ID recode, factory reset, CalibrationOfs, broadcast write,
-// unrestricted GoalPosition, or any DALY write. The DALY KEY probe is two
-// fixed commands with no arguments: no register, address or value input.
+// unrestricted GoalPosition, or any DALY write other than the ONE semantic
+// KEY configuration (@BMS KEY SET DISCHARGE CONFIRM: 0x0120 := 0x005A). The
+// DALY KEY commands are fixed strings with no arguments: no register,
+// address or value input.
 class CommandRouter {
  public:
   struct Modules {
@@ -46,6 +48,8 @@ class CommandRouter {
   void printBmsKeyReadResult();
   void printBmsKeyStatus();
   static void printBmsKeySnapshot(const power::DalyKeyConfigSnapshot& k);
+  void printBmsKeyWriteResult();
+  void printBmsKeyWriteStatus();
   void printLedStatus();
   void printServoScanResult();
   // Pure presentation of servo_census->result(). Computes nothing: the
@@ -62,6 +66,8 @@ class CommandRouter {
   bool bms_stream_enabled_ = false;
   uint32_t last_bms_stream_ms_ = 0;
   bool bms_key_read_result_pending_ = false;
+  bool bms_key_write_pending_ = false;
+  bool bms_key_write_ack_reported_ = false;
   bool servo_scan_result_pending_ = false;
   bool servo_census_result_pending_ = false;
 

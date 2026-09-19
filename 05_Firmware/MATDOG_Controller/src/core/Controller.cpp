@@ -128,7 +128,7 @@ void Controller::printBootBanner() {
   Serial.println("startup_motion   : DISABLED");
   Serial.println("startup_torque   : DISABLED");
   Serial.println("startup_servo_scan : DISABLED");
-  Serial.println("daly_write       : NOT_IMPLEMENTED (protocol unverified)");
+  Serial.println("daly_write       : KEY_LOGIC_DISCHARGE_ONLY (operator command; no MOS/power-cut write)");
   Serial.printf("operating_mode   : %s\n", toString(operating_mode_.mode()));
   Serial.println();
 }

@@ -137,7 +137,10 @@ links them; `DalyBms` keeps the UART. The second read frame there,
 `81 03 01 00 00 78 5B D4`, and the `0x0115`/`0x0120`/`0x0121`/`0x0122` decode come from static
 inspection of DALY's official BMSTool V1.14.79 (downloaded from dalybms.com, never run), not
 from a MATDOG bench source; the read was live-verified on MATDOG's unit on 2026-09-19 (see
-`VALIDATION.md`).
+`VALIDATION.md`). The one write frame, FC06 `81 06 01 20 00 5A` + CRC, reproduces BMSTool's own
+KEY-logic Set path (`FrmProduct::Btn_0x1820Data_Click` → `SendModbusData_Func0x06`), and its
+acknowledgement check reproduces `SerialPort_ParseModbusRtu` + `CheckModbusResult0x06`; it has
+not been sent to the BMS.
 
 ### LedRing (`src/status/LedRing.{h,cpp}`)
 
