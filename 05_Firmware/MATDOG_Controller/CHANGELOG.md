@@ -1,5 +1,19 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — DALY KEY live read-only validation — 2026-09-19
+
+Documentation only; no firmware change. Records the live validation of `a57fcdd`
+(ROBOT_POWERED, application-only flash, byte-identical clean rebuild, SHA-256 `7c0d5d35…c6ba`).
+
+- **DALY 0x81 read personality — PASS:** one `@BMS KEY READ` returned a CRC-valid 245-byte reply.
+- **Current KEY logic: DISABLED (`0x0055`)** — explains why the physical KEY did not switch the
+  discharge MOS in G3. Charge/discharge MOS control `1`/`1`; sleep time 360 → 3600 s (the manual's
+  default).
+- **Telemetry resumption — PASS:** `0xD2` `comm=OK` after the probe; `runtime_resets` 0 throughout.
+- Candidate `0x0120 = 0x005A` **not written, not validated**; DALY configuration write still
+  **BLOCKED**; the physical KEY is still **not** a validated safety barrier.
+- No DALY write, KEY toggle, MOS command, servo command or motion.
+
 ## Unreleased — DALY KEY read-only probe — 2026-09-19
 
 **Not flashed; live validation TO_TEST.** No DALY write, KEY toggle or power-state change.

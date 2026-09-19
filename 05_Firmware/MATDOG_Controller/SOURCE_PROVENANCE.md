@@ -136,7 +136,8 @@ unchanged into the Arduino-free `src/power/DalyProtocol.{h,cpp}` so the offline 
 links them; `DalyBms` keeps the UART. The second read frame there,
 `81 03 01 00 00 78 5B D4`, and the `0x0115`/`0x0120`/`0x0121`/`0x0122` decode come from static
 inspection of DALY's official BMSTool V1.14.79 (downloaded from dalybms.com, never run), not
-from a MATDOG bench source, and are not yet live-validated (see `VALIDATION.md`).
+from a MATDOG bench source; the read was live-verified on MATDOG's unit on 2026-09-19 (see
+`VALIDATION.md`).
 
 ### LedRing (`src/status/LedRing.{h,cpp}`)
 

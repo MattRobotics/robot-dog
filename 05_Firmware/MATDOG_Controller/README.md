@@ -259,8 +259,8 @@ protocol has not been identified or bench-verified (see `VALIDATION.md` and hand
 section 8A.8). No command in this surface can write servo EEPROM, recode an ID, save
 the BNO085 DCD, or write DALY configuration/MOS state.
 
-`@BMS KEY READ` is the read-only DALY KEY probe (implemented 2026-09-19, **live validation
-pending**). It queues one FC03 read of the DALY's second Modbus personality —
+`@BMS KEY READ` is the read-only DALY KEY probe (implemented and **live-verified read-only**
+2026-09-19; see `VALIDATION.md`). It queues one FC03 read of the DALY's second Modbus personality —
 `81 03 01 00 00 78 5B D4`, byte-identical to the parameter-block read in DALY's official BMSTool
 V1.14.79 — replies `BMS_KEY_READ=STARTED` (or `BUSY` while one is outstanding, `BLOCKED` outside
 `MAINTENANCE`), and reports asynchronously:
@@ -274,8 +274,8 @@ BMS_KEY_READ=COMPLETE result=OK
 ```
 
 or `BMS_KEY_READ=COMPLETE result=TIMEOUT|CRC_FAIL|BAD_HEADER rx_bytes=<n>`. The reply must be
-exactly 245 bytes, `51 03 F0`, CRC-valid. Decoded registers (BMSTool static analysis, not yet
-live-validated): `0x0120` KEY logic (`0x55` DISABLED, `0xA5` DISCHARGE_AND_SLEEP, `0x5A`
+exactly 245 bytes, `51 03 F0`, CRC-valid. Decoded registers (BMSTool static analysis; the read
+was live-verified on MATDOG's unit, which reports KEY logic DISABLED `0x0055` and sleep time 3600 s): `0x0120` KEY logic (`0x55` DISABLED, `0xA5` DISCHARGE_AND_SLEEP, `0x5A`
 DISCHARGE, `0xAA` CHARGE_AND_DISCHARGE, `0xA6` CHARGE_DISCHARGE_AND_SLEEP, anything else
 UNKNOWN), `0x0121`/`0x0122` charge/discharge MOS control, `0x0115` sleep time (raw × 10 s as
 BMSTool displays it). One transaction owner (`DalyBusScheduler`) starts both this read and
@@ -512,7 +512,8 @@ therefore hardware-first, and firmware cannot be the primary wake controller bec
 downstream of the DALY-protected supply it would need to enable. The KEY function itself is
 **OPEN**: in G3 the physical KEY switch produced no observed DALY state change, so it is not a
 validated shutdown or safety barrier; the fused disconnect is. The DALY's KEY configuration can be
-read (not written) with `@BMS KEY READ`, pending live validation; see `DEVELOPMENT_GATES.md`.
+read (not written) with `@BMS KEY READ` — live 2026-09-19: DISABLED (`0x0055`); see
+`DEVELOPMENT_GATES.md`.
 
 ## Bench test profile
 

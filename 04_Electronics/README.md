@@ -61,7 +61,7 @@ Lean by design. Each item below is a deliberate decision, not an omission.
 | **Seeed Bus Servo Driver** for the servo-bus electrical layer | selected |
 | **No CAN transceiver** | decided — not part of the current architecture |
 | **ESP32-S3 power**: DALY-protected B+/P− domain → 5 V step-down | **DECIDED**; validated no-motion in ROBOT_POWERED (G3, 2026-09-18) |
-| **Primary hardware ON/OFF/wake**: bistable pushbutton under the robot logo → DALY `KEY` directly | **DECIDED**; no ESP32 GPIO required. Function **OPEN** — in G3 the KEY switch produced no observed DALY state change; not a validated shutdown/safety barrier. KEY configuration readable via the read-only `@BMS KEY READ` probe (implemented 2026-09-19, live validation pending); no DALY write exists |
+| **Primary hardware ON/OFF/wake**: bistable pushbutton under the robot logo → DALY `KEY` directly | **DECIDED**; no ESP32 GPIO required. Function **OPEN** — in G3 the KEY switch produced no observed DALY state change; not a validated shutdown/safety barrier. KEY configuration read live 2026-09-19 via the read-only `@BMS KEY READ` probe: KEY logic **DISABLED** (`0x0055`), which explains the G3 finding; no DALY write exists |
 | **One removable, externally accessible ATO main fuse** | decided — rating **TBD** |
 | **Custom motor power busbar** | decided — dimensions and material **TBD** |
 | **Locking 3D-printed cable housings** | decided |

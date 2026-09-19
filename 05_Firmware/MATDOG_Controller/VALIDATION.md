@@ -2393,6 +2393,8 @@ Versus G3.1: +2104 bytes flash, +160 bytes static RAM (mostly the receive buffer
 
 ### Live validation — TO_TEST (read-only; needs a clean build, flash and separate authorization)
 
+> Executed 2026-09-19 — results in § DALY KEY live read-only validation below.
+
 1. Power the robot normally; connect USB (no-reset method). `@STATUS`, `@MODE STATUS`
    (MAINTENANCE is the boot default), `@BMS STATUS` — telemetry must be `comm=OK`.
 2. `@BMS KEY READ` once; capture the complete asynchronous result. `@BMS KEY STATUS`.
@@ -2409,3 +2411,121 @@ Decision:
 - `result=OK key_logic=UNKNOWN` — stop; the register map does not match this unit.
 - `result=TIMEOUT rx_bytes=0` (no `0x81` reply) or any other failure — **do not escalate to
   writes**; the personality is unconfirmed on this port.
+
+---
+
+## DALY KEY — LIVE READ-ONLY VALIDATION — 2026-09-19
+
+```text
+DALY 0x81 READ PERSONALITY        = PASS  (live verified, read-only)
+DALY KEY READ PROBE               = PASS  (one transaction, result=OK)
+TELEMETRY RESUMPTION              = PASS  (0xD2 comm=OK after the probe)
+CURRENT KEY LOGIC (0x0120)        = DISABLED (0x0055)
+CANDIDATE DISCHARGE LOGIC 0x005A  = NOT WRITTEN / NOT VALIDATED
+DALY CONFIGURATION WRITE          = BLOCKED
+PHYSICAL KEY SAFETY BARRIER       = STILL NOT VALIDATED — fused disconnect remains trusted isolation
+```
+
+Operator present and authorizing. Robot battery connected, fused disconnect closed, protected
+domain, ESP32 step-down and servo rail powered, DALY connected, physical KEY in its normal ON
+position (not toggled). The ASUS had no internet route during the session, so `origin` could not be
+re-queried live; local branch/HEAD and the remote-tracking refs recorded at push time matched
+(`a57fcdd`, `origin/main` `dd5746c`).
+
+### Source and flash
+
+| Step | Result |
+|---|---|
+| Source | branch `feat/daly-key-readonly-probe`, `a57fcddd29ac9bc7574520c86af57e183f43ae89`, clean tree |
+| Static audit | **PASS** (32 files) |
+| Clean rebuild, `MATDOG_PROFILE=ROBOT_POWERED` | manifest `SOURCE_STATE=CLEAN`, `BUILD_ID=a57fcddd29ac`, `HARDWARE_PROFILE=ROBOT_POWERED`, canonical FQBN; **byte-identical** to the earlier clean build: 389888 bytes, SHA-256 `7c0d5d35524177045ffc17ec890b131860b9ccf15c3d574ea9c500a4ebc4c6ba` |
+| Pre-flash state (previous firmware `e2fc605`) | `@STATUS` / `@BMS STATUS`: ROBOT_POWERED, MAINTENANCE, DALY ONLINE `comm=OK`, 11.0 V, SOC 38.5 %, MOS ON/ON, alarms none, `runtime_resets=0` |
+| `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh` | **`APPLICATION_ONLY_FLASH = PASS`** — backup, MAC `14:c1:9f:22:75:94`, static audit, clean manifest, FQBN, profile, rollback ENABLED / anti-rollback DISABLED, partition `app0 @ 0x010000`, size fits (389888 ≤ 3145728), one write, esptool hash verified, independent `verify-flash` digest matched |
+
+### First boot (passive, zero bytes sent)
+
+Complete banner: `MATDOG Controller 0.1.0`, `build a57fcddd29ac`, `ROBOT_POWERED (servo_power=YES
+battery=YES led_rail=YES)`, `partition app0 @ 0x010000`, `reset_reason OTHER` (the USB-JTAG RTS
+reset), `startup_motion` / `startup_torque` / `startup_servo_scan : DISABLED`, `daly_write :
+NOT_IMPLEMENTED`, `operating_mode MAINTENANCE`, `IMU_INIT=PASS`, `SYSTEM_BOOT_COMPLETE
+health=BOOTING power_state=RUN`, `runtime_resets=0`. No brownout, panic, watchdog or FAULT.
+
+### Pre-probe baseline (one persistent no-reset session, 2.5 s drain first)
+
+```text
+MODE=MAINTENANCE
+SYSTEM health=BOOTING power_state=RUN mode=MAINTENANCE uptime_ms=69553 profile=ROBOT_POWERED
+DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS
+  comm=OK age_ms=1782
+  pack_v=11.0 current_a=-0.1 soc=38.4% cells=3
+  cell_max_mv=3676 cell_min_mv=3665 delta_mv=11
+  charge_mos=ON discharge_mos=ON state=STATIONARY alarms=0000 0000 0000 0000
+BMS_KEY_STATUS last_read=NOT_REQUESTED
+  snapshot=NOT_READ key_logic=UNKNOWN
+```
+
+`health=BOOTING` is the by-design state before any servo probe (no census was run). A scripted
+fail-closed gate (MAINTENANCE, DALY REQUIRED/PASS, `comm=OK`, plausible 3-cell pack, no alarms,
+KEY cache `NOT_REQUESTED`/`NOT_READ`, ROBOT_POWERED) passed before the probe was sent.
+
+### The single KEY read
+
+`@BMS KEY READ` sent exactly once (no retry); complete result 0.36 s later:
+
+```text
+BMS_KEY_READ=STARTED
+BMS_KEY_READ=COMPLETE result=OK
+  key_logic_raw=0x0055 key_logic=DISABLED
+  charge_mos_control=1
+  discharge_mos_control=1
+  sleep_time_raw=360 sleep_time_s=3600
+```
+
+Then `@BMS KEY STATUS` (cache only):
+
+```text
+BMS_KEY_STATUS last_read=OK age_ms=3782 rx_bytes=245
+  snapshot=VALID age_ms=3782
+  key_logic_raw=0x0055 key_logic=DISABLED
+  charge_mos_control=1
+  discharge_mos_control=1
+  sleep_time_raw=360 sleep_time_s=3600
+```
+
+- The reply passed every check: 245 bytes, reply address `0x51`, function `0x03`, byte count
+  `0xF0`, CRC-16/MODBUS — the `0x81` personality exists on this unit's RS485 port.
+- `0x0055` decodes to DISABLED (BMSTool's "失能"): the KEY is not configured to switch any MOS,
+  consistent with G3, where both KEY positions left `discharge_mos=ON`.
+- Independent corroboration of the map: `0x0115 = 360` → 3600 s equals the manual's documented
+  3600 s default sleep time; `0x0121`/`0x0122 = 1` match the phone app's "Charge switch ON" /
+  "Discharge switch ON" (consistent with, not proof of, that app mapping).
+- The cached status matches the asynchronous result; its age is consistent with no new transaction.
+
+### Post-probe health
+
+```text
+DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS
+  comm=OK age_ms=395
+  pack_v=11.0 current_a=-0.1 soc=38.4% cells=3
+  cell_max_mv=3676 cell_min_mv=3665 delta_mv=11
+  charge_mos=ON discharge_mos=ON state=STATIONARY alarms=0000 0000 0000 0000
+SYSTEM health=BOOTING power_state=RUN mode=MAINTENANCE uptime_ms=81223 profile=ROBOT_POWERED
+```
+
+`age_ms=395` is a fresh `0xD2` sample taken after the KEY read — telemetry resumed on its own.
+`runtime_resets` 0 before and after; heap unchanged (331224 / 325924); every availability line
+identical to the baseline. Anomaly scan of the full raw capture (18828 bytes): no brownout, panic,
+watchdog, FAULT, `UNKNOWN_COMMAND` or servo command output.
+
+Commands sent this session: `@STATUS` and `@BMS STATUS` to the previous firmware before the flash;
+after it `@MODE STATUS`, `@STATUS` ×2, `@BMS STATUS` ×2, `@BMS KEY STATUS` ×2, and `@BMS KEY
+READ` ×1. **No DALY write, no KEY toggle, no MOS command, no `@SYSTEM SHUTDOWN`, no servo command,
+no mode change, no motion.**
+
+### Interpretation
+
+The G3 KEY finding is explained by configuration, not wiring: the BMS reports KEY logic DISABLED.
+The candidate MATDOG configuration — `0x0120 = 0x005A` (DISCHARGE: KEY OFF → discharge MOS OFF,
+charge MOS kept) — is **not written and not validated**. It needs its own authorized session: a
+reviewed write path, BMSTool's post-write BMS restart, a read-back, and a physical KEY test before
+KEY can be considered any kind of power-off or safety barrier.
