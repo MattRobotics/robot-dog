@@ -1032,6 +1032,46 @@ static void test_pre_transmit_mode_recheck() {
   }
 }
 
+// The BMS is now commissioned (0x0120 = 0x005A, live 2026-09-19). The write
+// command is retained for a replaced or factory-reset BMS, so prove it can
+// no longer transmit anything in the configured state.
+static void test_post_commissioning_state_cannot_write() {
+  g_case = "post_commissioning_state_cannot_write";
+  DalyRequest r = DalyRequest::TELEMETRY;
+
+  DalyKeyWriteInputs live = goodInputs();
+  live.snapshot.key_logic_raw = 0x005A;               // what the unit reads today
+  live.snapshot.key_logic = DalyKeyLogic::DISCHARGE;
+  const DalyKeyWriteGate gate = evaluateDalyKeyWrite(live);
+  CHECK(gate.decision == DalyKeyWriteDecision::ALREADY_CONFIGURED);
+  CHECK(gate.decision != DalyKeyWriteDecision::START);
+
+  // Accepted while still 0x0055, but the register reads 0x005A by the time
+  // the bus is idle: the queued write is dropped with zero bytes sent.
+  DalyBusScheduler bus;
+  DalyKeyWriteTracker t;
+  CHECK(bus.requestKeyLogicDischargeWrite());
+  t.accept();
+  CHECK(!dalyKeyWritePreTransmitCheck(&bus, &t, live));
+  CHECK_EQ(t.status().state, DalyKeyWriteState::ALREADY_CONFIGURED);
+  CHECK(!t.status().transmitted);
+  CHECK(!bus.operatorTransactionOutstanding());
+  CHECK(bus.startNext(2000, &r));
+  CHECK(r == DalyRequest::TELEMETRY);                 // only telemetry ever follows
+
+  // Only 0x0055 may ever start a write - every other recognized value, and
+  // every unknown one, refuses.
+  const uint16_t never[] = {0x005A, 0x00A5, 0x00AA, 0x00A6, 0x0000, 0x00FF, 0xFFFF, 0x5500};
+  for (uint16_t raw : never) {
+    DalyKeyWriteInputs in = goodInputs();
+    in.snapshot.key_logic_raw = raw;
+    CHECK(evaluateDalyKeyWrite(in).decision != DalyKeyWriteDecision::START);
+  }
+  DalyKeyWriteInputs disabled = goodInputs();
+  disabled.snapshot.key_logic_raw = 0x0055;
+  CHECK(evaluateDalyKeyWrite(disabled).decision == DalyKeyWriteDecision::START);
+}
+
 int main() {
   std::printf("MATDOG DALY protocol / KEY probe / KEY write offline tests\n");
 
@@ -1065,6 +1105,7 @@ int main() {
   test_scheduler_write_timeout_then_resumes();
   test_scheduler_cancel_queued_write();
   test_pre_transmit_mode_recheck();
+  test_post_commissioning_state_cannot_write();
 
   std::printf("checks_run=%d failures=%d\n", g_checks, g_failures);
   if (g_failures != 0) {
