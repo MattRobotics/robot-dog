@@ -127,9 +127,14 @@ send/accumulate/timeout state machine bounded by the same 750 ms deadline, calle
 every controller loop iteration instead of blocking one call.
 
 `requestDischargeOff()` is present only as a fail-closed placeholder that transmits
-nothing and always returns `false`, per handoff 8A.8 — the K-Series write protocol has
-not been identified or bench-verified. `scripts/static_audit.py` asserts this method's
-body has not been changed to something that transmits.
+nothing and always returns `false`, and `scripts/static_audit.py` asserts its body has not
+been changed to something that transmits. The rationale is no longer "the protocol is
+unknown": the KEY configuration write `0x0120 := 0x005A` is identified and live-verified
+(2026-09-19). Direct runtime MOS control is a separate thing and is deliberately **not**
+implemented or authorized — the frozen power architecture keeps the charge MOS normally ON
+and gives the KEY the discharge MOS only, so writes to `0x0121`/`0x0122` stay forbidden by
+the static audit. `@SYSTEM SHUTDOWN` therefore still resolves to `POWER_CUT_FAILED`; an
+autonomous power cut would need its own designed and validated phase.
 
 DALY KEY probe (2026-09-19): the query bytes, CRC and the probe-V2 register decode moved
 unchanged into the Arduino-free `src/power/DalyProtocol.{h,cpp}` so the offline host suite

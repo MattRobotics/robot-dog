@@ -1,6 +1,6 @@
 # MATDOG Architecture
 
-**Canonical architecture decisions as of 2026-09-18.**
+**Canonical architecture decisions as of 2026-09-20.**
 
 This document owns system contracts and target direction. It does not own the changing physical
 population or next milestone; those live in the [root project snapshot](../../README.md). The
@@ -204,8 +204,14 @@ detailed implementation record and validation state.
 
 ### OPEN
 
-- DALY `KEY` function — not a validated shutdown or safety barrier; the fused disconnect is the
-  trusted isolation method until the KEY investigation. Next steps are owned by the
+- DALY `KEY` **as a robot power-off** — **OPEN / BLOCKED.** The BMS-side investigation is
+  **COMPLETE**: KEY configuration read and write are both live-verified, and the current verified
+  KEY logic is **`0x005A` DISCHARGE** (2026-09-19), so the BMS switches the discharge MOS from the
+  KEY. What is still unproven is the *rail* behaviour: the first physical KEY test was
+  inconclusive because of a hardware `B-`/`P-` bypass (TECNOIOT `VIN-` on raw `B-`). The next gate
+  is the operator rewire `TECNOIOT VIN-` `B-` → `P-` plus the post-rewire validation in
+  [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
+  The fused disconnect remains the trusted isolation method meanwhile. Next steps are owned by the
   [root snapshot](../../README.md#where-we-are-and-the-next-gate).
 
 ## Embedded MATDOG Web UI / Control & Service Dashboard

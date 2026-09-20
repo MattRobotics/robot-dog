@@ -275,7 +275,8 @@ semantic KEY setting below.
 2026-09-19; see `VALIDATION.md`). It queues one FC03 read of the DALY's second Modbus personality —
 `81 03 01 00 00 78 5B D4`, byte-identical to the parameter-block read in DALY's official BMSTool
 V1.14.79 — replies `BMS_KEY_READ=STARTED` (or `BUSY` while one is outstanding, `BLOCKED` outside
-`MAINTENANCE`), and reports asynchronously:
+`MAINTENANCE`), and reports asynchronously — the block below is the **pre-commissioning** live
+example captured on 2026-09-19, *before* the single configuration write:
 
 ```text
 BMS_KEY_READ=COMPLETE result=OK
@@ -286,8 +287,14 @@ BMS_KEY_READ=COMPLETE result=OK
 ```
 
 or `BMS_KEY_READ=COMPLETE result=TIMEOUT|CRC_FAIL|BAD_HEADER rx_bytes=<n>`. The reply must be
-exactly 245 bytes, `51 03 F0`, CRC-valid. Decoded registers (BMSTool static analysis; the read
-was live-verified on MATDOG's unit, which reports KEY logic DISABLED `0x0055` and sleep time 3600 s): `0x0120` KEY logic (`0x55` DISABLED, `0xA5` DISCHARGE_AND_SLEEP, `0x5A`
+exactly 245 bytes, `51 03 F0`, CRC-valid.
+
+After the single verified commissioning write, the **current last verified value is `0x005A`
+DISCHARGE**, so a new read on this unit should normally report `0x005A` unless the BMS was reset,
+replaced or reconfigured.
+
+Decoded registers (BMSTool static analysis, read side live-verified on MATDOG's unit): `0x0120`
+KEY logic (`0x55` DISABLED, `0xA5` DISCHARGE_AND_SLEEP, `0x5A`
 DISCHARGE, `0xAA` CHARGE_AND_DISCHARGE, `0xA6` CHARGE_DISCHARGE_AND_SLEEP, anything else
 UNKNOWN), `0x0121`/`0x0122` charge/discharge MOS control, `0x0115` sleep time (raw × 10 s as
 BMSTool displays it). One transaction owner (`DalyBusScheduler`) starts both this read and

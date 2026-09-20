@@ -2825,3 +2825,52 @@ verified. The correction (`TECNOIOT VIN-` from `B-` to `P-`), the post-rewire va
 procedure and the resulting power-state table are owned by
 [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
 Until that session passes, KEY OFF must not be trusted to remove the robot rails.
+
+---
+
+## EVIDENCE PROVENANCE — raw live-session captures (limitation, 2026-09-20)
+
+```text
+COMMITTED TRANSCRIPTS   = SURVIVING EVIDENCE RECORD
+RAW CAPTURE FILES       = LOST (ephemeral scratch, cleared between sessions)
+RE-HASHING              = NOT POSSIBLE for the raw files
+LIVE RESULTS            = STILL VALID (this is an evidence limitation, not a retraction)
+```
+
+The raw byte captures and session logs of the 2026-09-19 live sessions (read-only KEY probe,
+application-only flash and first boot, pre-write baseline, and the single KEY configuration write)
+were written only to the assistant's ephemeral scratch directory. That scratch was cleared when
+the session restarted on 2026-09-20, before the files were copied anywhere durable. **They are
+gone and cannot be recovered or independently re-hashed.**
+
+What survives, and is the evidence record from here on:
+
+- the exact command/response transcripts quoted in the sections above (§ DALY KEY live read-only
+  validation, § DALY KEY — single live configuration write), committed to this repository;
+- the reproducible firmware identity: commit `6322563`, application SHA-256
+  `e9283ced5801d87d5fe44f95411ead2de6d6f6dad2101c88b210c31cd0e645b6`, which can be rebuilt from
+  source at any time;
+- the flash-script gate output and the build manifest recorded with it.
+
+Historical metadata only — the SHA-256 values reported for the raw files when they still existed.
+They are kept for the record and **cannot be verified any more**:
+
+```text
+live_flash.log         6fed383ebb49d58b272983e65120ae13bc138853285d12c4eac1487e6191d3e9
+live_boot_capture.bin  7e9d6af36fb939aacf6633c499b53b12a8901acffe58ae229f482d2480189313
+live_key_session.log   40379f97e408024a0e14cc58fb0da48832139276bf19a772a7416d0457777256
+live_key_session.raw   372b4336fafc3c8cff535f696b0dafb969478b4d67ac3b032da0ba35a2928606
+w2_flash.log           2c8687c2a9584211216e05be706b31fe64caa5683e6049e28851cce9043f467a
+w2_boot.bin            f30abe071004b76053334dd3a93c8206ebfe148082dd366106d4c4d0752b95ba
+w2_baseline.log        9e53fc4c3d7f8f8c68b948eae6c4fd9c2df316f2177a58c9d5de8a66b1cb242a
+w2_baseline.raw        64934c3b52c1ec6e3cbb34a3db960dae33d8eef3385d1a2af7f4b3f418fe3a2a
+w3_write.log           fc391f4e46223c34cbbb64a88ccdd04a50dbb01ffe0f0bd101da46323bac21ec
+w3_write.raw           6fa1a9ccd662ae7c8d4ef24a1f4985fd8304153ece31d6293bd22c6f53b01d02
+w3_write.py            994976ff46d94272fcc71d448ea2fb17ac6a7f498560d85bf5ab84f5a2365853
+```
+
+**Do not repeat the DALY `0x0120 := 0x005A` write to recreate raw evidence.** The configuration is
+already verified and the register already reads `0x005A`; a repeat write would be a new hardware
+action with no evidentiary benefit (and the firmware would refuse it as `ALREADY_CONFIGURED`
+anyway). Future live sessions must copy their captures out of scratch into a durable location
+before the session ends.

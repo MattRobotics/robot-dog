@@ -86,9 +86,18 @@ allocated joints.
 
 ## Power and wiring — validation status
 
-The power architecture is **DECIDED**, but the current 13-servo installed configuration has not yet
-completed ROBOT_POWERED validation. Nothing here should be read as evidence for a powered,
-multi-servo robot test.
+The power architecture is **DECIDED**, and the installed 13-servo configuration **passed
+ROBOT_POWERED no-motion validation** (G3 formal PASS 2026-09-17/18, G3.1 PASS 2026-09-18: DALY
+live read-only, LED live, 13/13 expected servos with 4 absent by design in two identical censuses,
+`VERIFIED_OFF` and `torque=0` on all 13). That evidence covers a *powered, no-motion* robot only.
+
+Still **TO_TEST**:
+
+- final power-domain conformance after `TECNOIOT VIN−` moves from `B−` to `P−`;
+- KEY OFF actually removing the robot rails, re-tested after that rewire;
+- the final busbar / power-distribution items G3 did not cover (busbar build, ATO rating, installed
+  13-servo wiring);
+- sustained multi-servo power/load behaviour — no motion or multi-servo load test exists.
 
 ### VALIDATED — proven on real hardware
 

@@ -149,8 +149,10 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   resumed (`comm=OK`), `runtime_resets` 0 before and after —
   [`VALIDATION.md` § DALY KEY live read-only validation](VALIDATION.md).
 - **RESULT** — `0x81` parameter personality **live verified (read-only)**; KEY logic register
-  `0x0120` **live verified (read-only)**; the unit's current KEY logic is **DISABLED (`0x0055`)**
-  — strong evidence for why the physical KEY did not control the discharge MOS in G3.
+  `0x0120` **live verified (read-only)**. At read-probe time, **pre-commissioning**, the register
+  read **DISABLED (`0x0055`)** — strong evidence for why the physical KEY did not control the
+  discharge MOS in G3. That value is historical: the **current last live-verified configuration is
+  `0x005A` DISCHARGE** (single commissioning write, same day — see below).
 - **WRITE / CONFIGURATION** — **LIVE VERIFIED** (2026-09-19, firmware `6322563`). Exactly one
   semantic write exists: `@BMS KEY SET DISCHARGE CONFIRM` (MAINTENANCE only) sends FC06
   `81 06 01 20 00 5A 16 07` — KEY logic `0x0120 := 0x005A` (DISCHARGE: KEY OFF → discharge MOS
