@@ -297,8 +297,16 @@ last valid snapshot and never marks the BMS absent. `@BMS KEY STATUS` prints the
 result/snapshot and its age with zero bus traffic (`snapshot=NOT_READ key_logic=UNKNOWN` until a
 read succeeds). Nothing is inferred from the live MOS state.
 
-`@BMS KEY SET DISCHARGE CONFIRM` is the **only** DALY write (implemented 2026-09-19, offline
-validated, **never sent to hardware** — live validation pending, see `DEVELOPMENT_GATES.md`). It
+**Why the commissioning write is retained** (reviewed 2026-09-20). With the register now reading
+`0x005A`, the gate answers `ALREADY_CONFIGURED` and transmits nothing, so the command is inert on
+this BMS: it can only act again on a unit that reads exactly `0x0055` — a replaced or
+factory-reset BMS, which is precisely the re-commissioning case. Removing it would delete the only
+Linux-side recovery path (DALY's own BMSTool is Windows-only) while removing no capability that is
+currently reachable, so it stays as tightly gated maintenance functionality. It must never be
+broadened: no second register, value, argument or alias.
+
+`@BMS KEY SET DISCHARGE CONFIRM` is the **only** DALY write (implemented and sent live **once**,
+2026-09-19: acknowledged and read back as `0x005A` — see `VALIDATION.md`). It
 sends FC06 `81 06 01 20 00 5A 16 07`: KEY logic `0x0120 := 0x005A` (DISCHARGE — KEY OFF turns the
 discharge MOS off, charge MOS kept), the exact frame DALY BMSTool V1.14.79 builds for that setting.
 It takes no argument and refuses with zero bytes sent (`BMS_KEY_WRITE=REFUSED reason=…`) unless:
@@ -540,16 +548,25 @@ compiled-in default profile remains `USB_ONLY`.
 
 ## Power architecture
 
-Canonical power and wiring details live in
-[`04_Electronics/README.md`](../../04_Electronics/README.md). The firmware consequence is that
-DALY `KEY` is controlled directly by the bistable logo pushbutton, not by an ESP32 GPIO. Power-on is
-therefore hardware-first, and firmware cannot be the primary wake controller because the ESP32 is
-downstream of the DALY-protected supply it would need to enable. The KEY function itself is
-**OPEN**: in G3 the physical KEY switch produced no observed DALY state change, so it is not a
-validated shutdown or safety barrier; the fused disconnect is. The DALY's KEY configuration can be
-read with `@BMS KEY READ` — live 2026-09-19: DISABLED (`0x0055`) — and set to DISCHARGE with the
-single guarded `@BMS KEY SET DISCHARGE CONFIRM` (offline-validated, never sent; live validation
-pending); see `DEVELOPMENT_GATES.md`.
+Canonical power domains, `KEY`/Charge-MOS semantics, power states, daily use, service isolation
+and charging live in
+[`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md);
+wiring and components in [`04_Electronics/README.md`](../../04_Electronics/README.md).
+
+The firmware consequences are:
+
+- DALY `KEY` is wired directly to the bistable logo pushbutton, **not** to an ESP32 GPIO. Power-on
+  is hardware-first, and firmware cannot be the primary wake controller because the ESP32 sits
+  downstream of the DALY-protected supply it would have to enable.
+- KEY controls the **discharge MOS only** (`0x0120 = 0x005A`, live-verified 2026-09-19). The charge
+  MOS stays independent and normally ON; firmware must never map KEY to it, and `0x0121`/`0x0122`
+  writes stay forbidden.
+- Every ordinary load, the ESP32 included, returns through DALY `P-`; never raw `B-`.
+- "Powered" and "motion enabled" are separate states: a future docked/charging robot stays powered
+  with torque off and motion inhibited, and docking must never write the MOS registers.
+- KEY OFF is **not yet** a validated power-off: a hardware `B-`/`P-` bypass kept the load rail
+  powered with the discharge MOS open. The fused disconnect remains the trusted isolation until
+  that rewire is corrected and validated — see `DEVELOPMENT_GATES.md`.
 
 ## Bench test profile
 

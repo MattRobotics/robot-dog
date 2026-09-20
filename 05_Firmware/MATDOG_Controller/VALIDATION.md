@@ -47,9 +47,13 @@ Powered build currently on the robot:
 ### OPEN
 
 - **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
-  DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
-  or safety barrier; the DALY's actual KEY configuration and function must be inspected before any
-  setting is changed. The fused disconnect remains the trusted physical isolation method.
+  DALY-reported state (`discharge_mos=ON` in both positions) — explained on 2026-09-19: the KEY
+  logic register read `0x0055` (DISABLED). It has since been set once, live, to `0x005A`
+  (DISCHARGE) and read back. KEY is still **not** a validated shutdown or safety barrier: the
+  physical test was inconclusive because of a hardware `B-`/`P-` bypass (TECNOIOT `VIN-` on raw
+  `B-`), so the fused disconnect remains the trusted physical isolation method. Power domains,
+  states and charging are owned by
+  [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
 - **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
   19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
   electrical and signal-integrity validation.
@@ -57,9 +61,11 @@ Powered build currently on the robot:
 ### Next
 
 ```text
-DALY KEY investigation
+hardware B-/P- rewire (TECNOIOT VIN- → P-) + post-rewire power validation
 → G4 Diagnostics / Maintenance
 ```
+
+Charging hardware (manual and dock) is a separate OPEN gate with no evidence yet.
 
 No motion, calibration or write-capable service capability exists in the firmware. Every later
 stage has its own gate in [`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md).
@@ -2534,6 +2540,10 @@ KEY can be considered any kind of power-off or safety barrier.
 
 ## DALY KEY DISCHARGE CONFIGURATION — OFFLINE IMPLEMENTATION — 2026-09-19
 
+> Superseded by § DALY KEY — single live configuration write (2026-09-19) below: the write was
+> executed once, acknowledged and read back as `0x005A`. The block below records the state at
+> implementation time.
+
 ```text
 DALY 0x81 READ                         = LIVE VERIFIED (read-only, 2026-09-19)
 CURRENT KEY LOGIC                      = DISABLED (0x0055)
@@ -2725,3 +2735,93 @@ stopped it. Fixed narrowly:
   MAINTENANCE from a live mode, and the Controller must pass `operating_mode_.mode()`. Mutation
   suite **52/52**: new cases replace the live mode with `true`, with a constant comparison, with
   `OperatingMode::MAINTENANCE` in the Controller, remove the check, or stop the helper cancelling.
+
+---
+
+## DALY KEY — SINGLE LIVE CONFIGURATION WRITE — 2026-09-19
+
+```text
+DALY KEY WRITE (0x0120 := 0x005A)   = VERIFIED (acknowledged and read back)
+CURRENT KEY LOGIC                   = 0x005A DISCHARGE
+WRITES SENT                         = exactly one FC06, ever
+PERSISTENCE ACROSS BMS POWER CYCLE  = TO_TEST (only an immediate read-back exists)
+PHYSICAL KEY OFF/ON BEHAVIOUR       = BLOCKED by the B-/P- bypass (see below)
+```
+
+Operator present and authorizing. Firmware `6322563` (clean ROBOT_POWERED, application SHA-256
+`e9283ced5801d87d5fe44f95411ead2de6d6f6dad2101c88b210c31cd0e645b6`), flashed application-only,
+KEY left in its normal ON position throughout.
+
+### Pre-write state
+
+```text
+MODE=MAINTENANCE
+DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS
+  comm=OK age_ms=1307
+  pack_v=10.2 current_a=-0.1 soc=35.9% cells=3
+  cell_max_mv=3426 cell_min_mv=3379 delta_mv=47
+  charge_mos=ON discharge_mos=ON state=STATIONARY alarms=0000 0000 0000 0000
+BMS_KEY_WRITE_STATUS state=NOT_REQUESTED transmitted=NO last_refusal=NONE
+
+BMS_KEY_READ=COMPLETE result=OK
+  key_logic_raw=0x0055 key_logic=DISABLED
+  charge_mos_control=1
+  discharge_mos_control=1
+  sleep_time_raw=360 sleep_time_s=3600
+```
+
+### The write — one FC06, sent once at 17:36:36.975
+
+The command was timed into the gap between telemetry polls (the poll phase was derived from
+`@BMS STATUS age_ms`), so the firmware's `BUS_BUSY` precondition could not refuse it and no second
+attempt was ever needed.
+
+```text
+BMS_KEY_WRITE=STARTED target=DISCHARGE raw=0x005A
+BMS_KEY_WRITE=ACK result=OK rx_bytes=8
+BMS_KEY_WRITE=COMPLETE ack=OK readback=VERIFIED
+  key_logic_raw=0x005A key_logic=DISCHARGE
+  charge_mos_control=1
+  discharge_mos_control=1
+  sleep_time_raw=360 sleep_time_s=3600
+
+BMS_KEY_WRITE_STATUS state=COMPLETE transmitted=YES last_refusal=NONE
+  ack=OK rx_bytes=8 age_ms=908
+  readback=VERIFIED key_logic_raw=0x005A age_ms=308
+```
+
+- Request `81 06 01 20 00 5A 16 07`; the acknowledgement is accepted as `OK` only for the exact
+  echo `51 06 01 20 00 5A 05 97` (8 bytes, reply address `0x51`, function `0x06`, valid CRC,
+  register and value echoed). It arrived ~45 ms after the command.
+- The automatic FC03 read-back ~0.6 s later returned `0x005A`, so the BMS reported the new value
+  immediately, with **no restart needed** — BMSTool's generic "restart after setting" advice did
+  not apply to this register on this unit.
+- Persistence across a BMS power cycle was **not** tested and remains **TO_TEST**.
+
+### Post-write state
+
+```text
+DALY   comm=OK age_ms=1177
+  pack_v=10.2 current_a=-0.1 soc=35.8% cells=3
+  charge_mos=ON discharge_mos=ON state=STATIONARY alarms=0000 0000 0000 0000
+SYSTEM health=BOOTING power_state=RUN mode=MAINTENANCE profile=ROBOT_POWERED
+```
+
+Telemetry resumed on its own, no MOS transition occurred with the KEY still ON, `runtime_resets`
+was 0 before and after, and the heap was unchanged. Anomaly scan of the 20,630-byte capture: no
+brownout, panic, watchdog, FAULT, refusal or servo output; the serial stream never paused more
+than 0.51 s. Exactly one FC06 configuration write was attempted in the whole session; no rollback,
+no restart, no KEY toggle, no MOS command, no servo command, no motion.
+
+### Follow-on physical KEY test — INCONCLUSIVE, and why
+
+Operator-reported (2026-09-19/20, instrument readings not archived): with KEY OFF the DALY
+reported **Discharge MOS OFF while the robot load rail stayed powered**. Root cause: the TECNOIOT
+step-down input return was tied to raw battery `B-`, and being a non-isolated buck it bridged
+`B-` to `P-` through the ESP32/Seeed/servo grounds, bypassing the open discharge MOS.
+
+This is a **hardware** defect, not a firmware or BMS-configuration defect: the KEY logic itself is
+verified. The correction (`TECNOIOT VIN-` from `B-` to `P-`), the post-rewire validation
+procedure and the resulting power-state table are owned by
+[`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
+Until that session passes, KEY OFF must not be trusted to remove the robot rails.

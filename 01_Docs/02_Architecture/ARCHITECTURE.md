@@ -165,12 +165,15 @@ bistable pushbutton under the MATDOG logo
    -> no ESP32 GPIO
 ```
 
-The KEY path itself is **OPEN**: in G3 the physical KEY switch produced no observed DALY state
-change, so it is not yet a validated shutdown or safety barrier. The DALY's KEY configuration is
-read-only observable through `@BMS KEY READ` (`0x81` register map from DALY BMSTool V1.14.79,
-live-verified read-only 2026-09-19: KEY logic **DISABLED**, `0x0055`). The only DALY write is the
-guarded `@BMS KEY SET DISCHARGE CONFIRM` (`0x0120 := 0x005A`, with read-back), offline-validated
-and not yet sent to the BMS.
+The KEY is configured and observable, but **not yet a validated power-off**. The `0x81` register
+map (from DALY BMSTool V1.14.79) is live-verified: on 2026-09-19 the KEY logic read `0x0055`
+(DISABLED), which explained the G3 finding, and the single guarded write
+`@BMS KEY SET DISCHARGE CONFIRM` set it **once** to `0x005A` (DISCHARGE), acknowledged and read
+back. KEY therefore switches the **discharge MOS only**; the charge MOS stays independent and
+normally ON, and KEY must never be mapped to it. The follow-on physical test was inconclusive
+because of a hardware `B-`/`P-` bypass (TECNOIOT `VIN-` on raw `B-`), so the fused disconnect
+remains the trusted isolation. Power domains, states and charging are owned by
+[`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
 
 The Controller cannot be the primary wake source because it is powered downstream of the DALY
 protected domain. The hardware button is the primary ON/OFF/wake interface. Electronics owns the

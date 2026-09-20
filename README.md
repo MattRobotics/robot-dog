@@ -138,14 +138,20 @@ COMPLETE   G3 ROBOT_POWERED no-motion            PASS (formal, 2026-09-18)
 COMPLETE   G3.1 CDC-independent Controller loop  PASS (2026-09-18)
 COMPLETE   DALY KEY research                     COMPLETE (read-only, 2026-09-19)
 COMPLETE   DALY 0x81 read                        LIVE VERIFIED (read-only, 2026-09-19)
-                                                 current KEY logic = DISABLED (0x0055)
-COMPLETE   Narrow KEY write (0x0120 := 0x005A)   OFFLINE VALIDATED (never sent to hardware)
+COMPLETE   DALY KEY write (0x0120 := 0x005A)     LIVE VERIFIED (2026-09-19; ACK + read-back)
+                                                 current KEY logic = DISCHARGE (0x005A)
 
-NEXT       DALY KEY write live validation        PENDING (needs its own authorization)
-PENDING    physical KEY behaviour with 0x005A    PENDING
+BLOCKED    physical KEY OFF removes robot rails  BLOCKED by a hardware B-/P- bypass:
+                                                 TECNOIOT VIN- must move from B- to P-
+NEXT       post-rewire power validation          TO_TEST (operator rewire, then dead-circuit +
+                                                 KEY OFF/ON + powered no-motion regression)
+OPEN       charging hardware (manual + dock)     OPEN — no charger/dock evidence exists
 OPEN       physical KEY safety barrier           NOT VALIDATED (fused disconnect = trusted isolation)
 THEN       G4 Diagnostics / Maintenance          NOT STARTED
 ```
+
+Power domains, KEY semantics, every power state and the charging gates are owned by
+[`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
 
 `ROBOT_POWERED` is **VALIDATED for no-motion operation**: DALY live read-only, LED live, 13/13
 expected servos present with 4 absent by design in two identical censuses, `SAFE_OFF`
@@ -159,10 +165,12 @@ presence: BNO085 acquisition runs at 50.1 Hz with the port closed (G3.1). No com
   or safety barrier. Research (2026-09-19): no public DALY document publishes a K-series KEY
   register; DALY's own BMSTool V1.14.79 (static inspection) points to KEY logic at `0x0120` on a
   second Modbus personality (`0x81`). Live-verified read-only the same day with `@BMS KEY READ`:
-  the unit's KEY logic is **DISABLED (`0x0055`)**, consistent with the G3 finding. A single
-  guarded write (`@BMS KEY SET DISCHARGE CONFIRM`, `0x0120 := 0x005A` with read-back) is
-  implemented and offline-validated but has never been sent; its live validation is pending. The
-  fused disconnect remains the trusted physical isolation method.
+  the unit's KEY logic was **DISABLED (`0x0055`)**, consistent with the G3 finding. The single
+  guarded write (`@BMS KEY SET DISCHARGE CONFIRM`, `0x0120 := 0x005A`) was sent **once, live, on
+  2026-09-19** and read back as `0x005A` (DISCHARGE). The follow-on physical KEY test was
+  inconclusive: a hardware `B-`/`P-` bypass (TECNOIOT `VIN-` on raw `B-`) kept the load rail
+  powered with the discharge MOS open, so KEY OFF is not yet a trusted power-off. The fused
+  disconnect remains the trusted physical isolation method.
 - **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
   19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
   electrical and signal-integrity validation.

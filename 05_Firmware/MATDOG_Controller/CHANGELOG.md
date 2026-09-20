@@ -1,5 +1,27 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — power/KEY architecture closeout — 2026-09-20
+
+Documentation and evidence only; **no firmware change** (the shipped Controller already satisfies
+every frozen policy — audited 2026-09-20).
+
+- **Live KEY write recorded:** `0x0120 := 0x005A` was sent once on 2026-09-19, acknowledged
+  (`51 06 01 20 00 5A 05 97`) and read back as `0x005A`, with no BMS restart needed. Persistence
+  across a BMS power cycle remains TO_TEST.
+- **New canonical owner:** `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` — power domains
+  (`B-` to the DALY only, every load on `B+`/`P-`), KEY = discharge MOS only, Charge MOS normally
+  ON, the full power-state table, daily use, storage, service isolation, manual charging and the
+  future docking/charging and Jetson behaviour, each with its validation status.
+- **New blocker recorded:** the physical KEY test was inconclusive because of a hardware `B-`/`P-`
+  bypass (TECNOIOT `VIN-` on raw `B-`). KEY OFF is not a trusted power-off until that rewire and
+  its validation; the fused disconnect remains the trusted isolation.
+- Charging hardware is a separate OPEN gate — no charger/dock evidence exists.
+- The one-time commissioning write is **retained** as tightly gated re-commissioning
+  functionality: with the register now `0x005A` it answers `ALREADY_CONFIGURED` and transmits
+  nothing, so it can only act on a replaced or factory-reset BMS.
+- Host suite gains a post-commissioning regression: the current `0x005A` state can never produce a
+  write, on arrival or at the pre-transmit re-check.
+
 ## Unreleased — DALY KEY write: live-mode pre-transmit re-check — 2026-09-19
 
 Review fix; **not flashed at commit time; still no DALY write sent.**

@@ -140,8 +140,7 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   DISCHARGE_AND_SLEEP, `0x5A` DISCHARGE, `0xAA` CHARGE_AND_DISCHARGE, `0xA6`
   CHARGE_DISCHARGE_AND_SLEEP), charge/discharge MOS control at `0x0121`/`0x0122` and sleep time at
   `0x0115` (shown as raw × 10 s). It uses a different register map from the live-validated `0xD2`
-  telemetry personality. The read side was live-verified the same day (READ PROBE below); the
-  write side is not.
+  telemetry personality. Both the read and the write side were live-verified the same day (below).
 - **READ PROBE** — **LIVE VERIFIED READ-ONLY** (2026-09-19, firmware `a57fcdd`). `@BMS KEY READ`
   (MAINTENANCE only) sends the single FC03 frame `81 03 01 00 00 78 5B D4` once; `@BMS KEY STATUS`
   prints the cached result with zero bus traffic. One live transaction: `result=OK`, 245 bytes,
@@ -152,33 +151,44 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **RESULT** — `0x81` parameter personality **live verified (read-only)**; KEY logic register
   `0x0120` **live verified (read-only)**; the unit's current KEY logic is **DISABLED (`0x0055`)**
   — strong evidence for why the physical KEY did not control the discharge MOS in G3.
-- **WRITE / CONFIGURATION** — **IMPLEMENTED, OFFLINE VALIDATED; LIVE VALIDATION PENDING.**
-  Exactly one semantic write exists: `@BMS KEY SET DISCHARGE CONFIRM` (MAINTENANCE only) sends
-  FC06 `81 06 01 20 00 5A 16 07` — KEY logic `0x0120 := 0x005A` (DISCHARGE: KEY OFF → discharge
-  MOS OFF, charge MOS kept) — reconstructed from BMSTool V1.14.79's own write path, then always
-  reads the register back. It refuses (zero TX) unless: MAINTENANCE; no write yet this boot; bus
-  idle; `0xD2` telemetry OK ≤ 5 s old; no alarms; a successful KEY read ≤ 30 s old showing exactly
-  `0x0055` with charge/discharge MOS control `1`/`1`; `0x005A` already → `ALREADY_CONFIGURED`. The
-  acknowledgement must be the exact echo `51 06 01 20 00 5A 05 97`; only a read-back of `0x005A`
-  counts as verified. The static audit admits only this write (FC10, other registers — MOS control
-  `0x0121`/`0x0122` included — other values and any caller-supplied target stay forbidden).
-  **`0x005A` has never been sent to the BMS.** Whether it takes effect before a BMS restart is
-  unknown (BMSTool asks for a restart after every setting). `requestDischargeOff()` remains a
-  fail-closed stub that transmits nothing; `@SYSTEM SHUTDOWN` still resolves to
-  `POWER_CUT_FAILED`.
-- **LIVE WRITE (needs its own authorization)** — procedure in
-  [`VALIDATION.md` § DALY KEY discharge configuration](VALIDATION.md): KEY in the recorded ON
-  position, fused disconnect at hand, a pre-decided ESP32 power path for the KEY OFF step, one
-  write, ACK, read-back; `PENDING_RESTART` → STOP for operator approval; physical KEY OFF/ON test
-  only after `VERIFIED`. Rollback candidate `0x0120 := 0x0055` is documented, not implemented.
-- **STATUS** — **OPEN.** KEY is not a validated shutdown or safety barrier.
+- **WRITE / CONFIGURATION** — **LIVE VERIFIED** (2026-09-19, firmware `6322563`). Exactly one
+  semantic write exists: `@BMS KEY SET DISCHARGE CONFIRM` (MAINTENANCE only) sends FC06
+  `81 06 01 20 00 5A 16 07` — KEY logic `0x0120 := 0x005A` (DISCHARGE: KEY OFF → discharge MOS
+  OFF, charge MOS kept) — reconstructed from BMSTool V1.14.79's own write path, then always reads
+  the register back. It refuses (zero TX) unless: MAINTENANCE (re-checked immediately before
+  transmitting); no write yet this boot; bus idle; `0xD2` telemetry OK ≤ 5 s old; no alarms; a
+  successful KEY read ≤ 30 s old showing exactly `0x0055` with charge/discharge MOS control
+  `1`/`1`; `0x005A` already → `ALREADY_CONFIGURED`. The static audit admits only this write (FC10,
+  other registers — MOS control `0x0121`/`0x0122` included — other values and any caller-supplied
+  target stay forbidden). `requestDischargeOff()` remains a fail-closed stub that transmits
+  nothing; `@SYSTEM SHUTDOWN` still resolves to `POWER_CUT_FAILED`.
+- **LIVE WRITE RESULT** — sent **once**: `ACK result=OK rx_bytes=8` (exact echo
+  `51 06 01 20 00 5A 05 97`) and `readback=VERIFIED key_logic_raw=0x005A`, with no BMS restart
+  needed. Telemetry resumed, MOS stayed ON/ON with the KEY ON, `runtime_resets` 0 —
+  [`VALIDATION.md` § DALY KEY single live configuration write](VALIDATION.md). Persistence across
+  a BMS power cycle is **TO_TEST**. The write is retained as tightly gated re-commissioning
+  functionality and is now inert on this unit (`ALREADY_CONFIGURED`, zero TX).
+- **PHYSICAL KEY TEST** — **BLOCKED / INCONCLUSIVE.** Operator-reported: with KEY OFF the DALY
+  showed the discharge MOS OFF while the robot load rail stayed powered. Root cause is a hardware
+  `B-`/`P-` bypass — the TECNOIOT step-down input return sits on raw battery `B-`, and being a
+  non-isolated buck it bridges `B-` to `P-` through the ESP32/Seeed/servo grounds.
+- **REQUIRED CORRECTION (operator)** — move `TECNOIOT VIN-` from `B-` to `P-`, then run the
+  dead-circuit / KEY ON / KEY OFF (USB disconnected) / KEY ON / powered no-motion procedure in
+  [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md)
+  § 11. Until it passes, KEY OFF must not be trusted to remove the robot rails.
+- **CHARGING** — separate **OPEN** gate: no charger/dock hardware evidence exists. Manual charging
+  with KEY OFF is an architectural target only.
+- **STATUS** — **OPEN.** The BMS-side KEY configuration is verified; the KEY as a power-off is
+  blocked on the hardware bypass above.
 - **INTERIM RULE** — the fused disconnect is the trusted physical isolation method.
 
 ## G4 — Diagnostics / Maintenance
 
 - **PURPOSE** — permanent read-only maintenance capability over the single shared `ServoBus`.
 - **ENTRY** — G3 formal PASS (including the census repeat); **G3.1 PASS**. Both satisfied
-  2026-09-18; the roadmap puts the DALY KEY investigation first.
+  2026-09-18. The DALY KEY investigation is closed on the BMS side (read and write both
+  live-verified); the roadmap puts the hardware `B-`/`P-` rewire and its post-rewire power
+  validation first.
 - **ALLOWED** — `SYSTEM_SELF_TEST`, consolidated servo health, source-signature read, profile audit;
   extension of the existing census/read/`SAFE_OFF` surface.
 - **FORBIDDEN** — any new persistent write path; any transport→register access; motion.

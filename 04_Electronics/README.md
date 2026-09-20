@@ -4,6 +4,9 @@ Electrical architecture and hardware integration records for MATDOG.
 
 Canonical system architecture: [`01_Docs/02_Architecture/ARCHITECTURE.md`](../01_Docs/02_Architecture/ARCHITECTURE.md)
 
+Canonical power domains, `KEY`/Charge-MOS semantics, power states, daily use, service isolation and
+charging: [`MATDOG_POWER_STATES_AND_CHARGING.md`](MATDOG_POWER_STATES_AND_CHARGING.md)
+
 Canonical current project snapshot, including the physically installed population:
 [`README.md`](../README.md)
 
@@ -60,8 +63,9 @@ Lean by design. Each item below is a deliberate decision, not an omission.
 |---|---|
 | **Seeed Bus Servo Driver** for the servo-bus electrical layer | selected |
 | **No CAN transceiver** | decided — not part of the current architecture |
-| **ESP32-S3 power**: DALY-protected B+/P− domain → 5 V step-down | **DECIDED**; validated no-motion in ROBOT_POWERED (G3, 2026-09-18) |
-| **Primary hardware ON/OFF/wake**: bistable pushbutton under the robot logo → DALY `KEY` directly | **DECIDED**; no ESP32 GPIO required. Function **OPEN** — in G3 the KEY switch produced no observed DALY state change; not a validated shutdown/safety barrier. KEY configuration read live 2026-09-19 via the read-only `@BMS KEY READ` probe: KEY logic **DISABLED** (`0x0055`), which explains the G3 finding. A guarded DISCHARGE write (`0x0120 := 0x005A`) is implemented offline, not yet sent; physical KEY OFF/ON behaviour with it is pending |
+| **ESP32-S3 power**: DALY-protected B+/P− domain → TECNOIOT 5 V step-down | **DECIDED**; validated no-motion in ROBOT_POWERED (G3, 2026-09-18). The ESP32 is **not** a raw-`B−` always-on load and needs **no isolated DC/DC**. **Hardware correction outstanding**: TECNOIOT `VIN−` must move from `B−` to `P−` (see Power-domain invariant below) |
+| **Power-domain invariant**: battery `B−` → DALY `B−` only; every ordinary load returns to `P−` | **DECIDED**; physical conformance **BLOCKED** until the TECNOIOT rewire is measured |
+| **Primary hardware ON/OFF/wake**: bistable pushbutton under the robot logo → DALY `KEY` directly | **DECIDED**; no ESP32 GPIO required. Function **OPEN** — in G3 the KEY switch produced no observed DALY state change; not a validated shutdown/safety barrier. KEY logic read live 2026-09-19 as **DISABLED** (`0x0055`), which explained the G3 finding, then set **once** to **DISCHARGE** (`0x005A`) by the guarded write — acknowledged and read back. KEY now controls the **discharge MOS only**; the charge MOS stays normally ON and must never be mapped to KEY. Physical KEY OFF/ON behaviour is **BLOCKED** by the `B−`/`P−` bypass |
 | **One removable, externally accessible ATO main fuse** | decided — rating **TBD** |
 | **Custom motor power busbar** | decided — dimensions and material **TBD** |
 | **Locking 3D-printed cable housings** | decided |
@@ -104,8 +108,14 @@ Evidence: [Bench QC V6.1](../09_Logs/Validation_Reports/ST3215_Bench_QC_2026-08-
 - the **ATO protection implementation** (rating TBD);
 - the installed **13-servo wiring**;
 - the installed **13-servo power budget** and any later 17-unit expansion;
-- the DALY `KEY` power/wake/shutdown function (the step-down controller supply itself ran the
-  whole G3 session; the fused disconnect remains the trusted isolation method);
+- the DALY `KEY` power/wake/shutdown **function on the rails** — the BMS-side configuration is
+  live-verified (`0x005A` DISCHARGE), but the first physical KEY test was inconclusive: with the
+  discharge MOS open the load rail stayed powered through a `B−`/`P−` bypass (TECNOIOT `VIN−` on
+  raw `B−`). Rewire `VIN−` to `P−`, then run the dead-circuit / KEY OFF-ON / powered no-motion
+  procedure in [`MATDOG_POWER_STATES_AND_CHARGING.md`](MATDOG_POWER_STATES_AND_CHARGING.md);
+  the fused disconnect remains the trusted isolation method meanwhile;
+- the **charging path** (charger CC/CV, dock/contacts, negative return, Charge-MOS behaviour, fuse
+  interaction, reverse polarity, current, thermal) — a separate OPEN gate, no evidence exists;
 - the GPIO19/GPIO20 external USB-data/service connector.
 
 Protection is deliberately minimal in the current revision: one externally accessible ATO main

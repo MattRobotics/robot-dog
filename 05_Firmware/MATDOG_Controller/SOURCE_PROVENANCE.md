@@ -139,8 +139,9 @@ inspection of DALY's official BMSTool V1.14.79 (downloaded from dalybms.com, nev
 from a MATDOG bench source; the read was live-verified on MATDOG's unit on 2026-09-19 (see
 `VALIDATION.md`). The one write frame, FC06 `81 06 01 20 00 5A` + CRC, reproduces BMSTool's own
 KEY-logic Set path (`FrmProduct::Btn_0x1820Data_Click` → `SendModbusData_Func0x06`), and its
-acknowledgement check reproduces `SerialPort_ParseModbusRtu` + `CheckModbusResult0x06`; it has
-not been sent to the BMS.
+acknowledgement check reproduces `SerialPort_ParseModbusRtu` + `CheckModbusResult0x06`. It was
+sent to the BMS exactly once, live, on 2026-09-19 (acknowledged and read back as `0x005A`); see
+`VALIDATION.md`.
 
 ### LedRing (`src/status/LedRing.{h,cpp}`)
 
