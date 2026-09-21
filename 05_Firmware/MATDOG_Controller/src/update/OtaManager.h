@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "../core/ActuatorAuthority.h"
+#include "OtaAuthorityGate.h"
 #include "OtaBootGuard.h"
 #include "OtaEspBackend.h"
 #include "OtaPolicy.h"
@@ -51,6 +53,8 @@ struct OtaManagerStatus {
   uint32_t confirmed_at_ms = 0;
 
   bool ingest_enabled = false;   // compile-time; see MATDOG_OTA_INGEST_ENABLED
+  bool holds_actuator_inhibit = false;  // an update is holding the exclusivity hold
+  core::ActuatorAuthority actuator_owner = core::ActuatorAuthority::NONE;
   bool identity_readable = false;
   bool fatal_reset_reason = false;
   char running_build_id[kOtaBuildIdBytes] = {0};
@@ -84,7 +88,9 @@ class OtaManager {
   static constexpr uint32_t kSelfCheckMinUptimeMs = 15000;
   static constexpr uint32_t kSelfCheckMinLoopTicks = 2000;
 
-  void begin(uint32_t now_ms);
+  // arbiter is the ONE central ActuatorAuthority instance, owned by the
+  // Controller. OTA never copies its state; it holds a pointer and asks.
+  void begin(uint32_t now_ms, core::ActuatorAuthorityArbiter* arbiter);
 
   // Bounded and cheap. Once the boot lifecycle has settled it does almost
   // nothing; it never touches flash.
@@ -111,7 +117,9 @@ class OtaManager {
   bool ingestAllowed();
 
   OtaEspBackend backend_{};
-  OtaStageAGate gate_{};   // OTA-B: replace with an ActuatorAuthority-backed gate
+  // OTA-B: the real gate. OTA takes an exclusivity inhibit on the central
+  // arbiter for the duration of an update; it never becomes an actuator owner.
+  OtaAuthorityGate gate_{};
   OtaPolicy policy_{};
   OtaBootGuard boot_guard_{};
   OtaManagerStatus status_{};

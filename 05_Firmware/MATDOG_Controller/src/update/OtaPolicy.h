@@ -137,38 +137,45 @@ enum class OtaFault : uint8_t {
 // OTA-B boundary: the authorization gate
 // ---------------------------------------------------------------------------
 
-// OTA-A must not invent a temporary ActuatorAuthority, and must not silently
-// become a bypass of the real one when it arrives. The compromise is this
-// interface plus one rule: the policy FAILS CLOSED with no gate installed.
+// OTA is NOT an actuator owner - it does not drive an actuator - so it never
+// appears in the ActuatorAuthority enum. What it needs is the opposite: a
+// guarantee that no actuator owner can appear while it runs.
 //
-// Permission during OTA-A is therefore not an implicit "nullptr means yes".
-// It is a named, greppable object (OtaStageAGate below) that the Controller
-// has to install on purpose, so replacing it with the real authority model is
-// a one-line change at one site, and forgetting to is a refusal rather than a
-// silent allow.
+// WHY THIS IS A HOLD AND NOT A QUERY
+// ----------------------------------
+// MATDOG's Controller is single-threaded, so a check-then-act sequence inside
+// one call is already atomic. The problem is DURATION: an OTA update spans
+// prepare -> openStream -> thousands of writeChunk calls -> finishStream ->
+// commit, across seconds of loop passes. Between any two of them a command
+// can arrive and a future CalibrationManager can acquire authority. So
+//
+//     if (authority == NONE) { start OTA }
+//
+// is genuinely insufficient, and no amount of re-checking fixes it. The gate
+// therefore ACQUIRES an exclusivity hold for the whole update and releases it
+// on abort, failure or reset. See core/ActuatorAuthority.h.
 enum class OtaGateVerdict : uint8_t {
-  PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET = 0,  // the OTA-A placeholder answer
-  PERMITTED_BY_AUTHORITY                 = 1,  // OTA-B: the real model said yes
-  REFUSED_NO_GATE_INSTALLED              = 2,  // fail closed
-  REFUSED_BY_AUTHORITY                   = 3,  // OTA-B: the real model said no
+  PERMITTED_BY_AUTHORITY         = 0,  // the hold was granted
+  REFUSED_NO_GATE_INSTALLED      = 1,  // fail closed: nothing installed
+  REFUSED_ACTUATOR_OWNER_ACTIVE  = 2,  // a write-capable owner holds the actuators
+  REFUSED_ALREADY_EXCLUSIVE      = 3,  // another exclusive activity is already running
+  REFUSED_BY_AUTHORITY           = 4,  // the arbiter refused for any other reason
 };
 
 class OtaAuthorizationGate {
  public:
   virtual ~OtaAuthorizationGate() = default;
-  virtual OtaGateVerdict otaPermitted() const = 0;
-};
 
-// The OTA-A placeholder. It permits, and says exactly why it permits: there
-// is no authority model yet. TO_IMPLEMENT / OTA-B: replace with a gate backed
-// by ActuatorAuthority (NONE/DIAGNOSTICS/CALIBRATION/QC/PROVISIONING/MOTION),
-// which must refuse while motion, calibration or a service write transaction
-// is active.
-class OtaStageAGate : public OtaAuthorizationGate {
- public:
-  OtaGateVerdict otaPermitted() const override {
-    return OtaGateVerdict::PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET;
-  }
+  // Query only - for diagnostics and for a transport to pre-check cheaply.
+  // Deliberately NOT what prepare() uses: a query cannot close the window
+  // described above.
+  virtual OtaGateVerdict otaPermitted() const = 0;
+
+  // Atomic check-and-hold. This is what an update must call.
+  virtual OtaGateVerdict beginExclusive() = 0;
+
+  // Must be idempotent and safe when nothing is held.
+  virtual void endExclusive() = 0;
 };
 
 bool isPermitted(OtaGateVerdict verdict);
@@ -245,7 +252,7 @@ struct OtaStatus {
 class OtaPolicy {
  public:
   // gate may be nullptr; that is a refusal, not a permission.
-  void begin(OtaBackend* backend, const OtaAuthorizationGate* gate);
+  void begin(OtaBackend* backend, OtaAuthorizationGate* gate);
 
   // Step 1. Validates the metadata and resolves + validates the target.
   // Touches NO flash. IDLE -> TARGET_RESOLVED, or -> FAILED.
@@ -287,7 +294,7 @@ class OtaPolicy {
   void resetTransfer();
 
   OtaBackend* backend_ = nullptr;
-  const OtaAuthorizationGate* gate_ = nullptr;
+  OtaAuthorizationGate* gate_ = nullptr;
   OtaStatus status_{};
   Sha256 hash_{};
   uint8_t expected_sha_[kSha256DigestBytes] = {0};

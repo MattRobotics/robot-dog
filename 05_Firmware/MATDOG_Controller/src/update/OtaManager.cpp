@@ -52,9 +52,10 @@ void copyBounded(char* dst, size_t dst_size, const char* src) {
 
 }  // namespace
 
-void OtaManager::begin(uint32_t now_ms) {
+void OtaManager::begin(uint32_t now_ms, core::ActuatorAuthorityArbiter* arbiter) {
   (void)now_ms;
 
+  gate_.bind(arbiter);
   policy_.begin(&backend_, &gate_);
 
   const OtaSelfCheckConfig config{kSelfCheckMinUptimeMs, kSelfCheckMinLoopTicks};
@@ -117,6 +118,10 @@ void OtaManager::refreshStatus() {
   status_.max_write_us = backend_.maxWriteUs();
   status_.max_end_us = backend_.maxEndUs();
   status_.last_backend_error = backend_.lastError();
+  status_.holds_actuator_inhibit = gate_.holdsExclusive();
+  // Read from the central arbiter through the gate's query, never cached:
+  // there is exactly one authority state and OTA is not allowed a copy of it.
+  status_.policy.last_gate_verdict = policy_.status().last_gate_verdict;
 }
 
 bool OtaManager::ingestAllowed() {
@@ -124,7 +129,6 @@ bool OtaManager::ingestAllowed() {
   // Not an oversight and not a silent no-op: the refusal is published so a
   // transport author sees exactly why nothing happened.
   status_.policy.fault = OtaFault::NOT_AUTHORIZED;
-  status_.policy.last_gate_verdict = OtaGateVerdict::REFUSED_NO_GATE_INSTALLED;
   return false;
 }
 

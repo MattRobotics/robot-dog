@@ -44,11 +44,10 @@ bool buildIdLooksValid(const char* build_id) {
 }  // namespace
 
 bool isPermitted(OtaGateVerdict verdict) {
-  return verdict == OtaGateVerdict::PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET ||
-         verdict == OtaGateVerdict::PERMITTED_BY_AUTHORITY;
+  return verdict == OtaGateVerdict::PERMITTED_BY_AUTHORITY;
 }
 
-void OtaPolicy::begin(OtaBackend* backend, const OtaAuthorizationGate* gate) {
+void OtaPolicy::begin(OtaBackend* backend, OtaAuthorizationGate* gate) {
   backend_ = backend;
   gate_ = gate;
   status_ = OtaStatus{};
@@ -83,6 +82,10 @@ bool OtaPolicy::failWith(OtaFault fault) {
   // deliberately NOT touched here: a failed attempt must leave the device
   // booting exactly what it booted before.
   if (backend_ != nullptr) backend_->abortWrite();
+  // And the actuator exclusivity hold is given back, so a failed update
+  // cannot leave the robot permanently unable to calibrate. Idempotent and
+  // safe when nothing was ever held.
+  if (gate_ != nullptr) gate_->endExclusive();
   return false;
 }
 
@@ -102,10 +105,13 @@ bool OtaPolicy::prepare(const OtaImageMetadata& metadata) {
   status_.state = OtaState::IDLE;
   status_.counters.updates_started++;
 
-  // --- Gate first. Fail closed when no gate is installed. ---------------
+  // --- Gate first, and as a HOLD rather than a query. -------------------
+  // beginExclusive() both checks that no actuator owner is active and takes
+  // the exclusivity hold in one call, so no owner can appear between the
+  // check and the rest of the update. Fail closed when no gate is installed.
   const OtaGateVerdict verdict = (gate_ == nullptr)
                                      ? OtaGateVerdict::REFUSED_NO_GATE_INSTALLED
-                                     : gate_->otaPermitted();
+                                     : gate_->beginExclusive();
   status_.last_gate_verdict = verdict;
   if (!isPermitted(verdict)) return failWith(OtaFault::NOT_AUTHORIZED);
 
@@ -259,6 +265,9 @@ bool OtaPolicy::commitBootTarget() {
   status_.boot_target_changed = true;
   status_.state = OtaState::BOOT_TARGET_SET;
   status_.counters.updates_committed++;
+  // The exclusivity hold is deliberately KEPT here. A boot switch is pending
+  // a reboot, and starting a calibration against an image that is about to be
+  // replaced is not something to permit for convenience. The reboot clears it.
   return true;
 }
 
@@ -273,6 +282,7 @@ void OtaPolicy::abort() {
   if (status_.state == OtaState::IDLE) return;
 
   if (backend_ != nullptr) backend_->abortWrite();
+  if (gate_ != nullptr) gate_->endExclusive();
   resetTransfer();
   status_.state = OtaState::IDLE;
   status_.fault = OtaFault::NONE;
@@ -285,6 +295,7 @@ bool OtaPolicy::reset() {
     return false;
   }
   if (backend_ != nullptr) backend_->abortWrite();
+  if (gate_ != nullptr) gate_->endExclusive();
   resetTransfer();
   status_.state = OtaState::IDLE;
   status_.fault = OtaFault::NONE;
@@ -345,11 +356,11 @@ const char* toString(OtaImgState state) {
 
 const char* toString(OtaGateVerdict verdict) {
   switch (verdict) {
-    case OtaGateVerdict::PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET:
-      return "PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET";
-    case OtaGateVerdict::PERMITTED_BY_AUTHORITY:    return "PERMITTED_BY_AUTHORITY";
-    case OtaGateVerdict::REFUSED_NO_GATE_INSTALLED: return "REFUSED_NO_GATE_INSTALLED";
-    case OtaGateVerdict::REFUSED_BY_AUTHORITY:      return "REFUSED_BY_AUTHORITY";
+    case OtaGateVerdict::PERMITTED_BY_AUTHORITY:        return "PERMITTED_BY_AUTHORITY";
+    case OtaGateVerdict::REFUSED_NO_GATE_INSTALLED:     return "REFUSED_NO_GATE_INSTALLED";
+    case OtaGateVerdict::REFUSED_ACTUATOR_OWNER_ACTIVE: return "REFUSED_ACTUATOR_OWNER_ACTIVE";
+    case OtaGateVerdict::REFUSED_ALREADY_EXCLUSIVE:     return "REFUSED_ALREADY_EXCLUSIVE";
+    case OtaGateVerdict::REFUSED_BY_AUTHORITY:          return "REFUSED_BY_AUTHORITY";
   }
   return "UNKNOWN";
 }

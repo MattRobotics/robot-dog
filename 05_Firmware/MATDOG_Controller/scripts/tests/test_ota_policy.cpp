@@ -21,11 +21,19 @@
 #include <string>
 #include <vector>
 
+#include "../../src/core/ActuatorAuthority.h"
+#include "../../src/update/OtaAuthorityGate.h"
 #include "../../src/update/OtaBootGuard.h"
 #include "../../src/update/OtaPolicy.h"
 #include "../../src/update/Sha256.h"
 
 using namespace matdog::update;
+using matdog::core::ActuatorAuthority;
+using matdog::core::ActuatorAuthorityArbiter;
+using matdog::core::AuthorityClearReason;
+using matdog::core::AuthorityLease;
+using matdog::core::AuthorityResult;
+using matdog::core::OperatingMode;
 
 static int g_checks = 0;
 static int g_failures = 0;
@@ -171,9 +179,17 @@ static OtaImageMetadata metaFor(const std::vector<uint8_t>& image,
   return m;
 }
 
-static OtaStageAGate g_gate;
+// The OTA tests now drive the REAL OTA-B gate against the REAL arbiter, so
+// the authorization path under test is the shipped one rather than a stub.
+static ActuatorAuthorityArbiter g_arbiter;
+static OtaAuthorityGate g_gate;
 
-static void wire(OtaPolicy& p, FakeBackend& b) { p.begin(&b, &g_gate); }
+static void wire(OtaPolicy& p, FakeBackend& b) {
+  g_arbiter.reset(AuthorityClearReason::BOOT);
+  g_gate.endExclusive();
+  g_gate.bind(&g_arbiter);
+  p.begin(&b, &g_gate);
+}
 
 // Streams an image through in fixed chunks. Returns false at the first
 // refusal, like a transport would.
@@ -664,13 +680,6 @@ static void test_software_reset_of_the_state_machine() {
 // OTA-B authorization boundary
 // ---------------------------------------------------------------------------
 
-class RefusingGate : public OtaAuthorizationGate {
- public:
-  OtaGateVerdict otaPermitted() const override {
-    return OtaGateVerdict::REFUSED_BY_AUTHORITY;
-  }
-};
-
 static void test_authorization_gate() {
   g_case = "authorization_gate_fails_closed_with_no_gate";
   { FakeBackend b; OtaPolicy p; p.begin(&b, nullptr);
@@ -681,20 +690,203 @@ static void test_authorization_gate() {
     CHECK_EQ(b.begin_calls, 0);
     CHECK_EQ(b.set_boot_calls, 0); }
 
-  g_case = "authorization_gate_refusal_is_honoured";
-  { FakeBackend b; RefusingGate gate; OtaPolicy p; p.begin(&b, &gate);
+  g_case = "gate_unbound_arbiter_fails_closed";
+  { FakeBackend b; OtaAuthorityGate gate; OtaPolicy p; p.begin(&b, &gate);
     CHECK(!p.prepare(metaFor(makeImage(512))));
     CHECK_FAULT(p, OtaFault::NOT_AUTHORIZED);
-    CHECK_EQ((int)p.status().last_gate_verdict, (int)OtaGateVerdict::REFUSED_BY_AUTHORITY);
+    CHECK_EQ((int)p.status().last_gate_verdict,
+             (int)OtaGateVerdict::REFUSED_NO_GATE_INSTALLED);
     CHECK_EQ(b.begin_calls, 0); }
 
-  g_case = "ota_a_gate_says_why_it_permits";
-  { OtaStageAGate gate;
-    CHECK_EQ((int)gate.otaPermitted(),
-             (int)OtaGateVerdict::PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET);
-    CHECK(isPermitted(gate.otaPermitted()));
+  g_case = "isPermitted_only_accepts_the_authority_verdict";
+  { CHECK(isPermitted(OtaGateVerdict::PERMITTED_BY_AUTHORITY));
     CHECK(!isPermitted(OtaGateVerdict::REFUSED_NO_GATE_INSTALLED));
+    CHECK(!isPermitted(OtaGateVerdict::REFUSED_ACTUATOR_OWNER_ACTIVE));
+    CHECK(!isPermitted(OtaGateVerdict::REFUSED_ALREADY_EXCLUSIVE));
     CHECK(!isPermitted(OtaGateVerdict::REFUSED_BY_AUTHORITY)); }
+}
+
+// ---------------------------------------------------------------------------
+// OTA-B: authorization against the real ActuatorAuthority arbiter
+// ---------------------------------------------------------------------------
+
+static void test_ota_refused_while_any_actuator_owner_is_active() {
+  g_case = "ota_refused_while_any_actuator_owner_is_active";
+  const ActuatorAuthority owners[] = {
+      ActuatorAuthority::DIAGNOSTICS, ActuatorAuthority::CALIBRATION,
+      ActuatorAuthority::QC, ActuatorAuthority::PROVISIONING, ActuatorAuthority::MOTION};
+
+  for (ActuatorAuthority owner : owners) {
+    ActuatorAuthorityArbiter arbiter;
+    arbiter.reset(AuthorityClearReason::BOOT);
+    const OperatingMode mode = (owner == ActuatorAuthority::MOTION)
+                                   ? OperatingMode::RUN
+                                   : OperatingMode::MAINTENANCE;
+    AuthorityLease lease;
+    CHECK_EQ((int)arbiter.request(owner, mode, &lease), (int)AuthorityResult::GRANTED);
+
+    FakeBackend b; OtaAuthorityGate gate; gate.bind(&arbiter);
+    OtaPolicy p; p.begin(&b, &gate);
+
+    CHECK(!p.prepare(metaFor(makeImage(4096))));
+    CHECK_FAULT(p, OtaFault::NOT_AUTHORIZED);
+    CHECK_EQ((int)p.status().last_gate_verdict,
+             (int)OtaGateVerdict::REFUSED_ACTUATOR_OWNER_ACTIVE);
+    // Not one byte of flash was touched, and the owner is undisturbed.
+    CHECK_EQ(b.begin_calls, 0);
+    CHECK_EQ(b.set_boot_calls, 0);
+    CHECK_EQ((int)arbiter.current(), (int)owner);
+    CHECK(!arbiter.inhibited());
+  }
+}
+
+static void test_ota_holds_the_inhibit_for_the_whole_update() {
+  g_case = "ota_holds_the_inhibit_for_the_whole_update";
+  // THE TOCTOU PROPERTY. A query-based gate would pass the first check and
+  // then let calibration in mid-stream. A hold cannot.
+  ActuatorAuthorityArbiter arbiter;
+  arbiter.reset(AuthorityClearReason::BOOT);
+  FakeBackend b; OtaAuthorityGate gate; gate.bind(&arbiter);
+  OtaPolicy p; p.begin(&b, &gate);
+
+  const auto img = makeImage(9000);
+  CHECK(p.prepare(metaFor(img)));
+  CHECK(arbiter.inhibited());
+  CHECK(gate.holdsExclusive());
+
+  // At every stage of the update, no owner can be acquired.
+  AuthorityLease intruder;
+  CHECK_EQ((int)arbiter.request(ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE,
+                                &intruder),
+           (int)AuthorityResult::REJECTED_INHIBITED);
+  CHECK(!intruder.valid());
+
+  CHECK(p.openStream());
+  CHECK_EQ((int)arbiter.request(ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE,
+                                &intruder),
+           (int)AuthorityResult::REJECTED_INHIBITED);
+
+  CHECK(streamAll(p, img, 1024));
+  CHECK_EQ((int)arbiter.request(ActuatorAuthority::QC, OperatingMode::MAINTENANCE, &intruder),
+           (int)AuthorityResult::REJECTED_INHIBITED);
+
+  CHECK(p.finishStream());
+  CHECK_EQ((int)arbiter.request(ActuatorAuthority::MOTION, OperatingMode::RUN, &intruder),
+           (int)AuthorityResult::REJECTED_INHIBITED);
+
+  CHECK(p.commitBootTarget());
+  // Deliberately still held after the commit: a boot switch is pending and
+  // starting a calibration against an image about to be replaced is not
+  // something to permit for convenience. A reboot clears it.
+  CHECK(arbiter.inhibited());
+  CHECK_EQ((int)arbiter.request(ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE,
+                                &intruder),
+           (int)AuthorityResult::REJECTED_INHIBITED);
+}
+
+static void test_failed_update_releases_the_inhibit() {
+  g_case = "failed_update_releases_the_inhibit";
+  // A failed update must not leave the robot permanently unable to calibrate.
+  const auto img = makeImage(4096);
+
+  // Failure during finishStream (hash mismatch).
+  { ActuatorAuthorityArbiter arbiter; arbiter.reset(AuthorityClearReason::BOOT);
+    FakeBackend b; OtaAuthorityGate gate; gate.bind(&arbiter);
+    OtaPolicy p; p.begin(&b, &gate);
+    OtaImageMetadata m = metaFor(makeImage(4096, 0x11));
+    m.image_size = (uint32_t)img.size();
+    CHECK(p.prepare(m));
+    CHECK(arbiter.inhibited());
+    CHECK(p.openStream());
+    CHECK(streamAll(p, img, 1024));
+    CHECK(!p.finishStream());
+    CHECK(!arbiter.inhibited());
+    CHECK(!gate.holdsExclusive());
+    AuthorityLease lease;
+    CHECK_EQ((int)arbiter.request(ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE,
+                                  &lease), (int)AuthorityResult::GRANTED); }
+
+  // Failure during the stream (write error).
+  { ActuatorAuthorityArbiter arbiter; arbiter.reset(AuthorityClearReason::BOOT);
+    FakeBackend b; b.fail_write_after_n_chunks = 1;
+    OtaAuthorityGate gate; gate.bind(&arbiter);
+    OtaPolicy p; p.begin(&b, &gate);
+    CHECK(p.prepare(metaFor(img)));
+    CHECK(p.openStream());
+    CHECK(!streamAll(p, img, 1024));
+    CHECK(!arbiter.inhibited()); }
+
+  // Operator abort mid-stream.
+  { ActuatorAuthorityArbiter arbiter; arbiter.reset(AuthorityClearReason::BOOT);
+    FakeBackend b; OtaAuthorityGate gate; gate.bind(&arbiter);
+    OtaPolicy p; p.begin(&b, &gate);
+    CHECK(p.prepare(metaFor(img)));
+    CHECK(p.openStream());
+    CHECK(arbiter.inhibited());
+    p.abort();
+    CHECK(!arbiter.inhibited()); }
+
+  // Software reset of the state machine.
+  { ActuatorAuthorityArbiter arbiter; arbiter.reset(AuthorityClearReason::BOOT);
+    FakeBackend b; OtaAuthorityGate gate; gate.bind(&arbiter);
+    OtaPolicy p; p.begin(&b, &gate);
+    CHECK(p.prepare(metaFor(img)));
+    CHECK(arbiter.inhibited());
+    CHECK(p.reset());
+    CHECK(!arbiter.inhibited()); }
+}
+
+static void test_ota_never_becomes_an_actuator_owner() {
+  g_case = "ota_never_becomes_an_actuator_owner";
+  // OTA does not drive actuators, so it must never appear as an owner - not
+  // during an update, and not after one.
+  ActuatorAuthorityArbiter arbiter;
+  arbiter.reset(AuthorityClearReason::BOOT);
+  FakeBackend b; OtaAuthorityGate gate; gate.bind(&arbiter);
+  OtaPolicy p; p.begin(&b, &gate);
+  const auto img = makeImage(4096);
+
+  CHECK_EQ((int)arbiter.current(), (int)ActuatorAuthority::NONE);
+  CHECK(p.prepare(metaFor(img)));
+  CHECK_EQ((int)arbiter.current(), (int)ActuatorAuthority::NONE);
+  CHECK(p.openStream());
+  CHECK_EQ((int)arbiter.current(), (int)ActuatorAuthority::NONE);
+  CHECK(streamAll(p, img, 1024));
+  CHECK(p.finishStream());
+  CHECK(p.commitBootTarget());
+  CHECK_EQ((int)arbiter.current(), (int)ActuatorAuthority::NONE);
+}
+
+static void test_gate_is_not_reentrant() {
+  g_case = "gate_is_not_reentrant";
+  ActuatorAuthorityArbiter arbiter;
+  arbiter.reset(AuthorityClearReason::BOOT);
+  OtaAuthorityGate gate; gate.bind(&arbiter);
+
+  CHECK_EQ((int)gate.beginExclusive(), (int)OtaGateVerdict::PERMITTED_BY_AUTHORITY);
+  const uint32_t first = gate.lease().generation;
+  // A second begin must not take a second hold that could release the first.
+  CHECK_EQ((int)gate.beginExclusive(), (int)OtaGateVerdict::PERMITTED_BY_AUTHORITY);
+  CHECK_EQ(gate.lease().generation, first);
+
+  gate.endExclusive();
+  CHECK(!arbiter.inhibited());
+  gate.endExclusive();   // idempotent, safe with nothing held
+  CHECK(!arbiter.inhibited());
+}
+
+static void test_gate_reports_an_existing_exclusive_activity() {
+  g_case = "gate_reports_an_existing_exclusive_activity";
+  ActuatorAuthorityArbiter arbiter;
+  arbiter.reset(AuthorityClearReason::BOOT);
+  matdog::core::InhibitLease other;
+  CHECK_EQ((int)arbiter.requestInhibit(matdog::core::InhibitReason::FIRMWARE_UPDATE, &other),
+           (int)AuthorityResult::GRANTED);
+
+  OtaAuthorityGate gate; gate.bind(&arbiter);
+  CHECK_EQ((int)gate.otaPermitted(), (int)OtaGateVerdict::REFUSED_ALREADY_EXCLUSIVE);
+  CHECK_EQ((int)gate.beginExclusive(), (int)OtaGateVerdict::REFUSED_ALREADY_EXCLUSIVE);
+  CHECK(!gate.holdsExclusive());
 }
 
 // ---------------------------------------------------------------------------
@@ -1023,6 +1215,12 @@ int main() {
   test_abort_after_commit_does_not_undo_the_boot_switch();
   test_software_reset_of_the_state_machine();
   test_authorization_gate();
+  test_ota_refused_while_any_actuator_owner_is_active();
+  test_ota_holds_the_inhibit_for_the_whole_update();
+  test_failed_update_releases_the_inhibit();
+  test_ota_never_becomes_an_actuator_owner();
+  test_gate_is_not_reentrant();
+  test_gate_reports_an_existing_exclusive_activity();
   test_boot_guard_confirmed_image_does_nothing();
   test_boot_guard_not_ota_managed();
   test_boot_guard_valid_first_boot();

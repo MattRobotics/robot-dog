@@ -53,12 +53,17 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# The OTA suite links the REAL OTA-B gate and the REAL arbiter, so the
+# authorization path it exercises is the shipped one, not a stub.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -o "$OUT/test_ota_policy" \
   "$SCRIPT_DIR/test_ota_policy.cpp" \
   "$SKETCH_DIR/src/update/OtaPolicy.cpp" \
   "$SKETCH_DIR/src/update/OtaBootGuard.cpp" \
-  "$SKETCH_DIR/src/update/Sha256.cpp"
+  "$SKETCH_DIR/src/update/Sha256.cpp" \
+  "$SKETCH_DIR/src/update/OtaAuthorityGate.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
 "$OUT/test_servo_population"
 "$OUT/test_daly_protocol"
