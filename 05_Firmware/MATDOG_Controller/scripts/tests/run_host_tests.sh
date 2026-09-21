@@ -52,6 +52,16 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_calibration_domain.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
 
+# The calibration manager links the REAL arbiter, so the authority
+# integration it exercises is the shipped one rather than a mock.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_manager" \
+  "$SCRIPT_DIR/test_calibration_manager.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationManager.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -o "$OUT/test_actuator_authority" \
   "$SCRIPT_DIR/test_actuator_authority.cpp" \
@@ -76,3 +86,4 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_actuator_authority"
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
+"$OUT/test_calibration_manager"

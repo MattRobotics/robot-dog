@@ -98,6 +98,14 @@ constexpr LfV25FineSequence kLfV25FineSequences[2] = {
 constexpr uint16_t kLfV25M12MaxObstructedTick = 3397;
 constexpr uint16_t kLfV25M12MaxAcceptedTick = 3443;
 
+// matdog.rs: LF_CONTACT_WITNESS_TOLERANCE_TICKS = 24.
+//
+// HISTORICAL AND LF-ONLY. It was measured on one leg, on an installation that
+// no longer exists, and the evidence file forbids mirroring LF results onto
+// RF/RH/LH. It is deliberately NOT a constant in the domain model: every
+// witness there must be given its own band explicitly.
+constexpr uint16_t kLfV25ContactWitnessToleranceTicks = 24;
+
 // MATDOG_LF_CALIBRATION_V25_FINAL.md §5.3 — the bounded tracking-lag rule,
 // stated as general and not M13-specific.
 constexpr uint16_t kLfV25SettleContinueTicks = 13;  // continue

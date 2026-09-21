@@ -245,35 +245,46 @@ static void test_the_two_q0_estimators_are_not_interchangeable() {
 static void test_direction_is_unknown_until_measured() {
   g_case = "direction_is_unknown_until_measured";
   DirectionEvidence d{};
-  CHECK_EQ((int)d.source, (int)DirectionSource::UNKNOWN);
+  CHECK_EQ((int)d.state, (int)DirectionState::UNKNOWN);
   CHECK_EQ(d.sign, 0);
-  CHECK(!d.isCalibrationEvidence());
+  CHECK(!d.isCurrentCalibrationEvidence());
+  CHECK(!d.isHistoricalSpecification());
 
   // AUDIT FINDING: LF V25's `direction` is a compile-time JointSpec constant,
-  // never measured. Carrying it forward as calibration evidence would be a
-  // fabrication - and after the 2026-08-27 reassembly it is not even evidence
-  // about this servo.
+  // never measured. There is no direction witness in the archive. The
+  // historical spec is usable BY THE REPLAY and by nothing else:
+  //   "LF V25 replay validates historical behaviour using historical
+  //    direction specs. It does not establish current joint direction."
   for (const auto& record : fixture::kLfV25Records) {
     DirectionEvidence spec{};
-    spec.source = DirectionSource::SPEC_CONSTANT;
+    spec.state = DirectionState::SPECIFIED_HISTORICAL;
     spec.sign = record.spec_direction;
     CHECK(spec.sign == -1 || spec.sign == 1);
-    CHECK(!spec.isCalibrationEvidence());   // a constant is not a witness
+    CHECK(spec.isHistoricalSpecification());       // the replay may use it
+    CHECK(!spec.isCurrentCalibrationEvidence());   // current calibration may not
   }
 
-  DirectionEvidence measured{};
-  measured.source = DirectionSource::MEASURED_WITNESS;
-  measured.sign = -1;
-  CHECK(measured.isCalibrationEvidence());
+  // A measured candidate is not yet accepted.
+  DirectionEvidence candidate{};
+  candidate.state = DirectionState::MEASURED_CANDIDATE;
+  candidate.sign = -1;
+  CHECK(!candidate.isCurrentCalibrationEvidence());
 
-  // A sign of 0 is never evidence, whatever the source claims.
-  measured.sign = 0;
-  CHECK(!measured.isCalibrationEvidence());
+  DirectionEvidence accepted{};
+  accepted.state = DirectionState::ACCEPTED;
+  accepted.sign = -1;
+  CHECK(accepted.isCurrentCalibrationEvidence());
 
+  // A sign of 0 is never evidence, whatever the state claims.
+  accepted.sign = 0;
+  CHECK(!accepted.isCurrentCalibrationEvidence());
+
+  // Conflicting sources fail closed.
   DirectionEvidence conflict{};
-  conflict.source = DirectionSource::CONFLICTING;
+  conflict.state = DirectionState::CONFLICT;
   conflict.sign = 1;
-  CHECK(!conflict.isCalibrationEvidence());
+  CHECK(!conflict.isCurrentCalibrationEvidence());
+  CHECK(!conflict.isHistoricalSpecification());
 }
 
 // ---------------------------------------------------------------------------
@@ -282,22 +293,36 @@ static void test_direction_is_unknown_until_measured() {
 
 static void test_contact_witness_band() {
   g_case = "contact_witness_band";
-  CHECK_EQ(kContactWitnessToleranceTicks, 24);  // matdog.rs constant
+  // The 24-tick band is HISTORICAL and LF-only. It lives in the fixture; the
+  // domain has no universal tolerance, because mirroring one leg's measured
+  // band onto the other three is exactly what the evidence file forbids.
+  const uint16_t band = fixture::kLfV25ContactWitnessToleranceTicks;
+  CHECK_EQ(band, 24);
 
-  ContactWitness w{};
-  CHECK(!w.accepted());        // never evaluated => never accepted
+  ContactWitness unevaluated{};
+  CHECK(!unevaluated.accepted());     // never evaluated => never accepted
+  CHECK(!unevaluated.tolerance_set);
 
-  w.evaluated = true;
-  w.min_deviation_ticks = 24;
-  w.max_deviation_ticks = 24;
-  CHECK(w.accepted());         // the bound is inclusive
+  // An evaluated witness with no band set is still not accepted: a zero
+  // tolerance must never be assumed to be a real one.
+  ContactWitness no_band{};
+  no_band.evaluated = true;
+  no_band.min_deviation_ticks = 0;
+  no_band.max_deviation_ticks = 0;
+  CHECK(!no_band.accepted());
 
-  w.max_deviation_ticks = 25;
-  CHECK(!w.accepted());        // one tick past the band is a rejection
+  ContactWitness w = makeContactWitness(band, band, band);
+  CHECK(w.accepted());                // the bound is inclusive
+
+  w = makeContactWitness(band, band + 1, band);
+  CHECK(!w.accepted());               // one tick past the band is a rejection
 
   // BOTH endpoints must be inside; one good endpoint does not rescue the pair.
-  w.min_deviation_ticks = 0;
+  w = makeContactWitness(0, band + 1, band);
   CHECK(!w.accepted());
+
+  w = makeContactWitness(0, 0, band);
+  CHECK(w.accepted());
 }
 
 static void test_contact_state_classification() {
@@ -503,9 +528,7 @@ static void test_lf_v25_oracle_replay() {
       e.has_measurement = true;
       e.coarse_tick = (side == ContactSide::MIN_SIDE) ? record.accepted_min_tick
                                                       : record.accepted_max_tick;
-      e.witness.evaluated = true;
-      e.witness.min_deviation_ticks = 0;
-      e.witness.max_deviation_ticks = 0;
+      e.witness = makeContactWitness(0, 0, fixture::kLfV25ContactWitnessToleranceTicks);
 
       CHECK(isContactEvidence(e.detection));
       CHECK(e.witness.accepted());
@@ -542,8 +565,8 @@ static void test_lf_v25_fine_sequences_match_the_archive() {
     const uint16_t lo = seq.fine_tick_1 < seq.fine_tick_2 ? seq.fine_tick_1 : seq.fine_tick_2;
     const uint16_t hi = seq.fine_tick_1 < seq.fine_tick_2 ? seq.fine_tick_2 : seq.fine_tick_1;
     CHECK_EQ(hi - lo, seq.documented_spread_ticks);
-    // Both samples are inside the uniform witness band around each other.
-    CHECK(hi - lo <= kContactWitnessToleranceTicks);
+    // Both samples sit inside the historical witness band around each other.
+    CHECK(hi - lo <= fixture::kLfV25ContactWitnessToleranceTicks);
   }
   // M13 MAX: coarse 1595, fine 1599/1601, spread 2.
   CHECK_EQ(fixture::kLfV25FineSequences[0].coarse_tick, 1595);
@@ -561,19 +584,11 @@ static void test_lf_v25_documented_failure_replay() {
                              fixture::kLfV25M12MaxObstructedTick;
   CHECK_EQ(deviation, 46);
 
-  ContactWitness obstructed{};
-  obstructed.evaluated = true;
-  obstructed.min_deviation_ticks = 0;
-  obstructed.max_deviation_ticks = deviation;
-  // 46 ticks is outside the 24-tick uniform band, so the witness rejects it -
-  // exactly as it did on hardware.
-  CHECK(!obstructed.accepted());
-
-  ContactWitness clean{};
-  clean.evaluated = true;
-  clean.min_deviation_ticks = 0;
-  clean.max_deviation_ticks = 0;
-  CHECK(clean.accepted());
+  const uint16_t band = fixture::kLfV25ContactWitnessToleranceTicks;
+  // 46 ticks is outside the historical 24-tick band, so the witness rejects
+  // it - exactly as it did on hardware.
+  CHECK(!makeContactWitness(0, deviation, band).accepted());
+  CHECK(makeContactWitness(0, 0, band).accepted());
 
   // The resulting failure demands an ordered restore, not a bare stop.
   RestorePlan p = restorePlanFor(CalibrationPhase::UPPER_MAX,
@@ -614,6 +629,192 @@ static void test_oracle_records_are_historical_provenance_only() {
 }
 
 // ---------------------------------------------------------------------------
+// Joint identity — physical unit, never a bus id
+// ---------------------------------------------------------------------------
+
+static JointIdentity makeIdentity(Leg leg, JointKind joint, const char* unit) {
+  JointIdentity id{};
+  id.leg = leg;
+  id.joint = joint;
+  setPhysicalUnit(&id, unit);
+  return id;
+}
+
+static void test_identity_requires_both_slot_and_physical_unit() {
+  g_case = "identity_requires_both_slot_and_physical_unit";
+  // The 2026-08-27 trap, concretely. In LF V25 the unit labelled M11 was the
+  // LF lower joint. Today LF lower is unit M33 (bus id 11 unchanged), and the
+  // unit M11 is NECK_PITCH. Slot agreement alone must not admit the evidence.
+  const JointIdentity historical = makeIdentity(Leg::LF, JointKind::LOWER, "M11");
+  const JointIdentity current = makeIdentity(Leg::LF, JointKind::LOWER, "M33");
+
+  CHECK(sameJointSlot(historical, current));        // same joint slot...
+  CHECK(!samePhysicalUnit(historical, current));    // ...different servo
+  CHECK(!identityPermitsEvidenceReuse(historical, current));
+
+  // Same unit in the same slot is the only case that passes.
+  const JointIdentity same = makeIdentity(Leg::LF, JointKind::LOWER, "M33");
+  CHECK(identityPermitsEvidenceReuse(current, same));
+
+  // Same unit moved to a different slot does not carry its calibration.
+  const JointIdentity moved = makeIdentity(Leg::RF, JointKind::LOWER, "M33");
+  CHECK(samePhysicalUnit(current, moved));
+  CHECK(!sameJointSlot(current, moved));
+  CHECK(!identityPermitsEvidenceReuse(current, moved));
+
+  // An unknown unit matches nothing - not even another unknown one. Evidence
+  // with no provenance cannot be applied anywhere.
+  JointIdentity unknown_a{};
+  unknown_a.leg = Leg::LF;
+  unknown_a.joint = JointKind::LOWER;
+  JointIdentity unknown_b = unknown_a;
+  CHECK(!unknown_a.unitKnown());
+  CHECK(!samePhysicalUnit(unknown_a, unknown_b));
+  CHECK(!identityPermitsEvidenceReuse(unknown_a, unknown_b));
+
+  // The label is bounded and always terminated.
+  JointIdentity longish{};
+  setPhysicalUnit(&longish, "ABCDEFGHIJKLMNOP");
+  CHECK_EQ(longish.physical_unit[kPhysicalUnitLabelBytes - 1], '\0');
+  CHECK(std::strlen(longish.physical_unit) < kPhysicalUnitLabelBytes);
+  setPhysicalUnit(nullptr, "x");
+}
+
+static void test_identity_has_no_bus_id_to_match_on() {
+  g_case = "identity_has_no_bus_id_to_match_on";
+  // A bus-id-only match is not merely discouraged, it is inexpressible: there
+  // is no bus id field in the identity or in the profile key.
+  const JointIdentity id = makeIdentity(Leg::LF, JointKind::LOWER, "M33");
+  CHECK_EQ(sizeof(id.physical_unit), kPhysicalUnitLabelBytes);
+  // Identity is (leg, joint, unit) and nothing else.
+  CHECK_EQ(sizeof(JointIdentity), sizeof(Leg) + sizeof(JointKind) + kPhysicalUnitLabelBytes);
+  ContactProfileKey key{Leg::LF, JointKind::LOWER, ContactSide::MIN_SIDE};
+  CHECK_EQ(sizeof(key), sizeof(Leg) + sizeof(JointKind) + sizeof(ContactSide));
+}
+
+// ---------------------------------------------------------------------------
+// q0 application rules
+// ---------------------------------------------------------------------------
+
+static void test_q0_cannot_be_applied_without_identity_and_promotion() {
+  g_case = "q0_cannot_be_applied_without_identity_and_promotion";
+  const JointIdentity current = makeIdentity(Leg::LF, JointKind::LOWER, "M33");
+
+  // A historical q0, complete and accepted, still cannot be applied: its
+  // origin forbids promotion and its unit is a different servo.
+  Q0Evidence historical{};
+  historical.measured = true;
+  historical.estimator = Q0Estimator::AFFINE;
+  historical.state = EvidenceState::ACCEPTED;
+  historical.origin = CalibrationOrigin::HISTORICAL_REPLAY;
+  historical.identity = makeIdentity(Leg::LF, JointKind::LOWER, "M11");
+  historical.tick = 2074;
+  CHECK(historical.hasUsableValue());
+  CHECK(!q0MayBeAppliedTo(historical, current));
+
+  // Even promoted and live, a mismatched physical unit is refused.
+  Q0Evidence wrong_unit = historical;
+  wrong_unit.origin = CalibrationOrigin::LIVE_SESSION;
+  wrong_unit.state = EvidenceState::PROMOTED;
+  CHECK(!q0MayBeAppliedTo(wrong_unit, current));
+
+  // Live, promoted, right unit, right slot: the only accepting case.
+  Q0Evidence good = wrong_unit;
+  good.identity = current;
+  CHECK(q0MayBeAppliedTo(good, current));
+
+  // Not promoted yet: ACCEPTED is not operational.
+  Q0Evidence accepted_only = good;
+  accepted_only.state = EvidenceState::ACCEPTED;
+  CHECK(!q0MayBeAppliedTo(accepted_only, current));
+
+  // Unmeasured: nothing to apply, whatever the tick says.
+  Q0Evidence unmeasured = good;
+  unmeasured.measured = false;
+  unmeasured.tick = kServoRawCenter;
+  CHECK(!q0MayBeAppliedTo(unmeasured, current));
+}
+
+// ---------------------------------------------------------------------------
+// Leg population gate (historical docs call it Full-Leg H1)
+// ---------------------------------------------------------------------------
+
+static LegPopulationEvidence makePopulation(uint16_t mask, CalibrationOrigin origin) {
+  LegPopulationEvidence e{};
+  e.evaluated = true;
+  e.origin = origin;
+  e.observed_mask = mask;
+  e.session_ms = 1234;
+  return e;
+}
+
+static void test_leg_population_gate() {
+  g_case = "leg_population_gate";
+  // 12 leg slots: 4 legs x 3 joints. ID 51 and the head/jaw units are not part
+  // of the Full-Leg population.
+  CHECK_EQ(kLegServoSlotCount, 12);
+
+  // Slot indices are dense and round-trip.
+  bool seen[kLegServoSlotCount] = {false};
+  for (Leg leg : kAllLegs) {
+    for (JointKind joint : kAllJoints) {
+      const uint8_t idx = legSlotIndex(leg, joint);
+      CHECK(idx < kLegServoSlotCount);
+      CHECK(!seen[idx]);
+      seen[idx] = true;
+      Leg out_leg = Leg::RF;
+      JointKind out_joint = JointKind::UPPER;
+      CHECK(legSlotFromIndex(idx, &out_leg, &out_joint));
+      CHECK_EQ((int)out_leg, (int)leg);
+      CHECK_EQ((int)out_joint, (int)joint);
+    }
+  }
+  for (uint8_t i = 0; i < kLegServoSlotCount; ++i) CHECK(seen[i]);
+
+  // Invalid inputs fail closed.
+  CHECK_EQ(legSlotIndex(static_cast<Leg>(9), JointKind::HIP), kLegServoSlotCount);
+  Leg l = Leg::LF; JointKind j = JointKind::HIP;
+  CHECK(!legSlotFromIndex(kLegServoSlotCount, &l, &j));
+  CHECK(!legSlotFromIndex(0, nullptr, &j));
+
+  constexpr uint16_t kAll = (1u << kLegServoSlotCount) - 1u;
+
+  // 12/12 live is the only current PASS.
+  LegPopulationEvidence full_live = makePopulation(kAll, CalibrationOrigin::LIVE_SESSION);
+  CHECK_EQ(observedLegSlotCount(full_live), 12);
+  CHECK_EQ((int)evaluateLegPopulation(full_live), (int)PopulationVerdict::PASS);
+  CHECK(populationIsCurrentPass(full_live));
+
+  // The last formal result on record is 6/12 and it is HISTORICAL.
+  LegPopulationEvidence six_of_twelve =
+      makePopulation(0x003Fu, CalibrationOrigin::HISTORICAL_REPLAY);
+  CHECK_EQ(observedLegSlotCount(six_of_twelve), 6);
+  CHECK_EQ((int)evaluateLegPopulation(six_of_twelve), (int)PopulationVerdict::FAIL);
+  CHECK(!populationIsCurrentPass(six_of_twelve));
+
+  // A COMPLETE historical population still cannot be a current PASS. This is
+  // the rule that stops the archive from authorising the robot.
+  LegPopulationEvidence full_historical =
+      makePopulation(kAll, CalibrationOrigin::HISTORICAL_REPLAY);
+  CHECK_EQ((int)evaluateLegPopulation(full_historical), (int)PopulationVerdict::PASS);
+  CHECK(!populationIsCurrentPass(full_historical));
+
+  // Not evaluated, no origin, or bits outside the 12 leg slots: fail closed.
+  LegPopulationEvidence never{};
+  CHECK_EQ((int)evaluateLegPopulation(never), (int)PopulationVerdict::NOT_EVALUATED);
+  CHECK(!populationIsCurrentPass(never));
+  CHECK_EQ((int)evaluateLegPopulation(makePopulation(kAll, CalibrationOrigin::NONE)),
+           (int)PopulationVerdict::INVALID);
+  CHECK_EQ((int)evaluateLegPopulation(
+               makePopulation(0xF000u | kAll, CalibrationOrigin::LIVE_SESSION)),
+           (int)PopulationVerdict::INVALID);
+
+  // The mask says WHICH six, not just how many.
+  CHECK((six_of_twelve.observed_mask >> legSlotIndex(Leg::LF, JointKind::HIP)) & 1u);
+  CHECK(!((six_of_twelve.observed_mask >> legSlotIndex(Leg::LH, JointKind::LOWER)) & 1u));
+}
+
+// ---------------------------------------------------------------------------
 // Presentation
 // ---------------------------------------------------------------------------
 
@@ -638,7 +839,8 @@ static void test_tostring_is_total() {
   CHECK_STR(toString(CalibrationPhase::RETURN_LOWER_HELD), "RETURN_LOWER_HELD");
   CHECK_STR(toString(EvidenceState::PROMOTED), "PROMOTED");
   CHECK_STR(toString(CalibrationOrigin::HISTORICAL_REPLAY), "HISTORICAL_REPLAY");
-  CHECK_STR(toString(DirectionSource::SPEC_CONSTANT), "SPEC_CONSTANT");
+  CHECK_STR(toString(DirectionState::SPECIFIED_HISTORICAL), "SPECIFIED_HISTORICAL");
+  CHECK_STR(toString(PopulationVerdict::FAIL), "FAIL");
 }
 
 int main() {
@@ -666,6 +868,10 @@ int main() {
   test_lf_v25_documented_failure_replay();
   test_lf_v25_bounded_tracking_lag_rule();
   test_oracle_records_are_historical_provenance_only();
+  test_identity_requires_both_slot_and_physical_unit();
+  test_identity_has_no_bus_id_to_match_on();
+  test_q0_cannot_be_applied_without_identity_and_promotion();
+  test_leg_population_gate();
   test_tostring_is_total();
 
   std::printf("checks_run=%d failures=%d\n", g_checks, g_failures);
