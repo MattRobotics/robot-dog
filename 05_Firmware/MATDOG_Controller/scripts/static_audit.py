@@ -1131,6 +1131,142 @@ def check_no_network_to_servo_path(files):
                  f"ServoBus (V2 architecture, forbidden path)")
 
 
+def check_ota_boundaries(files, sketch_dir):
+    """OTA-A permanent invariants.
+
+    OTA is the one subsystem that can make a device unbootable, so the rules
+    that keep it safe are enforced here rather than trusted to review:
+
+      1. the decision layers stay host-linkable, so the offline suite drives
+         the shipped state machine and every failure path is reachable;
+      2. the ESP-IDF OTA API is confined to ONE translation unit;
+      3. the boot target can be changed from exactly one validated state, and
+         only through esp_ota_set_boot_partition in that one unit;
+      4. the running image is never the write target;
+      5. the first-boot confirmation is not called at startup;
+      6. byte ingest is compiled OUT by default - OTA-A has no authentication,
+         so a production image must not contain a reachable firmware writer.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    update_dir = sketch_dir / "src" / "update"
+
+    # --- (1) host-linkable decision layers ---------------------------------
+    for name in ("OtaPolicy.h", "OtaPolicy.cpp", "OtaBootGuard.h", "OtaBootGuard.cpp",
+                 "Sha256.h", "Sha256.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            fail(f"{update_dir / name}: OTA-A decision unit not found")
+            continue
+        path, code = entry
+        for forbidden in ("#include <Arduino.h>", "#include <esp_ota_ops.h>",
+                          "#include <esp_partition.h>", "#include <WiFi.h>"):
+            if forbidden in code:
+                fail(f"{path}: contains {forbidden!r} - the OTA decision layers must stay "
+                     f"free of the Arduino runtime and of ESP-IDF so "
+                     f"scripts/tests/test_ota_policy.cpp drives the REAL state machine "
+                     f"against a fake backend (OTA-A)")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the OTA state layer must stay "
+                 f"transport-independent (ARCHITECTURE.md, telemetry snapshot model)")
+
+    # --- (2) the ESP-IDF OTA API lives in exactly one unit -----------------
+    ota_api = ("esp_ota_begin", "esp_ota_write", "esp_ota_end", "esp_ota_abort",
+               "esp_ota_set_boot_partition", "esp_ota_get_next_update_partition",
+               "esp_ota_mark_app_valid_cancel_rollback", "esp_ota_mark_app_invalid")
+    for path, code in files:
+        if path.name == "OtaEspBackend.cpp":
+            continue
+        hits = [sym for sym in ota_api if sym in code]
+        if hits:
+            fail(f"{path}: calls ESP-IDF OTA API {hits} outside "
+                 f"update/OtaEspBackend.cpp - the write/boot-switch surface must stay in "
+                 f"one auditable translation unit (OTA-A)")
+
+    backend = by_name.get("OtaEspBackend.cpp")
+    if backend is None:
+        fail(f"{update_dir / 'OtaEspBackend.cpp'}: OTA ESP-IDF backend not found")
+    else:
+        path, code = backend
+        # --- (4) the backend refuses to point boot at the running slot -----
+        body = re.search(r"bool OtaEspBackend::setBootPartition\([^)]*\)\s*\{(.*?)\n\}",
+                         code, re.DOTALL)
+        if not body:
+            fail(f"{path}: could not locate setBootPartition() to audit it")
+        elif "esp_ota_get_running_partition" not in body.group(1):
+            fail(f"{path}: setBootPartition() does not independently re-check the running "
+                 f"partition - the last line of defence against pointing the boot target "
+                 f"at the slot we are executing from (OTA-A)")
+        # esp_ota_begin must not be handed an explicit image size: that erases
+        # the whole range up front, seconds of blocking for a ~1 MB image.
+        if "OTA_WITH_SEQUENTIAL_WRITES" not in code:
+            fail(f"{path}: esp_ota_begin() is not using OTA_WITH_SEQUENTIAL_WRITES - an "
+                 f"up-front full-range erase blocks the Controller loop for seconds "
+                 f"(handoff section 18)")
+
+    # --- (3) exactly one commit path, reachable from one state -------------
+    policy = by_name.get("OtaPolicy.cpp")
+    if policy is not None:
+        path, code = policy
+        commit = re.search(r"bool OtaPolicy::commitBootTarget\(\)\s*\{(.*?)\n\}",
+                           code, re.DOTALL)
+        if not commit:
+            fail(f"{path}: could not locate commitBootTarget() to audit it")
+        else:
+            body = commit.group(1)
+            if "OtaState::IDENTITY_VERIFIED" not in body:
+                fail(f"{path}: commitBootTarget() is not gated on "
+                     f"OtaState::IDENTITY_VERIFIED - the boot target must only change "
+                     f"after the stream completed, the image passed the ESP-IDF check and "
+                     f"the hash matched (OTA-A critical safety rule)")
+        # setBootPartition must be called from that one method and nowhere else.
+        calls = len(re.findall(r"setBootPartition\(", code))
+        if calls != 1:
+            fail(f"{path}: setBootPartition( is called {calls} time(s) - exactly one call "
+                 f"site, inside commitBootTarget(), keeps the boot switch auditable")
+        for required, why in (
+            ("OtaFault::TARGET_IS_RUNNING", "the target must be explicitly checked against "
+                                            "the running partition"),
+            ("OtaFault::TARGET_NOT_OTA_SLOT", "the target subtype must be explicitly checked"),
+            ("OtaFault::IMAGE_TOO_LARGE", "the image size must be explicitly bounded by the "
+                                          "target partition"),
+            ("OtaFault::RUNNING_IMAGE_UNCONFIRMED", "a PENDING_VERIFY running image must be "
+                                                    "refused before esp_ota_begin sees it"),
+        ):
+            if required not in code:
+                fail(f"{path}: {required} is not present - {why} (OTA-A, fail closed)")
+
+    # --- (5) first-boot confirmation is earned, not granted at startup -----
+    guard = by_name.get("OtaBootGuard.cpp")
+    if guard is not None:
+        path, code = guard
+        if "markAppValid()" not in code:
+            fail(f"{path}: the boot guard never confirms an image - a PENDING_VERIFY image "
+                 f"would always be rolled back")
+    ctl = by_name.get("Controller.cpp")
+    if ctl is not None:
+        path, code = ctl
+        begin_body = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", code,
+                               re.DOTALL)
+        if begin_body and "markAppValid" in begin_body.group(1):
+            fail(f"{path}: Controller::begin() confirms the OTA image - confirmation must "
+                 f"be earned by running, not granted at startup, or the bootloader's "
+                 f"rollback is thrown away for exactly the case it exists for (OTA-A)")
+
+    # --- (6) ingest compiled out by default --------------------------------
+    manager = by_name.get("OtaManager.h")
+    if manager is None:
+        fail(f"{update_dir / 'OtaManager.h'}: OTA manager not found")
+    else:
+        path, code = manager
+        m = re.search(r"#define\s+MATDOG_OTA_INGEST_ENABLED\s+(\S+)", code)
+        if not m:
+            fail(f"{path}: could not locate the MATDOG_OTA_INGEST_ENABLED default")
+        elif m.group(1).strip() != "0":
+            fail(f"{path}: MATDOG_OTA_INGEST_ENABLED defaults to {m.group(1)!r}, expected 0 "
+                 f"- OTA-A has no authentication, so a reachable firmware writer must not "
+                 f"be compiled into an image by default (handoff section 17)")
+
+
 def check_wifi_runtime_boundaries(files, sketch_dir):
     """W1 permanent invariants for the Wi-Fi runtime.
 
@@ -1317,6 +1453,7 @@ def check_host_tests(sketch_dir):
     suite = sketch_dir / "scripts" / "tests" / "test_servo_population.cpp"
     daly_suite = sketch_dir / "scripts" / "tests" / "test_daly_protocol.cpp"
     wifi_suite = sketch_dir / "scripts" / "tests" / "test_wifi_policy.cpp"
+    ota_suite = sketch_dir / "scripts" / "tests" / "test_ota_policy.cpp"
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
         return
@@ -1326,11 +1463,15 @@ def check_host_tests(sketch_dir):
     if not wifi_suite.exists():
         fail(f"{wifi_suite}: W1 Wi-Fi runtime policy offline test suite not found")
         return
+    if not ota_suite.exists():
+        fail(f"{ota_suite}: OTA-A policy/boot-guard/sha256 offline test suite not found")
+        return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
     runner_text = strip_shell_comments(runner.read_text(encoding="utf-8"))
-    for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy"):
+    for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy",
+                   "test_ota_policy"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
@@ -1651,6 +1792,7 @@ def main():
     check_no_startup_servo_traffic(files)
     check_no_network_to_servo_path(files)
     check_wifi_runtime_boundaries(files, SKETCH_DIR)
+    check_ota_boundaries(files, SKETCH_DIR)
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
