@@ -1131,6 +1131,150 @@ def check_no_network_to_servo_path(files):
                  f"ServoBus (V2 architecture, forbidden path)")
 
 
+def check_actuator_authority(files, sketch_dir):
+    """The arbiter is the single point that decides who may write actuators,
+    so the properties that make it trustworthy are enforced, not reviewed:
+
+      1. it stays host-linkable and knows nothing about hardware;
+      2. SAFE_OFF is outside arbitration, in BOTH directions;
+      3. there is exactly one arbiter instance, owned by the Controller;
+      4. boot always lands on NONE;
+      5. nothing caches a copy of the authority state.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    core_dir = sketch_dir / "src" / "core"
+
+    # --- (1) host-linkable, hardware-blind -------------------------------
+    for name in ("ActuatorAuthority.h", "ActuatorAuthority.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            fail(f"{core_dir / name}: the actuator authority arbiter was not found")
+            continue
+        path, code = entry
+        for forbidden in ("#include <Arduino.h>", "#include <WiFi.h>",
+                          "#include <esp_ota_ops.h>"):
+            if forbidden in code:
+                fail(f"{path}: contains {forbidden!r} - the arbiter must stay host-linkable "
+                     f"so scripts/tests/test_actuator_authority.cpp drives the REAL "
+                     f"decision logic")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the arbiter must stay "
+                 f"transport-independent")
+        # It arbitrates authority; it must not know how to use it.
+        for forbidden in ("ServoBus", "EnableTorque", "WritePos", "SMS_STS", "ServoCensus"):
+            if forbidden in code:
+                fail(f"{path}: references {forbidden!r} - the arbiter decides WHO may "
+                     f"write actuators and must never be able to write one itself")
+
+    # --- (2) SAFE_OFF is outside arbitration, both directions -------------
+    # (a) ServoBus must not be able to consult an authority even if a later
+    #     change wanted it to.
+    for name in ("ServoBus.h", "ServoBus.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            continue
+        path, code = entry
+        for token in ("ActuatorAuthority", "authority", "Authority"):
+            if token in code:
+                fail(f"{path}: references {token!r} - SAFE_OFF must stay reachable in every "
+                     f"authority state, so the servo transport must not be able to consult "
+                     f"the arbiter at all (permanent invariant)")
+
+    # (b) The SAFE_OFF command branch must not gain an authority condition.
+    router = by_name.get("CommandRouter.cpp")
+    if router is not None:
+        path, code = router
+        branch = re.search(
+            r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
+            code, re.DOTALL)
+        if not branch:
+            fail(f"{path}: could not locate the @SERVO SAFE_OFF branch to audit it")
+        else:
+            body = branch.group(1)
+            for token in ("authority", "Authority", "operating_mode"):
+                if token in body:
+                    fail(f"{path}: the @SERVO SAFE_OFF branch references {token!r} - a safety "
+                         f"de-escalation must never be gated on authority or mode")
+        printer = re.search(r"void CommandRouter::printServoSafeOff\(int id\)\s*\{(.*?)\n\}",
+                            code, re.DOTALL)
+        if printer and ("authority" in printer.group(1) or "Authority" in printer.group(1)):
+            fail(f"{path}: printServoSafeOff() consults the authority - SAFE_OFF must not be "
+                 f"arbitrated")
+
+    # --- (3)(5) exactly one arbiter, owned by the Controller --------------
+    owners = []
+    for path, code in files:
+        for m in re.finditer(r"ActuatorAuthorityArbiter\s+(\w+)\s*[;{]", code):
+            owners.append((str(path), m.group(1)))
+    # Controller.h holds the one instance; the test suite may create its own.
+    real = [(p, n) for p, n in owners if "/scripts/" not in p]
+    if len(real) != 1 or pathlib.Path(real[0][0]).name != "Controller.h":
+        fail(f"ActuatorAuthorityArbiter is instantiated at {real} - exactly one instance "
+             f"must exist, owned by core/Controller.h. A second arbiter is a second "
+             f"authority model")
+
+    # Nobody may cache the current owner: they hold a pointer and ask.
+    for path, code in files:
+        if path.name in ("ActuatorAuthority.h", "ActuatorAuthority.cpp", "Controller.h"):
+            continue
+        if "/scripts/" in str(path):
+            continue
+        if re.search(r"ActuatorAuthority\s+\w+_\s*(=|;)", code):
+            fail(f"{path}: stores a copy of the ActuatorAuthority value - there is one "
+                 f"authority state and it lives in the arbiter; consult it, do not "
+                 f"remember it")
+
+    # --- (4) boot lands on NONE ------------------------------------------
+    ctl = by_name.get("Controller.cpp")
+    if ctl is not None:
+        path, code = ctl
+        body = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not body:
+            fail(f"{path}: could not locate Controller::begin() to audit authority init")
+        elif not re.search(r"authority_\.reset\(", body.group(1)):
+            fail(f"{path}: Controller::begin() does not reset the actuator authority - boot "
+                 f"must always land on NONE and must never restore a previous authority")
+
+    # --- OTA-B: the placeholder must be gone, not coexisting ---------------
+    for path, code in files:
+        for token in ("OtaStageAGate", "PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET"):
+            if token in code:
+                fail(f"{path}: still references the OTA-A placeholder {token!r} - OTA-B "
+                     f"replaces it; both must not coexist")
+
+    gate = by_name.get("OtaAuthorityGate.cpp")
+    if gate is None:
+        fail(f"{sketch_dir / 'src' / 'update' / 'OtaAuthorityGate.cpp'}: the OTA-B "
+             f"authorization gate was not found")
+    else:
+        path, code = gate
+        if "requestInhibit(" not in code:
+            fail(f"{path}: the OTA gate does not take an exclusivity hold - a plain "
+                 f"`authority == NONE` query cannot close the window between the check and "
+                 f"a multi-second update (OTA-B TOCTOU)")
+        if "request(" in code.replace("requestInhibit(", ""):
+            fail(f"{path}: the OTA gate acquires an actuator OWNER - OTA does not drive "
+                 f"actuators; it must inhibit, not own")
+
+    # OTA must never appear as an actuator owner.
+    auth_header = by_name.get("ActuatorAuthority.h")
+    if auth_header is not None:
+        path, code = auth_header
+        m = re.search(r"enum class ActuatorAuthority\s*:\s*uint8_t\s*\{(.*?)\}", code,
+                      re.DOTALL)
+        if not m:
+            fail(f"{path}: could not locate the ActuatorAuthority enum")
+        else:
+            body = m.group(1)
+            if re.search(r"\bOTA\b|UPDATE|FIRMWARE", body):
+                fail(f"{path}: the ActuatorAuthority enum contains an OTA/update owner - OTA "
+                     f"is not an actuator user; it requires that nobody is one")
+            for required in ("NONE", "DIAGNOSTICS", "CALIBRATION", "QC", "PROVISIONING",
+                             "MOTION"):
+                if required not in body:
+                    fail(f"{path}: the ActuatorAuthority enum is missing {required!r}")
+
+
 def check_ota_boundaries(files, sketch_dir):
     """OTA-A permanent invariants.
 
@@ -1454,6 +1598,7 @@ def check_host_tests(sketch_dir):
     daly_suite = sketch_dir / "scripts" / "tests" / "test_daly_protocol.cpp"
     wifi_suite = sketch_dir / "scripts" / "tests" / "test_wifi_policy.cpp"
     ota_suite = sketch_dir / "scripts" / "tests" / "test_ota_policy.cpp"
+    authority_suite = sketch_dir / "scripts" / "tests" / "test_actuator_authority.cpp"
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
         return
@@ -1466,12 +1611,15 @@ def check_host_tests(sketch_dir):
     if not ota_suite.exists():
         fail(f"{ota_suite}: OTA-A policy/boot-guard/sha256 offline test suite not found")
         return
+    if not authority_suite.exists():
+        fail(f"{authority_suite}: ActuatorAuthority offline test suite not found")
+        return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
     runner_text = strip_shell_comments(runner.read_text(encoding="utf-8"))
     for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy",
-                   "test_ota_policy"):
+                   "test_ota_policy", "test_actuator_authority"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
@@ -1793,6 +1941,7 @@ def main():
     check_no_network_to_servo_path(files)
     check_wifi_runtime_boundaries(files, SKETCH_DIR)
     check_ota_boundaries(files, SKETCH_DIR)
+    check_actuator_authority(files, SKETCH_DIR)
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
