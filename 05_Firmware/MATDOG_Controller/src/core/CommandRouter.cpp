@@ -186,6 +186,8 @@ void CommandRouter::handleLine(String line) {
       Serial.println("HINT=create src/config/WifiCredentials.local.h and rebuild");
     }
     printWifiStatus();
+  } else if (upper == "@AUTHORITY STATUS") {
+    printAuthorityStatus();
   } else if (upper == "@OTA STATUS") {
     printOtaStatus();
   } else if (upper.startsWith("@SERVO SCAN")) {
@@ -247,12 +249,17 @@ void CommandRouter::handleLine(String line) {
     }
   } else if (upper == "@MODE STATUS") {
     printModeStatus();
-  } else if (upper == "@MODE MAINTENANCE") {
-    modules_.operating_mode->setMode(OperatingMode::MAINTENANCE);
+  } else if (upper == "@MODE MAINTENANCE" || upper == "@MODE RUN") {
+    const OperatingMode next =
+        (upper == "@MODE RUN") ? OperatingMode::RUN : OperatingMode::MAINTENANCE;
+    modules_.operating_mode->setMode(next);
+    // A mode change that leaves the current owner incompatible clears it
+    // rather than leaving a suspended authority behind. Today nothing can
+    // ever hold one, so this is a no-op - it exists so the first real owner
+    // does not have to remember to add it.
+    modules_.authority->onOperatingModeChanged(next);
     printModeStatus();
-  } else if (upper == "@MODE RUN") {
-    modules_.operating_mode->setMode(OperatingMode::RUN);
-    printModeStatus();
+    printAuthorityStatus();
   } else if (upper == "@SYSTEM SHUTDOWN") {
     modules_.power_state->requestShutdown();
     Serial.println("SHUTDOWN_REQUESTED=YES");
@@ -286,6 +293,7 @@ void CommandRouter::printHelp() {
   Serial.println("  @WIFI STATUS           (cached snapshot; no radio query)");
   Serial.println("  @WIFI ON|OFF           (any mode; refused without credentials)");
   Serial.println("  @OTA STATUS            (read-only; OTA-A ships no transport)");
+  Serial.println("  @AUTHORITY STATUS      (read-only; no owner can be acquired yet)");
   Serial.println("  @SERVO SCAN <lo> <hi>   (MAINTENANCE mode only; incremental, bounded");
   Serial.println("                           per-ID blocking, result follows asynchronously)");
   Serial.println("  @SERVO CENSUS           (MAINTENANCE mode only; canonical 11-55 scan,");
@@ -378,12 +386,44 @@ void CommandRouter::printWifiStatus() {
                 (unsigned long)w.last_update_us, (unsigned long)w.max_update_us);
 }
 
+void CommandRouter::printAuthorityStatus() {
+  const ActuatorAuthorityArbiter* a = modules_.authority;
+  const AuthorityCounters& c = a->counters();
+
+  Serial.printf("AUTHORITY owner=%s generation=%lu last_result=%s\n",
+                toString(a->current()), (unsigned long)a->generation(),
+                toString(a->lastResult()));
+  Serial.printf("AUTHORITY_INHIBIT active=%s reason=%s\n",
+                a->inhibited() ? "YES" : "NO", toString(a->inhibitReason()));
+  Serial.printf("AUTHORITY_MODE operating_mode=%s motion_allowed=%s service_allowed=%s\n",
+                toString(modules_.operating_mode->mode()),
+                isModeCompatible(modules_.operating_mode->mode(),
+                                 ActuatorAuthority::MOTION) ? "YES" : "NO",
+                isModeCompatible(modules_.operating_mode->mode(),
+                                 ActuatorAuthority::CALIBRATION) ? "YES" : "NO");
+  Serial.printf("AUTHORITY_LAST_CLEAR %s\n", toString(a->lastClearReason()));
+  Serial.printf("AUTHORITY_COUNTERS grants=%lu already_owned=%lu releases=%lu "
+                "rejections=%lu stale=%lu force_clears=%lu inhibits=%lu\n",
+                (unsigned long)c.grants, (unsigned long)c.already_owned,
+                (unsigned long)c.releases, (unsigned long)c.rejections,
+                (unsigned long)c.stale_releases, (unsigned long)c.force_clears,
+                (unsigned long)c.inhibit_grants);
+  // The property that must survive every future phase: a safety
+  // de-escalation is not arbitrated.
+  Serial.println("AUTHORITY_NOTE SAFE_OFF is outside arbitration and always reachable");
+}
+
 void CommandRouter::printStatus() {
   SystemState* s = modules_.system_state;
-  Serial.printf("SYSTEM health=%s power_state=%s mode=%s uptime_ms=%lu profile=%s\n",
+  // authority= is on the SYSTEM line rather than its own, to stay inside the
+  // USB CDC TX ring budget the audit enforces (worst single-pass burst was
+  // 2758 B against a 3072 B ring after Wi-Fi/OTA; this adds ~24 B).
+  Serial.printf("SYSTEM health=%s power_state=%s mode=%s authority=%s uptime_ms=%lu "
+                "profile=%s\n",
                 toString(s->systemHealth()),
                 toString(modules_.power_state->state()),
                 toString(modules_.operating_mode->mode()),
+                toString(modules_.authority->current()),
                 (unsigned long)s->uptimeMillis(millis()),
                 build::kTestProfile);
 

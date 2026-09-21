@@ -10,6 +10,7 @@
 #include "../servo/ServoBus.h"
 #include "../servo/ServoCensus.h"
 #include "../status/LedRing.h"
+#include "ActuatorAuthority.h"
 #include "Availability.h"
 #include "OperatingMode.h"
 #include "PowerState.h"
@@ -38,6 +39,9 @@ class CommandRouter {
     SystemState* system_state;
     PowerStateMachine* power_state;
     OperatingModeManager* operating_mode;
+    // Pointer to the ONE arbiter owned by Controller. Never a copy of its
+    // state: the router asks, it does not remember.
+    ActuatorAuthorityArbiter* authority;
   };
 
   void begin(const Modules& modules);
@@ -77,6 +81,11 @@ class CommandRouter {
   void printServoRead(int id);
   void printServoSafeOff(int id);
   void printModeStatus();
+  // Read-only presentation of the central arbiter. There is deliberately no
+  // command that acquires or releases authority: no write-capable owner
+  // exists yet, and an operator-driven acquire would be a write path this
+  // phase explicitly does not add.
+  void printAuthorityStatus();
   static void printAvailabilityLine(const char* label, const AvailabilityStatus& a);
 
   Modules modules_{};

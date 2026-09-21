@@ -10,6 +10,7 @@
 #include "../servo/ServoCensus.h"
 #include "../status/LedRing.h"
 #include "../update/OtaManager.h"
+#include "ActuatorAuthority.h"
 #include "CommandRouter.h"
 #include "OperatingMode.h"
 #include "PowerState.h"
@@ -45,6 +46,11 @@ class Controller {
   SystemState system_state_;
   PowerStateMachine power_state_;
   OperatingModeManager operating_mode_;
+  // THE central arbiter of actuator write authority. Exactly one instance
+  // exists, here. No other component keeps a copy of its state - they hold a
+  // pointer and ask. Orthogonal to operating_mode_: that says what the
+  // Controller is doing, this says who, if anyone, may write actuators.
+  ActuatorAuthorityArbiter authority_;
   CommandRouter command_router_;
 
   // Set only at the very end of begin(). The OTA self-check must not treat a

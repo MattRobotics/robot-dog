@@ -53,11 +53,16 @@ void Controller::begin() {
 
   system_state_.beginBoot(millis());
 
+  // Boot always lands on NONE. A previous authority is never restored - not
+  // from NVS, not from a retained value, not from anywhere. See
+  // core/ActuatorAuthority.h.
+  authority_.reset(AuthorityClearReason::BOOT);
+
   // Before the banner, so the banner can report what the bootloader left us
   // with. Reads the partition table and otadata; writes nothing. In
   // particular it does NOT confirm the running image - that is earned in
   // update(), over seconds, by actually running (see update/OtaBootGuard.h).
-  ota_.begin(millis());
+  ota_.begin(millis(), &authority_);
 
   printBootBanner();
 
@@ -96,7 +101,7 @@ void Controller::begin() {
 
   CommandRouter::Modules modules{
       &servo_bus_, &servo_census_, &imu_, &daly_, &led_, &wifi_, &ota_, &system_state_,
-      &power_state_, &operating_mode_,
+      &power_state_, &operating_mode_, &authority_,
   };
   command_router_.begin(modules);
 
@@ -170,6 +175,11 @@ void Controller::printBootBanner() {
   Serial.println("startup_servo_scan : DISABLED");
   Serial.println("daly_write       : KEY_LOGIC_DISCHARGE_ONLY (operator command; no MOS/power-cut write)");
   Serial.printf("operating_mode   : %s\n", toString(operating_mode_.mode()));
+  // Two orthogonal axes, printed together so they can never be confused for
+  // one. actuator_authority is NONE at boot, always.
+  Serial.printf("actuator_authority : %s (inhibit=%s)\n",
+                toString(authority_.current()),
+                authority_.inhibited() ? toString(authority_.inhibitReason()) : "NONE");
   Serial.println();
 }
 
