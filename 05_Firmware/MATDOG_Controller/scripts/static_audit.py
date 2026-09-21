@@ -1131,6 +1131,118 @@ def check_no_network_to_servo_path(files):
                  f"ServoBus (V2 architecture, forbidden path)")
 
 
+def check_calibration_boundaries(files, sketch_dir):
+    """Calibration is the subsystem that will eventually move the robot, so the
+    boundaries that keep it inert today are enforced rather than reviewed:
+
+      1. the pure model stays pure - no Arduino, ServoBus, Wi-Fi or OTA;
+      2. the manager owns no transport and no actuator primitive;
+      3. no write path is introduced anywhere by this subsystem;
+      4. SAFE_OFF stays outside it;
+      5. the historical fixture cannot become runtime calibration;
+      6. hardware motion stays compile-time blocked;
+      7. exactly one Controller-owned CalibrationManager.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    cal_dir = sketch_dir / "src" / "calibration"
+
+    # --- (1)(2) purity of the whole subsystem -----------------------------
+    for name in ("CalibrationDomain.h", "CalibrationDomain.cpp",
+                 "CalibrationManager.h", "CalibrationManager.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            fail(f"{cal_dir / name}: calibration unit not found")
+            continue
+        path, code = entry
+        for forbidden in ("#include <Arduino.h>", "#include <WiFi.h>",
+                          "#include <esp_ota_ops.h>", "ServoBus", "ServoCensus",
+                          "WifiManager", "OtaManager", "HardwareSerial"):
+            if forbidden in code:
+                fail(f"{path}: references {forbidden!r} - the calibration layer must stay "
+                     f"pure and host-linkable, and must never own a transport. Population "
+                     f"evidence is an INPUT from servo/ServoCensus; a second census or a "
+                     f"direct bus path is forbidden")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the calibration layer must stay "
+                 f"transport-independent")
+
+        # --- (3) no write path, anywhere in the subsystem -----------------
+        for token in ("EnableTorque", "TorqueEnable", "WritePos", "SyncWrite", "RegWrite",
+                      "SMS_STS", "CalibrationOfs", "unLockEprom", "LockEprom",
+                      "PositionOffset", "GoalPosition"):
+            if token in code:
+                fail(f"{path}: references actuator/EEPROM primitive {token!r} - this phase "
+                     f"implements the arbiter and the evidence model, not a write path")
+
+    # --- (4) SAFE_OFF is not routed through calibration --------------------
+    router = by_name.get("CommandRouter.cpp")
+    if router is not None:
+        path, code = router
+        branch = re.search(
+            r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
+            code, re.DOTALL)
+        if branch and ("calibration" in branch.group(1) or "Calibration" in branch.group(1)):
+            fail(f"{path}: the @SERVO SAFE_OFF branch references calibration - a safety "
+                 f"de-escalation must never be routed through a calibration session")
+
+    for name in ("ServoBus.h", "ServoBus.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            continue
+        path, code = entry
+        if "Calibration" in code or "calibration" in code:
+            fail(f"{path}: references calibration - the servo transport must not be able to "
+                 f"consult a calibration session, so SAFE_OFF stays reachable in every state")
+
+    # --- (5) the historical fixture is not runtime calibration -------------
+    for path, code in files:
+        if "/scripts/tests/" in str(path):
+            continue
+        if "lf_v25_oracle_fixture" in code or "kLfV25" in code:
+            fail(f"{path}: references the LF V25 historical fixture outside the offline "
+                 f"tests - it describes a physical installation that no longer exists and "
+                 f"must never be compiled as runtime calibration")
+
+    # --- (6) hardware motion stays compile-time blocked --------------------
+    manager = by_name.get("CalibrationManager.h")
+    if manager is None:
+        fail(f"{cal_dir / 'CalibrationManager.h'}: CalibrationManager not found")
+    else:
+        path, code = manager
+        m = re.search(r"#define\s+MATDOG_CALIBRATION_HARDWARE_MOTION_AUTHORIZED\s+(\S+)",
+                      code)
+        if not m:
+            fail(f"{path}: could not locate the MATDOG_CALIBRATION_HARDWARE_MOTION_AUTHORIZED "
+                 f"default")
+        elif m.group(1).strip() != "0":
+            fail(f"{path}: hardware motion defaults to {m.group(1)!r}, expected 0 - "
+                 f"MATDOG_JOINT_CALIBRATION.yaml declares "
+                 f"CALIBRATION_RESET_PENDING_FULL_RECALIBRATION with "
+                 f"hardware_motion_authorized: false, and unblocking it requires a real "
+                 f"recalibration, not a flag flip")
+
+    # --- q0 must not be able to default to the raw servo centre ------------
+    domain = by_name.get("CalibrationDomain.cpp")
+    if domain is not None:
+        path, code = domain
+        if re.search(r"tick\s*=\s*kServoRawCenter", code) or \
+           re.search(r"tick\s*=\s*2048", code):
+            fail(f"{path}: assigns the raw servo centre to a q0 tick - the raw centre is a "
+                 f"servo-level fact that says nothing about joint zero. "
+                 f"MATDOG_JOINT_CALIBRATION.yaml: the final value MUST BE MEASURED")
+
+    # --- (7) exactly one manager, owned by the Controller ------------------
+    owners = []
+    for path, code in files:
+        if "/scripts/" in str(path):
+            continue
+        for m in re.finditer(r"CalibrationManager\s+(\w+)\s*[;{]", code):
+            owners.append((str(path), m.group(1)))
+    if owners and (len(owners) != 1 or pathlib.Path(owners[0][0]).name != "Controller.h"):
+        fail(f"CalibrationManager is instantiated at {owners} - exactly one instance must "
+             f"exist, owned by core/Controller.h")
+
+
 def check_actuator_authority(files, sketch_dir):
     """The arbiter is the single point that decides who may write actuators,
     so the properties that make it trustworthy are enforced, not reviewed:
@@ -1599,6 +1711,10 @@ def check_host_tests(sketch_dir):
     wifi_suite = sketch_dir / "scripts" / "tests" / "test_wifi_policy.cpp"
     ota_suite = sketch_dir / "scripts" / "tests" / "test_ota_policy.cpp"
     authority_suite = sketch_dir / "scripts" / "tests" / "test_actuator_authority.cpp"
+    calibration_suites = [
+        sketch_dir / "scripts" / "tests" / "test_calibration_domain.cpp",
+        sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
+    ]
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
         return
@@ -1614,12 +1730,17 @@ def check_host_tests(sketch_dir):
     if not authority_suite.exists():
         fail(f"{authority_suite}: ActuatorAuthority offline test suite not found")
         return
+    for suite in calibration_suites:
+        if not suite.exists():
+            fail(f"{suite}: calibration offline test suite not found")
+            return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
     runner_text = strip_shell_comments(runner.read_text(encoding="utf-8"))
     for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy",
-                   "test_ota_policy", "test_actuator_authority"):
+                   "test_ota_policy", "test_actuator_authority",
+                   "test_calibration_domain", "test_calibration_manager"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
@@ -1942,6 +2063,7 @@ def main():
     check_wifi_runtime_boundaries(files, SKETCH_DIR)
     check_ota_boundaries(files, SKETCH_DIR)
     check_actuator_authority(files, SKETCH_DIR)
+    check_calibration_boundaries(files, SKETCH_DIR)
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
