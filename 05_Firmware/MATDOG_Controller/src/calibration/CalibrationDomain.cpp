@@ -70,6 +70,101 @@ void formatProfileToken(const ContactProfileKey& key, uint8_t historical_motor_i
   out[w < out_size ? w : out_size - 1] = '\0';
 }
 
+void setPhysicalUnit(JointIdentity* identity, const char* label) {
+  if (identity == nullptr) return;
+  size_t i = 0;
+  if (label != nullptr) {
+    while (i + 1 < kPhysicalUnitLabelBytes && label[i] != '\0') {
+      identity->physical_unit[i] = label[i];
+      ++i;
+    }
+  }
+  identity->physical_unit[i] = '\0';
+}
+
+bool sameJointSlot(const JointIdentity& a, const JointIdentity& b) {
+  return a.valid() && b.valid() && a.leg == b.leg && a.joint == b.joint;
+}
+
+bool samePhysicalUnit(const JointIdentity& a, const JointIdentity& b) {
+  // Two unknown units are not "the same unit". An unknown identity can never
+  // match anything, which is what stops evidence with no provenance from
+  // being applied anywhere.
+  if (!a.unitKnown() || !b.unitKnown()) return false;
+  for (size_t i = 0; i < kPhysicalUnitLabelBytes; ++i) {
+    if (a.physical_unit[i] != b.physical_unit[i]) return false;
+    if (a.physical_unit[i] == '\0') return true;
+  }
+  return true;
+}
+
+bool identityPermitsEvidenceReuse(const JointIdentity& historical,
+                                  const JointIdentity& current) {
+  // BOTH axes. Slot agreement alone is exactly what the 2026-08-27 reassembly
+  // made unsafe: bus id 11 is still "LF lower", but it is a different servo.
+  return sameJointSlot(historical, current) && samePhysicalUnit(historical, current);
+}
+
+ContactWitness makeContactWitness(uint16_t min_deviation_ticks, uint16_t max_deviation_ticks,
+                                  uint16_t tolerance_ticks) {
+  ContactWitness w{};
+  w.evaluated = true;
+  w.tolerance_set = true;
+  w.min_deviation_ticks = min_deviation_ticks;
+  w.max_deviation_ticks = max_deviation_ticks;
+  w.tolerance_ticks = tolerance_ticks;
+  return w;
+}
+
+bool q0MayBeAppliedTo(const Q0Evidence& evidence, const JointIdentity& current_joint) {
+  if (!evidence.hasUsableValue()) return false;
+  // A replayed q0 describes a servo that is no longer in that joint - and in
+  // the LF V25 case, no longer in a leg at all.
+  if (!mayPromote(evidence.origin)) return false;
+  if (!isOperationalEvidence(evidence.state)) return false;
+  return identityPermitsEvidenceReuse(evidence.identity, current_joint);
+}
+
+uint8_t legSlotIndex(Leg leg, JointKind joint) {
+  if (!isKnownLeg(leg) || !isKnownJointKind(joint)) return kLegServoSlotCount;
+  return static_cast<uint8_t>(static_cast<uint8_t>(leg) * kJointKindCount +
+                              static_cast<uint8_t>(joint));
+}
+
+bool legSlotFromIndex(uint8_t index, Leg* out_leg, JointKind* out_joint) {
+  if (index >= kLegServoSlotCount || out_leg == nullptr || out_joint == nullptr) return false;
+  *out_leg = static_cast<Leg>(index / kJointKindCount);
+  *out_joint = static_cast<JointKind>(index % kJointKindCount);
+  return true;
+}
+
+uint8_t observedLegSlotCount(const LegPopulationEvidence& evidence) {
+  uint8_t count = 0;
+  for (uint8_t i = 0; i < kLegServoSlotCount; ++i) {
+    if ((evidence.observed_mask >> i) & 1u) ++count;
+  }
+  return count;
+}
+
+PopulationVerdict evaluateLegPopulation(const LegPopulationEvidence& evidence) {
+  if (!evidence.evaluated) return PopulationVerdict::NOT_EVALUATED;
+  // Any bit outside the 12 leg slots means the evidence was built against a
+  // different model; refuse rather than mask it away.
+  constexpr uint16_t kAllSlots =
+      static_cast<uint16_t>((1u << kLegServoSlotCount) - 1u);
+  if ((evidence.observed_mask & ~kAllSlots) != 0) return PopulationVerdict::INVALID;
+  if (evidence.origin == CalibrationOrigin::NONE) return PopulationVerdict::INVALID;
+  return observedLegSlotCount(evidence) == kLegServoSlotCount ? PopulationVerdict::PASS
+                                                              : PopulationVerdict::FAIL;
+}
+
+bool populationIsCurrentPass(const LegPopulationEvidence& evidence) {
+  // Historical evidence - including the 6/12 on record - can never produce a
+  // current PASS, however complete it looks.
+  if (evidence.origin != CalibrationOrigin::LIVE_SESSION) return false;
+  return evaluateLegPopulation(evidence) == PopulationVerdict::PASS;
+}
+
 bool isContactEvidence(ContactState state) { return state == ContactState::CONTACT_CONFIRMED; }
 
 bool isContactFailure(ContactState state) {
@@ -312,14 +407,25 @@ const char* toString(CalibrationFailure failure) {
   return "UNKNOWN";
 }
 
-const char* toString(DirectionSource source) {
-  switch (source) {
-    case DirectionSource::UNKNOWN:          return "UNKNOWN";
-    case DirectionSource::SPEC_CONSTANT:    return "SPEC_CONSTANT";
-    case DirectionSource::MEASURED_WITNESS: return "MEASURED_WITNESS";
-    case DirectionSource::CONFLICTING:      return "CONFLICTING";
+const char* toString(DirectionState state) {
+  switch (state) {
+    case DirectionState::UNKNOWN:              return "UNKNOWN";
+    case DirectionState::SPECIFIED_HISTORICAL: return "SPECIFIED_HISTORICAL";
+    case DirectionState::MEASURED_CANDIDATE:   return "MEASURED_CANDIDATE";
+    case DirectionState::ACCEPTED:             return "ACCEPTED";
+    case DirectionState::CONFLICT:             return "CONFLICT";
   }
-  return "UNKNOWN_SOURCE";
+  return "UNKNOWN_STATE";
+}
+
+const char* toString(PopulationVerdict verdict) {
+  switch (verdict) {
+    case PopulationVerdict::NOT_EVALUATED: return "NOT_EVALUATED";
+    case PopulationVerdict::PASS:          return "PASS";
+    case PopulationVerdict::FAIL:          return "FAIL";
+    case PopulationVerdict::INVALID:       return "INVALID";
+  }
+  return "UNKNOWN";
 }
 
 const char* toString(Q0Estimator estimator) {

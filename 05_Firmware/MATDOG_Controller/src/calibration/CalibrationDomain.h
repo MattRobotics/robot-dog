@@ -81,6 +81,43 @@ struct ContactProfileKey {
 // any invalid key - fail closed, never a wrapped or clamped index.
 uint16_t contactProfileIndex(const ContactProfileKey& key);
 
+// ---------------------------------------------------------------------------
+// Joint identity — physical unit first, bus id nowhere
+// ---------------------------------------------------------------------------
+
+// A bus id is an ADDRESS, not an identity. The 2026-08-27 reassembly recoded
+// ids and moved physical units between joints: today bus id 11 still means
+// "LF lower", but the servo answering there is unit M33, while the unit
+// labelled M11 - whose calibration the LF V25 archive records - is NECK_PITCH.
+//
+// So evidence is keyed by (leg, joint) plus the PHYSICAL UNIT LABEL from
+// config/MATDOG_SERVO_ALLOCATION.yaml ("M33", "ELR01", ...). There is no bus
+// id field anywhere in this model, which makes a bus-id-only match impossible
+// to express rather than merely discouraged.
+constexpr size_t kPhysicalUnitLabelBytes = 8;
+
+struct JointIdentity {
+  Leg leg = Leg::LF;
+  JointKind joint = JointKind::HIP;
+  char physical_unit[kPhysicalUnitLabelBytes] = {0};
+
+  bool unitKnown() const { return physical_unit[0] != '\0'; }
+  bool valid() const { return isKnownLeg(leg) && isKnownJointKind(joint); }
+};
+
+void setPhysicalUnit(JointIdentity* identity, const char* label);
+
+// Same mechanical joint position on the robot.
+bool sameJointSlot(const JointIdentity& a, const JointIdentity& b);
+// Same physical servo. Two unknown units are NOT the same unit.
+bool samePhysicalUnit(const JointIdentity& a, const JointIdentity& b);
+
+// Required before any historical evidence may be applied to a current joint:
+// BOTH the slot and the physical unit must agree. Slot agreement alone is what
+// the reassembly made unsafe.
+bool identityPermitsEvidenceReuse(const JointIdentity& historical,
+                                  const JointIdentity& current);
+
 // Inverse of contactProfileIndex(). Returns false for an out-of-range index.
 bool contactProfileFromIndex(uint16_t index, ContactProfileKey* out);
 
@@ -108,105 +145,6 @@ enum class ContactState : uint8_t {
 // mistake the V24 run made before the witness gate was added.
 bool isContactEvidence(ContactState state);
 bool isContactFailure(ContactState state);
-
-// ---------------------------------------------------------------------------
-// q0 - a MEASURED mechanical reference, never a constant
-// ---------------------------------------------------------------------------
-
-// The single most dangerous number in MATDOG calibration is 2048, because it
-// is three different things that all happen to share a value:
-//
-//   kServoRawCenter        the ST3215 raw centre. A servo-level fact only.
-//                          MATDOG_JOINT_CALIBRATION.yaml: "says nothing about
-//                          joint zero, mounting or direction".
-//   displayed-after-freeze what the servo reads back once PositionOffset has
-//                          been written (LF V25 accepted 2048 +/- 10).
-//   q0                     the measured mechanical zero. LF V25 measured
-//                          2067 / 2040 / 2074 - NOT ONE OF THEM IS 2048.
-//
-// These are kept in separate types so the third can never silently inherit the
-// first. The current repository rule is explicit:
-//   "The final value MUST BE MEASURED, not assumed or asserted.
-//    Do not impose q0_correction = 0."
-constexpr uint16_t kServoRawCenter = 2048;
-
-// LF V25 produced TWO independent zero estimates per joint and did not treat
-// them as interchangeable.
-enum class Q0Estimator : uint8_t {
-  NONE          = 0,
-  FIXED_SCALE   = 1,  // ModelZeroEstimate  - nominal tick scale, kept as diagnostic
-  AFFINE        = 2,  // AffineJointCalibration - measured span; AUTHORITATIVE in V25
-};
-
-struct Q0Evidence {
-  bool measured = false;              // false means "no measurement exists", not "2048"
-  Q0Estimator estimator = Q0Estimator::NONE;
-  uint16_t tick = 0;                  // meaningless unless measured == true
-  uint16_t shift_from_digital_home_ticks = 0;
-  uint16_t endpoint_disagreement_ticks = 0;
-  uint16_t scale_permille = 0;
-  bool accepted_by_gate = false;      // the V25 per-record `accepted` field
-
-  // The whole point of this type. An unmeasured q0 has no value at all, and in
-  // particular is NOT the raw servo centre.
-  bool hasUsableValue() const { return measured && estimator != Q0Estimator::NONE; }
-};
-
-// ---------------------------------------------------------------------------
-// Direction - recovered honestly, including what is NOT there
-// ---------------------------------------------------------------------------
-
-// AUDIT FINDING: there is no "direction witness" in the LF V25 archive.
-// `direction` is a compile-time constant in JointSpec, used arithmetically as
-//     tick = HOME_TICK + direction * q_delta
-// and is never measured, cross-checked or validated against evidence.
-//
-// The witness that DOES exist is the CONTACT witness (see ContactWitness
-// below), which compares measured contacts against a supervised hardware band.
-//
-// Representing a spec constant as if it were measured evidence would be a
-// fabrication, so the provenance is part of the type. A direction may only be
-// treated as calibration evidence when it is MEASURED_WITNESS.
-enum class DirectionSource : uint8_t {
-  UNKNOWN         = 0,  // nothing establishes it
-  SPEC_CONSTANT   = 1,  // LF V25: a hard-coded JointSpec value, NOT evidence
-  MEASURED_WITNESS = 2, // TO_IMPLEMENT - no historical mechanism exists to recover
-  CONFLICTING     = 3,  // two sources disagree; fail closed
-};
-
-struct DirectionEvidence {
-  DirectionSource source = DirectionSource::UNKNOWN;
-  int8_t sign = 0;  // -1 or +1 when known; 0 otherwise
-
-  // Only a measured witness counts as calibration evidence. A spec constant is
-  // an input to the maths, not proof about this physical installation - and
-  // after the reassembly it is not even proof about this servo.
-  bool isCalibrationEvidence() const {
-    return source == DirectionSource::MEASURED_WITNESS && (sign == -1 || sign == 1);
-  }
-};
-
-// ---------------------------------------------------------------------------
-// Contact witness - the real V25 gate
-// ---------------------------------------------------------------------------
-
-// matdog.rs: LF_CONTACT_WITNESS_TOLERANCE_TICKS = 24. A contact is accepted
-// only if BOTH endpoint deviations stay inside the uniform supervised band.
-// This is what rejected the cable-obstructed M12 MAX (~3397) and accepted the
-// unobstructed result (~3443).
-constexpr uint16_t kContactWitnessToleranceTicks = 24;
-
-struct ContactWitness {
-  bool evaluated = false;
-  uint16_t min_deviation_ticks = 0;
-  uint16_t max_deviation_ticks = 0;
-  uint16_t tolerance_ticks = kContactWitnessToleranceTicks;
-
-  bool accepted() const {
-    return evaluated && min_deviation_ticks <= tolerance_ticks &&
-           max_deviation_ticks <= tolerance_ticks;
-  }
-};
 
 // ---------------------------------------------------------------------------
 // Evidence lifecycle
@@ -253,6 +191,130 @@ enum class CalibrationOrigin : uint8_t {
 bool mayPromote(CalibrationOrigin origin);
 
 // ---------------------------------------------------------------------------
+// q0 - a MEASURED mechanical reference, never a constant
+// ---------------------------------------------------------------------------
+
+// The single most dangerous number in MATDOG calibration is 2048, because it
+// is three different things that all happen to share a value:
+//
+//   kServoRawCenter        the ST3215 raw centre. A servo-level fact only.
+//                          MATDOG_JOINT_CALIBRATION.yaml: "says nothing about
+//                          joint zero, mounting or direction".
+//   displayed-after-freeze what the servo reads back once PositionOffset has
+//                          been written (LF V25 accepted 2048 +/- 10).
+//   q0                     the measured mechanical zero. LF V25 measured
+//                          2067 / 2040 / 2074 - NOT ONE OF THEM IS 2048.
+//
+// These are kept in separate types so the third can never silently inherit the
+// first. The current repository rule is explicit:
+//   "The final value MUST BE MEASURED, not assumed or asserted.
+//    Do not impose q0_correction = 0."
+constexpr uint16_t kServoRawCenter = 2048;
+
+// LF V25 produced TWO independent zero estimates per joint and did not treat
+// them as interchangeable.
+enum class Q0Estimator : uint8_t {
+  NONE          = 0,
+  FIXED_SCALE   = 1,  // ModelZeroEstimate  - nominal tick scale, kept as diagnostic
+  AFFINE        = 2,  // AffineJointCalibration - measured span; AUTHORITATIVE in V25
+};
+
+struct Q0Evidence {
+  bool measured = false;              // false means "no measurement exists", not "2048"
+  Q0Estimator estimator = Q0Estimator::NONE;
+  EvidenceState state = EvidenceState::UNKNOWN;
+  CalibrationOrigin origin = CalibrationOrigin::NONE;
+  // Which joint AND which physical servo this was measured on. Without both,
+  // a q0 cannot be applied to anything.
+  JointIdentity identity{};
+  uint16_t tick = 0;                  // meaningless unless measured == true
+  uint16_t shift_from_digital_home_ticks = 0;
+  uint16_t endpoint_disagreement_ticks = 0;
+  uint16_t scale_permille = 0;
+  bool accepted_by_gate = false;      // the V25 per-record `accepted` field
+
+  // The whole point of this type. An unmeasured q0 has no value at all, and in
+  // particular is NOT the raw servo centre.
+  bool hasUsableValue() const { return measured && estimator != Q0Estimator::NONE; }
+};
+
+// ---------------------------------------------------------------------------
+// Direction - recovered honestly, including what is NOT there
+// ---------------------------------------------------------------------------
+
+// AUDIT FINDING: there is no "direction witness" in the LF V25 archive.
+// `direction` is a compile-time constant in JointSpec, used arithmetically as
+//     tick = HOME_TICK + direction * q_delta
+// and is never measured, cross-checked or validated against evidence.
+//
+// The witness that DOES exist is the CONTACT witness (see ContactWitness
+// below), which compares measured contacts against a supervised hardware band.
+//
+// Representing a spec constant as if it were measured evidence would be a
+// fabrication, so the provenance is part of the type. A direction may only be
+// treated as calibration evidence when it is MEASURED_WITNESS.
+enum class DirectionState : uint8_t {
+  UNKNOWN              = 0,  // nothing establishes it
+  SPECIFIED_HISTORICAL = 1,  // LF V25 JointSpec.direction - a static spec, NOT evidence
+  MEASURED_CANDIDATE   = 2,  // TO_IMPLEMENT: no historical mechanism exists to recover
+  ACCEPTED             = 3,  // TO_IMPLEMENT: requires current measured evidence
+  CONFLICT             = 4,  // sources disagree; fail closed
+};
+
+struct DirectionEvidence {
+  DirectionState state = DirectionState::UNKNOWN;
+  int8_t sign = 0;  // -1 or +1 when known; 0 otherwise
+  JointIdentity identity{};
+
+  // Only an ACCEPTED direction, backed by current measured evidence, may drive
+  // current calibration. SPECIFIED_HISTORICAL is usable by the historical
+  // replay and by nothing else:
+  //
+  //   "LF V25 replay validates historical behaviour using historical direction
+  //    specs. It does not establish current joint direction."
+  bool isCurrentCalibrationEvidence() const {
+    return state == DirectionState::ACCEPTED && (sign == -1 || sign == 1);
+  }
+  // What the historical replay is allowed to consume.
+  bool isHistoricalSpecification() const {
+    return state == DirectionState::SPECIFIED_HISTORICAL && (sign == -1 || sign == 1);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Contact witness - the real V25 gate
+// ---------------------------------------------------------------------------
+
+// A contact is accepted only if BOTH endpoint deviations stay inside the
+// supervised band. This is what rejected the cable-obstructed M12 MAX (~3397)
+// and accepted the unobstructed result (~3443).
+//
+// THE TOLERANCE IS DELIBERATELY NOT A CONSTANT HERE. LF V25's
+// LF_CONTACT_WITNESS_TOLERANCE_TICKS = 24 was measured on ONE leg, on a
+// physical installation that no longer exists. Promoting it to a universal
+// parameter for all four legs would be exactly the kind of unearned
+// generalisation the archive warns against ("never mirror LF evidence onto
+// RF, RH or LH"). It lives in the historical fixture; every witness must be
+// given its own band, and a band of zero tolerance is never assumed valid.
+struct ContactWitness {
+  bool evaluated = false;
+  bool tolerance_set = false;
+  uint16_t min_deviation_ticks = 0;
+  uint16_t max_deviation_ticks = 0;
+  uint16_t tolerance_ticks = 0;
+
+  bool accepted() const {
+    return evaluated && tolerance_set && min_deviation_ticks <= tolerance_ticks &&
+           max_deviation_ticks <= tolerance_ticks;
+  }
+};
+
+// Builds a witness with an explicit band. There is no overload that defaults
+// the tolerance.
+ContactWitness makeContactWitness(uint16_t min_deviation_ticks, uint16_t max_deviation_ticks,
+                                  uint16_t tolerance_ticks);
+
+// ---------------------------------------------------------------------------
 // Per-contact evidence record
 // ---------------------------------------------------------------------------
 
@@ -270,9 +332,70 @@ struct ContactEvidence {
   bool has_measurement = false;
 };
 
+// A q0 may only be applied to a current joint when the identity matches on
+// BOTH axes and the evidence came from a live session. Three shortcuts are
+// therefore impossible to express, not merely discouraged:
+//
+//   raw_center   -> q0     Q0Evidence starts empty, not centred
+//   historical q0 -> current q0   origin HISTORICAL_REPLAY can never promote
+//   replay q0     -> promoted q0  mayPromote() refuses that origin
+bool q0MayBeAppliedTo(const Q0Evidence& evidence, const JointIdentity& current_joint);
+
 // ---------------------------------------------------------------------------
-// Session phases - matdog.rs enum LfSessionState, recovered verbatim
+// Leg population gate  (the concept historical docs call "Full-Leg H1")
 // ---------------------------------------------------------------------------
+
+// NAMING, deliberately: this is NOT called H1 in new code. The repository uses
+// "H1" for two unrelated things - the Full-Leg calibration population gate,
+// and the Controller's own boot hardware test H1 in VALIDATION.md. Historical
+// documents keep their wording; new code uses an unambiguous name.
+//
+// This gate EVALUATES evidence. It does not scan: MATDOG already has exactly
+// one bus discovery path, servo/ServoCensus, and a second census is forbidden.
+// The observed population arrives here as an input.
+//
+// 12 leg servos: 4 legs x 3 joints. ID 51 (NECK_ROTATION) is explicitly NOT
+// part of the Full-Leg population, and neither are the other head/jaw units.
+constexpr uint8_t kLegServoSlotCount = kLegCount * kJointKindCount;
+
+enum class PopulationVerdict : uint8_t {
+  NOT_EVALUATED = 0,
+  PASS          = 1,  // every expected leg slot observed
+  FAIL          = 2,  // at least one missing
+  INVALID       = 3,  // the evidence itself is malformed; fail closed
+};
+
+struct LegPopulationEvidence {
+  bool evaluated = false;
+  CalibrationOrigin origin = CalibrationOrigin::NONE;
+  // Bit per leg slot, index = leg * kJointKindCount + joint. Using a mask
+  // rather than a count is what makes "6 of 12" say WHICH six.
+  uint16_t observed_mask = 0;
+  uint16_t unexpected_count = 0;   // responders outside the 12 leg slots
+  uint32_t session_ms = 0;         // provenance
+};
+
+uint8_t legSlotIndex(Leg leg, JointKind joint);
+bool legSlotFromIndex(uint8_t index, Leg* out_leg, JointKind* out_joint);
+uint8_t observedLegSlotCount(const LegPopulationEvidence& evidence);
+PopulationVerdict evaluateLegPopulation(const LegPopulationEvidence& evidence);
+
+// The last formal Full-Leg result on record is 6/12, and it is HISTORICAL.
+// A Controller census finding servos on the bus proves bus visibility, not
+// calibration population - the repository states this explicitly. Historical
+// evidence can never produce a current PASS.
+bool populationIsCurrentPass(const LegPopulationEvidence& evidence);
+
+// ---------------------------------------------------------------------------
+// Execution phases - matdog.rs enum LfSessionState, recovered verbatim
+// ---------------------------------------------------------------------------
+//
+// LAYERING: these are the phases of the LF V25 HARDWARE EXECUTION sequence.
+// They belong to a future calibration execution engine, not to the session
+// lifecycle. CalibrationManager owns session lifecycle and does not drive
+// these; it only records which one a future execution layer last reported, so
+// that restore intent can be expressed. The offline oracle replay walks them
+// directly, which is the only thing that does today.
 
 enum class CalibrationPhase : uint8_t {
   PREFLIGHT         = 0,
@@ -359,7 +482,8 @@ const char* toString(EvidenceState state);
 const char* toString(CalibrationOrigin origin);
 const char* toString(CalibrationPhase phase);
 const char* toString(CalibrationFailure failure);
-const char* toString(DirectionSource source);
+const char* toString(DirectionState state);
+const char* toString(PopulationVerdict verdict);
 const char* toString(Q0Estimator estimator);
 
 }  // namespace calibration
