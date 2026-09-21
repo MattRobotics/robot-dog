@@ -82,7 +82,7 @@ void WifiManager::update(uint32_t now_ms) {
   // One cheap status-bit read. This is the only place link state enters the
   // state machine, so CONNECTED can never mean anything but "the radio said
   // so on this tick".
-  const bool link_up = (WiFi.status() == WL_CONNECTED);
+  bool link_up = (WiFi.status() == WL_CONNECTED);
 
   const WifiAction action = policy_.update(now_ms, link_up);
 
@@ -112,6 +112,11 @@ void WifiManager::update(uint32_t now_ms) {
       // Async form on purpose — see the blocking-call audit above.
       WiFi.disconnectAsync(true /* wifioff */, false /* eraseap */);
       radio_polled_ = false;
+      // The link state read at the top of this tick is now stale by one
+      // statement: the radio is being torn down. Without this the snapshot
+      // would publish state=INACTIVE together with connected=YES and a live
+      // IP/RSSI, and would poll a radio that is going away.
+      link_up = false;
       break;
 
     case WifiAction::NONE:
@@ -130,24 +135,33 @@ void WifiManager::update(uint32_t now_ms) {
 }
 
 bool WifiManager::setEnabled(bool enabled, uint32_t now_ms) {
-  if (enabled && !policy_.credentialsPresent()) {
-    policy_.setEnabled(true, now_ms);  // records NO_CREDENTIALS, changes nothing else
-    refreshSnapshot(now_ms, false);
-    return false;
-  }
+  // Refused only when there is nothing to connect to. The policy is still
+  // told, so it records NO_CREDENTIALS instead of swallowing the refusal.
+  const bool accepted = !(enabled && !policy_.credentialsPresent());
   policy_.setEnabled(enabled, now_ms);
-  return true;
+
+  // Republish before returning. CommandRouter prints the snapshot in the
+  // same pass as the acknowledgement, so without this @WIFI OFF answered
+  // "WIFI=OFF" and then printed "enabled=YES" from the previous tick's
+  // snapshot — a reply that contradicted itself. Policy fields only: no
+  // radio query is issued from a command handler.
+  publishPolicyState();
+  return accepted;
 }
 
-void WifiManager::refreshSnapshot(uint32_t now_ms, bool link_up) {
+void WifiManager::publishPolicyState() {
   status_.state = policy_.state();
   status_.fault = policy_.fault();
   status_.enabled = policy_.enabled();
   status_.credentials_present = policy_.credentialsPresent();
-  status_.connected = link_up;
   status_.backoff_ms = policy_.backoffMs();
   status_.state_since_ms = policy_.stateSinceMs();
   status_.counters = policy_.counters();
+}
+
+void WifiManager::refreshSnapshot(uint32_t now_ms, bool link_up) {
+  publishPolicyState();
+  status_.connected = link_up;
 
   if (!link_up) {
     // Clear the link-scoped facts so a stale RSSI/IP can never be read as

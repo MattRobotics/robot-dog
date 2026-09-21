@@ -1207,6 +1207,38 @@ def check_wifi_runtime_boundaries(files, sketch_dir):
                     fail(f"{path}: WifiManager::update() contains {token!r} - the Wi-Fi "
                          f"tick must be a single bounded evaluation, never a wait loop")
 
+        # --- snapshot self-consistency (W1 review findings) -------------
+        # The adapter is not host-linkable (it owns the radio), so these two
+        # invariants cannot be pinned by the offline suite. They were found
+        # by review and are pinned here instead.
+        #
+        # 1. A command handler that changes state must republish the
+        #    snapshot before returning. CommandRouter prints the snapshot in
+        #    the same pass as the acknowledgement, so a stale one made
+        #    @WIFI OFF answer "WIFI=OFF" and then print "enabled=YES".
+        setter = re.search(r"bool WifiManager::setEnabled\([^)]*\)\s*\{(.*?)\n\}",
+                           code, re.DOTALL)
+        if not setter:
+            fail(f"{path}: could not locate WifiManager::setEnabled() to audit it")
+        elif "publishPolicyState(" not in setter.group(1) and \
+             "refreshSnapshot(" not in setter.group(1):
+            fail(f"{path}: WifiManager::setEnabled() does not republish the snapshot - the "
+                 f"@WIFI reply would contradict itself, printing the previous tick's "
+                 f"enabled/state alongside the new acknowledgement (W1 review)")
+
+        # 2. Tearing the radio down invalidates the link state read at the
+        #    top of the same tick. Without this the snapshot publishes
+        #    state=INACTIVE together with connected=YES and a live IP/RSSI,
+        #    and polls a radio that is going away.
+        if body:
+            stop_case = re.search(r"case WifiAction::STOP_RADIO:(.*?)break;", body.group(1),
+                                  re.DOTALL)
+            if not stop_case:
+                fail(f"{path}: WifiManager::update() has no STOP_RADIO case to audit")
+            elif not re.search(r"link_up\s*=\s*false", stop_case.group(1)):
+                fail(f"{path}: the STOP_RADIO path does not invalidate link_up - the "
+                     f"snapshot would report a torn-down radio as a live link (W1 review)")
+
         # The network layer may observe mode, never change it: authority is
         # not a network concept (handoff sections 9/19).
         if "setMode(" in code:

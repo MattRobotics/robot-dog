@@ -80,6 +80,12 @@ class WifiManager {
   const WifiStatus& status() const { return status_; }
 
  private:
+  // Copies the policy-derived half of the snapshot. Split out from
+  // refreshSnapshot() so a command handler can republish state it just
+  // changed WITHOUT triggering a radio query — @WIFI ON/OFF prints the
+  // snapshot in the same pass as its acknowledgement, and the architecture
+  // is explicit that a transport request must never cause a hardware read.
+  void publishPolicyState();
   void refreshSnapshot(uint32_t now_ms, bool link_up);
 
   WifiPolicy policy_{};
