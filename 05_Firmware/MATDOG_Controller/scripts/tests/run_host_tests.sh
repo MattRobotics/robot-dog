@@ -48,6 +48,12 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/network/WifiPolicy.cpp"
 
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_actuator_authority" \
+  "$SCRIPT_DIR/test_actuator_authority.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -o "$OUT/test_ota_policy" \
   "$SCRIPT_DIR/test_ota_policy.cpp" \
   "$SKETCH_DIR/src/update/OtaPolicy.cpp" \
@@ -57,4 +63,5 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_servo_population"
 "$OUT/test_daly_protocol"
 "$OUT/test_wifi_policy"
+"$OUT/test_actuator_authority"
 "$OUT/test_ota_policy"
