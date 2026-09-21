@@ -186,6 +186,8 @@ void CommandRouter::handleLine(String line) {
       Serial.println("HINT=create src/config/WifiCredentials.local.h and rebuild");
     }
     printWifiStatus();
+  } else if (upper == "@OTA STATUS") {
+    printOtaStatus();
   } else if (upper.startsWith("@SERVO SCAN")) {
     if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
       Serial.println("SERVO_SCAN=BLOCKED");
@@ -283,6 +285,7 @@ void CommandRouter::printHelp() {
   Serial.println("  @LED TEST");
   Serial.println("  @WIFI STATUS           (cached snapshot; no radio query)");
   Serial.println("  @WIFI ON|OFF           (any mode; refused without credentials)");
+  Serial.println("  @OTA STATUS            (read-only; OTA-A ships no transport)");
   Serial.println("  @SERVO SCAN <lo> <hi>   (MAINTENANCE mode only; incremental, bounded");
   Serial.println("                           per-ID blocking, result follows asynchronously)");
   Serial.println("  @SERVO CENSUS           (MAINTENANCE mode only; canonical 11-55 scan,");
@@ -302,6 +305,48 @@ void CommandRouter::printAvailabilityLine(const char* label, const AvailabilityS
 
 void CommandRouter::printModeStatus() {
   Serial.printf("MODE=%s\n", toString(modules_.operating_mode->mode()));
+}
+
+void CommandRouter::printOtaStatus() {
+  const update::OtaManagerStatus& o = modules_.ota->status();
+  const update::OtaStatus& u = o.policy;
+
+  Serial.printf("OTA_BOOT state=%s self_check=%s rollback_armed=%s ticks=%lu confirmed_at_ms=%lu\n",
+                update::toString(o.boot_state), update::toString(o.self_check_fault),
+                o.rollback_armed ? "YES" : "NO",
+                (unsigned long)o.self_check_ticks, (unsigned long)o.confirmed_at_ms);
+  Serial.printf("OTA_IMAGE running=%s @0x%06lx size=0x%06lx img_state=%s rollback_possible=%s\n",
+                u.running.label, (unsigned long)u.running.address,
+                (unsigned long)u.running.size, update::toString(u.running_image_state),
+                u.rollback_possible ? "YES" : "NO");
+  Serial.printf("OTA_IDENTITY build_id=%s readable=%s reset_reason=%s fatal=%s\n",
+                o.running_build_id, o.identity_readable ? "YES" : "NO",
+                o.reset_reason, o.fatal_reset_reason ? "YES" : "NO");
+  Serial.printf("OTA_UPDATE state=%s fault=%s gate=%s\n",
+                update::toString(u.state), update::toString(u.fault),
+                update::toString(u.last_gate_verdict));
+  Serial.printf("OTA_TARGET label=%s @0x%06lx size=0x%06lx boot_target_changed=%s\n",
+                u.target.valid ? u.target.label : "(unresolved)",
+                (unsigned long)u.target.address, (unsigned long)u.target.size,
+                u.boot_target_changed ? "YES" : "NO");
+  Serial.printf("OTA_STREAM declared=%lu written=%lu chunks=%lu\n",
+                (unsigned long)u.declared_size, (unsigned long)u.bytes_written,
+                (unsigned long)u.chunks_written);
+  Serial.printf("OTA_SHA declared=%s\n", u.declared_sha256[0] ? u.declared_sha256 : "(none)");
+  Serial.printf("OTA_SHA computed=%s\n", u.computed_sha256[0] ? u.computed_sha256 : "(none)");
+  Serial.printf("OTA_COUNTERS started=%lu committed=%lu failed=%lu aborted=%lu\n",
+                (unsigned long)u.counters.updates_started,
+                (unsigned long)u.counters.updates_committed,
+                (unsigned long)u.counters.updates_failed,
+                (unsigned long)u.counters.updates_aborted);
+  // Flash erase and write DO block this loop. These are the measured costs,
+  // so the OTA-B integration can argue from numbers rather than adjectives.
+  Serial.printf("OTA_TIMING open_us=%lu write_us=%lu end_us=%lu tick_us=%lu/%lu err=%ld\n",
+                (unsigned long)o.max_open_us, (unsigned long)o.max_write_us,
+                (unsigned long)o.max_end_us, (unsigned long)o.last_update_us,
+                (unsigned long)o.max_update_us, (long)o.last_backend_error);
+  Serial.printf("OTA_INGEST=%s\n",
+                o.ingest_enabled ? "ENABLED" : "DISABLED (OTA-A: no transport, no auth)");
 }
 
 void CommandRouter::printWifiStatus() {

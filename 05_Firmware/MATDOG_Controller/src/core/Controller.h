@@ -9,6 +9,7 @@
 #include "../servo/ServoBus.h"
 #include "../servo/ServoCensus.h"
 #include "../status/LedRing.h"
+#include "../update/OtaManager.h"
 #include "CommandRouter.h"
 #include "OperatingMode.h"
 #include "PowerState.h"
@@ -36,11 +37,19 @@ class Controller {
   // Owns the radio; owns nothing else. It has no path to ServoBus, to
   // OperatingMode or to any actuator — see network/WifiManager.h.
   network::WifiManager wifi_;
+  // Owns the OTA subsystem. In OTA-A it runs the first-boot rollback
+  // lifecycle and reports state; it has no transport, so nothing can feed it
+  // an image.
+  update::OtaManager ota_;
 
   SystemState system_state_;
   PowerStateMachine power_state_;
   OperatingModeManager operating_mode_;
   CommandRouter command_router_;
+
+  // Set only at the very end of begin(). The OTA self-check must not treat a
+  // half-initialized Controller as evidence that the image works.
+  bool initialized_ = false;
 };
 
 }  // namespace core

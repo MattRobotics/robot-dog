@@ -52,6 +52,13 @@ void Controller::begin() {
   delay(1500);  // let native USB CDC enumerate, matching every proven bring-up sketch.
 
   system_state_.beginBoot(millis());
+
+  // Before the banner, so the banner can report what the bootloader left us
+  // with. Reads the partition table and otadata; writes nothing. In
+  // particular it does NOT confirm the running image - that is earned in
+  // update(), over seconds, by actually running (see update/OtaBootGuard.h).
+  ota_.begin(millis());
+
   printBootBanner();
 
   // Init order: transports that cannot interfere with each other first.
@@ -88,7 +95,7 @@ void Controller::begin() {
   wifi_.begin(millis());
 
   CommandRouter::Modules modules{
-      &servo_bus_, &servo_census_, &imu_, &daly_, &led_, &wifi_, &system_state_,
+      &servo_bus_, &servo_census_, &imu_, &daly_, &led_, &wifi_, &ota_, &system_state_,
       &power_state_, &operating_mode_,
   };
   command_router_.begin(modules);
@@ -100,6 +107,11 @@ void Controller::begin() {
   Serial.printf("SYSTEM_BOOT_COMPLETE health=%s power_state=%s\n",
                 toString(system_state_.systemHealth()),
                 toString(power_state_.state()));
+
+  // Last statement in begin(), deliberately. This is one of the conditions
+  // the OTA first-boot self-check requires, and it must mean "begin() ran to
+  // completion", not "begin() started".
+  initialized_ = true;
 }
 
 void Controller::printBootBanner() {
@@ -141,6 +153,17 @@ void Controller::printBootBanner() {
                   running->label, (unsigned)running->address, (unsigned)running->size);
   }
 
+  // What the bootloader handed us, and whether this image still owes the
+  // bootloader a confirmation. Read-only; nothing here confirms anything.
+  {
+    const update::OtaManagerStatus& o = ota_.status();
+    Serial.printf("ota        : img_state=%s rollback_possible=%s ingest=%s build_id=%s\n",
+                  update::toString(o.policy.running_image_state),
+                  o.policy.rollback_possible ? "YES" : "NO",
+                  o.ingest_enabled ? "ENABLED" : "DISABLED (no transport, no auth)",
+                  o.running_build_id);
+  }
+
   Serial.printf("reset_reason : %s\n", resetReasonName(esp_reset_reason()));
   Serial.println("startup_motion   : DISABLED");
   Serial.println("startup_torque   : DISABLED");
@@ -179,6 +202,18 @@ void Controller::update(uint32_t now_ms) {
   // between a bus transaction and its follow-up. The cost of this call is
   // measured, not assumed: @WIFI STATUS reports last_us/max_us.
   wifi_.update(now_ms);
+
+  // Drives the first-boot rollback lifecycle. Bounded, touches no flash, and
+  // does almost nothing once the lifecycle has settled. The facts it judges
+  // are passed in rather than reached for, so the criteria stay testable off
+  // the device.
+  {
+    update::OtaHostFacts facts;
+    facts.controller_initialized = initialized_;
+    facts.command_router_bound = command_router_.bound();
+    facts.uptime_ms = system_state_.uptimeMillis(now_ms);
+    ota_.update(now_ms, facts);
+  }
 
   if (power_state_.state() == PowerState::SHUTDOWN_REQUESTED ||
       power_state_.state() == PowerState::SHUTTING_DOWN ||

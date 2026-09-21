@@ -6,6 +6,7 @@
 #include "../imu/Bno085Imu.h"
 #include "../network/WifiManager.h"
 #include "../power/DalyBms.h"
+#include "../update/OtaManager.h"
 #include "../servo/ServoBus.h"
 #include "../servo/ServoCensus.h"
 #include "../status/LedRing.h"
@@ -33,6 +34,7 @@ class CommandRouter {
     power::DalyBms* daly;
     status::LedRing* led;
     network::WifiManager* wifi;
+    update::OtaManager* ota;
     SystemState* system_state;
     PowerStateMachine* power_state;
     OperatingModeManager* operating_mode;
@@ -40,6 +42,11 @@ class CommandRouter {
 
   void begin(const Modules& modules);
   void update(uint32_t now_ms);
+
+  // Used by the OTA first-boot self-check: "is the command surface usable?"
+  // is one of the software-only conditions that must hold before a freshly
+  // booted OTA image is allowed to confirm itself.
+  bool bound() const { return modules_.system_state != nullptr; }
 
  private:
   void handleLine(String line);
@@ -58,6 +65,9 @@ class CommandRouter {
   // renders the same struct without a second hardware path (see
   // ARCHITECTURE.md, telemetry snapshot model).
   void printWifiStatus();
+  // Pure presentation of ota->status(). Read-only: OTA-A ships no transport
+  // and no command that can start an update.
+  void printOtaStatus();
   void printServoScanResult();
   // Pure presentation of servo_census->result(). Computes nothing: the
   // classification lives in servo/ServoPopulation.h so a future Web UI /
