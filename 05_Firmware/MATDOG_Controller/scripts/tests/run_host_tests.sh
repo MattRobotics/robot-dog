@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Compiles and runs the offline C++ host test suites: the G2 servo
-# population / hardware profile logic, and the DALY wire protocol / KEY
-# probe (frames, CRC, decoders, bus scheduling). No hardware, no Arduino
-# toolchain, no device I/O — they link the real firmware translation units,
-# which is why those were kept Arduino-free.
+# population / hardware profile logic, the DALY wire protocol / KEY
+# probe (frames, CRC, decoders, bus scheduling), and the W1 Wi-Fi runtime
+# policy (credential gate, two-phase radio start, connect deadline, backoff
+# ladder, link loss, wraparound). No hardware, no Arduino toolchain, no
+# device I/O — they link the real firmware translation units, which is why
+# those were kept Arduino-free.
 #
 # Invoked by scripts/static_audit.py so there is one gate command, matching
 # how the OTA partition parser's Python suite is already run.
@@ -35,5 +37,14 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_daly_protocol.cpp" \
   "$SKETCH_DIR/src/power/DalyProtocol.cpp"
 
+# -DDISABLED=0x00 here too: WifiPolicy.h documents why its first state is
+# INACTIVE and not DISABLED, and this flag makes that reasoning enforceable
+# on the host instead of only discoverable on the device build.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_wifi_policy" \
+  "$SCRIPT_DIR/test_wifi_policy.cpp" \
+  "$SKETCH_DIR/src/network/WifiPolicy.cpp"
+
 "$OUT/test_servo_population"
 "$OUT/test_daly_protocol"
+"$OUT/test_wifi_policy"
