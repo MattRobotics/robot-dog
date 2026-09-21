@@ -1,7 +1,11 @@
 #ifndef MATDOG_CORE_OPERATING_MODE_H
 #define MATDOG_CORE_OPERATING_MODE_H
 
-#include <Arduino.h>
+// <stdint.h>, not <Arduino.h>: nothing here needs the Arduino runtime, and
+// core/ActuatorAuthority.* consults OperatingMode while staying host-linkable
+// so the offline suite exercises the real compatibility rules. Same contract
+// as Availability.h / SystemState.h / HardwareProfile.h (G2).
+#include <stdint.h>
 
 namespace matdog {
 namespace core {
