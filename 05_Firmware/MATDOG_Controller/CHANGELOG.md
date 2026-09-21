@@ -1,5 +1,53 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — W1 Wi-Fi station runtime — 2026-09-21
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested** — no MATDOG build
+has associated with an access point. Wi-Fi is a network **link** here and nothing else: no server,
+no endpoint, no remote command, no update path.
+
+- **New `src/network/` module**, split the way the project already splits `power/` and `servo/`:
+  `WifiPolicy.*` is a pure, `<Arduino.h>`-free and `<WiFi.h>`-free lifecycle state machine driven
+  purely by `(now_ms, link_up)`; `WifiManager.*` is the sole owner of the radio and the only
+  translation unit that includes `<WiFi.h>`. `WifiStatus` is a plain copyable snapshot, so
+  `CommandRouter` formats it without querying the radio and a future Web adapter renders the same
+  struct without a second hardware path.
+- **Two non-obvious decisions, both forced by the platform.** The first state is `INACTIVE`, not
+  `DISABLED`, because `<esp32-hal-gpio.h>` `#define`s `DISABLED`; the host suite now passes
+  `-DDISABLED=0x00` so the clash is caught off-device, as the DALY suite already did.
+  `RADIO_STARTING` exists because `WiFi.begin()` reaches
+  `waitStatusBits(ESP_NETIF_STARTED_BIT, 1000)` in `esp32:esp32 3.3.11` — a blocking wait of up to
+  **one second**. Starting the driver and the association on separate ticks makes that wait
+  unreachable.
+- **Bounded runtime is measured, not asserted.** `@WIFI STATUS` reports `last_us`/`max_us` for
+  `WifiManager::update()`. Those numbers do not exist yet; they need the hardware test.
+- **Retry policy owned by MATDOG.** The core's auto-reconnect is turned off, so the doubling
+  ladder (2 s → 60 s, reset on success, restarted from the bottom after a link that was up drops)
+  is the single description of what actually happens. `persistent(false)` keeps the passphrase out
+  of NVS and out of a reconnect-loop flash-wear path.
+- **Credentials outside Git.** The repository had no convention; this adds the smallest one:
+  `-D` build flags, else a gitignored `src/config/WifiCredentials.local.h`, else **empty** — and
+  empty is supported, building and booting normally with the radio never started
+  (`state=INACTIVE fault=NO_CREDENTIALS`). `config::kWifiPassword` is named in exactly one place.
+- **Audit gains eleven Wi-Fi guards**, each verified by breaking it on purpose: host-linkability
+  and `Serial`-freedom of the policy layer; no `waitForConnectResult`, blocking `WiFi.disconnect()`,
+  blocking scan, `WiFi.SSID()` poll, `delay()` or `while` loop in the Wi-Fi tick; never
+  `setMode(` from a network unit; one and only one passphrase reference; no secret-shaped field in
+  the snapshot; the `.gitignore` rule present as an **exact active line** (the first version of
+  that check passed on a comment, which the mutation test found); and the local header never
+  tracked.
+- **Offline suite:** `test_wifi_policy.cpp` links the real state machine — credential gate,
+  two-phase start, one transition per tick, connect deadline, backoff ladder and ceiling,
+  reset-on-success, link loss, operator enable/disable, fail-closed action failures, the invariant
+  that a connect is never issued while connected, `millis()` wraparound, IPv4 formatting and its
+  bounds.
+- **Cost, same FQBN and profile, against frozen `19fe837`:** flash 392,468 B → 959,051 B
+  (12% → 30% of the 3 MB slot); static RAM 28,536 B → 50,868 B (8% → 15%). The ~40–50 KB the
+  driver allocates at first `WiFi.mode()` is heap and is not in those figures.
+- **Wi-Fi contributes nothing to `SystemState` health.** A missing access point is not a robot
+  health fact, and the G3/G3.1-validated meaning of `SYSTEM health=` must not change because a
+  router rebooted. Whether it ever should is **TO_DESIGN**.
+
 ## Unreleased — power/KEY architecture closeout — 2026-09-20
 
 Documentation and evidence only; **no firmware change** (the shipped Controller already satisfies

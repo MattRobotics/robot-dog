@@ -290,7 +290,27 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — reconnect cycles stable; no heap leak; no scheduler starvation; no bus timing
   degradation.
 - **NEXT** — UI-0/UI-1 and OTA.
-- **STATUS** — **TO_DESIGN.** No network code exists in the Controller.
+- **STATUS** — **PARTIAL (W1).** A station-mode runtime is **IMPLEMENTED**, **COMPILED** and
+  **OFFLINE TESTED**; it is **NOT HARDWARE TESTED** — no MATDOG build has associated with an
+  access point yet, so every PASS CRITERION above remains **TO_TEST**.
+  - Implemented: `src/network/WifiPolicy.*` (pure, host-linkable lifecycle state machine) and
+    `src/network/WifiManager.*` (sole owner of the radio, sole includer of `<WiFi.h>`),
+    `@WIFI STATUS|ON|OFF`, one `WIFI` line in `@STATUS`, credentials resolved outside Git.
+  - Offline evidence: `scripts/tests/test_wifi_policy.cpp` links the real state machine
+    (credential gate, two-phase radio start, connect deadline, backoff ladder and ceiling, link
+    loss, enable/disable, fail-closed action failures, `millis()` wraparound, IPv4 formatting).
+  - Bounded-runtime evidence is **measured, not asserted**: `@WIFI STATUS` reports `last_us` and
+    `max_us` for `WifiManager::update()`. Those numbers do not exist yet — they require the
+    hardware test.
+  - Build cost, same FQBN and profile, against frozen `19fe837`: flash 392,468 B → 959,051 B
+    (12% → 30% of the 3 MB slot); static RAM 28,536 B → 50,868 B (8% → 15%). The ~40–50 KB the
+    Wi-Fi driver allocates at first `WiFi.mode()` is heap and is **not** in those figures;
+    `@STATUS` reports `heap_free`/`heap_min_free` to observe it on device.
+  - Deliberately absent: any server, endpoint, remote command or update path. Wi-Fi is a link.
+  - Deliberately absent: any contribution to `SystemState` health aggregation — a missing access
+    point is not a robot health fact. Whether it should ever contribute is **TO_DESIGN**.
+  - Still **TO_TEST** on hardware: association, DHCP, RSSI/IP reporting, reconnect after AP loss,
+    heap stability over reconnect cycles, and the effect (if any) on BNO085/DALY/ServoBus timing.
 
 ## OTA
 
@@ -306,6 +326,12 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **NEXT** — UI-9.
 - **STATUS** — **PARTIAL.** Partition-selection logic **IMPLEMENTED** and offline-tested (40/40) and
   already used by the application-only flash workflow; OTA transport/runtime does **not** exist.
+  The Wi-Fi ENTRY condition above is **not met**: W1 is implemented and offline-tested but not
+  hardware-tested, so OTA-A may be designed and implemented but cannot be gate-passed. Two facts
+  from the W1 build already constrain it: the application is 959,051 B against a 3,145,728 B slot
+  (ample headroom for a second image), and `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` is already
+  active in the real build — so the moment OTA writes otadata, the bootloader will begin moving
+  `PENDING_VERIFY` entries to `ABORTED`, and a first-boot self-check stops being optional.
 
 ## Safe Actuator Layer
 

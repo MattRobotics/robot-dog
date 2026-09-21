@@ -39,6 +39,7 @@ PERMANENT MATDOG CONTROLLER — ESP32-S3
   Controller V0.1 platform                        official baseline
   core / USB diagnostics / BNO085                 VALIDATED in USB_ONLY scope
   ServoBus / DALY / LED / power-state baseline    VALIDATED no-motion in ROBOT_POWERED (G3/G3.1)
+  Wi-Fi station runtime (link only, no server)    IMPLEMENTED, TO_TEST on hardware (W1)
   maintenance / service / calibration modules     TO_DESIGN
   motion / IK / gait / stabilization              TO_DESIGN, later
           |
@@ -141,6 +142,10 @@ onboard native-USB validation does not validate that external wiring.
 ### Update policy
 
 - **DECIDED:** Wi-Fi/OTA is the normal future firmware-update path.
+- **IMPLEMENTED / TO_TEST:** a Wi-Fi **station runtime** exists in the Controller (W1). It is a
+  network link and nothing else — no server, no endpoint, no remote command, no update path — and
+  it has not yet associated with an access point on real hardware. It does not make OTA closer to
+  VALIDATED; it makes OTA implementable.
 - **DECIDED:** native USB CDC/USB-C remains available for wired service and recovery.
 - OTA must never remove or make wired recovery dependent on a working application image.
 - Controller V0.1's application-partition USB flashing procedure is not a Wi-Fi/OTA

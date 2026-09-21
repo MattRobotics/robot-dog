@@ -15,12 +15,17 @@ MATDOG Controller
 │                    live census classification (pure, transport-independent)
 ├── imu/             Bno085Imu — SH2_ROTATION_VECTOR acquisition, viewer-compatible
 ├── power/           DalyBms — read-only Modbus RTU battery telemetry
+├── network/         WifiPolicy — pure Wi-Fi lifecycle state machine (host-linkable)
+│                    WifiManager — the only translation unit that owns the radio
 └── status/          LedRing — WS2812B ring, boots OFF, non-blocking effects
 ```
 
 This is an **integration and platform milestone**, not a motion controller. No gait,
-IK, closed-loop stabilization, ROS 2/MoveIt 2, Wi-Fi/OTA or autonomous behaviour is
-implemented here — see `VALIDATION.md` for the precise scope.
+IK, closed-loop stabilization, ROS 2/MoveIt 2 or autonomous behaviour is implemented
+here — see `VALIDATION.md` for the precise scope. A **Wi-Fi station runtime** (W1) is
+implemented and offline-tested but **not yet hardware-tested**; **OTA remains
+unimplemented** beyond the host-side partition logic. See
+[Wi-Fi runtime](#wi-fi-runtime-w1) for exactly what that does and does not mean.
 
 ## Official baseline
 
@@ -231,6 +236,8 @@ persistence and any `requestDischargeOff()` body fail the build; the mutation su
 @BMS KEY SET DISCHARGE CONFIRM              (MAINTENANCE only; the ONE DALY write; once per boot)
 @BMS KEY WRITE STATUS                       (cached; no bus transaction)
 @LED STATUS | @LED OFF | @LED TEST
+@WIFI STATUS                                (cached snapshot; never queries the radio)
+@WIFI ON | @WIFI OFF                        (any mode; refused without credentials)
 @SERVO SCAN <lo> <hi> | @SERVO READ <id>   (MAINTENANCE mode only)
 @SERVO CENSUS                               (MAINTENANCE mode only)
 @SERVO SAFE_OFF <id>                        (always allowed, any mode)
@@ -468,6 +475,7 @@ not at boot, not on a timer.
 ```bash
 python3 scripts/tests/test_ota_partition_logic.py   # OTA slot selection (40 tests)
 bash scripts/tests/run_host_tests.sh                # servo population / profile + DALY protocol
+                                                    # + Wi-Fi runtime policy
 python3 scripts/tests/test_static_audit_daly.py     # DALY write-whitelist mutation suite
 python3 scripts/static_audit.py                     # runs all of the above, plus the audit
 ```
@@ -490,6 +498,15 @@ exactly as BMSTool accepts it (address, function, CRC, register and value echo, 
 precondition and its order, `ALREADY_CONFIGURED`, read-back classification (an ACK alone is never
 verification), the status tracker, and scheduling of write → read-back → telemetry after success,
 failure and timeout.
+
+`scripts/tests/test_wifi_policy.cpp` does the same for `src/network/WifiPolicy.cpp`: the
+credential gate (no SSID configured means the radio is never started, under any number of
+ticks), the two-phase radio start, the one-transition-per-tick rule, the connect deadline,
+the doubling backoff ladder and its 60 s ceiling, reset-on-success, link loss restarting the
+ladder from the bottom, operator enable/disable (including that no teardown is issued for a
+radio that was never brought up), fail-closed handling of a refused radio start or connect
+call, the invariant that a connect is never issued while connected, `millis()` wraparound,
+and the IPv4 formatter including its bounds.
 
 ## Operating mode (MAINTENANCE / RUN)
 
@@ -540,6 +557,115 @@ that saves `SCSerial::IOTimeOut` (a public field, set at runtime — the vendore
 never edited), applies the named timeout for that call site, and restores the previous
 value on every exit path. `begin()` never assigns `IOTimeOut` directly, so neither timeout
 can silently become a standing global override for some other call site.
+
+## Wi-Fi runtime (W1)
+
+**Status: implemented, compiled, offline-tested. NOT hardware-tested.** No MATDOG build has
+yet associated with an access point. Nothing below is a claim about radio behaviour on real
+hardware.
+
+Wi-Fi is a **station-mode network link and nothing else**. It serves no page, exposes no
+endpoint, accepts no remote command and performs no update. Those belong to later gates.
+
+### Ownership split
+
+```text
+core/Controller
+  └── network/WifiManager     owns the radio; the ONLY unit that includes <WiFi.h>
+        └── network/WifiPolicy  pure lifecycle state machine; no Arduino, no radio
+```
+
+`WifiPolicy` holds every decision — when to start the radio, when to retry, how long to wait,
+what the observable state is — and is driven purely by `(now_ms, link_up)`. That is what lets
+`scripts/tests/test_wifi_policy.cpp` link the **real** state machine on the host instead of a
+copy, exactly as `DalyProtocol` and `ServoPopulation` already do.
+
+`WifiStatus` is a plain copyable snapshot. `CommandRouter` only formats it; it never queries
+the radio. A future Web adapter renders the same struct without a second hardware path — the
+telemetry-snapshot model in
+[`ARCHITECTURE.md`](../../01_Docs/02_Architecture/ARCHITECTURE.md#telemetry-snapshot-model).
+
+### State machine
+
+```text
+INACTIVE ──► IDLE ──► RADIO_STARTING ──► CONNECTING ──► CONNECTED
+   ▲                        ▲                 │             │
+   │                        └───── IDLE ◄─┐   ▼             ▼
+   └── @WIFI OFF / no credentials         └── BACKOFF ◄──────┘
+```
+
+The first state is `INACTIVE`, not `DISABLED`, because `<esp32-hal-gpio.h>` `#define`s
+`DISABLED` and an enumerator by that name is textually replaced. The project has been bitten
+by this before — see the `-DDISABLED=0x00` flag in `scripts/tests/run_host_tests.sh`, which
+now also compiles the Wi-Fi suite so the clash is caught on the host, not only on device.
+
+`RADIO_STARTING` is not padding. In `esp32:esp32 3.3.11`, `WiFi.begin()` reaches
+`STAClass::begin()`, which calls `waitStatusBits(ESP_NETIF_STARTED_BIT, 1000)` — a blocking
+wait of **up to one second** if the netif has not come up. Splitting the start into
+`WiFi.mode(WIFI_STA)` (which contains no such wait) and, 100 ms later, `WiFi.begin()` means
+the bit is already set when the waiting call runs, so it returns immediately.
+
+Retries follow a doubling ladder, 2 s → 4 s → … → 60 s, reset on every successful
+association. A link that was up and then dropped restarts the ladder from the bottom: it is a
+fresh event, not accumulated retry pressure. The core's own auto-reconnect is turned **off**
+so `WifiPolicy` is the single owner of retry timing and its counters describe a process it
+actually controls.
+
+### Bounded, and measured rather than claimed
+
+`WifiManager::update()` performs one status-bit read, at most one radio action and one
+snapshot refresh. No loop, no `delay()`, no wait-for-result. It runs **last** among the
+Controller's services, so within a pass every timing-sensitive module has already advanced.
+RSSI/IP/channel are refreshed at most once per second, so telemetry consumers never drive
+radio queries.
+
+The claim is falsifiable: `@WIFI STATUS` reports `last_us` and `max_us`, the measured wall
+time of the last and worst tick since boot. The first `WiFi.mode()` call initializes the
+driver and allocates tens of KB of heap; that is the expensive one, it is deliberately kept
+out of `Controller::begin()`, and `@STATUS` already reports `heap_free`/`heap_min_free`.
+
+`scripts/static_audit.py` fails the build if the Wi-Fi unit acquires `waitForConnectResult`,
+the blocking `WiFi.disconnect()` overload, `WiFi.scanNetworks()`, `WiFi.SSID()`, a `delay()`,
+or a `while` loop inside `update()` — and if it ever calls `setMode(`, because a network task
+must never change `OperatingMode`.
+
+### Credentials
+
+Nothing secret is committed, and the audit keeps it that way.
+
+```bash
+cp src/config/WifiCredentials.local.h.example src/config/WifiCredentials.local.h
+$EDITOR src/config/WifiCredentials.local.h    # gitignored; never committed
+scripts/build.sh
+```
+
+Resolution order is `-DMATDOG_WIFI_SSID`/`-DMATDOG_WIFI_PASSWORD` build flags, then the local
+header, then **empty**. Empty is a supported state: the firmware builds, boots and runs
+normally, reporting `state=INACTIVE fault=NO_CREDENTIALS`, and never starts the radio. The
+local header is preferred over build flags on a workstation because a passphrase passed as
+`-D` lands in shell history, in `ps` output and in the build log `scripts/build.sh` echoes.
+
+`config::kWifiPassword` is referenced in exactly **one** place in the whole firmware — the
+`WiFi.begin()` call — and `scripts/static_audit.py` fails the build if a second reference
+appears, if `WifiStatus` gains any field whose name could hold a secret, if the `.gitignore`
+rule is deleted *or commented out*, or if the local header is ever tracked by Git. Those
+guards were verified by mutation: each one was broken on purpose and the audit caught it.
+
+This is **not** an authentication story. A credential compiled into an application image is
+readable by anyone who can read the flash. That is accepted for a home 2.4 GHz network on a
+bench robot; OTA authentication is a separate problem, deliberately unsolved here.
+
+### What Wi-Fi deliberately does not touch
+
+Wi-Fi contributes **nothing** to `SystemState` health aggregation. A missing access point is
+not a robot health fact, and the G3/G3.1-validated meaning of `SYSTEM health=` must not change
+because a router rebooted. Wi-Fi is observable through `@STATUS` (one line) and `@WIFI STATUS`
+(full snapshot) instead. Whether it should ever contribute is **TO_DESIGN**.
+
+There is no path from this module to `ServoBus`, to an actuator, or to `OperatingMode`, and
+`scripts/static_audit.py::check_no_network_to_servo_path` fails the build if a translation
+unit ever names both a network transport symbol and a servo primitive. That is the executable
+form of the permanent rule `network callback != servo command authority`.
 
 ## Anti-back-power (LED ring)
 
