@@ -282,6 +282,33 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **NEXT** — motion may be considered, behind the Safe Actuator Layer.
 - **STATUS** — **BLOCKED** by `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION`. Last formal H1 was
   6/12 and is **not** superseded by a Controller census.
+  - **Offline foundation: IMPLEMENTED / COMPILED / OFFLINE TESTED.** `src/calibration/` holds a
+    pure host-linkable domain model recovered from the LF V25 archive and a `CalibrationManager`
+    session foundation over the real `ActuatorAuthority`. Audit and evidence:
+    [`CALIBRATION_SOURCE_PRECEDENCE.md`](CALIBRATION_SOURCE_PRECEDENCE.md).
+  - **NO write path was added.** The firmware's only actuator write remains
+    `EnableTorque(id, 0)` in `safeOff()`. Torque, `GoalPosition`, `SyncWrite`, EEPROM,
+    `PositionOffset`, ID recode and provisioning are all absent from the subsystem and
+    audit-forbidden inside it.
+  - **Hardware motion is compile-time blocked.** `MATDOG_CALIBRATION_HARDWARE_MOTION_AUTHORIZED`
+    defaults to `0`, mirroring the YAML's `hardware_motion_authorized: false`; a live session is
+    refused before the arbiter is even asked. Unblocking requires a real recalibration and a
+    reviewed YAML change, not a flag flip.
+  - **LF V25 replay: RECOVERED / REPLAYED / MATCHED, offline only.** 58 steps, six LF contacts of
+    the twenty-four, the documented fine sequences, and the one documented failure (the
+    cable-obstructed M12 MAX rejected by the witness band). Every replayed record carries
+    `HISTORICAL_REPLAY`, which `mayPromote()` refuses — a replay can never become operational
+    calibration.
+  - **Naming:** new code says **leg population gate**, not H1 — the repository uses H1 for both
+    this gate and the Controller's own boot test. Historical documents keep their wording.
+  - **PASS CRITERIA status** — formal H1 for all 12 leg servos: **BLOCKED** (last formal 6/12,
+    historical; historical evidence can never produce a current PASS). Evidence lifecycle
+    `MEASURED → CANDIDATE → ACCEPTED → PROMOTED`: **IMPLEMENTED and offline-tested**, with every
+    shortcut refused.
+  - **TO_IMPLEMENT** — the calibration execution engine (the 18 recovered phases), the Safe
+    Actuator Layer beneath it, direction measurement (`MEASURED_CANDIDATE`/`ACCEPTED`: no
+    historical mechanism exists to recover), and the persistence boundary (**TO_DESIGN**: whether
+    an accepted calibration is written by `PROVISIONING` or by a separate transaction).
 
 ## HostLink semantic layer
 

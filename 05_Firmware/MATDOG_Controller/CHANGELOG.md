@@ -1,5 +1,38 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — calibration foundation + LF V25 oracle recovery — 2026-09-21
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested.**
+**No write path was added**: the firmware's only actuator write is still `EnableTorque(id, 0)`
+inside `safeOff()`. The installed robot's calibration remains
+`CALIBRATION_RESET_PENDING_FULL_RECALIBRATION` and hardware motion remains **BLOCKED**.
+
+- **C0 evidence audit recorded** in `CALIBRATION_SOURCE_PRECEDENCE.md`: source precedence,
+  current calibration truth, what LF V25 actually proved, the three evidence vocabularies, four
+  discrepancies, the Generic V25 component assessment and the EEPROM boundary.
+- **New `src/calibration/`** — a pure, host-linkable domain model recovered from the archive
+  (no Arduino runtime, no ServoBus, no Wi-Fi, no OTA) and a `CalibrationManager` session
+  foundation over the real `ActuatorAuthority`, creating no second lock.
+- **Confirmed from the archive, not assumed:** 24 contact profiles (4x3x2, and the archive's own
+  test asserts it), 58 sequence steps, six LF contacts, 18 execution phases.
+- **Three findings encoded as types.** q0 cannot default to the raw servo centre - 2048 is three
+  different quantities and LF V25's measured q0 was 2067/2040/2074. There is no "direction
+  witness" in the archive; `direction` is a static spec constant, and the witness that exists is
+  the CONTACT witness. Evidence is keyed by physical unit, never bus id, because unit M11 is
+  NECK_PITCH today while bus id 11 still means "LF lower".
+- **The 24-tick witness band is historical and LF-only**, kept in the fixture rather than
+  promoted to a universal domain constant - the evidence file forbids mirroring LF onto RF/RH/LH.
+- **"H1" avoided in new code.** The repository uses it for both the Full-Leg population gate and
+  the Controller's own boot test; new code says leg population gate. It evaluates evidence and
+  never scans - there is one bus discovery path and a second census is forbidden.
+- **LF V25 replayed offline and MATCHED**, including the one documented failure. Every replayed
+  record carries `HISTORICAL_REPLAY`, which `mayPromote()` refuses.
+- **Surface:** `@CALIBRATION STATUS`, read-only, leading with the stale/blocked verdict, plus a
+  `calibration` line on the boot banner. No START/RUN/MOVE command was added.
+- **Audit gains twelve calibration guards**, all twelve mutation-verified.
+- **Cost:** flash 970,127 B -> 973,463 B (+3,336 B, 30% of the 3 MB slot); static RAM 51,740 B ->
+  51,812 B (+72 B).
+
 ## Unreleased — ActuatorAuthority + OTA-B authorization — 2026-09-21
 
 **Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested.**

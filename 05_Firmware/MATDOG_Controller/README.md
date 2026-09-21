@@ -10,6 +10,8 @@ MATDOG Controller
 ├── core/system      boot, version, health aggregation, power-state machine,
 │                    cooperative non-blocking scheduling, USB command router
 │                    ActuatorAuthority — the one arbiter of actuator write authority
+├── calibration/     CalibrationDomain — pure model recovered from the LF V25 oracle
+│                    CalibrationManager — session lifecycle over ActuatorAuthority
 ├── config/          HardwareProfile — the single USB_ONLY / ROBOT_POWERED authority
 ├── servo/           ServoBus — ST3215 / Seeed bus transport, read-only diagnostics
 │                    ServoPopulation / ServoCensus — canonical 17 vs expected-now 13,
@@ -246,6 +248,7 @@ persistence and any `requestDischargeOff()` body fail the build; the mutation su
 @WIFI ON | @WIFI OFF                        (any mode; refused without credentials)
 @OTA STATUS                                 (read-only; OTA-A ships no transport)
 @AUTHORITY STATUS                           (read-only; no owner can be acquired yet)
+@CALIBRATION STATUS                         (read-only; no session can move hardware)
 @SERVO SCAN <lo> <hi> | @SERVO READ <id>   (MAINTENANCE mode only)
 @SERVO CENSUS                               (MAINTENANCE mode only)
 @SERVO SAFE_OFF <id>                        (always allowed, any mode)
@@ -484,6 +487,7 @@ not at boot, not on a timer.
 python3 scripts/tests/test_ota_partition_logic.py   # OTA slot selection (40 tests)
 bash scripts/tests/run_host_tests.sh                # servo population / profile + DALY protocol
                                                     # + Wi-Fi + OTA-A + ActuatorAuthority
+                                                    # + calibration domain & manager
 python3 scripts/tests/test_static_audit_daly.py     # DALY write-whitelist mutation suite
 python3 scripts/static_audit.py                     # runs all of the above, plus the audit
 ```
@@ -535,6 +539,32 @@ re-init always landing on `NONE`, corrupted enum values failing closed, release 
 non-owner, the stale-lease case the generation exists for, force-clear under every reason, the
 mode-compatibility table, a mode change clearing a stranded owner, and the whole inhibit
 lifecycle.
+
+`scripts/tests/test_calibration_domain.cpp` and `test_calibration_manager.cpp` cover
+`src/calibration/`: 702 domain checks including the 24-profile completeness derived from the
+Cartesian model, the three meanings of 2048 pinned apart, the physical-unit identity trap
+(unit M11 versus M33 in the LF lower slot), the leg population gate, the evidence lifecycle with
+every shortcut refused, and the LF V25 oracle replay; plus 322 manager checks against the **real**
+`ActuatorAuthority`, including the end-to-end stale-lease scenario where a finished session's late
+events are fired at a live one and must not touch it.
+
+## Calibration foundation
+
+**Status: implemented, compiled, offline-tested. NOT hardware-tested. NO write path added.**
+
+The installed robot's calibration is `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION` and hardware
+motion is **BLOCKED** — that is the repository's own declaration, and
+`MATDOG_CALIBRATION_HARDWARE_MOTION_AUTHORIZED` defaults to `0` so a live session is refused
+before the arbiter is even asked.
+
+The LF V25 archive is a **historical hardware oracle**, replayed offline and matched. It is not
+current calibration and cannot become it: every replayed record carries `HISTORICAL_REPLAY`, and
+`mayPromote()` refuses that origin.
+
+The full audit — source precedence, what LF V25 actually proved, the three evidence vocabularies,
+four discrepancies including the two unrelated meanings of "H1", the Generic V25 component
+assessment and the EEPROM boundary — is in
+[`CALIBRATION_SOURCE_PRECEDENCE.md`](CALIBRATION_SOURCE_PRECEDENCE.md).
 
 ## Operating mode (MAINTENANCE / RUN)
 
