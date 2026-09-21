@@ -266,6 +266,23 @@ Browser
   -> ServoBus
 ```
 
+**IMPLEMENTED:** `ActuatorAuthority` exists as `src/core/ActuatorAuthority.*` — one central
+arbiter, at most one write-capable owner at a time, `NONE` at boot, orthogonal to
+`OperatingMode`. Two properties of it are permanent and enforced by
+[`static_audit.py`](../../05_Firmware/MATDOG_Controller/scripts/static_audit.py):
+
+```text
+SAFE_OFF is never arbitrated                     PERMANENT
+a second authority owner/instance                FORBIDDEN
+a cached copy of the authority state             FORBIDDEN
+an OTA/update entry in the actuator owner enum   FORBIDDEN
+```
+
+An activity that is not an actuator user but must exclude all of them — firmware update is the
+first — takes an **exclusivity inhibit** on the same arbiter rather than a fake ownership. The
+inhibit is granted only from `NONE`, and because the check and the hold are one call there is no
+window in which an owner could appear between them.
+
 ### Forbidden architectures
 
 These are permanent prohibitions, enforced by review and by

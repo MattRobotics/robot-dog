@@ -1,5 +1,58 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — ActuatorAuthority + OTA-B authorization — 2026-09-21
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested.**
+**No new write path was added** — the firmware's only actuator write is still
+`EnableTorque(id, 0)` inside `safeOff()`, nothing can acquire an owner yet, and there is
+deliberately no command that does.
+
+- **New `src/core/ActuatorAuthority.*`** — the single central arbiter of actuator write
+  authority. Pure and host-linkable: no Arduino runtime, no `ServoBus`, no `Serial`. Exactly one
+  instance exists, owned by `Controller`, reset to `NONE` at boot; no component caches its value.
+  Both are audit-enforced.
+- **Orthogonal to `OperatingMode`, and enforced as such.** `MAINTENANCE` hosts the service owners
+  but not `MOTION`; `RUN` hosts `MOTION` and nothing else. A mode change that strands an owner
+  clears it instead of leaving a suspended authority — a no-op today, added so the first real
+  owner does not have to remember it.
+- **`SAFE_OFF` is outside arbitration, structurally.** `ServoBus` has no reference to the arbiter
+  and the arbiter has none to `ServoBus`, so `safeOff()` cannot consult an authority even if a
+  later edit wanted it to. The audit fails the build if `ServoBus` names one, or if the
+  `@SERVO SAFE_OFF` branch gains an authority or mode condition.
+- **Read-only diagnostics deliberately take no lock.** `@SERVO SCAN`/`CENSUS`/`READ` are
+  `Ping`/`readByte`/`readWord` and are `MAINTENANCE`-gated because they **block**. The arbiter
+  prevents write conflicts; it does not serialize reads.
+- **Two semantics chosen deliberately.** A same-owner re-request returns `ALREADY_OWNED` and
+  issues **no** second lease — a second valid lease would let two holders each believe they own it
+  and either release it out from under the other. And leases carry a generation, which catches the
+  case owner-matching cannot: the *same* owner across two sessions, where a late callback from the
+  first would otherwise clear the second.
+- **OTA-B authorization implemented; the OTA-A placeholder removed, not kept.** `OtaStageAGate`
+  and `PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET` are gone and the audit fails the build if either
+  name reappears. `src/update/OtaAuthorityGate.*` is backed by the real arbiter.
+- **OTA is not an actuator owner** and no OTA entry was added to the enum — audit-enforced. It
+  takes an **exclusivity inhibit** instead, because it requires that nobody is using the actuators
+  rather than competing for them.
+- **The TOCTOU analysis, and what it did NOT require.** `if (authority == NONE) { start OTA }` is
+  genuinely insufficient — not because of threading (MATDOG's Controller is single-threaded, so a
+  check-then-act inside one call is already atomic) but because of **duration**: an update spans
+  thousands of loop passes. The fix is a hold, not a query: `requestInhibit()` performs the check
+  and takes the hold in one arbiter call. **No `SystemActivity` layer was needed and none was
+  built.** The hold is released on every failure, abort and reset, and kept after a successful
+  commit until the reboot.
+- **Surface:** `@AUTHORITY STATUS` (read-only), `authority=` on the existing `@STATUS` SYSTEM line
+  (~24 B, keeping the worst single-pass burst at ~2782 B against the 3072 B TX ring),
+  `actuator_authority` on the boot banner, and `@MODE MAINTENANCE|RUN` now telling the arbiter.
+- **`core/OperatingMode` became host-linkable** (`<stdint.h>` instead of `<Arduino.h>`); it only
+  ever needed `uint8_t`, and the arbiter consults it while staying testable off the device.
+- **Offline suites:** 751 new checks for the arbiter, including the exhaustive 20-pair conflict
+  matrix with each challenger tried in its own legal mode, corrupted-enum fail-closed, stale-lease
+  refusal, force-clear under every reason, and the full inhibit lifecycle. The OTA suite grew
+  468 → 561 and now links the **real** gate and the **real** arbiter.
+- **Audit gains eleven guards**, all eleven mutation-verified.
+- **Cost:** flash 967,915 B → 970,127 B (+2,212 B, 30% of the 3 MB slot); static RAM 51,676 B →
+  51,740 B (+64 B).
+
 ## Unreleased — OTA-A update core — 2026-09-21
 
 **Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested** — no device has

@@ -212,8 +212,33 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — failure-injection tests for illegal cross-mode operations; reset clears write
   authority; host disconnect leaves no armed write transaction.
 - **NEXT** — Service / Provisioning / QC.
-- **STATUS** — **PARTIAL.** `OperatingMode{MAINTENANCE, RUN}` exists and gates blocking servo
-  diagnostics. Full `ActuatorAuthority` is **TO_DESIGN**.
+- **STATUS** — **IMPLEMENTED / COMPILED / OFFLINE TESTED. HARDWARE TO_TEST.**
+  - `src/core/ActuatorAuthority.*` is the single central arbiter: pure, host-linkable, with no
+    Arduino runtime, no `ServoBus` and no `Serial`. Exactly one instance exists, owned by
+    `Controller`, reset to `NONE` at boot. No component caches its value.
+  - Owners are `NONE`/`DIAGNOSTICS`/`CALIBRATION`/`QC`/`PROVISIONING`/`MOTION`, at most one at a
+    time. A same-owner re-request returns `ALREADY_OWNED` and issues **no** second lease. Leases
+    carry a generation so a late release from a previous session of the *same* owner is refused.
+  - Orthogonal to `OperatingMode`, and enforced as such: `MAINTENANCE` hosts the service owners
+    but not `MOTION`; `RUN` hosts `MOTION` and nothing else. A mode change that strands an owner
+    clears it rather than leaving a suspended authority.
+  - **`SAFE_OFF` is outside arbitration, structurally.** `ServoBus` has no reference to the
+    arbiter and the arbiter has none to `ServoBus`, so `safeOff()` cannot consult an authority
+    even if a later edit wanted it to. The audit fails the build if the `@SERVO SAFE_OFF` branch
+    ever gains an authority or mode condition.
+  - Read-only diagnostics stay outside arbitration on purpose: `@SERVO SCAN`/`CENSUS`/`READ` are
+    `Ping`/`readByte`/`readWord` and are `MAINTENANCE`-gated because they **block**, not because
+    they write.
+  - **No new write path was added.** The firmware's only actuator write remains
+    `EnableTorque(id, 0)` inside `safeOff()`. Nothing can acquire an owner yet, and there is
+    deliberately no command that does.
+  - Offline evidence: 751 checks, including the exhaustive 20-pair conflict matrix, corrupted-enum
+    fail-closed, stale-lease refusal, force-clear under every reason, and the inhibit.
+  - **PASS CRITERIA status** — failure-injection for illegal cross-mode operations: **PASS
+    (offline)**. Reset clears write authority: **PASS (offline)**. Host disconnect leaves no armed
+    write transaction: **TO_TEST** — no write transaction exists yet to arm.
+  - **TO_DESIGN** — the mode-compatibility table is the initial one and is enforced; it should be
+    re-reviewed when the motion loop lands and the `RUN` default flips.
 
 ## Service / Provisioning
 
@@ -345,8 +370,15 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   - **TO_IMPLEMENT** — transport and authentication. OTA-A ships neither; ingest is compiled out
     (`MATDOG_OTA_INGEST_ENABLED` defaults to `0`, audit-enforced), so no production image contains
     a reachable firmware writer. Transport options are evaluated in the Controller README.
-  - **TO_IMPLEMENT / OTA-B** — `OtaAuthorizationGate` backed by the real `ActuatorAuthority`, and
-    an explicit authorized operator rollback. OTA-A fails closed with no gate installed.
+  - **OTA-B authorization: IMPLEMENTED / COMPILED / OFFLINE TESTED.** The OTA-A placeholder gate
+    is gone. `src/update/OtaAuthorityGate.*` is backed by the real arbiter: OTA never becomes an
+    actuator owner (the audit fails the build if an OTA entry is added to the enum) and instead
+    takes an exclusivity **inhibit** for the whole update, granted only from `authority == NONE`.
+    Because the check and the hold are one arbiter call, the TOCTOU window a plain
+    `if (authority == NONE)` leaves open across a multi-second update does not exist. The hold is
+    released on every failure, abort and reset, and deliberately kept after a successful commit
+    until the reboot.
+  - **TO_IMPLEMENT / OTA-B** — an explicit authorized operator rollback.
   - **HARDWARE TO_TEST** — everything: no device has received an OTA image, no otadata has been
     written, no rollback has been observed, and the measured erase/write blocking costs
     (`@OTA STATUS` `open_us`/`write_us`/`end_us`) do not exist yet.

@@ -9,6 +9,7 @@ together and reports whether its hardware is detected, expected or unavailable.
 MATDOG Controller
 ├── core/system      boot, version, health aggregation, power-state machine,
 │                    cooperative non-blocking scheduling, USB command router
+│                    ActuatorAuthority — the one arbiter of actuator write authority
 ├── config/          HardwareProfile — the single USB_ONLY / ROBOT_POWERED authority
 ├── servo/           ServoBus — ST3215 / Seeed bus transport, read-only diagnostics
 │                    ServoPopulation / ServoCensus — canonical 17 vs expected-now 13,
@@ -244,6 +245,7 @@ persistence and any `requestDischargeOff()` body fail the build; the mutation su
 @WIFI STATUS                                (cached snapshot; never queries the radio)
 @WIFI ON | @WIFI OFF                        (any mode; refused without credentials)
 @OTA STATUS                                 (read-only; OTA-A ships no transport)
+@AUTHORITY STATUS                           (read-only; no owner can be acquired yet)
 @SERVO SCAN <lo> <hi> | @SERVO READ <id>   (MAINTENANCE mode only)
 @SERVO CENSUS                               (MAINTENANCE mode only)
 @SERVO SAFE_OFF <id>                        (always allowed, any mode)
@@ -481,7 +483,7 @@ not at boot, not on a timer.
 ```bash
 python3 scripts/tests/test_ota_partition_logic.py   # OTA slot selection (40 tests)
 bash scripts/tests/run_host_tests.sh                # servo population / profile + DALY protocol
-                                                    # + Wi-Fi runtime policy + OTA-A
+                                                    # + Wi-Fi + OTA-A + ActuatorAuthority
 python3 scripts/tests/test_static_audit_daly.py     # DALY write-whitelist mutation suite
 python3 scripts/static_audit.py                     # runs all of the above, plus the audit
 ```
@@ -524,6 +526,15 @@ image of the same length), the ordering property that the boot target does not m
 state other than `IDENTITY_VERIFIED`, replay/idempotence, and the whole first-boot rollback
 lifecycle. SHA-256 is checked against the FIPS 180-4 vectors and against itself at eight
 chunk sizes.
+
+`scripts/tests/test_actuator_authority.cpp` does the same for
+`src/core/ActuatorAuthority.cpp`. 751 checks, with the conflict matrix exhaustive rather than
+illustrative: all 20 ordered pairs of distinct write-capable owners, each challenger tried in
+**its own** legal operating mode so a rejection can only be about exclusivity. Also: boot and
+re-init always landing on `NONE`, corrupted enum values failing closed, release refused for every
+non-owner, the stale-lease case the generation exists for, force-clear under every reason, the
+mode-compatibility table, a mode change clearing a stranded owner, and the whole inhibit
+lifecycle.
 
 ## Operating mode (MAINTENANCE / RUN)
 
@@ -684,6 +695,116 @@ There is no path from this module to `ServoBus`, to an actuator, or to `Operatin
 unit ever names both a network transport symbol and a servo primitive. That is the executable
 form of the permanent rule `network callback != servo command authority`.
 
+## ActuatorAuthority
+
+**Status: implemented, compiled, offline-tested. NOT hardware-tested.**
+
+The single central arbiter of the exclusive right to **write** actuators. One instance exists,
+owned by `Controller`; every other component holds a pointer and asks. `scripts/static_audit.py`
+fails the build if a second instance appears or if any component caches the value.
+
+### It is not a second OperatingMode
+
+They are orthogonal axes and the distinction is load-bearing:
+
+```text
+OperatingMode       what the Controller as a whole is doing
+                    MAINTENANCE: blocking diagnostics are safe
+                    RUN:         a deterministic motion loop may be active
+
+ActuatorAuthority   WHO, if anyone, currently holds the exclusive right to
+                    issue actuator writes
+```
+
+A controller sits in `MAINTENANCE` with authority `NONE` indefinitely — that is the normal state
+today, because **no write-capable owner exists yet**. The mode says what is safe; the authority
+says who is doing it.
+
+The compatibility table is enforced, not decorative:
+
+| OperatingMode | may host |
+|---|---|
+| `MAINTENANCE` | `NONE`, `DIAGNOSTICS`, `CALIBRATION`, `QC`, `PROVISIONING` |
+| `RUN` | `NONE`, `MOTION` |
+
+A mode change that leaves the current owner incompatible **clears** it rather than leaving a
+suspended authority. Today nothing can ever hold one, so this is a no-op — it exists so the first
+real owner does not have to remember to add it. The table is the initial one and should be
+re-reviewed when the motion loop lands and the `RUN` default flips.
+
+### What it deliberately does not arbitrate
+
+**Reads.** `@SERVO SCAN`, `@SERVO CENSUS` and `@SERVO READ` are `Ping`/`readByte`/`readWord`. They
+are `MAINTENANCE`-gated because they **block**, not because they write, and they take no
+authority. The arbiter exists to prevent write conflicts, not to serialize every read.
+
+**`SAFE_OFF`.** A safety de-escalation must be reachable in every authority state, including an
+inconsistent one. This is structural rather than a promise: `ServoBus` has no reference to the
+arbiter and the arbiter has no reference to `ServoBus`, so `safeOff()` **cannot** consult an
+authority even if a later edit wanted it to. The audit fails the build if the `@SERVO SAFE_OFF`
+branch ever gains an authority or mode condition, or if `ServoBus` ever names one.
+
+### Two semantics worth stating
+
+**Same-owner re-request → `ALREADY_OWNED`, and no second lease.** Returning a second valid lease
+would let two holders each believe they own it, and either could then release it out from under
+the other. The existing holder keeps the only lease.
+
+**Leases carry a generation.** Matching the owner alone already rejects "`CALIBRATION` releases
+while `MOTION` holds". What it cannot catch is the same owner across two sessions:
+
+```text
+CALIBRATION acquires   (generation 1)
+CALIBRATION releases
+CALIBRATION acquires   (generation 2)
+late callback from session 1 calls release(CALIBRATION)
+    owner matches  ->  session 2 would be cleared out from under itself
+```
+
+The generation makes that release provably stale. It is refused and reported.
+
+### No new write path
+
+This phase implements the **arbiter**, not new capabilities. The firmware's only actuator write is
+still `EnableTorque(id, 0)` inside `safeOff()`. Nothing can acquire an owner yet, and there is
+deliberately **no command** that does — an operator-driven acquire would itself be a new write
+path. `@AUTHORITY STATUS` is read-only.
+
+### Exclusivity inhibit — and the TOCTOU problem it solves
+
+Some activities are not actuator users but must exclude all of them. Firmware update is the first.
+Adding an OTA entry to the owner enum would have been wrong twice over: OTA drives no actuator, and
+it does not *compete* with `CALIBRATION` for a resource — it requires that **nobody** is using one.
+The audit fails the build if such an entry is added.
+
+The naive gate is genuinely insufficient:
+
+```cpp
+if (authority == NONE) { start OTA }     // not enough
+```
+
+Not because of threading — MATDOG's Controller is single-threaded, every subsystem runs
+cooperatively inside `Controller::update()`, and nothing in MATDOG's own code owns a task or a
+callback, so a check-then-act **inside one call** is already atomic. The hazard is **duration**: an
+OTA update spans `prepare` → `openStream` → thousands of `writeChunk` calls → `finishStream` →
+`commit`, across seconds of loop passes. Between any two of them a command can arrive and a future
+`CalibrationManager` can acquire authority. No amount of re-checking closes that.
+
+So the arbiter exposes a **hold**, not a query:
+
+```text
+requestInhibit(FIRMWARE_UPDATE)
+    granted only when current() == NONE
+    while held, every request() is REJECTED_INHIBITED
+```
+
+The "is anyone an owner?" check and the hold happen inside one arbiter call, so there is no window
+between them. **No `SystemActivity` layer was needed**, and none was built.
+
+A stuck inhibit is fail-safe: it blocks writes, it does not enable them. `forceClear()` of the
+*owner* deliberately does not drop it — a fault must not quietly re-open actuator authority. It is
+cleared explicitly, or by the next boot.
+
 ## OTA-A (update core)
 
 **Status: implemented, compiled, offline-tested. NOT hardware-tested.** No MATDOG device has
@@ -817,17 +938,32 @@ and making it one would roll back a perfectly good image because a cable was unp
 the authority model lands, the question of whether confirmation should additionally require a
 safe actuator state is **TO_DESIGN**.
 
-### OTA-B boundary
+### OTA-B authorization — implemented
 
-`OtaAuthorizationGate` is the hook for the real model. OTA-A does **not** implement a
-temporary mini-authority. Instead:
+`src/update/OtaAuthorityGate.*` is the definitive gate, backed by the real
+[ActuatorAuthority](#actuatorauthority) arbiter. The OTA-A placeholder is **gone**, not kept
+alongside; the audit fails the build if its names reappear.
 
-- the policy **fails closed** with no gate installed (`REFUSED_NO_GATE_INSTALLED`);
-- permission during OTA-A is a named, greppable object, `OtaStageAGate`, whose verdict is
-  literally `PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET`, installed on purpose by `OtaManager`.
+OTA never becomes an actuator owner — it drives no actuator, and it does not compete with
+`CALIBRATION` for a resource, it requires that nobody is using one. It takes an **exclusivity
+inhibit** instead, and it takes it as a *hold* rather than a *query*, because an update spans
+seconds of loop passes and a query can only be true about the instant it ran. The reasoning and
+the TOCTOU analysis are in the
+[exclusivity inhibit](#exclusivity-inhibit--and-the-toctou-problem-it-solves) section.
 
-Replacing it with an `ActuatorAuthority`-backed gate is a one-line change at one site, and
-forgetting to is a refusal rather than a silent allow.
+```text
+prepare()            -> beginExclusive() -> requestInhibit(FIRMWARE_UPDATE)
+                        granted only when authority == NONE
+during the update    -> every request() is REJECTED_INHIBITED
+failure/abort/reset  -> endExclusive(), so a failed update never leaves the
+                        robot permanently unable to calibrate
+successful commit    -> hold KEPT until the reboot: a boot switch is pending,
+                        and calibrating against an image about to be replaced
+                        is not something to permit for convenience
+```
+
+The policy still **fails closed** with no gate installed, and now also with a gate whose arbiter
+was never bound. Remaining for OTA-B: an explicit, authorized operator rollback.
 
 ### Security posture — honestly stated
 
