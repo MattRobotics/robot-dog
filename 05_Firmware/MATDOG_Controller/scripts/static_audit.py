@@ -122,6 +122,7 @@ constant, or the mode seen when the command arrived).
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
+import pathlib
 import re
 import subprocess
 import sys
@@ -1130,23 +1131,174 @@ def check_no_network_to_servo_path(files):
                  f"ServoBus (V2 architecture, forbidden path)")
 
 
+def check_wifi_runtime_boundaries(files, sketch_dir):
+    """W1 permanent invariants for the Wi-Fi runtime.
+
+    The tripwire in check_no_network_to_servo_path already forbids the worst
+    outcome (a network translation unit reaching a servo primitive). These
+    checks defend the three other properties W1 actually rests on, so none
+    of them can be lost to a later "small" edit:
+
+      1. the decision logic stays host-linkable, so the offline suite
+         exercises the shipped state machine rather than a copy;
+      2. the Wi-Fi tick stays bounded, so it cannot starve the Controller
+         loop (ARCHITECTURE.md, resource isolation);
+      3. the passphrase stays in exactly one place and out of Git.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    network_dir = sketch_dir / "src" / "network"
+
+    # --- (1) the policy layer stays host-linkable --------------------------
+    for name in ("WifiPolicy.h", "WifiPolicy.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            fail(f"{network_dir / name}: W1 Wi-Fi policy unit not found - the Wi-Fi "
+                 f"decision logic must live in a host-linkable translation unit")
+            continue
+        path, code = entry
+        for forbidden in ("#include <Arduino.h>", "#include <WiFi.h>"):
+            if forbidden in code:
+                fail(f"{path}: contains {forbidden!r} - the Wi-Fi policy must stay free of "
+                     f"the Arduino runtime and of the radio so scripts/tests/"
+                     f"test_wifi_policy.cpp links the REAL state machine (W1, and the same "
+                     f"contract as DalyProtocol/ServoPopulation)")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the Wi-Fi state layer must stay "
+                 f"transport-independent so USB CDC and a future Web UI consume one "
+                 f"structured snapshot (ARCHITECTURE.md, telemetry snapshot model)")
+
+    policy_header = by_name.get("WifiPolicy.h")
+    if policy_header is not None and "struct WifiStatus" not in policy_header[1]:
+        fail(f"{policy_header[0]}: WifiStatus struct not found - the Wi-Fi layer must "
+             f"produce structured state, not formatted text")
+
+    # --- (2) the Wi-Fi tick stays bounded ----------------------------------
+    manager = by_name.get("WifiManager.cpp")
+    if manager is None:
+        fail(f"{network_dir / 'WifiManager.cpp'}: W1 Wi-Fi radio owner not found")
+    else:
+        path, code = manager
+        # Blocking calls that exist in esp32:esp32 3.3.11 and would stall
+        # Controller::update(). WiFi.disconnect() is listed because its
+        # default overload polls for up to 100 ms; disconnectAsync() does
+        # not, and is what this module is required to use.
+        for token, why in (
+            ("waitForConnectResult", "blocks until the association resolves"),
+            ("WiFi.disconnect(", "the blocking overload polls up to 100 ms - use "
+                                 "disconnectAsync()"),
+            ("WiFi.scanNetworks()", "the blocking scan form stops the loop for seconds"),
+            ("WiFi.SSID()", "returns an Arduino String and would allocate on every poll"),
+            ("delay(", "a delay in the network path is not a connection-management "
+                       "strategy (handoff section 18)"),
+        ):
+            if token in code:
+                fail(f"{path}: {token} is forbidden in the Wi-Fi runtime - {why}")
+
+        # No unbounded iteration in the per-tick entry point. begin() may
+        # loop (it copies the SSID once, bounded by the buffer); update()
+        # may not.
+        body = re.search(r"void WifiManager::update\(uint32_t now_ms\)\s*\{(.*?)\n\}",
+                         code, re.DOTALL)
+        if not body:
+            fail(f"{path}: could not locate WifiManager::update() to audit its bounds")
+        else:
+            for token in ("while (", "while("):
+                if token in body.group(1):
+                    fail(f"{path}: WifiManager::update() contains {token!r} - the Wi-Fi "
+                         f"tick must be a single bounded evaluation, never a wait loop")
+
+        # The network layer may observe mode, never change it: authority is
+        # not a network concept (handoff sections 9/19).
+        if "setMode(" in code:
+            fail(f"{path}: calls setMode( - a network task must never change "
+                 f"OperatingMode; authority stays with the Controller")
+
+    # --- (3) the passphrase: one use site, never committed -----------------
+    creds = by_name.get("WifiCredentials.h")
+    if creds is None:
+        fail(f"{sketch_dir / 'src' / 'config' / 'WifiCredentials.h'}: Wi-Fi credential "
+             f"resolver not found")
+    else:
+        path, code = creds
+        if "kWifiCredentialsPresent" not in code:
+            fail(f"{path}: kWifiCredentialsPresent not found - an absent SSID must be a "
+                 f"compile-time fact so the radio is never started without credentials")
+        if 'define MATDOG_WIFI_SSID ""' not in code:
+            fail(f"{path}: the empty-SSID fallback is missing - a checkout with no "
+                 f"credentials must still build and boot, with the radio never started")
+
+    # kWifiPassword must be named in exactly one place besides its own
+    # declaration: the single WiFi.begin() call. Anywhere else is a step
+    # toward it reaching a log line, @STATUS or a web response.
+    password_sites = []
+    for path, code in files:
+        if path.name == "WifiCredentials.h":
+            continue
+        if "kWifiPassword" in code:
+            password_sites.append((str(path), code.count("kWifiPassword")))
+    total = sum(n for _, n in password_sites)
+    if total != 1 or (password_sites and pathlib.Path(password_sites[0][0]).name != "WifiManager.cpp"):
+        fail(f"kWifiPassword is referenced {total} time(s) at {password_sites} - it must "
+             f"appear exactly once, in network/WifiManager.cpp, passed straight to the "
+             f"connect call. It must never be stored, returned or printed (W1)")
+
+    policy_files = [c for n, (p, c) in by_name.items() if n in ("WifiPolicy.h", "WifiPolicy.cpp")]
+    for code in policy_files:
+        for token in ("password", "passphrase", "psk"):
+            if token in code.lower():
+                fail(f"src/network/WifiPolicy.*: mentions {token!r} - the observable Wi-Fi "
+                     f"snapshot must have no field that could ever hold a secret (W1)")
+
+    # The local credentials file must stay ignored by Git, and untracked.
+    gitignore = sketch_dir / ".gitignore"
+    local_rel = "src/config/WifiCredentials.local.h"
+    if not gitignore.exists():
+        fail(f"{gitignore}: not found - it must ignore {local_rel}")
+    else:
+        # Exact-line match, not a substring search. The surrounding comment
+        # block names ".../WifiCredentials.local.h.example", which contains
+        # the rule as a substring - a naive `in` test would keep passing
+        # after the real rule line was deleted.
+        rules = [ln.strip() for ln in gitignore.read_text(encoding="utf-8").splitlines()]
+        rules = [ln for ln in rules if ln and not ln.startswith("#")]
+        if local_rel not in rules:
+            fail(f"{gitignore}: has no ignore rule for {local_rel} (active rules: {rules}) - "
+                 f"removing that entry makes a real Wi-Fi passphrase committable (W1)")
+
+    template = sketch_dir / "src" / "config" / "WifiCredentials.local.h.example"
+    if not template.exists():
+        fail(f"{template}: credential template not found - it is the documented way to "
+             f"configure Wi-Fi without touching a tracked file")
+
+    result = subprocess.run(["git", "-C", str(sketch_dir), "ls-files", "--error-unmatch",
+                             local_rel],
+                            capture_output=True, text=True)
+    if result.returncode == 0:
+        fail(f"{local_rel} is TRACKED by Git - a real Wi-Fi passphrase must never be "
+             f"committed. Run: git rm --cached {local_rel}")
+
+
 def check_host_tests(sketch_dir):
     """Runs the offline C++ census/profile suite, the same way the OTA
     parser's Python suite is already run from here: one gate command."""
     runner = sketch_dir / "scripts" / "tests" / "run_host_tests.sh"
     suite = sketch_dir / "scripts" / "tests" / "test_servo_population.cpp"
     daly_suite = sketch_dir / "scripts" / "tests" / "test_daly_protocol.cpp"
+    wifi_suite = sketch_dir / "scripts" / "tests" / "test_wifi_policy.cpp"
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
         return
     if not daly_suite.exists():
         fail(f"{daly_suite}: DALY protocol/KEY probe offline test suite not found")
         return
+    if not wifi_suite.exists():
+        fail(f"{wifi_suite}: W1 Wi-Fi runtime policy offline test suite not found")
+        return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
     runner_text = strip_shell_comments(runner.read_text(encoding="utf-8"))
-    for binary in ("test_servo_population", "test_daly_protocol"):
+    for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
@@ -1466,6 +1618,7 @@ def main():
     check_g2_state_is_transport_independent(files)
     check_no_startup_servo_traffic(files)
     check_no_network_to_servo_path(files)
+    check_wifi_runtime_boundaries(files, SKETCH_DIR)
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
