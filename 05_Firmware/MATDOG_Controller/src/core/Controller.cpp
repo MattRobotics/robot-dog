@@ -75,9 +75,21 @@ void Controller::begin() {
   led_.begin();
   system_state_.setLedHealth(led_.health());
 
+  // Configures the Wi-Fi policy and publishes its first snapshot. It does
+  // NOT start the radio: the first WiFi.mode() call initializes the driver
+  // and allocates tens of KB of heap, which does not belong in a boot path
+  // that must reach SYSTEM_BOOT_COMPLETE promptly. The radio comes up from
+  // update(), a few ticks later, if credentials exist.
+  //
+  // Wi-Fi is deliberately absent from system_state_: a missing access point
+  // is not a robot health fact, and the G3/G3.1-validated meaning of
+  // SYSTEM health must not silently change because a router rebooted.
+  // Wi-Fi is observable through @STATUS and @WIFI STATUS instead.
+  wifi_.begin(millis());
+
   CommandRouter::Modules modules{
-      &servo_bus_, &servo_census_, &imu_, &daly_, &led_, &system_state_, &power_state_,
-      &operating_mode_,
+      &servo_bus_, &servo_census_, &imu_, &daly_, &led_, &wifi_, &system_state_,
+      &power_state_, &operating_mode_,
   };
   command_router_.begin(modules);
 
@@ -117,6 +129,11 @@ void Controller::printBootBanner() {
                 pins::kBnoSck, pins::kBnoMiso, pins::kBnoMosi, pins::kBnoCs,
                 pins::kBnoInt, pins::kBnoRst, pins::kBnoPs0);
   Serial.printf("led        : GPIO%d / %u px\n", pins::kLedRingDin, status::LedRing::kNumPixels);
+  // Credentials presence only — never the SSID's passphrase, and never a
+  // claim about connectivity: the radio has not been started at this point.
+  Serial.printf("wifi       : credentials=%s state=%s (radio starts from update())\n",
+                wifi_.status().credentials_present ? "YES" : "NO",
+                network::toString(wifi_.status().state));
 
   const esp_partition_t* running = esp_ota_get_running_partition();
   if (running != nullptr) {
@@ -154,6 +171,14 @@ void Controller::update(uint32_t now_ms) {
   system_state_.setServoHealth(servo_bus_.health());
 
   system_state_.update();
+
+  // Last among the services, on purpose. Within one pass every
+  // timing-sensitive module (IMU, DALY, the incremental servo scan step)
+  // has already advanced before any network work happens, so a heavy tick
+  // here — the first WiFi.mode() call is the expensive one — cannot sit
+  // between a bus transaction and its follow-up. The cost of this call is
+  // measured, not assumed: @WIFI STATUS reports last_us/max_us.
+  wifi_.update(now_ms);
 
   if (power_state_.state() == PowerState::SHUTDOWN_REQUESTED ||
       power_state_.state() == PowerState::SHUTTING_DOWN ||

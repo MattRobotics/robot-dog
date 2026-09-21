@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 #include "../imu/Bno085Imu.h"
+#include "../network/WifiManager.h"
 #include "../power/DalyBms.h"
 #include "../servo/ServoBus.h"
 #include "../servo/ServoCensus.h"
@@ -32,6 +33,9 @@ class Controller {
   imu::Bno085Imu imu_;
   power::DalyBms daly_;
   status::LedRing led_;
+  // Owns the radio; owns nothing else. It has no path to ServoBus, to
+  // OperatingMode or to any actuator — see network/WifiManager.h.
+  network::WifiManager wifi_;
 
   SystemState system_state_;
   PowerStateMachine power_state_;

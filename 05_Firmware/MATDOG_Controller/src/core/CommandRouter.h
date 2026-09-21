@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 #include "../imu/Bno085Imu.h"
+#include "../network/WifiManager.h"
 #include "../power/DalyBms.h"
 #include "../servo/ServoBus.h"
 #include "../servo/ServoCensus.h"
@@ -31,6 +32,7 @@ class CommandRouter {
     imu::Bno085Imu* imu;
     power::DalyBms* daly;
     status::LedRing* led;
+    network::WifiManager* wifi;
     SystemState* system_state;
     PowerStateMachine* power_state;
     OperatingModeManager* operating_mode;
@@ -51,6 +53,11 @@ class CommandRouter {
   void printBmsKeyWriteResult();
   void printBmsKeyWriteStatus();
   void printLedStatus();
+  // Pure presentation of wifi->status(). Formats a snapshot the Wi-Fi layer
+  // already computed; it never queries the radio, so a future Web adapter
+  // renders the same struct without a second hardware path (see
+  // ARCHITECTURE.md, telemetry snapshot model).
+  void printWifiStatus();
   void printServoScanResult();
   // Pure presentation of servo_census->result(). Computes nothing: the
   // classification lives in servo/ServoPopulation.h so a future Web UI /

@@ -169,6 +169,23 @@ void CommandRouter::handleLine(String line) {
       Serial.printf("REASON=%s\n", status::LedRing::blockedReason());
       Serial.printf("PROFILE=%s\n", build::kTestProfile);
     }
+  } else if (upper == "@WIFI STATUS") {
+    printWifiStatus();
+  } else if (upper == "@WIFI ON" || upper == "@WIFI OFF") {
+    // Deliberately NOT gated by operating mode. The radio is orthogonal to
+    // servo safety: it cannot block the bus (WifiManager::update() is
+    // bounded and measured) and it has no path to an actuator. Gating it on
+    // MAINTENANCE would only make the network unusable in the mode a future
+    // motion loop actually runs in.
+    const bool on = (upper == "@WIFI ON");
+    if (modules_.wifi->setEnabled(on, millis())) {
+      Serial.printf("WIFI=%s\n", on ? "ON" : "OFF");
+    } else {
+      Serial.println("WIFI=REFUSED");
+      Serial.println("REASON=NO_CREDENTIALS");
+      Serial.println("HINT=create src/config/WifiCredentials.local.h and rebuild");
+    }
+    printWifiStatus();
   } else if (upper.startsWith("@SERVO SCAN")) {
     if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
       Serial.println("SERVO_SCAN=BLOCKED");
@@ -264,6 +281,8 @@ void CommandRouter::printHelp() {
   Serial.println("  @LED STATUS");
   Serial.println("  @LED OFF");
   Serial.println("  @LED TEST");
+  Serial.println("  @WIFI STATUS           (cached snapshot; no radio query)");
+  Serial.println("  @WIFI ON|OFF           (any mode; refused without credentials)");
   Serial.println("  @SERVO SCAN <lo> <hi>   (MAINTENANCE mode only; incremental, bounded");
   Serial.println("                           per-ID blocking, result follows asynchronously)");
   Serial.println("  @SERVO CENSUS           (MAINTENANCE mode only; canonical 11-55 scan,");
@@ -283,6 +302,35 @@ void CommandRouter::printAvailabilityLine(const char* label, const AvailabilityS
 
 void CommandRouter::printModeStatus() {
   Serial.printf("MODE=%s\n", toString(modules_.operating_mode->mode()));
+}
+
+void CommandRouter::printWifiStatus() {
+  const network::WifiStatus& w = modules_.wifi->status();
+
+  char ip[16];
+  network::formatIpv4(w.ipv4, ip, sizeof(ip));
+
+  Serial.printf("WIFI_STATE=%s fault=%s\n", network::toString(w.state),
+                network::toString(w.fault));
+  Serial.printf("WIFI_CONFIG enabled=%s credentials=%s ssid=%s\n",
+                w.enabled ? "YES" : "NO",
+                w.credentials_present ? "YES" : "NO",
+                w.credentials_present ? w.ssid : "(none)");
+  Serial.printf("WIFI_LINK connected=%s ip=%s rssi_dbm=%ld channel=%u\n",
+                w.connected ? "YES" : "NO", ip, (long)w.rssi_dbm, (unsigned)w.channel);
+  Serial.printf("WIFI_RETRY backoff_ms=%lu state_since_ms=%lu\n",
+                (unsigned long)w.backoff_ms, (unsigned long)w.state_since_ms);
+  Serial.printf("WIFI_COUNTERS radio_starts=%lu attempts=%lu connects=%lu reconnects=%lu "
+                "timeouts=%lu link_losses=%lu\n",
+                (unsigned long)w.counters.radio_starts,
+                (unsigned long)w.counters.connect_attempts,
+                (unsigned long)w.counters.connects,
+                (unsigned long)w.reconnects(),
+                (unsigned long)w.counters.connect_timeouts,
+                (unsigned long)w.counters.link_losses);
+  // The bounded-runtime claim, as a measurement the operator can read back.
+  Serial.printf("WIFI_TICK last_us=%lu max_us=%lu\n",
+                (unsigned long)w.last_update_us, (unsigned long)w.max_update_us);
 }
 
 void CommandRouter::printStatus() {
@@ -312,6 +360,19 @@ void CommandRouter::printStatus() {
                 (unsigned)servo::expectedNowCount(),
                 (unsigned)servo::absentByDesignCount(),
                 servo::toString(modules_.servo_census->result().verdict));
+
+  // One compact Wi-Fi line here; the full picture is @WIFI STATUS. @STATUS
+  // has a real byte budget: static_audit.py sizes the USB CDC TX ring
+  // against the worst single-pass burst, and with TX timeout 0 anything
+  // past the ring is dropped rather than queued (G3.1).
+  {
+    const network::WifiStatus& w = modules_.wifi->status();
+    char ip[16];
+    network::formatIpv4(w.ipv4, ip, sizeof(ip));
+    Serial.printf("WIFI  state=%s connected=%s ip=%s rssi_dbm=%ld fault=%s\n",
+                  network::toString(w.state), w.connected ? "YES" : "NO", ip,
+                  (long)w.rssi_dbm, network::toString(w.fault));
+  }
 
   Serial.printf("  heap_free=%u heap_min_free=%u\n",
                 (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap());
