@@ -48,6 +48,11 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/network/WifiPolicy.cpp"
 
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_domain" \
+  "$SCRIPT_DIR/test_calibration_domain.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
+
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -o "$OUT/test_actuator_authority" \
   "$SCRIPT_DIR/test_actuator_authority.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
@@ -70,3 +75,4 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_wifi_policy"
 "$OUT/test_actuator_authority"
 "$OUT/test_ota_policy"
+"$OUT/test_calibration_domain"
