@@ -5,7 +5,9 @@
 # policy (credential gate, two-phase radio start, connect deadline, backoff
 # ladder, link loss, wraparound). No hardware, no Arduino toolchain, no
 # device I/O — they link the real firmware translation units, which is why
-# those were kept Arduino-free.
+# those were kept Arduino-free. OTA-A adds a fourth: the update state
+# machine, the first-boot rollback guard and the streaming SHA-256, driven
+# against a fake OtaBackend so every flash-failure path is reachable offline.
 #
 # Invoked by scripts/static_audit.py so there is one gate command, matching
 # how the OTA partition parser's Python suite is already run.
@@ -45,6 +47,14 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_wifi_policy.cpp" \
   "$SKETCH_DIR/src/network/WifiPolicy.cpp"
 
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_ota_policy" \
+  "$SCRIPT_DIR/test_ota_policy.cpp" \
+  "$SKETCH_DIR/src/update/OtaPolicy.cpp" \
+  "$SKETCH_DIR/src/update/OtaBootGuard.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+
 "$OUT/test_servo_population"
 "$OUT/test_daly_protocol"
 "$OUT/test_wifi_policy"
+"$OUT/test_ota_policy"
