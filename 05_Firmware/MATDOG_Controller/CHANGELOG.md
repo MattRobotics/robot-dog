@@ -1,5 +1,59 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — OTA-A update core — 2026-09-21
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested** — no device has
+received an OTA image, no otadata has been written, no rollback has been observed. OTA-A is the
+update **core only**: no transport, no authentication, and byte ingest compiled out by default.
+
+- **New `src/update/` module**, split the way `network/` already is: `OtaPolicy.*` (pure update
+  state machine), `OtaBootGuard.*` (first-boot rollback lifecycle), `Sha256.*` (image identity) —
+  all Arduino-free and ESP-IDF-free — behind an `OtaBackend` interface implemented by
+  `OtaEspBackend.*`, the only translation unit in the firmware that calls `esp_ota_*`.
+- **The inactive-slot rule is structural, not documentary.** `target != running`,
+  `subtype ∈ ota_0..ota_15` and `image_size ≤ target.size` are explicit refusals rather than
+  inferences from a backend error; `OtaEspBackend::setBootPartition()` re-reads
+  `esp_ota_get_running_partition()` and refuses independently; and `commitBootTarget()` is the one
+  method that moves the boot target, with one call site, reachable from exactly one state.
+  `flash_app_only.sh` was audited for reusable logic and deliberately **not** adopted as the OTA
+  writer — it writes the **active** slot over USB and is a different guarantee.
+- **Five kinds of verification kept distinct** — transport integrity, image validity
+  (`esp_ota_end`), cryptographic hash identity (our SHA-256), firmware/build identity
+  (`build::kBuildId`), bootloader validity (otadata). Only the third distinguishes "a valid image"
+  from "the expected image", and the host suite proves it with a mismatched image of identical
+  length.
+- **`esp_app_desc_t` rejected as firmware identity**, on evidence: parsing the real binary shows
+  `version='ee57070'`, `project_name='arduino-lib-builder'`, `date='Jul 20 2026'` — the core's
+  identity, not MATDOG's. The existing scheme (`build::kBuildId` + the manifest's
+  `APPLICATION_SHA256`/`APPLICATION_SIZE`) is reused; no second version scheme was invented.
+- **First-boot confirmation is earned, not granted.** With `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y`
+  in the real build, never confirming is the safe default — the bootloader aborts a
+  `PENDING_VERIFY` image on the next boot by itself. `esp_ota_mark_app_valid_cancel_rollback()` is
+  called only after Controller init completed, CommandRouter is bound, identity is readable, the
+  boot did not follow PANIC/WDT/BROWNOUT, and the image survived ≥ 15 s **and** ≥ 2000 loop ticks.
+  The audit fails the build if `Controller::begin()` ever confirms an image.
+- **Refusal does not reboot.** Declining to confirm is already sufficient; rebooting a robot is not
+  OTA-A's decision. Explicit operator rollback is **OTA-B**.
+- **OTA-B boundary without a mini-authority.** `OtaAuthorizationGate` fails closed with no gate
+  installed; OTA-A permission is a named object (`OtaStageAGate`) whose verdict is literally
+  `PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET`.
+- **Security stated as a compile-time fact.** `MATDOG_OTA_INGEST_ENABLED` defaults to `0` and the
+  audit fails the build if the source default changes — same shape as the `USB_ONLY` profile gate —
+  so an unauthenticated firmware writer cannot reach a production image.
+- **Erase strategy chosen for loop responsiveness.** `esp_ota_begin()` uses
+  `OTA_WITH_SEQUENTIAL_WRITES`: an explicit size erases ~1 MB up front, seconds of blocking. The
+  size bound stays an explicit policy check instead of being delegated to the erase argument.
+- **Offline suite:** 468 checks against the real state machine with a fake backend — every target,
+  metadata, stream and verification failure; the ordering property that the boot target never moves
+  from any state but `IDENTITY_VERIFIED`; replay, idempotent abort and state-machine reset; and the
+  full rollback lifecycle. SHA-256 checked against FIPS 180-4 vectors, at eight chunk sizes, and
+  byte-for-byte against `sha256sum` on the real 959 KB binary.
+- **Audit gains thirteen OTA guards**, each mutation-verified. One initially escaped because the
+  mutation hit the comment documenting the erase strategy rather than the call; re-run against the
+  real call site, it fires.
+- **Cost:** flash 959,043 B → 967,915 B (+8,872 B, 30% of the 3 MB slot); static RAM 50,868 B →
+  51,676 B (+808 B). No image is ever held in RAM.
+
 ## Unreleased — W1 Wi-Fi station runtime — 2026-09-21
 
 **Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested** — no MATDOG build

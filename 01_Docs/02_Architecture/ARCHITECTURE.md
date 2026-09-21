@@ -40,6 +40,7 @@ PERMANENT MATDOG CONTROLLER — ESP32-S3
   core / USB diagnostics / BNO085                 VALIDATED in USB_ONLY scope
   ServoBus / DALY / LED / power-state baseline    VALIDATED no-motion in ROBOT_POWERED (G3/G3.1)
   Wi-Fi station runtime (link only, no server)    IMPLEMENTED, TO_TEST on hardware (W1)
+  OTA-A update core (no transport, no auth)       IMPLEMENTED, TO_TEST on hardware
   maintenance / service / calibration modules     TO_DESIGN
   motion / IK / gait / stabilization              TO_DESIGN, later
           |
@@ -147,6 +148,11 @@ onboard native-USB validation does not validate that external wiring.
   it has not yet associated with an access point on real hardware. It does not make OTA closer to
   VALIDATED; it makes OTA implementable.
 - **DECIDED:** native USB CDC/USB-C remains available for wired service and recovery.
+- **IMPLEMENTED / TO_TEST:** the OTA-A update core exists in the Controller — inactive-slot
+  resolution and writing, image and hash verification, a boot switch reachable from exactly one
+  validated state, and first-boot rollback validation. It has **no transport and no
+  authentication**, byte ingest is compiled out by default, and no device has received an OTA
+  image. Authority integration is **OTA-B**.
 - OTA must never remove or make wired recovery dependent on a working application image.
 - Controller V0.1's application-partition USB flashing procedure is not a Wi-Fi/OTA
   implementation.

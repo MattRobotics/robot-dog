@@ -17,15 +17,20 @@ MATDOG Controller
 ├── power/           DalyBms — read-only Modbus RTU battery telemetry
 ├── network/         WifiPolicy — pure Wi-Fi lifecycle state machine (host-linkable)
 │                    WifiManager — the only translation unit that owns the radio
+├── update/          OtaPolicy / OtaBootGuard / Sha256 — pure OTA state machine,
+│                    first-boot rollback lifecycle, image identity (host-linkable)
+│                    OtaEspBackend — the only unit that calls esp_ota_*
+│                    OtaManager — Controller-facing owner; no transport in OTA-A
 └── status/          LedRing — WS2812B ring, boots OFF, non-blocking effects
 ```
 
 This is an **integration and platform milestone**, not a motion controller. No gait,
 IK, closed-loop stabilization, ROS 2/MoveIt 2 or autonomous behaviour is implemented
-here — see `VALIDATION.md` for the precise scope. A **Wi-Fi station runtime** (W1) is
-implemented and offline-tested but **not yet hardware-tested**; **OTA remains
-unimplemented** beyond the host-side partition logic. See
-[Wi-Fi runtime](#wi-fi-runtime-w1) for exactly what that does and does not mean.
+here — see `VALIDATION.md` for the precise scope. A **Wi-Fi station runtime** (W1) and the
+**OTA-A update core** (state machine, inactive-slot writer, first-boot rollback validation)
+are implemented and offline-tested but **not yet hardware-tested**, and OTA ships **no
+transport and no authentication**. See [Wi-Fi runtime](#wi-fi-runtime-w1) and
+[OTA-A](#ota-a-update-core) for exactly what that does and does not mean.
 
 ## Official baseline
 
@@ -238,6 +243,7 @@ persistence and any `requestDischargeOff()` body fail the build; the mutation su
 @LED STATUS | @LED OFF | @LED TEST
 @WIFI STATUS                                (cached snapshot; never queries the radio)
 @WIFI ON | @WIFI OFF                        (any mode; refused without credentials)
+@OTA STATUS                                 (read-only; OTA-A ships no transport)
 @SERVO SCAN <lo> <hi> | @SERVO READ <id>   (MAINTENANCE mode only)
 @SERVO CENSUS                               (MAINTENANCE mode only)
 @SERVO SAFE_OFF <id>                        (always allowed, any mode)
@@ -475,7 +481,7 @@ not at boot, not on a timer.
 ```bash
 python3 scripts/tests/test_ota_partition_logic.py   # OTA slot selection (40 tests)
 bash scripts/tests/run_host_tests.sh                # servo population / profile + DALY protocol
-                                                    # + Wi-Fi runtime policy
+                                                    # + Wi-Fi runtime policy + OTA-A
 python3 scripts/tests/test_static_audit_daly.py     # DALY write-whitelist mutation suite
 python3 scripts/static_audit.py                     # runs all of the above, plus the audit
 ```
@@ -507,6 +513,17 @@ ladder from the bottom, operator enable/disable (including that no teardown is i
 radio that was never brought up), fail-closed handling of a refused radio start or connect
 call, the invariant that a connect is never issued while connected, `millis()` wraparound,
 and the IPv4 formatter including its bounds.
+
+`scripts/tests/test_ota_policy.cpp` does the same for `src/update/OtaPolicy.cpp`,
+`OtaBootGuard.cpp` and `Sha256.cpp`, with a fake `OtaBackend` substituting only the flash.
+468 checks: target resolution refusals (target == running, factory/TEST subtype, no inactive
+slot, oversize, zero length, and exactly-partition-sized which must be *allowed*), metadata
+refusals, the PENDING_VERIFY precondition, every stream failure (open rejected, write error,
+short write, truncation, overrun, `esp_ota_end` failure, hash mismatch against a different
+image of the same length), the ordering property that the boot target does not move from any
+state other than `IDENTITY_VERIFIED`, replay/idempotence, and the whole first-boot rollback
+lifecycle. SHA-256 is checked against the FIPS 180-4 vectors and against itself at eight
+chunk sizes.
 
 ## Operating mode (MAINTENANCE / RUN)
 
@@ -666,6 +683,206 @@ There is no path from this module to `ServoBus`, to an actuator, or to `Operatin
 `scripts/static_audit.py::check_no_network_to_servo_path` fails the build if a translation
 unit ever names both a network transport symbol and a servo primitive. That is the executable
 form of the permanent rule `network callback != servo command authority`.
+
+## OTA-A (update core)
+
+**Status: implemented, compiled, offline-tested. NOT hardware-tested.** No MATDOG device has
+received an OTA image. Nothing below is a claim about flash behaviour on real hardware.
+
+OTA-A is the **update core only**. It ships **no transport** and **no authentication**, and
+the byte-ingest entry points are compiled out by default. Nothing can feed it an image.
+
+### Layering
+
+```text
+network transport                    NOT IMPLEMENTED in OTA-A (substitution point)
+      |
+      v
+update/OtaManager                    Controller-facing owner + first-boot lifecycle
+      |
+      v
+update/OtaPolicy                     the update state machine        (host-linkable)
+update/OtaBootGuard                  the first-boot rollback guard   (host-linkable)
+update/Sha256                        image identity                  (host-linkable)
+      |
+      v
+OtaBackend (abstract)  ->  update/OtaEspBackend    the ONLY unit calling esp_ota_*
+      |
+      v
+inactive OTA application slot
+```
+
+The backend is an interface rather than a direct `esp_ota_*` call so the offline suite drives
+the **real** state machine against a fake backend that can fail any individual flash
+operation. The logic under test is the shipped logic; only the flash is substituted.
+
+### The one safety rule, made structural
+
+OTA writes the **inactive** slot and only the inactive slot. That is not enforced by a comment:
+
+- `esp_ota_get_next_update_partition(NULL)` is documented never to return the running
+  partition — and `OtaPolicy` checks it against the running partition anyway;
+- three checks are stated explicitly rather than inferred from a backend refusal:
+  `target != running`, `subtype ∈ ota_0..ota_15`, `image_size ≤ target.size`;
+- `OtaEspBackend::setBootPartition()` re-reads `esp_ota_get_running_partition()` and refuses
+  independently, so the last line of defence does not depend on `OtaPolicy` being correct;
+- `commitBootTarget()` is the **only** method that changes the boot target, it has exactly
+  one `setBootPartition(` call site, and it is callable from exactly one state.
+
+`scripts/flash_app_only.sh` is **not** reused as the OTA writer. It deliberately writes the
+**active** slot over USB — it is a wired service/recovery path with different guarantees, and
+its logic was audited for reuse, not adopted.
+
+### State machine
+
+```text
+IDLE ──prepare()──► TARGET_RESOLVED ──openStream()──► RECEIVING ──finishStream()──┐
+  ▲                        │                             │                        │
+  │                        │                             │                   IMAGE_SEALED
+  │                        │                             │                        │
+  │                        ▼                             ▼                        ▼
+  └──── abort()/reset() ──── FAILED ◄──────────────────────────────────  IDENTITY_VERIFIED
+                               ▲                                                  │
+                    boot target NEVER touched                          commitBootTarget()
+                                                                                  │
+                                                                                  ▼
+                                                                        BOOT_TARGET_SET
+```
+
+Each of the distinctions that matter is a separate observable fact: update not started
+(`IDLE`), target resolved but no flash touched (`TARGET_RESOLVED`), stream open and writing
+(`RECEIVING` + `bytes_written`), stream incomplete (`INCOMPLETE_STREAM`, caught by *our*
+byte count before the backend is even asked), `esp_ota_end` outcome (`IMAGE_SEALED` vs
+`IMAGE_REJECTED`), image identity (`IDENTITY_VERIFIED` vs `HASH_MISMATCH`), boot target not
+yet changed (every state except the last), boot target changed (`BOOT_TARGET_SET`).
+
+### Five kinds of verification, kept distinct
+
+They are not synonyms, and only the third can tell "a valid image" from "the expected image":
+
+| Layer | What it proves | Who does it |
+|---|---|---|
+| transport integrity | the declared number of bytes arrived | `OtaPolicy` byte accounting |
+| image validity | the bytes form a loadable app image | `esp_ota_end()` |
+| cryptographic hash identity | the bytes are **the** expected bytes | `Sha256` vs declared digest |
+| firmware/build identity | which commit this image came from | `build::kBuildId` in metadata |
+| bootloader validity | which slot boots, and its rollback state | otadata / `esp_ota_get_state_partition` |
+
+Metadata reuses the identity scheme the repository already has — `build::kBuildId`, plus the
+`APPLICATION_SHA256` and `APPLICATION_SIZE` that `scripts/build_manifest.py` already records.
+No second version scheme was invented.
+
+It deliberately does **not** use `esp_app_desc_t`. Parsing the real built binary shows why:
+
+```text
+version      = 'ee57070'              <- the arduino-lib-builder commit
+project_name = 'arduino-lib-builder'  <- not MATDOG
+date/time    = 'Jul 20 2026'          <- when the prebuilt libs were built
+```
+
+Those fields describe the core, not this firmware, so they cannot answer "is this the
+firmware I expected?".
+
+### First-boot validation and rollback
+
+The real build has `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` (read from the generated
+`sdkconfig`, not assumed). That makes **never confirming the safe default**: the bootloader
+moves a `PENDING_VERIFY` entry to `ABORTED` on the next boot and falls back to the other
+slot, with no code of ours involved. Confirming early throws that safety net away for exactly
+the case it exists for.
+
+So confirmation is **earned by running**. `esp_ota_mark_app_valid_cancel_rollback()` is called
+only after all of these hold, and `scripts/static_audit.py` fails the build if
+`Controller::begin()` ever confirms an image:
+
+```text
+Controller::begin() ran to COMPLETION     (the flag is its last statement)
+CommandRouter is bound and usable
+firmware identity is readable             (running slot is an OTA slot, build id present)
+this boot did NOT follow PANIC/INT_WDT/TASK_WDT/WDT/BROWNOUT
+uptime >= 15 s
+completed loop ticks >= 2000
+```
+
+Uptime alone would be satisfied by a controller wedged in one long call; ticks alone by a
+fast boot loop. Both are required, and both are finite and deterministic.
+
+A refusal deliberately does **not** call the invalidate-and-reboot API. Refusing is already
+sufficient, and rebooting a robot is not OTA-A's decision to make. An explicit, authorized
+operator rollback is **TO_IMPLEMENT / OTA-B**.
+
+**Provisional until ActuatorAuthority exists:** these criteria contain no servo, DALY, IMU or
+motion condition — deliberately, because peripheral presence is not evidence about firmware
+and making it one would roll back a perfectly good image because a cable was unplugged. When
+the authority model lands, the question of whether confirmation should additionally require a
+safe actuator state is **TO_DESIGN**.
+
+### OTA-B boundary
+
+`OtaAuthorizationGate` is the hook for the real model. OTA-A does **not** implement a
+temporary mini-authority. Instead:
+
+- the policy **fails closed** with no gate installed (`REFUSED_NO_GATE_INSTALLED`);
+- permission during OTA-A is a named, greppable object, `OtaStageAGate`, whose verdict is
+  literally `PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET`, installed on purpose by `OtaManager`.
+
+Replacing it with an `ActuatorAuthority`-backed gate is a one-line change at one site, and
+forgetting to is a refusal rather than a silent allow.
+
+### Security posture — honestly stated
+
+OTA-A has **no authentication**. Rather than leave that as a promise, ingest is compiled out:
+
+```c
+#define MATDOG_OTA_INGEST_ENABLED 0   // src/update/OtaManager.h
+```
+
+`prepare`/`openStream`/`writeChunk`/`finishStream`/`commitBootTarget` all refuse unless a
+build explicitly opts in with `-DMATDOG_OTA_INGEST_ENABLED=1`, and `scripts/static_audit.py`
+fails the build if the **source default** is anything but `0` — the same shape as the
+`USB_ONLY` hardware-profile gate. A production image therefore cannot contain a reachable
+firmware writer, and "we just haven't wired a transport yet" is not load-bearing.
+
+### Transport: evaluated, not yet chosen for implementation
+
+Everything below is bundled with `esp32:esp32 3.3.11` — no external dependency is needed by
+any option.
+
+| Option | Dependencies | Memory | Blocking | Auth | Verdict |
+|---|---|---|---|---|---|
+| **`ArduinoOTA`** | `Update.h`, UDP+TCP listener | moderate | `handle()` runs the whole transfer inline | MD5 password, weak | **Rejected.** It drives `Update.h`, which is a *second* OTA writer with its own partition logic — precisely the duplicate path the architecture forbids. Convenience is not a reason. |
+| **`WebServer`** (sync) | `WebServer` + `WiFi` | ~18 source files, heap per request | handler runs inline in `loop()` | none built in | Plausible later for the Web UI, but an HTTP stack is a large attack surface to add for a firmware writer. |
+| **`esp_http_server`** (IDF) | IDF component, available | own task + stack | runs in its own task → callback-context rules | none built in | Stronger than `WebServer`, but it introduces a second task that would need to hand bytes to the Controller thread. |
+| **`esp_https_server`** (IDF) | + mbedTLS (already linked) | + cert storage, TLS buffers | own task | TLS, real | The only option with genuine transport security. Needs a certificate/key story that does not exist yet. |
+| **Raw TCP framing over `NetworkClient`** | `WiFi` only | one socket, one chunk buffer | non-blocking reads, drained from `update()` | must be built | **Leanest.** Smallest surface, no HTTP parser, drains on the Controller thread so no cross-task state, and the chunk size is ours to bound. |
+| **USB CDC ingest** | none | none | already on the Controller thread | physical access | Useful as the *first* exercise of the ingest path with no network exposure at all. |
+
+**Recommendation, not yet implemented:** exercise the ingest path over **USB CDC** first — it
+proves the whole state machine on real flash with zero network exposure — then add a **raw
+TCP framing over `NetworkClient`** with a pre-shared key, and treat `esp_https_server` as the
+answer only once a certificate story exists. `ArduinoOTA` is rejected outright because it
+would introduce a second firmware writer.
+
+Transport and authentication are both **TO_IMPLEMENT**.
+
+### Resource cost
+
+Measured against the W1 build, same FQBN and profile:
+
+```text
+flash       959,043 B -> 967,915 B   (+8,872 B)   30% of the 3 MB slot
+static RAM   50,868 B ->  51,676 B   (+808 B)     15%
+```
+
+No image is ever held in RAM: bytes are hashed and written per chunk, and the chunk buffer
+belongs to the transport. `esp_ota_begin()` uses `OTA_WITH_SEQUENTIAL_WRITES` so the erase is
+incremental per sector instead of a single up-front ~1 MB erase that would stall the loop for
+seconds.
+
+**Flash erase and write do block the Controller loop.** That is a property of SPI flash, not
+something a comment can fix. `@OTA STATUS` reports the measured worst case
+(`open_us`/`write_us`/`end_us`), so the OTA-B integration can argue from numbers. Those
+numbers do not exist yet — they require a hardware test.
 
 ## Anti-back-power (LED ring)
 

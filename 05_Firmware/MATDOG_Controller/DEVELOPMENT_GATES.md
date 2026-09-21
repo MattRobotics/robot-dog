@@ -324,14 +324,34 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — update + reboot + identity confirmation + rollback behaviour all demonstrated;
   refused in unsafe states.
 - **NEXT** — UI-9.
-- **STATUS** — **PARTIAL.** Partition-selection logic **IMPLEMENTED** and offline-tested (40/40) and
-  already used by the application-only flash workflow; OTA transport/runtime does **not** exist.
-  The Wi-Fi ENTRY condition above is **not met**: W1 is implemented and offline-tested but not
-  hardware-tested, so OTA-A may be designed and implemented but cannot be gate-passed. Two facts
-  from the W1 build already constrain it: the application is 959,051 B against a 3,145,728 B slot
-  (ample headroom for a second image), and `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` is already
-  active in the real build — so the moment OTA writes otadata, the bootloader will begin moving
-  `PENDING_VERIFY` entries to `ABORTED`, and a first-boot self-check stops being optional.
+- **STATUS** — **PARTIAL (OTA-A core complete, not hardware tested).** The ENTRY condition above is
+  **not met**: Wi-Fi runtime is implemented but not hardware-tested, so OTA cannot be gate-passed.
+  - **IMPLEMENTED / COMPILED / OFFLINE TESTED** — the update core. `src/update/OtaPolicy.*` (pure
+    state machine), `OtaBootGuard.*` (first-boot rollback lifecycle), `Sha256.*` (image identity),
+    `OtaEspBackend.*` (the only unit calling `esp_ota_*`), `OtaManager.*`, `@OTA STATUS`.
+    Host-side partition-selection logic remains **IMPLEMENTED** and offline-tested (40/40).
+  - **Inactive-slot rule enforced structurally** — `target != running`, `subtype ∈ ota_0..ota_15`
+    and `image_size ≤ target.size` are explicit refusals; the backend re-checks the running
+    partition independently; `commitBootTarget()` has one call site and is reachable from exactly
+    one state, `IDENTITY_VERIFIED`. `flash_app_only.sh` is **not** reused as the OTA writer.
+  - **First-boot validation** — confirmation is earned: Controller init complete, CommandRouter
+    bound, identity readable, no PANIC/WDT/BROWNOUT reset, uptime ≥ 15 s and ≥ 2000 loop ticks.
+    The audit fails the build if `Controller::begin()` ever confirms an image. Criteria are
+    software-only and **provisional until ActuatorAuthority exists**.
+  - **Offline evidence** — 468 checks against the real state machine with a fake backend: every
+    target/metadata/stream/verification failure, the ordering property that the boot target never
+    moves outside `IDENTITY_VERIFIED`, replay/idempotence, and the whole rollback lifecycle.
+    SHA-256 checked against FIPS 180-4 vectors and against `sha256sum` on the real binary.
+  - **TO_IMPLEMENT** — transport and authentication. OTA-A ships neither; ingest is compiled out
+    (`MATDOG_OTA_INGEST_ENABLED` defaults to `0`, audit-enforced), so no production image contains
+    a reachable firmware writer. Transport options are evaluated in the Controller README.
+  - **TO_IMPLEMENT / OTA-B** — `OtaAuthorizationGate` backed by the real `ActuatorAuthority`, and
+    an explicit authorized operator rollback. OTA-A fails closed with no gate installed.
+  - **HARDWARE TO_TEST** — everything: no device has received an OTA image, no otadata has been
+    written, no rollback has been observed, and the measured erase/write blocking costs
+    (`@OTA STATUS` `open_us`/`write_us`/`end_us`) do not exist yet.
+  - Cost: flash 959,043 B → 967,915 B (+8,872 B, 30% of the 3 MB slot); static RAM 50,868 B →
+    51,676 B (+808 B).
 
 ## Safe Actuator Layer
 
