@@ -186,6 +186,8 @@ void CommandRouter::handleLine(String line) {
       Serial.println("HINT=create src/config/WifiCredentials.local.h and rebuild");
     }
     printWifiStatus();
+  } else if (upper == "@CALIBRATION STATUS") {
+    printCalibrationStatus();
   } else if (upper == "@AUTHORITY STATUS") {
     printAuthorityStatus();
   } else if (upper == "@OTA STATUS") {
@@ -294,6 +296,7 @@ void CommandRouter::printHelp() {
   Serial.println("  @WIFI ON|OFF           (any mode; refused without credentials)");
   Serial.println("  @OTA STATUS            (read-only; OTA-A ships no transport)");
   Serial.println("  @AUTHORITY STATUS      (read-only; no owner can be acquired yet)");
+  Serial.println("  @CALIBRATION STATUS    (read-only; no session can move hardware)");
   Serial.println("  @SERVO SCAN <lo> <hi>   (MAINTENANCE mode only; incremental, bounded");
   Serial.println("                           per-ID blocking, result follows asynchronously)");
   Serial.println("  @SERVO CENSUS           (MAINTENANCE mode only; canonical 11-55 scan,");
@@ -384,6 +387,39 @@ void CommandRouter::printWifiStatus() {
   // The bounded-runtime claim, as a measurement the operator can read back.
   Serial.printf("WIFI_TICK last_us=%lu max_us=%lu\n",
                 (unsigned long)w.last_update_us, (unsigned long)w.max_update_us);
+}
+
+void CommandRouter::printCalibrationStatus() {
+  const calibration::CalibrationSessionStatus& c = modules_.calibration->status();
+
+  // The headline fact, first: the installed robot has no valid calibration.
+  Serial.printf("CALIBRATION_CURRENT state=%s hardware_motion=%s\n",
+                c.current_calibration_stale ? "STALE_PENDING_FULL_RECALIBRATION" : "SEE_YAML",
+                c.hardware_motion_authorized ? "AUTHORIZED" : "BLOCKED");
+  Serial.println("CALIBRATION_NOTE source_of_truth=MATDOG_JOINT_CALIBRATION.yaml"
+                 " calibration_reset:");
+  Serial.printf("CALIBRATION_SESSION state=%s origin=%s leg=%s last_result=%s\n",
+                calibration::toString(c.state), calibration::toString(c.origin),
+                calibration::toString(c.leg), calibration::toString(c.last_result));
+  Serial.printf("CALIBRATION_AUTHORITY held=%s generation=%lu\n",
+                c.holds_authority ? "YES" : "NO", (unsigned long)c.lease_generation);
+  Serial.printf("CALIBRATION_POPULATION verdict=%s observed=%u/%u mask=0x%03x\n",
+                calibration::toString(c.population_verdict),
+                (unsigned)calibration::observedLegSlotCount(c.population),
+                (unsigned)calibration::kLegServoSlotCount,
+                (unsigned)c.population.observed_mask);
+  Serial.printf("CALIBRATION_PHASE reported=%s last=%s contacts=%u\n",
+                c.execution_phase_reported ? "YES" : "NO",
+                calibration::toString(c.last_reported_phase),
+                (unsigned)c.contacts_recorded);
+  Serial.printf("CALIBRATION_RESTORE required=%s torque_off_required=%s cause=%s\n",
+                c.restore.required ? "YES" : "NO",
+                c.restore.torque_off_required ? "YES" : "NO",
+                calibration::toString(c.restore.cause));
+  Serial.printf("CALIBRATION_COUNTERS started=%lu completed=%lu aborted=%lu failed=%lu\n",
+                (unsigned long)c.sessions_started, (unsigned long)c.sessions_completed,
+                (unsigned long)c.sessions_aborted, (unsigned long)c.sessions_failed);
+  Serial.println("CALIBRATION_LF_V25=HISTORICAL_HARDWARE_ORACLE (not current calibration)");
 }
 
 void CommandRouter::printAuthorityStatus() {

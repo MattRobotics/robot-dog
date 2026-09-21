@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 
+#include "../calibration/CalibrationManager.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/WifiManager.h"
 #include "../power/DalyBms.h"
@@ -42,6 +43,7 @@ class CommandRouter {
     // Pointer to the ONE arbiter owned by Controller. Never a copy of its
     // state: the router asks, it does not remember.
     ActuatorAuthorityArbiter* authority;
+    calibration::CalibrationManager* calibration;
   };
 
   void begin(const Modules& modules);
@@ -86,6 +88,10 @@ class CommandRouter {
   // exists yet, and an operator-driven acquire would be a write path this
   // phase explicitly does not add.
   void printAuthorityStatus();
+  // Read-only presentation of the calibration manager. There is deliberately
+  // no command that starts, runs or moves anything: no write path exists, and
+  // the repository declares hardware motion unauthorized.
+  void printCalibrationStatus();
   static void printAvailabilityLine(const char* label, const AvailabilityStatus& a);
 
   Modules modules_{};

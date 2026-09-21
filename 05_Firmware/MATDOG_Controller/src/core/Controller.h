@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 
+#include "../calibration/CalibrationManager.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/WifiManager.h"
 #include "../power/DalyBms.h"
@@ -51,6 +52,10 @@ class Controller {
   // pointer and ask. Orthogonal to operating_mode_: that says what the
   // Controller is doing, this says who, if anyone, may write actuators.
   ActuatorAuthorityArbiter authority_;
+  // The ONE calibration session manager. It holds no transport and cannot
+  // command a joint; it arbitrates a session through authority_ and records
+  // evidence. See calibration/CalibrationManager.h.
+  calibration::CalibrationManager calibration_;
   CommandRouter command_router_;
 
   // Set only at the very end of begin(). The OTA self-check must not treat a

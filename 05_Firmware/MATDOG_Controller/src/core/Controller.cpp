@@ -64,6 +64,11 @@ void Controller::begin() {
   // update(), over seconds, by actually running (see update/OtaBootGuard.h).
   ota_.begin(millis(), &authority_);
 
+  // Binds the calibration manager to the same single arbiter. It starts with
+  // no session and, because the repository declares the current calibration
+  // stale and hardware motion unauthorized, it refuses to open a live one.
+  calibration_.begin(&authority_);
+
   printBootBanner();
 
   // Init order: transports that cannot interfere with each other first.
@@ -101,7 +106,7 @@ void Controller::begin() {
 
   CommandRouter::Modules modules{
       &servo_bus_, &servo_census_, &imu_, &daly_, &led_, &wifi_, &ota_, &system_state_,
-      &power_state_, &operating_mode_, &authority_,
+      &power_state_, &operating_mode_, &authority_, &calibration_,
   };
   command_router_.begin(modules);
 
@@ -180,6 +185,11 @@ void Controller::printBootBanner() {
   Serial.printf("actuator_authority : %s (inhibit=%s)\n",
                 toString(authority_.current()),
                 authority_.inhibited() ? toString(authority_.inhibitReason()) : "NONE");
+  // The repository's own verdict on the installed robot, on the boot record.
+  Serial.printf("calibration      : %s hardware_motion=%s\n",
+                calibration_.status().current_calibration_stale
+                    ? "STALE_PENDING_FULL_RECALIBRATION" : "SEE_@CALIBRATION_STATUS",
+                calibration_.status().hardware_motion_authorized ? "AUTHORIZED" : "BLOCKED");
   Serial.println();
 }
 
@@ -224,6 +234,11 @@ void Controller::update(uint32_t now_ms) {
     facts.uptime_ms = system_state_.uptimeMillis(now_ms);
     ota_.update(now_ms, facts);
   }
+
+  // Bounded: returns immediately unless a session is live, and touches no
+  // hardware in any case. It exists so a session notices authority being
+  // taken away from underneath it.
+  calibration_.update(operating_mode_.mode());
 
   if (power_state_.state() == PowerState::SHUTDOWN_REQUESTED ||
       power_state_.state() == PowerState::SHUTTING_DOWN ||
