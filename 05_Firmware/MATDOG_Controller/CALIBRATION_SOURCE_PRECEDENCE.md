@@ -1,6 +1,7 @@
 # MATDOG calibration — source precedence, oracle recovery and V25 assessment
 
 **Audit date:** 2026-09-21 · **Branch:** `feat/controller-calibration-manager-v1`
+**Amended:** 2026-09-22 — read-only follow-up audit resolved D4; see §5.
 
 This document records the C0 evidence audit that preceded the native calibration
 foundation. It exists so the next person does not have to re-derive which of several
@@ -22,7 +23,7 @@ genuinely disagree stay visible instead of being quietly merged.
 | `.../RF_Calibrator_Local_Only/` | **SUPERSEDED WIP** — never committed |
 | `.../NormaCore_Main_MATDOG_Content/` | **HISTORICAL ONLY** (`matdog.rs` byte-identical to the LF oracle copy) |
 | `matdog_geometry_*` V5 compiler | **REUSABLE DESIGN REFERENCE** |
-| branch `matdog/full-leg-calibrator-v1` | **UNRESOLVED** — see §5 D4 |
+| tag `archive/2026-08-29/full-leg-calibrator-v1-h0` (ex-branch `matdog/full-leg-calibrator-v1`) | **ARCHIVED HISTORICAL HARDWARE ORACLE** — see §5 D4 |
 
 The ordering rule, which the repository states itself: current state defines what is
 valid; hardware-validated LF V25 defines historical behaviour; generic work supplies
@@ -120,11 +121,39 @@ exists to recover.
 
 **D3 — three evidence vocabularies.** See §4.
 
-**D4 — `matdog/full-leg-calibrator-v1` does not exist.** Not on `origin`, not local.
-Eight documents describe it as "preserved". The material actually preserved is the
-NormaCore archive. **UNRESOLVED**: either the branch was renamed into the archive and
-the references are stale, or it was lost before archiving. The archive's own
-provenance records only `release/matdog-lf-calibrator-v25`.
+**D4 — `matdog/full-leg-calibrator-v1` was archived, not lost.** *(Resolved 2026-09-22;
+the 2026-09-21 audit recorded this as UNRESOLVED because it looked for a branch.)*
+
+The branch no longer exists as a branch — not local, not on `origin`. Its content is
+preserved, intact, under a different ref type:
+
+| Item | State |
+|---|---|
+| Commit `15f3fb8f378e6cadf6bc479bfcaca2947741c9fd` | **EXISTS** — `calibrator: authorize H1 read-only census`, 2026-08-29 |
+| Archive tag | **`archive/2026-08-29/full-leg-calibrator-v1-h0`** — annotated (`e3fa747c…`) → `15f3fb8f…`, local **and** on `origin` |
+| Prior provenance | branch `matdog/full-leg-calibrator-v1` @ `15f3fb8f…` |
+| PR #22 | CLOSED, not merged (2026-09-15); `refs/pull/22/head` on `origin` still resolves to `15f3fb8f…` |
+| Worktree artifacts | `~/MATDOG/archive/full-leg-calibrator-v1/` — 17 files, `sha256sum -c SHA256SUMS` 17/17 OK |
+
+**The preservation mechanism is the tag and the out-of-Git archive, not the branch.**
+The tag's own message is the archival record: it states the branch it replaced, PR #22's
+outcome, the H0 PASS / H1 FAIL (`CENSUS_PRESENT=6/12`) hardware status, and that it was
+archived 2026-09-18 after the G3/G3.1 Controller closeout. Deleting the branch retired a
+pointer; it removed no oracle material.
+
+Classification: **ARCHIVED HISTORICAL HARDWARE ORACLE**. Reference implementation only —
+its calibration numbers are not valid for the current robot without revalidation, per the
+`calibration_reset:` rule in §2.
+
+Git does not record which command removed the branch and worktree (no reflog entry
+survives: the branch ref's log went with the ref, and the per-worktree `HEAD` log went
+with `robot-dog-full-leg-calibrator`). **Exact deletion command/actor: UNKNOWN** — which
+does not weaken the archival evidence above. Note also that the NormaCore archive's own
+provenance records only `release/matdog-lf-calibrator-v25`: it is a *separate*, older
+preservation, not this one.
+
+To read the oracle: `git show archive/2026-08-29/full-leg-calibrator-v1-h0` — do not
+recreate the branch.
 
 ---
 
