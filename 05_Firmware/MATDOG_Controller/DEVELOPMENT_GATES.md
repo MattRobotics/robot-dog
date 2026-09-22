@@ -423,7 +423,18 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — no direct-to-`ServoBus` write path exists outside this layer; static audit
   enforces it.
 - **NEXT** — first motion.
-- **STATUS** — **TO_DESIGN.** No motion primitive exists in the firmware today.
+- **STATUS** — **PARTIAL — policy core IMPLEMENTED / COMPILED / OFFLINE TESTED; runtime adapter
+  TO_IMPLEMENT.** `src/actuator/ActuatorWritePolicy.*` is the decision core: a pure,
+  host-linkable plan/commit transaction model bound to the real `ActuatorAuthority` lease and
+  generation, with no "check once then write later" path. It holds no transport, so an `ACCEPT`
+  authorises nothing by itself. The accepted-limit store is empty and refuses anything without
+  live, promoted provenance — `MATDOG_JOINT_CALIBRATION.yaml` records `{min: null, max: null}`
+  for all twelve leg joints, so every position-class command resolves to
+  `REJECT_NO_ACCEPTED_LIMITS`. `SAFE_OFF` is outside the layer structurally: no operation class
+  can name a torque removal. The only actuator write in the firmware is still torque OFF inside
+  `ServoBus::safeOff()`; the default build gained no write path and, with nothing referencing
+  the policy yet, no flash or RAM at all. Audit and design:
+  [`SAFE_ACTUATOR_LAYER.md`](SAFE_ACTUATOR_LAYER.md).
 
 ## First motion
 

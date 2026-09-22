@@ -262,7 +262,38 @@ returning `ACCEPT` is a decision, and the adapter that would act on it does not 
 
 ---
 
-## 9. Related
+## 9. Offline result — what was actually proven
+
+No hardware action of any kind was performed in this phase. No flash, no servo command, no
+torque, no goal position, no EEPROM access, no provisioning, no DALY write.
+
+| Gate | Result |
+|---|---|
+| `static_audit.py` | **PASS** — 64 source files |
+| Safe Actuator boundary mutation suite | **PASS** — 21 targeted mutations, each caught with the expected reason |
+| Host suite, write policy | **PASS** — 245 checks, 0 failures |
+| Host suite, total | **PASS** — 4457 checks, 0 failures across 8 suites |
+| `USB_ONLY` clean build (pinned FQBN) | **PASS** — 973447 bytes flash, 51812 bytes static RAM |
+| Flash / RAM delta vs `f243b6f` | **0 / 0 bytes** |
+
+The zero delta is the point, not a rounding artefact: the policy compiles, but nothing in the
+runtime references it yet, so the linker discards it entirely. The shipped image is
+byte-for-byte unchanged in size and gained no write path.
+
+`SAFE_OFF` is the one actuator write that remains reachable, exactly as before, with no
+authority, stale authority, a failed calibration session, a failed transaction, or a policy that
+rejects everything.
+
+```text
+CURRENT HARDWARE MOTION AUTHORIZATION   BLOCKED
+```
+
+Unblocking it needs a real recalibration and a reviewed change to
+`MATDOG_JOINT_CALIBRATION.yaml`, not a flag flip — and then, separately, the adapter of §7.
+
+---
+
+## 10. Related
 
 - [`CALIBRATION_SOURCE_PRECEDENCE.md`](CALIBRATION_SOURCE_PRECEDENCE.md) — source precedence, §7 EEPROM boundary
 - [`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md) — the calibration gate

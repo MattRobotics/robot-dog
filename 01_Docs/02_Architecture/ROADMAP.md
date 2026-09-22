@@ -137,7 +137,7 @@ Each row's *Blocks* column states what it gates. Arrows are hard dependencies, n
 
 | # | Stage | Status | Reality in this repository |
 |---|---|---|---|
-| 14 | **Safe Actuator Layer** | **FUTURE / TO_DESIGN** | The only legal path from joint-level commands to `ServoBus` writes. Does not exist. No motion primitive exists in the firmware at all today. |
+| 14 | **Safe Actuator Layer** | **PARTIAL — policy core IMPLEMENTED / OFFLINE TESTED** | The only legal path from joint-level commands to `ServoBus` writes. `src/actuator/ActuatorWritePolicy.*` holds the decision core: plan/commit transactions bound to the real `ActuatorAuthority` lease and generation, fail-closed on authority loss, replay and reset, with limits admitted on provenance only (branch `feat/controller-safe-actuator-layer-v1`). **No write path was added** — the runtime adapter is **TO_IMPLEMENT** and the only actuator write in the firmware is still torque OFF inside `ServoBus::safeOff()`. No motion primitive exists. Audit and design: [`SAFE_ACTUATOR_LAYER.md`](../../05_Firmware/MATDOG_Controller/SAFE_ACTUATOR_LAYER.md). |
 | 15 | **First bounded joint motion** | **BLOCKED** | Blockers: stages 3, 5, 8, 14. |
 | 16 | **Joint Test UI (UI-4)** | **BLOCKED** | Blockers: stages 11, 14, 15. |
 | 17 | **Controlled poses** | **BLOCKED** | Blocker: stage 15. |

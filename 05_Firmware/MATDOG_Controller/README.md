@@ -490,8 +490,10 @@ not at boot, not on a timer.
 python3 scripts/tests/test_ota_partition_logic.py   # OTA slot selection (40 tests)
 bash scripts/tests/run_host_tests.sh                # servo population / profile + DALY protocol
                                                     # + Wi-Fi + OTA-A + ActuatorAuthority
+                                                    # + safe actuator write policy
                                                     # + calibration domain & manager
 python3 scripts/tests/test_static_audit_daly.py     # DALY write-whitelist mutation suite
+python3 scripts/tests/test_static_audit_safe_actuator.py  # safe actuator boundary mutation suite
 python3 scripts/static_audit.py                     # runs all of the above, plus the audit
 ```
 
@@ -838,6 +840,40 @@ A stuck inhibit is fail-safe: it blocks writes, it does not enable them. `forceC
 *owner* deliberately does not drop it — a fault must not quietly re-open actuator authority. It is
 cleared explicitly, or by the next boot.
 
+## Safe Actuator Layer
+
+**Status: policy core implemented, compiled, offline-tested. Runtime adapter TO_IMPLEMENT.
+NO write path added.**
+
+`src/actuator/ActuatorWritePolicy.*` is the boundary every future actuator write must pass
+through. It is a **decision**, not a transport: there is no bus handle in it, so an `ACCEPT`
+authorises nothing by itself.
+
+**No "check once then write later".** `plan()` captures the `AuthorityLease`, the
+`OperatingMode` and a policy epoch; `commit()` re-reads the live arbiter and compares all of it
+again. Authority released and re-acquired, force-cleared, stranded by a mode change or overtaken
+by an OTA inhibit each fail closed at commit. At most one transaction is outstanding, which is
+what makes replay impossible rather than unlikely — a copy a caller kept is refused on identity
+before its contents are read, and `reset()` advances the epoch so anything outstanding can never
+match again.
+
+**Limits are provenance first, value second.** A bound is usable only if
+`calibration::mayPromote()` and `calibration::isOperationalEvidence()` both accept it and both
+identity axes agree — the same test `q0MayBeAppliedTo()` applies. The store is empty and stays
+empty: `MATDOG_JOINT_CALIBRATION.yaml` records `{min: null, max: null}` for all twelve leg
+joints, so every position-class command resolves to `REJECT_NO_ACCEPTED_LIMITS`. A missing bound
+is a refusal, never a fallback to a historical value.
+
+**`SAFE_OFF` is outside this layer structurally.** There is no operation class for *removing*
+torque, so a safety de-escalation is inexpressible here and no later edit can make it depend on
+an authority check. For the same reason no persistent/provisioning write is expressible while
+the repository still records that owner as `TO_DESIGN`.
+
+The runtime adapter is deliberately **not** built yet: it would need a torque-on or
+goal-position primitive, and both are prohibited by audits that exist for hardware-era reasons.
+The full S0 write-surface map and the design rationale are in
+[`SAFE_ACTUATOR_LAYER.md`](SAFE_ACTUATOR_LAYER.md).
+
 ## OTA-A (update core)
 
 **Status: implemented, compiled, offline-tested. NOT hardware-tested.** No MATDOG device has
@@ -1111,6 +1147,8 @@ cover, and handoff section 7A for the full matrix.
 │   ├── core/                  Controller, SystemState, PowerState, CommandRouter,
 │   │                          Availability (init/detected/expected/result model),
 │   │                          OperatingMode (MAINTENANCE/RUN)
+│   ├── actuator/              ActuatorWritePolicy (pure: the Safe Actuator Layer
+│   │                          decision core; no transport, no write path)
 │   ├── servo/                 ServoBus, ServoPopulation (pure policy),
 │   │                          ServoCensus (Controller-owned service)
 │   ├── imu/                   Bno085Imu
@@ -1129,5 +1167,7 @@ cover, and handoff section 7A for the full matrix.
         ├── test_servo_population.cpp    offline census/profile tests (host g++)
         ├── test_daly_protocol.cpp       offline DALY protocol / KEY probe tests (host g++)
         ├── test_static_audit_daly.py    DALY write-prohibition audit mutation tests
+        ├── test_actuator_write_policy.cpp        offline safe actuator policy tests (host g++)
+        ├── test_static_audit_safe_actuator.py    safe actuator boundary audit mutation tests
         └── run_host_tests.sh            compiles + runs the C++ suites
 ```
