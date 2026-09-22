@@ -1556,6 +1556,159 @@ def check_safe_actuator_boundaries(files, sketch_dir):
              f"policy is a second write boundary")
 
 
+def check_calibration_geometry_boundaries(files, sketch_dir):
+    """The calibration bootstrap consumes a geometry plan it did not compute, so
+    the properties that keep the plan trustworthy are enforced rather than
+    reviewed:
+
+      1. the profile stays pure - no Arduino, no bus, no mesh, no Serial;
+      2. the generated table is generated, and still matches its bundle;
+      3. the executability door needs BOTH the URDF domain and a PASS clearance;
+      4. the compiled counts are the canonical bundle's, and no UNRESOLVED
+         verdict sits on an executable endpoint;
+      5. the superseded hardcoded prerequisite poses are absent;
+      6. POSITION_COMMAND keeps the accepted-limits route to itself.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    actuator_dir = sketch_dir / "src" / "actuator"
+
+    units = ("CalibrationGeometryProfile.h", "CalibrationGeometryProfile.cpp",
+             "CalibrationGeometryProfileData.h")
+    for name in units:
+        if name not in by_name:
+            fail(f"{actuator_dir / name}: the calibration geometry profile was not found")
+            return
+
+    # --- (1) the profile is data plus lookups, never a geometry engine -----
+    for name in units:
+        path, code = by_name[name]
+        for forbidden in ("#include <Arduino.h>", "#include <WiFi.h>", "#include <math.h>",
+                          "#include <cmath>", "ServoBus", "ServoCensus", "SMS_STS",
+                          "HardwareSerial", "WifiManager", "OtaManager"):
+            if forbidden in code:
+                fail(f"{path}: references {forbidden!r} - the Controller consumes a "
+                     f"prevalidated geometry plan and must never recompute geometry or "
+                     f"reach a bus to act on one")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the geometry profile must stay "
+                 f"transport-independent")
+        if "float" in code or "double" in code:
+            fail(f"{path}: uses floating point - every geometric bound here is an integer "
+                 f"micro-radian so that a safety comparison cannot depend on rounding")
+
+    # --- (2) the generated table is generated ------------------------------
+    data_path, data_code = by_name["CalibrationGeometryProfileData.h"]
+    raw = data_path.read_text(encoding="utf-8")
+    for marker in ("GENERATED FILE - DO NOT EDIT BY HAND",
+                   "matdog_calibration_geometry_export.py",
+                   "MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4"):
+        if marker not in raw:
+            fail(f"{data_path}: missing the generated-file marker {marker!r} - this table "
+                 f"produced from the canonical Geometry Compiler V5 bundle and must never "
+                 f"be hand-written")
+
+    # --- (3) the one door --------------------------------------------------
+    path, code = by_name["CalibrationGeometryProfile.cpp"]
+    body = re.search(r"bool isExecutable\(const GeometryEndpointRecord& endpoint\)\s*\{(.*?)\n\}",
+                     code, re.DOTALL)
+    if not body:
+        fail(f"{path}: could not locate isExecutable() to audit it")
+    else:
+        text = body.group(1)
+        if "EXECUTABLE_URDF_DOMAIN" not in text:
+            fail(f"{path}: isExecutable() does not check the target domain - sixteen of the "
+                 f"twenty-four canonical endpoints contact BEYOND the declared URDF limit, "
+                 f"and a diagnostic endpoint is evidence, never a motion target")
+        if "ClearancePolicyResult::PASS" not in text:
+            fail(f"{path}: isExecutable() does not require a PASS clearance verdict - "
+                 f"UNRESOLVED is not PASS")
+
+    # --- (4)(5) the compiled data itself -----------------------------------
+    records = re.findall(r"\{calibration::Leg::(\w+), calibration::JointKind::(\w+), "
+                         r"calibration::ContactSide::(\w+), TargetDomain::(\w+), "
+                         r"ParkingOutcome::(\w+), ClearancePolicyResult::(\w+), "
+                         r"(-?\d+), (-?\d+), (-?\d+), (\w+), calibration::Leg::(\w+), "
+                         r"calibration::JointKind::(\w+), (-?\d+)\}", data_code)
+    if len(records) != 24:
+        fail(f"{data_path}: parsed {len(records)} endpoint records, expected the canonical 24")
+    executable = [r for r in records if r[3] == "EXECUTABLE_URDF_DOMAIN"]
+    parking = [r for r in records if r[4] == "FEASIBLE_1DOF_PLAN_FOUND"]
+    if len(executable) != 8:
+        fail(f"{data_path}: {len(executable)} executable endpoints, expected 8")
+    if len(parking) != 6:
+        fail(f"{data_path}: {len(parking)} endpoints needing parking, expected 6")
+    for record in records:
+        if record[5] != "PASS" and record[3] == "EXECUTABLE_URDF_DOMAIN":
+            fail(f"{data_path}: an EXECUTABLE endpoint carries clearance verdict "
+                 f"{record[5]!r} - "
+                 f"no executable target may rest on unresolved clearance evidence")
+        if record[4] == "NOT_NEEDED" and record[9] != "false":
+            fail(f"{data_path}: a NOT_NEEDED plan carries an auxiliary joint")
+        if record[4] == "FEASIBLE_1DOF_PLAN_FOUND" and record[9] != "true":
+            fail(f"{data_path}: an obstructed plan carries no auxiliary joint - a missing "
+                 f"parking plan must fail closed, not silently become a direct path")
+    # 30, 50, 85 and 90 degrees: the superseded hardcoded prerequisites. The
+    # current compiler found 35, 64.1667 and 93.3333 instead, and its own source
+    # notes that the empty default context proves the legacy poses were never
+    # core truth.
+    for record in records:
+        if record[9] != "true":
+            continue
+        target = int(record[12])
+        for legacy in (523599, 872665, 1483530, 1570796):
+            if abs(target - legacy) <= 1000:
+                fail(f"{data_path}: auxiliary target {target} micro-rad matches the "
+                     f"superseded "
+                     f"hardcoded prerequisite {legacy} - parking poses come from the current "
+                     f"Geometry V5 plan, never from the stale calibration block")
+
+    # --- (6) POSITION_COMMAND keeps its own route --------------------------
+    policy = by_name.get("ActuatorWritePolicy.cpp")
+    if policy is not None:
+        path, code = policy
+        route = re.search(r"bool operationUsesAcceptedLimits\(ActuatorOperation operation\)"
+                          r"\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not route:
+            fail(f"{path}: could not locate operationUsesAcceptedLimits() to audit it")
+        else:
+            text = route.group(1)
+            if "POSITION_COMMAND" not in text:
+                fail(f"{path}: POSITION_COMMAND no longer takes the accepted-limits route")
+            for other in ("CALIBRATION_CONTACT_PROBE", "DIRECTION_VERIFY",
+                          "CALIBRATION_AUXILIARY_MOVE", "TORQUE_ENABLE"):
+                if other in text:
+                    fail(f"{path}: {other!r} was added to the accepted-limits route - the "
+                         f"three authorisation routes must stay mutually exclusive")
+        envelope = re.search(r"bool operationUsesBootstrapEnvelope\(ActuatorOperation "
+                             r"operation\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if envelope and "POSITION_COMMAND" in envelope.group(1):
+            fail(f"{path}: POSITION_COMMAND can reach the bootstrap envelope - a geometry "
+                 f"plan describes the MODEL and must never stand in for an accepted bound "
+                 f"on the current machine")
+        plan_route = re.search(r"bool operationUsesEndpointPlan\(ActuatorOperation "
+                               r"operation\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if plan_route and "POSITION_COMMAND" in plan_route.group(1):
+            fail(f"{path}: POSITION_COMMAND can reach the endpoint-plan route")
+
+
+def check_calibration_geometry_export(sketch_dir):
+    """The generated profile must still be what the exporter produces from the
+    canonical bundle. Catches a hand-patched table, a drifted URDF or mesh, and
+    a compiler source edit - the exporter re-verifies every input hash."""
+    repo_root = sketch_dir.parents[1]
+    exporter = (repo_root / "06_Software/Matdog_Core/calibration/"
+                            "matdog_calibration_geometry_export.py")
+    if not exporter.exists():
+        fail(f"{exporter}: the calibration geometry exporter was not found")
+        return
+    result = subprocess.run([sys.executable, str(exporter), "--check"],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{exporter}: the committed geometry profile does not match the canonical "
+             f"Geometry Compiler V5 bundle (stdout={result.stdout!r} "
+             f"stderr={result.stderr!r})")
+
+
 def check_ota_boundaries(files, sketch_dir):
     """OTA-A permanent invariants.
 
@@ -1881,6 +2034,7 @@ def check_host_tests(sketch_dir):
     ota_suite = sketch_dir / "scripts" / "tests" / "test_ota_policy.cpp"
     authority_suite = sketch_dir / "scripts" / "tests" / "test_actuator_authority.cpp"
     policy_suite = sketch_dir / "scripts" / "tests" / "test_actuator_write_policy.cpp"
+    geometry_suite = sketch_dir / "scripts" / "tests" / "test_calibration_geometry.cpp"
     calibration_suites = [
         sketch_dir / "scripts" / "tests" / "test_calibration_domain.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
@@ -1903,6 +2057,9 @@ def check_host_tests(sketch_dir):
     if not policy_suite.exists():
         fail(f"{policy_suite}: Safe Actuator Layer write-policy offline test suite not found")
         return
+    if not geometry_suite.exists():
+        fail(f"{geometry_suite}: calibration bootstrap geometry offline test suite not found")
+        return
     for suite in calibration_suites:
         if not suite.exists():
             fail(f"{suite}: calibration offline test suite not found")
@@ -1913,6 +2070,7 @@ def check_host_tests(sketch_dir):
     runner_text = strip_shell_comments(runner.read_text(encoding="utf-8"))
     for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy",
                    "test_ota_policy", "test_actuator_authority", "test_actuator_write_policy",
+                   "test_calibration_geometry",
                    "test_calibration_domain", "test_calibration_manager"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
@@ -2252,6 +2410,8 @@ def main():
     check_actuator_authority(files, SKETCH_DIR)
     check_calibration_boundaries(files, SKETCH_DIR)
     check_safe_actuator_boundaries(files, SKETCH_DIR)
+    check_calibration_geometry_boundaries(files, SKETCH_DIR)
+    check_calibration_geometry_export(SKETCH_DIR)
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)
     check_safe_actuator_audit_mutation_suite(SKETCH_DIR)

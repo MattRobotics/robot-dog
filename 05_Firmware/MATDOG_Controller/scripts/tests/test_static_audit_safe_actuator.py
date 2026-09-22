@@ -56,6 +56,12 @@ def run_boundary_checks(files):
     return list(audit.failures)
 
 
+def run_geometry_checks(files):
+    audit.failures.clear()
+    audit.check_calibration_geometry_boundaries(files, SKETCH_DIR)
+    return list(audit.failures)
+
+
 def run_torque_checks(files):
     audit.failures.clear()
     audit.check_torque_enable(files)
@@ -101,6 +107,9 @@ def case(name, filename, pattern, repl, needle, runner=run_boundary_checks):
 
 POLICY_H = "ActuatorWritePolicy.h"
 POLICY_CPP = "ActuatorWritePolicy.cpp"
+PROFILE_H = "CalibrationGeometryProfile.h"
+PROFILE_CPP = "CalibrationGeometryProfile.cpp"
+PROFILE_DATA_H = "CalibrationGeometryProfileData.h"
 
 
 def main():
@@ -153,28 +162,28 @@ def main():
 
     # --- operation classes -------------------------------------------------
     case("a persistent write becomes expressible", POLICY_H,
-         r"(  CALIBRATION_CONTACT_PROBE = 3,)",
-         r"\1\n  EEPROM_WRITE              = 4,",
+         r"(  CALIBRATION_AUXILIARY_MOVE = 5,)",
+         r"\1\n  EEPROM_WRITE               = 6,",
          "EEPROM")
     case("a provisioning write becomes expressible", POLICY_H,
-         r"(  CALIBRATION_CONTACT_PROBE = 3,)",
-         r"\1\n  POSITION_OFFSET_WRITE     = 4,",
+         r"(  CALIBRATION_AUXILIARY_MOVE = 5,)",
+         r"\1\n  POSITION_OFFSET_WRITE      = 6,",
          "OFFSET")
     case("torque removal becomes expressible", POLICY_H,
-         r"(  CALIBRATION_CONTACT_PROBE = 3,)",
-         r"\1\n  TORQUE_DISABLE            = 4,",
+         r"(  CALIBRATION_AUXILIARY_MOVE = 5,)",
+         r"\1\n  TORQUE_DISABLE             = 6,",
          "DISABLE")
     case("an operation class disappears", POLICY_H,
-         r"  CALIBRATION_CONTACT_PROBE = 3,",
+         r"  CALIBRATION_CONTACT_PROBE  = 3,[^\n]*",
          "",
          "CALIBRATION_CONTACT_PROBE")
     case("the operation count drifts upward", POLICY_H,
-         r"kActuatorOperationCount = 4;",
-         "kActuatorOperationCount = 5;",
+         r"kActuatorOperationCount = 6;",
+         "kActuatorOperationCount = 7;",
          "kActuatorOperationCount")
     case("the operation count drifts downward", POLICY_H,
-         r"kActuatorOperationCount = 4;",
-         "kActuatorOperationCount = 3;",
+         r"kActuatorOperationCount = 6;",
+         "kActuatorOperationCount = 5;",
          "kActuatorOperationCount")
 
     # --- limit provenance --------------------------------------------------
@@ -201,6 +210,55 @@ def main():
          r"class CommandRouter \{",
          "class CommandRouter {\n  actuator::SafeActuatorPolicy policy_;",
          "SafeActuatorPolicy")
+
+    # --- the calibration bootstrap geometry contract -----------------------
+    expect_pass("baseline geometry", run_geometry_checks(BASE))
+
+    case("the executability door drops the URDF domain", PROFILE_CPP,
+         r"  if \(endpoint\.domain != TargetDomain::EXECUTABLE_URDF_DOMAIN\) return false;",
+         "",
+         "target domain", runner=run_geometry_checks)
+    case("the executability door accepts any clearance", PROFILE_CPP,
+         r"  return endpoint\.clearance == ClearancePolicyResult::PASS;",
+         "  return true;",
+         "PASS clearance", runner=run_geometry_checks)
+
+    case("a diagnostic endpoint is promoted to executable", PROFILE_DATA_H,
+         r"TargetDomain::DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS, "
+         r"ParkingOutcome::NOT_NEEDED, "
+         r"ClearancePolicyResult::UNRESOLVED_LOWER_BOUND_BELOW_THRESHOLD",
+         "TargetDomain::EXECUTABLE_URDF_DOMAIN, ParkingOutcome::NOT_NEEDED, "
+         "ClearancePolicyResult::UNRESOLVED_LOWER_BOUND_BELOW_THRESHOLD",
+         "unresolved clearance evidence", runner=run_geometry_checks)
+    case("an obstructed plan loses its auxiliary", PROFILE_DATA_H,
+         r"ParkingOutcome::FEASIBLE_1DOF_PLAN_FOUND, ClearancePolicyResult::PASS, "
+         r"(-?\d+), (-?\d+), (-?\d+), true",
+         r"ParkingOutcome::FEASIBLE_1DOF_PLAN_FOUND, ClearancePolicyResult::PASS, "
+         r"\1, \2, \3, false",
+         "fail closed", runner=run_geometry_checks)
+    case("a parking pose reverts to a legacy 50 degree prerequisite", PROFILE_DATA_H,
+         r"calibration::JointKind::UPPER, 610865\}",
+         "calibration::JointKind::UPPER, 872665}",
+         "superseded hardcoded prerequisite", runner=run_geometry_checks)
+    case("the geometry profile learns floating point", PROFILE_H,
+         r"using MicroRad = int32_t;",
+         "using MicroRad = int32_t;\nusing Approx = double;",
+         "floating point", runner=run_geometry_checks)
+    case("the geometry profile reaches the bus", PROFILE_CPP,
+         r"namespace actuator \{",
+         "namespace actuator {\nstatic SMS_STS g_bus;",
+         "SMS_STS", runner=run_geometry_checks)
+
+    case("POSITION_COMMAND is routed through the geometry envelope", POLICY_CPP,
+         r"  return operation == ActuatorOperation::DIRECTION_VERIFY;",
+         "  return operation == ActuatorOperation::DIRECTION_VERIFY ||\n"
+         "         operation == ActuatorOperation::POSITION_COMMAND;",
+         "bootstrap envelope", runner=run_geometry_checks)
+    case("a calibration class is routed through accepted limits", POLICY_CPP,
+         r"  return operation == ActuatorOperation::POSITION_COMMAND;",
+         "  return operation == ActuatorOperation::POSITION_COMMAND ||\n"
+         "         operation == ActuatorOperation::CALIBRATION_CONTACT_PROBE;",
+         "mutually exclusive", runner=run_geometry_checks)
 
     # --- the pre-existing torque guard still bites -------------------------
     # "No Torque ON path reachable in the default build" is this phase's claim
