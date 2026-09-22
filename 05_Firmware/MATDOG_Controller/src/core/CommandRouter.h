@@ -10,6 +10,7 @@
 #include "../update/OtaManager.h"
 #include "../servo/ServoBus.h"
 #include "../servo/ServoCensus.h"
+#include "../servo/ServoPreflight.h"
 #include "../status/LedRing.h"
 #include "ActuatorAuthority.h"
 #include "Availability.h"
@@ -32,6 +33,7 @@ class CommandRouter {
   struct Modules {
     servo::ServoBus* servo_bus;
     servo::ServoCensus* servo_census;
+    servo::ServoPreflight* servo_preflight;
     imu::Bno085Imu* imu;
     power::DalyBms* daly;
     status::LedRing* led;
@@ -80,6 +82,10 @@ class CommandRouter {
   // HostLink adapter can render the same structured result without
   // reimplementing it or re-scanning the bus (handoff sections 7/8/9).
   void printServoCensusResult();
+
+  // Pure presentation of servo_preflight->result(). Computes nothing and
+  // issues no bus transaction: the service already did the reading.
+  void printServoPreflightResult();
   void printServoRead(int id);
   void printServoSafeOff(int id);
   void printModeStatus();
@@ -102,6 +108,7 @@ class CommandRouter {
   bool bms_key_write_ack_reported_ = false;
   bool servo_scan_result_pending_ = false;
   bool servo_census_result_pending_ = false;
+  bool servo_preflight_result_pending_ = false;
 
   static constexpr size_t kLineBufSize = 96;
   char line_buf_[kLineBufSize] = {0};

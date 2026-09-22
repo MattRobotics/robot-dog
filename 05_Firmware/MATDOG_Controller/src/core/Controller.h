@@ -9,6 +9,7 @@
 #include "../power/DalyBms.h"
 #include "../servo/ServoBus.h"
 #include "../servo/ServoCensus.h"
+#include "../servo/ServoPreflight.h"
 #include "../status/LedRing.h"
 #include "../update/OtaManager.h"
 #include "ActuatorAuthority.h"
@@ -32,7 +33,8 @@ class Controller {
   void printBootBanner();
 
   servo::ServoBus servo_bus_;
-  servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-started
+  servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-start
+  servo::ServoPreflight servo_preflight_;  // H0 leg verification; read-only, never auto-started
   imu::Bno085Imu imu_;
   power::DalyBms daly_;
   status::LedRing led_;

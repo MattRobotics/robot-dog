@@ -1,5 +1,7 @@
 #include "CommandRouter.h"
 
+#include "../servo/ServoProfileData.h"
+
 #include "../config/BuildConfig.h"
 #include "../config/Pins.h"
 
@@ -79,6 +81,11 @@ void CommandRouter::update(uint32_t now_ms) {
       modules_.servo_census->state() == servo::ServoCensus::State::COMPLETE) {
     servo_census_result_pending_ = false;
     printServoCensusResult();
+  }
+  if (servo_preflight_result_pending_ &&
+      modules_.servo_preflight->state() == servo::ServoPreflight::State::COMPLETE) {
+    servo_preflight_result_pending_ = false;
+    printServoPreflightResult();
   }
 }
 
@@ -226,6 +233,24 @@ void CommandRouter::handleLine(String line) {
     } else {
       Serial.println("ERROR=SCAN_ALREADY_RUNNING");
     }
+  } else if (upper == "@SERVO PREFLIGHT") {
+    // H0 leg preflight. Strictly read-only: Ping plus register reads, no
+    // torque, no target, no EEPROM write. It carries the same bounded
+    // per-tick blocking as the census (one joint per update()), so it takes
+    // the same MAINTENANCE gate.
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
+      Serial.println("SERVO_PREFLIGHT=BLOCKED");
+      Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
+      Serial.printf("MODE=%s\n", toString(modules_.operating_mode->mode()));
+      return;
+    }
+    if (modules_.servo_preflight->start()) {
+      servo_preflight_result_pending_ = true;
+      Serial.printf("SERVO_PREFLIGHT=STARTED joints=%u profile=%s\n",
+                    (unsigned)servo::kLegPreflightCount, servo::profile_data::kProfileId);
+    } else {
+      Serial.println("ERROR=PREFLIGHT_ALREADY_RUNNING");
+    }
   } else if (upper.startsWith("@SERVO READ")) {
     if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
       Serial.println("SERVO_READ=BLOCKED");
@@ -301,6 +326,8 @@ void CommandRouter::printHelp() {
   Serial.println("                           per-ID blocking, result follows asynchronously)");
   Serial.println("  @SERVO CENSUS           (MAINTENANCE mode only; canonical 11-55 scan,");
   Serial.println("                           classified against the current servo configuration)");
+  Serial.println("  @SERVO PREFLIGHT        (MAINTENANCE mode only; read-only 12-leg");
+  Serial.println("                           identity + MATDOG_C018_V1 profile check)");
   Serial.println("  @SERVO READ <id>        (MAINTENANCE mode only)");
   Serial.println("  @SERVO SAFE_OFF <id>    (always allowed, any mode)");
   Serial.println("  @MODE STATUS|MAINTENANCE|RUN");
@@ -672,6 +699,48 @@ void CommandRouter::printServoCensusResult() {
     Serial.printf("  UNEXPECTED_ID id=%u\n", (unsigned)c.unexpected_ids[i]);
   }
 
+  printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
+}
+
+void CommandRouter::printServoPreflightResult() {
+  // Formatting ONLY. Every value below was read by ServoPreflight; nothing is
+  // computed here and no servo transaction is issued to render it.
+  const servo::PreflightResult& r = modules_.servo_preflight->result();
+
+  Serial.printf("SERVO_PREFLIGHT=%s profile=%s source_sha256=%s\n",
+                r.allPass() ? "PASS" : "FAIL", servo::profile_data::kProfileId,
+                servo::profile_data::kSourceSha256);
+  Serial.printf("  evaluated=%u pass=%u no_response=%u mismatch=%u incomplete=%u\n",
+                (unsigned)r.joints_evaluated, (unsigned)r.pass_count,
+                (unsigned)r.no_response_count, (unsigned)r.mismatch_count,
+                (unsigned)r.incomplete_count);
+  // expected_physical_unit is CONFIGURATION. A servo cannot report its unit
+  // label, so this column is never an observed hardware identity.
+  Serial.println("  expected_unit joint expected_id observed_id model offset "
+                 "profile torque position result");
+
+  for (uint8_t i = 0; i < r.joints_evaluated; ++i) {
+    const servo::JointPreflightRecord& j = r.joints[i];
+    Serial.printf("  JOINT expected_physical_unit=%s joint=%s expected_bus_id=%u "
+                  "observed_bus_id=%u model=%ld position_offset=%s%d "
+                  "persistent_profile=%s torque_enable=%ld present_position=%ld "
+                  "result=%s\n",
+                  j.expected_physical_unit, j.joint, (unsigned)j.expected_bus_id,
+                  (unsigned)j.observed_bus_id, (long)j.model,
+                  j.position_offset_read ? "" : "UNREAD:",
+                  j.position_offset_read ? (int)j.position_offset : 0,
+                  servo::toString(j.profile), (long)j.torque_enable,
+                  (long)j.present_position, servo::toString(j.result));
+    if (j.profile_mismatch_count > 0) {
+      Serial.printf("    PROFILE_MISMATCH count=%u first_addr=0x%02X expected=%u "
+                    "observed=%ld\n",
+                    (unsigned)j.profile_mismatch_count,
+                    (unsigned)j.first_mismatch_address,
+                    (unsigned)j.first_mismatch_expected,
+                    (long)j.first_mismatch_observed);
+    }
+  }
+  Serial.println("  NOTE present_position is a raw liveness tick, NOT q0");
   printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
 }
 

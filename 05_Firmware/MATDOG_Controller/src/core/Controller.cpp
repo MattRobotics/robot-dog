@@ -82,6 +82,7 @@ void Controller::begin() {
   // "no startup torque / no startup motion"), and scripts/static_audit.py
   // fails the build if Controller::begin() ever starts one.
   servo_census_.begin(&servo_bus_);
+  servo_preflight_.begin(&servo_bus_);
 
   imu_.begin();
   system_state_.setImuHealth(imu_.health());
@@ -105,7 +106,8 @@ void Controller::begin() {
   wifi_.begin(millis());
 
   CommandRouter::Modules modules{
-      &servo_bus_, &servo_census_, &imu_, &daly_, &led_, &wifi_, &ota_, &system_state_,
+      &servo_bus_, &servo_census_, &servo_preflight_, &imu_, &daly_, &led_, &wifi_, &ota_,
+      &system_state_,
       &power_state_, &operating_mode_, &authority_, &calibration_,
   };
   command_router_.begin(modules);
@@ -211,6 +213,7 @@ void Controller::update(uint32_t now_ms) {
   // Strictly after servo_bus_.update(): it observes that call's
   // RUNNING -> COMPLETE edge and classifies the raw scan exactly once.
   servo_census_.update();
+  servo_preflight_.update();
   system_state_.setServoHealth(servo_bus_.health());
 
   system_state_.update();

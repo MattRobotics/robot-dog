@@ -198,5 +198,21 @@ CensusResult classifyObserved(const int* observed_ids,
   return r;
 }
 
+bool isLegServo(uint8_t bus_id) {
+  if (bus_id < 11 || bus_id > 43) return false;
+  const uint8_t unit = bus_id % 10;
+  return unit >= 1 && unit <= 3;
+}
+
+const CanonicalServo* legServoAt(uint8_t index) {
+  uint8_t seen = 0;
+  for (uint8_t i = 0; i < kCanonicalServoCount; ++i) {
+    if (!isLegServo(kCanonicalServos[i].bus_id)) continue;
+    if (seen == index) return &kCanonicalServos[i];
+    ++seen;
+  }
+  return nullptr;
+}
+
 }  // namespace servo
 }  // namespace matdog
