@@ -6,6 +6,7 @@
 #include "../calibration/CalibrationDomain.h"
 #include "../core/ActuatorAuthority.h"
 #include "../core/OperatingMode.h"
+#include "CalibrationGeometryProfile.h"
 
 // The Safe Actuator Layer's decision core.
 //
@@ -57,22 +58,53 @@ namespace actuator {
 // static_audit.py fails the build if such a class is added here.
 //
 //   runtime actuator command  !=  persistent provisioning/configuration write
+//
+// The three calibration classes are NOT a mechanical expansion. Each is tied to
+// a DIFFERENT authorisation object, which is the only reason it exists:
+//
+//   DIRECTION_VERIFY            the symmetric proven-clear envelope around q=0.
+//                               It has no endpoint plan, because it is what runs
+//                               BEFORE the raw<->q transform exists at all.
+//   CALIBRATION_AUXILIARY_MOVE  a parking plan's auxiliary joint - a DIFFERENT
+//                               joint from the one being calibrated. The
+//                               compiler makes that distinction explicit for all
+//                               six obstructed endpoints; collapsing it would
+//                               let a probe command move an unrelated leg.
+//   CALIBRATION_CONTACT_PROBE   the endpoint's own task path toward contact.
+//
+// Backoff and restore are deliberately NOT separate classes: both retreat along
+// a corridor the same plan already validated, so they are the same intent with a
+// different target. Adding classes for them would be the mechanical expansion
+// the handoff warns against.
 enum class ActuatorOperation : uint8_t {
-  NONE                      = 0,  // the absence of an operation, never an operation
-  TORQUE_ENABLE             = 1,  // APPLY torque. Removing it is SAFE_OFF's job, not this layer's.
-  POSITION_COMMAND          = 2,  // a single-joint goal position
-  CALIBRATION_CONTACT_PROBE = 3,  // a bounded approach expecting a contact witness
+  NONE                       = 0,  // the absence of an operation, never an operation
+  TORQUE_ENABLE              = 1,  // APPLY torque. Removing it is SAFE_OFF's job, not this layer's.
+  POSITION_COMMAND           = 2,  // a single-joint goal position under accepted limits
+  CALIBRATION_CONTACT_PROBE  = 3,  // a bounded approach expecting a contact witness
+  DIRECTION_VERIFY           = 4,  // a micro excursion from the captured q0 tick
+  CALIBRATION_AUXILIARY_MOVE = 5,  // park/unpark a plan's auxiliary joint
 };
 
-constexpr uint8_t kActuatorOperationCount = 4;
+constexpr uint8_t kActuatorOperationCount = 6;
 
 bool isKnownOperation(ActuatorOperation operation);
 
 // An operation that actually commands something. NONE is not one.
 bool isCommandOperation(ActuatorOperation operation);
 
-// Which operations carry a target tick, and therefore need accepted bounds.
+// Which operations carry a target at all. TORQUE_ENABLE does not.
 bool operationNeedsTarget(ActuatorOperation operation);
+
+// The three authorisation routes, mutually exclusive by construction. Which one
+// an operation takes is a property of the operation, never of the caller.
+//
+// POSITION_COMMAND keeps the ORIGINAL route and is not weakened by anything
+// below: it still requires an accepted joint bound, and none exists.
+bool operationUsesAcceptedLimits(ActuatorOperation operation);
+// DIRECTION_VERIFY only: the geometry envelope, checked in tick space.
+bool operationUsesBootstrapEnvelope(ActuatorOperation operation);
+// The plan-bound calibration moves: a V5 endpoint record authorises them.
+bool operationUsesEndpointPlan(ActuatorOperation operation);
 
 // Owner -> operation eligibility.
 //
@@ -149,6 +181,59 @@ class ActuatorLimitTable {
   uint8_t count_ = 0;
 };
 
+// The accepted raw<->q transform store. Same shape and same gate as the limit
+// table: admit() refuses anything without operational provenance, so a
+// historical q0 or an unmeasured direction cannot become a live transform.
+// Empty today, because no q0 has been captured on the current installation.
+class JointTransformTable {
+ public:
+  static constexpr uint8_t kCapacity = calibration::kLegServoSlotCount;  // 12 leg joints
+
+  void clear();
+  bool admit(const JointTransform& transform);
+  const JointTransform* find(const calibration::JointIdentity& joint) const;
+
+  uint8_t size() const { return count_; }
+  bool empty() const { return count_ == 0; }
+
+ private:
+  JointTransform entries_[kCapacity];
+  uint8_t count_ = 0;
+};
+
+// ---------------------------------------------------------------------------
+// The calibration bootstrap context
+// ---------------------------------------------------------------------------
+//
+// What the CURRENT calibration session has established. Supplied by the
+// CalibrationManager; the policy never invents any of it, and every field
+// defaults to the refusing value.
+//
+// It is not a second calibration state machine. It carries exactly the four
+// facts the geometry-authorised operations must check and nothing else.
+struct CalibrationBootstrapContext {
+  bool session_active = false;
+  // A replay session authorises nothing physical, however complete it looks.
+  calibration::CalibrationOrigin origin = calibration::CalibrationOrigin::NONE;
+
+  // The operator-approved excursion for a direction-verification move, in raw
+  // ticks. Zero means NOT AUTHORISED - the geometry says what is clear, the
+  // session says how much of that it may use, and both must agree. Deliberately
+  // not defaulted to anything derived from the envelope: choosing it is a
+  // mechanical decision about spline fit and placement error, not a geometric
+  // one, and the repository has no evidence for it yet.
+  int32_t direction_verify_tick_budget = 0;
+
+  // Which endpoint, if any, currently has its auxiliary joint parked. The
+  // compiler validated every direct path with ALL other joints at q=0, so a
+  // parked auxiliary invalidates a NOT_NEEDED direct path just as surely as a
+  // missing one invalidates an obstructed plan.
+  bool auxiliary_parked = false;
+  calibration::Leg parked_leg = calibration::Leg::LF;
+  calibration::JointKind parked_joint = calibration::JointKind::HIP;
+  calibration::ContactSide parked_side = calibration::ContactSide::MIN_SIDE;
+};
+
 // ---------------------------------------------------------------------------
 // The decision
 // ---------------------------------------------------------------------------
@@ -168,6 +253,22 @@ enum class WriteDecision : uint8_t {
   REJECT_TARGET_OUT_OF_BOUNDS = 11,
   REJECT_TRANSACTION_STATE  = 12,  // replay, resume after abort, or a second outstanding plan
   REJECT_STALE_EPOCH        = 13,  // the policy was reset under the transaction
+
+  // --- calibration bootstrap, geometry-authorised --------------------------
+  REJECT_NO_GEOMETRY_PROFILE        = 14,  // no compiled geometry bound
+  REJECT_GEOMETRY_PROVENANCE        = 15,  // the profile is not the model this build expects
+  REJECT_NO_CALIBRATION_SESSION     = 16,  // no live session, or a replay session
+  REJECT_UNKNOWN_GEOMETRY_JOINT     = 17,  // the joint is not in the compiled model
+  REJECT_NO_ENVELOPE_BUDGET         = 18,  // the session authorised no excursion
+  REJECT_OUTSIDE_BOOTSTRAP_ENVELOPE = 19,  // beyond the proven-clear span, or beyond the budget
+  REJECT_NO_ENDPOINT_PLAN           = 20,  // the compiler produced no plan for this endpoint
+  REJECT_ENDPOINT_NOT_EXECUTABLE    = 21,  // diagnostic endpoint, or clearance not PASS
+  REJECT_PARKING_REQUIRED           = 22,  // the plan is obstructed and nothing is parked
+  REJECT_UNEXPECTED_PARKING         = 23,  // a direct path validated at q=0, with something parked
+  REJECT_WRONG_AUXILIARY_JOINT      = 24,  // not the auxiliary joint the plan names
+  REJECT_AUXILIARY_TARGET           = 25,  // not the parked pose the compiler found
+  REJECT_NO_ACCEPTED_TRANSFORM      = 26,  // no raw<->q transform with live, promoted provenance
+  REJECT_TARGET_OUTSIDE_URDF_LIMITS = 27,  // outside the joint's declared URDF domain
 };
 
 // ---------------------------------------------------------------------------
@@ -184,8 +285,30 @@ enum class TransactionState : uint8_t {
 
 struct ActuatorCommand {
   ActuatorOperation operation = ActuatorOperation::NONE;
+
+  // The joint that MOVES. For an auxiliary move this is NOT the joint being
+  // calibrated - that is the whole point of the class.
   calibration::JointIdentity joint{};
-  uint16_t target_tick = 0;  // meaningless unless operationNeedsTarget(operation)
+
+  // POSITION_COMMAND only. Meaningless for every other operation.
+  uint16_t target_tick = 0;
+
+  // DIRECTION_VERIFY only: a SIGNED excursion from the captured q0 tick. Ticks,
+  // not radians, because the magnitude of a tick delta is a servo-profile fact
+  // that needs neither q0 nor direction - which is exactly what makes this move
+  // checkable before either exists.
+  int32_t delta_ticks = 0;
+
+  // The plan-bound moves: a target in the URDF joint frame. Reaching it needs
+  // the raw<->q transform, so it is refused until one is accepted.
+  MicroRad target_urad = 0;
+
+  // Which endpoint plan authorises this command. For a contact probe this is
+  // the joint being probed; for an auxiliary move it is the endpoint the
+  // parking serves, while `joint` above is the auxiliary being moved.
+  calibration::Leg endpoint_leg = calibration::Leg::LF;
+  calibration::JointKind endpoint_joint = calibration::JointKind::HIP;
+  calibration::ContactSide endpoint_side = calibration::ContactSide::MIN_SIDE;
 };
 
 // What a planned write knows about the world it was planned in. Every field is
@@ -246,6 +369,18 @@ class SafeActuatorPolicy {
   ActuatorLimitTable& limits() { return limits_; }
   const ActuatorLimitTable& limits() const { return limits_; }
 
+  JointTransformTable& transforms() { return transforms_; }
+  const JointTransformTable& transforms() const { return transforms_; }
+
+  // Binds the compiled geometry AND the provenance this build expects it to
+  // have. Both are required: a profile whose provenance cannot be matched is
+  // a profile from a different robot.
+  void bindGeometry(const CalibrationGeometryProfile* profile,
+                    const GeometryProvenance* expected_provenance);
+
+  void setBootstrapContext(const CalibrationBootstrapContext& context);
+  const CalibrationBootstrapContext& bootstrapContext() const { return bootstrap_; }
+
   uint32_t epoch() const { return epoch_; }
   bool hasOutstandingTransaction() const { return outstanding_id_ != 0; }
   const ActuatorPolicyCounters& counters() const { return counters_; }
@@ -260,7 +395,15 @@ class SafeActuatorPolicy {
 
   WriteDecision record(WriteDecision decision);
 
+  WriteDecision evaluateBootstrapEnvelope(const ActuatorCommand& command) const;
+  WriteDecision evaluateEndpointPlan(const ActuatorCommand& command) const;
+  WriteDecision geometryPreconditions() const;
+
   const core::ActuatorAuthorityArbiter* arbiter_ = nullptr;
+  const CalibrationGeometryProfile* geometry_ = nullptr;
+  const GeometryProvenance* expected_provenance_ = nullptr;
+  CalibrationBootstrapContext bootstrap_{};
+  JointTransformTable transforms_{};
   ActuatorLimitTable limits_{};
   uint32_t epoch_ = 1;         // never 0: a zeroed transaction must not match
   uint32_t next_id_ = 1;       // never 0: 0 means "never planned"
