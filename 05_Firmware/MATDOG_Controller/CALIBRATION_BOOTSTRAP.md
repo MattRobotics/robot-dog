@@ -534,7 +534,34 @@ Two items must be closed by a human before step 4, and neither is a software tas
 
 ---
 
-## 17. Related
+## 17. Offline result
+
+No hardware action of any kind. No flash, no servo write, no torque, no goal position, no
+EEPROM access, no provisioning, no DALY write, no push, no merge.
+
+| Gate | Result |
+|---|---|
+| `static_audit.py` | **PASS** — 68 source files |
+| Safe Actuator / geometry mutation suite | **PASS** — 30 targeted mutations, each caught with the expected reason |
+| Host suite, calibration geometry | **PASS** — 354 checks, 0 failures |
+| Host suite, write policy | **PASS** — 310 checks, 0 failures |
+| Host suite, total | **PASS** — 4876 checks, 0 failures across 9 suites |
+| Geometry export `--check` | **PASS** — the committed table matches the canonical bundle |
+| `USB_ONLY` clean build (pinned FQBN) | **PASS** — 973447 bytes flash, 51812 bytes static RAM |
+| Flash / RAM delta vs `988c84a` | **0 / 0 bytes** |
+
+The zero delta again: the profile tables are `constexpr` and no runtime translation unit
+references them yet, so the linker discards them. The shipped image gained no write path and
+no footprint.
+
+```text
+CURRENT HARDWARE MOTION AUTHORIZATION   BLOCKED
+DEFAULT BUILD WRITE REACHABILITY        torque OFF only, unchanged
+```
+
+---
+
+## 18. Related
 
 - [`SAFE_ACTUATOR_LAYER.md`](SAFE_ACTUATOR_LAYER.md) — the write-surface audit and the policy core
 - [`CALIBRATION_SOURCE_PRECEDENCE.md`](CALIBRATION_SOURCE_PRECEDENCE.md) — source precedence and the EEPROM boundary
