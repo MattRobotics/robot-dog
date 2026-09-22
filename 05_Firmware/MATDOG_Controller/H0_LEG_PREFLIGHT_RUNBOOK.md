@@ -1,6 +1,8 @@
 # H0 — CURRENT 12/12 LEG SERVO READ-ONLY PREFLIGHT
 
 **Runbook for the operator · prepared 2026-09-22 · NOT YET EXECUTED**
+**Amended 2026-09-22:** H0-B is now implemented in this branch. The board is **unchanged** —
+see §1.1 and §7.
 
 Strictly read-only on the servo bus. The only write permitted anywhere in this gate is
 `SAFE_OFF` / torque OFF, which the architecture already authorises as a safety de-escalation.
@@ -51,21 +53,36 @@ None of `feat/controller-wifi-ota-v1`, `…-calibration-manager-v1`, `…-safe-a
 | 9 | `PresentPosition` / raw | ✅ | `@SERVO READ <id>` → `position=` |
 | 10 | `result` | ✅ | derived from the above |
 
+### 1.2b After the H0-B work on this branch
+
+Every gap above is now **implemented in `feat/h0-current-leg-preflight-v1`** and none of it is on
+the board:
+
+| # | H0 field | In this branch | On the installed firmware |
+|---:|---|---|---|
+| 5 | `model` | ✅ `@SERVO PREFLIGHT`, compared against 777 | ❌ |
+| 6 | `PositionOffset` | ✅ `ServoBus::readPositionOffset()`, int16 two's complement | ❌ |
+| 7 | persistent profile | ✅ 20 registers compared against the generated `MATDOG_C018_V1` table | ❌ |
+| 1 | `physical_unit` | ✅ reported as `expected_physical_unit`, from configuration | ❌ |
+
+**Reaching any of it on hardware requires a flash, and a flash requires a new explicit
+authorization.** None has been performed.
+
 ### 1.3 Verdict
 
 ```text
-H0 AS FULLY SPECIFIED      CANNOT BE EXECUTED on the installed firmware
-                           3 of 10 record fields are unreachable
+INSTALLED FIRMWARE  6322563  -  UNCHANGED, and 3 of 10 record fields are unreachable on it
 
 H0-A  population / identity / liveness / raw    EXECUTABLE NOW, no flash
-H0-B  model / PositionOffset / profile          BLOCKED, needs firmware capability
+H0-B  model / PositionOffset / profile          IMPLEMENTED in this branch,
+                                                REQUIRES A FLASH to reach hardware
 ```
 
-**I have not flashed anything and will not without a new explicit authorization.** §7 states
-exactly what H0-B would require, so the decision is yours.
+**I have not flashed anything and will not without a new explicit authorization.**
 
-H0-A is still the gate worth running: it is the half that converts the historical **6/12** into
-a current result, and it needs no firmware change.
+H0-A remains worth running on its own: it converts the historical **6/12** into a current result
+and needs no firmware change. H0-B upgrades the same gate to the full ten-field record once the
+operator authorises a flash.
 
 ---
 
@@ -184,6 +201,23 @@ One command per leg servo, in this order:
 ID 51 (`NECK_ROTATION`) is installed and will appear in the census, but it is **not** part of the
 12-joint leg record.
 
+### Step 5b — H0-B full record · **only after a flash, only with new authorization**
+
+Not available on the installed firmware. Once `feat/h0-current-leg-preflight-v1` is flashed:
+
+```text
+@SERVO PREFLIGHT
+```
+
+Asynchronous, like the census: it prints `SERVO_PREFLIGHT=STARTED joints=12 profile=…`
+immediately and one joint is evaluated per Controller tick. Keep collecting until the
+`SERVO_PREFLIGHT=PASS|FAIL` block arrives.
+
+It replaces Step 5 rather than supplementing it: the same twelve joints, with model,
+`PositionOffset` and the twenty-register `MATDOG_C018_V1` comparison added. Strictly read-only —
+`Ping` plus register reads, and each joint is pinged first so an absent unit costs one bounded
+timeout instead of twenty-three.
+
 ### Step 6 — SAFE_OFF confirmation, 12 joints
 
 ```text
@@ -245,6 +279,33 @@ SERVO_READ id=11 position=<0..4095> speed=<n> load=<n> voltage=<n> temp=<n> torq
 > **`position` is NOT q0.** This capture is preflight liveness evidence only. q0 is a separate,
 > later step that requires the robot manually aligned to the nominal URDF q=0 pose with torque
 > confirmed off, and it has its own gate. Do not record these values as calibration.
+
+### `@SERVO PREFLIGHT` — expected shape (H0-B only)
+
+```text
+SERVO_PREFLIGHT=PASS profile=MATDOG_C018_V1 source_sha256=70aee512…
+  evaluated=12 pass=12 no_response=0 mismatch=0 incomplete=0
+  JOINT expected_physical_unit=M33 joint=LF_LOWER expected_bus_id=11 observed_bus_id=11
+        model=777 position_offset=0 persistent_profile=MATDOG torque_enable=0
+        present_position=2051 result=PASS
+  … eleven more …
+  NOTE present_position is a raw liveness tick, NOT q0
+```
+
+| Field | Meaning |
+|---|---|
+| `expected_physical_unit` | **configuration**, from `MATDOG_SERVO_ALLOCATION.yaml`. An ST3215 exposes no unit serial, so this is never an observation. |
+| `observed_bus_id` | the **only** identity a servo supplies: it answered at this address. `0` means it did not. |
+| `model` | register `0x03`; `777` for the ST-3215-C018 |
+| `position_offset` | register `0x1F`, int16 two's complement; `UNREAD:` prefix if the read failed — a failed read is never reported as zero |
+| `persistent_profile` | `MATCH` / `MISMATCH` / `INCOMPLETE` over the twenty registers. `INCOMPLETE` is never a pass: an unread register is never assumed correct. |
+| `result` | `PASS` only when the unit answered, model matched, offset read and zero, and the profile matched |
+
+A profile disagreement adds a detail line naming the first offending register:
+
+```text
+    PROFILE_MISMATCH count=1 first_addr=0x15 expected=32 observed=16
+```
 
 ### `@SERVO SAFE_OFF <id>` — expected shape
 
@@ -344,29 +405,39 @@ date, the firmware identity from §1.1, and the pack voltage at open and close.
 
 ---
 
-## 7. BLOCKERS
+## 7. THE BLOCKERS — now implemented, still unflashed
 
-### BL-1 — model identity is not reachable · **BLOCKER**
+All four are closed in `feat/h0-current-leg-preflight-v1`. **None of it is on the board**: reaching any of it requires a flash and a new explicit authorization.
+
+### BL-1 — model identity · **IMPLEMENTED**
 
 `ServoBus::readModel(id, &model)` exists and reads register `0x03` (expected `777` for the
 ST-3215-C018). **No command in `CommandRouter` calls it**, and neither `@SERVO CENSUS` nor
 `@SERVO SCAN` prints a model — the census emits only `FOUND id=`.
 
-*To unblock:* expose the existing primitive. No new bus capability, no new register.
+**Done:** `@SERVO PREFLIGHT` reads register `0x03` per joint and compares it against `777` from the generated invariants. The existing `ServoBus::readModel()` primitive is reused; no new bus capability and no new register.
 
-### BL-2 — `PositionOffset` cannot be read · **BLOCKER**
+### BL-2 — `PositionOffset` · **IMPLEMENTED, with the audit gate narrowed deliberately**
 
 There is no read of register `0x1F` (int16 LE, expected `0`). The Controller's servo surface is
 `Ping` + the six `readRuntimeState` registers + the model word, and nothing else.
 
-*To unblock, and this one needs a decision:* `SMS_STS_OFS_L` and `SMS_STS_OFS_H` are in
-`check_forbidden_literals` in `static_audit.py`. That ban is **total — it blocks reads as well as
-writes.** Adding a read means deliberately narrowing the prohibition from "this register does not
-appear" to "this register is never written", and re-proving the write ban by mutation. Reading it
-with a magic number instead would evade exactly the audit that makes the ban meaningful. Do it
-properly or not at all.
+**Done, properly.** The total ban was replaced, not evaded:
 
-### BL-3 — `MATDOG_C018_V1` profile verification does not exist in the Controller · **BLOCKER**
+```text
+read through exactly ServoBus::readPositionOffset()  = ALLOWED
+any PositionOffset write                             = FORBIDDEN
+CalibrationOfs                                       = FORBIDDEN
+```
+
+`check_position_offset_boundary` enforces that `SMS_STS_OFS_L` appears in exactly one file and
+one function; that the accessor uses `readWord` and contains no write primitive; that no
+`writeByte`/`writeWord`/`genWrite`/`RegWrite` anywhere names the offset register under **any**
+spelling, including the bare address `0x1F`; and that the decoder is two's complement rather than
+sign-magnitude. Five mutations prove it bites — including one that inserts a literal
+`writeWord(id, SMS_STS_OFS_L, 0)` into the accessor itself.
+
+### BL-3 — `MATDOG_C018_V1` profile verification · **IMPLEMENTED**
 
 The profile is fully specified and machine-readable
 (`06_Software/Matdog_Core/config/MATDOG_ST3215_C018_V1.yaml`): **20 EEPROM registers** hashing to
@@ -387,10 +458,17 @@ bus itself.
 > owner, it is write-capable, and the architecture permits exactly one owner. Using it here would
 > trade the thing H0 is meant to establish for the thing H0 is meant to avoid.
 
-*To unblock:* a read-only profile verifier in the Controller — 20 register reads, compare, hash,
-report `MATDOG_C018_V1 = MATCH | MISMATCH` per unit.
+**Done.** `matdog_servo_profile_export.py` reduces the reviewed YAML to a `constexpr` table —
+the twenty values are never retyped — and `ServoProfile` compares them register by register.
+**No runtime SHA-256**: individual values are compared, which is both cheaper and more
+diagnosable than a digest, and a mismatch names the first offending register.
 
-### BL-4 — the firmware cannot confirm physical-unit identity · **BLOCKER (structural)**
+The three layers stay apart, and the exporter fails if they blur: the twenty **persistent**
+registers; the **invariants** (model, offset, baud, raw centre) which are checked but are not
+part of the delta set; and **runtime RAM state** (`TorqueLimit`, `GoalSpeed`, `Acc`) which is
+absent entirely.
+
+### BL-4 — physical-unit identity · **RESOLVED AS A SEMANTIC**
 
 `kCanonicalServos` in the installed firmware is `{bus_id, joint, current_config}` — **no physical
 unit field.** The firmware knows bus 11 is `LF_LOWER`; it has no way to know the unit answering
@@ -411,20 +489,42 @@ honest options are:
 3. treat unit identity as a physical/process control (labelling and assembly discipline), which is
    how it was established on 2026-08-27 in the first place.
 
-**Option 3 is what actually holds today.** It should be stated as such rather than implied by a
-column in a table.
+**Option 3 is what holds, and it is now stated rather than implied.** `CanonicalServo` carries
+the expected unit from the allocation YAML; the report column is named
+`expected_physical_unit`; and `check_h0_preflight_boundaries` fails the build if it is ever
+renamed to suggest an observation, or if the report drops its `NOT q0` note. A mutation proves
+each.
 
 ---
 
 ## 8. SUMMARY
 
 ```text
-FIRMWARE INSTALLED            6322563, ROBOT_POWERED, app e9283ced…  (confirm at Step 3)
-H0-A  EXECUTABLE NOW          census + 12 reads + 12 SAFE_OFF + re-read
-H0-B  BLOCKED                 BL-1 model, BL-2 PositionOffset, BL-3 profile, BL-4 unit identity
-FLASHING                      NOT performed, NOT scheduled, needs new explicit authorization
+FIRMWARE INSTALLED            6322563, ROBOT_POWERED, app e9283ced…  UNCHANGED
+H0-A  EXECUTABLE NOW          census + 12 reads + 12 SAFE_OFF + re-read, no flash
+H0-B  IMPLEMENTED, UNFLASHED  @SERVO PREFLIGHT - needs a flash + new authorization
+FLASHING                      NOT performed, NOT scheduled
 HARDWARE MOTION               BLOCKED
-DEFAULT WRITE REACHABILITY    torque OFF only
+DEFAULT WRITE REACHABILITY    torque OFF only (SAFE_OFF)
 ```
+
+### The path after H0
+
+```text
+H0 12/12 PASS
+  -> manual URDF q=0 pose
+  -> read-only current q0 capture
+  -> q0 sanity analysis
+  -> motorDirection read from the current URDF   (no measurement, no campaign)
+  -> current raw<->rad transforms
+  -> conservative runtime motion settings
+  -> SafeActuator runtime adapter
+  -> C4-C CURRENT-INSTALLATION STAND REVALIDATION
+```
+
+The stand is a **revalidation**: the C4-C 51-frame trajectory has already run on real hardware to
+roughly 150 mm body height with stable four-foot Torque-ON hold. Reuse it unless current
+q0/provenance analysis shows a concrete incompatibility. Contact calibration is a permanent
+MAINTENANCE capability and is **not** a prerequisite for this stand.
 
 Nothing in this runbook has been executed.

@@ -428,20 +428,60 @@ and the reset document both prohibit exactly that.
 
 ---
 
-## 11. DIRECTION VERIFICATION CONTRACT
+## 11. DIRECTION — CONTRACT DATA, NOT A RECALIBRATION DATUM
 
-LF V25's `direction` was **specification data used arithmetically**, never a measured witness.
-The URDF's `motorDirection` is the same kind of thing. Both are what a current measurement is
-compared *against*; neither may seed one. `JointTransform::direction` defaults to `0`, meaning
-*not measured*, and a transform with direction 0 is refused.
+> **CORRECTED 2026-09-22.** This section previously treated current direction as
+> calibration work to be measured. That was wrong, and the code has been corrected on
+> `feat/h0-current-leg-preflight-v1`.
+
+The canonical URDF already carries the per-joint `motorDirection`, and **those directions were
+validated on real hardware**. The 2026-08-27 reprovisioning changed:
 
 ```text
-q0 captured
-+ a small geometry-approved excursion
-+ observed raw delta / physical sign
-+ comparison against URDF +q
-= current direction evidence
+physical units          CHANGED
+PositionOffset baseline CHANGED
+raw q0 installation     CHANGED
 ```
+
+and did **not** change:
+
+```text
+servo model                    UNCHANGED
+servo mounting orientation     UNCHANGED
+joint mechanical architecture  UNCHANGED
+URDF joint axes                UNCHANGED
+canonical motorDirection       UNCHANGED
+```
+
+So direction never became unknown. The permanent rule:
+
+```text
+q0              CURRENT INSTALLATION CALIBRATION DATA   measured
+motorDirection  CURRENT URDF / HARDWARE CONTRACT DATA   read, not measured
+```
+
+**A same-type ST3215 replacement mounted in the same orientation needs a new q0 capture and does
+NOT need direction re-verification.** Direction is reconsidered only when the servo's physical
+orientation, the transmission topology, the servo type or encoder convention, the URDF joint axis
+or `motorDirection` change — or when contradictory hardware evidence appears. Every one of those
+changes the URDF, and therefore the geometry provenance tag, and therefore invalidates the
+affected transforms automatically.
+
+`JointTransform` carries **no** `direction` field. It is resolved by
+`jointDirection(profile, joint)` from the bound profile's `urdf_motor_direction`: one source of
+truth, one invalidation path. A copy stored as evidence could silently disagree with the URDF the
+geometry plan was compiled against.
+
+### The optional direction diagnostic
+
+`DIRECTION_VERIFY` survives as an **OPTIONAL / DIAGNOSTIC ONLY** operation — *"does this joint
+move, and does it move the way the contract says"* after a mechanical repair. It is **never
+required for calibration acceptance and never required for stand authorization**, and
+`direction_verify_tick_budget` defaults to `0` = not authorised. `check_direction_is_contractual`
+fails the build if any calibration path consults it.
+
+The envelope below is what bounds that diagnostic when it IS authorised. It is not a calibration
+prerequisite.
 
 ### How V5 supplies the envelope — answered from the existing artifacts
 
@@ -475,7 +515,7 @@ budget are independent gates; neither can grant what the other refuses.
 Operational safe limits are **not** used — they do not exist. Historical LF limits are **not**
 used — they describe the previous installation.
 
-**Not executed on hardware in this phase.**
+**Not executed on hardware in this phase, and not required before the stand.**
 
 ---
 
@@ -630,17 +670,38 @@ Only after it passes, in order, each its own authorised session:
 2. read-only q0 capture on all twelve joints → q0 candidates;
 3. **derive** the q0 acceptance tolerance from that distribution, under the 81.92-tick
    half-tooth ceiling (§10) — measure first, then set the window;
-4. one micro direction verification, budget explicitly approved;
-5. one-joint bootstrap actuator transaction validated;
-6. first safe operational envelope, derived from the C4-A/C4-C stand range — **not** from the
-   URDF limits, and requiring **no contact endpoint** (§8.4);
-7. stand-up;
-8. **then** the 8 upper-leg contacts, the only ones required for final calibration and the only
+4. `motorDirection` read from the current URDF (§11) — **no measurement, no campaign**;
+5. current raw↔rad transforms, from (2) and (4);
+6. conservative runtime motion settings, defined and verified rather than inherited;
+7. the Safe Actuator runtime adapter;
+8. **C4-C current-installation stand revalidation** — see below;
+9. **then** the 8 upper-leg contacts, the only ones required for final calibration and the only
    ones reachable without beyond-URDF motion (§8.3);
-9. full current safe limits.
+10. full current safe limits.
 
-Note that **contact calibration moved after the stand**, not before it. Nothing in steps 1–7
-needs a mechanical contact, so nothing in them justifies designing beyond-URDF motion.
+### The next stand is a REVALIDATION, not a first stand
+
+> **CORRECTED 2026-09-22.** MATDOG has **already executed the C4-C 51-frame stand trajectory on
+> real hardware** — from near q=0 to roughly 150 mm body height, on the ground, four-foot
+> support, stable Torque-ON hold.
+
+So the next motion phase is **CURRENT-INSTALLATION STAND REVALIDATION** after reprovisioning and
+remounting, not first-stand development. **Reuse the validated C4-C trajectory and model** unless
+current q0/provenance analysis shows a concrete incompatibility.
+
+Do **not** introduce as mandatory, without evidence that the validated trajectory no longer
+applies:
+
+```text
+a 12-joint direction campaign
+a harness stand campaign
+a low-stand redesign
+a new stand trajectory
+```
+
+**Contact calibration is not a prerequisite for this stand.** It remains a permanent MAINTENANCE
+capability (see [`CALIBRATION_MAINTENANCE_REQUIREMENT.md`](CALIBRATION_MAINTENANCE_REQUIREMENT.md)),
+and nothing in steps 1–8 needs a mechanical contact.
 
 One item must still be closed by a human, and it is not a software task: the **low-energy
 runtime settings** (goal speed, acceleration, torque limit) for the new execution contract,
