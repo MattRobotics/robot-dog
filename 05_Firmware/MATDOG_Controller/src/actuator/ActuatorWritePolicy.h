@@ -133,6 +133,11 @@ struct JointLimit {
   calibration::JointIdentity identity{};
   calibration::EvidenceState state = calibration::EvidenceState::UNKNOWN;
   calibration::CalibrationOrigin origin = calibration::CalibrationOrigin::NONE;
+  // WHICH MODEL this bound was derived under. A safe operational limit
+  // descends from a contact target that came from the geometry plan and from
+  // a MODEL-versus-REAL comparison whose model half is the URDF. Change the
+  // URDF and the comparison no longer describes this robot.
+  GeometryProvenanceTag geometry = kNoGeometryProvenance;
   uint16_t min_tick = 0;
   uint16_t max_tick = 0;
   bool present = false;  // false means "no bound exists", never "use the full range"
@@ -141,6 +146,11 @@ struct JointLimit {
   // measured on the current installation (LIVE_SESSION) and promoted to
   // operational calibration (PROMOTED). A replay can reach neither.
   bool usableProvenance() const;
+
+  // The geometry axis, separate from usableProvenance() on purpose: a bound
+  // can be perfectly measured and still belong to a model that is no longer
+  // loaded. It stays historically recorded; it is not CURRENT evidence.
+  bool boundToGeometry() const { return geometry != kNoGeometryProvenance; }
 
   // A bound with min > max is corrupt, not permissive.
   bool ordered() const { return min_tick <= max_tick; }
@@ -167,11 +177,21 @@ class ActuatorLimitTable {
   void clear();
 
   // Returns false and stores nothing unless the limit is present, ordered,
-  // identified by slot AND physical unit, and carries operational provenance.
-  // Re-admitting the same joint replaces its entry.
+  // identified by slot AND physical unit, carries operational provenance AND
+  // names the geometry it was measured under. Re-admitting the same joint
+  // replaces its entry.
   bool admit(const JointLimit& limit);
 
-  const JointLimit* find(const calibration::JointIdentity& joint) const;
+  // CURRENT operational evidence: identity AND geometry must both match.
+  // A zero tag matches nothing, so an unbound policy finds nothing.
+  const JointLimit* find(const calibration::JointIdentity& joint,
+                         GeometryProvenanceTag geometry) const;
+
+  // The historical view: identity only. A record measured under a superseded
+  // model is still ON RECORD and findable here - it is simply never returned
+  // by find(), so it can never authorise a write. Reporting surfaces use
+  // this; the decision path must not.
+  const JointLimit* findAny(const calibration::JointIdentity& joint) const;
 
   uint8_t size() const { return count_; }
   bool empty() const { return count_ == 0; }
@@ -191,7 +211,14 @@ class JointTransformTable {
 
   void clear();
   bool admit(const JointTransform& transform);
-  const JointTransform* find(const calibration::JointIdentity& joint) const;
+
+  // CURRENT operational evidence: identity AND geometry must both match.
+  const JointTransform* find(const calibration::JointIdentity& joint,
+                             GeometryProvenanceTag geometry) const;
+
+  // The historical view: identity only, geometry ignored. See the note on
+  // ActuatorLimitTable::findAny().
+  const JointTransform* findAny(const calibration::JointIdentity& joint) const;
 
   uint8_t size() const { return count_; }
   bool empty() const { return count_ == 0; }
@@ -269,6 +296,10 @@ enum class WriteDecision : uint8_t {
   REJECT_AUXILIARY_TARGET           = 25,  // not the parked pose the compiler found
   REJECT_NO_ACCEPTED_TRANSFORM      = 26,  // no raw<->q transform with live, promoted provenance
   REJECT_TARGET_OUTSIDE_URDF_LIMITS = 27,  // outside the joint's declared URDF domain
+
+  // Evidence exists for this joint and is well-formed, but it was measured
+  // under a DIFFERENT geometry model. It stays on record; it is not current.
+  REJECT_EVIDENCE_GEOMETRY_MISMATCH = 28,
 };
 
 // ---------------------------------------------------------------------------
@@ -380,6 +411,12 @@ class SafeActuatorPolicy {
 
   void setBootstrapContext(const CalibrationBootstrapContext& context);
   const CalibrationBootstrapContext& bootstrapContext() const { return bootstrap_; }
+
+  // The tag every stored record must carry to count as current evidence:
+  // the bound profile's, and only when its provenance is the one this build
+  // expects. Unbound, mismatched or half-bound all yield
+  // kNoGeometryProvenance, which matches no record.
+  GeometryProvenanceTag currentGeometryTag() const;
 
   uint32_t epoch() const { return epoch_; }
   bool hasOutstandingTransaction() const { return outstanding_id_ != 0; }

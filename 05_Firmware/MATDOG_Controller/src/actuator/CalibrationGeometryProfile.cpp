@@ -33,6 +33,27 @@ bool sameProvenance(const GeometryProvenance& a, const GeometryProvenance& b) {
          sameHash(a.allocation_sha256, b.allocation_sha256);
 }
 
+GeometryProvenanceTag geometryProvenanceTag(const GeometryProvenance& provenance) {
+  const char* const fields[] = {
+      provenance.urdf_sha256,           provenance.mesh_manifest_sha256,
+      provenance.endpoint_semantic_sha256, provenance.parking_semantic_sha256,
+      provenance.safety_policy_semantic_sha256, provenance.allocation_sha256,
+  };
+  uint64_t hash = 1469598103934665603ULL;  // FNV-1a 64 offset basis
+  for (uint8_t f = 0; f < 6; ++f) {
+    for (uint8_t i = 0; i < kSha256HexBytes && fields[f][i] != '\0'; ++i) {
+      hash ^= static_cast<uint8_t>(fields[f][i]);
+      hash *= 1099511628211ULL;
+    }
+    // Field separator: without it, moving a character across a boundary would
+    // produce the same tag for two different provenances.
+    hash ^= 0xFFu;
+    hash *= 1099511628211ULL;
+  }
+  // 0 is reserved for "no geometry", so it must never be produced.
+  return hash == kNoGeometryProvenance ? 1ULL : hash;
+}
+
 bool isExecutable(const GeometryEndpointRecord& endpoint) {
   // Both conditions, and neither implies the other. Sixteen endpoints have a
   // perfectly real geometric contact that lies beyond the URDF limit, and
@@ -69,6 +90,11 @@ void CalibrationGeometryProfile::clear() {
 bool CalibrationGeometryProfile::provenanceMatches(const GeometryProvenance& expected) const {
   if (!bound()) return false;
   return sameProvenance(*provenance_, expected);
+}
+
+GeometryProvenanceTag CalibrationGeometryProfile::provenanceTag() const {
+  if (!bound()) return kNoGeometryProvenance;
+  return geometryProvenanceTag(*provenance_);
 }
 
 const GeometryJointRecord* CalibrationGeometryProfile::findJoint(

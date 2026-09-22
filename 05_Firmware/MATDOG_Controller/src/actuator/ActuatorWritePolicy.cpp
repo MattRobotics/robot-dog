@@ -110,6 +110,10 @@ bool ActuatorLimitTable::admit(const JointLimit& limit) {
   // stored at all, so there is no "degraded" entry for a later reader to
   // misread as a bound.
   if (!limit.usableProvenance()) return false;
+  // And it must say which model it was measured under. A bound that cannot
+  // name its geometry could never be invalidated when that geometry changes,
+  // which is the whole point of carrying the tag.
+  if (!limit.boundToGeometry()) return false;
 
   for (uint8_t i = 0; i < count_; ++i) {
     if (calibration::identityPermitsEvidenceReuse(entries_[i].identity, limit.identity)) {
@@ -122,12 +126,22 @@ bool ActuatorLimitTable::admit(const JointLimit& limit) {
   return true;
 }
 
-const JointLimit* ActuatorLimitTable::find(const JointIdentity& joint) const {
+const JointLimit* ActuatorLimitTable::findAny(const JointIdentity& joint) const {
   if (!joint.valid() || !joint.unitKnown()) return nullptr;
   for (uint8_t i = 0; i < count_; ++i) {
     if (limitMayBeAppliedTo(entries_[i], joint)) return &entries_[i];
   }
   return nullptr;
+}
+
+const JointLimit* ActuatorLimitTable::find(const JointIdentity& joint,
+                                           GeometryProvenanceTag geometry) const {
+  // Fail closed on an unbound caller: kNoGeometryProvenance matches nothing,
+  // so a policy with no geometry loaded finds no evidence at all.
+  if (geometry == kNoGeometryProvenance) return nullptr;
+  const JointLimit* entry = findAny(joint);
+  if (entry == nullptr) return nullptr;
+  return entry->geometry == geometry ? entry : nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +158,9 @@ bool JointTransformTable::admit(const JointTransform& transform) {
   // cannot prove it was measured on the current installation and promoted to
   // operational calibration is not stored at all.
   if (!transform.usableProvenance()) return false;
+  // q0 is captured at the nominal URDF q=0 pose, so it is only meaningful
+  // against the URDF that defines that pose. A transform must name it.
+  if (!transform.boundToGeometry()) return false;
 
   for (uint8_t i = 0; i < count_; ++i) {
     if (calibration::identityPermitsEvidenceReuse(entries_[i].identity, transform.identity)) {
@@ -156,12 +173,20 @@ bool JointTransformTable::admit(const JointTransform& transform) {
   return true;
 }
 
-const JointTransform* JointTransformTable::find(const JointIdentity& joint) const {
+const JointTransform* JointTransformTable::findAny(const JointIdentity& joint) const {
   if (!joint.valid() || !joint.unitKnown()) return nullptr;
   for (uint8_t i = 0; i < count_; ++i) {
     if (transformMayBeAppliedTo(entries_[i], joint)) return &entries_[i];
   }
   return nullptr;
+}
+
+const JointTransform* JointTransformTable::find(const JointIdentity& joint,
+                                                GeometryProvenanceTag geometry) const {
+  if (geometry == kNoGeometryProvenance) return nullptr;
+  const JointTransform* entry = findAny(joint);
+  if (entry == nullptr) return nullptr;
+  return entry->geometry == geometry ? entry : nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +229,16 @@ void SafeActuatorPolicy::reset() {
   bootstrap_ = CalibrationBootstrapContext{};
   counters_.resets++;
   last_decision_ = WriteDecision::REJECT_TRANSACTION_STATE;
+}
+
+GeometryProvenanceTag SafeActuatorPolicy::currentGeometryTag() const {
+  if (geometry_ == nullptr || expected_provenance_ == nullptr) return kNoGeometryProvenance;
+  if (!geometry_->bound()) return kNoGeometryProvenance;
+  // Not merely "some geometry is loaded" - it must be the geometry this build
+  // expects. A profile that fails provenanceMatches() stamps and matches
+  // nothing, so evidence cannot survive a model swap by accident.
+  if (!geometry_->provenanceMatches(*expected_provenance_)) return kNoGeometryProvenance;
+  return geometry_->provenanceTag();
 }
 
 WriteDecision SafeActuatorPolicy::record(WriteDecision decision) {
@@ -296,8 +331,10 @@ WriteDecision SafeActuatorPolicy::evaluateEndpointPlan(const ActuatorCommand& co
     if (command.target_urad < moving->urdf_lower || command.target_urad > moving->urdf_upper) {
       return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
     }
-    if (transforms_.find(command.joint) == nullptr) {
-      return WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
+    if (transforms_.find(command.joint, currentGeometryTag()) == nullptr) {
+      return transforms_.findAny(command.joint) != nullptr
+                 ? WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH
+                 : WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
     }
     return WriteDecision::ACCEPT;
   }
@@ -331,8 +368,10 @@ WriteDecision SafeActuatorPolicy::evaluateEndpointPlan(const ActuatorCommand& co
     return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
   }
 
-  if (transforms_.find(command.joint) == nullptr) {
-    return WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
+  if (transforms_.find(command.joint, currentGeometryTag()) == nullptr) {
+    return transforms_.findAny(command.joint) != nullptr
+               ? WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH
+               : WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
   }
   return WriteDecision::ACCEPT;
 }
@@ -375,7 +414,12 @@ WriteDecision SafeActuatorPolicy::evaluate(const ActuatorCommand& command,
   }
 
   if (operationUsesAcceptedLimits(command.operation)) {
-    const JointLimit* limit = limits_.find(command.joint);
+    const JointLimit* limit = limits_.find(command.joint, currentGeometryTag());
+    if (limit == nullptr && limits_.findAny(command.joint) != nullptr) {
+      // The bound exists and is well-formed, but it belongs to a different
+      // model. It stays on record and is reportable; it authorises nothing.
+      return WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH;
+    }
     // Today this is always the answer: MATDOG_JOINT_CALIBRATION.yaml holds no
     // accepted bound for any of the 12 leg joints. The safe result of a
     // missing bound is a refusal, never a fallback to a historical value - and
@@ -556,6 +600,8 @@ const char* toString(WriteDecision decision) {
       return "REJECT_NO_ACCEPTED_TRANSFORM";
     case WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS:
       return "REJECT_TARGET_OUTSIDE_URDF_LIMITS";
+    case WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH:
+      return "REJECT_EVIDENCE_GEOMETRY_MISMATCH";
   }
   return "UNKNOWN";
 }

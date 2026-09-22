@@ -119,6 +119,41 @@ struct GeometryProvenance {
 bool sameProvenance(const GeometryProvenance& a, const GeometryProvenance& b);
 
 // ---------------------------------------------------------------------------
+// Geometry provenance tag
+// ---------------------------------------------------------------------------
+//
+// A compact identity for one GeometryProvenance, so a piece of calibration
+// evidence can record WHICH model it was measured under without carrying 390
+// bytes of hex per record.
+//
+// THIS IS AN IDENTITY TAG, NOT A SECURITY DIGEST. It answers "was this
+// measured under the model that is loaded right now?", which is a question
+// about accidental drift - a rebuild from a different URDF, a regenerated
+// profile - and not about an adversary. The six SHA-256 hashes remain the
+// authority and stay available on the bound profile for reporting.
+//
+// THREE AXES, DELIBERATELY SEPARATE. Conflating any two of them loses a
+// distinction that matters:
+//
+//   physical unit identity   WHICH SERVO produced the evidence
+//                            (JointIdentity; survives a geometry change)
+//   calibration provenance   HOW GOOD the evidence is
+//                            (EvidenceState + CalibrationOrigin)
+//   geometry provenance      WHICH MODEL it was measured against
+//                            (this tag; survives a servo change)
+//
+// A servo swap invalidates the first and leaves the other two intact. A URDF
+// change invalidates the third and leaves the other two intact.
+using GeometryProvenanceTag = uint64_t;
+
+// Never a valid tag: an unbound record can never be current evidence.
+constexpr GeometryProvenanceTag kNoGeometryProvenance = 0;
+
+// FNV-1a over the six hashes, with separators so a field boundary cannot be
+// forged by shifting characters between adjacent fields. Never returns 0.
+GeometryProvenanceTag geometryProvenanceTag(const GeometryProvenance& provenance);
+
+// ---------------------------------------------------------------------------
 // Records
 // ---------------------------------------------------------------------------
 
@@ -182,6 +217,10 @@ class CalibrationGeometryProfile {
   // any other. Compares all six hashes.
   bool provenanceMatches(const GeometryProvenance& expected) const;
 
+  // kNoGeometryProvenance when nothing is bound, so an unbound profile can
+  // never stamp or match a record.
+  GeometryProvenanceTag provenanceTag() const;
+
   const GeometryProvenance* provenance() const { return provenance_; }
   uint8_t jointCount() const { return joint_count_; }
   uint8_t endpointCount() const { return endpoint_count_; }
@@ -230,6 +269,10 @@ struct JointTransform {
   calibration::JointIdentity identity{};
   calibration::EvidenceState state = calibration::EvidenceState::UNKNOWN;
   calibration::CalibrationOrigin origin = calibration::CalibrationOrigin::NONE;
+  // WHICH MODEL this was measured under. q0 is captured at "the nominal URDF
+  // q=0 pose", so it is meaningless against a different URDF - the pose it
+  // refers to is not the same pose.
+  GeometryProvenanceTag geometry = kNoGeometryProvenance;
   uint16_t q0_tick = 0;
   int8_t direction = 0;  // 0 means "not measured"; never defaulted to the URDF sign
   bool present = false;
@@ -238,6 +281,12 @@ struct JointTransform {
   // applies: measured on the current installation and promoted to operational
   // calibration. A replay can reach neither.
   bool usableProvenance() const;
+
+  // The geometry axis, kept separate from usableProvenance() on purpose: a
+  // transform can be perfectly measured and still describe a model that is no
+  // longer loaded. That record stays historically valid; it is simply not
+  // CURRENT operational evidence.
+  bool boundToGeometry() const { return geometry != kNoGeometryProvenance; }
 };
 
 bool transformMayBeAppliedTo(const JointTransform& transform,
