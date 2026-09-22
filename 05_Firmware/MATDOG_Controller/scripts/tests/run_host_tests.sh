@@ -68,6 +68,17 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# The Safe Actuator Layer policy links the REAL arbiter and the REAL
+# calibration domain model: the authority binding and the limit-provenance
+# rules it enforces are the shipped ones, not a mock's idea of them.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_actuator_write_policy" \
+  "$SCRIPT_DIR/test_actuator_write_policy.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
 # The OTA suite links the REAL OTA-B gate and the REAL arbiter, so the
 # authorization path it exercises is the shipped one, not a stub.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -84,6 +95,7 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_daly_protocol"
 "$OUT/test_wifi_policy"
 "$OUT/test_actuator_authority"
+"$OUT/test_actuator_write_policy"
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_manager"
