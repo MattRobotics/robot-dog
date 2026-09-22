@@ -167,7 +167,11 @@ def check_forbidden_literals(files):
         "SyncWritePosEx",
         "WheelMode",
         "SMS_STS_GOAL_POSITION",
-        "SMS_STS_OFS_L",
+        # SMS_STS_OFS_L is NOT banned outright any more. A total ban blocked
+        # reading PositionOffset as well as writing it, and left the Controller
+        # unable to verify the single most safety-relevant provisioning fact.
+        # check_position_offset_boundary() replaces it with a narrower and
+        # stronger rule: one approved read accessor, and no write, ever.
         "SMS_STS_OFS_H",
         "factory reset",
         "FactoryReset",
@@ -1013,12 +1017,13 @@ def check_servo_population_model(files, sketch_dir):
         fail(f"{path}: kCanonicalServoCount must be derived with sizeof(kCanonicalServos), "
              f"not written as a literal")
 
-    rows = re.findall(r'\{\s*(\d+),\s*"(\w+)",\s*CurrentConfig::(\w+)\s*\}', code)
+    rows = re.findall(
+        r'\{\s*(\d+),\s*"(\w+)",\s*"(\w+)",\s*CurrentConfig::(\w+)\s*\}', code)
     if len(rows) != 17:
         fail(f"{path}: canonical servo table has {len(rows)} entries, expected 17 "
              f"(MATDOG canonical allocation)")
-    installed = [r for r in rows if r[2] == "INSTALLED"]
-    absent = [r for r in rows if r[2] == "ABSENT_BY_DESIGN"]
+    installed = [r for r in rows if r[3] == "INSTALLED"]
+    absent = [r for r in rows if r[3] == "ABSENT_BY_DESIGN"]
     if len(installed) != 13:
         fail(f"{path}: {len(installed)} servos marked INSTALLED, expected 13 for the "
              f"current physical configuration")
@@ -1052,6 +1057,25 @@ def check_servo_population_model(files, sketch_dir):
         fail(f"{path}: embedded canonical table {table_ids} disagrees with "
              f"{yaml_path.name} {yaml_ids} - the YAML is the canonical project "
              f"authority; fix the firmware table, not the YAML")
+
+    # The full identity triple, not just the ids. The firmware carries the
+    # EXPECTED physical unit so the preflight can report it; if that drifts
+    # from the allocation, the report would name the wrong servo.
+    yaml_text = yaml_path.read_text(encoding="utf-8")
+    yaml_triples = {
+        int(bus): (unit, joint)
+        for unit, joint, bus in re.findall(
+            r"- unit:\s*(\S+)\n\s+joint:\s*(\S+)\n\s+bus_id:\s*(\d+)", yaml_text)
+    }
+    for bus, joint, unit, _config in rows:
+        expected = yaml_triples.get(int(bus))
+        if expected is None:
+            fail(f"{path}: bus id {bus} is not in {yaml_path.name}")
+        elif (unit, joint) != expected:
+            fail(f"{path}: bus id {bus} is ({unit}, {joint}) in the firmware table but "
+                 f"{expected} in {yaml_path.name} - the YAML is the authority for the "
+                 f"physical unit binding, and the preflight reports that binding as "
+                 f"EXPECTED identity")
 
 
 def check_g2_state_is_transport_independent(files):
@@ -1709,6 +1733,408 @@ def check_calibration_geometry_export(sketch_dir):
              f"stderr={result.stderr!r})")
 
 
+def check_position_offset_boundary(files, sketch_dir):
+    """PositionOffset: exactly one approved read accessor, and never a write.
+
+    The old rule was "the register symbol must not appear at all". That was
+    strong but too blunt: it also forbade READING the offset, so the firmware
+    could not verify that every unit still holds PositionOffset = 0 - the one
+    provisioning fact the 2026-08-27 reset document cares most about.
+
+    The rule is now:
+
+        read through exactly ServoBus::readPositionOffset()  = ALLOWED
+        any PositionOffset write                             = FORBIDDEN
+        CalibrationOfs                                       = FORBIDDEN
+
+    Writing an offset to compensate a mechanical mounting error is named in
+    MATDOG_JOINT_CALIBRATION.yaml's `forbidden:` list. Reading it is how we
+    prove nobody did.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+
+    accessor = "readPositionOffset"
+    entry = by_name.get("ServoBus.cpp")
+    if entry is None:
+        fail(f"{sketch_dir / 'src' / 'servo' / 'ServoBus.cpp'}: not found")
+        return
+    bus_path, bus_code = entry
+
+    # --- the symbol appears in exactly one file, and one function ----------
+    for path, code in files:
+        if "SMS_STS_OFS_L" not in code:
+            continue
+        if path.name != "ServoBus.cpp":
+            fail(f"{path}: names SMS_STS_OFS_L - the PositionOffset register may only be "
+                 f"touched by the single approved read accessor "
+                 f"ServoBus::{accessor}(), so that every access to it is in one "
+                 f"auditable place")
+
+    body = re.search(r"bool ServoBus::" + accessor + r"\(int id, int16_t\* out\)\s*\{(.*?)\n\}",
+                     bus_code, re.DOTALL)
+    if not body:
+        fail(f"{bus_path}: the approved accessor ServoBus::{accessor}(int, int16_t*) was "
+             f"not found - PositionOffset must be reachable through exactly one function")
+        return
+    accessor_body = body.group(1)
+
+    if "SMS_STS_OFS_L" not in accessor_body:
+        fail(f"{bus_path}: {accessor}() does not name SMS_STS_OFS_L - if the register is "
+             f"reached some other way (a raw 0x1F, an alias) the audit can no longer see "
+             f"every access, which is the entire point of having one accessor")
+
+    # --- it must be a READ, and only a read --------------------------------
+    if not re.search(r"\breadWord\s*\(", accessor_body):
+        fail(f"{bus_path}: {accessor}() does not use readWord() - PositionOffset is a "
+             f"read-only accessor")
+    for token in ("writeByte", "writeWord", "genWrite", "regWrite", "RegWrite",
+                  "EnableTorque", "WritePos", "SyncWrite", "Action(", "unLockEprom",
+                  "LockEprom"):
+        if token in accessor_body:
+            fail(f"{bus_path}: {accessor}() contains {token!r} - the PositionOffset "
+                 f"accessor is READ-ONLY and no write primitive may appear in it")
+
+    # --- no PositionOffset write anywhere, under any spelling --------------
+    offset_write = re.compile(
+        r"(writeByte|writeWord|genWrite|regWrite|RegWrite)\s*\([^;]*?"
+        r"(SMS_STS_OFS_L|SMS_STS_OFS|0x1F|POSITION_OFFSET|PositionOffset)")
+    for path, code in files:
+        if offset_write.search(code):
+            fail(f"{path}: a PositionOffset WRITE is expressible here - writing an offset "
+                 f"to compensate mechanical mounting error is named in "
+                 f"MATDOG_JOINT_CALIBRATION.yaml's forbidden: list and must stay "
+                 f"unreachable")
+        # 0x1F as a bare register address is how the accessor rule gets evaded.
+        if path.name != "ServoBus.cpp" and re.search(r"(readByte|readWord)\s*\([^;]*0x1F", code):
+            fail(f"{path}: reads register 0x1F directly - PositionOffset must go through "
+                 f"ServoBus::{accessor}(), not a magic address that the audit cannot "
+                 f"attribute")
+
+    # --- the offset decoder must be two's complement -----------------------
+    profile = by_name.get("ServoProfile.cpp")
+    if profile is None:
+        fail(f"{sketch_dir / 'src' / 'servo' / 'ServoProfile.cpp'}: not found")
+    else:
+        path, code = profile
+        decoder = re.search(r"int16_t decodePositionOffset\(uint16_t raw\)\s*\{(.*?)\n\}",
+                            code, re.DOTALL)
+        if not decoder:
+            fail(f"{path}: decodePositionOffset() not found")
+        elif "static_cast<int16_t>" not in decoder.group(1):
+            fail(f"{path}: decodePositionOffset() is not a two's-complement cast - the "
+                 f"C018 stores the offset as int16 LE two's complement, and a "
+                 f"sign-magnitude decode turns a negative offset into a positive one")
+
+
+def check_servo_profile_contract(files, sketch_dir):
+    """MATDOG_C018_V1 stays a generated, read-only contract.
+
+      1. the register table is generated from the reviewed YAML, not retyped;
+      2. the exporter still reproduces the committed header exactly;
+      3. runtime RAM state never leaks into the persistent profile;
+      4. nothing in the profile path can write.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    servo_dir = sketch_dir / "src" / "servo"
+
+    for name in ("ServoProfile.h", "ServoProfile.cpp", "ServoProfileData.h"):
+        if name not in by_name:
+            fail(f"{servo_dir / name}: the MATDOG_C018_V1 profile contract was not found")
+            return
+
+    data_path, data_code = by_name["ServoProfileData.h"]
+    raw = data_path.read_text(encoding="utf-8")
+    for marker in ("GENERATED FILE - DO NOT EDIT BY HAND",
+                   "matdog_servo_profile_export.py",
+                   "MATDOG_ST3215_C018_V1.yaml"):
+        if marker not in raw:
+            fail(f"{data_path}: missing the generated-file marker {marker!r} - the twenty "
+                 f"register values come from the reviewed YAML and are never hand-written")
+
+    rows = re.findall(r"\{0x([0-9A-F]{2}), (\d), (\d+), \"(\w+)\"\}", data_code)
+    if len(rows) != 20:
+        fail(f"{data_path}: {len(rows)} persistent registers, expected the canonical 20")
+    # Runtime RAM state is a different layer and must not appear as persistent.
+    for _addr, _w, _v, name in rows:
+        if name in ("TorqueLimit", "GoalSpeed", "Acc", "GoalPosition", "Acceleration"):
+            fail(f"{data_path}: {name!r} is runtime RAM state and must never be part of "
+                 f"the persistent profile - TorqueLimit/GoalSpeed/Acc are written per "
+                 f"motion, not provisioned")
+
+    for name in ("ServoProfile.h", "ServoProfile.cpp"):
+        path, code = by_name[name]
+        for forbidden in ("#include <Arduino.h>", "SMS_STS", "ServoBus", "Serial.",
+                          "writeByte", "writeWord", "EnableTorque", "WritePos"):
+            if forbidden in code:
+                fail(f"{path}: references {forbidden!r} - the profile contract is pure "
+                     f"data plus comparisons and must never reach a bus or write")
+
+    # A missing read must never fold into a MATCH.
+    path, code = by_name["ServoProfile.cpp"]
+    fold = re.search(r"ProfileVerdict foldRegisterCheck\(.*?\n\}", code, re.DOTALL)
+    if not fold:
+        fail(f"{path}: foldRegisterCheck() not found")
+    elif not re.search(r"case RegisterCheck::NO_ANSWER:\s*case RegisterCheck::NOT_READ:"
+                       r"\s*return ProfileVerdict::INCOMPLETE;", fold.group(0)):
+        fail(f"{path}: foldRegisterCheck() does not map NO_ANSWER/NOT_READ to INCOMPLETE - "
+             f"an unread register would then be assumed to hold its expected value, and a "
+             f"partially read unit could report MATCH")
+
+
+def check_servo_profile_export(sketch_dir):
+    """The committed profile table must still be what the exporter produces."""
+    repo_root = sketch_dir.parents[1]
+    exporter = repo_root / "06_Software/Matdog_Core/config/matdog_servo_profile_export.py"
+    if not exporter.exists():
+        fail(f"{exporter}: the MATDOG_C018_V1 profile exporter was not found")
+        return
+    result = subprocess.run([sys.executable, str(exporter), "--check"],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{exporter}: the committed profile table does not match "
+             f"MATDOG_ST3215_C018_V1.yaml (stdout={result.stdout!r} "
+             f"stderr={result.stderr!r})")
+
+
+def check_h0_preflight_boundaries(files, sketch_dir):
+    """The H0 preflight is a permanent READ-ONLY capability.
+
+      1. no write primitive anywhere in the service;
+      2. MAINTENANCE-gated at the command surface, like the census;
+      3. expected_physical_unit is configuration and is never called observed;
+      4. present_position is never presented as q0.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    servo_dir = sketch_dir / "src" / "servo"
+
+    for name in ("ServoPreflight.h", "ServoPreflight.cpp"):
+        if name not in by_name:
+            fail(f"{servo_dir / name}: the H0 preflight service was not found")
+            return
+        path, code = by_name[name]
+        for token in ("EnableTorque", "WritePos", "SyncWrite", "RegWrite", "writeByte",
+                      "writeWord", "unLockEprom", "LockEprom", "Serial."):
+            if token in code:
+                fail(f"{path}: contains {token!r} - the preflight is strictly read-only "
+                     f"and transport-independent")
+
+    router = by_name.get("CommandRouter.cpp")
+    if router is not None:
+        path, code = router
+        branch = re.search(r'upper == "@SERVO PREFLIGHT"\s*\)\s*\{(.*?)\}\s*else',
+                           code, re.DOTALL)
+        if not branch:
+            fail(f"{path}: could not locate the @SERVO PREFLIGHT branch to audit it")
+        elif "NOT_IN_MAINTENANCE_MODE" not in branch.group(1):
+            fail(f"{path}: @SERVO PREFLIGHT is not MAINTENANCE-gated - it carries the same "
+                 f"bounded per-tick blocking as the census and must take the same gate")
+
+        printer = re.search(r"void CommandRouter::printServoPreflightResult\(\)\s*\{(.*?)\n\}",
+                            code, re.DOTALL)
+        if not printer:
+            fail(f"{path}: printServoPreflightResult() not found")
+        else:
+            text = printer.group(1)
+            if "expected_physical_unit" not in text:
+                fail(f"{path}: the preflight report does not label the unit column as "
+                     f"EXPECTED - a servo cannot report its unit label, so it must never "
+                     f"be presented as observed hardware identity")
+            if re.search(r"observed_physical_unit|physical_unit_observed", text):
+                fail(f"{path}: the preflight report claims an OBSERVED physical unit - an "
+                     f"ST3215 exposes no unit serial; that binding is held by labelling "
+                     f"discipline, not by measurement")
+            if "NOT q0" not in text:
+                fail(f"{path}: the preflight report does not state that present_position "
+                     f"is NOT q0 - a raw liveness tick must never be read as a "
+                     f"calibration pose")
+
+
+def check_evidence_geometry_binding(files, sketch_dir):
+    """B1: calibration evidence is bound to the geometry it was measured under.
+
+    A servo swap invalidates a JOINT; a URDF/mesh/profile change invalidates a
+    MODEL. Those are different axes and both must bite:
+
+      1. JointLimit and JointTransform each carry a geometry tag;
+      2. admit() refuses a record that does not name its geometry;
+      3. find() is geometry-scoped, and an unbound tag matches nothing;
+      4. findAny() exists so a superseded record stays ON RECORD without ever
+         becoming current evidence;
+      5. the policy's current tag requires the provenance this build expects,
+         not merely "some geometry is loaded".
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    actuator_dir = sketch_dir / "src" / "actuator"
+
+    policy_h = by_name.get("ActuatorWritePolicy.h")
+    policy_cpp = by_name.get("ActuatorWritePolicy.cpp")
+    profile_h = by_name.get("CalibrationGeometryProfile.h")
+    if policy_h is None or policy_cpp is None or profile_h is None:
+        fail(f"{actuator_dir}: the Safe Actuator Layer sources were not found")
+        return
+
+    # --- (1) both records carry the tag ------------------------------------
+    for holder, name in ((policy_h, "JointLimit"), (profile_h, "JointTransform")):
+        path, code = holder
+        body = re.search(r"struct " + name + r"\s*\{(.*?)\n\};", code, re.DOTALL)
+        if not body:
+            fail(f"{path}: struct {name} not found")
+            continue
+        if "GeometryProvenanceTag geometry" not in body.group(1):
+            fail(f"{path}: {name} carries no GeometryProvenanceTag - a record that cannot "
+                 f"name the model it was measured under could never be invalidated when "
+                 f"that model changes")
+        if "boundToGeometry" not in code:
+            fail(f"{path}: {name} has no boundToGeometry() - the geometry axis must stay "
+                 f"separate from calibration provenance and from physical-unit identity")
+
+    # --- (2)(3)(4) the tables ----------------------------------------------
+    path, code = policy_cpp
+    for table, record in (("ActuatorLimitTable", "limit"), ("JointTransformTable", "transform")):
+        admit = re.search(r"bool " + table + r"::admit\(.*?\n\}", code, re.DOTALL)
+        if not admit:
+            fail(f"{path}: {table}::admit() not found")
+        elif f"{record}.boundToGeometry()" not in admit.group(0):
+            fail(f"{path}: {table}::admit() does not require boundToGeometry() - a record "
+                 f"with no geometry would be stored and could never be invalidated")
+
+        find = re.search(r"::find\(const JointIdentity& joint,\s*"
+                         r"GeometryProvenanceTag geometry\) const\s*\{(.*?)\n\}",
+                         code, re.DOTALL)
+        if not find:
+            fail(f"{path}: {table}::find() is not geometry-scoped - the decision path must "
+                 f"not be able to look evidence up by identity alone")
+    # findAny() exists to explain a refusal, never to produce the pointer a
+    # decision is made from. Assigning from it is exactly how the geometry
+    # scope gets bypassed while still looking careful.
+    for m in re.finditer(r"=\s*(limits_|transforms_)\.findAny\(", code):
+        fail(f"{path}: authorising evidence is assigned from {m.group(1)}findAny() - "
+             f"findAny() ignores the geometry tag and may only be used as a predicate "
+             f"when explaining REJECT_EVIDENCE_GEOMETRY_MISMATCH")
+
+    if "findAny" not in code:
+        fail(f"{path}: findAny() is gone - a superseded record must stay historically "
+             f"registered even though it is never current evidence")
+    # An unbound tag must match nothing, in both tables.
+    if code.count("if (geometry == kNoGeometryProvenance) return nullptr;") < 2:
+        fail(f"{path}: a geometry-scoped find() does not fail closed on "
+             f"kNoGeometryProvenance - an unbound policy would then match stored evidence")
+
+    # --- (5) the current tag is the EXPECTED model's ------------------------
+    tag = re.search(r"GeometryProvenanceTag SafeActuatorPolicy::currentGeometryTag\(\) const"
+                    r"\s*\{(.*?)\n\}", code, re.DOTALL)
+    if not tag:
+        fail(f"{path}: SafeActuatorPolicy::currentGeometryTag() not found")
+    else:
+        text = tag.group(1)
+        if "provenanceMatches" not in text:
+            fail(f"{path}: currentGeometryTag() does not check provenanceMatches() - "
+                 f"'some geometry is loaded' is not 'the geometry this build expects'")
+        if "kNoGeometryProvenance" not in text:
+            fail(f"{path}: currentGeometryTag() cannot return kNoGeometryProvenance - an "
+                 f"unbound or mismatched profile must match no stored evidence")
+
+    # The decision path must never look evidence up without the tag.
+    # One level of nesting, so currentGeometryTag()'s own parentheses do not
+    # truncate the captured argument list.
+    for call in re.finditer(
+            r"(limits_|transforms_)\.find\(((?:[^()]|\([^()]*\))*)\)", code):
+        if "currentGeometryTag()" not in call.group(2):
+            fail(f"{path}: {call.group(0)} looks evidence up without the current geometry "
+                 f"tag - identity alone is not enough to make a record current")
+
+
+def check_direction_is_contractual(files, sketch_dir):
+    """Joint direction is hardware-contract data, not a recalibration datum.
+
+    The canonical URDF carries per-joint motorDirection and those directions
+    were validated on real hardware. The 2026-08-27 reprovisioning changed the
+    physical units, the PositionOffset baseline and the raw q0 installation -
+    it did NOT change the servo model, the mounting orientation, the joint
+    mechanical architecture, the URDF axes or motorDirection.
+
+        q0              CURRENT INSTALLATION CALIBRATION DATA - measured
+        motorDirection  CURRENT URDF / HARDWARE CONTRACT DATA - read
+
+    So:
+
+      1. JointTransform carries NO direction field - one source of truth;
+      2. jointDirection() resolves it from the bound profile's URDF record;
+      3. usableProvenance() does not require a measured direction;
+      4. the optional DIRECTION_VERIFY diagnostic budget is consulted ONLY by
+         the diagnostic path - never by calibration acceptance.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    profile_h = by_name.get("CalibrationGeometryProfile.h")
+    profile_cpp = by_name.get("CalibrationGeometryProfile.cpp")
+    policy_cpp = by_name.get("ActuatorWritePolicy.cpp")
+    if profile_h is None or profile_cpp is None or policy_cpp is None:
+        fail(f"{sketch_dir / 'src' / 'actuator'}: the Safe Actuator sources were not found")
+        return
+
+    # --- (1) direction is not stored as transform evidence -----------------
+    path, code = profile_h
+    body = re.search(r"struct JointTransform\s*\{(.*?)\n\};", code, re.DOTALL)
+    if not body:
+        fail(f"{path}: struct JointTransform not found")
+    elif re.search(r"^\s*int8_t\s+direction\s*=", body.group(1), re.M):
+        fail(f"{path}: JointTransform carries a `direction` field - direction is "
+             f"hardware-contract data read from the URDF, not measured evidence. Storing a "
+             f"copy creates a second source of truth that can silently disagree with the "
+             f"URDF the geometry plan was compiled against")
+
+    # --- (2) it is resolved from the profile -------------------------------
+    path, code = profile_cpp
+    resolver = re.search(r"int8_t jointDirection\(.*?\n\}", code, re.DOTALL)
+    if not resolver:
+        fail(f"{path}: jointDirection() not found - direction must be resolvable from the "
+             f"bound profile, which is what ties it to the URDF provenance")
+    else:
+        text = resolver.group(0)
+        if "urdf_motor_direction" not in text:
+            fail(f"{path}: jointDirection() does not read urdf_motor_direction - the URDF "
+                 f"is the only authority for a joint's direction")
+        if "findJoint" not in text:
+            fail(f"{path}: jointDirection() does not go through the bound profile - a "
+                 f"direction read outside the profile escapes the geometry provenance tag, "
+                 f"so a URDF change would not invalidate it")
+        if "return 0" not in text:
+            fail(f"{path}: jointDirection() cannot return 0 - an unknown joint or an "
+                 f"unbound profile must fail closed rather than guess a sign")
+
+    # --- (3) provenance does not demand a measured direction ---------------
+    provenance = re.search(r"bool JointTransform::usableProvenance\(\) const\s*\{(.*?)\n\}",
+                           code, re.DOTALL)
+    if provenance and "direction" in provenance.group(1):
+        fail(f"{path}: JointTransform::usableProvenance() still consults a direction - a "
+             f"same-type servo replacement in the same mounting invalidates q0 only, and "
+             f"must not be blocked waiting for a direction measurement")
+
+    # --- (4) the diagnostic budget never gates calibration -----------------
+    path, code = policy_cpp
+    for m in re.finditer(r"(\w+)\s*\([^)]*\)\s*(?:const\s*)?\{", code):
+        pass  # function boundaries are not reliable here; scope by name instead
+    envelope = re.search(r"WriteDecision SafeActuatorPolicy::evaluateBootstrapEnvelope"
+                         r"\(.*?\n\}", code, re.DOTALL)
+    plan_route = re.search(r"WriteDecision SafeActuatorPolicy::evaluateEndpointPlan"
+                           r"\(.*?\n\}", code, re.DOTALL)
+    if plan_route is None:
+        fail(f"{path}: evaluateEndpointPlan() not found")
+    else:
+        for token in ("direction_verify_tick_budget", "DIRECTION_VERIFY"):
+            if token in plan_route.group(0):
+                fail(f"{path}: the endpoint-plan route consults {token!r} - contact "
+                     f"probing and auxiliary moves are calibration work and must never "
+                     f"depend on an optional direction diagnostic")
+    budget_uses = code.count("direction_verify_tick_budget")
+    in_envelope = envelope.group(0).count("direction_verify_tick_budget") if envelope else 0
+    if budget_uses != in_envelope:
+        fail(f"{path}: direction_verify_tick_budget is read outside "
+             f"evaluateBootstrapEnvelope() ({budget_uses} uses, {in_envelope} of them in "
+             f"the diagnostic path) - it is an OPTIONAL diagnostic budget and must gate "
+             f"nothing else")
+
+
 def check_ota_boundaries(files, sketch_dir):
     """OTA-A permanent invariants.
 
@@ -2035,6 +2461,7 @@ def check_host_tests(sketch_dir):
     authority_suite = sketch_dir / "scripts" / "tests" / "test_actuator_authority.cpp"
     policy_suite = sketch_dir / "scripts" / "tests" / "test_actuator_write_policy.cpp"
     geometry_suite = sketch_dir / "scripts" / "tests" / "test_calibration_geometry.cpp"
+    profile_suite = sketch_dir / "scripts" / "tests" / "test_servo_profile.cpp"
     calibration_suites = [
         sketch_dir / "scripts" / "tests" / "test_calibration_domain.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
@@ -2060,6 +2487,9 @@ def check_host_tests(sketch_dir):
     if not geometry_suite.exists():
         fail(f"{geometry_suite}: calibration bootstrap geometry offline test suite not found")
         return
+    if not profile_suite.exists():
+        fail(f"{profile_suite}: MATDOG_C018_V1 profile offline test suite not found")
+        return
     for suite in calibration_suites:
         if not suite.exists():
             fail(f"{suite}: calibration offline test suite not found")
@@ -2070,7 +2500,7 @@ def check_host_tests(sketch_dir):
     runner_text = strip_shell_comments(runner.read_text(encoding="utf-8"))
     for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy",
                    "test_ota_policy", "test_actuator_authority", "test_actuator_write_policy",
-                   "test_calibration_geometry",
+                   "test_calibration_geometry", "test_servo_profile",
                    "test_calibration_domain", "test_calibration_manager"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
@@ -2412,6 +2842,12 @@ def main():
     check_safe_actuator_boundaries(files, SKETCH_DIR)
     check_calibration_geometry_boundaries(files, SKETCH_DIR)
     check_calibration_geometry_export(SKETCH_DIR)
+    check_position_offset_boundary(files, SKETCH_DIR)
+    check_servo_profile_contract(files, SKETCH_DIR)
+    check_servo_profile_export(SKETCH_DIR)
+    check_h0_preflight_boundaries(files, SKETCH_DIR)
+    check_evidence_geometry_binding(files, SKETCH_DIR)
+    check_direction_is_contractual(files, SKETCH_DIR)
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)
     check_safe_actuator_audit_mutation_suite(SKETCH_DIR)

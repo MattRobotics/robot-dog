@@ -160,9 +160,24 @@ GeometryProvenanceTag geometryProvenanceTag(const GeometryProvenance& provenance
 struct GeometryJointRecord {
   calibration::JointIdentity identity;  // leg, kind, PHYSICAL UNIT - never a bus id alone
   uint8_t bus_id;                       // transport metadata; cross-checked against URDF motorId
-  // The sign the URDF MODEL expects. SPECIFICATION DATA, not a measured
-  // witness: current direction is calibration work that has not happened.
-  // Direction evidence is compared against this; it is never seeded from it.
+  // THE JOINT'S DIRECTION. Hardware-contract data, not a recalibration datum.
+  //
+  // The canonical URDF carries the per-joint motorDirection and those
+  // directions were validated on real hardware. The 2026-08-27 reprovisioning
+  // changed the physical units, the PositionOffset baseline and the raw q0
+  // installation. It did NOT change the servo model, the mounting
+  // orientation, the joint mechanical architecture, the URDF joint axes or
+  // motorDirection - so direction did not become unknown.
+  //
+  //   q0              CURRENT INSTALLATION CALIBRATION DATA - measured
+  //   motorDirection  CURRENT URDF / HARDWARE CONTRACT DATA - read, not measured
+  //
+  // Replacing a servo with the same type in the same mounting needs a new q0
+  // capture; it does NOT need direction re-verification. Direction is only
+  // reconsidered when the servo's physical orientation, the transmission
+  // topology, the servo type / encoder convention, the URDF joint axis or
+  // motorDirection change - or when contradictory hardware evidence appears.
+  // Every one of those changes the URDF, and therefore the provenance tag.
   int8_t urdf_motor_direction;
   MicroRad urdf_lower;
   MicroRad urdf_upper;
@@ -257,12 +272,20 @@ class CalibrationGeometryProfile {
 //
 //   q0        MEASURED, read-only, with torque off, at the manually aligned
 //             URDF q=0 pose. It is NOT 2048 - the provisioned raw centre is a
-//             servo-level fact and a sanity prior, nothing more.
-//   direction MEASURED for the current installation by comparing an observed
-//             raw delta against URDF +q. The URDF motorDirection is what that
-//             measurement is checked against, never its source.
+//             servo-level fact and a sanity prior, nothing more. This is the
+//             ONLY half that a reprovisioning invalidates.
+//   direction NOT carried here at all. It is contract data read from the
+//             bound profile's GeometryJointRecord::urdf_motor_direction, and
+//             it is already hardware-validated. Storing a measured copy would
+//             create a second source of truth that could silently disagree
+//             with the URDF the geometry plan was compiled against.
 //
-// Until both exist with operational provenance, every angle-targeted
+// The two are therefore invalidated by DIFFERENT events, which is the point:
+// a same-type servo replacement in the same mounting invalidates q0 and leaves
+// direction untouched, while a URDF change moves the provenance tag and makes
+// the whole transform stale.
+//
+// Until q0 exists with operational provenance, every angle-targeted
 // calibration operation resolves to a refusal. That is the correct state after
 // CALIBRATION_RESET_PENDING_FULL_RECALIBRATION, not a gap to paper over.
 struct JointTransform {
@@ -274,7 +297,8 @@ struct JointTransform {
   // refers to is not the same pose.
   GeometryProvenanceTag geometry = kNoGeometryProvenance;
   uint16_t q0_tick = 0;
-  int8_t direction = 0;  // 0 means "not measured"; never defaulted to the URDF sign
+  // No `direction` field, deliberately. See jointDirection() below: direction
+  // is resolved from the bound profile, never stored as measured evidence.
   bool present = false;
 
   // Operational provenance, the same test calibration::q0MayBeAppliedTo
@@ -291,6 +315,17 @@ struct JointTransform {
 
 bool transformMayBeAppliedTo(const JointTransform& transform,
                              const calibration::JointIdentity& current);
+
+// The joint's direction, from the CURRENT URDF via the bound profile. Returns
+// 0 when the profile is unbound or does not know the joint - which fails
+// closed, because 0 is not a usable sign.
+//
+// Resolved rather than stored on purpose. A change to the URDF's motorDirection
+// changes the URDF hash, which changes the geometry provenance tag, which makes
+// every transform measured under the old model stale. One source of truth, one
+// invalidation path.
+int8_t jointDirection(const CalibrationGeometryProfile& profile,
+                      const calibration::JointIdentity& joint);
 
 const char* toString(TargetDomain domain);
 const char* toString(ParkingOutcome outcome);

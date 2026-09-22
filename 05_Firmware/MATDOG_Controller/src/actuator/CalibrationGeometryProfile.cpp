@@ -139,7 +139,6 @@ bool CalibrationGeometryProfile::withinDirectionVerifyEnvelope(
 
 bool JointTransform::usableProvenance() const {
   if (!present) return false;
-  if (direction != 1 && direction != -1) return false;
   if (!identity.valid() || !identity.unitKnown()) return false;
   if (!calibration::mayPromote(origin)) return false;
   return calibration::isOperationalEvidence(state);
@@ -149,6 +148,16 @@ bool transformMayBeAppliedTo(const JointTransform& transform,
                              const calibration::JointIdentity& current) {
   if (!transform.usableProvenance()) return false;
   return calibration::identityPermitsEvidenceReuse(transform.identity, current);
+}
+
+int8_t jointDirection(const CalibrationGeometryProfile& profile,
+                      const calibration::JointIdentity& joint) {
+  const GeometryJointRecord* record = profile.findJoint(joint);
+  if (record == nullptr) return 0;  // unknown joint is not a direction
+  const int8_t direction = record->urdf_motor_direction;
+  // The URDF gate already requires exactly one motorDirection in {-1, +1} per
+  // actuated joint, but a corrupted table must not produce a third sign.
+  return (direction == 1 || direction == -1) ? direction : 0;
 }
 
 const char* toString(TargetDomain domain) {

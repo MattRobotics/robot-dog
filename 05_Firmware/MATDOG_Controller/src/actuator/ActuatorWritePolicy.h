@@ -62,9 +62,9 @@ namespace actuator {
 // The three calibration classes are NOT a mechanical expansion. Each is tied to
 // a DIFFERENT authorisation object, which is the only reason it exists:
 //
-//   DIRECTION_VERIFY            the symmetric proven-clear envelope around q=0.
-//                               It has no endpoint plan, because it is what runs
-//                               BEFORE the raw<->q transform exists at all.
+//   DIRECTION_VERIFY            OPTIONAL / DIAGNOSTIC ONLY - see below. The
+//                               symmetric proven-clear envelope around q=0. It
+//                               has no endpoint plan.
 //   CALIBRATION_AUXILIARY_MOVE  a parking plan's auxiliary joint - a DIFFERENT
 //                               joint from the one being calibrated. The
 //                               compiler makes that distinction explicit for all
@@ -81,6 +81,19 @@ enum class ActuatorOperation : uint8_t {
   TORQUE_ENABLE              = 1,  // APPLY torque. Removing it is SAFE_OFF's job, not this layer's.
   POSITION_COMMAND           = 2,  // a single-joint goal position under accepted limits
   CALIBRATION_CONTACT_PROBE  = 3,  // a bounded approach expecting a contact witness
+  // OPTIONAL / DIAGNOSTIC ONLY. NOT part of the calibration contract.
+  //
+  // Joint direction is HARDWARE-CONTRACT DATA read from the URDF (see
+  // CalibrationGeometryProfile::jointDirection), already validated on real
+  // hardware, and it is NOT re-measured during normal calibration or after a
+  // same-type servo replacement in the same mounting. This operation is
+  // therefore never required for calibration acceptance and never required
+  // for stand authorization.
+  //
+  // It survives only as a development/maintenance diagnostic - "does this
+  // joint move, and does it move the way the contract says" after a
+  // mechanical repair. Its budget defaults to 0 = not authorised, and nothing
+  // in the calibration path consults it.
   DIRECTION_VERIFY           = 4,  // a micro excursion from the captured q0 tick
   CALIBRATION_AUXILIARY_MOVE = 5,  // park/unpark a plan's auxiliary joint
 };
@@ -101,7 +114,8 @@ bool operationNeedsTarget(ActuatorOperation operation);
 // POSITION_COMMAND keeps the ORIGINAL route and is not weakened by anything
 // below: it still requires an accepted joint bound, and none exists.
 bool operationUsesAcceptedLimits(ActuatorOperation operation);
-// DIRECTION_VERIFY only: the geometry envelope, checked in tick space.
+// DIRECTION_VERIFY only: the geometry envelope, checked in tick space. An
+// OPTIONAL diagnostic route - no calibration step takes it.
 bool operationUsesBootstrapEnvelope(ActuatorOperation operation);
 // The plan-bound calibration moves: a V5 endpoint record authorises them.
 bool operationUsesEndpointPlan(ActuatorOperation operation);
@@ -243,12 +257,16 @@ struct CalibrationBootstrapContext {
   // A replay session authorises nothing physical, however complete it looks.
   calibration::CalibrationOrigin origin = calibration::CalibrationOrigin::NONE;
 
-  // The operator-approved excursion for a direction-verification move, in raw
-  // ticks. Zero means NOT AUTHORISED - the geometry says what is clear, the
-  // session says how much of that it may use, and both must agree. Deliberately
-  // not defaulted to anything derived from the envelope: choosing it is a
-  // mechanical decision about spline fit and placement error, not a geometric
-  // one, and the repository has no evidence for it yet.
+  // OPTIONAL DIAGNOSTIC BUDGET. NOT a calibration prerequisite and NOT a gate
+  // anything waits on.
+  //
+  // The operator-approved excursion for the optional DIRECTION_VERIFY
+  // diagnostic, in raw ticks. Zero means NOT AUTHORISED, which is the normal
+  // state: no calibration step, no acceptance decision and no stand
+  // authorization consults this field. Direction itself comes from the URDF.
+  //
+  // When a diagnostic IS authorised, geometry says what is clear and the
+  // session says how much of that it may use; both must agree.
   int32_t direction_verify_tick_budget = 0;
 
   // Which endpoint, if any, currently has its auxiliary joint parked. The

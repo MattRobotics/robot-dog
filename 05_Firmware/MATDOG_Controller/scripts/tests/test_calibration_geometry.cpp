@@ -103,14 +103,16 @@ static JointIdentity lfLower() { return identity(Leg::LF, JointKind::LOWER, "M33
 // one today - no q0 has been captured on the current installation - so this
 // exists only to prove the gated paths are reachable at all and that the gate
 // is real rather than vacuous.
-static JointTransform acceptedTransform(JointIdentity id, uint16_t q0_tick, int8_t direction) {
+// q0 only. Direction is NOT transform evidence - it is contract data read from
+// the URDF via jointDirection(), already hardware-validated, and a
+// reprovisioning does not make it unknown.
+static JointTransform acceptedTransform(JointIdentity id, uint16_t q0_tick) {
   JointTransform t{};
   t.identity = id;
   t.geometry = geometryProvenanceTag(geometry_data::kProvenance);
   t.state = EvidenceState::PROMOTED;
   t.origin = CalibrationOrigin::LIVE_SESSION;
   t.q0_tick = q0_tick;
-  t.direction = direction;
   t.present = true;
   return t;
 }
@@ -538,7 +540,7 @@ static void test_direction_verify_does_not_need_a_transform() {
 static void test_a_diagnostic_endpoint_can_never_become_executable() {
   g_case = "diagnostic != executable";
   Harness h;
-  h.policy.transforms().admit(acceptedTransform(lfLower(), 2048, 1));
+  h.policy.transforms().admit(acceptedTransform(lfLower(), 2048));
 
   // lf_lower:min is a real geometric contact at -92.074 degrees - 0.074
   // degrees BEYOND the declared URDF limit. It is evidence about where the
@@ -580,7 +582,7 @@ static void test_a_diagnostic_endpoint_can_never_become_executable() {
 static void test_a_direct_path_is_used_only_as_the_compiler_validated_it() {
   g_case = "direct path";
   Harness h;
-  h.policy.transforms().admit(acceptedTransform(lfUpper(), 2048, 1));
+  h.policy.transforms().admit(acceptedTransform(lfUpper(), 2048));
 
   // lf_upper:min is EXECUTABLE and NOT_NEEDED: the compiler validated the
   // direct q=0 -> target path with every other joint at q=0.
@@ -606,8 +608,8 @@ static void test_a_direct_path_is_used_only_as_the_compiler_validated_it() {
 static void test_an_obstructed_plan_requires_its_parking_first() {
   g_case = "parking required";
   Harness h;
-  h.policy.transforms().admit(acceptedTransform(lfUpper(), 2048, 1));
-  h.policy.transforms().admit(acceptedTransform(lhUpper(), 2048, 1));
+  h.policy.transforms().admit(acceptedTransform(lfUpper(), 2048));
+  h.policy.transforms().admit(acceptedTransform(lhUpper(), 2048));
 
   // lf_upper:max is EXECUTABLE but obstructed: the LF foot meets the LH foot.
   // The compiler's plan lifts the LH upper leg to 35 degrees first.
@@ -642,8 +644,8 @@ static void test_an_obstructed_plan_requires_its_parking_first() {
 static void test_an_auxiliary_move_must_be_the_compilers_plan() {
   g_case = "auxiliary move";
   Harness h;
-  h.policy.transforms().admit(acceptedTransform(lhUpper(), 2048, 1));
-  h.policy.transforms().admit(acceptedTransform(rhUpper(), 2048, -1));
+  h.policy.transforms().admit(acceptedTransform(lhUpper(), 2048));
+  h.policy.transforms().admit(acceptedTransform(rhUpper(), 2048));
 
   // The LF upper:max plan parks the LH upper leg at exactly 0.610865 rad.
   CHECK_DECISION(h.plan(auxiliary(lhUpper(), Leg::LF, JointKind::UPPER, ContactSide::MAX_SIDE,
@@ -675,7 +677,7 @@ static void test_an_auxiliary_move_must_be_the_compilers_plan() {
 static void test_a_probe_must_name_its_own_endpoint_and_stay_inside_it() {
   g_case = "probe target bounds";
   Harness h;
-  h.policy.transforms().admit(acceptedTransform(lfUpper(), 2048, 1));
+  h.policy.transforms().admit(acceptedTransform(lfUpper(), 2048));
 
   // Moving a joint that is not the endpoint's joint is not this plan's probe.
   CHECK_DECISION(h.plan(probe(lfLower(), Leg::LF, JointKind::UPPER, ContactSide::MIN_SIDE,
@@ -721,7 +723,7 @@ static void test_q0_is_never_assumed_and_historical_q0_is_refused() {
   // servo-level guarantee about mounting, and it is NOT a q0: a transform
   // carrying it without provenance is unusable, exactly like one carrying any
   // other number.
-  JointTransform assumed = acceptedTransform(lfUpper(), 2048, 1);
+  JointTransform assumed = acceptedTransform(lfUpper(), 2048);
   assumed.state = EvidenceState::UNKNOWN;
   assumed.origin = CalibrationOrigin::NONE;
   CHECK(!assumed.usableProvenance());
@@ -729,7 +731,7 @@ static void test_q0_is_never_assumed_and_historical_q0_is_refused() {
   CHECK(table.empty());
 
   // A replayed q0 describes a servo that is no longer in that joint.
-  JointTransform replayed = acceptedTransform(lfUpper(), 2067, 1);
+  JointTransform replayed = acceptedTransform(lfUpper(), 2067);
   replayed.origin = CalibrationOrigin::HISTORICAL_REPLAY;
   CHECK(!replayed.usableProvenance());
   CHECK(!table.admit(replayed));
@@ -737,37 +739,32 @@ static void test_q0_is_never_assumed_and_historical_q0_is_refused() {
   // Measured on the current installation but not yet operational calibration.
   for (EvidenceState state : {EvidenceState::MEASURED, EvidenceState::CANDIDATE,
                               EvidenceState::ACCEPTED, EvidenceState::REJECTED}) {
-    JointTransform unpromoted = acceptedTransform(lfUpper(), 2050, 1);
+    JointTransform unpromoted = acceptedTransform(lfUpper(), 2050);
     unpromoted.state = state;
     CHECK(!unpromoted.usableProvenance());
     CHECK(!table.admit(unpromoted));
   }
 
-  // Direction is never defaulted to the URDF sign. Zero means "not measured".
-  JointTransform undirected = acceptedTransform(lfUpper(), 2050, 0);
-  CHECK(!undirected.usableProvenance());
-  CHECK(!table.admit(undirected));
-
   // And one that does not say which model q0 was captured against. q0 is
   // measured at "the nominal URDF q=0 pose"; without the URDF that defines
   // that pose the number refers to nothing.
-  JointTransform modelless = acceptedTransform(lfUpper(), 2050, 1);
+  JointTransform modelless = acceptedTransform(lfUpper(), 2050);
   modelless.geometry = kNoGeometryProvenance;
   CHECK(!modelless.boundToGeometry());
   CHECK(!table.admit(modelless));
 
   // Absent, or anonymous.
-  JointTransform absent = acceptedTransform(lfUpper(), 2050, 1);
+  JointTransform absent = acceptedTransform(lfUpper(), 2050);
   absent.present = false;
   CHECK(!table.admit(absent));
-  JointTransform anonymous = acceptedTransform(lfUpper(), 2050, 1);
+  JointTransform anonymous = acceptedTransform(lfUpper(), 2050);
   std::memset(anonymous.identity.physical_unit, 0,
               sizeof(anonymous.identity.physical_unit));
   CHECK(!table.admit(anonymous));
   CHECK(table.empty());
 
   // A properly measured one is admitted, and applies only to its own joint.
-  CHECK(table.admit(acceptedTransform(lfUpper(), 2050, 1)));
+  CHECK(table.admit(acceptedTransform(lfUpper(), 2050)));
   CHECK_EQ(table.size(), 1);
   CHECK(table.find(lfUpper(), geometryProvenanceTag(geometry_data::kProvenance)) != nullptr);
   CHECK(table.find(lhUpper(), geometryProvenanceTag(geometry_data::kProvenance)) == nullptr);
@@ -804,7 +801,7 @@ static void test_reset_drops_the_session_and_the_transforms() {
   ctx.direction_verify_tick_budget = 32;
   ctx.auxiliary_parked = true;
   h.policy.setBootstrapContext(ctx);
-  CHECK(h.policy.transforms().admit(acceptedTransform(lfUpper(), 2050, 1)));
+  CHECK(h.policy.transforms().admit(acceptedTransform(lfUpper(), 2050)));
 
   h.policy.reset();
 
@@ -828,7 +825,7 @@ static void test_position_command_is_not_weakened_by_any_of_this() {
   CalibrationBootstrapContext ctx = liveSession();
   ctx.direction_verify_tick_budget = 64;
   h.policy.setBootstrapContext(ctx);
-  h.policy.transforms().admit(acceptedTransform(lfUpper(), 2048, 1));
+  h.policy.transforms().admit(acceptedTransform(lfUpper(), 2048));
 
   // A bound compiled geometry, a live session, an approved envelope and an
   // accepted transform together still authorise NOTHING for a normal position
@@ -868,10 +865,137 @@ static void test_the_profile_carries_no_lf_v25_numeric_evidence() {
     CHECK(j.urdf_motor_direction == 1 || j.urdf_motor_direction == -1);
   }
   JointTransform fresh{};
-  CHECK_EQ(fresh.direction, 0);
   CHECK_EQ(fresh.q0_tick, 0);
   CHECK(!fresh.present);
   CHECK(!fresh.usableProvenance());
+}
+
+// ---------------------------------------------------------------------------
+// Direction is hardware-contract data, not a recalibration datum
+// ---------------------------------------------------------------------------
+
+static void test_a_same_type_replacement_invalidates_q0_and_keeps_direction() {
+  g_case = "servo replacement";
+  CalibrationGeometryProfile profile = boundProfile();
+  JointTransformTable table;
+  const GeometryProvenanceTag tag = geometryProvenanceTag(geometry_data::kProvenance);
+
+  const int8_t contract_direction = jointDirection(profile, lfUpper());
+  CHECK(contract_direction == 1 || contract_direction == -1);
+
+  CHECK(table.admit(acceptedTransform(lfUpper(), 2050)));
+  CHECK(table.find(lfUpper(), tag) != nullptr);
+
+  // A same-type ST3215 goes in, same mounting, new physical unit. The joint
+  // slot is unchanged; the unit label is not.
+  JointIdentity replaced = identity(Leg::LF, JointKind::UPPER, "NEW09");
+
+  // q0 IS invalidated: the stored transform belongs to a unit no longer in
+  // that joint, and none exists for the new one.
+  CHECK(table.find(replaced, tag) == nullptr);
+  CHECK(table.findAny(replaced) == nullptr);
+
+  // Direction is NOT invalidated. It is a property of the joint's mechanical
+  // architecture and the URDF axis, and a same-type replacement in the same
+  // mounting touches neither - so it never became unknown and nothing had to
+  // be re-measured to know it.
+  CHECK_EQ(jointDirection(profile, lfUpper()), contract_direction);
+
+  // The replacement is not in the compiled allocation yet, so the profile
+  // cannot answer for it. Fail-closed, and a rebuild is the documented cost of
+  // a servo swap - not a direction campaign.
+  CHECK_EQ(jointDirection(profile, replaced), 0);
+
+  // Every leg joint's direction is available from the contract right now, with
+  // no measurement of any kind.
+  int resolved = 0;
+  for (uint8_t i = 0; i < geometry_data::kJointCount; ++i) {
+    const GeometryJointRecord& j = geometry_data::kJoints[i];
+    const int8_t d = jointDirection(profile, j.identity);
+    if (d == 1 || d == -1) ++resolved;
+    CHECK_EQ(d, j.urdf_motor_direction);
+  }
+  CHECK_EQ(resolved, geometry_data::kJointCount);
+
+  // An unbound profile is not a source of direction either.
+  CalibrationGeometryProfile unbound;
+  CHECK_EQ(jointDirection(unbound, lfUpper()), 0);
+}
+
+static void test_a_changed_urdf_makes_the_affected_transform_stale() {
+  g_case = "URDF change invalidates";
+  ActuatorAuthorityArbiter arbiter;
+  arbiter.reset(AuthorityClearReason::BOOT);
+  CalibrationGeometryProfile profile = boundProfile();
+  SafeActuatorPolicy policy;
+  policy.begin(&arbiter);
+  policy.bindGeometry(&profile, &geometry_data::kProvenance);
+  policy.setBootstrapContext(liveSession());
+  AuthorityLease lease{};
+  CHECK(arbiter.request(ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE,
+                        &lease) == AuthorityResult::GRANTED);
+
+  CHECK(policy.transforms().admit(acceptedTransform(lfUpper(), 2050)));
+
+  ActuatorTransaction txn{};
+  const ActuatorCommand p = probe(lfUpper(), Leg::LF, JointKind::UPPER,
+                                  ContactSide::MIN_SIDE, -900000);
+  CHECK_DECISION(policy.plan(p, lease, OperatingMode::MAINTENANCE, &txn),
+                 WriteDecision::ACCEPT);
+  policy.abort(&txn);
+
+  // A URDF change - including a change to a joint's motorDirection - changes
+  // the URDF hash, which moves the geometry provenance tag.
+  GeometryProvenance changed_urdf = geometry_data::kProvenance;
+  changed_urdf.urdf_sha256[0] = (changed_urdf.urdf_sha256[0] == 'a') ? 'b' : 'a';
+  CHECK(geometryProvenanceTag(changed_urdf) !=
+        geometryProvenanceTag(geometry_data::kProvenance));
+
+  policy.bindGeometry(&profile, &changed_urdf);
+  CHECK_EQ((long long)policy.currentGeometryTag(), (long long)kNoGeometryProvenance);
+
+  // The transform stays ON RECORD - historical evidence is preserved - but it
+  // is no longer CURRENT evidence.
+  CHECK(policy.transforms().findAny(lfUpper()) != nullptr);
+  CHECK(policy.transforms().find(lfUpper(), policy.currentGeometryTag()) == nullptr);
+
+  // And the probe fails closed. It is refused at the profile gate, BEFORE the
+  // transform is even consulted - a stricter outcome than the evidence-level
+  // mismatch, because a plan-bound move needs the model itself to be the one
+  // this build expects.
+  CHECK_DECISION(policy.plan(p, lease, OperatingMode::MAINTENANCE, &txn),
+                 WriteDecision::REJECT_GEOMETRY_PROVENANCE);
+  policy.abort(&txn);
+
+  // The evidence-level refusal is reachable on its own: rebind the expected
+  // provenance so the profile gate passes again, and admit a transform that
+  // was measured under another model.
+  policy.bindGeometry(&profile, &geometry_data::kProvenance);
+  policy.transforms().clear();
+  JointTransform other_model = acceptedTransform(lfUpper(), 2050);
+  other_model.geometry = geometryProvenanceTag(changed_urdf);
+  CHECK(policy.transforms().admit(other_model));
+  CHECK(policy.transforms().findAny(lfUpper()) != nullptr);
+  CHECK_DECISION(policy.plan(p, lease, OperatingMode::MAINTENANCE, &txn),
+                 WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH);
+  policy.abort(&txn);
+}
+
+static void test_direction_verify_is_optional_and_never_required() {
+  g_case = "direction verify is optional";
+  Harness h;
+  // The normal state: no diagnostic budget. Nothing in the calibration path
+  // needs one, so a contact probe is unaffected by its absence.
+  CHECK_EQ(h.policy.bootstrapContext().direction_verify_tick_budget, 0);
+  h.policy.transforms().admit(acceptedTransform(lfUpper(), 2050));
+  CHECK_DECISION(h.plan(probe(lfUpper(), Leg::LF, JointKind::UPPER, ContactSide::MIN_SIDE,
+                              -900000)),
+                 WriteDecision::ACCEPT);
+
+  // Only the diagnostic itself is refused, and only because it was not
+  // authorised - never because calibration is waiting on it.
+  CHECK_DECISION(h.plan(directionVerify(lfUpper(), 16)),
+                 WriteDecision::REJECT_NO_ENVELOPE_BUDGET);
 }
 
 static void test_tostring_is_total() {
@@ -919,6 +1043,9 @@ int main() {
   test_a_probe_must_name_its_own_endpoint_and_stay_inside_it();
 
   test_q0_is_never_assumed_and_historical_q0_is_refused();
+  test_a_same_type_replacement_invalidates_q0_and_keeps_direction();
+  test_a_changed_urdf_makes_the_affected_transform_stale();
+  test_direction_verify_is_optional_and_never_required();
   test_plan_bound_moves_fail_closed_without_a_transform();
   test_reset_drops_the_session_and_the_transforms();
 

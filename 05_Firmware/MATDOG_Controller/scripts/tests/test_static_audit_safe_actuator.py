@@ -93,6 +93,12 @@ def run_population_checks(files):
     return list(audit.failures)
 
 
+def run_direction_checks(files):
+    audit.failures.clear()
+    audit.check_direction_is_contractual(files, SKETCH_DIR)
+    return list(audit.failures)
+
+
 def run_torque_checks(files):
     audit.failures.clear()
     audit.check_torque_enable(files)
@@ -405,6 +411,33 @@ def main():
          r'\{11, "LF_LOWER", "M33", CurrentConfig::INSTALLED\}',
          '{11, "LF_LOWER", "M99", CurrentConfig::INSTALLED}',
          "physical unit binding", runner=run_population_checks)
+
+    # --- direction is contract data, not a recalibration datum -------------
+    expect_pass("baseline direction contract", run_direction_checks(BASE))
+
+    case("direction becomes stored transform evidence again", PROFILE_H,
+         r"  uint16_t q0_tick = 0;",
+         "  uint16_t q0_tick = 0;\n  int8_t direction = 0;",
+         "second source of truth", runner=run_direction_checks)
+    case("the direction resolver stops reading the URDF", PROFILE_CPP,
+         r"  const int8_t direction = record->urdf_motor_direction;",
+         "  const int8_t direction = 1;",
+         "urdf_motor_direction", runner=run_direction_checks)
+    case("the direction resolver bypasses the bound profile", PROFILE_CPP,
+         r"  const GeometryJointRecord\* record = profile\.findJoint\(joint\);",
+         "  const GeometryJointRecord* record = &geometry_data_kJoints[0];",
+         "geometry provenance tag", runner=run_direction_checks)
+    case("provenance demands a measured direction again", PROFILE_CPP,
+         r"bool JointTransform::usableProvenance\(\) const \{\n  if \(!present\) return false;",
+         "bool JointTransform::usableProvenance() const {\n"
+         "  if (direction != 1) return false;\n  if (!present) return false;",
+         "invalidates q0 only", runner=run_direction_checks)
+    case("the diagnostic budget gates a calibration move", POLICY_CPP,
+         r"  if \(parking_planned && !parked_here\) return WriteDecision::REJECT_PARKING_REQUIRED;",
+         "  if (bootstrap_.direction_verify_tick_budget <= 0) return "
+         "WriteDecision::REJECT_NO_ENVELOPE_BUDGET;\n"
+         "  if (parking_planned && !parked_here) return WriteDecision::REJECT_PARKING_REQUIRED;",
+         "OPTIONAL diagnostic budget", runner=run_direction_checks)
 
     # --- the pre-existing torque guard still bites -------------------------
     # "No Torque ON path reachable in the default build" is this phase's claim

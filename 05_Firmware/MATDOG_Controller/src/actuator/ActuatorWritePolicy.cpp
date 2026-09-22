@@ -63,8 +63,8 @@ bool operationPermittedForOwner(core::ActuatorAuthority owner, ActuatorOperation
       // Motion gets torque and position commands. Every calibration-bootstrap
       // class is refused: a probe drives a joint into a mechanical endstop, an
       // auxiliary move parks a leg that is not the one being commanded, and a
-      // direction verification exists to establish evidence a motion owner is
-      // supposed to already have.
+      // direction verification is an optional diagnostic that has no place in
+      // a motion owner's vocabulary.
       return operation == ActuatorOperation::TORQUE_ENABLE ||
              operation == ActuatorOperation::POSITION_COMMAND;
     case core::ActuatorAuthority::DIAGNOSTICS:
@@ -286,11 +286,10 @@ WriteDecision SafeActuatorPolicy::evaluateBootstrapEnvelope(
     return WriteDecision::REJECT_OUTSIDE_BOOTSTRAP_ENVELOPE;
   }
 
-  // Deliberately NO transform requirement. This is the one calibration move
-  // that runs before the raw<->q transform exists - it is how the transform's
-  // missing half gets measured. Its safety comes from the envelope being
-  // symmetric: the same tick magnitude is proven clear whichever way the joint
-  // turns out to turn.
+  // Deliberately NO transform requirement: this diagnostic is commanded as a
+  // raw tick delta and needs neither q0 nor a direction. Its safety comes from
+  // the envelope being symmetric - the same tick magnitude is proven clear in
+  // both directions, so the move is bounded whichever way the joint turns.
   return WriteDecision::ACCEPT;
 }
 
