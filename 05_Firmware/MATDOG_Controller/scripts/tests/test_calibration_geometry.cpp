@@ -106,6 +106,7 @@ static JointIdentity lfLower() { return identity(Leg::LF, JointKind::LOWER, "M33
 static JointTransform acceptedTransform(JointIdentity id, uint16_t q0_tick, int8_t direction) {
   JointTransform t{};
   t.identity = id;
+  t.geometry = geometryProvenanceTag(geometry_data::kProvenance);
   t.state = EvidenceState::PROMOTED;
   t.origin = CalibrationOrigin::LIVE_SESSION;
   t.q0_tick = q0_tick;
@@ -747,6 +748,14 @@ static void test_q0_is_never_assumed_and_historical_q0_is_refused() {
   CHECK(!undirected.usableProvenance());
   CHECK(!table.admit(undirected));
 
+  // And one that does not say which model q0 was captured against. q0 is
+  // measured at "the nominal URDF q=0 pose"; without the URDF that defines
+  // that pose the number refers to nothing.
+  JointTransform modelless = acceptedTransform(lfUpper(), 2050, 1);
+  modelless.geometry = kNoGeometryProvenance;
+  CHECK(!modelless.boundToGeometry());
+  CHECK(!table.admit(modelless));
+
   // Absent, or anonymous.
   JointTransform absent = acceptedTransform(lfUpper(), 2050, 1);
   absent.present = false;
@@ -760,10 +769,11 @@ static void test_q0_is_never_assumed_and_historical_q0_is_refused() {
   // A properly measured one is admitted, and applies only to its own joint.
   CHECK(table.admit(acceptedTransform(lfUpper(), 2050, 1)));
   CHECK_EQ(table.size(), 1);
-  CHECK(table.find(lfUpper()) != nullptr);
-  CHECK(table.find(lhUpper()) == nullptr);
-  CHECK(table.find(identity(Leg::LF, JointKind::UPPER, "M11")) == nullptr);
-  CHECK_EQ(table.find(lfUpper())->q0_tick, 2050);
+  CHECK(table.find(lfUpper(), geometryProvenanceTag(geometry_data::kProvenance)) != nullptr);
+  CHECK(table.find(lhUpper(), geometryProvenanceTag(geometry_data::kProvenance)) == nullptr);
+  CHECK(table.find(identity(Leg::LF, JointKind::UPPER, "M11"),
+                   geometryProvenanceTag(geometry_data::kProvenance)) == nullptr);
+  CHECK_EQ(table.find(lfUpper(), geometryProvenanceTag(geometry_data::kProvenance))->q0_tick, 2050);
 }
 
 static void test_plan_bound_moves_fail_closed_without_a_transform() {

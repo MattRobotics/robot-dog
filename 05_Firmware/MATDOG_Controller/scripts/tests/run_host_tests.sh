@@ -32,6 +32,18 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/Availability.cpp" \
   "$SKETCH_DIR/src/core/SystemState.cpp"
 
+# The MATDOG_C018_V1 contract links the REAL generated register table, so the
+# twenty values under test are the ones the firmware carries. The preflight
+# SERVICE is device-only (it holds a ServoBus); what is host-testable is the
+# contract, the comparison semantics and the leg selection.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -o "$OUT/test_servo_profile" \
+  "$SCRIPT_DIR/test_servo_profile.cpp" \
+  "$SKETCH_DIR/src/servo/ServoProfile.cpp" \
+  "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \
+  "$SKETCH_DIR/src/core/Availability.cpp" \
+  "$SKETCH_DIR/src/core/SystemState.cpp"
+
 # -DDISABLED=0x00 reproduces the Arduino-ESP32 core macro (esp32-hal-gpio.h)
 # so an identifier clash with it fails here, not only in the device build.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -106,6 +118,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
 "$OUT/test_servo_population"
+"$OUT/test_servo_profile"
 "$OUT/test_daly_protocol"
 "$OUT/test_wifi_policy"
 "$OUT/test_actuator_authority"

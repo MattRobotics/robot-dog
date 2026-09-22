@@ -62,6 +62,37 @@ def run_geometry_checks(files):
     return list(audit.failures)
 
 
+def run_offset_checks(files):
+    audit.failures.clear()
+    audit.check_position_offset_boundary(files, SKETCH_DIR)
+    audit.check_forbidden_literals(files)
+    return list(audit.failures)
+
+
+def run_profile_checks(files):
+    audit.failures.clear()
+    audit.check_servo_profile_contract(files, SKETCH_DIR)
+    return list(audit.failures)
+
+
+def run_preflight_checks(files):
+    audit.failures.clear()
+    audit.check_h0_preflight_boundaries(files, SKETCH_DIR)
+    return list(audit.failures)
+
+
+def run_binding_checks(files):
+    audit.failures.clear()
+    audit.check_evidence_geometry_binding(files, SKETCH_DIR)
+    return list(audit.failures)
+
+
+def run_population_checks(files):
+    audit.failures.clear()
+    audit.check_servo_population_model(files, SKETCH_DIR)
+    return list(audit.failures)
+
+
 def run_torque_checks(files):
     audit.failures.clear()
     audit.check_torque_enable(files)
@@ -110,6 +141,12 @@ POLICY_CPP = "ActuatorWritePolicy.cpp"
 PROFILE_H = "CalibrationGeometryProfile.h"
 PROFILE_CPP = "CalibrationGeometryProfile.cpp"
 PROFILE_DATA_H = "CalibrationGeometryProfileData.h"
+BUS_CPP = "ServoBus.cpp"
+SERVO_PROFILE_CPP = "ServoProfile.cpp"
+SERVO_PROFILE_DATA_H = "ServoProfileData.h"
+PREFLIGHT_CPP = "ServoPreflight.cpp"
+POPULATION_H = "ServoPopulation.h"
+ROUTER_CPP = "CommandRouter.cpp"
 
 
 def main():
@@ -259,6 +296,115 @@ def main():
          "  return operation == ActuatorOperation::POSITION_COMMAND ||\n"
          "         operation == ActuatorOperation::CALIBRATION_CONTACT_PROBE;",
          "mutually exclusive", runner=run_geometry_checks)
+
+    # --- B1: evidence is bound to the geometry it was measured under -------
+    expect_pass("baseline binding", run_binding_checks(BASE))
+
+    case("a joint bound loses its geometry tag", POLICY_H,
+         r"  GeometryProvenanceTag geometry = kNoGeometryProvenance;\n  uint16_t min_tick",
+         "  uint16_t min_tick",
+         "GeometryProvenanceTag", runner=run_binding_checks)
+    case("admit stops requiring a geometry", POLICY_CPP,
+         r"  if \(!limit\.boundToGeometry\(\)\) return false;",
+         "",
+         "boundToGeometry", runner=run_binding_checks)
+    case("transform admit stops requiring a geometry", POLICY_CPP,
+         r"  if \(!transform\.boundToGeometry\(\)\) return false;",
+         "",
+         "boundToGeometry", runner=run_binding_checks)
+    case("an unbound tag stops failing closed", POLICY_CPP,
+         r"  if \(geometry == kNoGeometryProvenance\) return nullptr;\n"
+         r"  const JointLimit\* entry = findAny\(joint\);",
+         "  const JointLimit* entry = findAny(joint);",
+         "fail closed", runner=run_binding_checks)
+    case("the decision path looks evidence up by identity alone", POLICY_CPP,
+         r"limits_\.find\(command\.joint, currentGeometryTag\(\)\)",
+         "limits_.findAny(command.joint)",
+         "findAny()", runner=run_binding_checks)
+    case("the current tag stops checking the expected provenance", POLICY_CPP,
+         r"  if \(!geometry_->provenanceMatches\(\*expected_provenance_\)\) "
+         r"return kNoGeometryProvenance;",
+         "",
+         "provenanceMatches", runner=run_binding_checks)
+
+    # --- PositionOffset: one read accessor, never a write ------------------
+    expect_pass("baseline offset boundary", run_offset_checks(BASE))
+
+    # THE case this gate exists for.
+    case("a PositionOffset WRITE appears in the accessor", BUS_CPP,
+         r"  const int raw = st_\.readWord\(static_cast<uint8_t>\(id\), SMS_STS_OFS_L\);",
+         "  st_.writeWord(static_cast<uint8_t>(id), SMS_STS_OFS_L, 0);\n"
+         "  const int raw = st_.readWord(static_cast<uint8_t>(id), SMS_STS_OFS_L);",
+         "writeWord", runner=run_offset_checks)
+    case("a PositionOffset write appears elsewhere", ROUTER_CPP,
+         r"void CommandRouter::printServoRead\(int id\) \{",
+         "void CommandRouter::printServoRead(int id) {\n"
+         "  modules_.servo_bus->writeWord(id, SMS_STS_OFS_L, 0);",
+         "WRITE", runner=run_offset_checks)
+    case("the offset register is read outside the approved accessor", ROUTER_CPP,
+         r"void CommandRouter::printServoRead\(int id\) \{",
+         "void CommandRouter::printServoRead(int id) {\n"
+         "  int ofs = readWord(id, 0x1F);\n  (void)ofs;",
+         "0x1F", runner=run_offset_checks)
+    case("the accessor stops being a read", BUS_CPP,
+         r"  const int raw = st_\.readWord\(static_cast<uint8_t>\(id\), SMS_STS_OFS_L\);",
+         "  const int raw = SMS_STS_OFS_L;",
+         "readWord", runner=run_offset_checks)
+    case("the offset decoder becomes sign-magnitude", SERVO_PROFILE_CPP,
+         r"  return static_cast<int16_t>\(raw\);",
+         "  return (raw & 0x8000) ? -(int16_t)(raw & 0x7FFF) : (int16_t)raw;",
+         "two's-complement", runner=run_offset_checks)
+
+    # --- the MATDOG_C018_V1 contract ---------------------------------------
+    expect_pass("baseline profile contract", run_profile_checks(BASE))
+
+    case("runtime RAM state leaks into the persistent profile", SERVO_PROFILE_DATA_H,
+         r'\{0x27, 1, 200, "VelocityClosedLoopI"\},',
+         '{0x27, 1, 200, "VelocityClosedLoopI"},\n    {0x30, 2, 1000, "TorqueLimit"},',
+         "runtime RAM state", runner=run_profile_checks)
+    case("a persistent register disappears", SERVO_PROFILE_DATA_H,
+         r'\{0x09, 2, 0, "MinAngle"\},',
+         "",
+         "expected the canonical 20", runner=run_profile_checks)
+    case("an unread register can fold into MATCH", SERVO_PROFILE_CPP,
+         r"      return ProfileVerdict::INCOMPLETE;",
+         "      return running;",
+         "INCOMPLETE", runner=run_profile_checks)
+    case("the profile contract reaches the bus", SERVO_PROFILE_CPP,
+         r"namespace servo \{",
+         "namespace servo {\nstatic SMS_STS g_bus;",
+         "SMS_STS", runner=run_profile_checks)
+
+    # --- the H0 preflight stays read-only ----------------------------------
+    expect_pass("baseline preflight", run_preflight_checks(BASE))
+
+    case("the preflight gains a write primitive", PREFLIGHT_CPP,
+         r"  record->expected_bus_id = expected\.bus_id;",
+         "  bus_->EnableTorque(expected.bus_id, 1);\n"
+         "  record->expected_bus_id = expected.bus_id;",
+         "EnableTorque", runner=run_preflight_checks)
+    case("the preflight loses its MAINTENANCE gate", ROUTER_CPP,
+         r'      Serial\.println\("REASON=NOT_IN_MAINTENANCE_MODE"\);\n'
+         r'      Serial\.printf\("MODE=%s\\n", toString\(modules_\.operating_mode->mode\(\)\)\);\n'
+         r"      return;\n    \}\n    if \(modules_\.servo_preflight->start\(\)\)",
+         "      return;\n    }\n    if (modules_.servo_preflight->start())",
+         "MAINTENANCE-gated", runner=run_preflight_checks)
+    case("the report claims an observed physical unit", ROUTER_CPP,
+         r'"  JOINT expected_physical_unit=%s joint=%s expected_bus_id=%u "',
+         '"  JOINT observed_physical_unit=%s joint=%s expected_bus_id=%u "',
+         "OBSERVED physical unit", runner=run_preflight_checks)
+    case("the report drops the q0 warning", ROUTER_CPP,
+         r'  Serial\.println\("  NOTE present_position is a raw liveness tick, NOT q0"\);',
+         "",
+         "NOT q0", runner=run_preflight_checks)
+
+    # --- the expected physical unit must match the allocation --------------
+    expect_pass("baseline population", run_population_checks(BASE))
+
+    case("the expected physical unit drifts from the allocation", POPULATION_H,
+         r'\{11, "LF_LOWER", "M33", CurrentConfig::INSTALLED\}',
+         '{11, "LF_LOWER", "M99", CurrentConfig::INSTALLED}',
+         "physical unit binding", runner=run_population_checks)
 
     # --- the pre-existing torque guard still bites -------------------------
     # "No Torque ON path reachable in the default build" is this phase's claim

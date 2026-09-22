@@ -17,9 +17,11 @@
 
 #include <cstdio>
 #include <cstring>
+#include <cstddef>
 #include <initializer_list>
 
 #include "../../src/actuator/ActuatorWritePolicy.h"
+#include "../../src/actuator/CalibrationGeometryProfileData.h"
 
 using namespace matdog;
 using namespace matdog::actuator;
@@ -106,9 +108,24 @@ static ActuatorCommand command(ActuatorOperation operation, JointIdentity id,
 // MATDOG_JOINT_CALIBRATION.yaml records {min: null, max: null} for all twelve
 // leg joints - so this exists only to prove the accept path is reachable at all
 // and that the bounds check is real rather than vacuous.
+// The geometry every fixture in this suite is measured under: the real
+// compiled profile, so the provenance binding under test is the shipped one.
+static GeometryProvenanceTag testGeometry() {
+  return geometryProvenanceTag(geometry_data::kProvenance);
+}
+
+static CalibrationGeometryProfile boundProfile() {
+  CalibrationGeometryProfile profile;
+  profile.bind(&geometry_data::kProvenance, geometry_data::kJoints,
+               geometry_data::kJointCount, geometry_data::kEndpoints,
+               geometry_data::kEndpointCount);
+  return profile;
+}
+
 static JointLimit acceptedLimit(JointIdentity id, uint16_t lo, uint16_t hi) {
   JointLimit limit{};
   limit.identity = id;
+  limit.geometry = testGeometry();
   limit.state = EvidenceState::PROMOTED;
   limit.origin = CalibrationOrigin::LIVE_SESSION;
   limit.min_tick = lo;
@@ -498,7 +515,106 @@ static void test_historical_limits_can_never_be_admitted() {
   JointLimit anonymous = acceptedLimit(lfLower(), 1800, 2300);
   std::memset(anonymous.identity.physical_unit, 0, sizeof(anonymous.identity.physical_unit));
   CHECK(!table.admit(anonymous));
+
+  // And a bound that does not say WHICH MODEL it was measured under. It could
+  // never be invalidated when that model changes, so it is never stored.
+  JointLimit modelless = acceptedLimit(lfLower(), 1800, 2300);
+  modelless.geometry = kNoGeometryProvenance;
+  CHECK(!modelless.boundToGeometry());
+  CHECK(!table.admit(modelless));
   CHECK(table.empty());
+}
+
+// ---------------------------------------------------------------------------
+// B1 - evidence is bound to the geometry it was measured under
+// ---------------------------------------------------------------------------
+
+static void test_evidence_from_another_model_stays_on_record_but_is_not_current() {
+  g_case = "geometry-bound evidence";
+  ActuatorAuthorityArbiter arbiter;
+  arbiter.reset(AuthorityClearReason::BOOT);
+  CalibrationGeometryProfile profile = boundProfile();
+  SafeActuatorPolicy policy;
+  policy.begin(&arbiter);
+  policy.bindGeometry(&profile, &geometry_data::kProvenance);
+  const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
+                                     OperatingMode::MAINTENANCE);
+
+  // A bound measured under a DIFFERENT model: a rebuild from another URDF, a
+  // regenerated profile. It is well-formed and stays on record.
+  JointLimit other = acceptedLimit(lfLower(), 1800, 2300);
+  other.geometry = testGeometry() ^ 0xA5A5A5A5ULL;
+  CHECK(policy.limits().admit(other));
+  CHECK_EQ(policy.limits().size(), 1);
+  CHECK(policy.limits().findAny(lfLower()) != nullptr);   // historically registered
+  CHECK(policy.limits().find(lfLower(), testGeometry()) == nullptr);  // not current
+
+  ActuatorCommand position{};
+  position.operation = ActuatorOperation::POSITION_COMMAND;
+  position.joint = lfLower();
+  position.target_tick = 2048;
+  ActuatorTransaction txn{};
+  CHECK_DECISION(policy.plan(position, lease, OperatingMode::MAINTENANCE, &txn),
+                 WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH);
+  policy.abort(&txn);
+
+  // The same bound, measured under the model that IS loaded, authorises.
+  policy.limits().clear();
+  CHECK(policy.limits().admit(acceptedLimit(lfLower(), 1800, 2300)));
+  CHECK_DECISION(policy.plan(position, lease, OperatingMode::MAINTENANCE, &txn),
+                 WriteDecision::ACCEPT);
+  policy.abort(&txn);
+
+  // Unbind the geometry and the very same record stops being current: an
+  // unbound policy has no tag, and no tag matches nothing.
+  policy.bindGeometry(nullptr, nullptr);
+  CHECK_EQ(policy.currentGeometryTag(), (long long)kNoGeometryProvenance);
+  CHECK_DECISION(policy.plan(position, lease, OperatingMode::MAINTENANCE, &txn),
+                 WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH);
+  policy.abort(&txn);
+
+  // Bind a profile whose provenance is not the one this build expects: same
+  // outcome. "Some geometry is loaded" is not "the right geometry is loaded".
+  GeometryProvenance impostor = geometry_data::kProvenance;
+  impostor.urdf_sha256[0] = (impostor.urdf_sha256[0] == 'a') ? 'b' : 'a';
+  policy.bindGeometry(&profile, &impostor);
+  CHECK_EQ(policy.currentGeometryTag(), (long long)kNoGeometryProvenance);
+  CHECK_DECISION(policy.plan(position, lease, OperatingMode::MAINTENANCE, &txn),
+                 WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH);
+  policy.abort(&txn);
+}
+
+static void test_the_geometry_tag_separates_models() {
+  g_case = "geometry tag";
+  CHECK(geometryProvenanceTag(geometry_data::kProvenance) != kNoGeometryProvenance);
+  // Deterministic.
+  CHECK_EQ((long long)geometryProvenanceTag(geometry_data::kProvenance),
+           (long long)geometryProvenanceTag(geometry_data::kProvenance));
+
+  // Every one of the six hashes participates: change any one and the tag moves.
+  const size_t offsets[] = {
+      offsetof(GeometryProvenance, urdf_sha256),
+      offsetof(GeometryProvenance, mesh_manifest_sha256),
+      offsetof(GeometryProvenance, endpoint_semantic_sha256),
+      offsetof(GeometryProvenance, parking_semantic_sha256),
+      offsetof(GeometryProvenance, safety_policy_semantic_sha256),
+      offsetof(GeometryProvenance, allocation_sha256),
+  };
+  for (size_t offset : offsets) {
+    GeometryProvenance tampered = geometry_data::kProvenance;
+    char* hash = reinterpret_cast<char*>(&tampered) + offset;
+    hash[0] = (hash[0] == 'a') ? 'b' : 'a';
+    CHECK(geometryProvenanceTag(tampered) !=
+          geometryProvenanceTag(geometry_data::kProvenance));
+  }
+
+  // Physical-unit identity and geometry provenance are SEPARATE axes: the tag
+  // is a property of the model and says nothing about which servo answered.
+  CalibrationGeometryProfile profile = boundProfile();
+  CHECK_EQ((long long)profile.provenanceTag(),
+           (long long)geometryProvenanceTag(geometry_data::kProvenance));
+  CalibrationGeometryProfile unbound;
+  CHECK_EQ((long long)unbound.provenanceTag(), (long long)kNoGeometryProvenance);
 }
 
 static void test_a_limit_applies_only_to_the_same_slot_and_the_same_unit() {
@@ -510,21 +626,21 @@ static void test_a_limit_applies_only_to_the_same_slot_and_the_same_unit() {
 
   // Same slot, different physical servo: exactly what the 2026-08-27 reassembly
   // made unsafe.
-  CHECK(table.find(joint(Leg::LF, JointKind::LOWER, "ELR01")) == nullptr);
+  CHECK(table.find(joint(Leg::LF, JointKind::LOWER, "ELR01"), testGeometry()) == nullptr);
   // Same physical servo, different slot.
-  CHECK(table.find(joint(Leg::RF, JointKind::LOWER, "M33")) == nullptr);
+  CHECK(table.find(joint(Leg::RF, JointKind::LOWER, "M33"), testGeometry()) == nullptr);
   // Both agree.
-  CHECK(table.find(lfLower()) != nullptr);
+  CHECK(table.find(lfLower(), testGeometry()) != nullptr);
   // Anonymous lookups match nothing.
   JointIdentity anonymous{};
   anonymous.leg = Leg::LF;
   anonymous.joint = JointKind::LOWER;
-  CHECK(table.find(anonymous) == nullptr);
+  CHECK(table.find(anonymous, testGeometry()) == nullptr);
 
   // Re-admitting the same joint replaces rather than duplicates.
   CHECK(table.admit(acceptedLimit(lfLower(), 1900, 2200)));
   CHECK_EQ(table.size(), 1);
-  CHECK_EQ(table.find(lfLower())->min_tick, 1900);
+  CHECK_EQ(table.find(lfLower(), testGeometry())->min_tick, 1900);
 
   // A second joint is a second entry.
   CHECK(table.admit(acceptedLimit(lfHip(), 1000, 3000)));
@@ -536,7 +652,11 @@ static void test_target_bounds_are_enforced_in_both_directions() {
   ActuatorAuthorityArbiter arbiter;
   arbiter.reset(AuthorityClearReason::BOOT);
   SafeActuatorPolicy policy;
+  CalibrationGeometryProfile profile = boundProfile();
   policy.begin(&arbiter);
+  // A bound is only current evidence while the model it was measured under is
+  // the model that is loaded.
+  policy.bindGeometry(&profile, &geometry_data::kProvenance);
   CHECK(policy.limits().admit(acceptedLimit(lfLower(), 1800, 2300)));
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
@@ -923,13 +1043,13 @@ static void test_tostring_is_total() {
   }
   CHECK(std::strcmp(toString(static_cast<ActuatorOperation>(99)), "UNKNOWN") == 0);
 
-  for (uint8_t raw = 0; raw <= (uint8_t)WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
+  for (uint8_t raw = 0; raw <= (uint8_t)WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH;
        ++raw) {
     CHECK(std::strcmp(toString(static_cast<WriteDecision>(raw)), "UNKNOWN") != 0);
   }
   CHECK(std::strcmp(toString(static_cast<WriteDecision>(99)), "UNKNOWN") == 0);
   CHECK(std::strcmp(toString(static_cast<WriteDecision>(
-                        (uint8_t)WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS + 1)),
+                        (uint8_t)WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH + 1)),
                     "UNKNOWN") == 0);
 
   for (uint8_t raw = 0; raw <= (uint8_t)TransactionState::ABORTED; ++raw) {
@@ -956,6 +1076,8 @@ int main() {
 
   test_missing_current_limits_reject();
   test_historical_limits_can_never_be_admitted();
+  test_evidence_from_another_model_stays_on_record_but_is_not_current();
+  test_the_geometry_tag_separates_models();
   test_a_limit_applies_only_to_the_same_slot_and_the_same_unit();
   test_target_bounds_are_enforced_in_both_directions();
   test_reset_clears_the_limit_table();
