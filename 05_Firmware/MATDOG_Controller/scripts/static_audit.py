@@ -122,6 +122,7 @@ constant, or the mode seen when the command arrived).
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
+import os
 import pathlib
 import re
 import subprocess
@@ -1387,6 +1388,174 @@ def check_actuator_authority(files, sketch_dir):
                     fail(f"{path}: the ActuatorAuthority enum is missing {required!r}")
 
 
+def check_safe_actuator_boundaries(files, sketch_dir):
+    """The Safe Actuator Layer is the boundary every future actuator write must
+    pass through, so the properties that make it a boundary are enforced rather
+    than reviewed:
+
+      1. the policy core stays pure - no Arduino, ServoBus, Wi-Fi, OTA, Serial;
+      2. it is a DECISION, not a transport: no bus primitive lives in it;
+      3. no write path is enabled anywhere under src/actuator/;
+      4. SAFE_OFF stays outside it, in BOTH directions;
+      5. a persistent/provisioning write is not expressible as an operation;
+      6. limits are admitted on provenance, and nothing at runtime admits any;
+      7. at most one policy instance, and it would be the Controller's.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    actuator_dir = sketch_dir / "src" / "actuator"
+
+    policy_units = ("ActuatorWritePolicy.h", "ActuatorWritePolicy.cpp")
+    for name in policy_units:
+        if name not in by_name:
+            fail(f"{actuator_dir / name}: the Safe Actuator Layer policy core was not found")
+            return
+
+    # --- (1)(2) pure decision core ----------------------------------------
+    for name in policy_units:
+        path, code = by_name[name]
+        for forbidden in ("#include <Arduino.h>", "#include <WiFi.h>",
+                          "#include <esp_ota_ops.h>", "#include <SCServo.h>",
+                          "ServoBus", "ServoCensus", "WifiManager", "OtaManager",
+                          "HardwareSerial", "SMS_STS"):
+            if forbidden in code:
+                fail(f"{path}: references {forbidden!r} - the Safe Actuator Layer policy "
+                     f"decides whether a write may happen and must never be able to perform "
+                     f"one. scripts/tests/test_actuator_write_policy.cpp links the REAL "
+                     f"policy, which is only possible while it stays host-linkable")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the policy must stay "
+                 f"transport-independent")
+        for token in ("EnableTorque", "WritePos", "SyncWrite", "RegWrite", "readByte(",
+                      "readWord(", "Ping("):
+            if token in code:
+                fail(f"{path}: references bus primitive {token!r} - an ACCEPT from this "
+                     f"policy is a decision, never an action")
+
+    # --- (3) no write path is enabled anywhere under src/actuator/ ---------
+    # The runtime adapter is TO_IMPLEMENT (SAFE_ACTUATOR_LAYER.md §7): building
+    # one would require weakening check_torque_enable and the goal-position
+    # prohibitions in check_forbidden_literals BEFORE anything could validate
+    # the replacement. Enabling a write path here is a reviewed decision that
+    # belongs to a later gate, not a quiet addition.
+    for path, code in files:
+        if f"{os.sep}src{os.sep}actuator{os.sep}" not in str(path):
+            continue
+        for token in ("EnableTorque", "WritePos", "SyncWrite", "RegWrite", "writeByte",
+                      "writeWord"):
+            if token in code:
+                fail(f"{path}: contains actuator write primitive {token!r} - the Safe "
+                     f"Actuator Layer runtime adapter is TO_IMPLEMENT and no write path "
+                     f"may be enabled in the default build")
+
+    # --- (4) SAFE_OFF is outside this layer, both directions ---------------
+    layer_tokens = ("SafeActuatorPolicy", "ActuatorWritePolicy", "WriteDecision",
+                    "ActuatorOperation", "ActuatorTransaction", "actuator::")
+    for name in ("ServoBus.h", "ServoBus.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            continue
+        path, code = entry
+        for token in layer_tokens:
+            if token in code:
+                fail(f"{path}: references {token!r} - SAFE_OFF must stay reachable with no "
+                     f"authority, stale authority, a failed calibration manager or a "
+                     f"rejecting policy, so the servo transport must not be able to consult "
+                     f"the Safe Actuator Layer at all (permanent invariant)")
+
+    router = by_name.get("CommandRouter.cpp")
+    if router is not None:
+        path, code = router
+        branch = re.search(
+            r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
+            code, re.DOTALL)
+        if not branch:
+            fail(f"{path}: could not locate the @SERVO SAFE_OFF branch to audit it")
+        else:
+            for token in layer_tokens:
+                if token in branch.group(1):
+                    fail(f"{path}: the @SERVO SAFE_OFF branch references {token!r} - a "
+                         f"safety de-escalation must never be routed through the write "
+                         f"policy, which can reject")
+
+    # --- (5) the operation classes ----------------------------------------
+    path, code = by_name["ActuatorWritePolicy.h"]
+    m = re.search(r"enum class ActuatorOperation\s*:\s*uint8_t\s*\{(.*?)\}", code, re.DOTALL)
+    if not m:
+        fail(f"{path}: could not locate the ActuatorOperation enum")
+    else:
+        body = m.group(1)
+        # A persistent/configuration write must not be expressible here while
+        # the repository still records its owner as TO_DESIGN
+        # (CALIBRATION_SOURCE_PRECEDENCE.md §7).
+        for banned in ("EEPROM", "ID_WRITE", "OFFSET", "PERSIST", "PROVISION", "LOCK",
+                       "RESET"):
+            if banned in body:
+                fail(f"{path}: the ActuatorOperation enum contains {banned!r} - a "
+                     f"persistent/provisioning write must stay inexpressible through this "
+                     f"layer: runtime actuator command != persistent configuration write")
+        # And no class may name a torque-removal: SAFE_OFF must not become
+        # something this policy can be asked to gate.
+        for banned in ("SAFE_OFF", "TORQUE_OFF", "DISABLE", "TORQUE_DISABLE"):
+            if banned in body:
+                fail(f"{path}: the ActuatorOperation enum contains {banned!r} - removing "
+                     f"torque is SAFE_OFF's job and must stay outside this layer, so it "
+                     f"must not be expressible as a policy operation")
+        for required in ("NONE", "TORQUE_ENABLE", "POSITION_COMMAND",
+                         "CALIBRATION_CONTACT_PROBE"):
+            if required not in body:
+                fail(f"{path}: the ActuatorOperation enum is missing {required!r}")
+        members = len(re.findall(r"^\s*([A-Z_]+)\s*=", body, re.M))
+        count = re.search(r"kActuatorOperationCount\s*=\s*(\d+)", code)
+        if not count:
+            fail(f"{path}: could not locate kActuatorOperationCount")
+        elif int(count.group(1)) != members:
+            fail(f"{path}: kActuatorOperationCount is {count.group(1)} but the enum has "
+                 f"{members} members - isKnownOperation() would then accept a value with no "
+                 f"meaning, or reject one with meaning. Fail closed means these agree")
+
+    # --- (6) limits are admitted on provenance, and never at runtime -------
+    path, code = by_name["ActuatorWritePolicy.cpp"]
+    provenance = re.search(r"bool JointLimit::usableProvenance\(\) const\s*\{(.*?)\n\}",
+                           code, re.DOTALL)
+    if not provenance:
+        fail(f"{path}: could not locate JointLimit::usableProvenance() to audit it")
+    else:
+        body = provenance.group(1)
+        for required in ("mayPromote", "isOperationalEvidence"):
+            if required not in body:
+                fail(f"{path}: usableProvenance() does not consult calibration::{required} "
+                     f"- a limit may only come from operational calibration measured on the "
+                     f"current installation. Historical LF V25 values are fixtures, never "
+                     f"live safety bounds")
+    if "HISTORICAL_REPLAY" in code:
+        fail(f"{path}: names CalibrationOrigin::HISTORICAL_REPLAY - the policy must ask "
+             f"calibration::mayPromote() rather than special-case a replay, so a new "
+             f"non-promotable origin cannot silently become admissible")
+
+    # Nothing in the runtime may fill the accepted-limit store. Today nothing
+    # in the repository qualifies to: MATDOG_JOINT_CALIBRATION.yaml records
+    # {min: null, max: null} for all twelve leg joints.
+    for path, code in files:
+        if path.name in policy_units or "/scripts/" in str(path).replace(os.sep, "/"):
+            continue
+        if re.search(r"\blimits\(\)\.admit\(|\bActuatorLimitTable\b", code):
+            fail(f"{path}: populates or holds an ActuatorLimitTable - accepted joint bounds "
+                 f"do not exist yet, and a runtime translation unit must not be the thing "
+                 f"that invents them")
+
+    # --- (7) at most one policy instance, and it would be the Controller's --
+    owners = []
+    for path, code in files:
+        if "/scripts/" in str(path).replace(os.sep, "/"):
+            continue
+        for m in re.finditer(r"SafeActuatorPolicy\s+(\w+)\s*[;{]", code):
+            owners.append((str(path), m.group(1)))
+    if len(owners) > 1 or (owners and pathlib.Path(owners[0][0]).name != "Controller.h"):
+        fail(f"SafeActuatorPolicy is instantiated at {owners} - at most one instance may "
+             f"exist and it belongs to core/Controller.h, next to the one arbiter. A second "
+             f"policy is a second write boundary")
+
+
 def check_ota_boundaries(files, sketch_dir):
     """OTA-A permanent invariants.
 
@@ -1711,6 +1880,7 @@ def check_host_tests(sketch_dir):
     wifi_suite = sketch_dir / "scripts" / "tests" / "test_wifi_policy.cpp"
     ota_suite = sketch_dir / "scripts" / "tests" / "test_ota_policy.cpp"
     authority_suite = sketch_dir / "scripts" / "tests" / "test_actuator_authority.cpp"
+    policy_suite = sketch_dir / "scripts" / "tests" / "test_actuator_write_policy.cpp"
     calibration_suites = [
         sketch_dir / "scripts" / "tests" / "test_calibration_domain.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
@@ -1730,6 +1900,9 @@ def check_host_tests(sketch_dir):
     if not authority_suite.exists():
         fail(f"{authority_suite}: ActuatorAuthority offline test suite not found")
         return
+    if not policy_suite.exists():
+        fail(f"{policy_suite}: Safe Actuator Layer write-policy offline test suite not found")
+        return
     for suite in calibration_suites:
         if not suite.exists():
             fail(f"{suite}: calibration offline test suite not found")
@@ -1739,7 +1912,7 @@ def check_host_tests(sketch_dir):
         return
     runner_text = strip_shell_comments(runner.read_text(encoding="utf-8"))
     for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy",
-                   "test_ota_policy", "test_actuator_authority",
+                   "test_ota_policy", "test_actuator_authority", "test_actuator_write_policy",
                    "test_calibration_domain", "test_calibration_manager"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
@@ -1758,6 +1931,20 @@ def check_daly_audit_mutation_suite(sketch_dir):
     result = subprocess.run([sys.executable, str(suite)], capture_output=True, text=True)
     if result.returncode != 0:
         fail(f"{suite}: DALY audit mutation tests FAILED "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
+
+def check_safe_actuator_audit_mutation_suite(sketch_dir):
+    """Proves the Safe Actuator Layer boundaries above actually fail on
+    mutation - purity, SAFE_OFF independence, the operation classes, limit
+    provenance, and the pre-existing torque-on prohibition."""
+    suite = sketch_dir / "scripts" / "tests" / "test_static_audit_safe_actuator.py"
+    if not suite.exists():
+        fail(f"{suite}: Safe Actuator Layer audit mutation suite not found")
+        return
+    result = subprocess.run([sys.executable, str(suite)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{suite}: Safe Actuator Layer audit mutation tests FAILED "
              f"(stdout={result.stdout!r} stderr={result.stderr!r})")
 
 
@@ -2064,8 +2251,10 @@ def main():
     check_ota_boundaries(files, SKETCH_DIR)
     check_actuator_authority(files, SKETCH_DIR)
     check_calibration_boundaries(files, SKETCH_DIR)
+    check_safe_actuator_boundaries(files, SKETCH_DIR)
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)
+    check_safe_actuator_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
     check_unknown_detection_is_not_a_verdict(files)
     check_usb_cdc_tx_never_blocks(files)
