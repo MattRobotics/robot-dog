@@ -75,6 +75,20 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_actuator_write_policy" \
   "$SCRIPT_DIR/test_actuator_write_policy.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
+# The calibration bootstrap geometry suite links the REAL generated profile
+# table, so the 24 endpoints, 6 parking plans and per-joint envelopes it
+# checks are the exact ones the firmware would carry - reduced from the
+# canonical Geometry Compiler V5 bundle, never retyped.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_geometry" \
+  "$SCRIPT_DIR/test_calibration_geometry.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
@@ -96,6 +110,7 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_wifi_policy"
 "$OUT/test_actuator_authority"
 "$OUT/test_actuator_write_policy"
+"$OUT/test_calibration_geometry"
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_manager"

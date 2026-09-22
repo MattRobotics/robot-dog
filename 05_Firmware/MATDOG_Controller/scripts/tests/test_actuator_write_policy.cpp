@@ -377,14 +377,18 @@ static void test_owner_operation_matrix_is_exhaustive() {
         ActuatorAuthority::QC, ActuatorAuthority::PROVISIONING, ActuatorAuthority::MOTION}) {
     for (ActuatorOperation operation :
          {ActuatorOperation::NONE, ActuatorOperation::TORQUE_ENABLE,
-          ActuatorOperation::POSITION_COMMAND, ActuatorOperation::CALIBRATION_CONTACT_PROBE}) {
+          ActuatorOperation::POSITION_COMMAND, ActuatorOperation::CALIBRATION_CONTACT_PROBE,
+          ActuatorOperation::DIRECTION_VERIFY, ActuatorOperation::CALIBRATION_AUXILIARY_MOVE}) {
       const bool permitted = operationPermittedForOwner(owner, operation);
       bool expected = false;
       if (operation != ActuatorOperation::NONE) {
         if (owner == ActuatorAuthority::CALIBRATION) {
           expected = true;
         } else if (owner == ActuatorAuthority::MOTION) {
-          expected = (operation != ActuatorOperation::CALIBRATION_CONTACT_PROBE);
+          // Motion gets torque and position commands. Every calibration
+          // bootstrap class is refused it.
+          expected = (operation == ActuatorOperation::TORQUE_ENABLE ||
+                      operation == ActuatorOperation::POSITION_COMMAND);
         }
       }
       if (permitted != expected) {
@@ -400,7 +404,8 @@ static void test_owner_operation_matrix_is_exhaustive() {
   const ActuatorAuthority corrupt = static_cast<ActuatorAuthority>(77);
   for (ActuatorOperation operation :
        {ActuatorOperation::TORQUE_ENABLE, ActuatorOperation::POSITION_COMMAND,
-        ActuatorOperation::CALIBRATION_CONTACT_PROBE}) {
+        ActuatorOperation::CALIBRATION_CONTACT_PROBE, ActuatorOperation::DIRECTION_VERIFY,
+        ActuatorOperation::CALIBRATION_AUXILIARY_MOVE}) {
     CHECK(!operationPermittedForOwner(corrupt, operation));
   }
 }
@@ -423,12 +428,30 @@ static void test_missing_current_limits_reject() {
   CHECK(policy.limits().empty());
 
   ActuatorTransaction txn{};
+  CHECK_DECISION(policy.plan(command(ActuatorOperation::POSITION_COMMAND, lfLower(), 2048),
+                             lease, OperatingMode::MAINTENANCE, &txn),
+                 WriteDecision::REJECT_NO_ACCEPTED_LIMITS);
+
+  // The calibration-bootstrap classes take the GEOMETRY route instead, and
+  // with nothing bound they refuse earlier still. The point of checking it
+  // here is that admitting a bound below cannot make them reachable: the two
+  // routes never meet.
   for (ActuatorOperation operation :
-       {ActuatorOperation::POSITION_COMMAND, ActuatorOperation::CALIBRATION_CONTACT_PROBE}) {
+       {ActuatorOperation::CALIBRATION_CONTACT_PROBE, ActuatorOperation::DIRECTION_VERIFY,
+        ActuatorOperation::CALIBRATION_AUXILIARY_MOVE}) {
     CHECK_DECISION(policy.plan(command(operation, lfLower(), 2048), lease,
                                OperatingMode::MAINTENANCE, &txn),
-                   WriteDecision::REJECT_NO_ACCEPTED_LIMITS);
+                   WriteDecision::REJECT_NO_GEOMETRY_PROFILE);
   }
+  CHECK(policy.limits().admit(acceptedLimit(lfLower(), 0, 4095)));
+  for (ActuatorOperation operation :
+       {ActuatorOperation::CALIBRATION_CONTACT_PROBE, ActuatorOperation::DIRECTION_VERIFY,
+        ActuatorOperation::CALIBRATION_AUXILIARY_MOVE}) {
+    CHECK_DECISION(policy.plan(command(operation, lfLower(), 2048), lease,
+                               OperatingMode::MAINTENANCE, &txn),
+                   WriteDecision::REJECT_NO_GEOMETRY_PROFILE);
+  }
+  policy.limits().clear();
 
   // 2048 is not a permissive default either. The raw servo centre is a
   // servo-level fact that says nothing about joint zero - it must not become a
@@ -792,7 +815,7 @@ static void test_safe_off_is_not_expressible_through_this_layer() {
   // safety de-escalation on authority, mode, limits or a transaction. The
   // ungated path stays ServoBus::safeOff(), which static_audit.py keeps free of
   // any reference to authority or to this layer.
-  CHECK_EQ(kActuatorOperationCount, 4);
+  CHECK_EQ(kActuatorOperationCount, 6);
 
   int command_operations = 0;
   for (uint8_t raw = 0; raw < kActuatorOperationCount; ++raw) {
@@ -806,14 +829,28 @@ static void test_safe_off_is_not_expressible_through_this_layer() {
     CHECK(std::strstr(name, "TORQUE_OFF") == nullptr);
     CHECK(std::strstr(name, "DISABLE") == nullptr);
   }
-  CHECK_EQ(command_operations, 3);
+  CHECK_EQ(command_operations, 5);
 
   // TORQUE_ENABLE means APPLY torque and carries no target that could encode
   // "off": the operations that carry a target are the position-class ones.
   CHECK(!operationNeedsTarget(ActuatorOperation::TORQUE_ENABLE));
   CHECK(operationNeedsTarget(ActuatorOperation::POSITION_COMMAND));
   CHECK(operationNeedsTarget(ActuatorOperation::CALIBRATION_CONTACT_PROBE));
+  CHECK(operationNeedsTarget(ActuatorOperation::DIRECTION_VERIFY));
+  CHECK(operationNeedsTarget(ActuatorOperation::CALIBRATION_AUXILIARY_MOVE));
   CHECK(!operationNeedsTarget(ActuatorOperation::NONE));
+
+  // The three authorisation routes are mutually exclusive: no operation can
+  // reach a bound by taking the route meant for another.
+  for (uint8_t raw = 0; raw < kActuatorOperationCount; ++raw) {
+    const ActuatorOperation operation = static_cast<ActuatorOperation>(raw);
+    const int routes = (operationUsesAcceptedLimits(operation) ? 1 : 0) +
+                       (operationUsesBootstrapEnvelope(operation) ? 1 : 0) +
+                       (operationUsesEndpointPlan(operation) ? 1 : 0);
+    CHECK(routes <= 1);
+  }
+  CHECK(operationUsesAcceptedLimits(ActuatorOperation::POSITION_COMMAND));
+  CHECK(!operationUsesAcceptedLimits(ActuatorOperation::CALIBRATION_CONTACT_PROBE));
 }
 
 static void test_no_persistent_write_class_exists() {
@@ -833,7 +870,8 @@ static void test_no_persistent_write_class_exists() {
   // through this layer.
   for (ActuatorOperation operation :
        {ActuatorOperation::TORQUE_ENABLE, ActuatorOperation::POSITION_COMMAND,
-        ActuatorOperation::CALIBRATION_CONTACT_PROBE}) {
+        ActuatorOperation::CALIBRATION_CONTACT_PROBE, ActuatorOperation::DIRECTION_VERIFY,
+        ActuatorOperation::CALIBRATION_AUXILIARY_MOVE}) {
     CHECK(!operationPermittedForOwner(ActuatorAuthority::PROVISIONING, operation));
   }
 }
@@ -885,10 +923,14 @@ static void test_tostring_is_total() {
   }
   CHECK(std::strcmp(toString(static_cast<ActuatorOperation>(99)), "UNKNOWN") == 0);
 
-  for (uint8_t raw = 0; raw <= (uint8_t)WriteDecision::REJECT_STALE_EPOCH; ++raw) {
+  for (uint8_t raw = 0; raw <= (uint8_t)WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
+       ++raw) {
     CHECK(std::strcmp(toString(static_cast<WriteDecision>(raw)), "UNKNOWN") != 0);
   }
   CHECK(std::strcmp(toString(static_cast<WriteDecision>(99)), "UNKNOWN") == 0);
+  CHECK(std::strcmp(toString(static_cast<WriteDecision>(
+                        (uint8_t)WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS + 1)),
+                    "UNKNOWN") == 0);
 
   for (uint8_t raw = 0; raw <= (uint8_t)TransactionState::ABORTED; ++raw) {
     CHECK(std::strcmp(toString(static_cast<TransactionState>(raw)), "UNKNOWN") != 0);
