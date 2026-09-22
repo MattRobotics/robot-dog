@@ -491,6 +491,7 @@ python3 scripts/tests/test_ota_partition_logic.py   # OTA slot selection (40 tes
 bash scripts/tests/run_host_tests.sh                # servo population / profile + DALY protocol
                                                     # + Wi-Fi + OTA-A + ActuatorAuthority
                                                     # + safe actuator write policy
+                                                    # + calibration bootstrap geometry
                                                     # + calibration domain & manager
 python3 scripts/tests/test_static_audit_daly.py     # DALY write-whitelist mutation suite
 python3 scripts/tests/test_static_audit_safe_actuator.py  # safe actuator boundary mutation suite
@@ -874,6 +875,37 @@ goal-position primitive, and both are prohibited by audits that exist for hardwa
 The full S0 write-surface map and the design rationale are in
 [`SAFE_ACTUATOR_LAYER.md`](SAFE_ACTUATOR_LAYER.md).
 
+### Calibration bootstrap — geometry-authorised moves
+
+`src/actuator/CalibrationGeometryProfile.*` gives the Controller the compiled Geometry
+Compiler V5 result as a generated `constexpr` table: **no JSON parser, no heap, no mesh and no
+collision maths on the device**. It was produced by
+`06_Software/Matdog_Core/calibration/matdog_calibration_geometry_export.py`, a pure reduction
+of the canonical bundle that re-verifies every input hash and refuses to emit anything on
+drift.
+
+Three authorisation routes, mutually exclusive by construction:
+
+| Operation | Authorised by |
+|---|---|
+| `POSITION_COMMAND` | accepted joint bounds — **unchanged, not weakened** |
+| `DIRECTION_VERIFY` | the symmetric bootstrap envelope **and** the session's approved budget |
+| `CALIBRATION_CONTACT_PROBE` | the endpoint plan **and** an accepted raw↔q transform |
+| `CALIBRATION_AUXILIARY_MOVE` | the endpoint plan **and** an accepted raw↔q transform |
+
+Three meanings are kept apart: a **geometric contact** is not an **executable target**, a
+clearance **PASS** is not a **motion authorization**, and a **diagnostic endpoint** is not a
+place the robot may be commanded to. Of 24 canonical endpoints only 8 are executable, and the
+8 `UNRESOLVED` clearance verdicts all sit on diagnostic endpoints.
+
+The direction-verify envelope is **symmetric and checked in tick space** — the magnitude of a
+tick delta needs neither q0 nor direction, which is what makes the move that measures the sign
+safe before the sign is known.
+
+Everything fails closed today: no q0 has been captured on the current installation, so no
+transform exists and every plan-bound move refuses. Audit and contract:
+[`CALIBRATION_BOOTSTRAP.md`](CALIBRATION_BOOTSTRAP.md).
+
 ## OTA-A (update core)
 
 **Status: implemented, compiled, offline-tested. NOT hardware-tested.** No MATDOG device has
@@ -1148,7 +1180,9 @@ cover, and handoff section 7A for the full matrix.
 │   │                          Availability (init/detected/expected/result model),
 │   │                          OperatingMode (MAINTENANCE/RUN)
 │   ├── actuator/              ActuatorWritePolicy (pure: the Safe Actuator Layer
-│   │                          decision core; no transport, no write path)
+│   │                          decision core; no transport, no write path),
+│   │                          CalibrationGeometryProfile + its GENERATED data
+│   │                          table (compiled Geometry V5; no mesh, no FK)
 │   ├── servo/                 ServoBus, ServoPopulation (pure policy),
 │   │                          ServoCensus (Controller-owned service)
 │   ├── imu/                   Bno085Imu
@@ -1168,6 +1202,7 @@ cover, and handoff section 7A for the full matrix.
         ├── test_daly_protocol.cpp       offline DALY protocol / KEY probe tests (host g++)
         ├── test_static_audit_daly.py    DALY write-prohibition audit mutation tests
         ├── test_actuator_write_policy.cpp        offline safe actuator policy tests (host g++)
+        ├── test_calibration_geometry.cpp         offline geometry contract tests (host g++)
         ├── test_static_audit_safe_actuator.py    safe actuator boundary audit mutation tests
         └── run_host_tests.sh            compiles + runs the C++ suites
 ```

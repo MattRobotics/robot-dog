@@ -281,6 +281,13 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — formal H1 satisfied for all 12 leg servos (ID 51 is not in Full-Leg H1); the
   evidence lifecycle `MEASURED → CANDIDATE → ACCEPTED → PROMOTED` is preserved.
 - **NEXT** — motion may be considered, behind the Safe Actuator Layer.
+- **GEOMETRY** — the current Geometry Compiler V5 canonical bundle is the only source of
+  prerequisite, parking and contact-corridor data. The pre-reset calibration block's
+  `rear_parking_pose` / `front_leg_dependencies` and the 30/50/85/90 poses are **SUPERSEDED**;
+  the current plans park at 35.000 / 64.1667 / 93.3333 degrees. Of the 24 endpoints only the
+  **8 upper-leg** ones are `EXECUTABLE_URDF_DOMAIN`; the 16 hip and lower-leg endpoints contact
+  beyond the declared URDF limit and are diagnostic evidence, never motion targets, whatever
+  their clearance verdict. See [`CALIBRATION_BOOTSTRAP.md`](CALIBRATION_BOOTSTRAP.md).
 - **STATUS** — **BLOCKED** by `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION`. Last formal H1 was
   6/12 and is **not** superseded by a Controller census.
   - **Offline foundation: IMPLEMENTED / COMPILED / OFFLINE TESTED.** `src/calibration/` holds a
