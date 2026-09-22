@@ -56,8 +56,11 @@ scope.
 integrate Diagnostics, Maintenance, Service, Servo QC, Provisioning, Full Leg Calibration,
 Wi-Fi/OTA and host transport here, followed later by Motion, IK, Gait and Stabilization.
 
-The preserved branch `matdog/full-leg-calibrator-v1` is an oracle for calibration-engine, safety
-and evidence logic, not a replacement runtime and not a branch to merge wholesale. Likewise, the
+The preserved Full Leg Calibrator V1 tree — annotated tag
+`archive/2026-08-29/full-leg-calibrator-v1-h0` -> `15f3fb8f378e6cadf6bc479bfcaca2947741c9fd`, from
+the former branch `matdog/full-leg-calibrator-v1`, archived 2026-09-18 — is an oracle for
+calibration-engine, safety and evidence logic, not a replacement runtime and not a tree to merge
+wholesale. Likewise, the
 frozen [`ST3215_Bench_Tools`](../ST3215_Bench_Tools/README.md) remain immutable evidence even when
 equivalent service capabilities are later integrated here.
 

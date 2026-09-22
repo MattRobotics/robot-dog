@@ -200,9 +200,11 @@ must travel `Browser -> CommandRouter -> Controller services -> authority -> Saf
 ServoBus`; a direct browser-to-`ServoBus` path is permanently forbidden. Contract in
 [`ARCHITECTURE.md`](01_Docs/02_Architecture/ARCHITECTURE.md#embedded-matdog-web-ui--control--service-dashboard).
 
-The branch `matdog/full-leg-calibrator-v1` is a preserved oracle/evidence branch. Its useful
-calibration engine, safety, and evidence patterns may later be migrated selectively into the
-Controller; the branch is not the final runtime architecture and must not be merged wholesale.
+The Full Leg Calibrator V1 tree is a preserved oracle/evidence source, held by the annotated tag
+`archive/2026-08-29/full-leg-calibrator-v1-h0` -> `15f3fb8f378e6cadf6bc479bfcaca2947741c9fd` (the
+former branch `matdog/full-leg-calibrator-v1` was archived 2026-09-18 and no longer exists). Its
+useful calibration engine, safety, and evidence patterns may later be migrated selectively into
+the Controller; it is not the final runtime architecture and must not be merged wholesale.
 
 The frozen ST3215 tools remain immutable qualification evidence even after equivalent service
 capabilities are integrated into the Controller.

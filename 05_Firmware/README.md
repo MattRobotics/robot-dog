@@ -63,9 +63,12 @@ baseline. Future integrated capabilities include:
 - verified DALY write support (Discharge MOS OFF), once the K-Series protocol is identified
 - Jetson onboard host integration
 
-The branch `matdog/full-leg-calibrator-v1` is preserved as an implementation and evidence oracle.
-It is not the final runtime architecture and must not be merged wholesale; selected calibration,
-safety and evidence logic may be migrated into the permanent Controller in a later phase.
+The Full Leg Calibrator V1 tree is preserved as an implementation and evidence oracle by the
+annotated tag `archive/2026-08-29/full-leg-calibrator-v1-h0` ->
+`15f3fb8f378e6cadf6bc479bfcaca2947741c9fd`; the former branch `matdog/full-leg-calibrator-v1` was
+archived 2026-09-18 and no longer exists. It is not the final runtime architecture and must not be
+merged wholesale; selected calibration, safety and evidence logic may be migrated into the
+permanent Controller in a later phase.
 
 The frozen ST3215 tools remain immutable qualification evidence. Equivalent service capabilities
 may later be integrated into the Controller without rewriting or replacing those frozen sources.

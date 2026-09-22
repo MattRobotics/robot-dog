@@ -27,7 +27,9 @@ transitional references, not the current control flow.
 
 ## Full-leg calibration oracle
 
-The branch `matdog/full-leg-calibrator-v1` is preserved as an engineering oracle and evidence
-source. It is **not** the final runtime architecture and must not be merged wholesale into the
-Controller. Its useful calibration engine, safety gates, and evidence logic are candidates for a
+The Full Leg Calibrator V1 tree is preserved as an engineering oracle and evidence source by the
+annotated tag `archive/2026-08-29/full-leg-calibrator-v1-h0` ->
+`15f3fb8f378e6cadf6bc479bfcaca2947741c9fd`; the former branch `matdog/full-leg-calibrator-v1` was
+archived 2026-09-18 and no longer exists. It is **not** the final runtime architecture and must
+not be merged wholesale into the Controller. Its useful calibration engine, safety gates, and evidence logic are candidates for a
 later deliberate migration into the unified Controller architecture.

@@ -274,7 +274,8 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   powered bus health proven.
 - **ALLOWED** — H1 census semantics, q0 evidence capture, direction witnesses, characterization,
   then staged calibration motion **each with its own session authorization**.
-- **FORBIDDEN** — merging `matdog/full-leg-calibrator-v1` wholesale; duplicating `ServoBus`/UART/
+- **FORBIDDEN** — merging the archived calibrator tree
+  (`archive/2026-08-29/full-leg-calibrator-v1-h0`) wholesale; duplicating `ServoBus`/UART/
   scheduler/`SAFE_OFF`; auto-promoting measurements; assuming `q0 = 2048`; any H2+ motion before a
   formal H1 PASS.
 - **PASS CRITERIA** — formal H1 satisfied for all 12 leg servos (ID 51 is not in Full-Leg H1); the

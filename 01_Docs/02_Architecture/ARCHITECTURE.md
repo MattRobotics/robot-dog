@@ -384,10 +384,13 @@ They remain qualification instruments, not editable Controller modules. Equivale
 maintenance/service features must be integrated without rewriting their source or historical
 evidence.
 
-The branch `matdog/full-leg-calibrator-v1` is preserved as an oracle/evidence branch. It is not
-the final runtime architecture. Selected calibration-engine, safety, and evidence logic may be
-migrated later into the permanent Controller; the branch must not be rebased, deleted, or merged
-wholesale for that purpose.
+The Full Leg Calibrator V1 tree is preserved as an oracle/evidence source under the annotated tag
+`archive/2026-08-29/full-leg-calibrator-v1-h0` -> `15f3fb8f378e6cadf6bc479bfcaca2947741c9fd`. It was
+archived 2026-09-18 from the former branch `matdog/full-leg-calibrator-v1`, which no longer exists;
+the tag, not a branch, is the preservation mechanism. It is not the final runtime architecture.
+Selected calibration-engine, safety, and evidence logic may be migrated later into the permanent
+Controller; the tag must not be moved or deleted, and the tree must not be merged wholesale for
+that purpose.
 
 ## Repository responsibilities
 
