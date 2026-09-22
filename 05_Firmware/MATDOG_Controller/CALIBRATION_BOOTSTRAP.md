@@ -41,8 +41,8 @@ No historical replay may skip to `PROMOTED`. No hardware action was performed.
 | `03_CAD/URDF/matt_robodog_rev00/` + `SHA256SUMS.txt` | **VERIFIED CURRENT** |
 | Geometry Compiler V5 canonical bundle (§4) | **VERIFIED CURRENT → REUSED** |
 | `09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md` | **VERIFIED CURRENT** — the reset's own authority |
-| `archive/2026-08-29/full-leg-calibrator-v1-h0` (LF V25) | **HISTORICAL ORACLE** — behaviour only, §10 |
-| `rear_parking_pose`, `front_leg_dependencies`, `zero_encoder_final`, historical `direction`, historical `q0` | **SUPERSEDED** — §9 |
+| `archive/2026-08-29/full-leg-calibrator-v1-h0` (LF V25) | **HISTORICAL ORACLE** — behaviour only, §11 |
+| `rear_parking_pose`, `front_leg_dependencies`, `zero_encoder_final`, historical `direction`, historical `q0` | **SUPERSEDED** — §10 |
 
 The current state block, unchanged:
 
@@ -176,6 +176,9 @@ calibration of the hip and lower joints cannot use these geometric endpoints as 
 targets.** Reaching them requires an explicit calibration-specific geometry safety plan that
 does not exist yet, and cannot be inferred from a diagnostic endpoint.
 
+§8 asks the prior question — whether those 16 contacts need to be reached at all — and finds
+that none of them is required before the first stand.
+
 ---
 
 ## 6. EXACT 6 PARKING / OBSTRUCTED PATHS
@@ -234,7 +237,88 @@ proves that dropping either one is caught.
 
 ---
 
-## 8. CALIBRATION GEOMETRY PROFILE CONTRACT
+## 8. CONTACT NECESSITY — which of the 24 are actually obligatory
+
+Reaching a geometric contact is not a goal. This section asks, per purpose, **what data is
+genuinely required**, so that no beyond-URDF motion is designed for a contact nothing depends
+on.
+
+### 8.1 The structural fact that decides it
+
+The margin between the declared URDF limit and the geometric contact **inverts** between joint
+kinds, and that inversion is the whole answer:
+
+| Joint kind | Endpoints | Margin URDF → contact | Who binds first |
+|---|---:|---|---|
+| **upper leg** | 8, all `EXECUTABLE` | **−0.367° to −0.625°** (−4.2 to −7.1 ticks) | **the MECHANISM**, inside the URDF domain |
+| hip | 8, all `DIAGNOSTIC` | +0.156° to +1.012° (+1.8 to +11.5 ticks) | the URDF limit |
+| lower leg | 8, all `DIAGNOSTIC` | +0.074° / +0.680° (+0.8 / +7.7 ticks) | the URDF limit |
+
+Read plainly: **for hips and lower legs the URDF limit is already inside the mechanical stop,
+so a command that respects URDF can never reach the stop.** For upper legs it is the reverse —
+the URDF limit is *not* a safe bound, because the mechanism arrives 4 to 7 ticks earlier.
+
+### 8.2 What the first stand actually uses
+
+The validated C4-A stand candidate and the 51-frame C4-C contact-locked rest-to-stand
+trajectory give the answer without any new analysis:
+
+| Joint | Trajectory range | Nearest URDF limit | Margin |
+|---|---|---|---:|
+| all four hips | **0.000° throughout** | ±45° | 45.000° |
+| LF/RF lower | −27.042° … +20.029° | +37.5° | **17.471°** |
+| LH/RH lower | −39.366° … +0.045° | +37.5° | 37.455° |
+| LF/RF upper | +23.484° … +49.257° | +122.5° | 73.243° |
+| LH/RH upper | +51.471° … +80.506° | +122.5° | 41.994° |
+
+**The tightest approach to any URDF limit across the whole stand trajectory is 17.471°, about
+199 ticks.** The hips never move at all. Nothing in the stand comes within two orders of a tick
+budget of any mechanical contact.
+
+### 8.3 Classification of the 24
+
+| Class | Count | Endpoints | Why |
+|---|---:|---|---|
+| **REQUIRED_BEFORE_FIRST_STAND** | **0** | — | The stand trajectory stays ≥199 ticks from every URDF limit and ≥199 ticks from every contact. No contact measurement makes it safer. |
+| **REQUIRED_FOR_FINAL_CALIBRATION** | **8** | all `upper:min` and `upper:max` | Here and only here the mechanism binds **inside** the URDF domain, so the declared limit is unsafe and the true usable range is unknown until measured. They are also the only 8 `EXECUTABLE` endpoints — reachable with no beyond-URDF motion at all. |
+| **MODEL_VALIDATION_ONLY** | **8** | all `lower:min` and `lower:max` | The model claims the URDF limit is conservative by as little as **0.074° (0.84 ticks)** at `lower:min` — the tightest claim anywhere in the model. Confirming it has real value before any future use of the full lower range, but no operational envelope depends on it. Requires beyond-URDF motion. |
+| **OPTIONAL_METROLOGY** | **8** | all `hip:min` and `hip:max` | The hips are held at exactly 0° through the entire validated stand trajectory, and nothing in stages 1–9 moves them. Their contacts matter for lateral gait, which is past the horizon of this plan. Requires beyond-URDF motion. |
+
+`OPTIONAL_METROLOGY` means optional **for the current path to a first stand**, not permanently
+unnecessary.
+
+### 8.4 The question answered directly
+
+> Can the already-conservative URDF limits for HIP/LOWER, together with current q0/direction
+> and Geometry V5, support the first safe operational envelope without first reaching the
+> mechanical contact beyond URDF?
+
+**Yes — and by a wide margin. But the envelope must not be the URDF limit itself.**
+
+Three reasons the URDF limit is the wrong envelope, in descending order of severity:
+
+1. **For upper legs it is not conservative at all.** The mechanism binds 4.2 to 7.1 ticks
+   inside it. Commanding an upper leg to its URDF limit would drive it into the stop. This is
+   why the 8 upper endpoints are `REQUIRED_FOR_FINAL_CALIBRATION` rather than optional.
+2. **At `lower:min` the conservatism is 0.84 ticks — less than one tick.** It is a nominal-model
+   figure with backlash and assembly stack-up unmodelled, and it is stated in *joint* space, so
+   any q0 error consumes it outright. Treating the URDF limit as a safety bound there would be
+   treating a sub-tick model margin as a physical one.
+3. The V5 model itself declares `NOMINAL_COLLISION_GEOMETRY_ONLY`. Its margins are design
+   margins, not as-built ones.
+
+**The defensible first operational envelope is the stand trajectory's own range plus a working
+margin**, which sits ~199 ticks clear of every URDF limit and further still from every contact.
+It needs current q0, current direction, and the V5 collision validation that already exists —
+and it needs **no contact endpoint at all**.
+
+Deriving that envelope is the next design step. **No code is added for it in this branch**, and
+nothing here changes `DIRECTION_VERIFY budget = 0`, hardware motion `BLOCKED`, or default write
+reachability.
+
+---
+
+## 9. CALIBRATION GEOMETRY PROFILE CONTRACT
 
 ```text
 URDF + collision meshes
@@ -269,7 +353,7 @@ distances, blocking link-pair names, and the 2-DOF search space that came back e
 
 ---
 
-## 9. q0 BOOTSTRAP CONTRACT
+## 10. q0 BOOTSTRAP CONTRACT
 
 ```text
 operator manually aligns the robot to the nominal URDF q=0 pose
@@ -287,39 +371,64 @@ id field.
 `present == false`, and a transform carrying 2048 without provenance is refused exactly like
 one carrying any other number.
 
-### The sanity window — **BLOCKED on one mechanical measurement**
+### Servo mechanical prior — **VERIFIED SERVO MECHANICAL PRIOR**
 
-The window is deliberately **not invented here**. The dominant failure mode is not a few
-degrees of alignment error; it is a **one-tooth spline misindex**, and the window has to be
-narrow enough to catch one:
+Manufacturer data for the Feetech **ST-3215-C018** horn gear spline:
 
 ```text
-one_tooth_shift_ticks = 4096 / spline_tooth_count
-q0_sanity_window      < one_tooth_shift_ticks / 2
+spline          = 25T, OD 5.9 mm
+tooth pitch     = 360 / 25       = 14.40 deg
+tooth pitch     = 4096 / 25      = 163.84 encoder ticks
+half tooth      = 7.20 deg       = 81.92 encoder ticks
+encoder scale   = 4096 / 360     = 11.3778 ticks/deg
 ```
 
-What the repository proves today:
+Classification: **VERIFIED SERVO MECHANICAL PRIOR**. It is a property of the servo and its
+horn, independent of mounting, calibration and this robot.
 
-| Input | Status |
+### The q0 acceptance tolerance — **still TO_DERIVE**
+
+**The spline prior is not the tolerance, and is deliberately not converted into one.** A
+±81.92-tick gate is not written anywhere in this branch and no such constant exists in the
+firmware.
+
+Half a tooth is the *discrimination ceiling*: a q0 window wider than 81.92 ticks could not
+distinguish a correctly seated horn from one seated a whole tooth out, so it would be useless.
+It is an upper bound on a useful window, not the window:
+
+```text
+81.92 ticks   = the widest a USEFUL window could be (one-tooth discrimination)
+q0 tolerance  < 81.92 ticks, by an amount nobody has measured yet
+```
+
+The actual tolerance has to absorb three further contributions, none of which the repository
+quantifies:
+
+| Contribution | Status |
 |---|---|
-| Provisioned raw centre, 2048 ±1 tick, all 17 units | **VERIFIED CURRENT** |
-| Output splines physically separated from horns and links | **VERIFIED CURRENT** |
-| Assembly stack-up, bushings, screws, backlash, fit clearances | **UNKNOWN** — V5 `geometry_unknowns: NOMINAL_COLLISION_GEOMETRY_ONLY` |
-| Adjacent-pair hardstop local sensitivity | **NOT COMPUTED** — V5 `geometry_unknowns` |
-| **ST3215 output spline tooth count / horn indexing pitch** | **ABSENT FROM THE REPOSITORY** |
+| Spline indexing granularity | **VERIFIED** — 163.84 ticks/tooth |
+| Manual alignment error at the nominal q=0 pose | **UNMEASURED** — operator-placed, "a few degrees" |
+| Servo/linkage backlash | **UNKNOWN** — V5 `geometry_unknowns: NOMINAL_COLLISION_GEOMETRY_ONLY` |
+| Assembly stack-up (bushings, screws, fit clearances) | **UNKNOWN** — same source |
+| Provisioned raw-centre spread | **VERIFIED** — 2048 ±1 tick, all 17 units |
 
-Every candidate window I could write down would be a number with no provenance, which is the
-one thing this project consistently refuses. **One operator-supplied measurement closes it:**
-the tooth count of the ST3215 output spline. With it the window follows from the inequality
-above; without it any figure is an assertion.
+Manual alignment alone plausibly dominates: at 11.3778 ticks/deg, three degrees of placement
+error is 34 ticks — 42% of the half-tooth ceiling on its own. A window has to sit above the
+real spread of those terms and below 81.92, and the only way to find out where is to capture
+q0 on all twelve joints and look at the distribution.
 
-A deviation beyond the window must **fail preflight and require mechanical inspection**. It
+**Derivation order, deliberately in this direction:** measure first, then set the window.
+Setting it first would make the first capture pass or fail against a number chosen before any
+evidence existed.
+
+A deviation beyond the eventual window must **fail preflight and require mechanical
+inspection**. It
 must never be compensated by writing EEPROM `PositionOffset` — the YAML's `forbidden:` list
 and the reset document both prohibit exactly that.
 
 ---
 
-## 10. DIRECTION VERIFICATION CONTRACT
+## 11. DIRECTION VERIFICATION CONTRACT
 
 LF V25's `direction` was **specification data used arithmetically**, never a measured witness.
 The URDF's `motorDirection` is the same kind of thing. Both are what a current measurement is
@@ -360,7 +469,7 @@ operator approves, it will sit far inside geometry the compiler sampled and foun
 
 The envelope bounds the geometry. **It does not set the excursion.** Choosing that is a
 mechanical judgement about spline fit and placement error, and it shares the missing input of
-§9, so `direction_verify_tick_budget` defaults to `0` = **not authorised**. Geometry and
+§10, so `direction_verify_tick_budget` defaults to `0` = **not authorised**. Geometry and
 budget are independent gates; neither can grant what the other refuses.
 
 Operational safe limits are **not** used — they do not exist. Historical LF limits are **not**
@@ -370,7 +479,7 @@ used — they describe the previous installation.
 
 ---
 
-## 11. CALIBRATION BOOTSTRAP AUTHORIZATION MODEL
+## 12. CALIBRATION BOOTSTRAP AUTHORIZATION MODEL
 
 Three routes through `SafeActuatorPolicy`, mutually exclusive by construction:
 
@@ -411,7 +520,7 @@ removal, and the static audit forbids `ServoBus` from referencing this layer at 
 
 ---
 
-## 12. LF V25 — BEHAVIOR RETAINED vs DATA REJECTED
+## 13. LF V25 — BEHAVIOR RETAINED vs DATA REJECTED
 
 Every numeric constant classified before reuse, as the handoff requires. **Only class A may
 transfer as behaviour.**
@@ -449,7 +558,7 @@ every runtime motion parameter above is class C.
 
 ---
 
-## 13. REUSED / STALE / SUPERSEDED COMPONENTS
+## 14. REUSED / STALE / SUPERSEDED COMPONENTS
 
 **REUSED, unchanged:** Geometry Compiler V5 (all 11 sources, all 8 artifacts); `ServoBus`;
 `ServoCensus` / `ServoPopulation`; `ActuatorAuthority` arbiter with lease, generation and
@@ -471,7 +580,7 @@ LF sequence as an architecture.
 
 ---
 
-## 14. SAFE ACTUATOR POLICY CHANGES
+## 15. SAFE ACTUATOR POLICY CHANGES
 
 `POSITION_COMMAND` is **not weakened**. Its route is unchanged, it still requires an accepted
 bound on the current machine, and a bound geometry profile plus a live session plus an
@@ -479,7 +588,7 @@ approved envelope plus an accepted transform together still leave it at
 `REJECT_NO_ACCEPTED_LIMITS`. The audit fails the build if `POSITION_COMMAND` is ever routed
 through either geometry path, and a mutation proves it.
 
-Added: two operation classes (§11), 14 new refusal reasons, `JointTransformTable`,
+Added: two operation classes (§12), 14 new refusal reasons, `JointTransformTable`,
 `CalibrationBootstrapContext`, and the geometry binding. `reset()` now also clears transforms,
 the session and the parked flag.
 
@@ -490,7 +599,7 @@ state and an accepted transform.
 
 ---
 
-## 15. DEFAULT BUILD WRITE REACHABILITY
+## 16. DEFAULT BUILD WRITE REACHABILITY
 
 ```text
 Unchanged: torque OFF only, inside ServoBus::safeOff().
@@ -506,7 +615,7 @@ CURRENT HARDWARE MOTION AUTHORIZATION   BLOCKED
 
 ---
 
-## 16. NEXT SINGLE HARDWARE GATE
+## 17. NEXT SINGLE HARDWARE GATE
 
 **Robot-powered read-only preflight — formal 12/12 leg population, identity and profile
 verification.** Nothing else, and it is read-only: `Ping` and register reads, `SAFE_OFF`
@@ -518,23 +627,33 @@ it is the gate that turns the last formal `6/12` into a current result.
 Only after it passes, in order, each its own authorised session:
 
 1. manual URDF q=0 pose, torque OFF;
-2. read-only q0 capture → q0 candidates;
-3. **the q0 sanity window** (§9) — *blocked until the spline tooth count is supplied*;
+2. read-only q0 capture on all twelve joints → q0 candidates;
+3. **derive** the q0 acceptance tolerance from that distribution, under the 81.92-tick
+   half-tooth ceiling (§10) — measure first, then set the window;
 4. one micro direction verification, budget explicitly approved;
 5. one-joint bootstrap actuator transaction validated;
-6. staged contact calibration — upper legs first, since they are the only executable endpoints;
-7. current safe limits;
-8. stand-up.
+6. first safe operational envelope, derived from the C4-A/C4-C stand range — **not** from the
+   URDF limits, and requiring **no contact endpoint** (§8.4);
+7. stand-up;
+8. **then** the 8 upper-leg contacts, the only ones required for final calibration and the only
+   ones reachable without beyond-URDF motion (§8.3);
+9. full current safe limits.
 
-Two items must be closed by a human before step 4, and neither is a software task:
+Note that **contact calibration moved after the stand**, not before it. Nothing in steps 1–7
+needs a mechanical contact, so nothing in them justifies designing beyond-URDF motion.
 
-- the **ST3215 output spline tooth count**, which sets the q0 sanity window;
-- the **low-energy runtime settings** (goal speed, acceleration, torque limit) for the new
-  execution contract, which must be defined and verified rather than inherited from LF V25.
+One item must still be closed by a human, and it is not a software task: the **low-energy
+runtime settings** (goal speed, acceleration, torque limit) for the new execution contract,
+which must be defined and verified rather than inherited from LF V25.
+
+The ST3215 spline geometry is no longer open — it is recorded as a **VERIFIED SERVO MECHANICAL
+PRIOR** in §10. What remains open is the q0 acceptance tolerance, and it is open for a
+different reason: it depends on manual alignment, backlash and assembly stack-up, which are
+measured on the robot rather than read from a datasheet.
 
 ---
 
-## 17. Offline result
+## 18. Offline result
 
 No hardware action of any kind. No flash, no servo write, no torque, no goal position, no
 EEPROM access, no provisioning, no DALY write, no push, no merge.
@@ -561,7 +680,7 @@ DEFAULT BUILD WRITE REACHABILITY        torque OFF only, unchanged
 
 ---
 
-## 18. Related
+## 19. Related
 
 - [`SAFE_ACTUATOR_LAYER.md`](SAFE_ACTUATOR_LAYER.md) — the write-surface audit and the policy core
 - [`CALIBRATION_SOURCE_PRECEDENCE.md`](CALIBRATION_SOURCE_PRECEDENCE.md) — source precedence and the EEPROM boundary
