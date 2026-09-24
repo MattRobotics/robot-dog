@@ -1151,9 +1151,12 @@ The firmware consequences are:
 - Every ordinary load, the ESP32 included, returns through DALY `P-`; never raw `B-`.
 - "Powered" and "motion enabled" are separate states: a future docked/charging robot stays powered
   with torque off and motion inhibited, and docking must never write the MOS registers.
-- KEY OFF is **not yet** a validated power-off: a hardware `B-`/`P-` bypass kept the load rail
-  powered with the discharge MOS open. The fused disconnect remains the trusted isolation until
-  that rewire is corrected and validated — see `DEVELOPMENT_GATES.md`.
+- KEY OFF is a **validated power-off** for the robot as built, with no charger and no USB
+  connected (post-rewire power gate A–E PASS, 2026-09-24 — see `DEVELOPMENT_GATES.md` and
+  `VALIDATION.md`). The historical `B-`/`P-` bypass that made the first physical test inconclusive
+  is corrected. A connected charger still backfeeds the `B+`/`P-` load bus independent of KEY
+  state, so the fused disconnect remains the trusted maintenance-isolation point whenever a charger
+  may be present — see `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` §§ 7–8.
 
 ## Bench test profile
 

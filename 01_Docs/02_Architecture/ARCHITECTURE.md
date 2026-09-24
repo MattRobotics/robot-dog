@@ -137,8 +137,10 @@ Dated calibration results remain evidence of earlier installations.
 - The higher-level command/telemetry protocol over CDC remains **TO_DESIGN**.
 
 An existing external four-pin connector carries GPIO19, GPIO20, ESP32 GND, and an unconnected 5 V
-position. It is a USB-data/service predisposition, **TO_TEST** on the physical connector. The
-onboard native-USB validation does not validate that external wiring.
+position. It is **VALIDATED** 2026-09-24 as a USB-data/service connector: native enumeration, CDC,
+and the `esptool` reset/flash-identification handshake were all confirmed through it alone, with
+the onboard USB-C disconnected. Because host VBUS is intentionally not wired, it does not power the
+ESP32 on its own.
 
 ### Update policy
 
@@ -176,14 +178,17 @@ bistable pushbutton under the MATDOG logo
    -> no ESP32 GPIO
 ```
 
-The KEY is configured and observable, but **not yet a validated power-off**. The `0x81` register
-map (from DALY BMSTool V1.14.79) is live-verified: on 2026-09-19 the KEY logic read `0x0055`
-(DISABLED), which explained the G3 finding, and the single guarded write
-`@BMS KEY SET DISCHARGE CONFIRM` set it **once** to `0x005A` (DISCHARGE), acknowledged and read
-back. KEY therefore switches the **discharge MOS only**; the charge MOS stays independent and
-normally ON, and KEY must never be mapped to it. The follow-on physical test was inconclusive
-because of a hardware `B-`/`P-` bypass (TECNOIOT `VIN-` on raw `B-`), so the fused disconnect
-remains the trusted isolation. Power domains, states and charging are owned by
+The KEY is configured and, as of 2026-09-24, a **validated power-off** for the robot as built with
+no charger and no USB connected. The `0x81` register map (from DALY BMSTool V1.14.79) is
+live-verified: on 2026-09-19 the KEY logic read `0x0055` (DISABLED), which explained the G3
+finding, and the single guarded write `@BMS KEY SET DISCHARGE CONFIRM` set it **once** to `0x005A`
+(DISCHARGE), acknowledged and read back. KEY therefore switches the **discharge MOS only**; the
+charge MOS stays independent and normally ON, and KEY must never be mapped to it. The follow-on
+physical test was inconclusive on 2026-09-19 because of a hardware `B-`/`P-` bypass (TECNOIOT
+`VIN-` on raw `B-`); that bypass is now corrected, and the post-rewire power gate passed live on
+2026-09-24 — KEY OFF measured 0 V on every protected rail. A connected charger still backfeeds the
+`B+`/`P-` bus independent of KEY state, so the fused disconnect remains the trusted isolation
+whenever a charger may be present. Power domains, states and charging are owned by
 [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
 
 The Controller cannot be the primary wake source because it is powered downstream of the DALY
@@ -215,14 +220,14 @@ detailed implementation record and validation state.
 
 ### OPEN
 
-- DALY `KEY` **as a robot power-off** — **OPEN / BLOCKED.** The BMS-side investigation is
-  **COMPLETE**: KEY configuration read and write are both live-verified, and the current verified
-  KEY logic is **`0x005A` DISCHARGE** (2026-09-19), so the BMS switches the discharge MOS from the
-  KEY. What is still unproven is the *rail* behaviour: the first physical KEY test was
-  inconclusive because of a hardware `B-`/`P-` bypass (TECNOIOT `VIN-` on raw `B-`). The next gate
-  is the operator rewire `TECNOIOT VIN-` `B-` → `P-` plus the post-rewire validation in
-  [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
-  The fused disconnect remains the trusted isolation method meanwhile. Next steps are owned by the
+- **Charging beyond the one attended manual session** — **FUTURE / OPEN.** DALY `KEY` as a robot
+  power-off is now **VERIFIED** (2026-09-24, post-rewire power gate A–E, PASS — see
+  [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md)),
+  but that verification holds only with no charger connected: a connected charger backfeeds the
+  `B+`/`P-` bus directly, independent of KEY state (live-verified 2026-09-22/23 + 2026-09-24).
+  Autonomous dock/contact hardware, reverse-polarity protection, unattended charge
+  acceptance/termination and future Jetson charging behaviour remain **FUTURE**, with no hardware
+  evidence beyond the one manual session. Next steps are owned by the
   [root snapshot](../../README.md#where-we-are-and-the-next-gate).
 
 ## Embedded MATDOG Web UI / Control & Service Dashboard

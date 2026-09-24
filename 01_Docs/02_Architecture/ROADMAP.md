@@ -1,7 +1,7 @@
 # MATDOG Roadmap
 
 **Canonical owner of the MATDOG development sequence, its dependencies, and where the project
-currently stands.** Last updated 2026-09-18.
+currently stands.** Last updated 2026-09-24.
 
 This file answers *where are we, what is next, and why a stage cannot be skipped*. It does not
 duplicate other owners:
@@ -57,13 +57,17 @@ COMPLETE   DALY KEY research                      COMPLETE (read-only, 2026-09-1
 COMPLETE   DALY 0x81 read                         LIVE VERIFIED (read-only, 2026-09-19)
 COMPLETE   DALY KEY write (0x0120 := 0x005A)      LIVE VERIFIED (2026-09-19; ACK + read-back)
                                                   current KEY logic = DISCHARGE (0x005A)
+COMPLETE   B-/P- hardware bypass correction       VERIFIED (2026-09-24; TECNOIOT VIN- now on P-)
+COMPLETE   post-rewire power gate A-E             PASS (2026-09-24; dead-circuit + KEY OFF/ON +
+                                                  powered no-motion regression, live)
+COMPLETE   external USB service/programming port  VALIDATED (2026-09-24; GPIO19/20, no host VBUS —
+                                                  enumeration, CDC, esptool reset/flash-ID)
 
-BLOCKED    physical KEY OFF removes robot rails   BLOCKED by a hardware B-/P- bypass:
-                                                  TECNOIOT VIN- must move from B- to P-
-NEXT       post-rewire power validation           TO_TEST (operator rewire, then dead-circuit +
-                                                  KEY OFF/ON + powered no-motion regression)
-OPEN       charging hardware (manual + dock)      OPEN — no charger/dock evidence exists
-OPEN       physical KEY safety barrier            NOT VALIDATED (fused disconnect = trusted isolation)
+OPEN       manual charging common-port behaviour  VERIFIED electrically (2026-09-22/23 + 09-24):
+                                                  a connected charger backfeeds B+/P- regardless
+                                                  of KEY state — see MATDOG_POWER_STATES_AND_CHARGING.md §8
+OPEN       autonomous dock/charging qualification OPEN — no dock hardware evidence beyond one
+                                                  attended manual charging session
 THEN       G4 Diagnostics / Maintenance           NOT STARTED
 ```
 
@@ -81,23 +85,27 @@ by the G3/G3.1 closeout pull request.
 
 ### Open hardware notes
 
-- **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
-  DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
-  or safety barrier. Research (2026-09-19): public DALY documents publish no K-series KEY
-  register; DALY's own BMSTool V1.14.79 (static inspection) points to KEY logic at `0x0120` on a
-  second Modbus personality (`0x81`). **Live-verified read-only the same day** with `@BMS KEY
-  READ`: the `0x81` personality answers and the unit's KEY logic is **DISABLED (`0x0055`)** —
-  consistent with the G3 finding. The single guarded write — `@BMS KEY SET DISCHARGE CONFIRM`,
-  `0x0120 := 0x005A` (DISCHARGE) — was sent **once, live, on 2026-09-19**: acknowledged and read
-  back as `0x005A`, so the BMS now switches the discharge MOS from the KEY. The follow-on physical
-  KEY test was **inconclusive**: a hardware `B-`/`P-` bypass (TECNOIOT `VIN-` on raw `B-`) kept the
-  load rail powered with the discharge MOS open. Until that rewire and its validation, KEY OFF must
-  not be trusted to remove the rails, and the fused disconnect remains the trusted physical
-  isolation method — see
+- **DALY `KEY` — RESOLVED as a power-off, 2026-09-24.** Research (2026-09-19): public DALY
+  documents publish no K-series KEY register; DALY's own BMSTool V1.14.79 (static inspection)
+  points to KEY logic at `0x0120` on a second Modbus personality (`0x81`). **Live-verified
+  read-only the same day** with `@BMS KEY READ`: the `0x81` personality answers and the unit's KEY
+  logic was **DISABLED (`0x0055`)** pre-commissioning — consistent with the G3 finding, where
+  toggling the physical KEY produced no observed change in `discharge_mos`. The single guarded
+  write — `@BMS KEY SET DISCHARGE CONFIRM`, `0x0120 := 0x005A` (DISCHARGE) — was sent **once, live,
+  on 2026-09-19**: acknowledged and read back as `0x005A`, so the BMS now switches the discharge
+  MOS from the KEY. The follow-on physical KEY test was **inconclusive** at the time because a
+  hardware `B-`/`P-` bypass (TECNOIOT `VIN-` on raw `B-`) kept the load rail powered with the
+  discharge MOS open. That rewire is now **complete**, and the post-rewire power gate A–E **passed
+  live on 2026-09-24**: with no charger and no USB present, KEY OFF measures 0 V on every protected
+  rail. A connected charger still backfeeds the `B+`/`P-` bus independent of KEY state, so the
+  fused disconnect remains the trusted physical isolation method whenever a charger may be present
+  — see
   [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
-- **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
-  19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
-  electrical and signal-integrity validation.
+- **GPIO19/GPIO20 — VALIDATED 2026-09-24.** GPIO19 = native USB D−, GPIO20 = native USB D+. The
+  external 19/20/GND connector (host VBUS intentionally not wired) was validated as a
+  service/programming port: native enumeration, bidirectional CDC and the `esptool`
+  reset/flash-identification handshake all confirmed with the onboard USB-C disconnected. It does
+  not power the ESP32 on its own.
 
 ---
 
@@ -111,13 +119,13 @@ Each row's *Blocks* column states what it gates. Arrows are hard dependencies, n
 |---|---|---|---|
 | 1 | **MATDOG Controller baseline** | **COMPLETE** | V0.1 unified runtime, **FROZEN** at tag `matdog-controller-v0.1.0`. **VALIDATED** on real hardware in the `USB_ONLY` profile only. |
 | 2 | **ROBOT_POWERED preparation** | **COMPLETE** | `HardwareProfile` authority (`USB_ONLY` / `ROBOT_POWERED`), profile-derived module expectations, canonical-17 / expected-13 / absent-by-design-4 servo population model, structured census classification, build-manifest flash provenance. Software **FROZEN**; hardware-validated by stage 3. |
-| 3 | **ROBOT_POWERED no-motion validation** | **COMPLETE** | **G3 PASS (formal)**, live 2026-09-17 / 2026-09-18, two identical censuses. **G3.1 CDC-independent Controller loop PASS**, 2026-09-18. Evidence in [`VALIDATION.md`](../../05_Firmware/MATDOG_Controller/VALIDATION.md). Open hardware item: DALY `KEY` (see above). |
+| 3 | **ROBOT_POWERED no-motion validation** | **COMPLETE** | **G3 PASS (formal)**, live 2026-09-17 / 2026-09-18, two identical censuses. **G3.1 CDC-independent Controller loop PASS**, 2026-09-18. **Post-rewire power gate A–E PASS**, 2026-09-24. Evidence in [`VALIDATION.md`](../../05_Firmware/MATDOG_Controller/VALIDATION.md). |
 
 ### Phase 2 — Maintenance, authority, service
 
 | # | Stage | Status | Reality in this repository |
 |---|---|---|---|
-| 4 | **G4 — Diagnostics / Maintenance** | **PARTIAL — NOT STARTED** (DALY KEY read and write both live-verified; the open item is the hardware `B-`/`P-` bypass, not the Controller) | Already exist: `@STATUS` module availability, `@SERVO SCAN`, `@SERVO READ`, `@SERVO CENSUS` (structured population classification), `@SERVO SAFE_OFF` with independent readback, `@IMU`/`@BMS`/`@LED` status. Do **not** exist: `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated servo health summary. |
+| 4 | **G4 — Diagnostics / Maintenance** | **PARTIAL — NOT STARTED** (DALY KEY read/write and the physical power-off are all live-verified; no hardware blocker remains for this stage) | Already exist: `@STATUS` module availability, `@SERVO SCAN`, `@SERVO READ`, `@SERVO CENSUS` (structured population classification), `@SERVO SAFE_OFF` with independent readback, `@IMU`/`@BMS`/`@LED` status. Do **not** exist: `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated servo health summary. |
 | 5 | **OperatingMode / ActuatorAuthority** | **IMPLEMENTED / OFFLINE TESTED** | `src/core/ActuatorAuthority.*` is the single central arbiter (`NONE`/`DIAGNOSTICS`/`CALIBRATION`/`QC`/`PROVISIONING`/`MOTION`, at most one owner at a time), pure and host-linkable, one instance owned by `Controller`, `NONE` at boot, leases carrying a generation against stale releases. Orthogonal to `OperatingMode` and enforced as such. `SAFE_OFF` is outside arbitration structurally. Read-only servo diagnostics deliberately take no lock. **No new write path was added** — the only actuator write is still `EnableTorque(id, 0)`, and nothing can acquire an owner yet. 751 offline checks. **HARDWARE TO_TEST.** |
 | 6 | **Service / Provisioning / QC** | **FUTURE** | Frozen bench tools (Bench QC V6.1, Source Signature Survey V1, Provisioner V6) remain **FROZEN** oracles; nothing is integrated into the Controller. Blocked by stage 5. |
 | 7 | **Full Leg Calibration integration** | **PARTIAL — offline foundation IMPLEMENTED / OFFLINE TESTED** | `src/calibration/` holds a pure host-linkable domain model recovered from the LF V25 archive plus a `CalibrationManager` over the real `ActuatorAuthority` (branch `feat/controller-calibration-manager-v1`). LF V25 replayed offline: 58 steps, 6 LF contacts of 24, matched. **No write path was added** and hardware motion is compile-time blocked. The Geometry Compiler V5 canonical bundle is **REUSED** (all 18 gated inputs, 9 compiler sources and 8 artifacts re-verified bit-for-bit) and exported to a compact on-device profile: 24 endpoints of which **8 executable / 16 diagnostic**, the **6** 1-DOF parking plans, and a per-joint bootstrap envelope. The execution engine is **TO_IMPLEMENT**. Audit and source precedence: [`CALIBRATION_SOURCE_PRECEDENCE.md`](../../05_Firmware/MATDOG_Controller/CALIBRATION_SOURCE_PRECEDENCE.md). Note: `matdog/full-leg-calibrator-v1` no longer exists as a branch; it was archived 2026-09-18 under the annotated tag `archive/2026-08-29/full-leg-calibrator-v1-h0` -> `15f3fb8f378e6cadf6bc479bfcaca2947741c9fd` (local and on `origin`), with its worktree-only hardware evidence in `~/MATDOG/archive/full-leg-calibrator-v1/`. No oracle material was lost. |
@@ -204,12 +212,12 @@ authoritative Controller state, never from frontend assumptions.
 
 | Blocker | Blocks | Cleared by |
 |---|---|---|
-| **Hardware `B-`/`P-` bypass**: TECNOIOT `VIN-` returns to raw battery `B-`, so the load rail stayed powered with the discharge MOS open | KEY OFF as a power-off; every OFF / MANUAL_CHARGE_OFF / SERVICE_ISOLATED state; the physical KEY test | operator rewire (`TECNOIOT VIN-` → `P-`) then the dead-circuit + KEY OFF/ON + powered no-motion validation in [`MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md) (KEY logic itself is live-verified `0x005A`; fused disconnect is the trusted isolation meanwhile) |
-| Charging hardware (charger, dock, contacts, return path) never tested | manual charging with KEY OFF; autonomous docking/charging | a separate charging-hardware gate once charger/dock hardware exists |
+| ~~Hardware `B-`/`P-` bypass~~ — **RESOLVED 2026-09-24**: TECNOIOT `VIN-` now returns to `P-`; post-rewire power gate A–E passed live | *(historical)* KEY OFF as a power-off; the OFF / `MANUAL_CHARGE_KEY_OFF` / SERVICE_ISOLATED states | operator rewire + validation, both done — see [`MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md) §§ 10–11 |
+| Autonomous dock/contact hardware and charger-topology qualification beyond one attended manual session (reverse-polarity protection not yet evidenced; a connected charger backfeeds `B+`/`P-` independent of KEY state) | autonomous docking/charging; unattended charge acceptance/termination | a separate charging-hardware gate once dock hardware exists — see [`MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md) §8 |
 | `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION` | all motion (15, 17, 20, 23) | stages 7 + 8 |
-| No `ActuatorAuthority` model | write-capable service, QC, calibration, motion | stage 5 |
-| No Safe Actuator Layer | all motion | stage 14 |
-| No Wi-Fi runtime | all Web UI and OTA runtime | stage 10 |
+| `ActuatorAuthority` arbiter is implemented / offline-tested but **not hardware-tested**, and no write-capable command exists yet to acquire an owner | write-capable service, QC, calibration, motion | stage 5 hardware validation + a write-capable command |
+| Safe Actuator Layer's policy core is implemented / offline-tested; the `ServoBus` runtime adapter and every motion primitive are **TO_IMPLEMENT** | all motion | stage 14 completion |
+| Wi-Fi runtime (station-mode) is implemented / offline-tested but **not hardware-tested** — no MATDOG build has associated with an access point | hardware-validated Web UI and OTA runtime | stage 10 hardware test |
 
 ---
 
