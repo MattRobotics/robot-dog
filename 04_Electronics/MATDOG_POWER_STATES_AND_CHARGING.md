@@ -60,16 +60,32 @@ The BMS KEY logic register is configured to:
 |---|---|---|
 | Discharge MOS | ON | OFF |
 | Charge MOS | ON | **stays ON** |
-| `P-` load domain | available | removed |
-| Robot electronics | powered | off |
-| Charging | possible | still architecturally possible |
+| Battery discharge path (pack → `P-`) | available | removed |
+| `B+`/`P-` robot domain, no external source connected | available | **removed — VERIFIED 2026-09-24** |
+| `B+`/`P-` robot domain, charger connected across `B+`/`P-` | available | **NOT removed — the charger backfeeds it regardless of KEY state, VERIFIED 2026-09-22/23 + 2026-09-24** |
+| Charging | possible | still possible (Charge MOS unaffected by KEY) |
 
-**KEY controls the Discharge MOS only.** It must never be changed to `CHARGE_AND_DISCHARGE`
-(`0x00AA`) and must never be mapped to the Charge MOS.
+**KEY controls the Discharge MOS only** — that is, it switches the battery's own discharge path,
+not the `B+`/`P-` bus as a whole. It must never be changed to `CHARGE_AND_DISCHARGE` (`0x00AA`) and
+must never be mapped to the Charge MOS.
 
-Human meaning: KEY ON = MATDOG available; KEY OFF = deliberately powered off. It is **not** a
-charging command, **not** a service isolation device, and **not** a substitute for the removable
-main fuse / service disconnect.
+**KEY OFF removes the battery discharge path through the DALY, not necessarily the `B+`/`P-` load
+bus itself:**
+
+- With **no external source connected**, removing the discharge path collapses the entire `B+`/`P-`
+  robot domain: servo rail, TECNOIOT and the ESP32-S3 all go to 0 V. **VERIFIED 2026-09-24** (§11
+  procedure A/C).
+- If an **external charger is connected directly across `B+`/`P-`** (the current common-port
+  topology — see §8), that charger energizes the load bus on its own, independent of the Discharge
+  MOS. The ESP32-S3 and servo rail may stay powered from the charger even with KEY OFF and
+  Discharge MOS OFF. **VERIFIED 2026-09-22/23 + 2026-09-24.**
+- **KEY state alone must therefore never be interpreted as proof that the `B+`/`P-` bus is
+  de-energized.** The only way to know is to check for an external source (charger/dock) and, when
+  in doubt, measure the rails directly — see §7.
+
+Human meaning: KEY ON = MATDOG available; KEY OFF = deliberately powered off **provided no external
+source is connected** (see above). It is **not** a charging command, **not** a service isolation
+device, and **not** a substitute for the removable main fuse / service disconnect.
 
 Status: the register write is **VERIFIED** (live, 2026-09-19 — see §9); the resulting physical
 KEY OFF/ON rail behaviour is **VERIFIED** 2026-09-24 (§11 procedure A–E, PASS). Persistence of the
@@ -189,20 +205,33 @@ substitute for the removable fuse / service disconnect as the trusted maintenanc
 because a connected charger alone can re-energize the `B+`/`P-` bus regardless of KEY state.
 
 ```text
-1. controlled shutdown
+1. controlled shutdown / SAFE_OFF as applicable
 2. KEY OFF
-3. verify the load rails are down (measure, do not assume)
-4. remove/open the main service fuse / disconnect
-5. disconnect the charging dock / charger
-6. disconnect USB and any external grounds as required
-7. verify the absence of unintended power/backfeed before work
+3. disconnect the charger/dock and any other external power source
+4. disconnect USB and any external grounds as required
+5. verify the robot load rails are down (measure, do not assume)
+6. remove/open the main battery service fuse / disconnect
+7. re-verify the absence of unintended power/backfeed before physical service
 ```
 
-Status: **VERIFIED** 2026-09-24 for the current hardware — the full sequence (KEY OFF, fuse
-removed, external USB unplugged) was executed as the session closeout and measured down to 0 V on
-every rail (§11, §3 of the 2026-09-24 closeout record). Step 3 (verify the load rails are down) is
-now trustworthy with the charger and USB absent; it must **not** be assumed to hold with a charger
-connected — see §8.
+**Why every external source is disconnected before the verification step, and the fuse comes
+after it, not before:** the fuse's position relative to the charger's `PAD+`/`PAD-` tap point has
+**not** been electrically traced or tested — §11's dead-circuit measurements (both fuse states,
+0 V in both) were taken with **no charger connected**, and no evidence exists either way for
+whether pulling the fuse alone would also interrupt a connected charger's contribution to `B+`/`P-`
+(§8 already shows the charger backfeeds that bus independent of Discharge-MOS/KEY state, which is
+a different node than the fuse). Until that is traced and tested, the fuse must not be assumed to
+isolate a connected charger. The safe order is therefore to disconnect every known external source
+(charger/dock, then USB) first, so that "verify the load rails are down" (step 5) is a clean
+measurement against zero known sources rather than a reading that could be misinterpreted either
+way; the fuse pull (step 6) is then the physical isolation added on top of an already-measured dead
+circuit, and step 7 re-verifies nothing changed as a result of pulling it.
+
+Status: **VERIFIED** 2026-09-24 for the current hardware, with no charger connected — the full
+sequence (external USB unplugged, KEY OFF, rails measured down, fuse removed) was executed as the
+session closeout (§6 of the 2026-09-24 closeout record) and every rail measured 0 V (§11, §3 of the
+same record). This sequence has **not** been exercised end-to-end with a charger connected at step
+3; do not assume step 5 reads 0 V if a charger or dock is still attached — see §8.
 
 ---
 
