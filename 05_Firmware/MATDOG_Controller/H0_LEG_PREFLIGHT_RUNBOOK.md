@@ -31,12 +31,13 @@ None of `feat/controller-wifi-ota-v1`, `…-calibration-manager-v1`, `…-safe-a
 | Hardware profile | `ROBOT_POWERED` build override |
 | Flash path | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`, `app0 @ 0x010000` |
 
-> **Documentation discrepancy, resolved.** `VALIDATION.md` § *Present-day baseline* still says
-> the powered build on the robot is `e2fc605` / `e2b474b5…`. That table was written on
-> 2026-09-18 (commit `055d93a`) and was never updated after the 2026-09-19 flash. The later
-> record at `VALIDATION.md` § *DALY KEY — SINGLE LIVE CONFIGURATION WRITE* is authoritative:
-> `6322563` is what is installed. **Step 3 of the procedure confirms this from the board
-> itself** rather than trusting either document.
+> **Documentation discrepancy — historical, now resolved.** From 2026-09-18 (commit `055d93a`)
+> until the 2026-09-24 power closeout, `VALIDATION.md` § *Present-day baseline* briefly listed the
+> powered build on the robot as `e2fc605` / `e2b474b5…` without yet reflecting the 2026-09-19 DALY
+> KEY write flash. `VALIDATION.md` § *Present-day baseline* now correctly lists `6322563` as the
+> firmware currently on the robot, with the `e2fc605` row explicitly marked superseded. **Step 3
+> of the procedure still confirms this from the board itself** rather than trusting either
+> document.
 
 ### 1.2 Capability matrix — the H0 record, field by field
 
@@ -98,8 +99,15 @@ operator authorises a flash.
 | Secondary abort | `@SERVO SAFE_OFF <id>` per joint — secondary only, never a substitute |
 | Physical | robot on a flat surface, all four feet down, nothing under the legs, no hand in the leg workspace |
 
-**The KEY switch is not a safety barrier.** The `B-`/`P-` bypass makes it inconclusive; the fused
-disconnect is the trusted isolation.
+**KEY OFF is a verified functional power-off, but it is NOT the trusted service-isolation
+mechanism.** The historical `B-`/`P-` bypass is **RESOLVED** (2026-09-24): with no charger and no
+USB/external source connected, physical KEY OFF now removes the entire protected robot domain —
+every protected rail measures 0 V. However, a charger connected across `B+`/`P-` can still energize
+that bus **even with KEY OFF and Discharge MOS OFF** — see
+[`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md)
+§§ 7–8. The removable main fuse / service disconnect remains the **trusted physical isolation for
+maintenance**. Before any service action: disconnect every external source (charger, USB) and
+verify the protected rails are dead — do not rely on KEY OFF alone.
 
 ### The USB connection must not reset the board
 
@@ -115,6 +123,15 @@ Use the no-reset method already proven on 2026-09-17 and 2026-09-19:
 - **the first write after opening is dropped.** Collect for ~1 s, clear `ECHO`, send a lone
   `\n` to flush the Controller's line buffer, *then* send the first real command;
 - do **not** use `esptool` for anything in this gate — every `esptool` path resets the board.
+
+> **External GPIO19/GPIO20/GND connector — VALIDATED 2026-09-24** as a native USB
+> service/programming port: enumeration, bidirectional CDC, and the `esptool`
+> reset/flash-identification handshake — plus correct re-enumeration after that reset — were all
+> confirmed through it alone, with no host VBUS wired. It reaches the **same** native
+> USB-Serial-JTAG peripheral as the onboard USB-C, so if this session is opened through that
+> connector instead, the no-reset method above still applies unchanged. This validates it as a
+> future flashing path for the H0-B authorization in §1.3; it changes nothing about **this**
+> procedure, which never calls `esptool` on either connector.
 
 Confirm no reset happened: `runtime_resets=0` and a monotonically increasing `uptime_ms` across
 the whole session.
