@@ -1,7 +1,7 @@
 # MATDOG Controller — Development Gates
 
 **Canonical owner of the technical pass/fail authorization criteria for each Controller
-development gate.** Last updated 2026-09-18.
+development gate.** Last updated 2026-09-24.
 
 This file answers *what must be true before this stage may begin, what it may and may not do, and
 what proves it passed*. It is not a narrative roadmap and not an evidence log:
@@ -129,7 +129,7 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   `runtime_resets` 0; every command reply complete once the backlog had drained.
 - **EVIDENCE** — [`VALIDATION.md` § G3.1](VALIDATION.md).
 
-## Open hardware item — DALY KEY (before G4)
+## DALY KEY hardware item — closed 2026-09-24 (before G4)
 
 - **FINDING** — during G3 both positions of the physical KEY switch produced identical
   DALY-reported state (`discharge_mos=ON` in both).
@@ -170,27 +170,37 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   [`VALIDATION.md` § DALY KEY single live configuration write](VALIDATION.md). Persistence across
   a BMS power cycle is **TO_TEST**. The write is retained as tightly gated re-commissioning
   functionality and is now inert on this unit (`ALREADY_CONFIGURED`, zero TX).
-- **PHYSICAL KEY TEST** — **BLOCKED / INCONCLUSIVE.** Operator-reported: with KEY OFF the DALY
-  showed the discharge MOS OFF while the robot load rail stayed powered. Root cause is a hardware
-  `B-`/`P-` bypass — the TECNOIOT step-down input return sits on raw battery `B-`, and being a
-  non-isolated buck it bridges `B-` to `P-` through the ESP32/Seeed/servo grounds.
-- **REQUIRED CORRECTION (operator)** — move `TECNOIOT VIN-` from `B-` to `P-`, then run the
-  dead-circuit / KEY ON / KEY OFF (USB disconnected) / KEY ON / powered no-motion procedure in
+- **PHYSICAL KEY TEST (2026-09-19)** — **HISTORICAL / SUPERSEDED.** Operator-reported: with KEY OFF
+  the DALY showed the discharge MOS OFF while the robot load rail stayed powered. Root cause was a
+  hardware `B-`/`P-` bypass — the TECNOIOT step-down input return sat on raw battery `B-`, and
+  being a non-isolated buck it bridged `B-` to `P-` through the ESP32/Seeed/servo grounds.
+- **CORRECTION AND POST-REWIRE VALIDATION — DONE, PASS (2026-09-24).** `TECNOIOT VIN-` was moved
+  from `B-` to `P-`, and the dead-circuit / KEY ON / KEY OFF (USB disconnected) / KEY ON / powered
+  no-motion procedure in
   [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md)
-  § 11. Until it passes, KEY OFF must not be trusted to remove the robot rails.
-- **CHARGING** — separate **OPEN** gate: no charger/dock hardware evidence exists. Manual charging
-  with KEY OFF is an architectural target only.
-- **STATUS** — **OPEN.** The BMS-side KEY configuration is verified; the KEY as a power-off is
-  blocked on the hardware bypass above.
-- **INTERIM RULE** — the fused disconnect is the trusted physical isolation method.
+  § 11 passed live: with no charger and no USB present, KEY OFF now removes the robot rails
+  (servo rail, TECNOIOT output and PAD+→PAD- all measured 0 V), and the powered no-motion
+  regression still holds. Full evidence:
+  [`VALIDATION.md` § POWER GATE A–E, MANUAL CHARGING & EXTERNAL USB SERVICE PORT](VALIDATION.md).
+  BMS KEY-configuration persistence across a true DALY power cycle remains **TO_TEST**.
+- **CHARGING** — a connected charger backfeeds the `B+`/`P-` load bus directly, independent of
+  KEY/Discharge-MOS state (live-verified 2026-09-22/23 + 2026-09-24 — see
+  `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` § 8). KEY OFF does **not** de-energize the
+  robot while a charger is connected. Full autonomous dock/charging qualification remains a
+  separate **FUTURE/OPEN** gate.
+- **STATUS** — **CLOSED for this gate.** The BMS-side KEY configuration and the physical KEY
+  power-off are both verified for the robot as built. See G4 below for what follows.
+- **INTERIM RULE, updated** — the fused disconnect remains the primary maintenance isolation
+  point (§7 of the canonical power doc), because a connected charger can still re-energize the
+  `B+`/`P-` bus regardless of KEY state; KEY OFF alone is no longer distrusted when no charger is
+  connected.
 
 ## G4 — Diagnostics / Maintenance
 
 - **PURPOSE** — permanent read-only maintenance capability over the single shared `ServoBus`.
 - **ENTRY** — G3 formal PASS (including the census repeat); **G3.1 PASS**. Both satisfied
-  2026-09-18. The DALY KEY investigation is closed on the BMS side (read and write both
-  live-verified); the roadmap puts the hardware `B-`/`P-` rewire and its post-rewire power
-  validation first.
+  2026-09-18. The DALY KEY investigation is closed both on the BMS side (read and write both
+  live-verified) and on the physical power-off side (post-rewire power gate A–E PASS, 2026-09-24).
 - **ALLOWED** — `SYSTEM_SELF_TEST`, consolidated servo health, source-signature read, profile audit;
   extension of the existing census/read/`SAFE_OFF` surface.
 - **FORBIDDEN** — any new persistent write path; any transport→register access; motion.

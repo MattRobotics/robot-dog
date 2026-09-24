@@ -33,9 +33,21 @@ checkboxes are not current project status and are intentionally not rewritten.
   read-only DALY, live LED, 13/13 expected servos with 4 absent by design in two identical
   censuses, `VERIFIED_OFF` and `torque=0` on all 13, concurrent soak;
 - **CDC-independent Controller loop — G3.1 PASS (2026-09-18):** BNO085 acquisition at 50.1 Hz with
-  the USB CDC port closed, open, and with `@BMS STREAM` enabled.
+  the USB CDC port closed, open, and with `@BMS STREAM` enabled;
+- **DALY KEY logic set to DISCHARGE-only (`0x0120 := 0x005A`) — live-verified 2026-09-19**, ACK +
+  read-back, no BMS restart needed;
+- **Post-rewire power gate A–E — PASS (2026-09-24):** the historical `B-`/`P-` bypass is corrected
+  and measured gone; physical KEY OFF now removes the entire protected robot domain with no
+  charger and no USB present, and the powered no-motion regression still holds on the currently
+  installed firmware;
+- **Manual charging, common-port electrical behaviour — VERIFIED (2026-09-22/23 + 2026-09-24):** a
+  connected charger backfeeds the `B+`/`P-` load bus regardless of KEY/Discharge-MOS state — see §
+  POWER GATE A–E, MANUAL CHARGING & EXTERNAL USB SERVICE PORT below;
+- **External USB service/programming port (GPIO19/GPIO20, no host VBUS) — VALIDATED (2026-09-24):**
+  enumeration, CDC RX/TX, and the `esptool` reset/flash-identification path all confirmed through
+  the external connector alone.
 
-Powered build currently on the robot:
+Powered build on the robot at G3/G3.1 closure (2026-09-18, superseded by the row below):
 
 | Identity | Value |
 |---|---|
@@ -44,28 +56,47 @@ Powered build currently on the robot:
 | Application | 387808 bytes, SHA256 `e2b474b5c07e98649fbaf31d3d08970d022ffbdb5f1212d6b606dc28cac065d2` |
 | Flash path | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`, `app0 @ 0x010000` |
 
+Powered build currently on the robot, as of the 2026-09-24 session — the DALY KEY write flash
+(2026-09-19) superseded the G3/G3.1 image above, and no commit since has touched firmware source
+(`4604e36`, `efba2dc`, `19fe837` are test-only or docs-only — see § POWER GATE A–E, MANUAL CHARGING
+& EXTERNAL USB SERVICE PORT below):
+
+| Identity | Value |
+|---|---|
+| Source commit | `6322563` (`fix(controller): recheck mode before DALY KEY write`) |
+| Hardware profile | `ROBOT_POWERED` build override; the source default remains `USB_ONLY` |
+| Application SHA256 | `e9283ced5801d87d5fe44f95411ead2de6d6f6dad2101c88b210c31cd0e645b6` (per § EVIDENCE PROVENANCE below) |
+| Flash path | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`, `app0 @ 0x010000` |
+
 ### OPEN
 
-- **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
-  DALY-reported state (`discharge_mos=ON` in both positions) — explained on 2026-09-19: the KEY
-  logic register read `0x0055` (DISABLED). It has since been set once, live, to `0x005A`
-  (DISCHARGE) and read back. KEY is still **not** a validated shutdown or safety barrier: the
-  physical test was inconclusive because of a hardware `B-`/`P-` bypass (TECNOIOT `VIN-` on raw
-  `B-`), so the fused disconnect remains the trusted physical isolation method. Power domains,
-  states and charging are owned by
+- **DALY `KEY` — physical power-off VERIFIED 2026-09-24, BMS-side configuration VERIFIED
+  2026-09-19.** The KEY logic register was live-verified `0x0055` (DISABLED) pre-commissioning,
+  then set once, live, to `0x005A` (DISCHARGE) and read back. The follow-on physical KEY test was
+  inconclusive on 2026-09-19 because of a hardware `B-`/`P-` bypass; that bypass is now corrected
+  and the post-rewire power gate A–E passed live on 2026-09-24 (KEY OFF removes the whole protected
+  domain with no charger/USB present). Persistence of the register value across a true DALY power
+  cycle remains **TO_TEST**. A connected charger still backfeeds the `B+`/`P-` bus regardless of
+  KEY state — see the charging note below. Power domains, states and charging are owned by
   [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
-- **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
-  19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
-  electrical and signal-integrity validation.
+- **GPIO19/GPIO20 — VALIDATED 2026-09-24.** GPIO19 = native USB D−, GPIO20 = native USB D+. The
+  external 19/20/GND connector (no host VBUS) has been validated as a service/programming port:
+  enumeration, CDC RX/TX, and the `esptool` reset/flash-identification path all confirmed with the
+  onboard USB-C disconnected. It does not power the ESP32 on its own.
+- **Manual charging common-port behaviour — VERIFIED 2026-09-22/23 + 2026-09-24, informational.**
+  A connected charger energizes the `B+`/`P-` load bus directly, independent of KEY/Discharge-MOS
+  state; only unplugging the charger (with KEY OFF) removes power. See
+  `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` § 8.
 
 ### Next
 
 ```text
-hardware B-/P- rewire (TECNOIOT VIN- → P-) + post-rewire power validation
-→ G4 Diagnostics / Maintenance
+G4 Diagnostics / Maintenance
 ```
 
-Charging hardware (manual and dock) is a separate OPEN gate with no evidence yet.
+Charging hardware qualification beyond the one attended manual session (autonomous dock/contact,
+reverse-polarity protection, unattended charge acceptance/termination, future Jetson charging) is
+a separate FUTURE/OPEN gate.
 
 No motion, calibration or write-capable service capability exists in the firmware. Every later
 stage has its own gate in [`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md).
@@ -2874,3 +2905,75 @@ already verified and the register already reads `0x005A`; a repeat write would b
 action with no evidentiary benefit (and the firmware would refuse it as `ALREADY_CONFIGURED`
 anyway). Future live sessions must copy their captures out of scratch into a durable location
 before the session ends.
+
+## POWER GATE A–E, MANUAL CHARGING & EXTERNAL USB SERVICE PORT — 2026-09-24
+
+Full narrative and every measured value: [`09_Logs/Development_Log/2026-09-24_MATDOG_POWER_CHARGING_USB_VALIDATION_CLOSEOUT.md`](../../09_Logs/Development_Log/2026-09-24_MATDOG_POWER_CHARGING_USB_VALIDATION_CLOSEOUT.md).
+This section summarizes it as validation evidence; it does not restate every figure.
+
+**Firmware identity.** No firmware source change occurred between the 2026-09-19 KEY write
+session and this session: `4604e36` (test-only), `efba2dc` (docs-only) and `19fe837` (docs-only)
+touched no firmware source. The robot exercised on 2026-09-24 was running the powered firmware
+already installed from the 2026-09-19 live DALY work (source commit `6322563`). No
+documentation-only commit was flashed.
+
+**Hardware correction — VERIFIED.** The `B-`/`P-` bypass recorded in § EVIDENCE PROVENANCE above
+and in `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` (historical §10) is resolved: TECNOIOT
+`VIN-` now returns to DALY `P-` instead of raw battery `B-`. This is a hardware correction; no
+firmware change was needed or made.
+
+**Post-rewire power gate A–E — PASS**, executed live, no motion at any point:
+
+| Step | Result |
+|---|---|
+| A — dead circuit (fuse in/out, KEY OFF, no USB/charger) | PASS — servo rail, TECNOIOT output, PAD+→PAD- all 0 V in both fuse states |
+| B — KEY ON | PASS — servo rail 12.23 V, TECNOIOT 5.18 V, PAD+→PAD- 12.23 V, both MOS ON, no alarms |
+| C — KEY OFF, USB disconnected | PASS — immediate shutdown, all rails 0 V, Discharge MOS OFF, Charge MOS stayed ON |
+| D — KEY ON again | PASS — rails restored (≈5.3 V / ≈12.2 V), cold boot clean, no reset loop, no alarm |
+| E — powered no-motion regression | PASS — `@STATUS`, BNO085, DALY, servo census and `SAFE_OFF` all as below |
+
+E in detail: `@STATUS` reported `health=BOOTING`, `power_state=RUN`, `mode=MAINTENANCE`,
+`profile=ROBOT_POWERED`. BNO085 `init=OK detected=ONLINE expected=REQUIRED result=PASS`. DALY
+`init=OK detected=ONLINE expected=REQUIRED result=PASS`, `pack_v=12.0 V`, `current_a=-0.2 A`,
+`soc=94.2 %`, `cells=3`, `cell_max_mv=4035`, `cell_min_mv=4019`, `delta_mv=16`, `charge_mos=ON`,
+`discharge_mos=ON`, `state=STATIONARY`, `alarms=0000 0000 0000 0000`. Servo census
+`SERVO_CENSUS=PASS lo=11 hi=55`, `canonical_allocated=17 expected_now=13`, `present_expected=13`,
+`missing_expected=0`, `absent_by_design=4`, `absent_by_design_present=0`, `unexpected_id=0`,
+`not_probed=0`, `truncated=NO`. `SAFE_OFF` on all 13 installed servos
+(`11 12 13 21 22 23 31 32 33 41 42 43 51`) returned `VERIFIED_OFF`. `runtime_resets=0` throughout.
+No servo moved.
+
+**This closes the post-rewire validation gate** named in `DEVELOPMENT_GATES.md` § DALY KEY hardware
+item and in `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` § 11. KEY OFF is now a
+measured power-off for the robot as built, provided no charger is connected (see next).
+
+**Manual charging discovery — VERIFIED common-port behaviour, 2026-09-22/23 + 2026-09-24.** A
+separate live session (Zeee LiPo 3S1P 9000 mAh, 12.6 V/3 A CC/CV charger across `PAD+`/`PAD-`)
+showed that with the charger connected, KEY OFF + Discharge MOS OFF + Charge MOS ON does **not**
+de-energize the `B+`/`P-` load bus: the charger itself backfeeds it, so the ESP32-S3, servo rail
+and TECNOIOT all stayed powered from the charger with the discharge path open. Unplugging the
+charger with KEY still OFF immediately collapsed all three. This corrects the previously assumed
+"manual charging with KEY OFF → robot domain OFF" model, which was never live-verified and is now
+known to be false for this hardware; see `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` § 8
+for the corrected `MANUAL_CHARGE_KEY_OFF` semantics. Charging timeline (SOC/voltage/current/temp
+progression) is recorded in the 2026-09-24 closeout record § 4; it is evidence of one attended
+session, not of full charge-cycle or autonomous-dock qualification, which remain **FUTURE**.
+
+**External USB service/programming port — VALIDATED.** A three-wire connector (GPIO19 D-, GPIO20
+D+, GND; host VBUS intentionally not connected, so the port cannot power the ESP32 on its own) was
+exercised with the onboard USB-C disconnected: native enumeration (`303a:1001`, "Espressif USB
+JTAG/serial debug unit", stable `by-id` path), bidirectional CDC (`@STATUS`, `@MODE STATUS`,
+`@BMS STATUS`, `@IMU STATUS`, `@LED STATUS`, BNO085/DALY both PASS, `runtime_resets=0`), and the
+`esptool` v5.3.1 reset/ROM-download handshake with a flash-identification read (chip, PSRAM, flash
+size — no write), followed by correct re-enumeration after `esptool`'s hard reset. This closes the
+"future USB service-port candidate — TO_TEST" status previously carried for GPIO19/GPIO20's
+external connector.
+
+**Final state.** External USB unplugged, KEY OFF, servo rail and ESP32-S3 shut down, main fuse
+removed — the robot was left electrically isolated for service.
+
+**Remaining open, not closed by this session:** BMS KEY-configuration persistence across a true
+DALY power cycle (still **TO_TEST** — no such power cycle was performed here); autonomous
+dock/contact hardware, reverse-polarity protection, complete unattended charge-acceptance
+validation, future Jetson charging behaviour, and long-term automated charge termination (all
+**FUTURE**); the charging LED-ring indication concept (**FUTURE / TO_DESIGN, NOT IMPLEMENTED**).

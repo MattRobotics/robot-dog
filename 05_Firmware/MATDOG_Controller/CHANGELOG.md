@@ -1,5 +1,33 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — post-rewire power validation & external USB service port closeout — 2026-09-24
+
+Documentation and evidence only; **no firmware change**. No firmware commit since `6322563`
+(2026-09-19) touched source (`4604e36`/`efba2dc`/`19fe837` are test-only or docs-only), so the
+robot exercised in this session ran the already-installed powered firmware from the earlier live
+DALY work. Full evidence:
+[`09_Logs/Development_Log/2026-09-24_MATDOG_POWER_CHARGING_USB_VALIDATION_CLOSEOUT.md`](../../09_Logs/Development_Log/2026-09-24_MATDOG_POWER_CHARGING_USB_VALIDATION_CLOSEOUT.md).
+
+- **Hardware `B-`/`P-` bypass corrected and verified:** TECNOIOT `VIN-` now returns to DALY `P-`
+  instead of raw battery `B-`. Post-rewire power gate A–E passed live: with no charger and no USB
+  present, physical KEY OFF now removes the entire protected robot domain (servo rail, TECNOIOT
+  output and PAD+→PAD- all measured 0 V), and the powered no-motion regression (BNO085/DALY/servo
+  census/`SAFE_OFF`) still holds.
+- **Manual charging common-port behaviour discovered and documented:** a charger connected across
+  `B+`/`P-` backfeeds that bus independent of KEY/Discharge-MOS state — KEY OFF while a charger is
+  connected does **not** de-energize the robot. The previous "manual charging with KEY OFF → robot
+  domain OFF" description was never live-verified and is now corrected; see
+  `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` § 8 for the renamed `MANUAL_CHARGE_KEY_OFF`
+  state and its accurate semantics.
+- **External USB service/programming port (GPIO19 D-, GPIO20 D+, GND, no host VBUS) validated:**
+  native enumeration, bidirectional CDC, and the `esptool` reset/flash-identification path all
+  confirmed through the external connector alone, with correct re-enumeration after reset. The port
+  cannot power the ESP32 on its own.
+- Remaining open: BMS KEY-configuration persistence across a true DALY power cycle (**TO_TEST**);
+  autonomous dock/contact hardware, reverse-polarity protection, unattended charge
+  acceptance/termination, future Jetson charging (**FUTURE**); charging LED-ring progress
+  indication (**FUTURE / TO_DESIGN, NOT IMPLEMENTED** — no firmware for it exists).
+
 ## Unreleased — power/KEY architecture closeout — 2026-09-20
 
 Documentation and evidence only; **no firmware change** (the shipped Controller already satisfies
