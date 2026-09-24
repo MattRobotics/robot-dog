@@ -87,6 +87,38 @@ be explicitly 0 and set, with the ring size, before Serial.begin() and any
 output; nothing may set it again; Serial.flush() (discards or waits) and
 debug-output routing (a second per-character transmit path) are forbidden.
 
+DALY KEY read-only probe (2026-09-19) additions: a second DALY transaction
+(the one-shot 0x81 KEY/parameter read) replaced the old "exactly one fixed
+kQuery[]" rule with a stricter whitelist, not a looser one. DALY firmware may
+put on the bus ONLY the two known FC03 read frames (D2 03 00 00 00 3E D7 B9 and
+81 03 01 00 00 78 5B D4), each re-verified here byte-for-byte, function 0x03
+and CRC-16/MODBUS; through exactly ONE bms_uart_.write() whose bytes come only
+from dalyRequestFrame(<enum>); with no other use of bms_uart_, no other UART2
+route, no other initialized byte array, and no Modbus write function literal
+(0x06/0x10) in the DALY sources. requestDischargeOff() stays a no-op returning
+false. The command surface gains only two argument-free commands (@BMS KEY
+READ, MAINTENANCE-gated; @BMS KEY STATUS, cache-only) and no @BMS command may
+parse arguments or name a write. The KEY probe APIs may not leak into the
+power-state or health logic. The protocol unit stays Arduino-free for the host
+suite, and scripts/tests/test_static_audit_daly.py proves these rules fail on
+mutation (e.g. the KEY request function 0x03 -> 0x06).
+
+DALY KEY discharge configuration (2026-09-19) addition - the ONE permitted
+DALY write, made obvious here (DALY_THE_ONE_WRITE): FC06, address 0x81,
+register 0x0120 (KEY logic) := 0x005A (DISCHARGE), frame 81 06 01 20 00 5A
+16 07, built by the parameterless dalyKeyLogicDischargeWriteFrame() whose
+whole body must match the reviewed recipe (literal bytes 0-5, CRC appended by
+crc16Modbus). Only @BMS KEY SET DISCHARGE CONFIRM (exact text,
+MAINTENANCE-gated, passing only the live operating mode) can request it, via
+exactly one call chain. Still forbidden: FC10 anywhere; FC06 to any other
+register (0x0121/0x0122 MOS control included) or with any other value; a
+second write frame; any caller-supplied address/register/value; raw write
+commands; persistence in the DALY module; any requestDischargeOff() body.
+The write may leave the UART only if the operating mode is STILL MAINTENANCE
+at the final pre-transmit check: DalyBms::update() takes the live mode from
+the Controller on every loop and the check must use it (never `true`, a
+constant, or the mode seen when the command arrived).
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
@@ -168,30 +200,369 @@ def check_servo_id_write(files):
                  f"plus EnableTorque(id, 0) only")
 
 
+# The complete DALY transmit vocabulary. Each entry is re-verified below
+# (function 0x03, CRC-16/MODBUS), so editing this table to admit a write frame
+# still fails the audit.
+DALY_WHITELISTED_READ_FRAMES = {
+    "kDalyTelemetryRequest": bytes.fromhex("D2 03 00 00 00 3E D7 B9"),
+    "kDalyKeyConfigRequest": bytes.fromhex("81 03 01 00 00 78 5B D4"),
+}
+DALY_SOURCE_NAMES = {"DalyBms.h", "DalyBms.cpp", "DalyProtocol.h", "DalyProtocol.cpp"}
+DALY_TRANSMIT_CALL = "bms_uart_.write(dalyRequestFrame(request), kDalyRequestLen)"
+DALY_UART_METHODS = {"begin", "available", "read", "write", "flush"}
+BMS_COMMANDS_ALLOWED = {"@BMS STATUS", "@BMS STREAM ON", "@BMS STREAM OFF",
+                        "@BMS KEY READ", "@BMS KEY STATUS",
+                        "@BMS KEY SET DISCHARGE CONFIRM", "@BMS KEY WRITE STATUS"}
+BMS_HELP_TOKENS_ALLOWED = BMS_COMMANDS_ALLOWED | {"@BMS STREAM ON|OFF"}
+
+# THE ONE PERMITTED DALY WRITE. Everything below is checked against this.
+DALY_THE_ONE_WRITE = {
+    "address": 0x81,        # 0x80 + board 1 (the live-verified 0x81 personality)
+    "function": 0x06,       # write single register
+    "register": 0x0120,     # KEY logic
+    "value": 0x005A,        # DISCHARGE: KEY OFF -> discharge MOS OFF, charge MOS kept
+}
+DALY_WRITE_PAYLOAD = bytes([DALY_THE_ONE_WRITE["address"], DALY_THE_ONE_WRITE["function"],
+                            DALY_THE_ONE_WRITE["register"] >> 8,
+                            DALY_THE_ONE_WRITE["register"] & 0xFF,
+                            DALY_THE_ONE_WRITE["value"] >> 8, DALY_THE_ONE_WRITE["value"] & 0xFF])
+# The reviewed recipe, whitespace-normalized: literal bytes 0-5, CRC appended.
+DALY_WRITE_BUILDER_BODY = (
+    "DalyFrame f = {{0x81, 0x06, 0x01, 0x20, 0x00, 0x5A, 0x00, 0x00}}; "
+    "const uint16_t crc = crc16Modbus(f.bytes, kDalyRequestLen - 2); "
+    "f.bytes[6] = static_cast<uint8_t>(crc & 0xFF); "
+    "f.bytes[7] = static_cast<uint8_t>(crc >> 8); "
+    "return f;")
+
+
+def modbus_crc16(data: bytes) -> int:
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            crc = (crc >> 1) ^ 0xA001 if crc & 1 else crc >> 1
+    return crc
+
+
+def daly_the_one_write_frame():
+    crc = modbus_crc16(DALY_WRITE_PAYLOAD)
+    return DALY_WRITE_PAYLOAD + bytes([crc & 0xFF, crc >> 8])
+
+
 def check_daly_write(files):
+    """DALY runtime may transmit only the whitelisted FC03 READ frames and
+    the ONE semantic KEY write (DALY_THE_ONE_WRITE).
+
+    Origin: V0.1 allowed exactly one fixed read query and one write call.
+    The DALY KEY probe added a second whitelisted read; the KEY discharge
+    configuration adds exactly one write. Everything else about the
+    invariant is kept or tightened (see the module docstring).
+    """
+    for name, frame in DALY_WHITELISTED_READ_FRAMES.items():
+        if len(frame) != 8 or frame[1] != 0x03 or \
+                modbus_crc16(frame[:6]) != frame[6] | (frame[7] << 8):
+            fail(f"static_audit.py: whitelisted DALY frame {name} is not a well-formed FC03 "
+                 f"read - the whitelist itself must never admit a write")
+    if DALY_THE_ONE_WRITE != {"address": 0x81, "function": 0x06, "register": 0x0120,
+                              "value": 0x005A} or \
+            daly_the_one_write_frame() != bytes.fromhex("81 06 01 20 00 5A 16 07"):
+        fail("static_audit.py: DALY_THE_ONE_WRITE drifted from the reviewed KEY logic "
+             "DISCHARGE write (FC06 0x0120 := 0x005A at 0x81, frame 81 06 01 20 00 5A 16 07)")
+
+    daly = [(p, c) for p, c in files if p.name in DALY_SOURCE_NAMES]
+    by_name = {p.name: (p, c) for p, c in daly}
+    for required in ("DalyBms.h", "DalyBms.cpp", "DalyProtocol.h"):
+        if required not in by_name:
+            fail(f"{required}: DALY source not found - the transmit whitelist cannot be verified")
+            return
+
+    # 1. Every initialized byte array in the DALY sources is either a zeroed
+    #    receive buffer or one of the whitelisted frames, byte for byte.
+    found = {}
+    for path, code in daly:
+        for m in re.finditer(r"uint8_t\s+(\w+)\s*\[[^\]]*\]\s*=\s*\{([^}]*)\}", code):
+            name, body = m.group(1), m.group(2)
+            if body.strip() in ("0", ""):
+                continue
+            values = re.findall(r"0x([0-9A-Fa-f]{1,2})\b|\b(\d+)\b", body)
+            frame = bytes(int(h, 16) if h else int(d) for h, d in values)
+            if name not in DALY_WHITELISTED_READ_FRAMES:
+                fail(f"{path}: initialized byte array {name}[] = {frame.hex(' ')} is not a "
+                     f"whitelisted DALY read frame - no other transmit bytes may exist")
+                continue
+            if name in found:
+                fail(f"{path}: {name}[] defined more than once")
+            found[name] = frame
+            if frame != DALY_WHITELISTED_READ_FRAMES[name]:
+                fail(f"{path}: {name}[] = {frame.hex(' ')} differs from the whitelisted "
+                     f"{DALY_WHITELISTED_READ_FRAMES[name].hex(' ')}")
+            if len(frame) < 2 or frame[1] != 0x03:
+                fail(f"{path}: {name}[] function code is "
+                     f"{frame[1] if len(frame) > 1 else None!r}, expected 0x03 (READ)")
+            elif len(frame) == 8 and modbus_crc16(frame[:6]) != frame[6] | (frame[7] << 8):
+                fail(f"{path}: {name}[] CRC-16/MODBUS does not match its bytes")
+    for name in DALY_WHITELISTED_READ_FRAMES:
+        if name not in found:
+            fail(f"DalyProtocol.h: whitelisted read frame {name}[] not found")
+
+    proto_path, proto = by_name["DalyProtocol.h"]
+    if not re.search(r"constexpr\s+size_t\s+kDalyRequestLen\s*=\s*8\s*;", proto):
+        fail(f"{proto_path}: kDalyRequestLen must be exactly 8 (one FC03 read request)")
+
+    # 2. The only frame selector takes an enum and can return only the two
+    #    whitelisted arrays - no buffer, pointer or register parameter.
+    selectors = [(p, m) for p, c in daly for m in re.finditer(
+        r"const\s+uint8_t\s*\*\s*dalyRequestFrame\s*\(([^)]*)\)\s*\{(.*?)\n\}", c, re.DOTALL)]
+    if len(selectors) != 1:
+        fail(f"dalyRequestFrame() must be defined exactly once, found {len(selectors)}")
+    for path, m in selectors:
+        if m.group(1).split() != ["DalyRequest", "request"]:
+            fail(f"{path}: dalyRequestFrame() must take only (DalyRequest request), "
+                 f"found ({m.group(1).strip()})")
+        body = re.sub(r"\s+", " ", m.group(2)).strip()
+        expected = ("return request == DalyRequest::KEY_CONFIG ? kDalyKeyConfigRequest "
+                    ": request == DalyRequest::KEY_LOGIC_DISCHARGE_WRITE ? "
+                    "kDalyKeyLogicDischargeWrite.bytes : kDalyTelemetryRequest;")
+        if body != expected:
+            fail(f"{path}: dalyRequestFrame() must map KEY_CONFIG -> the KEY read, "
+                 f"KEY_LOGIC_DISCHARGE_WRITE -> the one write, anything else -> telemetry, "
+                 f"exactly; found {body!r}")
+
+    # 2b. THE ONE WRITE: a single parameterless builder whose body is the
+    #     reviewed recipe, and no other DalyFrame anywhere.
+    builders = [(p, m) for p, c in daly for m in re.finditer(
+        r"constexpr\s+DalyFrame\s+(\w+)\s*\(([^)]*)\)\s*\{(.*?)\n\}", c, re.DOTALL)]
+    if len(builders) != 1:
+        fail(f"exactly one DalyFrame builder may exist (the KEY logic DISCHARGE write), "
+             f"found {len(builders)}")
+    for path, m in builders:
+        if m.group(1) != "dalyKeyLogicDischargeWriteFrame" or m.group(2).strip():
+            fail(f"{path}: the write builder must be the parameterless "
+                 f"dalyKeyLogicDischargeWriteFrame() - no caller may supply address, register "
+                 f"or value (found {m.group(1)}({m.group(2).strip()}))")
+        if re.sub(r"\s+", " ", m.group(3)).strip() != DALY_WRITE_BUILDER_BODY:
+            fail(f"{path}: dalyKeyLogicDischargeWriteFrame() differs from the reviewed recipe "
+                 f"{DALY_WRITE_BUILDER_BODY!r}")
+    for path, code in daly:
+        for m in re.finditer(r"DalyFrame\s+\w+\s*=\s*\{\{([^}]*)\}\}", code):
+            values = re.findall(r"0x([0-9A-Fa-f]{1,2})\b|\b(\d+)\b", m.group(1))
+            payload = bytes(int(h, 16) if h else int(d) for h, d in values)
+            if payload != DALY_WRITE_PAYLOAD + b"\x00\x00":
+                fail(f"{path}: write payload {payload.hex(' ')} is not the one permitted write "
+                     f"{DALY_WRITE_PAYLOAD.hex(' ')} (FC06 0x0120 := 0x005A)")
+        constants = re.findall(r"constexpr\s+DalyFrame\s+(\w+)\s*=\s*([^;]*);", code)
+        for name, init in constants:
+            if name != "kDalyKeyLogicDischargeWrite" or \
+                    init.strip() != "dalyKeyLogicDischargeWriteFrame()":
+                fail(f"{path}: extra write frame constant {name} = {init.strip()} - only "
+                     f"kDalyKeyLogicDischargeWrite may exist")
     for path, code in files:
-        if "DalyBms.cpp" not in str(path):
+        if "kDalyKeyLogicDischargeWrite" in code and path.name not in \
+                ("DalyProtocol.h", "DalyProtocol.cpp") and "scripts" not in path.parts:
+            fail(f"{path}: references the write frame directly - it may only leave through "
+                 f"dalyRequestFrame(DalyRequest::KEY_LOGIC_DISCHARGE_WRITE)")
+
+    # 2c. Exactly one call chain can request it: @BMS KEY SET DISCHARGE CONFIRM
+    #     -> DalyBms::requestKeyLogicDischarge(mode) -> scheduler.
+    sched_calls = [(p, c.count("requestKeyLogicDischargeWrite(")) for p, c in files
+                   if "requestKeyLogicDischargeWrite(" in c and "scripts" not in p.parts]
+    if sorted((p.name, n) for p, n in sched_calls) != [("DalyBms.cpp", 1), ("DalyProtocol.h", 1)]:
+        fail(f"requestKeyLogicDischargeWrite() must be declared once (DalyProtocol.h) and "
+             f"called once (DalyBms::requestKeyLogicDischarge), found "
+             f"{[(str(p), n) for p, n in sched_calls]}")
+    bms_h_path, bms_h = by_name["DalyBms.h"]
+    if not re.search(r"DalyKeyWriteGate\s+requestKeyLogicDischarge\(\s*core::OperatingMode\s+"
+                     r"mode\s*\)\s*;", bms_h):
+        fail(f"{bms_h_path}: requestKeyLogicDischarge() must take only (core::OperatingMode "
+             f"mode) - no register or value parameter")
+
+    # 2d. The FC06 frame may leave only if the operating mode is STILL
+    #     MAINTENANCE at the pre-transmit check: DalyBms::update() receives
+    #     the live mode from the Controller every loop, and every gate input
+    #     derives MAINTENANCE from a live mode - never `true`, a constant, or
+    #     the mode seen when the command arrived.
+    bms_cpp_path, bms_cpp = by_name["DalyBms.cpp"]
+    if not re.search(r"void\s+DalyBms::update\(\s*uint32_t\s+now_ms\s*,\s*"
+                     r"core::OperatingMode\s+mode\s*\)", bms_cpp):
+        fail(f"{bms_cpp_path}: DalyBms::update() must take the live (core::OperatingMode mode)")
+    precheck = ("dalyKeyWritePreTransmitCheck(&bus_,&key_write_,keyWriteInputs(mode=="
+                "core::OperatingMode::MAINTENANCE,false,now_ms));")
+    if re.sub(r"\s+", "", bms_cpp).count(precheck) != 1:
+        fail(f"{bms_cpp_path}: the pre-transmit write check must be exactly "
+             f"dalyKeyWritePreTransmitCheck(&bus_, &key_write_, keyWriteInputs(mode == "
+             f"core::OperatingMode::MAINTENANCE, false, now_ms)) - the live mode, once")
+    for m in re.finditer(r"keyWriteInputs\(([^,]*),", bms_cpp):
+        if m.group(1).strip() not in ("mode == core::OperatingMode::MAINTENANCE",
+                                      "bool maintenance_mode"):
+            fail(f"{bms_cpp_path}: keyWriteInputs() called with maintenance="
+                 f"{m.group(1).strip()!r} - MAINTENANCE must come from the live operating mode")
+    helper_calls = [p for p, c in files if "dalyKeyWritePreTransmitCheck(" in c and
+                    "scripts" not in p.parts]
+    if sorted(p.name for p in helper_calls) != ["DalyBms.cpp", "DalyProtocol.cpp",
+                                                "DalyProtocol.h"]:
+        fail(f"dalyKeyWritePreTransmitCheck() must be defined in DalyProtocol and called only by "
+             f"DalyBms::update(), found {[str(p) for p in helper_calls]}")
+    proto_cpp = by_name.get("DalyProtocol.cpp", (None, ""))[1]
+    body = re.search(r"bool dalyKeyWritePreTransmitCheck\(.*?\n\}", proto_cpp, re.DOTALL)
+    if not body or not all(t in body.group(0) for t in (
+            "evaluateDalyKeyWrite(live)", "cancelQueuedOperatorRequest()",
+            "cancelBeforeTransmit(gate)")):
+        fail("DalyProtocol.cpp: dalyKeyWritePreTransmitCheck() must evaluate the live inputs and "
+             "cancel (zero TX) a write that no longer passes")
+    ctl = [(p, c) for p, c in files if p.name == "Controller.cpp"]
+    if not ctl or re.findall(r"daly_\.update\(([^;]*)\);", ctl[0][1]) != \
+            ["now_ms, operating_mode_.mode()"]:
+        fail("Controller.cpp: must call daly_.update(now_ms, operating_mode_.mode()) - the DALY "
+             "module needs the operating mode as it is on every loop")
+
+    # 3. Exactly one transmit call in the whole firmware, in DalyBms.cpp,
+    #    sending only what dalyRequestFrame() selected.
+    writes = [(p, m) for p, c in files for m in re.finditer(r"bms_uart_\.write\(", c)]
+    if len(writes) != 1:
+        fail(f"expected exactly one bms_uart_.write() call in the firmware, found "
+             f"{len(writes)} {[str(p) for p, _ in writes]} - DALY transport must have one "
+             f"transmit point")
+    for path, code in daly:
+        for m in re.finditer(r"bms_uart_\.write\([^;]*\)", code):
+            call = re.sub(r"\s+", "", m.group(0))
+            if path.name != "DalyBms.cpp" or call != DALY_TRANSMIT_CALL.replace(" ", ""):
+                fail(f"{path}: DALY transmit must be exactly {DALY_TRANSMIT_CALL!r}, "
+                     f"found {m.group(0)!r}")
+
+    # 4. bms_uart_ is used only for begin/available/read/write/flush - never
+    #    print*/other writers, never handed to another function as a stream.
+    for path, code in files:
+        for m in re.finditer(r"\bbms_uart_\b", code):
+            tail = code[m.end():m.end() + 24]
+            method = re.match(r"\.(\w+)\(", tail)
+            declaration = re.match(r"\{2\}", tail) and \
+                code[max(0, m.start() - 16):m.start()].rstrip().endswith("HardwareSerial")
+            if declaration:
+                continue
+            if path.name not in ("DalyBms.h", "DalyBms.cpp") or not method or \
+                    method.group(1) not in DALY_UART_METHODS:
+                fail(f"{path}: bms_uart_ used as {('bms_uart_' + tail.split(chr(10))[0])!r} - "
+                     f"only {sorted(DALY_UART_METHODS)} are allowed, inside DalyBms")
+
+    # 5. No second route to the DALY UART.
+    for path, code in files:
+        for token in ("Serial2", "uart_write_bytes", "uart_tx_chars"):
+            if re.search(rf"\b{token}\b", code):
+                fail(f"{path}: {token} is forbidden - bytes for the DALY bus may only leave "
+                     f"through DalyBms's single bms_uart_ transmit point")
+        for m in re.finditer(r"HardwareSerial\s+(\w+)\s*[{(]", code):
+            if m.group(1) not in ("servo_uart_", "bms_uart_"):
+                fail(f"{path}: extra HardwareSerial {m.group(1)} - only servo_uart_ and "
+                     f"bms_uart_ may own a UART")
+
+    # 6. No Modbus write function code or write helper in the DALY sources.
+    for path, code in daly:
+        # The one reviewed write payload is the only place 0x06 may appear.
+        scan = re.sub(r"DalyFrame\s+f\s*=\s*\{\{0x81, 0x06, 0x01, 0x20, 0x00, 0x5A, "
+                      r"0x00, 0x00\}\}", "", code)
+        for m in re.finditer(r"\b0[xX](06|10)\b", scan):
+            fail(f"{path}: Modbus write function literal {m.group(0)} in DALY source - FC10 is "
+                 f"forbidden and FC06 exists only in the one reviewed KEY logic write")
+        for token in ("Preferences", "nvs_", "EEPROM"):
+            if token in code:
+                fail(f"{path}: {token} in the DALY module - no DALY/KEY state may persist; the "
+                     f"BMS register is the only state (a power loss after the write must "
+                     f"never need a second write to finish it)")
+        m = re.search(r"(?i)\b(write_?(single|multiple)_?reg\w*|write_?register\w*|"
+                      r"func_?0x(06|10)\w*|fc_?(06|10)\w*|modbus_?write\w*)\b", code)
+        if m:
+            fail(f"{path}: DALY write helper {m.group(0)!r} is forbidden")
+
+    # 7. requestDischargeOff() stays the fail-closed no-op.
+    path, code = by_name["DalyBms.h"]
+    if "bool requestDischargeOff() { return false; }" not in code:
+        fail(f"{path}: requestDischargeOff() must be a no-op returning false "
+             f"until the K-Series write protocol is verified (handoff 8A.8)")
+    for p2, c2 in files:
+        if "DalyBms::requestDischargeOff" in c2 or c2.count("requestDischargeOff(") > \
+                (1 if p2.name == "DalyBms.h" else 0):
+            fail(f"{p2}: requestDischargeOff() redefined or called - it must stay the single "
+                 f"inline no-op in DalyBms.h")
+
+
+def check_bms_command_surface(files):
+    """The DALY KEY probe is two fixed commands; nothing takes an argument."""
+    router = [(p, c) for p, c in files if p.name == "CommandRouter.cpp"]
+    if not router:
+        fail("CommandRouter.cpp not found - the @BMS command surface cannot be audited")
+        return
+    path, code = router[0]
+
+    compared = set(re.findall(r'upper\s*==\s*"(@BMS[^"]*)"', code))
+    for command in sorted(compared - BMS_COMMANDS_ALLOWED):
+        fail(f"{path}: unreviewed BMS command {command!r} - only "
+             f"{sorted(BMS_COMMANDS_ALLOWED)} may exist")
+    for command in sorted(BMS_COMMANDS_ALLOWED - {"@BMS STATUS", "@BMS STREAM ON",
+                                                  "@BMS STREAM OFF"}):
+        if command not in compared:
+            fail(f"{path}: {command!r} handler not found")
+    if re.search(r'startsWith\(\s*"@BMS', code) or re.search(r'sscanf\([^;]*"@BMS', code):
+        fail(f"{path}: an @BMS command parses arguments - no register, address or value "
+             f"input may reach the DALY module")
+    # Every @BMS command text anywhere in the router (handlers, help) must be
+    # one of the reviewed commands - no other SET/WRITE/REG/MOS spelling.
+    for literal in re.findall(r'"([^"\n]*@BMS[^"\n]*)"', code):
+        for token in re.findall(r"@BMS(?: [A-Z|]+)*", literal):
+            if token not in BMS_HELP_TOKENS_ALLOWED:
+                fail(f"{path}: unreviewed BMS command text {token!r}")
+
+    branch = re.search(r'upper\s*==\s*"@BMS KEY READ"\)\s*\{(.*?)\}\s*else if', code, re.DOTALL)
+    if not branch or "modules_.operating_mode->mode() != OperatingMode::MAINTENANCE" \
+            not in branch.group(1):
+        fail(f"{path}: @BMS KEY READ must refuse outside OperatingMode::MAINTENANCE")
+    if code.count("requestKeyConfigRead(") != 1 or \
+            (branch and "requestKeyConfigRead(" not in branch.group(1)):
+        fail(f"{path}: requestKeyConfigRead() must be called once, from @BMS KEY READ only - "
+             f"@BMS KEY STATUS performs zero bus transactions")
+
+    # The one write: MAINTENANCE-gated, requested exactly once, from its own
+    # branch, with the live operating mode (never a constant).
+    set_branch = re.search(r'upper\s*==\s*"@BMS KEY SET DISCHARGE CONFIRM"\)\s*\{(.*?)'
+                           r'\}\s*else if\s*\(upper\s*==\s*"@BMS KEY WRITE STATUS"\)', code,
+                           re.DOTALL)
+    if not set_branch or "modules_.operating_mode->mode() != OperatingMode::MAINTENANCE" \
+            not in set_branch.group(1):
+        fail(f"{path}: @BMS KEY SET DISCHARGE CONFIRM must refuse outside "
+             f"OperatingMode::MAINTENANCE (and be followed by @BMS KEY WRITE STATUS)")
+    calls = re.findall(r"requestKeyLogicDischarge\(([^)]*\)?)\)", code)
+    if calls != ["modules_.operating_mode->mode()"] or \
+            (set_branch and "requestKeyLogicDischarge(" not in set_branch.group(1)):
+        fail(f"{path}: requestKeyLogicDischarge() must be called exactly once, from @BMS KEY SET "
+             f"DISCHARGE CONFIRM, with modules_.operating_mode->mode() - found {calls}")
+
+    # The KEY probe is diagnostics only: no power-state/health consumer yet.
+    # Firmware sources only - the offline host suite exercises these APIs.
+    for p2, c2 in files:
+        if "scripts" in p2.parts or p2.name in DALY_SOURCE_NAMES or \
+                p2.name in ("CommandRouter.cpp", "CommandRouter.h"):
             continue
-        write_calls = re.findall(r"bms_uart_\.write\(", code)
-        if len(write_calls) > 1:
-            fail(f"{path}: more than one bms_uart_.write() call found — "
-                 f"V0.1 DALY module must only ever transmit the fixed read query")
+        for token in ("requestKeyConfigRead", "keyConfigSnapshot", "keyConfigReadResult",
+                      "DalyKeyLogic", "DalyKeyConfigSnapshot", "requestKeyLogicDischarge",
+                      "keyWriteStatus", "DalyKeyWrite", "kDalyKeyLogicDischargeWrite"):
+            if token in c2:
+                fail(f"{p2}: uses the DALY KEY probe ({token}) - the KEY mapping must not "
+                     f"become operational before it is live-validated")
 
-        query_match = re.search(r"kQuery\[\]\s*=\s*\{([^}]+)\}", code, re.DOTALL)
-        if not query_match:
-            fail(f"{path}: could not locate kQuery[] to verify Modbus function code")
-        else:
-            bytes_hex = re.findall(r"0x[0-9A-Fa-f]{2}", query_match.group(1))
-            if len(bytes_hex) < 2:
-                fail(f"{path}: kQuery[] too short to contain a function code")
-            elif int(bytes_hex[1], 16) != 0x03:
-                fail(f"{path}: kQuery[] function code is {bytes_hex[1]}, expected 0x03 (READ)")
 
+def check_daly_protocol_is_host_linkable(files):
+    """The protocol unit is linked by the offline host suite: it must stay
+    free of Arduino, Serial and wall-clock time so the tests exercise the
+    shipped frames/decoders/scheduling, not a copy."""
+    names = {p.name for p, _ in files}
+    for required in ("DalyProtocol.h", "DalyProtocol.cpp"):
+        if required not in names:
+            fail(f"{required}: DALY protocol unit not found")
     for path, code in files:
-        if path.name == "DalyBms.h":
-            if "bool requestDischargeOff() { return false; }" not in code:
-                fail(f"{path}: requestDischargeOff() must be a no-op returning false "
-                     f"until the K-Series write protocol is verified (handoff 8A.8)")
+        if path.name not in ("DalyProtocol.h", "DalyProtocol.cpp"):
+            continue
+        for token in ("#include <Arduino.h>", "Serial.", "millis(", "HardwareSerial"):
+            if token in code:
+                fail(f"{path}: contains {token!r} - keep the DALY protocol unit host-linkable")
 
 
 def check_pin_collisions(files):
@@ -764,15 +1135,35 @@ def check_host_tests(sketch_dir):
     parser's Python suite is already run from here: one gate command."""
     runner = sketch_dir / "scripts" / "tests" / "run_host_tests.sh"
     suite = sketch_dir / "scripts" / "tests" / "test_servo_population.cpp"
+    daly_suite = sketch_dir / "scripts" / "tests" / "test_daly_protocol.cpp"
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
+        return
+    if not daly_suite.exists():
+        fail(f"{daly_suite}: DALY protocol/KEY probe offline test suite not found")
         return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
+    runner_text = strip_shell_comments(runner.read_text(encoding="utf-8"))
+    for binary in ("test_servo_population", "test_daly_protocol"):
+        if f'"$OUT/{binary}"' not in runner_text:
+            fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
     if result.returncode != 0:
         fail(f"{runner}: servo population/profile offline tests FAILED "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
+
+def check_daly_audit_mutation_suite(sketch_dir):
+    """Proves the DALY write prohibition above actually fails on mutation."""
+    suite = sketch_dir / "scripts" / "tests" / "test_static_audit_daly.py"
+    if not suite.exists():
+        fail(f"{suite}: DALY audit mutation suite not found")
+        return
+    result = subprocess.run([sys.executable, str(suite)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{suite}: DALY audit mutation tests FAILED "
              f"(stdout={result.stdout!r} stderr={result.stderr!r})")
 
 
@@ -1011,10 +1402,11 @@ def check_usb_cdc_tx_never_blocks(files):
         fail(f"{cfg_path}: kUsbTxTimeoutMs must be exactly 0 - any non-zero value lets "
              f"HWCDC::write() wait on a host that is not reading (G3.1)")
     m = re.search(r"kUsbTxRingBytes\s*=\s*(\d+)\s*;", cfg)
-    if not m or int(m.group(1)) < 2560:
-        fail(f"{cfg_path}: kUsbTxRingBytes must be >= 2560 - the largest single loop-pass "
-             f"burst is 2395 B and with timeout 0 anything beyond the ring is dropped even "
-             f"while a host is reading (G3.1)")
+    if not m or int(m.group(1)) < 3072:
+        fail(f"{cfg_path}: kUsbTxRingBytes must be >= 3072 - the largest single loop-pass "
+             f"burst is 2674 B (worst census + DALY KEY write ACK and COMPLETE + IMU + BMS; "
+             f"2395 B before the KEY probe) and with timeout 0 anything beyond the ring is "
+             f"dropped even while a host is reading (G3.1)")
 
     ctl_path, ctl = by_name.get("Controller.cpp", (None, ""))
     body = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", ctl, re.DOTALL)
@@ -1056,6 +1448,8 @@ def main():
     check_torque_enable(files)
     check_servo_id_write(files)
     check_daly_write(files)
+    check_bms_command_surface(files)
+    check_daly_protocol_is_host_linkable(files)
     check_pin_collisions(files)
     check_uart_peripheral_separation(files)
     check_no_auto_scan_on_boot(files)
@@ -1073,6 +1467,7 @@ def main():
     check_no_startup_servo_traffic(files)
     check_no_network_to_servo_path(files)
     check_host_tests(SKETCH_DIR)
+    check_daly_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
     check_unknown_detection_is_not_a_verdict(files)
     check_usb_cdc_tx_never_blocks(files)

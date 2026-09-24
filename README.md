@@ -43,6 +43,14 @@ Every current-facing document uses these meanings:
   absent-by-design 52-55) and structured census, live read-only DALY, live LED, two identical
   censuses, `SAFE_OFF` `VERIFIED_OFF` and `torque=0` on all 13, and a Controller loop independent
   of USB CDC host presence. No motion or calibration capability exists yet.
+- The post-rewire power gate (2026-09-24): the historical `B-`/`P-` bypass is corrected, and
+  physical KEY OFF now measures 0 V on every protected rail with no charger and no USB present.
+- The external USB service/programming port (2026-09-24): GPIO19/GPIO20/GND, no host VBUS —
+  enumeration, bidirectional CDC and the `esptool` reset/flash-identification handshake all
+  confirmed with the onboard USB-C disconnected.
+- Manual charging, common-port electrical behaviour (2026-09-22/23 + 2026-09-24): a connected
+  charger backfeeds the `B+`/`P-` load bus directly, independent of KEY/Discharge-MOS state. Full
+  charging/dock qualification remains **FUTURE**.
 
 ### IMPLEMENTED
 
@@ -60,14 +68,15 @@ Every current-facing document uses these meanings:
 - GPIO19/GPIO20 mean native USB D-/D+; their historical Jetson-UART use is **SUPERSEDED**.
 - The ESP32-S3 is powered from the DALY-protected B+/P− domain through the 5 V step-down. The
   bistable logo pushbutton connects directly to DALY `KEY`; no ESP32 KEY GPIO is required. Its
-  actual function is **OPEN**: in G3 the KEY switch produced no observed DALY state change, so it
-  is not a validated shutdown or safety barrier — the fused disconnect is.
+  function is now a **VALIDATED** power-off (2026-09-24, no charger/USB present) — the fused
+  disconnect remains the trusted isolation whenever a charger may be connected, because a
+  connected charger backfeeds the load bus independent of KEY state (see *Where we are* below).
 
 ### TO_TEST
 
-- The DALY `KEY` function (see *Where we are* below).
-- The external four-pin connector (GPIO19, GPIO20, GND, 5 V not connected) as a future USB
-  service port — not a UART — pending electrical and signal-integrity validation.
+- BMS KEY-configuration persistence across a true DALY power cycle (see *Where we are* below).
+- Charging qualification beyond the one attended manual session (autonomous dock/contact hardware,
+  reverse-polarity protection, unattended charge acceptance/termination).
 
 ### TO_DESIGN
 
@@ -136,10 +145,26 @@ COMPLETE   Controller V0.1 baseline              VALIDATED (USB_ONLY hardware)
 COMPLETE   G2 ROBOT_POWERED software             PASS / FROZEN
 COMPLETE   G3 ROBOT_POWERED no-motion            PASS (formal, 2026-09-18)
 COMPLETE   G3.1 CDC-independent Controller loop  PASS (2026-09-18)
+COMPLETE   DALY KEY research                     COMPLETE (read-only, 2026-09-19)
+COMPLETE   DALY 0x81 read                        LIVE VERIFIED (read-only, 2026-09-19)
+COMPLETE   DALY KEY write (0x0120 := 0x005A)     LIVE VERIFIED (2026-09-19; ACK + read-back)
+                                                 current KEY logic = DISCHARGE (0x005A)
+COMPLETE   B-/P- hardware bypass correction      VERIFIED (2026-09-24; TECNOIOT VIN- now on P-)
+COMPLETE   post-rewire power gate A-E            PASS (2026-09-24; dead-circuit + KEY OFF/ON +
+                                                 powered no-motion regression, live)
+COMPLETE   external USB service/programming port VALIDATED (2026-09-24; GPIO19/20, no host VBUS —
+                                                 enumeration, CDC, esptool reset/flash-ID)
 
-NEXT       DALY KEY investigation
-THEN       G4 Diagnostics / Maintenance
+OPEN       manual charging common-port behaviour VERIFIED electrically (2026-09-22/23 + 09-24):
+                                                 a connected charger backfeeds B+/P- regardless
+                                                 of KEY state
+OPEN       autonomous dock/charging              OPEN — no dock hardware evidence beyond one
+                                                 attended manual charging session
+THEN       G4 Diagnostics / Maintenance          NOT STARTED
 ```
+
+Power domains, KEY semantics, every power state and the charging gates are owned by
+[`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
 
 `ROBOT_POWERED` is **VALIDATED for no-motion operation**: DALY live read-only, LED live, 13/13
 expected servos present with 4 absent by design in two identical censuses, `SAFE_OFF`
@@ -148,13 +173,24 @@ presence: BNO085 acquisition runs at 50.1 Hz with the port closed (G3.1). No com
 
 ### Open hardware notes
 
-- **DALY `KEY` — OPEN.** Toggling the physical KEY switch produced no observed change in any
-  DALY-reported state (`discharge_mos=ON` in both positions). KEY is **not** a validated shutdown
-  or safety barrier; the DALY's actual KEY configuration and function must be inspected before any
-  setting is changed. The fused disconnect remains the trusted physical isolation method.
-- **GPIO19/GPIO20 — frozen.** GPIO19 = native USB D−, GPIO20 = native USB D+. The external
-  19/20/GND connector remains a future USB service-port candidate — **not** a UART — pending
-  electrical and signal-integrity validation.
+- **DALY `KEY` — RESOLVED as a power-off, 2026-09-24.** Research (2026-09-19): no public DALY
+  document publishes a K-series KEY register; DALY's own BMSTool V1.14.79 (static inspection)
+  points to KEY logic at `0x0120` on a second Modbus personality (`0x81`). Live-verified read-only
+  the same day with `@BMS KEY READ`: the unit's KEY logic was **DISABLED (`0x0055`)**
+  pre-commissioning, consistent with the G3 finding, where toggling the physical KEY produced no
+  observed change in `discharge_mos`. The single guarded write (`@BMS KEY SET DISCHARGE CONFIRM`,
+  `0x0120 := 0x005A`) was sent **once, live, on 2026-09-19** and read back as `0x005A`
+  (DISCHARGE). The follow-on physical KEY test was inconclusive at the time: a hardware `B-`/`P-`
+  bypass (TECNOIOT `VIN-` on raw `B-`) kept the load rail powered with the discharge MOS open. That
+  rewire is now **complete**, and the post-rewire power gate A–E **passed live on 2026-09-24**:
+  with no charger and no USB present, KEY OFF measures 0 V on every protected rail. A connected
+  charger still backfeeds the `B+`/`P-` bus independent of KEY state, so the fused disconnect
+  remains the trusted physical isolation method whenever a charger may be present.
+- **GPIO19/GPIO20 — VALIDATED 2026-09-24.** GPIO19 = native USB D−, GPIO20 = native USB D+. The
+  external 19/20/GND connector (host VBUS intentionally not wired) was validated as a
+  service/programming port: native enumeration, bidirectional CDC and the `esptool`
+  reset/flash-identification handshake all confirmed with the onboard USB-C disconnected. It does
+  not power the ESP32 on its own.
 
 Criteria are owned by the Controller
 [`DEVELOPMENT_GATES.md`](05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md); evidence by the

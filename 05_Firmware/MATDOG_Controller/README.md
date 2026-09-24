@@ -198,6 +198,27 @@ network-handler → servo-primitive path. It also compiles and runs the offline 
 suite (`scripts/tests/run_host_tests.sh`) as part of the audit, the same way it already
 runs the OTA parser's Python suite.
 
+DALY KEY probe additions (2026-09-19): the DALY firmware may transmit **only** the two
+whitelisted FC03 read frames (`D2 03 00 00 00 3E D7 B9`, `81 03 01 00 00 78 5B D4`), each
+re-verified byte-for-byte with function `0x03` and CRC-16/MODBUS, through exactly one
+`bms_uart_.write(dalyRequestFrame(request), kDalyRequestLen)`; any other initialized byte array,
+`bms_uart_` use, UART2 route, FC06/FC10 literal or write helper fails. `requestDischargeOff()`
+stays a no-op; `@BMS` commands take no arguments and name no write; `@BMS KEY READ` keeps its
+`MAINTENANCE` gate and `@BMS KEY STATUS` never starts a transaction; the KEY probe may not leak
+into power-state/health logic; `DalyProtocol.*` stays Arduino-free. The audit also runs
+`scripts/tests/test_static_audit_daly.py`, which proves those rules fail on mutation (e.g. the KEY
+request function `0x03 → 0x06`). The G3.1 TX-ring floor rises from 2560 to 3072 bytes because the
+largest single loop pass grew (now 2674 bytes; see `VALIDATION.md`).
+
+DALY KEY discharge configuration additions: the one permitted write is spelled out in
+`DALY_THE_ONE_WRITE` (FC06, `0x81`, `0x0120 := 0x005A`). The parameterless
+`dalyKeyLogicDischargeWriteFrame()` must match the reviewed recipe exactly; the selector must map
+each request to its own frame; the write can be requested only through `@BMS KEY SET DISCHARGE
+CONFIRM` (MAINTENANCE-gated, live operating mode) → `DalyBms::requestKeyLogicDischarge(mode)` →
+the scheduler, once each. FC10, any other register (MOS control `0x0121`/`0x0122` included), value,
+address or second write frame, a caller-supplied target, a generic `@BMS` write spelling, DALY
+persistence and any `requestDischargeOff()` body fail the build; the mutation suite proves it.
+
 ## USB diagnostic command surface
 
 ```text
@@ -205,6 +226,10 @@ runs the OTA parser's Python suite.
 @STATUS
 @IMU STATUS | @IMU STREAM ON|OFF
 @BMS STATUS | @BMS STREAM ON|OFF
+@BMS KEY READ                               (MAINTENANCE mode only; read-only)
+@BMS KEY STATUS                             (cached; no bus transaction)
+@BMS KEY SET DISCHARGE CONFIRM              (MAINTENANCE only; the ONE DALY write; once per boot)
+@BMS KEY WRITE STATUS                       (cached; no bus transaction)
 @LED STATUS | @LED OFF | @LED TEST
 @SERVO SCAN <lo> <hi> | @SERVO READ <id>   (MAINTENANCE mode only)
 @SERVO CENSUS                               (MAINTENANCE mode only)
@@ -243,7 +268,68 @@ power-state machine through its shutdown sequence but always resolves to
 `POWER_CUT_FAILED` in V0.1, because the DALY K-Series `Discharge MOS OFF` write
 protocol has not been identified or bench-verified (see `VALIDATION.md` and handoff
 section 8A.8). No command in this surface can write servo EEPROM, recode an ID, save
-the BNO085 DCD, or write DALY configuration/MOS state.
+the BNO085 DCD, or write DALY MOS state; the only DALY configuration write is the single
+semantic KEY setting below.
+
+`@BMS KEY READ` is the read-only DALY KEY probe (implemented and **live-verified read-only**
+2026-09-19; see `VALIDATION.md`). It queues one FC03 read of the DALY's second Modbus personality —
+`81 03 01 00 00 78 5B D4`, byte-identical to the parameter-block read in DALY's official BMSTool
+V1.14.79 — replies `BMS_KEY_READ=STARTED` (or `BUSY` while one is outstanding, `BLOCKED` outside
+`MAINTENANCE`), and reports asynchronously — the block below is the **pre-commissioning** live
+example captured on 2026-09-19, *before* the single configuration write:
+
+```text
+BMS_KEY_READ=COMPLETE result=OK
+  key_logic_raw=0x0055 key_logic=DISABLED
+  charge_mos_control=1
+  discharge_mos_control=1
+  sleep_time_raw=360 sleep_time_s=3600
+```
+
+or `BMS_KEY_READ=COMPLETE result=TIMEOUT|CRC_FAIL|BAD_HEADER rx_bytes=<n>`. The reply must be
+exactly 245 bytes, `51 03 F0`, CRC-valid.
+
+After the single verified commissioning write, the **current last verified value is `0x005A`
+DISCHARGE**, so a new read on this unit should normally report `0x005A` unless the BMS was reset,
+replaced or reconfigured.
+
+Decoded registers (BMSTool static analysis, read side live-verified on MATDOG's unit): `0x0120`
+KEY logic (`0x55` DISABLED, `0xA5` DISCHARGE_AND_SLEEP, `0x5A`
+DISCHARGE, `0xAA` CHARGE_AND_DISCHARGE, `0xA6` CHARGE_DISCHARGE_AND_SLEEP, anything else
+UNKNOWN), `0x0121`/`0x0122` charge/discharge MOS control, `0x0115` sleep time (raw × 10 s as
+BMSTool displays it). One transaction owner (`DalyBusScheduler`) starts both this read and
+telemetry, so they never overlap; the KEY read goes first at the next idle boundary, defers at
+most one 2 s telemetry poll, and telemetry resumes on its own. A failed read never replaces the
+last valid snapshot and never marks the BMS absent. `@BMS KEY STATUS` prints the cached
+result/snapshot and its age with zero bus traffic (`snapshot=NOT_READ key_logic=UNKNOWN` until a
+read succeeds). Nothing is inferred from the live MOS state.
+
+**Why the commissioning write is retained** (reviewed 2026-09-20). With the register now reading
+`0x005A`, the gate answers `ALREADY_CONFIGURED` and transmits nothing, so the command is inert on
+this BMS: it can only act again on a unit that reads exactly `0x0055` — a replaced or
+factory-reset BMS, which is precisely the re-commissioning case. Removing it would delete the only
+Linux-side recovery path (DALY's own BMSTool is Windows-only) while removing no capability that is
+currently reachable, so it stays as tightly gated maintenance functionality. It must never be
+broadened: no second register, value, argument or alias.
+
+`@BMS KEY SET DISCHARGE CONFIRM` is the **only** DALY write (implemented and sent live **once**,
+2026-09-19: acknowledged and read back as `0x005A` — see `VALIDATION.md`). It
+sends FC06 `81 06 01 20 00 5A 16 07`: KEY logic `0x0120 := 0x005A` (DISCHARGE — KEY OFF turns the
+discharge MOS off, charge MOS kept), the exact frame DALY BMSTool V1.14.79 builds for that setting.
+It takes no argument and refuses with zero bytes sent (`BMS_KEY_WRITE=REFUSED reason=…`) unless:
+MAINTENANCE; no write already sent this boot; no DALY transaction in flight or queued; `0xD2`
+telemetry OK and ≤ 5 s old; no alarms; a successful `@BMS KEY READ` ≤ 30 s old showing exactly
+`0x0055` with charge/discharge MOS control `1`/`1` (`0x005A` → `ALREADY_CONFIGURED`). Accepted, it
+replies `BMS_KEY_WRITE=STARTED target=DISCHARGE raw=0x005A`, re-checks every precondition (the
+live operating mode included) just before
+transmitting, then reports `BMS_KEY_WRITE=ACK result=OK|TIMEOUT|CRC_FAIL|BAD_HEADER|BAD_ECHO
+rx_bytes=<n>` (only the exact echo `51 06 01 20 00 5A 05 97` is `OK`) and, after an automatic
+FC03 read-back, `BMS_KEY_WRITE=COMPLETE ack=… readback=VERIFIED|PENDING_RESTART|MISMATCH|READ_FAILED`
+with the decoded register. Only `VERIFIED` (`0x005A` read back) means the setting is stored;
+`PENDING_RESTART` means the BMS still reports `0x0055` (BMSTool asks for a BMS restart after every
+setting — MATDOG never restarts the BMS). `@BMS KEY WRITE STATUS` prints the cached record with
+zero bus traffic. Nothing persists on the ESP32: if it loses power after the write, `@BMS KEY
+READ` after reboot shows the real register. No rollback command exists.
 
 `@STATUS` (and the per-module `@IMU`/`@BMS`/`@LED` variants) report each module as
 `init=.. detected=.. expected=.. result=..` — separating "did the driver initialize"
@@ -381,8 +467,9 @@ not at boot, not on a timer.
 
 ```bash
 python3 scripts/tests/test_ota_partition_logic.py   # OTA slot selection (40 tests)
-bash scripts/tests/run_host_tests.sh                # servo population / profile
-python3 scripts/static_audit.py                     # runs both, plus the audit
+bash scripts/tests/run_host_tests.sh                # servo population / profile + DALY protocol
+python3 scripts/tests/test_static_audit_daly.py     # DALY write-whitelist mutation suite
+python3 scripts/static_audit.py                     # runs all of the above, plus the audit
 ```
 
 `scripts/tests/test_servo_population.cpp` compiles the **real** firmware translation
@@ -392,6 +479,17 @@ expected-now distinction, every per-ID classification, missing/unexpected/
 absent-but-present cases, the fail-closed partial-scan and truncation paths, and both
 profiles' expected-hardware semantics (proving `USB_ONLY` behaviour did not regress
 while `ROBOT_POWERED` was added).
+
+`scripts/tests/test_daly_protocol.cpp` does the same for `src/power/DalyProtocol.cpp`: both
+request frames and their CRCs, the 245-byte `0x81` reply built from BMSTool's literal byte
+positions (proving the register-based offsets), all KEY-logic values, sleep-time width, rejection
+of bad header/CRC/length without replacing the last valid snapshot, the unchanged `0xD2`
+telemetry decoder, and the bus scheduler (no overlap, KEY priority, bounded telemetry deferral,
+automatic resumption). It also covers the one write: its exact bytes and CRC, the acknowledgement
+exactly as BMSTool accepts it (address, function, CRC, register and value echo, length), every
+precondition and its order, `ALREADY_CONFIGURED`, read-back classification (an ACK alone is never
+verification), the status tracker, and scheduling of write → read-back → telemetry after success,
+failure and timeout.
 
 ## Operating mode (MAINTENANCE / RUN)
 
@@ -457,13 +555,28 @@ compiled-in default profile remains `USB_ONLY`.
 
 ## Power architecture
 
-Canonical power and wiring details live in
-[`04_Electronics/README.md`](../../04_Electronics/README.md). The firmware consequence is that
-DALY `KEY` is controlled directly by the bistable logo pushbutton, not by an ESP32 GPIO. Power-on is
-therefore hardware-first, and firmware cannot be the primary wake controller because the ESP32 is
-downstream of the DALY-protected supply it would need to enable. The KEY function itself is
-**OPEN**: in G3 the physical KEY switch produced no observed DALY state change, so it is not a
-validated shutdown or safety barrier; the fused disconnect is.
+Canonical power domains, `KEY`/Charge-MOS semantics, power states, daily use, service isolation
+and charging live in
+[`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md);
+wiring and components in [`04_Electronics/README.md`](../../04_Electronics/README.md).
+
+The firmware consequences are:
+
+- DALY `KEY` is wired directly to the bistable logo pushbutton, **not** to an ESP32 GPIO. Power-on
+  is hardware-first, and firmware cannot be the primary wake controller because the ESP32 sits
+  downstream of the DALY-protected supply it would have to enable.
+- KEY controls the **discharge MOS only** (`0x0120 = 0x005A`, live-verified 2026-09-19). The charge
+  MOS stays independent and normally ON; firmware must never map KEY to it, and `0x0121`/`0x0122`
+  writes stay forbidden.
+- Every ordinary load, the ESP32 included, returns through DALY `P-`; never raw `B-`.
+- "Powered" and "motion enabled" are separate states: a future docked/charging robot stays powered
+  with torque off and motion inhibited, and docking must never write the MOS registers.
+- KEY OFF is a **validated power-off** for the robot as built, with no charger and no USB
+  connected (post-rewire power gate A–E PASS, 2026-09-24 — see `DEVELOPMENT_GATES.md` and
+  `VALIDATION.md`). The historical `B-`/`P-` bypass that made the first physical test inconclusive
+  is corrected. A connected charger still backfeeds the `B+`/`P-` load bus independent of KEY
+  state, so the fused disconnect remains the trusted maintenance-isolation point whenever a charger
+  may be present — see `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` §§ 7–8.
 
 ## Bench test profile
 
@@ -492,7 +605,8 @@ cover, and handoff section 7A for the full matrix.
 │   ├── servo/                 ServoBus, ServoPopulation (pure policy),
 │   │                          ServoCensus (Controller-owned service)
 │   ├── imu/                   Bno085Imu
-│   ├── power/                 DalyBms
+│   ├── power/                 DalyBms (UART owner), DalyProtocol (pure: read frames,
+│   │                          decoders, KEY model, single-owner bus scheduler)
 │   └── status/                LedRing
 └── scripts/
     ├── build.sh
@@ -504,5 +618,7 @@ cover, and handoff section 7A for the full matrix.
     └── tests/
         ├── test_ota_partition_logic.py  offline unit tests, no device/flash required
         ├── test_servo_population.cpp    offline census/profile tests (host g++)
-        └── run_host_tests.sh            compiles + runs the above
+        ├── test_daly_protocol.cpp       offline DALY protocol / KEY probe tests (host g++)
+        ├── test_static_audit_daly.py    DALY write-prohibition audit mutation tests
+        └── run_host_tests.sh            compiles + runs the C++ suites
 ```

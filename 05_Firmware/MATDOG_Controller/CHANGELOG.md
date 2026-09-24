@@ -1,5 +1,127 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — post-rewire power validation & external USB service port closeout — 2026-09-24
+
+Documentation and evidence only; **no firmware change**. No firmware commit since `6322563`
+(2026-09-19) touched source (`4604e36`/`efba2dc`/`19fe837` are test-only or docs-only), so the
+robot exercised in this session ran the already-installed powered firmware from the earlier live
+DALY work. Full evidence:
+[`09_Logs/Development_Log/2026-09-24_MATDOG_POWER_CHARGING_USB_VALIDATION_CLOSEOUT.md`](../../09_Logs/Development_Log/2026-09-24_MATDOG_POWER_CHARGING_USB_VALIDATION_CLOSEOUT.md).
+
+- **Hardware `B-`/`P-` bypass corrected and verified:** TECNOIOT `VIN-` now returns to DALY `P-`
+  instead of raw battery `B-`. Post-rewire power gate A–E passed live: with no charger and no USB
+  present, physical KEY OFF now removes the entire protected robot domain (servo rail, TECNOIOT
+  output and PAD+→PAD- all measured 0 V), and the powered no-motion regression (BNO085/DALY/servo
+  census/`SAFE_OFF`) still holds.
+- **Manual charging common-port behaviour discovered and documented:** a charger connected across
+  `B+`/`P-` backfeeds that bus independent of KEY/Discharge-MOS state — KEY OFF while a charger is
+  connected does **not** de-energize the robot. The previous "manual charging with KEY OFF → robot
+  domain OFF" description was never live-verified and is now corrected; see
+  `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` § 8 for the renamed `MANUAL_CHARGE_KEY_OFF`
+  state and its accurate semantics.
+- **External USB service/programming port (GPIO19 D-, GPIO20 D+, GND, no host VBUS) validated:**
+  native enumeration, bidirectional CDC, and the `esptool` reset/flash-identification path all
+  confirmed through the external connector alone, with correct re-enumeration after reset. The port
+  cannot power the ESP32 on its own.
+- Remaining open: BMS KEY-configuration persistence across a true DALY power cycle (**TO_TEST**);
+  autonomous dock/contact hardware, reverse-polarity protection, unattended charge
+  acceptance/termination, future Jetson charging (**FUTURE**); charging LED-ring progress
+  indication (**FUTURE / TO_DESIGN, NOT IMPLEMENTED** — no firmware for it exists).
+
+## Unreleased — power/KEY architecture closeout — 2026-09-20
+
+Documentation and evidence only; **no firmware change** (the shipped Controller already satisfies
+every frozen policy — audited 2026-09-20).
+
+- **Live KEY write recorded:** `0x0120 := 0x005A` was sent once on 2026-09-19, acknowledged
+  (`51 06 01 20 00 5A 05 97`) and read back as `0x005A`, with no BMS restart needed. Persistence
+  across a BMS power cycle remains TO_TEST.
+- **New canonical owner:** `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` — power domains
+  (`B-` to the DALY only, every load on `B+`/`P-`), KEY = discharge MOS only, Charge MOS normally
+  ON, the full power-state table, daily use, storage, service isolation, manual charging and the
+  future docking/charging and Jetson behaviour, each with its validation status.
+- **New blocker recorded:** the physical KEY test was inconclusive because of a hardware `B-`/`P-`
+  bypass (TECNOIOT `VIN-` on raw `B-`). KEY OFF is not a trusted power-off until that rewire and
+  its validation; the fused disconnect remains the trusted isolation.
+- Charging hardware is a separate OPEN gate — no charger/dock evidence exists.
+- The one-time commissioning write is **retained** as tightly gated re-commissioning
+  functionality: with the register now `0x005A` it answers `ALREADY_CONFIGURED` and transmits
+  nothing, so it can only act on a replaced or factory-reset BMS.
+- Host suite gains a post-commissioning regression: the current `0x005A` state can never produce a
+  write, on arrival or at the pre-transmit re-check.
+
+## Unreleased — DALY KEY write: live-mode pre-transmit re-check — 2026-09-19
+
+Review fix; **not flashed at commit time; still no DALY write sent.**
+
+- The FC06 KEY write can now leave the UART only if the operating mode is **still MAINTENANCE at
+  the final pre-transmit check**. `DalyBms::update(now_ms, mode)` receives
+  `operating_mode_.mode()` from the Controller every loop; the pure
+  `dalyKeyWritePreTransmitCheck()` uses it instead of a literal `true`. A switch to RUN after the
+  command was accepted cancels the write with zero bytes sent (`reason=NOT_IN_MAINTENANCE_MODE`).
+- Host regression test added (DALY suite 404 checks); audit rule + 5 new mutation cases (52/52).
+
+## Unreleased — DALY KEY discharge configuration (guarded write) — 2026-09-19
+
+**Not flashed; never sent to hardware; live validation TO_TEST.**
+
+- **One semantic DALY write:** `@BMS KEY SET DISCHARGE CONFIRM` (MAINTENANCE only, no argument,
+  once per boot) sends FC06 `81 06 01 20 00 5A 16 07` — KEY logic `0x0120 := 0x005A` (DISCHARGE) —
+  the exact frame DALY BMSTool V1.14.79 builds (static IL analysis: address `0x81`, big-endian
+  register/value, CRC-16/MODBUS). The acknowledgement must be the exact echo
+  `51 06 01 20 00 5A 05 97`; an FC03 read-back always follows and only `0x005A` read back is
+  `VERIFIED` (`0x0055` → `PENDING_RESTART`, anything else → `MISMATCH`).
+- **Fail-closed preconditions**, checked on arrival and again just before transmitting: MAINTENANCE,
+  no earlier write this boot, idle bus, fresh `0xD2` telemetry, no alarms, a successful KEY read
+  ≤ 30 s old showing exactly `0x0055` with MOS control `1`/`1`. `0x005A` already →
+  `ALREADY_CONFIGURED`, zero TX. `@BMS KEY WRITE STATUS`: cached, zero TX.
+- `DalyBusScheduler` serves one operator transaction (KEY read or write) at a time; telemetry
+  resumes after success, failure or timeout. Nothing persists on the ESP32.
+- Static audit: `DALY_THE_ONE_WRITE` is the only admitted write; FC10, other registers (MOS control
+  included), values, addresses, a second write, caller-supplied targets and persistence fail. 47/47
+  mutation cases; DALY host suite 365 checks. `DalyProtocol.h` no longer calls the live-verified
+  read map unvalidated.
+- Boot banner now reads `daly_write : KEY_LOGIC_DISCHARGE_ONLY (operator command; no MOS/power-cut
+  write)`.
+- Unchanged: `requestDischargeOff()` (no-op), `@SYSTEM SHUTDOWN` → `POWER_CUT_FAILED`. No restart,
+  no rollback command (rollback `0x0055` documented only).
+
+## Unreleased — DALY KEY live read-only validation — 2026-09-19
+
+Documentation only; no firmware change. Records the live validation of `a57fcdd`
+(ROBOT_POWERED, application-only flash, byte-identical clean rebuild, SHA-256 `7c0d5d35…c6ba`).
+
+- **DALY 0x81 read personality — PASS:** one `@BMS KEY READ` returned a CRC-valid 245-byte reply.
+- **Current KEY logic: DISABLED (`0x0055`)** — explains why the physical KEY did not switch the
+  discharge MOS in G3. Charge/discharge MOS control `1`/`1`; sleep time 360 → 3600 s (the manual's
+  default).
+- **Telemetry resumption — PASS:** `0xD2` `comm=OK` after the probe; `runtime_resets` 0 throughout.
+- Candidate `0x0120 = 0x005A` **not written, not validated**; DALY configuration write still
+  **BLOCKED**; the physical KEY is still **not** a validated safety barrier.
+- No DALY write, KEY toggle, MOS command, servo command or motion.
+
+## Unreleased — DALY KEY read-only probe — 2026-09-19
+
+**Not flashed; live validation TO_TEST.** No DALY write, KEY toggle or power-state change.
+
+- **Research:** public DALY documents publish no K-series KEY register. DALY's official BMSTool
+  V1.14.79 (static inspection, never run) reveals a second Modbus personality (`0x81` → reply
+  `0x51`) with KEY logic at `0x0120`, charge/discharge MOS control at `0x0121`/`0x0122` and sleep
+  time at `0x0115` — not yet live-validated on MATDOG's unit.
+- **`@BMS KEY READ`** (MAINTENANCE only): one FC03 read `81 03 01 00 00 78 5B D4`, reply validated
+  (245 bytes, `51 03 F0`, CRC), result reported asynchronously. **`@BMS KEY STATUS`**: cached
+  snapshot, zero bus traffic. Neither takes an argument.
+- New Arduino-free `power/DalyProtocol`: the two whitelisted read frames, CRC, validation, the
+  `0xD2` telemetry decoder (moved unchanged), the KEY decoder and `DalyBusScheduler` — one
+  transaction owner, so telemetry and the KEY read never overlap; a KEY read defers at most one
+  telemetry poll and polling resumes on its own.
+- `requestDischargeOff()` unchanged (no-op, `false`); `@SYSTEM SHUTDOWN` still resolves to
+  `POWER_CUT_FAILED`. Candidate `0x0120 = 0x005A` is **not** implemented.
+- Static audit: DALY may transmit only the two whitelisted FC03 frames through one
+  `bms_uart_.write()`; FC06/FC10, any other frame, `bms_uart_` use or UART2 route, and any
+  argument-taking `@BMS` command fail. New mutation suite (24/24) and DALY host suite
+  (214 checks). G3.1 ring floor 2560 → 3072 bytes (largest loop pass now 2588 bytes).
+
 ## Unreleased — G3 / G3.1 live closure — 2026-09-18
 
 Documentation only; no firmware change. Records the live validation of `e2fc605`.

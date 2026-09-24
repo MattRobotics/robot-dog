@@ -36,6 +36,31 @@ void CommandRouter::update(uint32_t now_ms) {
     printBmsStatus();
   }
 
+  // The 0x81 read itself advances inside DalyBms::update(); this reports
+  // its completion exactly once, without the command handler blocking.
+  if (bms_key_read_result_pending_ &&
+      modules_.daly->keyConfigReadResult() != power::DalyKeyReadResult::PENDING) {
+    bms_key_read_result_pending_ = false;
+    printBmsKeyReadResult();
+  }
+
+  // The KEY write reports in two stages: the acknowledgement as soon as it
+  // is classified (so it reaches the host even if the load domain drops
+  // right after), then the read-back verdict.
+  if (bms_key_write_pending_) {
+    const power::DalyKeyWriteStatus& w = modules_.daly->keyWriteStatus();
+    if (!bms_key_write_ack_reported_ && w.ack != power::DalyKeyWriteAck::NONE &&
+        w.ack != power::DalyKeyWriteAck::PENDING) {
+      bms_key_write_ack_reported_ = true;
+      Serial.printf("BMS_KEY_WRITE=ACK result=%s rx_bytes=%u\n",
+                    power::toString(w.ack), (unsigned)w.ack_rx_bytes);
+    }
+    if (w.state != power::DalyKeyWriteState::PENDING) {
+      bms_key_write_pending_ = false;
+      printBmsKeyWriteResult();
+    }
+  }
+
   // The scan itself advances inside ServoBus::update() (called from
   // Controller::update() before this router runs); this just notices the
   // RUNNING -> COMPLETE transition and reports the result exactly once,
@@ -84,6 +109,48 @@ void CommandRouter::handleLine(String line) {
   } else if (upper == "@BMS STREAM OFF") {
     bms_stream_enabled_ = false;
     Serial.println("BMS_STREAM=OFF");
+  } else if (upper == "@BMS KEY READ") {
+    // One read-only FC03 transaction on the RS485 bus the BMS also answers
+    // telemetry on: a diagnostic, so MAINTENANCE only, like @SERVO SCAN.
+    // Takes no arguments - there is deliberately no register/value input.
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
+      Serial.println("BMS_KEY_READ=BLOCKED");
+      Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
+      Serial.printf("MODE=%s\n", toString(modules_.operating_mode->mode()));
+      return;
+    }
+    if (modules_.daly->requestKeyConfigRead()) {
+      bms_key_read_result_pending_ = true;
+      Serial.println("BMS_KEY_READ=STARTED");
+    } else {
+      Serial.println("BMS_KEY_READ=BUSY");
+      Serial.println("REASON=READ_ALREADY_PENDING");
+    }
+  } else if (upper == "@BMS KEY STATUS") {
+    printBmsKeyStatus();
+  } else if (upper == "@BMS KEY SET DISCHARGE CONFIRM") {
+    // The ONE DALY write: KEY logic 0x0120 := 0x005A (DISCHARGE). Exact text
+    // only - no alias, no argument, no value. DalyBms re-checks every
+    // precondition and transmits nothing on refusal.
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
+      Serial.println("BMS_KEY_WRITE=REFUSED reason=NOT_IN_MAINTENANCE_MODE");
+      Serial.printf("MODE=%s\n", toString(modules_.operating_mode->mode()));
+      return;
+    }
+    const power::DalyKeyWriteGate gate =
+        modules_.daly->requestKeyLogicDischarge(modules_.operating_mode->mode());
+    if (gate.decision == power::DalyKeyWriteDecision::START) {
+      bms_key_write_pending_ = true;
+      bms_key_write_ack_reported_ = false;
+      Serial.println("BMS_KEY_WRITE=STARTED target=DISCHARGE raw=0x005A");
+    } else if (gate.decision == power::DalyKeyWriteDecision::ALREADY_CONFIGURED) {
+      Serial.println("BMS_KEY_WRITE=ALREADY_CONFIGURED raw=0x005A tx_bytes=0");
+    } else {
+      Serial.printf("BMS_KEY_WRITE=REFUSED reason=%s tx_bytes=0\n",
+                    power::toString(gate.refusal));
+    }
+  } else if (upper == "@BMS KEY WRITE STATUS") {
+    printBmsKeyWriteStatus();
   } else if (upper == "@LED STATUS") {
     printLedStatus();
   } else if (upper == "@LED OFF") {
@@ -189,6 +256,11 @@ void CommandRouter::printHelp() {
   Serial.println("  @IMU STREAM ON|OFF");
   Serial.println("  @BMS STATUS");
   Serial.println("  @BMS STREAM ON|OFF");
+  Serial.println("  @BMS KEY READ           (MAINTENANCE mode only; read-only, async result)");
+  Serial.println("  @BMS KEY STATUS         (cached KEY snapshot; no bus transaction)");
+  Serial.println("  @BMS KEY SET DISCHARGE CONFIRM  (MAINTENANCE only; the one DALY write,");
+  Serial.println("                           0x0120 := 0x005A, then read-back; once per boot)");
+  Serial.println("  @BMS KEY WRITE STATUS   (cached write result; no bus transaction)");
   Serial.println("  @LED STATUS");
   Serial.println("  @LED OFF");
   Serial.println("  @LED TEST");
@@ -272,6 +344,91 @@ void CommandRouter::printBmsStatus() {
                   sample.discharge_mos_on ? "ON" : "OFF",
                   sample.state_name,
                   sample.alarms[0], sample.alarms[1], sample.alarms[2], sample.alarms[3]);
+  }
+}
+
+// Formatting only, from the stored snapshot. Configuration is reported
+// exactly as read; nothing here is inferred from the live MOS state.
+void CommandRouter::printBmsKeySnapshot(const power::DalyKeyConfigSnapshot& k) {
+  Serial.printf("  key_logic_raw=0x%04X key_logic=%s\n",
+                k.key_logic_raw, power::toString(k.key_logic));
+  Serial.printf("  charge_mos_control=%u\n", k.charge_mos_control);
+  Serial.printf("  discharge_mos_control=%u\n", k.discharge_mos_control);
+  Serial.printf("  sleep_time_raw=%u sleep_time_s=%lu\n",
+                k.sleep_time_raw, (unsigned long)k.sleep_time_seconds);
+}
+
+void CommandRouter::printBmsKeyReadResult() {
+  power::DalyBms* daly = modules_.daly;
+  const power::DalyKeyReadResult result = daly->keyConfigReadResult();
+  if (result != power::DalyKeyReadResult::OK) {
+    Serial.printf("BMS_KEY_READ=COMPLETE result=%s rx_bytes=%u\n",
+                  power::toString(result), (unsigned)daly->keyConfigReadRxBytes());
+    return;
+  }
+  Serial.println("BMS_KEY_READ=COMPLETE result=OK");
+  printBmsKeySnapshot(daly->keyConfigSnapshot());
+}
+
+void CommandRouter::printBmsKeyStatus() {
+  // Zero bus transactions: cached state only.
+  power::DalyBms* daly = modules_.daly;
+  const uint32_t now_ms = millis();
+  const power::DalyKeyReadResult result = daly->keyConfigReadResult();
+
+  if (result == power::DalyKeyReadResult::NOT_REQUESTED ||
+      result == power::DalyKeyReadResult::PENDING) {
+    Serial.printf("BMS_KEY_STATUS last_read=%s\n", power::toString(result));
+  } else {
+    Serial.printf("BMS_KEY_STATUS last_read=%s age_ms=%lu rx_bytes=%u\n",
+                  power::toString(result), (unsigned long)daly->keyConfigReadAgeMs(now_ms),
+                  (unsigned)daly->keyConfigReadRxBytes());
+  }
+
+  const power::DalyKeyConfigSnapshot& k = daly->keyConfigSnapshot();
+  if (!k.valid) {
+    Serial.println("  snapshot=NOT_READ key_logic=UNKNOWN");
+    return;
+  }
+  Serial.printf("  snapshot=VALID age_ms=%lu\n", (unsigned long)(now_ms - k.sampled_at_ms));
+  printBmsKeySnapshot(k);
+}
+
+void CommandRouter::printBmsKeyWriteResult() {
+  const power::DalyKeyWriteStatus& w = modules_.daly->keyWriteStatus();
+  if (w.state != power::DalyKeyWriteState::COMPLETE) {
+    // Accepted, then refused by the last check before transmitting.
+    Serial.printf("BMS_KEY_WRITE=%s reason=%s tx_bytes=0\n", power::toString(w.state),
+                  power::toString(w.last_refusal));
+    return;
+  }
+  Serial.printf("BMS_KEY_WRITE=COMPLETE ack=%s readback=%s\n", power::toString(w.ack),
+                power::toString(w.readback));
+  if (w.readback == power::DalyKeyReadback::READ_FAILED) {
+    Serial.printf("  readback_rx_bytes=%u\n", (unsigned)modules_.daly->keyConfigReadRxBytes());
+    return;
+  }
+  printBmsKeySnapshot(modules_.daly->keyConfigSnapshot());
+}
+
+void CommandRouter::printBmsKeyWriteStatus() {
+  // Zero bus transactions: cached state only.
+  const power::DalyKeyWriteStatus& w = modules_.daly->keyWriteStatus();
+  const uint32_t now_ms = millis();
+  Serial.printf("BMS_KEY_WRITE_STATUS state=%s transmitted=%s last_refusal=%s\n",
+                power::toString(w.state), w.transmitted ? "YES" : "NO",
+                power::toString(w.last_refusal));
+  if (w.ack != power::DalyKeyWriteAck::NONE && w.ack != power::DalyKeyWriteAck::PENDING) {
+    Serial.printf("  ack=%s rx_bytes=%u age_ms=%lu\n", power::toString(w.ack),
+                  (unsigned)w.ack_rx_bytes, (unsigned long)(now_ms - w.ack_at_ms));
+  }
+  if (w.readback == power::DalyKeyReadback::READ_FAILED) {
+    Serial.printf("  readback=READ_FAILED age_ms=%lu\n",
+                  (unsigned long)(now_ms - w.readback_at_ms));
+  } else if (w.readback != power::DalyKeyReadback::NONE &&
+             w.readback != power::DalyKeyReadback::PENDING) {
+    Serial.printf("  readback=%s key_logic_raw=0x%04X age_ms=%lu\n", power::toString(w.readback),
+                  w.readback_raw, (unsigned long)(now_ms - w.readback_at_ms));
   }
 }
 

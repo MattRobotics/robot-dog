@@ -4,6 +4,9 @@ Electrical architecture and hardware integration records for MATDOG.
 
 Canonical system architecture: [`01_Docs/02_Architecture/ARCHITECTURE.md`](../01_Docs/02_Architecture/ARCHITECTURE.md)
 
+Canonical power domains, `KEY`/Charge-MOS semantics, power states, daily use, service isolation and
+charging: [`MATDOG_POWER_STATES_AND_CHARGING.md`](MATDOG_POWER_STATES_AND_CHARGING.md)
+
 Canonical current project snapshot, including the physically installed population:
 [`README.md`](../README.md)
 
@@ -38,17 +41,19 @@ allocates 17 units, but only 13 are installed today.
 |---|---|
 | Transport | native USB 2.0 Full-Speed / USB CDC — **DECIDED**; validated through the controller's native USB connection |
 | ESP32-S3 USB pins | D− = **GPIO19**, D+ = **GPIO20** |
-| External 4-pin connector | GPIO19, GPIO20, ESP32 GND; 5 V is **not connected** — **TO_TEST** USB-data/service predisposition |
+| External 4-pin connector | GPIO19, GPIO20, ESP32 GND; 5 V is **not connected** — **VALIDATED** 2026-09-24 as a USB service/programming port (enumeration, CDC, `esptool` reset/flash-ID); does not power the ESP32 on its own |
 | Theoretical rate | 12 Mbit/s |
 | USB 3.x | neither required nor available on ESP32-S3 |
 | Secondary channel | Wi-Fi command/diagnostic — planned |
 | Packet/command protocol | **TBD** — transport frozen, protocol is not |
 
 Historical Jetson-UART use of GPIO19/GPIO20 is **SUPERSEDED**. Their current canonical meaning is
-native USB D−/D+. The existing external connector has not yet been physically validated as a USB
-service link; the validated onboard/native USB path does not prove that connector. It remains a
-future USB service-port candidate — not a UART — pending electrical and signal-integrity
-validation.
+native USB D−/D+. The external connector (GPIO19, GPIO20, GND; host VBUS intentionally not wired)
+was validated 2026-09-24 as a USB service/programming link: native enumeration, bidirectional CDC,
+and the `esptool` reset/flash-identification handshake all confirmed with the onboard USB-C
+disconnected, and the board re-enumerated correctly after `esptool`'s hard reset. Because host
+VBUS is not connected, this port cannot power the ESP32 on its own — diagnostics/programming
+through it require the robot already powered from its protected supply (normally KEY ON).
 
 ---
 
@@ -60,8 +65,9 @@ Lean by design. Each item below is a deliberate decision, not an omission.
 |---|---|
 | **Seeed Bus Servo Driver** for the servo-bus electrical layer | selected |
 | **No CAN transceiver** | decided — not part of the current architecture |
-| **ESP32-S3 power**: DALY-protected B+/P− domain → 5 V step-down | **DECIDED**; validated no-motion in ROBOT_POWERED (G3, 2026-09-18) |
-| **Primary hardware ON/OFF/wake**: bistable pushbutton under the robot logo → DALY `KEY` directly | **DECIDED**; no ESP32 GPIO required. Function **OPEN** — in G3 the KEY switch produced no observed DALY state change; not a validated shutdown/safety barrier |
+| **ESP32-S3 power**: DALY-protected B+/P− domain → TECNOIOT 5 V step-down | **DECIDED**; validated no-motion in ROBOT_POWERED (G3, 2026-09-18). The ESP32 is **not** a raw-`B−` always-on load and needs **no isolated DC/DC**. **Hardware correction completed and validated 2026-09-24**: TECNOIOT `VIN−` now returns to `P−`, not `B−` (see Power-domain invariant below) |
+| **Power-domain invariant**: battery `B−` → DALY `B−` only; every ordinary load returns to `P−` | **DECIDED**; physical conformance **VERIFIED** 2026-09-24 (post-rewire power gate A–E, PASS) |
+| **Primary hardware ON/OFF/wake**: bistable pushbutton under the robot logo → DALY `KEY` directly | **DECIDED**; no ESP32 GPIO required. KEY logic read live 2026-09-19 as **DISABLED** (`0x0055`), which explained the G3 finding, then set **once** to **DISCHARGE** (`0x005A`) by the guarded write — acknowledged and read back. KEY now controls the **discharge MOS only**; the charge MOS stays normally ON and must never be mapped to KEY. Physical KEY OFF/ON behaviour is **VERIFIED** 2026-09-24 (post-rewire power gate A–E, PASS) with no charger and no USB present. A connected charger still backfeeds the `B+`/`P−` bus independent of KEY state — see `MATDOG_POWER_STATES_AND_CHARGING.md` § 8 |
 | **One removable, externally accessible ATO main fuse** | decided — rating **TBD** |
 | **Custom motor power busbar** | decided — dimensions and material **TBD** |
 | **Locking 3D-printed cable housings** | decided |
@@ -82,9 +88,20 @@ allocated joints.
 
 ## Power and wiring — validation status
 
-The power architecture is **DECIDED**, but the current 13-servo installed configuration has not yet
-completed ROBOT_POWERED validation. Nothing here should be read as evidence for a powered,
-multi-servo robot test.
+The power architecture is **DECIDED**, and the installed 13-servo configuration **passed
+ROBOT_POWERED no-motion validation** (G3 formal PASS 2026-09-17/18, G3.1 PASS 2026-09-18: DALY
+live read-only, LED live, 13/13 expected servos with 4 absent by design in two identical censuses,
+`VERIFIED_OFF` and `torque=0` on all 13). That evidence covers a *powered, no-motion* robot only.
+
+**VERIFIED** 2026-09-24: power-domain conformance after the `TECNOIOT VIN−` → `P−` rewire, and KEY
+OFF actually removing the robot rails with no charger/USB present (post-rewire power gate A–E,
+PASS — see `MATDOG_POWER_STATES_AND_CHARGING.md` § 11).
+
+Still **TO_TEST**:
+
+- the final busbar / power-distribution items G3 did not cover (busbar build, ATO rating, installed
+  13-servo wiring);
+- sustained multi-servo power/load behaviour — no motion or multi-servo load test exists.
 
 ### VALIDATED — proven on real hardware
 
@@ -104,9 +121,19 @@ Evidence: [Bench QC V6.1](../09_Logs/Validation_Reports/ST3215_Bench_QC_2026-08-
 - the **ATO protection implementation** (rating TBD);
 - the installed **13-servo wiring**;
 - the installed **13-servo power budget** and any later 17-unit expansion;
-- the DALY `KEY` power/wake/shutdown function (the step-down controller supply itself ran the
-  whole G3 session; the fused disconnect remains the trusted isolation method);
-- the GPIO19/GPIO20 external USB-data/service connector.
+- the **charging path** beyond the one attended manual session (charger CC/CV was confirmed
+  live 2026-09-22/23; dock/contacts, negative return under autonomous docking, reverse polarity,
+  and thermal/current behaviour under longer sessions remain untested) — see
+  [`MATDOG_POWER_STATES_AND_CHARGING.md`](MATDOG_POWER_STATES_AND_CHARGING.md) § 8;
+- BMS KEY-configuration persistence across a true DALY power cycle (only KEY toggles and
+  fuse removal/reinsertion have been tested, not a BMS power cycle).
+
+**VERIFIED** 2026-09-24: the DALY `KEY` power/wake/shutdown function on the rails (BMS-side
+configuration `0x005A` DISCHARGE, and the physical KEY test — the `B−`/`P−` bypass is corrected and
+the post-rewire procedure passed) and the GPIO19/GPIO20 external USB-data/service connector (native
+enumeration, CDC, `esptool` reset/flash-ID). The fused disconnect remains the trusted maintenance
+isolation point whenever a charger may be connected — see
+[`MATDOG_POWER_STATES_AND_CHARGING.md`](MATDOG_POWER_STATES_AND_CHARGING.md) §§ 7–8.
 
 Protection is deliberately minimal in the current revision: one externally accessible ATO main
 fuse, removable without disassembly.

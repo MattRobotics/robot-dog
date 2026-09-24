@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Compiles and runs the offline C++ host test suite for the G2 servo
-# population / hardware profile logic. No hardware, no Arduino toolchain,
-# no device I/O — it links the real firmware translation units, which is
-# why they were kept Arduino-free.
+# Compiles and runs the offline C++ host test suites: the G2 servo
+# population / hardware profile logic, and the DALY wire protocol / KEY
+# probe (frames, CRC, decoders, bus scheduling). No hardware, no Arduino
+# toolchain, no device I/O — they link the real firmware translation units,
+# which is why those were kept Arduino-free.
 #
 # Invoked by scripts/static_audit.py so there is one gate command, matching
 # how the OTA partition parser's Python suite is already run.
@@ -27,4 +28,12 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/Availability.cpp" \
   "$SKETCH_DIR/src/core/SystemState.cpp"
 
+# -DDISABLED=0x00 reproduces the Arduino-ESP32 core macro (esp32-hal-gpio.h)
+# so an identifier clash with it fails here, not only in the device build.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_daly_protocol" \
+  "$SCRIPT_DIR/test_daly_protocol.cpp" \
+  "$SKETCH_DIR/src/power/DalyProtocol.cpp"
+
 "$OUT/test_servo_population"
+"$OUT/test_daly_protocol"

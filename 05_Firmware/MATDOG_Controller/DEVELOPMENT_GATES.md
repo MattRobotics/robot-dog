@@ -1,7 +1,7 @@
 # MATDOG Controller — Development Gates
 
 **Canonical owner of the technical pass/fail authorization criteria for each Controller
-development gate.** Last updated 2026-09-18.
+development gate.** Last updated 2026-09-24.
 
 This file answers *what must be true before this stage may begin, what it may and may not do, and
 what proves it passed*. It is not a narrative roadmap and not an evidence log:
@@ -129,21 +129,78 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   `runtime_resets` 0; every command reply complete once the backlog had drained.
 - **EVIDENCE** — [`VALIDATION.md` § G3.1](VALIDATION.md).
 
-## Open hardware item — DALY KEY (before G4)
+## DALY KEY hardware item — closed 2026-09-24 (before G4)
 
 - **FINDING** — during G3 both positions of the physical KEY switch produced identical
   DALY-reported state (`discharge_mos=ON` in both).
-- **STATUS** — **OPEN.** KEY is not a validated shutdown or safety barrier. The DALY's actual KEY
-  configuration and function must be inspected before any setting is changed; the investigation
-  needs its own session authorization. `requestDischargeOff()` remains a fail-closed stub that
-  transmits nothing, and no DALY write exists.
-- **INTERIM RULE** — the fused disconnect is the trusted physical isolation method.
+- **RESEARCH** — **COMPLETE** (read-only, 2026-09-19). Public DALY K-series documentation does
+  not publish a KEY configuration register. Static inspection (not execution) of DALY's official
+  BMSTool V1.14.79 found a second Modbus personality — request address `0x81`, reply `0x51` —
+  whose parameter block holds KEY logic at `0x0120` (`0x55` DISABLED, `0xA5`
+  DISCHARGE_AND_SLEEP, `0x5A` DISCHARGE, `0xAA` CHARGE_AND_DISCHARGE, `0xA6`
+  CHARGE_DISCHARGE_AND_SLEEP), charge/discharge MOS control at `0x0121`/`0x0122` and sleep time at
+  `0x0115` (shown as raw × 10 s). It uses a different register map from the live-validated `0xD2`
+  telemetry personality. Both the read and the write side were live-verified the same day (below).
+- **READ PROBE** — **LIVE VERIFIED READ-ONLY** (2026-09-19, firmware `a57fcdd`). `@BMS KEY READ`
+  (MAINTENANCE only) sends the single FC03 frame `81 03 01 00 00 78 5B D4` once; `@BMS KEY STATUS`
+  prints the cached result with zero bus traffic. One live transaction: `result=OK`, 245 bytes,
+  `key_logic_raw=0x0055 key_logic=DISABLED`, `charge_mos_control=1`, `discharge_mos_control=1`,
+  `sleep_time_raw=360 sleep_time_s=3600` (matches the manual's 3600 s default). `0xD2` telemetry
+  resumed (`comm=OK`), `runtime_resets` 0 before and after —
+  [`VALIDATION.md` § DALY KEY live read-only validation](VALIDATION.md).
+- **RESULT** — `0x81` parameter personality **live verified (read-only)**; KEY logic register
+  `0x0120` **live verified (read-only)**. At read-probe time, **pre-commissioning**, the register
+  read **DISABLED (`0x0055`)** — strong evidence for why the physical KEY did not control the
+  discharge MOS in G3. That value is historical: the **current last live-verified configuration is
+  `0x005A` DISCHARGE** (single commissioning write, same day — see below).
+- **WRITE / CONFIGURATION** — **LIVE VERIFIED** (2026-09-19, firmware `6322563`). Exactly one
+  semantic write exists: `@BMS KEY SET DISCHARGE CONFIRM` (MAINTENANCE only) sends FC06
+  `81 06 01 20 00 5A 16 07` — KEY logic `0x0120 := 0x005A` (DISCHARGE: KEY OFF → discharge MOS
+  OFF, charge MOS kept) — reconstructed from BMSTool V1.14.79's own write path, then always reads
+  the register back. It refuses (zero TX) unless: MAINTENANCE (re-checked immediately before
+  transmitting); no write yet this boot; bus idle; `0xD2` telemetry OK ≤ 5 s old; no alarms; a
+  successful KEY read ≤ 30 s old showing exactly `0x0055` with charge/discharge MOS control
+  `1`/`1`; `0x005A` already → `ALREADY_CONFIGURED`. The static audit admits only this write (FC10,
+  other registers — MOS control `0x0121`/`0x0122` included — other values and any caller-supplied
+  target stay forbidden). `requestDischargeOff()` remains a fail-closed stub that transmits
+  nothing; `@SYSTEM SHUTDOWN` still resolves to `POWER_CUT_FAILED`.
+- **LIVE WRITE RESULT** — sent **once**: `ACK result=OK rx_bytes=8` (exact echo
+  `51 06 01 20 00 5A 05 97`) and `readback=VERIFIED key_logic_raw=0x005A`, with no BMS restart
+  needed. Telemetry resumed, MOS stayed ON/ON with the KEY ON, `runtime_resets` 0 —
+  [`VALIDATION.md` § DALY KEY single live configuration write](VALIDATION.md). Persistence across
+  a BMS power cycle is **TO_TEST**. The write is retained as tightly gated re-commissioning
+  functionality and is now inert on this unit (`ALREADY_CONFIGURED`, zero TX).
+- **PHYSICAL KEY TEST (2026-09-19)** — **HISTORICAL / SUPERSEDED.** Operator-reported: with KEY OFF
+  the DALY showed the discharge MOS OFF while the robot load rail stayed powered. Root cause was a
+  hardware `B-`/`P-` bypass — the TECNOIOT step-down input return sat on raw battery `B-`, and
+  being a non-isolated buck it bridged `B-` to `P-` through the ESP32/Seeed/servo grounds.
+- **CORRECTION AND POST-REWIRE VALIDATION — DONE, PASS (2026-09-24).** `TECNOIOT VIN-` was moved
+  from `B-` to `P-`, and the dead-circuit / KEY ON / KEY OFF (USB disconnected) / KEY ON / powered
+  no-motion procedure in
+  [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md)
+  § 11 passed live: with no charger and no USB present, KEY OFF now removes the robot rails
+  (servo rail, TECNOIOT output and PAD+→PAD- all measured 0 V), and the powered no-motion
+  regression still holds. Full evidence:
+  [`VALIDATION.md` § POWER GATE A–E, MANUAL CHARGING & EXTERNAL USB SERVICE PORT](VALIDATION.md).
+  BMS KEY-configuration persistence across a true DALY power cycle remains **TO_TEST**.
+- **CHARGING** — a connected charger backfeeds the `B+`/`P-` load bus directly, independent of
+  KEY/Discharge-MOS state (live-verified 2026-09-22/23 + 2026-09-24 — see
+  `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md` § 8). KEY OFF does **not** de-energize the
+  robot while a charger is connected. Full autonomous dock/charging qualification remains a
+  separate **FUTURE/OPEN** gate.
+- **STATUS** — **CLOSED for this gate.** The BMS-side KEY configuration and the physical KEY
+  power-off are both verified for the robot as built. See G4 below for what follows.
+- **INTERIM RULE, updated** — the fused disconnect remains the primary maintenance isolation
+  point (§7 of the canonical power doc), because a connected charger can still re-energize the
+  `B+`/`P-` bus regardless of KEY state; KEY OFF alone is no longer distrusted when no charger is
+  connected.
 
 ## G4 — Diagnostics / Maintenance
 
 - **PURPOSE** — permanent read-only maintenance capability over the single shared `ServoBus`.
 - **ENTRY** — G3 formal PASS (including the census repeat); **G3.1 PASS**. Both satisfied
-  2026-09-18; the roadmap puts the DALY KEY investigation first.
+  2026-09-18. The DALY KEY investigation is closed both on the BMS side (read and write both
+  live-verified) and on the physical power-off side (post-rewire power gate A–E PASS, 2026-09-24).
 - **ALLOWED** — `SYSTEM_SELF_TEST`, consolidated servo health, source-signature read, profile audit;
   extension of the existing census/read/`SAFE_OFF` surface.
 - **FORBIDDEN** — any new persistent write path; any transport→register access; motion.
