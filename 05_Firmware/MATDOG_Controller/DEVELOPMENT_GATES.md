@@ -337,10 +337,21 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     historical; historical evidence can never produce a current PASS). Evidence lifecycle
     `MEASURED → CANDIDATE → ACCEPTED → PROMOTED`: **IMPLEMENTED and offline-tested**, with every
     shortcut refused.
-  - **TO_IMPLEMENT** — the calibration execution engine (the 18 recovered phases), the Safe
-    Actuator Layer beneath it, direction measurement (`MEASURED_CANDIDATE`/`ACCEPTED`: no
-    historical mechanism exists to recover), and the persistence boundary (**TO_DESIGN**: whether
-    an accepted calibration is written by `PROVISIONING` or by a separate transaction).
+  - **I5 (2026-09-25):** a generic, intent-based Calibration Execution boundary is now
+    **IMPLEMENTED / OFFLINE TESTED** — `src/calibration/CalibrationExecutionEngine.*`. Per V3
+    handoff §15.11 (binding): the LF V25 18-phase sequence is a **HISTORICAL_REPLAY / ORACLE**,
+    usable in regression tests and never the production execution architecture. The engine is
+    driven by `CalibrationIntent` (`CONTACT_PROBE`/`AUXILIARY_MOVE`/`DIRECTION_VERIFY`/`RESTORE`/
+    `ABORT`), routes the three executable intents through the unmodified `SafeActuatorPolicy` and
+    `ActuatorRuntime`, and treats `RESTORE`/`ABORT` as categorically non-executing — neither ever
+    reaches a backend call, by construction, which is what makes "authority loss → zero restore
+    motion" true without a special-cased guard. It owns no session state, no persistence and no
+    geometry profile of its own — full record and adversarial test list in
+    [`../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md`](../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md).
+  - **Still TO_IMPLEMENT** — direction measurement (`MEASURED_CANDIDATE`/`ACCEPTED`: no historical
+    mechanism exists to recover) and the persistence boundary (**TO_DESIGN**: whether an accepted
+    calibration is written by `PROVISIONING` or by a separate transaction — deliberately not
+    decided by I5).
 
 ## HostLink semantic layer
 

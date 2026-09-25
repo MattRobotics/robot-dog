@@ -1,5 +1,37 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I5 Calibration Execution Architecture — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. No production
+backend exists. Persistence/promotion remains TO_DESIGN.**
+
+- **Corrected stale documentation**: `DEVELOPMENT_GATES.md` previously said the calibration
+  execution engine meant "the 18 recovered phases" — conflating the LF V25 historical oracle with
+  the production architecture, which V3 handoff §15.11 forbids. Fixed.
+- **New `src/calibration/CalibrationExecutionEngine.{h,cpp}`** — a generic, intent-based
+  Calibration Execution boundary (`CalibrationIntent`: `CONTACT_PROBE`/`AUXILIARY_MOVE`/
+  `DIRECTION_VERIFY`/`RESTORE`/`ABORT`), routing the three executable intents through the
+  unmodified `SafeActuatorPolicy`/`ActuatorRuntime`. `RESTORE` and `ABORT` are categorically
+  non-executing — neither ever reaches a backend call, by construction, which is what makes
+  "authority loss → zero restore motion" true without a special-cased guard. Owns no session
+  state, no persistence, no geometry profile, and never references `CalibrationPhase` — the LF V25
+  18-phase sequence stays a historical oracle, exercised only by
+  `test_calibration_domain.cpp`'s existing replay.
+- **New static-audit check** `check_calibration_execution_engine_boundaries()`: fails the build if
+  the engine stops being host-linkable, references the 18-phase sequence, names a torque-removal
+  primitive, or is referenced anywhere outside `src/calibration/`/the offline suite.
+  `check_actuator_runtime_boundaries()` (I4) was extended to allow this new legitimate consumer.
+  Confirmed independently: both hardware profiles compile to byte-identical flash sizes with and
+  without the engine present.
+- **New offline suite** `test_calibration_execution_engine.cpp`: 72 checks, 0 failures, covering
+  all ten operator-specified adversarial cases (authority loss → no restore motion, stale
+  generation, diagnostic-endpoint refusal, wrong geometry provenance, replay-origin refusal, no
+  accepted transform → no raw target, CALIBRATION-only eligibility, MOTION exclusion, abort/
+  restore/SAFE_OFF distinctness, unknown-intent fail-closed). Offline baseline is now 13 host
+  suites / 5695 checks (previously 12 / 5623). Full record:
+  [`09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md`](../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md).
+- **Cost:** `USB_ONLY` and `ROBOT_POWERED` flash/RAM unchanged (978,195 B / 978,751 B).
+
 ## Unreleased — I4 Safe Actuator runtime boundary — 2026-09-25
 
 **Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. No production

@@ -783,7 +783,9 @@ def check_actuator_runtime_boundaries(files):
     still no production ActuatorBackend anywhere in this firmware - ServoBus
     exposes exactly one write, safeOff() (torque OFF) - so nothing may
     construct or reference ActuatorRuntime outside src/actuator/ (the
-    adapter itself) or the offline test suite."""
+    adapter itself), src/calibration/ (I5's execution boundary, itself
+    audited by check_calibration_execution_engine_boundaries() to stay
+    unreferenced by Controller/CommandRouter) or the offline test suite."""
     names = {p.name for p, _ in files}
     for required in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
         if required not in names:
@@ -797,7 +799,7 @@ def check_actuator_runtime_boundaries(files):
                 fail(f"{path}: contains {token!r} - keep the Safe Actuator runtime adapter "
                      f"host-linkable, the same contract as ActuatorWritePolicy itself")
 
-    allowed_dirs = {"actuator", "tests"}
+    allowed_dirs = {"actuator", "calibration", "tests"}
     for path, code in files:
         if path.name in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
             continue
@@ -806,7 +808,47 @@ def check_actuator_runtime_boundaries(files):
         if re.search(r"\bActuatorRuntime\b", code):
             fail(f"{path}: references ActuatorRuntime - I4's runtime adapter has no production "
                  f"backend (ServoBus exposes no torque-on/GoalPosition write) and must not be "
-                 f"constructed or owned outside src/actuator/ or the offline test suite")
+                 f"constructed or owned outside src/actuator/, src/calibration/ or the offline "
+                 f"test suite")
+
+
+def check_calibration_execution_engine_boundaries(files):
+    """I5: the Calibration Execution boundary must stay free of the LF V25
+    18-phase sequence (V3 handoff Sec 15.11, binding: historical oracle
+    only, never the production architecture) and must never name a
+    torque-removal primitive - SAFE_OFF stays outside this layer exactly
+    like it stays outside ActuatorWritePolicy and ActuatorRuntime."""
+    names = {p.name for p, _ in files}
+    for required in ("CalibrationExecutionEngine.h", "CalibrationExecutionEngine.cpp"):
+        if required not in names:
+            fail(f"{required}: Calibration Execution engine unit not found")
+
+    for path, code in files:
+        if path.name not in ("CalibrationExecutionEngine.h", "CalibrationExecutionEngine.cpp"):
+            continue
+        for token in ("#include <Arduino.h>", "Serial.", "millis(", "ServoBus",
+                      "CalibrationPhase", "safeOff", "EnableTorque"):
+            if token in code:
+                fail(f"{path}: contains {token!r} - the Calibration Execution boundary must "
+                     f"stay host-linkable, must never reference the historical LF V25 18-phase "
+                     f"sequence as its architecture (V3 handoff Sec 15.11), and must never name "
+                     f"a torque-removal primitive (SAFE_OFF stays outside this layer)")
+
+    # Same "not wired into Controller" guarantee I4 enforces for
+    # ActuatorRuntime, applied to this class directly: #include hides a
+    # transitive ActuatorRuntime reference from a textual scan of
+    # Controller.h/.cpp, so the engine itself needs its own boundary check
+    # rather than relying on check_actuator_runtime_boundaries() alone.
+    allowed_dirs = {"calibration", "tests"}
+    for path, code in files:
+        if path.name in ("CalibrationExecutionEngine.h", "CalibrationExecutionEngine.cpp"):
+            continue
+        if path.parent.name in allowed_dirs:
+            continue
+        if re.search(r"\bCalibrationExecutionEngine\b", code):
+            fail(f"{path}: references CalibrationExecutionEngine - I5's execution boundary has "
+                 f"no production backend behind it and must not be constructed or owned outside "
+                 f"src/calibration/ or the offline test suite")
 
 
 def check_led_status_boundaries(files):
@@ -2533,6 +2575,9 @@ def check_host_tests(sketch_dir):
     ]
     led_status_suite = sketch_dir / "scripts" / "tests" / "test_led_status_policy.cpp"
     actuator_runtime_suite = sketch_dir / "scripts" / "tests" / "test_actuator_runtime.cpp"
+    calibration_execution_suite = (
+        sketch_dir / "scripts" / "tests" / "test_calibration_execution_engine.cpp"
+    )
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
         return
@@ -2567,6 +2612,10 @@ def check_host_tests(sketch_dir):
     if not actuator_runtime_suite.exists():
         fail(f"{actuator_runtime_suite}: Safe Actuator runtime adapter offline test suite not found")
         return
+    if not calibration_execution_suite.exists():
+        fail(f"{calibration_execution_suite}: Calibration Execution boundary offline test suite "
+             f"not found")
+        return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
@@ -2575,7 +2624,8 @@ def check_host_tests(sketch_dir):
                    "test_ota_policy", "test_actuator_authority", "test_actuator_write_policy",
                    "test_calibration_geometry", "test_servo_profile",
                    "test_calibration_domain", "test_calibration_manager",
-                   "test_led_status_policy", "test_actuator_runtime"):
+                   "test_led_status_policy", "test_actuator_runtime",
+                   "test_calibration_execution_engine"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
@@ -2901,6 +2951,7 @@ def main():
     check_led_anti_back_power(files)
     check_led_status_boundaries(files)
     check_actuator_runtime_boundaries(files)
+    check_calibration_execution_engine_boundaries(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)
     check_servo_timeout_not_global(files)

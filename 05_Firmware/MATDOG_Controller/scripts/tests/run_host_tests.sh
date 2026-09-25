@@ -132,6 +132,22 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# The Calibration Execution boundary suite links the REAL engine, the REAL
+# policy, the REAL runtime adapter and the REAL arbiter against a fake
+# backend, the same contract as test_actuator_runtime.cpp. LF V25's 18-phase
+# sequence is never linked here (V3 handoff Sec 15.11) - only the current
+# generated geometry profile data.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_execution_engine" \
+  "$SCRIPT_DIR/test_calibration_execution_engine.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
 # The LED status suite links the REAL decision core; LedStatusPolicy.* has
 # no <Arduino.h> and no LedRing dependency, so this drives the whole
 # priority/effect table from a synthetic clock, the same contract as the
@@ -152,4 +168,5 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_manager"
 "$OUT/test_actuator_runtime"
+"$OUT/test_calibration_execution_engine"
 "$OUT/test_led_status_policy"
