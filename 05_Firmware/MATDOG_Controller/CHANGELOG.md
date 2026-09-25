@@ -1,5 +1,34 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I4 Safe Actuator runtime boundary — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. No production
+backend exists.**
+
+- **New `src/actuator/ActuatorRuntime.{h,cpp}`** — the runtime adapter `SAFE_ACTUATOR_LAYER.md`
+  §7 marks `TO_IMPLEMENT`: an abstract `ActuatorBackend` interface (`enableTorque`/
+  `writeGoalPosition`, unsigned tick domain) and `ActuatorRuntime`, which calls
+  `SafeActuatorPolicy::commit()` once and issues at most one backend call, only on `ACCEPT`.
+  `ActuatorWritePolicy.*` itself is untouched.
+- **`ServoBus` still exposes exactly one write, `safeOff()`** — no `EnableTorque(id, 1)`/
+  `GoalPosition` primitive exists, so no production `ActuatorBackend` was created. The adapter is
+  exercised only offline against a fake backend.
+- **The three geometry-authorised operations** (`CALIBRATION_CONTACT_PROBE`/`DIRECTION_VERIFY`/
+  `CALIBRATION_AUXILIARY_MOVE`) have no raw-tick target yet — that conversion needs an accepted
+  q0/direction transform from a real execution engine (deferred to I5) — and always resolve to
+  `ExecuteResult::NO_RAW_TARGET`, never a guessed conversion.
+- **New static-audit check** `check_actuator_runtime_boundaries()`: fails the build if the adapter
+  stops being host-linkable, or if `ActuatorRuntime` is referenced anywhere outside
+  `src/actuator/`/the offline suite. Confirmed independently: both hardware profiles compile to
+  byte-identical flash sizes with and without the adapter present — the linker dead-code-eliminates
+  it entirely since nothing references it.
+- **New offline suite** `test_actuator_runtime.cpp`: 46 checks, 0 failures, including an explicit
+  proof that a rejected commit never reaches the backend. Offline baseline is now 12 host suites /
+  5623 checks (previously 11 / 5577). Full record:
+  [`09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md`](../../09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md).
+- **Cost:** `USB_ONLY` and `ROBOT_POWERED` flash/RAM unchanged (978,195 B / 978,751 B) — the
+  adapter contributes zero bytes to either compiled image.
+
 ## Unreleased — I3 SOURCE_SIGNATURE — 2026-09-25
 
 - **New `@SYSTEM SOURCE_SIGNATURE`** read-only command: reports `build::kBuildId`, firmware name/

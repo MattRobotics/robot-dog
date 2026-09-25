@@ -454,18 +454,31 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — no direct-to-`ServoBus` write path exists outside this layer; static audit
   enforces it.
 - **NEXT** — first motion.
-- **STATUS** — **PARTIAL — policy core IMPLEMENTED / COMPILED / OFFLINE TESTED; runtime adapter
-  TO_IMPLEMENT.** `src/actuator/ActuatorWritePolicy.*` is the decision core: a pure,
-  host-linkable plan/commit transaction model bound to the real `ActuatorAuthority` lease and
-  generation, with no "check once then write later" path. It holds no transport, so an `ACCEPT`
-  authorises nothing by itself. The accepted-limit store is empty and refuses anything without
-  live, promoted provenance — `MATDOG_JOINT_CALIBRATION.yaml` records `{min: null, max: null}`
-  for all twelve leg joints, so every position-class command resolves to
+- **STATUS** — **PARTIAL — policy core AND offline runtime adapter IMPLEMENTED / COMPILED /
+  OFFLINE TESTED; production backend TO_IMPLEMENT.** `src/actuator/ActuatorWritePolicy.*` is the
+  decision core: a pure, host-linkable plan/commit transaction model bound to the real
+  `ActuatorAuthority` lease and generation, with no "check once then write later" path. It holds
+  no transport, so an `ACCEPT` authorises nothing by itself. The accepted-limit store is empty and
+  refuses anything without live, promoted provenance — `MATDOG_JOINT_CALIBRATION.yaml` records
+  `{min: null, max: null}` for all twelve leg joints, so every position-class command resolves to
   `REJECT_NO_ACCEPTED_LIMITS`. `SAFE_OFF` is outside the layer structurally: no operation class
-  can name a torque removal. The only actuator write in the firmware is still torque OFF inside
-  `ServoBus::safeOff()`; the default build gained no write path and, with nothing referencing
-  the policy yet, no flash or RAM at all. Audit and design:
-  [`SAFE_ACTUATOR_LAYER.md`](SAFE_ACTUATOR_LAYER.md).
+  can name a torque removal.
+  **I4 (2026-09-25):** `src/actuator/ActuatorRuntime.*` adds the runtime adapter itself — an
+  abstract `ActuatorBackend` interface (`enableTorque`/`writeGoalPosition`, unsigned tick domain)
+  and `ActuatorRuntime`, which calls `SafeActuatorPolicy::commit()` exactly once and issues at
+  most one backend call, only on `ACCEPT`; every other decision reaches the backend zero times
+  (host-tested explicitly). There is still **no production `ActuatorBackend`** — `ServoBus`
+  exposes exactly one write, `safeOff()` — so the adapter is exercised only offline against a fake
+  backend (`test_actuator_runtime.cpp`, 46 checks). `scripts/static_audit.py`'s
+  `check_actuator_runtime_boundaries()` fails the build if `ActuatorRuntime` is referenced
+  anywhere outside `src/actuator/` or the offline suite, and neither `Controller` nor
+  `CommandRouter` does: both compiled profiles are byte-identical with and without the adapter
+  present, because the linker dead-code-eliminates it entirely. The three geometry-authorised
+  operations have no raw-tick target yet and always resolve to `ExecuteResult::NO_RAW_TARGET` —
+  that conversion needs an accepted q0/direction transform applied by a real execution engine,
+  deferred to I5. The only actuator write in the firmware is still torque OFF inside
+  `ServoBus::safeOff()`. Audit and design: [`SAFE_ACTUATOR_LAYER.md`](SAFE_ACTUATOR_LAYER.md),
+  [`../../09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md`](../../09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md).
 
 ## First motion
 

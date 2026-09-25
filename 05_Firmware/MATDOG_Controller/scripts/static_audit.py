@@ -776,6 +776,39 @@ def check_led_anti_back_power(files):
     # AND that the active profile is still USB_ONLY.
 
 
+def check_actuator_runtime_boundaries(files):
+    """I4: the Safe Actuator runtime adapter (src/actuator/ActuatorRuntime.*)
+    must stay host-linkable exactly like ActuatorWritePolicy itself, and its
+    mere existence must not make ordinary physical motion reachable. There is
+    still no production ActuatorBackend anywhere in this firmware - ServoBus
+    exposes exactly one write, safeOff() (torque OFF) - so nothing may
+    construct or reference ActuatorRuntime outside src/actuator/ (the
+    adapter itself) or the offline test suite."""
+    names = {p.name for p, _ in files}
+    for required in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
+        if required not in names:
+            fail(f"{required}: Safe Actuator runtime adapter unit not found")
+
+    for path, code in files:
+        if path.name not in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
+            continue
+        for token in ("#include <Arduino.h>", "Serial.", "millis(", "ServoBus"):
+            if token in code:
+                fail(f"{path}: contains {token!r} - keep the Safe Actuator runtime adapter "
+                     f"host-linkable, the same contract as ActuatorWritePolicy itself")
+
+    allowed_dirs = {"actuator", "tests"}
+    for path, code in files:
+        if path.name in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
+            continue
+        if path.parent.name in allowed_dirs:
+            continue
+        if re.search(r"\bActuatorRuntime\b", code):
+            fail(f"{path}: references ActuatorRuntime - I4's runtime adapter has no production "
+                 f"backend (ServoBus exposes no torque-on/GoalPosition write) and must not be "
+                 f"constructed or owned outside src/actuator/ or the offline test suite")
+
+
 def check_led_status_boundaries(files):
     """LED presentation must have exactly one periodic owner (I2).
     LedStatusPolicy is the pure decision core - host-linkable, the same
@@ -2499,6 +2532,7 @@ def check_host_tests(sketch_dir):
         sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
     ]
     led_status_suite = sketch_dir / "scripts" / "tests" / "test_led_status_policy.cpp"
+    actuator_runtime_suite = sketch_dir / "scripts" / "tests" / "test_actuator_runtime.cpp"
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
         return
@@ -2530,6 +2564,9 @@ def check_host_tests(sketch_dir):
     if not led_status_suite.exists():
         fail(f"{led_status_suite}: LED status policy offline test suite not found")
         return
+    if not actuator_runtime_suite.exists():
+        fail(f"{actuator_runtime_suite}: Safe Actuator runtime adapter offline test suite not found")
+        return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
@@ -2538,7 +2575,7 @@ def check_host_tests(sketch_dir):
                    "test_ota_policy", "test_actuator_authority", "test_actuator_write_policy",
                    "test_calibration_geometry", "test_servo_profile",
                    "test_calibration_domain", "test_calibration_manager",
-                   "test_led_status_policy"):
+                   "test_led_status_policy", "test_actuator_runtime"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
@@ -2863,6 +2900,7 @@ def main():
     check_servo_diagnostics_require_maintenance_mode(files)
     check_led_anti_back_power(files)
     check_led_status_boundaries(files)
+    check_actuator_runtime_boundaries(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)
     check_servo_timeout_not_global(files)

@@ -117,6 +117,21 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# The Safe Actuator runtime adapter suite links the REAL adapter, the REAL
+# policy and the REAL arbiter, so the "no ACCEPT -> no backend call" and
+# "ACCEPT -> exactly one backend call" properties under test are the shipped
+# ones. Only the backend is fake - the one thing this adapter is meant to be
+# tested against, the same contract as the OTA suite's fake OtaBackend.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_actuator_runtime" \
+  "$SCRIPT_DIR/test_actuator_runtime.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
 # The LED status suite links the REAL decision core; LedStatusPolicy.* has
 # no <Arduino.h> and no LedRing dependency, so this drives the whole
 # priority/effect table from a synthetic clock, the same contract as the
@@ -136,4 +151,5 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_manager"
+"$OUT/test_actuator_runtime"
 "$OUT/test_led_status_policy"
