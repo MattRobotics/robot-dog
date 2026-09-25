@@ -2,10 +2,13 @@
 
 #include <esp_ota_ops.h>
 
+#include <initializer_list>
+
 #include "../servo/ServoProfileData.h"
 
 #include "../config/BuildConfig.h"
 #include "../config/Pins.h"
+#include "ControllerService.h"
 
 namespace matdog {
 namespace core {
@@ -291,6 +294,8 @@ void CommandRouter::handleLine(String line) {
     printAuthorityStatus();
   } else if (upper == "@SYSTEM SOURCE_SIGNATURE") {
     printSourceSignature();
+  } else if (upper == "@HOSTLINK READINESS") {
+    printHostLinkReadiness();
   } else if (upper == "@SYSTEM SHUTDOWN") {
     modules_.power_state->requestShutdown();
     Serial.println("SHUTDOWN_REQUESTED=YES");
@@ -327,6 +332,7 @@ void CommandRouter::printHelp() {
   Serial.println("  @AUTHORITY STATUS      (read-only; no owner can be acquired yet)");
   Serial.println("  @CALIBRATION STATUS    (read-only; no session can move hardware)");
   Serial.println("  @SYSTEM SOURCE_SIGNATURE  (read-only build/source identity)");
+  Serial.println("  @HOSTLINK READINESS    (read-only; BLOCKED/TO_TEST/READY per capability)");
   Serial.println("  @SERVO SCAN <lo> <hi>   (MAINTENANCE mode only; incremental, bounded");
   Serial.println("                           per-ID blocking, result follows asynchronously)");
   Serial.println("  @SERVO CENSUS           (MAINTENANCE mode only; canonical 11-55 scan,");
@@ -351,7 +357,7 @@ void CommandRouter::printModeStatus() {
 }
 
 void CommandRouter::printOtaStatus() {
-  const update::OtaManagerStatus& o = modules_.ota->status();
+  const update::OtaManagerStatus& o = modules_.service->otaStatus();
   const update::OtaStatus& u = o.policy;
 
   Serial.printf("OTA_BOOT state=%s self_check=%s rollback_armed=%s ticks=%lu confirmed_at_ms=%lu\n",
@@ -393,7 +399,7 @@ void CommandRouter::printOtaStatus() {
 }
 
 void CommandRouter::printWifiStatus() {
-  const network::WifiStatus& w = modules_.wifi->status();
+  const network::WifiStatus& w = modules_.service->wifiStatus();
 
   char ip[16];
   network::formatIpv4(w.ipv4, ip, sizeof(ip));
@@ -422,7 +428,7 @@ void CommandRouter::printWifiStatus() {
 }
 
 void CommandRouter::printCalibrationStatus() {
-  const calibration::CalibrationSessionStatus& c = modules_.calibration->status();
+  const calibration::CalibrationSessionStatus& c = modules_.service->calibrationStatus();
 
   // The headline fact, first: the installed robot has no valid calibration.
   Serial.printf("CALIBRATION_CURRENT state=%s hardware_motion=%s\n",
@@ -455,21 +461,21 @@ void CommandRouter::printCalibrationStatus() {
 }
 
 void CommandRouter::printAuthorityStatus() {
-  const ActuatorAuthorityArbiter* a = modules_.authority;
-  const AuthorityCounters& c = a->counters();
+  ControllerService* s = modules_.service;
+  const AuthorityCounters& c = s->authorityCounters();
 
   Serial.printf("AUTHORITY owner=%s generation=%lu last_result=%s\n",
-                toString(a->current()), (unsigned long)a->generation(),
-                toString(a->lastResult()));
+                toString(s->authorityOwner()), (unsigned long)s->authorityGeneration(),
+                toString(s->authorityLastResult()));
   Serial.printf("AUTHORITY_INHIBIT active=%s reason=%s\n",
-                a->inhibited() ? "YES" : "NO", toString(a->inhibitReason()));
+                s->authorityInhibited() ? "YES" : "NO", toString(s->authorityInhibitReason()));
   Serial.printf("AUTHORITY_MODE operating_mode=%s motion_allowed=%s service_allowed=%s\n",
-                toString(modules_.operating_mode->mode()),
-                isModeCompatible(modules_.operating_mode->mode(),
+                toString(s->operatingMode()),
+                isModeCompatible(s->operatingMode(),
                                  ActuatorAuthority::MOTION) ? "YES" : "NO",
-                isModeCompatible(modules_.operating_mode->mode(),
+                isModeCompatible(s->operatingMode(),
                                  ActuatorAuthority::CALIBRATION) ? "YES" : "NO");
-  Serial.printf("AUTHORITY_LAST_CLEAR %s\n", toString(a->lastClearReason()));
+  Serial.printf("AUTHORITY_LAST_CLEAR %s\n", toString(s->authorityLastClearReason()));
   Serial.printf("AUTHORITY_COUNTERS grants=%lu already_owned=%lu releases=%lu "
                 "rejections=%lu stale=%lu force_clears=%lu inhibits=%lu\n",
                 (unsigned long)c.grants, (unsigned long)c.already_owned,
@@ -482,16 +488,16 @@ void CommandRouter::printAuthorityStatus() {
 }
 
 void CommandRouter::printStatus() {
-  SystemState* s = modules_.system_state;
+  ControllerService* s = modules_.service;
   // authority= is on the SYSTEM line rather than its own, to stay inside the
   // USB CDC TX ring budget the audit enforces (worst single-pass burst was
   // 2758 B against a 3072 B ring after Wi-Fi/OTA; this adds ~24 B).
   Serial.printf("SYSTEM health=%s power_state=%s mode=%s authority=%s uptime_ms=%lu "
                 "profile=%s\n",
                 toString(s->systemHealth()),
-                toString(modules_.power_state->state()),
-                toString(modules_.operating_mode->mode()),
-                toString(modules_.authority->current()),
+                toString(s->powerState()),
+                toString(s->operatingMode()),
+                toString(s->authorityOwner()),
                 (unsigned long)s->uptimeMillis(millis()),
                 build::kTestProfile);
 
@@ -499,10 +505,10 @@ void CommandRouter::printStatus() {
   // from "was it even expected to be reachable right now" — see
   // core/Availability.h. This replaces the earlier imu=/servo=/bms=/led=
   // single-word summary, which could not express that.
-  printAvailabilityLine("BNO085", modules_.imu->availability());
-  printAvailabilityLine("DALY  ", modules_.daly->availability());
-  printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
-  printAvailabilityLine("LED   ", modules_.led->availability());
+  printAvailabilityLine("BNO085", s->imuAvailability());
+  printAvailabilityLine("DALY  ", s->bmsAvailability());
+  printAvailabilityLine("SERVO ", s->servoAvailability());
+  printAvailabilityLine("LED   ", s->ledAvailability());
 
   // Declared servo configuration (compile-time facts) plus the verdict of
   // the last census, if one was run. NOT_RUN is the honest answer after a
@@ -512,14 +518,14 @@ void CommandRouter::printStatus() {
                 (unsigned)servo::canonicalAllocatedCount(),
                 (unsigned)servo::expectedNowCount(),
                 (unsigned)servo::absentByDesignCount(),
-                servo::toString(modules_.servo_census->result().verdict));
+                servo::toString(s->servoCensusResult().verdict));
 
   // One compact Wi-Fi line here; the full picture is @WIFI STATUS. @STATUS
   // has a real byte budget: static_audit.py sizes the USB CDC TX ring
   // against the worst single-pass burst, and with TX timeout 0 anything
   // past the ring is dropped rather than queued (G3.1).
   {
-    const network::WifiStatus& w = modules_.wifi->status();
+    const network::WifiStatus& w = s->wifiStatus();
     char ip[16];
     network::formatIpv4(w.ipv4, ip, sizeof(ip));
     Serial.printf("WIFI  state=%s connected=%s ip=%s rssi_dbm=%ld fault=%s\n",
@@ -532,22 +538,23 @@ void CommandRouter::printStatus() {
 }
 
 void CommandRouter::printImuStatus() {
-  printAvailabilityLine("BNO085", modules_.imu->availability());
+  ControllerService* s = modules_.service;
+  printAvailabilityLine("BNO085", s->imuAvailability());
   Serial.printf("  stream=%s rv_count=%lu runtime_resets=%lu\n",
-                modules_.imu->streamEnabled() ? "ON" : "OFF",
-                (unsigned long)modules_.imu->rvCount(),
-                (unsigned long)modules_.imu->runtimeResetCount());
+                s->imuStreamEnabled() ? "ON" : "OFF",
+                (unsigned long)s->imuRvCount(),
+                (unsigned long)s->imuRuntimeResetCount());
 }
 
 void CommandRouter::printBmsStatus() {
-  power::DalyBms* daly = modules_.daly;
-  printAvailabilityLine("DALY  ", daly->availability());
+  ControllerService* s = modules_.service;
+  printAvailabilityLine("DALY  ", s->bmsAvailability());
   Serial.printf("  comm=%s age_ms=%lu\n",
-                power::toString(daly->lastCommResult()),
-                (unsigned long)daly->lastResultAgeMs(millis()));
+                power::toString(s->bmsLastCommResult()),
+                (unsigned long)s->bmsLastResultAgeMs(millis()));
 
-  if (daly->hasValidSample()) {
-    const power::DalySample& sample = daly->sample();
+  if (s->bmsHasValidSample()) {
+    const power::DalySample& sample = s->bmsSample();
     Serial.printf("  pack_v=%.1f current_a=%.1f soc=%.1f%% cells=%u\n",
                   sample.pack_voltage_v, sample.pack_current_a,
                   sample.soc_percent, sample.cell_count);
@@ -573,33 +580,33 @@ void CommandRouter::printBmsKeySnapshot(const power::DalyKeyConfigSnapshot& k) {
 }
 
 void CommandRouter::printBmsKeyReadResult() {
-  power::DalyBms* daly = modules_.daly;
-  const power::DalyKeyReadResult result = daly->keyConfigReadResult();
+  ControllerService* s = modules_.service;
+  const power::DalyKeyReadResult result = s->bmsKeyConfigReadResult();
   if (result != power::DalyKeyReadResult::OK) {
     Serial.printf("BMS_KEY_READ=COMPLETE result=%s rx_bytes=%u\n",
-                  power::toString(result), (unsigned)daly->keyConfigReadRxBytes());
+                  power::toString(result), (unsigned)s->bmsKeyConfigReadRxBytes());
     return;
   }
   Serial.println("BMS_KEY_READ=COMPLETE result=OK");
-  printBmsKeySnapshot(daly->keyConfigSnapshot());
+  printBmsKeySnapshot(s->bmsKeySnapshot());
 }
 
 void CommandRouter::printBmsKeyStatus() {
   // Zero bus transactions: cached state only.
-  power::DalyBms* daly = modules_.daly;
+  ControllerService* s = modules_.service;
   const uint32_t now_ms = millis();
-  const power::DalyKeyReadResult result = daly->keyConfigReadResult();
+  const power::DalyKeyReadResult result = s->bmsKeyConfigReadResult();
 
   if (result == power::DalyKeyReadResult::NOT_REQUESTED ||
       result == power::DalyKeyReadResult::PENDING) {
     Serial.printf("BMS_KEY_STATUS last_read=%s\n", power::toString(result));
   } else {
     Serial.printf("BMS_KEY_STATUS last_read=%s age_ms=%lu rx_bytes=%u\n",
-                  power::toString(result), (unsigned long)daly->keyConfigReadAgeMs(now_ms),
-                  (unsigned)daly->keyConfigReadRxBytes());
+                  power::toString(result), (unsigned long)s->bmsKeyConfigReadAgeMs(now_ms),
+                  (unsigned)s->bmsKeyConfigReadRxBytes());
   }
 
-  const power::DalyKeyConfigSnapshot& k = daly->keyConfigSnapshot();
+  const power::DalyKeyConfigSnapshot& k = s->bmsKeySnapshot();
   if (!k.valid) {
     Serial.println("  snapshot=NOT_READ key_logic=UNKNOWN");
     return;
@@ -609,7 +616,8 @@ void CommandRouter::printBmsKeyStatus() {
 }
 
 void CommandRouter::printBmsKeyWriteResult() {
-  const power::DalyKeyWriteStatus& w = modules_.daly->keyWriteStatus();
+  ControllerService* s = modules_.service;
+  const power::DalyKeyWriteStatus& w = s->bmsKeyWriteStatus();
   if (w.state != power::DalyKeyWriteState::COMPLETE) {
     // Accepted, then refused by the last check before transmitting.
     Serial.printf("BMS_KEY_WRITE=%s reason=%s tx_bytes=0\n", power::toString(w.state),
@@ -619,15 +627,15 @@ void CommandRouter::printBmsKeyWriteResult() {
   Serial.printf("BMS_KEY_WRITE=COMPLETE ack=%s readback=%s\n", power::toString(w.ack),
                 power::toString(w.readback));
   if (w.readback == power::DalyKeyReadback::READ_FAILED) {
-    Serial.printf("  readback_rx_bytes=%u\n", (unsigned)modules_.daly->keyConfigReadRxBytes());
+    Serial.printf("  readback_rx_bytes=%u\n", (unsigned)s->bmsKeyConfigReadRxBytes());
     return;
   }
-  printBmsKeySnapshot(modules_.daly->keyConfigSnapshot());
+  printBmsKeySnapshot(s->bmsKeySnapshot());
 }
 
 void CommandRouter::printBmsKeyWriteStatus() {
   // Zero bus transactions: cached state only.
-  const power::DalyKeyWriteStatus& w = modules_.daly->keyWriteStatus();
+  const power::DalyKeyWriteStatus& w = modules_.service->bmsKeyWriteStatus();
   const uint32_t now_ms = millis();
   Serial.printf("BMS_KEY_WRITE_STATUS state=%s transmitted=%s last_refusal=%s\n",
                 power::toString(w.state), w.transmitted ? "YES" : "NO",
@@ -647,7 +655,7 @@ void CommandRouter::printBmsKeyWriteStatus() {
 }
 
 void CommandRouter::printSourceSignature() {
-  const update::OtaManagerStatus& o = modules_.ota->status();
+  const update::OtaManagerStatus& o = modules_.service->otaStatus();
   Serial.printf("SOURCE_SIGNATURE build_id=%s firmware=%s version=%s profile=%s board=%s\n",
                 build::kBuildId, build::kFirmwareName, build::kFirmwareVersion,
                 build::kTestProfile, build::kBoardName);
@@ -661,25 +669,45 @@ void CommandRouter::printSourceSignature() {
   }
 }
 
+void CommandRouter::printHostLinkReadiness() {
+  // Read-only, computed-on-demand: HostLink's readiness classification is a
+  // pure function of two facts (hardware_motion_authorized, and today's
+  // unconditional "no hardware validated yet" for Wi-Fi/OTA), never a
+  // second source of truth. See core/ServiceReadiness.h.
+  ControllerService* s = modules_.service;
+  for (ServiceCapability cap : {ServiceCapability::ACTUATOR_TORQUE_ENABLE,
+                                ServiceCapability::ACTUATOR_POSITION_COMMAND,
+                                ServiceCapability::CALIBRATION_CONTACT_PROBE,
+                                ServiceCapability::CALIBRATION_AUXILIARY_MOVE,
+                                ServiceCapability::CALIBRATION_DIRECTION_VERIFY,
+                                ServiceCapability::WIFI_HARDWARE_ASSOCIATION,
+                                ServiceCapability::OTA_END_TO_END,
+                                ServiceCapability::WEB_READ_ONLY_DASHBOARD}) {
+    Serial.printf("HOSTLINK_READINESS capability=%s readiness=%s\n", toString(cap),
+                  toString(s->readiness(cap)));
+  }
+}
+
 void CommandRouter::printLedStatus() {
-  printAvailabilityLine("LED   ", modules_.led->availability());
+  ControllerService* s = modules_.service;
+  printAvailabilityLine("LED   ", s->ledAvailability());
   Serial.printf("  pixels=%u pin=%d brightness_max=%u test_running=%s data_pin_driven=%s\n",
                 status::LedRing::kNumPixels,
                 pins::kLedRingDin,
                 status::LedRing::kMaxBrightness,
-                modules_.led->testRunning() ? "YES" : "NO",
-                modules_.led->dataPinDriven() ? "YES" : "NO");
+                s->ledTestRunning() ? "YES" : "NO",
+                s->ledDataPinDriven() ? "YES" : "NO");
   // Presentation only - this is what the status manager last decided to
   // show, never a second source of truth. See status/LedStatusPolicy.h.
-  Serial.printf("  presentation=%s\n", status::toString(modules_.led_status->state()));
+  Serial.printf("  presentation=%s\n", status::toString(s->ledPresentationState()));
 }
 
 void CommandRouter::printServoScanResult() {
-  const servo::ScanResult& result = modules_.servo_bus->lastScanResult();
+  const servo::ScanResult& result = modules_.service->servoScanResult();
   Serial.printf("SERVO_SCAN=COMPLETE lo=%d hi=%d found=%d elapsed_ms=%lu max_ping_us=%lu\n",
                 result.lo, result.hi, result.found_count,
                 (unsigned long)result.elapsed_ms, (unsigned long)result.max_ping_us);
-  printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
+  printAvailabilityLine("SERVO ", modules_.service->servoAvailability());
 
   int listed = result.found_count < servo::ServoBus::kMaxScanIds
                    ? result.found_count
@@ -693,7 +721,7 @@ void CommandRouter::printServoCensusResult() {
   // Formatting ONLY. Every number below is read from the stored
   // CensusResult; none of it is computed here, and no servo transaction is
   // issued to render it.
-  const servo::CensusResult& c = modules_.servo_census->result();
+  const servo::CensusResult& c = modules_.service->servoCensusResult();
 
   Serial.printf("SERVO_CENSUS=%s lo=%d hi=%d\n",
                 servo::toString(c.verdict), c.scan_lo, c.scan_hi);
@@ -722,13 +750,13 @@ void CommandRouter::printServoCensusResult() {
     Serial.printf("  UNEXPECTED_ID id=%u\n", (unsigned)c.unexpected_ids[i]);
   }
 
-  printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
+  printAvailabilityLine("SERVO ", modules_.service->servoAvailability());
 }
 
 void CommandRouter::printServoPreflightResult() {
   // Formatting ONLY. Every value below was read by ServoPreflight; nothing is
   // computed here and no servo transaction is issued to render it.
-  const servo::PreflightResult& r = modules_.servo_preflight->result();
+  const servo::PreflightResult& r = modules_.service->servoPreflightResult();
 
   Serial.printf("SERVO_PREFLIGHT=%s profile=%s source_sha256=%s\n",
                 r.allPass() ? "PASS" : "FAIL", servo::profile_data::kProfileId,
@@ -764,7 +792,7 @@ void CommandRouter::printServoPreflightResult() {
     }
   }
   Serial.println("  NOTE present_position is a raw liveness tick, NOT q0");
-  printAvailabilityLine("SERVO ", modules_.servo_bus->availability());
+  printAvailabilityLine("SERVO ", modules_.service->servoAvailability());
 }
 
 void CommandRouter::printServoRead(int id) {

@@ -22,6 +22,12 @@
 namespace matdog {
 namespace core {
 
+// Forward-declared, not included: ControllerService.h includes THIS header
+// (it needs the complete Modules struct below), so this direction must stay
+// a pointer-only forward declaration to avoid a cycle. CommandRouter.cpp
+// includes ControllerService.h directly wherever it actually calls into it.
+class ControllerService;
+
 // Small, explicit, safe USB CDC diagnostic command surface.
 // See handoff section 22. Deliberately does NOT expose: arbitrary EEPROM
 // write, ID recode, factory reset, CalibrationOfs, broadcast write,
@@ -48,6 +54,11 @@ class CommandRouter {
     // state: the router asks, it does not remember.
     ActuatorAuthorityArbiter* authority;
     calibration::CalibrationManager* calibration;
+    // The transport-neutral telemetry layer (I6) — read-only status
+    // commands route through this instead of the pointers above directly.
+    // Action/write commands still use the module pointers above; see
+    // ControllerService.h for the exact scope boundary.
+    ControllerService* service;
   };
 
   void begin(const Modules& modules);
@@ -86,6 +97,10 @@ class CommandRouter {
   // (see update/OtaPolicy.h), so it is not authoritative identity here
   // either.
   void printSourceSignature();
+  // Read-only HostLink readiness (I6). BLOCKED/TO_TEST/READY per named
+  // capability — see core/ServiceReadiness.h. Computed on demand from two
+  // facts; nothing here is cached state.
+  void printHostLinkReadiness();
   void printServoScanResult();
   // Pure presentation of servo_census->result(). Computes nothing: the
   // classification lives in servo/ServoPopulation.h so a future Web UI /

@@ -148,6 +148,13 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# The HostLink readiness classifier suite links the REAL pure classifier -
+# no module pointer, no hardware call - I6 (2026-09-25 objective change).
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_service_readiness" \
+  "$SCRIPT_DIR/test_service_readiness.cpp" \
+  "$SKETCH_DIR/src/core/ServiceReadiness.cpp"
+
 # The LED status suite links the REAL decision core; LedStatusPolicy.* has
 # no <Arduino.h> and no LedRing dependency, so this drives the whole
 # priority/effect table from a synthetic clock, the same contract as the
@@ -169,4 +176,5 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_calibration_manager"
 "$OUT/test_actuator_runtime"
 "$OUT/test_calibration_execution_engine"
+"$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"

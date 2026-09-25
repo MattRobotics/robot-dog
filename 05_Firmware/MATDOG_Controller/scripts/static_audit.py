@@ -543,9 +543,13 @@ def check_bms_command_surface(files):
 
     # The KEY probe is diagnostics only: no power-state/health consumer yet.
     # Firmware sources only - the offline host suite exercises these APIs.
+    # ControllerService.h (I6) is a reviewed exception: it forwards the same
+    # already-computed KEY snapshot/status CommandRouter already read, for
+    # the same diagnostic presentation, through the transport-neutral
+    # telemetry layer - it does not add a second decision path.
     for p2, c2 in files:
         if "scripts" in p2.parts or p2.name in DALY_SOURCE_NAMES or \
-                p2.name in ("CommandRouter.cpp", "CommandRouter.h"):
+                p2.name in ("CommandRouter.cpp", "CommandRouter.h", "ControllerService.h"):
             continue
         for token in ("requestKeyConfigRead", "keyConfigSnapshot", "keyConfigReadResult",
                       "DalyKeyLogic", "DalyKeyConfigSnapshot", "requestKeyLogicDischarge",
@@ -849,6 +853,26 @@ def check_calibration_execution_engine_boundaries(files):
             fail(f"{path}: references CalibrationExecutionEngine - I5's execution boundary has "
                  f"no production backend behind it and must not be constructed or owned outside "
                  f"src/calibration/ or the offline test suite")
+
+
+def check_service_readiness_is_host_linkable(files):
+    """I6: the HostLink readiness classifier must stay pure and
+    host-linkable, the same contract as every other decision core in this
+    codebase - no module pointer, no hardware call, no transport."""
+    names = {p.name for p, _ in files}
+    for required in ("ServiceReadiness.h", "ServiceReadiness.cpp"):
+        if required not in names:
+            fail(f"{required}: HostLink readiness classifier unit not found")
+
+    for path, code in files:
+        if path.name not in ("ServiceReadiness.h", "ServiceReadiness.cpp"):
+            continue
+        for token in ("#include <Arduino.h>", "Serial.", "millis(", "ServoBus",
+                      "CommandRouter", "ControllerService"):
+            if token in code:
+                fail(f"{path}: contains {token!r} - keep the HostLink readiness classifier "
+                     f"pure and host-linkable; module/transport wiring belongs in "
+                     f"ControllerService, not here")
 
 
 def check_led_status_boundaries(files):
@@ -2578,6 +2602,7 @@ def check_host_tests(sketch_dir):
     calibration_execution_suite = (
         sketch_dir / "scripts" / "tests" / "test_calibration_execution_engine.cpp"
     )
+    service_readiness_suite = sketch_dir / "scripts" / "tests" / "test_service_readiness.cpp"
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
         return
@@ -2616,6 +2641,9 @@ def check_host_tests(sketch_dir):
         fail(f"{calibration_execution_suite}: Calibration Execution boundary offline test suite "
              f"not found")
         return
+    if not service_readiness_suite.exists():
+        fail(f"{service_readiness_suite}: HostLink readiness offline test suite not found")
+        return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
@@ -2625,7 +2653,7 @@ def check_host_tests(sketch_dir):
                    "test_calibration_geometry", "test_servo_profile",
                    "test_calibration_domain", "test_calibration_manager",
                    "test_led_status_policy", "test_actuator_runtime",
-                   "test_calibration_execution_engine"):
+                   "test_calibration_execution_engine", "test_service_readiness"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
@@ -2952,6 +2980,7 @@ def main():
     check_led_status_boundaries(files)
     check_actuator_runtime_boundaries(files)
     check_calibration_execution_engine_boundaries(files)
+    check_service_readiness_is_host_linkable(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)
     check_servo_timeout_not_global(files)

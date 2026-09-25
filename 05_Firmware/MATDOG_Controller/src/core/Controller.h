@@ -15,6 +15,7 @@
 #include "../update/OtaManager.h"
 #include "ActuatorAuthority.h"
 #include "CommandRouter.h"
+#include "ControllerService.h"
 #include "OperatingMode.h"
 #include "PowerState.h"
 #include "SystemState.h"
@@ -62,6 +63,10 @@ class Controller {
   // command a joint; it arbitrates a session through authority_ and records
   // evidence. See calibration/CalibrationManager.h.
   calibration::CalibrationManager calibration_;
+  // The transport-neutral telemetry layer (I6) — see ControllerService.h.
+  // Bound to the same module pointers CommandRouter already holds; adds no
+  // module ownership of its own.
+  ControllerService service_;
   CommandRouter command_router_;
 
   // Set only at the very end of begin(). The OTA self-check must not treat a

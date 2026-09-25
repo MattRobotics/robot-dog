@@ -1,5 +1,27 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I6 HostLink implementation (candidate objective change) — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested.** Supersedes the
+earlier audit-only I6 gate, per the operator's instruction to produce one maximally integrated
+hardware-validation candidate: sequencing gates activation/validation, not offline preparation of
+fail-closed software.
+
+- **New `src/core/ServiceReadiness.{h,cpp}`** — pure readiness classifier. 8 named capabilities x
+  hardware-validation flags -> `READY`/`TO_TEST`/`BLOCKED`. 31 offline checks.
+- **New `src/core/ControllerService.h`** — transport-neutral telemetry layer, scope bounded to
+  passive status reads. ~30 accessors, each a one-line forward of a struct its module already
+  computed — zero duplicated logic. Action/write commands stay `CommandRouter`-direct.
+- **`CommandRouter` refactored** (not duplicated): every read-only `print*` method now routes
+  through `ControllerService`. New `@HOSTLINK READINESS` command surfaces the classifier.
+- **New static-audit check** `check_service_readiness_is_host_linkable()`. The pre-existing
+  DALY-KEY-probe scope check was extended to allow `ControllerService.h` as a reviewed consumer
+  (same reasoning already applied to `CommandRouter`); the full DALY mutation suite (52/52) was
+  re-verified green afterward.
+- **Cost:** `USB_ONLY` flash 978,336 B -> 979,111 B (+775 B), RAM +64 B; `ROBOT_POWERED`
+  978,896 B -> 979,655 B (+759 B). Offline baseline now 14 host suites / 5726 checks. Full record:
+  [`09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_IMPLEMENTATION.md).
+
 ## Unreleased — F0 final flash readiness — 2026-09-25
 
 Documentation only; **no flash attempted or proposed**.

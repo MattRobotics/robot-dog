@@ -111,7 +111,9 @@ void Controller::begin() {
       &wifi_, &ota_,
       &system_state_,
       &power_state_, &operating_mode_, &authority_, &calibration_,
+      &service_,
   };
+  service_.begin(modules);
   command_router_.begin(modules);
 
   system_state_.update();

@@ -356,11 +356,15 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 ## HostLink semantic layer
 
 - **PURPOSE** — one semantic command/service contract independent of transport.
-- **ENTRY** — all preceding [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md) stages through
+- **ENTRY (for gate PASS / activation)** — all preceding [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md) stages through
   **formal recalibration** completed, plus the Diagnostics/Maintenance foundation required by the
   semantic service layer. The Diagnostics/Maintenance foundation alone is a technical prerequisite,
   **not** an authorization: HostLink follows Service/Provisioning/QC and Full Leg Calibration in
-  the canonical sequence and must not be pulled forward ahead of them (see rule 6 above).
+  the canonical sequence and must not be pulled forward ahead of them (see rule 6 above). **This
+  entry condition gates claiming the gate PASSED and any hardware/network activation — it does not
+  prohibit implementing isolated, fail-closed offline software in advance** (2026-09-25 objective
+  clarification): sequencing is an activation/validation gate, not a ban on preparatory
+  engineering that reports its own unreadiness honestly.
 - **ALLOWED** — transport adapters over one Controller service implementation; structured state and
   telemetry snapshots.
 - **NOTE (G3.1)** — the USB CDC diagnostic surface's best-effort delivery (timeout 0, short writes
@@ -371,9 +375,22 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — a second transport can consume the same semantic state without
   reimplementation or a duplicate hardware transaction.
 - **NEXT** — Wi-Fi runtime.
-- **STATUS** — **PARTIAL.** `CommandRouter` is a USB CDC adapter; G2 made the census layer
-  transport-independent (no `Serial`, no `<Arduino.h>`, structured `CensusResult`), which is the
-  precondition. A formal Controller Service Layer and schema are **TO_DESIGN**.
+- **STATUS** — **PARTIAL — telemetry half IMPLEMENTED / OFFLINE TESTED (2026-09-25).**
+  `src/core/ControllerService.h` aggregates the structured snapshots every module already
+  computes (`WifiStatus`, `OtaManagerStatus`, `CalibrationSessionStatus`, ...) behind one class
+  that carries no `servo::ServoBus*`/`power::DalyBms*` pointers, so a second transport needs only
+  this class — not `CommandRouter::Modules` — to render the same semantics `CommandRouter` already
+  prints. `CommandRouter`'s read-only `print*` methods were refactored (not duplicated) to route
+  through it; presentation (the `printf` formatting) stays local to the Serial adapter.
+  `src/core/ServiceReadiness.*` adds a pure, host-tested readiness classifier
+  (`BLOCKED`/`TO_TEST`/`READY` per named capability), exposed via the new `@HOSTLINK READINESS`
+  command — the mechanism V3 asked for so currently-unavailable functions report their state
+  explicitly rather than disappearing. **Not done**: the *action* half of the semantic model
+  (servo scan/census/preflight/read/safe_off, mode changes, DALY KEY, Wi-Fi enable, LED test) is
+  still `CommandRouter`-direct, deliberately — those commands carry side effects and were left
+  untouched to keep this gate's risk bounded. A formal command schema/session model for a genuine
+  second transport remains **TO_DESIGN**. Full record:
+  [`09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_IMPLEMENTATION.md).
 
 ## Wi-Fi runtime
 
