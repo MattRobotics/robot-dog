@@ -1,5 +1,30 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I2 LED Status Manager — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested.**
+
+- **New `src/status/LedStatusPolicy.{h,cpp}`** — pure LED presentation decision core, host-linkable
+  like `network::WifiPolicy`/`update::OtaPolicy` (no `<Arduino.h>`, no `LedRing` dependency).
+  Deterministic priority: `FAULT` > `FIRMWARE_UPDATE_IN_PROGRESS` > `CALIBRATION_IN_PROGRESS` >
+  `DEGRADED` > `WIFI_CONNECTING` > `BOOTING` > `READY`. Solid effects for fault/degraded/booting/
+  ready; a pure integer triangle-wave breathing effect for update/calibration/wifi-connecting.
+- **New `src/status/LedStatusManager.{h,cpp}`** — the single periodic owner of `LedRing`
+  presentation, wired into `Controller::update()` last, after every input it reads has refreshed
+  for the tick. Steps aside while the existing `@LED TEST` diagnostic chase is running; reuses
+  `LedRing` completely unchanged, including its `USB_ONLY` anti-back-power guarantee.
+- **Battery/charging states deliberately NOT implemented**: no reviewed SOC/taper threshold policy
+  exists yet (`MATDOG_POWER_STATES_AND_CHARGING.md` §14). Full architecture table and rationale in
+  [`09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md`](../../09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md).
+- **New static-audit check** `check_led_status_boundaries()`: fails the build if the decision core
+  stops being host-linkable, or if any translation unit other than `LedStatusManager.cpp` calls
+  `LedRing::setSolid()`.
+- **New offline suite** `test_led_status_policy.cpp`: 198 checks, 0 failures. Offline baseline is
+  now 11 host suites / 5577 checks (previously 10 / 5379).
+- **`@LED STATUS`** now also reports `presentation=<state>`, read-only.
+- **Cost:** `USB_ONLY` flash 976,991 B -> 977,747 B (+756 B), RAM 52,404 B -> 52,420 B (+16 B);
+  `ROBOT_POWERED` flash 977,471 B -> 978,299 B (+828 B).
+
 ## Unreleased — NextGen software integration I0/I1 — 2026-09-25
 
 Documentation and repository-topology only; **no firmware change**.

@@ -12,6 +12,7 @@
 #include "../servo/ServoCensus.h"
 #include "../servo/ServoPreflight.h"
 #include "../status/LedRing.h"
+#include "../status/LedStatusManager.h"
 #include "ActuatorAuthority.h"
 #include "Availability.h"
 #include "OperatingMode.h"
@@ -37,6 +38,7 @@ class CommandRouter {
     imu::Bno085Imu* imu;
     power::DalyBms* daly;
     status::LedRing* led;
+    status::LedStatusManager* led_status;
     network::WifiManager* wifi;
     update::OtaManager* ota;
     SystemState* system_state;

@@ -117,6 +117,15 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# The LED status suite links the REAL decision core; LedStatusPolicy.* has
+# no <Arduino.h> and no LedRing dependency, so this drives the whole
+# priority/effect table from a synthetic clock, the same contract as the
+# Wi-Fi and OTA policy suites above.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_led_status_policy" \
+  "$SCRIPT_DIR/test_led_status_policy.cpp" \
+  "$SKETCH_DIR/src/status/LedStatusPolicy.cpp"
+
 "$OUT/test_servo_population"
 "$OUT/test_servo_profile"
 "$OUT/test_daly_protocol"
@@ -127,3 +136,4 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_manager"
+"$OUT/test_led_status_policy"

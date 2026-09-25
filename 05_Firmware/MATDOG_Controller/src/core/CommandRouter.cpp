@@ -649,6 +649,9 @@ void CommandRouter::printLedStatus() {
                 status::LedRing::kMaxBrightness,
                 modules_.led->testRunning() ? "YES" : "NO",
                 modules_.led->dataPinDriven() ? "YES" : "NO");
+  // Presentation only - this is what the status manager last decided to
+  // show, never a second source of truth. See status/LedStatusPolicy.h.
+  Serial.printf("  presentation=%s\n", status::toString(modules_.led_status->state()));
 }
 
 void CommandRouter::printServoScanResult() {

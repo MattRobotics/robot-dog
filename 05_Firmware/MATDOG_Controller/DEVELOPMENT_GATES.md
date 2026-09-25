@@ -212,8 +212,15 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   `@SERVO PREFLIGHT` (H0 — `src/servo/ServoPreflight.*`, read-only 12-leg-joint model /
   `PositionOffset` / `MATDOG_C018_V1` profile verification; **IMPLEMENTED / COMPILED / OFFLINE
   TESTED**, 444 checks; **HARDWARE TO_TEST**, not flashed — see
-  [`H0_LEG_PREFLIGHT_RUNBOOK.md`](H0_LEG_PREFLIGHT_RUNBOOK.md)). Not implemented:
-  `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated health summary.
+  [`H0_LEG_PREFLIGHT_RUNBOOK.md`](H0_LEG_PREFLIGHT_RUNBOOK.md)). Also implemented: the **LED Status
+  Manager** (I2, `src/status/LedStatusPolicy.*` + `LedStatusManager.*`) — a single non-blocking
+  presentation owner above `LedRing` with deterministic priority arbitration over
+  fault/update/calibration/degraded/Wi-Fi-connecting/booting/ready; **IMPLEMENTED / COMPILED /
+  OFFLINE TESTED**, 198 checks; **HARDWARE TO_TEST**. Battery/charging LED states are explicitly
+  deferred pending a reviewed SOC/taper threshold policy — see
+  [`09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md`](../../09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md).
+  Not implemented: `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated health
+  summary.
 
 ## Authority model — OperatingMode / ActuatorAuthority
 

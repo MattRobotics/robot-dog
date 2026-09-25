@@ -776,6 +776,38 @@ def check_led_anti_back_power(files):
     # AND that the active profile is still USB_ONLY.
 
 
+def check_led_status_boundaries(files):
+    """LED presentation must have exactly one periodic owner (I2).
+    LedStatusPolicy is the pure decision core - host-linkable, the same
+    contract as network/WifiPolicy and update/OtaPolicy - and
+    LedStatusManager.cpp is the only translation unit allowed to call
+    LedRing::setSolid() on the periodic path. The manual @LED TEST/@LED OFF
+    diagnostic stays in CommandRouter and does not call setSolid()."""
+    names = {p.name for p, _ in files}
+    for required in ("LedStatusPolicy.h", "LedStatusPolicy.cpp",
+                      "LedStatusManager.h", "LedStatusManager.cpp"):
+        if required not in names:
+            fail(f"{required}: LED status manager unit not found")
+
+    for path, code in files:
+        if path.name not in ("LedStatusPolicy.h", "LedStatusPolicy.cpp"):
+            continue
+        for token in ("#include <Arduino.h>", "Serial.", "millis(", "LedRing"):
+            if token in code:
+                fail(f"{path}: contains {token!r} - keep the LED status decision core "
+                     f"host-linkable and hardware-free, the same contract as "
+                     f"network/WifiPolicy and update/OtaPolicy")
+
+    allowed_setsolid_callers = {"LedStatusManager.cpp", "LedRing.cpp"}
+    for path, code in files:
+        if path.suffix != ".cpp" or path.name in allowed_setsolid_callers:
+            continue
+        if re.search(r"\bsetSolid\s*\(", code):
+            fail(f"{path}: calls setSolid() directly - LED presentation has exactly one "
+                 f"periodic owner (LedStatusManager); nothing else may drive the ring "
+                 f"outside the manual @LED TEST/@LED OFF diagnostic path")
+
+
 def check_servo_timeout_not_global(files):
     # Session 2.2, Finding C: no servo bus timeout may ever become a
     # standing global override of SCServo's own conservative default. Fails
@@ -2466,6 +2498,7 @@ def check_host_tests(sketch_dir):
         sketch_dir / "scripts" / "tests" / "test_calibration_domain.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
     ]
+    led_status_suite = sketch_dir / "scripts" / "tests" / "test_led_status_policy.cpp"
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
         return
@@ -2494,6 +2527,9 @@ def check_host_tests(sketch_dir):
         if not suite.exists():
             fail(f"{suite}: calibration offline test suite not found")
             return
+    if not led_status_suite.exists():
+        fail(f"{led_status_suite}: LED status policy offline test suite not found")
+        return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
@@ -2501,7 +2537,8 @@ def check_host_tests(sketch_dir):
     for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy",
                    "test_ota_policy", "test_actuator_authority", "test_actuator_write_policy",
                    "test_calibration_geometry", "test_servo_profile",
-                   "test_calibration_domain", "test_calibration_manager"):
+                   "test_calibration_domain", "test_calibration_manager",
+                   "test_led_status_policy"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
@@ -2825,6 +2862,7 @@ def main():
     check_servo_scan_bounded_incremental(files)
     check_servo_diagnostics_require_maintenance_mode(files)
     check_led_anti_back_power(files)
+    check_led_status_boundaries(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)
     check_servo_timeout_not_global(files)

@@ -92,6 +92,7 @@ void Controller::begin() {
 
   led_.begin();
   system_state_.setLedHealth(led_.health());
+  led_status_.begin(&led_);
 
   // Configures the Wi-Fi policy and publishes its first snapshot. It does
   // NOT start the radio: the first WiFi.mode() call initializes the driver
@@ -106,7 +107,8 @@ void Controller::begin() {
   wifi_.begin(millis());
 
   CommandRouter::Modules modules{
-      &servo_bus_, &servo_census_, &servo_preflight_, &imu_, &daly_, &led_, &wifi_, &ota_,
+      &servo_bus_, &servo_census_, &servo_preflight_, &imu_, &daly_, &led_, &led_status_,
+      &wifi_, &ota_,
       &system_state_,
       &power_state_, &operating_mode_, &authority_, &calibration_,
   };
@@ -242,6 +244,20 @@ void Controller::update(uint32_t now_ms) {
   // hardware in any case. It exists so a session notices authority being
   // taken away from underneath it.
   calibration_.update(operating_mode_.mode());
+
+  // Last: every input below was just refreshed this tick. LED presentation
+  // is read-only over all of them — see status/LedStatusPolicy.h for why
+  // none of this duplicates a hardware read.
+  {
+    status::LedStatusInputs led_inputs;
+    led_inputs.system_health = system_state_.systemHealth();
+    led_inputs.firmware_update_in_progress =
+        authority_.inhibited() && authority_.inhibitReason() == InhibitReason::FIRMWARE_UPDATE;
+    led_inputs.calibration_in_progress = calibration_.sessionLive();
+    led_inputs.wifi_connecting = wifi_.status().state == network::WifiState::RADIO_STARTING ||
+                                 wifi_.status().state == network::WifiState::CONNECTING;
+    led_status_.update(now_ms, led_inputs);
+  }
 
   if (power_state_.state() == PowerState::SHUTDOWN_REQUESTED ||
       power_state_.state() == PowerState::SHUTTING_DOWN ||

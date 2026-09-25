@@ -11,6 +11,7 @@
 #include "../servo/ServoCensus.h"
 #include "../servo/ServoPreflight.h"
 #include "../status/LedRing.h"
+#include "../status/LedStatusManager.h"
 #include "../update/OtaManager.h"
 #include "ActuatorAuthority.h"
 #include "CommandRouter.h"
@@ -38,6 +39,9 @@ class Controller {
   imu::Bno085Imu imu_;
   power::DalyBms daly_;
   status::LedRing led_;
+  // The single periodic owner of LED presentation, above led_. See
+  // status/LedStatusManager.h.
+  status::LedStatusManager led_status_;
   // Owns the radio; owns nothing else. It has no path to ServoBus, to
   // OperatingMode or to any actuator — see network/WifiManager.h.
   network::WifiManager wifi_;
