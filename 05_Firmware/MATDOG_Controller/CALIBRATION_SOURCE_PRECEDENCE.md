@@ -2,6 +2,9 @@
 
 **Audit date:** 2026-09-21 · **Branch:** `feat/controller-calibration-manager-v1`
 **Amended:** 2026-09-22 — read-only follow-up audit resolved D4; see §5.
+**Amended:** 2026-09-25 — I1 repository-truth reconciliation carried six legacy open items
+forward from the historical `REPOSITORY_VERIFICATION_INDEX.md` snapshot into this current-truth
+document; see §9.
 
 This document records the C0 evidence audit that preceded the native calibration
 foundation. It exists so the next person does not have to re-derive which of several
@@ -210,3 +213,27 @@ distinct owner, which is what keeps the question answerable later.
 - [`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md) — the calibration gate
 - [`../../09_Logs/Historical/NormaCore_MATDOG_Archive/README.md`](../../09_Logs/Historical/NormaCore_MATDOG_Archive/README.md)
 - [`../../06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml`](../../06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml)
+
+---
+
+## 9. Legacy open items carried forward (I1, 2026-09-25)
+
+The historical `REPOSITORY_VERIFICATION_INDEX.md` (2026-08-11 Geometry Compiler V5 snapshot)
+recorded seven items for "the planned next phase." That file is explicitly historical and is not
+consulted for current status, so these are restated here, against a current-truth document, with
+an explicit status each. None is resolved by this amendment; each stays an open input to the
+future Calibration Execution Engine (`I5`).
+
+| # | Item | Status | Owner / where it must be resolved |
+|---|---|---|---|
+| 1 | `robot.calibration_status: DIGITAL_ZERO_CALIBRATED_AND_VERIFIED` in `MATDOG_JOINT_CALIBRATION.yaml` vs. the loader requirement `VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION` (`matdog_leg_fk_live.py`, `matdog_visual_zero_pose_probe.py`, `matdog_apply_visual_zero.py`, `matdog_calibration_gate.py`, `matdog_calibration_validate.py`, `matdog_live_joint_monitor.py` — six consumers) | **KNOWN / DOCUMENTED, not fixed.** The enum is deliberately left stale — see §2 above and the YAML's own header comment. `calibration_reset:` is authoritative; the enum is not. | **TO_DESIGN.** A real fix changes the enum and all six consumers in one reviewed change, not a string edit. Not required before the current-installation stand revalidation, which does not read this enum. |
+| 2 | 8 unresolved conservative clearance lower bounds, all `DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS`, outside the executable target domain | **OPEN, tracked.** See [`CALIBRATION_BOOTSTRAP.md`](CALIBRATION_BOOTSTRAP.md) §7, "still current, and still not PASS." | Geometry Compiler V5 / Phase 2B-2C scope, unchanged by this integration branch. |
+| 3 | RF/RH/LH have no hardware-oracle evidence equivalent to LF V25 | **OPEN, unresolved.** Only LF V25 is mechanically hardware-validated (§6 above: "RF/RH/LH profiles never finished"). | Requires a dedicated per-leg hardware calibration campaign; not an offline-software gate. |
+| 4 | Do not copy LF V25 measured spans (q0, direction, thresholds) into RF/RH/LH as if they were current truth | **RULE, enforced by convention, not by a runtime guard.** Consistent with §1 source precedence and 15.11 of the NextGen handoff. | No code currently attempts this copy; the constraint is a review discipline for the future execution engine, not a present defect. |
+| 5 | FRONT/HIND geometry is not interchangeable by mechanical convention | **RULE, no violation found.** No current code merges front/hind endpoint or parking data. | Future Geometry V5 consumers must preserve the distinction; nothing to fix today. |
+| 6 | A fitted affine diagnostic must never erase the raw model-vs-hardware discrepancy it was fitted from | **RULE, no violation found.** No affine-fit diagnostic exists in the current Controller or calibration domain; the constraint applies if/when one is built. | Binding on any future diagnostic that fits LF V25's measured q0 (2067/2040/2074) against the nominal model. |
+
+None of these six items block I1, I2 or any other software-only integration gate. They remain
+explicit inputs to `I5` (Calibration Execution Architecture) and to any future per-leg hardware
+calibration session, and none may be silently resolved by editing a string or a status enum
+without the coordinated change each row describes.

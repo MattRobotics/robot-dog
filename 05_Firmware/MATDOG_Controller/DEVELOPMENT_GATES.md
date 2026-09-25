@@ -208,7 +208,11 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   expected/absent/missing/unexpected; reachable over USB CDC.
 - **NEXT** — Authority model.
 - **STATUS** — **PARTIAL.** Already implemented: `@STATUS` availability, `@SERVO SCAN`,
-  `@SERVO READ`, `@SERVO CENSUS`, `@SERVO SAFE_OFF`, `@IMU`/`@BMS`/`@LED` status. Not implemented:
+  `@SERVO READ`, `@SERVO CENSUS`, `@SERVO SAFE_OFF`, `@IMU`/`@BMS`/`@LED` status, and
+  `@SERVO PREFLIGHT` (H0 — `src/servo/ServoPreflight.*`, read-only 12-leg-joint model /
+  `PositionOffset` / `MATDOG_C018_V1` profile verification; **IMPLEMENTED / COMPILED / OFFLINE
+  TESTED**, 444 checks; **HARDWARE TO_TEST**, not flashed — see
+  [`H0_LEG_PREFLIGHT_RUNBOOK.md`](H0_LEG_PREFLIGHT_RUNBOOK.md)). Not implemented:
   `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated health summary.
 
 ## Authority model — OperatingMode / ActuatorAuthority

@@ -1,5 +1,20 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — NextGen software integration I0/I1 — 2026-09-25
+
+Documentation and repository-topology only; **no firmware change**.
+
+- **I0:** created the single active integration branch/worktree
+  `feat/controller-nextgen-integration-v1` from exact H0 HEAD `b95ea31641609fbc29c5d67dd1deb776d59c2504`
+  (`feat/h0-current-leg-preflight-v1`), no content commit, pushed with upstream set. `main`,
+  `feat/h0-current-leg-preflight-v1` and every other frozen branch/worktree left untouched.
+- **I1:** repository-truth reconciliation. Fixed the root `README.md` snapshot banner (stale at
+  2026-09-15, now 2026-09-25). Added the H0 `@SERVO PREFLIGHT` capability, previously undocumented
+  in `ROADMAP.md` and `DEVELOPMENT_GATES.md`, to both. Carried the six legacy open items from the
+  historical `REPOSITORY_VERIFICATION_INDEX.md` (2026-08-11) snapshot forward into
+  `CALIBRATION_SOURCE_PRECEDENCE.md` §9 as explicit, unresolved, owned items. Full record:
+  [`09_Logs/Development_Log/2026-09-25_I1_REPOSITORY_TRUTH_RECONCILIATION.md`](../../09_Logs/Development_Log/2026-09-25_I1_REPOSITORY_TRUTH_RECONCILIATION.md).
+
 ## Unreleased — post-rewire power validation & external USB service port closeout — 2026-09-24
 
 Documentation and evidence only; **no firmware change**. No firmware commit since `6322563`
