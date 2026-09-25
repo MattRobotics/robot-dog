@@ -1,5 +1,20 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I6 HostLink audit — 2026-09-25
+
+Documentation only; **no code change**.
+
+- Audited `CommandRouter`'s transport coupling: most read-only state is already
+  transport-independent (structured snapshots per module, the G2 pattern); dispatch and
+  presentation for all 25 `@COMMAND`s remain embedded in the 792-line USB CDC adapter itself.
+  Recorded a design sketch for a future semantic layer, not implemented.
+- Scoped this gate to audit-only rather than implementation: `DEVELOPMENT_GATES.md`'s own rule 6
+  forbids pulling the HostLink gate forward of its unmet prerequisites (Service/Provisioning/QC,
+  formal recalibration), and its `PASS CRITERIA` (a second transport consuming the same semantics)
+  is unverifiable without a second transport, which is itself gated behind Wi-Fi hardware
+  validation this phase does not authorize. Full reasoning:
+  [`09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_AUDIT.md`](../../09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_AUDIT.md).
+
 ## Unreleased — I5 Calibration Execution Architecture — 2026-09-25
 
 **Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. No production
