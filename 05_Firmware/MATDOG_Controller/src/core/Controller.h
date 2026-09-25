@@ -3,6 +3,9 @@
 
 #include <Arduino.h>
 
+#include "../actuator/ActuatorRuntime.h"
+#include "../actuator/ActuatorWritePolicy.h"
+#include "../calibration/CalibrationExecutionEngine.h"
 #include "../calibration/CalibrationManager.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/WifiManager.h"
@@ -63,6 +66,19 @@ class Controller {
   // command a joint; it arbitrates a session through authority_ and records
   // evidence. See calibration/CalibrationManager.h.
   calibration::CalibrationManager calibration_;
+  // Safe Actuator / Calibration Execution infrastructure (I4/I5), owned here
+  // as fail-closed status/lifecycle infrastructure only — 2026-09-25
+  // objective change. actuator_runtime_ is wired with a null backend (see
+  // begin()): every ACCEPT decision it could ever reach resolves to
+  // NO_BACKEND, independent of anything else. No geometry is bound, no
+  // limit or transform is admitted, no live bootstrap context is set —
+  // scripts/static_audit.py's check_actuator_infrastructure_wired_fail_closed()
+  // enforces all of this structurally. No command path reaches plan()/
+  // commit()/execute()/abort() on any of the three; only read-only status
+  // (ControllerService) is exposed.
+  actuator::SafeActuatorPolicy actuator_policy_;
+  actuator::ActuatorRuntime actuator_runtime_;
+  calibration::CalibrationExecutionEngine calibration_execution_;
   // The transport-neutral telemetry layer (I6) — see ControllerService.h.
   // Bound to the same module pointers CommandRouter already holds; adds no
   // module ownership of its own.

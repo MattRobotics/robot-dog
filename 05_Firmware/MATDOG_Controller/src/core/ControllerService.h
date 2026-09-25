@@ -8,6 +8,7 @@
 #include "PowerState.h"
 #include "ServiceReadiness.h"
 #include "SystemState.h"
+#include "../actuator/ActuatorWritePolicy.h"
 #include "../calibration/CalibrationManager.h"
 
 // The transport-neutral semantic/telemetry layer — I6, implemented per the
@@ -117,6 +118,32 @@ class ControllerService {
   }
   const servo::PreflightResult& servoPreflightResult() const {
     return modules_.servo_preflight->result();
+  }
+
+  // --- Safe Actuator policy status (I4/I5 fail-closed infrastructure) --------
+  // Read-only. Never plan()/commit()/execute()/abort() — enforced by
+  // scripts/static_audit.py's check_actuator_infrastructure_wired_fail_closed().
+  // ActuatorRuntime and CalibrationExecutionEngine themselves expose no
+  // status of their own worth reporting (both are effectively stateless
+  // between calls neither of which this class ever makes) — everything
+  // observable about the I4/I5 infrastructure lives on the policy they both
+  // sit on top of.
+  uint32_t actuatorPolicyEpoch() const { return modules_.actuator_policy->epoch(); }
+  bool actuatorPolicyHasOutstandingTransaction() const {
+    return modules_.actuator_policy->hasOutstandingTransaction();
+  }
+  const actuator::ActuatorPolicyCounters& actuatorPolicyCounters() const {
+    return modules_.actuator_policy->counters();
+  }
+  actuator::WriteDecision actuatorPolicyLastDecision() const {
+    return modules_.actuator_policy->lastDecision();
+  }
+  uint8_t actuatorPolicyLimitsAdmitted() const { return modules_.actuator_policy->limits().size(); }
+  uint8_t actuatorPolicyTransformsAdmitted() const {
+    return modules_.actuator_policy->transforms().size();
+  }
+  bool actuatorPolicyGeometryBound() const {
+    return modules_.actuator_policy->currentGeometryTag() != actuator::kNoGeometryProvenance;
   }
 
   // --- readiness -----------------------------------------------------------

@@ -507,6 +507,14 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   deferred to I5. The only actuator write in the firmware is still torque OFF inside
   `ServoBus::safeOff()`. Audit and design: [`SAFE_ACTUATOR_LAYER.md`](SAFE_ACTUATOR_LAYER.md),
   [`../../09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md`](../../09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md).
+  **I4/I5 Controller wiring (2026-09-25, objective change):** `Controller` now owns real
+  `SafeActuatorPolicy`/`ActuatorRuntime`/`CalibrationExecutionEngine` instances as fail-closed
+  status/lifecycle infrastructure — `actuator_runtime_` is wired with a `nullptr` backend, no
+  geometry/limit/transform is ever admitted from `Controller`, and no command path reaches
+  `plan()`/`commit()`/`execute()`/`abort()` (new `check_actuator_infrastructure_wired_fail_closed()`
+  audit gate, mutation-verified). New read-only `@ACTUATOR STATUS`. `hardware_motion_authorized`
+  stays `0`; nothing above changes. See
+  [`../../09_Logs/Development_Log/2026-09-25_I4_I5_CONTROLLER_WIRING.md`](../../09_Logs/Development_Log/2026-09-25_I4_I5_CONTROLLER_WIRING.md).
 
 ## First motion
 

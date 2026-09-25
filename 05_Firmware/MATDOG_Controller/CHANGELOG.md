@@ -1,5 +1,29 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I4/I5 Controller wiring — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. Fail-closed by
+construction and by audit.**
+
+- **`Controller` now owns real `SafeActuatorPolicy`/`ActuatorRuntime`/`CalibrationExecutionEngine`
+  instances** as status/lifecycle infrastructure — previously none of the three were wired into
+  `Controller` at all. `actuator_runtime_` is given `nullptr` as its backend (every `ACCEPT`
+  resolves to `NO_BACKEND` regardless of anything else); no geometry/limit/transform is ever
+  admitted from `Controller`; no command path calls `plan()`/`commit()`/`execute()`/`abort()`.
+- **New `@ACTUATOR STATUS`** (read-only): policy epoch, outstanding-transaction flag, last
+  decision, counters, limits/transforms-admitted counts, geometry-bound flag.
+- **New static-audit check** `check_actuator_infrastructure_wired_fail_closed()` enforces the
+  three fail-closed choices above structurally. **A manual mutation check caught a real bug**: the
+  first version of the "no plan/commit/execute/abort call" rule matched only `.method(` and missed
+  every actual call site, which uses `->method(` (`modules_.actuator_policy` is a pointer) — fixed
+  to a regex matching both syntaxes, re-verified via the same injected-then-reverted mutation.
+  The I4/I5 boundary checks were extended to allow `Controller.h`/`Controller.cpp` by exact
+  filename (not by directory), so `CommandRouter.cpp`/`ControllerService.h` remain excluded.
+- **Cost:** `USB_ONLY` flash 979,111 B -> 981,727 B (+2,616 B — no longer dead-code-eliminated,
+  since `Controller` now genuinely calls into it), RAM +872 B; `ROBOT_POWERED` 979,655 B ->
+  982,299 B (+2,644 B). Full record:
+  [`09_Logs/Development_Log/2026-09-25_I4_I5_CONTROLLER_WIRING.md`](../../09_Logs/Development_Log/2026-09-25_I4_I5_CONTROLLER_WIRING.md).
+
 ## Unreleased — I7 reconsidered, scope unchanged — 2026-09-25
 
 Documentation only; **no code change**. Reconsidered building the USB CDC OTA ingest transport

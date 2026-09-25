@@ -785,11 +785,15 @@ def check_actuator_runtime_boundaries(files):
     must stay host-linkable exactly like ActuatorWritePolicy itself, and its
     mere existence must not make ordinary physical motion reachable. There is
     still no production ActuatorBackend anywhere in this firmware - ServoBus
-    exposes exactly one write, safeOff() (torque OFF) - so nothing may
-    construct or reference ActuatorRuntime outside src/actuator/ (the
-    adapter itself), src/calibration/ (I5's execution boundary, itself
-    audited by check_calibration_execution_engine_boundaries() to stay
-    unreferenced by Controller/CommandRouter) or the offline test suite."""
+    exposes exactly one write, safeOff() (torque OFF).
+
+    2026-09-25 objective change: Controller.{h,cpp} may now own an
+    ActuatorRuntime instance as fail-closed status/lifecycle infrastructure
+    (it must be wired with a null backend - see
+    check_actuator_infrastructure_wired_fail_closed()). Every OTHER file
+    stays excluded, in particular CommandRouter.cpp and ControllerService.h:
+    neither may reference this class by name, which is what keeps "Controller
+    owns one" from silently growing into "a command can reach one"."""
     names = {p.name for p, _ in files}
     for required in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
         if required not in names:
@@ -804,15 +808,17 @@ def check_actuator_runtime_boundaries(files):
                      f"host-linkable, the same contract as ActuatorWritePolicy itself")
 
     allowed_dirs = {"actuator", "calibration", "tests"}
+    allowed_names = {"ActuatorRuntime.h", "ActuatorRuntime.cpp", "Controller.h", "Controller.cpp"}
     for path, code in files:
-        if path.name in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
+        if path.name in allowed_names:
             continue
         if path.parent.name in allowed_dirs:
             continue
         if re.search(r"\bActuatorRuntime\b", code):
             fail(f"{path}: references ActuatorRuntime - I4's runtime adapter has no production "
                  f"backend (ServoBus exposes no torque-on/GoalPosition write) and must not be "
-                 f"constructed or owned outside src/actuator/, src/calibration/ or the offline "
+                 f"constructed or referenced outside src/actuator/, src/calibration/, "
+                 f"Controller.{{h,cpp}} (fail-closed status infrastructure only) or the offline "
                  f"test suite")
 
 
@@ -838,21 +844,27 @@ def check_calibration_execution_engine_boundaries(files):
                      f"sequence as its architecture (V3 handoff Sec 15.11), and must never name "
                      f"a torque-removal primitive (SAFE_OFF stays outside this layer)")
 
-    # Same "not wired into Controller" guarantee I4 enforces for
-    # ActuatorRuntime, applied to this class directly: #include hides a
-    # transitive ActuatorRuntime reference from a textual scan of
-    # Controller.h/.cpp, so the engine itself needs its own boundary check
-    # rather than relying on check_actuator_runtime_boundaries() alone.
+    # Same guarantee I4 enforces for ActuatorRuntime, applied to this class
+    # directly: #include hides a transitive ActuatorRuntime reference from a
+    # textual scan of Controller.h/.cpp, so the engine itself needs its own
+    # boundary check rather than relying on check_actuator_runtime_boundaries()
+    # alone. 2026-09-25 objective change: Controller.{h,cpp} may now own an
+    # instance as fail-closed status/lifecycle infrastructure (audited by
+    # check_actuator_infrastructure_wired_fail_closed()); every other file
+    # stays excluded, in particular CommandRouter.cpp and ControllerService.h.
     allowed_dirs = {"calibration", "tests"}
+    allowed_names = {"CalibrationExecutionEngine.h", "CalibrationExecutionEngine.cpp",
+                     "Controller.h", "Controller.cpp"}
     for path, code in files:
-        if path.name in ("CalibrationExecutionEngine.h", "CalibrationExecutionEngine.cpp"):
+        if path.name in allowed_names:
             continue
         if path.parent.name in allowed_dirs:
             continue
         if re.search(r"\bCalibrationExecutionEngine\b", code):
             fail(f"{path}: references CalibrationExecutionEngine - I5's execution boundary has "
-                 f"no production backend behind it and must not be constructed or owned outside "
-                 f"src/calibration/ or the offline test suite")
+                 f"no production backend behind it and must not be constructed or referenced "
+                 f"outside src/calibration/, Controller.{{h,cpp}} (fail-closed status "
+                 f"infrastructure only) or the offline test suite")
 
 
 def check_service_readiness_is_host_linkable(files):
@@ -873,6 +885,62 @@ def check_service_readiness_is_host_linkable(files):
                 fail(f"{path}: contains {token!r} - keep the HostLink readiness classifier "
                      f"pure and host-linkable; module/transport wiring belongs in "
                      f"ControllerService, not here")
+
+
+def check_actuator_infrastructure_wired_fail_closed(files):
+    """I4/I5 Controller wiring (2026-09-25 objective change): SafeActuatorPolicy,
+    ActuatorRuntime and CalibrationExecutionEngine may be owned by Controller
+    as status/lifecycle infrastructure, but wiring them in must never make
+    Torque ON, GoalPosition, contact motion or calibration motion reachable.
+    This enforces the specific fail-closed choices that make that true
+    structurally, not merely by review."""
+    controller_cpp = None
+    for path, code in files:
+        if path.name == "Controller.cpp":
+            controller_cpp = (path, code)
+            break
+    if controller_cpp is None:
+        fail("Controller.cpp not found - cannot audit fail-closed actuator wiring")
+        return
+    path, code = controller_cpp
+
+    # The runtime adapter must be given no backend. That alone makes every
+    # ACCEPT decision resolve to NO_BACKEND, independent of anything else -
+    # the single fact this whole check exists to pin down.
+    m = re.search(r"actuator_runtime_\.begin\(([^)]*)\)", code)
+    if not m or "nullptr" not in m.group(1):
+        fail(f"{path}: actuator_runtime_.begin() must pass nullptr as the backend - no "
+             f"production ActuatorBackend may ever be wired into Controller")
+
+    # No geometry may be bound, no limit or transform admitted, no live
+    # bootstrap context set, from Controller - those are exactly what would
+    # turn "infrastructure present" into "a target is reachable".
+    for forbidden in ("bindGeometry(", ".admit(", "setBootstrapContext("):
+        if forbidden in code:
+            fail(f"{path}: contains {forbidden!r} - Controller may own the Safe Actuator/"
+                 f"Calibration Execution infrastructure but must never bind geometry, admit a "
+                 f"limit/transform, or set a live bootstrap context; doing so would make a "
+                 f"target reachable, not merely present")
+
+    # No command path may trigger a decision or a write - only read-only
+    # status/counters accessors are permitted from CommandRouter or
+    # ControllerService. Matches BOTH call syntaxes - modules_.actuator_policy
+    # is a pointer (-> ), while a hypothetical value member would use '.' -
+    # a dot-only check silently misses every real call site in this codebase,
+    # which is exactly the gap a manual mutation check (temporarily injecting
+    # modules_.actuator_policy->plan(...) into CommandRouter.cpp) caught
+    # during I4/I5 Controller-wiring review.
+    forbidden_call = re.compile(r"(?:\.|->)\s*(plan|commit|execute|abort)\s*\(")
+    for path2, code2 in files:
+        if path2.name not in ("CommandRouter.cpp", "ControllerService.h", "Controller.cpp"):
+            continue
+        m = forbidden_call.search(code2)
+        if m:
+            fail(f"{path2}: contains a call to {m.group(1)}() - CommandRouter/ControllerService/"
+                 f"Controller may only read status from the Safe Actuator/Calibration "
+                 f"Execution infrastructure, never plan, commit, execute or abort a "
+                 f"transaction; that belongs to a future, separately reviewed activation "
+                 f"gate")
 
 
 def check_led_status_boundaries(files):
@@ -2980,6 +3048,7 @@ def main():
     check_led_status_boundaries(files)
     check_actuator_runtime_boundaries(files)
     check_calibration_execution_engine_boundaries(files)
+    check_actuator_infrastructure_wired_fail_closed(files)
     check_service_readiness_is_host_linkable(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)

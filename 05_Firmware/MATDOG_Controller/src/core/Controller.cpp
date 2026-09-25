@@ -69,6 +69,21 @@ void Controller::begin() {
   // stale and hardware motion unauthorized, it refuses to open a live one.
   calibration_.begin(&authority_);
 
+  // Safe Actuator / Calibration Execution infrastructure (I4/I5), bound as
+  // fail-closed status/lifecycle infrastructure only — 2026-09-25 objective
+  // change. actuator_policy_ is bound to the real arbiter (read-only
+  // authority checks, same as calibration_ above): no geometry is bound, no
+  // limit or transform is ever admitted, so every position-class or
+  // geometry-authorised operation refuses at the earliest possible gate.
+  // actuator_runtime_ is given nullptr as its backend, deliberately: even a
+  // hypothetical future ACCEPT can never reach a write, because there is
+  // nothing to write to. scripts/static_audit.py's
+  // check_actuator_infrastructure_wired_fail_closed() enforces both facts
+  // structurally, not merely by this comment.
+  actuator_policy_.begin(&authority_);
+  actuator_runtime_.begin(&actuator_policy_, /*backend=*/nullptr);
+  calibration_execution_.begin(&actuator_policy_, &actuator_runtime_);
+
   printBootBanner();
 
   // Init order: transports that cannot interfere with each other first.
@@ -111,6 +126,7 @@ void Controller::begin() {
       &wifi_, &ota_,
       &system_state_,
       &power_state_, &operating_mode_, &authority_, &calibration_,
+      &actuator_policy_,
       &service_,
   };
   service_.begin(modules);

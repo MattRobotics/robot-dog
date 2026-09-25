@@ -200,6 +200,8 @@ void CommandRouter::handleLine(String line) {
     printWifiStatus();
   } else if (upper == "@CALIBRATION STATUS") {
     printCalibrationStatus();
+  } else if (upper == "@ACTUATOR STATUS") {
+    printActuatorStatus();
   } else if (upper == "@AUTHORITY STATUS") {
     printAuthorityStatus();
   } else if (upper == "@OTA STATUS") {
@@ -331,6 +333,7 @@ void CommandRouter::printHelp() {
   Serial.println("  @OTA STATUS            (read-only; OTA-A ships no transport)");
   Serial.println("  @AUTHORITY STATUS      (read-only; no owner can be acquired yet)");
   Serial.println("  @CALIBRATION STATUS    (read-only; no session can move hardware)");
+  Serial.println("  @ACTUATOR STATUS       (read-only; no command can plan/commit/execute)");
   Serial.println("  @SYSTEM SOURCE_SIGNATURE  (read-only build/source identity)");
   Serial.println("  @HOSTLINK READINESS    (read-only; BLOCKED/TO_TEST/READY per capability)");
   Serial.println("  @SERVO SCAN <lo> <hi>   (MAINTENANCE mode only; incremental, bounded");
@@ -458,6 +461,32 @@ void CommandRouter::printCalibrationStatus() {
                 (unsigned long)c.sessions_started, (unsigned long)c.sessions_completed,
                 (unsigned long)c.sessions_aborted, (unsigned long)c.sessions_failed);
   Serial.println("CALIBRATION_LF_V25=HISTORICAL_HARDWARE_ORACLE (not current calibration)");
+}
+
+void CommandRouter::printActuatorStatus() {
+  // Formatting ONLY, from the real SafeActuatorPolicy this Controller owns
+  // as fail-closed infrastructure (I4/I5, 2026-09-25). No command reaches
+  // plan()/commit()/execute()/abort() — see ControllerService.h.
+  ControllerService* s = modules_.service;
+  Serial.printf("ACTUATOR_POLICY epoch=%lu outstanding_transaction=%s last_decision=%s\n",
+                (unsigned long)s->actuatorPolicyEpoch(),
+                s->actuatorPolicyHasOutstandingTransaction() ? "YES" : "NO",
+                actuator::toString(s->actuatorPolicyLastDecision()));
+  Serial.printf("ACTUATOR_PROVENANCE limits_admitted=%u transforms_admitted=%u "
+                "geometry_bound=%s\n",
+                (unsigned)s->actuatorPolicyLimitsAdmitted(),
+                (unsigned)s->actuatorPolicyTransformsAdmitted(),
+                s->actuatorPolicyGeometryBound() ? "YES" : "NO");
+  const actuator::ActuatorPolicyCounters& c = s->actuatorPolicyCounters();
+  Serial.printf("ACTUATOR_COUNTERS plans=%lu plan_rejections=%lu commits=%lu "
+                "commit_rejections=%lu aborts=%lu resets=%lu\n",
+                (unsigned long)c.plans, (unsigned long)c.plan_rejections,
+                (unsigned long)c.commits, (unsigned long)c.commit_rejections,
+                (unsigned long)c.aborts, (unsigned long)c.resets);
+  Serial.println("ACTUATOR_NOTE runtime adapter has no production backend "
+                 "(nullptr) - no ACCEPT can ever reach a write");
+  Serial.printf("ACTUATOR_NOTE hardware_motion_authorized=%s\n",
+                calibration::CalibrationManager::hardwareMotionAuthorized() ? "YES" : "NO");
 }
 
 void CommandRouter::printAuthorityStatus() {

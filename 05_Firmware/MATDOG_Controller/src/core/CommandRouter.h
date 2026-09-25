@@ -20,6 +20,13 @@
 #include "SystemState.h"
 
 namespace matdog {
+namespace actuator {
+// Forward-declared for the same reason as core::ControllerService below:
+// only a pointer is needed here, and ActuatorWritePolicy.h is a large
+// include CommandRouter.h itself has no other reason to pull in.
+class SafeActuatorPolicy;
+}  // namespace actuator
+
 namespace core {
 
 // Forward-declared, not included: ControllerService.h includes THIS header
@@ -54,6 +61,10 @@ class CommandRouter {
     // state: the router asks, it does not remember.
     ActuatorAuthorityArbiter* authority;
     calibration::CalibrationManager* calibration;
+    // I4/I5 fail-closed status infrastructure (2026-09-25 objective change).
+    // Read-only status only — see ControllerService.h and
+    // scripts/static_audit.py's check_actuator_infrastructure_wired_fail_closed().
+    actuator::SafeActuatorPolicy* actuator_policy;
     // The transport-neutral telemetry layer (I6) — read-only status
     // commands route through this instead of the pointers above directly.
     // Action/write commands still use the module pointers above; see
@@ -123,6 +134,12 @@ class CommandRouter {
   // no command that starts, runs or moves anything: no write path exists, and
   // the repository declares hardware motion unauthorized.
   void printCalibrationStatus();
+  // Read-only presentation of the Safe Actuator policy (I4/I5 fail-closed
+  // infrastructure, 2026-09-25 objective change). There is deliberately no
+  // command that plans, commits, executes or aborts anything through it —
+  // see ControllerService.h and scripts/static_audit.py's
+  // check_actuator_infrastructure_wired_fail_closed().
+  void printActuatorStatus();
   static void printAvailabilityLine(const char* label, const AvailabilityStatus& a);
 
   Modules modules_{};
