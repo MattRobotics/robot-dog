@@ -1,5 +1,13 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I8 deferred — 2026-09-25
+
+No code or status change. I8 (read-only Web foundation) requires I6 semantics "stable" (I6 was
+audit-only, `HostLink` remains `TO_DESIGN`), Wi-Fi runtime `PASS` (hardware-untested, out of scope
+this session) and a chosen web transport (deliberately left undecided in I7). Deferred rather than
+attempted with a workaround. Full reasoning:
+[`09_Logs/Development_Log/2026-09-25_I8_WEB_FOUNDATION_DEFERRED.md`](../../09_Logs/Development_Log/2026-09-25_I8_WEB_FOUNDATION_DEFERRED.md).
+
 ## Unreleased — I7 Wi-Fi/OTA audit — 2026-09-25
 
 Documentation only; **no code change**.
