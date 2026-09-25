@@ -34,6 +34,19 @@ Pure logic here, device I/O nowhere — deliberately mirroring
 device I/O in the manifest gate at all, so one file is enough; the CLI at
 the bottom is a thin shell over the pure functions above it.
 
+OTA INGEST PROVENANCE (I7 hardening, 2026-09-25)
+-------------------------------------------------
+The same "which build is this, really" problem the hardware profile solves
+above applies to `MATDOG_OTA_INGEST_ENABLED`: the source default is `0` and
+must stay `0` (scripts/static_audit.py enforces the `#define`), but the ONE
+hardware-validation candidate needs ingest compiled in so the same flashed
+image can later validate the OTA end-to-end path too, without a second
+flash. `OTA_INGEST_ENABLED` is therefore a second, orthogonal authorization
+axis on the manifest — same shape as `HARDWARE_PROFILE`, same
+explicit-authorization requirement, its own mismatch reason, never inferred
+from the profile (a `ROBOT_POWERED` build with ingest still `0` is a
+perfectly ordinary, expected combination).
+
 FAIL-CLOSED CONTRACT
 --------------------
 `verify_manifest()` returns a refusal reason for every case it cannot
@@ -48,10 +61,12 @@ manifest profile.
 Usage:
     build_manifest.py write  --output P --binary P --source-commit SHA \\
                              --build-id ID --source-state CLEAN|DIRTY|NO_GIT \\
-                             --profile USB_ONLY|ROBOT_POWERED --fqbn FQBN
+                             --profile USB_ONLY|ROBOT_POWERED --fqbn FQBN \\
+                             --ota-ingest 0|1
     build_manifest.py verify --manifest P --binary P --head SHA \\
                              --expected-fqbn FQBN --tree-state CLEAN|DIRTY \\
-                             --requested-profile USB_ONLY|ROBOT_POWERED
+                             --requested-profile USB_ONLY|ROBOT_POWERED \\
+                             --requested-ota-ingest 0|1
 
 Exit code 0 = OK, 1 = REFUSE (reason printed as REFUSED=<CODE>).
 """
@@ -75,12 +90,28 @@ PROFILES_REQUIRING_EXPLICIT_AUTHORIZATION = ("ROBOT_POWERED",)
 
 DEFAULT_FLASH_PROFILE = "USB_ONLY"
 
+# The only OTA-ingest values that may ever appear in a manifest — a string,
+# not a bool, for the same reason profile is a name and not a flag: it is
+# rendered into and parsed back out of a flat KEY=VALUE text file, and an
+# explicit closed set is refused-not-guessed on anything else.
+KNOWN_OTA_INGEST_VALUES = ("0", "1")
+
+# "1" (ingest compiled in) requires explicit authorization, the same shape
+# as ROBOT_POWERED above and for the same reason: MATDOG_OTA_INGEST_ENABLED
+# defaulting to 0 is a permanent safety property (scripts/static_audit.py
+# fails the build if the source default is anything else), so a binary that
+# overrides it must never be flashed by an unqualified invocation.
+OTA_INGEST_VALUES_REQUIRING_EXPLICIT_AUTHORIZATION = ("1",)
+
+DEFAULT_FLASH_OTA_INGEST = "0"
+
 REQUIRED_KEYS = (
     "MATDOG_MANIFEST_VERSION",
     "SOURCE_COMMIT",
     "BUILD_ID",
     "SOURCE_STATE",
     "HARDWARE_PROFILE",
+    "OTA_INGEST_ENABLED",
     "FQBN",
     "APPLICATION_BINARY",
     "APPLICATION_SIZE",
@@ -105,17 +136,22 @@ class Refusal:
     PROFILE_UNKNOWN = "PROFILE_UNKNOWN"
     REQUESTED_PROFILE_UNKNOWN = "REQUESTED_PROFILE_UNKNOWN"
     PROFILE_MISMATCH = "PROFILE_MISMATCH"
+    OTA_INGEST_UNKNOWN = "OTA_INGEST_UNKNOWN"
+    REQUESTED_OTA_INGEST_UNKNOWN = "REQUESTED_OTA_INGEST_UNKNOWN"
+    OTA_INGEST_MISMATCH = "OTA_INGEST_MISMATCH"
 
 
 class Verdict:
-    def __init__(self, ok, reason=None, profile=None, detail=""):
+    def __init__(self, ok, reason=None, profile=None, ota_ingest=None, detail=""):
         self.ok = ok
         self.reason = reason
         self.profile = profile
+        self.ota_ingest = ota_ingest
         self.detail = detail
 
     def __repr__(self):  # pragma: no cover - debugging aid only
-        return f"Verdict(ok={self.ok}, reason={self.reason!r}, profile={self.profile!r})"
+        return (f"Verdict(ok={self.ok}, reason={self.reason!r}, profile={self.profile!r}, "
+               f"ota_ingest={self.ota_ingest!r})")
 
 
 def sha256_file(path):
@@ -126,8 +162,8 @@ def sha256_file(path):
     return h.hexdigest()
 
 
-def render_manifest(*, source_commit, build_id, source_state, profile, fqbn,
-                    application_binary, application_size, application_sha256):
+def render_manifest(*, source_commit, build_id, source_state, profile, ota_ingest_enabled,
+                    fqbn, application_binary, application_size, application_sha256):
     """Renders the manifest text. Deliberately a flat, fixed-order
     KEY=VALUE format with no quoting, no nesting and no escaping: it is
     consumed by `grep '^KEY=' | cut -d= -f2-` in shell as well as by this
@@ -138,6 +174,7 @@ def render_manifest(*, source_commit, build_id, source_state, profile, fqbn,
         f"BUILD_ID={build_id}",
         f"SOURCE_STATE={source_state}",
         f"HARDWARE_PROFILE={profile}",
+        f"OTA_INGEST_ENABLED={ota_ingest_enabled}",
         f"FQBN={fqbn}",
         f"APPLICATION_BINARY={application_binary}",
         f"APPLICATION_SIZE={application_size}",
@@ -171,7 +208,8 @@ def parse_manifest(text):
 
 
 def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
-                    binary_exists, binary_size, binary_sha256, requested_profile):
+                    binary_exists, binary_size, binary_sha256, requested_profile,
+                    requested_ota_ingest):
     """The fail-closed gate. Pure: every observation is passed in.
 
     `manifest` is a parsed dict (or None when the file was missing).
@@ -179,13 +217,15 @@ def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
     reported refusal names the most upstream problem rather than a
     downstream symptom of it — manifest integrity, then build identity
     (commit + FQBN), then tree state, then the binary's exact bytes, then
-    profile authorization.
+    profile authorization, then OTA-ingest authorization.
 
     A successful verdict positively proves that ALL of the following belong
     to the artifact being authorized: source commit, clean build state,
     clean current tree, application filename, exact binary size, exact
-    binary SHA256, hardware profile, and FQBN. Nothing is assumed and
-    nothing is inferred from one field to another.
+    binary SHA256, hardware profile, OTA-ingest compile state, and FQBN.
+    Nothing is assumed and nothing is inferred from one field to another —
+    in particular, OTA-ingest state is never inferred from the hardware
+    profile; a ROBOT_POWERED build with ingest still 0 is ordinary.
 
     `expected_fqbn` is deliberately a required keyword argument with no
     default: the caller (flash_app_only.sh) pins its own FQBN and must
@@ -271,7 +311,32 @@ def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
                        detail=f"manifest built {manifest_profile}, flash requested "
                               f"{requested_profile}{extra}")
 
-    return Verdict(True, profile=manifest_profile)
+    manifest_ota_ingest = manifest["OTA_INGEST_ENABLED"]
+    if manifest_ota_ingest not in KNOWN_OTA_INGEST_VALUES:
+        return Verdict(False, Refusal.OTA_INGEST_UNKNOWN,
+                       detail=f"manifest OTA_INGEST_ENABLED={manifest_ota_ingest!r} is not "
+                              f"one of {list(KNOWN_OTA_INGEST_VALUES)}")
+
+    if requested_ota_ingest not in KNOWN_OTA_INGEST_VALUES:
+        return Verdict(False, Refusal.REQUESTED_OTA_INGEST_UNKNOWN,
+                       detail=f"requested OTA ingest {requested_ota_ingest!r} is not one "
+                              f"of {list(KNOWN_OTA_INGEST_VALUES)}")
+
+    if manifest_ota_ingest != requested_ota_ingest:
+        # The other half of the case this module exists for: a binary built
+        # with the OTA firmware-ingest writer compiled in must never be
+        # flashed by an invocation that did not explicitly ask for it — the
+        # same "never silently the more capable image" rule PROFILE_MISMATCH
+        # already gives HARDWARE_PROFILE.
+        extra = ""
+        if manifest_ota_ingest in OTA_INGEST_VALUES_REQUIRING_EXPLICIT_AUTHORIZATION:
+            extra = (" — flashing an image with OTA ingest compiled in requires explicit "
+                     "authorization (MATDOG_FLASH_OTA_INGEST=1)")
+        return Verdict(False, Refusal.OTA_INGEST_MISMATCH,
+                       detail=f"manifest built with OTA_INGEST_ENABLED={manifest_ota_ingest}, "
+                              f"flash requested {requested_ota_ingest}{extra}")
+
+    return Verdict(True, profile=manifest_profile, ota_ingest=manifest_ota_ingest)
 
 
 def load_manifest(path):
@@ -295,12 +360,17 @@ def _cmd_write(args):
         print(f"REFUSED={Refusal.PROFILE_UNKNOWN}", file=sys.stderr)
         print(f"DETAIL=unknown profile {args.profile!r}", file=sys.stderr)
         return 1
+    if args.ota_ingest not in KNOWN_OTA_INGEST_VALUES:
+        print(f"REFUSED={Refusal.OTA_INGEST_UNKNOWN}", file=sys.stderr)
+        print(f"DETAIL=unknown ota-ingest value {args.ota_ingest!r}", file=sys.stderr)
+        return 1
 
     text = render_manifest(
         source_commit=args.source_commit,
         build_id=args.build_id,
         source_state=args.source_state,
         profile=args.profile,
+        ota_ingest_enabled=args.ota_ingest,
         fqbn=args.fqbn,
         application_binary=binary.name,
         application_size=binary.stat().st_size,
@@ -309,6 +379,7 @@ def _cmd_write(args):
     Path(args.output).write_text(text, encoding="utf-8")
     print(f"BUILD_MANIFEST={args.output}")
     print(f"HARDWARE_PROFILE={args.profile}")
+    print(f"OTA_INGEST_ENABLED={args.ota_ingest}")
     return 0
 
 
@@ -330,6 +401,7 @@ def _cmd_verify(args):
         binary_size=binary.stat().st_size if binary_exists else 0,
         binary_sha256=sha256_file(binary) if binary_exists else "",
         requested_profile=args.requested_profile,
+        requested_ota_ingest=args.requested_ota_ingest,
     )
 
     if not verdict.ok:
@@ -338,6 +410,7 @@ def _cmd_verify(args):
         return 1
 
     print(f"VERIFIED_HARDWARE_PROFILE={verdict.profile}")
+    print(f"VERIFIED_OTA_INGEST_ENABLED={verdict.ota_ingest}")
     print(f"VERIFIED_SOURCE_COMMIT={manifest['SOURCE_COMMIT']}")
     print(f"VERIFIED_FQBN={manifest['FQBN']}")
     print(f"VERIFIED_APPLICATION_SHA256={manifest['APPLICATION_SHA256']}")
@@ -356,6 +429,11 @@ def main(argv=None):
     w.add_argument("--build-id", required=True)
     w.add_argument("--source-state", required=True, choices=("CLEAN", "DIRTY", "NO_GIT"))
     w.add_argument("--profile", required=True)
+    # Deliberately REQUIRED here too, with no default: the backwards-safe "0"
+    # belongs to the caller (scripts/build.sh), which states it explicitly -
+    # a default here would let a caller that forgot the flag silently record
+    # an unauthorized-sounding "0" for a build that was never checked.
+    w.add_argument("--ota-ingest", required=True)
     w.add_argument("--fqbn", required=True)
     w.set_defaults(func=_cmd_write)
 
@@ -369,6 +447,10 @@ def main(argv=None):
     # states it explicitly. A default in this module would mean a caller
     # that forgot to pass the flag silently got a permissive answer.
     v.add_argument("--requested-profile", required=True)
+    # Same reasoning, for the OTA-ingest authorization axis: the
+    # backwards-safe "0" default belongs to flash_app_only.sh, stated
+    # explicitly, never assumed here.
+    v.add_argument("--requested-ota-ingest", required=True)
     # Also required with no default, for the same reason: flash_app_only.sh
     # pins the FQBN and must state it, so a caller that forgets cannot
     # silently skip the build-configuration check.

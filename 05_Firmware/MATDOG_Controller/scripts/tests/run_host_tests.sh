@@ -182,6 +182,12 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/update/Hmac256.cpp" \
   "$SKETCH_DIR/src/update/Sha256.cpp"
 
+# HttpTransport's single-slot mailbox correlation logic (I7/I8 hardening,
+# 2026-09-25). Header-only and pure: no .cpp to link.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -o "$OUT/test_http_mailbox" \
+  "$SCRIPT_DIR/test_http_mailbox.cpp"
+
 "$OUT/test_servo_population"
 "$OUT/test_servo_profile"
 "$OUT/test_daly_protocol"
@@ -198,3 +204,4 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_led_status_policy"
 "$OUT/test_hmac256"
 "$OUT/test_ota_session"
+"$OUT/test_http_mailbox"

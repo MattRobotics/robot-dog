@@ -35,9 +35,24 @@ void HttpTransport::begin(core::ControllerService* service, update::OtaManager* 
 bool HttpTransport::start() {
   if (server_ != nullptr) return false;
 
+  // Defensive: every partial-failure path below cleans up its own handles
+  // via stop(), so this should never find leftovers — but stop() is cheap
+  // and idempotent, and calling it first means start() can never CreateBinary()
+  // over a still-live handle from some earlier, imperfectly-cleaned attempt.
+  stop();
+
   request_ready_ = xSemaphoreCreateBinary();
   response_ready_ = xSemaphoreCreateBinary();
-  if (request_ready_ == nullptr || response_ready_ == nullptr) return false;
+  slot_free_ = xSemaphoreCreateBinary();
+  if (request_ready_ == nullptr || response_ready_ == nullptr || slot_free_ == nullptr) {
+    stop();  // releases whichever of the three this attempt did create
+    return false;
+  }
+  // The slot starts free: the first dispatch() must be able to claim it
+  // without waiting for a Controller-thread Give() that can never come —
+  // nothing has been serviced yet.
+  xSemaphoreGive(slot_free_);
+  mailbox_ = HttpMailbox{};
 
   // Explicit default config: exactly one httpd task, requests served one at
   // a time. That is what makes the single-slot mailbox below safe — see
@@ -46,6 +61,7 @@ bool HttpTransport::start() {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   if (httpd_start(&server_, &config) != ESP_OK) {
     server_ = nullptr;
+    stop();  // releases the three semaphores this attempt created
     return false;
   }
 
@@ -60,19 +76,64 @@ bool HttpTransport::start() {
 }
 
 void HttpTransport::stop() {
-  if (server_ == nullptr) return;
-  httpd_stop(server_);
-  server_ = nullptr;
+  // NOTE (HARDWARE_TO_TEST): httpd_stop() is expected to tear down the
+  // httpd task and every in-flight connection before returning, but
+  // whether a request genuinely mid-dispatch() at the exact moment
+  // @WEB SERVER STOP runs is safely unwound — versus racing the semaphore
+  // deletions below — has not been exercised against real concurrent HTTP
+  // load. stop() itself is only ever called from the Controller thread
+  // (Controller::update() -> CommandRouter -> here), the same thread
+  // update()/dispatch()'s Controller-side code runs on, so there is no
+  // Controller-thread-vs-itself race; the residual risk is specifically
+  // the httpd task, mid-handler, losing its semaphore handles out from
+  // under it.
+  if (server_ != nullptr) {
+    httpd_stop(server_);
+    server_ = nullptr;
+  }
+  // Every semaphore start() may have created, released here — idempotent
+  // and individually guarded (vSemaphoreDelete on a null handle is
+  // unsafe), so a bounded START -> STOP -> START -> STOP cycle, or a
+  // partial-start failure calling this directly, never leaks a handle.
+  if (request_ready_ != nullptr) {
+    vSemaphoreDelete(request_ready_);
+    request_ready_ = nullptr;
+  }
+  if (response_ready_ != nullptr) {
+    vSemaphoreDelete(response_ready_);
+    response_ready_ = nullptr;
+  }
+  if (slot_free_ != nullptr) {
+    vSemaphoreDelete(slot_free_);
+    slot_free_ = nullptr;
+  }
+  mailbox_ = HttpMailbox{};
 }
 
 bool HttpTransport::dispatch(const HttpTransportRequest& req, HttpTransportResponse* out_resp) {
+  // Claim exclusive use of the shared slot before touching it — bounded, so
+  // a still-in-flight (even abandoned) previous request can never be
+  // overwritten mid-read by the Controller thread. See the class comment
+  // and HttpMailbox.h.
+  if (xSemaphoreTake(slot_free_, pdMS_TO_TICKS(kDispatchTimeoutMs)) != pdTRUE) {
+    return false;  // mailbox still busy with a previous, presumably stuck, request
+  }
+
   pending_request_ = req;
+  mailbox_.beginDispatch();
   xSemaphoreGive(request_ready_);
   if (xSemaphoreTake(response_ready_, pdMS_TO_TICKS(kDispatchTimeoutMs)) != pdTRUE) {
     // The Controller thread did not answer in time. Fail the HTTP request
     // closed rather than block the httpd task indefinitely — see the class
     // comment on why this can only mean something upstream already
-    // stalled, never a reason to retry the wait.
+    // stalled, never a reason to retry the wait. Tell the mailbox nobody
+    // is listening any more, so a late Give(response_ready_) for THIS
+    // request cannot satisfy a future, unrelated dispatch() (HttpMailbox.h).
+    // slot_free_ is deliberately NOT given here: only the Controller thread
+    // gives it, once it has genuinely finished with pending_request_/
+    // pending_response_, so a new dispatch() still cannot overwrite state
+    // that thread might still be reading.
+    mailbox_.abandon();
     return false;
   }
   *out_resp = pending_response_;
@@ -84,7 +145,18 @@ void HttpTransport::update(uint32_t now_ms) {
   if (xSemaphoreTake(request_ready_, 0) != pdTRUE) return;  // nothing pending — non-blocking
 
   serviceRequest(now_ms);
-  xSemaphoreGive(response_ready_);
+
+  // Only signal a response if the httpd task is still the one that asked
+  // for it — a timed-out dispatch() already called mailbox_.abandon(), and
+  // must not be satisfied by a stale Give() meant for it (HttpMailbox.h).
+  if (mailbox_.awaitingResponse()) {
+    xSemaphoreGive(response_ready_);
+  }
+  mailbox_.delivered();
+  // Safe to reuse the slot only once this thread is fully done with
+  // pending_request_/pending_response_ — i.e. now, unconditionally, whether
+  // or not anyone was still waiting for the answer.
+  xSemaphoreGive(slot_free_);
 }
 
 void HttpTransport::serviceRequest(uint32_t now_ms) {

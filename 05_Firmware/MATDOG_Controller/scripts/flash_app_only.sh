@@ -66,6 +66,16 @@ BUILD_MANIFEST="$BUILD_DIR/matdog_build_manifest.txt"
 # There is no path by which a powered image is written implicitly.
 REQUESTED_FLASH_PROFILE="${MATDOG_FLASH_PROFILE:-USB_ONLY}"
 
+# Same backwards-safe shape for the OTA-ingest authorization axis (I7
+# hardening, 2026-09-25). An omitted MATDOG_FLASH_OTA_INGEST means 0: a
+# manifest built with the firmware-ingest writer compiled in is then
+# REFUSED unless the operator explicitly asks for it —
+#
+#   MATDOG_FLASH_OTA_INGEST=1 scripts/flash_app_only.sh
+#
+# There is no path by which an ingest-enabled image is written implicitly.
+REQUESTED_FLASH_OTA_INGEST="${MATDOG_FLASH_OTA_INGEST:-0}"
+
 refuse() {
   echo "REFUSE: $1" >&2
   exit 1
@@ -118,14 +128,20 @@ MANIFEST_INFO="$(python3 "$SCRIPT_DIR/build_manifest.py" verify \
   --head "$SOURCE_COMMIT" \
   --expected-fqbn "$FQBN" \
   --tree-state "$TREE_STATE" \
-  --requested-profile "$REQUESTED_FLASH_PROFILE")" || \
+  --requested-profile "$REQUESTED_FLASH_PROFILE" \
+  --requested-ota-ingest "$REQUESTED_FLASH_OTA_INGEST")" || \
   refuse "build manifest verification failed (see REFUSED=... above) — the binary in \
-$BUILD_DIR cannot be proven to be a $REQUESTED_FLASH_PROFILE build of $SOURCE_COMMIT. \
-Rebuild with the intended profile: MATDOG_PROFILE=$REQUESTED_FLASH_PROFILE scripts/build.sh"
+$BUILD_DIR cannot be proven to be a $REQUESTED_FLASH_PROFILE build of $SOURCE_COMMIT with \
+OTA_INGEST_ENABLED=$REQUESTED_FLASH_OTA_INGEST. Rebuild with the intended settings: \
+MATDOG_PROFILE=$REQUESTED_FLASH_PROFILE MATDOG_OTA_INGEST_VALIDATION=$REQUESTED_FLASH_OTA_INGEST \
+scripts/build.sh"
 
 VERIFIED_HARDWARE_PROFILE="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_HARDWARE_PROFILE=' | cut -d= -f2-)"
 [ -n "$VERIFIED_HARDWARE_PROFILE" ] || \
   refuse "manifest verification produced no VERIFIED_HARDWARE_PROFILE"
+VERIFIED_OTA_INGEST_ENABLED="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_OTA_INGEST_ENABLED=' | cut -d= -f2-)"
+[ -n "$VERIFIED_OTA_INGEST_ENABLED" ] || \
+  refuse "manifest verification produced no VERIFIED_OTA_INGEST_ENABLED"
 VERIFIED_FQBN="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_FQBN=' | cut -d= -f2-)"
 [ -n "$VERIFIED_FQBN" ] || refuse "manifest verification produced no VERIFIED_FQBN"
 
@@ -187,7 +203,8 @@ echo "BUILD_MANIFEST        = $BUILD_MANIFEST"
 echo
 echo "############################################################"
 echo "#  HARDWARE PROFILE   = $VERIFIED_HARDWARE_PROFILE"
-echo "#  (verified against the build manifest, not assumed)"
+echo "#  OTA_INGEST_ENABLED = $VERIFIED_OTA_INGEST_ENABLED"
+echo "#  (both verified against the build manifest, not assumed)"
 echo "############################################################"
 echo
 
@@ -216,3 +233,4 @@ fi
 
 echo "APPLICATION_ONLY_FLASH = PASS"
 echo "FLASHED_HARDWARE_PROFILE = $VERIFIED_HARDWARE_PROFILE"
+echo "FLASHED_OTA_INGEST_ENABLED = $VERIFIED_OTA_INGEST_ENABLED"

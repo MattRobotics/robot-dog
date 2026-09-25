@@ -65,16 +65,50 @@ case "${MATDOG_PROFILE:-}" in
     ;;
 esac
 
+# OTA-ingest validation override (I7 hardening, 2026-09-25). The SOURCE
+# default is 0 and must stay 0 — scripts/static_audit.py fails the build if
+# the #define's own default in src/update/OtaManager.h is ever anything
+# else, so this override can never change what a plain `scripts/build.sh`
+# produces. It exists so the ONE hardware-validation candidate can carry a
+# real, reachable OTA ingest writer instead of needing a second flash later
+# just to turn it on:
+#
+#   MATDOG_OTA_INGEST_VALIDATION=1 MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh
+#
+# Deliberately explicit and loud, the same shape as MATDOG_PROFILE above: the
+# chosen value is echoed below and recorded in the build manifest
+# (OTA_INGEST_ENABLED=1), so a binary with the firmware-ingest writer
+# compiled in can never be produced, flashed or mistaken for an ordinary
+# build silently. It is a SEPARATE axis from MATDOG_PROFILE — a
+# ROBOT_POWERED build with ingest still 0 is the ordinary case.
+OTA_INGEST_FLAG=""
+OTA_INGEST_ID="0"
+OTA_INGEST_NAME="DISABLED (source default)"
+case "${MATDOG_OTA_INGEST_VALIDATION:-}" in
+  ""|0)
+    ;;
+  1)
+    OTA_INGEST_FLAG=" -DMATDOG_OTA_INGEST_ENABLED=1"
+    OTA_INGEST_ID="1"
+    OTA_INGEST_NAME="ENABLED (OVERRIDE — hardware-validation candidate only)"
+    ;;
+  *)
+    echo "ERROR: MATDOG_OTA_INGEST_VALIDATION='${MATDOG_OTA_INGEST_VALIDATION}' must be 0 or 1" >&2
+    exit 1
+    ;;
+esac
+
 echo "== MATDOG Controller build =="
-echo "sketch   : $SKETCH_DIR"
-echo "fqbn     : $FQBN"
-echo "build_id : $BUILD_ID"
-echo "profile  : $PROFILE_NAME"
+echo "sketch     : $SKETCH_DIR"
+echo "fqbn       : $FQBN"
+echo "build_id   : $BUILD_ID"
+echo "profile    : $PROFILE_NAME"
+echo "ota_ingest : $OTA_INGEST_NAME"
 echo
 
 "$ARDUINO" compile \
   --fqbn "$FQBN" \
-  --build-property "compiler.cpp.extra_flags=-DMATDOG_BUILD_ID=\"${BUILD_ID}\"${PROFILE_FLAG}" \
+  --build-property "compiler.cpp.extra_flags=-DMATDOG_BUILD_ID=\"${BUILD_ID}\"${PROFILE_FLAG}${OTA_INGEST_FLAG}" \
   --warnings all \
   --export-binaries \
   "$SKETCH_DIR" \
@@ -107,4 +141,5 @@ python3 "$SCRIPT_DIR/build_manifest.py" write \
   --build-id "$BUILD_ID" \
   --source-state "$SOURCE_STATE" \
   --profile "$PROFILE_ID" \
+  --ota-ingest "$OTA_INGEST_ID" \
   --fqbn "$FQBN"

@@ -1,5 +1,38 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I7/I8 network transport hardening — 2026-09-25
+
+**Implemented, compiled and offline-tested.** Six concrete findings from operator review of the
+I7/I8 implementation below, all addressed:
+
+- **OTA-ingest validation override**, so the ONE hardware-validation candidate can carry a real,
+  reachable OTA writer without a second later flash, while the source default stays `0`:
+  `MATDOG_OTA_INGEST_VALIDATION=1` (new `scripts/build.sh` input) and `MATDOG_FLASH_OTA_INGEST=1`
+  (new `scripts/flash_app_only.sh` input), both loud and both requiring explicit authorization —
+  `scripts/build_manifest.py` gained `OTA_INGEST_ENABLED` as a second, fully independent
+  authorization axis alongside `HARDWARE_PROFILE`, never inferred from it.
+- **Mailbox stale-response fix**: a third semaphore (`slot_free_`) plus a new pure, host-tested
+  decision core (`src/network/HttpMailbox.h`, `scripts/tests/test_http_mailbox.cpp`, 27 checks)
+  close a real bug — a timed-out `dispatch()`'s late-computed response could previously leak
+  forward and be wrongly consumed by a later, unrelated request.
+- **Start/stop lifecycle fix**: `stop()` now deletes every semaphore `start()` creates (previously
+  leaked two handles per START/STOP cycle); `start()` releases whatever it already allocated on
+  every partial-failure path. New static-audit structural checks, mutation-verified.
+- **OTA challenge hardening**: `issueChallenge()` is now idempotent while a still-valid challenge is
+  outstanding, so a repeated unauthenticated call can no longer displace a legitimate client's
+  in-flight nonce (an availability weakness adjacent to the nonce-consumption bug already fixed in
+  the previous entry). 3 new/replaced adversarial tests, mutation-verified.
+- **`/status` threat model and OTA security model documented explicitly** in
+  `src/network/HttpTransport.h`: `/status` stays unauthenticated by deliberate, justified choice
+  (reachable only after a MAINTENANCE-mode USB `@WEB SERVER START`, carries no secret, and adding
+  auth here was rejected as either reusing the OTA credential — backwards from "write must stay
+  stronger than read" — or inventing a second, unjustified credential system); the OTA transport's
+  exact protections and non-protections (no TLS, no confidentiality) are stated plainly with no
+  guarantee implied that does not exist.
+
+Full record:
+[`09_Logs/Development_Log/2026-09-25_I7_I8_HARDENING.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_HARDENING.md).
+
 ## Unreleased — I7/I8 network transport implemented — 2026-09-25
 
 **Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. Server disabled at
@@ -45,7 +78,9 @@ general — an HTTP transport's request body never touches `CommandRouter::handl
 - `MATDOG_OTA_INGEST_ENABLED` remains `0` by default, unchanged — the transport's existence does
   not make ingest reachable; starting the Web server checks `OtaManager::ingestEnabled()` and
   returns `403` if it is off.
-- Build cost: `USB_ONLY` flash 32% (unchanged bracket), static RAM 17% (was 16%).
+- Build cost vs the previous frozen candidate (`c8906378`): `USB_ONLY` flash 981,856 B → 1,024,288 B
+  (31% → 32%, +42,432 B — the `esp_http_server`/mbedTLS-linked HMAC path and the FreeRTOS semaphore
+  API), static RAM 53,356 B → 56,660 B (16% → 17%, +3,304 B).
 
 Full record:
 [`09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md).

@@ -266,11 +266,17 @@ void test_tampering_with_any_metadata_field_invalidates_the_signature() {
 }
 
 // ---------------------------------------------------------------------------
-// issueChallenge() invalidates any previous outstanding nonce
+// issueChallenge() lifecycle (I7 hardening, 2026-09-25): idempotent while
+// still valid, genuinely rotates only once expired or consumed
 // ---------------------------------------------------------------------------
 
-void test_new_challenge_invalidates_the_previous_one() {
-  g_case = "new challenge invalidates old";
+void test_repeated_challenge_calls_do_not_displace_a_still_valid_nonce() {
+  // THE case this hardening exists for: an unauthenticated caller hitting
+  // /ota/challenge repeatedly must not be able to invalidate a legitimate
+  // client's in-flight nonce (an availability bug immediately adjacent to
+  // the one test_wrong_nonce_is_rejected_without_burning_the_real_challenge
+  // already closes).
+  g_case = "repeated challenge calls preserve a valid nonce";
   OtaSession session;
   session.begin(OtaSessionConfig{}, kSecret, sizeof(kSecret));
 
@@ -279,23 +285,86 @@ void test_new_challenge_invalidates_the_previous_one() {
   uint8_t nonce1[kOtaNonceBytes];
   session.issueChallenge(1000, random1, nonce1);
 
+  // An attacker (or just another client) calls the challenge endpoint again
+  // before the legitimate holder of nonce1 has authenticated.
   uint8_t random2[kOtaNonceBytes];
   fillNonce(random2, 50);
   uint8_t nonce2[kOtaNonceBytes];
   session.issueChallenge(1001, random2, nonce2);
 
+  // The SAME nonce is returned both times — nothing was displaced.
+  CHECK(memcmp(nonce1, nonce2, kOtaNonceBytes) == 0);
+
+  // The original holder's nonce still authenticates.
   const OtaImageMetadata metadata = sampleMetadata();
   uint8_t sig1[kHmac256DigestBytes];
   signFor(kSecret, sizeof(kSecret), nonce1, metadata, sig1);
+  CHECK_EQ((int)session.authenticate(1001, nonce1, metadata, sig1), (int)OtaAuthResult::OK);
+}
 
-  // The FIRST nonce is no longer the outstanding one at all.
-  CHECK_EQ((int)session.authenticate(1001, nonce1, metadata, sig1),
+void test_challenge_rotates_once_the_previous_one_expires() {
+  g_case = "challenge rotates after expiry";
+  OtaSessionConfig config;
+  config.challenge_ttl_ms = 30000;
+  OtaSession session;
+  session.begin(config, kSecret, sizeof(kSecret));
+
+  uint8_t random1[kOtaNonceBytes];
+  fillNonce(random1, 8);
+  uint8_t nonce1[kOtaNonceBytes];
+  session.issueChallenge(1000, random1, nonce1);
+
+  // Past the TTL: this call must genuinely rotate, not repeat.
+  uint8_t random2[kOtaNonceBytes];
+  fillNonce(random2, 50);
+  uint8_t nonce2[kOtaNonceBytes];
+  session.issueChallenge(1000 + config.challenge_ttl_ms + 1, random2, nonce2);
+
+  CHECK(memcmp(nonce1, nonce2, kOtaNonceBytes) != 0);
+
+  const OtaImageMetadata metadata = sampleMetadata();
+
+  // The old nonce is simply not the outstanding one any more — same
+  // REJECTED_NONCE_MISMATCH path as any other unrecognized nonce, and it
+  // still does not consume the new, real challenge (see
+  // test_wrong_nonce_is_rejected_without_burning_the_real_challenge).
+  uint8_t sig1[kHmac256DigestBytes];
+  signFor(kSecret, sizeof(kSecret), nonce1, metadata, sig1);
+  CHECK_EQ((int)session.authenticate(1000 + config.challenge_ttl_ms + 1, nonce1, metadata, sig1),
           (int)OtaAuthResult::REJECTED_NONCE_MISMATCH);
 
-  // The second, current nonce still works.
+  // The new, current nonce still works.
   uint8_t sig2[kHmac256DigestBytes];
   signFor(kSecret, sizeof(kSecret), nonce2, metadata, sig2);
-  CHECK_EQ((int)session.authenticate(1001, nonce2, metadata, sig2), (int)OtaAuthResult::OK);
+  CHECK_EQ((int)session.authenticate(1000 + config.challenge_ttl_ms + 1, nonce2, metadata, sig2),
+          (int)OtaAuthResult::OK);
+}
+
+void test_challenge_rotates_immediately_after_being_consumed() {
+  // Idempotence applies only to an UNCONSUMED, still-outstanding challenge.
+  // Once authenticate() has consumed it (success or failure — see
+  // buildOtaSignedPayload's caller), challenge_outstanding_ is false, so the
+  // very next issueChallenge() call must issue a genuinely fresh nonce, not
+  // repeat the now-spent one.
+  g_case = "challenge rotates after consumption";
+  OtaSession session;
+  session.begin(OtaSessionConfig{}, kSecret, sizeof(kSecret));
+
+  uint8_t random1[kOtaNonceBytes];
+  fillNonce(random1, 8);
+  uint8_t nonce1[kOtaNonceBytes];
+  session.issueChallenge(1000, random1, nonce1);
+
+  const OtaImageMetadata metadata = sampleMetadata();
+  uint8_t sig1[kHmac256DigestBytes];
+  signFor(kSecret, sizeof(kSecret), nonce1, metadata, sig1);
+  CHECK_EQ((int)session.authenticate(1000, nonce1, metadata, sig1), (int)OtaAuthResult::OK);
+
+  uint8_t random2[kOtaNonceBytes];
+  fillNonce(random2, 50);
+  uint8_t nonce2[kOtaNonceBytes];
+  session.issueChallenge(1001, random2, nonce2);
+  CHECK(memcmp(nonce1, nonce2, kOtaNonceBytes) != 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -396,7 +465,9 @@ int main() {
   test_correct_signature_is_accepted_exactly_once();
   test_wrong_secret_is_rejected();
   test_tampering_with_any_metadata_field_invalidates_the_signature();
-  test_new_challenge_invalidates_the_previous_one();
+  test_repeated_challenge_calls_do_not_displace_a_still_valid_nonce();
+  test_challenge_rotates_once_the_previous_one_expires();
+  test_challenge_rotates_immediately_after_being_consumed();
   test_timeout_tracks_activity_and_reset_clears_it();
   test_signed_payload_ignores_garbage_past_the_build_id_nul();
   test_to_string_covers_every_value();

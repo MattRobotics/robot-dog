@@ -107,12 +107,16 @@ class OtaSession {
   // pattern in this codebase.
   void begin(const OtaSessionConfig& config, const uint8_t* secret, size_t secret_len);
 
-  // Issues a fresh nonce into out_nonce. `random_bytes` is caller-supplied
-  // entropy (esp_random() on device, a fixed test vector offline) — this
-  // class never reaches for a hardware RNG itself. Always succeeds:
-  // issuing a new challenge invalidates any previous outstanding one, so
-  // there is never more than one live nonce, and a caller who abandons a
-  // challenge cannot lock out future ones.
+  // Issues a nonce into out_nonce. `random_bytes` is caller-supplied entropy
+  // (esp_random() on device, a fixed test vector offline) — this class
+  // never reaches for a hardware RNG itself. Always succeeds; there is
+  // never more than one live nonce. Idempotent while a still-valid
+  // challenge is already outstanding (I7 hardening, 2026-09-25): the SAME
+  // nonce is returned again rather than rotated, so a repeated unauthenticated
+  // call cannot invalidate a legitimate client's in-flight nonce — see
+  // OtaSession.cpp. Once that challenge expires (or none is outstanding), the
+  // next call genuinely rotates to a fresh nonce, so an abandoned challenge
+  // still cannot lock out future ones past challenge_ttl_ms.
   void issueChallenge(uint32_t now_ms, const uint8_t random_bytes[kOtaNonceBytes],
                       uint8_t out_nonce[kOtaNonceBytes]);
 

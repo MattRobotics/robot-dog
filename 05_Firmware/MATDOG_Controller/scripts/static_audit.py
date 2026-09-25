@@ -2497,20 +2497,29 @@ def check_http_transport_boundaries(files, sketch_dir):
     update_dir = sketch_dir / "src" / "update"
     network_dir = sketch_dir / "src" / "network"
 
-    # --- (1) Hmac256/OtaSession stay host-linkable --------------------------
-    for name in ("Hmac256.h", "Hmac256.cpp", "OtaSession.h", "OtaSession.cpp"):
+    # --- (1) Hmac256/OtaSession/HttpMailbox stay host-linkable --------------
+    host_linkable_units = {
+        "Hmac256.h": update_dir, "Hmac256.cpp": update_dir,
+        "OtaSession.h": update_dir, "OtaSession.cpp": update_dir,
+        # HttpMailbox.h alone: the mailbox correlation logic (I7/I8
+        # hardening, 2026-09-25) is small enough to stay header-only, so
+        # there is no matching .cpp to require here.
+        "HttpMailbox.h": network_dir,
+    }
+    for name, unit_dir in host_linkable_units.items():
         entry = by_name.get(name)
         if entry is None:
-            fail(f"{update_dir / name}: I7 authentication/session unit not found")
+            fail(f"{unit_dir / name}: I7/I8 authentication/session/mailbox unit not found")
             continue
         path, code = entry
         for forbidden in ("#include <Arduino.h>", "#include <esp_http_server.h>",
                           "#include <WiFi.h>", "Serial."):
             if forbidden in code:
-                fail(f"{path}: contains {forbidden!r} - the OTA authentication/session layer "
-                     f"must stay free of the Arduino runtime and of the transport so "
-                     f"scripts/tests/test_hmac256.cpp and test_ota_session.cpp link the REAL "
-                     f"logic (I7, the same contract as WifiPolicy/OtaPolicy)")
+                fail(f"{path}: contains {forbidden!r} - the OTA authentication/session/"
+                     f"mailbox-correlation layers must stay free of the Arduino runtime and "
+                     f"of the transport so scripts/tests/test_hmac256.cpp, "
+                     f"test_ota_session.cpp and test_http_mailbox.cpp link the REAL logic "
+                     f"(I7/I8, the same contract as WifiPolicy/OtaPolicy)")
 
     # --- (2) the ESP-IDF HTTP server API lives in exactly one unit ---------
     httpd_api_prefixes = ("httpd_start", "httpd_stop", "httpd_register_uri_handler",
@@ -2575,6 +2584,38 @@ def check_http_transport_boundaries(files, sketch_dir):
             fail(f"{path}: calls esp_restart() - a committed OTA image must wait for a "
                  f"separate, explicit reboot step, never one the network transport takes "
                  f"on its own (I7)")
+
+        # --- (4b) bounded START -> STOP resource lifecycle (I7/I8 hardening,
+        # 2026-09-25): every semaphore created must be matched by exactly one
+        # delete, so a repeated start()/stop() cycle cannot leak handles.
+        # Counting textual occurrences is a coarse proxy, but a genuine leak
+        # (a fourth CreateBinary with no matching Delete, or vice versa) can
+        # only make these counts diverge, never coincidentally match.
+        creates = len(re.findall(r"xSemaphoreCreateBinary\s*\(", code))
+        deletes = len(re.findall(r"vSemaphoreDelete\s*\(", code))
+        if creates == 0:
+            fail(f"{path}: no xSemaphoreCreateBinary() call found - expected the "
+                 f"request/response/slot-free mailbox semaphores")
+        elif creates != deletes:
+            fail(f"{path}: {creates} xSemaphoreCreateBinary() call(s) but {deletes} "
+                 f"vSemaphoreDelete() call(s) - every semaphore start() creates must be "
+                 f"released by stop(), or a bounded START -> STOP -> START -> STOP cycle "
+                 f"leaks a handle (I7/I8 hardening)")
+
+        # stop() must be reachable from every partial-failure path in
+        # start() - not just from an explicit @WEB SERVER STOP - or a
+        # failed httpd_start()/CreateBinary() attempt leaks whatever it did
+        # allocate. Counted within start()'s own body only.
+        start_body = re.search(r"bool HttpTransport::start\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not start_body:
+            fail(f"{path}: could not locate HttpTransport::start() to audit its cleanup")
+        else:
+            stop_calls_in_start = len(re.findall(r"\bstop\(\)", start_body.group(1)))
+            if stop_calls_in_start < 2:
+                fail(f"{path}: HttpTransport::start() calls stop() {stop_calls_in_start} "
+                     f"time(s) - expected at least 2 (an upfront defensive call, plus at "
+                     f"least one partial-failure cleanup path) - a failed start() attempt "
+                     f"must release whatever it already allocated (I7/I8 hardening)")
 
     # --- (5) the OTA shared secret: one use site, never committed ----------
     creds = by_name.get("OtaCredentials.h")
@@ -2863,6 +2904,7 @@ def check_host_tests(sketch_dir):
     service_readiness_suite = sketch_dir / "scripts" / "tests" / "test_service_readiness.cpp"
     hmac256_suite = sketch_dir / "scripts" / "tests" / "test_hmac256.cpp"
     ota_session_suite = sketch_dir / "scripts" / "tests" / "test_ota_session.cpp"
+    http_mailbox_suite = sketch_dir / "scripts" / "tests" / "test_http_mailbox.cpp"
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
         return
@@ -2911,6 +2953,10 @@ def check_host_tests(sketch_dir):
         fail(f"{ota_session_suite}: OTA transport session/authentication offline test suite "
              f"not found (I7)")
         return
+    if not http_mailbox_suite.exists():
+        fail(f"{http_mailbox_suite}: HTTP transport mailbox correlation offline test suite "
+             f"not found (I7/I8)")
+        return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
@@ -2921,7 +2967,7 @@ def check_host_tests(sketch_dir):
                    "test_calibration_domain", "test_calibration_manager",
                    "test_led_status_policy", "test_actuator_runtime",
                    "test_calibration_execution_engine", "test_service_readiness",
-                   "test_hmac256", "test_ota_session"):
+                   "test_hmac256", "test_ota_session", "test_http_mailbox"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
@@ -2992,7 +3038,8 @@ def check_build_profile_provenance(sketch_dir):
                   "PROFILE_MISMATCH", "PROFILE_UNKNOWN", "MANIFEST_MISSING",
                   "FQBN_MISMATCH",
                   "BINARY_SHA256_MISMATCH", "BINARY_SIZE_MISMATCH",
-                  "SOURCE_COMMIT_MISMATCH", "TREE_NOT_CLEAN"):
+                  "SOURCE_COMMIT_MISMATCH", "TREE_NOT_CLEAN",
+                  "KNOWN_OTA_INGEST_VALUES", "OTA_INGEST_MISMATCH", "OTA_INGEST_UNKNOWN"):
         if token not in logic_text:
             fail(f"{logic}: missing required manifest/provenance primitive {token!r}")
 
@@ -3005,6 +3052,20 @@ def check_build_profile_provenance(sketch_dir):
     if re.search(r'add_argument\("--requested-profile"[^)]*default=', logic_text):
         fail(f"{logic}: --requested-profile gained a default - flash_app_only.sh must "
              f"pass it explicitly")
+
+    # Same reasoning, for the OTA-ingest authorization axis (I7 hardening,
+    # 2026-09-25): a binary with the firmware-ingest writer compiled in must
+    # never be flashed by an invocation that did not explicitly ask for it.
+    if re.search(r"def verify_manifest\([^)]*requested_ota_ingest\s*=", logic_text, re.DOTALL):
+        fail(f"{logic}: verify_manifest() gained a default for requested_ota_ingest - the "
+             f"caller must always state the OTA-ingest state it intends to flash")
+    if re.search(r'add_argument\("--requested-ota-ingest"[^)]*default=', logic_text):
+        fail(f"{logic}: --requested-ota-ingest gained a default - flash_app_only.sh must "
+             f"pass it explicitly")
+    if not re.search(r'manifest_ota_ingest\s*!=\s*requested_ota_ingest', logic_text):
+        fail(f"{logic}: the OTA_INGEST_ENABLED equality comparison against "
+             f"requested_ota_ingest is missing - recording the ingest state without "
+             f"comparing it proves nothing")
 
     # Build-configuration provenance: the recorded FQBN must be COMPARED,
     # not merely recorded. The manifest carried FQBN from the start while
@@ -3034,6 +3095,19 @@ def check_build_profile_provenance(sketch_dir):
         fail(f"{build_sh}: does not pass --profile to the manifest writer")
     if "--source-state" not in build_text:
         fail(f"{build_sh}: does not record the clean/dirty source state in the manifest")
+    if "--ota-ingest" not in build_text:
+        fail(f"{build_sh}: does not pass --ota-ingest to the manifest writer - a binary "
+             f"with the OTA firmware-ingest writer compiled in could be produced with no "
+             f"record of that fact")
+    if "MATDOG_OTA_INGEST_VALIDATION:-" not in build_text:
+        fail(f"{build_sh}: lost the MATDOG_OTA_INGEST_VALIDATION override input (expected "
+             f"a ${{MATDOG_OTA_INGEST_VALIDATION:-...}} expansion) - the ONE hardware-"
+             f"validation candidate needs an explicit, loud way to compile ingest in "
+             f"without editing the source default")
+    if "-DMATDOG_OTA_INGEST_ENABLED=1" not in build_text:
+        fail(f"{build_sh}: the OTA-ingest override no longer passes "
+             f"-DMATDOG_OTA_INGEST_ENABLED=1 to the compiler - the override input would be "
+             f"read but never reach the build")
 
     if not flash_sh.exists():
         fail(f"{flash_sh}: application-only flash script not found")
@@ -3046,6 +3120,10 @@ def check_build_profile_provenance(sketch_dir):
              f"unknown hardware profile could be written to the device")
     if "--requested-profile" not in flash_text:
         fail(f"{flash_sh}: does not pass --requested-profile to the manifest verifier")
+    if "--requested-ota-ingest" not in flash_text:
+        fail(f"{flash_sh}: does not pass --requested-ota-ingest to the manifest verifier - "
+             f"an ingest-enabled binary could be flashed with no explicit authorization "
+             f"check")
     if not re.search(r'--expected-fqbn\s+"\$FQBN"', flash_text):
         fail(f"{flash_sh}: does not pass --expected-fqbn \"$FQBN\" to the manifest "
              f"verifier - the recorded build FQBN would go unverified")
@@ -3054,6 +3132,9 @@ def check_build_profile_provenance(sketch_dir):
     if "MATDOG_FLASH_PROFILE:-" not in flash_text:
         fail(f"{flash_sh}: lost the MATDOG_FLASH_PROFILE operator authorization input "
              f"(expected a ${{MATDOG_FLASH_PROFILE:-...}} expansion)")
+    if "MATDOG_FLASH_OTA_INGEST:-" not in flash_text:
+        fail(f"{flash_sh}: lost the MATDOG_FLASH_OTA_INGEST operator authorization input "
+             f"(expected a ${{MATDOG_FLASH_OTA_INGEST:-...}} expansion)")
 
     write_match = re.search(r"write-flash", flash_text)
 

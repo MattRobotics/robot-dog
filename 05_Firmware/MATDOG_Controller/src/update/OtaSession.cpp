@@ -51,6 +51,20 @@ void OtaSession::begin(const OtaSessionConfig& config, const uint8_t* secret, si
 
 void OtaSession::issueChallenge(uint32_t now_ms, const uint8_t random_bytes[kOtaNonceBytes],
                                 uint8_t out_nonce[kOtaNonceBytes]) {
+  // Idempotent while a still-valid challenge is outstanding (I7 hardening,
+  // 2026-09-25): an unauthenticated caller repeatedly hitting the challenge
+  // endpoint must not be able to invalidate a legitimate client's in-flight
+  // nonce. Re-issuing the SAME nonce is safe — it is not bound to a caller
+  // identity, only consumed once by whichever request first presents a
+  // valid signature over it (authenticate() still single-use-consumes it) —
+  // so this closes the availability gap without weakening anything: replay
+  // is still rejected, expiration is still bounded, and an abandoned
+  // challenge still cannot lock out future ones past challenge_ttl_ms.
+  if (challenge_outstanding_ &&
+      (now_ms - challenge_issued_ms_) <= config_.challenge_ttl_ms) {
+    memcpy(out_nonce, nonce_, kOtaNonceBytes);
+    return;
+  }
   memcpy(nonce_, random_bytes, kOtaNonceBytes);
   challenge_issued_ms_ = now_ms;
   challenge_outstanding_ = true;
