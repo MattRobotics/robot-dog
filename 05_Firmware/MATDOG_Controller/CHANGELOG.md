@@ -1,5 +1,13 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — F0 re-run against the integrated candidate — 2026-09-25
+
+Documentation only; **no flash attempted or proposed**. `FINAL_FLASH_ELIGIBLE=DEFERRED_UNPOWERED`
+— unchanged, the ESP32 was never enumerated this session. `SOFTWARE_FREEZE_GATE`,
+`ARTIFACT_PROVENANCE_GATE` and `FAIL_CLOSED_GATE` all PASS against the MATDOG NEXTGEN INTEGRATED
+HARDWARE VALIDATION CANDIDATE. Full record:
+[`09_Logs/Development_Log/2026-09-25_F0_RERUN_CANDIDATE.md`](../../09_Logs/Development_Log/2026-09-25_F0_RERUN_CANDIDATE.md).
+
 ## Unreleased — MATDOG NEXTGEN INTEGRATED HARDWARE VALIDATION CANDIDATE — 2026-09-25
 
 Documentation only; **no code change**. Full integrated software freeze superseding the earlier I9
