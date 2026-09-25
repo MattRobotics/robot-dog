@@ -1,5 +1,17 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I3 SOURCE_SIGNATURE — 2026-09-25
+
+- **New `@SYSTEM SOURCE_SIGNATURE`** read-only command: reports `build::kBuildId`, firmware name/
+  version, active profile/board, the OTA manager's running-image build id/state/reset reason, and
+  the ESP-IDF running partition. All facts were already computed elsewhere (boot banner, OTA
+  first-boot self-check) — no new hardware read, no new bus traffic. Closes the `SOURCE_SIGNATURE`
+  item of G4's documented gap list. `SYSTEM_SELF_TEST`, `PROFILE_AUDIT` and a consolidated servo
+  health summary remain open design questions, deliberately not guessed — see
+  [`09_Logs/Development_Log/2026-09-25_I3_SOURCE_SIGNATURE.md`](../../09_Logs/Development_Log/2026-09-25_I3_SOURCE_SIGNATURE.md).
+- **Cost:** `USB_ONLY` flash 977,747 B -> 978,195 B (+448 B); `ROBOT_POWERED` 978,299 B -> 978,751 B
+  (+452 B). RAM unchanged.
+
 ## Unreleased — I2 LED Status Manager — 2026-09-25
 
 **Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested.**

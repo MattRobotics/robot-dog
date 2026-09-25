@@ -78,6 +78,14 @@ class CommandRouter {
   // Pure presentation of ota->status(). Read-only: OTA-A ships no transport
   // and no command that can start an update.
   void printOtaStatus();
+  // Read-only build/source identity (G4 SOURCE_SIGNATURE). Presents facts
+  // already computed elsewhere (build::kBuildId, the OTA manager's running-
+  // image bookkeeping, the ESP-IDF running partition) — no new hardware
+  // read, no new bus traffic. Deliberately does NOT surface esp_app_desc_t:
+  // in an Arduino-ESP32 build it describes arduino-lib-builder, not MATDOG
+  // (see update/OtaPolicy.h), so it is not authoritative identity here
+  // either.
+  void printSourceSignature();
   void printServoScanResult();
   // Pure presentation of servo_census->result(). Computes nothing: the
   // classification lives in servo/ServoPopulation.h so a future Web UI /

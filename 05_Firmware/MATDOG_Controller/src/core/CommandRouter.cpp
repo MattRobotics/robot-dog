@@ -1,5 +1,7 @@
 #include "CommandRouter.h"
 
+#include <esp_ota_ops.h>
+
 #include "../servo/ServoProfileData.h"
 
 #include "../config/BuildConfig.h"
@@ -287,6 +289,8 @@ void CommandRouter::handleLine(String line) {
     modules_.authority->onOperatingModeChanged(next);
     printModeStatus();
     printAuthorityStatus();
+  } else if (upper == "@SYSTEM SOURCE_SIGNATURE") {
+    printSourceSignature();
   } else if (upper == "@SYSTEM SHUTDOWN") {
     modules_.power_state->requestShutdown();
     Serial.println("SHUTDOWN_REQUESTED=YES");
@@ -322,6 +326,7 @@ void CommandRouter::printHelp() {
   Serial.println("  @OTA STATUS            (read-only; OTA-A ships no transport)");
   Serial.println("  @AUTHORITY STATUS      (read-only; no owner can be acquired yet)");
   Serial.println("  @CALIBRATION STATUS    (read-only; no session can move hardware)");
+  Serial.println("  @SYSTEM SOURCE_SIGNATURE  (read-only build/source identity)");
   Serial.println("  @SERVO SCAN <lo> <hi>   (MAINTENANCE mode only; incremental, bounded");
   Serial.println("                           per-ID blocking, result follows asynchronously)");
   Serial.println("  @SERVO CENSUS           (MAINTENANCE mode only; canonical 11-55 scan,");
@@ -638,6 +643,21 @@ void CommandRouter::printBmsKeyWriteStatus() {
              w.readback != power::DalyKeyReadback::PENDING) {
     Serial.printf("  readback=%s key_logic_raw=0x%04X age_ms=%lu\n", power::toString(w.readback),
                   w.readback_raw, (unsigned long)(now_ms - w.readback_at_ms));
+  }
+}
+
+void CommandRouter::printSourceSignature() {
+  const update::OtaManagerStatus& o = modules_.ota->status();
+  Serial.printf("SOURCE_SIGNATURE build_id=%s firmware=%s version=%s profile=%s board=%s\n",
+                build::kBuildId, build::kFirmwareName, build::kFirmwareVersion,
+                build::kTestProfile, build::kBoardName);
+  Serial.printf("  ota_running_build_id=%s ota_running_image_state=%s reset_reason=%s\n",
+                o.running_build_id, update::toString(o.policy.running_image_state),
+                o.reset_reason);
+  const esp_partition_t* running = esp_ota_get_running_partition();
+  if (running != nullptr) {
+    Serial.printf("  partition=%s address=0x%06x size=0x%06x\n",
+                  running->label, (unsigned)running->address, (unsigned)running->size);
   }
 }
 

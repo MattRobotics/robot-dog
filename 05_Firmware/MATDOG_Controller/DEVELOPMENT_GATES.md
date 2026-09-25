@@ -219,8 +219,11 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   OFFLINE TESTED**, 198 checks; **HARDWARE TO_TEST**. Battery/charging LED states are explicitly
   deferred pending a reviewed SOC/taper threshold policy — see
   [`09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md`](../../09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md).
-  Not implemented: `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated health
-  summary.
+  Also implemented: `@SYSTEM SOURCE_SIGNATURE` (I3) — read-only build/source identity
+  (`build::kBuildId`, firmware name/version, active profile/board, the OTA manager's running-image
+  build id and image state, the ESP-IDF running partition), presenting only facts already computed
+  elsewhere; no new hardware read. Not implemented: `SYSTEM_SELF_TEST`, `PROFILE_AUDIT`,
+  consolidated servo health summary.
 
 ## Authority model — OperatingMode / ActuatorAuthority
 
