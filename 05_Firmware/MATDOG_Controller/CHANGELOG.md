@@ -1,5 +1,19 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I8 reconsidered, no server code added — 2026-09-25
+
+Documentation only; **no code change**. Reconsidered the read-only Web foundation now that I6 is
+substantially implemented. Split UI-0 into a data/schema half (already done — `ControllerService`
+IS the typed semantic/telemetry layer a future HTTP handler would serve) and a server half
+(`WebServer`/`esp_http_server`/`esp_https_server`, all requiring `<WiFi.h>` and, for two of the
+three, an additional FreeRTOS task). Declined to add the server half: its central safety property
+("bounded memory/latency") is not testable without live Wi-Fi association, and unlike
+`MATDOG_OTA_INGEST_ENABLED` (which gates an already-reviewed state machine), there is no existing
+offline-tested decision core to gate an HTTP stack behind — it would be new, unreviewed surface
+area. `ServiceReadiness`'s `WEB_READ_ONLY_DASHBOARD` capability already reports the
+"disabled/not qualified until Wi-Fi hardware validation" state as data. Full reasoning:
+[`09_Logs/Development_Log/2026-09-25_I8_RECONSIDERED.md`](../../09_Logs/Development_Log/2026-09-25_I8_RECONSIDERED.md).
+
 ## Unreleased — I4/I5 Controller wiring — 2026-09-25
 
 **Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. Fail-closed by
