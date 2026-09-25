@@ -1,5 +1,27 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I9 integrated software freeze — 2026-09-25
+
+Documentation only; **no code change**. Full offline validation matrix run from a clean tree:
+
+- C++ Controller host suites: **13 suites, 5695 checks, 0 failures**.
+- Static safety audit (mutation guards, OTA partition tests, build-manifest tests included):
+  **PASS, 85 files, 0 findings**.
+- Python kinematics/calibration suites (`06_Software/Matdog_Core`): **370 collected, 366 passed, 4
+  known/justified failures** — all four are the pre-existing, already-documented live-FK
+  `calibration_status` YAML/loader enum mismatch (I1, `CALIBRATION_SOURCE_PRECEDENCE.md` §9 item
+  1), not a regression and explicitly not fixed per the V3 handoff's own instruction.
+- Both hardware profiles compiled clean from commit `cc0940b0f62f242f0ab66c09ea24f7cb8ed2aa08`:
+  `USB_ONLY` 978,336 B / `ROBOT_POWERED` 978,896 B (SHA256
+  `a292b2166d5381f1a8f75c494f79753e8aae4a23ee875c42325fe10ecb35203b`). Default `USB_ONLY` artifact
+  restored last.
+- Fail-closed re-verified directly against source: `hardware_motion_authorized=0`,
+  `USB_ONLY` source default, OTA ingest `=0` — all audit-enforced. Neither of this session's two
+  new adapters (I4 `ActuatorRuntime`, I5 `CalibrationExecutionEngine`) is referenced by
+  `Controller`/`CommandRouter`; both are proven dead-code-eliminated from both compiled profiles.
+- Full record, final artifact provenance and classification matrix:
+  [`09_Logs/Development_Log/2026-09-25_I9_INTEGRATED_SOFTWARE_FREEZE.md`](../../09_Logs/Development_Log/2026-09-25_I9_INTEGRATED_SOFTWARE_FREEZE.md).
+
 ## Unreleased — I8 deferred — 2026-09-25
 
 No code or status change. I8 (read-only Web foundation) requires I6 semantics "stable" (I6 was
