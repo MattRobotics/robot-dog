@@ -1,5 +1,27 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — MATDOG NEXTGEN INTEGRATED HARDWARE VALIDATION CANDIDATE — 2026-09-25
+
+Documentation only; **no code change**. Full integrated software freeze superseding the earlier I9
+freeze, run from this exact clean commit after I6 (HostLink), I7 (reconsidered), I4/I5 (Controller
+wiring) and I8 (reconsidered):
+
+- C++ host suites: **14 suites, 5726 checks, 0 failures**.
+- Static audit: **PASS, 89 files, 0 findings**.
+- Python suites: **370 collected, 366 passed, 4 known/justified failures** (identical result to
+  I9 — same pre-existing root cause, no Python source changed).
+- `USB_ONLY` 981,856 B / `ROBOT_POWERED` 982,432 B (SHA256
+  `94ae5c4a5152d914520db579d0282f0df5b540a56b90e9a772e67954e244b6b0`), both clean from commit
+  `c8906378df04468d886d6c1d064f67f74a16042b`.
+- Fail-closed re-verified, now covering the I4/I5/I6 additions: `ActuatorRuntime`/
+  `CalibrationExecutionEngine` are Controller-owned but wired with a `nullptr` backend and no
+  geometry/limit/transform ever admitted; no command path reaches `plan`/`commit`/`execute`/
+  `abort` (audit-enforced, mutation-verified).
+
+This artifact is named **MATDOG NEXTGEN INTEGRATED HARDWARE VALIDATION CANDIDATE** per the
+operator's instruction — the single build the later physical campaign will validate. Full record:
+[`09_Logs/Development_Log/2026-09-25_INTEGRATED_FREEZE_CANDIDATE.md`](../../09_Logs/Development_Log/2026-09-25_INTEGRATED_FREEZE_CANDIDATE.md).
+
 ## Unreleased — I8 reconsidered, no server code added — 2026-09-25
 
 Documentation only; **no code change**. Reconsidered the read-only Web foundation now that I6 is
