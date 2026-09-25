@@ -1,5 +1,18 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I7 reconsidered, scope unchanged — 2026-09-25
+
+Documentation only; **no code change**. Reconsidered building the USB CDC OTA ingest transport
+under the objective-change instruction (real ingest may stay disabled by default in the frozen
+candidate either way). Found a concrete blocker: `CommandRouter::kLineBufSize = 96` bytes means a
+usable ingest transport needs a genuine second Serial I/O mode (suspending line parsing for
+length-prefixed binary reads), not a thin adapter over the existing `OtaManager` API — real,
+unreviewed I/O architecture whose interaction with the G3.1 non-blocking USB CDC guarantee was not
+assessed this session. Building it would not change the frozen candidate's reachable behavior
+(ingest stays compiled out either way) while carrying real risk. Re-confirmed `OtaPolicy::reset()`
+already provides the transport-independent retry primitive. Full reasoning:
+[`09_Logs/Development_Log/2026-09-25_I7_RECONSIDERED.md`](../../09_Logs/Development_Log/2026-09-25_I7_RECONSIDERED.md).
+
 ## Unreleased — I6 HostLink implementation (candidate objective change) — 2026-09-25
 
 **Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested.** Supersedes the
