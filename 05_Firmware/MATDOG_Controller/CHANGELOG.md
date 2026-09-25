@@ -1,5 +1,20 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — F0 final flash readiness — 2026-09-25
+
+Documentation only; **no flash attempted or proposed**.
+
+- `SOFTWARE_FREEZE_GATE`, `ARTIFACT_PROVENANCE_GATE` and `FAIL_CLOSED_GATE` all **PASS**.
+  `POWER_ISOLATION_GATE=UNPROVEN` and `FLASH_RECOVERY_GATE=DEFERRED_UNPOWERED` — unchanged since
+  I0, the ESP32 was never enumerated this session (`USB_STATE=ESP32_NOT_ENUMERATED`).
+- `FINAL_FLASH_ELIGIBLE=DEFERRED_UNPOWERED` per the handoff's explicit rule. No authorization
+  question was asked (Section 19 applies only when `FINAL_FLASH_ELIGIBLE=PASS`).
+- Recorded the exact future flash procedure (prove power isolation → fresh full-flash read-back
+  under proven power → re-run F0 → Section-19 report → explicit YES/NO → application-only flash via
+  `flash_app_only.sh`) so nothing has to be re-derived once the operator is physically present.
+  Full record:
+  [`09_Logs/Development_Log/2026-09-25_F0_FINAL_FLASH_READINESS.md`](../../09_Logs/Development_Log/2026-09-25_F0_FINAL_FLASH_READINESS.md).
+
 ## Unreleased — I9 integrated software freeze — 2026-09-25
 
 Documentation only; **no code change**. Full offline validation matrix run from a clean tree:
