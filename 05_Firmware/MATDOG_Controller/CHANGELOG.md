@@ -1,5 +1,20 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I7 Wi-Fi/OTA audit — 2026-09-25
+
+Documentation only; **no code change**.
+
+- Checked V3 handoff's eleven Wi-Fi/OTA sub-items against the existing implementation: nine
+  (authorization, session semantics, manifest identity, hash validation, pending-reboot,
+  recovery invariant, bounded memory, concurrency, status reporting) were already complete.
+  Authenticated transport remains deliberately unimplemented — the Controller README already
+  evaluates five transport options with a "not yet implemented" recommendation, and building even
+  the recommended first step (USB CDC ingest) means writing the first reachable firmware-write
+  code path in this codebase, which is a decision-grade commitment, not routine offline
+  advancement. `failure/retry` semantics are inseparable from that undecided transport. Full
+  reasoning:
+  [`09_Logs/Development_Log/2026-09-25_I7_WIFI_OTA_AUDIT.md`](../../09_Logs/Development_Log/2026-09-25_I7_WIFI_OTA_AUDIT.md).
+
 ## Unreleased — I6 HostLink audit — 2026-09-25
 
 Documentation only; **no code change**.
