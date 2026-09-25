@@ -8,6 +8,7 @@
 #include "../calibration/CalibrationExecutionEngine.h"
 #include "../calibration/CalibrationManager.h"
 #include "../imu/Bno085Imu.h"
+#include "../network/HttpTransport.h"
 #include "../network/WifiManager.h"
 #include "../power/DalyBms.h"
 #include "../servo/ServoBus.h"
@@ -83,6 +84,11 @@ class Controller {
   // Bound to the same module pointers CommandRouter already holds; adds no
   // module ownership of its own.
   ControllerService service_;
+  // The network transport (I7/I8, 2026-09-25 correction) — read-only Web
+  // status plus HMAC-authenticated OTA ingest, both through the one
+  // existing OtaManager writer. Never started from begin() — see
+  // network/HttpTransport.h and the @WEB SERVER command in CommandRouter.
+  network::HttpTransport http_transport_;
   CommandRouter command_router_;
 
   // Set only at the very end of begin(). The OTA self-check must not treat a

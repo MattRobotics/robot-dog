@@ -4,6 +4,7 @@
 #include <esp_system.h>
 
 #include "../config/BuildConfig.h"
+#include "../config/OtaCredentials.h"
 #include "../config/Pins.h"
 
 // G3.1: the non-blocking USB CDC guarantee in Controller::begin() rests on
@@ -128,8 +129,16 @@ void Controller::begin() {
       &power_state_, &operating_mode_, &authority_, &calibration_,
       &actuator_policy_,
       &service_,
+      &http_transport_,
   };
   service_.begin(modules);
+  // Never starts the listening socket here — see network/HttpTransport.h.
+  // The secret is passed as raw bytes (strlen of the configured string, or
+  // 0 if none was configured); OtaSession fails closed on a zero-length
+  // secret exactly like WifiPolicy fails closed on an empty SSID.
+  http_transport_.begin(&service_, &ota_,
+                        reinterpret_cast<const uint8_t*>(config::kOtaSecret),
+                        config::kOtaSecretPresent ? strlen(config::kOtaSecret) : 0);
   command_router_.begin(modules);
 
   system_state_.update();
@@ -276,6 +285,12 @@ void Controller::update(uint32_t now_ms) {
                                  wifi_.status().state == network::WifiState::CONNECTING;
     led_status_.update(now_ms, led_inputs);
   }
+
+  // Drains at most one pending HTTP request, if the Web server was ever
+  // started (see @WEB SERVER START). A no-op, bounded check when it was
+  // not — see network/HttpTransport.h for the cross-thread handoff this
+  // advances.
+  http_transport_.update(now_ms);
 
   if (power_state_.state() == PowerState::SHUTDOWN_REQUESTED ||
       power_state_.state() == PowerState::SHUTTING_DOWN ||

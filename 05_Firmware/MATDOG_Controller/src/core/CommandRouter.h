@@ -27,6 +27,14 @@ namespace actuator {
 class SafeActuatorPolicy;
 }  // namespace actuator
 
+namespace network {
+// Forward-declared, not included: HttpTransport.h pulls in
+// esp_http_server.h and ControllerService.h, neither of which
+// CommandRouter.h needs just to hold a pointer for @WEB SERVER
+// START|STOP|STATUS. CommandRouter.cpp includes it directly.
+class HttpTransport;
+}  // namespace network
+
 namespace core {
 
 // Forward-declared, not included: ControllerService.h includes THIS header
@@ -70,6 +78,11 @@ class CommandRouter {
     // Action/write commands still use the module pointers above; see
     // ControllerService.h for the exact scope boundary.
     ControllerService* service;
+    // The network transport (I7/I8, 2026-09-25 correction). @WEB SERVER
+    // START|STOP|STATUS only starts/stops/queries it — CommandRouter never
+    // reaches into its OTA session or HTTP internals. See
+    // network/HttpTransport.h.
+    network::HttpTransport* http_transport;
   };
 
   void begin(const Modules& modules);
@@ -140,6 +153,11 @@ class CommandRouter {
   // see ControllerService.h and scripts/static_audit.py's
   // check_actuator_infrastructure_wired_fail_closed().
   void printActuatorStatus();
+  // Read-only presentation of the HTTP transport's own lifecycle state
+  // (I7/I8). Never reports OTA session secrets or in-flight request
+  // contents — those live only in HttpTransport's cross-thread mailbox,
+  // which this deliberately does not reach into.
+  void printWebStatus();
   static void printAvailabilityLine(const char* label, const AvailabilityStatus& a);
 
   Modules modules_{};

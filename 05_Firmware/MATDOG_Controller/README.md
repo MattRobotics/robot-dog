@@ -1080,7 +1080,7 @@ fails the build if the **source default** is anything but `0` — the same shape
 `USB_ONLY` hardware-profile gate. A production image therefore cannot contain a reachable
 firmware writer, and "we just haven't wired a transport yet" is not load-bearing.
 
-### Transport: evaluated, not yet chosen for implementation
+### Transport: chosen and implemented (2026-09-25, I7)
 
 Everything below is bundled with `esp32:esp32 3.3.11` — no external dependency is needed by
 any option.
@@ -1088,19 +1088,22 @@ any option.
 | Option | Dependencies | Memory | Blocking | Auth | Verdict |
 |---|---|---|---|---|---|
 | **`ArduinoOTA`** | `Update.h`, UDP+TCP listener | moderate | `handle()` runs the whole transfer inline | MD5 password, weak | **Rejected.** It drives `Update.h`, which is a *second* OTA writer with its own partition logic — precisely the duplicate path the architecture forbids. Convenience is not a reason. |
-| **`WebServer`** (sync) | `WebServer` + `WiFi` | ~18 source files, heap per request | handler runs inline in `loop()` | none built in | Plausible later for the Web UI, but an HTTP stack is a large attack surface to add for a firmware writer. |
-| **`esp_http_server`** (IDF) | IDF component, available | own task + stack | runs in its own task → callback-context rules | none built in | Stronger than `WebServer`, but it introduces a second task that would need to hand bytes to the Controller thread. |
-| **`esp_https_server`** (IDF) | + mbedTLS (already linked) | + cert storage, TLS buffers | own task | TLS, real | The only option with genuine transport security. Needs a certificate/key story that does not exist yet. |
-| **Raw TCP framing over `NetworkClient`** | `WiFi` only | one socket, one chunk buffer | non-blocking reads, drained from `update()` | must be built | **Leanest.** Smallest surface, no HTTP parser, drains on the Controller thread so no cross-task state, and the chunk size is ours to bound. |
-| **USB CDC ingest** | none | none | already on the Controller thread | physical access | Useful as the *first* exercise of the ingest path with no network exposure at all. |
+| **`WebServer`** (sync) | `WebServer` + `WiFi` | ~18 source files, heap per request | handler runs inline in `loop()` | none built in | Rejected in favor of `esp_http_server`: I8's read-only dashboard needed a server too, and `esp_http_server` serves both endpoints from one instance. |
+| **`esp_http_server`** (IDF) | IDF component, available | own task + stack | runs in its own task → callback-context rules | HMAC-SHA256, built here | **Chosen.** The cross-task handoff this requires is solved by a bounded single-slot FreeRTOS-semaphore mailbox (`src/network/HttpTransport.*`) that hands each request to the Controller thread and back — see [`09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md). |
+| **`esp_https_server`** (IDF) | + mbedTLS (already linked) | + cert storage, TLS buffers | own task | TLS, real | Available and confirmed installed, but not chosen: needs a certificate/key story that does not exist yet, and its ESP32-S3 resource cost has never been measured on this hardware. Remains the option to revisit if HMAC-over-plain-HTTP proves insufficient (e.g. a transport-confidentiality requirement, not just integrity/authentication) — `OtaSession`'s authentication layer underneath does not change either way. |
+| **Raw TCP framing over `NetworkClient`** | `WiFi` only | one socket, one chunk buffer | non-blocking reads, drained from `update()` | must be built | Not chosen: would have needed its own framing/auth protocol built from scratch, where `esp_http_server` gave headers, a body-streaming API and a well-understood request/response shape for free. |
+| **USB CDC ingest** | none | none | already on the Controller thread | physical access | Not the ingest transport: `CommandRouter`'s 96-byte line-oriented buffer blocks streaming firmware through it specifically — the network transport bypasses this parser entirely, so this is not a network-transport prerequisite either. |
 
-**Recommendation, not yet implemented:** exercise the ingest path over **USB CDC** first — it
-proves the whole state machine on real flash with zero network exposure — then add a **raw
-TCP framing over `NetworkClient`** with a pre-shared key, and treat `esp_https_server` as the
-answer only once a certificate story exists. `ArduinoOTA` is rejected outright because it
-would introduce a second firmware writer.
+**Implemented:** `esp_http_server`, authenticated with a pre-shared-secret HMAC-SHA256
+challenge/response session layer (`src/update/OtaSession.*` over `src/update/Hmac256.*`),
+never `esp_https_server`/TLS this gate. `ArduinoOTA` remains rejected outright — it would
+introduce a second firmware writer.
 
-Transport and authentication are both **TO_IMPLEMENT**.
+Transport and authentication are both **IMPLEMENTED / COMPILED / OFFLINE TESTED**, compiled into
+the candidate, disabled at boot (`HttpTransport::start()` is never called from
+`Controller::begin()` — reachable only via the MAINTENANCE-gated `@WEB SERVER START` command).
+Byte ingest remains compiled out by default (`MATDOG_OTA_INGEST_ENABLED=0`) regardless — the
+transport's existence does not make it reachable.
 
 ### Resource cost
 

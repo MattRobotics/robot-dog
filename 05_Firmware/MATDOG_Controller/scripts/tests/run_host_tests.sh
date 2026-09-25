@@ -164,6 +164,24 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_led_status_policy.cpp" \
   "$SKETCH_DIR/src/status/LedStatusPolicy.cpp"
 
+# HMAC-SHA256 (I7, 2026-09-25 correction), verified against the RFC 4231
+# vectors, not self-consistency only. Links the REAL Sha256 it is built on.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -o "$OUT/test_hmac256" \
+  "$SCRIPT_DIR/test_hmac256.cpp" \
+  "$SKETCH_DIR/src/update/Hmac256.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+
+# The OTA transport's authentication/session layer (I7). Links the REAL
+# Hmac256/Sha256 it is built on. OtaPolicy.h is included only for the
+# OtaImageMetadata type, so OtaPolicy.cpp is deliberately not linked here.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_ota_session" \
+  "$SCRIPT_DIR/test_ota_session.cpp" \
+  "$SKETCH_DIR/src/update/OtaSession.cpp" \
+  "$SKETCH_DIR/src/update/Hmac256.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+
 "$OUT/test_servo_population"
 "$OUT/test_servo_profile"
 "$OUT/test_daly_protocol"
@@ -178,3 +196,5 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_calibration_execution_engine"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"
+"$OUT/test_hmac256"
+"$OUT/test_ota_session"

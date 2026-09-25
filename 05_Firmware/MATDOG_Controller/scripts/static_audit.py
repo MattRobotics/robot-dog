@@ -2470,6 +2470,196 @@ def check_ota_boundaries(files, sketch_dir):
                  f"be compiled into an image by default (handoff section 17)")
 
 
+def check_http_transport_boundaries(files, sketch_dir):
+    """I7/I8 permanent invariants for the network transport (2026-09-25
+    correction).
+
+    HttpTransport is the CONTROL/AUTHORIZATION plane in front of the one
+    existing OtaManager/OtaPolicy/OtaEspBackend writer, never a second
+    writer of its own. These checks defend the properties that design rests
+    on, so none of them can be lost to a later "small" edit:
+
+      1. Hmac256/OtaSession stay pure and host-linkable, so the offline
+         suites (test_hmac256.cpp, test_ota_session.cpp) drive the REAL
+         authentication logic, not a copy;
+      2. the ESP-IDF HTTP server API is confined to ONE translation unit,
+         the same "one auditable unit" rule check_ota_boundaries already
+         gives the ESP-IDF OTA API;
+      3. the listening socket is never opened from Controller::begin() -
+         it stays MAINTENANCE-gated, reachable only through @WEB SERVER;
+      4. it never reboots on its own - a committed OTA image waits for a
+         separate, explicit step, exactly like the reviewed manual
+         application-only flash path;
+      5. the shared secret follows the exact same one-place,
+         never-committed discipline as the Wi-Fi passphrase (W1).
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    update_dir = sketch_dir / "src" / "update"
+    network_dir = sketch_dir / "src" / "network"
+
+    # --- (1) Hmac256/OtaSession stay host-linkable --------------------------
+    for name in ("Hmac256.h", "Hmac256.cpp", "OtaSession.h", "OtaSession.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            fail(f"{update_dir / name}: I7 authentication/session unit not found")
+            continue
+        path, code = entry
+        for forbidden in ("#include <Arduino.h>", "#include <esp_http_server.h>",
+                          "#include <WiFi.h>", "Serial."):
+            if forbidden in code:
+                fail(f"{path}: contains {forbidden!r} - the OTA authentication/session layer "
+                     f"must stay free of the Arduino runtime and of the transport so "
+                     f"scripts/tests/test_hmac256.cpp and test_ota_session.cpp link the REAL "
+                     f"logic (I7, the same contract as WifiPolicy/OtaPolicy)")
+
+    # --- (2) the ESP-IDF HTTP server API lives in exactly one unit ---------
+    httpd_api_prefixes = ("httpd_start", "httpd_stop", "httpd_register_uri_handler",
+                          "httpd_req_recv", "httpd_req_get_hdr_value_str",
+                          "httpd_req_get_hdr_value_len", "httpd_resp_send")
+    for path, code in files:
+        if path.name == "HttpTransport.cpp":
+            continue
+        hits = [sym for sym in httpd_api_prefixes if sym in code]
+        if hits:
+            fail(f"{path}: calls ESP-IDF HTTP server API {hits} outside "
+                 f"network/HttpTransport.cpp - the listening socket and every handler must "
+                 f"stay in one auditable translation unit (I7/I8)")
+
+    # --- (3) never started from Controller::begin() ------------------------
+    ctl = by_name.get("Controller.cpp")
+    if ctl is None:
+        fail(f"{sketch_dir / 'src' / 'core' / 'Controller.cpp'}: not found - cannot audit "
+             f"HTTP transport startup")
+    else:
+        path, code = ctl
+        begin_body = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if begin_body and "http_transport_.start()" in begin_body.group(1):
+            fail(f"{path}: Controller::begin() starts the HTTP transport - the listening "
+                 f"socket must stay off at boot, reachable only from the MAINTENANCE-gated "
+                 f"@WEB SERVER START command (I7/I8)")
+
+    # @WEB SERVER START must be gated the same way every other diagnostic
+    # that can be triggered without hardware authorization already is.
+    router = by_name.get("CommandRouter.cpp")
+    if router is None:
+        fail(f"{sketch_dir / 'src' / 'core' / 'CommandRouter.cpp'}: not found - cannot audit "
+             f"the @WEB SERVER command gate")
+    else:
+        path, code = router
+        if '"@WEB SERVER START"' not in code:
+            fail(f"{path}: @WEB SERVER START command not found - the HTTP transport must be "
+                 f"reachable from the command surface, not only from source")
+        else:
+            # Bounded to the WEB SERVER branch itself - the next "} else if
+            # (upper ==" marks the start of an unrelated command's branch, so
+            # this must not just search a fixed character window forward,
+            # which previously kept matching the NEXT command's own
+            # MAINTENANCE check instead of this one's (caught by manual
+            # mutation: deleting this branch's gate still passed until this
+            # was bounded to the branch).
+            branch = re.search(
+                r'"@WEB SERVER START".*?\{(.*?)(?=\}\s*else\s+if\s*\(upper\b)',
+                code, re.DOTALL)
+            if not branch or "OperatingMode::MAINTENANCE" not in branch.group(1):
+                fail(f"{path}: @WEB SERVER START does not check "
+                     f"OperatingMode::MAINTENANCE inside its own branch - starting the "
+                     f"listening socket must stay MAINTENANCE-gated, the same trust "
+                     f"boundary as the DALY KEY write and the servo scan/census/preflight "
+                     f"commands")
+
+    # --- (4) never reboots itself -------------------------------------------
+    transport = by_name.get("HttpTransport.cpp")
+    if transport is not None:
+        path, code = transport
+        if "esp_restart(" in code:
+            fail(f"{path}: calls esp_restart() - a committed OTA image must wait for a "
+                 f"separate, explicit reboot step, never one the network transport takes "
+                 f"on its own (I7)")
+
+    # --- (5) the OTA shared secret: one use site, never committed ----------
+    creds = by_name.get("OtaCredentials.h")
+    if creds is None:
+        fail(f"{sketch_dir / 'src' / 'config' / 'OtaCredentials.h'}: OTA credential resolver "
+             f"not found")
+    else:
+        path, code = creds
+        if "kOtaSecretPresent" not in code:
+            fail(f"{path}: kOtaSecretPresent not found - an absent secret must be a "
+                 f"compile-time fact so OtaSession fails closed rather than authenticating "
+                 f"against an empty key")
+        if 'define MATDOG_OTA_SECRET ""' not in code:
+            fail(f"{path}: the empty-secret fallback is missing - a checkout with no OTA "
+                 f"secret configured must still build and boot, with every OTA request "
+                 f"rejected")
+
+    # Word-boundary match: kOtaSecretPresent is a separate, harmless
+    # compile-time boolean and must not be counted as a use of the secret
+    # itself. Unlike kWifiPassword (passed once to WiFi.begin()), the raw
+    # secret legitimately appears twice at its one call site - once as bytes
+    # and once via strlen() for its length - so the invariant enforced here
+    # is "only at that one call site", not "exactly once textually".
+    secret_re = re.compile(r"\bkOtaSecret\b")
+    secret_sites = []
+    for path, code in files:
+        if path.name == "OtaCredentials.h":
+            continue
+        n = len(secret_re.findall(code))
+        if n:
+            secret_sites.append((str(path), n))
+    other_files = [s for s in secret_sites if pathlib.Path(s[0]).name != "Controller.cpp"]
+    if other_files:
+        fail(f"kOtaSecret is referenced outside core/Controller.cpp: {other_files} - it must "
+             f"appear only at the one HttpTransport::begin() call site. It must never be "
+             f"stored, returned or printed (I7)")
+    ctl_entry = by_name.get("Controller.cpp")
+    if ctl_entry is not None:
+        path, code = ctl_entry
+        n = len(secret_re.findall(code))
+        begin_call = re.search(r"http_transport_\.begin\(([^;]*)\)", code, re.DOTALL)
+        if n == 0:
+            fail(f"{path}: kOtaSecret is not referenced - HttpTransport::begin() must be "
+                 f"given the configured secret (I7)")
+        elif not begin_call or len(secret_re.findall(begin_call.group(1))) != n:
+            fail(f"{path}: kOtaSecret is referenced {n} time(s) outside the "
+                 f"http_transport_.begin() call - every use must be at that one call site, "
+                 f"passed straight through, never stored, returned or printed (I7)")
+
+    session_files = [(p, c) for n, (p, c) in by_name.items()
+                     if n in ("OtaSession.h", "OtaSession.cpp")]
+    for path, code in session_files:
+        for token in ("secret", "password", "passphrase"):
+            # "secret" itself is expected (it is the parameter name); this
+            # instead looks for it ever being formatted, logged or exposed
+            # through a status/printf-shaped call, which none of these files
+            # should ever contain regardless.
+            if "printf" in code.lower() and token in code.lower():
+                fail(f"{path}: mentions {token!r} near a printf-shaped call - the OTA session "
+                     f"layer must never format or expose the secret (I7)")
+
+    gitignore = sketch_dir / ".gitignore"
+    local_rel = "src/config/OtaCredentials.local.h"
+    if not gitignore.exists():
+        fail(f"{gitignore}: not found - it must ignore {local_rel}")
+    else:
+        rules = [ln.strip() for ln in gitignore.read_text(encoding="utf-8").splitlines()]
+        rules = [ln for ln in rules if ln and not ln.startswith("#")]
+        if local_rel not in rules:
+            fail(f"{gitignore}: has no ignore rule for {local_rel} (active rules: {rules}) - "
+                 f"removing that entry makes a real OTA secret committable (I7)")
+
+    template = sketch_dir / "src" / "config" / "OtaCredentials.local.h.example"
+    if not template.exists():
+        fail(f"{template}: credential template not found - it is the documented way to "
+             f"configure OTA authentication without touching a tracked file")
+
+    result = subprocess.run(["git", "-C", str(sketch_dir), "ls-files", "--error-unmatch",
+                             local_rel],
+                            capture_output=True, text=True)
+    if result.returncode == 0:
+        fail(f"{local_rel} is TRACKED by Git - a real OTA secret must never be committed. "
+             f"Run: git rm --cached {local_rel}")
+
+
 def check_wifi_runtime_boundaries(files, sketch_dir):
     """W1 permanent invariants for the Wi-Fi runtime.
 
@@ -2671,6 +2861,8 @@ def check_host_tests(sketch_dir):
         sketch_dir / "scripts" / "tests" / "test_calibration_execution_engine.cpp"
     )
     service_readiness_suite = sketch_dir / "scripts" / "tests" / "test_service_readiness.cpp"
+    hmac256_suite = sketch_dir / "scripts" / "tests" / "test_hmac256.cpp"
+    ota_session_suite = sketch_dir / "scripts" / "tests" / "test_ota_session.cpp"
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
         return
@@ -2712,6 +2904,13 @@ def check_host_tests(sketch_dir):
     if not service_readiness_suite.exists():
         fail(f"{service_readiness_suite}: HostLink readiness offline test suite not found")
         return
+    if not hmac256_suite.exists():
+        fail(f"{hmac256_suite}: HMAC-SHA256 offline test suite not found (I7)")
+        return
+    if not ota_session_suite.exists():
+        fail(f"{ota_session_suite}: OTA transport session/authentication offline test suite "
+             f"not found (I7)")
+        return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
@@ -2721,7 +2920,8 @@ def check_host_tests(sketch_dir):
                    "test_calibration_geometry", "test_servo_profile",
                    "test_calibration_domain", "test_calibration_manager",
                    "test_led_status_policy", "test_actuator_runtime",
-                   "test_calibration_execution_engine", "test_service_readiness"):
+                   "test_calibration_execution_engine", "test_service_readiness",
+                   "test_hmac256", "test_ota_session"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
@@ -3062,6 +3262,7 @@ def main():
     check_no_network_to_servo_path(files)
     check_wifi_runtime_boundaries(files, SKETCH_DIR)
     check_ota_boundaries(files, SKETCH_DIR)
+    check_http_transport_boundaries(files, SKETCH_DIR)
     check_actuator_authority(files, SKETCH_DIR)
     check_calibration_boundaries(files, SKETCH_DIR)
     check_safe_actuator_boundaries(files, SKETCH_DIR)

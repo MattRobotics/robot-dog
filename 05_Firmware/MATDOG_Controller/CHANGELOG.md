@@ -1,5 +1,55 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — I7/I8 network transport implemented — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. Server disabled at
+boot; ingest still compiled out by default.** Supersedes the earlier "I7 reconsidered" / "I8
+reconsidered" entries below, per the operator's "FINAL PRE-FLASH CONSOLIDATION" instruction, which
+corrected the premise those entries were blocked on: the 96-byte USB CDC line buffer blocks
+streaming firmware through the line-oriented command parser, not the OTA transport architecture in
+general — an HTTP transport's request body never touches `CommandRouter::handleLine()` at all.
+
+- **New `src/network/HttpTransport.h/.cpp`** — an `esp_http_server` adapter, the CONTROL/
+  AUTHORIZATION plane in front of the one existing `OtaManager`/`OtaPolicy`/`OtaEspBackend` writer.
+  Three endpoints: `GET /status` (I8, read-only), `GET /ota/challenge` (I7), `POST /ota/update`
+  (I7). A single-slot FreeRTOS binary-semaphore mailbox hands each httpd-task request to the one
+  Controller thread and back, bounded by a 3000 ms timeout (fails closed to `503` on timeout,
+  never blocks either task indefinitely). `start()`/`stop()` are never called from
+  `Controller::begin()` — reachable only from the new MAINTENANCE-gated `@WEB SERVER
+  START\|STOP\|STATUS` command.
+- **New `src/update/OtaSession.h/.cpp`** — a pure, host-linkable HMAC-SHA256 challenge/response
+  authentication/session layer between the transport and `OtaManager`. Single-use server-issued
+  nonces (no clock-sync dependency), a fixed-width signed payload (nonce + schema/size/sha256/
+  build_id), configurable challenge TTL and activity timeout. Two real bugs found and fixed by its
+  own 35-check adversarial suite before being trusted: a nonce-consumption availability bug (a
+  mismatched nonce was burning the real outstanding challenge — a DoS against the legitimate
+  client) and a `build_id` tail-byte nondeterminism bug in the signed payload.
+- **New `src/update/Hmac256.h/.cpp`** — HMAC-SHA256 (RFC 2104/FIPS 198-1) built on the existing
+  reviewed `Sha256`. Verified against RFC 4231's official test vectors (11 checks), not
+  self-consistency only.
+- **New `src/config/OtaCredentials.h` / `OtaCredentials.local.h.example`** — the OTA HMAC shared
+  secret, following the exact same resolution order, gitignore discipline and
+  exactly-one-use-site audit enforcement as `WifiCredentials.h` (W1). A separate secret from the
+  Wi-Fi passphrase.
+- **`GET /status` field coverage** — system/source identity, module health, Wi-Fi state, BMS
+  cached telemetry, IMU stream/rv summary, LED presentation, actuator readiness (via
+  `ServiceReadiness`), calibration readiness/state, OTA status/provenance. Strictly read-only; no
+  actuator-write API of any kind.
+- **New static-audit check** `check_http_transport_boundaries()`: `Hmac256`/`OtaSession` stay
+  host-linkable; the ESP-IDF HTTP server API is confined to `HttpTransport.cpp` (mirroring the
+  existing OTA-API-confinement rule); `Controller::begin()` never starts the server;
+  `@WEB SERVER START` checks `OperatingMode::MAINTENANCE` inside its own branch; `HttpTransport`
+  never calls `esp_restart()`; the OTA secret is referenced only at its one call site. Every new
+  check was manually mutation-tested before being trusted — one draft (the MAINTENANCE-gate check)
+  was itself caught matching the wrong branch and rewritten before being trusted.
+- `MATDOG_OTA_INGEST_ENABLED` remains `0` by default, unchanged — the transport's existence does
+  not make ingest reachable; starting the Web server checks `OtaManager::ingestEnabled()` and
+  returns `403` if it is off.
+- Build cost: `USB_ONLY` flash 32% (unchanged bracket), static RAM 17% (was 16%).
+
+Full record:
+[`09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md).
+
 ## Unreleased — F0 re-run against the integrated candidate — 2026-09-25
 
 Documentation only; **no flash attempted or proposed**. `FINAL_FLASH_ELIGIBLE=DEFERRED_UNPOWERED`

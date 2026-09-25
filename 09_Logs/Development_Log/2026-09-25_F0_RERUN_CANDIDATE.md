@@ -44,14 +44,16 @@ anywhere; exists only in this local, gitignored `build/` directory.
 
 ## Exact future flash procedure
 
-Unchanged from the earlier F0 (same seven steps: prove power isolation via the validated external
-service port → re-check `USB_STATE` → fresh full-flash read-back only once isolation is proven →
-archive the currently-installed application's identity → re-run F0 → if all gates PASS, produce the
-Section 19 report and ask the single `AUTHORIZE FINAL APPLICATION-ONLY FLASH: YES/NO` question →
-only on explicit `YES`, flash via `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`) —
-see [`2026-09-25_F0_FINAL_FLASH_READINESS.md`](2026-09-25_F0_FINAL_FLASH_READINESS.md) for the full
-seven-step procedure, which now targets this candidate's exact SHA256 instead of the superseded I9
-artifact.
+Unchanged from the earlier F0 (same seven steps: prove power isolation via a genuinely separate
+power path, never the data-only external service connector by itself → re-check `USB_STATE` →
+fresh full-flash read-back only once isolation is proven → archive the currently-installed
+application's identity → re-run F0 → if all gates PASS, produce the Section 19 report and ask the
+single `AUTHORIZE FINAL APPLICATION-ONLY FLASH: YES/NO` question → only on explicit `YES`, flash via
+`MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`) — see
+[`2026-09-25_F0_FINAL_FLASH_READINESS.md`](2026-09-25_F0_FINAL_FLASH_READINESS.md) for the full
+seven-step procedure (step 1 corrected 2026-09-25, I7/I8 consolidation: the validated external
+service connector, GPIO19/20, is data-path-only and cannot itself resolve `POWER_ISOLATION_GATE`),
+which now targets this candidate's exact SHA256 instead of the superseded I9 artifact.
 
 ## Outcome
 

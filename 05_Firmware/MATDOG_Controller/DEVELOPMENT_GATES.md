@@ -436,8 +436,9 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — update + reboot + identity confirmation + rollback behaviour all demonstrated;
   refused in unsafe states.
 - **NEXT** — UI-9.
-- **STATUS** — **PARTIAL (OTA-A core complete, not hardware tested).** The ENTRY condition above is
-  **not met**: Wi-Fi runtime is implemented but not hardware-tested, so OTA cannot be gate-passed.
+- **STATUS** — **PARTIAL (OTA-A core + transport/auth layer complete, not hardware tested).** The
+  ENTRY condition above is **not met**: Wi-Fi runtime is implemented but not hardware-tested, so OTA
+  cannot be gate-passed.
   - **IMPLEMENTED / COMPILED / OFFLINE TESTED** — the update core. `src/update/OtaPolicy.*` (pure
     state machine), `OtaBootGuard.*` (first-boot rollback lifecycle), `Sha256.*` (image identity),
     `OtaEspBackend.*` (the only unit calling `esp_ota_*`), `OtaManager.*`, `@OTA STATUS`.
@@ -454,9 +455,17 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     target/metadata/stream/verification failure, the ordering property that the boot target never
     moves outside `IDENTITY_VERIFIED`, replay/idempotence, and the whole rollback lifecycle.
     SHA-256 checked against FIPS 180-4 vectors and against `sha256sum` on the real binary.
-  - **TO_IMPLEMENT** — transport and authentication. OTA-A ships neither; ingest is compiled out
-    (`MATDOG_OTA_INGEST_ENABLED` defaults to `0`, audit-enforced), so no production image contains
-    a reachable firmware writer. Transport options are evaluated in the Controller README.
+  - **Transport and authentication: IMPLEMENTED / COMPILED / OFFLINE TESTED (2026-09-25, I7).**
+    `src/network/HttpTransport.*` (an `esp_http_server` adapter, the CONTROL/AUTHORIZATION plane)
+    and `src/update/OtaSession.*` (a pure, host-linkable HMAC-SHA256 challenge/response session
+    layer over `src/update/Hmac256.*`) sit in front of the one existing
+    `OtaManager`/`OtaPolicy`/`OtaEspBackend` writer — never a second writer, never ArduinoOTA. Ingest
+    remains compiled out by default (`MATDOG_OTA_INGEST_ENABLED` defaults to `0`, audit-enforced), so
+    no production image contains a reachable firmware writer regardless of whether the transport code
+    is compiled in. `HttpTransport::start()` is never called from `Controller::begin()` — reachable
+    only from the MAINTENANCE-gated `@WEB SERVER START` command, audit-enforced
+    (`check_http_transport_boundaries`). Full record:
+    [`../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md).
   - **OTA-B authorization: IMPLEMENTED / COMPILED / OFFLINE TESTED.** The OTA-A placeholder gate
     is gone. `src/update/OtaAuthorityGate.*` is backed by the real arbiter: OTA never becomes an
     actuator owner (the audit fails the build if an OTA entry is added to the enum) and instead
@@ -561,8 +570,8 @@ Sequencing: [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md#embedded-web
 
 | Gate | Purpose | Entry | Pass criteria | Status |
 |---|---|---|---|---|
-| **UI-0** | Web architecture contract: frontend/backend boundary, typed semantic command model, telemetry snapshot schema, session identity, bounded clients, static-asset storage plan | none — designable offline now | proves `Web → Controller Services → Authority/Safety → hardware` with **no** direct web→`ServoBus` path | **TO_DESIGN** (may start) |
-| **UI-1** | Read-only dashboard: overview, BNO085 3D, BMS, servo census/health, mode/authority/fault | Wi-Fi runtime PASS | reconnect cycles stable; no heap leak; no scheduler starvation; no bus timing degradation; **no actuator command from web** | **BLOCKED** (Wi-Fi) |
+| **UI-0** | Web architecture contract: frontend/backend boundary, typed semantic command model, telemetry snapshot schema, session identity, bounded clients, static-asset storage plan | none — designable offline now | proves `Web → Controller Services → Authority/Safety → hardware` with **no** direct web→`ServoBus` path | **PARTIAL — data/schema half IMPLEMENTED (2026-09-25, I6/I8)**: `ControllerService` is the typed semantic model, `GET /status` (`src/network/HttpTransport.*`) is the transport adapter over it. No session identity / bounded-clients model exists beyond the one-request-at-a-time `esp_http_server` default and the single-slot Controller-thread mailbox — see [`../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md) |
+| **UI-1** | Read-only dashboard: overview, BNO085 3D, BMS, servo census/health, mode/authority/fault | Wi-Fi runtime PASS | reconnect cycles stable; no heap leak; no scheduler starvation; no bus timing degradation; **no actuator command from web** | **BLOCKED** (Wi-Fi hardware validation, ENTRY unmet) — the read-only data source itself (`GET /status`: module health, BMS telemetry, IMU summary, LED presentation, actuator/calibration readiness, OTA provenance) is **IMPLEMENTED / OFFLINE TESTED**, compiled into the candidate, disabled at boot, MAINTENANCE-gated to start (2026-09-25, I8); no browser/3D rendering exists. Per the 2026-09-25 objective clarification this is preparatory offline engineering, not a claim that UI-1 itself has passed |
 | **UI-2** | Maintenance controls: self-test, census, health, profile audit, source signature, `SAFE_OFF`, logs | Diagnostics/Maintenance PASS + UI-1 | no EEPROM write, no motor motion | **BLOCKED** |
 | **UI-3** | Calibration / service workflow UI | Authority model PASS + backend workflows | firmware owns the transaction state machine; refresh/reconnect never silently resumes a dangerous transaction | **BLOCKED** |
 | **UI-4** | Joint test: bounded single-joint command | Safe Actuator PASS + first motion PASS | mandatory command lease/watchdog; no raw slider; no EEPROM | **BLOCKED** |

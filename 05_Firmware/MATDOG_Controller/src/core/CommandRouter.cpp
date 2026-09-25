@@ -8,6 +8,7 @@
 
 #include "../config/BuildConfig.h"
 #include "../config/Pins.h"
+#include "../network/HttpTransport.h"
 #include "ControllerService.h"
 
 namespace matdog {
@@ -206,6 +207,31 @@ void CommandRouter::handleLine(String line) {
     printAuthorityStatus();
   } else if (upper == "@OTA STATUS") {
     printOtaStatus();
+  } else if (upper == "@WEB SERVER STATUS") {
+    printWebStatus();
+  } else if (upper == "@WEB SERVER START" || upper == "@WEB SERVER STOP") {
+    // Same "physical/USB access is the trust boundary" gate as the DALY KEY
+    // write and the servo scan/census/preflight commands: starting the
+    // listening socket is a MAINTENANCE-only action, even though the socket
+    // itself never grants actuator authority (see HttpTransport.h).
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
+      Serial.println("WEB_SERVER=BLOCKED");
+      Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
+      Serial.printf("MODE=%s\n", toString(modules_.operating_mode->mode()));
+      return;
+    }
+    if (upper == "@WEB SERVER START") {
+      if (modules_.http_transport->start()) {
+        Serial.println("WEB_SERVER=STARTED");
+      } else {
+        Serial.println("WEB_SERVER=START_FAILED");
+        Serial.println("REASON=ALREADY_STARTED_OR_HTTPD_START_FAILED");
+      }
+    } else {
+      modules_.http_transport->stop();
+      Serial.println("WEB_SERVER=STOPPED");
+    }
+    printWebStatus();
   } else if (upper.startsWith("@SERVO SCAN")) {
     if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
       Serial.println("SERVO_SCAN=BLOCKED");
@@ -331,6 +357,8 @@ void CommandRouter::printHelp() {
   Serial.println("  @WIFI STATUS           (cached snapshot; no radio query)");
   Serial.println("  @WIFI ON|OFF           (any mode; refused without credentials)");
   Serial.println("  @OTA STATUS            (read-only; OTA-A ships no transport)");
+  Serial.println("  @WEB SERVER STATUS     (read-only; is the listening socket up)");
+  Serial.println("  @WEB SERVER START|STOP (MAINTENANCE mode only; never auto-started)");
   Serial.println("  @AUTHORITY STATUS      (read-only; no owner can be acquired yet)");
   Serial.println("  @CALIBRATION STATUS    (read-only; no session can move hardware)");
   Serial.println("  @ACTUATOR STATUS       (read-only; no command can plan/commit/execute)");
@@ -399,6 +427,18 @@ void CommandRouter::printOtaStatus() {
                 (unsigned long)o.max_update_us, (long)o.last_backend_error);
   Serial.printf("OTA_INGEST=%s\n",
                 o.ingest_enabled ? "ENABLED" : "DISABLED (OTA-A: no transport, no auth)");
+}
+
+void CommandRouter::printWebStatus() {
+  // Lifecycle only: whether the listening socket is up. It carries no OTA
+  // session state (that is not read here even by pointer) and no in-flight
+  // request contents — see HttpTransport.h's cross-thread mailbox comment.
+  Serial.printf("WEB_SERVER started=%s\n",
+                modules_.http_transport->started() ? "YES" : "NO");
+  Serial.println("WEB_NOTE never started from Controller::begin(); "
+                 "MAINTENANCE mode required to start or stop it");
+  Serial.printf("WEB_NOTE ota_ingest_compiled=%s\n",
+                update::OtaManager::ingestEnabled() ? "ENABLED" : "DISABLED");
 }
 
 void CommandRouter::printWifiStatus() {

@@ -11,7 +11,7 @@ Evaluated after `I9 = PASS`. **No flash is attempted or proposed in this documen
 | `SOFTWARE_FREEZE_GATE` | **PASS** | I9: 13 C++ suites / 5695 checks PASS; static audit PASS (85 files, 0 findings); Python suites 366/370 with the one known/justified exclusion; clean tree throughout |
 | `ARTIFACT_PROVENANCE_GATE` | **PASS** | Exact `ROBOT_POWERED` provenance recorded in I9: `SOURCE_HEAD=cc0940b0f62f242f0ab66c09ea24f7cb8ed2aa08`, `BUILD_ID=cc0940b0f62f`, `SOURCE_STATE=CLEAN`, `APPLICATION_SIZE=978896`, `APPLICATION_SHA256=a292b2166d5381f1a8f75c494f79753e8aae4a23ee875c42325fe10ecb35203b` |
 | `FAIL_CLOSED_GATE` | **PASS** | `hardware_motion_authorized=0`, `USB_ONLY` source default, OTA ingest `=0` — verified directly against source and audit-enforced; neither I4's `ActuatorRuntime` nor I5's `CalibrationExecutionEngine` is referenced by `Controller`/`CommandRouter`, and both are proven dead-code-eliminated from both compiled profiles |
-| `POWER_ISOLATION_GATE` | **UNPROVEN** | No durable evidence ties today's (absent) connection to a proven controller-only power path — see Section 2 of the handoff; unchanged since I0 |
+| `POWER_ISOLATION_GATE` | **UNPROVEN** | No durable evidence ties today's (absent) connection to a proven controller-only power path — see Section 2 of the handoff; unchanged since I0. The validated external service connector (GPIO19/20, §15 of `MATDOG_POWER_STATES_AND_CHARGING.md`) is data-only (no VBUS) and cannot resolve this gate by itself; see the corrected step 1 below |
 | `FLASH_RECOVERY_GATE` | **DEFERRED_UNPOWERED** | A fresh full-flash read-back is only eligible once `POWER_ISOLATION_GATE=PASS`; the device is not enumerated, so none was attempted. The 2026-09-10 historical backup was re-verified byte-for-byte in I0 and again in I9 (16,777,216 bytes, SHA256 `5cbba0b9c5500d0c95247b9b7e7173a29f934b8b13f6800cc9f583374d67fd32`), but per Section 3 of the handoff that backup predates the currently-installed application (`6322563`) and is not treated as an exact backup of the present device state |
 
 ## `FINAL_FLASH_ELIGIBLE`
@@ -50,12 +50,20 @@ flashed or uploaded anywhere; it exists only in this local, gitignored `build/` 
 Recorded so nothing has to be re-derived later. **None of the following is authorized by this
 document** — each step still requires the explicit-authorization gate it is written under.
 
-1. **Prove power isolation.** With the main fuse still removed, connect the ESP32 through the
-   already-validated external service port (GPIO19 D-, GPIO20 D+, GND — no host VBUS) or another
-   path with equivalent durable evidence that it powers the controller only, not the servo rail or
-   the protected robot power domain. This alone reclassifies `POWER_ISOLATION_GATE`; it is a
-   hardware step requiring the operator's physical presence and explicit authorization for that
-   session, not a software action.
+1. **Prove power isolation.** **Correction (2026-09-25, I7/I8 consolidation):** the validated
+   external service connector (GPIO19 = D-, GPIO20 = D+, GND, host VBUS intentionally NOT
+   connected — §15 of `04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`) is a **DATA PATH
+   ONLY**. It cannot power the ESP32 by itself, and connecting through it proves nothing about
+   power isolation — it was previously described here in a way that could be misread as the
+   isolation solution itself, which it is not. Powering the controller for a future flash/read-back
+   session requires a genuinely **separate power path** (e.g. an external bench supply wired
+   directly to the ESP32's own USB-C VBUS, never through the robot's main fuse or TECNOIOT-derived
+   protected supply). Whatever that power path turns out to be, it — not the data connector — is
+   what must be independently and durably proven (by direct measurement, with the main fuse still
+   removed) to leave the servo rail and the protected robot power domain de-energized before any
+   flash or read-back is attempted. This is a hardware step requiring the operator's physical
+   presence and explicit authorization for that session, not a software action, and it is not
+   satisfied by identifying the data connector alone.
 2. **Re-evaluate `USB_STATE`.** Passive check only (`lsusb`, `/dev/serial/by-id`) — confirm
    enumeration before touching `esptool` or any active serial session.
 3. **Take a fresh full-flash read-back**, only once step 1 is durably proven — never merely because
