@@ -2,17 +2,22 @@
 
 ## Status and scope
 
-**IMPLEMENTED / OFFLINE-VALIDATED. Focused LED hardware validation: TO_TEST.**
+**IMPLEMENTED / OFFLINE-VALIDATED, with focused hardware PASS for BOOTING breathing,
+READY SOC mapping and `@LED SOC TEST`/automatic resume.** Live charging-specific
+animations remain **TO_TEST**; reserved FULL/warning/critical facts have no producer.
+The exact hardware-validated source is `88062e1a1217f288ebcc161c6213dbb543ea6f8a`; see
+[the focused hardware record](2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md).
 
 Base remote `origin/main` was fetched and verified exactly as
 `f14aa40faf3c8c3fb9bace03dd8b71132f09edd5` before edits. Implementation branch:
 `feat/led-status-manager-v2-final`.
 
-This change consumes cached facts and changes LED presentation only. No hardware or
-serial device was accessed, no flash occurred and main was not merged. Motion,
+This change consumes cached facts and changes LED presentation only. The implementation
+passes performed no hardware/serial access or flash. A later operator-authorized
+session installed and validated source `88062e1...` as recorded separately. The third
+commit aligns documentation only; it is not the flashed firmware source. Motion,
 calibration, servo safety, KEY/MOS control and OTA/Wi-Fi behavior remain unchanged.
-The existing hardware validation record describes the previously installed candidate;
-it does not establish hardware validation of LED V2.
+Main remains unmerged during this closeout.
 
 ## Physical map and quantization
 
@@ -121,20 +126,29 @@ stubs; these tests exercise production behavior without device access.
 - Local Wi-Fi/OTA credential files remained ignored and untracked; contents were not
   printed or committed. No dependency was added.
 
-The final clean builds run after the implementation commit. Their generated ignored
+The implementation passes generated clean builds after their source commits. Their ignored
 manifests bind application size/SHA256, profile, OTA ingest fact and exact source commit.
 The final handoff report records those candidate values. The USB_ONLY build uses ingest 0;
 the ROBOT_POWERED validation candidate uses the existing explicit ingest 1 build override,
 matching the previously installed candidate's capability. Source defaults remain
-USB_ONLY and ingest 0. No OTA ingest operation or flash was performed.
+USB_ONLY and ingest 0. No OTA ingest operation or flash was performed during those
+offline implementation passes.
 
-## Focused physical validation still required
+## Focused physical validation and remaining checks
 
-After separate authorization for application-only flashing: observe subtle BOOTING,
-READY SOC mapping, native chase, SOC diagnostic fill/drain and automatic resume; inspect
-charging progress/100% tail, fresh-alarm red breathing and stale/invalid amber where
-appropriate cached telemetry is available. Physical brightness/perception and the final
-LED V2 behavior are not established by host stubs or compilation.
+The [focused hardware session](2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md)
+passed application-only installation/digest verification, BOOTING breathing, servo
+preflight 12/12 with `torque_enable=0`, READY transition, real 75.x% SOC to nine LEDs,
+noon/clockwise mapping, and SOC diagnostic fill/drain/automatic resume. Authority
+remained NONE and no calibration motion occurred. BOOTING was perceived as white /
+slightly cyan-ish; exact hue was not calibrated. The firmware source remains
+`88062e1a1217f288ebcc161c6213dbb543ea6f8a`, regardless of later docs or merge commits.
+
+Live CHARGING/next-segment and 100% tail breathing, a real charging-fault alarm, and
+stale/invalid amber were not exercised by this focused session. `@LED SOC TEST` uses
+fixed bar frames and does not simulate charging, so absence of a charging pulse in
+that diagnostic is expected. FULL/warning/critical active presentations remain
+unvalidated on hardware and have no production producers.
 
 True charge-completion policy, autonomous dock and unattended charging qualification
 remain FUTURE. RF/data-plane and OTA network authentication remain open from the prior
@@ -162,10 +176,11 @@ Physical mapping, conservative SOC quantization, READY/charging rendering, repor
 protection retain the previous candidate's contract. LED presentation still has one
 owner; motion/calibration/servo and BMS-control semantics are unchanged.
 
-This completion is **IMPLEMENTED / OFFLINE-VALIDATED**, with physical LED validation
-still **TO_TEST**. The full host suite and static/mutation audits pass, including
-exhaustive new priorities and reserved-fact producer tripwires. Clean USB_ONLY and
-ROBOT_POWERED builds are generated from the second commit; the latter retains the
+At this implementation pass, the completion was **IMPLEMENTED / OFFLINE-VALIDATED**.
+The later focused hardware results and remaining boundaries are recorded above.
+The full host suite and static/mutation audits passed, including exhaustive new
+priorities and reserved-fact producer tripwires. Clean USB_ONLY and ROBOT_POWERED
+builds were generated from the second commit; the latter retains the
 existing validation OTA-ingest override. Their manifests and exact application
 identity are recorded in the final completion report. No hardware access, flash,
-merge, amendment or force-push is part of this pass.
+merge, amendment or force-push was part of that implementation pass.

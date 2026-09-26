@@ -3056,3 +3056,55 @@ The existing FAULT, charging-fault and DEGRADED effects remain distinct and unch
 
 No hardware/serial access, flash or merge to main occurred. True FULL remains
 unreachable from SOC alone. Focused physical validation is still required.
+
+## LED V2 focused hardware validation — 2026-09-26
+
+**HARDWARE PASS for the checks listed below.** This later session supersedes the
+blanket hardware TO_TEST status in the two implementation entries above. It does
+not validate live charging-specific animations or reserved active battery-policy states.
+Evidence is recorded from the operator's closure handoff; this docs-only closeout
+performs no rebuild, test rerun, hardware/serial access, flash, merge or calibration work.
+
+```text
+HW_VALIDATED_FIRMWARE_SOURCE=88062e1a1217f288ebcc161c6213dbb543ea6f8a
+BUILD_ID=88062e1a1217
+HARDWARE_PROFILE=ROBOT_POWERED
+OTA_INGEST_ENABLED=1
+APPLICATION_PARTITION=app0
+APPLICATION_OFFSET=0x010000
+APPLICATION_SIZE=1029232
+APPLICATION_SHA256=772a046e1b2d61888dba0ab7ddc759be13bbd4a33d1722b6be5285c313aac56b
+APPLICATION_ONLY_FLASH=PASS
+VERIFY_FLASH=PASS
+```
+
+The subsequent docs-only commit and eventual merge commit are not the installed
+firmware source. The future immutable validation tag must target `88062e1...`;
+no tag is created or moved during this closeout.
+
+| Hardware check | Result |
+|---|---|
+| Exact candidate application-only installation and digest verification | PASS; bootloader, partition table, boot_app0 and NVS untouched |
+| BOOTING breathing | PASS; intended white, perceived white / slightly cyan-ish; hue not calibrated |
+| BNO085 / DALY / LED | PASS; Wi-Fi associated, RF/data-plane completion remains open |
+| Servo preflight | PASS, MATDOG_C018_V1, 12/12; model 777, position_offset 0, profile MATCH, torque_enable 0 on all twelve |
+| System READY after preflight | PASS; mode MAINTENANCE, power_state RUN |
+| READY cached SOC rendering | PASS; 75.5% to nine green LEDs, noon through eight o'clock |
+| SOC physical order | PASS; noon clockwise, `{1,2,3,4,5,6,7,8,9,10,11,0}` |
+| `@LED SOC TEST` | PASS; 0..12, full pause, 12..0, bounded self-termination |
+| Automatic resume | PASS; READY at 75.2%, nine segments, diagnostic NONE |
+| Actuator authority | NONE throughout; no motion or calibration motion |
+
+No Torque ON, EEPROM/PositionOffset write, DALY configuration change or full flash
+occurred in the recorded session. The SOC diagnostic intentionally uses fixed bars;
+it does not simulate DALY CHARGING, so absence of a next-segment pulse is expected.
+
+**Still open:** live CHARGING/next-segment and reported-100% tail breathing; real
+CHARGING_FAULT alarm presentation; active FULL/battery warning/battery critical
+presentations (all three facts still have no production producer); true charge-completion
+policy (FUTURE / TO_DESIGN); autonomous/unattended charging qualification; existing
+RF/data-plane and OTA network end-to-end validation; separate full calibration work.
+**SOC 100% != true FULL.** No additional renderer is declared hardware-validated here.
+
+Full observations, flash provenance and recovery-backup reference:
+[`2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md`](../../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md).

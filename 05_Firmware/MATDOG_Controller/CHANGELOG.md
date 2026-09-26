@@ -1,5 +1,33 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — LED V2 focused hardware validation recorded — 2026-09-26
+
+**Focused HARDWARE PASS; live charging-specific animations remain TO_TEST.**
+This entry records the completed operator session; the repository closeout itself is
+one docs-only commit with no rebuild, flash, serial access or merge.
+
+- Exact flashed source: `88062e1a1217f288ebcc161c6213dbb543ea6f8a`, build ID
+  `88062e1a1217`, ROBOT_POWERED, OTA ingest 1; application 1,029,232 bytes at
+  `app0 @ 0x010000`, SHA256
+  `772a046e1b2d61888dba0ab7ddc759be13bbd4a33d1722b6be5285c313aac56b`.
+  Application-only flash and independent digest verification passed. The later docs
+  commit and any eventual merge commit are separate from this firmware provenance.
+- BOOTING breathing passed (perceived white / slightly cyan-ish; hue not calibrated).
+  Servo preflight passed 12/12 with `torque_enable=0`; system transitioned to READY
+  and authority stayed NONE. No actuator or calibration motion occurred.
+- Real cached 75.5% SOC produced nine green LEDs, noon through eight o'clock.
+  Noon/clockwise order and `@LED SOC TEST` fill/drain, self-termination and automatic
+  return to the real nine-segment bar at 75.2% passed physically.
+- Live charging pulse, charging-at-100% tail and real charging-fault presentation
+  remain TO_TEST. SOC TEST displays fixed bars and does not simulate CHARGING.
+  FULL/warning/critical facts still have no producer; true FULL policy remains
+  FUTURE / TO_DESIGN, and SOC 100% never proves FULL. Existing RF/OTA and autonomous/
+  unattended charging gaps remain open; full calibration is a separate workstream.
+
+Full evidence and validation boundary:
+[`2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md`](../../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md).
+The following implementation entries preserve their status before this hardware session.
+
 ## Unreleased — LED V2 reserved battery facts — 2026-09-26
 
 **IMPLEMENTED / OFFLINE-VALIDATED. Physical LED validation remains TO_TEST.**
