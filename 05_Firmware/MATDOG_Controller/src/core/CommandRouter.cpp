@@ -785,10 +785,11 @@ void CommandRouter::printLedStatus() {
   } else {
     Serial.print("UNKNOWN");
   }
-  Serial.printf(" soc_segments=%u charging=%s charging_fault=%s charge_complete_verified=%s diagnostic=%s\n",
+  Serial.printf(" soc_segments=%u charging=%s charging_fault=%s charge_complete_verified=%s battery_warning=%s battery_critical=%s diagnostic=%s\n",
                 (unsigned)led.soc_segments,
                 led.charging ? "YES" : "NO", led.charging_fault ? "YES" : "NO",
                 led.charge_complete_verified ? "YES" : "NO",
+                led.battery_warning ? "YES" : "NO", led.battery_critical ? "YES" : "NO",
                 status::toString(s->ledDiagnostic()));
 }
 

@@ -48,7 +48,7 @@ This is a view of BMS-reported SOC, with no claim of capacity accuracy or true F
 
 Priority, highest first:
 
-`FAULT > FIRMWARE_UPDATE_IN_PROGRESS > CALIBRATION_IN_PROGRESS > CHARGING_FAULT > DEGRADED > WIFI_CONNECTING > BOOTING > CHARGE_COMPLETE_VERIFIED > CHARGING > READY`
+`FAULT > FIRMWARE_UPDATE_IN_PROGRESS > CALIBRATION_IN_PROGRESS > CHARGING_FAULT > BATTERY_CRITICAL > DEGRADED > BATTERY_WARNING > WIFI_CONNECTING > BOOTING > CHARGE_COMPLETE_VERIFIED > CHARGING > READY`
 
 | State | Presentation at the current brightness ceiling 60 |
 |---|---|
@@ -56,7 +56,9 @@ Priority, highest first:
 | OTA | Blue `(0,80,255)`, breathing 6..60 over 2 s |
 | Calibration | Violet `(160,0,220)`, breathing 6..60 over 2 s |
 | Charging fault | Red, breathing 6..60 over 2 s |
+| Battery critical (reserved) | Red `(255,0,0)`, breathing 6..30 over 3 s |
 | Degraded | Solid amber `(255,140,0)`, 30 |
+| Battery warning (reserved) | Amber `(255,140,0)`, breathing 6..20 over 3 s |
 | Wi-Fi connecting | Cyan `(0,200,200)`, breathing 6..60 over 2 s |
 | BOOTING | White, breathing 6..20 over 3 s |
 | Verified charge complete (reserved) | All green, breathing 6..20 over 3 s |
@@ -102,8 +104,8 @@ on its start tick. Neither diagnostic blocks. The manager yields frames during e
 diagnostic, keeps its snapshot current and resumes automatically when it ends.
 
 `@LED STATUS` reads that snapshot: presentation, SOC validity/value/segments, charging,
-charging fault, verified completion and diagnostic NONE/CHASE/SOC_TEST. Invalid SOC is
-printed UNKNOWN. There is no remote arbitrary pixel API.
+charging fault, verified completion, battery warning/critical and diagnostic
+NONE/CHASE/SOC_TEST. Invalid SOC is printed UNKNOWN. There is no remote arbitrary pixel API.
 
 USB_ONLY refuses both starts, keeps GPIO47 INPUT and never calls NeoPixel begin/show.
 Host tests compile the actual ring and manager under each profile against inert transport
@@ -138,3 +140,32 @@ True charge-completion policy, autonomous dock and unattended charging qualifica
 remain FUTURE. RF/data-plane and OTA network authentication remain open from the prior
 hardware session. Full calibration is a separate workstream after LED review and focused
 hardware validation; this change does not authorize or implement calibration motion.
+
+## Contract completion — reserved battery-policy facts
+
+The second normal commit on `feat/led-status-manager-v2-final` extends the previous
+candidate `021cab7f70a4eb4c1c345ea58349ba3852416503` with `battery_warning` and
+`battery_critical` in the presentation input and snapshot. Both default false and
+have **no production producer**. Controller remains unchanged and leaves both false.
+There is no SOC, voltage or current threshold, new DALY transaction or control action.
+A future separately reviewed battery-policy owner must decide these facts and their
+validity; the renderer copies them without deriving battery policy from telemetry.
+
+The priority and effect table above describe the completed contract. Warning is
+amber `(255,140,0)`, breathing 6..20 over 3 s. Critical is red `(255,0,0)`, breathing
+6..30 over 3 s. FAULT remains solid red at 60; charging fault remains red breathing
+6..60 over 2 s; DEGRADED remains fixed amber at 30. `@LED STATUS` exposes both facts
+from the manager snapshot, including when another presentation has higher priority.
+
+Physical mapping, conservative SOC quantization, READY/charging rendering, reported
+100% charging behavior, reserved true FULL, freshness, both diagnostics and USB_ONLY
+protection retain the previous candidate's contract. LED presentation still has one
+owner; motion/calibration/servo and BMS-control semantics are unchanged.
+
+This completion is **IMPLEMENTED / OFFLINE-VALIDATED**, with physical LED validation
+still **TO_TEST**. The full host suite and static/mutation audits pass, including
+exhaustive new priorities and reserved-fact producer tripwires. Clean USB_ONLY and
+ROBOT_POWERED builds are generated from the second commit; the latter retains the
+existing validation OTA-ingest override. Their manifests and exact application
+identity are recorded in the final completion report. No hardware access, flash,
+merge, amendment or force-push is part of this pass.

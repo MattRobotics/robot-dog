@@ -25,13 +25,15 @@ enum class LedPresentationState : uint8_t {
   CHARGE_COMPLETE_VERIFIED,
   BOOTING,
   WIFI_CONNECTING,
+  BATTERY_WARNING,
   DEGRADED,
+  BATTERY_CRITICAL,
   CHARGING_FAULT,
   CALIBRATION_IN_PROGRESS,
   FIRMWARE_UPDATE_IN_PROGRESS,
   FAULT,
 };
-constexpr uint8_t kLedPresentationStateCount = 10;
+constexpr uint8_t kLedPresentationStateCount = 12;
 
 struct LedStatusInputs {
   core::SystemHealth system_health = core::SystemHealth::BOOTING;
@@ -47,6 +49,11 @@ struct LedStatusInputs {
   // Reserved for a future reviewed power policy. No production producer.
   // SOC (even 100%) can never set this fact.
   bool charge_complete_verified = false;
+  // Reserved for a separately reviewed battery-policy owner. That owner
+  // will decide thresholds and validity; presentation only consumes facts.
+  // Controller leaves both false today.
+  bool battery_warning = false;
+  bool battery_critical = false;
 };
 
 // Independent brightness per physical pixel, capped at the caller's ceiling.
@@ -70,6 +77,8 @@ struct LedStatusSnapshot {
   bool charging = false;
   bool charging_fault = false;
   bool charge_complete_verified = false;
+  bool battery_warning = false;
+  bool battery_critical = false;
 };
 
 LedPresentationState selectLedState(const LedStatusInputs& inputs);

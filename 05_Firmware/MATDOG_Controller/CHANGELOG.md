@@ -1,5 +1,18 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — LED V2 reserved battery facts — 2026-09-26
+
+**IMPLEMENTED / OFFLINE-VALIDATED. Physical LED validation remains TO_TEST.**
+
+- Reserve `battery_warning` and `battery_critical` in the presentation API and
+  snapshot; both default false and have no production producer or invented threshold.
+- Warning breathes amber at 6..20 over 3 s, between DEGRADED and WIFI_CONNECTING.
+  Critical breathes red at 6..30 over 3 s, between CHARGING_FAULT and DEGRADED.
+- `@LED STATUS` exposes both facts. Host tests and static/mutation audits enforce
+  the final priority, effects and absence of a production battery-policy producer.
+- Existing SOC, charging, diagnostics, USB_ONLY and safety contracts remain unchanged.
+  Full offline checks and both clean builds pass; no hardware or flash was involved.
+
 ## Unreleased — LED Status Manager V2 final — 2026-09-26
 
 **IMPLEMENTED / OFFLINE-VALIDATED. LED V2 hardware validation remains TO_TEST.**

@@ -35,7 +35,9 @@ LedPresentationState selectFromFacts(const LedStatusInputs& in, const LedStatusS
   if (in.firmware_update_in_progress) return LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS;
   if (in.calibration_in_progress) return LedPresentationState::CALIBRATION_IN_PROGRESS;
   if (facts.charging_fault) return LedPresentationState::CHARGING_FAULT;
+  if (facts.battery_critical) return LedPresentationState::BATTERY_CRITICAL;
   if (in.system_health == core::SystemHealth::DEGRADED) return LedPresentationState::DEGRADED;
+  if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;
   if (in.wifi_connecting) return LedPresentationState::WIFI_CONNECTING;
   if (in.system_health == core::SystemHealth::BOOTING) return LedPresentationState::BOOTING;
   if (facts.charge_complete_verified) return LedPresentationState::CHARGE_COMPLETE_VERIFIED;
@@ -55,6 +57,8 @@ LedStatusSnapshot factsFor(const LedStatusInputs& in) {
   facts.charging = fresh && in.battery_charging;
   facts.charging_fault = facts.charging && in.battery_alarm;
   facts.charge_complete_verified = fresh && !in.battery_alarm && in.charge_complete_verified;
+  facts.battery_warning = in.battery_warning;
+  facts.battery_critical = in.battery_critical;
   facts.presentation = selectFromFacts(in, facts);
   return facts;
 }
@@ -102,8 +106,13 @@ LedEffect ledEffectFor(LedPresentationState state, uint32_t now_ms, uint8_t max_
     case LedPresentationState::CHARGING_FAULT:
       return {255, 0, 0, triangleBrightness(now_ms, kBreathePeriodMs, kBreatheMinBrightness,
                                            max_brightness)};
+    case LedPresentationState::BATTERY_CRITICAL:
+      return {255, 0, 0, triangleBrightness(now_ms, kSubtleBreathePeriodMs, kBreatheMinBrightness,
+                                           max_brightness / 2)};
     case LedPresentationState::DEGRADED:
       return {255, 140, 0, static_cast<uint8_t>(max_brightness / 2)};
+    case LedPresentationState::BATTERY_WARNING:
+      return {255, 140, 0, subtleBrightness(now_ms, max_brightness)};
     case LedPresentationState::WIFI_CONNECTING:
       return {0, 200, 200, triangleBrightness(now_ms, kBreathePeriodMs, kBreatheMinBrightness,
                                             max_brightness)};
@@ -125,7 +134,9 @@ const char* toString(LedPresentationState state) {
     case LedPresentationState::CHARGE_COMPLETE_VERIFIED: return "CHARGE_COMPLETE_VERIFIED";
     case LedPresentationState::BOOTING: return "BOOTING";
     case LedPresentationState::WIFI_CONNECTING: return "WIFI_CONNECTING";
+    case LedPresentationState::BATTERY_WARNING: return "BATTERY_WARNING";
     case LedPresentationState::DEGRADED: return "DEGRADED";
+    case LedPresentationState::BATTERY_CRITICAL: return "BATTERY_CRITICAL";
     case LedPresentationState::CHARGING_FAULT: return "CHARGING_FAULT";
     case LedPresentationState::CALIBRATION_IN_PROGRESS: return "CALIBRATION_IN_PROGRESS";
     case LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS: return "FIRMWARE_UPDATE_IN_PROGRESS";

@@ -61,7 +61,7 @@ void testPriorityAndFacts() {
   // health values is exercised, including fresh charging/fault/full facts.
   for (SystemHealth health : {SystemHealth::READY, SystemHealth::BOOTING,
        SystemHealth::DEGRADED, SystemHealth::FAULT, SystemHealth::MAINTENANCE}) {
-    for (unsigned mask = 0; mask < 64; ++mask) {
+    for (unsigned mask = 0; mask < 256; ++mask) {
       auto in = ready(100);
       in.system_health = health;
       in.firmware_update_in_progress = (mask & 1) != 0;
@@ -70,15 +70,19 @@ void testPriorityAndFacts() {
       in.battery_charging = (mask & 8) != 0;
       in.battery_alarm = (mask & 16) != 0;
       in.charge_complete_verified = (mask & 32) != 0;
+      in.battery_warning = (mask & 64) != 0;
+      in.battery_critical = (mask & 128) != 0;
       const bool triggered[] = {health == SystemHealth::FAULT,
         in.firmware_update_in_progress, in.calibration_in_progress,
-        in.battery_charging && in.battery_alarm, health == SystemHealth::DEGRADED,
+        in.battery_charging && in.battery_alarm, in.battery_critical,
+        health == SystemHealth::DEGRADED, in.battery_warning,
         in.wifi_connecting, health == SystemHealth::BOOTING,
         in.charge_complete_verified && !in.battery_alarm, in.battery_charging, true};
       const LedPresentationState states[] = {LedPresentationState::FAULT,
         LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS,
         LedPresentationState::CALIBRATION_IN_PROGRESS, LedPresentationState::CHARGING_FAULT,
-        LedPresentationState::DEGRADED, LedPresentationState::WIFI_CONNECTING,
+        LedPresentationState::BATTERY_CRITICAL, LedPresentationState::DEGRADED,
+        LedPresentationState::BATTERY_WARNING, LedPresentationState::WIFI_CONNECTING,
         LedPresentationState::BOOTING, LedPresentationState::CHARGE_COMPLETE_VERIFIED,
         LedPresentationState::CHARGING, LedPresentationState::READY};
       unsigned winner = 0;
@@ -92,8 +96,124 @@ void testPriorityAndFacts() {
       CHECK_EQ(policy.snapshot().charging_fault, in.battery_charging && in.battery_alarm);
       CHECK_EQ(policy.snapshot().charge_complete_verified,
                in.charge_complete_verified && !in.battery_alarm);
+      CHECK_EQ(policy.snapshot().battery_warning, in.battery_warning);
+      CHECK_EQ(policy.snapshot().battery_critical, in.battery_critical);
     }
   }
+}
+
+void testReservedBatteryFacts() {
+  g_case = "reserved facts default false without SOC or alarm inference";
+  LedStatusInputs defaults;
+  LedStatusSnapshot snapshot;
+  CHECK(!defaults.battery_warning);
+  CHECK(!defaults.battery_critical);
+  CHECK(!snapshot.battery_warning);
+  CHECK(!snapshot.battery_critical);
+  for (float soc : {-100.0f, 0.0f, 1.0f, 8.33f, 20.0f, 50.0f, 99.99f, 100.0f,
+       125.0f, std::numeric_limits<float>::quiet_NaN(),
+       std::numeric_limits<float>::infinity()}) {
+    for (unsigned mask = 0; mask < 8; ++mask) {
+      auto in = ready(soc);
+      in.battery_charging = (mask & 1) != 0;
+      in.battery_alarm = (mask & 2) != 0;
+      in.charge_complete_verified = (mask & 4) != 0;
+      LedStatusPolicy policy;
+      policy.update(in, 1500, 60);
+      CHECK(!in.battery_warning);
+      CHECK(!in.battery_critical);
+      CHECK(!policy.snapshot().battery_warning);
+      CHECK(!policy.snapshot().battery_critical);
+      CHECK(policy.state() != LedPresentationState::BATTERY_WARNING);
+      CHECK(policy.state() != LedPresentationState::BATTERY_CRITICAL);
+    }
+  }
+  g_case = "reserved facts pass through independently of DALY and SOC validity";
+  // A future battery-policy owner owns these facts' validity. Presentation
+  // must neither infer them nor silently apply the DALY freshness gate.
+  for (unsigned invalid = 0; invalid < 7; ++invalid) {
+    auto in = ready();
+    if (invalid == 1) in.sample_valid = false;
+    if (invalid == 2) in.daly_comm_ok = false;
+    if (invalid == 3) in.telemetry_age_ms = kDalyTelemetryFreshnessMs + 1;
+    if (invalid == 4) in.soc_percent = std::numeric_limits<float>::quiet_NaN();
+    if (invalid == 5) in.soc_percent = std::numeric_limits<float>::infinity();
+    if (invalid == 6) in.telemetry_age_ms = UINT32_MAX;
+    LedStatusPolicy policy;
+    for (unsigned mask : {0u, 1u, 2u, 3u, 0u}) {
+      in.battery_warning = (mask & 1) != 0;
+      in.battery_critical = (mask & 2) != 0;
+      const auto expected = in.battery_critical ? LedPresentationState::BATTERY_CRITICAL
+          : in.battery_warning ? LedPresentationState::BATTERY_WARNING
+                               : LedPresentationState::READY;
+      policy.update(in, 1500, 60);
+      CHECK_EQ(selectLedState(in), expected);
+      CHECK_EQ(policy.state(), expected);
+      CHECK_EQ(policy.snapshot().battery_warning, in.battery_warning);
+      CHECK_EQ(policy.snapshot().battery_critical, in.battery_critical);
+      CHECK(!policy.snapshot().charge_complete_verified);
+    }
+  }
+}
+
+void testReservedBatteryEffects() {
+  g_case = "reserved battery states render uniform slow breathing";
+  const uint8_t warning_envelope[] = {6, 13, 20, 13, 6};
+  const uint8_t critical_envelope[] = {6, 18, 30, 18, 6};
+  for (bool critical : {false, true}) {
+    const auto state = critical ? LedPresentationState::BATTERY_CRITICAL
+                                : LedPresentationState::BATTERY_WARNING;
+    const uint8_t green = critical ? 0 : 140;
+    const uint8_t peak = critical ? 30 : 20;
+    auto in = ready(0);
+    in.battery_warning = !critical;
+    in.battery_critical = critical;
+    LedStatusPolicy policy;
+    for (unsigned i = 0; i < 5; ++i) {
+      const uint8_t expected = critical ? critical_envelope[i] : warning_envelope[i];
+      checkEffect(ledEffectFor(state, i * 750, 60), 255, green, 0, expected);
+      checkUniform(policy.update(in, i * 750, 60), 255, green, 0, expected);
+      CHECK_EQ(policy.state(), state);
+    }
+    uint8_t low = 255, high = 0;
+    for (uint32_t t = 0; t <= 6000; t += 25) {
+      const auto e = ledEffectFor(state, t, 60);
+      CHECK(e.brightness >= 6 && e.brightness <= peak);
+      checkUniform(policy.update(in, t, 60), 255, green, 0, e.brightness);
+      CHECK_EQ(e.brightness, ledEffectFor(state, t + 3000, 60).brightness);
+      if (e.brightness < low) low = e.brightness;
+      if (e.brightness > high) high = e.brightness;
+    }
+    CHECK_EQ(low, 6);
+    CHECK_EQ(high, peak);
+  }
+  g_case = "reserved battery brightness ceilings include degenerate ranges";
+  for (unsigned max = 0; max <= 255; ++max) {
+    for (bool critical : {false, true}) {
+      const auto state = critical ? LedPresentationState::BATTERY_CRITICAL
+                                  : LedPresentationState::BATTERY_WARNING;
+      const uint8_t green = critical ? 0 : 140;
+      const uint8_t peak = max / (critical ? 2 : 3);
+      const uint8_t minimum = peak < 6 ? peak : 6;
+      auto in = ready();
+      in.battery_warning = !critical;
+      in.battery_critical = critical;
+      LedStatusPolicy policy;
+      checkUniform(policy.update(in, 0, max), 255, green, 0, minimum);
+      checkUniform(policy.update(in, 1500, max), 255, green, 0, peak);
+      for (uint32_t t : {0u, 750u, 1000u, 1500u, 2250u, 3000u, UINT32_MAX}) {
+        const auto e = ledEffectFor(state, t, max);
+        CHECK(e.brightness >= minimum && e.brightness <= peak);
+        CHECK(e.brightness <= max);
+      }
+    }
+  }
+  g_case = "battery envelopes remain distinct from legacy alarm displays";
+  checkEffect(ledEffectFor(LedPresentationState::FAULT, 1000, 60), 255, 0, 0, 60);
+  checkEffect(ledEffectFor(LedPresentationState::CHARGING_FAULT, 1000, 60), 255, 0, 0, 60);
+  checkEffect(ledEffectFor(LedPresentationState::BATTERY_CRITICAL, 1000, 60), 255, 0, 0, 22);
+  checkEffect(ledEffectFor(LedPresentationState::DEGRADED, 1500, 60), 255, 140, 0, 30);
+  checkEffect(ledEffectFor(LedPresentationState::BATTERY_WARNING, 1500, 60), 255, 140, 0, 20);
 }
 
 void testLegacyEffectsAndSubtleBoot() {
@@ -297,8 +417,9 @@ void testChargingAndTrueFullSeparation() {
 void testNamesAndInitialState() {
   g_case = "names and initial state";
   const char* names[] = {"READY", "CHARGING", "CHARGE_COMPLETE_VERIFIED", "BOOTING",
-    "WIFI_CONNECTING", "DEGRADED", "CHARGING_FAULT", "CALIBRATION_IN_PROGRESS",
-    "FIRMWARE_UPDATE_IN_PROGRESS", "FAULT"};
+    "WIFI_CONNECTING", "BATTERY_WARNING", "DEGRADED", "BATTERY_CRITICAL",
+    "CHARGING_FAULT", "CALIBRATION_IN_PROGRESS", "FIRMWARE_UPDATE_IN_PROGRESS", "FAULT"};
+  CHECK_EQ(kLedPresentationStateCount, sizeof(names) / sizeof(names[0]));
   for (unsigned i = 0; i < sizeof(names) / sizeof(names[0]); ++i)
     CHECK_STR(toString(static_cast<LedPresentationState>(i)), names[i]);
   CHECK_STR(toString(static_cast<LedPresentationState>(200)), "UNKNOWN");
@@ -308,11 +429,15 @@ void testNamesAndInitialState() {
   CHECK_EQ(policy.snapshot().presentation, LedPresentationState::BOOTING);
   CHECK(!policy.snapshot().soc_valid);
   CHECK(!policy.snapshot().charge_complete_verified);
+  CHECK(!policy.snapshot().battery_warning);
+  CHECK(!policy.snapshot().battery_critical);
 }
 }  // namespace
 
 int main() {
   testPriorityAndFacts();
+  testReservedBatteryFacts();
+  testReservedBatteryEffects();
   testLegacyEffectsAndSubtleBoot();
   testQuantizationBoundariesAndPhysicalFrames();
   testCachedFreshnessAndIndeterminate();

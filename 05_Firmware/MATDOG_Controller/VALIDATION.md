@@ -3019,3 +3019,40 @@ in the final handoff report; no artifact is represented as hardware-validated.
 No hardware/serial access, flash, OTA write or merge to main occurred. Focused physical
 LED validation remains open. Full implementation record and physical validation scope:
 [`2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md`](../../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md).
+
+### LED V2 contract completion — reserved battery warning/critical — 2026-09-26
+
+**IMPLEMENTED / OFFLINE-VALIDATED. Physical LED validation remains TO_TEST.**
+This is a second normal commit on the same feature branch, extending
+`021cab7f70a4eb4c1c345ea58349ba3852416503` without rewriting that candidate.
+
+Final priority, highest first:
+
+`FAULT > FIRMWARE_UPDATE_IN_PROGRESS > CALIBRATION_IN_PROGRESS > CHARGING_FAULT > BATTERY_CRITICAL > DEGRADED > BATTERY_WARNING > WIFI_CONNECTING > BOOTING > CHARGE_COMPLETE_VERIFIED > CHARGING > READY`
+
+`battery_warning` and `battery_critical` default false in the input and snapshot;
+Controller remains unchanged and leaves both false. They have no production producer,
+threshold or new DALY transaction. A future reviewed battery-policy owner must decide
+them. `@LED STATUS` exposes the manager's cached facts. Warning is amber `(255,140,0)`,
+breathing 6..20 over 3 s; critical is red `(255,0,0)`, breathing 6..30 over 3 s.
+The existing FAULT, charging-fault and DEGRADED effects remain distinct and unchanged.
+
+- Full host suite: PASS. The real LED policy now passes 112,734 checks, including
+  every combination of eight independent facts across five system-health values,
+  both reserved defaults, exact passthrough without inferred battery policy,
+  snapshot visibility under higher priorities, and complete breathing frames.
+- Existing driver/manager tests remain PASS: USB_ONLY 17 checks, ROBOT_POWERED 1,571.
+- Full static audit and DALY/actuator/LED mutation suites: PASS. LED coverage is
+  88 cases: 57 static mutations, 29 compiled policy mutations and 2 baselines.
+  Checks reject production producers (including positional initialization and aliases),
+  threshold derivation, changed defaults, lost passthrough, incorrect priority/effect
+  parameters and missing status observation.
+- Both clean builds: PASS from the second commit; USB_ONLY with OTA ingest 0 and
+  ROBOT_POWERED with the existing explicit validation OTA-ingest override 1.
+  Final application size, SHA256 and verified manifest are in the completion report.
+- Scope, credential-leak review and `git diff --check`: PASS. Existing mapping,
+  quantization, charging/100%/FULL semantics, freshness, both diagnostics and
+  anti-back-power behavior remain intact. No safety/control implementation changed.
+
+No hardware/serial access, flash or merge to main occurred. True FULL remains
+unreachable from SOC alone. Focused physical validation is still required.

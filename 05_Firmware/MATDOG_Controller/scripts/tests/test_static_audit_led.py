@@ -33,13 +33,20 @@ def checked_replace(code, old, new):
     return code.replace(old, new, 1)
 
 
-def mutate(filename, old, new):
+def mutate(filename, old, new, struct=None):
     matches = 0
     result = []
     for path, code in BASE:
         if path.name == filename:
             matches += 1
-            code = checked_replace(code, old, new)
+            if struct is None:
+                code = checked_replace(code, old, new)
+            else:
+                body = re.search(rf"struct\s+{struct}\s*\{{(.*?)\n\}};", code, re.DOTALL)
+                if not body:
+                    raise AssertionError(f"mutation struct not found: {struct}")
+                replacement = checked_replace(body.group(1), old, new)
+                code = code[:body.start(1)] + replacement + code[body.end(1):]
         result.append((path, code))
     if matches != 1:
         raise AssertionError(f"expected one production {filename}, got {matches}")
@@ -75,10 +82,18 @@ STATIC_MUTATIONS = [
     ("unreviewed full producer", "Controller.cpp", "led_status_.update(led_now_ms, led_inputs);",
      "led_inputs.charge_complete_verified = battery.soc_percent == 100;\n"
      "    led_status_.update(led_now_ms, led_inputs);"),
-    ("full input defaults true", "LedStatusPolicy.h", "bool charge_complete_verified = false;\n};\n\n\nstruct LedEffect",
-     "bool charge_complete_verified = true;\n};\n\n\nstruct LedEffect"),
+    ("full input defaults true", "LedStatusPolicy.h", "bool charge_complete_verified = false;",
+     "bool charge_complete_verified = true;", "LedStatusInputs"),
     ("full input loses false default", "LedStatusPolicy.h", "struct LedStatusInputs {",
      "struct LedStatusInputs {\n  LedStatusInputs() : charge_complete_verified(true) {}"),
+    ("reserved input aggregate initializer", "Controller.cpp", "status::LedStatusInputs led_inputs;",
+     "status::LedStatusInputs led_inputs = {core::SystemHealth::READY, false, false, false,\n"
+     "      false, false, 0, 0, false, false, false, true, true};"),
+    ("reserved input aggregate replacement", "Controller.cpp", "led_status_.update(led_now_ms, led_inputs);",
+     "led_inputs = {core::SystemHealth::READY, false, false, false, false, false,\n"
+     "      0, 0, false, false, false, true, true}; led_status_.update(led_now_ms, led_inputs);"),
+    ("reserved input whole-object alias", "Controller.cpp", "led_status_.update(led_now_ms, led_inputs);",
+     "auto& reserved = led_inputs; reserved = {}; led_status_.update(led_now_ms, led_inputs);"),
     ("diagnostic ownership bypass", "LedStatusManager.cpp", "ring_ == nullptr || ring_->testRunning()",
      "ring_ == nullptr"),
     ("second manager render", "LedStatusManager.cpp", "ring_->setFrame(frame);",
@@ -117,6 +132,42 @@ STATIC_MUTATIONS = [
      "bool LedRing::startSocTest() {\n  if (false) return false;"),
 ]
 
+# Both reserved facts must be protected in every production layer, not only
+# at the Controller wiring point. Include aliases and constructor overrides
+# to show that the audit is stronger than a plain assignment search.
+for fact in ("battery_warning", "battery_critical"):
+    STATIC_MUTATIONS.extend([
+        (f"{fact} Controller SOC producer", "Controller.cpp",
+         "led_status_.update(led_now_ms, led_inputs);",
+         f"led_inputs.{fact} = battery.soc_percent < 20;\n"
+         "    led_status_.update(led_now_ms, led_inputs);"),
+        (f"{fact} Controller alias producer", "Controller.cpp",
+         "led_status_.update(led_now_ms, led_inputs);",
+         f"auto& reserved = led_inputs.{fact}; reserved = true;\n"
+         "    led_status_.update(led_now_ms, led_inputs);"),
+        (f"{fact} manager producer", "LedStatusManager.cpp", "ring_->setFrame(frame);",
+         f"ring_->setFrame(frame); inputs.{fact} = true;"),
+        (f"{fact} policy SOC threshold", "LedStatusPolicy.cpp",
+         f"facts.{fact} = in.{fact};", f"facts.{fact} = in.soc_percent < 20;"),
+        (f"{fact} policy compound producer", "LedStatusPolicy.cpp",
+         f"facts.{fact} = in.{fact};", f"facts.{fact} = in.{fact}; facts.{fact} |= true;"),
+        (f"{fact} loses passthrough", "LedStatusPolicy.cpp",
+         f"facts.{fact} = in.{fact};", ""),
+        (f"{fact} policy freshness gate", "LedStatusPolicy.cpp",
+         f"facts.{fact} = in.{fact};", f"facts.{fact} = fresh && in.{fact};"),
+        (f"{fact} input constructor overrides default", "LedStatusPolicy.h",
+         "struct LedStatusInputs {", f"struct LedStatusInputs {{\n  LedStatusInputs() : {fact}(true) {{}}"),
+        (f"{fact} status observation removed", "CommandRouter.cpp",
+         f'led.{fact} ? "YES" : "NO"', 'false ? "YES" : "NO"'),
+    ])
+    for struct in ("LedStatusInputs", "LedStatusSnapshot"):
+        STATIC_MUTATIONS.extend([
+            (f"{fact} {struct} defaults true", "LedStatusPolicy.h",
+             f"bool {fact} = false;", f"bool {fact} = true;", struct),
+            (f"{fact} {struct} loses default", "LedStatusPolicy.h",
+             f"bool {fact} = false;", f"bool {fact};", struct),
+        ])
+
 # Compile-valid semantic changes prove the suite checks behavior, rather
 # than merely grepping matching production expressions.
 POLICY_MUTATIONS = [
@@ -143,7 +194,76 @@ POLICY_MUTATIONS = [
      "if (state() == LedPresentationState::CHARGING && snapshot_.soc_segments < kSocPixelCount) {"),
     ("charging fault suppressed", "LedStatusPolicy.cpp",
      "facts.charging_fault = facts.charging && in.battery_alarm;", "facts.charging_fault = false;"),
+    ("critical loses priority over degraded", "LedStatusPolicy.cpp",
+     "if (facts.battery_critical) return LedPresentationState::BATTERY_CRITICAL;\n"
+     "  if (in.system_health == core::SystemHealth::DEGRADED) return LedPresentationState::DEGRADED;",
+     "if (in.system_health == core::SystemHealth::DEGRADED) return LedPresentationState::DEGRADED;\n"
+     "  if (facts.battery_critical) return LedPresentationState::BATTERY_CRITICAL;"),
+    ("critical overrides charging fault", "LedStatusPolicy.cpp",
+     "if (facts.charging_fault) return LedPresentationState::CHARGING_FAULT;\n"
+     "  if (facts.battery_critical) return LedPresentationState::BATTERY_CRITICAL;",
+     "if (facts.battery_critical) return LedPresentationState::BATTERY_CRITICAL;\n"
+     "  if (facts.charging_fault) return LedPresentationState::CHARGING_FAULT;"),
+    ("warning overrides degraded", "LedStatusPolicy.cpp",
+     "if (in.system_health == core::SystemHealth::DEGRADED) return LedPresentationState::DEGRADED;\n"
+     "  if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;",
+     "if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;\n"
+     "  if (in.system_health == core::SystemHealth::DEGRADED) return LedPresentationState::DEGRADED;"),
+    ("warning loses priority over Wi-Fi", "LedStatusPolicy.cpp",
+     "if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;\n"
+     "  if (in.wifi_connecting) return LedPresentationState::WIFI_CONNECTING;",
+     "if (in.wifi_connecting) return LedPresentationState::WIFI_CONNECTING;\n"
+     "  if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;"),
+    ("warning uses wrong RGB", "LedStatusPolicy.cpp",
+     "case LedPresentationState::BATTERY_WARNING:\n      return {255, 140, 0,",
+     "case LedPresentationState::BATTERY_WARNING:\n      return {255, 0, 0,"),
+    ("warning becomes fixed amber", "LedStatusPolicy.cpp",
+     "case LedPresentationState::BATTERY_WARNING:\n"
+     "      return {255, 140, 0, subtleBrightness(now_ms, max_brightness)};",
+     "case LedPresentationState::BATTERY_WARNING:\n"
+     "      return {255, 140, 0, static_cast<uint8_t>(max_brightness / 3)};"),
+    ("warning uses 2 second period", "LedStatusPolicy.cpp",
+     "case LedPresentationState::BATTERY_WARNING:\n"
+     "      return {255, 140, 0, subtleBrightness(now_ms, max_brightness)};",
+     "case LedPresentationState::BATTERY_WARNING:\n"
+     "      return {255, 140, 0, triangleBrightness(now_ms, kBreathePeriodMs,\n"
+     "                                             kBreatheMinBrightness, max_brightness / 3)};"),
+    ("warning brightness rises to 30", "LedStatusPolicy.cpp",
+     "case LedPresentationState::BATTERY_WARNING:\n"
+     "      return {255, 140, 0, subtleBrightness(now_ms, max_brightness)};",
+     "case LedPresentationState::BATTERY_WARNING:\n"
+     "      return {255, 140, 0, triangleBrightness(now_ms, kSubtleBreathePeriodMs,\n"
+     "                                             kBreatheMinBrightness, max_brightness / 2)};"),
+    ("critical uses wrong RGB", "LedStatusPolicy.cpp",
+     "case LedPresentationState::BATTERY_CRITICAL:\n      return {255, 0, 0,",
+     "case LedPresentationState::BATTERY_CRITICAL:\n      return {255, 140, 0,"),
+    ("critical uses 2 second period", "LedStatusPolicy.cpp",
+     "case LedPresentationState::BATTERY_CRITICAL:\n"
+     "      return {255, 0, 0, triangleBrightness(now_ms, kSubtleBreathePeriodMs,",
+     "case LedPresentationState::BATTERY_CRITICAL:\n"
+     "      return {255, 0, 0, triangleBrightness(now_ms, kBreathePeriodMs,"),
+    ("critical brightness rises to 60", "LedStatusPolicy.cpp",
+     "case LedPresentationState::BATTERY_CRITICAL:\n"
+     "      return {255, 0, 0, triangleBrightness(now_ms, kSubtleBreathePeriodMs, kBreatheMinBrightness,\n"
+     "                                           max_brightness / 2)};",
+     "case LedPresentationState::BATTERY_CRITICAL:\n"
+     "      return {255, 0, 0, triangleBrightness(now_ms, kSubtleBreathePeriodMs, kBreatheMinBrightness,\n"
+     "                                           max_brightness)};"),
 ]
+
+for fact, state in (("battery_warning", "BATTERY_WARNING"),
+                    ("battery_critical", "BATTERY_CRITICAL")):
+    POLICY_MUTATIONS.extend([
+        (f"{fact} snapshot fact lost", "LedStatusPolicy.cpp",
+         f"facts.{fact} = in.{fact};", f"facts.{fact} = false;"),
+        (f"{fact} wrongly gated by DALY freshness", "LedStatusPolicy.cpp",
+         f"facts.{fact} = in.{fact};", f"facts.{fact} = fresh && in.{fact};"),
+        (f"{fact} fabricates threshold", "LedStatusPolicy.cpp",
+         f"facts.{fact} = in.{fact};", f"facts.{fact} = in.soc_percent < 20;"),
+        (f"{fact} loses state label", "LedStatusPolicy.cpp",
+         f'case LedPresentationState::{state}: return "{state}";',
+         f'case LedPresentationState::{state}: return "UNKNOWN";'),
+    ])
 
 
 def run_policy(directory, filename=None, old=None, new=None):
@@ -171,9 +291,9 @@ def main():
         failed.append(("unmutated static baseline", baseline))
     else:
         passed += 1
-    for label, filename, old, new in STATIC_MUTATIONS:
+    for label, *mutation in STATIC_MUTATIONS:
         try:
-            if findings(mutate(filename, old, new)):
+            if findings(mutate(*mutation)):
                 passed += 1
             else:
                 failed.append((label, "static mutation not detected"))

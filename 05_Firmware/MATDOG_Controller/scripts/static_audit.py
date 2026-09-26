@@ -984,6 +984,42 @@ def check_led_status_boundaries(files):
     if len(re.findall(r"bool charge_complete_verified\s*=\s*false\s*;", policy_h)) != 2 or re.search(
             r"charge_complete_verified\s*\(\s*(?!false\b)", policy_h):
         fail("LedStatusPolicy.h: reserved verified-full fact must default false")
+
+    # These facts have no battery-policy owner today. Pin their entire
+    # production vocabulary, including read sites, so a new constructor,
+    # alias, compound assignment, or policy-side threshold cannot quietly
+    # become a producer. Only the two false defaults, exact passthrough,
+    # selector read, and read-only @LED STATUS observation are permitted.
+    for fact, state in (("battery_warning", "BATTERY_WARNING"),
+                        ("battery_critical", "BATTERY_CRITICAL")):
+        declaration = rf"\bbool\s+{fact}\s*=\s*false\s*;"
+        for struct in ("LedStatusInputs", "LedStatusSnapshot"):
+            body = re.search(rf"struct\s+{struct}\s*\{{(.*?)\n\}};", policy_h, re.DOTALL)
+            if not body or len(re.findall(declaration, body.group(1))) != 1:
+                fail(f"LedStatusPolicy.h: {struct}.{fact} must default false")
+        for path, code in production:
+            # Ignore format-string labels, but require their presence below.
+            remaining = re.sub(r'"(?:\\.|[^"\\])*"', '""', code)
+            if path.name == "LedStatusPolicy.h":
+                remaining, count = re.subn(declaration, "", remaining)
+                if count != 2:
+                    fail(f"{path}: {fact} must have exactly two false defaults")
+            elif path.name == "LedStatusPolicy.cpp":
+                for allowed in (rf"\bfacts\.{fact}\s*=\s*in\.{fact}\s*;",
+                                rf"\bif\s*\(facts\.{fact}\)\s*return\s+"
+                                rf"LedPresentationState::{state}\s*;"):
+                    remaining, count = re.subn(allowed, "", remaining)
+                    if count != 1:
+                        fail(f"{path}: {fact} requires one exact passthrough and selector read")
+            elif path.name == "CommandRouter.cpp":
+                remaining, count = re.subn(rf'\bled\.{fact}\s*\?\s*""\s*:\s*""',
+                                          "", remaining)
+                if count != 1 or f"{fact}=%s" not in code:
+                    fail(f"{path}: @LED STATUS must observe reserved {fact}")
+            if re.search(rf"\b{fact}\b", remaining):
+                fail(f"{path}: {fact} has no reviewed production producer; "
+                     "only false defaults, exact cached passthrough and presentation reads are allowed")
+
     manager_path, manager = by_name.get("LedStatusManager.cpp", (None, ""))
     if manager.count("ring_->setFrame(frame)") != 1:
         fail(f"{manager_path}: manager must have exactly one frame submission")
@@ -994,6 +1030,17 @@ def check_led_status_boundaries(files):
         fail(f"{manager_path}: update cached facts, then yield to diagnostics, then render")
 
     ctl_path, ctl = by_name.get("Controller.cpp", (None, ""))
+    # Preserve default construction at the sole production input owner.
+    # Aggregate construction/assignment or an alias of the whole object
+    # could otherwise turn on a reserved fact without naming the field.
+    input_uses = ctl
+    for allowed in (r"\bstatus::LedStatusInputs\s+led_inputs\s*;",
+                    r"\bled_status_\.update\(led_now_ms,\s*led_inputs\);"):
+        input_uses, count = re.subn(allowed, "", input_uses)
+        if count != 1:
+            fail(f"{ctl_path}: LED inputs must be default-constructed once and passed directly to the manager")
+    if re.search(r"\bled_inputs\b(?!\s*\.)|\bLedStatusInputs\b", input_uses):
+        fail(f"{ctl_path}: LED inputs must not gain aggregate initialization, replacement or aliases")
     if len(re.findall(r"\bdaly_\.update\(", ctl)) != 1:
         fail(f"{ctl_path}: DALY must keep its one existing scheduler update")
     if len(re.findall(r"\bled_status_\.update\(", ctl)) != 1:
