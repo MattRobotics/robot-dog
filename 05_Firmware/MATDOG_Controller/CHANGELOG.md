@@ -1,5 +1,28 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — network-path diagnosis, no reflash — 2026-09-26
+
+Documentation only; same flashed candidate (`build_id=c45858c532e9`, re-confirmed unchanged).
+Follow-up to the entry below: diagnosed why `GET /status`/OTA network reachability failed, instead
+of assuming RSSI alone.
+
+- `ip neigh show 192.168.1.136` on the client machine reports **`FAILED`** — ARP never resolved a
+  MAC address at all, while the router and other LAN devices resolve normally. This rules out a
+  local firewall (ARP is below any packet-filtering layer) and is a stronger finding than "weak
+  signal, reduced throughput."
+- 6 RSSI reads this session: **-89 to -93 dBm**, consistently at/below the -90 dBm threshold treated
+  as too weak for a meaningful transport test. Classified **`RF_LINK_TOO_WEAK_FOR_MEANINGFUL_TRANSPORT_TEST`**;
+  network validation stopped there per instruction, with no firmware change and no request for any
+  physical RF intervention.
+- **`WIFI_TICK` re-characterized favorably**: 5 steady-state reads while `CONNECTED` showed
+  `last_us` of 3-19 µs — tiny, matching the bounded/non-blocking design intent. The previously-flagged
+  `max_us=45612` (45.6 ms) stayed byte-identical across every reading, consistent with a one-time
+  connection-sequence cost, not a recurring one.
+
+Full record:
+[`09_Logs/Development_Log/2026-09-26_HARDWARE_VALIDATION_CANDIDATE_V3.md`](../../09_Logs/Development_Log/2026-09-26_HARDWARE_VALIDATION_CANDIDATE_V3.md)
+(follow-up section).
+
 ## Unreleased — first hardware flash + validation (candidate V3) — 2026-09-26
 
 **HARDWARE VALIDATED (partial — see below). No motion, no torque, no EEPROM/DALY write.**

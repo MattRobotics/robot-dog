@@ -141,12 +141,6 @@ liveness ticks, not calibrated `q0` — no calibration or motion inference is dr
 
 ## Known-open / TO_TEST items surfaced this session
 
-- Wi-Fi link RSSI (-92/-93 dBm) and its effect on sustained data-plane traffic — `KNOWN_OPEN`,
-  not investigated further.
-- `WIFI_TICK max_us=45612` — a real measurement, not previously available; whether this recurs on
-  every connection attempt or was a one-time cost of this specific session is `TO_TEST`.
-- `GET /status`/OTA-challenge network reachability — `TO_TEST`, blocked on resolving the Wi-Fi link
-  quality question above (or testing from a client closer to the robot).
 - `reset_reason=OTHER` after an esptool RTS-pin hard reset — `KNOWN_OPEN`, not investigated (not
   flagged as fatal by the firmware's own self-check).
 - Everything validated this session (boot, IMU, BMS, LED presentation, Wi-Fi association, Web server
@@ -154,10 +148,63 @@ liveness ticks, not calibrated `q0` — no calibration or motion inference is dr
   superseding the `HARDWARE_TO_TEST` classification those items carried in every prior freeze
   document this session produced.
 
+## Follow-up session (same date) — network-path diagnosis, no reflash
+
+Continuation on the SAME flashed candidate (`build_id=c45858c532e9`, re-confirmed unchanged; no
+rebuild, no reflash). Goal: diagnose the `GET /status`/OTA network-reachability gap left open above,
+systematically rather than assuming RSSI alone. Physical RF inspection (antenna, coax, internal
+wiring) was explicitly out of scope this round.
+
+**Diagnosis, on the ASUS (192.168.1.149, `enp5s0`):**
+
+- `ip route get 192.168.1.136` resolves via `enp5s0`, as expected (lowest-metric route to that
+  subnet).
+- `ip neigh show 192.168.1.136` reports **`FAILED`** — no MAC address was ever resolved via ARP.
+  For comparison, the router (`192.168.1.254`) shows `REACHABLE`, and three other LAN devices show
+  `STALE` (previously resolved, just aged out of cache) — `FAILED` specifically means broadcast ARP
+  requests for `192.168.1.136` went unanswered.
+- This **rules out a local host firewall** as the cause: ARP resolution happens below any IP/TCP
+  packet-filtering layer, so a firewall rule on the ASUS could not produce an ARP-level failure.
+  (`iptables`/`nft`/`ufw` were not directly inspectable — none installed/accessible without sudo in
+  this environment — but the ARP evidence makes that check moot: a firewall is not a candidate
+  explanation for a failure this far down the stack.)
+- 6 independent `WIFI STATUS` reads across the session: RSSI ranged **-89 to -93 dBm** — consistently
+  at or below the -90 dBm threshold this session's instructions treat as too weak for a meaningful
+  transport test.
+
+**Classification: `RF_LINK_TOO_WEAK_FOR_MEANINGFUL_TRANSPORT_TEST`.** Per instruction, network
+validation (`GET /status`, `/ota/challenge`, HMAC auth rejection/acceptance) stopped here without
+touching firmware, without attempting the tests again against a link already shown non-functional at
+Layer 2, and without asking the operator for any physical RF intervention (antenna, coax, cover,
+internal wiring — all explicitly out of scope).
+
+**`WIFI_TICK` re-characterized, with a materially better picture than the raw `max_us` figure alone
+suggested:** 5 consecutive steady-state reads while already `CONNECTED` showed `last_us` of
+**3-19 µs** — tiny, matching the "bounded, non-blocking" design intent exactly.
+`max_us=45612` (45.6 ms) stayed byte-identical across every single reading this session and the
+prior one, consistent with a **one-time cost from the initial connection/association sequence**,
+not a recurring per-tick cost. This meaningfully de-risks the open question the first flash session
+left about Wi-Fi tick timing under load — the number to watch going forward is the small, stable
+steady-state figure, not the historical spike.
+
+```text
+WEB_STATUS_NETWORK           FAIL   (blocked upstream by the RF classification above)
+OTA_CHALLENGE_NETWORK        FAIL   (same)
+OTA_AUTH_REJECTION           FAIL   (same — never reached)
+OTA_VALID_AUTH_NONWRITING    NOT_APPLICABLE
+WIFI_RSSI                    -89 to -93 dBm (6 reads)
+WIFI_TICK_STEADY_LAST_US     3-19 us (5 reads)
+WIFI_TICK_HISTORICAL_MAX_US  45612 (unchanged; one-time, not recurring)
+CONTROLLER_RESPONSIVE        YES
+FAIL_CLOSED_GATE             PASS
+```
+
 ## Outcome
 
 Flash `PASS`. Boot, fail-closed, IMU, BMS, LED, Wi-Fi association, and 12/12 servo preflight all
 validated on real, powered hardware for the first time against this candidate. Web server lifecycle
 validated over USB CDC; its network-reachable surface (`GET /status`, OTA challenge/authentication)
-remains untested pending the Wi-Fi link-quality question above. No motion, no torque, no EEPROM/DALY
-write occurred at any point. No merge to `main`, no branch/worktree deletion.
+remains blocked on Wi-Fi link quality, now precisely classified as `RF_LINK_TOO_WEAK_FOR_MEANINGFUL_TRANSPORT_TEST`
+(ARP-level failure, not merely reduced throughput) rather than left as an unexplained gap. No motion,
+no torque, no EEPROM/DALY write occurred at any point across either session. No merge to `main`, no
+branch/worktree deletion.
