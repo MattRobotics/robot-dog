@@ -4,13 +4,11 @@ namespace matdog {
 namespace status {
 
 void LedStatusManager::update(uint32_t now_ms, const LedStatusInputs& inputs) {
-  if (ring_ == nullptr) return;
-  // The manual @LED TEST diagnostic owns the ring until its lap finishes -
-  // see the class comment in LedStatusManager.h.
-  if (ring_->testRunning()) return;
-
-  const LedEffect effect = policy_.update(inputs, now_ms, LedRing::kMaxBrightness);
-  ring_->setSolid(effect.r, effect.g, effect.b, effect.brightness);
+  const LedFrame frame = policy_.update(inputs, now_ms, LedRing::kMaxBrightness);
+  // Keep read-only status facts fresh while either manual diagnostic owns
+  // the pixels. Normal presentation resumes as soon as it finishes.
+  if (ring_ == nullptr || ring_->testRunning()) return;
+  ring_->setFrame(frame);
 }
 
 }  // namespace status

@@ -1,5 +1,69 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — LED V2 focused hardware validation recorded — 2026-09-26
+
+**Focused HARDWARE PASS; live charging-specific animations remain TO_TEST.**
+This entry records the completed operator session; the repository closeout itself is
+one docs-only commit with no rebuild, flash, serial access or merge.
+
+- Exact flashed source: `88062e1a1217f288ebcc161c6213dbb543ea6f8a`, build ID
+  `88062e1a1217`, ROBOT_POWERED, OTA ingest 1; application 1,029,232 bytes at
+  `app0 @ 0x010000`, SHA256
+  `772a046e1b2d61888dba0ab7ddc759be13bbd4a33d1722b6be5285c313aac56b`.
+  Application-only flash and independent digest verification passed. The later docs
+  commit and any eventual merge commit are separate from this firmware provenance.
+- BOOTING breathing passed (perceived white / slightly cyan-ish; hue not calibrated).
+  Servo preflight passed 12/12 with `torque_enable=0`; system transitioned to READY
+  and authority stayed NONE. No actuator or calibration motion occurred.
+- Real cached 75.5% SOC produced nine green LEDs, noon through eight o'clock.
+  Noon/clockwise order and `@LED SOC TEST` fill/drain, self-termination and automatic
+  return to the real nine-segment bar at 75.2% passed physically.
+- Live charging pulse, charging-at-100% tail and real charging-fault presentation
+  remain TO_TEST. SOC TEST displays fixed bars and does not simulate CHARGING.
+  FULL/warning/critical facts still have no producer; true FULL policy remains
+  FUTURE / TO_DESIGN, and SOC 100% never proves FULL. Existing RF/OTA and autonomous/
+  unattended charging gaps remain open; full calibration is a separate workstream.
+
+Full evidence and validation boundary:
+[`2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md`](../../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md).
+The following implementation entries preserve their status before this hardware session.
+
+## Unreleased — LED V2 reserved battery facts — 2026-09-26
+
+**IMPLEMENTED / OFFLINE-VALIDATED. Physical LED validation remains TO_TEST.**
+
+- Reserve `battery_warning` and `battery_critical` in the presentation API and
+  snapshot; both default false and have no production producer or invented threshold.
+- Warning breathes amber at 6..20 over 3 s, between DEGRADED and WIFI_CONNECTING.
+  Critical breathes red at 6..30 over 3 s, between CHARGING_FAULT and DEGRADED.
+- `@LED STATUS` exposes both facts. Host tests and static/mutation audits enforce
+  the final priority, effects and absence of a production battery-policy producer.
+- Existing SOC, charging, diagnostics, USB_ONLY and safety contracts remain unchanged.
+  Full offline checks and both clean builds pass; no hardware or flash was involved.
+
+## Unreleased — LED Status Manager V2 final — 2026-09-26
+
+**IMPLEMENTED / OFFLINE-VALIDATED. LED V2 hardware validation remains TO_TEST.**
+
+- READY now displays completed twelfths of fresh BMS-reported SOC, starting at noon
+  and filling clockwise through physical `{1,2,3,4,5,6,7,8,9,10,11,0}`. Quantization
+  is `floor(clamp(SOC,0,100)*12/100)`, with no upward rounding at float boundaries.
+- Cached DALY `CHARGING` adds a subtle pulse on the next segment; at reported 100%,
+  the final segment keeps pulsing. Charging with a cached alarm breathes red.
+  Freshness requires a valid sample, latest comm OK and age at most 5000 ms, sharing
+  the existing telemetry bound. Invalid/stale SOC breathes amber.
+- BOOTING changes to subtle white breathing. Existing fault/OTA/calibration/degraded/
+  Wi-Fi colors and envelopes remain unchanged. All subtle effects use 6..20 over 3 s.
+- Reserved verified charge-complete rendering has no production producer;
+  SOC 100% never selects FULL. Charge-completion policy remains FUTURE / TO_DESIGN.
+- Added bounded `@LED SOC TEST` (600ms levels, full pause, 16.8 s total) and cached
+  renderer facts in `@LED STATUS`. The existing native `@LED TEST` chase is preserved.
+- Real policy and driver/manager host tests, USB_ONLY transport checks and mutation
+  audits cover the change. Both firmware profiles compile. No hardware was accessed.
+
+Evidence and remaining physical checks:
+[`2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md`](../../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md).
+
 ## Unreleased — network-path diagnosis, no reflash — 2026-09-26
 
 Documentation only; same flashed candidate (`build_id=c45858c532e9`, re-confirmed unchanged).

@@ -294,8 +294,8 @@ That is **not** sufficient to call the charging path fully validated. Still open
 gates: autonomous dock/contact topology, reverse-polarity protection (not yet evidenced),
 complete unattended charge-acceptance and termination behaviour, charging current/thermal
 behaviour under longer or repeated sessions, and future Jetson charging behaviour. Do not infer a
-true FULL state from SOC alone — see §14 for the (future, unimplemented) LED indication concept,
-which explicitly requires more than SOC.
+true FULL state from SOC alone — see §16 for LED V2 renderer status and the future charge-completion policy,
+which requires evidence beyond SOC.
 
 ---
 
@@ -479,13 +479,44 @@ Not closed by the 2026-09-24 validation above:
   only one manual, attended charging session exists (§8).
 - **Future Jetson charging behaviour** — **FUTURE**, architectural only (§13).
 - **Long-term automated charge-termination policy** — **FUTURE / TO_DESIGN**.
-- **Charging LED-ring progress indication** — **FUTURE / TO_DESIGN, NOT IMPLEMENTED.** Target
-  concept only, not built and not validated: source of truth is fresh DALY telemetry, never the
-  KEY GPIO; during active charging, 12 LEDs each represent 1/12 of SOC, with completed segments
-  fixed and the next segment slow-pulsing; FULL shows all-green slow breathing; a stale/invalid SOC
-  shows indeterminate amber rather than a fabricated percentage; a charging fault shows a distinct
-  red warning; FULL must eventually be derived from fresh telemetry (no charge alarm, cell/pack
-  voltage near target, tapered current, and stability over time), never from SOC alone; the
-  implementation must be non-blocking (no `delay()`) and must never imply any motion authority;
-  unplugging the charger with KEY OFF naturally removes power and turns the ring off. No firmware
-  for this exists.
+- **LED-ring presentation V2** — **IMPLEMENTED / OFFLINE-VALIDATED**, with focused
+  **HARDWARE PASS** (2026-09-26) for BOOTING breathing, READY SOC mapping and the bounded
+  SOC diagnostic/automatic resume on source `88062e1a1217f288ebcc161c6213dbb543ea6f8a`.
+  At real 75.5% SOC, nine green LEDs ran from noon through eight o'clock; `@LED SOC TEST`
+  filled/drained and returned automatically to nine segments at 75.2%. Servo preflight
+  passed 12/12 with torque_enable=0 and authority remained NONE; no calibration motion
+  occurred. BOOTING breathing passed, with no calibrated hue claim. The frozen SOC order is
+  physical `{1,2,3,4,5,6,7,8,9,10,11,0}`: noon clockwise to eleven o'clock. READY shows
+  `floor(clamp(BMS_REPORTED_SOC, 0, 100) * 12 / 100)` completed green segments at brightness 20;
+  remaining pixels are off. The calculation never rounds upward.
+- **Active charging detection and progress** — **IMPLEMENTED / OFFLINE-VALIDATED;
+  live charging, reported-100% tail and real charging-fault animations remain TO_TEST.**
+  The focused session used STATIONARY telemetry; `@LED SOC TEST` shows fixed bars and
+  does not simulate CHARGING. Detection uses only
+  cached DALY telemetry: valid sample, latest communication result OK, sample age at most the
+  shared `kDalyTelemetryFreshnessMs=5000` bound. The bound reuses the existing telemetry contract
+  (2s poll cadence, 750ms response deadline, allowance for a deferred poll). Cached
+  `state_name=CHARGING` selects progress; KEY state is not an input. Completed segments stay
+  green at 20; the next logical segment breathes green at 6..20 over 3 s. At reported 100%, only
+  physical 0 (the final segment) breathes, so charging remains distinguishable. Fresh charging
+  plus any nonzero DALY alarm word selects red breathing (6..60 over 2 s). Invalid/stale SOC
+  instead shows subtle amber breathing (6..20), subject to higher-priority system states.
+- **True charge-completion policy** — **FUTURE / TO_DESIGN**. A reserved
+  `charge_complete_verified` input and all-green slow-breathing renderer exist, but the input
+  has **no production producer** and stays false. SOC 100% is never proof of FULL. A future
+  reviewed policy must establish fresh telemetry, no charge alarm, pack/cell voltage near
+  target, tapered current, and stability over time; no thresholds are fabricated here.
+- **Reserved battery warning/critical facts** — **IMPLEMENTED / OFFLINE-VALIDATED**
+  presentation API only; both remain false with **no production producer** and their
+  active presentations are **NOT HARDWARE-VALIDATED**. No battery thresholds were added.
+- **Autonomous dock and unattended charging qualification** — **FUTURE**. LED V2 is a
+  non-blocking presentation of existing facts and grants no motion or power-control authority.
+  Unplugging the charger with KEY OFF still naturally removes power and turns the ring off.
+
+Implementation and offline evidence:
+[`2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md`](../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md).
+
+Focused hardware evidence and its exact flashed firmware provenance:
+[`2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md`](../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md).
+The later docs-only closeout commit is not the installed firmware source. Active
+`charge_complete_verified` likewise remains unvalidated on hardware and has no producer.

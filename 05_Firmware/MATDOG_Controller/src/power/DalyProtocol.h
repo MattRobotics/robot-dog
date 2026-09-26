@@ -202,6 +202,13 @@ enum class DalyCommResult : uint8_t {
 
 const char* toString(DalyCommResult result);
 
+// Shared cached telemetry freshness contract. Reuses the existing 5 s KEY
+// telemetry limit: 2 s poll cadence, 750 ms telemetry deadline, and room for
+// a deferred poll while the scheduler serializes operator transactions.
+// Consumers must also require a valid sample and the latest comm result OK;
+// this bound never excuses a failed poll. Age is inclusive and wrap-safe.
+constexpr uint32_t kDalyTelemetryFreshnessMs = 5000;
+
 struct DalySample {
   bool valid = false;
   uint32_t sampled_at_ms = 0;
@@ -341,7 +348,7 @@ const char* toString(DalyKeyWriteRefusal refusal);
 // first). 0xD2 telemetry must be this recent (one missed 2 s poll plus a
 // deferred one still pass).
 constexpr uint32_t kDalyKeyWriteMaxSnapshotAgeMs = 30000;
-constexpr uint32_t kDalyKeyWriteMaxTelemetryAgeMs = 5000;
+constexpr uint32_t kDalyKeyWriteMaxTelemetryAgeMs = kDalyTelemetryFreshnessMs;
 
 // Everything the gate looks at. Filled by DalyBms; pure so the host suite
 // tests the real rules.

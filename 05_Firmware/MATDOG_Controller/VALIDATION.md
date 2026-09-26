@@ -2977,3 +2977,134 @@ DALY power cycle (still **TO_TEST** — no such power cycle was performed here);
 dock/contact hardware, reverse-polarity protection, complete unattended charge-acceptance
 validation, future Jetson charging behaviour, and long-term automated charge termination (all
 **FUTURE**); the charging LED-ring indication concept (**FUTURE / TO_DESIGN, NOT IMPLEMENTED**).
+
+## LED Status Manager V2 final — 2026-09-26
+
+**IMPLEMENTED / OFFLINE-VALIDATED. LED V2 hardware validation remains TO_TEST.**
+This supersedes the earlier charging LED entry's NOT IMPLEMENTED status for the
+renderer and fresh cached charging detection only. True charge-completion policy
+and autonomous/unattended charging qualification remain FUTURE.
+
+Base: `f14aa40faf3c8c3fb9bace03dd8b71132f09edd5`, verified against fetched `origin/main`
+before edits. Branch: `feat/led-status-manager-v2-final`.
+
+| Offline check | Result |
+|---|---|
+| Full C++ host runner | PASS, including all existing suites |
+| Real LED policy | PASS — 22,728 checks; exact rational quantization boundaries, frozen physical order, every segment count, all priorities, freshness, legacy effects and no FULL from SOC |
+| Real driver/manager, USB_ONLY | PASS — 17 checks; zero NeoPixel begin/show, GPIO47 INPUT only, diagnostics refused |
+| Real driver/manager, ROBOT_POWERED | PASS — 1,571 checks; legacy channel output/chase, per-pixel ceiling, SOC fill/drain, wrap/skipped ticks, diagnostic ownership/resume |
+| Full static audit | PASS — includes existing provenance/partition tests, DALY and actuator mutation suites, and LED ownership/transport/cached-fact checks |
+| LED mutation suite | PASS — 40 cases: 28 static mutations, 10 compile-valid policy mutations, 2 unmutated baselines |
+| USB_ONLY build | PASS — source profile default retained; OTA ingest 0 |
+| ROBOT_POWERED build | PASS — explicit profile override; validation candidate uses existing OTA ingest 1 override |
+| Scope/whitespace/secrets | PASS — no safety-semantic edits; ignored credentials untracked and absent from changed text; `git diff --check` clean |
+
+The shared cached telemetry bound is 5000 ms (valid sample, latest comm OK, inclusive
+sample age), reusing the existing DALY telemetry contract without changing its value.
+READY displays completed twelfths at brightness 20; charging pulses the next clockwise
+segment, including physical 0 at reported 100%. Invalid/stale SOC breathes amber.
+BOOTING now breathes white. All subtle effects are 6..20; charging fault breathes red
+up to 60. The reserved verified-complete input has no production producer.
+
+`@LED TEST` remains unchanged. `@LED SOC TEST` advances every 600 ms, pauses at full,
+drains and ends after 16.8 s; normal rendering resumes automatically. A fresh clock in
+the Controller's LED block and a diagnostic pre-start guard cover timestamps newer
+than the tick-start time without changing other subsystem scheduling.
+
+Final clean post-commit builds generate the existing ignored build manifest. Candidate
+application size/SHA256, exact source commit, profile and OTA ingest fact are recorded
+in the final handoff report; no artifact is represented as hardware-validated.
+
+No hardware/serial access, flash, OTA write or merge to main occurred. Focused physical
+LED validation remains open. Full implementation record and physical validation scope:
+[`2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md`](../../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md).
+
+### LED V2 contract completion — reserved battery warning/critical — 2026-09-26
+
+**IMPLEMENTED / OFFLINE-VALIDATED. Physical LED validation remains TO_TEST.**
+This is a second normal commit on the same feature branch, extending
+`021cab7f70a4eb4c1c345ea58349ba3852416503` without rewriting that candidate.
+
+Final priority, highest first:
+
+`FAULT > FIRMWARE_UPDATE_IN_PROGRESS > CALIBRATION_IN_PROGRESS > CHARGING_FAULT > BATTERY_CRITICAL > DEGRADED > BATTERY_WARNING > WIFI_CONNECTING > BOOTING > CHARGE_COMPLETE_VERIFIED > CHARGING > READY`
+
+`battery_warning` and `battery_critical` default false in the input and snapshot;
+Controller remains unchanged and leaves both false. They have no production producer,
+threshold or new DALY transaction. A future reviewed battery-policy owner must decide
+them. `@LED STATUS` exposes the manager's cached facts. Warning is amber `(255,140,0)`,
+breathing 6..20 over 3 s; critical is red `(255,0,0)`, breathing 6..30 over 3 s.
+The existing FAULT, charging-fault and DEGRADED effects remain distinct and unchanged.
+
+- Full host suite: PASS. The real LED policy now passes 112,734 checks, including
+  every combination of eight independent facts across five system-health values,
+  both reserved defaults, exact passthrough without inferred battery policy,
+  snapshot visibility under higher priorities, and complete breathing frames.
+- Existing driver/manager tests remain PASS: USB_ONLY 17 checks, ROBOT_POWERED 1,571.
+- Full static audit and DALY/actuator/LED mutation suites: PASS. LED coverage is
+  88 cases: 57 static mutations, 29 compiled policy mutations and 2 baselines.
+  Checks reject production producers (including positional initialization and aliases),
+  threshold derivation, changed defaults, lost passthrough, incorrect priority/effect
+  parameters and missing status observation.
+- Both clean builds: PASS from the second commit; USB_ONLY with OTA ingest 0 and
+  ROBOT_POWERED with the existing explicit validation OTA-ingest override 1.
+  Final application size, SHA256 and verified manifest are in the completion report.
+- Scope, credential-leak review and `git diff --check`: PASS. Existing mapping,
+  quantization, charging/100%/FULL semantics, freshness, both diagnostics and
+  anti-back-power behavior remain intact. No safety/control implementation changed.
+
+No hardware/serial access, flash or merge to main occurred. True FULL remains
+unreachable from SOC alone. Focused physical validation is still required.
+
+## LED V2 focused hardware validation — 2026-09-26
+
+**HARDWARE PASS for the checks listed below.** This later session supersedes the
+blanket hardware TO_TEST status in the two implementation entries above. It does
+not validate live charging-specific animations or reserved active battery-policy states.
+Evidence is recorded from the operator's closure handoff; this docs-only closeout
+performs no rebuild, test rerun, hardware/serial access, flash, merge or calibration work.
+
+```text
+HW_VALIDATED_FIRMWARE_SOURCE=88062e1a1217f288ebcc161c6213dbb543ea6f8a
+BUILD_ID=88062e1a1217
+HARDWARE_PROFILE=ROBOT_POWERED
+OTA_INGEST_ENABLED=1
+APPLICATION_PARTITION=app0
+APPLICATION_OFFSET=0x010000
+APPLICATION_SIZE=1029232
+APPLICATION_SHA256=772a046e1b2d61888dba0ab7ddc759be13bbd4a33d1722b6be5285c313aac56b
+APPLICATION_ONLY_FLASH=PASS
+VERIFY_FLASH=PASS
+```
+
+The subsequent docs-only commit and eventual merge commit are not the installed
+firmware source. The future immutable validation tag must target `88062e1...`;
+no tag is created or moved during this closeout.
+
+| Hardware check | Result |
+|---|---|
+| Exact candidate application-only installation and digest verification | PASS; bootloader, partition table, boot_app0 and NVS untouched |
+| BOOTING breathing | PASS; intended white, perceived white / slightly cyan-ish; hue not calibrated |
+| BNO085 / DALY / LED | PASS; Wi-Fi associated, RF/data-plane completion remains open |
+| Servo preflight | PASS, MATDOG_C018_V1, 12/12; model 777, position_offset 0, profile MATCH, torque_enable 0 on all twelve |
+| System READY after preflight | PASS; mode MAINTENANCE, power_state RUN |
+| READY cached SOC rendering | PASS; 75.5% to nine green LEDs, noon through eight o'clock |
+| SOC physical order | PASS; noon clockwise, `{1,2,3,4,5,6,7,8,9,10,11,0}` |
+| `@LED SOC TEST` | PASS; 0..12, full pause, 12..0, bounded self-termination |
+| Automatic resume | PASS; READY at 75.2%, nine segments, diagnostic NONE |
+| Actuator authority | NONE throughout; no motion or calibration motion |
+
+No Torque ON, EEPROM/PositionOffset write, DALY configuration change or full flash
+occurred in the recorded session. The SOC diagnostic intentionally uses fixed bars;
+it does not simulate DALY CHARGING, so absence of a next-segment pulse is expected.
+
+**Still open:** live CHARGING/next-segment and reported-100% tail breathing; real
+CHARGING_FAULT alarm presentation; active FULL/battery warning/battery critical
+presentations (all three facts still have no production producer); true charge-completion
+policy (FUTURE / TO_DESIGN); autonomous/unattended charging qualification; existing
+RF/data-plane and OTA network end-to-end validation; separate full calibration work.
+**SOC 100% != true FULL.** No additional renderer is declared hardware-validated here.
+
+Full observations, flash provenance and recovery-backup reference:
+[`2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md`](../../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md).

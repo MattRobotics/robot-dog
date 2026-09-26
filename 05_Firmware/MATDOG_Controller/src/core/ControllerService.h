@@ -103,6 +103,10 @@ class ControllerService {
   status::LedPresentationState ledPresentationState() const {
     return modules_.led_status->state();
   }
+  const status::LedStatusSnapshot& ledSnapshot() const {
+    return modules_.led_status->snapshot();
+  }
+  status::LedDiagnostic ledDiagnostic() const { return modules_.led->diagnostic(); }
 
   // --- Wi-Fi / OTA / Calibration (already-aggregated structs) ------------------
   const network::WifiStatus& wifiStatus() const { return modules_.wifi->status(); }
