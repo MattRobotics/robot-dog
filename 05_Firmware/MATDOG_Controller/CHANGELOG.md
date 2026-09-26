@@ -1,5 +1,32 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — first hardware flash + validation (candidate V3) — 2026-09-26
+
+**HARDWARE VALIDATED (partial — see below). No motion, no torque, no EEPROM/DALY write.**
+First-ever real flash of a `ROBOT_POWERED` + `OTA_INGEST_ENABLED=1` candidate
+(`SOURCE_HEAD=c45858c532e97a5a104fb8330ad9cd909b75663e`,
+`APPLICATION_SHA256=13a1e9504e950d3d4bbc14ed78032019c8bf8bacb75804ca57555069787d5b71`), application
+partition only, hash-verified at write time and independently by a post-write `verify-flash`.
+
+- **Fail-closed properties confirmed live on hardware**: no actuator authority ever granted, no
+  torque ever enabled (every servo preflight record shows `torque_enable=0`), no limits/transforms
+  admitted, `hardware_motion_authorized=NO`, Web server `started=NO` at boot, OTA update gate refused
+  with no session ever started.
+- **IMU, BMS, servo preflight (12/12 PASS, zero mismatches)**: all `HARDWARE_VALIDATED` for the
+  checks run, superseding their prior `HARDWARE_TO_TEST` classification.
+- **Wi-Fi**: first-ever real association for this project — connected on the first attempt, DHCP-
+  assigned. RSSI measured at -92/-93 dBm (very weak) and `WIFI_TICK max_us=45612` (45.6 ms, the
+  first real measurement of this figure) are both recorded as genuine findings, not glossed over.
+- **I7/I8 network transport, first hardware exercise**: the `@WEB SERVER START/STOP/START/STATUS`
+  lifecycle (the I7/I8 hardening round's fix) completed cleanly with the Controller thread staying
+  responsive throughout. `GET /status` and the OTA challenge/authentication path from a network
+  client could **not** be validated this session — the client machine had a direct route to the
+  robot's subnet but neither `ping` nor `curl` reached it, most likely due to the weak RSSI above;
+  not investigated further, `TO_TEST`.
+
+Full record:
+[`09_Logs/Development_Log/2026-09-26_HARDWARE_VALIDATION_CANDIDATE_V3.md`](../../09_Logs/Development_Log/2026-09-26_HARDWARE_VALIDATION_CANDIDATE_V3.md).
+
 ## Unreleased — I7/I8 network transport hardening — 2026-09-25
 
 **Implemented, compiled and offline-tested.** Six concrete findings from operator review of the
