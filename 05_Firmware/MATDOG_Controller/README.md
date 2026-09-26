@@ -9,18 +9,31 @@ together and reports whether its hardware is detected, expected or unavailable.
 MATDOG Controller
 ├── core/system      boot, version, health aggregation, power-state machine,
 │                    cooperative non-blocking scheduling, USB command router
+│                    ActuatorAuthority — the one arbiter of actuator write authority
+├── calibration/     CalibrationDomain — pure model recovered from the LF V25 oracle
+│                    CalibrationManager — session lifecycle over ActuatorAuthority
 ├── config/          HardwareProfile — the single USB_ONLY / ROBOT_POWERED authority
 ├── servo/           ServoBus — ST3215 / Seeed bus transport, read-only diagnostics
 │                    ServoPopulation / ServoCensus — canonical 17 vs expected-now 13,
 │                    live census classification (pure, transport-independent)
 ├── imu/             Bno085Imu — SH2_ROTATION_VECTOR acquisition, viewer-compatible
 ├── power/           DalyBms — read-only Modbus RTU battery telemetry
+├── network/         WifiPolicy — pure Wi-Fi lifecycle state machine (host-linkable)
+│                    WifiManager — the only translation unit that owns the radio
+├── update/          OtaPolicy / OtaBootGuard / Sha256 — pure OTA state machine,
+│                    first-boot rollback lifecycle, image identity (host-linkable)
+│                    OtaEspBackend — the only unit that calls esp_ota_*
+│                    OtaManager — Controller-facing owner; no transport in OTA-A
 └── status/          LedRing — WS2812B ring, boots OFF, non-blocking effects
 ```
 
 This is an **integration and platform milestone**, not a motion controller. No gait,
-IK, closed-loop stabilization, ROS 2/MoveIt 2, Wi-Fi/OTA or autonomous behaviour is
-implemented here — see `VALIDATION.md` for the precise scope.
+IK, closed-loop stabilization, ROS 2/MoveIt 2 or autonomous behaviour is implemented
+here — see `VALIDATION.md` for the precise scope. A **Wi-Fi station runtime** (W1) and the
+**OTA-A update core** (state machine, inactive-slot writer, first-boot rollback validation)
+are implemented and offline-tested but **not yet hardware-tested**, and OTA ships **no
+transport and no authentication**. See [Wi-Fi runtime](#wi-fi-runtime-w1) and
+[OTA-A](#ota-a-update-core) for exactly what that does and does not mean.
 
 ## Official baseline
 
@@ -43,8 +56,11 @@ scope.
 integrate Diagnostics, Maintenance, Service, Servo QC, Provisioning, Full Leg Calibration,
 Wi-Fi/OTA and host transport here, followed later by Motion, IK, Gait and Stabilization.
 
-The preserved branch `matdog/full-leg-calibrator-v1` is an oracle for calibration-engine, safety
-and evidence logic, not a replacement runtime and not a branch to merge wholesale. Likewise, the
+The preserved Full Leg Calibrator V1 tree — annotated tag
+`archive/2026-08-29/full-leg-calibrator-v1-h0` -> `15f3fb8f378e6cadf6bc479bfcaca2947741c9fd`, from
+the former branch `matdog/full-leg-calibrator-v1`, archived 2026-09-18 — is an oracle for
+calibration-engine, safety and evidence logic, not a replacement runtime and not a tree to merge
+wholesale. Likewise, the
 frozen [`ST3215_Bench_Tools`](../ST3215_Bench_Tools/README.md) remain immutable evidence even when
 equivalent service capabilities are later integrated here.
 
@@ -231,6 +247,11 @@ persistence and any `requestDischargeOff()` body fail the build; the mutation su
 @BMS KEY SET DISCHARGE CONFIRM              (MAINTENANCE only; the ONE DALY write; once per boot)
 @BMS KEY WRITE STATUS                       (cached; no bus transaction)
 @LED STATUS | @LED OFF | @LED TEST
+@WIFI STATUS                                (cached snapshot; never queries the radio)
+@WIFI ON | @WIFI OFF                        (any mode; refused without credentials)
+@OTA STATUS                                 (read-only; OTA-A ships no transport)
+@AUTHORITY STATUS                           (read-only; no owner can be acquired yet)
+@CALIBRATION STATUS                         (read-only; no session can move hardware)
 @SERVO SCAN <lo> <hi> | @SERVO READ <id>   (MAINTENANCE mode only)
 @SERVO CENSUS                               (MAINTENANCE mode only)
 @SERVO SAFE_OFF <id>                        (always allowed, any mode)
@@ -468,7 +489,12 @@ not at boot, not on a timer.
 ```bash
 python3 scripts/tests/test_ota_partition_logic.py   # OTA slot selection (40 tests)
 bash scripts/tests/run_host_tests.sh                # servo population / profile + DALY protocol
+                                                    # + Wi-Fi + OTA-A + ActuatorAuthority
+                                                    # + safe actuator write policy
+                                                    # + calibration bootstrap geometry
+                                                    # + calibration domain & manager
 python3 scripts/tests/test_static_audit_daly.py     # DALY write-whitelist mutation suite
+python3 scripts/tests/test_static_audit_safe_actuator.py  # safe actuator boundary mutation suite
 python3 scripts/static_audit.py                     # runs all of the above, plus the audit
 ```
 
@@ -490,6 +516,61 @@ exactly as BMSTool accepts it (address, function, CRC, register and value echo, 
 precondition and its order, `ALREADY_CONFIGURED`, read-back classification (an ACK alone is never
 verification), the status tracker, and scheduling of write → read-back → telemetry after success,
 failure and timeout.
+
+`scripts/tests/test_wifi_policy.cpp` does the same for `src/network/WifiPolicy.cpp`: the
+credential gate (no SSID configured means the radio is never started, under any number of
+ticks), the two-phase radio start, the one-transition-per-tick rule, the connect deadline,
+the doubling backoff ladder and its 60 s ceiling, reset-on-success, link loss restarting the
+ladder from the bottom, operator enable/disable (including that no teardown is issued for a
+radio that was never brought up), fail-closed handling of a refused radio start or connect
+call, the invariant that a connect is never issued while connected, `millis()` wraparound,
+and the IPv4 formatter including its bounds.
+
+`scripts/tests/test_ota_policy.cpp` does the same for `src/update/OtaPolicy.cpp`,
+`OtaBootGuard.cpp` and `Sha256.cpp`, with a fake `OtaBackend` substituting only the flash.
+468 checks: target resolution refusals (target == running, factory/TEST subtype, no inactive
+slot, oversize, zero length, and exactly-partition-sized which must be *allowed*), metadata
+refusals, the PENDING_VERIFY precondition, every stream failure (open rejected, write error,
+short write, truncation, overrun, `esp_ota_end` failure, hash mismatch against a different
+image of the same length), the ordering property that the boot target does not move from any
+state other than `IDENTITY_VERIFIED`, replay/idempotence, and the whole first-boot rollback
+lifecycle. SHA-256 is checked against the FIPS 180-4 vectors and against itself at eight
+chunk sizes.
+
+`scripts/tests/test_actuator_authority.cpp` does the same for
+`src/core/ActuatorAuthority.cpp`. 751 checks, with the conflict matrix exhaustive rather than
+illustrative: all 20 ordered pairs of distinct write-capable owners, each challenger tried in
+**its own** legal operating mode so a rejection can only be about exclusivity. Also: boot and
+re-init always landing on `NONE`, corrupted enum values failing closed, release refused for every
+non-owner, the stale-lease case the generation exists for, force-clear under every reason, the
+mode-compatibility table, a mode change clearing a stranded owner, and the whole inhibit
+lifecycle.
+
+`scripts/tests/test_calibration_domain.cpp` and `test_calibration_manager.cpp` cover
+`src/calibration/`: 702 domain checks including the 24-profile completeness derived from the
+Cartesian model, the three meanings of 2048 pinned apart, the physical-unit identity trap
+(unit M11 versus M33 in the LF lower slot), the leg population gate, the evidence lifecycle with
+every shortcut refused, and the LF V25 oracle replay; plus 322 manager checks against the **real**
+`ActuatorAuthority`, including the end-to-end stale-lease scenario where a finished session's late
+events are fired at a live one and must not touch it.
+
+## Calibration foundation
+
+**Status: implemented, compiled, offline-tested. NOT hardware-tested. NO write path added.**
+
+The installed robot's calibration is `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION` and hardware
+motion is **BLOCKED** — that is the repository's own declaration, and
+`MATDOG_CALIBRATION_HARDWARE_MOTION_AUTHORIZED` defaults to `0` so a live session is refused
+before the arbiter is even asked.
+
+The LF V25 archive is a **historical hardware oracle**, replayed offline and matched. It is not
+current calibration and cannot become it: every replayed record carries `HISTORICAL_REPLAY`, and
+`mayPromote()` refuses that origin.
+
+The full audit — source precedence, what LF V25 actually proved, the three evidence vocabularies,
+four discrepancies including the two unrelated meanings of "H1", the Generic V25 component
+assessment and the EEPROM boundary — is in
+[`CALIBRATION_SOURCE_PRECEDENCE.md`](CALIBRATION_SOURCE_PRECEDENCE.md).
 
 ## Operating mode (MAINTENANCE / RUN)
 
@@ -540,6 +621,508 @@ that saves `SCSerial::IOTimeOut` (a public field, set at runtime — the vendore
 never edited), applies the named timeout for that call site, and restores the previous
 value on every exit path. `begin()` never assigns `IOTimeOut` directly, so neither timeout
 can silently become a standing global override for some other call site.
+
+## Wi-Fi runtime (W1)
+
+**Status: implemented, compiled, offline-tested. NOT hardware-tested.** No MATDOG build has
+yet associated with an access point. Nothing below is a claim about radio behaviour on real
+hardware.
+
+Wi-Fi is a **station-mode network link and nothing else**. It serves no page, exposes no
+endpoint, accepts no remote command and performs no update. Those belong to later gates.
+
+### Ownership split
+
+```text
+core/Controller
+  └── network/WifiManager     owns the radio; the ONLY unit that includes <WiFi.h>
+        └── network/WifiPolicy  pure lifecycle state machine; no Arduino, no radio
+```
+
+`WifiPolicy` holds every decision — when to start the radio, when to retry, how long to wait,
+what the observable state is — and is driven purely by `(now_ms, link_up)`. That is what lets
+`scripts/tests/test_wifi_policy.cpp` link the **real** state machine on the host instead of a
+copy, exactly as `DalyProtocol` and `ServoPopulation` already do.
+
+`WifiStatus` is a plain copyable snapshot. `CommandRouter` only formats it; it never queries
+the radio. A future Web adapter renders the same struct without a second hardware path — the
+telemetry-snapshot model in
+[`ARCHITECTURE.md`](../../01_Docs/02_Architecture/ARCHITECTURE.md#telemetry-snapshot-model).
+
+### State machine
+
+```text
+INACTIVE ──► IDLE ──► RADIO_STARTING ──► CONNECTING ──► CONNECTED
+   ▲                        ▲                 │             │
+   │                        └───── IDLE ◄─┐   ▼             ▼
+   └── @WIFI OFF / no credentials         └── BACKOFF ◄──────┘
+```
+
+The first state is `INACTIVE`, not `DISABLED`, because `<esp32-hal-gpio.h>` `#define`s
+`DISABLED` and an enumerator by that name is textually replaced. The project has been bitten
+by this before — see the `-DDISABLED=0x00` flag in `scripts/tests/run_host_tests.sh`, which
+now also compiles the Wi-Fi suite so the clash is caught on the host, not only on device.
+
+`RADIO_STARTING` is not padding. In `esp32:esp32 3.3.11`, `WiFi.begin()` reaches
+`STAClass::begin()`, which calls `waitStatusBits(ESP_NETIF_STARTED_BIT, 1000)` — a blocking
+wait of **up to one second** if the netif has not come up. Splitting the start into
+`WiFi.mode(WIFI_STA)` (which contains no such wait) and, 100 ms later, `WiFi.begin()` means
+the bit is already set when the waiting call runs, so it returns immediately.
+
+Retries follow a doubling ladder, 2 s → 4 s → … → 60 s, reset on every successful
+association. A link that was up and then dropped restarts the ladder from the bottom: it is a
+fresh event, not accumulated retry pressure. The core's own auto-reconnect is turned **off**
+so `WifiPolicy` is the single owner of retry timing and its counters describe a process it
+actually controls.
+
+### Bounded, and measured rather than claimed
+
+`WifiManager::update()` performs one status-bit read, at most one radio action and one
+snapshot refresh. No loop, no `delay()`, no wait-for-result. It runs **last** among the
+Controller's services, so within a pass every timing-sensitive module has already advanced.
+RSSI/IP/channel are refreshed at most once per second, so telemetry consumers never drive
+radio queries.
+
+The claim is falsifiable: `@WIFI STATUS` reports `last_us` and `max_us`, the measured wall
+time of the last and worst tick since boot. The first `WiFi.mode()` call initializes the
+driver and allocates tens of KB of heap; that is the expensive one, it is deliberately kept
+out of `Controller::begin()`, and `@STATUS` already reports `heap_free`/`heap_min_free`.
+
+`scripts/static_audit.py` fails the build if the Wi-Fi unit acquires `waitForConnectResult`,
+the blocking `WiFi.disconnect()` overload, `WiFi.scanNetworks()`, `WiFi.SSID()`, a `delay()`,
+or a `while` loop inside `update()` — and if it ever calls `setMode(`, because a network task
+must never change `OperatingMode`.
+
+### Credentials
+
+Nothing secret is committed, and the audit keeps it that way.
+
+```bash
+cp src/config/WifiCredentials.local.h.example src/config/WifiCredentials.local.h
+$EDITOR src/config/WifiCredentials.local.h    # gitignored; never committed
+scripts/build.sh
+```
+
+Resolution order is `-DMATDOG_WIFI_SSID`/`-DMATDOG_WIFI_PASSWORD` build flags, then the local
+header, then **empty**. Empty is a supported state: the firmware builds, boots and runs
+normally, reporting `state=INACTIVE fault=NO_CREDENTIALS`, and never starts the radio. The
+local header is preferred over build flags on a workstation because a passphrase passed as
+`-D` lands in shell history, in `ps` output and in the build log `scripts/build.sh` echoes.
+
+`config::kWifiPassword` is referenced in exactly **one** place in the whole firmware — the
+`WiFi.begin()` call — and `scripts/static_audit.py` fails the build if a second reference
+appears, if `WifiStatus` gains any field whose name could hold a secret, if the `.gitignore`
+rule is deleted *or commented out*, or if the local header is ever tracked by Git. Those
+guards were verified by mutation: each one was broken on purpose and the audit caught it.
+
+This is **not** an authentication story. A credential compiled into an application image is
+readable by anyone who can read the flash. That is accepted for a home 2.4 GHz network on a
+bench robot; OTA authentication is a separate problem, deliberately unsolved here.
+
+### What Wi-Fi deliberately does not touch
+
+Wi-Fi contributes **nothing** to `SystemState` health aggregation. A missing access point is
+not a robot health fact, and the G3/G3.1-validated meaning of `SYSTEM health=` must not change
+because a router rebooted. Wi-Fi is observable through `@STATUS` (one line) and `@WIFI STATUS`
+(full snapshot) instead. Whether it should ever contribute is **TO_DESIGN**.
+
+There is no path from this module to `ServoBus`, to an actuator, or to `OperatingMode`, and
+`scripts/static_audit.py::check_no_network_to_servo_path` fails the build if a translation
+unit ever names both a network transport symbol and a servo primitive. That is the executable
+form of the permanent rule `network callback != servo command authority`.
+
+## ActuatorAuthority
+
+**Status: implemented, compiled, offline-tested. NOT hardware-tested.**
+
+The single central arbiter of the exclusive right to **write** actuators. One instance exists,
+owned by `Controller`; every other component holds a pointer and asks. `scripts/static_audit.py`
+fails the build if a second instance appears or if any component caches the value.
+
+### It is not a second OperatingMode
+
+They are orthogonal axes and the distinction is load-bearing:
+
+```text
+OperatingMode       what the Controller as a whole is doing
+                    MAINTENANCE: blocking diagnostics are safe
+                    RUN:         a deterministic motion loop may be active
+
+ActuatorAuthority   WHO, if anyone, currently holds the exclusive right to
+                    issue actuator writes
+```
+
+A controller sits in `MAINTENANCE` with authority `NONE` indefinitely — that is the normal state
+today, because **no write-capable owner exists yet**. The mode says what is safe; the authority
+says who is doing it.
+
+The compatibility table is enforced, not decorative:
+
+| OperatingMode | may host |
+|---|---|
+| `MAINTENANCE` | `NONE`, `DIAGNOSTICS`, `CALIBRATION`, `QC`, `PROVISIONING` |
+| `RUN` | `NONE`, `MOTION` |
+
+A mode change that leaves the current owner incompatible **clears** it rather than leaving a
+suspended authority. Today nothing can ever hold one, so this is a no-op — it exists so the first
+real owner does not have to remember to add it. The table is the initial one and should be
+re-reviewed when the motion loop lands and the `RUN` default flips.
+
+### What it deliberately does not arbitrate
+
+**Reads.** `@SERVO SCAN`, `@SERVO CENSUS` and `@SERVO READ` are `Ping`/`readByte`/`readWord`. They
+are `MAINTENANCE`-gated because they **block**, not because they write, and they take no
+authority. The arbiter exists to prevent write conflicts, not to serialize every read.
+
+**`SAFE_OFF`.** A safety de-escalation must be reachable in every authority state, including an
+inconsistent one. This is structural rather than a promise: `ServoBus` has no reference to the
+arbiter and the arbiter has no reference to `ServoBus`, so `safeOff()` **cannot** consult an
+authority even if a later edit wanted it to. The audit fails the build if the `@SERVO SAFE_OFF`
+branch ever gains an authority or mode condition, or if `ServoBus` ever names one.
+
+### Two semantics worth stating
+
+**Same-owner re-request → `ALREADY_OWNED`, and no second lease.** Returning a second valid lease
+would let two holders each believe they own it, and either could then release it out from under
+the other. The existing holder keeps the only lease.
+
+**Leases carry a generation.** Matching the owner alone already rejects "`CALIBRATION` releases
+while `MOTION` holds". What it cannot catch is the same owner across two sessions:
+
+```text
+CALIBRATION acquires   (generation 1)
+CALIBRATION releases
+CALIBRATION acquires   (generation 2)
+late callback from session 1 calls release(CALIBRATION)
+    owner matches  ->  session 2 would be cleared out from under itself
+```
+
+The generation makes that release provably stale. It is refused and reported.
+
+### No new write path
+
+This phase implements the **arbiter**, not new capabilities. The firmware's only actuator write is
+still `EnableTorque(id, 0)` inside `safeOff()`. Nothing can acquire an owner yet, and there is
+deliberately **no command** that does — an operator-driven acquire would itself be a new write
+path. `@AUTHORITY STATUS` is read-only.
+
+### Exclusivity inhibit — and the TOCTOU problem it solves
+
+Some activities are not actuator users but must exclude all of them. Firmware update is the first.
+Adding an OTA entry to the owner enum would have been wrong twice over: OTA drives no actuator, and
+it does not *compete* with `CALIBRATION` for a resource — it requires that **nobody** is using one.
+The audit fails the build if such an entry is added.
+
+The naive gate is genuinely insufficient:
+
+```cpp
+if (authority == NONE) { start OTA }     // not enough
+```
+
+Not because of threading — MATDOG's Controller is single-threaded, every subsystem runs
+cooperatively inside `Controller::update()`, and nothing in MATDOG's own code owns a task or a
+callback, so a check-then-act **inside one call** is already atomic. The hazard is **duration**: an
+OTA update spans `prepare` → `openStream` → thousands of `writeChunk` calls → `finishStream` →
+`commit`, across seconds of loop passes. Between any two of them a command can arrive and a future
+`CalibrationManager` can acquire authority. No amount of re-checking closes that.
+
+So the arbiter exposes a **hold**, not a query:
+
+```text
+requestInhibit(FIRMWARE_UPDATE)
+    granted only when current() == NONE
+    while held, every request() is REJECTED_INHIBITED
+```
+
+The "is anyone an owner?" check and the hold happen inside one arbiter call, so there is no window
+between them. **No `SystemActivity` layer was needed**, and none was built.
+
+A stuck inhibit is fail-safe: it blocks writes, it does not enable them. `forceClear()` of the
+*owner* deliberately does not drop it — a fault must not quietly re-open actuator authority. It is
+cleared explicitly, or by the next boot.
+
+## Safe Actuator Layer
+
+**Status: policy core implemented, compiled, offline-tested. Runtime adapter TO_IMPLEMENT.
+NO write path added.**
+
+`src/actuator/ActuatorWritePolicy.*` is the boundary every future actuator write must pass
+through. It is a **decision**, not a transport: there is no bus handle in it, so an `ACCEPT`
+authorises nothing by itself.
+
+**No "check once then write later".** `plan()` captures the `AuthorityLease`, the
+`OperatingMode` and a policy epoch; `commit()` re-reads the live arbiter and compares all of it
+again. Authority released and re-acquired, force-cleared, stranded by a mode change or overtaken
+by an OTA inhibit each fail closed at commit. At most one transaction is outstanding, which is
+what makes replay impossible rather than unlikely — a copy a caller kept is refused on identity
+before its contents are read, and `reset()` advances the epoch so anything outstanding can never
+match again.
+
+**Limits are provenance first, value second.** A bound is usable only if
+`calibration::mayPromote()` and `calibration::isOperationalEvidence()` both accept it and both
+identity axes agree — the same test `q0MayBeAppliedTo()` applies. The store is empty and stays
+empty: `MATDOG_JOINT_CALIBRATION.yaml` records `{min: null, max: null}` for all twelve leg
+joints, so every position-class command resolves to `REJECT_NO_ACCEPTED_LIMITS`. A missing bound
+is a refusal, never a fallback to a historical value.
+
+**`SAFE_OFF` is outside this layer structurally.** There is no operation class for *removing*
+torque, so a safety de-escalation is inexpressible here and no later edit can make it depend on
+an authority check. For the same reason no persistent/provisioning write is expressible while
+the repository still records that owner as `TO_DESIGN`.
+
+The runtime adapter is deliberately **not** built yet: it would need a torque-on or
+goal-position primitive, and both are prohibited by audits that exist for hardware-era reasons.
+The full S0 write-surface map and the design rationale are in
+[`SAFE_ACTUATOR_LAYER.md`](SAFE_ACTUATOR_LAYER.md).
+
+### Calibration bootstrap — geometry-authorised moves
+
+`src/actuator/CalibrationGeometryProfile.*` gives the Controller the compiled Geometry
+Compiler V5 result as a generated `constexpr` table: **no JSON parser, no heap, no mesh and no
+collision maths on the device**. It was produced by
+`06_Software/Matdog_Core/calibration/matdog_calibration_geometry_export.py`, a pure reduction
+of the canonical bundle that re-verifies every input hash and refuses to emit anything on
+drift.
+
+Three authorisation routes, mutually exclusive by construction:
+
+| Operation | Authorised by |
+|---|---|
+| `POSITION_COMMAND` | accepted joint bounds — **unchanged, not weakened** |
+| `DIRECTION_VERIFY` | the symmetric bootstrap envelope **and** the session's approved budget |
+| `CALIBRATION_CONTACT_PROBE` | the endpoint plan **and** an accepted raw↔q transform |
+| `CALIBRATION_AUXILIARY_MOVE` | the endpoint plan **and** an accepted raw↔q transform |
+
+Three meanings are kept apart: a **geometric contact** is not an **executable target**, a
+clearance **PASS** is not a **motion authorization**, and a **diagnostic endpoint** is not a
+place the robot may be commanded to. Of 24 canonical endpoints only 8 are executable, and the
+8 `UNRESOLVED` clearance verdicts all sit on diagnostic endpoints.
+
+The direction-verify envelope is **symmetric and checked in tick space** — the magnitude of a
+tick delta needs neither q0 nor direction, which is what makes the move that measures the sign
+safe before the sign is known.
+
+Everything fails closed today: no q0 has been captured on the current installation, so no
+transform exists and every plan-bound move refuses. Audit and contract:
+[`CALIBRATION_BOOTSTRAP.md`](CALIBRATION_BOOTSTRAP.md).
+
+## OTA-A (update core)
+
+**Status: implemented, compiled, offline-tested. NOT hardware-tested.** No MATDOG device has
+received an OTA image. Nothing below is a claim about flash behaviour on real hardware.
+
+OTA-A is the **update core only**. It ships **no transport** and **no authentication**, and
+the byte-ingest entry points are compiled out by default. Nothing can feed it an image.
+
+### Layering
+
+```text
+network transport                    NOT IMPLEMENTED in OTA-A (substitution point)
+      |
+      v
+update/OtaManager                    Controller-facing owner + first-boot lifecycle
+      |
+      v
+update/OtaPolicy                     the update state machine        (host-linkable)
+update/OtaBootGuard                  the first-boot rollback guard   (host-linkable)
+update/Sha256                        image identity                  (host-linkable)
+      |
+      v
+OtaBackend (abstract)  ->  update/OtaEspBackend    the ONLY unit calling esp_ota_*
+      |
+      v
+inactive OTA application slot
+```
+
+The backend is an interface rather than a direct `esp_ota_*` call so the offline suite drives
+the **real** state machine against a fake backend that can fail any individual flash
+operation. The logic under test is the shipped logic; only the flash is substituted.
+
+### The one safety rule, made structural
+
+OTA writes the **inactive** slot and only the inactive slot. That is not enforced by a comment:
+
+- `esp_ota_get_next_update_partition(NULL)` is documented never to return the running
+  partition — and `OtaPolicy` checks it against the running partition anyway;
+- three checks are stated explicitly rather than inferred from a backend refusal:
+  `target != running`, `subtype ∈ ota_0..ota_15`, `image_size ≤ target.size`;
+- `OtaEspBackend::setBootPartition()` re-reads `esp_ota_get_running_partition()` and refuses
+  independently, so the last line of defence does not depend on `OtaPolicy` being correct;
+- `commitBootTarget()` is the **only** method that changes the boot target, it has exactly
+  one `setBootPartition(` call site, and it is callable from exactly one state.
+
+`scripts/flash_app_only.sh` is **not** reused as the OTA writer. It deliberately writes the
+**active** slot over USB — it is a wired service/recovery path with different guarantees, and
+its logic was audited for reuse, not adopted.
+
+### State machine
+
+```text
+IDLE ──prepare()──► TARGET_RESOLVED ──openStream()──► RECEIVING ──finishStream()──┐
+  ▲                        │                             │                        │
+  │                        │                             │                   IMAGE_SEALED
+  │                        │                             │                        │
+  │                        ▼                             ▼                        ▼
+  └──── abort()/reset() ──── FAILED ◄──────────────────────────────────  IDENTITY_VERIFIED
+                               ▲                                                  │
+                    boot target NEVER touched                          commitBootTarget()
+                                                                                  │
+                                                                                  ▼
+                                                                        BOOT_TARGET_SET
+```
+
+Each of the distinctions that matter is a separate observable fact: update not started
+(`IDLE`), target resolved but no flash touched (`TARGET_RESOLVED`), stream open and writing
+(`RECEIVING` + `bytes_written`), stream incomplete (`INCOMPLETE_STREAM`, caught by *our*
+byte count before the backend is even asked), `esp_ota_end` outcome (`IMAGE_SEALED` vs
+`IMAGE_REJECTED`), image identity (`IDENTITY_VERIFIED` vs `HASH_MISMATCH`), boot target not
+yet changed (every state except the last), boot target changed (`BOOT_TARGET_SET`).
+
+### Five kinds of verification, kept distinct
+
+They are not synonyms, and only the third can tell "a valid image" from "the expected image":
+
+| Layer | What it proves | Who does it |
+|---|---|---|
+| transport integrity | the declared number of bytes arrived | `OtaPolicy` byte accounting |
+| image validity | the bytes form a loadable app image | `esp_ota_end()` |
+| cryptographic hash identity | the bytes are **the** expected bytes | `Sha256` vs declared digest |
+| firmware/build identity | which commit this image came from | `build::kBuildId` in metadata |
+| bootloader validity | which slot boots, and its rollback state | otadata / `esp_ota_get_state_partition` |
+
+Metadata reuses the identity scheme the repository already has — `build::kBuildId`, plus the
+`APPLICATION_SHA256` and `APPLICATION_SIZE` that `scripts/build_manifest.py` already records.
+No second version scheme was invented.
+
+It deliberately does **not** use `esp_app_desc_t`. Parsing the real built binary shows why:
+
+```text
+version      = 'ee57070'              <- the arduino-lib-builder commit
+project_name = 'arduino-lib-builder'  <- not MATDOG
+date/time    = 'Jul 20 2026'          <- when the prebuilt libs were built
+```
+
+Those fields describe the core, not this firmware, so they cannot answer "is this the
+firmware I expected?".
+
+### First-boot validation and rollback
+
+The real build has `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` (read from the generated
+`sdkconfig`, not assumed). That makes **never confirming the safe default**: the bootloader
+moves a `PENDING_VERIFY` entry to `ABORTED` on the next boot and falls back to the other
+slot, with no code of ours involved. Confirming early throws that safety net away for exactly
+the case it exists for.
+
+So confirmation is **earned by running**. `esp_ota_mark_app_valid_cancel_rollback()` is called
+only after all of these hold, and `scripts/static_audit.py` fails the build if
+`Controller::begin()` ever confirms an image:
+
+```text
+Controller::begin() ran to COMPLETION     (the flag is its last statement)
+CommandRouter is bound and usable
+firmware identity is readable             (running slot is an OTA slot, build id present)
+this boot did NOT follow PANIC/INT_WDT/TASK_WDT/WDT/BROWNOUT
+uptime >= 15 s
+completed loop ticks >= 2000
+```
+
+Uptime alone would be satisfied by a controller wedged in one long call; ticks alone by a
+fast boot loop. Both are required, and both are finite and deterministic.
+
+A refusal deliberately does **not** call the invalidate-and-reboot API. Refusing is already
+sufficient, and rebooting a robot is not OTA-A's decision to make. An explicit, authorized
+operator rollback is **TO_IMPLEMENT / OTA-B**.
+
+**Provisional until ActuatorAuthority exists:** these criteria contain no servo, DALY, IMU or
+motion condition — deliberately, because peripheral presence is not evidence about firmware
+and making it one would roll back a perfectly good image because a cable was unplugged. When
+the authority model lands, the question of whether confirmation should additionally require a
+safe actuator state is **TO_DESIGN**.
+
+### OTA-B authorization — implemented
+
+`src/update/OtaAuthorityGate.*` is the definitive gate, backed by the real
+[ActuatorAuthority](#actuatorauthority) arbiter. The OTA-A placeholder is **gone**, not kept
+alongside; the audit fails the build if its names reappear.
+
+OTA never becomes an actuator owner — it drives no actuator, and it does not compete with
+`CALIBRATION` for a resource, it requires that nobody is using one. It takes an **exclusivity
+inhibit** instead, and it takes it as a *hold* rather than a *query*, because an update spans
+seconds of loop passes and a query can only be true about the instant it ran. The reasoning and
+the TOCTOU analysis are in the
+[exclusivity inhibit](#exclusivity-inhibit--and-the-toctou-problem-it-solves) section.
+
+```text
+prepare()            -> beginExclusive() -> requestInhibit(FIRMWARE_UPDATE)
+                        granted only when authority == NONE
+during the update    -> every request() is REJECTED_INHIBITED
+failure/abort/reset  -> endExclusive(), so a failed update never leaves the
+                        robot permanently unable to calibrate
+successful commit    -> hold KEPT until the reboot: a boot switch is pending,
+                        and calibrating against an image about to be replaced
+                        is not something to permit for convenience
+```
+
+The policy still **fails closed** with no gate installed, and now also with a gate whose arbiter
+was never bound. Remaining for OTA-B: an explicit, authorized operator rollback.
+
+### Security posture — honestly stated
+
+OTA-A has **no authentication**. Rather than leave that as a promise, ingest is compiled out:
+
+```c
+#define MATDOG_OTA_INGEST_ENABLED 0   // src/update/OtaManager.h
+```
+
+`prepare`/`openStream`/`writeChunk`/`finishStream`/`commitBootTarget` all refuse unless a
+build explicitly opts in with `-DMATDOG_OTA_INGEST_ENABLED=1`, and `scripts/static_audit.py`
+fails the build if the **source default** is anything but `0` — the same shape as the
+`USB_ONLY` hardware-profile gate. A production image therefore cannot contain a reachable
+firmware writer, and "we just haven't wired a transport yet" is not load-bearing.
+
+### Transport: chosen and implemented (2026-09-25, I7)
+
+Everything below is bundled with `esp32:esp32 3.3.11` — no external dependency is needed by
+any option.
+
+| Option | Dependencies | Memory | Blocking | Auth | Verdict |
+|---|---|---|---|---|---|
+| **`ArduinoOTA`** | `Update.h`, UDP+TCP listener | moderate | `handle()` runs the whole transfer inline | MD5 password, weak | **Rejected.** It drives `Update.h`, which is a *second* OTA writer with its own partition logic — precisely the duplicate path the architecture forbids. Convenience is not a reason. |
+| **`WebServer`** (sync) | `WebServer` + `WiFi` | ~18 source files, heap per request | handler runs inline in `loop()` | none built in | Rejected in favor of `esp_http_server`: I8's read-only dashboard needed a server too, and `esp_http_server` serves both endpoints from one instance. |
+| **`esp_http_server`** (IDF) | IDF component, available | own task + stack | runs in its own task → callback-context rules | HMAC-SHA256, built here | **Chosen.** The cross-task handoff this requires is solved by a bounded single-slot FreeRTOS-semaphore mailbox (`src/network/HttpTransport.*`) that hands each request to the Controller thread and back — see [`09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md). |
+| **`esp_https_server`** (IDF) | + mbedTLS (already linked) | + cert storage, TLS buffers | own task | TLS, real | Available and confirmed installed, but not chosen: needs a certificate/key story that does not exist yet, and its ESP32-S3 resource cost has never been measured on this hardware. Remains the option to revisit if HMAC-over-plain-HTTP proves insufficient (e.g. a transport-confidentiality requirement, not just integrity/authentication) — `OtaSession`'s authentication layer underneath does not change either way. |
+| **Raw TCP framing over `NetworkClient`** | `WiFi` only | one socket, one chunk buffer | non-blocking reads, drained from `update()` | must be built | Not chosen: would have needed its own framing/auth protocol built from scratch, where `esp_http_server` gave headers, a body-streaming API and a well-understood request/response shape for free. |
+| **USB CDC ingest** | none | none | already on the Controller thread | physical access | Not the ingest transport: `CommandRouter`'s 96-byte line-oriented buffer blocks streaming firmware through it specifically — the network transport bypasses this parser entirely, so this is not a network-transport prerequisite either. |
+
+**Implemented:** `esp_http_server`, authenticated with a pre-shared-secret HMAC-SHA256
+challenge/response session layer (`src/update/OtaSession.*` over `src/update/Hmac256.*`),
+never `esp_https_server`/TLS this gate. `ArduinoOTA` remains rejected outright — it would
+introduce a second firmware writer.
+
+Transport and authentication are both **IMPLEMENTED / COMPILED / OFFLINE TESTED**, compiled into
+the candidate, disabled at boot (`HttpTransport::start()` is never called from
+`Controller::begin()` — reachable only via the MAINTENANCE-gated `@WEB SERVER START` command).
+Byte ingest remains compiled out by default (`MATDOG_OTA_INGEST_ENABLED=0`) regardless — the
+transport's existence does not make it reachable.
+
+### Resource cost
+
+Measured against the W1 build, same FQBN and profile:
+
+```text
+flash       959,043 B -> 967,915 B   (+8,872 B)   30% of the 3 MB slot
+static RAM   50,868 B ->  51,676 B   (+808 B)     15%
+```
+
+No image is ever held in RAM: bytes are hashed and written per chunk, and the chunk buffer
+belongs to the transport. `esp_ota_begin()` uses `OTA_WITH_SEQUENTIAL_WRITES` so the erase is
+incremental per sector instead of a single up-front ~1 MB erase that would stall the loop for
+seconds.
+
+**Flash erase and write do block the Controller loop.** That is a property of SPI flash, not
+something a comment can fix. `@OTA STATUS` reports the measured worst case
+(`open_us`/`write_us`/`end_us`), so the OTA-B integration can argue from numbers. Those
+numbers do not exist yet — they require a hardware test.
 
 ## Anti-back-power (LED ring)
 
@@ -602,6 +1185,10 @@ cover, and handoff section 7A for the full matrix.
 │   ├── core/                  Controller, SystemState, PowerState, CommandRouter,
 │   │                          Availability (init/detected/expected/result model),
 │   │                          OperatingMode (MAINTENANCE/RUN)
+│   ├── actuator/              ActuatorWritePolicy (pure: the Safe Actuator Layer
+│   │                          decision core; no transport, no write path),
+│   │                          CalibrationGeometryProfile + its GENERATED data
+│   │                          table (compiled Geometry V5; no mesh, no FK)
 │   ├── servo/                 ServoBus, ServoPopulation (pure policy),
 │   │                          ServoCensus (Controller-owned service)
 │   ├── imu/                   Bno085Imu
@@ -620,5 +1207,8 @@ cover, and handoff section 7A for the full matrix.
         ├── test_servo_population.cpp    offline census/profile tests (host g++)
         ├── test_daly_protocol.cpp       offline DALY protocol / KEY probe tests (host g++)
         ├── test_static_audit_daly.py    DALY write-prohibition audit mutation tests
+        ├── test_actuator_write_policy.cpp        offline safe actuator policy tests (host g++)
+        ├── test_calibration_geometry.cpp         offline geometry contract tests (host g++)
+        ├── test_static_audit_safe_actuator.py    safe actuator boundary audit mutation tests
         └── run_host_tests.sh            compiles + runs the C++ suites
 ```

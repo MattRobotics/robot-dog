@@ -39,6 +39,8 @@ PERMANENT MATDOG CONTROLLER — ESP32-S3
   Controller V0.1 platform                        official baseline
   core / USB diagnostics / BNO085                 VALIDATED in USB_ONLY scope
   ServoBus / DALY / LED / power-state baseline    VALIDATED no-motion in ROBOT_POWERED (G3/G3.1)
+  Wi-Fi station runtime (link only, no server)    IMPLEMENTED, TO_TEST on hardware (W1)
+  OTA-A update core (no transport, no auth)       IMPLEMENTED, TO_TEST on hardware
   maintenance / service / calibration modules     TO_DESIGN
   motion / IK / gait / stabilization              TO_DESIGN, later
           |
@@ -143,7 +145,16 @@ ESP32 on its own.
 ### Update policy
 
 - **DECIDED:** Wi-Fi/OTA is the normal future firmware-update path.
+- **IMPLEMENTED / TO_TEST:** a Wi-Fi **station runtime** exists in the Controller (W1). It is a
+  network link and nothing else — no server, no endpoint, no remote command, no update path — and
+  it has not yet associated with an access point on real hardware. It does not make OTA closer to
+  VALIDATED; it makes OTA implementable.
 - **DECIDED:** native USB CDC/USB-C remains available for wired service and recovery.
+- **IMPLEMENTED / TO_TEST:** the OTA-A update core exists in the Controller — inactive-slot
+  resolution and writing, image and hash verification, a boot switch reachable from exactly one
+  validated state, and first-boot rollback validation. It has **no transport and no
+  authentication**, byte ingest is compiled out by default, and no device has received an OTA
+  image. Authority integration is **OTA-B**.
 - OTA must never remove or make wired recovery dependent on a working application image.
 - Controller V0.1's application-partition USB flashing procedure is not a Wi-Fi/OTA
   implementation.
@@ -260,6 +271,23 @@ Browser
   -> ServoBus
 ```
 
+**IMPLEMENTED:** `ActuatorAuthority` exists as `src/core/ActuatorAuthority.*` — one central
+arbiter, at most one write-capable owner at a time, `NONE` at boot, orthogonal to
+`OperatingMode`. Two properties of it are permanent and enforced by
+[`static_audit.py`](../../05_Firmware/MATDOG_Controller/scripts/static_audit.py):
+
+```text
+SAFE_OFF is never arbitrated                     PERMANENT
+a second authority owner/instance                FORBIDDEN
+a cached copy of the authority state             FORBIDDEN
+an OTA/update entry in the actuator owner enum   FORBIDDEN
+```
+
+An activity that is not an actuator user but must exclude all of them — firmware update is the
+first — takes an **exclusivity inhibit** on the same arbiter rather than a fake ownership. The
+inhibit is granted only from `NONE`, and because the check and the hold are one call there is no
+window in which an owner could appear between them.
+
 ### Forbidden architectures
 
 These are permanent prohibitions, enforced by review and by
@@ -361,10 +389,13 @@ They remain qualification instruments, not editable Controller modules. Equivale
 maintenance/service features must be integrated without rewriting their source or historical
 evidence.
 
-The branch `matdog/full-leg-calibrator-v1` is preserved as an oracle/evidence branch. It is not
-the final runtime architecture. Selected calibration-engine, safety, and evidence logic may be
-migrated later into the permanent Controller; the branch must not be rebased, deleted, or merged
-wholesale for that purpose.
+The Full Leg Calibrator V1 tree is preserved as an oracle/evidence source under the annotated tag
+`archive/2026-08-29/full-leg-calibrator-v1-h0` -> `15f3fb8f378e6cadf6bc479bfcaca2947741c9fd`. It was
+archived 2026-09-18 from the former branch `matdog/full-leg-calibrator-v1`, which no longer exists;
+the tag, not a branch, is the preservation mechanism. It is not the final runtime architecture.
+Selected calibration-engine, safety, and evidence logic may be migrated later into the permanent
+Controller; the tag must not be moved or deleted, and the tree must not be merged wholesale for
+that purpose.
 
 ## Repository responsibilities
 

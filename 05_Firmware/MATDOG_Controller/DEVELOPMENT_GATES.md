@@ -208,8 +208,22 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   expected/absent/missing/unexpected; reachable over USB CDC.
 - **NEXT** — Authority model.
 - **STATUS** — **PARTIAL.** Already implemented: `@STATUS` availability, `@SERVO SCAN`,
-  `@SERVO READ`, `@SERVO CENSUS`, `@SERVO SAFE_OFF`, `@IMU`/`@BMS`/`@LED` status. Not implemented:
-  `SYSTEM_SELF_TEST`, `SOURCE_SIGNATURE`, `PROFILE_AUDIT`, consolidated health summary.
+  `@SERVO READ`, `@SERVO CENSUS`, `@SERVO SAFE_OFF`, `@IMU`/`@BMS`/`@LED` status, and
+  `@SERVO PREFLIGHT` (H0 — `src/servo/ServoPreflight.*`, read-only 12-leg-joint model /
+  `PositionOffset` / `MATDOG_C018_V1` profile verification; **IMPLEMENTED / COMPILED / OFFLINE
+  TESTED**, 444 checks; **HARDWARE TO_TEST**, not flashed — see
+  [`H0_LEG_PREFLIGHT_RUNBOOK.md`](H0_LEG_PREFLIGHT_RUNBOOK.md)). Also implemented: the **LED Status
+  Manager** (I2, `src/status/LedStatusPolicy.*` + `LedStatusManager.*`) — a single non-blocking
+  presentation owner above `LedRing` with deterministic priority arbitration over
+  fault/update/calibration/degraded/Wi-Fi-connecting/booting/ready; **IMPLEMENTED / COMPILED /
+  OFFLINE TESTED**, 198 checks; **HARDWARE TO_TEST**. Battery/charging LED states are explicitly
+  deferred pending a reviewed SOC/taper threshold policy — see
+  [`09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md`](../../09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md).
+  Also implemented: `@SYSTEM SOURCE_SIGNATURE` (I3) — read-only build/source identity
+  (`build::kBuildId`, firmware name/version, active profile/board, the OTA manager's running-image
+  build id and image state, the ESP-IDF running partition), presenting only facts already computed
+  elsewhere; no new hardware read. Not implemented: `SYSTEM_SELF_TEST`, `PROFILE_AUDIT`,
+  consolidated servo health summary.
 
 ## Authority model — OperatingMode / ActuatorAuthority
 
@@ -222,8 +236,33 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — failure-injection tests for illegal cross-mode operations; reset clears write
   authority; host disconnect leaves no armed write transaction.
 - **NEXT** — Service / Provisioning / QC.
-- **STATUS** — **PARTIAL.** `OperatingMode{MAINTENANCE, RUN}` exists and gates blocking servo
-  diagnostics. Full `ActuatorAuthority` is **TO_DESIGN**.
+- **STATUS** — **IMPLEMENTED / COMPILED / OFFLINE TESTED. HARDWARE TO_TEST.**
+  - `src/core/ActuatorAuthority.*` is the single central arbiter: pure, host-linkable, with no
+    Arduino runtime, no `ServoBus` and no `Serial`. Exactly one instance exists, owned by
+    `Controller`, reset to `NONE` at boot. No component caches its value.
+  - Owners are `NONE`/`DIAGNOSTICS`/`CALIBRATION`/`QC`/`PROVISIONING`/`MOTION`, at most one at a
+    time. A same-owner re-request returns `ALREADY_OWNED` and issues **no** second lease. Leases
+    carry a generation so a late release from a previous session of the *same* owner is refused.
+  - Orthogonal to `OperatingMode`, and enforced as such: `MAINTENANCE` hosts the service owners
+    but not `MOTION`; `RUN` hosts `MOTION` and nothing else. A mode change that strands an owner
+    clears it rather than leaving a suspended authority.
+  - **`SAFE_OFF` is outside arbitration, structurally.** `ServoBus` has no reference to the
+    arbiter and the arbiter has none to `ServoBus`, so `safeOff()` cannot consult an authority
+    even if a later edit wanted it to. The audit fails the build if the `@SERVO SAFE_OFF` branch
+    ever gains an authority or mode condition.
+  - Read-only diagnostics stay outside arbitration on purpose: `@SERVO SCAN`/`CENSUS`/`READ` are
+    `Ping`/`readByte`/`readWord` and are `MAINTENANCE`-gated because they **block**, not because
+    they write.
+  - **No new write path was added.** The firmware's only actuator write remains
+    `EnableTorque(id, 0)` inside `safeOff()`. Nothing can acquire an owner yet, and there is
+    deliberately no command that does.
+  - Offline evidence: 751 checks, including the exhaustive 20-pair conflict matrix, corrupted-enum
+    fail-closed, stale-lease refusal, force-clear under every reason, and the inhibit.
+  - **PASS CRITERIA status** — failure-injection for illegal cross-mode operations: **PASS
+    (offline)**. Reset clears write authority: **PASS (offline)**. Host disconnect leaves no armed
+    write transaction: **TO_TEST** — no write transaction exists yet to arm.
+  - **TO_DESIGN** — the mode-compatibility table is the initial one and is enforced; it should be
+    re-reviewed when the motion loop lands and the `RUN` default flips.
 
 ## Service / Provisioning
 
@@ -259,23 +298,73 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   powered bus health proven.
 - **ALLOWED** — H1 census semantics, q0 evidence capture, direction witnesses, characterization,
   then staged calibration motion **each with its own session authorization**.
-- **FORBIDDEN** — merging `matdog/full-leg-calibrator-v1` wholesale; duplicating `ServoBus`/UART/
+- **FORBIDDEN** — merging the archived calibrator tree
+  (`archive/2026-08-29/full-leg-calibrator-v1-h0`) wholesale; duplicating `ServoBus`/UART/
   scheduler/`SAFE_OFF`; auto-promoting measurements; assuming `q0 = 2048`; any H2+ motion before a
   formal H1 PASS.
 - **PASS CRITERIA** — formal H1 satisfied for all 12 leg servos (ID 51 is not in Full-Leg H1); the
   evidence lifecycle `MEASURED → CANDIDATE → ACCEPTED → PROMOTED` is preserved.
 - **NEXT** — motion may be considered, behind the Safe Actuator Layer.
+- **GEOMETRY** — the current Geometry Compiler V5 canonical bundle is the only source of
+  prerequisite, parking and contact-corridor data. The pre-reset calibration block's
+  `rear_parking_pose` / `front_leg_dependencies` and the 30/50/85/90 poses are **SUPERSEDED**;
+  the current plans park at 35.000 / 64.1667 / 93.3333 degrees. Of the 24 endpoints only the
+  **8 upper-leg** ones are `EXECUTABLE_URDF_DOMAIN`; the 16 hip and lower-leg endpoints contact
+  beyond the declared URDF limit and are diagnostic evidence, never motion targets, whatever
+  their clearance verdict. See [`CALIBRATION_BOOTSTRAP.md`](CALIBRATION_BOOTSTRAP.md).
 - **STATUS** — **BLOCKED** by `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION`. Last formal H1 was
   6/12 and is **not** superseded by a Controller census.
+  - **Offline foundation: IMPLEMENTED / COMPILED / OFFLINE TESTED.** `src/calibration/` holds a
+    pure host-linkable domain model recovered from the LF V25 archive and a `CalibrationManager`
+    session foundation over the real `ActuatorAuthority`. Audit and evidence:
+    [`CALIBRATION_SOURCE_PRECEDENCE.md`](CALIBRATION_SOURCE_PRECEDENCE.md).
+  - **NO write path was added.** The firmware's only actuator write remains
+    `EnableTorque(id, 0)` in `safeOff()`. Torque, `GoalPosition`, `SyncWrite`, EEPROM,
+    `PositionOffset`, ID recode and provisioning are all absent from the subsystem and
+    audit-forbidden inside it.
+  - **Hardware motion is compile-time blocked.** `MATDOG_CALIBRATION_HARDWARE_MOTION_AUTHORIZED`
+    defaults to `0`, mirroring the YAML's `hardware_motion_authorized: false`; a live session is
+    refused before the arbiter is even asked. Unblocking requires a real recalibration and a
+    reviewed YAML change, not a flag flip.
+  - **LF V25 replay: RECOVERED / REPLAYED / MATCHED, offline only.** 58 steps, six LF contacts of
+    the twenty-four, the documented fine sequences, and the one documented failure (the
+    cable-obstructed M12 MAX rejected by the witness band). Every replayed record carries
+    `HISTORICAL_REPLAY`, which `mayPromote()` refuses — a replay can never become operational
+    calibration.
+  - **Naming:** new code says **leg population gate**, not H1 — the repository uses H1 for both
+    this gate and the Controller's own boot test. Historical documents keep their wording.
+  - **PASS CRITERIA status** — formal H1 for all 12 leg servos: **BLOCKED** (last formal 6/12,
+    historical; historical evidence can never produce a current PASS). Evidence lifecycle
+    `MEASURED → CANDIDATE → ACCEPTED → PROMOTED`: **IMPLEMENTED and offline-tested**, with every
+    shortcut refused.
+  - **I5 (2026-09-25):** a generic, intent-based Calibration Execution boundary is now
+    **IMPLEMENTED / OFFLINE TESTED** — `src/calibration/CalibrationExecutionEngine.*`. Per V3
+    handoff §15.11 (binding): the LF V25 18-phase sequence is a **HISTORICAL_REPLAY / ORACLE**,
+    usable in regression tests and never the production execution architecture. The engine is
+    driven by `CalibrationIntent` (`CONTACT_PROBE`/`AUXILIARY_MOVE`/`DIRECTION_VERIFY`/`RESTORE`/
+    `ABORT`), routes the three executable intents through the unmodified `SafeActuatorPolicy` and
+    `ActuatorRuntime`, and treats `RESTORE`/`ABORT` as categorically non-executing — neither ever
+    reaches a backend call, by construction, which is what makes "authority loss → zero restore
+    motion" true without a special-cased guard. It owns no session state, no persistence and no
+    geometry profile of its own — full record and adversarial test list in
+    [`../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md`](../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md).
+  - **Still TO_IMPLEMENT** — direction measurement (`MEASURED_CANDIDATE`/`ACCEPTED`: no historical
+    mechanism exists to recover) and the persistence boundary (**TO_DESIGN**: whether an accepted
+    calibration is written by `PROVISIONING` or by a separate transaction — deliberately not
+    decided by I5).
 
 ## HostLink semantic layer
 
 - **PURPOSE** — one semantic command/service contract independent of transport.
-- **ENTRY** — all preceding [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md) stages through
+- **ENTRY (for gate PASS / activation)** — all preceding [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md) stages through
   **formal recalibration** completed, plus the Diagnostics/Maintenance foundation required by the
   semantic service layer. The Diagnostics/Maintenance foundation alone is a technical prerequisite,
   **not** an authorization: HostLink follows Service/Provisioning/QC and Full Leg Calibration in
-  the canonical sequence and must not be pulled forward ahead of them (see rule 6 above).
+  the canonical sequence and must not be pulled forward ahead of them (see rule 6 above). **This
+  entry condition gates claiming the gate PASSED and any hardware/network activation — it does not
+  prohibit implementing isolated, fail-closed offline software in advance** (2026-09-25 objective
+  clarification): sequencing is an activation/validation gate, not a ban on preparatory
+  engineering that reports its own unreadiness honestly.
 - **ALLOWED** — transport adapters over one Controller service implementation; structured state and
   telemetry snapshots.
 - **NOTE (G3.1)** — the USB CDC diagnostic surface's best-effort delivery (timeout 0, short writes
@@ -286,9 +375,22 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — a second transport can consume the same semantic state without
   reimplementation or a duplicate hardware transaction.
 - **NEXT** — Wi-Fi runtime.
-- **STATUS** — **PARTIAL.** `CommandRouter` is a USB CDC adapter; G2 made the census layer
-  transport-independent (no `Serial`, no `<Arduino.h>`, structured `CensusResult`), which is the
-  precondition. A formal Controller Service Layer and schema are **TO_DESIGN**.
+- **STATUS** — **PARTIAL — telemetry half IMPLEMENTED / OFFLINE TESTED (2026-09-25).**
+  `src/core/ControllerService.h` aggregates the structured snapshots every module already
+  computes (`WifiStatus`, `OtaManagerStatus`, `CalibrationSessionStatus`, ...) behind one class
+  that carries no `servo::ServoBus*`/`power::DalyBms*` pointers, so a second transport needs only
+  this class — not `CommandRouter::Modules` — to render the same semantics `CommandRouter` already
+  prints. `CommandRouter`'s read-only `print*` methods were refactored (not duplicated) to route
+  through it; presentation (the `printf` formatting) stays local to the Serial adapter.
+  `src/core/ServiceReadiness.*` adds a pure, host-tested readiness classifier
+  (`BLOCKED`/`TO_TEST`/`READY` per named capability), exposed via the new `@HOSTLINK READINESS`
+  command — the mechanism V3 asked for so currently-unavailable functions report their state
+  explicitly rather than disappearing. **Not done**: the *action* half of the semantic model
+  (servo scan/census/preflight/read/safe_off, mode changes, DALY KEY, Wi-Fi enable, LED test) is
+  still `CommandRouter`-direct, deliberately — those commands carry side effects and were left
+  untouched to keep this gate's risk bounded. A formal command schema/session model for a genuine
+  second transport remains **TO_DESIGN**. Full record:
+  [`09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_IMPLEMENTATION.md).
 
 ## Wi-Fi runtime
 
@@ -300,7 +402,27 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — reconnect cycles stable; no heap leak; no scheduler starvation; no bus timing
   degradation.
 - **NEXT** — UI-0/UI-1 and OTA.
-- **STATUS** — **TO_DESIGN.** No network code exists in the Controller.
+- **STATUS** — **PARTIAL (W1).** A station-mode runtime is **IMPLEMENTED**, **COMPILED** and
+  **OFFLINE TESTED**; it is **NOT HARDWARE TESTED** — no MATDOG build has associated with an
+  access point yet, so every PASS CRITERION above remains **TO_TEST**.
+  - Implemented: `src/network/WifiPolicy.*` (pure, host-linkable lifecycle state machine) and
+    `src/network/WifiManager.*` (sole owner of the radio, sole includer of `<WiFi.h>`),
+    `@WIFI STATUS|ON|OFF`, one `WIFI` line in `@STATUS`, credentials resolved outside Git.
+  - Offline evidence: `scripts/tests/test_wifi_policy.cpp` links the real state machine
+    (credential gate, two-phase radio start, connect deadline, backoff ladder and ceiling, link
+    loss, enable/disable, fail-closed action failures, `millis()` wraparound, IPv4 formatting).
+  - Bounded-runtime evidence is **measured, not asserted**: `@WIFI STATUS` reports `last_us` and
+    `max_us` for `WifiManager::update()`. Those numbers do not exist yet — they require the
+    hardware test.
+  - Build cost, same FQBN and profile, against frozen `19fe837`: flash 392,468 B → 959,051 B
+    (12% → 30% of the 3 MB slot); static RAM 28,536 B → 50,868 B (8% → 15%). The ~40–50 KB the
+    Wi-Fi driver allocates at first `WiFi.mode()` is heap and is **not** in those figures;
+    `@STATUS` reports `heap_free`/`heap_min_free` to observe it on device.
+  - Deliberately absent: any server, endpoint, remote command or update path. Wi-Fi is a link.
+  - Deliberately absent: any contribution to `SystemState` health aggregation — a missing access
+    point is not a robot health fact. Whether it should ever contribute is **TO_DESIGN**.
+  - Still **TO_TEST** on hardware: association, DHCP, RSSI/IP reporting, reconnect after AP loss,
+    heap stability over reconnect cycles, and the effect (if any) on BNO085/DALY/ServoBus timing.
 
 ## OTA
 
@@ -314,8 +436,50 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — update + reboot + identity confirmation + rollback behaviour all demonstrated;
   refused in unsafe states.
 - **NEXT** — UI-9.
-- **STATUS** — **PARTIAL.** Partition-selection logic **IMPLEMENTED** and offline-tested (40/40) and
-  already used by the application-only flash workflow; OTA transport/runtime does **not** exist.
+- **STATUS** — **PARTIAL (OTA-A core + transport/auth layer complete, not hardware tested).** The
+  ENTRY condition above is **not met**: Wi-Fi runtime is implemented but not hardware-tested, so OTA
+  cannot be gate-passed.
+  - **IMPLEMENTED / COMPILED / OFFLINE TESTED** — the update core. `src/update/OtaPolicy.*` (pure
+    state machine), `OtaBootGuard.*` (first-boot rollback lifecycle), `Sha256.*` (image identity),
+    `OtaEspBackend.*` (the only unit calling `esp_ota_*`), `OtaManager.*`, `@OTA STATUS`.
+    Host-side partition-selection logic remains **IMPLEMENTED** and offline-tested (40/40).
+  - **Inactive-slot rule enforced structurally** — `target != running`, `subtype ∈ ota_0..ota_15`
+    and `image_size ≤ target.size` are explicit refusals; the backend re-checks the running
+    partition independently; `commitBootTarget()` has one call site and is reachable from exactly
+    one state, `IDENTITY_VERIFIED`. `flash_app_only.sh` is **not** reused as the OTA writer.
+  - **First-boot validation** — confirmation is earned: Controller init complete, CommandRouter
+    bound, identity readable, no PANIC/WDT/BROWNOUT reset, uptime ≥ 15 s and ≥ 2000 loop ticks.
+    The audit fails the build if `Controller::begin()` ever confirms an image. Criteria are
+    software-only and **provisional until ActuatorAuthority exists**.
+  - **Offline evidence** — 468 checks against the real state machine with a fake backend: every
+    target/metadata/stream/verification failure, the ordering property that the boot target never
+    moves outside `IDENTITY_VERIFIED`, replay/idempotence, and the whole rollback lifecycle.
+    SHA-256 checked against FIPS 180-4 vectors and against `sha256sum` on the real binary.
+  - **Transport and authentication: IMPLEMENTED / COMPILED / OFFLINE TESTED (2026-09-25, I7).**
+    `src/network/HttpTransport.*` (an `esp_http_server` adapter, the CONTROL/AUTHORIZATION plane)
+    and `src/update/OtaSession.*` (a pure, host-linkable HMAC-SHA256 challenge/response session
+    layer over `src/update/Hmac256.*`) sit in front of the one existing
+    `OtaManager`/`OtaPolicy`/`OtaEspBackend` writer — never a second writer, never ArduinoOTA. Ingest
+    remains compiled out by default (`MATDOG_OTA_INGEST_ENABLED` defaults to `0`, audit-enforced), so
+    no production image contains a reachable firmware writer regardless of whether the transport code
+    is compiled in. `HttpTransport::start()` is never called from `Controller::begin()` — reachable
+    only from the MAINTENANCE-gated `@WEB SERVER START` command, audit-enforced
+    (`check_http_transport_boundaries`). Full record:
+    [`../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md).
+  - **OTA-B authorization: IMPLEMENTED / COMPILED / OFFLINE TESTED.** The OTA-A placeholder gate
+    is gone. `src/update/OtaAuthorityGate.*` is backed by the real arbiter: OTA never becomes an
+    actuator owner (the audit fails the build if an OTA entry is added to the enum) and instead
+    takes an exclusivity **inhibit** for the whole update, granted only from `authority == NONE`.
+    Because the check and the hold are one arbiter call, the TOCTOU window a plain
+    `if (authority == NONE)` leaves open across a multi-second update does not exist. The hold is
+    released on every failure, abort and reset, and deliberately kept after a successful commit
+    until the reboot.
+  - **TO_IMPLEMENT / OTA-B** — an explicit authorized operator rollback.
+  - **HARDWARE TO_TEST** — everything: no device has received an OTA image, no otadata has been
+    written, no rollback has been observed, and the measured erase/write blocking costs
+    (`@OTA STATUS` `open_us`/`write_us`/`end_us`) do not exist yet.
+  - Cost: flash 959,043 B → 967,915 B (+8,872 B, 30% of the 3 MB slot); static RAM 50,868 B →
+    51,676 B (+808 B).
 
 ## Safe Actuator Layer
 
@@ -327,7 +491,39 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — no direct-to-`ServoBus` write path exists outside this layer; static audit
   enforces it.
 - **NEXT** — first motion.
-- **STATUS** — **TO_DESIGN.** No motion primitive exists in the firmware today.
+- **STATUS** — **PARTIAL — policy core AND offline runtime adapter IMPLEMENTED / COMPILED /
+  OFFLINE TESTED; production backend TO_IMPLEMENT.** `src/actuator/ActuatorWritePolicy.*` is the
+  decision core: a pure, host-linkable plan/commit transaction model bound to the real
+  `ActuatorAuthority` lease and generation, with no "check once then write later" path. It holds
+  no transport, so an `ACCEPT` authorises nothing by itself. The accepted-limit store is empty and
+  refuses anything without live, promoted provenance — `MATDOG_JOINT_CALIBRATION.yaml` records
+  `{min: null, max: null}` for all twelve leg joints, so every position-class command resolves to
+  `REJECT_NO_ACCEPTED_LIMITS`. `SAFE_OFF` is outside the layer structurally: no operation class
+  can name a torque removal.
+  **I4 (2026-09-25):** `src/actuator/ActuatorRuntime.*` adds the runtime adapter itself — an
+  abstract `ActuatorBackend` interface (`enableTorque`/`writeGoalPosition`, unsigned tick domain)
+  and `ActuatorRuntime`, which calls `SafeActuatorPolicy::commit()` exactly once and issues at
+  most one backend call, only on `ACCEPT`; every other decision reaches the backend zero times
+  (host-tested explicitly). There is still **no production `ActuatorBackend`** — `ServoBus`
+  exposes exactly one write, `safeOff()` — so the adapter is exercised only offline against a fake
+  backend (`test_actuator_runtime.cpp`, 46 checks). `scripts/static_audit.py`'s
+  `check_actuator_runtime_boundaries()` fails the build if `ActuatorRuntime` is referenced
+  anywhere outside `src/actuator/` or the offline suite, and neither `Controller` nor
+  `CommandRouter` does: both compiled profiles are byte-identical with and without the adapter
+  present, because the linker dead-code-eliminates it entirely. The three geometry-authorised
+  operations have no raw-tick target yet and always resolve to `ExecuteResult::NO_RAW_TARGET` —
+  that conversion needs an accepted q0/direction transform applied by a real execution engine,
+  deferred to I5. The only actuator write in the firmware is still torque OFF inside
+  `ServoBus::safeOff()`. Audit and design: [`SAFE_ACTUATOR_LAYER.md`](SAFE_ACTUATOR_LAYER.md),
+  [`../../09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md`](../../09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md).
+  **I4/I5 Controller wiring (2026-09-25, objective change):** `Controller` now owns real
+  `SafeActuatorPolicy`/`ActuatorRuntime`/`CalibrationExecutionEngine` instances as fail-closed
+  status/lifecycle infrastructure — `actuator_runtime_` is wired with a `nullptr` backend, no
+  geometry/limit/transform is ever admitted from `Controller`, and no command path reaches
+  `plan()`/`commit()`/`execute()`/`abort()` (new `check_actuator_infrastructure_wired_fail_closed()`
+  audit gate, mutation-verified). New read-only `@ACTUATOR STATUS`. `hardware_motion_authorized`
+  stays `0`; nothing above changes. See
+  [`../../09_Logs/Development_Log/2026-09-25_I4_I5_CONTROLLER_WIRING.md`](../../09_Logs/Development_Log/2026-09-25_I4_I5_CONTROLLER_WIRING.md).
 
 ## First motion
 
@@ -374,8 +570,8 @@ Sequencing: [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md#embedded-web
 
 | Gate | Purpose | Entry | Pass criteria | Status |
 |---|---|---|---|---|
-| **UI-0** | Web architecture contract: frontend/backend boundary, typed semantic command model, telemetry snapshot schema, session identity, bounded clients, static-asset storage plan | none — designable offline now | proves `Web → Controller Services → Authority/Safety → hardware` with **no** direct web→`ServoBus` path | **TO_DESIGN** (may start) |
-| **UI-1** | Read-only dashboard: overview, BNO085 3D, BMS, servo census/health, mode/authority/fault | Wi-Fi runtime PASS | reconnect cycles stable; no heap leak; no scheduler starvation; no bus timing degradation; **no actuator command from web** | **BLOCKED** (Wi-Fi) |
+| **UI-0** | Web architecture contract: frontend/backend boundary, typed semantic command model, telemetry snapshot schema, session identity, bounded clients, static-asset storage plan | none — designable offline now | proves `Web → Controller Services → Authority/Safety → hardware` with **no** direct web→`ServoBus` path | **PARTIAL — data/schema half IMPLEMENTED (2026-09-25, I6/I8)**: `ControllerService` is the typed semantic model, `GET /status` (`src/network/HttpTransport.*`) is the transport adapter over it. No session identity / bounded-clients model exists beyond the one-request-at-a-time `esp_http_server` default and the single-slot Controller-thread mailbox — see [`../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md) |
+| **UI-1** | Read-only dashboard: overview, BNO085 3D, BMS, servo census/health, mode/authority/fault | Wi-Fi runtime PASS | reconnect cycles stable; no heap leak; no scheduler starvation; no bus timing degradation; **no actuator command from web** | **BLOCKED** (Wi-Fi hardware validation, ENTRY unmet) — the read-only data source itself (`GET /status`: module health, BMS telemetry, IMU summary, LED presentation, actuator/calibration readiness, OTA provenance) is **IMPLEMENTED / OFFLINE TESTED**, compiled into the candidate, disabled at boot, MAINTENANCE-gated to start (2026-09-25, I8); no browser/3D rendering exists. Per the 2026-09-25 objective clarification this is preparatory offline engineering, not a claim that UI-1 itself has passed |
 | **UI-2** | Maintenance controls: self-test, census, health, profile audit, source signature, `SAFE_OFF`, logs | Diagnostics/Maintenance PASS + UI-1 | no EEPROM write, no motor motion | **BLOCKED** |
 | **UI-3** | Calibration / service workflow UI | Authority model PASS + backend workflows | firmware owns the transaction state machine; refresh/reconnect never silently resumes a dangerous transaction | **BLOCKED** |
 | **UI-4** | Joint test: bounded single-joint command | Safe Actuator PASS + first motion PASS | mandatory command lease/watchdog; no raw slider; no EEPROM | **BLOCKED** |

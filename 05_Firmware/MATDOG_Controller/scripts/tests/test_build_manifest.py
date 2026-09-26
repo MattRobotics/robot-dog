@@ -34,7 +34,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from build_manifest import (  # noqa: E402
+    DEFAULT_FLASH_OTA_INGEST,
     DEFAULT_FLASH_PROFILE,
+    KNOWN_OTA_INGEST_VALUES,
     KNOWN_PROFILES,
     MANIFEST_VERSION,
     Refusal,
@@ -66,6 +68,7 @@ def manifest(**overrides):
         "BUILD_ID": "34afbc7808e2",
         "SOURCE_STATE": "CLEAN",
         "HARDWARE_PROFILE": "USB_ONLY",
+        "OTA_INGEST_ENABLED": "0",
         "FQBN": CANONICAL_FQBN,
         "APPLICATION_BINARY": "MATDOG_Controller.ino.bin",
         "APPLICATION_SIZE": "387164",
@@ -77,7 +80,7 @@ def manifest(**overrides):
 
 def verify(m=None, *, head=HEAD, expected_fqbn=CANONICAL_FQBN, tree_state="CLEAN",
            binary_exists=True, binary_size=387164, binary_sha256=SHA,
-           requested_profile="USB_ONLY"):
+           requested_profile="USB_ONLY", requested_ota_ingest="0"):
     return verify_manifest(
         manifest() if m is None else m,
         head_commit=head,
@@ -87,6 +90,7 @@ def verify(m=None, *, head=HEAD, expected_fqbn=CANONICAL_FQBN, tree_state="CLEAN
         binary_size=binary_size,
         binary_sha256=binary_sha256,
         requested_profile=requested_profile,
+        requested_ota_ingest=requested_ota_ingest,
     )
 
 
@@ -106,6 +110,16 @@ class TestHappyPath(unittest.TestCase):
         self.assertEqual(DEFAULT_FLASH_PROFILE, "USB_ONLY")
         self.assertIn("USB_ONLY", KNOWN_PROFILES)
         self.assertIn("ROBOT_POWERED", KNOWN_PROFILES)
+
+    def test_ota_ingest_enabled_manifest_with_explicit_authorization_is_allowed(self):
+        v = verify(manifest(OTA_INGEST_ENABLED="1"), requested_ota_ingest="1")
+        self.assertTrue(v.ok, v.detail)
+        self.assertEqual(v.ota_ingest, "1")
+
+    def test_default_flash_ota_ingest_is_the_backwards_safe_one(self):
+        self.assertEqual(DEFAULT_FLASH_OTA_INGEST, "0")
+        self.assertIn("0", KNOWN_OTA_INGEST_VALUES)
+        self.assertIn("1", KNOWN_OTA_INGEST_VALUES)
 
 
 class TestProfileAuthorization(unittest.TestCase):
@@ -151,6 +165,72 @@ class TestProfileAuthorization(unittest.TestCase):
                            requested_profile=r_profile)
                 self.assertEqual(v.ok, m_profile == r_profile,
                                  f"{m_profile} vs {r_profile}")
+
+
+class TestOtaIngestAuthorization(unittest.TestCase):
+    """The second, orthogonal authorization axis (I7 hardening,
+    2026-09-25): OTA_INGEST_ENABLED is never inferred from HARDWARE_PROFILE
+    and carries its own explicit-authorization requirement, the same shape
+    TestProfileAuthorization already gives HARDWARE_PROFILE."""
+
+    def test_ingest_enabled_manifest_without_authorization_refuses(self):
+        # THE case this axis exists for: an ingest-enabled image left in the
+        # shared build directory must never be flashed by an unqualified
+        # invocation.
+        v = verify(manifest(OTA_INGEST_ENABLED="1"),
+                   requested_ota_ingest=DEFAULT_FLASH_OTA_INGEST)
+        self.assertFalse(v.ok)
+        self.assertEqual(v.reason, Refusal.OTA_INGEST_MISMATCH)
+        self.assertIn("MATDOG_FLASH_OTA_INGEST=1", v.detail)
+
+    def test_ingest_disabled_manifest_when_enabled_was_requested_refuses(self):
+        v = verify(manifest(OTA_INGEST_ENABLED="0"), requested_ota_ingest="1")
+        self.assertFalse(v.ok)
+        self.assertEqual(v.reason, Refusal.OTA_INGEST_MISMATCH)
+
+    def test_unknown_manifest_ota_ingest_refuses(self):
+        for bad in ("TRUE", "ENABLED", "2", "yes", ""):
+            if bad == "":
+                # An empty value is caught upstream as MANIFEST_INCOMPLETE -
+                # see test_empty_manifest_ota_ingest_refuses_as_incomplete.
+                continue
+            v = verify(manifest(OTA_INGEST_ENABLED=bad))
+            self.assertFalse(v.ok, bad)
+            self.assertEqual(v.reason, Refusal.OTA_INGEST_UNKNOWN, bad)
+
+    def test_empty_manifest_ota_ingest_refuses_as_incomplete(self):
+        v = verify(manifest(OTA_INGEST_ENABLED=""))
+        self.assertFalse(v.ok)
+        self.assertEqual(v.reason, Refusal.MANIFEST_INCOMPLETE)
+
+    def test_unknown_requested_ota_ingest_refuses(self):
+        v = verify(requested_ota_ingest="ANYTHING_ELSE")
+        self.assertFalse(v.ok)
+        self.assertEqual(v.reason, Refusal.REQUESTED_OTA_INGEST_UNKNOWN)
+
+    def test_matching_ota_ingest_is_never_inferred_from_one_side(self):
+        for m_ingest in KNOWN_OTA_INGEST_VALUES:
+            for r_ingest in KNOWN_OTA_INGEST_VALUES:
+                v = verify(manifest(OTA_INGEST_ENABLED=m_ingest),
+                           requested_ota_ingest=r_ingest)
+                self.assertEqual(v.ok, m_ingest == r_ingest, f"{m_ingest} vs {r_ingest}")
+
+    def test_ota_ingest_is_never_inferred_from_hardware_profile(self):
+        # A ROBOT_POWERED build with ingest still 0 is the ordinary case;
+        # a USB_ONLY build with ingest 1 is unusual but not itself a reason
+        # to refuse — only the two OTA_INGEST_ENABLED values are compared.
+        for profile in KNOWN_PROFILES:
+            for ingest in KNOWN_OTA_INGEST_VALUES:
+                v = verify(manifest(HARDWARE_PROFILE=profile, OTA_INGEST_ENABLED=ingest),
+                           requested_profile=profile, requested_ota_ingest=ingest)
+                self.assertTrue(v.ok, f"{profile}/{ingest}: {v.detail}")
+
+    def test_profile_mismatch_outranks_ota_ingest_mismatch(self):
+        # Ordering: HARDWARE_PROFILE is checked first, so a build that fails
+        # both authorizations reports the more upstream one.
+        v = verify(manifest(HARDWARE_PROFILE="ROBOT_POWERED", OTA_INGEST_ENABLED="1"),
+                   requested_profile="USB_ONLY", requested_ota_ingest="0")
+        self.assertEqual(v.reason, Refusal.PROFILE_MISMATCH)
 
 
 class TestBinaryBinding(unittest.TestCase):
@@ -314,14 +394,14 @@ class TestManifestIntegrity(unittest.TestCase):
         v = verify_manifest(None, head_commit=HEAD, expected_fqbn=CANONICAL_FQBN,
                             tree_state="CLEAN", binary_exists=True,
                             binary_size=387164, binary_sha256=SHA,
-                            requested_profile="USB_ONLY")
+                            requested_profile="USB_ONLY", requested_ota_ingest="0")
         self.assertFalse(v.ok)
         self.assertEqual(v.reason, Refusal.MANIFEST_MISSING)
 
     def test_incomplete_manifest_refuses(self):
-        for key in ("SOURCE_COMMIT", "HARDWARE_PROFILE", "APPLICATION_SHA256",
-                    "APPLICATION_SIZE", "SOURCE_STATE", "BUILD_ID", "FQBN",
-                    "APPLICATION_BINARY", "MATDOG_MANIFEST_VERSION"):
+        for key in ("SOURCE_COMMIT", "HARDWARE_PROFILE", "OTA_INGEST_ENABLED",
+                    "APPLICATION_SHA256", "APPLICATION_SIZE", "SOURCE_STATE", "BUILD_ID",
+                    "FQBN", "APPLICATION_BINARY", "MATDOG_MANIFEST_VERSION"):
             m = manifest()
             del m[key]
             v = verify(m)
@@ -352,11 +432,12 @@ class TestManifestIntegrity(unittest.TestCase):
     def test_render_then_parse_roundtrip(self):
         text = render_manifest(
             source_commit=HEAD, build_id="34afbc7808e2", source_state="CLEAN",
-            profile="ROBOT_POWERED", fqbn=CANONICAL_FQBN,
+            profile="ROBOT_POWERED", ota_ingest_enabled="1", fqbn=CANONICAL_FQBN,
             application_binary="MATDOG_Controller.ino.bin",
             application_size=387632, application_sha256=SHA)
         m = parse_manifest(text)
         self.assertEqual(m["HARDWARE_PROFILE"], "ROBOT_POWERED")
+        self.assertEqual(m["OTA_INGEST_ENABLED"], "1")
         self.assertEqual(m["APPLICATION_SIZE"], "387632")
         self.assertEqual(m["SOURCE_COMMIT"], HEAD)
         # Every key the verifier requires must be produced by the writer —
@@ -364,7 +445,7 @@ class TestManifestIntegrity(unittest.TestCase):
         v = verify_manifest(m, head_commit=HEAD, expected_fqbn=CANONICAL_FQBN,
                             tree_state="CLEAN", binary_exists=True,
                             binary_size=387632, binary_sha256=SHA,
-                            requested_profile="ROBOT_POWERED")
+                            requested_profile="ROBOT_POWERED", requested_ota_ingest="1")
         self.assertTrue(v.ok, v.detail)
 
 
@@ -381,23 +462,25 @@ class TestCliEndToEnd(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             return fn(*args, **kwargs)
 
-    def _build(self, tmp, profile, content=b"firmware-bytes", fqbn=CANONICAL_FQBN):
+    def _build(self, tmp, profile, content=b"firmware-bytes", fqbn=CANONICAL_FQBN,
+              ota_ingest="0"):
         binary = Path(tmp) / "MATDOG_Controller.ino.bin"
         binary.write_bytes(content)
         out = Path(tmp) / "matdog_build_manifest.txt"
         rc = self._quiet(main, ["write", "--output", str(out), "--binary", str(binary),
                                  "--source-commit", HEAD, "--build-id", "34afbc7808e2",
                                  "--source-state", "CLEAN", "--profile", profile,
-                                 "--fqbn", fqbn])
+                                 "--ota-ingest", ota_ingest, "--fqbn", fqbn])
         self.assertEqual(rc, 0)
         return binary, out
 
     def _verify(self, binary, out, requested, head=HEAD, tree="CLEAN",
-                expected_fqbn=CANONICAL_FQBN):
+                expected_fqbn=CANONICAL_FQBN, requested_ota_ingest="0"):
         return self._quiet(main, ["verify", "--manifest", str(out), "--binary", str(binary),
                                   "--head", head, "--expected-fqbn", expected_fqbn,
                                   "--tree-state", tree,
-                                  "--requested-profile", requested])
+                                  "--requested-profile", requested,
+                                  "--requested-ota-ingest", requested_ota_ingest])
 
     def test_write_then_verify_usb_only(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -411,6 +494,24 @@ class TestCliEndToEnd(unittest.TestCase):
             self.assertEqual(self._verify(binary, out, "ROBOT_POWERED"), 0)
             # No authorization -> refused.
             self.assertEqual(self._verify(binary, out, DEFAULT_FLASH_PROFILE), 1)
+
+    def test_write_then_verify_ota_ingest_enabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            binary, out = self._build(tmp, "ROBOT_POWERED", ota_ingest="1")
+            self.assertEqual(
+                self._verify(binary, out, "ROBOT_POWERED", requested_ota_ingest="1"), 0)
+            # No ingest authorization -> refused, even with the right profile.
+            self.assertEqual(
+                self._verify(binary, out, "ROBOT_POWERED",
+                             requested_ota_ingest=DEFAULT_FLASH_OTA_INGEST), 1)
+
+    def test_ordinary_build_defaults_to_ingest_disabled(self):
+        # scripts/build.sh with no MATDOG_OTA_INGEST_VALIDATION override
+        # must produce a manifest that verifies against the backwards-safe
+        # default with no new ceremony.
+        with tempfile.TemporaryDirectory() as tmp:
+            binary, out = self._build(tmp, "USB_ONLY")
+            self.assertEqual(self._verify(binary, out, "USB_ONLY"), 0)
 
     def test_rebuilt_binary_invalidates_a_stale_manifest(self):
         # The exact scenario from the review: a manifest from one profile
@@ -440,7 +541,8 @@ class TestCliEndToEnd(unittest.TestCase):
             rc = self._quiet(main, ["write", "--output", str(Path(tmp) / "m.txt"),
                                     "--binary", str(binary), "--source-commit", HEAD,
                                     "--build-id", "x", "--source-state", "CLEAN",
-                                    "--profile", "SOMETHING_ELSE", "--fqbn", CANONICAL_FQBN])
+                                    "--profile", "SOMETHING_ELSE", "--ota-ingest", "0",
+                                    "--fqbn", CANONICAL_FQBN])
             self.assertEqual(rc, 1)
 
     def test_write_refuses_missing_binary(self):
@@ -449,6 +551,17 @@ class TestCliEndToEnd(unittest.TestCase):
                                     "--binary", str(Path(tmp) / "nope.bin"),
                                     "--source-commit", HEAD, "--build-id", "x",
                                     "--source-state", "CLEAN", "--profile", "USB_ONLY",
+                                    "--ota-ingest", "0", "--fqbn", CANONICAL_FQBN])
+            self.assertEqual(rc, 1)
+
+    def test_write_refuses_unknown_ota_ingest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            binary = Path(tmp) / "MATDOG_Controller.ino.bin"
+            binary.write_bytes(b"x")
+            rc = self._quiet(main, ["write", "--output", str(Path(tmp) / "m.txt"),
+                                    "--binary", str(binary), "--source-commit", HEAD,
+                                    "--build-id", "x", "--source-state", "CLEAN",
+                                    "--profile", "USB_ONLY", "--ota-ingest", "TRUE",
                                     "--fqbn", CANONICAL_FQBN])
             self.assertEqual(rc, 1)
 

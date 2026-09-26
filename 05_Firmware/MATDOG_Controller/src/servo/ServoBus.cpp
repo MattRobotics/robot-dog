@@ -1,6 +1,7 @@
 #include "ServoBus.h"
 
 #include "../config/Pins.h"
+#include "ServoProfile.h"
 
 namespace matdog {
 namespace servo {
@@ -182,6 +183,40 @@ bool ServoBus::readRuntimeState(int id, RuntimeState* out) {
   out->present_temperature = st_.readByte(static_cast<uint8_t>(id), SMS_STS_PRESENT_TEMPERATURE);
   out->torque_enable       = st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE);
 
+  return true;
+}
+
+bool ServoBus::readPositionOffset(int id, int16_t* out) {
+  if (id < 0 || id > 253 || out == nullptr) return false;
+
+  // Diagnostic timeout: this is provisioning verification, not an operational
+  // control read, and an absent unit must fail fast rather than stall the loop.
+  ScopedIOTimeout guard(st_, kDiagnosticTimeoutMs);
+
+  const int raw = st_.readWord(static_cast<uint8_t>(id), SMS_STS_OFS_L);
+  if (raw < 0) {
+    last_detected_ = core::DetectedState::NO_RESPONSE;
+    return false;  // no answer is not an offset of zero
+  }
+  last_detected_ = core::DetectedState::ONLINE;
+  *out = decodePositionOffset(static_cast<uint16_t>(raw));
+  return true;
+}
+
+bool ServoBus::readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out) {
+  if (id < 0 || id > 253 || out == nullptr) return false;
+  if (width != 1 && width != 2) return false;  // refuse, never guess
+
+  ScopedIOTimeout guard(st_, kDiagnosticTimeoutMs);
+
+  const int raw = (width == 1) ? st_.readByte(static_cast<uint8_t>(id), address)
+                               : st_.readWord(static_cast<uint8_t>(id), address);
+  if (raw < 0) {
+    last_detected_ = core::DetectedState::NO_RESPONSE;
+    return false;
+  }
+  last_detected_ = core::DetectedState::ONLINE;
+  *out = raw;
   return true;
 }
 

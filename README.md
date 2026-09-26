@@ -4,13 +4,20 @@ MATDOG is Matt Robotics' custom quadruped platform: a 17-DOF mechanical design w
 articulated head, an ESP32-S3 real-time controller, and a future Jetson-based high-level stack.
 This repository is the single active engineering repository for the robot.
 
-> **Current snapshot — 2026-09-15**
+> **Current snapshot — 2026-09-25**
 >
 > - **13 servos are physically installed:** all 12 leg servos plus `NECK_ROTATION` (ID 51).
 > - **17 servos remain canonically allocated.** IDs 52–55 are intentionally absent today.
-> - **MATDOG Controller V0.1 is the official firmware baseline.** Its validated scope is the
->   `USB_ONLY` bench profile, not the powered robot.
-> - The immediate milestone is the no-motion `ROBOT_POWERED` validation sequence.
+> - **MATDOG Controller V0.1 is the official firmware baseline.** `ROBOT_POWERED` no-motion
+>   operation is now **VALIDATED** (G3/G3.1 PASS, 2026-09-17/18); the firmware actually installed
+>   on the robot is still source `6322563` (2026-09-19) — everything below is not flashed.
+> - The active workstream is **software-only NextGen integration**
+>   (branch `feat/controller-nextgen-integration-v1`, base `feat/h0-current-leg-preflight-v1`):
+>   Wi-Fi/OTA core, `ActuatorAuthority`, the Safe Actuator policy core, the calibration domain/
+>   manager foundation, and H0 leg preflight are all **IMPLEMENTED / OFFLINE TESTED**, none
+>   **HARDWARE TESTED**. The main fuse is intentionally removed during this phase; no flashing,
+>   motion, KEY operation or charger action is authorized until an integrated software freeze and a
+>   dedicated hardware-validation authorization.
 > - Joint calibration remains reset. No stale calibration authorizes motion.
 
 ## Status vocabulary
@@ -217,9 +224,11 @@ must travel `Browser -> CommandRouter -> Controller services -> authority -> Saf
 ServoBus`; a direct browser-to-`ServoBus` path is permanently forbidden. Contract in
 [`ARCHITECTURE.md`](01_Docs/02_Architecture/ARCHITECTURE.md#embedded-matdog-web-ui--control--service-dashboard).
 
-The branch `matdog/full-leg-calibrator-v1` is a preserved oracle/evidence branch. Its useful
-calibration engine, safety, and evidence patterns may later be migrated selectively into the
-Controller; the branch is not the final runtime architecture and must not be merged wholesale.
+The Full Leg Calibrator V1 tree is a preserved oracle/evidence source, held by the annotated tag
+`archive/2026-08-29/full-leg-calibrator-v1-h0` -> `15f3fb8f378e6cadf6bc479bfcaca2947741c9fd` (the
+former branch `matdog/full-leg-calibrator-v1` was archived 2026-09-18 and no longer exists). Its
+useful calibration engine, safety, and evidence patterns may later be migrated selectively into
+the Controller; it is not the final runtime architecture and must not be merged wholesale.
 
 The frozen ST3215 tools remain immutable qualification evidence even after equivalent service
 capabilities are integrated into the Controller.

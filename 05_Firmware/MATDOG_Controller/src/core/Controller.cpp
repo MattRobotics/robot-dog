@@ -4,6 +4,7 @@
 #include <esp_system.h>
 
 #include "../config/BuildConfig.h"
+#include "../config/OtaCredentials.h"
 #include "../config/Pins.h"
 
 // G3.1: the non-blocking USB CDC guarantee in Controller::begin() rests on
@@ -52,6 +53,38 @@ void Controller::begin() {
   delay(1500);  // let native USB CDC enumerate, matching every proven bring-up sketch.
 
   system_state_.beginBoot(millis());
+
+  // Boot always lands on NONE. A previous authority is never restored - not
+  // from NVS, not from a retained value, not from anywhere. See
+  // core/ActuatorAuthority.h.
+  authority_.reset(AuthorityClearReason::BOOT);
+
+  // Before the banner, so the banner can report what the bootloader left us
+  // with. Reads the partition table and otadata; writes nothing. In
+  // particular it does NOT confirm the running image - that is earned in
+  // update(), over seconds, by actually running (see update/OtaBootGuard.h).
+  ota_.begin(millis(), &authority_);
+
+  // Binds the calibration manager to the same single arbiter. It starts with
+  // no session and, because the repository declares the current calibration
+  // stale and hardware motion unauthorized, it refuses to open a live one.
+  calibration_.begin(&authority_);
+
+  // Safe Actuator / Calibration Execution infrastructure (I4/I5), bound as
+  // fail-closed status/lifecycle infrastructure only — 2026-09-25 objective
+  // change. actuator_policy_ is bound to the real arbiter (read-only
+  // authority checks, same as calibration_ above): no geometry is bound, no
+  // limit or transform is ever admitted, so every position-class or
+  // geometry-authorised operation refuses at the earliest possible gate.
+  // actuator_runtime_ is given nullptr as its backend, deliberately: even a
+  // hypothetical future ACCEPT can never reach a write, because there is
+  // nothing to write to. scripts/static_audit.py's
+  // check_actuator_infrastructure_wired_fail_closed() enforces both facts
+  // structurally, not merely by this comment.
+  actuator_policy_.begin(&authority_);
+  actuator_runtime_.begin(&actuator_policy_, /*backend=*/nullptr);
+  calibration_execution_.begin(&actuator_policy_, &actuator_runtime_);
+
   printBootBanner();
 
   // Init order: transports that cannot interfere with each other first.
@@ -65,6 +98,7 @@ void Controller::begin() {
   // "no startup torque / no startup motion"), and scripts/static_audit.py
   // fails the build if Controller::begin() ever starts one.
   servo_census_.begin(&servo_bus_);
+  servo_preflight_.begin(&servo_bus_);
 
   imu_.begin();
   system_state_.setImuHealth(imu_.health());
@@ -74,11 +108,37 @@ void Controller::begin() {
 
   led_.begin();
   system_state_.setLedHealth(led_.health());
+  led_status_.begin(&led_);
+
+  // Configures the Wi-Fi policy and publishes its first snapshot. It does
+  // NOT start the radio: the first WiFi.mode() call initializes the driver
+  // and allocates tens of KB of heap, which does not belong in a boot path
+  // that must reach SYSTEM_BOOT_COMPLETE promptly. The radio comes up from
+  // update(), a few ticks later, if credentials exist.
+  //
+  // Wi-Fi is deliberately absent from system_state_: a missing access point
+  // is not a robot health fact, and the G3/G3.1-validated meaning of
+  // SYSTEM health must not silently change because a router rebooted.
+  // Wi-Fi is observable through @STATUS and @WIFI STATUS instead.
+  wifi_.begin(millis());
 
   CommandRouter::Modules modules{
-      &servo_bus_, &servo_census_, &imu_, &daly_, &led_, &system_state_, &power_state_,
-      &operating_mode_,
+      &servo_bus_, &servo_census_, &servo_preflight_, &imu_, &daly_, &led_, &led_status_,
+      &wifi_, &ota_,
+      &system_state_,
+      &power_state_, &operating_mode_, &authority_, &calibration_,
+      &actuator_policy_,
+      &service_,
+      &http_transport_,
   };
+  service_.begin(modules);
+  // Never starts the listening socket here — see network/HttpTransport.h.
+  // The secret is passed as raw bytes (strlen of the configured string, or
+  // 0 if none was configured); OtaSession fails closed on a zero-length
+  // secret exactly like WifiPolicy fails closed on an empty SSID.
+  http_transport_.begin(&service_, &ota_,
+                        reinterpret_cast<const uint8_t*>(config::kOtaSecret),
+                        config::kOtaSecretPresent ? strlen(config::kOtaSecret) : 0);
   command_router_.begin(modules);
 
   system_state_.update();
@@ -88,6 +148,11 @@ void Controller::begin() {
   Serial.printf("SYSTEM_BOOT_COMPLETE health=%s power_state=%s\n",
                 toString(system_state_.systemHealth()),
                 toString(power_state_.state()));
+
+  // Last statement in begin(), deliberately. This is one of the conditions
+  // the OTA first-boot self-check requires, and it must mean "begin() ran to
+  // completion", not "begin() started".
+  initialized_ = true;
 }
 
 void Controller::printBootBanner() {
@@ -117,11 +182,27 @@ void Controller::printBootBanner() {
                 pins::kBnoSck, pins::kBnoMiso, pins::kBnoMosi, pins::kBnoCs,
                 pins::kBnoInt, pins::kBnoRst, pins::kBnoPs0);
   Serial.printf("led        : GPIO%d / %u px\n", pins::kLedRingDin, status::LedRing::kNumPixels);
+  // Credentials presence only — never the SSID's passphrase, and never a
+  // claim about connectivity: the radio has not been started at this point.
+  Serial.printf("wifi       : credentials=%s state=%s (radio starts from update())\n",
+                wifi_.status().credentials_present ? "YES" : "NO",
+                network::toString(wifi_.status().state));
 
   const esp_partition_t* running = esp_ota_get_running_partition();
   if (running != nullptr) {
     Serial.printf("partition  : %s @ 0x%06x (size 0x%06x)\n",
                   running->label, (unsigned)running->address, (unsigned)running->size);
+  }
+
+  // What the bootloader handed us, and whether this image still owes the
+  // bootloader a confirmation. Read-only; nothing here confirms anything.
+  {
+    const update::OtaManagerStatus& o = ota_.status();
+    Serial.printf("ota        : img_state=%s rollback_possible=%s ingest=%s build_id=%s\n",
+                  update::toString(o.policy.running_image_state),
+                  o.policy.rollback_possible ? "YES" : "NO",
+                  o.ingest_enabled ? "ENABLED" : "DISABLED (no transport, no auth)",
+                  o.running_build_id);
   }
 
   Serial.printf("reset_reason : %s\n", resetReasonName(esp_reset_reason()));
@@ -130,6 +211,16 @@ void Controller::printBootBanner() {
   Serial.println("startup_servo_scan : DISABLED");
   Serial.println("daly_write       : KEY_LOGIC_DISCHARGE_ONLY (operator command; no MOS/power-cut write)");
   Serial.printf("operating_mode   : %s\n", toString(operating_mode_.mode()));
+  // Two orthogonal axes, printed together so they can never be confused for
+  // one. actuator_authority is NONE at boot, always.
+  Serial.printf("actuator_authority : %s (inhibit=%s)\n",
+                toString(authority_.current()),
+                authority_.inhibited() ? toString(authority_.inhibitReason()) : "NONE");
+  // The repository's own verdict on the installed robot, on the boot record.
+  Serial.printf("calibration      : %s hardware_motion=%s\n",
+                calibration_.status().current_calibration_stale
+                    ? "STALE_PENDING_FULL_RECALIBRATION" : "SEE_@CALIBRATION_STATUS",
+                calibration_.status().hardware_motion_authorized ? "AUTHORIZED" : "BLOCKED");
   Serial.println();
 }
 
@@ -151,9 +242,55 @@ void Controller::update(uint32_t now_ms) {
   // Strictly after servo_bus_.update(): it observes that call's
   // RUNNING -> COMPLETE edge and classifies the raw scan exactly once.
   servo_census_.update();
+  servo_preflight_.update();
   system_state_.setServoHealth(servo_bus_.health());
 
   system_state_.update();
+
+  // Last among the services, on purpose. Within one pass every
+  // timing-sensitive module (IMU, DALY, the incremental servo scan step)
+  // has already advanced before any network work happens, so a heavy tick
+  // here — the first WiFi.mode() call is the expensive one — cannot sit
+  // between a bus transaction and its follow-up. The cost of this call is
+  // measured, not assumed: @WIFI STATUS reports last_us/max_us.
+  wifi_.update(now_ms);
+
+  // Drives the first-boot rollback lifecycle. Bounded, touches no flash, and
+  // does almost nothing once the lifecycle has settled. The facts it judges
+  // are passed in rather than reached for, so the criteria stay testable off
+  // the device.
+  {
+    update::OtaHostFacts facts;
+    facts.controller_initialized = initialized_;
+    facts.command_router_bound = command_router_.bound();
+    facts.uptime_ms = system_state_.uptimeMillis(now_ms);
+    ota_.update(now_ms, facts);
+  }
+
+  // Bounded: returns immediately unless a session is live, and touches no
+  // hardware in any case. It exists so a session notices authority being
+  // taken away from underneath it.
+  calibration_.update(operating_mode_.mode());
+
+  // Last: every input below was just refreshed this tick. LED presentation
+  // is read-only over all of them — see status/LedStatusPolicy.h for why
+  // none of this duplicates a hardware read.
+  {
+    status::LedStatusInputs led_inputs;
+    led_inputs.system_health = system_state_.systemHealth();
+    led_inputs.firmware_update_in_progress =
+        authority_.inhibited() && authority_.inhibitReason() == InhibitReason::FIRMWARE_UPDATE;
+    led_inputs.calibration_in_progress = calibration_.sessionLive();
+    led_inputs.wifi_connecting = wifi_.status().state == network::WifiState::RADIO_STARTING ||
+                                 wifi_.status().state == network::WifiState::CONNECTING;
+    led_status_.update(now_ms, led_inputs);
+  }
+
+  // Drains at most one pending HTTP request, if the Web server was ever
+  // started (see @WEB SERVER START). A no-op, bounded check when it was
+  // not — see network/HttpTransport.h for the cross-thread handoff this
+  // advances.
+  http_transport_.update(now_ms);
 
   if (power_state_.state() == PowerState::SHUTDOWN_REQUESTED ||
       power_state_.state() == PowerState::SHUTTING_DOWN ||

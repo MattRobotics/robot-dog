@@ -122,6 +122,8 @@ constant, or the mode seen when the command arrived).
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
+import os
+import pathlib
 import re
 import subprocess
 import sys
@@ -165,7 +167,11 @@ def check_forbidden_literals(files):
         "SyncWritePosEx",
         "WheelMode",
         "SMS_STS_GOAL_POSITION",
-        "SMS_STS_OFS_L",
+        # SMS_STS_OFS_L is NOT banned outright any more. A total ban blocked
+        # reading PositionOffset as well as writing it, and left the Controller
+        # unable to verify the single most safety-relevant provisioning fact.
+        # check_position_offset_boundary() replaces it with a narrower and
+        # stronger rule: one approved read accessor, and no write, ever.
         "SMS_STS_OFS_H",
         "factory reset",
         "FactoryReset",
@@ -537,9 +543,13 @@ def check_bms_command_surface(files):
 
     # The KEY probe is diagnostics only: no power-state/health consumer yet.
     # Firmware sources only - the offline host suite exercises these APIs.
+    # ControllerService.h (I6) is a reviewed exception: it forwards the same
+    # already-computed KEY snapshot/status CommandRouter already read, for
+    # the same diagnostic presentation, through the transport-neutral
+    # telemetry layer - it does not add a second decision path.
     for p2, c2 in files:
         if "scripts" in p2.parts or p2.name in DALY_SOURCE_NAMES or \
-                p2.name in ("CommandRouter.cpp", "CommandRouter.h"):
+                p2.name in ("CommandRouter.cpp", "CommandRouter.h", "ControllerService.h"):
             continue
         for token in ("requestKeyConfigRead", "keyConfigSnapshot", "keyConfigReadResult",
                       "DalyKeyLogic", "DalyKeyConfigSnapshot", "requestKeyLogicDischarge",
@@ -768,6 +778,201 @@ def check_led_anti_back_power(files):
     # value is no longer the right question. What replaced it is strictly
     # stronger - it checks that they are DERIVED from one profile authority
     # AND that the active profile is still USB_ONLY.
+
+
+def check_actuator_runtime_boundaries(files):
+    """I4: the Safe Actuator runtime adapter (src/actuator/ActuatorRuntime.*)
+    must stay host-linkable exactly like ActuatorWritePolicy itself, and its
+    mere existence must not make ordinary physical motion reachable. There is
+    still no production ActuatorBackend anywhere in this firmware - ServoBus
+    exposes exactly one write, safeOff() (torque OFF).
+
+    2026-09-25 objective change: Controller.{h,cpp} may now own an
+    ActuatorRuntime instance as fail-closed status/lifecycle infrastructure
+    (it must be wired with a null backend - see
+    check_actuator_infrastructure_wired_fail_closed()). Every OTHER file
+    stays excluded, in particular CommandRouter.cpp and ControllerService.h:
+    neither may reference this class by name, which is what keeps "Controller
+    owns one" from silently growing into "a command can reach one"."""
+    names = {p.name for p, _ in files}
+    for required in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
+        if required not in names:
+            fail(f"{required}: Safe Actuator runtime adapter unit not found")
+
+    for path, code in files:
+        if path.name not in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
+            continue
+        for token in ("#include <Arduino.h>", "Serial.", "millis(", "ServoBus"):
+            if token in code:
+                fail(f"{path}: contains {token!r} - keep the Safe Actuator runtime adapter "
+                     f"host-linkable, the same contract as ActuatorWritePolicy itself")
+
+    allowed_dirs = {"actuator", "calibration", "tests"}
+    allowed_names = {"ActuatorRuntime.h", "ActuatorRuntime.cpp", "Controller.h", "Controller.cpp"}
+    for path, code in files:
+        if path.name in allowed_names:
+            continue
+        if path.parent.name in allowed_dirs:
+            continue
+        if re.search(r"\bActuatorRuntime\b", code):
+            fail(f"{path}: references ActuatorRuntime - I4's runtime adapter has no production "
+                 f"backend (ServoBus exposes no torque-on/GoalPosition write) and must not be "
+                 f"constructed or referenced outside src/actuator/, src/calibration/, "
+                 f"Controller.{{h,cpp}} (fail-closed status infrastructure only) or the offline "
+                 f"test suite")
+
+
+def check_calibration_execution_engine_boundaries(files):
+    """I5: the Calibration Execution boundary must stay free of the LF V25
+    18-phase sequence (V3 handoff Sec 15.11, binding: historical oracle
+    only, never the production architecture) and must never name a
+    torque-removal primitive - SAFE_OFF stays outside this layer exactly
+    like it stays outside ActuatorWritePolicy and ActuatorRuntime."""
+    names = {p.name for p, _ in files}
+    for required in ("CalibrationExecutionEngine.h", "CalibrationExecutionEngine.cpp"):
+        if required not in names:
+            fail(f"{required}: Calibration Execution engine unit not found")
+
+    for path, code in files:
+        if path.name not in ("CalibrationExecutionEngine.h", "CalibrationExecutionEngine.cpp"):
+            continue
+        for token in ("#include <Arduino.h>", "Serial.", "millis(", "ServoBus",
+                      "CalibrationPhase", "safeOff", "EnableTorque"):
+            if token in code:
+                fail(f"{path}: contains {token!r} - the Calibration Execution boundary must "
+                     f"stay host-linkable, must never reference the historical LF V25 18-phase "
+                     f"sequence as its architecture (V3 handoff Sec 15.11), and must never name "
+                     f"a torque-removal primitive (SAFE_OFF stays outside this layer)")
+
+    # Same guarantee I4 enforces for ActuatorRuntime, applied to this class
+    # directly: #include hides a transitive ActuatorRuntime reference from a
+    # textual scan of Controller.h/.cpp, so the engine itself needs its own
+    # boundary check rather than relying on check_actuator_runtime_boundaries()
+    # alone. 2026-09-25 objective change: Controller.{h,cpp} may now own an
+    # instance as fail-closed status/lifecycle infrastructure (audited by
+    # check_actuator_infrastructure_wired_fail_closed()); every other file
+    # stays excluded, in particular CommandRouter.cpp and ControllerService.h.
+    allowed_dirs = {"calibration", "tests"}
+    allowed_names = {"CalibrationExecutionEngine.h", "CalibrationExecutionEngine.cpp",
+                     "Controller.h", "Controller.cpp"}
+    for path, code in files:
+        if path.name in allowed_names:
+            continue
+        if path.parent.name in allowed_dirs:
+            continue
+        if re.search(r"\bCalibrationExecutionEngine\b", code):
+            fail(f"{path}: references CalibrationExecutionEngine - I5's execution boundary has "
+                 f"no production backend behind it and must not be constructed or referenced "
+                 f"outside src/calibration/, Controller.{{h,cpp}} (fail-closed status "
+                 f"infrastructure only) or the offline test suite")
+
+
+def check_service_readiness_is_host_linkable(files):
+    """I6: the HostLink readiness classifier must stay pure and
+    host-linkable, the same contract as every other decision core in this
+    codebase - no module pointer, no hardware call, no transport."""
+    names = {p.name for p, _ in files}
+    for required in ("ServiceReadiness.h", "ServiceReadiness.cpp"):
+        if required not in names:
+            fail(f"{required}: HostLink readiness classifier unit not found")
+
+    for path, code in files:
+        if path.name not in ("ServiceReadiness.h", "ServiceReadiness.cpp"):
+            continue
+        for token in ("#include <Arduino.h>", "Serial.", "millis(", "ServoBus",
+                      "CommandRouter", "ControllerService"):
+            if token in code:
+                fail(f"{path}: contains {token!r} - keep the HostLink readiness classifier "
+                     f"pure and host-linkable; module/transport wiring belongs in "
+                     f"ControllerService, not here")
+
+
+def check_actuator_infrastructure_wired_fail_closed(files):
+    """I4/I5 Controller wiring (2026-09-25 objective change): SafeActuatorPolicy,
+    ActuatorRuntime and CalibrationExecutionEngine may be owned by Controller
+    as status/lifecycle infrastructure, but wiring them in must never make
+    Torque ON, GoalPosition, contact motion or calibration motion reachable.
+    This enforces the specific fail-closed choices that make that true
+    structurally, not merely by review."""
+    controller_cpp = None
+    for path, code in files:
+        if path.name == "Controller.cpp":
+            controller_cpp = (path, code)
+            break
+    if controller_cpp is None:
+        fail("Controller.cpp not found - cannot audit fail-closed actuator wiring")
+        return
+    path, code = controller_cpp
+
+    # The runtime adapter must be given no backend. That alone makes every
+    # ACCEPT decision resolve to NO_BACKEND, independent of anything else -
+    # the single fact this whole check exists to pin down.
+    m = re.search(r"actuator_runtime_\.begin\(([^)]*)\)", code)
+    if not m or "nullptr" not in m.group(1):
+        fail(f"{path}: actuator_runtime_.begin() must pass nullptr as the backend - no "
+             f"production ActuatorBackend may ever be wired into Controller")
+
+    # No geometry may be bound, no limit or transform admitted, no live
+    # bootstrap context set, from Controller - those are exactly what would
+    # turn "infrastructure present" into "a target is reachable".
+    for forbidden in ("bindGeometry(", ".admit(", "setBootstrapContext("):
+        if forbidden in code:
+            fail(f"{path}: contains {forbidden!r} - Controller may own the Safe Actuator/"
+                 f"Calibration Execution infrastructure but must never bind geometry, admit a "
+                 f"limit/transform, or set a live bootstrap context; doing so would make a "
+                 f"target reachable, not merely present")
+
+    # No command path may trigger a decision or a write - only read-only
+    # status/counters accessors are permitted from CommandRouter or
+    # ControllerService. Matches BOTH call syntaxes - modules_.actuator_policy
+    # is a pointer (-> ), while a hypothetical value member would use '.' -
+    # a dot-only check silently misses every real call site in this codebase,
+    # which is exactly the gap a manual mutation check (temporarily injecting
+    # modules_.actuator_policy->plan(...) into CommandRouter.cpp) caught
+    # during I4/I5 Controller-wiring review.
+    forbidden_call = re.compile(r"(?:\.|->)\s*(plan|commit|execute|abort)\s*\(")
+    for path2, code2 in files:
+        if path2.name not in ("CommandRouter.cpp", "ControllerService.h", "Controller.cpp"):
+            continue
+        m = forbidden_call.search(code2)
+        if m:
+            fail(f"{path2}: contains a call to {m.group(1)}() - CommandRouter/ControllerService/"
+                 f"Controller may only read status from the Safe Actuator/Calibration "
+                 f"Execution infrastructure, never plan, commit, execute or abort a "
+                 f"transaction; that belongs to a future, separately reviewed activation "
+                 f"gate")
+
+
+def check_led_status_boundaries(files):
+    """LED presentation must have exactly one periodic owner (I2).
+    LedStatusPolicy is the pure decision core - host-linkable, the same
+    contract as network/WifiPolicy and update/OtaPolicy - and
+    LedStatusManager.cpp is the only translation unit allowed to call
+    LedRing::setSolid() on the periodic path. The manual @LED TEST/@LED OFF
+    diagnostic stays in CommandRouter and does not call setSolid()."""
+    names = {p.name for p, _ in files}
+    for required in ("LedStatusPolicy.h", "LedStatusPolicy.cpp",
+                      "LedStatusManager.h", "LedStatusManager.cpp"):
+        if required not in names:
+            fail(f"{required}: LED status manager unit not found")
+
+    for path, code in files:
+        if path.name not in ("LedStatusPolicy.h", "LedStatusPolicy.cpp"):
+            continue
+        for token in ("#include <Arduino.h>", "Serial.", "millis(", "LedRing"):
+            if token in code:
+                fail(f"{path}: contains {token!r} - keep the LED status decision core "
+                     f"host-linkable and hardware-free, the same contract as "
+                     f"network/WifiPolicy and update/OtaPolicy")
+
+    allowed_setsolid_callers = {"LedStatusManager.cpp", "LedRing.cpp"}
+    for path, code in files:
+        if path.suffix != ".cpp" or path.name in allowed_setsolid_callers:
+            continue
+        if re.search(r"\bsetSolid\s*\(", code):
+            fail(f"{path}: calls setSolid() directly - LED presentation has exactly one "
+                 f"periodic owner (LedStatusManager); nothing else may drive the ring "
+                 f"outside the manual @LED TEST/@LED OFF diagnostic path")
 
 
 def check_servo_timeout_not_global(files):
@@ -1011,12 +1216,13 @@ def check_servo_population_model(files, sketch_dir):
         fail(f"{path}: kCanonicalServoCount must be derived with sizeof(kCanonicalServos), "
              f"not written as a literal")
 
-    rows = re.findall(r'\{\s*(\d+),\s*"(\w+)",\s*CurrentConfig::(\w+)\s*\}', code)
+    rows = re.findall(
+        r'\{\s*(\d+),\s*"(\w+)",\s*"(\w+)",\s*CurrentConfig::(\w+)\s*\}', code)
     if len(rows) != 17:
         fail(f"{path}: canonical servo table has {len(rows)} entries, expected 17 "
              f"(MATDOG canonical allocation)")
-    installed = [r for r in rows if r[2] == "INSTALLED"]
-    absent = [r for r in rows if r[2] == "ABSENT_BY_DESIGN"]
+    installed = [r for r in rows if r[3] == "INSTALLED"]
+    absent = [r for r in rows if r[3] == "ABSENT_BY_DESIGN"]
     if len(installed) != 13:
         fail(f"{path}: {len(installed)} servos marked INSTALLED, expected 13 for the "
              f"current physical configuration")
@@ -1050,6 +1256,25 @@ def check_servo_population_model(files, sketch_dir):
         fail(f"{path}: embedded canonical table {table_ids} disagrees with "
              f"{yaml_path.name} {yaml_ids} - the YAML is the canonical project "
              f"authority; fix the firmware table, not the YAML")
+
+    # The full identity triple, not just the ids. The firmware carries the
+    # EXPECTED physical unit so the preflight can report it; if that drifts
+    # from the allocation, the report would name the wrong servo.
+    yaml_text = yaml_path.read_text(encoding="utf-8")
+    yaml_triples = {
+        int(bus): (unit, joint)
+        for unit, joint, bus in re.findall(
+            r"- unit:\s*(\S+)\n\s+joint:\s*(\S+)\n\s+bus_id:\s*(\d+)", yaml_text)
+    }
+    for bus, joint, unit, _config in rows:
+        expected = yaml_triples.get(int(bus))
+        if expected is None:
+            fail(f"{path}: bus id {bus} is not in {yaml_path.name}")
+        elif (unit, joint) != expected:
+            fail(f"{path}: bus id {bus} is ({unit}, {joint}) in the firmware table but "
+                 f"{expected} in {yaml_path.name} - the YAML is the authority for the "
+                 f"physical unit binding, and the preflight reports that binding as "
+                 f"EXPECTED identity")
 
 
 def check_g2_state_is_transport_independent(files):
@@ -1130,23 +1355,1619 @@ def check_no_network_to_servo_path(files):
                  f"ServoBus (V2 architecture, forbidden path)")
 
 
+def check_calibration_boundaries(files, sketch_dir):
+    """Calibration is the subsystem that will eventually move the robot, so the
+    boundaries that keep it inert today are enforced rather than reviewed:
+
+      1. the pure model stays pure - no Arduino, ServoBus, Wi-Fi or OTA;
+      2. the manager owns no transport and no actuator primitive;
+      3. no write path is introduced anywhere by this subsystem;
+      4. SAFE_OFF stays outside it;
+      5. the historical fixture cannot become runtime calibration;
+      6. hardware motion stays compile-time blocked;
+      7. exactly one Controller-owned CalibrationManager.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    cal_dir = sketch_dir / "src" / "calibration"
+
+    # --- (1)(2) purity of the whole subsystem -----------------------------
+    for name in ("CalibrationDomain.h", "CalibrationDomain.cpp",
+                 "CalibrationManager.h", "CalibrationManager.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            fail(f"{cal_dir / name}: calibration unit not found")
+            continue
+        path, code = entry
+        for forbidden in ("#include <Arduino.h>", "#include <WiFi.h>",
+                          "#include <esp_ota_ops.h>", "ServoBus", "ServoCensus",
+                          "WifiManager", "OtaManager", "HardwareSerial"):
+            if forbidden in code:
+                fail(f"{path}: references {forbidden!r} - the calibration layer must stay "
+                     f"pure and host-linkable, and must never own a transport. Population "
+                     f"evidence is an INPUT from servo/ServoCensus; a second census or a "
+                     f"direct bus path is forbidden")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the calibration layer must stay "
+                 f"transport-independent")
+
+        # --- (3) no write path, anywhere in the subsystem -----------------
+        for token in ("EnableTorque", "TorqueEnable", "WritePos", "SyncWrite", "RegWrite",
+                      "SMS_STS", "CalibrationOfs", "unLockEprom", "LockEprom",
+                      "PositionOffset", "GoalPosition"):
+            if token in code:
+                fail(f"{path}: references actuator/EEPROM primitive {token!r} - this phase "
+                     f"implements the arbiter and the evidence model, not a write path")
+
+    # --- (4) SAFE_OFF is not routed through calibration --------------------
+    router = by_name.get("CommandRouter.cpp")
+    if router is not None:
+        path, code = router
+        branch = re.search(
+            r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
+            code, re.DOTALL)
+        if branch and ("calibration" in branch.group(1) or "Calibration" in branch.group(1)):
+            fail(f"{path}: the @SERVO SAFE_OFF branch references calibration - a safety "
+                 f"de-escalation must never be routed through a calibration session")
+
+    for name in ("ServoBus.h", "ServoBus.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            continue
+        path, code = entry
+        if "Calibration" in code or "calibration" in code:
+            fail(f"{path}: references calibration - the servo transport must not be able to "
+                 f"consult a calibration session, so SAFE_OFF stays reachable in every state")
+
+    # --- (5) the historical fixture is not runtime calibration -------------
+    for path, code in files:
+        if "/scripts/tests/" in str(path):
+            continue
+        if "lf_v25_oracle_fixture" in code or "kLfV25" in code:
+            fail(f"{path}: references the LF V25 historical fixture outside the offline "
+                 f"tests - it describes a physical installation that no longer exists and "
+                 f"must never be compiled as runtime calibration")
+
+    # --- (6) hardware motion stays compile-time blocked --------------------
+    manager = by_name.get("CalibrationManager.h")
+    if manager is None:
+        fail(f"{cal_dir / 'CalibrationManager.h'}: CalibrationManager not found")
+    else:
+        path, code = manager
+        m = re.search(r"#define\s+MATDOG_CALIBRATION_HARDWARE_MOTION_AUTHORIZED\s+(\S+)",
+                      code)
+        if not m:
+            fail(f"{path}: could not locate the MATDOG_CALIBRATION_HARDWARE_MOTION_AUTHORIZED "
+                 f"default")
+        elif m.group(1).strip() != "0":
+            fail(f"{path}: hardware motion defaults to {m.group(1)!r}, expected 0 - "
+                 f"MATDOG_JOINT_CALIBRATION.yaml declares "
+                 f"CALIBRATION_RESET_PENDING_FULL_RECALIBRATION with "
+                 f"hardware_motion_authorized: false, and unblocking it requires a real "
+                 f"recalibration, not a flag flip")
+
+    # --- q0 must not be able to default to the raw servo centre ------------
+    domain = by_name.get("CalibrationDomain.cpp")
+    if domain is not None:
+        path, code = domain
+        if re.search(r"tick\s*=\s*kServoRawCenter", code) or \
+           re.search(r"tick\s*=\s*2048", code):
+            fail(f"{path}: assigns the raw servo centre to a q0 tick - the raw centre is a "
+                 f"servo-level fact that says nothing about joint zero. "
+                 f"MATDOG_JOINT_CALIBRATION.yaml: the final value MUST BE MEASURED")
+
+    # --- (7) exactly one manager, owned by the Controller ------------------
+    owners = []
+    for path, code in files:
+        if "/scripts/" in str(path):
+            continue
+        for m in re.finditer(r"CalibrationManager\s+(\w+)\s*[;{]", code):
+            owners.append((str(path), m.group(1)))
+    if owners and (len(owners) != 1 or pathlib.Path(owners[0][0]).name != "Controller.h"):
+        fail(f"CalibrationManager is instantiated at {owners} - exactly one instance must "
+             f"exist, owned by core/Controller.h")
+
+
+def check_actuator_authority(files, sketch_dir):
+    """The arbiter is the single point that decides who may write actuators,
+    so the properties that make it trustworthy are enforced, not reviewed:
+
+      1. it stays host-linkable and knows nothing about hardware;
+      2. SAFE_OFF is outside arbitration, in BOTH directions;
+      3. there is exactly one arbiter instance, owned by the Controller;
+      4. boot always lands on NONE;
+      5. nothing caches a copy of the authority state.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    core_dir = sketch_dir / "src" / "core"
+
+    # --- (1) host-linkable, hardware-blind -------------------------------
+    for name in ("ActuatorAuthority.h", "ActuatorAuthority.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            fail(f"{core_dir / name}: the actuator authority arbiter was not found")
+            continue
+        path, code = entry
+        for forbidden in ("#include <Arduino.h>", "#include <WiFi.h>",
+                          "#include <esp_ota_ops.h>"):
+            if forbidden in code:
+                fail(f"{path}: contains {forbidden!r} - the arbiter must stay host-linkable "
+                     f"so scripts/tests/test_actuator_authority.cpp drives the REAL "
+                     f"decision logic")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the arbiter must stay "
+                 f"transport-independent")
+        # It arbitrates authority; it must not know how to use it.
+        for forbidden in ("ServoBus", "EnableTorque", "WritePos", "SMS_STS", "ServoCensus"):
+            if forbidden in code:
+                fail(f"{path}: references {forbidden!r} - the arbiter decides WHO may "
+                     f"write actuators and must never be able to write one itself")
+
+    # --- (2) SAFE_OFF is outside arbitration, both directions -------------
+    # (a) ServoBus must not be able to consult an authority even if a later
+    #     change wanted it to.
+    for name in ("ServoBus.h", "ServoBus.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            continue
+        path, code = entry
+        for token in ("ActuatorAuthority", "authority", "Authority"):
+            if token in code:
+                fail(f"{path}: references {token!r} - SAFE_OFF must stay reachable in every "
+                     f"authority state, so the servo transport must not be able to consult "
+                     f"the arbiter at all (permanent invariant)")
+
+    # (b) The SAFE_OFF command branch must not gain an authority condition.
+    router = by_name.get("CommandRouter.cpp")
+    if router is not None:
+        path, code = router
+        branch = re.search(
+            r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
+            code, re.DOTALL)
+        if not branch:
+            fail(f"{path}: could not locate the @SERVO SAFE_OFF branch to audit it")
+        else:
+            body = branch.group(1)
+            for token in ("authority", "Authority", "operating_mode"):
+                if token in body:
+                    fail(f"{path}: the @SERVO SAFE_OFF branch references {token!r} - a safety "
+                         f"de-escalation must never be gated on authority or mode")
+        printer = re.search(r"void CommandRouter::printServoSafeOff\(int id\)\s*\{(.*?)\n\}",
+                            code, re.DOTALL)
+        if printer and ("authority" in printer.group(1) or "Authority" in printer.group(1)):
+            fail(f"{path}: printServoSafeOff() consults the authority - SAFE_OFF must not be "
+                 f"arbitrated")
+
+    # --- (3)(5) exactly one arbiter, owned by the Controller --------------
+    owners = []
+    for path, code in files:
+        for m in re.finditer(r"ActuatorAuthorityArbiter\s+(\w+)\s*[;{]", code):
+            owners.append((str(path), m.group(1)))
+    # Controller.h holds the one instance; the test suite may create its own.
+    real = [(p, n) for p, n in owners if "/scripts/" not in p]
+    if len(real) != 1 or pathlib.Path(real[0][0]).name != "Controller.h":
+        fail(f"ActuatorAuthorityArbiter is instantiated at {real} - exactly one instance "
+             f"must exist, owned by core/Controller.h. A second arbiter is a second "
+             f"authority model")
+
+    # Nobody may cache the current owner: they hold a pointer and ask.
+    for path, code in files:
+        if path.name in ("ActuatorAuthority.h", "ActuatorAuthority.cpp", "Controller.h"):
+            continue
+        if "/scripts/" in str(path):
+            continue
+        if re.search(r"ActuatorAuthority\s+\w+_\s*(=|;)", code):
+            fail(f"{path}: stores a copy of the ActuatorAuthority value - there is one "
+                 f"authority state and it lives in the arbiter; consult it, do not "
+                 f"remember it")
+
+    # --- (4) boot lands on NONE ------------------------------------------
+    ctl = by_name.get("Controller.cpp")
+    if ctl is not None:
+        path, code = ctl
+        body = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not body:
+            fail(f"{path}: could not locate Controller::begin() to audit authority init")
+        elif not re.search(r"authority_\.reset\(", body.group(1)):
+            fail(f"{path}: Controller::begin() does not reset the actuator authority - boot "
+                 f"must always land on NONE and must never restore a previous authority")
+
+    # --- OTA-B: the placeholder must be gone, not coexisting ---------------
+    for path, code in files:
+        for token in ("OtaStageAGate", "PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET"):
+            if token in code:
+                fail(f"{path}: still references the OTA-A placeholder {token!r} - OTA-B "
+                     f"replaces it; both must not coexist")
+
+    gate = by_name.get("OtaAuthorityGate.cpp")
+    if gate is None:
+        fail(f"{sketch_dir / 'src' / 'update' / 'OtaAuthorityGate.cpp'}: the OTA-B "
+             f"authorization gate was not found")
+    else:
+        path, code = gate
+        if "requestInhibit(" not in code:
+            fail(f"{path}: the OTA gate does not take an exclusivity hold - a plain "
+                 f"`authority == NONE` query cannot close the window between the check and "
+                 f"a multi-second update (OTA-B TOCTOU)")
+        if "request(" in code.replace("requestInhibit(", ""):
+            fail(f"{path}: the OTA gate acquires an actuator OWNER - OTA does not drive "
+                 f"actuators; it must inhibit, not own")
+
+    # OTA must never appear as an actuator owner.
+    auth_header = by_name.get("ActuatorAuthority.h")
+    if auth_header is not None:
+        path, code = auth_header
+        m = re.search(r"enum class ActuatorAuthority\s*:\s*uint8_t\s*\{(.*?)\}", code,
+                      re.DOTALL)
+        if not m:
+            fail(f"{path}: could not locate the ActuatorAuthority enum")
+        else:
+            body = m.group(1)
+            if re.search(r"\bOTA\b|UPDATE|FIRMWARE", body):
+                fail(f"{path}: the ActuatorAuthority enum contains an OTA/update owner - OTA "
+                     f"is not an actuator user; it requires that nobody is one")
+            for required in ("NONE", "DIAGNOSTICS", "CALIBRATION", "QC", "PROVISIONING",
+                             "MOTION"):
+                if required not in body:
+                    fail(f"{path}: the ActuatorAuthority enum is missing {required!r}")
+
+
+def check_safe_actuator_boundaries(files, sketch_dir):
+    """The Safe Actuator Layer is the boundary every future actuator write must
+    pass through, so the properties that make it a boundary are enforced rather
+    than reviewed:
+
+      1. the policy core stays pure - no Arduino, ServoBus, Wi-Fi, OTA, Serial;
+      2. it is a DECISION, not a transport: no bus primitive lives in it;
+      3. no write path is enabled anywhere under src/actuator/;
+      4. SAFE_OFF stays outside it, in BOTH directions;
+      5. a persistent/provisioning write is not expressible as an operation;
+      6. limits are admitted on provenance, and nothing at runtime admits any;
+      7. at most one policy instance, and it would be the Controller's.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    actuator_dir = sketch_dir / "src" / "actuator"
+
+    policy_units = ("ActuatorWritePolicy.h", "ActuatorWritePolicy.cpp")
+    for name in policy_units:
+        if name not in by_name:
+            fail(f"{actuator_dir / name}: the Safe Actuator Layer policy core was not found")
+            return
+
+    # --- (1)(2) pure decision core ----------------------------------------
+    for name in policy_units:
+        path, code = by_name[name]
+        for forbidden in ("#include <Arduino.h>", "#include <WiFi.h>",
+                          "#include <esp_ota_ops.h>", "#include <SCServo.h>",
+                          "ServoBus", "ServoCensus", "WifiManager", "OtaManager",
+                          "HardwareSerial", "SMS_STS"):
+            if forbidden in code:
+                fail(f"{path}: references {forbidden!r} - the Safe Actuator Layer policy "
+                     f"decides whether a write may happen and must never be able to perform "
+                     f"one. scripts/tests/test_actuator_write_policy.cpp links the REAL "
+                     f"policy, which is only possible while it stays host-linkable")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the policy must stay "
+                 f"transport-independent")
+        for token in ("EnableTorque", "WritePos", "SyncWrite", "RegWrite", "readByte(",
+                      "readWord(", "Ping("):
+            if token in code:
+                fail(f"{path}: references bus primitive {token!r} - an ACCEPT from this "
+                     f"policy is a decision, never an action")
+
+    # --- (3) no write path is enabled anywhere under src/actuator/ ---------
+    # The runtime adapter is TO_IMPLEMENT (SAFE_ACTUATOR_LAYER.md §7): building
+    # one would require weakening check_torque_enable and the goal-position
+    # prohibitions in check_forbidden_literals BEFORE anything could validate
+    # the replacement. Enabling a write path here is a reviewed decision that
+    # belongs to a later gate, not a quiet addition.
+    for path, code in files:
+        if f"{os.sep}src{os.sep}actuator{os.sep}" not in str(path):
+            continue
+        for token in ("EnableTorque", "WritePos", "SyncWrite", "RegWrite", "writeByte",
+                      "writeWord"):
+            if token in code:
+                fail(f"{path}: contains actuator write primitive {token!r} - the Safe "
+                     f"Actuator Layer runtime adapter is TO_IMPLEMENT and no write path "
+                     f"may be enabled in the default build")
+
+    # --- (4) SAFE_OFF is outside this layer, both directions ---------------
+    layer_tokens = ("SafeActuatorPolicy", "ActuatorWritePolicy", "WriteDecision",
+                    "ActuatorOperation", "ActuatorTransaction", "actuator::")
+    for name in ("ServoBus.h", "ServoBus.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            continue
+        path, code = entry
+        for token in layer_tokens:
+            if token in code:
+                fail(f"{path}: references {token!r} - SAFE_OFF must stay reachable with no "
+                     f"authority, stale authority, a failed calibration manager or a "
+                     f"rejecting policy, so the servo transport must not be able to consult "
+                     f"the Safe Actuator Layer at all (permanent invariant)")
+
+    router = by_name.get("CommandRouter.cpp")
+    if router is not None:
+        path, code = router
+        branch = re.search(
+            r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
+            code, re.DOTALL)
+        if not branch:
+            fail(f"{path}: could not locate the @SERVO SAFE_OFF branch to audit it")
+        else:
+            for token in layer_tokens:
+                if token in branch.group(1):
+                    fail(f"{path}: the @SERVO SAFE_OFF branch references {token!r} - a "
+                         f"safety de-escalation must never be routed through the write "
+                         f"policy, which can reject")
+
+    # --- (5) the operation classes ----------------------------------------
+    path, code = by_name["ActuatorWritePolicy.h"]
+    m = re.search(r"enum class ActuatorOperation\s*:\s*uint8_t\s*\{(.*?)\}", code, re.DOTALL)
+    if not m:
+        fail(f"{path}: could not locate the ActuatorOperation enum")
+    else:
+        body = m.group(1)
+        # A persistent/configuration write must not be expressible here while
+        # the repository still records its owner as TO_DESIGN
+        # (CALIBRATION_SOURCE_PRECEDENCE.md §7).
+        for banned in ("EEPROM", "ID_WRITE", "OFFSET", "PERSIST", "PROVISION", "LOCK",
+                       "RESET"):
+            if banned in body:
+                fail(f"{path}: the ActuatorOperation enum contains {banned!r} - a "
+                     f"persistent/provisioning write must stay inexpressible through this "
+                     f"layer: runtime actuator command != persistent configuration write")
+        # And no class may name a torque-removal: SAFE_OFF must not become
+        # something this policy can be asked to gate.
+        for banned in ("SAFE_OFF", "TORQUE_OFF", "DISABLE", "TORQUE_DISABLE"):
+            if banned in body:
+                fail(f"{path}: the ActuatorOperation enum contains {banned!r} - removing "
+                     f"torque is SAFE_OFF's job and must stay outside this layer, so it "
+                     f"must not be expressible as a policy operation")
+        for required in ("NONE", "TORQUE_ENABLE", "POSITION_COMMAND",
+                         "CALIBRATION_CONTACT_PROBE"):
+            if required not in body:
+                fail(f"{path}: the ActuatorOperation enum is missing {required!r}")
+        members = len(re.findall(r"^\s*([A-Z_]+)\s*=", body, re.M))
+        count = re.search(r"kActuatorOperationCount\s*=\s*(\d+)", code)
+        if not count:
+            fail(f"{path}: could not locate kActuatorOperationCount")
+        elif int(count.group(1)) != members:
+            fail(f"{path}: kActuatorOperationCount is {count.group(1)} but the enum has "
+                 f"{members} members - isKnownOperation() would then accept a value with no "
+                 f"meaning, or reject one with meaning. Fail closed means these agree")
+
+    # --- (6) limits are admitted on provenance, and never at runtime -------
+    path, code = by_name["ActuatorWritePolicy.cpp"]
+    provenance = re.search(r"bool JointLimit::usableProvenance\(\) const\s*\{(.*?)\n\}",
+                           code, re.DOTALL)
+    if not provenance:
+        fail(f"{path}: could not locate JointLimit::usableProvenance() to audit it")
+    else:
+        body = provenance.group(1)
+        for required in ("mayPromote", "isOperationalEvidence"):
+            if required not in body:
+                fail(f"{path}: usableProvenance() does not consult calibration::{required} "
+                     f"- a limit may only come from operational calibration measured on the "
+                     f"current installation. Historical LF V25 values are fixtures, never "
+                     f"live safety bounds")
+    if "HISTORICAL_REPLAY" in code:
+        fail(f"{path}: names CalibrationOrigin::HISTORICAL_REPLAY - the policy must ask "
+             f"calibration::mayPromote() rather than special-case a replay, so a new "
+             f"non-promotable origin cannot silently become admissible")
+
+    # Nothing in the runtime may fill the accepted-limit store. Today nothing
+    # in the repository qualifies to: MATDOG_JOINT_CALIBRATION.yaml records
+    # {min: null, max: null} for all twelve leg joints.
+    for path, code in files:
+        if path.name in policy_units or "/scripts/" in str(path).replace(os.sep, "/"):
+            continue
+        if re.search(r"\blimits\(\)\.admit\(|\bActuatorLimitTable\b", code):
+            fail(f"{path}: populates or holds an ActuatorLimitTable - accepted joint bounds "
+                 f"do not exist yet, and a runtime translation unit must not be the thing "
+                 f"that invents them")
+
+    # --- (7) at most one policy instance, and it would be the Controller's --
+    owners = []
+    for path, code in files:
+        if "/scripts/" in str(path).replace(os.sep, "/"):
+            continue
+        for m in re.finditer(r"SafeActuatorPolicy\s+(\w+)\s*[;{]", code):
+            owners.append((str(path), m.group(1)))
+    if len(owners) > 1 or (owners and pathlib.Path(owners[0][0]).name != "Controller.h"):
+        fail(f"SafeActuatorPolicy is instantiated at {owners} - at most one instance may "
+             f"exist and it belongs to core/Controller.h, next to the one arbiter. A second "
+             f"policy is a second write boundary")
+
+
+def check_calibration_geometry_boundaries(files, sketch_dir):
+    """The calibration bootstrap consumes a geometry plan it did not compute, so
+    the properties that keep the plan trustworthy are enforced rather than
+    reviewed:
+
+      1. the profile stays pure - no Arduino, no bus, no mesh, no Serial;
+      2. the generated table is generated, and still matches its bundle;
+      3. the executability door needs BOTH the URDF domain and a PASS clearance;
+      4. the compiled counts are the canonical bundle's, and no UNRESOLVED
+         verdict sits on an executable endpoint;
+      5. the superseded hardcoded prerequisite poses are absent;
+      6. POSITION_COMMAND keeps the accepted-limits route to itself.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    actuator_dir = sketch_dir / "src" / "actuator"
+
+    units = ("CalibrationGeometryProfile.h", "CalibrationGeometryProfile.cpp",
+             "CalibrationGeometryProfileData.h")
+    for name in units:
+        if name not in by_name:
+            fail(f"{actuator_dir / name}: the calibration geometry profile was not found")
+            return
+
+    # --- (1) the profile is data plus lookups, never a geometry engine -----
+    for name in units:
+        path, code = by_name[name]
+        for forbidden in ("#include <Arduino.h>", "#include <WiFi.h>", "#include <math.h>",
+                          "#include <cmath>", "ServoBus", "ServoCensus", "SMS_STS",
+                          "HardwareSerial", "WifiManager", "OtaManager"):
+            if forbidden in code:
+                fail(f"{path}: references {forbidden!r} - the Controller consumes a "
+                     f"prevalidated geometry plan and must never recompute geometry or "
+                     f"reach a bus to act on one")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the geometry profile must stay "
+                 f"transport-independent")
+        if "float" in code or "double" in code:
+            fail(f"{path}: uses floating point - every geometric bound here is an integer "
+                 f"micro-radian so that a safety comparison cannot depend on rounding")
+
+    # --- (2) the generated table is generated ------------------------------
+    data_path, data_code = by_name["CalibrationGeometryProfileData.h"]
+    raw = data_path.read_text(encoding="utf-8")
+    for marker in ("GENERATED FILE - DO NOT EDIT BY HAND",
+                   "matdog_calibration_geometry_export.py",
+                   "MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4"):
+        if marker not in raw:
+            fail(f"{data_path}: missing the generated-file marker {marker!r} - this table "
+                 f"produced from the canonical Geometry Compiler V5 bundle and must never "
+                 f"be hand-written")
+
+    # --- (3) the one door --------------------------------------------------
+    path, code = by_name["CalibrationGeometryProfile.cpp"]
+    body = re.search(r"bool isExecutable\(const GeometryEndpointRecord& endpoint\)\s*\{(.*?)\n\}",
+                     code, re.DOTALL)
+    if not body:
+        fail(f"{path}: could not locate isExecutable() to audit it")
+    else:
+        text = body.group(1)
+        if "EXECUTABLE_URDF_DOMAIN" not in text:
+            fail(f"{path}: isExecutable() does not check the target domain - sixteen of the "
+                 f"twenty-four canonical endpoints contact BEYOND the declared URDF limit, "
+                 f"and a diagnostic endpoint is evidence, never a motion target")
+        if "ClearancePolicyResult::PASS" not in text:
+            fail(f"{path}: isExecutable() does not require a PASS clearance verdict - "
+                 f"UNRESOLVED is not PASS")
+
+    # --- (4)(5) the compiled data itself -----------------------------------
+    records = re.findall(r"\{calibration::Leg::(\w+), calibration::JointKind::(\w+), "
+                         r"calibration::ContactSide::(\w+), TargetDomain::(\w+), "
+                         r"ParkingOutcome::(\w+), ClearancePolicyResult::(\w+), "
+                         r"(-?\d+), (-?\d+), (-?\d+), (\w+), calibration::Leg::(\w+), "
+                         r"calibration::JointKind::(\w+), (-?\d+)\}", data_code)
+    if len(records) != 24:
+        fail(f"{data_path}: parsed {len(records)} endpoint records, expected the canonical 24")
+    executable = [r for r in records if r[3] == "EXECUTABLE_URDF_DOMAIN"]
+    parking = [r for r in records if r[4] == "FEASIBLE_1DOF_PLAN_FOUND"]
+    if len(executable) != 8:
+        fail(f"{data_path}: {len(executable)} executable endpoints, expected 8")
+    if len(parking) != 6:
+        fail(f"{data_path}: {len(parking)} endpoints needing parking, expected 6")
+    for record in records:
+        if record[5] != "PASS" and record[3] == "EXECUTABLE_URDF_DOMAIN":
+            fail(f"{data_path}: an EXECUTABLE endpoint carries clearance verdict "
+                 f"{record[5]!r} - "
+                 f"no executable target may rest on unresolved clearance evidence")
+        if record[4] == "NOT_NEEDED" and record[9] != "false":
+            fail(f"{data_path}: a NOT_NEEDED plan carries an auxiliary joint")
+        if record[4] == "FEASIBLE_1DOF_PLAN_FOUND" and record[9] != "true":
+            fail(f"{data_path}: an obstructed plan carries no auxiliary joint - a missing "
+                 f"parking plan must fail closed, not silently become a direct path")
+    # 30, 50, 85 and 90 degrees: the superseded hardcoded prerequisites. The
+    # current compiler found 35, 64.1667 and 93.3333 instead, and its own source
+    # notes that the empty default context proves the legacy poses were never
+    # core truth.
+    for record in records:
+        if record[9] != "true":
+            continue
+        target = int(record[12])
+        for legacy in (523599, 872665, 1483530, 1570796):
+            if abs(target - legacy) <= 1000:
+                fail(f"{data_path}: auxiliary target {target} micro-rad matches the "
+                     f"superseded "
+                     f"hardcoded prerequisite {legacy} - parking poses come from the current "
+                     f"Geometry V5 plan, never from the stale calibration block")
+
+    # --- (6) POSITION_COMMAND keeps its own route --------------------------
+    policy = by_name.get("ActuatorWritePolicy.cpp")
+    if policy is not None:
+        path, code = policy
+        route = re.search(r"bool operationUsesAcceptedLimits\(ActuatorOperation operation\)"
+                          r"\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not route:
+            fail(f"{path}: could not locate operationUsesAcceptedLimits() to audit it")
+        else:
+            text = route.group(1)
+            if "POSITION_COMMAND" not in text:
+                fail(f"{path}: POSITION_COMMAND no longer takes the accepted-limits route")
+            for other in ("CALIBRATION_CONTACT_PROBE", "DIRECTION_VERIFY",
+                          "CALIBRATION_AUXILIARY_MOVE", "TORQUE_ENABLE"):
+                if other in text:
+                    fail(f"{path}: {other!r} was added to the accepted-limits route - the "
+                         f"three authorisation routes must stay mutually exclusive")
+        envelope = re.search(r"bool operationUsesBootstrapEnvelope\(ActuatorOperation "
+                             r"operation\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if envelope and "POSITION_COMMAND" in envelope.group(1):
+            fail(f"{path}: POSITION_COMMAND can reach the bootstrap envelope - a geometry "
+                 f"plan describes the MODEL and must never stand in for an accepted bound "
+                 f"on the current machine")
+        plan_route = re.search(r"bool operationUsesEndpointPlan\(ActuatorOperation "
+                               r"operation\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if plan_route and "POSITION_COMMAND" in plan_route.group(1):
+            fail(f"{path}: POSITION_COMMAND can reach the endpoint-plan route")
+
+
+def check_calibration_geometry_export(sketch_dir):
+    """The generated profile must still be what the exporter produces from the
+    canonical bundle. Catches a hand-patched table, a drifted URDF or mesh, and
+    a compiler source edit - the exporter re-verifies every input hash."""
+    repo_root = sketch_dir.parents[1]
+    exporter = (repo_root / "06_Software/Matdog_Core/calibration/"
+                            "matdog_calibration_geometry_export.py")
+    if not exporter.exists():
+        fail(f"{exporter}: the calibration geometry exporter was not found")
+        return
+    result = subprocess.run([sys.executable, str(exporter), "--check"],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{exporter}: the committed geometry profile does not match the canonical "
+             f"Geometry Compiler V5 bundle (stdout={result.stdout!r} "
+             f"stderr={result.stderr!r})")
+
+
+def check_position_offset_boundary(files, sketch_dir):
+    """PositionOffset: exactly one approved read accessor, and never a write.
+
+    The old rule was "the register symbol must not appear at all". That was
+    strong but too blunt: it also forbade READING the offset, so the firmware
+    could not verify that every unit still holds PositionOffset = 0 - the one
+    provisioning fact the 2026-08-27 reset document cares most about.
+
+    The rule is now:
+
+        read through exactly ServoBus::readPositionOffset()  = ALLOWED
+        any PositionOffset write                             = FORBIDDEN
+        CalibrationOfs                                       = FORBIDDEN
+
+    Writing an offset to compensate a mechanical mounting error is named in
+    MATDOG_JOINT_CALIBRATION.yaml's `forbidden:` list. Reading it is how we
+    prove nobody did.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+
+    accessor = "readPositionOffset"
+    entry = by_name.get("ServoBus.cpp")
+    if entry is None:
+        fail(f"{sketch_dir / 'src' / 'servo' / 'ServoBus.cpp'}: not found")
+        return
+    bus_path, bus_code = entry
+
+    # --- the symbol appears in exactly one file, and one function ----------
+    for path, code in files:
+        if "SMS_STS_OFS_L" not in code:
+            continue
+        if path.name != "ServoBus.cpp":
+            fail(f"{path}: names SMS_STS_OFS_L - the PositionOffset register may only be "
+                 f"touched by the single approved read accessor "
+                 f"ServoBus::{accessor}(), so that every access to it is in one "
+                 f"auditable place")
+
+    body = re.search(r"bool ServoBus::" + accessor + r"\(int id, int16_t\* out\)\s*\{(.*?)\n\}",
+                     bus_code, re.DOTALL)
+    if not body:
+        fail(f"{bus_path}: the approved accessor ServoBus::{accessor}(int, int16_t*) was "
+             f"not found - PositionOffset must be reachable through exactly one function")
+        return
+    accessor_body = body.group(1)
+
+    if "SMS_STS_OFS_L" not in accessor_body:
+        fail(f"{bus_path}: {accessor}() does not name SMS_STS_OFS_L - if the register is "
+             f"reached some other way (a raw 0x1F, an alias) the audit can no longer see "
+             f"every access, which is the entire point of having one accessor")
+
+    # --- it must be a READ, and only a read --------------------------------
+    if not re.search(r"\breadWord\s*\(", accessor_body):
+        fail(f"{bus_path}: {accessor}() does not use readWord() - PositionOffset is a "
+             f"read-only accessor")
+    for token in ("writeByte", "writeWord", "genWrite", "regWrite", "RegWrite",
+                  "EnableTorque", "WritePos", "SyncWrite", "Action(", "unLockEprom",
+                  "LockEprom"):
+        if token in accessor_body:
+            fail(f"{bus_path}: {accessor}() contains {token!r} - the PositionOffset "
+                 f"accessor is READ-ONLY and no write primitive may appear in it")
+
+    # --- no PositionOffset write anywhere, under any spelling --------------
+    offset_write = re.compile(
+        r"(writeByte|writeWord|genWrite|regWrite|RegWrite)\s*\([^;]*?"
+        r"(SMS_STS_OFS_L|SMS_STS_OFS|0x1F|POSITION_OFFSET|PositionOffset)")
+    for path, code in files:
+        if offset_write.search(code):
+            fail(f"{path}: a PositionOffset WRITE is expressible here - writing an offset "
+                 f"to compensate mechanical mounting error is named in "
+                 f"MATDOG_JOINT_CALIBRATION.yaml's forbidden: list and must stay "
+                 f"unreachable")
+        # 0x1F as a bare register address is how the accessor rule gets evaded.
+        if path.name != "ServoBus.cpp" and re.search(r"(readByte|readWord)\s*\([^;]*0x1F", code):
+            fail(f"{path}: reads register 0x1F directly - PositionOffset must go through "
+                 f"ServoBus::{accessor}(), not a magic address that the audit cannot "
+                 f"attribute")
+
+    # --- the offset decoder must be two's complement -----------------------
+    profile = by_name.get("ServoProfile.cpp")
+    if profile is None:
+        fail(f"{sketch_dir / 'src' / 'servo' / 'ServoProfile.cpp'}: not found")
+    else:
+        path, code = profile
+        decoder = re.search(r"int16_t decodePositionOffset\(uint16_t raw\)\s*\{(.*?)\n\}",
+                            code, re.DOTALL)
+        if not decoder:
+            fail(f"{path}: decodePositionOffset() not found")
+        elif "static_cast<int16_t>" not in decoder.group(1):
+            fail(f"{path}: decodePositionOffset() is not a two's-complement cast - the "
+                 f"C018 stores the offset as int16 LE two's complement, and a "
+                 f"sign-magnitude decode turns a negative offset into a positive one")
+
+
+def check_servo_profile_contract(files, sketch_dir):
+    """MATDOG_C018_V1 stays a generated, read-only contract.
+
+      1. the register table is generated from the reviewed YAML, not retyped;
+      2. the exporter still reproduces the committed header exactly;
+      3. runtime RAM state never leaks into the persistent profile;
+      4. nothing in the profile path can write.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    servo_dir = sketch_dir / "src" / "servo"
+
+    for name in ("ServoProfile.h", "ServoProfile.cpp", "ServoProfileData.h"):
+        if name not in by_name:
+            fail(f"{servo_dir / name}: the MATDOG_C018_V1 profile contract was not found")
+            return
+
+    data_path, data_code = by_name["ServoProfileData.h"]
+    raw = data_path.read_text(encoding="utf-8")
+    for marker in ("GENERATED FILE - DO NOT EDIT BY HAND",
+                   "matdog_servo_profile_export.py",
+                   "MATDOG_ST3215_C018_V1.yaml"):
+        if marker not in raw:
+            fail(f"{data_path}: missing the generated-file marker {marker!r} - the twenty "
+                 f"register values come from the reviewed YAML and are never hand-written")
+
+    rows = re.findall(r"\{0x([0-9A-F]{2}), (\d), (\d+), \"(\w+)\"\}", data_code)
+    if len(rows) != 20:
+        fail(f"{data_path}: {len(rows)} persistent registers, expected the canonical 20")
+    # Runtime RAM state is a different layer and must not appear as persistent.
+    for _addr, _w, _v, name in rows:
+        if name in ("TorqueLimit", "GoalSpeed", "Acc", "GoalPosition", "Acceleration"):
+            fail(f"{data_path}: {name!r} is runtime RAM state and must never be part of "
+                 f"the persistent profile - TorqueLimit/GoalSpeed/Acc are written per "
+                 f"motion, not provisioned")
+
+    for name in ("ServoProfile.h", "ServoProfile.cpp"):
+        path, code = by_name[name]
+        for forbidden in ("#include <Arduino.h>", "SMS_STS", "ServoBus", "Serial.",
+                          "writeByte", "writeWord", "EnableTorque", "WritePos"):
+            if forbidden in code:
+                fail(f"{path}: references {forbidden!r} - the profile contract is pure "
+                     f"data plus comparisons and must never reach a bus or write")
+
+    # A missing read must never fold into a MATCH.
+    path, code = by_name["ServoProfile.cpp"]
+    fold = re.search(r"ProfileVerdict foldRegisterCheck\(.*?\n\}", code, re.DOTALL)
+    if not fold:
+        fail(f"{path}: foldRegisterCheck() not found")
+    elif not re.search(r"case RegisterCheck::NO_ANSWER:\s*case RegisterCheck::NOT_READ:"
+                       r"\s*return ProfileVerdict::INCOMPLETE;", fold.group(0)):
+        fail(f"{path}: foldRegisterCheck() does not map NO_ANSWER/NOT_READ to INCOMPLETE - "
+             f"an unread register would then be assumed to hold its expected value, and a "
+             f"partially read unit could report MATCH")
+
+
+def check_servo_profile_export(sketch_dir):
+    """The committed profile table must still be what the exporter produces."""
+    repo_root = sketch_dir.parents[1]
+    exporter = repo_root / "06_Software/Matdog_Core/config/matdog_servo_profile_export.py"
+    if not exporter.exists():
+        fail(f"{exporter}: the MATDOG_C018_V1 profile exporter was not found")
+        return
+    result = subprocess.run([sys.executable, str(exporter), "--check"],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{exporter}: the committed profile table does not match "
+             f"MATDOG_ST3215_C018_V1.yaml (stdout={result.stdout!r} "
+             f"stderr={result.stderr!r})")
+
+
+def check_h0_preflight_boundaries(files, sketch_dir):
+    """The H0 preflight is a permanent READ-ONLY capability.
+
+      1. no write primitive anywhere in the service;
+      2. MAINTENANCE-gated at the command surface, like the census;
+      3. expected_physical_unit is configuration and is never called observed;
+      4. present_position is never presented as q0.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    servo_dir = sketch_dir / "src" / "servo"
+
+    for name in ("ServoPreflight.h", "ServoPreflight.cpp"):
+        if name not in by_name:
+            fail(f"{servo_dir / name}: the H0 preflight service was not found")
+            return
+        path, code = by_name[name]
+        for token in ("EnableTorque", "WritePos", "SyncWrite", "RegWrite", "writeByte",
+                      "writeWord", "unLockEprom", "LockEprom", "Serial."):
+            if token in code:
+                fail(f"{path}: contains {token!r} - the preflight is strictly read-only "
+                     f"and transport-independent")
+
+    router = by_name.get("CommandRouter.cpp")
+    if router is not None:
+        path, code = router
+        branch = re.search(r'upper == "@SERVO PREFLIGHT"\s*\)\s*\{(.*?)\}\s*else',
+                           code, re.DOTALL)
+        if not branch:
+            fail(f"{path}: could not locate the @SERVO PREFLIGHT branch to audit it")
+        elif "NOT_IN_MAINTENANCE_MODE" not in branch.group(1):
+            fail(f"{path}: @SERVO PREFLIGHT is not MAINTENANCE-gated - it carries the same "
+                 f"bounded per-tick blocking as the census and must take the same gate")
+
+        printer = re.search(r"void CommandRouter::printServoPreflightResult\(\)\s*\{(.*?)\n\}",
+                            code, re.DOTALL)
+        if not printer:
+            fail(f"{path}: printServoPreflightResult() not found")
+        else:
+            text = printer.group(1)
+            if "expected_physical_unit" not in text:
+                fail(f"{path}: the preflight report does not label the unit column as "
+                     f"EXPECTED - a servo cannot report its unit label, so it must never "
+                     f"be presented as observed hardware identity")
+            if re.search(r"observed_physical_unit|physical_unit_observed", text):
+                fail(f"{path}: the preflight report claims an OBSERVED physical unit - an "
+                     f"ST3215 exposes no unit serial; that binding is held by labelling "
+                     f"discipline, not by measurement")
+            if "NOT q0" not in text:
+                fail(f"{path}: the preflight report does not state that present_position "
+                     f"is NOT q0 - a raw liveness tick must never be read as a "
+                     f"calibration pose")
+
+
+def check_evidence_geometry_binding(files, sketch_dir):
+    """B1: calibration evidence is bound to the geometry it was measured under.
+
+    A servo swap invalidates a JOINT; a URDF/mesh/profile change invalidates a
+    MODEL. Those are different axes and both must bite:
+
+      1. JointLimit and JointTransform each carry a geometry tag;
+      2. admit() refuses a record that does not name its geometry;
+      3. find() is geometry-scoped, and an unbound tag matches nothing;
+      4. findAny() exists so a superseded record stays ON RECORD without ever
+         becoming current evidence;
+      5. the policy's current tag requires the provenance this build expects,
+         not merely "some geometry is loaded".
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    actuator_dir = sketch_dir / "src" / "actuator"
+
+    policy_h = by_name.get("ActuatorWritePolicy.h")
+    policy_cpp = by_name.get("ActuatorWritePolicy.cpp")
+    profile_h = by_name.get("CalibrationGeometryProfile.h")
+    if policy_h is None or policy_cpp is None or profile_h is None:
+        fail(f"{actuator_dir}: the Safe Actuator Layer sources were not found")
+        return
+
+    # --- (1) both records carry the tag ------------------------------------
+    for holder, name in ((policy_h, "JointLimit"), (profile_h, "JointTransform")):
+        path, code = holder
+        body = re.search(r"struct " + name + r"\s*\{(.*?)\n\};", code, re.DOTALL)
+        if not body:
+            fail(f"{path}: struct {name} not found")
+            continue
+        if "GeometryProvenanceTag geometry" not in body.group(1):
+            fail(f"{path}: {name} carries no GeometryProvenanceTag - a record that cannot "
+                 f"name the model it was measured under could never be invalidated when "
+                 f"that model changes")
+        if "boundToGeometry" not in code:
+            fail(f"{path}: {name} has no boundToGeometry() - the geometry axis must stay "
+                 f"separate from calibration provenance and from physical-unit identity")
+
+    # --- (2)(3)(4) the tables ----------------------------------------------
+    path, code = policy_cpp
+    for table, record in (("ActuatorLimitTable", "limit"), ("JointTransformTable", "transform")):
+        admit = re.search(r"bool " + table + r"::admit\(.*?\n\}", code, re.DOTALL)
+        if not admit:
+            fail(f"{path}: {table}::admit() not found")
+        elif f"{record}.boundToGeometry()" not in admit.group(0):
+            fail(f"{path}: {table}::admit() does not require boundToGeometry() - a record "
+                 f"with no geometry would be stored and could never be invalidated")
+
+        find = re.search(r"::find\(const JointIdentity& joint,\s*"
+                         r"GeometryProvenanceTag geometry\) const\s*\{(.*?)\n\}",
+                         code, re.DOTALL)
+        if not find:
+            fail(f"{path}: {table}::find() is not geometry-scoped - the decision path must "
+                 f"not be able to look evidence up by identity alone")
+    # findAny() exists to explain a refusal, never to produce the pointer a
+    # decision is made from. Assigning from it is exactly how the geometry
+    # scope gets bypassed while still looking careful.
+    for m in re.finditer(r"=\s*(limits_|transforms_)\.findAny\(", code):
+        fail(f"{path}: authorising evidence is assigned from {m.group(1)}findAny() - "
+             f"findAny() ignores the geometry tag and may only be used as a predicate "
+             f"when explaining REJECT_EVIDENCE_GEOMETRY_MISMATCH")
+
+    if "findAny" not in code:
+        fail(f"{path}: findAny() is gone - a superseded record must stay historically "
+             f"registered even though it is never current evidence")
+    # An unbound tag must match nothing, in both tables.
+    if code.count("if (geometry == kNoGeometryProvenance) return nullptr;") < 2:
+        fail(f"{path}: a geometry-scoped find() does not fail closed on "
+             f"kNoGeometryProvenance - an unbound policy would then match stored evidence")
+
+    # --- (5) the current tag is the EXPECTED model's ------------------------
+    tag = re.search(r"GeometryProvenanceTag SafeActuatorPolicy::currentGeometryTag\(\) const"
+                    r"\s*\{(.*?)\n\}", code, re.DOTALL)
+    if not tag:
+        fail(f"{path}: SafeActuatorPolicy::currentGeometryTag() not found")
+    else:
+        text = tag.group(1)
+        if "provenanceMatches" not in text:
+            fail(f"{path}: currentGeometryTag() does not check provenanceMatches() - "
+                 f"'some geometry is loaded' is not 'the geometry this build expects'")
+        if "kNoGeometryProvenance" not in text:
+            fail(f"{path}: currentGeometryTag() cannot return kNoGeometryProvenance - an "
+                 f"unbound or mismatched profile must match no stored evidence")
+
+    # The decision path must never look evidence up without the tag.
+    # One level of nesting, so currentGeometryTag()'s own parentheses do not
+    # truncate the captured argument list.
+    for call in re.finditer(
+            r"(limits_|transforms_)\.find\(((?:[^()]|\([^()]*\))*)\)", code):
+        if "currentGeometryTag()" not in call.group(2):
+            fail(f"{path}: {call.group(0)} looks evidence up without the current geometry "
+                 f"tag - identity alone is not enough to make a record current")
+
+
+def check_direction_is_contractual(files, sketch_dir):
+    """Joint direction is hardware-contract data, not a recalibration datum.
+
+    The canonical URDF carries per-joint motorDirection and those directions
+    were validated on real hardware. The 2026-08-27 reprovisioning changed the
+    physical units, the PositionOffset baseline and the raw q0 installation -
+    it did NOT change the servo model, the mounting orientation, the joint
+    mechanical architecture, the URDF axes or motorDirection.
+
+        q0              CURRENT INSTALLATION CALIBRATION DATA - measured
+        motorDirection  CURRENT URDF / HARDWARE CONTRACT DATA - read
+
+    So:
+
+      1. JointTransform carries NO direction field - one source of truth;
+      2. jointDirection() resolves it from the bound profile's URDF record;
+      3. usableProvenance() does not require a measured direction;
+      4. the optional DIRECTION_VERIFY diagnostic budget is consulted ONLY by
+         the diagnostic path - never by calibration acceptance.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    profile_h = by_name.get("CalibrationGeometryProfile.h")
+    profile_cpp = by_name.get("CalibrationGeometryProfile.cpp")
+    policy_cpp = by_name.get("ActuatorWritePolicy.cpp")
+    if profile_h is None or profile_cpp is None or policy_cpp is None:
+        fail(f"{sketch_dir / 'src' / 'actuator'}: the Safe Actuator sources were not found")
+        return
+
+    # --- (1) direction is not stored as transform evidence -----------------
+    path, code = profile_h
+    body = re.search(r"struct JointTransform\s*\{(.*?)\n\};", code, re.DOTALL)
+    if not body:
+        fail(f"{path}: struct JointTransform not found")
+    elif re.search(r"^\s*int8_t\s+direction\s*=", body.group(1), re.M):
+        fail(f"{path}: JointTransform carries a `direction` field - direction is "
+             f"hardware-contract data read from the URDF, not measured evidence. Storing a "
+             f"copy creates a second source of truth that can silently disagree with the "
+             f"URDF the geometry plan was compiled against")
+
+    # --- (2) it is resolved from the profile -------------------------------
+    path, code = profile_cpp
+    resolver = re.search(r"int8_t jointDirection\(.*?\n\}", code, re.DOTALL)
+    if not resolver:
+        fail(f"{path}: jointDirection() not found - direction must be resolvable from the "
+             f"bound profile, which is what ties it to the URDF provenance")
+    else:
+        text = resolver.group(0)
+        if "urdf_motor_direction" not in text:
+            fail(f"{path}: jointDirection() does not read urdf_motor_direction - the URDF "
+                 f"is the only authority for a joint's direction")
+        if "findJoint" not in text:
+            fail(f"{path}: jointDirection() does not go through the bound profile - a "
+                 f"direction read outside the profile escapes the geometry provenance tag, "
+                 f"so a URDF change would not invalidate it")
+        if "return 0" not in text:
+            fail(f"{path}: jointDirection() cannot return 0 - an unknown joint or an "
+                 f"unbound profile must fail closed rather than guess a sign")
+
+    # --- (3) provenance does not demand a measured direction ---------------
+    provenance = re.search(r"bool JointTransform::usableProvenance\(\) const\s*\{(.*?)\n\}",
+                           code, re.DOTALL)
+    if provenance and "direction" in provenance.group(1):
+        fail(f"{path}: JointTransform::usableProvenance() still consults a direction - a "
+             f"same-type servo replacement in the same mounting invalidates q0 only, and "
+             f"must not be blocked waiting for a direction measurement")
+
+    # --- (4) the diagnostic budget never gates calibration -----------------
+    path, code = policy_cpp
+    for m in re.finditer(r"(\w+)\s*\([^)]*\)\s*(?:const\s*)?\{", code):
+        pass  # function boundaries are not reliable here; scope by name instead
+    envelope = re.search(r"WriteDecision SafeActuatorPolicy::evaluateBootstrapEnvelope"
+                         r"\(.*?\n\}", code, re.DOTALL)
+    plan_route = re.search(r"WriteDecision SafeActuatorPolicy::evaluateEndpointPlan"
+                           r"\(.*?\n\}", code, re.DOTALL)
+    if plan_route is None:
+        fail(f"{path}: evaluateEndpointPlan() not found")
+    else:
+        for token in ("direction_verify_tick_budget", "DIRECTION_VERIFY"):
+            if token in plan_route.group(0):
+                fail(f"{path}: the endpoint-plan route consults {token!r} - contact "
+                     f"probing and auxiliary moves are calibration work and must never "
+                     f"depend on an optional direction diagnostic")
+    budget_uses = code.count("direction_verify_tick_budget")
+    in_envelope = envelope.group(0).count("direction_verify_tick_budget") if envelope else 0
+    if budget_uses != in_envelope:
+        fail(f"{path}: direction_verify_tick_budget is read outside "
+             f"evaluateBootstrapEnvelope() ({budget_uses} uses, {in_envelope} of them in "
+             f"the diagnostic path) - it is an OPTIONAL diagnostic budget and must gate "
+             f"nothing else")
+
+
+def check_ota_boundaries(files, sketch_dir):
+    """OTA-A permanent invariants.
+
+    OTA is the one subsystem that can make a device unbootable, so the rules
+    that keep it safe are enforced here rather than trusted to review:
+
+      1. the decision layers stay host-linkable, so the offline suite drives
+         the shipped state machine and every failure path is reachable;
+      2. the ESP-IDF OTA API is confined to ONE translation unit;
+      3. the boot target can be changed from exactly one validated state, and
+         only through esp_ota_set_boot_partition in that one unit;
+      4. the running image is never the write target;
+      5. the first-boot confirmation is not called at startup;
+      6. byte ingest is compiled OUT by default - OTA-A has no authentication,
+         so a production image must not contain a reachable firmware writer.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    update_dir = sketch_dir / "src" / "update"
+
+    # --- (1) host-linkable decision layers ---------------------------------
+    for name in ("OtaPolicy.h", "OtaPolicy.cpp", "OtaBootGuard.h", "OtaBootGuard.cpp",
+                 "Sha256.h", "Sha256.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            fail(f"{update_dir / name}: OTA-A decision unit not found")
+            continue
+        path, code = entry
+        for forbidden in ("#include <Arduino.h>", "#include <esp_ota_ops.h>",
+                          "#include <esp_partition.h>", "#include <WiFi.h>"):
+            if forbidden in code:
+                fail(f"{path}: contains {forbidden!r} - the OTA decision layers must stay "
+                     f"free of the Arduino runtime and of ESP-IDF so "
+                     f"scripts/tests/test_ota_policy.cpp drives the REAL state machine "
+                     f"against a fake backend (OTA-A)")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the OTA state layer must stay "
+                 f"transport-independent (ARCHITECTURE.md, telemetry snapshot model)")
+
+    # --- (2) the ESP-IDF OTA API lives in exactly one unit -----------------
+    ota_api = ("esp_ota_begin", "esp_ota_write", "esp_ota_end", "esp_ota_abort",
+               "esp_ota_set_boot_partition", "esp_ota_get_next_update_partition",
+               "esp_ota_mark_app_valid_cancel_rollback", "esp_ota_mark_app_invalid")
+    for path, code in files:
+        if path.name == "OtaEspBackend.cpp":
+            continue
+        hits = [sym for sym in ota_api if sym in code]
+        if hits:
+            fail(f"{path}: calls ESP-IDF OTA API {hits} outside "
+                 f"update/OtaEspBackend.cpp - the write/boot-switch surface must stay in "
+                 f"one auditable translation unit (OTA-A)")
+
+    backend = by_name.get("OtaEspBackend.cpp")
+    if backend is None:
+        fail(f"{update_dir / 'OtaEspBackend.cpp'}: OTA ESP-IDF backend not found")
+    else:
+        path, code = backend
+        # --- (4) the backend refuses to point boot at the running slot -----
+        body = re.search(r"bool OtaEspBackend::setBootPartition\([^)]*\)\s*\{(.*?)\n\}",
+                         code, re.DOTALL)
+        if not body:
+            fail(f"{path}: could not locate setBootPartition() to audit it")
+        elif "esp_ota_get_running_partition" not in body.group(1):
+            fail(f"{path}: setBootPartition() does not independently re-check the running "
+                 f"partition - the last line of defence against pointing the boot target "
+                 f"at the slot we are executing from (OTA-A)")
+        # esp_ota_begin must not be handed an explicit image size: that erases
+        # the whole range up front, seconds of blocking for a ~1 MB image.
+        if "OTA_WITH_SEQUENTIAL_WRITES" not in code:
+            fail(f"{path}: esp_ota_begin() is not using OTA_WITH_SEQUENTIAL_WRITES - an "
+                 f"up-front full-range erase blocks the Controller loop for seconds "
+                 f"(handoff section 18)")
+
+    # --- (3) exactly one commit path, reachable from one state -------------
+    policy = by_name.get("OtaPolicy.cpp")
+    if policy is not None:
+        path, code = policy
+        commit = re.search(r"bool OtaPolicy::commitBootTarget\(\)\s*\{(.*?)\n\}",
+                           code, re.DOTALL)
+        if not commit:
+            fail(f"{path}: could not locate commitBootTarget() to audit it")
+        else:
+            body = commit.group(1)
+            if "OtaState::IDENTITY_VERIFIED" not in body:
+                fail(f"{path}: commitBootTarget() is not gated on "
+                     f"OtaState::IDENTITY_VERIFIED - the boot target must only change "
+                     f"after the stream completed, the image passed the ESP-IDF check and "
+                     f"the hash matched (OTA-A critical safety rule)")
+        # setBootPartition must be called from that one method and nowhere else.
+        calls = len(re.findall(r"setBootPartition\(", code))
+        if calls != 1:
+            fail(f"{path}: setBootPartition( is called {calls} time(s) - exactly one call "
+                 f"site, inside commitBootTarget(), keeps the boot switch auditable")
+        for required, why in (
+            ("OtaFault::TARGET_IS_RUNNING", "the target must be explicitly checked against "
+                                            "the running partition"),
+            ("OtaFault::TARGET_NOT_OTA_SLOT", "the target subtype must be explicitly checked"),
+            ("OtaFault::IMAGE_TOO_LARGE", "the image size must be explicitly bounded by the "
+                                          "target partition"),
+            ("OtaFault::RUNNING_IMAGE_UNCONFIRMED", "a PENDING_VERIFY running image must be "
+                                                    "refused before esp_ota_begin sees it"),
+        ):
+            if required not in code:
+                fail(f"{path}: {required} is not present - {why} (OTA-A, fail closed)")
+
+    # --- (5) first-boot confirmation is earned, not granted at startup -----
+    guard = by_name.get("OtaBootGuard.cpp")
+    if guard is not None:
+        path, code = guard
+        if "markAppValid()" not in code:
+            fail(f"{path}: the boot guard never confirms an image - a PENDING_VERIFY image "
+                 f"would always be rolled back")
+    ctl = by_name.get("Controller.cpp")
+    if ctl is not None:
+        path, code = ctl
+        begin_body = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", code,
+                               re.DOTALL)
+        if begin_body and "markAppValid" in begin_body.group(1):
+            fail(f"{path}: Controller::begin() confirms the OTA image - confirmation must "
+                 f"be earned by running, not granted at startup, or the bootloader's "
+                 f"rollback is thrown away for exactly the case it exists for (OTA-A)")
+
+    # --- (6) ingest compiled out by default --------------------------------
+    manager = by_name.get("OtaManager.h")
+    if manager is None:
+        fail(f"{update_dir / 'OtaManager.h'}: OTA manager not found")
+    else:
+        path, code = manager
+        m = re.search(r"#define\s+MATDOG_OTA_INGEST_ENABLED\s+(\S+)", code)
+        if not m:
+            fail(f"{path}: could not locate the MATDOG_OTA_INGEST_ENABLED default")
+        elif m.group(1).strip() != "0":
+            fail(f"{path}: MATDOG_OTA_INGEST_ENABLED defaults to {m.group(1)!r}, expected 0 "
+                 f"- OTA-A has no authentication, so a reachable firmware writer must not "
+                 f"be compiled into an image by default (handoff section 17)")
+
+
+def check_http_transport_boundaries(files, sketch_dir):
+    """I7/I8 permanent invariants for the network transport (2026-09-25
+    correction).
+
+    HttpTransport is the CONTROL/AUTHORIZATION plane in front of the one
+    existing OtaManager/OtaPolicy/OtaEspBackend writer, never a second
+    writer of its own. These checks defend the properties that design rests
+    on, so none of them can be lost to a later "small" edit:
+
+      1. Hmac256/OtaSession stay pure and host-linkable, so the offline
+         suites (test_hmac256.cpp, test_ota_session.cpp) drive the REAL
+         authentication logic, not a copy;
+      2. the ESP-IDF HTTP server API is confined to ONE translation unit,
+         the same "one auditable unit" rule check_ota_boundaries already
+         gives the ESP-IDF OTA API;
+      3. the listening socket is never opened from Controller::begin() -
+         it stays MAINTENANCE-gated, reachable only through @WEB SERVER;
+      4. it never reboots on its own - a committed OTA image waits for a
+         separate, explicit step, exactly like the reviewed manual
+         application-only flash path;
+      5. the shared secret follows the exact same one-place,
+         never-committed discipline as the Wi-Fi passphrase (W1).
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    update_dir = sketch_dir / "src" / "update"
+    network_dir = sketch_dir / "src" / "network"
+
+    # --- (1) Hmac256/OtaSession/HttpMailbox stay host-linkable --------------
+    host_linkable_units = {
+        "Hmac256.h": update_dir, "Hmac256.cpp": update_dir,
+        "OtaSession.h": update_dir, "OtaSession.cpp": update_dir,
+        # HttpMailbox.h alone: the mailbox correlation logic (I7/I8
+        # hardening, 2026-09-25) is small enough to stay header-only, so
+        # there is no matching .cpp to require here.
+        "HttpMailbox.h": network_dir,
+    }
+    for name, unit_dir in host_linkable_units.items():
+        entry = by_name.get(name)
+        if entry is None:
+            fail(f"{unit_dir / name}: I7/I8 authentication/session/mailbox unit not found")
+            continue
+        path, code = entry
+        for forbidden in ("#include <Arduino.h>", "#include <esp_http_server.h>",
+                          "#include <WiFi.h>", "Serial."):
+            if forbidden in code:
+                fail(f"{path}: contains {forbidden!r} - the OTA authentication/session/"
+                     f"mailbox-correlation layers must stay free of the Arduino runtime and "
+                     f"of the transport so scripts/tests/test_hmac256.cpp, "
+                     f"test_ota_session.cpp and test_http_mailbox.cpp link the REAL logic "
+                     f"(I7/I8, the same contract as WifiPolicy/OtaPolicy)")
+
+    # --- (2) the ESP-IDF HTTP server API lives in exactly one unit ---------
+    httpd_api_prefixes = ("httpd_start", "httpd_stop", "httpd_register_uri_handler",
+                          "httpd_req_recv", "httpd_req_get_hdr_value_str",
+                          "httpd_req_get_hdr_value_len", "httpd_resp_send")
+    for path, code in files:
+        if path.name == "HttpTransport.cpp":
+            continue
+        hits = [sym for sym in httpd_api_prefixes if sym in code]
+        if hits:
+            fail(f"{path}: calls ESP-IDF HTTP server API {hits} outside "
+                 f"network/HttpTransport.cpp - the listening socket and every handler must "
+                 f"stay in one auditable translation unit (I7/I8)")
+
+    # --- (3) never started from Controller::begin() ------------------------
+    ctl = by_name.get("Controller.cpp")
+    if ctl is None:
+        fail(f"{sketch_dir / 'src' / 'core' / 'Controller.cpp'}: not found - cannot audit "
+             f"HTTP transport startup")
+    else:
+        path, code = ctl
+        begin_body = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if begin_body and "http_transport_.start()" in begin_body.group(1):
+            fail(f"{path}: Controller::begin() starts the HTTP transport - the listening "
+                 f"socket must stay off at boot, reachable only from the MAINTENANCE-gated "
+                 f"@WEB SERVER START command (I7/I8)")
+
+    # @WEB SERVER START must be gated the same way every other diagnostic
+    # that can be triggered without hardware authorization already is.
+    router = by_name.get("CommandRouter.cpp")
+    if router is None:
+        fail(f"{sketch_dir / 'src' / 'core' / 'CommandRouter.cpp'}: not found - cannot audit "
+             f"the @WEB SERVER command gate")
+    else:
+        path, code = router
+        if '"@WEB SERVER START"' not in code:
+            fail(f"{path}: @WEB SERVER START command not found - the HTTP transport must be "
+                 f"reachable from the command surface, not only from source")
+        else:
+            # Bounded to the WEB SERVER branch itself - the next "} else if
+            # (upper ==" marks the start of an unrelated command's branch, so
+            # this must not just search a fixed character window forward,
+            # which previously kept matching the NEXT command's own
+            # MAINTENANCE check instead of this one's (caught by manual
+            # mutation: deleting this branch's gate still passed until this
+            # was bounded to the branch).
+            branch = re.search(
+                r'"@WEB SERVER START".*?\{(.*?)(?=\}\s*else\s+if\s*\(upper\b)',
+                code, re.DOTALL)
+            if not branch or "OperatingMode::MAINTENANCE" not in branch.group(1):
+                fail(f"{path}: @WEB SERVER START does not check "
+                     f"OperatingMode::MAINTENANCE inside its own branch - starting the "
+                     f"listening socket must stay MAINTENANCE-gated, the same trust "
+                     f"boundary as the DALY KEY write and the servo scan/census/preflight "
+                     f"commands")
+
+    # --- (4) never reboots itself -------------------------------------------
+    transport = by_name.get("HttpTransport.cpp")
+    if transport is not None:
+        path, code = transport
+        if "esp_restart(" in code:
+            fail(f"{path}: calls esp_restart() - a committed OTA image must wait for a "
+                 f"separate, explicit reboot step, never one the network transport takes "
+                 f"on its own (I7)")
+
+        # --- (4b) bounded START -> STOP resource lifecycle (I7/I8 hardening,
+        # 2026-09-25): every semaphore created must be matched by exactly one
+        # delete, so a repeated start()/stop() cycle cannot leak handles.
+        # Counting textual occurrences is a coarse proxy, but a genuine leak
+        # (a fourth CreateBinary with no matching Delete, or vice versa) can
+        # only make these counts diverge, never coincidentally match.
+        creates = len(re.findall(r"xSemaphoreCreateBinary\s*\(", code))
+        deletes = len(re.findall(r"vSemaphoreDelete\s*\(", code))
+        if creates == 0:
+            fail(f"{path}: no xSemaphoreCreateBinary() call found - expected the "
+                 f"request/response/slot-free mailbox semaphores")
+        elif creates != deletes:
+            fail(f"{path}: {creates} xSemaphoreCreateBinary() call(s) but {deletes} "
+                 f"vSemaphoreDelete() call(s) - every semaphore start() creates must be "
+                 f"released by stop(), or a bounded START -> STOP -> START -> STOP cycle "
+                 f"leaks a handle (I7/I8 hardening)")
+
+        # stop() must be reachable from every partial-failure path in
+        # start() - not just from an explicit @WEB SERVER STOP - or a
+        # failed httpd_start()/CreateBinary() attempt leaks whatever it did
+        # allocate. Counted within start()'s own body only.
+        start_body = re.search(r"bool HttpTransport::start\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not start_body:
+            fail(f"{path}: could not locate HttpTransport::start() to audit its cleanup")
+        else:
+            stop_calls_in_start = len(re.findall(r"\bstop\(\)", start_body.group(1)))
+            if stop_calls_in_start < 2:
+                fail(f"{path}: HttpTransport::start() calls stop() {stop_calls_in_start} "
+                     f"time(s) - expected at least 2 (an upfront defensive call, plus at "
+                     f"least one partial-failure cleanup path) - a failed start() attempt "
+                     f"must release whatever it already allocated (I7/I8 hardening)")
+
+    # --- (5) the OTA shared secret: one use site, never committed ----------
+    creds = by_name.get("OtaCredentials.h")
+    if creds is None:
+        fail(f"{sketch_dir / 'src' / 'config' / 'OtaCredentials.h'}: OTA credential resolver "
+             f"not found")
+    else:
+        path, code = creds
+        if "kOtaSecretPresent" not in code:
+            fail(f"{path}: kOtaSecretPresent not found - an absent secret must be a "
+                 f"compile-time fact so OtaSession fails closed rather than authenticating "
+                 f"against an empty key")
+        if 'define MATDOG_OTA_SECRET ""' not in code:
+            fail(f"{path}: the empty-secret fallback is missing - a checkout with no OTA "
+                 f"secret configured must still build and boot, with every OTA request "
+                 f"rejected")
+
+    # Word-boundary match: kOtaSecretPresent is a separate, harmless
+    # compile-time boolean and must not be counted as a use of the secret
+    # itself. Unlike kWifiPassword (passed once to WiFi.begin()), the raw
+    # secret legitimately appears twice at its one call site - once as bytes
+    # and once via strlen() for its length - so the invariant enforced here
+    # is "only at that one call site", not "exactly once textually".
+    secret_re = re.compile(r"\bkOtaSecret\b")
+    secret_sites = []
+    for path, code in files:
+        if path.name == "OtaCredentials.h":
+            continue
+        n = len(secret_re.findall(code))
+        if n:
+            secret_sites.append((str(path), n))
+    other_files = [s for s in secret_sites if pathlib.Path(s[0]).name != "Controller.cpp"]
+    if other_files:
+        fail(f"kOtaSecret is referenced outside core/Controller.cpp: {other_files} - it must "
+             f"appear only at the one HttpTransport::begin() call site. It must never be "
+             f"stored, returned or printed (I7)")
+    ctl_entry = by_name.get("Controller.cpp")
+    if ctl_entry is not None:
+        path, code = ctl_entry
+        n = len(secret_re.findall(code))
+        begin_call = re.search(r"http_transport_\.begin\(([^;]*)\)", code, re.DOTALL)
+        if n == 0:
+            fail(f"{path}: kOtaSecret is not referenced - HttpTransport::begin() must be "
+                 f"given the configured secret (I7)")
+        elif not begin_call or len(secret_re.findall(begin_call.group(1))) != n:
+            fail(f"{path}: kOtaSecret is referenced {n} time(s) outside the "
+                 f"http_transport_.begin() call - every use must be at that one call site, "
+                 f"passed straight through, never stored, returned or printed (I7)")
+
+    session_files = [(p, c) for n, (p, c) in by_name.items()
+                     if n in ("OtaSession.h", "OtaSession.cpp")]
+    for path, code in session_files:
+        for token in ("secret", "password", "passphrase"):
+            # "secret" itself is expected (it is the parameter name); this
+            # instead looks for it ever being formatted, logged or exposed
+            # through a status/printf-shaped call, which none of these files
+            # should ever contain regardless.
+            if "printf" in code.lower() and token in code.lower():
+                fail(f"{path}: mentions {token!r} near a printf-shaped call - the OTA session "
+                     f"layer must never format or expose the secret (I7)")
+
+    gitignore = sketch_dir / ".gitignore"
+    local_rel = "src/config/OtaCredentials.local.h"
+    if not gitignore.exists():
+        fail(f"{gitignore}: not found - it must ignore {local_rel}")
+    else:
+        rules = [ln.strip() for ln in gitignore.read_text(encoding="utf-8").splitlines()]
+        rules = [ln for ln in rules if ln and not ln.startswith("#")]
+        if local_rel not in rules:
+            fail(f"{gitignore}: has no ignore rule for {local_rel} (active rules: {rules}) - "
+                 f"removing that entry makes a real OTA secret committable (I7)")
+
+    template = sketch_dir / "src" / "config" / "OtaCredentials.local.h.example"
+    if not template.exists():
+        fail(f"{template}: credential template not found - it is the documented way to "
+             f"configure OTA authentication without touching a tracked file")
+
+    result = subprocess.run(["git", "-C", str(sketch_dir), "ls-files", "--error-unmatch",
+                             local_rel],
+                            capture_output=True, text=True)
+    if result.returncode == 0:
+        fail(f"{local_rel} is TRACKED by Git - a real OTA secret must never be committed. "
+             f"Run: git rm --cached {local_rel}")
+
+
+def check_wifi_runtime_boundaries(files, sketch_dir):
+    """W1 permanent invariants for the Wi-Fi runtime.
+
+    The tripwire in check_no_network_to_servo_path already forbids the worst
+    outcome (a network translation unit reaching a servo primitive). These
+    checks defend the three other properties W1 actually rests on, so none
+    of them can be lost to a later "small" edit:
+
+      1. the decision logic stays host-linkable, so the offline suite
+         exercises the shipped state machine rather than a copy;
+      2. the Wi-Fi tick stays bounded, so it cannot starve the Controller
+         loop (ARCHITECTURE.md, resource isolation);
+      3. the passphrase stays in exactly one place and out of Git.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    network_dir = sketch_dir / "src" / "network"
+
+    # --- (1) the policy layer stays host-linkable --------------------------
+    for name in ("WifiPolicy.h", "WifiPolicy.cpp"):
+        entry = by_name.get(name)
+        if entry is None:
+            fail(f"{network_dir / name}: W1 Wi-Fi policy unit not found - the Wi-Fi "
+                 f"decision logic must live in a host-linkable translation unit")
+            continue
+        path, code = entry
+        for forbidden in ("#include <Arduino.h>", "#include <WiFi.h>"):
+            if forbidden in code:
+                fail(f"{path}: contains {forbidden!r} - the Wi-Fi policy must stay free of "
+                     f"the Arduino runtime and of the radio so scripts/tests/"
+                     f"test_wifi_policy.cpp links the REAL state machine (W1, and the same "
+                     f"contract as DalyProtocol/ServoPopulation)")
+        if "Serial." in code:
+            fail(f"{path}: contains Serial output - the Wi-Fi state layer must stay "
+                 f"transport-independent so USB CDC and a future Web UI consume one "
+                 f"structured snapshot (ARCHITECTURE.md, telemetry snapshot model)")
+
+    policy_header = by_name.get("WifiPolicy.h")
+    if policy_header is not None and "struct WifiStatus" not in policy_header[1]:
+        fail(f"{policy_header[0]}: WifiStatus struct not found - the Wi-Fi layer must "
+             f"produce structured state, not formatted text")
+
+    # --- (2) the Wi-Fi tick stays bounded ----------------------------------
+    manager = by_name.get("WifiManager.cpp")
+    if manager is None:
+        fail(f"{network_dir / 'WifiManager.cpp'}: W1 Wi-Fi radio owner not found")
+    else:
+        path, code = manager
+        # Blocking calls that exist in esp32:esp32 3.3.11 and would stall
+        # Controller::update(). WiFi.disconnect() is listed because its
+        # default overload polls for up to 100 ms; disconnectAsync() does
+        # not, and is what this module is required to use.
+        for token, why in (
+            ("waitForConnectResult", "blocks until the association resolves"),
+            ("WiFi.disconnect(", "the blocking overload polls up to 100 ms - use "
+                                 "disconnectAsync()"),
+            ("WiFi.scanNetworks()", "the blocking scan form stops the loop for seconds"),
+            ("WiFi.SSID()", "returns an Arduino String and would allocate on every poll"),
+            ("delay(", "a delay in the network path is not a connection-management "
+                       "strategy (handoff section 18)"),
+        ):
+            if token in code:
+                fail(f"{path}: {token} is forbidden in the Wi-Fi runtime - {why}")
+
+        # No unbounded iteration in the per-tick entry point. begin() may
+        # loop (it copies the SSID once, bounded by the buffer); update()
+        # may not.
+        body = re.search(r"void WifiManager::update\(uint32_t now_ms\)\s*\{(.*?)\n\}",
+                         code, re.DOTALL)
+        if not body:
+            fail(f"{path}: could not locate WifiManager::update() to audit its bounds")
+        else:
+            for token in ("while (", "while("):
+                if token in body.group(1):
+                    fail(f"{path}: WifiManager::update() contains {token!r} - the Wi-Fi "
+                         f"tick must be a single bounded evaluation, never a wait loop")
+
+        # --- snapshot self-consistency (W1 review findings) -------------
+        # The adapter is not host-linkable (it owns the radio), so these two
+        # invariants cannot be pinned by the offline suite. They were found
+        # by review and are pinned here instead.
+        #
+        # 1. A command handler that changes state must republish the
+        #    snapshot before returning. CommandRouter prints the snapshot in
+        #    the same pass as the acknowledgement, so a stale one made
+        #    @WIFI OFF answer "WIFI=OFF" and then print "enabled=YES".
+        setter = re.search(r"bool WifiManager::setEnabled\([^)]*\)\s*\{(.*?)\n\}",
+                           code, re.DOTALL)
+        if not setter:
+            fail(f"{path}: could not locate WifiManager::setEnabled() to audit it")
+        elif "publishPolicyState(" not in setter.group(1) and \
+             "refreshSnapshot(" not in setter.group(1):
+            fail(f"{path}: WifiManager::setEnabled() does not republish the snapshot - the "
+                 f"@WIFI reply would contradict itself, printing the previous tick's "
+                 f"enabled/state alongside the new acknowledgement (W1 review)")
+
+        # 2. Tearing the radio down invalidates the link state read at the
+        #    top of the same tick. Without this the snapshot publishes
+        #    state=INACTIVE together with connected=YES and a live IP/RSSI,
+        #    and polls a radio that is going away.
+        if body:
+            stop_case = re.search(r"case WifiAction::STOP_RADIO:(.*?)break;", body.group(1),
+                                  re.DOTALL)
+            if not stop_case:
+                fail(f"{path}: WifiManager::update() has no STOP_RADIO case to audit")
+            elif not re.search(r"link_up\s*=\s*false", stop_case.group(1)):
+                fail(f"{path}: the STOP_RADIO path does not invalidate link_up - the "
+                     f"snapshot would report a torn-down radio as a live link (W1 review)")
+
+        # The network layer may observe mode, never change it: authority is
+        # not a network concept (handoff sections 9/19).
+        if "setMode(" in code:
+            fail(f"{path}: calls setMode( - a network task must never change "
+                 f"OperatingMode; authority stays with the Controller")
+
+    # --- (3) the passphrase: one use site, never committed -----------------
+    creds = by_name.get("WifiCredentials.h")
+    if creds is None:
+        fail(f"{sketch_dir / 'src' / 'config' / 'WifiCredentials.h'}: Wi-Fi credential "
+             f"resolver not found")
+    else:
+        path, code = creds
+        if "kWifiCredentialsPresent" not in code:
+            fail(f"{path}: kWifiCredentialsPresent not found - an absent SSID must be a "
+                 f"compile-time fact so the radio is never started without credentials")
+        if 'define MATDOG_WIFI_SSID ""' not in code:
+            fail(f"{path}: the empty-SSID fallback is missing - a checkout with no "
+                 f"credentials must still build and boot, with the radio never started")
+
+    # kWifiPassword must be named in exactly one place besides its own
+    # declaration: the single WiFi.begin() call. Anywhere else is a step
+    # toward it reaching a log line, @STATUS or a web response.
+    password_sites = []
+    for path, code in files:
+        if path.name == "WifiCredentials.h":
+            continue
+        if "kWifiPassword" in code:
+            password_sites.append((str(path), code.count("kWifiPassword")))
+    total = sum(n for _, n in password_sites)
+    if total != 1 or (password_sites and pathlib.Path(password_sites[0][0]).name != "WifiManager.cpp"):
+        fail(f"kWifiPassword is referenced {total} time(s) at {password_sites} - it must "
+             f"appear exactly once, in network/WifiManager.cpp, passed straight to the "
+             f"connect call. It must never be stored, returned or printed (W1)")
+
+    policy_files = [c for n, (p, c) in by_name.items() if n in ("WifiPolicy.h", "WifiPolicy.cpp")]
+    for code in policy_files:
+        for token in ("password", "passphrase", "psk"):
+            if token in code.lower():
+                fail(f"src/network/WifiPolicy.*: mentions {token!r} - the observable Wi-Fi "
+                     f"snapshot must have no field that could ever hold a secret (W1)")
+
+    # The local credentials file must stay ignored by Git, and untracked.
+    gitignore = sketch_dir / ".gitignore"
+    local_rel = "src/config/WifiCredentials.local.h"
+    if not gitignore.exists():
+        fail(f"{gitignore}: not found - it must ignore {local_rel}")
+    else:
+        # Exact-line match, not a substring search. The surrounding comment
+        # block names ".../WifiCredentials.local.h.example", which contains
+        # the rule as a substring - a naive `in` test would keep passing
+        # after the real rule line was deleted.
+        rules = [ln.strip() for ln in gitignore.read_text(encoding="utf-8").splitlines()]
+        rules = [ln for ln in rules if ln and not ln.startswith("#")]
+        if local_rel not in rules:
+            fail(f"{gitignore}: has no ignore rule for {local_rel} (active rules: {rules}) - "
+                 f"removing that entry makes a real Wi-Fi passphrase committable (W1)")
+
+    template = sketch_dir / "src" / "config" / "WifiCredentials.local.h.example"
+    if not template.exists():
+        fail(f"{template}: credential template not found - it is the documented way to "
+             f"configure Wi-Fi without touching a tracked file")
+
+    result = subprocess.run(["git", "-C", str(sketch_dir), "ls-files", "--error-unmatch",
+                             local_rel],
+                            capture_output=True, text=True)
+    if result.returncode == 0:
+        fail(f"{local_rel} is TRACKED by Git - a real Wi-Fi passphrase must never be "
+             f"committed. Run: git rm --cached {local_rel}")
+
+
 def check_host_tests(sketch_dir):
     """Runs the offline C++ census/profile suite, the same way the OTA
     parser's Python suite is already run from here: one gate command."""
     runner = sketch_dir / "scripts" / "tests" / "run_host_tests.sh"
     suite = sketch_dir / "scripts" / "tests" / "test_servo_population.cpp"
     daly_suite = sketch_dir / "scripts" / "tests" / "test_daly_protocol.cpp"
+    wifi_suite = sketch_dir / "scripts" / "tests" / "test_wifi_policy.cpp"
+    ota_suite = sketch_dir / "scripts" / "tests" / "test_ota_policy.cpp"
+    authority_suite = sketch_dir / "scripts" / "tests" / "test_actuator_authority.cpp"
+    policy_suite = sketch_dir / "scripts" / "tests" / "test_actuator_write_policy.cpp"
+    geometry_suite = sketch_dir / "scripts" / "tests" / "test_calibration_geometry.cpp"
+    profile_suite = sketch_dir / "scripts" / "tests" / "test_servo_profile.cpp"
+    calibration_suites = [
+        sketch_dir / "scripts" / "tests" / "test_calibration_domain.cpp",
+        sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
+    ]
+    led_status_suite = sketch_dir / "scripts" / "tests" / "test_led_status_policy.cpp"
+    actuator_runtime_suite = sketch_dir / "scripts" / "tests" / "test_actuator_runtime.cpp"
+    calibration_execution_suite = (
+        sketch_dir / "scripts" / "tests" / "test_calibration_execution_engine.cpp"
+    )
+    service_readiness_suite = sketch_dir / "scripts" / "tests" / "test_service_readiness.cpp"
+    hmac256_suite = sketch_dir / "scripts" / "tests" / "test_hmac256.cpp"
+    ota_session_suite = sketch_dir / "scripts" / "tests" / "test_ota_session.cpp"
+    http_mailbox_suite = sketch_dir / "scripts" / "tests" / "test_http_mailbox.cpp"
     if not suite.exists():
         fail(f"{suite}: G2 servo population/profile offline test suite not found")
         return
     if not daly_suite.exists():
         fail(f"{daly_suite}: DALY protocol/KEY probe offline test suite not found")
         return
+    if not wifi_suite.exists():
+        fail(f"{wifi_suite}: W1 Wi-Fi runtime policy offline test suite not found")
+        return
+    if not ota_suite.exists():
+        fail(f"{ota_suite}: OTA-A policy/boot-guard/sha256 offline test suite not found")
+        return
+    if not authority_suite.exists():
+        fail(f"{authority_suite}: ActuatorAuthority offline test suite not found")
+        return
+    if not policy_suite.exists():
+        fail(f"{policy_suite}: Safe Actuator Layer write-policy offline test suite not found")
+        return
+    if not geometry_suite.exists():
+        fail(f"{geometry_suite}: calibration bootstrap geometry offline test suite not found")
+        return
+    if not profile_suite.exists():
+        fail(f"{profile_suite}: MATDOG_C018_V1 profile offline test suite not found")
+        return
+    for suite in calibration_suites:
+        if not suite.exists():
+            fail(f"{suite}: calibration offline test suite not found")
+            return
+    if not led_status_suite.exists():
+        fail(f"{led_status_suite}: LED status policy offline test suite not found")
+        return
+    if not actuator_runtime_suite.exists():
+        fail(f"{actuator_runtime_suite}: Safe Actuator runtime adapter offline test suite not found")
+        return
+    if not calibration_execution_suite.exists():
+        fail(f"{calibration_execution_suite}: Calibration Execution boundary offline test suite "
+             f"not found")
+        return
+    if not service_readiness_suite.exists():
+        fail(f"{service_readiness_suite}: HostLink readiness offline test suite not found")
+        return
+    if not hmac256_suite.exists():
+        fail(f"{hmac256_suite}: HMAC-SHA256 offline test suite not found (I7)")
+        return
+    if not ota_session_suite.exists():
+        fail(f"{ota_session_suite}: OTA transport session/authentication offline test suite "
+             f"not found (I7)")
+        return
+    if not http_mailbox_suite.exists():
+        fail(f"{http_mailbox_suite}: HTTP transport mailbox correlation offline test suite "
+             f"not found (I7/I8)")
+        return
     if not runner.exists():
         fail(f"{runner}: host test runner not found")
         return
     runner_text = strip_shell_comments(runner.read_text(encoding="utf-8"))
-    for binary in ("test_servo_population", "test_daly_protocol"):
+    for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy",
+                   "test_ota_policy", "test_actuator_authority", "test_actuator_write_policy",
+                   "test_calibration_geometry", "test_servo_profile",
+                   "test_calibration_domain", "test_calibration_manager",
+                   "test_led_status_policy", "test_actuator_runtime",
+                   "test_calibration_execution_engine", "test_service_readiness",
+                   "test_hmac256", "test_ota_session", "test_http_mailbox"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
@@ -1164,6 +2985,20 @@ def check_daly_audit_mutation_suite(sketch_dir):
     result = subprocess.run([sys.executable, str(suite)], capture_output=True, text=True)
     if result.returncode != 0:
         fail(f"{suite}: DALY audit mutation tests FAILED "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
+
+def check_safe_actuator_audit_mutation_suite(sketch_dir):
+    """Proves the Safe Actuator Layer boundaries above actually fail on
+    mutation - purity, SAFE_OFF independence, the operation classes, limit
+    provenance, and the pre-existing torque-on prohibition."""
+    suite = sketch_dir / "scripts" / "tests" / "test_static_audit_safe_actuator.py"
+    if not suite.exists():
+        fail(f"{suite}: Safe Actuator Layer audit mutation suite not found")
+        return
+    result = subprocess.run([sys.executable, str(suite)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{suite}: Safe Actuator Layer audit mutation tests FAILED "
              f"(stdout={result.stdout!r} stderr={result.stderr!r})")
 
 
@@ -1203,7 +3038,8 @@ def check_build_profile_provenance(sketch_dir):
                   "PROFILE_MISMATCH", "PROFILE_UNKNOWN", "MANIFEST_MISSING",
                   "FQBN_MISMATCH",
                   "BINARY_SHA256_MISMATCH", "BINARY_SIZE_MISMATCH",
-                  "SOURCE_COMMIT_MISMATCH", "TREE_NOT_CLEAN"):
+                  "SOURCE_COMMIT_MISMATCH", "TREE_NOT_CLEAN",
+                  "KNOWN_OTA_INGEST_VALUES", "OTA_INGEST_MISMATCH", "OTA_INGEST_UNKNOWN"):
         if token not in logic_text:
             fail(f"{logic}: missing required manifest/provenance primitive {token!r}")
 
@@ -1216,6 +3052,20 @@ def check_build_profile_provenance(sketch_dir):
     if re.search(r'add_argument\("--requested-profile"[^)]*default=', logic_text):
         fail(f"{logic}: --requested-profile gained a default - flash_app_only.sh must "
              f"pass it explicitly")
+
+    # Same reasoning, for the OTA-ingest authorization axis (I7 hardening,
+    # 2026-09-25): a binary with the firmware-ingest writer compiled in must
+    # never be flashed by an invocation that did not explicitly ask for it.
+    if re.search(r"def verify_manifest\([^)]*requested_ota_ingest\s*=", logic_text, re.DOTALL):
+        fail(f"{logic}: verify_manifest() gained a default for requested_ota_ingest - the "
+             f"caller must always state the OTA-ingest state it intends to flash")
+    if re.search(r'add_argument\("--requested-ota-ingest"[^)]*default=', logic_text):
+        fail(f"{logic}: --requested-ota-ingest gained a default - flash_app_only.sh must "
+             f"pass it explicitly")
+    if not re.search(r'manifest_ota_ingest\s*!=\s*requested_ota_ingest', logic_text):
+        fail(f"{logic}: the OTA_INGEST_ENABLED equality comparison against "
+             f"requested_ota_ingest is missing - recording the ingest state without "
+             f"comparing it proves nothing")
 
     # Build-configuration provenance: the recorded FQBN must be COMPARED,
     # not merely recorded. The manifest carried FQBN from the start while
@@ -1245,6 +3095,19 @@ def check_build_profile_provenance(sketch_dir):
         fail(f"{build_sh}: does not pass --profile to the manifest writer")
     if "--source-state" not in build_text:
         fail(f"{build_sh}: does not record the clean/dirty source state in the manifest")
+    if "--ota-ingest" not in build_text:
+        fail(f"{build_sh}: does not pass --ota-ingest to the manifest writer - a binary "
+             f"with the OTA firmware-ingest writer compiled in could be produced with no "
+             f"record of that fact")
+    if "MATDOG_OTA_INGEST_VALIDATION:-" not in build_text:
+        fail(f"{build_sh}: lost the MATDOG_OTA_INGEST_VALIDATION override input (expected "
+             f"a ${{MATDOG_OTA_INGEST_VALIDATION:-...}} expansion) - the ONE hardware-"
+             f"validation candidate needs an explicit, loud way to compile ingest in "
+             f"without editing the source default")
+    if "-DMATDOG_OTA_INGEST_ENABLED=1" not in build_text:
+        fail(f"{build_sh}: the OTA-ingest override no longer passes "
+             f"-DMATDOG_OTA_INGEST_ENABLED=1 to the compiler - the override input would be "
+             f"read but never reach the build")
 
     if not flash_sh.exists():
         fail(f"{flash_sh}: application-only flash script not found")
@@ -1257,6 +3120,10 @@ def check_build_profile_provenance(sketch_dir):
              f"unknown hardware profile could be written to the device")
     if "--requested-profile" not in flash_text:
         fail(f"{flash_sh}: does not pass --requested-profile to the manifest verifier")
+    if "--requested-ota-ingest" not in flash_text:
+        fail(f"{flash_sh}: does not pass --requested-ota-ingest to the manifest verifier - "
+             f"an ingest-enabled binary could be flashed with no explicit authorization "
+             f"check")
     if not re.search(r'--expected-fqbn\s+"\$FQBN"', flash_text):
         fail(f"{flash_sh}: does not pass --expected-fqbn \"$FQBN\" to the manifest "
              f"verifier - the recorded build FQBN would go unverified")
@@ -1265,6 +3132,9 @@ def check_build_profile_provenance(sketch_dir):
     if "MATDOG_FLASH_PROFILE:-" not in flash_text:
         fail(f"{flash_sh}: lost the MATDOG_FLASH_PROFILE operator authorization input "
              f"(expected a ${{MATDOG_FLASH_PROFILE:-...}} expansion)")
+    if "MATDOG_FLASH_OTA_INGEST:-" not in flash_text:
+        fail(f"{flash_sh}: lost the MATDOG_FLASH_OTA_INGEST operator authorization input "
+             f"(expected a ${{MATDOG_FLASH_OTA_INGEST:-...}} expansion)")
 
     write_match = re.search(r"write-flash", flash_text)
 
@@ -1295,10 +3165,15 @@ def check_build_profile_provenance(sketch_dir):
     # deleted comparison still leaves two mentions behind. These patterns
     # match the actual comparison that does the gating.
     for pattern, description in (
-            (r'\[\s*"\$BACKUP_SIZE"\s*-eq\s*"\$EXPECTED_BACKUP_SIZE"\s*\]',
-             "full-flash backup size comparison"),
-            (r'\[\s*"\$BACKUP_SHA256"\s*=\s*"\$EXPECTED_BACKUP_SHA256"\s*\]',
-             "full-flash backup digest comparison"),
+            # 2026-09-25 recovery-backup hardening moved the literal
+            # size/digest comparison into scripts/backup_gate_logic.py
+            # (host-tested, mutation-verified) - the anti-weakening
+            # property here is now "the real measured size/sha256 are
+            # actually passed to that gate", not a bash [ ] comparison.
+            (r'--actual-size\s+"\$BACKUP_SIZE"',
+             "full-flash backup size passed to the backup gate"),
+            (r'--actual-sha256\s+"\$BACKUP_SHA256"',
+             "full-flash backup digest passed to the backup gate"),
             (r'\[\s*"\$DEVICE_MAC"\s*=\s*"\$EXPECTED_MAC"\s*\]',
              "device identity (MAC) comparison"),
             (r'\[\s*-n\s*"\$(APPLICATION_OFFSET|MAX_PARTITION_SIZE)"\s*\]',
@@ -1341,6 +3216,101 @@ def check_build_profile_provenance(sketch_dir):
     if result.returncode != 0:
         fail(f"{tests}: build manifest offline tests FAILED "
              f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
+
+def check_backup_gate_provenance(sketch_dir):
+    """Recovery-backup hardening (2026-09-25): flash_app_only.sh's backup
+    gate must PROVE a full-flash backup is authorized, never accept one by
+    path or size alone.
+
+    The historical default backup's hash is pinned once, reviewed, in
+    scripts/backup_gate_logic.py. Any other ("custom") backup path is
+    accepted only together with an explicitly authorized expected SHA256 -
+    this check makes the pinned hash's exact value, and the requirement
+    that a custom backup supply its own, both audit-enforced rather than
+    trusted to review alone.
+    """
+    scripts_dir = sketch_dir / "scripts"
+    logic = scripts_dir / "backup_gate_logic.py"
+    flash_sh = scripts_dir / "flash_app_only.sh"
+    tests = scripts_dir / "tests" / "test_backup_gate_logic.py"
+
+    if not logic.exists():
+        fail(f"{logic}: backup gate logic module not found - the flash path would have "
+             f"no way to prove a full-flash backup is authorized")
+        return
+    logic_text = logic.read_text(encoding="utf-8")
+
+    for token in ("DEFAULT_BACKUP_SHA256", "EXPECTED_BACKUP_SIZE", "verify_backup",
+                  "NO_EXPECTED_HASH", "SHA256_MISMATCH", "SIZE_MISMATCH"):
+        if token not in logic_text:
+            fail(f"{logic}: missing required backup-gate primitive {token!r}")
+
+    # The ONE historical backup's hash, reviewed once. A silent edit here
+    # would let a different backup pass as "the" trusted default without
+    # any of the explicit-authorization ceremony a custom backup requires.
+    if 'DEFAULT_BACKUP_SHA256 = "5cbba0b9c5500d0c95247b9b7e7173a29f934b8b13f6800cc9f583374d67fd32"' \
+            not in logic_text:
+        fail(f"{logic}: DEFAULT_BACKUP_SHA256 no longer matches the reviewed 2026-09-10 "
+             f"historical backup hash - this constant must never change silently")
+
+    if 'EXPECTED_BACKUP_SIZE = 16777216' not in logic_text:
+        fail(f"{logic}: EXPECTED_BACKUP_SIZE is no longer the full 16 MiB flash size")
+
+    # verify_backup() must not acquire a permissive default that would make
+    # a custom backup's missing authorization silently pass.
+    if re.search(r"def verify_backup\([^)]*custom_expected_sha256\s*=\s*(?!None)",
+                logic_text, re.DOTALL):
+        fail(f"{logic}: verify_backup() gained a non-None default for "
+             f"custom_expected_sha256 - a custom backup with no stated hash must reach "
+             f"the NO_EXPECTED_HASH refusal, never a permissive default")
+    if not re.search(r"else:\s*\n\s*return Verdict\(False, Refusal\.NO_EXPECTED_HASH",
+                     logic_text):
+        fail(f"{logic}: the NO_EXPECTED_HASH refusal path is missing or was moved out of "
+             f"the is_default_backup/custom_expected_sha256/manifest_sha256 chain - a "
+             f"custom backup with none of the three must still be refused")
+
+    if not flash_sh.exists():
+        fail(f"{flash_sh}: application-only flash script not found")
+        return
+    flash_text = strip_shell_comments(flash_sh.read_text(encoding="utf-8"))
+
+    verify_match = re.search(r"backup_gate_logic\.py", flash_text)
+    if not verify_match:
+        fail(f"{flash_sh}: does not invoke backup_gate_logic.py - a backup of unknown "
+             f"provenance could be trusted for the pre-flash recovery gate")
+    if "MATDOG_FLASH_BACKUP_SHA256:-" not in flash_text:
+        fail(f"{flash_sh}: lost the MATDOG_FLASH_BACKUP_SHA256 operator authorization "
+             f"input (expected a ${{MATDOG_FLASH_BACKUP_SHA256:-...}} expansion)")
+    if "MATDOG_FLASH_BACKUP_MANIFEST:-" not in flash_text:
+        fail(f"{flash_sh}: lost the MATDOG_FLASH_BACKUP_MANIFEST recovery-manifest input "
+             f"(expected a ${{MATDOG_FLASH_BACKUP_MANIFEST:-...}} expansion)")
+
+    write_match = re.search(r"write-flash", flash_text)
+    if verify_match is not None and write_match is not None and \
+            verify_match.start() > write_match.start():
+        fail(f"{flash_sh}: the backup-gate verification must appear before the esptool "
+             f"write-flash invocation")
+
+    if verify_match is not None:
+        lines = flash_text.splitlines()
+        start = flash_text[:verify_match.start()].count("\n")
+        block = []
+        for line in lines[max(0, start - 2):start + 12]:
+            block.append(line)
+        if re.search(r"backup_gate_logic\.py.*?\)\"\s*\|\|\s*(true|:|echo|warn)\b",
+                     "\n".join(block), re.DOTALL):
+            fail(f"{flash_sh}: the backup-gate verification swallows its own failure "
+                 f"('|| true'/'|| :'/'|| echo') - it must REFUSE, not warn")
+
+    if not tests.exists():
+        fail(f"{tests}: backup gate offline test suite not found")
+        return
+    result = subprocess.run([sys.executable, str(tests)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{tests}: backup gate offline tests FAILED "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
 
 def check_unknown_detection_is_not_a_verdict(files):
     """G2 pre-G3 hardening (review Finding 2): classify() must keep
@@ -1456,6 +3426,11 @@ def main():
     check_servo_scan_bounded_incremental(files)
     check_servo_diagnostics_require_maintenance_mode(files)
     check_led_anti_back_power(files)
+    check_led_status_boundaries(files)
+    check_actuator_runtime_boundaries(files)
+    check_calibration_execution_engine_boundaries(files)
+    check_actuator_infrastructure_wired_fail_closed(files)
+    check_service_readiness_is_host_linkable(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)
     check_servo_timeout_not_global(files)
@@ -1466,9 +3441,25 @@ def main():
     check_g2_state_is_transport_independent(files)
     check_no_startup_servo_traffic(files)
     check_no_network_to_servo_path(files)
+    check_wifi_runtime_boundaries(files, SKETCH_DIR)
+    check_ota_boundaries(files, SKETCH_DIR)
+    check_http_transport_boundaries(files, SKETCH_DIR)
+    check_actuator_authority(files, SKETCH_DIR)
+    check_calibration_boundaries(files, SKETCH_DIR)
+    check_safe_actuator_boundaries(files, SKETCH_DIR)
+    check_calibration_geometry_boundaries(files, SKETCH_DIR)
+    check_calibration_geometry_export(SKETCH_DIR)
+    check_position_offset_boundary(files, SKETCH_DIR)
+    check_servo_profile_contract(files, SKETCH_DIR)
+    check_servo_profile_export(SKETCH_DIR)
+    check_h0_preflight_boundaries(files, SKETCH_DIR)
+    check_evidence_geometry_binding(files, SKETCH_DIR)
+    check_direction_is_contractual(files, SKETCH_DIR)
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)
+    check_safe_actuator_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
+    check_backup_gate_provenance(SKETCH_DIR)
     check_unknown_detection_is_not_a_verdict(files)
     check_usb_cdc_tx_never_blocks(files)
 

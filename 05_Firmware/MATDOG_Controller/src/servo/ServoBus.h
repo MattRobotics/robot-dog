@@ -174,6 +174,38 @@ class ServoBus {
   };
   bool readRuntimeState(int id, RuntimeState* out);
 
+  // -------------------------------------------------------------------------
+  // H0 preflight reads — READ-ONLY, no write path exists for any of them
+  // -------------------------------------------------------------------------
+
+  // THE ONE APPROVED PositionOffset ACCESSOR.
+  //
+  // `SMS_STS_OFS_L` appears in exactly one place in this firmware: the body of
+  // this function. scripts/static_audit.py enforces that, and enforces that no
+  // write primitive ever names it. The prohibition was once absolute - the
+  // register symbol could not appear at all - which also blocked reading it,
+  // and left the Controller unable to verify the single most safety-relevant
+  // provisioning fact: that every unit still holds PositionOffset = 0.
+  //
+  // The gate is now narrower and stronger:
+  //     read through exactly this accessor  = ALLOWED
+  //     any PositionOffset write            = FORBIDDEN
+  //     CalibrationOfs                      = FORBIDDEN
+  //
+  // Writing an offset to compensate a mechanical mounting error is exactly
+  // what MATDOG_JOINT_CALIBRATION.yaml's `forbidden:` list and the 2026-08-27
+  // reset document prohibit. Reading it is how we prove nobody did.
+  //
+  // Decodes int16 LE TWO'S COMPLEMENT, not sign-magnitude. Returns false and
+  // leaves *out untouched if the servo does not answer - a failed read is
+  // never reported as an offset of zero.
+  bool readPositionOffset(int id, int16_t* out);
+
+  // One persistent-profile register. Width 1 or 2; any other width is refused
+  // rather than guessed. Read-only by construction: there is no width-aware
+  // write counterpart anywhere.
+  bool readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out);
+
  private:
   // RAII guard: saves SMS_STS::IOTimeOut (a plain public field, not a
   // vendored-library edit), sets it to the given timeout for the guard's

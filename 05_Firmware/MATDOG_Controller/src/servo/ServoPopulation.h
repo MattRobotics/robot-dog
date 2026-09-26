@@ -72,6 +72,13 @@ enum class CurrentConfig : uint8_t {
 struct CanonicalServo {
   uint8_t bus_id;
   const char* joint;
+  // The EXPECTED physical unit from MATDOG_SERVO_ALLOCATION.yaml. It is
+  // configuration, never an observation: an ST3215 exposes no unit serial on
+  // the bus, so nothing the servo can say confirms it. "M33" is a MATDOG
+  // label applied during the 2026-08-27 provisioning campaign, and the
+  // binding is held by labelling and assembly discipline - which is why it is
+  // reported as `expected_physical_unit` and never as observed identity.
+  const char* physical_unit;
   CurrentConfig current_config;
 };
 
@@ -79,27 +86,27 @@ struct CanonicalServo {
 // Mirrors MATDOG_SERVO_ALLOCATION.yaml (see provenance note above).
 constexpr CanonicalServo kCanonicalServos[] = {
     // Left front
-    {11, "LF_LOWER", CurrentConfig::INSTALLED},
-    {12, "LF_UPPER", CurrentConfig::INSTALLED},
-    {13, "LF_HIP",   CurrentConfig::INSTALLED},
+    {11, "LF_LOWER", "M33", CurrentConfig::INSTALLED},
+    {12, "LF_UPPER", "ELR01", CurrentConfig::INSTALLED},
+    {13, "LF_HIP", "M22", CurrentConfig::INSTALLED},
     // Right front
-    {21, "RF_LOWER", CurrentConfig::INSTALLED},
-    {22, "RF_UPPER", CurrentConfig::INSTALLED},
-    {23, "RF_HIP",   CurrentConfig::INSTALLED},
+    {21, "RF_LOWER", "NEW03", CurrentConfig::INSTALLED},
+    {22, "RF_UPPER", "ELR03", CurrentConfig::INSTALLED},
+    {23, "RF_HIP", "NEW01", CurrentConfig::INSTALLED},
     // Right hind
-    {31, "RH_LOWER", CurrentConfig::INSTALLED},
-    {32, "RH_UPPER", CurrentConfig::INSTALLED},
-    {33, "RH_HIP",   CurrentConfig::INSTALLED},
+    {31, "RH_LOWER", "NEW05", CurrentConfig::INSTALLED},
+    {32, "RH_UPPER", "ELR02", CurrentConfig::INSTALLED},
+    {33, "RH_HIP", "NEW06", CurrentConfig::INSTALLED},
     // Left hind
-    {41, "LH_LOWER", CurrentConfig::INSTALLED},
-    {42, "LH_UPPER", CurrentConfig::INSTALLED},
-    {43, "LH_HIP",   CurrentConfig::INSTALLED},
+    {41, "LH_LOWER", "M41", CurrentConfig::INSTALLED},
+    {42, "LH_UPPER", "M42", CurrentConfig::INSTALLED},
+    {43, "LH_HIP", "M43", CurrentConfig::INSTALLED},
     // Head / neck — allocated and bench-provisioned, only 51 is mounted.
-    {51, "NECK_ROTATION", CurrentConfig::INSTALLED},
-    {52, "NECK_PITCH",    CurrentConfig::ABSENT_BY_DESIGN},
-    {53, "HEAD_ROTATION", CurrentConfig::ABSENT_BY_DESIGN},
-    {54, "HEAD_PITCH",    CurrentConfig::ABSENT_BY_DESIGN},
-    {55, "JAW",           CurrentConfig::ABSENT_BY_DESIGN},
+    {51, "NECK_ROTATION", "M31", CurrentConfig::INSTALLED},
+    {52, "NECK_PITCH", "M11", CurrentConfig::ABSENT_BY_DESIGN},
+    {53, "HEAD_ROTATION", "NEW04", CurrentConfig::ABSENT_BY_DESIGN},
+    {54, "HEAD_PITCH", "NEW02", CurrentConfig::ABSENT_BY_DESIGN},
+    {55, "JAW", "ELR04", CurrentConfig::ABSENT_BY_DESIGN},
 };
 
 constexpr uint8_t kCanonicalServoCount =
@@ -109,6 +116,17 @@ constexpr uint8_t kCanonicalServoCount =
 // it covers every canonical ID (11..55 = 45 IDs, within ServoBus's bounded
 // scan range). A narrower scan cannot distinguish "absent" from
 // "never asked" — see CensusVerdict::RANGE_INCOMPLETE.
+// The twelve leg joints, selected WITHOUT parsing a joint name: bus ids
+// 11..43 whose unit digit is 1..3. Head and neck (51..55) are excluded, and
+// so is any future id outside that block. Pure so the offline suite can prove
+// the selection is exactly twelve.
+bool isLegServo(uint8_t bus_id);
+
+// The index-th leg servo in canonical table order, or nullptr past the end.
+const CanonicalServo* legServoAt(uint8_t index);
+
+constexpr uint8_t kLegServoCount = 12;
+
 constexpr int kCanonicalScanLo = 11;
 constexpr int kCanonicalScanHi = 55;
 

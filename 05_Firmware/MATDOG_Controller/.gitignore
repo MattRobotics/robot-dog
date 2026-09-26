@@ -1,3 +1,16 @@
 # Compiled binaries are not committed — reproducible from source + the FQBN
 # recorded in README.md, matching the convention in ST3215_Bench_Tools/.
 build/
+
+# Local Wi-Fi credentials (W1). The real file is created by the operator
+# from src/config/WifiCredentials.local.h.example and must never be
+# committed. scripts/static_audit.py FAILS the build if this entry is
+# removed, so a passphrase cannot become committable by an unreviewed edit.
+src/config/WifiCredentials.local.h
+
+# Local OTA HMAC shared secret (I7, 2026-09-25). The real file is created
+# by the operator from src/config/OtaCredentials.local.h.example and must
+# never be committed. scripts/static_audit.py FAILS the build if this
+# entry is removed, so a secret cannot become committable by an unreviewed
+# edit.
+src/config/OtaCredentials.local.h

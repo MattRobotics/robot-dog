@@ -1,5 +1,431 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — network-path diagnosis, no reflash — 2026-09-26
+
+Documentation only; same flashed candidate (`build_id=c45858c532e9`, re-confirmed unchanged).
+Follow-up to the entry below: diagnosed why `GET /status`/OTA network reachability failed, instead
+of assuming RSSI alone.
+
+- `ip neigh show 192.168.1.136` on the client machine reports **`FAILED`** — ARP never resolved a
+  MAC address at all, while the router and other LAN devices resolve normally. This rules out a
+  local firewall (ARP is below any packet-filtering layer) and is a stronger finding than "weak
+  signal, reduced throughput."
+- 6 RSSI reads this session: **-89 to -93 dBm**, consistently at/below the -90 dBm threshold treated
+  as too weak for a meaningful transport test. Classified **`RF_LINK_TOO_WEAK_FOR_MEANINGFUL_TRANSPORT_TEST`**;
+  network validation stopped there per instruction, with no firmware change and no request for any
+  physical RF intervention.
+- **`WIFI_TICK` re-characterized favorably**: 5 steady-state reads while `CONNECTED` showed
+  `last_us` of 3-19 µs — tiny, matching the bounded/non-blocking design intent. The previously-flagged
+  `max_us=45612` (45.6 ms) stayed byte-identical across every reading, consistent with a one-time
+  connection-sequence cost, not a recurring one.
+
+Full record:
+[`09_Logs/Development_Log/2026-09-26_HARDWARE_VALIDATION_CANDIDATE_V3.md`](../../09_Logs/Development_Log/2026-09-26_HARDWARE_VALIDATION_CANDIDATE_V3.md)
+(follow-up section).
+
+## Unreleased — first hardware flash + validation (candidate V3) — 2026-09-26
+
+**HARDWARE VALIDATED (partial — see below). No motion, no torque, no EEPROM/DALY write.**
+First-ever real flash of a `ROBOT_POWERED` + `OTA_INGEST_ENABLED=1` candidate
+(`SOURCE_HEAD=c45858c532e97a5a104fb8330ad9cd909b75663e`,
+`APPLICATION_SHA256=13a1e9504e950d3d4bbc14ed78032019c8bf8bacb75804ca57555069787d5b71`), application
+partition only, hash-verified at write time and independently by a post-write `verify-flash`.
+
+- **Fail-closed properties confirmed live on hardware**: no actuator authority ever granted, no
+  torque ever enabled (every servo preflight record shows `torque_enable=0`), no limits/transforms
+  admitted, `hardware_motion_authorized=NO`, Web server `started=NO` at boot, OTA update gate refused
+  with no session ever started.
+- **IMU, BMS, servo preflight (12/12 PASS, zero mismatches)**: all `HARDWARE_VALIDATED` for the
+  checks run, superseding their prior `HARDWARE_TO_TEST` classification.
+- **Wi-Fi**: first-ever real association for this project — connected on the first attempt, DHCP-
+  assigned. RSSI measured at -92/-93 dBm (very weak) and `WIFI_TICK max_us=45612` (45.6 ms, the
+  first real measurement of this figure) are both recorded as genuine findings, not glossed over.
+- **I7/I8 network transport, first hardware exercise**: the `@WEB SERVER START/STOP/START/STATUS`
+  lifecycle (the I7/I8 hardening round's fix) completed cleanly with the Controller thread staying
+  responsive throughout. `GET /status` and the OTA challenge/authentication path from a network
+  client could **not** be validated this session — the client machine had a direct route to the
+  robot's subnet but neither `ping` nor `curl` reached it, most likely due to the weak RSSI above;
+  not investigated further, `TO_TEST`.
+
+Full record:
+[`09_Logs/Development_Log/2026-09-26_HARDWARE_VALIDATION_CANDIDATE_V3.md`](../../09_Logs/Development_Log/2026-09-26_HARDWARE_VALIDATION_CANDIDATE_V3.md).
+
+## Unreleased — I7/I8 network transport hardening — 2026-09-25
+
+**Implemented, compiled and offline-tested.** Six concrete findings from operator review of the
+I7/I8 implementation below, all addressed:
+
+- **OTA-ingest validation override**, so the ONE hardware-validation candidate can carry a real,
+  reachable OTA writer without a second later flash, while the source default stays `0`:
+  `MATDOG_OTA_INGEST_VALIDATION=1` (new `scripts/build.sh` input) and `MATDOG_FLASH_OTA_INGEST=1`
+  (new `scripts/flash_app_only.sh` input), both loud and both requiring explicit authorization —
+  `scripts/build_manifest.py` gained `OTA_INGEST_ENABLED` as a second, fully independent
+  authorization axis alongside `HARDWARE_PROFILE`, never inferred from it.
+- **Mailbox stale-response fix**: a third semaphore (`slot_free_`) plus a new pure, host-tested
+  decision core (`src/network/HttpMailbox.h`, `scripts/tests/test_http_mailbox.cpp`, 27 checks)
+  close a real bug — a timed-out `dispatch()`'s late-computed response could previously leak
+  forward and be wrongly consumed by a later, unrelated request.
+- **Start/stop lifecycle fix**: `stop()` now deletes every semaphore `start()` creates (previously
+  leaked two handles per START/STOP cycle); `start()` releases whatever it already allocated on
+  every partial-failure path. New static-audit structural checks, mutation-verified.
+- **OTA challenge hardening**: `issueChallenge()` is now idempotent while a still-valid challenge is
+  outstanding, so a repeated unauthenticated call can no longer displace a legitimate client's
+  in-flight nonce (an availability weakness adjacent to the nonce-consumption bug already fixed in
+  the previous entry). 3 new/replaced adversarial tests, mutation-verified.
+- **`/status` threat model and OTA security model documented explicitly** in
+  `src/network/HttpTransport.h`: `/status` stays unauthenticated by deliberate, justified choice
+  (reachable only after a MAINTENANCE-mode USB `@WEB SERVER START`, carries no secret, and adding
+  auth here was rejected as either reusing the OTA credential — backwards from "write must stay
+  stronger than read" — or inventing a second, unjustified credential system); the OTA transport's
+  exact protections and non-protections (no TLS, no confidentiality) are stated plainly with no
+  guarantee implied that does not exist.
+
+Full record:
+[`09_Logs/Development_Log/2026-09-25_I7_I8_HARDENING.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_HARDENING.md).
+
+## Unreleased — I7/I8 network transport implemented — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. Server disabled at
+boot; ingest still compiled out by default.** Supersedes the earlier "I7 reconsidered" / "I8
+reconsidered" entries below, per the operator's "FINAL PRE-FLASH CONSOLIDATION" instruction, which
+corrected the premise those entries were blocked on: the 96-byte USB CDC line buffer blocks
+streaming firmware through the line-oriented command parser, not the OTA transport architecture in
+general — an HTTP transport's request body never touches `CommandRouter::handleLine()` at all.
+
+- **New `src/network/HttpTransport.h/.cpp`** — an `esp_http_server` adapter, the CONTROL/
+  AUTHORIZATION plane in front of the one existing `OtaManager`/`OtaPolicy`/`OtaEspBackend` writer.
+  Three endpoints: `GET /status` (I8, read-only), `GET /ota/challenge` (I7), `POST /ota/update`
+  (I7). A single-slot FreeRTOS binary-semaphore mailbox hands each httpd-task request to the one
+  Controller thread and back, bounded by a 3000 ms timeout (fails closed to `503` on timeout,
+  never blocks either task indefinitely). `start()`/`stop()` are never called from
+  `Controller::begin()` — reachable only from the new MAINTENANCE-gated `@WEB SERVER
+  START\|STOP\|STATUS` command.
+- **New `src/update/OtaSession.h/.cpp`** — a pure, host-linkable HMAC-SHA256 challenge/response
+  authentication/session layer between the transport and `OtaManager`. Single-use server-issued
+  nonces (no clock-sync dependency), a fixed-width signed payload (nonce + schema/size/sha256/
+  build_id), configurable challenge TTL and activity timeout. Two real bugs found and fixed by its
+  own 35-check adversarial suite before being trusted: a nonce-consumption availability bug (a
+  mismatched nonce was burning the real outstanding challenge — a DoS against the legitimate
+  client) and a `build_id` tail-byte nondeterminism bug in the signed payload.
+- **New `src/update/Hmac256.h/.cpp`** — HMAC-SHA256 (RFC 2104/FIPS 198-1) built on the existing
+  reviewed `Sha256`. Verified against RFC 4231's official test vectors (11 checks), not
+  self-consistency only.
+- **New `src/config/OtaCredentials.h` / `OtaCredentials.local.h.example`** — the OTA HMAC shared
+  secret, following the exact same resolution order, gitignore discipline and
+  exactly-one-use-site audit enforcement as `WifiCredentials.h` (W1). A separate secret from the
+  Wi-Fi passphrase.
+- **`GET /status` field coverage** — system/source identity, module health, Wi-Fi state, BMS
+  cached telemetry, IMU stream/rv summary, LED presentation, actuator readiness (via
+  `ServiceReadiness`), calibration readiness/state, OTA status/provenance. Strictly read-only; no
+  actuator-write API of any kind.
+- **New static-audit check** `check_http_transport_boundaries()`: `Hmac256`/`OtaSession` stay
+  host-linkable; the ESP-IDF HTTP server API is confined to `HttpTransport.cpp` (mirroring the
+  existing OTA-API-confinement rule); `Controller::begin()` never starts the server;
+  `@WEB SERVER START` checks `OperatingMode::MAINTENANCE` inside its own branch; `HttpTransport`
+  never calls `esp_restart()`; the OTA secret is referenced only at its one call site. Every new
+  check was manually mutation-tested before being trusted — one draft (the MAINTENANCE-gate check)
+  was itself caught matching the wrong branch and rewritten before being trusted.
+- `MATDOG_OTA_INGEST_ENABLED` remains `0` by default, unchanged — the transport's existence does
+  not make ingest reachable; starting the Web server checks `OtaManager::ingestEnabled()` and
+  returns `403` if it is off.
+- Build cost vs the previous frozen candidate (`c8906378`): `USB_ONLY` flash 981,856 B → 1,024,288 B
+  (31% → 32%, +42,432 B — the `esp_http_server`/mbedTLS-linked HMAC path and the FreeRTOS semaphore
+  API), static RAM 53,356 B → 56,660 B (16% → 17%, +3,304 B).
+
+Full record:
+[`09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md).
+
+## Unreleased — F0 re-run against the integrated candidate — 2026-09-25
+
+Documentation only; **no flash attempted or proposed**. `FINAL_FLASH_ELIGIBLE=DEFERRED_UNPOWERED`
+— unchanged, the ESP32 was never enumerated this session. `SOFTWARE_FREEZE_GATE`,
+`ARTIFACT_PROVENANCE_GATE` and `FAIL_CLOSED_GATE` all PASS against the MATDOG NEXTGEN INTEGRATED
+HARDWARE VALIDATION CANDIDATE. Full record:
+[`09_Logs/Development_Log/2026-09-25_F0_RERUN_CANDIDATE.md`](../../09_Logs/Development_Log/2026-09-25_F0_RERUN_CANDIDATE.md).
+
+## Unreleased — MATDOG NEXTGEN INTEGRATED HARDWARE VALIDATION CANDIDATE — 2026-09-25
+
+Documentation only; **no code change**. Full integrated software freeze superseding the earlier I9
+freeze, run from this exact clean commit after I6 (HostLink), I7 (reconsidered), I4/I5 (Controller
+wiring) and I8 (reconsidered):
+
+- C++ host suites: **14 suites, 5726 checks, 0 failures**.
+- Static audit: **PASS, 89 files, 0 findings**.
+- Python suites: **370 collected, 366 passed, 4 known/justified failures** (identical result to
+  I9 — same pre-existing root cause, no Python source changed).
+- `USB_ONLY` 981,856 B / `ROBOT_POWERED` 982,432 B (SHA256
+  `94ae5c4a5152d914520db579d0282f0df5b540a56b90e9a772e67954e244b6b0`), both clean from commit
+  `c8906378df04468d886d6c1d064f67f74a16042b`.
+- Fail-closed re-verified, now covering the I4/I5/I6 additions: `ActuatorRuntime`/
+  `CalibrationExecutionEngine` are Controller-owned but wired with a `nullptr` backend and no
+  geometry/limit/transform ever admitted; no command path reaches `plan`/`commit`/`execute`/
+  `abort` (audit-enforced, mutation-verified).
+
+This artifact is named **MATDOG NEXTGEN INTEGRATED HARDWARE VALIDATION CANDIDATE** per the
+operator's instruction — the single build the later physical campaign will validate. Full record:
+[`09_Logs/Development_Log/2026-09-25_INTEGRATED_FREEZE_CANDIDATE.md`](../../09_Logs/Development_Log/2026-09-25_INTEGRATED_FREEZE_CANDIDATE.md).
+
+## Unreleased — I8 reconsidered, no server code added — 2026-09-25
+
+Documentation only; **no code change**. Reconsidered the read-only Web foundation now that I6 is
+substantially implemented. Split UI-0 into a data/schema half (already done — `ControllerService`
+IS the typed semantic/telemetry layer a future HTTP handler would serve) and a server half
+(`WebServer`/`esp_http_server`/`esp_https_server`, all requiring `<WiFi.h>` and, for two of the
+three, an additional FreeRTOS task). Declined to add the server half: its central safety property
+("bounded memory/latency") is not testable without live Wi-Fi association, and unlike
+`MATDOG_OTA_INGEST_ENABLED` (which gates an already-reviewed state machine), there is no existing
+offline-tested decision core to gate an HTTP stack behind — it would be new, unreviewed surface
+area. `ServiceReadiness`'s `WEB_READ_ONLY_DASHBOARD` capability already reports the
+"disabled/not qualified until Wi-Fi hardware validation" state as data. Full reasoning:
+[`09_Logs/Development_Log/2026-09-25_I8_RECONSIDERED.md`](../../09_Logs/Development_Log/2026-09-25_I8_RECONSIDERED.md).
+
+## Unreleased — I4/I5 Controller wiring — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. Fail-closed by
+construction and by audit.**
+
+- **`Controller` now owns real `SafeActuatorPolicy`/`ActuatorRuntime`/`CalibrationExecutionEngine`
+  instances** as status/lifecycle infrastructure — previously none of the three were wired into
+  `Controller` at all. `actuator_runtime_` is given `nullptr` as its backend (every `ACCEPT`
+  resolves to `NO_BACKEND` regardless of anything else); no geometry/limit/transform is ever
+  admitted from `Controller`; no command path calls `plan()`/`commit()`/`execute()`/`abort()`.
+- **New `@ACTUATOR STATUS`** (read-only): policy epoch, outstanding-transaction flag, last
+  decision, counters, limits/transforms-admitted counts, geometry-bound flag.
+- **New static-audit check** `check_actuator_infrastructure_wired_fail_closed()` enforces the
+  three fail-closed choices above structurally. **A manual mutation check caught a real bug**: the
+  first version of the "no plan/commit/execute/abort call" rule matched only `.method(` and missed
+  every actual call site, which uses `->method(` (`modules_.actuator_policy` is a pointer) — fixed
+  to a regex matching both syntaxes, re-verified via the same injected-then-reverted mutation.
+  The I4/I5 boundary checks were extended to allow `Controller.h`/`Controller.cpp` by exact
+  filename (not by directory), so `CommandRouter.cpp`/`ControllerService.h` remain excluded.
+- **Cost:** `USB_ONLY` flash 979,111 B -> 981,727 B (+2,616 B — no longer dead-code-eliminated,
+  since `Controller` now genuinely calls into it), RAM +872 B; `ROBOT_POWERED` 979,655 B ->
+  982,299 B (+2,644 B). Full record:
+  [`09_Logs/Development_Log/2026-09-25_I4_I5_CONTROLLER_WIRING.md`](../../09_Logs/Development_Log/2026-09-25_I4_I5_CONTROLLER_WIRING.md).
+
+## Unreleased — I7 reconsidered, scope unchanged — 2026-09-25
+
+Documentation only; **no code change**. Reconsidered building the USB CDC OTA ingest transport
+under the objective-change instruction (real ingest may stay disabled by default in the frozen
+candidate either way). Found a concrete blocker: `CommandRouter::kLineBufSize = 96` bytes means a
+usable ingest transport needs a genuine second Serial I/O mode (suspending line parsing for
+length-prefixed binary reads), not a thin adapter over the existing `OtaManager` API — real,
+unreviewed I/O architecture whose interaction with the G3.1 non-blocking USB CDC guarantee was not
+assessed this session. Building it would not change the frozen candidate's reachable behavior
+(ingest stays compiled out either way) while carrying real risk. Re-confirmed `OtaPolicy::reset()`
+already provides the transport-independent retry primitive. Full reasoning:
+[`09_Logs/Development_Log/2026-09-25_I7_RECONSIDERED.md`](../../09_Logs/Development_Log/2026-09-25_I7_RECONSIDERED.md).
+
+## Unreleased — I6 HostLink implementation (candidate objective change) — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested.** Supersedes the
+earlier audit-only I6 gate, per the operator's instruction to produce one maximally integrated
+hardware-validation candidate: sequencing gates activation/validation, not offline preparation of
+fail-closed software.
+
+- **New `src/core/ServiceReadiness.{h,cpp}`** — pure readiness classifier. 8 named capabilities x
+  hardware-validation flags -> `READY`/`TO_TEST`/`BLOCKED`. 31 offline checks.
+- **New `src/core/ControllerService.h`** — transport-neutral telemetry layer, scope bounded to
+  passive status reads. ~30 accessors, each a one-line forward of a struct its module already
+  computed — zero duplicated logic. Action/write commands stay `CommandRouter`-direct.
+- **`CommandRouter` refactored** (not duplicated): every read-only `print*` method now routes
+  through `ControllerService`. New `@HOSTLINK READINESS` command surfaces the classifier.
+- **New static-audit check** `check_service_readiness_is_host_linkable()`. The pre-existing
+  DALY-KEY-probe scope check was extended to allow `ControllerService.h` as a reviewed consumer
+  (same reasoning already applied to `CommandRouter`); the full DALY mutation suite (52/52) was
+  re-verified green afterward.
+- **Cost:** `USB_ONLY` flash 978,336 B -> 979,111 B (+775 B), RAM +64 B; `ROBOT_POWERED`
+  978,896 B -> 979,655 B (+759 B). Offline baseline now 14 host suites / 5726 checks. Full record:
+  [`09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_IMPLEMENTATION.md).
+
+## Unreleased — F0 final flash readiness — 2026-09-25
+
+Documentation only; **no flash attempted or proposed**.
+
+- `SOFTWARE_FREEZE_GATE`, `ARTIFACT_PROVENANCE_GATE` and `FAIL_CLOSED_GATE` all **PASS**.
+  `POWER_ISOLATION_GATE=UNPROVEN` and `FLASH_RECOVERY_GATE=DEFERRED_UNPOWERED` — unchanged since
+  I0, the ESP32 was never enumerated this session (`USB_STATE=ESP32_NOT_ENUMERATED`).
+- `FINAL_FLASH_ELIGIBLE=DEFERRED_UNPOWERED` per the handoff's explicit rule. No authorization
+  question was asked (Section 19 applies only when `FINAL_FLASH_ELIGIBLE=PASS`).
+- Recorded the exact future flash procedure (prove power isolation → fresh full-flash read-back
+  under proven power → re-run F0 → Section-19 report → explicit YES/NO → application-only flash via
+  `flash_app_only.sh`) so nothing has to be re-derived once the operator is physically present.
+  Full record:
+  [`09_Logs/Development_Log/2026-09-25_F0_FINAL_FLASH_READINESS.md`](../../09_Logs/Development_Log/2026-09-25_F0_FINAL_FLASH_READINESS.md).
+
+## Unreleased — I9 integrated software freeze — 2026-09-25
+
+Documentation only; **no code change**. Full offline validation matrix run from a clean tree:
+
+- C++ Controller host suites: **13 suites, 5695 checks, 0 failures**.
+- Static safety audit (mutation guards, OTA partition tests, build-manifest tests included):
+  **PASS, 85 files, 0 findings**.
+- Python kinematics/calibration suites (`06_Software/Matdog_Core`): **370 collected, 366 passed, 4
+  known/justified failures** — all four are the pre-existing, already-documented live-FK
+  `calibration_status` YAML/loader enum mismatch (I1, `CALIBRATION_SOURCE_PRECEDENCE.md` §9 item
+  1), not a regression and explicitly not fixed per the V3 handoff's own instruction.
+- Both hardware profiles compiled clean from commit `cc0940b0f62f242f0ab66c09ea24f7cb8ed2aa08`:
+  `USB_ONLY` 978,336 B / `ROBOT_POWERED` 978,896 B (SHA256
+  `a292b2166d5381f1a8f75c494f79753e8aae4a23ee875c42325fe10ecb35203b`). Default `USB_ONLY` artifact
+  restored last.
+- Fail-closed re-verified directly against source: `hardware_motion_authorized=0`,
+  `USB_ONLY` source default, OTA ingest `=0` — all audit-enforced. Neither of this session's two
+  new adapters (I4 `ActuatorRuntime`, I5 `CalibrationExecutionEngine`) is referenced by
+  `Controller`/`CommandRouter`; both are proven dead-code-eliminated from both compiled profiles.
+- Full record, final artifact provenance and classification matrix:
+  [`09_Logs/Development_Log/2026-09-25_I9_INTEGRATED_SOFTWARE_FREEZE.md`](../../09_Logs/Development_Log/2026-09-25_I9_INTEGRATED_SOFTWARE_FREEZE.md).
+
+## Unreleased — I8 deferred — 2026-09-25
+
+No code or status change. I8 (read-only Web foundation) requires I6 semantics "stable" (I6 was
+audit-only, `HostLink` remains `TO_DESIGN`), Wi-Fi runtime `PASS` (hardware-untested, out of scope
+this session) and a chosen web transport (deliberately left undecided in I7). Deferred rather than
+attempted with a workaround. Full reasoning:
+[`09_Logs/Development_Log/2026-09-25_I8_WEB_FOUNDATION_DEFERRED.md`](../../09_Logs/Development_Log/2026-09-25_I8_WEB_FOUNDATION_DEFERRED.md).
+
+## Unreleased — I7 Wi-Fi/OTA audit — 2026-09-25
+
+Documentation only; **no code change**.
+
+- Checked V3 handoff's eleven Wi-Fi/OTA sub-items against the existing implementation: nine
+  (authorization, session semantics, manifest identity, hash validation, pending-reboot,
+  recovery invariant, bounded memory, concurrency, status reporting) were already complete.
+  Authenticated transport remains deliberately unimplemented — the Controller README already
+  evaluates five transport options with a "not yet implemented" recommendation, and building even
+  the recommended first step (USB CDC ingest) means writing the first reachable firmware-write
+  code path in this codebase, which is a decision-grade commitment, not routine offline
+  advancement. `failure/retry` semantics are inseparable from that undecided transport. Full
+  reasoning:
+  [`09_Logs/Development_Log/2026-09-25_I7_WIFI_OTA_AUDIT.md`](../../09_Logs/Development_Log/2026-09-25_I7_WIFI_OTA_AUDIT.md).
+
+## Unreleased — I6 HostLink audit — 2026-09-25
+
+Documentation only; **no code change**.
+
+- Audited `CommandRouter`'s transport coupling: most read-only state is already
+  transport-independent (structured snapshots per module, the G2 pattern); dispatch and
+  presentation for all 25 `@COMMAND`s remain embedded in the 792-line USB CDC adapter itself.
+  Recorded a design sketch for a future semantic layer, not implemented.
+- Scoped this gate to audit-only rather than implementation: `DEVELOPMENT_GATES.md`'s own rule 6
+  forbids pulling the HostLink gate forward of its unmet prerequisites (Service/Provisioning/QC,
+  formal recalibration), and its `PASS CRITERIA` (a second transport consuming the same semantics)
+  is unverifiable without a second transport, which is itself gated behind Wi-Fi hardware
+  validation this phase does not authorize. Full reasoning:
+  [`09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_AUDIT.md`](../../09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_AUDIT.md).
+
+## Unreleased — I5 Calibration Execution Architecture — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. No production
+backend exists. Persistence/promotion remains TO_DESIGN.**
+
+- **Corrected stale documentation**: `DEVELOPMENT_GATES.md` previously said the calibration
+  execution engine meant "the 18 recovered phases" — conflating the LF V25 historical oracle with
+  the production architecture, which V3 handoff §15.11 forbids. Fixed.
+- **New `src/calibration/CalibrationExecutionEngine.{h,cpp}`** — a generic, intent-based
+  Calibration Execution boundary (`CalibrationIntent`: `CONTACT_PROBE`/`AUXILIARY_MOVE`/
+  `DIRECTION_VERIFY`/`RESTORE`/`ABORT`), routing the three executable intents through the
+  unmodified `SafeActuatorPolicy`/`ActuatorRuntime`. `RESTORE` and `ABORT` are categorically
+  non-executing — neither ever reaches a backend call, by construction, which is what makes
+  "authority loss → zero restore motion" true without a special-cased guard. Owns no session
+  state, no persistence, no geometry profile, and never references `CalibrationPhase` — the LF V25
+  18-phase sequence stays a historical oracle, exercised only by
+  `test_calibration_domain.cpp`'s existing replay.
+- **New static-audit check** `check_calibration_execution_engine_boundaries()`: fails the build if
+  the engine stops being host-linkable, references the 18-phase sequence, names a torque-removal
+  primitive, or is referenced anywhere outside `src/calibration/`/the offline suite.
+  `check_actuator_runtime_boundaries()` (I4) was extended to allow this new legitimate consumer.
+  Confirmed independently: both hardware profiles compile to byte-identical flash sizes with and
+  without the engine present.
+- **New offline suite** `test_calibration_execution_engine.cpp`: 72 checks, 0 failures, covering
+  all ten operator-specified adversarial cases (authority loss → no restore motion, stale
+  generation, diagnostic-endpoint refusal, wrong geometry provenance, replay-origin refusal, no
+  accepted transform → no raw target, CALIBRATION-only eligibility, MOTION exclusion, abort/
+  restore/SAFE_OFF distinctness, unknown-intent fail-closed). Offline baseline is now 13 host
+  suites / 5695 checks (previously 12 / 5623). Full record:
+  [`09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md`](../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md).
+- **Cost:** `USB_ONLY` and `ROBOT_POWERED` flash/RAM unchanged (978,195 B / 978,751 B).
+
+## Unreleased — I4 Safe Actuator runtime boundary — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested. No production
+backend exists.**
+
+- **New `src/actuator/ActuatorRuntime.{h,cpp}`** — the runtime adapter `SAFE_ACTUATOR_LAYER.md`
+  §7 marks `TO_IMPLEMENT`: an abstract `ActuatorBackend` interface (`enableTorque`/
+  `writeGoalPosition`, unsigned tick domain) and `ActuatorRuntime`, which calls
+  `SafeActuatorPolicy::commit()` once and issues at most one backend call, only on `ACCEPT`.
+  `ActuatorWritePolicy.*` itself is untouched.
+- **`ServoBus` still exposes exactly one write, `safeOff()`** — no `EnableTorque(id, 1)`/
+  `GoalPosition` primitive exists, so no production `ActuatorBackend` was created. The adapter is
+  exercised only offline against a fake backend.
+- **The three geometry-authorised operations** (`CALIBRATION_CONTACT_PROBE`/`DIRECTION_VERIFY`/
+  `CALIBRATION_AUXILIARY_MOVE`) have no raw-tick target yet — that conversion needs an accepted
+  q0/direction transform from a real execution engine (deferred to I5) — and always resolve to
+  `ExecuteResult::NO_RAW_TARGET`, never a guessed conversion.
+- **New static-audit check** `check_actuator_runtime_boundaries()`: fails the build if the adapter
+  stops being host-linkable, or if `ActuatorRuntime` is referenced anywhere outside
+  `src/actuator/`/the offline suite. Confirmed independently: both hardware profiles compile to
+  byte-identical flash sizes with and without the adapter present — the linker dead-code-eliminates
+  it entirely since nothing references it.
+- **New offline suite** `test_actuator_runtime.cpp`: 46 checks, 0 failures, including an explicit
+  proof that a rejected commit never reaches the backend. Offline baseline is now 12 host suites /
+  5623 checks (previously 11 / 5577). Full record:
+  [`09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md`](../../09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md).
+- **Cost:** `USB_ONLY` and `ROBOT_POWERED` flash/RAM unchanged (978,195 B / 978,751 B) — the
+  adapter contributes zero bytes to either compiled image.
+
+## Unreleased — I3 SOURCE_SIGNATURE — 2026-09-25
+
+- **New `@SYSTEM SOURCE_SIGNATURE`** read-only command: reports `build::kBuildId`, firmware name/
+  version, active profile/board, the OTA manager's running-image build id/state/reset reason, and
+  the ESP-IDF running partition. All facts were already computed elsewhere (boot banner, OTA
+  first-boot self-check) — no new hardware read, no new bus traffic. Closes the `SOURCE_SIGNATURE`
+  item of G4's documented gap list. `SYSTEM_SELF_TEST`, `PROFILE_AUDIT` and a consolidated servo
+  health summary remain open design questions, deliberately not guessed — see
+  [`09_Logs/Development_Log/2026-09-25_I3_SOURCE_SIGNATURE.md`](../../09_Logs/Development_Log/2026-09-25_I3_SOURCE_SIGNATURE.md).
+- **Cost:** `USB_ONLY` flash 977,747 B -> 978,195 B (+448 B); `ROBOT_POWERED` 978,299 B -> 978,751 B
+  (+452 B). RAM unchanged.
+
+## Unreleased — I2 LED Status Manager — 2026-09-25
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested.**
+
+- **New `src/status/LedStatusPolicy.{h,cpp}`** — pure LED presentation decision core, host-linkable
+  like `network::WifiPolicy`/`update::OtaPolicy` (no `<Arduino.h>`, no `LedRing` dependency).
+  Deterministic priority: `FAULT` > `FIRMWARE_UPDATE_IN_PROGRESS` > `CALIBRATION_IN_PROGRESS` >
+  `DEGRADED` > `WIFI_CONNECTING` > `BOOTING` > `READY`. Solid effects for fault/degraded/booting/
+  ready; a pure integer triangle-wave breathing effect for update/calibration/wifi-connecting.
+- **New `src/status/LedStatusManager.{h,cpp}`** — the single periodic owner of `LedRing`
+  presentation, wired into `Controller::update()` last, after every input it reads has refreshed
+  for the tick. Steps aside while the existing `@LED TEST` diagnostic chase is running; reuses
+  `LedRing` completely unchanged, including its `USB_ONLY` anti-back-power guarantee.
+- **Battery/charging states deliberately NOT implemented**: no reviewed SOC/taper threshold policy
+  exists yet (`MATDOG_POWER_STATES_AND_CHARGING.md` §14). Full architecture table and rationale in
+  [`09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md`](../../09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md).
+- **New static-audit check** `check_led_status_boundaries()`: fails the build if the decision core
+  stops being host-linkable, or if any translation unit other than `LedStatusManager.cpp` calls
+  `LedRing::setSolid()`.
+- **New offline suite** `test_led_status_policy.cpp`: 198 checks, 0 failures. Offline baseline is
+  now 11 host suites / 5577 checks (previously 10 / 5379).
+- **`@LED STATUS`** now also reports `presentation=<state>`, read-only.
+- **Cost:** `USB_ONLY` flash 976,991 B -> 977,747 B (+756 B), RAM 52,404 B -> 52,420 B (+16 B);
+  `ROBOT_POWERED` flash 977,471 B -> 978,299 B (+828 B).
+
+## Unreleased — NextGen software integration I0/I1 — 2026-09-25
+
+Documentation and repository-topology only; **no firmware change**.
+
+- **I0:** created the single active integration branch/worktree
+  `feat/controller-nextgen-integration-v1` from exact H0 HEAD `b95ea31641609fbc29c5d67dd1deb776d59c2504`
+  (`feat/h0-current-leg-preflight-v1`), no content commit, pushed with upstream set. `main`,
+  `feat/h0-current-leg-preflight-v1` and every other frozen branch/worktree left untouched.
+- **I1:** repository-truth reconciliation. Fixed the root `README.md` snapshot banner (stale at
+  2026-09-15, now 2026-09-25). Added the H0 `@SERVO PREFLIGHT` capability, previously undocumented
+  in `ROADMAP.md` and `DEVELOPMENT_GATES.md`, to both. Carried the six legacy open items from the
+  historical `REPOSITORY_VERIFICATION_INDEX.md` (2026-08-11) snapshot forward into
+  `CALIBRATION_SOURCE_PRECEDENCE.md` §9 as explicit, unresolved, owned items. Full record:
+  [`09_Logs/Development_Log/2026-09-25_I1_REPOSITORY_TRUTH_RECONCILIATION.md`](../../09_Logs/Development_Log/2026-09-25_I1_REPOSITORY_TRUTH_RECONCILIATION.md).
+
 ## Unreleased — post-rewire power validation & external USB service port closeout — 2026-09-24
 
 Documentation and evidence only; **no firmware change**. No firmware commit since `6322563`
@@ -27,6 +453,194 @@ DALY work. Full evidence:
   autonomous dock/contact hardware, reverse-polarity protection, unattended charge
   acceptance/termination, future Jetson charging (**FUTURE**); charging LED-ring progress
   indication (**FUTURE / TO_DESIGN, NOT IMPLEMENTED** — no firmware for it exists).
+
+## Unreleased — calibration foundation + LF V25 oracle recovery — 2026-09-21
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested.**
+**No write path was added**: the firmware's only actuator write is still `EnableTorque(id, 0)`
+inside `safeOff()`. The installed robot's calibration remains
+`CALIBRATION_RESET_PENDING_FULL_RECALIBRATION` and hardware motion remains **BLOCKED**.
+
+- **C0 evidence audit recorded** in `CALIBRATION_SOURCE_PRECEDENCE.md`: source precedence,
+  current calibration truth, what LF V25 actually proved, the three evidence vocabularies, four
+  discrepancies, the Generic V25 component assessment and the EEPROM boundary.
+- **New `src/calibration/`** — a pure, host-linkable domain model recovered from the archive
+  (no Arduino runtime, no ServoBus, no Wi-Fi, no OTA) and a `CalibrationManager` session
+  foundation over the real `ActuatorAuthority`, creating no second lock.
+- **Confirmed from the archive, not assumed:** 24 contact profiles (4x3x2, and the archive's own
+  test asserts it), 58 sequence steps, six LF contacts, 18 execution phases.
+- **Three findings encoded as types.** q0 cannot default to the raw servo centre - 2048 is three
+  different quantities and LF V25's measured q0 was 2067/2040/2074. There is no "direction
+  witness" in the archive; `direction` is a static spec constant, and the witness that exists is
+  the CONTACT witness. Evidence is keyed by physical unit, never bus id, because unit M11 is
+  NECK_PITCH today while bus id 11 still means "LF lower".
+- **The 24-tick witness band is historical and LF-only**, kept in the fixture rather than
+  promoted to a universal domain constant - the evidence file forbids mirroring LF onto RF/RH/LH.
+- **"H1" avoided in new code.** The repository uses it for both the Full-Leg population gate and
+  the Controller's own boot test; new code says leg population gate. It evaluates evidence and
+  never scans - there is one bus discovery path and a second census is forbidden.
+- **LF V25 replayed offline and MATCHED**, including the one documented failure. Every replayed
+  record carries `HISTORICAL_REPLAY`, which `mayPromote()` refuses.
+- **Surface:** `@CALIBRATION STATUS`, read-only, leading with the stale/blocked verdict, plus a
+  `calibration` line on the boot banner. No START/RUN/MOVE command was added.
+- **Audit gains twelve calibration guards**, all twelve mutation-verified.
+- **Cost:** flash 970,127 B -> 973,463 B (+3,336 B, 30% of the 3 MB slot); static RAM 51,740 B ->
+  51,812 B (+72 B).
+
+## Unreleased — ActuatorAuthority + OTA-B authorization — 2026-09-21
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested.**
+**No new write path was added** — the firmware's only actuator write is still
+`EnableTorque(id, 0)` inside `safeOff()`, nothing can acquire an owner yet, and there is
+deliberately no command that does.
+
+- **New `src/core/ActuatorAuthority.*`** — the single central arbiter of actuator write
+  authority. Pure and host-linkable: no Arduino runtime, no `ServoBus`, no `Serial`. Exactly one
+  instance exists, owned by `Controller`, reset to `NONE` at boot; no component caches its value.
+  Both are audit-enforced.
+- **Orthogonal to `OperatingMode`, and enforced as such.** `MAINTENANCE` hosts the service owners
+  but not `MOTION`; `RUN` hosts `MOTION` and nothing else. A mode change that strands an owner
+  clears it instead of leaving a suspended authority — a no-op today, added so the first real
+  owner does not have to remember it.
+- **`SAFE_OFF` is outside arbitration, structurally.** `ServoBus` has no reference to the arbiter
+  and the arbiter has none to `ServoBus`, so `safeOff()` cannot consult an authority even if a
+  later edit wanted it to. The audit fails the build if `ServoBus` names one, or if the
+  `@SERVO SAFE_OFF` branch gains an authority or mode condition.
+- **Read-only diagnostics deliberately take no lock.** `@SERVO SCAN`/`CENSUS`/`READ` are
+  `Ping`/`readByte`/`readWord` and are `MAINTENANCE`-gated because they **block**. The arbiter
+  prevents write conflicts; it does not serialize reads.
+- **Two semantics chosen deliberately.** A same-owner re-request returns `ALREADY_OWNED` and
+  issues **no** second lease — a second valid lease would let two holders each believe they own it
+  and either release it out from under the other. And leases carry a generation, which catches the
+  case owner-matching cannot: the *same* owner across two sessions, where a late callback from the
+  first would otherwise clear the second.
+- **OTA-B authorization implemented; the OTA-A placeholder removed, not kept.** `OtaStageAGate`
+  and `PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET` are gone and the audit fails the build if either
+  name reappears. `src/update/OtaAuthorityGate.*` is backed by the real arbiter.
+- **OTA is not an actuator owner** and no OTA entry was added to the enum — audit-enforced. It
+  takes an **exclusivity inhibit** instead, because it requires that nobody is using the actuators
+  rather than competing for them.
+- **The TOCTOU analysis, and what it did NOT require.** `if (authority == NONE) { start OTA }` is
+  genuinely insufficient — not because of threading (MATDOG's Controller is single-threaded, so a
+  check-then-act inside one call is already atomic) but because of **duration**: an update spans
+  thousands of loop passes. The fix is a hold, not a query: `requestInhibit()` performs the check
+  and takes the hold in one arbiter call. **No `SystemActivity` layer was needed and none was
+  built.** The hold is released on every failure, abort and reset, and kept after a successful
+  commit until the reboot.
+- **Surface:** `@AUTHORITY STATUS` (read-only), `authority=` on the existing `@STATUS` SYSTEM line
+  (~24 B, keeping the worst single-pass burst at ~2782 B against the 3072 B TX ring),
+  `actuator_authority` on the boot banner, and `@MODE MAINTENANCE|RUN` now telling the arbiter.
+- **`core/OperatingMode` became host-linkable** (`<stdint.h>` instead of `<Arduino.h>`); it only
+  ever needed `uint8_t`, and the arbiter consults it while staying testable off the device.
+- **Offline suites:** 751 new checks for the arbiter, including the exhaustive 20-pair conflict
+  matrix with each challenger tried in its own legal mode, corrupted-enum fail-closed, stale-lease
+  refusal, force-clear under every reason, and the full inhibit lifecycle. The OTA suite grew
+  468 → 561 and now links the **real** gate and the **real** arbiter.
+- **Audit gains eleven guards**, all eleven mutation-verified.
+- **Cost:** flash 967,915 B → 970,127 B (+2,212 B, 30% of the 3 MB slot); static RAM 51,676 B →
+  51,740 B (+64 B).
+
+## Unreleased — OTA-A update core — 2026-09-21
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested** — no device has
+received an OTA image, no otadata has been written, no rollback has been observed. OTA-A is the
+update **core only**: no transport, no authentication, and byte ingest compiled out by default.
+
+- **New `src/update/` module**, split the way `network/` already is: `OtaPolicy.*` (pure update
+  state machine), `OtaBootGuard.*` (first-boot rollback lifecycle), `Sha256.*` (image identity) —
+  all Arduino-free and ESP-IDF-free — behind an `OtaBackend` interface implemented by
+  `OtaEspBackend.*`, the only translation unit in the firmware that calls `esp_ota_*`.
+- **The inactive-slot rule is structural, not documentary.** `target != running`,
+  `subtype ∈ ota_0..ota_15` and `image_size ≤ target.size` are explicit refusals rather than
+  inferences from a backend error; `OtaEspBackend::setBootPartition()` re-reads
+  `esp_ota_get_running_partition()` and refuses independently; and `commitBootTarget()` is the one
+  method that moves the boot target, with one call site, reachable from exactly one state.
+  `flash_app_only.sh` was audited for reusable logic and deliberately **not** adopted as the OTA
+  writer — it writes the **active** slot over USB and is a different guarantee.
+- **Five kinds of verification kept distinct** — transport integrity, image validity
+  (`esp_ota_end`), cryptographic hash identity (our SHA-256), firmware/build identity
+  (`build::kBuildId`), bootloader validity (otadata). Only the third distinguishes "a valid image"
+  from "the expected image", and the host suite proves it with a mismatched image of identical
+  length.
+- **`esp_app_desc_t` rejected as firmware identity**, on evidence: parsing the real binary shows
+  `version='ee57070'`, `project_name='arduino-lib-builder'`, `date='Jul 20 2026'` — the core's
+  identity, not MATDOG's. The existing scheme (`build::kBuildId` + the manifest's
+  `APPLICATION_SHA256`/`APPLICATION_SIZE`) is reused; no second version scheme was invented.
+- **First-boot confirmation is earned, not granted.** With `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y`
+  in the real build, never confirming is the safe default — the bootloader aborts a
+  `PENDING_VERIFY` image on the next boot by itself. `esp_ota_mark_app_valid_cancel_rollback()` is
+  called only after Controller init completed, CommandRouter is bound, identity is readable, the
+  boot did not follow PANIC/WDT/BROWNOUT, and the image survived ≥ 15 s **and** ≥ 2000 loop ticks.
+  The audit fails the build if `Controller::begin()` ever confirms an image.
+- **Refusal does not reboot.** Declining to confirm is already sufficient; rebooting a robot is not
+  OTA-A's decision. Explicit operator rollback is **OTA-B**.
+- **OTA-B boundary without a mini-authority.** `OtaAuthorizationGate` fails closed with no gate
+  installed; OTA-A permission is a named object (`OtaStageAGate`) whose verdict is literally
+  `PERMITTED_OTA_A_NO_AUTHORITY_MODEL_YET`.
+- **Security stated as a compile-time fact.** `MATDOG_OTA_INGEST_ENABLED` defaults to `0` and the
+  audit fails the build if the source default changes — same shape as the `USB_ONLY` profile gate —
+  so an unauthenticated firmware writer cannot reach a production image.
+- **Erase strategy chosen for loop responsiveness.** `esp_ota_begin()` uses
+  `OTA_WITH_SEQUENTIAL_WRITES`: an explicit size erases ~1 MB up front, seconds of blocking. The
+  size bound stays an explicit policy check instead of being delegated to the erase argument.
+- **Offline suite:** 468 checks against the real state machine with a fake backend — every target,
+  metadata, stream and verification failure; the ordering property that the boot target never moves
+  from any state but `IDENTITY_VERIFIED`; replay, idempotent abort and state-machine reset; and the
+  full rollback lifecycle. SHA-256 checked against FIPS 180-4 vectors, at eight chunk sizes, and
+  byte-for-byte against `sha256sum` on the real 959 KB binary.
+- **Audit gains thirteen OTA guards**, each mutation-verified. One initially escaped because the
+  mutation hit the comment documenting the erase strategy rather than the call; re-run against the
+  real call site, it fires.
+- **Cost:** flash 959,043 B → 967,915 B (+8,872 B, 30% of the 3 MB slot); static RAM 50,868 B →
+  51,676 B (+808 B). No image is ever held in RAM.
+
+## Unreleased — W1 Wi-Fi station runtime — 2026-09-21
+
+**Implemented, compiled and offline-tested. NOT flashed. NOT hardware-tested** — no MATDOG build
+has associated with an access point. Wi-Fi is a network **link** here and nothing else: no server,
+no endpoint, no remote command, no update path.
+
+- **New `src/network/` module**, split the way the project already splits `power/` and `servo/`:
+  `WifiPolicy.*` is a pure, `<Arduino.h>`-free and `<WiFi.h>`-free lifecycle state machine driven
+  purely by `(now_ms, link_up)`; `WifiManager.*` is the sole owner of the radio and the only
+  translation unit that includes `<WiFi.h>`. `WifiStatus` is a plain copyable snapshot, so
+  `CommandRouter` formats it without querying the radio and a future Web adapter renders the same
+  struct without a second hardware path.
+- **Two non-obvious decisions, both forced by the platform.** The first state is `INACTIVE`, not
+  `DISABLED`, because `<esp32-hal-gpio.h>` `#define`s `DISABLED`; the host suite now passes
+  `-DDISABLED=0x00` so the clash is caught off-device, as the DALY suite already did.
+  `RADIO_STARTING` exists because `WiFi.begin()` reaches
+  `waitStatusBits(ESP_NETIF_STARTED_BIT, 1000)` in `esp32:esp32 3.3.11` — a blocking wait of up to
+  **one second**. Starting the driver and the association on separate ticks makes that wait
+  unreachable.
+- **Bounded runtime is measured, not asserted.** `@WIFI STATUS` reports `last_us`/`max_us` for
+  `WifiManager::update()`. Those numbers do not exist yet; they need the hardware test.
+- **Retry policy owned by MATDOG.** The core's auto-reconnect is turned off, so the doubling
+  ladder (2 s → 60 s, reset on success, restarted from the bottom after a link that was up drops)
+  is the single description of what actually happens. `persistent(false)` keeps the passphrase out
+  of NVS and out of a reconnect-loop flash-wear path.
+- **Credentials outside Git.** The repository had no convention; this adds the smallest one:
+  `-D` build flags, else a gitignored `src/config/WifiCredentials.local.h`, else **empty** — and
+  empty is supported, building and booting normally with the radio never started
+  (`state=INACTIVE fault=NO_CREDENTIALS`). `config::kWifiPassword` is named in exactly one place.
+- **Audit gains eleven Wi-Fi guards**, each verified by breaking it on purpose: host-linkability
+  and `Serial`-freedom of the policy layer; no `waitForConnectResult`, blocking `WiFi.disconnect()`,
+  blocking scan, `WiFi.SSID()` poll, `delay()` or `while` loop in the Wi-Fi tick; never
+  `setMode(` from a network unit; one and only one passphrase reference; no secret-shaped field in
+  the snapshot; the `.gitignore` rule present as an **exact active line** (the first version of
+  that check passed on a comment, which the mutation test found); and the local header never
+  tracked.
+- **Offline suite:** `test_wifi_policy.cpp` links the real state machine — credential gate,
+  two-phase start, one transition per tick, connect deadline, backoff ladder and ceiling,
+  reset-on-success, link loss, operator enable/disable, fail-closed action failures, the invariant
+  that a connect is never issued while connected, `millis()` wraparound, IPv4 formatting and its
+  bounds.
+- **Cost, same FQBN and profile, against frozen `19fe837`:** flash 392,468 B → 959,051 B
+  (12% → 30% of the 3 MB slot); static RAM 28,536 B → 50,868 B (8% → 15%). The ~40–50 KB the
+  driver allocates at first `WiFi.mode()` is heap and is not in those figures.
+- **Wi-Fi contributes nothing to `SystemState` health.** A missing access point is not a robot
+  health fact, and the G3/G3.1-validated meaning of `SYSTEM health=` must not change because a
+  router rebooted. Whether it ever should is **TO_DESIGN**.
 
 ## Unreleased — power/KEY architecture closeout — 2026-09-20
 
