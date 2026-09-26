@@ -3165,10 +3165,15 @@ def check_build_profile_provenance(sketch_dir):
     # deleted comparison still leaves two mentions behind. These patterns
     # match the actual comparison that does the gating.
     for pattern, description in (
-            (r'\[\s*"\$BACKUP_SIZE"\s*-eq\s*"\$EXPECTED_BACKUP_SIZE"\s*\]',
-             "full-flash backup size comparison"),
-            (r'\[\s*"\$BACKUP_SHA256"\s*=\s*"\$EXPECTED_BACKUP_SHA256"\s*\]',
-             "full-flash backup digest comparison"),
+            # 2026-09-25 recovery-backup hardening moved the literal
+            # size/digest comparison into scripts/backup_gate_logic.py
+            # (host-tested, mutation-verified) - the anti-weakening
+            # property here is now "the real measured size/sha256 are
+            # actually passed to that gate", not a bash [ ] comparison.
+            (r'--actual-size\s+"\$BACKUP_SIZE"',
+             "full-flash backup size passed to the backup gate"),
+            (r'--actual-sha256\s+"\$BACKUP_SHA256"',
+             "full-flash backup digest passed to the backup gate"),
             (r'\[\s*"\$DEVICE_MAC"\s*=\s*"\$EXPECTED_MAC"\s*\]',
              "device identity (MAC) comparison"),
             (r'\[\s*-n\s*"\$(APPLICATION_OFFSET|MAX_PARTITION_SIZE)"\s*\]',
@@ -3211,6 +3216,101 @@ def check_build_profile_provenance(sketch_dir):
     if result.returncode != 0:
         fail(f"{tests}: build manifest offline tests FAILED "
              f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
+
+def check_backup_gate_provenance(sketch_dir):
+    """Recovery-backup hardening (2026-09-25): flash_app_only.sh's backup
+    gate must PROVE a full-flash backup is authorized, never accept one by
+    path or size alone.
+
+    The historical default backup's hash is pinned once, reviewed, in
+    scripts/backup_gate_logic.py. Any other ("custom") backup path is
+    accepted only together with an explicitly authorized expected SHA256 -
+    this check makes the pinned hash's exact value, and the requirement
+    that a custom backup supply its own, both audit-enforced rather than
+    trusted to review alone.
+    """
+    scripts_dir = sketch_dir / "scripts"
+    logic = scripts_dir / "backup_gate_logic.py"
+    flash_sh = scripts_dir / "flash_app_only.sh"
+    tests = scripts_dir / "tests" / "test_backup_gate_logic.py"
+
+    if not logic.exists():
+        fail(f"{logic}: backup gate logic module not found - the flash path would have "
+             f"no way to prove a full-flash backup is authorized")
+        return
+    logic_text = logic.read_text(encoding="utf-8")
+
+    for token in ("DEFAULT_BACKUP_SHA256", "EXPECTED_BACKUP_SIZE", "verify_backup",
+                  "NO_EXPECTED_HASH", "SHA256_MISMATCH", "SIZE_MISMATCH"):
+        if token not in logic_text:
+            fail(f"{logic}: missing required backup-gate primitive {token!r}")
+
+    # The ONE historical backup's hash, reviewed once. A silent edit here
+    # would let a different backup pass as "the" trusted default without
+    # any of the explicit-authorization ceremony a custom backup requires.
+    if 'DEFAULT_BACKUP_SHA256 = "5cbba0b9c5500d0c95247b9b7e7173a29f934b8b13f6800cc9f583374d67fd32"' \
+            not in logic_text:
+        fail(f"{logic}: DEFAULT_BACKUP_SHA256 no longer matches the reviewed 2026-09-10 "
+             f"historical backup hash - this constant must never change silently")
+
+    if 'EXPECTED_BACKUP_SIZE = 16777216' not in logic_text:
+        fail(f"{logic}: EXPECTED_BACKUP_SIZE is no longer the full 16 MiB flash size")
+
+    # verify_backup() must not acquire a permissive default that would make
+    # a custom backup's missing authorization silently pass.
+    if re.search(r"def verify_backup\([^)]*custom_expected_sha256\s*=\s*(?!None)",
+                logic_text, re.DOTALL):
+        fail(f"{logic}: verify_backup() gained a non-None default for "
+             f"custom_expected_sha256 - a custom backup with no stated hash must reach "
+             f"the NO_EXPECTED_HASH refusal, never a permissive default")
+    if not re.search(r"else:\s*\n\s*return Verdict\(False, Refusal\.NO_EXPECTED_HASH",
+                     logic_text):
+        fail(f"{logic}: the NO_EXPECTED_HASH refusal path is missing or was moved out of "
+             f"the is_default_backup/custom_expected_sha256/manifest_sha256 chain - a "
+             f"custom backup with none of the three must still be refused")
+
+    if not flash_sh.exists():
+        fail(f"{flash_sh}: application-only flash script not found")
+        return
+    flash_text = strip_shell_comments(flash_sh.read_text(encoding="utf-8"))
+
+    verify_match = re.search(r"backup_gate_logic\.py", flash_text)
+    if not verify_match:
+        fail(f"{flash_sh}: does not invoke backup_gate_logic.py - a backup of unknown "
+             f"provenance could be trusted for the pre-flash recovery gate")
+    if "MATDOG_FLASH_BACKUP_SHA256:-" not in flash_text:
+        fail(f"{flash_sh}: lost the MATDOG_FLASH_BACKUP_SHA256 operator authorization "
+             f"input (expected a ${{MATDOG_FLASH_BACKUP_SHA256:-...}} expansion)")
+    if "MATDOG_FLASH_BACKUP_MANIFEST:-" not in flash_text:
+        fail(f"{flash_sh}: lost the MATDOG_FLASH_BACKUP_MANIFEST recovery-manifest input "
+             f"(expected a ${{MATDOG_FLASH_BACKUP_MANIFEST:-...}} expansion)")
+
+    write_match = re.search(r"write-flash", flash_text)
+    if verify_match is not None and write_match is not None and \
+            verify_match.start() > write_match.start():
+        fail(f"{flash_sh}: the backup-gate verification must appear before the esptool "
+             f"write-flash invocation")
+
+    if verify_match is not None:
+        lines = flash_text.splitlines()
+        start = flash_text[:verify_match.start()].count("\n")
+        block = []
+        for line in lines[max(0, start - 2):start + 12]:
+            block.append(line)
+        if re.search(r"backup_gate_logic\.py.*?\)\"\s*\|\|\s*(true|:|echo|warn)\b",
+                     "\n".join(block), re.DOTALL):
+            fail(f"{flash_sh}: the backup-gate verification swallows its own failure "
+                 f"('|| true'/'|| :'/'|| echo') - it must REFUSE, not warn")
+
+    if not tests.exists():
+        fail(f"{tests}: backup gate offline test suite not found")
+        return
+    result = subprocess.run([sys.executable, str(tests)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{tests}: backup gate offline tests FAILED "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
 
 def check_unknown_detection_is_not_a_verdict(files):
     """G2 pre-G3 hardening (review Finding 2): classify() must keep
@@ -3359,6 +3459,7 @@ def main():
     check_daly_audit_mutation_suite(SKETCH_DIR)
     check_safe_actuator_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
+    check_backup_gate_provenance(SKETCH_DIR)
     check_unknown_detection_is_not_a_verdict(files)
     check_usb_cdc_tx_never_blocks(files)
 

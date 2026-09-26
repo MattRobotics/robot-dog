@@ -49,9 +49,20 @@ FQBN='esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq
 PORT="${MATDOG_ESP32_PORT:-/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00}"
 EXPECTED_MAC="${MATDOG_ESP32_MAC:-14:c1:9f:22:75:94}"
 
-BACKUP="${MATDOG_FLASH_BACKUP:-$HOME/MATDOG/backups/esp32/matdog_esp32s3_fullflash_2026-09-10.bin}"
-EXPECTED_BACKUP_SIZE=16777216
-EXPECTED_BACKUP_SHA256="5cbba0b9c5500d0c95247b9b7e7173a29f934b8b13f6800cc9f583374d67fd32"
+# Recovery-backup hardening (2026-09-25): the ONE historical default backup
+# is unchanged, its hash still pinned (now in scripts/backup_gate_logic.py,
+# reviewed once). Any OTHER backup path is a "custom" backup — a genuine
+# hardware-validation session needs a FRESH backup taken immediately before
+# it, and a fresh backup's hash cannot be pinned in source ahead of time. A
+# custom backup is accepted ONLY together with an explicitly authorized
+# expected SHA256: MATDOG_FLASH_BACKUP_SHA256 (stated directly), or a
+# companion recovery manifest (MATDOG_FLASH_BACKUP_MANIFEST, defaulting to
+# "$BACKUP.manifest.txt") recording a BACKUP_SHA256= line. Never accepted
+# by path or size alone — see scripts/backup_gate_logic.py.
+DEFAULT_BACKUP="$HOME/MATDOG/backups/esp32/matdog_esp32s3_fullflash_2026-09-10.bin"
+BACKUP="${MATDOG_FLASH_BACKUP:-$DEFAULT_BACKUP}"
+CUSTOM_BACKUP_SHA256="${MATDOG_FLASH_BACKUP_SHA256:-}"
+BACKUP_MANIFEST_PATH="${MATDOG_FLASH_BACKUP_MANIFEST:-${BACKUP}.manifest.txt}"
 
 APPLICATION_BINARY="$BUILD_DIR/MATDOG_Controller.ino.bin"
 BUILD_MANIFEST="$BUILD_DIR/matdog_build_manifest.txt"
@@ -145,14 +156,23 @@ VERIFIED_OTA_INGEST_ENABLED="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_OTA_INGES
 VERIFIED_FQBN="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_FQBN=' | cut -d= -f2-)"
 [ -n "$VERIFIED_FQBN" ] || refuse "manifest verification produced no VERIFIED_FQBN"
 
-# --- Gate: backup exists, correct size and hash ----------------------------
+# --- Gate: backup exists, correct size and an AUTHORIZED hash --------------
 [ -f "$BACKUP" ] || refuse "full-flash backup not found: $BACKUP"
 BACKUP_SIZE="$(stat -c%s "$BACKUP")"
-[ "$BACKUP_SIZE" -eq "$EXPECTED_BACKUP_SIZE" ] || \
-  refuse "backup size $BACKUP_SIZE != expected $EXPECTED_BACKUP_SIZE"
 BACKUP_SHA256="$(sha256sum "$BACKUP" | cut -d' ' -f1)"
-[ "$BACKUP_SHA256" = "$EXPECTED_BACKUP_SHA256" ] || \
-  refuse "backup sha256 $BACKUP_SHA256 != expected $EXPECTED_BACKUP_SHA256"
+BACKUP_GATE_INFO="$(python3 "$SCRIPT_DIR/backup_gate_logic.py" \
+  --backup-path "$BACKUP" \
+  --default-backup-path "$DEFAULT_BACKUP" \
+  --actual-size "$BACKUP_SIZE" \
+  --actual-sha256 "$BACKUP_SHA256" \
+  --custom-expected-sha256 "$CUSTOM_BACKUP_SHA256" \
+  --manifest-path "$BACKUP_MANIFEST_PATH")" || \
+  refuse "backup verification failed (see REFUSED=... above) — $BACKUP cannot be proven \
+to be an authorized full-flash backup. For a custom (non-default) backup, set \
+MATDOG_FLASH_BACKUP_SHA256=<hex> or provide a recovery manifest at $BACKUP_MANIFEST_PATH \
+with a BACKUP_SHA256=... line."
+VERIFIED_BACKUP_SHA256="$(echo "$BACKUP_GATE_INFO" | grep '^VERIFIED_BACKUP_SHA256=' | cut -d= -f2-)"
+[ -n "$VERIFIED_BACKUP_SHA256" ] || refuse "backup verification produced no VERIFIED_BACKUP_SHA256"
 
 # --- Gate: static safety audit PASS ----------------------------------------
 if ! python3 "$SCRIPT_DIR/static_audit.py" "$SKETCH_DIR"; then
@@ -197,6 +217,8 @@ echo "APPLICATION_SHA256    = $APPLICATION_SHA256"
 echo "APPLICATION_OFFSET    = $APPLICATION_OFFSET (partition '$ACTIVE_PARTITION_LABEL')"
 echo "APPLICATION_SIZE      = $APPLICATION_SIZE"
 echo "MAX_PARTITION_SIZE    = $MAX_PARTITION_SIZE"
+echo "BACKUP                = $BACKUP"
+echo "BACKUP_SHA256         = $VERIFIED_BACKUP_SHA256 (verified against $([ "$BACKUP" = "$DEFAULT_BACKUP" ] && echo "the pinned historical default" || echo "an explicit authorization or recovery manifest"))"
 echo "FQBN                  = $FQBN (verified against the build manifest)"
 echo "SOURCE_COMMIT         = $SOURCE_COMMIT"
 echo "BUILD_MANIFEST        = $BUILD_MANIFEST"
