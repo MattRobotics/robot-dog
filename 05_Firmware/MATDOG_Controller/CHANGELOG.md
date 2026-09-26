@@ -1,5 +1,28 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — LED Status Manager V2 final — 2026-09-26
+
+**IMPLEMENTED / OFFLINE-VALIDATED. LED V2 hardware validation remains TO_TEST.**
+
+- READY now displays completed twelfths of fresh BMS-reported SOC, starting at noon
+  and filling clockwise through physical `{1,2,3,4,5,6,7,8,9,10,11,0}`. Quantization
+  is `floor(clamp(SOC,0,100)*12/100)`, with no upward rounding at float boundaries.
+- Cached DALY `CHARGING` adds a subtle pulse on the next segment; at reported 100%,
+  the final segment keeps pulsing. Charging with a cached alarm breathes red.
+  Freshness requires a valid sample, latest comm OK and age at most 5000 ms, sharing
+  the existing telemetry bound. Invalid/stale SOC breathes amber.
+- BOOTING changes to subtle white breathing. Existing fault/OTA/calibration/degraded/
+  Wi-Fi colors and envelopes remain unchanged. All subtle effects use 6..20 over 3 s.
+- Reserved verified charge-complete rendering has no production producer;
+  SOC 100% never selects FULL. Charge-completion policy remains FUTURE / TO_DESIGN.
+- Added bounded `@LED SOC TEST` (600ms levels, full pause, 16.8 s total) and cached
+  renderer facts in `@LED STATUS`. The existing native `@LED TEST` chase is preserved.
+- Real policy and driver/manager host tests, USB_ONLY transport checks and mutation
+  audits cover the change. Both firmware profiles compile. No hardware was accessed.
+
+Evidence and remaining physical checks:
+[`2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md`](../../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md).
+
 ## Unreleased — network-path diagnosis, no reflash — 2026-09-26
 
 Documentation only; same flashed candidate (`build_id=c45858c532e9`, re-confirmed unchanged).

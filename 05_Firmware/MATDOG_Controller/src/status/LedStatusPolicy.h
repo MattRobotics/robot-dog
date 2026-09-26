@@ -5,86 +5,87 @@
 
 #include "../core/SystemState.h"
 
-// Pure LED presentation decision core. Deliberately <stdint.h> plus
-// core/SystemState.h only — no <Arduino.h>, no LedRing, no Adafruit_NeoPixel
-// — the same host-linkable contract as network/WifiPolicy.* and
-// update/OtaPolicy.*: scripts/tests/test_led_status_policy.cpp links this
-// translation unit directly, so the priority order and effects under test
-// are the ones that ship. status/LedStatusManager.* is the only unit that
-// touches LedRing; it turns the LedEffect this policy computes into exactly
-// one setSolid() call per tick.
-//
-// LED PRESENTATION IS NEVER SOURCE OF TRUTH. Every input here is a snapshot
-// already computed by its owning subsystem (SystemState, ActuatorAuthority,
-// CalibrationManager, WifiPolicy) — this file duplicates no hardware read
-// and holds no telemetry of its own beyond the derived on-screen state.
-//
-// Battery/charging LED states (I2 architecture table, 09_Logs/Development_
-// Log/2026-09-25_I2_LED_STATUS_MANAGER.md) are deliberately NOT part of this
-// enum yet: MATDOG_POWER_STATES_AND_CHARGING.md is explicit that FULL must
-// never be inferred from SOC alone and that no reviewed empirical threshold
-// exists for it. Adding those states is a separate, reviewed change once a
-// threshold policy exists — not a placeholder guessed here.
-
+// Pure, host-linked presentation over cached facts. No hardware reads,
+// subsystem writes, motion authority or charge-completion policy lives here.
 namespace matdog {
 namespace status {
 
-// Deterministic priority, FAULT highest, READY lowest/default. Reordering
-// this list is a reviewed safety/legibility decision, not a rendering
-// tweak — see the I2 architecture table referenced above.
+constexpr uint8_t kSocPixelCount = 12;
+constexpr uint8_t kSocStartPixel = 1;
+enum class SocDirection : uint8_t { CLOCKWISE };
+constexpr SocDirection kSocDirection = SocDirection::CLOCKWISE;
+// Physical 0 = 11 o'clock, 1 = 12 o'clock, 2 = 1 o'clock, ... 11 = 10 o'clock.
+// Native physical index progression is clockwise. The SOC bar starts at noon.
+constexpr uint8_t kSocPixelOrder[kSocPixelCount] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0};
+
+// Increasing priority; READY includes the indeterminate battery renderer.
 enum class LedPresentationState : uint8_t {
-  READY                       = 0,
-  BOOTING                     = 1,
-  WIFI_CONNECTING             = 2,
-  DEGRADED                    = 3,
-  CALIBRATION_IN_PROGRESS     = 4,
-  FIRMWARE_UPDATE_IN_PROGRESS = 5,
-  FAULT                       = 6,
+  READY = 0,
+  CHARGING,
+  CHARGE_COMPLETE_VERIFIED,
+  BOOTING,
+  WIFI_CONNECTING,
+  DEGRADED,
+  CHARGING_FAULT,
+  CALIBRATION_IN_PROGRESS,
+  FIRMWARE_UPDATE_IN_PROGRESS,
+  FAULT,
 };
+constexpr uint8_t kLedPresentationStateCount = 10;
 
-constexpr uint8_t kLedPresentationStateCount = 7;
-
-// Snapshot of everything the policy is allowed to look at. Each field is
-// already-computed state from its owning subsystem — no field here may ever
-// become a second read of hardware.
 struct LedStatusInputs {
   core::SystemHealth system_health = core::SystemHealth::BOOTING;
-  // ActuatorAuthorityArbiter::inhibited() && inhibitReason() == FIRMWARE_UPDATE.
   bool firmware_update_in_progress = false;
-  // CalibrationManager::sessionLive() — PREFLIGHT or ACTIVE, live or replay.
   bool calibration_in_progress = false;
-  // WifiManager::status().state in {RADIO_STARTING, CONNECTING}.
   bool wifi_connecting = false;
+  bool sample_valid = false;
+  bool daly_comm_ok = false;
+  uint32_t telemetry_age_ms = UINT32_MAX;
+  float soc_percent = 0;
+  bool battery_charging = false;
+  bool battery_alarm = false;
+  // Reserved for a future reviewed power policy. No production producer.
+  // SOC (even 100%) can never set this fact.
+  bool charge_complete_verified = false;
 };
 
-// r/g/b in 0..255; brightness already time-modulated and capped by the
-// caller's max_brightness — passed straight to LedRing::setSolid().
+// Independent brightness per physical pixel, capped at the caller's ceiling.
 struct LedEffect {
   uint8_t r = 0;
   uint8_t g = 0;
   uint8_t b = 0;
   uint8_t brightness = 0;
 };
+struct LedFrame {
+  LedEffect pixels[kSocPixelCount];
+};
 
-// Highest-priority true condition wins; deterministic, single evaluation,
-// no history beyond what LedStatusInputs carries this tick.
+// The manager's read-only status is the same derived model used to render.
+// soc_percent/segments are meaningful only when soc_valid is true.
+struct LedStatusSnapshot {
+  LedPresentationState presentation = LedPresentationState::BOOTING;
+  bool soc_valid = false;
+  float soc_percent = 0;
+  uint8_t soc_segments = 0;
+  bool charging = false;
+  bool charging_fault = false;
+  bool charge_complete_verified = false;
+};
+
 LedPresentationState selectLedState(const LedStatusInputs& inputs);
-
-// Pure function of (state, now_ms, max_brightness). Solid states ignore
-// now_ms; breathing states derive a triangle-wave brightness from it —
-// never a delay, never a blocking wait.
 LedEffect ledEffectFor(LedPresentationState state, uint32_t now_ms, uint8_t max_brightness);
-
+uint8_t socCompletedSegments(float reported_soc);
+LedFrame socBarFrame(uint8_t completed, uint8_t max_brightness);
 const char* toString(LedPresentationState state);
 
-// Thin stateful wrapper so the manager has one call site per tick.
 class LedStatusPolicy {
  public:
-  LedEffect update(const LedStatusInputs& inputs, uint32_t now_ms, uint8_t max_brightness);
-  LedPresentationState state() const { return state_; }
+  LedFrame update(const LedStatusInputs& inputs, uint32_t now_ms, uint8_t max_brightness);
+  LedPresentationState state() const { return snapshot_.presentation; }
+  const LedStatusSnapshot& snapshot() const { return snapshot_; }
 
  private:
-  LedPresentationState state_ = LedPresentationState::BOOTING;
+  LedStatusSnapshot snapshot_;
 };
 
 }  // namespace status

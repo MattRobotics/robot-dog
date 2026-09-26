@@ -164,6 +164,20 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_led_status_policy.cpp" \
   "$SKETCH_DIR/src/status/LedStatusPolicy.cpp"
 
+# Link the actual driver, manager and policy under both hardware profiles.
+# Only the Arduino/NeoPixel transport is replaced with host observations.
+for LED_PROFILE in USB_ONLY ROBOT_POWERED; do
+  "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+    "-DMATDOG_ACTIVE_HARDWARE_PROFILE=::matdog::config::HardwareProfile::$LED_PROFILE" \
+    -I"$SCRIPT_DIR/led_stubs" \
+    -o "$OUT/test_led_ring_manager_$LED_PROFILE" \
+    "$SCRIPT_DIR/test_led_ring_manager.cpp" \
+    "$SKETCH_DIR/src/status/LedRing.cpp" \
+    "$SKETCH_DIR/src/status/LedStatusManager.cpp" \
+    "$SKETCH_DIR/src/status/LedStatusPolicy.cpp" \
+    "$SKETCH_DIR/src/core/Availability.cpp"
+done
+
 # HMAC-SHA256 (I7, 2026-09-25 correction), verified against the RFC 4231
 # vectors, not self-consistency only. Links the REAL Sha256 it is built on.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
@@ -202,6 +216,8 @@ trap 'rm -rf "$OUT"' EXIT
 "$OUT/test_calibration_execution_engine"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"
+"$OUT/test_led_ring_manager_USB_ONLY"
+"$OUT/test_led_ring_manager_ROBOT_POWERED"
 "$OUT/test_hmac256"
 "$OUT/test_ota_session"
 "$OUT/test_http_mailbox"

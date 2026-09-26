@@ -2977,3 +2977,45 @@ DALY power cycle (still **TO_TEST** — no such power cycle was performed here);
 dock/contact hardware, reverse-polarity protection, complete unattended charge-acceptance
 validation, future Jetson charging behaviour, and long-term automated charge termination (all
 **FUTURE**); the charging LED-ring indication concept (**FUTURE / TO_DESIGN, NOT IMPLEMENTED**).
+
+## LED Status Manager V2 final — 2026-09-26
+
+**IMPLEMENTED / OFFLINE-VALIDATED. LED V2 hardware validation remains TO_TEST.**
+This supersedes the earlier charging LED entry's NOT IMPLEMENTED status for the
+renderer and fresh cached charging detection only. True charge-completion policy
+and autonomous/unattended charging qualification remain FUTURE.
+
+Base: `f14aa40faf3c8c3fb9bace03dd8b71132f09edd5`, verified against fetched `origin/main`
+before edits. Branch: `feat/led-status-manager-v2-final`.
+
+| Offline check | Result |
+|---|---|
+| Full C++ host runner | PASS, including all existing suites |
+| Real LED policy | PASS — 22,728 checks; exact rational quantization boundaries, frozen physical order, every segment count, all priorities, freshness, legacy effects and no FULL from SOC |
+| Real driver/manager, USB_ONLY | PASS — 17 checks; zero NeoPixel begin/show, GPIO47 INPUT only, diagnostics refused |
+| Real driver/manager, ROBOT_POWERED | PASS — 1,571 checks; legacy channel output/chase, per-pixel ceiling, SOC fill/drain, wrap/skipped ticks, diagnostic ownership/resume |
+| Full static audit | PASS — includes existing provenance/partition tests, DALY and actuator mutation suites, and LED ownership/transport/cached-fact checks |
+| LED mutation suite | PASS — 40 cases: 28 static mutations, 10 compile-valid policy mutations, 2 unmutated baselines |
+| USB_ONLY build | PASS — source profile default retained; OTA ingest 0 |
+| ROBOT_POWERED build | PASS — explicit profile override; validation candidate uses existing OTA ingest 1 override |
+| Scope/whitespace/secrets | PASS — no safety-semantic edits; ignored credentials untracked and absent from changed text; `git diff --check` clean |
+
+The shared cached telemetry bound is 5000 ms (valid sample, latest comm OK, inclusive
+sample age), reusing the existing DALY telemetry contract without changing its value.
+READY displays completed twelfths at brightness 20; charging pulses the next clockwise
+segment, including physical 0 at reported 100%. Invalid/stale SOC breathes amber.
+BOOTING now breathes white. All subtle effects are 6..20; charging fault breathes red
+up to 60. The reserved verified-complete input has no production producer.
+
+`@LED TEST` remains unchanged. `@LED SOC TEST` advances every 600 ms, pauses at full,
+drains and ends after 16.8 s; normal rendering resumes automatically. A fresh clock in
+the Controller's LED block and a diagnostic pre-start guard cover timestamps newer
+than the tick-start time without changing other subsystem scheduling.
+
+Final clean post-commit builds generate the existing ignored build manifest. Candidate
+application size/SHA256, exact source commit, profile and OTA ingest fact are recorded
+in the final handoff report; no artifact is represented as hardware-validated.
+
+No hardware/serial access, flash, OTA write or merge to main occurred. Focused physical
+LED validation remains open. Full implementation record and physical validation scope:
+[`2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md`](../../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_FINAL.md).

@@ -2,6 +2,7 @@
 
 #include <esp_ota_ops.h>
 #include <esp_system.h>
+#include <string.h>
 
 #include "../config/BuildConfig.h"
 #include "../config/OtaCredentials.h"
@@ -283,7 +284,19 @@ void Controller::update(uint32_t now_ms) {
     led_inputs.calibration_in_progress = calibration_.sessionLive();
     led_inputs.wifi_connecting = wifi_.status().state == network::WifiState::RADIO_STARTING ||
                                  wifi_.status().state == network::WifiState::CONNECTING;
-    led_status_.update(now_ms, led_inputs);
+    const power::DalySample& battery = daly_.sample();
+    // DALY may have stamped a sample after this tick's now_ms was captured.
+    const uint32_t led_now_ms = millis();
+    led_inputs.sample_valid = battery.valid;
+    led_inputs.daly_comm_ok = daly_.lastCommResult() == power::DalyCommResult::OK;
+    led_inputs.telemetry_age_ms = led_now_ms - battery.sampled_at_ms;
+    led_inputs.soc_percent = battery.soc_percent;
+    led_inputs.battery_charging = strcmp(battery.state_name, "CHARGING") == 0;
+    led_inputs.battery_alarm = battery.alarms[0] != 0 || battery.alarms[1] != 0 ||
+                               battery.alarms[2] != 0 || battery.alarms[3] != 0;
+    // No reviewed charge-completion policy exists yet: the reserved
+    // charge_complete_verified input stays false, including at 100% SOC.
+    led_status_.update(led_now_ms, led_inputs);
   }
 
   // Drains at most one pending HTTP request, if the Web server was ever

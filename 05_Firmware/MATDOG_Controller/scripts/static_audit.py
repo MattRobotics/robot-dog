@@ -754,30 +754,28 @@ def check_ota_partition_verifier_fail_closed(sketch_dir):
 
 
 def check_led_anti_back_power(files):
-    # Session 2 hardening: under USB_ONLY (build::kLedRailPowered == false)
-    # the WS2812 transport must never be initialized or driven — no
-    # pixels_.begin()/show() may execute before the kLedRailPowered guard.
-    for path, code in files:
-        if path.name != "LedRing.cpp":
+    """Every WS2812 transport entry retains an effective USB_ONLY return."""
+    ring = next(((p, c) for p, c in files if p.name == "LedRing.cpp"), None)
+    if ring is None:
+        fail("LedRing.cpp not found - cannot audit anti-back-power")
+        return
+    path, code = ring
+    for name in ("begin", "off", "setSolid", "renderFrame", "startTest", "startSocTest", "update"):
+        match = re.search(r"(?:bool|void) LedRing::" + name + r"\([^)]*\)\s*\{(.*?)\n\}",
+                          code, re.DOTALL)
+        body = match.group(1) if match else ""
+        guard = re.search(r"if\s*\(!build::kLedRailPowered\)\s*(?:\{([^}]+)\}|(return[^;]*;))",
+                          body, re.DOTALL)
+        guarded = (guard.group(1) or guard.group(2)) if guard else ""
+        if not guard or not re.search(r"\breturn(?:\s+(?:true|false))?\s*;", guarded):
+            fail(f"{path}: {name}() lost its effective USB_ONLY transport guard")
             continue
-        begin_match = re.search(r"bool LedRing::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
-        if not begin_match:
-            fail(f"{path}: could not locate LedRing::begin() to audit anti-back-power guard")
-            continue
-        body = begin_match.group(1)
-        guard_pos = body.find("if (!build::kLedRailPowered)")
-        pixels_begin_pos = body.find("pixels_.begin()")
-        if guard_pos == -1:
-            fail(f"{path}: LedRing::begin() is missing the kLedRailPowered guard")
-        elif pixels_begin_pos != -1 and pixels_begin_pos < guard_pos:
-            fail(f"{path}: pixels_.begin() appears before the kLedRailPowered guard in begin()")
-
-    # The BuildConfig rail-flag audit that used to live here moved to
-    # check_hardware_profile_authority() in G2: the three flags are no
-    # longer independently editable literals, so auditing their literal
-    # value is no longer the right question. What replaced it is strictly
-    # stronger - it checks that they are DERIVED from one profile authority
-    # AND that the active profile is still USB_ONLY.
+        if re.search(r"pixels_\.", body[:guard.end()]):
+            fail(f"{path}: {name}() drives WS2812 before the USB_ONLY return")
+        if name == "begin" and not re.search(r"pinMode\(pins::kLedRingDin,\s*INPUT\)", guarded):
+            fail(f"{path}: USB_ONLY begin() must retain GPIO47 INPUT")
+    if re.search(r"pinMode\([^,]+,\s*OUTPUT\)", code):
+        fail(f"{path}: direct GPIO output bypasses the guarded WS2812 transport")
 
 
 def check_actuator_runtime_boundaries(files):
@@ -944,35 +942,81 @@ def check_actuator_infrastructure_wired_fail_closed(files):
 
 
 def check_led_status_boundaries(files):
-    """LED presentation must have exactly one periodic owner (I2).
-    LedStatusPolicy is the pure decision core - host-linkable, the same
-    contract as network/WifiPolicy and update/OtaPolicy - and
-    LedStatusManager.cpp is the only translation unit allowed to call
-    LedRing::setSolid() on the periodic path. The manual @LED TEST/@LED OFF
-    diagnostic stays in CommandRouter and does not call setSolid()."""
-    names = {p.name for p, _ in files}
-    for required in ("LedStatusPolicy.h", "LedStatusPolicy.cpp",
-                      "LedStatusManager.h", "LedStatusManager.cpp"):
-        if required not in names:
-            fail(f"{required}: LED status manager unit not found")
+    """LED V2: pure cached-fact policy, one presenter, one transport owner.
 
-    for path, code in files:
-        if path.name not in ("LedStatusPolicy.h", "LedStatusPolicy.cpp"):
-            continue
-        for token in ("#include <Arduino.h>", "Serial.", "millis(", "LedRing"):
-            if token in code:
-                fail(f"{path}: contains {token!r} - keep the LED status decision core "
-                     f"host-linkable and hardware-free, the same contract as "
-                     f"network/WifiPolicy and update/OtaPolicy")
+    Textual regression tripwires complement real linked policy/driver tests;
+    scripts/tests is excluded because those tests deliberately call the API.
+    """
+    production = [(p, c) for p, c in files if "tests" not in p.parts]
+    by_name = {p.name: (p, c) for p, c in production}
+    for required in ("LedStatusPolicy.h", "LedStatusPolicy.cpp", "LedStatusManager.h",
+                     "LedStatusManager.cpp", "LedRing.h", "LedRing.cpp"):
+        if required not in by_name:
+            fail(f"{required}: LED presentation unit not found")
 
-    allowed_setsolid_callers = {"LedStatusManager.cpp", "LedRing.cpp"}
-    for path, code in files:
-        if path.suffix != ".cpp" or path.name in allowed_setsolid_callers:
-            continue
-        if re.search(r"\bsetSolid\s*\(", code):
-            fail(f"{path}: calls setSolid() directly - LED presentation has exactly one "
-                 f"periodic owner (LedStatusManager); nothing else may drive the ring "
-                 f"outside the manual @LED TEST/@LED OFF diagnostic path")
+    for path, code in production:
+        if path.name in ("LedStatusPolicy.h", "LedStatusPolicy.cpp"):
+            for token in ("Arduino.h", "Serial", "millis(", "LedRing", "DalyBms",
+                          "ControllerService", "pinMode(", "digitalWrite(", "analogWrite("):
+                if token in code:
+                    fail(f"{path}: {token!r} breaks the pure LED policy boundary")
+        if path.parent.name == "status":
+            for token in ("DalyBms", "bms_uart_", "ServoBus", "EEPROM", "PowerStateMachine",
+                          "EnableTorque", "GoalPosition", "requestKey", "requestDischarge",
+                          "esp_ota_", "WiFi."):
+                if token in code:
+                    fail(f"{path}: {token!r} gives LED presentation a hardware/control side effect")
+            if re.search(r"\b(?:delay|delayMicroseconds)\s*\(", code):
+                fail(f"{path}: LED presentation/diagnostics must remain non-blocking")
+        if path.name not in ("LedStatusManager.cpp", "LedRing.cpp", "LedRing.h") and \
+                re.search(r"\b(?:setSolid|setFrame|renderFrame)\s*\(", code):
+            fail(f"{path}: direct LED rendering bypasses the single presentation owner")
+        if path.name not in ("LedRing.h", "LedRing.cpp") and \
+                re.search(r"Adafruit_NeoPixel|pixels_\.|\b(?:rmtWrite|neopixelWrite)\s*\(", code):
+            fail(f"{path}: WS2812 access belongs only to LedRing")
+        # Reserve the fact without creating a current producer in any layer.
+        if path.name not in ("LedStatusPolicy.h", "LedStatusPolicy.cpp") and \
+                re.search(r"\bcharge_complete_verified\s*=",
+                          re.sub(r'"(?:\\.|[^"\\])*"', '""', code)):
+            fail(f"{path}: charge_complete_verified has no reviewed production producer")
+
+    policy_h = by_name.get("LedStatusPolicy.h", (None, ""))[1]
+    if len(re.findall(r"bool charge_complete_verified\s*=\s*false\s*;", policy_h)) != 2 or re.search(
+            r"charge_complete_verified\s*\(\s*(?!false\b)", policy_h):
+        fail("LedStatusPolicy.h: reserved verified-full fact must default false")
+    manager_path, manager = by_name.get("LedStatusManager.cpp", (None, ""))
+    if manager.count("ring_->setFrame(frame)") != 1:
+        fail(f"{manager_path}: manager must have exactly one frame submission")
+    policy_pos = manager.find("policy_.update(inputs, now_ms, LedRing::kMaxBrightness)")
+    guard = re.search(r"if\s*\(ring_ == nullptr \|\| ring_->testRunning\(\)\)\s*return;", manager)
+    frame_pos = manager.find("ring_->setFrame(frame)")
+    if policy_pos < 0 or not guard or not (policy_pos < guard.start() < frame_pos):
+        fail(f"{manager_path}: update cached facts, then yield to diagnostics, then render")
+
+    ctl_path, ctl = by_name.get("Controller.cpp", (None, ""))
+    if len(re.findall(r"\bdaly_\.update\(", ctl)) != 1:
+        fail(f"{ctl_path}: DALY must keep its one existing scheduler update")
+    if len(re.findall(r"\bled_status_\.update\(", ctl)) != 1:
+        fail(f"{ctl_path}: LED manager must have one periodic caller")
+    for call in re.findall(r"\bdaly_\.(\w+)\s*\(", ctl):
+        if call not in {"begin", "update", "availability", "health", "sample", "lastCommResult"}:
+            fail(f"{ctl_path}: DALY {call}() is outside cached LED inputs/existing scheduler")
+    for required in ("led_inputs.sample_valid = battery.valid",
+                     "led_inputs.daly_comm_ok = daly_.lastCommResult() == power::DalyCommResult::OK",
+                     "const uint32_t led_now_ms = millis()",
+                     "led_inputs.telemetry_age_ms = led_now_ms - battery.sampled_at_ms",
+                     "led_inputs.soc_percent = battery.soc_percent",
+                     'led_inputs.battery_charging = strcmp(battery.state_name, "CHARGING") == 0'):
+        if required not in ctl:
+            fail(f"{ctl_path}: missing reviewed cached telemetry input: {required}")
+    alarm = re.search(r"led_inputs\.battery_alarm\s*=([^;]+);", ctl)
+    if not alarm or any(f"battery.alarms[{i}] != 0" not in alarm.group(1) for i in range(4)):
+        fail(f"{ctl_path}: charging fault must consume all four cached alarm words")
+
+    protocol = by_name.get("DalyProtocol.h", (None, ""))[1]
+    if not re.search(r"kDalyTelemetryFreshnessMs\s*=\s*5000\s*;", protocol) or not re.search(
+            r"kDalyKeyWriteMaxTelemetryAgeMs\s*=\s*kDalyTelemetryFreshnessMs\s*;", protocol):
+        fail("DalyProtocol.h: LED and existing KEY age contract must share reviewed 5000 ms bound")
 
 
 def check_servo_timeout_not_global(files):
@@ -2897,6 +2941,7 @@ def check_host_tests(sketch_dir):
         sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
     ]
     led_status_suite = sketch_dir / "scripts" / "tests" / "test_led_status_policy.cpp"
+    led_driver_suite = sketch_dir / "scripts" / "tests" / "test_led_ring_manager.cpp"
     actuator_runtime_suite = sketch_dir / "scripts" / "tests" / "test_actuator_runtime.cpp"
     calibration_execution_suite = (
         sketch_dir / "scripts" / "tests" / "test_calibration_execution_engine.cpp"
@@ -2936,6 +2981,9 @@ def check_host_tests(sketch_dir):
     if not led_status_suite.exists():
         fail(f"{led_status_suite}: LED status policy offline test suite not found")
         return
+    if not led_driver_suite.exists():
+        fail(f"{led_driver_suite}: real LED driver/manager host suite not found")
+        return
     if not actuator_runtime_suite.exists():
         fail(f"{actuator_runtime_suite}: Safe Actuator runtime adapter offline test suite not found")
         return
@@ -2970,6 +3018,12 @@ def check_host_tests(sketch_dir):
                    "test_hmac256", "test_ota_session", "test_http_mailbox"):
         if f'"$OUT/{binary}"' not in runner_text:
             fail(f"{runner}: does not run {binary} - every offline suite must gate")
+    for profile in ("USB_ONLY", "ROBOT_POWERED"):
+        if f'"$OUT/test_led_ring_manager_{profile}"' not in runner_text:
+            fail(f"{runner}: real LED driver/manager suite must run for {profile}")
+    for source in ("LedStatusManager.cpp", "LedRing.cpp"):
+        if source not in runner_text:
+            fail(f"{runner}: LED integration suite must link real {source}")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
     if result.returncode != 0:
         fail(f"{runner}: servo population/profile offline tests FAILED "
@@ -2999,6 +3053,18 @@ def check_safe_actuator_audit_mutation_suite(sketch_dir):
     result = subprocess.run([sys.executable, str(suite)], capture_output=True, text=True)
     if result.returncode != 0:
         fail(f"{suite}: Safe Actuator Layer audit mutation tests FAILED "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
+
+def check_led_audit_mutation_suite(sketch_dir):
+    """Proves LED tripwires and linked policy tests reject targeted mutations."""
+    suite = sketch_dir / "scripts" / "tests" / "test_static_audit_led.py"
+    if not suite.exists():
+        fail(f"{suite}: LED mutation suite not found")
+        return
+    result = subprocess.run([sys.executable, str(suite)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{suite}: LED mutation tests FAILED "
              f"(stdout={result.stdout!r} stderr={result.stderr!r})")
 
 
@@ -3458,6 +3524,7 @@ def main():
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)
     check_safe_actuator_audit_mutation_suite(SKETCH_DIR)
+    check_led_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
     check_backup_gate_provenance(SKETCH_DIR)
     check_unknown_detection_is_not_a_verdict(files)

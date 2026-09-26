@@ -182,6 +182,14 @@ void CommandRouter::handleLine(String line) {
       Serial.printf("REASON=%s\n", status::LedRing::blockedReason());
       Serial.printf("PROFILE=%s\n", build::kTestProfile);
     }
+  } else if (upper == "@LED SOC TEST") {
+    if (modules_.led->startSocTest()) {
+      Serial.println("LED_SOC_TEST=STARTED");
+    } else {
+      Serial.println("LED_SOC_TEST=BLOCKED");
+      Serial.printf("REASON=%s\n", status::LedRing::blockedReason());
+      Serial.printf("PROFILE=%s\n", build::kTestProfile);
+    }
   } else if (upper == "@WIFI STATUS") {
     printWifiStatus();
   } else if (upper == "@WIFI ON" || upper == "@WIFI OFF") {
@@ -354,6 +362,7 @@ void CommandRouter::printHelp() {
   Serial.println("  @LED STATUS");
   Serial.println("  @LED OFF");
   Serial.println("  @LED TEST");
+  Serial.println("  @LED SOC TEST");
   Serial.println("  @WIFI STATUS           (cached snapshot; no radio query)");
   Serial.println("  @WIFI ON|OFF           (any mode; refused without credentials)");
   Serial.println("  @OTA STATUS            (read-only; OTA-A ships no transport)");
@@ -768,7 +777,19 @@ void CommandRouter::printLedStatus() {
                 s->ledDataPinDriven() ? "YES" : "NO");
   // Presentation only - this is what the status manager last decided to
   // show, never a second source of truth. See status/LedStatusPolicy.h.
-  Serial.printf("  presentation=%s\n", status::toString(s->ledPresentationState()));
+  const status::LedStatusSnapshot& led = s->ledSnapshot();
+  Serial.printf("  presentation=%s soc_valid=%s soc_percent=",
+                status::toString(led.presentation), led.soc_valid ? "YES" : "NO");
+  if (led.soc_valid) {
+    Serial.printf("%.1f", led.soc_percent);
+  } else {
+    Serial.print("UNKNOWN");
+  }
+  Serial.printf(" soc_segments=%u charging=%s charging_fault=%s charge_complete_verified=%s diagnostic=%s\n",
+                (unsigned)led.soc_segments,
+                led.charging ? "YES" : "NO", led.charging_fault ? "YES" : "NO",
+                led.charge_complete_verified ? "YES" : "NO",
+                status::toString(s->ledDiagnostic()));
 }
 
 void CommandRouter::printServoScanResult() {

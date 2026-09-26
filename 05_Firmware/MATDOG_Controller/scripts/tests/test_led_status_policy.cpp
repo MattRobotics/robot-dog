@@ -1,340 +1,323 @@
-// Offline host tests for the LED presentation decision core
-// (src/status/LedStatusPolicy.*): the deterministic priority order over
-// FAULT / FIRMWARE_UPDATE_IN_PROGRESS / CALIBRATION_IN_PROGRESS / DEGRADED /
-// WIFI_CONNECTING / BOOTING / READY, the RGB/brightness effect for each
-// state, the triangle-wave breathing envelope, and toString().
-//
-// Links the REAL firmware translation unit, not a host-side copy — the same
-// contract as test_wifi_policy.cpp and test_ota_policy.cpp. That is only
-// possible because LedStatusPolicy.* has no <Arduino.h> and no LedRing
-// dependency; the one setSolid() call per tick lives entirely in
-// status/LedStatusManager.cpp, which is why this suite can drive the whole
-// selection/effect logic from a synthetic clock and synthetic inputs.
-//
-// What this suite deliberately does NOT claim: nothing here proves a WS2812
-// frame reaches a real ring, or that the colors read as intended to a human
-// eye. That is a hardware/visual review, not a host test.
-//
-// Same conventions as the other suites: no framework, a CHECK macro and a
-// pass/fail tally. Run via scripts/tests/run_host_tests.sh.
-
+// Offline tests link the real, pure LED policy. Frames are checked in physical
+// pixel space against the independently frozen 12 o'clock clockwise mapping.
+// Hardware brightness/color perception remains a later physical validation.
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
+#include <limits>
 
 #include "../../src/status/LedStatusPolicy.h"
+#include "../../src/power/DalyProtocol.h"
 
 using namespace matdog::status;
 using matdog::core::SystemHealth;
+using matdog::power::kDalyTelemetryFreshnessMs;
 
 static int g_checks = 0;
 static int g_failures = 0;
 static const char* g_case = "";
-
-#define CHECK(cond)                                                            \
-  do {                                                                         \
-    ++g_checks;                                                                \
-    if (!(cond)) {                                                             \
-      ++g_failures;                                                            \
-      std::printf("  FAIL [%s] %s:%d: %s\n", g_case, __FILE__, __LINE__, #cond); \
-    }                                                                          \
-  } while (0)
-
-#define CHECK_EQ(actual, expected)                                             \
-  do {                                                                         \
-    ++g_checks;                                                                \
-    const long a_ = (long)(actual);                                            \
-    const long e_ = (long)(expected);                                          \
-    if (a_ != e_) {                                                            \
-      ++g_failures;                                                            \
-      std::printf("  FAIL [%s] %s:%d: %s == %ld, expected %ld\n", g_case,      \
-                  __FILE__, __LINE__, #actual, a_, e_);                        \
-    }                                                                          \
-  } while (0)
-
-#define CHECK_STR(actual, expected)                                            \
-  do {                                                                         \
-    ++g_checks;                                                                \
-    if (std::strcmp((actual), (expected)) != 0) {                              \
-      ++g_failures;                                                            \
-      std::printf("  FAIL [%s] %s:%d: %s == \"%s\", expected \"%s\"\n", g_case, \
-                  __FILE__, __LINE__, #actual, (actual), (expected));          \
-    }                                                                          \
-  } while (0)
+#define CHECK(cond) do { ++g_checks; if (!(cond)) { ++g_failures; \
+  std::printf("FAIL [%s] line %d: %s\n", g_case, __LINE__, #cond); } } while (0)
+#define CHECK_EQ(actual, expected) CHECK((actual) == (expected))
+#define CHECK_STR(actual, expected) CHECK(std::strcmp((actual), (expected)) == 0)
 
 namespace {
+constexpr uint8_t kExpectedOrder[12] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0};
 
-LedStatusInputs allClear() {
+LedStatusInputs ready(float soc = 50.0f) {
   LedStatusInputs in;
   in.system_health = SystemHealth::READY;
-  in.firmware_update_in_progress = false;
-  in.calibration_in_progress = false;
-  in.wifi_connecting = false;
+  in.sample_valid = true;
+  in.daly_comm_ok = true;
+  in.telemetry_age_ms = 0;
+  in.soc_percent = soc;
   return in;
 }
 
-// ---------------------------------------------------------------------------
-// selectLedState() — deterministic priority
-// ---------------------------------------------------------------------------
-
-void testDefaultIsReadyWhenNothingElseIsTrue() {
-  g_case = "default_ready";
-  CHECK_EQ((int)selectLedState(allClear()), (int)LedPresentationState::READY);
+void checkEffect(const LedEffect& e, uint8_t r, uint8_t g, uint8_t b, uint8_t brightness) {
+  CHECK_EQ(e.r, r);
+  CHECK_EQ(e.g, g);
+  CHECK_EQ(e.b, b);
+  CHECK_EQ(e.brightness, brightness);
 }
 
-void testEachSoloTriggerSelectsItsOwnState() {
-  g_case = "solo_triggers";
-  {
-    LedStatusInputs in = allClear();
-    in.system_health = SystemHealth::FAULT;
-    CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::FAULT);
-  }
-  {
-    LedStatusInputs in = allClear();
-    in.firmware_update_in_progress = true;
-    CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS);
-  }
-  {
-    LedStatusInputs in = allClear();
-    in.calibration_in_progress = true;
-    CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::CALIBRATION_IN_PROGRESS);
-  }
-  {
-    LedStatusInputs in = allClear();
-    in.system_health = SystemHealth::DEGRADED;
-    CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::DEGRADED);
-  }
-  {
-    LedStatusInputs in = allClear();
-    in.wifi_connecting = true;
-    CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::WIFI_CONNECTING);
-  }
-  {
-    LedStatusInputs in = allClear();
-    in.system_health = SystemHealth::BOOTING;
-    CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::BOOTING);
+void checkUniform(const LedFrame& f, uint8_t r, uint8_t g, uint8_t b, uint8_t brightness) {
+  for (const auto& e : f.pixels) checkEffect(e, r, g, b, brightness);
+}
+
+void checkBar(const LedFrame& f, uint8_t count, int pulse = -1, uint8_t pulse_brightness = 0) {
+  for (uint8_t logical = 0; logical < 12; ++logical) {
+    const auto& e = f.pixels[kExpectedOrder[logical]];
+    if (logical == pulse) checkEffect(e, 0, 255, 0, pulse_brightness);
+    else if (logical < count) checkEffect(e, 0, 255, 0, 20);
+    else checkEffect(e, 0, 0, 0, 0);
   }
 }
 
-// SystemHealth::MAINTENANCE is a real enumerator that SystemState::update()
-// never actually produces (see SystemState.cpp) — but the policy must still
-// fail closed to READY rather than crash or fall through undefined, in case
-// a future producer of it appears before this table is reviewed again.
-void testUnclaimedSystemHealthFallsBackToReady() {
-  g_case = "maintenance_falls_back_to_ready";
-  LedStatusInputs in = allClear();
-  in.system_health = SystemHealth::MAINTENANCE;
-  CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::READY);
-}
-
-// Every higher-priority row must win over every lower-priority row it can
-// coexist with, exactly as documented in the I2 architecture table.
-void testPriorityOrderingOnConflict() {
-  g_case = "priority_ordering";
-
-  // FAULT beats every other simultaneous trigger.
-  {
-    LedStatusInputs in;
-    in.system_health = SystemHealth::FAULT;
-    in.firmware_update_in_progress = true;
-    in.calibration_in_progress = true;
-    in.wifi_connecting = true;
-    CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::FAULT);
-  }
-
-  // FIRMWARE_UPDATE_IN_PROGRESS beats calibration, degraded and wifi, but
-  // never beats FAULT.
-  {
-    LedStatusInputs in = allClear();
-    in.firmware_update_in_progress = true;
-    in.calibration_in_progress = true;
-    in.system_health = SystemHealth::DEGRADED;
-    in.wifi_connecting = true;
-    CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS);
-  }
-
-  // CALIBRATION_IN_PROGRESS beats degraded and wifi.
-  {
-    LedStatusInputs in = allClear();
-    in.calibration_in_progress = true;
-    in.system_health = SystemHealth::DEGRADED;
-    in.wifi_connecting = true;
-    CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::CALIBRATION_IN_PROGRESS);
-  }
-
-  // DEGRADED beats wifi-connecting and booting.
-  {
-    LedStatusInputs in = allClear();
-    in.system_health = SystemHealth::DEGRADED;
-    in.wifi_connecting = true;
-    CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::DEGRADED);
-  }
-
-  // WIFI_CONNECTING beats booting (booting cannot realistically coexist with
-  // it on the real Controller — Wi-Fi never starts before boot completes —
-  // but the priority table must still be total and deterministic).
-  {
-    LedStatusInputs in = allClear();
-    in.system_health = SystemHealth::BOOTING;
-    in.wifi_connecting = true;
-    CHECK_EQ((int)selectLedState(in), (int)LedPresentationState::WIFI_CONNECTING);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// ledEffectFor() — colors, solid vs. breathing, brightness bounds
-// ---------------------------------------------------------------------------
-
-void testSolidStatesIgnoreNowMs() {
-  g_case = "solid_states_ignore_time";
-  for (LedPresentationState s : {LedPresentationState::FAULT, LedPresentationState::DEGRADED,
-                                 LedPresentationState::BOOTING, LedPresentationState::READY}) {
-    const LedEffect a = ledEffectFor(s, 0, 60);
-    const LedEffect b = ledEffectFor(s, 999999, 60);
-    CHECK_EQ(a.r, b.r);
-    CHECK_EQ(a.g, b.g);
-    CHECK_EQ(a.b, b.b);
-    CHECK_EQ(a.brightness, b.brightness);
-  }
-}
-
-void testFaultIsSolidRedAtMaxBrightness() {
-  g_case = "fault_effect";
-  const LedEffect e = ledEffectFor(LedPresentationState::FAULT, 12345, 60);
-  CHECK_EQ(e.r, 255);
-  CHECK_EQ(e.g, 0);
-  CHECK_EQ(e.b, 0);
-  CHECK_EQ(e.brightness, 60);
-}
-
-void testReadyIsDimGreen() {
-  g_case = "ready_effect";
-  const LedEffect e = ledEffectFor(LedPresentationState::READY, 0, 60);
-  CHECK_EQ(e.r, 0);
-  CHECK_EQ(e.g, 255);
-  CHECK_EQ(e.b, 0);
-  CHECK(e.brightness > 0);
-  CHECK(e.brightness < 60);  // dim, never the FAULT ceiling
-}
-
-void testDegradedIsSolidAmber() {
-  g_case = "degraded_effect";
-  const LedEffect e = ledEffectFor(LedPresentationState::DEGRADED, 0, 60);
-  CHECK(e.r > 0);
-  CHECK(e.g > 0);
-  CHECK_EQ(e.b, 0);
-  CHECK(e.r > e.g);  // amber, not yellow-green: red channel dominates
-}
-
-// Breathing states (update/calibration/wifi) must actually vary with time,
-// reach the requested ceiling at the wave's peak, and never exceed it.
-void testBreathingStatesVaryWithTimeAndRespectCeiling() {
-  g_case = "breathing_effects";
-  for (LedPresentationState s : {LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS,
-                                 LedPresentationState::CALIBRATION_IN_PROGRESS,
-                                 LedPresentationState::WIFI_CONNECTING}) {
-    uint8_t min_seen = 255;
-    uint8_t max_seen = 0;
-    bool saw_variation = false;
-    uint8_t previous = ledEffectFor(s, 0, 60).brightness;
-    for (uint32_t t = 0; t <= 2000; t += 50) {
-      const LedEffect e = ledEffectFor(s, t, 60);
-      CHECK(e.brightness <= 60);
-      if (e.brightness != previous) saw_variation = true;
-      previous = e.brightness;
-      if (e.brightness < min_seen) min_seen = e.brightness;
-      if (e.brightness > max_seen) max_seen = e.brightness;
+void testPriorityAndFacts() {
+  g_case = "all simultaneous priority combinations";
+  // Every representable conflict among independent facts and the exclusive
+  // health values is exercised, including fresh charging/fault/full facts.
+  for (SystemHealth health : {SystemHealth::READY, SystemHealth::BOOTING,
+       SystemHealth::DEGRADED, SystemHealth::FAULT, SystemHealth::MAINTENANCE}) {
+    for (unsigned mask = 0; mask < 64; ++mask) {
+      auto in = ready(100);
+      in.system_health = health;
+      in.firmware_update_in_progress = (mask & 1) != 0;
+      in.calibration_in_progress = (mask & 2) != 0;
+      in.wifi_connecting = (mask & 4) != 0;
+      in.battery_charging = (mask & 8) != 0;
+      in.battery_alarm = (mask & 16) != 0;
+      in.charge_complete_verified = (mask & 32) != 0;
+      const bool triggered[] = {health == SystemHealth::FAULT,
+        in.firmware_update_in_progress, in.calibration_in_progress,
+        in.battery_charging && in.battery_alarm, health == SystemHealth::DEGRADED,
+        in.wifi_connecting, health == SystemHealth::BOOTING,
+        in.charge_complete_verified && !in.battery_alarm, in.battery_charging, true};
+      const LedPresentationState states[] = {LedPresentationState::FAULT,
+        LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS,
+        LedPresentationState::CALIBRATION_IN_PROGRESS, LedPresentationState::CHARGING_FAULT,
+        LedPresentationState::DEGRADED, LedPresentationState::WIFI_CONNECTING,
+        LedPresentationState::BOOTING, LedPresentationState::CHARGE_COMPLETE_VERIFIED,
+        LedPresentationState::CHARGING, LedPresentationState::READY};
+      unsigned winner = 0;
+      while (!triggered[winner]) ++winner;
+      CHECK_EQ(selectLedState(in), states[winner]);
+      LedStatusPolicy policy;
+      policy.update(in, 0, 60);
+      CHECK_EQ(policy.state(), states[winner]);
+      CHECK_EQ(policy.snapshot().presentation, states[winner]);
+      CHECK_EQ(policy.snapshot().charging, in.battery_charging);
+      CHECK_EQ(policy.snapshot().charging_fault, in.battery_charging && in.battery_alarm);
+      CHECK_EQ(policy.snapshot().charge_complete_verified,
+               in.charge_complete_verified && !in.battery_alarm);
     }
-    CHECK(saw_variation);
-    CHECK_EQ(max_seen, 60);      // the wave reaches the requested ceiling
-    CHECK(min_seen < max_seen);  // and is strictly dimmer somewhere in the cycle
   }
 }
 
-void testBreathingPeriodRepeats() {
-  g_case = "breathing_period_repeats";
-  // One full 2000 ms cycle must reproduce the same brightness.
-  const LedEffect a = ledEffectFor(LedPresentationState::WIFI_CONNECTING, 500, 60);
-  const LedEffect b = ledEffectFor(LedPresentationState::WIFI_CONNECTING, 2500, 60);
-  CHECK_EQ(a.brightness, b.brightness);
-}
-
-void testDegenerateBrightnessCeilingNeverUnderflows() {
-  g_case = "degenerate_ceiling";
-  // max_brightness at or below the breathing floor must not wrap a uint8_t
-  // subtraction; the effect must simply hold the ceiling constant.
-  for (uint32_t t = 0; t <= 2000; t += 250) {
-    const LedEffect e = ledEffectFor(LedPresentationState::CALIBRATION_IN_PROGRESS, t, 3);
-    CHECK_EQ(e.brightness, 3);
+void testLegacyEffectsAndSubtleBoot() {
+  g_case = "unchanged legacy RGB/envelopes";
+  for (uint32_t t : {0u, 500u, 1000u, 1500u, 2000u, 999999u, UINT32_MAX}) {
+    checkEffect(ledEffectFor(LedPresentationState::FAULT, t, 60), 255, 0, 0, 60);
+    checkEffect(ledEffectFor(LedPresentationState::DEGRADED, t, 60), 255, 140, 0, 30);
+    checkEffect(ledEffectFor(LedPresentationState::READY, t, 60), 0, 255, 0, 20);
   }
-  const LedEffect zero = ledEffectFor(LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS, 0, 0);
-  CHECK_EQ(zero.brightness, 0);
+  const uint8_t old_envelope[5] = {6, 33, 60, 33, 6};
+  for (unsigned i = 0; i < 5; ++i) {
+    checkEffect(ledEffectFor(LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS, i * 500, 60),
+                0, 80, 255, old_envelope[i]);
+    checkEffect(ledEffectFor(LedPresentationState::CALIBRATION_IN_PROGRESS, i * 500, 60),
+                160, 0, 220, old_envelope[i]);
+    checkEffect(ledEffectFor(LedPresentationState::WIFI_CONNECTING, i * 500, 60),
+                0, 200, 200, old_envelope[i]);
+    checkEffect(ledEffectFor(LedPresentationState::CHARGING_FAULT, i * 500, 60),
+                255, 0, 0, old_envelope[i]);
+  }
+  g_case = "subtle white boot and future verified full";
+  for (auto state : {LedPresentationState::BOOTING, LedPresentationState::CHARGE_COMPLETE_VERIFIED}) {
+    uint8_t low = 255, high = 0;
+    for (uint32_t t = 0; t <= 6000; t += 25) {
+      const auto e = ledEffectFor(state, t, 60);
+      CHECK_EQ(e.r, state == LedPresentationState::BOOTING ? 255 : 0);
+      CHECK_EQ(e.g, 255);
+      CHECK_EQ(e.b, state == LedPresentationState::BOOTING ? 255 : 0);
+      CHECK(e.brightness >= 6 && e.brightness <= 20);
+      if (e.brightness < low) low = e.brightness;
+      if (e.brightness > high) high = e.brightness;
+      CHECK_EQ(e.brightness, ledEffectFor(state, t + 3000, 60).brightness);
+    }
+    CHECK_EQ(low, 6);
+    CHECK_EQ(high, 20);
+    CHECK_EQ(ledEffectFor(state, 0, 60).brightness, 6);
+    CHECK_EQ(ledEffectFor(state, 1500, 60).brightness, 20);
+  }
+  g_case = "all brightness ceilings avoid overflow";
+  for (unsigned max = 0; max <= 255; ++max) {
+    for (auto state : {LedPresentationState::BOOTING,
+         LedPresentationState::CHARGE_COMPLETE_VERIFIED,
+         LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS,
+         LedPresentationState::CHARGING_FAULT}) {
+      for (uint32_t t : {0u, 750u, 1000u, 1500u, UINT32_MAX})
+        CHECK(ledEffectFor(state, t, max).brightness <= max);
+    }
+  }
 }
 
-// ---------------------------------------------------------------------------
-// toString()
-// ---------------------------------------------------------------------------
-
-void testToStringCoversEveryState() {
-  g_case = "to_string";
-  CHECK_STR(toString(LedPresentationState::READY), "READY");
-  CHECK_STR(toString(LedPresentationState::BOOTING), "BOOTING");
-  CHECK_STR(toString(LedPresentationState::WIFI_CONNECTING), "WIFI_CONNECTING");
-  CHECK_STR(toString(LedPresentationState::DEGRADED), "DEGRADED");
-  CHECK_STR(toString(LedPresentationState::CALIBRATION_IN_PROGRESS), "CALIBRATION_IN_PROGRESS");
-  CHECK_STR(toString(LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS),
-           "FIRMWARE_UPDATE_IN_PROGRESS");
-  CHECK_STR(toString(LedPresentationState::FAULT), "FAULT");
+void testQuantizationBoundariesAndPhysicalFrames() {
+  g_case = "frozen map and exact rational boundaries";
+  CHECK_EQ(kSocPixelCount, 12);
+  CHECK_EQ(kSocStartPixel, 1);
+  CHECK_EQ(kSocDirection, SocDirection::CLOCKWISE);
+  for (unsigned i = 0; i < 12; ++i) CHECK_EQ(kSocPixelOrder[i], kExpectedOrder[i]);
+  // 100*n/12 is not representable as float except n=3,6,9,12. Select
+  // adjacent representable floats straddling each mathematical boundary.
+  // An epsilon or float-intermediate multiplication can incorrectly round
+  // the lower value upward; these assertions reject either regression.
+  for (unsigned n = 1; n <= 12; ++n) {
+    const double boundary = 100.0 * n / 12.0;
+    float upper = static_cast<float>(boundary);
+    if (static_cast<double>(upper) < boundary)
+      upper = std::nextafter(upper, std::numeric_limits<float>::infinity());
+    const float lower = std::nextafter(upper, -std::numeric_limits<float>::infinity());
+    CHECK(static_cast<double>(lower) < boundary);
+    CHECK(static_cast<double>(upper) >= boundary);
+    CHECK_EQ(socCompletedSegments(lower), n - 1);
+    CHECK_EQ(socCompletedSegments(upper), n);
+    if (n % 3 == 0) CHECK_EQ(static_cast<double>(upper), boundary);
+    LedStatusPolicy policy;
+    checkBar(policy.update(ready(lower), 0, 60), n - 1);
+    checkBar(policy.update(ready(upper), 0, 60), n);
+  }
+  CHECK_EQ(socCompletedSegments(-100), 0);
+  CHECK_EQ(socCompletedSegments(-0.01f), 0);
+  CHECK_EQ(socCompletedSegments(0), 0);
+  CHECK_EQ(socCompletedSegments(8.33f), 0);
+  CHECK_EQ(socCompletedSegments(99.99f), 11);
+  CHECK_EQ(socCompletedSegments(100), 12);
+  CHECK_EQ(socCompletedSegments(101), 12);
+  CHECK_EQ(socCompletedSegments(std::numeric_limits<float>::quiet_NaN()), 0);
+  CHECK_EQ(socCompletedSegments(std::numeric_limits<float>::infinity()), 0);
+  CHECK_EQ(socCompletedSegments(-std::numeric_limits<float>::infinity()), 0);
+  for (unsigned n = 0; n <= 12; ++n) {
+    const float percent = n == 12 ? 100 : (n + 0.5f) * 100 / 12;
+    LedStatusPolicy policy;
+    auto in = ready(percent);
+    const auto frame = policy.update(in, 123, 60);
+    CHECK_EQ(policy.state(), LedPresentationState::READY);
+    CHECK(policy.snapshot().soc_valid);
+    CHECK_EQ(policy.snapshot().soc_segments, n);
+    CHECK_EQ(policy.snapshot().soc_percent, percent);
+    checkBar(frame, n);
+    checkBar(socBarFrame(n, 60), n);
+  }
+  checkBar(socBarFrame(255, 60), 12);
+  for (float percent : {-99.0f, 101.0f}) {
+    LedStatusPolicy policy;
+    checkBar(policy.update(ready(percent), 0, 60), percent < 0 ? 0 : 12);
+    CHECK(policy.snapshot().soc_valid);
+  }
 }
 
-void testToStringFailsClosedOnCorruptedValue() {
-  g_case = "to_string_corrupted";
-  const auto corrupted = static_cast<LedPresentationState>(200);
-  CHECK_STR(toString(corrupted), "UNKNOWN");
-}
-
-// ---------------------------------------------------------------------------
-// LedStatusPolicy — the stateful wrapper Controller/LedStatusManager use
-// ---------------------------------------------------------------------------
-
-void testPolicyStateTracksLastSelection() {
-  g_case = "policy_state_tracking";
+void testCachedFreshnessAndIndeterminate() {
+  g_case = "shared freshness boundary and cached validity";
+  CHECK_EQ(kDalyTelemetryFreshnessMs, 5000u);
+  for (unsigned invalid = 0; invalid < 6; ++invalid) {
+    for (bool charging : {false, true}) {
+      auto in = ready();
+      in.battery_charging = charging;
+      if (invalid == 0) in.sample_valid = false;
+      if (invalid == 1) in.daly_comm_ok = false;
+      if (invalid == 2) in.telemetry_age_ms = kDalyTelemetryFreshnessMs + 1;
+      if (invalid == 3) in.soc_percent = std::numeric_limits<float>::quiet_NaN();
+      if (invalid == 4) in.soc_percent = std::numeric_limits<float>::infinity();
+      if (invalid == 5) in.soc_percent = -std::numeric_limits<float>::infinity();
+      LedStatusPolicy policy;
+      checkUniform(policy.update(in, 0, 60), 255, 140, 0, 6);
+      CHECK(!policy.snapshot().soc_valid);
+      CHECK_EQ(policy.snapshot().soc_segments, 0);
+      CHECK_EQ(policy.state(), charging && invalid >= 3 ? LedPresentationState::CHARGING
+                                                       : LedPresentationState::READY);
+      checkUniform(policy.update(in, 1500, 60), 255, 140, 0, 20);
+      in.system_health = SystemHealth::FAULT;
+      checkUniform(policy.update(in, 1500, 60), 255, 0, 0, 60);
+      // All telemetry-dependent facts are rejected if the sample/comm/age
+      // gate fails; numeric SOC is independently validated for rendering.
+      in.system_health = SystemHealth::READY;
+      in.battery_charging = true;
+      in.battery_alarm = true;
+      in.charge_complete_verified = true;
+      policy.update(in, 0, 60);
+      CHECK_EQ(policy.state(), invalid < 3 ? LedPresentationState::READY
+                                          : LedPresentationState::CHARGING_FAULT);
+      CHECK(!policy.snapshot().charge_complete_verified);
+      in.battery_alarm = false;
+      policy.update(in, 0, 60);
+      CHECK_EQ(policy.snapshot().charge_complete_verified, invalid >= 3);
+    }
+  }
+  for (uint32_t age : {0u, kDalyTelemetryFreshnessMs - 1, kDalyTelemetryFreshnessMs}) {
+    auto in = ready();
+    in.telemetry_age_ms = age;
+    LedStatusPolicy policy;
+    checkBar(policy.update(in, 0, 60), 6);
+    CHECK(policy.snapshot().soc_valid);
+  }
+  auto in = ready();
+  in.telemetry_age_ms = UINT32_MAX;
   LedStatusPolicy policy;
-  CHECK_EQ((int)policy.state(), (int)LedPresentationState::BOOTING);  // constructed default
-
-  LedStatusInputs in = allClear();
-  in.system_health = SystemHealth::BOOTING;
-  policy.update(in, 0, 60);
-  CHECK_EQ((int)policy.state(), (int)LedPresentationState::BOOTING);
-
-  in.system_health = SystemHealth::READY;
-  const LedEffect e = policy.update(in, 0, 60);
-  CHECK_EQ((int)policy.state(), (int)LedPresentationState::READY);
-  CHECK_EQ(e.g, 255);  // the returned effect matches the newly selected state
-
-  in.system_health = SystemHealth::FAULT;
-  policy.update(in, 0, 60);
-  CHECK_EQ((int)policy.state(), (int)LedPresentationState::FAULT);
+  checkUniform(policy.update(in, 0, 60), 255, 140, 0, 6);
+  CHECK(!policy.snapshot().soc_valid);
 }
 
+void testChargingAndTrueFullSeparation() {
+  g_case = "next logical segment breathes; 100 percent remains charging";
+  for (unsigned n = 0; n <= 12; ++n) {
+    auto in = ready(n == 12 ? 100 : (n + 0.5f) * 100 / 12);
+    in.battery_charging = true;
+    LedStatusPolicy policy;
+    const int pulsing = n == 12 ? 11 : n;
+    checkBar(policy.update(in, 0, 60), n, pulsing, 6);
+    CHECK_EQ(policy.state(), LedPresentationState::CHARGING);
+    CHECK(!policy.snapshot().charge_complete_verified);
+    checkBar(policy.update(in, 1500, 60), n, pulsing, 20);
+    for (uint32_t t = 0; t <= 3000; t += 75) {
+      const auto frame = policy.update(in, t, 60);
+      CHECK(frame.pixels[kExpectedOrder[pulsing]].brightness >= 6);
+      for (const auto& e : frame.pixels) CHECK(e.brightness <= 20);
+    }
+  }
+  g_case = "no full producer from numeric SOC";
+  for (float soc : {0.0f, 99.99f, 100.0f, 125.0f}) {
+    for (bool charging : {false, true}) {
+      auto in = ready(soc);
+      in.battery_charging = charging;
+      CHECK(!in.charge_complete_verified);
+      CHECK_EQ(selectLedState(in), charging ? LedPresentationState::CHARGING
+                                           : LedPresentationState::READY);
+    }
+  }
+  g_case = "reserved verified-full renderer and fault";
+  auto in = ready(100);
+  in.charge_complete_verified = true;
+  LedStatusPolicy policy;
+  checkUniform(policy.update(in, 0, 60), 0, 255, 0, 6);
+  CHECK_EQ(policy.state(), LedPresentationState::CHARGE_COMPLETE_VERIFIED);
+  checkUniform(policy.update(in, 1500, 60), 0, 255, 0, 20);
+  in.battery_charging = true;
+  CHECK_EQ(selectLedState(in), LedPresentationState::CHARGE_COMPLETE_VERIFIED);
+  in.battery_alarm = true;
+  checkUniform(policy.update(in, 0, 60), 255, 0, 0, 6);
+  CHECK_EQ(policy.state(), LedPresentationState::CHARGING_FAULT);
+  checkUniform(policy.update(in, 1000, 60), 255, 0, 0, 60);
+  in.battery_charging = false;
+  CHECK_EQ(selectLedState(in), LedPresentationState::READY);
+}
+
+void testNamesAndInitialState() {
+  g_case = "names and initial state";
+  const char* names[] = {"READY", "CHARGING", "CHARGE_COMPLETE_VERIFIED", "BOOTING",
+    "WIFI_CONNECTING", "DEGRADED", "CHARGING_FAULT", "CALIBRATION_IN_PROGRESS",
+    "FIRMWARE_UPDATE_IN_PROGRESS", "FAULT"};
+  for (unsigned i = 0; i < sizeof(names) / sizeof(names[0]); ++i)
+    CHECK_STR(toString(static_cast<LedPresentationState>(i)), names[i]);
+  CHECK_STR(toString(static_cast<LedPresentationState>(200)), "UNKNOWN");
+  checkEffect(ledEffectFor(static_cast<LedPresentationState>(200), 0, 60), 0, 0, 0, 0);
+  LedStatusPolicy policy;
+  CHECK_EQ(policy.state(), LedPresentationState::BOOTING);
+  CHECK_EQ(policy.snapshot().presentation, LedPresentationState::BOOTING);
+  CHECK(!policy.snapshot().soc_valid);
+  CHECK(!policy.snapshot().charge_complete_verified);
+}
 }  // namespace
 
 int main() {
-  testDefaultIsReadyWhenNothingElseIsTrue();
-  testEachSoloTriggerSelectsItsOwnState();
-  testUnclaimedSystemHealthFallsBackToReady();
-  testPriorityOrderingOnConflict();
-  testSolidStatesIgnoreNowMs();
-  testFaultIsSolidRedAtMaxBrightness();
-  testReadyIsDimGreen();
-  testDegradedIsSolidAmber();
-  testBreathingStatesVaryWithTimeAndRespectCeiling();
-  testBreathingPeriodRepeats();
-  testDegenerateBrightnessCeilingNeverUnderflows();
-  testToStringCoversEveryState();
-  testToStringFailsClosedOnCorruptedValue();
-  testPolicyStateTracksLastSelection();
-
+  testPriorityAndFacts();
+  testLegacyEffectsAndSubtleBoot();
+  testQuantizationBoundariesAndPhysicalFrames();
+  testCachedFreshnessAndIndeterminate();
+  testChargingAndTrueFullSeparation();
+  testNamesAndInitialState();
   std::printf("test_led_status_policy: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;
 }
