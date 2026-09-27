@@ -2443,15 +2443,23 @@ def check_calibration_q0_production_wiring(files, sketch_dir):
                 fail(f"{rpath}: q0 STATUS contains {forbidden!r} - status is cached only")
 
     # CR2-B reserves ordinary servo diagnostics so no other read/scan is
-    # interleaved into its evidence bundle.
-    for command, token in (
-        ("@SERVO SCAN", "CALIBRATION_Q0_CAPTURE_ACTIVE"),
-        ("@SERVO CENSUS", "CALIBRATION_Q0_CAPTURE_ACTIVE"),
-        ("@SERVO PREFLIGHT", "CALIBRATION_Q0_CAPTURE_ACTIVE"),
-        ("@SERVO READ", "CALIBRATION_Q0_CAPTURE_ACTIVE"),
-    ):
-        pos = rcode.find(command)
-        if pos < 0 or token not in rcode[pos:pos + 2600]:
+    # interleaved into its evidence bundle. Inspect the actual parser branches,
+    # not nearby comments/help text.
+    diagnostic_branches = (
+        ("@SERVO SCAN",
+         r'upper\.startsWith\("@SERVO SCAN"\)\s*\)\s*\{(.*?)\}\s*else'),
+        ("@SERVO CENSUS",
+         r'upper == "@SERVO CENSUS"\s*\)\s*\{(.*?)\}\s*else'),
+        ("@SERVO PREFLIGHT",
+         r'upper == "@SERVO PREFLIGHT"\s*\)\s*\{(.*?)\}\s*else'),
+        ("@SERVO READ",
+         r'upper\.startsWith\("@SERVO READ"\)\s*\)\s*\{(.*?)\}\s*else'),
+    )
+    for command, pattern in diagnostic_branches:
+        branch = re.search(pattern, rcode, re.DOTALL)
+        if not branch:
+            fail(f"{rpath}: could not locate {command} branch for CR2-B audit")
+        elif "CALIBRATION_Q0_CAPTURE_ACTIVE" not in branch.group(1):
             fail(f"{rpath}: {command} is not refused while CR2-B owns servo diagnostics")
 
     # SAFE_OFF is the deliberate exception: a de-escalation must stay
