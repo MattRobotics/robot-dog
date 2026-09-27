@@ -1463,7 +1463,8 @@ def check_calibration_boundaries(files, sketch_dir):
 
     # --- (1)(2) purity of the whole subsystem -----------------------------
     for name in ("CalibrationDomain.h", "CalibrationDomain.cpp",
-                 "CalibrationManager.h", "CalibrationManager.cpp"):
+                 "CalibrationManager.h", "CalibrationManager.cpp",
+                 "CalibrationPopulationEvidence.h", "CalibrationPopulationEvidence.cpp"):
         entry = by_name.get(name)
         if entry is None:
             fail(f"{cal_dir / name}: calibration unit not found")
@@ -2238,6 +2239,57 @@ def check_h0_preflight_boundaries(files, sketch_dir):
                      f"is NOT q0 - a raw liveness tick must never be read as a "
                      f"calibration pose")
 
+
+def check_calibration_population_evidence(files, sketch_dir):
+    """CR1 formal leg-population producer stays pure, derived and fail closed."""
+    by_name = {path.name: (path, code) for path, code in files}
+    header = by_name.get("CalibrationPopulationEvidence.h")
+    source = by_name.get("CalibrationPopulationEvidence.cpp")
+    if header is None or source is None:
+        fail(f"{sketch_dir / 'src' / 'calibration'}: CR1 population evidence producer missing")
+        return
+
+    for path, code in (header, source):
+        for forbidden in ("#include <Arduino.h>", "ServoBus", "ServoCensus", "startScan(",
+                          "EnableTorque", "WritePos", "GoalPosition", "Serial."):
+            if forbidden in code:
+                fail(f"{path}: CR1 producer contains {forbidden!r} - it must consume existing "
+                     f"structured evidence and never own transport or hardware")
+
+    path, code = source
+    for required in (
+        "current_observation_bundle",
+        "census.scan_lo <= servo::kCanonicalScanLo",
+        "census.scan_hi >= servo::kCanonicalScanHi",
+        "census.unexpected_id",
+        "census.absent_by_design_present",
+        "servo::isLegServo(census.missing_ids[i])",
+        "record.result != servo::JointPreflightResult::PASS",
+        "record.profile != servo::ProfileVerdict::MATCH",
+        "record.position_offset != 0",
+        "record.torque_enable != 0",
+        "record.present_position < kRawTickMin",
+        "record.present_position > kRawTickMax",
+        "semanticIdentityFromCanonical",
+        "setPhysicalUnit",
+        "legSlotIndex",
+        "populationIsCurrentPass",
+    ):
+        if required not in code:
+            fail(f"{path}: CR1 producer lost required formal-population gate {required!r}")
+
+    domain = by_name.get("CalibrationDomain.cpp")
+    if domain is None or "evidence.unexpected_count != 0" not in domain[1]:
+        fail(f"{sketch_dir / 'src' / 'calibration' / 'CalibrationDomain.cpp'}: "
+             f"domain PASS no longer rejects anomalous population evidence")
+
+    # CR1 is deliberately foundation-only. A production orchestration point is
+    # a later gate after session/freshness semantics are reviewed.
+    for name in ("Controller.cpp", "CommandRouter.cpp"):
+        entry = by_name.get(name)
+        if entry is not None and "buildCurrentLegPopulationEvidence(" in entry[1]:
+            fail(f"{entry[0]}: CR1 producer is wired into production before its session "
+                 f"freshness/orchestration gate is implemented")
 
 def check_evidence_geometry_binding(files, sketch_dir):
     """B1: calibration evidence is bound to the geometry it was measured under.
@@ -3071,6 +3123,7 @@ def check_host_tests(sketch_dir):
     profile_suite = sketch_dir / "scripts" / "tests" / "test_servo_profile.cpp"
     calibration_suites = [
         sketch_dir / "scripts" / "tests" / "test_calibration_domain.cpp",
+        sketch_dir / "scripts" / "tests" / "test_calibration_population_evidence.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
     ]
     led_status_suite = sketch_dir / "scripts" / "tests" / "test_led_status_policy.cpp"
@@ -3145,7 +3198,8 @@ def check_host_tests(sketch_dir):
     for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy",
                    "test_ota_policy", "test_actuator_authority", "test_actuator_write_policy",
                    "test_calibration_geometry", "test_servo_profile",
-                   "test_calibration_domain", "test_calibration_manager",
+                   "test_calibration_domain", "test_calibration_population_evidence",
+                   "test_calibration_manager",
                    "test_led_status_policy", "test_actuator_runtime",
                    "test_calibration_execution_engine", "test_service_readiness",
                    "test_hmac256", "test_ota_session", "test_http_mailbox"):
@@ -3652,6 +3706,7 @@ def main():
     check_servo_profile_contract(files, SKETCH_DIR)
     check_servo_profile_export(SKETCH_DIR)
     check_h0_preflight_boundaries(files, SKETCH_DIR)
+    check_calibration_population_evidence(files, SKETCH_DIR)
     check_evidence_geometry_binding(files, SKETCH_DIR)
     check_calibration_readiness_contract(SKETCH_DIR)
     check_direction_is_contractual(files, SKETCH_DIR)
