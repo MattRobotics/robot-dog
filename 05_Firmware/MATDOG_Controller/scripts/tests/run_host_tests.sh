@@ -64,6 +64,15 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_calibration_domain.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
 
+# CR1 formal population evidence is a pure adapter over existing structured
+# census + preflight results. No ServoBus or device I/O is linked.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_population_evidence" \
+  "$SCRIPT_DIR/test_calibration_population_evidence.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationPopulationEvidence.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/servo/ServoPopulation.cpp"
+
 # The calibration manager links the REAL arbiter, so the authority
 # integration it exercises is the shipped one rather than a mock.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -211,6 +220,7 @@ done
 "$OUT/test_calibration_geometry"
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
+"$OUT/test_calibration_population_evidence"
 "$OUT/test_calibration_manager"
 "$OUT/test_actuator_runtime"
 "$OUT/test_calibration_execution_engine"
