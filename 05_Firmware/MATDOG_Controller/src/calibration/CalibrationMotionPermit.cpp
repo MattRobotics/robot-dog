@@ -59,7 +59,7 @@ CalibrationPermitStatus CalibrationMotionPermit::grant(
 
 CalibrationPermitStatus CalibrationMotionPermit::check(
     const CalibrationMotionPermitFacts& facts,
-    const CalibrationMotionPermitToken& token) const {
+    const CalibrationMotionPermitToken& token) {
   if (!active_ || !token.valid() ||
       token.permit_generation != generation_ ||
       token.session_id != bound_session_id_ ||
@@ -68,12 +68,45 @@ CalibrationPermitStatus CalibrationMotionPermit::check(
   }
 
   const CalibrationPermitStatus evaluated = evaluateFacts(facts);
-  if (evaluated != CalibrationPermitStatus::ACTIVE) return evaluated;
+  if (evaluated != CalibrationPermitStatus::ACTIVE) {
+    CalibrationPermitRevokeReason reason = CalibrationPermitRevokeReason::PREREQUISITE_LOST;
+    switch (evaluated) {
+      case CalibrationPermitStatus::REJECT_NO_OPERATOR_AUTH:
+        reason = CalibrationPermitRevokeReason::EXPLICIT;
+        break;
+      case CalibrationPermitStatus::REJECT_MODE:
+        reason = CalibrationPermitRevokeReason::MODE_INCOMPATIBLE;
+        break;
+      case CalibrationPermitStatus::REJECT_SYSTEM_HEALTH:
+        reason = CalibrationPermitRevokeReason::SYSTEM_FAULT;
+        break;
+      case CalibrationPermitStatus::REJECT_SESSION:
+        reason = CalibrationPermitRevokeReason::SESSION_ENDED;
+        break;
+      case CalibrationPermitStatus::REJECT_AUTHORITY:
+        reason = CalibrationPermitRevokeReason::AUTHORITY_LOST;
+        break;
+      case CalibrationPermitStatus::REJECT_INHIBITED:
+        reason = CalibrationPermitRevokeReason::INHIBITED;
+        break;
+      case CalibrationPermitStatus::REVOKED:
+      case CalibrationPermitStatus::ACTIVE:
+      case CalibrationPermitStatus::REJECT_PROFILE:
+      case CalibrationPermitStatus::REJECT_POPULATION:
+      case CalibrationPermitStatus::REJECT_GEOMETRY:
+      case CalibrationPermitStatus::REJECT_TRANSFORMS:
+        break;
+    }
+    revoke(reason);
+    return evaluated;
+  }
 
   if (facts.session_id != bound_session_id_) {
+    revoke(CalibrationPermitRevokeReason::SESSION_ENDED);
     return CalibrationPermitStatus::REJECT_SESSION;
   }
   if (facts.authority_generation != bound_authority_generation_) {
+    revoke(CalibrationPermitRevokeReason::AUTHORITY_LOST);
     return CalibrationPermitStatus::REJECT_AUTHORITY;
   }
   return CalibrationPermitStatus::ACTIVE;
@@ -128,6 +161,7 @@ const char* toString(CalibrationPermitRevokeReason reason) {
     case CalibrationPermitRevokeReason::SYSTEM_FAULT: return "SYSTEM_FAULT";
     case CalibrationPermitRevokeReason::INHIBITED: return "INHIBITED";
     case CalibrationPermitRevokeReason::RESET: return "RESET";
+    case CalibrationPermitRevokeReason::PREREQUISITE_LOST: return "PREREQUISITE_LOST";
   }
   return "UNKNOWN";
 }

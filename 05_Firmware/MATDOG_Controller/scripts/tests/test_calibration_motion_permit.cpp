@@ -108,6 +108,54 @@ static void test_session_and_authority_binding() {
         "reset invalidates copied token");
 }
 
+static void test_dynamic_prerequisite_loss_expires_token() {
+  CalibrationMotionPermit permit;
+  CalibrationMotionPermitToken token{};
+  auto f = goodFacts();
+  check(permit.grant(f, &token) == CalibrationPermitStatus::ACTIVE,
+        "grant for expiry test");
+
+  auto bad = f;
+  bad.mode = OperatingMode::RUN;
+  check(permit.check(bad, token) == CalibrationPermitStatus::REJECT_MODE,
+        "mode incompatibility rejects");
+  check(!permit.active(), "mode incompatibility revokes permit");
+  check(permit.lastRevokeReason() ==
+            CalibrationPermitRevokeReason::MODE_INCOMPATIBLE,
+        "mode incompatibility records revoke reason");
+
+  // Returning to healthy facts must NOT resurrect the old token.
+  check(permit.check(f, token) == CalibrationPermitStatus::REVOKED,
+        "old token cannot revive after mode recovers");
+
+  CalibrationMotionPermitToken token2{};
+  check(permit.grant(f, &token2) == CalibrationPermitStatus::ACTIVE,
+        "fresh explicit grant required after expiry");
+
+  bad = f;
+  bad.system_health = SystemHealth::FAULT;
+  check(permit.check(bad, token2) ==
+            CalibrationPermitStatus::REJECT_SYSTEM_HEALTH,
+        "fatal health loss rejects");
+  check(!permit.active(), "fatal health loss revokes");
+  check(permit.lastRevokeReason() ==
+            CalibrationPermitRevokeReason::SYSTEM_FAULT,
+        "fatal health loss records fault revoke");
+
+  CalibrationMotionPermitToken token3{};
+  check(permit.grant(f, &token3) == CalibrationPermitStatus::ACTIVE,
+        "fresh grant after fault");
+  bad = f;
+  bad.authority_generation++;
+  check(permit.check(bad, token3) ==
+            CalibrationPermitStatus::REJECT_AUTHORITY,
+        "authority generation loss rejects");
+  check(!permit.active(), "authority generation loss revokes");
+  check(permit.lastRevokeReason() ==
+            CalibrationPermitRevokeReason::AUTHORITY_LOST,
+        "authority loss records revoke reason");
+}
+
 static void test_revoke_is_final_for_token() {
   CalibrationMotionPermit permit;
   CalibrationMotionPermitToken token{};
@@ -130,6 +178,7 @@ static void test_revoke_is_final_for_token() {
 int main() {
   test_grant_requires_every_fact();
   test_session_and_authority_binding();
+  test_dynamic_prerequisite_loss_expires_token();
   test_revoke_is_final_for_token();
   std::printf("test_calibration_motion_permit: %d checks, %d failures\n",
               g_checks, g_failures);

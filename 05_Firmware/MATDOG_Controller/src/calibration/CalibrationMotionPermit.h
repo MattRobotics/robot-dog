@@ -44,6 +44,7 @@ enum class CalibrationPermitRevokeReason : uint8_t {
   SYSTEM_FAULT = 5,
   INHIBITED = 6,
   RESET = 7,
+  PREREQUISITE_LOST = 8,
 };
 
 struct CalibrationMotionPermitFacts {
@@ -85,7 +86,7 @@ class CalibrationMotionPermit {
   // Re-checks every dynamic prerequisite against the exact token that was
   // granted. Does not renew or extend a permit.
   CalibrationPermitStatus check(const CalibrationMotionPermitFacts& facts,
-                                const CalibrationMotionPermitToken& token) const;
+                                const CalibrationMotionPermitToken& token);
 
   void revoke(CalibrationPermitRevokeReason reason);
   void reset();
