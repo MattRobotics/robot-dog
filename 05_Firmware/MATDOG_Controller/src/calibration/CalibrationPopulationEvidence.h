@@ -34,9 +34,10 @@ enum class PopulationEvidenceBuildStatus : uint8_t {
   PASS                          = 9,
 };
 
-// The future session orchestrator owns freshness. Until that orchestrator is
-// reviewed and wired, no production call site may set this context from cached
-// evidence and claim a current formal pass.
+// The session orchestrator owns freshness. CR2-B is the first reviewed
+// production caller: it may set current_observation_bundle only after it has
+// itself sequenced a fresh census followed by a fresh preflight inside one
+// acquisition transaction. Cached stand-alone diagnostics remain ineligible.
 struct PopulationEvidenceBuildContext {
   bool current_observation_bundle = false;
   uint32_t session_ms = 0;
