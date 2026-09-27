@@ -98,14 +98,38 @@ truth but cannot execute the repository's C++/Python test runner.
 Therefore current status is deliberately:
 
 ```text
-CR0  IMPLEMENTED / SOURCE-REVIEWED / AUDIT ADDED
-CR1  IMPLEMENTED / TESTS ADDED / AUDIT ADDED
-CR1  LOCAL HOST + STATIC EXECUTION REQUIRED
+CR0  IMPLEMENTED / OFFLINE VALIDATED
+CR1  IMPLEMENTED / OFFLINE VALIDATED / NOT PRODUCTION-WIRED
 HARDWARE VALIDATION  NOT STARTED
 FORMAL CURRENT H1    NOT CLAIMED
 ```
 
-No CR2 q0 implementation should be treated as validated until this checkpoint passes locally.
+The local checkpoint passed on the synchronized ASUS K53SV checkout at
+`55c036cb92d8039658309ef9fe6c3dc713ca22eb`:
+
+```text
+python3 scripts/static_audit.py
+  Scanned 108 source files
+  STATIC_AUDIT = PASS
+
+bash scripts/tests/run_host_tests.sh
+  all suites PASS
+  CALIBRATION_DOMAIN_TESTS = 704 checks / 0 failures
+  CALIBRATION_POPULATION_EVIDENCE_TESTS = 248 checks / 0 failures
+  CALIBRATION_MANAGER_TESTS = 322 checks / 0 failures
+
+git diff --check
+  clean
+
+git status --short --branch
+  ## feat/calibration-readiness-v1
+
+git rev-parse HEAD
+  55c036cb92d8039658309ef9fe6c3dc713ca22eb
+```
+
+This closes the CR0/CR1 offline validation checkpoint. It does not create current formal H1
+evidence and does not authorize any hardware action.
 
 ## 4. Next gate
 
