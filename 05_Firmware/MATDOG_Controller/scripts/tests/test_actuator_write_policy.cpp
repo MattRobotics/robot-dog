@@ -143,6 +143,18 @@ static AuthorityLease grant(ActuatorAuthorityArbiter& arbiter, ActuatorAuthority
   return lease;
 }
 
+static void setCalibrationPermit(SafeActuatorPolicy& policy,
+                                 const AuthorityLease& lease) {
+  CalibrationBootstrapContext ctx{};
+  ctx.session_active = true;
+  ctx.origin = CalibrationOrigin::LIVE_SESSION;
+  ctx.motion_permit_active = true;
+  ctx.motion_permit_generation = 1;
+  ctx.motion_permit_session_id = 1;
+  ctx.motion_permit_authority_generation = lease.generation;
+  policy.setBootstrapContext(ctx);
+}
+
 // ---------------------------------------------------------------------------
 // Authority binding
 // ---------------------------------------------------------------------------
@@ -194,6 +206,7 @@ static void test_wrong_owner_rejects() {
 
   const AuthorityLease calibration = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                            OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, calibration);
 
   // A lease claiming a different owner, carrying the CURRENT generation - so
   // only the owner comparison can catch it.
@@ -218,9 +231,11 @@ static void test_stale_generation_rejects() {
   // one and a write in session two.
   const AuthorityLease first = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, first);
   CHECK(arbiter.release(first) == AuthorityResult::RELEASED);
   const AuthorityLease second = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                       OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, second);
   CHECK(first.generation != second.generation);
 
   ActuatorTransaction txn{};
@@ -267,6 +282,7 @@ static void test_operating_mode_mismatch_rejects() {
   // it. The lease is genuine; only the mode is wrong.
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   ActuatorTransaction txn{};
   CHECK_DECISION(policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
@@ -297,6 +313,7 @@ static void test_invalid_and_corrupt_operations_reject() {
   policy.begin(&arbiter);
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   ActuatorTransaction txn{};
 
@@ -322,6 +339,7 @@ static void test_invalid_joint_identity_rejects() {
   policy.begin(&arbiter);
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   ActuatorTransaction txn{};
 
@@ -343,6 +361,22 @@ static void test_invalid_joint_identity_rejects() {
                  WriteDecision::REJECT_INVALID_JOINT);
 }
 
+static void test_calibration_lease_without_motion_permit_rejects() {
+  g_case = "calibration requires permit";
+  ActuatorAuthorityArbiter arbiter;
+  arbiter.reset(AuthorityClearReason::BOOT);
+  SafeActuatorPolicy policy;
+  policy.begin(&arbiter);
+  const AuthorityLease lease =
+      grant(arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+
+  ActuatorTransaction txn{};
+  CHECK_DECISION(policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
+                             OperatingMode::MAINTENANCE, &txn),
+                 WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT);
+  CHECK(!txn.planned());
+}
+
 static void test_calibration_lease_accepts_an_eligible_calibration_operation() {
   g_case = "calibration accepts";
   ActuatorAuthorityArbiter arbiter;
@@ -351,6 +385,7 @@ static void test_calibration_lease_accepts_an_eligible_calibration_operation() {
   policy.begin(&arbiter);
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   ActuatorTransaction txn{};
   CHECK_DECISION(policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
@@ -439,6 +474,7 @@ static void test_missing_current_limits_reject() {
   policy.begin(&arbiter);
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   // This is the SHIPPED state: the limit table is empty because nothing in the
   // repository qualifies to fill it.
@@ -539,6 +575,7 @@ static void test_evidence_from_another_model_stays_on_record_but_is_not_current(
   policy.bindGeometry(&profile, &geometry_data::kProvenance);
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   // A bound measured under a DIFFERENT model: a rebuild from another URDF, a
   // regenerated profile. It is well-formed and stays on record.
@@ -660,6 +697,7 @@ static void test_target_bounds_are_enforced_in_both_directions() {
   CHECK(policy.limits().admit(acceptedLimit(lfLower(), 1800, 2300)));
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   ActuatorTransaction txn{};
   struct Case {
@@ -715,6 +753,7 @@ static void test_authority_lost_between_plan_and_commit_rejects() {
   policy.begin(&arbiter);
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   // (a) the owner is force-cleared under the transaction.
   ActuatorTransaction txn{};
@@ -728,6 +767,7 @@ static void test_authority_lost_between_plan_and_commit_rejects() {
   // (b) the lease is released and re-acquired: same owner, new generation.
   const AuthorityLease again = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, again);
   ActuatorTransaction txn_b{};
   CHECK_DECISION(policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), again,
                              OperatingMode::MAINTENANCE, &txn_b),
@@ -735,6 +775,7 @@ static void test_authority_lost_between_plan_and_commit_rejects() {
   CHECK(arbiter.release(again) == AuthorityResult::RELEASED);
   const AuthorityLease third = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, third);
   (void)third;
   CHECK_DECISION(policy.commit(&txn_b), WriteDecision::REJECT_STALE_GENERATION);
 
@@ -745,6 +786,7 @@ static void test_authority_lost_between_plan_and_commit_rejects() {
   mode_policy.begin(&mode_arbiter);
   const AuthorityLease service = grant(mode_arbiter, ActuatorAuthority::CALIBRATION,
                                        OperatingMode::MAINTENANCE);
+  setCalibrationPermit(mode_policy, service);
   ActuatorTransaction txn_c{};
   CHECK_DECISION(mode_policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), service,
                                   OperatingMode::MAINTENANCE, &txn_c),
@@ -759,6 +801,7 @@ static void test_authority_lost_between_plan_and_commit_rejects() {
   ota_policy.begin(&ota_arbiter);
   const AuthorityLease held = grant(ota_arbiter, ActuatorAuthority::CALIBRATION,
                                     OperatingMode::MAINTENANCE);
+  setCalibrationPermit(ota_policy, held);
   ActuatorTransaction txn_d{};
   CHECK_DECISION(ota_policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), held,
                                  OperatingMode::MAINTENANCE, &txn_d),
@@ -778,6 +821,7 @@ static void test_transaction_replay_rejects() {
   policy.begin(&arbiter);
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   ActuatorTransaction txn{};
   CHECK_DECISION(policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
@@ -809,6 +853,7 @@ static void test_only_one_transaction_may_be_outstanding() {
   policy.begin(&arbiter);
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   ActuatorTransaction first{};
   CHECK_DECISION(policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
@@ -842,6 +887,7 @@ static void test_aborted_transaction_cannot_resume() {
   policy.begin(&arbiter);
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   ActuatorTransaction txn{};
   CHECK_DECISION(policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
@@ -868,6 +914,7 @@ static void test_reset_invalidates_outstanding_transactions() {
   policy.begin(&arbiter);
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   ActuatorTransaction txn{};
   CHECK_DECISION(policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
@@ -915,6 +962,7 @@ static void test_null_pointers_are_refusals() {
   policy.begin(&arbiter);
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   CHECK_DECISION(policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
                              OperatingMode::MAINTENANCE, nullptr),
@@ -1008,6 +1056,7 @@ static void test_counters_track_what_happened() {
   policy.begin(&arbiter);  // one reset
   const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy, lease);
 
   ActuatorTransaction txn{};
   policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
@@ -1043,13 +1092,13 @@ static void test_tostring_is_total() {
   }
   CHECK(std::strcmp(toString(static_cast<ActuatorOperation>(99)), "UNKNOWN") == 0);
 
-  for (uint8_t raw = 0; raw <= (uint8_t)WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH;
+  for (uint8_t raw = 0; raw <= (uint8_t)WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT;
        ++raw) {
     CHECK(std::strcmp(toString(static_cast<WriteDecision>(raw)), "UNKNOWN") != 0);
   }
   CHECK(std::strcmp(toString(static_cast<WriteDecision>(99)), "UNKNOWN") == 0);
   CHECK(std::strcmp(toString(static_cast<WriteDecision>(
-                        (uint8_t)WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH + 1)),
+                        (uint8_t)WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT + 1)),
                     "UNKNOWN") == 0);
 
   for (uint8_t raw = 0; raw <= (uint8_t)TransactionState::ABORTED; ++raw) {
@@ -1070,6 +1119,7 @@ int main() {
 
   test_invalid_and_corrupt_operations_reject();
   test_invalid_joint_identity_rejects();
+  test_calibration_lease_without_motion_permit_rejects();
   test_calibration_lease_accepts_an_eligible_calibration_operation();
   test_motion_lease_cannot_issue_a_calibration_only_operation();
   test_owner_operation_matrix_is_exhaustive();
