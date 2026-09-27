@@ -2663,6 +2663,10 @@ def check_calibration_readiness_contract(sketch_dir):
 
     readiness = docs.get("CALIBRATION_READINESS.md", "")
     for token, why in (
+        ("CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: IMPLEMENTED / OFFLINE VALIDATION PENDING",
+         "same-session q0 orchestration is implemented but not yet hardware-authorized"),
+        ("@CALIBRATION Q0 CAPTURE <samples 3..32> <stability_ticks 0..2047> CONFIRM_Q0_POSE",
+         "the read-only q0 capture command must remain explicit and pose-confirmed"),
         ("motorDirection  = current URDF / hardware-contract data",
          "production direction must remain bound to the current URDF/geometry contract"),
         ("8  upper-leg endpoints  EXECUTABLE_URDF_DOMAIN",
@@ -2677,6 +2681,18 @@ def check_calibration_readiness_contract(sketch_dir):
     ):
         if token not in readiness:
             fail(f"{required_docs['CALIBRATION_READINESS.md']}: missing CR0 invariant {token!r} - {why}")
+
+    # CR2-B is now implemented. Current contracts must not regress to
+    # describing the same-session Controller orchestration as future work.
+    for stale in (
+        "CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: TO_IMPLEMENT",
+        "CR2-B same-session read-only Controller orchestration remains TO_IMPLEMENT",
+        "same-session Controller read orchestration remains **TO_IMPLEMENT**",
+    ):
+        for name in ("CALIBRATION_READINESS.md", "DEVELOPMENT_GATES.md",
+                     "CALIBRATION_BOOTSTRAP.md"):
+            if stale in docs.get(name, ""):
+                fail(f"{required_docs[name]}: stale CR2-B readiness state {stale!r}")
 
     # Current-contract docs must not regress to the superseded pre-9aae03d
     # direction model. Exact historical logs are intentionally left untouched.
