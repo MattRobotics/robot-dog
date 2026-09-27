@@ -250,10 +250,57 @@ write phase. CR2 reuses only the non-authoritative **measurement method** alread
 there — repeated read-only samples, Torque OFF, circular median and stability spread — while
 discarding its IDs, q0 values, offsets, EEPROM logic and tolerances.
 
-**CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: TO_IMPLEMENT.** A pure reducer cannot prove
-wall-clock freshness. A later Controller-side read-only transaction must produce the formal
-population evidence and q0 sample bundle inside one explicitly scoped capture session before
-calling CR2-A. That future path still may not enable torque, command GoalPosition, move a joint or
-write EEPROM.
+**CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: IMPLEMENTED / OFFLINE VALIDATION PENDING.**
 
-CR2-A passed the synchronized local host/static gate on 2026-09-27 at `5daefc73f824797d3052c75002a495bed21b58f3`: static audit PASS (111 source files), dedicated CR2 suite 52/52 PASS, all host suites PASS, `git diff --check` clean and working tree clean. CR2-B same-session read-only orchestration may now proceed.
+`CalibrationQ0CaptureSession.*` now owns one explicit evidence-acquisition transaction, separate
+from `CalibrationManager`. This separation is intentional: `CalibrationManager::startSession(
+LIVE_SESSION)` remains correctly blocked by `hardware_motion_authorized=false`, while collecting
+read-only q0 evidence does not need and must not acquire actuator authority.
+
+The production path reuses only existing Controller-owned services:
+
+```text
+explicit USB command + MAINTENANCE + ROBOT_POWERED profile
+  -> existing ServoCensus, newly started inside this capture
+  -> existing ServoPreflight, newly started inside this capture
+  -> CR1 formal current population evidence
+  -> N round-robin passes over the 12 current leg joints
+       -> existing ServoBus::readRuntimeState()
+       -> PresentPosition + TorqueEnable only
+  -> CR2-A reducer
+  -> 12 Q0Evidence CANDIDATE records
+```
+
+One sampling pass reads each of the twelve leg joints once before the next pass begins. This avoids
+taking all samples from one joint in one short burst and makes pose drift across the acquisition
+session observable in each joint's spread.
+
+The command surface is deliberately narrow:
+
+```text
+@CALIBRATION Q0 STATUS
+@CALIBRATION Q0 ABORT
+@CALIBRATION Q0 CAPTURE <samples 3..32> <stability_ticks 0..2047> CONFIRM_Q0_POSE
+```
+
+`CAPTURE` is refused outside `MAINTENANCE`, refused in the source-default `USB_ONLY` profile,
+and refused while another servo scan/census/preflight/read diagnostic owns the bus. While the q0
+transaction is active, those ordinary diagnostics are refused so they cannot interleave with the
+evidence bundle. `@SERVO SAFE_OFF` is deliberately **not** blocked: safety de-escalation stays
+independent and reachable in every state.
+
+`STATUS` reads cached structures only. `ABORT` ends the q0 transaction and prevents further q0
+runtime samples; an already-running read-only census/preflight service may finish its current
+diagnostic sequence because those existing services have no cancellation primitive. No actuator
+command is issued by abort.
+
+CR2-B does not submit a live motion session to `CalibrationManager`, request
+`ActuatorAuthority::CALIBRATION`, promote evidence, admit `JointTransform`, enable torque,
+produce GoalPosition, or write EEPROM. Formal population and the twelve q0 candidates remain
+ephemeral evidence for the later CR3 acceptance/persistence gate.
+
+CR2-A passed the synchronized local host/static gate on 2026-09-27 at
+`5daefc73f824797d3052c75002a495bed21b58f3`: static audit PASS (111 source files), dedicated
+CR2-A suite 52/52 PASS, all host suites PASS, `git diff --check` clean and working tree clean.
+CR2-B now requires a fresh full static/host gate **and both USB_ONLY and ROBOT_POWERED firmware
+compile gates** before any flash or live read-only capture is considered.
