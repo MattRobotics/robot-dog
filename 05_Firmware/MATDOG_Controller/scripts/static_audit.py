@@ -2404,6 +2404,11 @@ def check_calibration_q0_production_wiring(files, sketch_dir):
             if forbidden in text:
                 fail(f"{cpath}: updateQ0Capture() contains {forbidden!r} - q0 acquisition "
                      f"must remain read-only and authority-free")
+        if text.count("servo_bus_.readRuntimeState(") != 1:
+            fail(f"{cpath}: updateQ0Capture() must contain exactly one runtime-read call site")
+        if re.search(r"\b(?:for|while)\s*\(", text):
+            fail(f"{cpath}: updateQ0Capture() gained a loop - CR2-B must advance at most one "
+                 f"runtime q0 observation per Controller tick")
 
     # Never automatic at boot. Controller may own/update it only after an
     # explicit command starts the transaction.
