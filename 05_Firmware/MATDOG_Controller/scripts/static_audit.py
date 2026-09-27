@@ -2386,7 +2386,7 @@ def check_calibration_readiness_contract(sketch_dir):
     gates = docs.get("DEVELOPMENT_GATES.md", "")
     for stale in (
         "direction witnesses",
-        "Still TO_IMPLEMENT** - direction measurement",
+        "direction measurement (",
         "accepted q0/direction transform",
     ):
         if stale in gates:
