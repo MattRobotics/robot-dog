@@ -123,6 +123,19 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
 
+# CR2-B same-session acquisition coordinator is pure. It links the real
+# CR1 population producer and CR2-A q0 reducer plus current generated geometry,
+# but no Arduino or device I/O.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_q0_capture_session" \
+  "$SCRIPT_DIR/test_calibration_q0_capture_session.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationPopulationEvidence.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/servo/ServoPopulation.cpp"
+
 # The OTA suite links the REAL OTA-B gate and the REAL arbiter, so the
 # authorization path it exercises is the shipped one, not a stub.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -228,6 +241,7 @@ done
 "$OUT/test_actuator_write_policy"
 "$OUT/test_calibration_geometry"
 "$OUT/test_calibration_q0_bootstrap"
+"$OUT/test_calibration_q0_capture_session"
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_population_evidence"
