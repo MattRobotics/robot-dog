@@ -39,8 +39,11 @@ struct Q0BootstrapRequest {
   // distance to 2048: the bootstrap contract requires manual URDF q=0.
   bool nominal_zero_pose_confirmed = false;
 
-  // Stability only, NOT the final q0 plausibility/acceptance window. The caller
-  // must supply this explicitly; CR2 intentionally defines no default.
+  // Stability only, NOT the final q0 plausibility/acceptance window. A zero
+  // tick budget is a valid deliberately-strict choice, so a separate presence
+  // bit makes "operator/orchestrator supplied 0" distinguishable from
+  // "caller forgot to supply a budget".
+  bool stability_budget_specified = false;
   uint16_t max_stability_spread_ticks = 0;
 };
 
@@ -81,6 +84,11 @@ struct Q0BootstrapCandidate {
 // Builds one current q0 candidate from repeated read-only observations.
 // expected_provenance is the model this build/session expects. The supplied
 // profile must already be bound to exactly that provenance.
+//
+// This pure reducer cannot prove wall-clock freshness by itself. Its
+// LegPopulationEvidence and sample bundle must be assembled by one future
+// read-only orchestration transaction; production wiring is forbidden until
+// that same-session contract exists.
 //
 // No comparison against raw 2048 is performed. A candidate at 3000 is allowed
 // to exist if the operator placement and measurements are internally stable;
