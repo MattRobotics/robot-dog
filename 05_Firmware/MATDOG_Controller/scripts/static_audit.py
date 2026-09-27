@@ -2326,6 +2326,7 @@ def check_calibration_q0_bootstrap(files, sketch_dir):
         "profile.findJoint(request.identity)",
         "joint->bus_id != request.bus_id",
         "request.nominal_zero_pose_confirmed",
+        "!request.stability_budget_specified",
         "sample_count < kQ0BootstrapMinSamples",
         "sample_count > kQ0BootstrapMaxSamples",
         "!sample.read_ok",
