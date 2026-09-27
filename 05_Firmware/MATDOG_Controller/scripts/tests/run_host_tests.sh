@@ -136,6 +136,17 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
   "$SKETCH_DIR/src/servo/ServoPopulation.cpp"
 
+# CR3-M1/M2: pure q0 acceptance/promotion plus the one checked q<->raw
+# resolver. Links real generated Geometry V5 data; no ServoBus/Arduino/device IO.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_cr3_q0_transform" \
+  "$SCRIPT_DIR/test_cr3_q0_transform.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Promotion.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
+
 # The OTA suite links the REAL OTA-B gate and the REAL arbiter, so the
 # authorization path it exercises is the shipped one, not a stub.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -242,6 +253,7 @@ done
 "$OUT/test_calibration_geometry"
 "$OUT/test_calibration_q0_bootstrap"
 "$OUT/test_calibration_q0_capture_session"
+"$OUT/test_cr3_q0_transform"
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_population_evidence"

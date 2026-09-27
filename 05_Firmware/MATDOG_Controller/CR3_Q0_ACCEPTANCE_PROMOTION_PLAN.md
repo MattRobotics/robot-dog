@@ -49,12 +49,15 @@ Before a CANDIDATE may become ACCEPTED, policy must require:
 CR2-C justifies retaining the twelve records as current hardware evidence. It does not yet justify
 choosing a universal q0 plausibility threshold from one manually established pose.
 
-The next design decision is how independent pose-placement repeatability is measured before fixing
-that final threshold. Preferred evidence is repeated, independently re-established nominal-q0
-captures, not repeated samples while the mechanism remains untouched; static repeatability was
-already measured by CR2-C at zero spread.
+CR3-M1 resolves the threshold independently from the observed data. The ST3215/MATDOG mechanical
+contract gives 4096 ticks/revolution and 25 output-spline teeth, so half a tooth is 81.92 ticks.
+Using the already-reviewed 16-tick CR2 stability quantum, the largest whole quantum strictly below
+half a tooth is 80 ticks. The acceptance rule is therefore |circular(q0-2048)| <= 80 ticks.
 
-No further hardware run is authorized by this document.
+Independent re-position/re-capture remains useful metrology before first stand/final operational
+authorization, but it is not a blocker for the first single-joint bounded calibration motion.
+
+No hardware run is authorized by this document.
 
 ## Promotion/persistence boundary
 
