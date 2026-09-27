@@ -71,14 +71,10 @@ SessionResult CalibrationManager::startSession(Leg leg, core::OperatingMode mode
     return status_.last_result;
   }
 
-  // The repository's own refusal, enforced here. A replay commands nothing and
-  // is allowed; anything that would touch the robot is not.
-  if (origin == CalibrationOrigin::LIVE_SESSION && !hardwareMotionAuthorized()) {
-    status_.last_result = SessionResult::REJECTED_MOTION_BLOCKED;
-    status_.failure = CalibrationFailure::STALE_CALIBRATION_REFUSED;
-    return status_.last_result;
-  }
-
+  // CR3: the final operational flag is intentionally NOT a session gate.
+  // A LIVE session can collect/own calibration evidence while
+  // hardware_motion_authorized remains false. Physical writes are separately
+  // gated by CalibrationMotionPermit + SafeActuatorPolicy.
   // The REAL arbiter. No second lock is created. Mode compatibility is the
   // arbiter's to judge, not this manager's to second-guess.
   core::AuthorityLease lease;
@@ -96,6 +92,8 @@ SessionResult CalibrationManager::startSession(Leg leg, core::OperatingMode mode
   status_.leg = leg;
   status_.holds_authority = true;
   status_.lease_generation = lease.generation;
+  status_.session_id = next_session_id_++;
+  if (next_session_id_ == 0) next_session_id_ = 1;
   status_.restore = RestorePlan{};
   status_.population = LegPopulationEvidence{};
   status_.population_verdict = PopulationVerdict::NOT_EVALUATED;

@@ -16,8 +16,11 @@
 //     all_joint_data_below_is_stale: true
 //     hardware_motion_authorized: false
 //
-// A live calibration session is therefore refused. Unblocking it requires a
-// real recalibration and a reviewed change to that YAML, not a flag flip.
+// This remains the FINAL OPERATIONAL motion flag and stays false throughout
+// CR3 calibration. A LIVE calibration session may exist while it is false,
+// but a separate RAM-only CALIBRATION_MOTION_PERMIT is required before any
+// physical calibration write. Full Calibration + later review are still
+// required before this global flag may ever become true.
 // scripts/static_audit.py FAILS the build if the source default here is
 // anything but 0.
 //
@@ -72,7 +75,7 @@ enum class SessionResult : uint8_t {
   STARTED                   = 1,
   REJECTED_BUSY             = 2,  // a session already exists
   REJECTED_NO_AUTHORITY     = 3,  // the arbiter refused CALIBRATION
-  REJECTED_MOTION_BLOCKED   = 4,  // hardware_motion_authorized: false
+  REJECTED_MOTION_BLOCKED   = 4,  // retained for log/API compatibility; not the CR3 session gate
   REJECTED_INVALID_LEG      = 5,
   REJECTED_NO_ARBITER       = 6,  // fail closed: nothing to ask
   REJECTED_WRONG_STATE      = 7,
@@ -88,6 +91,7 @@ struct CalibrationSessionStatus {
 
   bool holds_authority = false;
   uint32_t lease_generation = 0;
+  uint32_t session_id = 0;  // boot-local, monotonic; permit binding
 
   // Eligibility, established during PREFLIGHT.
   LegPopulationEvidence population{};
@@ -121,10 +125,10 @@ class CalibrationManager {
   // arbiter may be nullptr; that is a refusal, not a permission.
   void begin(core::ActuatorAuthorityArbiter* arbiter);
 
-  // Acquires ActuatorAuthority::CALIBRATION and enters PREFLIGHT. A
-  // LIVE_SESSION is refused while hardware motion is not authorized; a
-  // HISTORICAL_REPLAY session commands nothing and is allowed, which is what
-  // lets the offline oracle replay exercise this manager.
+  // Acquires ActuatorAuthority::CALIBRATION and enters PREFLIGHT.
+  // CR3 permits LIVE_SESSION while final hardware_motion_authorized remains
+  // false: session existence is not motion permission. Physical writes require
+  // the independent RAM-only CALIBRATION_MOTION_PERMIT.
   SessionResult startSession(Leg leg, core::OperatingMode mode, CalibrationOrigin origin);
 
   // Eligibility input. The population evidence comes FROM servo/ServoCensus;
@@ -154,6 +158,7 @@ class CalibrationManager {
   void reset();
 
   const CalibrationSessionStatus& status() const { return status_; }
+  core::AuthorityLease authorityLease() const { return lease_; }
   bool sessionLive() const {
     return status_.state == SessionState::PREFLIGHT || status_.state == SessionState::ACTIVE;
   }
@@ -166,6 +171,7 @@ class CalibrationManager {
   core::ActuatorAuthorityArbiter* arbiter_ = nullptr;
   core::AuthorityLease lease_{};
   CalibrationSessionStatus status_{};
+  uint32_t next_session_id_ = 1;
 };
 
 const char* toString(SessionState state);

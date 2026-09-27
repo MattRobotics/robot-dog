@@ -117,10 +117,14 @@ static JointTransform acceptedTransform(JointIdentity id, uint16_t q0_tick) {
   return t;
 }
 
-static CalibrationBootstrapContext liveSession() {
+static CalibrationBootstrapContext liveSession(uint32_t authority_generation = 1) {
   CalibrationBootstrapContext ctx{};
   ctx.session_active = true;
   ctx.origin = CalibrationOrigin::LIVE_SESSION;
+  ctx.motion_permit_active = true;
+  ctx.motion_permit_generation = 1;
+  ctx.motion_permit_session_id = 1;
+  ctx.motion_permit_authority_generation = authority_generation;
   return ctx;
 }
 
@@ -135,10 +139,10 @@ struct Harness {
     profile = boundProfile();
     policy.begin(&arbiter);
     policy.bindGeometry(&profile, &geometry_data::kProvenance);
-    policy.setBootstrapContext(liveSession());
     const AuthorityResult granted =
         arbiter.request(ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE, &lease);
     (void)granted;
+    policy.setBootstrapContext(liveSession(lease.generation));
   }
 
   WriteDecision plan(const ActuatorCommand& command) {
@@ -1018,6 +1022,23 @@ static void test_tostring_is_total() {
   CHECK(std::strcmp(toString(static_cast<ClearancePolicyResult>(9)), "UNKNOWN") == 0);
 }
 
+static void test_calibration_authority_never_substitutes_for_motion_permit() {
+  g_case = "calibration permit";
+  Harness h;
+  CalibrationBootstrapContext no_permit = liveSession(h.lease.generation);
+  no_permit.motion_permit_active = false;
+  no_permit.motion_permit_generation = 0;
+  h.policy.setBootstrapContext(no_permit);
+
+  ActuatorCommand c = directionVerify(lfUpper(), 16);
+  CHECK_DECISION(h.plan(c), WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT);
+
+  CalibrationBootstrapContext stale = liveSession(h.lease.generation + 1);
+  stale.direction_verify_tick_budget = 32;
+  h.policy.setBootstrapContext(stale);
+  CHECK_DECISION(h.plan(c), WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT);
+}
+
 int main() {
   std::printf("MATDOG calibration bootstrap geometry offline tests\n");
 
@@ -1032,6 +1053,7 @@ int main() {
   test_a_stale_profile_is_refused_by_the_policy();
 
   test_direction_verify_needs_a_live_session_and_a_budget();
+  test_calibration_authority_never_substitutes_for_motion_permit();
   test_direction_verify_envelope_is_symmetric_and_bounded();
   test_tick_to_microrad_conversion_never_rounds_in_our_favour();
   test_direction_verify_does_not_need_a_transform();

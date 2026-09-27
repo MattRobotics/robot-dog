@@ -412,6 +412,17 @@ WriteDecision SafeActuatorPolicy::evaluate(const ActuatorCommand& command,
     return WriteDecision::REJECT_OPERATION_NOT_PERMITTED;
   }
 
+  if (lease.owner == core::ActuatorAuthority::CALIBRATION) {
+    if (!bootstrap_.session_active ||
+        !calibration::mayPromote(bootstrap_.origin) ||
+        !bootstrap_.motion_permit_active ||
+        bootstrap_.motion_permit_generation == 0 ||
+        bootstrap_.motion_permit_session_id == 0 ||
+        bootstrap_.motion_permit_authority_generation != lease.generation) {
+      return WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT;
+    }
+  }
+
   if (operationUsesAcceptedLimits(command.operation)) {
     const JointLimit* limit = limits_.find(command.joint, currentGeometryTag());
     if (limit == nullptr && limits_.findAny(command.joint) != nullptr) {
@@ -601,6 +612,8 @@ const char* toString(WriteDecision decision) {
       return "REJECT_TARGET_OUTSIDE_URDF_LIMITS";
     case WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH:
       return "REJECT_EVIDENCE_GEOMETRY_MISMATCH";
+    case WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT:
+      return "REJECT_NO_CALIBRATION_MOTION_PERMIT";
   }
   return "UNKNOWN";
 }

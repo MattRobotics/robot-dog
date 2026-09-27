@@ -114,9 +114,8 @@ static void test_start_fails_closed_without_an_arbiter() {
   CHECK_STATE(mgr, SessionState::NO_SESSION);
 }
 
-static void test_live_session_is_blocked_by_the_hardware_motion_gate() {
-  g_case = "live_session_is_blocked_by_the_hardware_motion_gate";
-  // MATDOG_JOINT_CALIBRATION.yaml: hardware_motion_authorized: false.
+static void test_live_session_is_distinct_from_final_motion_authorization() {
+  g_case = "live_session_is_distinct_from_final_motion_authorization";
   CHECK(!CalibrationManager::hardwareMotionAuthorized());
 
   ActuatorAuthorityArbiter arb;
@@ -126,12 +125,15 @@ static void test_live_session_is_blocked_by_the_hardware_motion_gate() {
 
   CHECK_EQ((int)mgr.startSession(Leg::LF, OperatingMode::MAINTENANCE,
                                  CalibrationOrigin::LIVE_SESSION),
-           (int)SessionResult::REJECTED_MOTION_BLOCKED);
-  CHECK_STATE(mgr, SessionState::NO_SESSION);
-  CHECK_EQ((int)mgr.status().failure, (int)CalibrationFailure::STALE_CALIBRATION_REFUSED);
-  // Refused before the arbiter was even asked: no authority was taken.
+           (int)SessionResult::STARTED);
+  CHECK_STATE(mgr, SessionState::PREFLIGHT);
+  CHECK(mgr.sessionLive());
+  CHECK(mgr.status().holds_authority);
+  CHECK(mgr.status().session_id != 0);
+  CHECK_EQ((int)arb.current(), (int)ActuatorAuthority::CALIBRATION);
+  CHECK(!mgr.status().hardware_motion_authorized);
+  mgr.abortSession();
   CHECK_EQ((int)arb.current(), (int)ActuatorAuthority::NONE);
-  CHECK_EQ(arb.counters().grants, 0u);
 }
 
 static void test_start_acquires_the_real_calibration_authority() {
@@ -646,7 +648,7 @@ int main() {
 
   test_no_session_at_construction();
   test_start_fails_closed_without_an_arbiter();
-  test_live_session_is_blocked_by_the_hardware_motion_gate();
+  test_live_session_is_distinct_from_final_motion_authorization();
   test_start_acquires_the_real_calibration_authority();
   test_start_is_refused_when_another_owner_holds_authority();
   test_start_is_refused_in_an_incompatible_operating_mode();
