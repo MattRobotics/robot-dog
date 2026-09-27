@@ -29,6 +29,14 @@ constexpr uint32_t kCaptureSessionId = 1;
 constexpr uint8_t kSampleCount = 9;
 constexpr uint16_t kStabilitySpreadTicks = 0;
 
+// Frozen capture-level prerequisites proved by the preserved CR2-C package.
+// These are deliberately separate from the per-joint q0 summary: CR3 must
+// not silently manufacture a current candidate if the capture itself did
+// not prove the formal population, operator q0 pose, and Torque-OFF gates.
+constexpr bool kFormalPopulationPass = true;
+constexpr bool kNominalZeroPoseConfirmed = true;
+constexpr bool kTorqueOffVerifiedBeforeCapture = true;
+
 constexpr GeometryProvenance kSourceGeometry = {
     "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
     "60fff604eae0857c7c61f115bbe3922949ababdd827fab61c74e1673336c39e1",

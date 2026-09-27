@@ -15,7 +15,22 @@ enum class Q0EvidencePreparationStatus : uint8_t {
   REJECT_RECORD_DUPLICATE = 5,
   REJECT_CANDIDATE = 6,
   REJECT_PROMOTION = 7,
+  REJECT_CAPTURE_POPULATION_NOT_PASS = 8,
+  REJECT_CAPTURE_Q0_POSE_NOT_CONFIRMED = 9,
+  REJECT_CAPTURE_TORQUE_NOT_OFF = 10,
 };
+
+struct Q0EvidencePackageFacts {
+  bool formal_population_pass = false;
+  bool nominal_zero_pose_confirmed = false;
+  bool torque_off_verified_before_capture = false;
+};
+
+// Pure validation boundary for the persisted capture package. Tests can
+// independently prove every mandatory capture-level prerequisite fails closed.
+Q0EvidencePackageFacts frozenQ0EvidencePackageFacts();
+Q0EvidencePreparationStatus validateQ0EvidencePackageFacts(
+    const Q0EvidencePackageFacts& facts);
 
 struct Q0EvidencePreparation {
   Q0EvidencePreparationStatus status = Q0EvidencePreparationStatus::NOT_EVALUATED;

@@ -50,6 +50,33 @@ static void test_no_implicit_promotion_after_boot() {
   check(result.transform_count == 0, "no transform produced without confirmation");
 }
 
+static void test_capture_package_prerequisites_fail_closed() {
+  const auto frozen = frozenQ0EvidencePackageFacts();
+  check(frozen.formal_population_pass, "CR2-C frozen population PASS");
+  check(frozen.nominal_zero_pose_confirmed, "CR2-C frozen nominal q0 confirmation");
+  check(frozen.torque_off_verified_before_capture, "CR2-C frozen Torque OFF prerequisite");
+  check(validateQ0EvidencePackageFacts(frozen) == Q0EvidencePreparationStatus::READY,
+        "complete capture facts validate");
+
+  auto bad = frozen;
+  bad.formal_population_pass = false;
+  check(validateQ0EvidencePackageFacts(bad) ==
+            Q0EvidencePreparationStatus::REJECT_CAPTURE_POPULATION_NOT_PASS,
+        "missing formal population PASS rejects");
+
+  bad = frozen;
+  bad.nominal_zero_pose_confirmed = false;
+  check(validateQ0EvidencePackageFacts(bad) ==
+            Q0EvidencePreparationStatus::REJECT_CAPTURE_Q0_POSE_NOT_CONFIRMED,
+        "missing explicit q0 pose confirmation rejects");
+
+  bad = frozen;
+  bad.torque_off_verified_before_capture = false;
+  check(validateQ0EvidencePackageFacts(bad) ==
+            Q0EvidencePreparationStatus::REJECT_CAPTURE_TORQUE_NOT_OFF,
+        "missing Torque OFF prerequisite rejects");
+}
+
 static void test_current_package_repasses_real_gates() {
   const auto p = profile();
   const auto result =
@@ -82,6 +109,7 @@ static void test_geometry_change_invalidates_package() {
 int main() {
   test_snapshot_is_exact_cr2c_package();
   test_no_implicit_promotion_after_boot();
+  test_capture_package_prerequisites_fail_closed();
   test_current_package_repasses_real_gates();
   test_geometry_change_invalidates_package();
 

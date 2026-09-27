@@ -3,6 +3,29 @@
 namespace matdog {
 namespace actuator {
 
+Q0EvidencePackageFacts frozenQ0EvidencePackageFacts() {
+  Q0EvidencePackageFacts facts{};
+  facts.formal_population_pass = q0_evidence_data::kFormalPopulationPass;
+  facts.nominal_zero_pose_confirmed = q0_evidence_data::kNominalZeroPoseConfirmed;
+  facts.torque_off_verified_before_capture =
+      q0_evidence_data::kTorqueOffVerifiedBeforeCapture;
+  return facts;
+}
+
+Q0EvidencePreparationStatus validateQ0EvidencePackageFacts(
+    const Q0EvidencePackageFacts& facts) {
+  if (!facts.formal_population_pass) {
+    return Q0EvidencePreparationStatus::REJECT_CAPTURE_POPULATION_NOT_PASS;
+  }
+  if (!facts.nominal_zero_pose_confirmed) {
+    return Q0EvidencePreparationStatus::REJECT_CAPTURE_Q0_POSE_NOT_CONFIRMED;
+  }
+  if (!facts.torque_off_verified_before_capture) {
+    return Q0EvidencePreparationStatus::REJECT_CAPTURE_TORQUE_NOT_OFF;
+  }
+  return Q0EvidencePreparationStatus::READY;
+}
+
 namespace {
 
 uint16_t circularDistanceFromCenter(uint16_t tick) {
@@ -62,6 +85,13 @@ Q0EvidencePreparation prepareCurrentQ0Evidence(
   if (!explicit_current_installation_confirmation) {
     out.status =
         Q0EvidencePreparationStatus::REJECT_CURRENT_INSTALLATION_NOT_CONFIRMED;
+    return out;
+  }
+
+  const Q0EvidencePreparationStatus package_status =
+      validateQ0EvidencePackageFacts(frozenQ0EvidencePackageFacts());
+  if (package_status != Q0EvidencePreparationStatus::READY) {
+    out.status = package_status;
     return out;
   }
 
@@ -134,6 +164,12 @@ const char* toString(Q0EvidencePreparationStatus status) {
       return "REJECT_CANDIDATE";
     case Q0EvidencePreparationStatus::REJECT_PROMOTION:
       return "REJECT_PROMOTION";
+    case Q0EvidencePreparationStatus::REJECT_CAPTURE_POPULATION_NOT_PASS:
+      return "REJECT_CAPTURE_POPULATION_NOT_PASS";
+    case Q0EvidencePreparationStatus::REJECT_CAPTURE_Q0_POSE_NOT_CONFIRMED:
+      return "REJECT_CAPTURE_Q0_POSE_NOT_CONFIRMED";
+    case Q0EvidencePreparationStatus::REJECT_CAPTURE_TORQUE_NOT_OFF:
+      return "REJECT_CAPTURE_TORQUE_NOT_OFF";
   }
   return "UNKNOWN";
 }
