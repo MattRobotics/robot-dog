@@ -2292,13 +2292,16 @@ def check_calibration_population_evidence(files, sketch_dir):
         fail(f"{sketch_dir / 'src' / 'calibration' / 'CalibrationDomain.cpp'}: "
              f"domain PASS no longer rejects anomalous population evidence")
 
-    # CR1 is deliberately foundation-only. A production orchestration point is
-    # a later gate after session/freshness semantics are reviewed.
-    for name in ("Controller.cpp", "CommandRouter.cpp"):
-        entry = by_name.get(name)
-        if entry is not None and "buildCurrentLegPopulationEvidence(" in entry[1]:
-            fail(f"{entry[0]}: CR1 producer is wired into production before its session "
-                 f"freshness/orchestration gate is implemented")
+    # CR2-B is now the ONE reviewed production freshness owner. No parser,
+    # Controller body or other module may manufacture a current bundle directly.
+    for path, code in files:
+        if "scripts" in path.parts or path.name == "CalibrationPopulationEvidence.cpp":
+            continue
+        if "buildCurrentLegPopulationEvidence(" not in code:
+            continue
+        if path.name != "CalibrationQ0CaptureSession.cpp":
+            fail(f"{path}: calls the CR1 producer outside the reviewed CR2-B same-session "
+                 f"orchestrator; cached/independent diagnostics must never self-declare current")
 
 def check_calibration_q0_capture_session(files, sketch_dir):
     """CR2-B same-session acquisition stays pure, current and candidate-only."""
