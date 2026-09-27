@@ -436,9 +436,10 @@ const char* toString(PopulationVerdict verdict) {
 
 const char* toString(Q0Estimator estimator) {
   switch (estimator) {
-    case Q0Estimator::NONE:        return "NONE";
-    case Q0Estimator::FIXED_SCALE: return "FIXED_SCALE";
-    case Q0Estimator::AFFINE:      return "AFFINE";
+    case Q0Estimator::NONE:             return "NONE";
+    case Q0Estimator::FIXED_SCALE:      return "FIXED_SCALE";
+    case Q0Estimator::AFFINE:           return "AFFINE";
+    case Q0Estimator::MANUAL_ZERO_POSE: return "MANUAL_ZERO_POSE";
   }
   return "UNKNOWN";
 }
