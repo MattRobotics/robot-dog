@@ -49,6 +49,12 @@ struct PopulationEvidenceBuildResult {
   uint16_t rejected_slots = 0;
 };
 
+// One canonical semantic mapping shared by CR1 and CR2-B. This converts the
+// reviewed current allocation row into JointIdentity; it does not observe
+// physical-unit identity from hardware (ST3215 cannot report that label).
+bool semanticIdentityFromCanonical(const servo::CanonicalServo& canonical,
+                                   JointIdentity* out);
+
 PopulationEvidenceBuildResult buildCurrentLegPopulationEvidence(
     const servo::CensusResult& census,
     const servo::PreflightResult& preflight,
