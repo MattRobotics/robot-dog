@@ -163,6 +163,22 @@ static void test_preflight_must_be_complete() {
         "incomplete preflight refused");
 }
 
+static void test_source_counters_must_be_self_consistent() {
+  CensusResult c = goodCensus();
+  c.missing_expected = 1;
+  // Missing count says one, but there is no missing-id evidence and the
+  // present+missing total now exceeds expected_now.
+  auto r = buildCurrentLegPopulationEvidence(c, goodPreflight(), currentContext());
+  check(r.status == PopulationEvidenceBuildStatus::REJECT_CENSUS_INCOMPLETE,
+        "inconsistent census counters refused");
+
+  PreflightResult p = goodPreflight();
+  p.pass_count = kLegPreflightCount - 1;
+  r = buildCurrentLegPopulationEvidence(goodCensus(), p, currentContext());
+  check(r.status == PopulationEvidenceBuildStatus::REJECT_PREFLIGHT_INCOMPLETE,
+        "inconsistent preflight counters refused");
+}
+
 static void test_each_slot_must_be_formally_qualified() {
   PreflightResult p = goodPreflight();
   p.joints[0].torque_enable = 1;
@@ -177,6 +193,13 @@ static void test_each_slot_must_be_formally_qualified() {
   r = buildCurrentLegPopulationEvidence(goodCensus(), p, currentContext());
   check(r.status == PopulationEvidenceBuildStatus::REJECT_JOINT_QUALIFICATION,
         "out-of-domain raw position refused");
+
+  p = goodPreflight();
+  p.joints[5].model = 123;
+  // Even a corrupted/stale PASS label cannot override the direct model check.
+  r = buildCurrentLegPopulationEvidence(goodCensus(), p, currentContext());
+  check(r.status == PopulationEvidenceBuildStatus::REJECT_JOINT_QUALIFICATION,
+        "wrong model refused independently of PASS label");
 
   p = goodPreflight();
   p.joints[4].profile = ProfileVerdict::MISMATCH;
@@ -222,6 +245,7 @@ int main() {
   test_missing_leg_is_refused();
   test_bus_anomalies_are_refused();
   test_preflight_must_be_complete();
+  test_source_counters_must_be_self_consistent();
   test_each_slot_must_be_formally_qualified();
   test_semantic_identity_and_uniqueness_are_required();
   test_status_strings_are_total();
