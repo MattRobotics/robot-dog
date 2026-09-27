@@ -313,3 +313,12 @@ files, `git diff --check` was clean and the working tree was clean.
 Therefore CR2-B is **offline + build validated**. This is still not hardware validation, does not
 authorize flashing or live capture by itself, and does not change
 `hardware_motion_authorized=false`.
+
+### CR2-C — first hardware q0 capture
+
+**PREPARED / NOT AUTHORIZED / NOT EXECUTED.**
+
+The operator procedure is frozen in
+[`CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md`](CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md).
+It preserves the existing powered-session/flash authorization boundary and permits only a
+Torque-OFF, no-motion, no-EEPROM acquisition of twelve ephemeral q0 candidates.
