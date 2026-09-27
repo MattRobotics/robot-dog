@@ -273,8 +273,11 @@ const char* toString(Q0CaptureFailure failure) {
     case Q0CaptureFailure::READ_FAILED:         return "READ_FAILED";
     case Q0CaptureFailure::TORQUE_NOT_OFF:      return "TORQUE_NOT_OFF";
     case Q0CaptureFailure::RAW_DOMAIN:          return "RAW_DOMAIN";
-    case Q0CaptureFailure::CANDIDATE_REJECTED:  return "CANDIDATE_REJECTED";
-    case Q0CaptureFailure::EXTERNAL_ABORT:      return "EXTERNAL_ABORT";
+    case Q0CaptureFailure::CANDIDATE_REJECTED:   return "CANDIDATE_REJECTED";
+    case Q0CaptureFailure::MODE_NOT_MAINTENANCE: return "MODE_NOT_MAINTENANCE";
+    case Q0CaptureFailure::CENSUS_START_REFUSED: return "CENSUS_START_REFUSED";
+    case Q0CaptureFailure::PREFLIGHT_START_REFUSED: return "PREFLIGHT_START_REFUSED";
+    case Q0CaptureFailure::EXTERNAL_ABORT:       return "EXTERNAL_ABORT";
   }
   return "UNKNOWN";
 }
