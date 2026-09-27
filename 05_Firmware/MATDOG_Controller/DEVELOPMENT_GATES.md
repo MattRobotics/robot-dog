@@ -383,14 +383,17 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     against 2048, promote evidence, admit transforms or access `ServoBus`. CR2-A local validation
     at `5daefc73f824797d3052c75002a495bed21b58f3`: static audit PASS (111 files), dedicated
     suite 52/52 PASS, all host suites PASS.
-  - **CR2-B same-session q0 acquisition (2026-09-27): IMPLEMENTED / OFFLINE+BUILD VALIDATION
-    PENDING.** A separate read-only `CalibrationQ0CaptureSession` sequences the existing
+  - **CR2-B same-session q0 acquisition (2026-09-27): IMPLEMENTED / OFFLINE+BUILD VALIDATED.** A separate read-only `CalibrationQ0CaptureSession` sequences the existing
     `ServoCensus`, existing `ServoPreflight`, CR1 formal population evidence and one
     `ServoBus::readRuntimeState()` sample per Controller tick in 12-joint round-robin passes.
     It acquires no `ActuatorAuthority`, never starts `CalibrationManager::LIVE_SESSION`, and
     cannot promote/admit calibration. The USB command is MAINTENANCE + ROBOT_POWERED gated and
     requires `CONFIRM_Q0_POSE`. Ordinary servo diagnostics are excluded while the transaction is
-    active; `SAFE_OFF` remains independent and reachable. **No live q0 capture is claimed yet.**
+    active; `SAFE_OFF` remains independent and reachable. Validation evidence:
+    `2e5cbfa43378ed8d0e76e1c2a942886ef34a89db` passed CR2-B 467/467, all host suites,
+    `USB_ONLY` build and `ROBOT_POWERED` build; audit-only follow-up
+    `9ff046f0302928dfd2833d848206f3d66ca75228` passed static audit over 114 source files with
+    clean diff/worktree. **No live q0 capture is claimed yet and no hardware authorization changed.**
 
 ## HostLink semantic layer
 
