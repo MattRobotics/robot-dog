@@ -375,14 +375,12 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     `MEASURED_CANDIDATE`/`ACCEPTED` direction vocabulary is legacy/oracle-domain state, not a
     production readiness prerequisite. **Still TO_DESIGN** — the persistence/promotion boundary
     (whether accepted calibration is written by `PROVISIONING` or by a separate transaction).
-  - **CR2-A q0 bootstrap foundation (2026-09-27): IMPLEMENTED / TESTS ADDED /
-    LOCAL OFFLINE VALIDATION PENDING.** `CalibrationQ0Bootstrap.*` is a pure reducer from
+  - **CR2-A q0 bootstrap foundation (2026-09-27): IMPLEMENTED / OFFLINE VALIDATED.** `CalibrationQ0Bootstrap.*` is a pure reducer from
     repeated Torque-OFF raw observations to per-joint `Q0Evidence` `CANDIDATE`. It requires
     current population evidence, exact Geometry V5 provenance, current semantic/physical-unit
     identity, bus-address cross-check, explicit manual q=0 confirmation and explicit stability
     budget. It deliberately does not gate against 2048, promote evidence, admit transforms or
-    access `ServoBus`. **CR2-B same-session read-only Controller orchestration remains
-    TO_IMPLEMENT; no live q0 capture is claimed.**
+    access `ServoBus`. **CR2-B same-session read-only Controller orchestration remains TO_IMPLEMENT; no live q0 capture is claimed.** CR2-A local validation at `5daefc73f824797d3052c75002a495bed21b58f3`: static audit PASS (111 files), dedicated suite 52/52 PASS, all host suites PASS.
 
 ## HostLink semantic layer
 
