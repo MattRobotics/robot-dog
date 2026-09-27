@@ -2695,8 +2695,8 @@ def check_calibration_readiness_contract(sketch_dir):
 
     readiness = docs.get("CALIBRATION_READINESS.md", "")
     for token, why in (
-        ("CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: IMPLEMENTED / OFFLINE VALIDATION PENDING",
-         "same-session q0 orchestration is implemented but not yet hardware-authorized"),
+        ("CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: IMPLEMENTED / OFFLINE + BUILD VALIDATED",
+         "same-session q0 orchestration passed offline/build validation but remains hardware-unvalidated"),
         ("@CALIBRATION Q0 CAPTURE <samples 3..32> <stability_ticks 0..2047> CONFIRM_Q0_POSE",
          "the read-only q0 capture command must remain explicit and pose-confirmed"),
         ("motorDirection  = current URDF / hardware-contract data",
