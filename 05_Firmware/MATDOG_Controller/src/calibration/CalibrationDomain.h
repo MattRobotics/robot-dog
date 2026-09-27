@@ -370,7 +370,10 @@ struct LegPopulationEvidence {
   // Bit per leg slot, index = leg * kJointKindCount + joint. Using a mask
   // rather than a count is what makes "6 of 12" say WHICH six.
   uint16_t observed_mask = 0;
-  uint16_t unexpected_count = 0;   // responders outside the 12 leg slots
+  // Responders that violate the declared CURRENT bus population. Legitimate
+  // non-leg devices (currently NECK_ROTATION / ID 51) are excluded from this
+  // count; absent-by-design or wholly unexpected responders are not.
+  uint16_t unexpected_count = 0;
   uint32_t session_ms = 0;         // provenance
 };
 
