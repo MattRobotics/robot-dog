@@ -219,7 +219,7 @@ Offline validation was completed on the synchronized ASUS K53SV checkout on 2026
 
 ### CR2 — Read-only q0 bootstrap
 
-**CR2-A PURE FOUNDATION: IMPLEMENTED / TESTS ADDED / LOCAL OFFLINE VALIDATION PENDING.**
+**CR2-A PURE FOUNDATION: IMPLEMENTED / OFFLINE VALIDATED.**
 
 The current implementation adds `src/actuator/CalibrationQ0Bootstrap.*` and a dedicated host
 suite. It does **not** read `ServoBus`, does not own a UART, does not issue any command, does not
@@ -256,4 +256,4 @@ population evidence and q0 sample bundle inside one explicitly scoped capture se
 calling CR2-A. That future path still may not enable torque, command GoalPosition, move a joint or
 write EEPROM.
 
-Only after CR2-A passes the local host/static gate should CR2-B be designed.
+CR2-A passed the synchronized local host/static gate on 2026-09-27 at `5daefc73f824797d3052c75002a495bed21b58f3`: static audit PASS (111 source files), dedicated CR2 suite 52/52 PASS, all host suites PASS, `git diff --check` clean and working tree clean. CR2-B same-session read-only orchestration may now proceed.
