@@ -2537,12 +2537,15 @@ def check_calibration_q0_bootstrap(files, sketch_dir):
         fail(f"{path}: CR2 gates candidate acceptance against raw centre 2048 - the bootstrap "
              f"contract requires measure first, derive the plausibility window later")
 
-    # Foundation only: no production path may invoke the builder yet.
-    for name in ("Controller.cpp", "CommandRouter.cpp", "ServoPreflight.cpp", "ServoBus.cpp"):
-        entry = by_name.get(name)
-        if entry is not None and "buildQ0BootstrapCandidate(" in entry[1]:
-            fail(f"{entry[0]}: CR2 q0 builder is production-wired before the read-only "
-                 f"same-session capture/orchestration gate is implemented")
+    # CR2-B is the sole reviewed production consumer. Hardware-facing
+    # Controller/parser/servo code must never call the reducer directly.
+    for path, code in files:
+        if "scripts" in path.parts or path.name == "CalibrationQ0Bootstrap.cpp":
+            continue
+        if "buildQ0BootstrapCandidate(" not in code:
+            continue
+        if path.name != "CalibrationQ0CaptureSession.cpp":
+            fail(f"{path}: calls CR2-A outside the reviewed CR2-B acquisition coordinator")
 
 def check_evidence_geometry_binding(files, sketch_dir):
     """B1: calibration evidence is bound to the geometry it was measured under.
