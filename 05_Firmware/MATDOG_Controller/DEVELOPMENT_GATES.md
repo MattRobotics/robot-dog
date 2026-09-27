@@ -354,8 +354,9 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     internally inconsistent census/preflight evidence, anomalous responders, missing leg IDs,
     semantic/current-allocation identity mismatches, duplicate leg slots, non-PASS profile data,
     nonzero offset, torque-on state, wrong model and raw position outside 0..4095. The domain gate
-    now also rejects `unexpected_count != 0`. **TESTS ADDED; local host/static execution still
-    required before CR1 is called offline-validated.** The recent Controller
+    now also rejects `unexpected_count != 0`. **OFFLINE VALIDATED 2026-09-27** on the synchronized ASUS checkout at
+    `55c036cb92d8039658309ef9fe6c3dc713ca22eb`: static audit PASS (108 source files),
+    dedicated CR1 suite 248/248 PASS, all host suites PASS, `git diff --check` clean. The recent Controller
     `@SERVO PREFLIGHT 12/12 PASS` is unchanged evidence and has not been relabelled formal H1.
   - **I5 (2026-09-25):** a generic, intent-based Calibration Execution boundary is now
     **IMPLEMENTED / OFFLINE TESTED** — `src/calibration/CalibrationExecutionEngine.*`. Per V3
