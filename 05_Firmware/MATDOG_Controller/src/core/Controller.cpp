@@ -127,7 +127,7 @@ void Controller::begin() {
       &servo_bus_, &servo_census_, &servo_preflight_, &imu_, &daly_, &led_, &led_status_,
       &wifi_, &ota_,
       &system_state_,
-      &power_state_, &operating_mode_, &authority_, &calibration_,
+      &power_state_, &operating_mode_, &authority_, &calibration_, &q0_capture_,
       &actuator_policy_,
       &service_,
       &http_transport_,
@@ -154,6 +154,84 @@ void Controller::begin() {
   // the OTA first-boot self-check requires, and it must mean "begin() ran to
   // completion", not "begin() started".
   initialized_ = true;
+}
+
+void Controller::updateQ0Capture() {
+  if (!q0_capture_.active()) return;
+
+  // A q0 evidence capture is a MAINTENANCE diagnostic transaction. Leaving
+  // MAINTENANCE ends the transaction; there is no authority to release
+  // because read-only evidence acquisition never acquired one.
+  if (operating_mode_.mode() != OperatingMode::MAINTENANCE) {
+    q0_capture_.fail(calibration::Q0CaptureFailure::MODE_NOT_MAINTENANCE);
+    return;
+  }
+
+  switch (q0_capture_.status().state) {
+    case calibration::Q0CaptureState::NEED_CENSUS_START:
+      // Reuse the ONE existing census service and therefore the ONE ServoBus
+      // scan state machine. No second scan implementation exists here.
+      if (!servo_census_.start()) {
+        q0_capture_.fail(calibration::Q0CaptureFailure::CENSUS_START_REFUSED);
+        return;
+      }
+      if (!q0_capture_.markCensusStarted()) {
+        q0_capture_.fail(calibration::Q0CaptureFailure::WRONG_STATE);
+      }
+      return;
+
+    case calibration::Q0CaptureState::WAIT_CENSUS:
+      if (servo_census_.state() != servo::ServoCensus::State::COMPLETE) return;
+      if (!q0_capture_.submitCensus(servo_census_.result())) {
+        q0_capture_.fail(calibration::Q0CaptureFailure::WRONG_STATE);
+      }
+      return;
+
+    case calibration::Q0CaptureState::NEED_PREFLIGHT_START:
+      // Same rule: reuse the existing permanent read-only preflight service.
+      if (!servo_preflight_.start()) {
+        q0_capture_.fail(calibration::Q0CaptureFailure::PREFLIGHT_START_REFUSED);
+        return;
+      }
+      if (!q0_capture_.markPreflightStarted()) {
+        q0_capture_.fail(calibration::Q0CaptureFailure::WRONG_STATE);
+      }
+      return;
+
+    case calibration::Q0CaptureState::WAIT_PREFLIGHT:
+      if (servo_preflight_.state() != servo::ServoPreflight::State::COMPLETE) return;
+      // This call builds CR1 formal current population evidence from the
+      // census + preflight that THIS acquisition transaction sequenced.
+      q0_capture_.submitPreflight(servo_preflight_.result());
+      return;
+
+    case calibration::Q0CaptureState::SAMPLING: {
+      calibration::Q0ReadRequest request{};
+      if (!q0_capture_.nextReadRequest(&request) || !request.valid) {
+        q0_capture_.fail(calibration::Q0CaptureFailure::WRONG_STATE);
+        return;
+      }
+
+      // Exactly one existing ServoBus runtime read per Controller tick.
+      // readRuntimeState() supplies the two CR2 facts needed here:
+      // present_position and TorqueEnable. No new register accessor exists.
+      servo::ServoBus::RuntimeState state{};
+      calibration::Q0ReadObservation observation{};
+      observation.bus_id = request.bus_id;
+      observation.read_ok = servo_bus_.readRuntimeState(request.bus_id, &state);
+      if (observation.read_ok) {
+        observation.raw_tick = state.present_position;
+        observation.torque_enable = state.torque_enable;
+      }
+      q0_capture_.recordRead(observation);
+      return;
+    }
+
+    case calibration::Q0CaptureState::IDLE:
+    case calibration::Q0CaptureState::COMPLETE:
+    case calibration::Q0CaptureState::FAILED:
+      return;
+  }
 }
 
 void Controller::printBootBanner() {
@@ -244,6 +322,9 @@ void Controller::update(uint32_t now_ms) {
   // RUNNING -> COMPLETE edge and classifies the raw scan exactly once.
   servo_census_.update();
   servo_preflight_.update();
+  // CR2-B: advances at most one read-only acquisition action per tick.
+  // It never acquires actuator authority and never writes the servo bus.
+  updateQ0Capture();
   system_state_.setServoHealth(servo_bus_.health());
 
   system_state_.update();
