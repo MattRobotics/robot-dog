@@ -2334,6 +2334,92 @@ def check_evidence_geometry_binding(files, sketch_dir):
                  f"tag - identity alone is not enough to make a record current")
 
 
+def check_calibration_readiness_contract(sketch_dir):
+    """CR0 - calibration-readiness repository contract.
+
+    This is deliberately a documentation/source-truth audit, not a motion
+    implementation. It prevents the three ambiguities closed on 2026-09-27
+    from silently returning while all existing actuator fail-closed checks
+    continue to enforce zero production write reachability:
+
+      1. motorDirection is current URDF/Geometry V5 contract data;
+      2. Full Calibration does not require the 16 beyond-URDF hip/lower
+         diagnostic contacts to become executable;
+      3. future calibration-motion permission is distinct from final
+         hardware_motion_authorized.
+
+    Historical development logs and CHANGELOG are intentionally not scanned:
+    they are records of what was believed at their date, not current contracts.
+    """
+    required_docs = {
+        "CALIBRATION_READINESS.md": sketch_dir / "CALIBRATION_READINESS.md",
+        "DEVELOPMENT_GATES.md": sketch_dir / "DEVELOPMENT_GATES.md",
+        "CALIBRATION_BOOTSTRAP.md": sketch_dir / "CALIBRATION_BOOTSTRAP.md",
+        "CALIBRATION_SOURCE_PRECEDENCE.md": sketch_dir / "CALIBRATION_SOURCE_PRECEDENCE.md",
+    }
+    docs = {}
+    for name, path in required_docs.items():
+        if not path.is_file():
+            fail(f"{path}: CR0 current-contract document missing")
+            continue
+        docs[name] = path.read_text(encoding="utf-8")
+
+    readiness = docs.get("CALIBRATION_READINESS.md", "")
+    for token, why in (
+        ("motorDirection  = current URDF / hardware-contract data",
+         "production direction must remain bound to the current URDF/geometry contract"),
+        ("8  upper-leg endpoints  EXECUTABLE_URDF_DOMAIN",
+         "the executable V5 endpoint population must remain explicit"),
+        ("16 hip/lower endpoints  DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS",
+         "the beyond-URDF diagnostic population must remain explicit"),
+        ("CALIBRATION_MOTION_PERMIT", "the separate calibration-motion concept must stay named"),
+        ("!= hardware_motion_authorized",
+         "calibration motion must not collapse back into final operational authorization"),
+        ("remains false throughout readiness work",
+         "CR0 must not authorize normal motion as part of readiness"),
+    ):
+        if token not in readiness:
+            fail(f"{required_docs['CALIBRATION_READINESS.md']}: missing CR0 invariant {token!r} - {why}")
+
+    # Current-contract docs must not regress to the superseded pre-9aae03d
+    # direction model. Exact historical logs are intentionally left untouched.
+    gates = docs.get("DEVELOPMENT_GATES.md", "")
+    for stale in (
+        "direction witnesses",
+        "Still TO_IMPLEMENT** - direction measurement",
+        "accepted q0/direction transform",
+    ):
+        if stale in gates:
+            fail(f"{required_docs['DEVELOPMENT_GATES.md']}: stale CR0 direction contract {stale!r}")
+
+    bootstrap = docs.get("CALIBRATION_BOOTSTRAP.md", "")
+    for stale in (
+        "current direction verification            TO_IMPLEMENT",
+        "current q0/direction",
+    ):
+        if stale in bootstrap:
+            fail(f"{required_docs['CALIBRATION_BOOTSTRAP.md']}: stale CR0 direction prerequisite {stale!r}")
+    for required in (
+        "current motorDirection from URDF/V5       REUSED / CONTRACT DATA",
+        "8 upper endpoints are `REQUIRED_FOR_FINAL_CALIBRATION`",
+        "a 12-joint direction campaign",
+    ):
+        if required not in bootstrap:
+            fail(f"{required_docs['CALIBRATION_BOOTSTRAP.md']}: missing CR0 bootstrap evidence {required!r}")
+
+    precedence = docs.get("CALIBRATION_SOURCE_PRECEDENCE.md", "")
+    if "`MEASURED_CANDIDATE` and `ACCEPTED` are **TO_IMPLEMENT**" in precedence:
+        fail(f"{required_docs['CALIBRATION_SOURCE_PRECEDENCE.md']}: legacy DirectionEvidence "
+             f"vocabulary is still presented as a production TO_IMPLEMENT prerequisite")
+    for required in (
+        "production no longer needs one",
+        "current URDF/Geometry V5 contract",
+        "check_direction_is_contractual()",
+    ):
+        if required not in precedence:
+            fail(f"{required_docs['CALIBRATION_SOURCE_PRECEDENCE.md']}: missing CR0 source-precedence "
+                 f"statement {required!r}")
+
 def check_direction_is_contractual(files, sketch_dir):
     """Joint direction is hardware-contract data, not a recalibration datum.
 
@@ -3567,6 +3653,7 @@ def main():
     check_servo_profile_export(SKETCH_DIR)
     check_h0_preflight_boundaries(files, SKETCH_DIR)
     check_evidence_geometry_binding(files, SKETCH_DIR)
+    check_calibration_readiness_contract(SKETCH_DIR)
     check_direction_is_contractual(files, SKETCH_DIR)
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)
