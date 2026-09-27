@@ -50,6 +50,7 @@ static Q0BootstrapRequest goodRequest() {
   r.bus_id = 12;
   r.capture_session_id = 77;
   r.nominal_zero_pose_confirmed = true;
+  r.stability_budget_specified = true;
   r.max_stability_spread_ticks = 2;
   return r;
 }
@@ -170,6 +171,13 @@ static void test_identity_bus_and_pose_are_mandatory() {
       profile, geometry_data::kProvenance, currentPopulation(), q, s, 3);
   check(r.status == Q0BootstrapStatus::REJECT_INVALID_REQUEST,
         "zero capture session refused");
+
+  q = goodRequest();
+  q.stability_budget_specified = false;
+  r = buildQ0BootstrapCandidate(
+      profile, geometry_data::kProvenance, currentPopulation(), q, s, 3);
+  check(r.status == Q0BootstrapStatus::REJECT_INVALID_REQUEST,
+        "omitted stability budget refused");
 }
 
 static void test_sample_set_fails_closed() {
