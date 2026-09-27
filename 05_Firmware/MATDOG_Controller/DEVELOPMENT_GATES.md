@@ -394,6 +394,8 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     `USB_ONLY` build and `ROBOT_POWERED` build; audit-only follow-up
     `9ff046f0302928dfd2833d848206f3d66ca75228` passed static audit over 114 source files with
     clean diff/worktree. **No live q0 capture is claimed yet and no hardware authorization changed.**
+    The next gate is CR2-C, prepared but not authorized/executed in
+    [`CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md`](CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md).
 
 ## HostLink semantic layer
 
