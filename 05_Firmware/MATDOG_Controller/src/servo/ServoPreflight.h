@@ -3,12 +3,13 @@
 
 #include <stdint.h>
 
-#include "ServoBus.h"
 #include "ServoPopulation.h"
 #include "ServoProfile.h"
 
 namespace matdog {
 namespace servo {
+
+class ServoBus;
 
 // Controller-owned semantic service: "verify the twelve leg servos against the
 // canonical allocation and the MATDOG_C018_V1 persistent profile, and hold the
