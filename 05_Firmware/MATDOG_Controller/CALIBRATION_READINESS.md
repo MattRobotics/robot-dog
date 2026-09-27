@@ -217,9 +217,43 @@ Offline validation was completed on the synchronized ASUS K53SV checkout on 2026
 `CALIBRATION_POPULATION_EVIDENCE_TESTS = PASS` with 248 checks / 0 failures;
 `git diff --check` was clean and the working tree remained clean.
 
-### Next gate
+### CR2 — Read-only q0 bootstrap
 
-**CR2 — read-only q0 bootstrap** is next. It may add only a controlled evidence-capture path:
-manual nominal URDF q=0 placement, torque confirmed OFF, repeated raw-position reads, semantic
-joint + physical-unit + geometry provenance, and candidate evidence. It must add no Torque ON,
-GoalPosition or automatic movement.
+**CR2-A PURE FOUNDATION: IMPLEMENTED / TESTS ADDED / LOCAL OFFLINE VALIDATION PENDING.**
+
+The current implementation adds `src/actuator/CalibrationQ0Bootstrap.*` and a dedicated host
+suite. It does **not** read `ServoBus`, does not own a UART, does not issue any command, does not
+bind the geometry into `Controller`, and does not create/admit a `JointTransform`.
+
+CR2-A receives already-read samples and may produce only a per-joint `Q0Evidence`
+`CANDIDATE`. A candidate requires:
+
+- formal current leg-population evidence;
+- the current bound Geometry V5 profile with matching provenance;
+- semantic joint + current physical-unit identity, with bus ID checked only as transport metadata;
+- a nonzero capture-session identifier;
+- explicit operator confirmation that the mechanism is manually at nominal URDF q=0;
+- an explicitly supplied stability budget;
+- 3..32 successful samples;
+- Torque OFF on every sample;
+- every raw sample in unsigned encoder domain 0..4095;
+- circular-median stability within the supplied budget.
+
+`Q0Estimator::MANUAL_ZERO_POSE` distinguishes this current direct measurement from the two
+historical LF V25 estimators. Raw 2048 is **not** an acceptance gate: its distance is recorded
+only as a diagnostic. CR2-A cannot set `ACCEPTED`/`PROMOTED`, cannot admit a transform, and
+cannot make q0 operational.
+
+The old Station-mediated `matdog_digital_zero_calibration.py` is not reused as current runtime:
+it belongs to the superseded pre-2026-08-27 architecture and contains a forbidden PositionOffset
+write phase. CR2 reuses only the non-authoritative **measurement method** already demonstrated
+there — repeated read-only samples, Torque OFF, circular median and stability spread — while
+discarding its IDs, q0 values, offsets, EEPROM logic and tolerances.
+
+**CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: TO_IMPLEMENT.** A pure reducer cannot prove
+wall-clock freshness. A later Controller-side read-only transaction must produce the formal
+population evidence and q0 sample bundle inside one explicitly scoped capture session before
+calling CR2-A. That future path still may not enable torque, command GoalPosition, move a joint or
+write EEPROM.
+
+Only after CR2-A passes the local host/static gate should CR2-B be designed.
