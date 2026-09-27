@@ -223,7 +223,7 @@ Current status before the next synchronized local run:
 CR2-A SOURCE IMPLEMENTED
 CR2-A TESTS ADDED
 CR2-A STATIC AUDIT ADDED
-CR2-A LOCAL OFFLINE VALIDATION PENDING
+CR2-A OFFLINE VALIDATED
 CR2-B PRODUCTION READ-ONLY ORCHESTRATION TO_IMPLEMENT
 FORMAL CURRENT H1 NOT CLAIMED
 LIVE q0 NOT CAPTURED
@@ -231,3 +231,26 @@ HARDWARE MOTION AUTHORIZATION UNCHANGED / FALSE
 ```
 
 No hardware action is authorized by this implementation.
+
+## 10. Local validation closure
+
+On the synchronized ASUS K53SV checkout at `5daefc73f824797d3052c75002a495bed21b58f3`:
+
+```text
+python3 scripts/static_audit.py
+  Scanned 111 source files
+  STATIC_AUDIT = PASS
+
+bash scripts/tests/run_host_tests.sh
+  CALIBRATION_Q0_BOOTSTRAP_TESTS = PASS
+  checks_run=52 failures=0
+  all other host suites PASS
+
+git diff --check
+  clean
+
+git status --short --branch
+  ## feat/calibration-readiness-v1
+```
+
+CR2-A is therefore **offline validated**. This does not constitute formal current H1, a live q0 capture, evidence promotion, hardware motion authorization, or any hardware action.
