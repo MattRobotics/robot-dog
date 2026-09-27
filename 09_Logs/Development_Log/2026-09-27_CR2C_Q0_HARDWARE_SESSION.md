@@ -126,3 +126,37 @@ No servo motion was reported. No Torque ON, GoalPosition, EEPROM, PositionOffset
 operation was performed.
 
 The powered bus is therefore in the required pre-esptool safe state for CR2-C.2 recovery backup.
+
+## CR2-C.2 — fresh full-flash recovery backup
+
+**Result: PASS (backup acquisition)**
+
+The operator performed a full 16 MiB ROM-loader read with the already validated no-stub method:
+
+```text
+READ_METHOD=NO_STUB_FULL
+offset=0x000000
+size=0x1000000
+baud=115200
+```
+
+Observed result:
+
+```text
+BACKUP_PATH=/home/matteo-manicardi/MATDOG/backups/esp32/matdog_esp32s3_fullflash_2026-09-27_160127_nostub.bin
+READ_BYTES=16777216
+ESPTOOL_RC=0
+BACKUP_SIZE=16777216
+BACKUP_SHA256=339c01f7805b9f44c113074bf9a82b460e14b8fe55e6796ca25b0f24323cb7ce
+READ_DURATION=1580.1 s
+READ_RATE=84.9 kbit/s
+```
+
+The dump reached address `0x01000000` and esptool completed normally, then reset the board via
+RTS. The explicit terminal convenience line `CR2C_BACKUP=PASS` was not captured in the pasted
+transcript, but the underlying gate facts (RC=0 and exact 16 MiB size) are present and controlling.
+
+No flash write was performed during CR2-C.2.
+
+Offline structural validation and creation of the companion recovery manifest remain the next
+sub-gate before any build/flash action.
