@@ -214,9 +214,10 @@ constexpr uint16_t kServoRawCenter = 2048;
 // LF V25 produced TWO independent zero estimates per joint and did not treat
 // them as interchangeable.
 enum class Q0Estimator : uint8_t {
-  NONE          = 0,
-  FIXED_SCALE   = 1,  // ModelZeroEstimate  - nominal tick scale, kept as diagnostic
-  AFFINE        = 2,  // AffineJointCalibration - measured span; AUTHORITATIVE in V25
+  NONE             = 0,
+  FIXED_SCALE      = 1,  // historical ModelZeroEstimate diagnostic
+  AFFINE           = 2,  // historical LF V25 affine result
+  MANUAL_ZERO_POSE = 3,  // current direct read at operator-confirmed nominal URDF q=0
 };
 
 struct Q0Evidence {
