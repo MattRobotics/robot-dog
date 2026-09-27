@@ -13,7 +13,7 @@ namespace matdog {
 namespace calibration {
 
 // CR2-B: one read-only acquisition transaction spanning census, preflight and
-// round-robin q0 observations. Pure orchestration only: no ServoBus, no UART,
+// round-robin q0 observations. Pure orchestration only: no bus transport, no UART,
 // no Arduino clock and no command surface live here.
 enum class Q0CaptureState : uint8_t {
   IDLE = 0,
