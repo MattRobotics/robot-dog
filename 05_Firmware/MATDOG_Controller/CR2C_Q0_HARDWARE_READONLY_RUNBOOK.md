@@ -87,19 +87,32 @@ Those belong to later gates.
 
 ---
 
-## 3. Physical safety envelope
+## 3. Physical safety envelope and current power topology
 
-Before any powered session:
+The current validated hardware topology is a **single DALY-protected B+/P- robot domain**:
+ESP32-S3 (through the TECNOIOT 5 V step-down), servo rail and LED rail are ordinary loads on that
+same protected domain. With the main fuse/disconnect inserted and DALY KEY ON, these loads are
+powered together. CR2-C does **not** require, and must not pretend to require, an independently
+powered ESP32 with a dead servo rail.
+
+This matches the post-rewire power validation of 2026-09-24 and the already validated G3
+`ROBOT_POWERED` operating model.
+
+Before any powered CR2-C action:
 
 - operator physically present;
+- charger disconnected;
+- main fuse/disconnect inserted and physically reachable;
+- DALY KEY ON, so ESP32-S3 + servo rail + LED rail are powered together as designed;
 - robot mechanically supported so no leg is load-bearing and no joint can fall under gravity;
-- leg workspace clear;
-- main fused disconnect physically reachable;
-- charger and unrelated external sources disconnected unless the specific power topology under test
-  explicitly requires them;
+- leg/head workspace clear;
 - polarity/fuse/protection already verified;
 - controller recovery/data path available;
 - no second tool connected to the ST3215 bus.
+
+Because the servo rail is necessarily powered whenever the controller is battery-powered, the
+safety invariant is **powered rail + verified Torque OFF**, not an impossible 0 V servo-rail
+condition.
 
 The nominal q=0 pose is established **manually**. Servo torque must not be used to hold it.
 
@@ -127,19 +140,30 @@ or enabling torque.
 
 ---
 
-## 4. Flash / recovery prerequisite
+## 4. Flash / recovery prerequisite — powered-safe-state variant
 
 CR2-C requires the current `ROBOT_POWERED` image because the source-default `USB_ONLY` image
 correctly refuses the live capture.
 
-Use the already-reviewed recovery/flash process, not a new path:
+The historical F0 wording that required a separately powered controller with the servo rail at
+0 V is **not applicable to the current MATDOG wiring**. It described a conservative flash-isolation
+arrangement that the present robot does not implement. CR2-C instead uses the already
+hardware-demonstrated `ROBOT_POWERED` topology plus a stronger actuator-state prerequisite:
+**all powered installed servos are explicitly verified Torque OFF before any esptool reset/read or
+application flash.**
 
-1. prove the controller/service power topology for the session;
-2. confirm USB enumeration;
-3. take a **fresh 16 MiB full-flash read-back** immediately before flashing and record size,
-   SHA256 and recovery manifest;
-4. rerun static/offline gates on the exact clean HEAD;
-5. build:
+Use the existing recovery/flash tooling, not a new flash path:
+
+1. power the robot normally from the battery: fuse/disconnect inserted, KEY ON, charger disconnected;
+2. open one no-reset runtime CDC session and establish `MAINTENANCE`;
+3. issue `@SERVO SAFE_OFF` and obtain `VERIFIED_OFF` for **all 13 currently installed servos**
+   (12 leg joints plus neck rotation ID 51);
+4. close the runtime connection without touching DTR/RTS;
+5. confirm passive USB enumeration;
+6. with the servo rail still powered but all 13 servos verified Torque OFF, take a **fresh 16 MiB
+   full-flash read-back** immediately before flashing and record size, SHA256 and recovery manifest;
+7. rerun static/offline gates on the exact clean HEAD;
+8. build:
    ```bash
    MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh
    ```
@@ -150,7 +174,8 @@ Use the already-reviewed recovery/flash process, not a new path:
    SOURCE_COMMIT=<exact HEAD>
    OTA_INGEST_ENABLED=0
    ```
-7. only after the explicit flash authorization, flash application partition only:
+10. only under the already received CR2-C powered-session authorization, and after the fresh
+    backup + manifest gates pass, flash the application partition only:
    ```bash
    MATDOG_FLASH_PROFILE=ROBOT_POWERED \
    MATDOG_FLASH_BACKUP=<fresh-backup-path> \
@@ -160,8 +185,14 @@ Use the already-reviewed recovery/flash process, not a new path:
 
 Never use the normal Arduino full upload for this gate.
 
-The flash and the powered q0 session are separate authorization decisions. A successful flash does
-not authorize q0 acquisition automatically.
+During the esptool reset/read/flash interval the servo rail remains powered. This is acceptable
+only because Torque OFF was verified on all 13 units immediately beforehand and the firmware
+startup contract contains no Torque ON, GoalPosition or automatic servo scan/motion. Any servo
+motion during reset/reboot is an immediate physical-stop condition.
+
+The operator's explicit CR2-C authorization covers this read-only q0 campaign and its necessary
+application-only firmware installation, but it does not waive any fail-closed backup, manifest,
+device-identity or application-partition gate.
 
 ---
 
