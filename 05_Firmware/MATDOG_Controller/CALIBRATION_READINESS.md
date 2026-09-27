@@ -186,7 +186,7 @@ Repository contracts now agree that:
 
 ### CR1 — Formal Current Leg-Population Evidence Producer
 
-**IMPLEMENTED / TESTS ADDED / NOT YET PRODUCTION-WIRED.**
+**IMPLEMENTED / OFFLINE VALIDATED / NOT YET PRODUCTION-WIRED.**
 
 `src/calibration/CalibrationPopulationEvidence.*` derives a formal
 `LegPopulationEvidence` from the existing structured `ServoCensus` and `ServoPreflight`
@@ -211,11 +211,13 @@ yet. Session freshness/orchestration is a later gate, and the existing 2026-09-2
 `@SERVO PREFLIGHT 12/12 PASS` remains preflight evidence rather than being relabelled as formal
 H1 evidence.
 
-Offline tests and static-audit hooks are present. Because this repository currently has no
-GitHub Actions workflow, the complete host/static test gate must be executed from a synchronized
-local checkout before CR1 is marked offline-validated.
+Offline validation was completed on the synchronized ASUS K53SV checkout on 2026-09-27 at
+`55c036cb92d8039658309ef9fe6c3dc713ca22eb`: `python3 scripts/static_audit.py` PASS
+(108 source files); the explicit host runner passed every suite, including
+`CALIBRATION_POPULATION_EVIDENCE_TESTS = PASS` with 248 checks / 0 failures;
+`git diff --check` was clean and the working tree remained clean.
 
-### Next gate after local validation
+### Next gate
 
 **CR2 — read-only q0 bootstrap** is next. It may add only a controlled evidence-capture path:
 manual nominal URDF q=0 placement, torque confirmed OFF, repeated raw-position reads, semantic
