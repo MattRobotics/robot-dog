@@ -1464,7 +1464,8 @@ def check_calibration_boundaries(files, sketch_dir):
     # --- (1)(2) purity of the whole subsystem -----------------------------
     for name in ("CalibrationDomain.h", "CalibrationDomain.cpp",
                  "CalibrationManager.h", "CalibrationManager.cpp",
-                 "CalibrationPopulationEvidence.h", "CalibrationPopulationEvidence.cpp"):
+                 "CalibrationPopulationEvidence.h", "CalibrationPopulationEvidence.cpp",
+                 "CalibrationQ0CaptureSession.h", "CalibrationQ0CaptureSession.cpp"):
         entry = by_name.get(name)
         if entry is None:
             fail(f"{cal_dir / name}: calibration unit not found")
@@ -2298,6 +2299,54 @@ def check_calibration_population_evidence(files, sketch_dir):
         if entry is not None and "buildCurrentLegPopulationEvidence(" in entry[1]:
             fail(f"{entry[0]}: CR1 producer is wired into production before its session "
                  f"freshness/orchestration gate is implemented")
+
+def check_calibration_q0_capture_session(files, sketch_dir):
+    """CR2-B same-session acquisition stays pure, current and candidate-only."""
+    by_name = {path.name: (path, code) for path, code in files}
+    header = by_name.get("CalibrationQ0CaptureSession.h")
+    source = by_name.get("CalibrationQ0CaptureSession.cpp")
+    if header is None or source is None:
+        fail(f"{sketch_dir / 'src' / 'calibration'}: CR2-B q0 capture session missing")
+        return
+
+    for path, code in (header, source):
+        for forbidden in ("#include <Arduino.h>", "ServoBus", "HardwareSerial",
+                          "Serial.", "millis(", "CalibrationManager", "ActuatorAuthority",
+                          "hardwareMotionAuthorized", "EnableTorque", "WritePos",
+                          "GoalPosition", "SyncWrite", "RegWrite", "CalibrationOfs",
+                          "PositionOffset", "EvidenceState::PROMOTED", ".admit("):
+            if forbidden in code:
+                fail(f"{path}: CR2-B contains {forbidden!r} - evidence acquisition must stay "
+                     f"transport/authority blind and candidate-only")
+
+    path, code = source
+    for required in (
+        "buildCurrentLegPopulationEvidence",
+        "context.current_observation_bundle = true",
+        "populationIsCurrentPass(population_.evidence)",
+        "servo::legServoAt",
+        "semanticIdentityFromCanonical",
+        "profile_.findJoint(identity)",
+        "geometry->bus_id != canonical->bus_id",
+        "actuator::geometry_data::kProvenance",
+        "actuator::buildQ0BootstrapCandidate",
+        "Q0BootstrapStatus::CANDIDATE",
+        "status_.next_joint_index++",
+        "status_.next_joint_index >= kLegServoSlotCount",
+        "status_.completed_sample_passes++",
+        "status_.completed_sample_passes >= config_.samples_per_joint",
+        "observation.torque_enable != 0",
+        "observation.raw_tick < kRawTickMin",
+        "observation.raw_tick > kRawTickMax",
+    ):
+        if required not in code:
+            fail(f"{path}: CR2-B lost required same-session/q0 gate {required!r}")
+
+    # The only legitimate producer of current-observation truth in CR2-B is
+    # this session after it has itself sequenced census then preflight.
+    if code.count("current_observation_bundle = true") != 1:
+        fail(f"{path}: CR2-B must stamp current_observation_bundle exactly once, only after "
+             f"its own census+preflight sequence")
 
 def check_calibration_q0_bootstrap(files, sketch_dir):
     """CR2 read-only q0 candidate builder stays pure and non-operational."""
@@ -3195,6 +3244,7 @@ def check_host_tests(sketch_dir):
         sketch_dir / "scripts" / "tests" / "test_calibration_domain.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_population_evidence.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_q0_bootstrap.cpp",
+        sketch_dir / "scripts" / "tests" / "test_calibration_q0_capture_session.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
     ]
     led_status_suite = sketch_dir / "scripts" / "tests" / "test_led_status_policy.cpp"
@@ -3270,7 +3320,8 @@ def check_host_tests(sketch_dir):
                    "test_ota_policy", "test_actuator_authority", "test_actuator_write_policy",
                    "test_calibration_geometry", "test_servo_profile",
                    "test_calibration_domain", "test_calibration_population_evidence",
-                   "test_calibration_q0_bootstrap", "test_calibration_manager",
+                   "test_calibration_q0_bootstrap", "test_calibration_q0_capture_session",
+                   "test_calibration_manager",
                    "test_led_status_policy", "test_actuator_runtime",
                    "test_calibration_execution_engine", "test_service_readiness",
                    "test_hmac256", "test_ota_session", "test_http_mailbox"):
@@ -3778,6 +3829,7 @@ def main():
     check_servo_profile_export(SKETCH_DIR)
     check_h0_preflight_boundaries(files, SKETCH_DIR)
     check_calibration_population_evidence(files, SKETCH_DIR)
+    check_calibration_q0_capture_session(files, SKETCH_DIR)
     check_calibration_q0_bootstrap(files, SKETCH_DIR)
     check_evidence_geometry_binding(files, SKETCH_DIR)
     check_calibration_readiness_contract(SKETCH_DIR)
