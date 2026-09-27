@@ -169,3 +169,55 @@ CR0 is complete when repository truth is internally consistent on these three po
 CR0 changes contracts and auditability only. It must not add a production backend, Torque ON,
 GoalPosition, live calibration action command, geometry/transform admission, or any motion
 authorization.
+
+## 8. Implementation status
+
+### CR0 — Contract Closure
+
+**IMPLEMENTED on `feat/calibration-readiness-v1`.**
+
+Repository contracts now agree that:
+- production `motorDirection` comes from current URDF / Geometry V5;
+- Full Calibration does not require the 16 beyond-URDF hip/lower contacts;
+- controlled calibration motion will need a session-scoped permit distinct from final
+  `hardware_motion_authorized`.
+
+`check_calibration_readiness_contract()` protects these statements from documentation drift.
+
+### CR1 — Formal Current Leg-Population Evidence Producer
+
+**IMPLEMENTED / TESTS ADDED / NOT YET PRODUCTION-WIRED.**
+
+`src/calibration/CalibrationPopulationEvidence.*` derives a formal
+`LegPopulationEvidence` from the existing structured `ServoCensus` and `ServoPreflight`
+results. It creates no bus transaction and no second census.
+
+A current PASS requires:
+- an explicitly current observation bundle rather than cached preflight data;
+- canonical census range coverage and internally coherent census counters;
+- no unexpected or absent-by-design responder;
+- no missing leg ID (ID 51 remains outside the leg calibration population);
+- exactly 12 unique semantic leg slots matched to the current canonical joint +
+  expected physical-unit configuration;
+- per-slot preflight PASS with the expected model, zero offset, full persistent-profile match,
+  torque OFF and raw position inside 0..4095;
+- final acceptance by `populationIsCurrentPass()`.
+
+The domain gate itself now also rejects nonzero `unexpected_count`, closing the prior case in
+which a complete 12-bit mask plus an anomalous responder could have evaluated PASS.
+
+CR1 deliberately does **not** submit the result to `CalibrationManager` from production code
+yet. Session freshness/orchestration is a later gate, and the existing 2026-09-26
+`@SERVO PREFLIGHT 12/12 PASS` remains preflight evidence rather than being relabelled as formal
+H1 evidence.
+
+Offline tests and static-audit hooks are present. Because this repository currently has no
+GitHub Actions workflow, the complete host/static test gate must be executed from a synchronized
+local checkout before CR1 is marked offline-validated.
+
+### Next gate after local validation
+
+**CR2 — read-only q0 bootstrap** is next. It may add only a controlled evidence-capture path:
+manual nominal URDF q=0 placement, torque confirmed OFF, repeated raw-position reads, semantic
+joint + physical-unit + geometry provenance, and candidate evidence. It must add no Torque ON,
+GoalPosition or automatic movement.
