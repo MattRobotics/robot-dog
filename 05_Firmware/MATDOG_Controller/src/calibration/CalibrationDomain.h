@@ -214,9 +214,10 @@ constexpr uint16_t kServoRawCenter = 2048;
 // LF V25 produced TWO independent zero estimates per joint and did not treat
 // them as interchangeable.
 enum class Q0Estimator : uint8_t {
-  NONE          = 0,
-  FIXED_SCALE   = 1,  // ModelZeroEstimate  - nominal tick scale, kept as diagnostic
-  AFFINE        = 2,  // AffineJointCalibration - measured span; AUTHORITATIVE in V25
+  NONE             = 0,
+  FIXED_SCALE      = 1,  // historical ModelZeroEstimate diagnostic
+  AFFINE           = 2,  // historical LF V25 affine result
+  MANUAL_ZERO_POSE = 3,  // current direct read at operator-confirmed nominal URDF q=0
 };
 
 struct Q0Evidence {
@@ -239,25 +240,25 @@ struct Q0Evidence {
 };
 
 // ---------------------------------------------------------------------------
-// Direction - recovered honestly, including what is NOT there
+// Direction evidence vocabulary - historical/oracle domain only
 // ---------------------------------------------------------------------------
 
 // AUDIT FINDING: there is no "direction witness" in the LF V25 archive.
-// `direction` is a compile-time constant in JointSpec, used arithmetically as
-//     tick = HOME_TICK + direction * q_delta
-// and is never measured, cross-checked or validated against evidence.
+// `direction` is a compile-time JointSpec constant there, used arithmetically
+// and never measured. The witness that DOES exist is the CONTACT witness.
 //
-// The witness that DOES exist is the CONTACT witness (see ContactWitness
-// below), which compares measured contacts against a supervised hardware band.
-//
-// Representing a spec constant as if it were measured evidence would be a
-// fabrication, so the provenance is part of the type. A direction may only be
-// treated as calibration evidence when it is MEASURED_WITNESS.
+// This recovered vocabulary is retained so historical replay and optional
+// diagnostics can represent what a source claimed without laundering a static
+// LF V25 spec into current evidence. It is NOT the production source of joint
+// direction. Since commit 9aae03d, current production `motorDirection` is
+// hardware-contract data resolved from the bound CalibrationGeometryProfile's
+// URDF record; JointTransform deliberately stores no direction field and
+// SafeActuatorPolicy does not wait for DirectionEvidence.
 enum class DirectionState : uint8_t {
   UNKNOWN              = 0,  // nothing establishes it
   SPECIFIED_HISTORICAL = 1,  // LF V25 JointSpec.direction - a static spec, NOT evidence
-  MEASURED_CANDIDATE   = 2,  // TO_IMPLEMENT: no historical mechanism exists to recover
-  ACCEPTED             = 3,  // TO_IMPLEMENT: requires current measured evidence
+  MEASURED_CANDIDATE   = 2,  // optional diagnostic/oracle-domain measured candidate
+  ACCEPTED             = 3,  // accepted inside this legacy evidence vocabulary only
   CONFLICT             = 4,  // sources disagree; fail closed
 };
 
@@ -266,12 +267,11 @@ struct DirectionEvidence {
   int8_t sign = 0;  // -1 or +1 when known; 0 otherwise
   JointIdentity identity{};
 
-  // Only an ACCEPTED direction, backed by current measured evidence, may drive
-  // current calibration. SPECIFIED_HISTORICAL is usable by the historical
-  // replay and by nothing else:
-  //
-  //   "LF V25 replay validates historical behaviour using historical direction
-  //    specs. It does not establish current joint direction."
+  // Legacy predicate retained for the recovered domain/tests. ACCEPTED means
+  // "accepted inside this DirectionEvidence vocabulary"; it does NOT grant
+  // production calibration authority and is not consulted by JointTransform,
+  // jointDirection() or SafeActuatorPolicy. SPECIFIED_HISTORICAL remains usable
+  // by historical replay only.
   bool isCurrentCalibrationEvidence() const {
     return state == DirectionState::ACCEPTED && (sign == -1 || sign == 1);
   }
@@ -371,7 +371,10 @@ struct LegPopulationEvidence {
   // Bit per leg slot, index = leg * kJointKindCount + joint. Using a mask
   // rather than a count is what makes "6 of 12" say WHICH six.
   uint16_t observed_mask = 0;
-  uint16_t unexpected_count = 0;   // responders outside the 12 leg slots
+  // Responders that violate the declared CURRENT bus population. Legitimate
+  // non-leg devices (currently NECK_ROTATION / ID 51) are excluded from this
+  // count; absent-by-design or wholly unexpected responders are not.
+  uint16_t unexpected_count = 0;
   uint32_t session_ms = 0;         // provenance
 };
 

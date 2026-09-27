@@ -7,6 +7,7 @@
 #include "../actuator/ActuatorWritePolicy.h"
 #include "../calibration/CalibrationExecutionEngine.h"
 #include "../calibration/CalibrationManager.h"
+#include "../calibration/CalibrationQ0CaptureSession.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/HttpTransport.h"
 #include "../network/WifiManager.h"
@@ -37,6 +38,7 @@ class Controller {
 
  private:
   void printBootBanner();
+  void updateQ0Capture();
 
   servo::ServoBus servo_bus_;
   servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-start
@@ -67,6 +69,10 @@ class Controller {
   // command a joint; it arbitrates a session through authority_ and records
   // evidence. See calibration/CalibrationManager.h.
   calibration::CalibrationManager calibration_;
+  // CR2-B read-only evidence acquisition. This is NOT a motion calibration
+  // session and owns no actuator authority. It sequences the existing census,
+  // preflight and ServoBus read-only runtime snapshots from Controller.
+  calibration::CalibrationQ0CaptureSession q0_capture_;
   // Safe Actuator / Calibration Execution infrastructure (I4/I5), owned here
   // as fail-closed status/lifecycle infrastructure only — 2026-09-25
   // objective change. actuator_runtime_ is wired with a null backend (see

@@ -1,0 +1,348 @@
+# MATDOG Calibration Readiness Closure
+
+**Status:** current architecture contract  
+**Date:** 2026-09-27  
+**Scope:** readiness for a future first controlled Full Calibration hardware session  
+**Motion authorization:** **NONE** — this document does not authorize Torque ON, GoalPosition, contact probing, or any physical motion.
+
+This document closes the architectural ambiguities that must be resolved before a production
+calibration write path may be added. It does not replace the authoritative calibration state in
+`06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml`; while
+`calibration_reset.hardware_motion_authorized: false`, normal robot motion remains blocked.
+
+## 1. Source precedence
+
+Current calibration truth remains:
+
+```text
+state:                          CALIBRATION_RESET_PENDING_FULL_RECALIBRATION
+all_joint_data_below_is_stale:  true
+hardware_motion_authorized:     false
+```
+
+The current servo allocation, current URDF / collision geometry and the generated Geometry
+Compiler V5 profile are current sources. LF V25 remains a historical hardware and regression
+oracle only. Historical q0, historical physical-unit assignments and historical direction values
+must never be promoted into current-installation calibration evidence.
+
+## 2. Direction is current hardware-contract data
+
+For the current mechanical architecture, `motorDirection` is part of the current URDF / Geometry
+Compiler V5 contract, not a datum that normal recalibration measures.
+
+The production rule is:
+
+```text
+q0              = current-installation calibration data; capture and promote
+motorDirection  = current URDF / hardware-contract data; resolve from bound geometry
+```
+
+`JointTransform` therefore carries q0 but no stored direction copy. The current direction is
+resolved through the bound `CalibrationGeometryProfile`, and a geometry-provenance change makes
+previous transforms non-current.
+
+`DIRECTION_VERIFY` remains an optional maintenance/development diagnostic. Its default budget is
+zero. It is not a prerequisite for calibration acceptance, contact calibration, first stand, or
+normal motion authorization.
+
+A mechanical/topology change that invalidates the URDF contract requires updating and
+re-validating the URDF/geometry source; it does not justify silently copying a historical
+direction.
+
+## 3. Full operational calibration does not mean 24 contact motions
+
+Geometry Compiler V5 currently classifies the 24 leg endpoints as:
+
+```text
+8  upper-leg endpoints  EXECUTABLE_URDF_DOMAIN
+16 hip/lower endpoints  DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS
+```
+
+The sixteen hip/lower geometric contacts are evidence about the mechanism, not legal motion
+targets under the current V5 policy. Full Calibration must not weaken `isExecutable()`, extend
+the URDF limits, or command those diagnostic contacts merely to reproduce historical LF V25
+behaviour.
+
+For the current path, calibration completeness is defined by the evidence needed to construct a
+safe current operational model:
+
+- current identity / allocation and formal leg-population evidence for all 12 leg joints;
+- current q0 for all 12 leg joints, captured at the nominal URDF q=0 pose with torque confirmed
+  OFF and bound to physical-unit + geometry provenance;
+- current direction resolved from the current URDF / Geometry V5 contract;
+- physical contact calibration for the 8 executable upper-leg endpoints;
+- current operational limits/envelopes for all 12 joints, with hip/lower envelopes derived
+  conservatively without commanding beyond-URDF contacts;
+- the required evidence lifecycle and explicit promotion to current operational evidence.
+
+The hip/lower diagnostic contacts remain available for future model-validation/metrology work
+under a separately reviewed safety plan. They are not a prerequisite for the first operational
+calibration or first stand.
+
+## 4. Calibration motion permit is not operational motion authorization
+
+The current `hardware_motion_authorized` reset state represents the installed robot's
+**operational** calibration/motion status. It must not be flipped merely to make a calibration
+session executable.
+
+A future controlled calibration motion path therefore needs a distinct, fail-closed,
+session-scoped permit. Conceptually:
+
+```text
+CALIBRATION_MOTION_PERMIT
+  != hardware_motion_authorized
+```
+
+The calibration permit is a temporary execution precondition for an explicitly authorized
+calibration session. It must require the reviewed current prerequisites (including formal
+population evidence, current q0/geometry prerequisites appropriate to the requested operation,
+CALIBRATION actuator authority and operator authorization), and it expires with the session.
+
+`hardware_motion_authorized` remains false throughout readiness work and throughout any
+pre-calibration evidence collection. Transitioning it to true is a separate, reviewed
+post-calibration state change after successful Full Calibration; it is not an entry condition
+that may be used to bootstrap Full Calibration.
+
+This separation removes the circular dependency:
+
+```text
+full recalibration needs controlled calibration motion
+normal motion authorization must follow successful recalibration
+therefore calibration motion cannot be represented by normal motion authorization
+```
+
+No implementation of the permit is added by this gate.
+
+## 5. Permanent safety invariants
+
+The readiness work must preserve all of the following:
+
+- no EEPROM calibration write;
+- no PositionOffset compensation;
+- no CalibrationOfs / one-key-middle;
+- GoalPosition raw domain is unsigned `0..4095`;
+- signed-wrap target semantics are forbidden;
+- SAFE_OFF remains independent of ordinary write policy and actuator authority;
+- one ServoBus/UART owner; no duplicate transport ownership;
+- historical replay can never authorize physical motion;
+- `RESTORE INTENT != ABORT != SAFE_OFF`;
+- authority loss fails closed and causes zero restore motion;
+- LF V25 is a historical hardware/regression oracle, not the production execution architecture;
+- no physical motion, Torque ON or contact probe occurs without explicit operator authorization.
+
+## 6. Minimum readiness dependency chain
+
+The lean dependency order is:
+
+```text
+contract closure
+  -> formal current leg-population evidence producer
+  -> read-only q0 bootstrap
+  -> current promoted transforms
+  -> V5 runtime binding
+  -> single checked q<->raw target resolver
+  -> persistence/promotion boundary
+  -> minimal production actuator backend
+  -> generic calibration endpoint executor
+  -> session-scoped calibration motion permit
+  -> hardware qualification
+  -> 8 executable upper contact calibrations
+  -> reviewed Full Calibration completion
+  -> separate operational motion authorization
+```
+
+A production actuator backend is therefore not the first readiness step. Every prerequisite that
+can be closed while the Controller remains physically unable to apply torque or GoalPosition
+should be closed first.
+
+## 7. Acceptance criteria for CR0
+
+CR0 is complete when repository truth is internally consistent on these three points:
+
+1. normal calibration does not require measuring `motorDirection`; `DIRECTION_VERIFY` is
+   diagnostic-only;
+2. Full Calibration does not require commanding the 16 hip/lower diagnostic contacts beyond the
+   URDF domain;
+3. future calibration motion authorization is explicitly distinct from final
+   `hardware_motion_authorized`.
+
+CR0 changes contracts and auditability only. It must not add a production backend, Torque ON,
+GoalPosition, live calibration action command, geometry/transform admission, or any motion
+authorization.
+
+## 8. Implementation status
+
+### CR0 — Contract Closure
+
+**IMPLEMENTED on `feat/calibration-readiness-v1`.**
+
+Repository contracts now agree that:
+- production `motorDirection` comes from current URDF / Geometry V5;
+- Full Calibration does not require the 16 beyond-URDF hip/lower contacts;
+- controlled calibration motion will need a session-scoped permit distinct from final
+  `hardware_motion_authorized`.
+
+`check_calibration_readiness_contract()` protects these statements from documentation drift.
+
+### CR1 — Formal Current Leg-Population Evidence Producer
+
+**IMPLEMENTED / OFFLINE VALIDATED / NOT YET PRODUCTION-WIRED.**
+
+`src/calibration/CalibrationPopulationEvidence.*` derives a formal
+`LegPopulationEvidence` from the existing structured `ServoCensus` and `ServoPreflight`
+results. It creates no bus transaction and no second census.
+
+A current PASS requires:
+- an explicitly current observation bundle rather than cached preflight data;
+- canonical census range coverage and internally coherent census counters;
+- no unexpected or absent-by-design responder;
+- no missing leg ID (ID 51 remains outside the leg calibration population);
+- exactly 12 unique semantic leg slots matched to the current canonical joint +
+  expected physical-unit configuration;
+- per-slot preflight PASS with the expected model, zero offset, full persistent-profile match,
+  torque OFF and raw position inside 0..4095;
+- final acceptance by `populationIsCurrentPass()`.
+
+The domain gate itself now also rejects nonzero `unexpected_count`, closing the prior case in
+which a complete 12-bit mask plus an anomalous responder could have evaluated PASS.
+
+CR1 deliberately does **not** submit the result to `CalibrationManager` from production code
+yet. Session freshness/orchestration is a later gate, and the existing 2026-09-26
+`@SERVO PREFLIGHT 12/12 PASS` remains preflight evidence rather than being relabelled as formal
+H1 evidence.
+
+Offline validation was completed on the synchronized ASUS K53SV checkout on 2026-09-27 at
+`55c036cb92d8039658309ef9fe6c3dc713ca22eb`: `python3 scripts/static_audit.py` PASS
+(108 source files); the explicit host runner passed every suite, including
+`CALIBRATION_POPULATION_EVIDENCE_TESTS = PASS` with 248 checks / 0 failures;
+`git diff --check` was clean and the working tree remained clean.
+
+### CR2 — Read-only q0 bootstrap
+
+**CR2-A PURE FOUNDATION: IMPLEMENTED / OFFLINE VALIDATED.**
+
+The current implementation adds `src/actuator/CalibrationQ0Bootstrap.*` and a dedicated host
+suite. It does **not** read `ServoBus`, does not own a UART, does not issue any command, does not
+bind the geometry into `Controller`, and does not create/admit a `JointTransform`.
+
+CR2-A receives already-read samples and may produce only a per-joint `Q0Evidence`
+`CANDIDATE`. A candidate requires:
+
+- formal current leg-population evidence;
+- the current bound Geometry V5 profile with matching provenance;
+- semantic joint + current physical-unit identity, with bus ID checked only as transport metadata;
+- a nonzero capture-session identifier;
+- explicit operator confirmation that the mechanism is manually at nominal URDF q=0;
+- an explicitly supplied stability budget;
+- 3..32 successful samples;
+- Torque OFF on every sample;
+- every raw sample in unsigned encoder domain 0..4095;
+- circular-median stability within the supplied budget.
+
+`Q0Estimator::MANUAL_ZERO_POSE` distinguishes this current direct measurement from the two
+historical LF V25 estimators. Raw 2048 is **not** an acceptance gate: its distance is recorded
+only as a diagnostic. CR2-A cannot set `ACCEPTED`/`PROMOTED`, cannot admit a transform, and
+cannot make q0 operational.
+
+The old Station-mediated `matdog_digital_zero_calibration.py` is not reused as current runtime:
+it belongs to the superseded pre-2026-08-27 architecture and contains a forbidden PositionOffset
+write phase. CR2 reuses only the non-authoritative **measurement method** already demonstrated
+there — repeated read-only samples, Torque OFF, circular median and stability spread — while
+discarding its IDs, q0 values, offsets, EEPROM logic and tolerances.
+
+**CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: IMPLEMENTED / OFFLINE + BUILD VALIDATED.**
+
+`CalibrationQ0CaptureSession.*` now owns one explicit evidence-acquisition transaction, separate
+from `CalibrationManager`. This separation is intentional: `CalibrationManager::startSession(
+LIVE_SESSION)` remains correctly blocked by `hardware_motion_authorized=false`, while collecting
+read-only q0 evidence does not need and must not acquire actuator authority.
+
+The production path reuses only existing Controller-owned services:
+
+```text
+explicit USB command + MAINTENANCE + ROBOT_POWERED profile
+  -> existing ServoCensus, newly started inside this capture
+  -> existing ServoPreflight, newly started inside this capture
+  -> CR1 formal current population evidence
+  -> N round-robin passes over the 12 current leg joints
+       -> existing ServoBus::readRuntimeState()
+       -> PresentPosition + TorqueEnable only
+  -> CR2-A reducer
+  -> 12 Q0Evidence CANDIDATE records
+```
+
+One sampling pass reads each of the twelve leg joints once before the next pass begins. This avoids
+taking all samples from one joint in one short burst and makes pose drift across the acquisition
+session observable in each joint's spread.
+
+The command surface is deliberately narrow:
+
+```text
+@CALIBRATION Q0 STATUS
+@CALIBRATION Q0 ABORT
+@CALIBRATION Q0 CAPTURE <samples 3..32> <stability_ticks 0..2047> CONFIRM_Q0_POSE
+```
+
+`CAPTURE` is refused outside `MAINTENANCE`, refused in the source-default `USB_ONLY` profile,
+and refused while another servo scan/census/preflight/read diagnostic owns the bus. While the q0
+transaction is active, those ordinary diagnostics are refused so they cannot interleave with the
+evidence bundle. `@SERVO SAFE_OFF` is deliberately **not** blocked: safety de-escalation stays
+independent and reachable in every state.
+
+`STATUS` reads cached structures only. `ABORT` ends the q0 transaction and prevents further q0
+runtime samples; an already-running read-only census/preflight service may finish its current
+diagnostic sequence because those existing services have no cancellation primitive. No actuator
+command is issued by abort.
+
+CR2-B does not submit a live motion session to `CalibrationManager`, request
+`ActuatorAuthority::CALIBRATION`, promote evidence, admit `JointTransform`, enable torque,
+produce GoalPosition, or write EEPROM. Formal population and the twelve q0 candidates remain
+ephemeral evidence for the later CR3 acceptance/persistence gate.
+
+CR2-A passed the synchronized local host/static gate on 2026-09-27 at
+`5daefc73f824797d3052c75002a495bed21b58f3`: static audit PASS (111 source files), dedicated
+CR2-A suite 52/52 PASS, all host suites PASS, `git diff --check` clean and working tree clean.
+CR2-B passed its complete local validation sequence on 2026-09-27. The functional firmware at
+`2e5cbfa43378ed8d0e76e1c2a942886ef34a89db` passed the dedicated CR2-B host suite
+(467/467), every host suite, the source-default `USB_ONLY` firmware build and the explicit
+`ROBOT_POWERED` firmware build; the final local build artifact was restored to `USB_ONLY`.
+The subsequent audit-only correction at `9ff046f0302928dfd2833d848206f3d66ca75228` changed
+only `scripts/static_audit.py`; on that exact HEAD the static audit passed over 114 source
+files, `git diff --check` was clean and the working tree was clean.
+
+Therefore CR2-B is **offline + build validated**. This is still not hardware validation, does not
+authorize flashing or live capture by itself, and does not change
+`hardware_motion_authorized=false`.
+
+### CR2-C — first hardware q0 capture
+
+**PASS — HARDWARE READ-ONLY CAPTURE COMPLETE (2026-09-27).**
+
+The authorized procedure in
+[`CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md`](CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md)
+was executed on source/build `315d4ade6ff0de59f6f3032f9864accb1680c669`.
+
+Result:
+
+```text
+fresh same-session population evidence = PASS 12/12
+q0 capture state                       = COMPLETE
+q0 failure                             = NONE
+q0 candidates                          = 12/12
+samples per joint                      = 9
+maximum measured spread                = 0 ticks
+accepted                               = NO
+promoted                               = NO
+transform_admitted                     = NO
+motion_authorized                      = NO
+```
+
+All twelve measured joints were verified Torque OFF immediately before acquisition. Final closeout
+again returned `VERIFIED_OFF` for all 13 installed servos, authority remained NONE,
+`runtime_resets=0`, and hardware motion remained BLOCKED.
+
+Evidence package:
+[`../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/`](../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/).
+
+CR2-C therefore closes the first current-installation q0 measurement gate. It does not make any q0
+operational. CR3 owns acceptance, persistence and promotion policy.

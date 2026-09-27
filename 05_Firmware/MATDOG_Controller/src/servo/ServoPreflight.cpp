@@ -1,5 +1,7 @@
 #include "ServoPreflight.h"
 
+#include "ServoBus.h"
+
 #include "ServoProfileData.h"
 
 namespace matdog {

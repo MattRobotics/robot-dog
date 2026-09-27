@@ -114,6 +114,15 @@ class ControllerService {
   const calibration::CalibrationSessionStatus& calibrationStatus() const {
     return modules_.calibration->status();
   }
+  const calibration::Q0CaptureStatus& calibrationQ0Status() const {
+    return modules_.q0_capture->status();
+  }
+  const calibration::PopulationEvidenceBuildResult& calibrationQ0Population() const {
+    return modules_.q0_capture->populationResult();
+  }
+  const actuator::Q0BootstrapCandidate* calibrationQ0Candidates() const {
+    return modules_.q0_capture->candidates();
+  }
 
   // --- servo diagnostic results (formatting-only snapshots) --------------------
   const servo::ScanResult& servoScanResult() const { return modules_.servo_bus->lastScanResult(); }

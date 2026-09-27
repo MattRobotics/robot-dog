@@ -239,11 +239,11 @@ static void test_the_two_q0_estimators_are_not_interchangeable() {
 }
 
 // ---------------------------------------------------------------------------
-// Direction — evidence, not a sign convention
+// DirectionEvidence — legacy/oracle vocabulary, isolated from production direction
 // ---------------------------------------------------------------------------
 
-static void test_direction_is_unknown_until_measured() {
-  g_case = "direction_is_unknown_until_measured";
+static void test_legacy_direction_evidence_is_isolated_from_production_contract() {
+  g_case = "legacy_direction_evidence_is_isolated_from_production_contract";
   DirectionEvidence d{};
   CHECK_EQ((int)d.state, (int)DirectionState::UNKNOWN);
   CHECK_EQ(d.sign, 0);
@@ -264,7 +264,9 @@ static void test_direction_is_unknown_until_measured() {
     CHECK(!spec.isCurrentCalibrationEvidence());   // current calibration may not
   }
 
-  // A measured candidate is not yet accepted.
+  // The recovered vocabulary still has candidate/accepted states for oracle
+  // and optional-diagnostic representation. Production motorDirection does not
+  // consult them (enforced separately by check_direction_is_contractual).
   DirectionEvidence candidate{};
   candidate.state = DirectionState::MEASURED_CANDIDATE;
   candidate.sign = -1;
@@ -785,6 +787,14 @@ static void test_leg_population_gate() {
   CHECK_EQ((int)evaluateLegPopulation(full_live), (int)PopulationVerdict::PASS);
   CHECK(populationIsCurrentPass(full_live));
 
+  // A complete mask plus an anomalous responder is NOT a formal PASS. The
+  // archived H1 gate failed closed on unexpected responders; unexpected_count
+  // exists precisely so that information cannot be dropped by the domain gate.
+  LegPopulationEvidence anomalous_live = full_live;
+  anomalous_live.unexpected_count = 1;
+  CHECK_EQ((int)evaluateLegPopulation(anomalous_live), (int)PopulationVerdict::FAIL);
+  CHECK(!populationIsCurrentPass(anomalous_live));
+
   // The last formal result on record is 6/12 and it is HISTORICAL.
   LegPopulationEvidence six_of_twelve =
       makePopulation(0x003Fu, CalibrationOrigin::HISTORICAL_REPLAY);
@@ -854,7 +864,7 @@ int main() {
   test_q0_never_defaults_to_the_raw_servo_centre();
   test_the_three_meanings_of_2048_stay_separate();
   test_the_two_q0_estimators_are_not_interchangeable();
-  test_direction_is_unknown_until_measured();
+  test_legacy_direction_evidence_is_isolated_from_production_contract();
   test_contact_witness_band();
   test_contact_state_classification();
   test_evidence_lifecycle_has_no_shortcuts();

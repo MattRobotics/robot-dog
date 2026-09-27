@@ -3,6 +3,7 @@
 #include <esp_ota_ops.h>
 
 #include <initializer_list>
+#include <cstring>
 
 #include "../servo/ServoProfileData.h"
 
@@ -17,6 +18,17 @@ namespace core {
 void CommandRouter::begin(const Modules& modules) {
   modules_ = modules;
   line_len_ = 0;
+}
+
+bool CommandRouter::q0CaptureOwnsServoDiagnostics() const {
+  return modules_.q0_capture != nullptr && modules_.q0_capture->active();
+}
+
+bool CommandRouter::servoDiagnosticBusy() const {
+  if (q0CaptureOwnsServoDiagnostics()) return true;
+  return modules_.servo_bus->scanState() == servo::ScanState::RUNNING ||
+         modules_.servo_census->state() == servo::ServoCensus::State::RUNNING ||
+         modules_.servo_preflight->state() == servo::ServoPreflight::State::RUNNING;
 }
 
 void CommandRouter::update(uint32_t now_ms) {
@@ -92,6 +104,13 @@ void CommandRouter::update(uint32_t now_ms) {
       modules_.servo_preflight->state() == servo::ServoPreflight::State::COMPLETE) {
     servo_preflight_result_pending_ = false;
     printServoPreflightResult();
+  }
+
+  // CR2-B completion/failure is reported once. All data are cached by the
+  // acquisition coordinator; printing performs no servo transaction.
+  if (q0_capture_result_pending_ && modules_.q0_capture->terminal()) {
+    q0_capture_result_pending_ = false;
+    printCalibrationQ0Status();
   }
 }
 
@@ -207,6 +226,82 @@ void CommandRouter::handleLine(String line) {
       Serial.println("HINT=create src/config/WifiCredentials.local.h and rebuild");
     }
     printWifiStatus();
+  } else if (upper == "@CALIBRATION Q0 STATUS") {
+    printCalibrationQ0Status();
+  } else if (upper == "@CALIBRATION Q0 ABORT") {
+    if (modules_.q0_capture->active()) {
+      modules_.q0_capture->fail(calibration::Q0CaptureFailure::EXTERNAL_ABORT);
+      q0_capture_result_pending_ = false;
+      Serial.println("CALIBRATION_Q0_ABORT=OK");
+    } else {
+      Serial.println("CALIBRATION_Q0_ABORT=NO_ACTIVE_CAPTURE");
+    }
+    printCalibrationQ0Status();
+  } else if (upper.startsWith("@CALIBRATION Q0 CAPTURE")) {
+    // Read-only evidence acquisition is deliberately separate from a live
+    // CalibrationManager motion session. No authority is requested here.
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
+      Serial.println("CALIBRATION_Q0=BLOCKED");
+      Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
+      return;
+    }
+    if (!build::kServoPowerAvailable) {
+      Serial.println("CALIBRATION_Q0=BLOCKED");
+      Serial.println("REASON=SERVO_RAIL_UNPOWERED_IN_ACTIVE_PROFILE");
+      Serial.printf("PROFILE=%s\n", build::kTestProfile);
+      return;
+    }
+    if (modules_.q0_capture->active()) {
+      Serial.println("CALIBRATION_Q0=BUSY");
+      Serial.println("REASON=CAPTURE_ALREADY_ACTIVE");
+      return;
+    }
+    if (servoDiagnosticBusy()) {
+      Serial.println("CALIBRATION_Q0=BUSY");
+      Serial.println("REASON=SERVO_DIAGNOSTIC_TRANSACTION_ACTIVE");
+      return;
+    }
+
+    int samples = -1;
+    int stability_spread = -1;
+    char confirm[32] = {0};
+    char extra[2] = {0};
+    const int parsed = sscanf(upper.c_str(),
+                              "@CALIBRATION Q0 CAPTURE %d %d %31s %1s",
+                              &samples, &stability_spread, confirm, extra);
+    if (parsed != 3 || strcmp(confirm, "CONFIRM_Q0_POSE") != 0 ||
+        samples < actuator::kQ0BootstrapMinSamples ||
+        samples > actuator::kQ0BootstrapMaxSamples ||
+        stability_spread < 0 || stability_spread >= 2048) {
+      Serial.println("CALIBRATION_Q0=REFUSED");
+      Serial.println("REASON=USAGE_OR_CONFIRMATION");
+      Serial.println("USAGE=@CALIBRATION Q0 CAPTURE <samples 3..32> "
+                     "<stability_ticks 0..2047> CONFIRM_Q0_POSE");
+      return;
+    }
+
+    calibration::Q0CaptureConfig config{};
+    config.samples_per_joint = static_cast<uint8_t>(samples);
+    config.stability_budget_specified = true;
+    config.max_stability_spread_ticks = static_cast<uint16_t>(stability_spread);
+    config.nominal_zero_pose_confirmed = true;
+    config.started_at_ms = millis();
+
+    if (!modules_.q0_capture->start(config)) {
+      Serial.println("CALIBRATION_Q0=REFUSED");
+      Serial.printf("REASON=%s\n",
+                    calibration::toString(modules_.q0_capture->status().failure));
+      return;
+    }
+
+    q0_capture_result_pending_ = true;
+    Serial.printf("CALIBRATION_Q0=STARTED session=%lu samples_per_joint=%u "
+                  "stability_ticks=%u\n",
+                  (unsigned long)modules_.q0_capture->status().capture_session_id,
+                  (unsigned)modules_.q0_capture->status().samples_per_joint,
+                  (unsigned)config.max_stability_spread_ticks);
+    Serial.println("CALIBRATION_Q0_NOTE read-only; torque must already be OFF; "
+                   "no motion/authority/EEPROM write");
   } else if (upper == "@CALIBRATION STATUS") {
     printCalibrationStatus();
   } else if (upper == "@ACTUATOR STATUS") {
@@ -241,6 +336,11 @@ void CommandRouter::handleLine(String line) {
     }
     printWebStatus();
   } else if (upper.startsWith("@SERVO SCAN")) {
+    if (q0CaptureOwnsServoDiagnostics()) {
+      Serial.println("SERVO_SCAN=BLOCKED");
+      Serial.println("REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
+      return;
+    }
     if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
       Serial.println("SERVO_SCAN=BLOCKED");
       Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
@@ -259,6 +359,11 @@ void CommandRouter::handleLine(String line) {
       Serial.println("ERROR=USAGE @SERVO SCAN <lo> <hi>");
     }
   } else if (upper == "@SERVO CENSUS") {
+    if (q0CaptureOwnsServoDiagnostics()) {
+      Serial.println("SERVO_CENSUS=BLOCKED");
+      Serial.println("REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
+      return;
+    }
     // Same bounded per-ID blocking as @SERVO SCAN (it drives the same
     // ServoBus scan), so it carries the same MAINTENANCE-mode gate.
     if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
@@ -275,6 +380,11 @@ void CommandRouter::handleLine(String line) {
       Serial.println("ERROR=SCAN_ALREADY_RUNNING");
     }
   } else if (upper == "@SERVO PREFLIGHT") {
+    if (q0CaptureOwnsServoDiagnostics()) {
+      Serial.println("SERVO_PREFLIGHT=BLOCKED");
+      Serial.println("REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
+      return;
+    }
     // H0 leg preflight. Strictly read-only: Ping plus register reads, no
     // torque, no target, no EEPROM write. It carries the same bounded
     // per-tick blocking as the census (one joint per update()), so it takes
@@ -293,6 +403,11 @@ void CommandRouter::handleLine(String line) {
       Serial.println("ERROR=PREFLIGHT_ALREADY_RUNNING");
     }
   } else if (upper.startsWith("@SERVO READ")) {
+    if (q0CaptureOwnsServoDiagnostics()) {
+      Serial.println("SERVO_READ=BLOCKED");
+      Serial.println("REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
+      return;
+    }
     if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
       Serial.println("SERVO_READ=BLOCKED");
       Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
@@ -370,6 +485,10 @@ void CommandRouter::printHelp() {
   Serial.println("  @WEB SERVER START|STOP (MAINTENANCE mode only; never auto-started)");
   Serial.println("  @AUTHORITY STATUS      (read-only; no owner can be acquired yet)");
   Serial.println("  @CALIBRATION STATUS    (read-only; no session can move hardware)");
+  Serial.println("  @CALIBRATION Q0 STATUS (cached CR2-B acquisition state; no bus transaction)");
+  Serial.println("  @CALIBRATION Q0 ABORT  (stop future q0 reads; no actuator command)");
+  Serial.println("  @CALIBRATION Q0 CAPTURE <samples> <stability_ticks> CONFIRM_Q0_POSE");
+  Serial.println("                           (ROBOT_POWERED + MAINTENANCE; read-only)");
   Serial.println("  @ACTUATOR STATUS       (read-only; no command can plan/commit/execute)");
   Serial.println("  @SYSTEM SOURCE_SIGNATURE  (read-only build/source identity)");
   Serial.println("  @HOSTLINK READINESS    (read-only; BLOCKED/TO_TEST/READY per capability)");
@@ -510,6 +629,52 @@ void CommandRouter::printCalibrationStatus() {
                 (unsigned long)c.sessions_started, (unsigned long)c.sessions_completed,
                 (unsigned long)c.sessions_aborted, (unsigned long)c.sessions_failed);
   Serial.println("CALIBRATION_LF_V25=HISTORICAL_HARDWARE_ORACLE (not current calibration)");
+}
+
+void CommandRouter::printCalibrationQ0Status() {
+  ControllerService* s = modules_.service;
+  const calibration::Q0CaptureStatus& q = s->calibrationQ0Status();
+  const calibration::PopulationEvidenceBuildResult& population =
+      s->calibrationQ0Population();
+
+  Serial.printf("CALIBRATION_Q0 state=%s failure=%s session=%lu "
+                "sample_passes=%u/%u next_joint=%u candidates=%u/%u\n",
+                calibration::toString(q.state), calibration::toString(q.failure),
+                (unsigned long)q.capture_session_id,
+                (unsigned)q.completed_sample_passes, (unsigned)q.samples_per_joint,
+                (unsigned)q.next_joint_index, (unsigned)q.candidates_complete,
+                (unsigned)calibration::kLegServoSlotCount);
+  Serial.printf("CALIBRATION_Q0_POPULATION status=%s verdict=%s observed=%u/%u\n",
+                calibration::toString(q.population_status),
+                calibration::toString(calibration::evaluateLegPopulation(population.evidence)),
+                (unsigned)calibration::observedLegSlotCount(population.evidence),
+                (unsigned)calibration::kLegServoSlotCount);
+
+  if (q.state == calibration::Q0CaptureState::COMPLETE) {
+    const actuator::Q0BootstrapCandidate* candidates = s->calibrationQ0Candidates();
+    for (uint8_t i = 0; i < calibration::kLegServoSlotCount; ++i) {
+      const actuator::Q0BootstrapCandidate& candidate = candidates[i];
+      const calibration::Q0Evidence& e = candidate.evidence;
+      Serial.printf("  Q0 bus=%u leg=%s joint=%s unit=%s tick=%u spread=%u "
+                    "samples=%u state=%s estimator=%s\n",
+                    (unsigned)candidate.bus_id,
+                    calibration::toString(e.identity.leg),
+                    calibration::toString(e.identity.joint),
+                    e.identity.physical_unit,
+                    (unsigned)e.tick,
+                    (unsigned)candidate.stability_spread_ticks,
+                    (unsigned)candidate.sample_count,
+                    calibration::toString(e.state),
+                    calibration::toString(e.estimator));
+    }
+    Serial.println("CALIBRATION_Q0_RESULT=12_CANDIDATES_ONLY");
+    Serial.println("CALIBRATION_Q0_NOTE accepted=NO promoted=NO "
+                   "transform_admitted=NO motion_authorized=NO");
+  } else if (q.state == calibration::Q0CaptureState::FAILED) {
+    Serial.println("CALIBRATION_Q0_RESULT=FAILED_NO_PROMOTION");
+  } else {
+    Serial.println("CALIBRATION_Q0_RESULT=IN_PROGRESS_OR_NOT_RUN");
+  }
 }
 
 void CommandRouter::printActuatorStatus() {

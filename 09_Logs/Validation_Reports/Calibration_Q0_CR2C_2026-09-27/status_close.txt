@@ -1,0 +1,105 @@
+=== CR2-C.7 FINAL CLOSEOUT ===
+
+>>> @IMU STREAM OFF
+IMU_STREAM=OFF
+
+>>> @STATUS
+SYSTEM health=READY power_state=RUN mode=MAINTENANCE authority=NONE uptime_ms=1237991 profile=ROBOT_POWERED
+BNO085 init=OK detected=ONLINE expected=REQUIRED result=PASS
+DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS
+SERVO  init=OK detected=ONLINE expected=REQUIRED result=PASS
+LED    init=OK detected=UNKNOWN expected=OPTIONAL result=PASS
+SERVO_POP canonical=17 expected_now=13 absent_by_design=4 last_census=PASS
+WIFI  state=CONNECTED connected=YES ip=192.168.1.156 rssi_dbm=-74 fault=NONE
+  heap_free=238372 heap_min_free=233412
+
+>>> @IMU STATUS
+BNO085 init=OK detected=ONLINE expected=REQUIRED result=PASS
+  stream=OFF rv_count=61877 runtime_resets=0
+
+>>> @BMS STATUS
+DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS
+  comm=OK age_ms=519
+  pack_v=11.3 current_a=-0.3 soc=66.3% cells=3
+  cell_max_mv=3804 cell_min_mv=3795 delta_mv=9
+  charge_mos=ON discharge_mos=ON state=STATIONARY alarms=0000 0000 0000 0000
+
+>>> @AUTHORITY STATUS
+AUTHORITY owner=NONE generation=0 last_result=RELEASED
+AUTHORITY_INHIBIT active=NO reason=NONE
+AUTHORITY_MODE operating_mode=MAINTENANCE motion_allowed=NO service_allowed=YES
+AUTHORITY_LAST_CLEAR BOOT
+AUTHORITY_COUNTERS grants=0 already_owned=0 releases=0 rejections=0 stale=0 force_clears=0 inhibits=0
+AUTHORITY_NOTE SAFE_OFF is outside arbitration and always reachable
+
+>>> @CALIBRATION STATUS
+CALIBRATION_CURRENT state=STALE_PENDING_FULL_RECALIBRATION hardware_motion=BLOCKED
+CALIBRATION_NOTE source_of_truth=MATDOG_JOINT_CALIBRATION.yaml calibration_reset:
+CALIBRATION_SESSION state=NO_SESSION origin=NONE leg=LF last_result=OK
+CALIBRATION_AUTHORITY held=NO generation=0
+CALIBRATION_POPULATION verdict=NOT_EVALUATED observed=0/12 mask=0x000
+CALIBRATION_PHASE reported=NO last=PREFLIGHT contacts=0
+CALIBRATION_RESTORE required=NO torque_off_required=YES cause=NONE
+CALIBRATION_COUNTERS started=0 completed=0 aborted=0 failed=0
+CALIBRATION_LF_V25=HISTORICAL_HARDWARE_ORACLE (not current calibration)
+
+>>> @CALIBRATION Q0 STATUS
+CALIBRATION_Q0 state=COMPLETE failure=NONE session=1 sample_passes=9/9 next_joint=0 candidates=12/12
+CALIBRATION_Q0_POPULATION status=PASS verdict=PASS observed=12/12
+  Q0 bus=11 leg=LF joint=LOWER unit=M33 tick=2087 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=12 leg=LF joint=UPPER unit=ELR01 tick=2100 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=13 leg=LF joint=HIP unit=M22 tick=1996 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=21 leg=RF joint=LOWER unit=NEW03 tick=1985 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=22 leg=RF joint=UPPER unit=ELR03 tick=2092 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=23 leg=RF joint=HIP unit=NEW01 tick=2030 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=31 leg=RH joint=LOWER unit=NEW05 tick=2034 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=32 leg=RH joint=UPPER unit=ELR02 tick=2042 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=33 leg=RH joint=HIP unit=NEW06 tick=2081 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=41 leg=LH joint=LOWER unit=M41 tick=2073 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=42 leg=LH joint=UPPER unit=M42 tick=2089 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=43 leg=LH joint=HIP unit=M43 tick=2035 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+CALIBRATION_Q0_RESULT=12_CANDIDATES_ONLY
+CALIBRATION_Q0_NOTE accepted=NO promoted=NO transform_admitted=NO motion_authorized=NO
+
+=== FINAL SAFE_OFF 13/13 ===
+
+>>> @SERVO SAFE_OFF 11
+SERVO_SAFE_OFF id=11 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 12
+SERVO_SAFE_OFF id=12 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 13
+SERVO_SAFE_OFF id=13 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 21
+SERVO_SAFE_OFF id=21 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 22
+SERVO_SAFE_OFF id=22 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 23
+SERVO_SAFE_OFF id=23 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 31
+SERVO_SAFE_OFF id=31 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 32
+SERVO_SAFE_OFF id=32 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 33
+SERVO_SAFE_OFF id=33 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 41
+SERVO_SAFE_OFF id=41 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 42
+SERVO_SAFE_OFF id=42 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 43
+SERVO_SAFE_OFF id=43 result=VERIFIED_OFF
+
+>>> @SERVO SAFE_OFF 51
+SERVO_SAFE_OFF id=51 result=VERIFIED_OFF
+
+CR2C_CLOSEOUT=PASS authority=NONE motion=BLOCKED q0=12_CANDIDATES_ONLY safe_off=13/13

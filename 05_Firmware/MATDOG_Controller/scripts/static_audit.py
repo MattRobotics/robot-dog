@@ -1463,7 +1463,9 @@ def check_calibration_boundaries(files, sketch_dir):
 
     # --- (1)(2) purity of the whole subsystem -----------------------------
     for name in ("CalibrationDomain.h", "CalibrationDomain.cpp",
-                 "CalibrationManager.h", "CalibrationManager.cpp"):
+                 "CalibrationManager.h", "CalibrationManager.cpp",
+                 "CalibrationPopulationEvidence.h", "CalibrationPopulationEvidence.cpp",
+                 "CalibrationQ0CaptureSession.h", "CalibrationQ0CaptureSession.cpp"):
         entry = by_name.get(name)
         if entry is None:
             fail(f"{cal_dir / name}: calibration unit not found")
@@ -2239,6 +2241,333 @@ def check_h0_preflight_boundaries(files, sketch_dir):
                      f"calibration pose")
 
 
+def check_calibration_population_evidence(files, sketch_dir):
+    """CR1 formal leg-population producer stays pure, derived and fail closed."""
+    by_name = {path.name: (path, code) for path, code in files}
+    header = by_name.get("CalibrationPopulationEvidence.h")
+    source = by_name.get("CalibrationPopulationEvidence.cpp")
+    if header is None or source is None:
+        fail(f"{sketch_dir / 'src' / 'calibration'}: CR1 population evidence producer missing")
+        return
+
+    for path, code in (header, source):
+        for forbidden in ("#include <Arduino.h>", "ServoBus", "ServoCensus", "startScan(",
+                          "EnableTorque", "WritePos", "GoalPosition", "Serial."):
+            if forbidden in code:
+                fail(f"{path}: CR1 producer contains {forbidden!r} - it must consume existing "
+                     f"structured evidence and never own transport or hardware")
+
+    path, code = source
+    for required in (
+        "current_observation_bundle",
+        "census.scan_lo <= servo::kCanonicalScanLo",
+        "census.scan_hi >= servo::kCanonicalScanHi",
+        "census.unexpected_id",
+        "census.absent_by_design_present",
+        "census.missing_id_count == census.missing_expected",
+        "census.unexpected_id_count == census.unexpected_id",
+        "census.absent_by_design_present_id_count ==",
+        "preflight.pass_count != servo::kLegPreflightCount",
+        "preflight.no_response_count != 0",
+        "preflight.mismatch_count != 0",
+        "preflight.incomplete_count != 0",
+        "servo::isLegServo(census.missing_ids[i])",
+        "record.result != servo::JointPreflightResult::PASS",
+        "record.model != servo::profile_data::kInvariants.model_expected",
+        "record.profile != servo::ProfileVerdict::MATCH",
+        "record.position_offset != 0",
+        "record.torque_enable != 0",
+        "record.present_position < kRawTickMin",
+        "record.present_position > kRawTickMax",
+        "semanticIdentityFromCanonical",
+        "setPhysicalUnit",
+        "legSlotIndex",
+        "populationIsCurrentPass",
+    ):
+        if required not in code:
+            fail(f"{path}: CR1 producer lost required formal-population gate {required!r}")
+
+    domain = by_name.get("CalibrationDomain.cpp")
+    if domain is None or "evidence.unexpected_count != 0" not in domain[1]:
+        fail(f"{sketch_dir / 'src' / 'calibration' / 'CalibrationDomain.cpp'}: "
+             f"domain PASS no longer rejects anomalous population evidence")
+
+    # CR2-B is now the ONE reviewed production freshness owner. No parser,
+    # Controller body or other module may manufacture a current bundle directly.
+    # Mask only CR1's own public declaration; an inline/header call anywhere
+    # else must still be treated as a production call site.
+    for path, code in files:
+        if "scripts" in path.parts or path.name == "CalibrationPopulationEvidence.cpp":
+            continue
+        inspected = code
+        if path.name == "CalibrationPopulationEvidence.h":
+            inspected = re.sub(
+                r"PopulationEvidenceBuildResult\s+buildCurrentLegPopulationEvidence\s*"
+                r"\([^;]*\);",
+                "",
+                inspected,
+                flags=re.DOTALL,
+            )
+        if "buildCurrentLegPopulationEvidence(" not in inspected:
+            continue
+        if path.name != "CalibrationQ0CaptureSession.cpp":
+            fail(f"{path}: calls the CR1 producer outside the reviewed CR2-B same-session "
+                 f"orchestrator; cached/independent diagnostics must never self-declare current")
+
+def check_calibration_q0_capture_session(files, sketch_dir):
+    """CR2-B same-session acquisition stays pure, current and candidate-only."""
+    by_name = {path.name: (path, code) for path, code in files}
+    header = by_name.get("CalibrationQ0CaptureSession.h")
+    source = by_name.get("CalibrationQ0CaptureSession.cpp")
+    if header is None or source is None:
+        fail(f"{sketch_dir / 'src' / 'calibration'}: CR2-B q0 capture session missing")
+        return
+
+    for path, code in (header, source):
+        for forbidden in ("#include <Arduino.h>", "ServoBus", "HardwareSerial",
+                          "Serial.", "millis(", "CalibrationManager", "ActuatorAuthority",
+                          "hardwareMotionAuthorized", "EnableTorque", "WritePos",
+                          "GoalPosition", "SyncWrite", "RegWrite", "CalibrationOfs",
+                          "PositionOffset", "EvidenceState::PROMOTED", ".admit("):
+            if forbidden in code:
+                fail(f"{path}: CR2-B contains {forbidden!r} - evidence acquisition must stay "
+                     f"transport/authority blind and candidate-only")
+
+    path, code = source
+    for required in (
+        "buildCurrentLegPopulationEvidence",
+        "context.current_observation_bundle = true",
+        "populationIsCurrentPass(population_.evidence)",
+        "servo::legServoAt",
+        "semanticIdentityFromCanonical",
+        "profile_.findJoint(identity)",
+        "geometry->bus_id != canonical->bus_id",
+        "actuator::geometry_data::kProvenance",
+        "actuator::buildQ0BootstrapCandidate",
+        "Q0BootstrapStatus::CANDIDATE",
+        "status_.next_joint_index++",
+        "status_.next_joint_index >= kLegServoSlotCount",
+        "status_.completed_sample_passes++",
+        "status_.completed_sample_passes >= config_.samples_per_joint",
+        "observation.torque_enable != 0",
+        "observation.raw_tick < kRawTickMin",
+        "observation.raw_tick > kRawTickMax",
+    ):
+        if required not in code:
+            fail(f"{path}: CR2-B lost required same-session/q0 gate {required!r}")
+
+    # The only legitimate producer of current-observation truth in CR2-B is
+    # this session after it has itself sequenced census then preflight.
+    if code.count("current_observation_bundle = true") != 1:
+        fail(f"{path}: CR2-B must stamp current_observation_bundle exactly once, only after "
+             f"its own census+preflight sequence")
+
+def check_calibration_q0_production_wiring(files, sketch_dir):
+    """CR2-B production wiring is read-only, single-owner and authority-free."""
+    by_name = {path.name: (path, code) for path, code in files}
+    controller_h = by_name.get("Controller.h")
+    controller_cpp = by_name.get("Controller.cpp")
+    router_h = by_name.get("CommandRouter.h")
+    router_cpp = by_name.get("CommandRouter.cpp")
+    service_h = by_name.get("ControllerService.h")
+    if any(x is None for x in (controller_h, controller_cpp, router_h, router_cpp, service_h)):
+        fail(f"{sketch_dir / 'src' / 'core'}: CR2-B production wiring source missing")
+        return
+
+    # Exactly one coordinator instance, owned by Controller. Tests may create
+    # locals; production must not gain a second session state machine.
+    owners = []
+    for path, code in files:
+        if "scripts" in path.parts:
+            continue
+        for m in re.finditer(r"CalibrationQ0CaptureSession\s+(\w+)\s*[;{]", code):
+            owners.append((path.name, m.group(1)))
+    if owners != [("Controller.h", "q0_capture_")]:
+        fail(f"CR2-B coordinator instances={owners!r}; expected exactly Controller.h:q0_capture_")
+
+    # Controller orchestration may start the existing census/preflight and
+    # take one existing runtime READ. Nothing in this function may acquire
+    # actuator authority, enter a motion session or write a servo.
+    cpath, ccode = controller_cpp
+    body = re.search(r"void Controller::updateQ0Capture\(\)\s*\{(.*?)\n\}",
+                     ccode, re.DOTALL)
+    if not body:
+        fail(f"{cpath}: updateQ0Capture() not found")
+    else:
+        text = body.group(1)
+        for required in (
+            "OperatingMode::MAINTENANCE",
+            "servo_census_.start()",
+            "servo_preflight_.start()",
+            "servo_bus_.readRuntimeState",
+            "Q0CaptureFailure::MODE_NOT_MAINTENANCE",
+            "Q0CaptureFailure::CENSUS_START_REFUSED",
+            "Q0CaptureFailure::PREFLIGHT_START_REFUSED",
+        ):
+            if required not in text:
+                fail(f"{cpath}: CR2-B Controller wiring lost {required!r}")
+        for forbidden in (
+            "safeOff(", "EnableTorque", "WritePos", "GoalPosition", "SyncWrite",
+            "RegWrite", "PositionOffset", "CalibrationOfs", "authority_.request",
+            "calibration_.startSession", "calibration_.activate", ".plan(",
+            ".commit(", ".execute(",
+        ):
+            if forbidden in text:
+                fail(f"{cpath}: updateQ0Capture() contains {forbidden!r} - q0 acquisition "
+                     f"must remain read-only and authority-free")
+        if text.count("servo_bus_.readRuntimeState(") != 1:
+            fail(f"{cpath}: updateQ0Capture() must contain exactly one runtime-read call site")
+        if re.search(r"\b(?:for|while)\s*\(", text):
+            fail(f"{cpath}: updateQ0Capture() gained a loop - CR2-B must advance at most one "
+                 f"runtime q0 observation per Controller tick")
+
+    # Never automatic at boot. Controller may own/update it only after an
+    # explicit command starts the transaction.
+    begin = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", ccode, re.DOTALL)
+    if begin and re.search(r"q0_capture_\s*\.\s*start\s*\(", begin.group(1)):
+        fail(f"{cpath}: q0 capture starts from Controller::begin() - hardware diagnostics must "
+             f"never auto-start at boot")
+
+    rpath, rcode = router_cpp
+
+    # CAPTURE: explicit physical/USB command, maintenance-only, powered-profile
+    # only, exact pose confirmation, and refuses any competing servo diagnostic.
+    capture = re.search(
+        r'upper\.startsWith\("@CALIBRATION Q0 CAPTURE"\)\s*\)\s*\{(.*?)\}\s*else',
+        rcode, re.DOTALL)
+    if not capture:
+        fail(f"{rpath}: @CALIBRATION Q0 CAPTURE branch not found")
+    else:
+        text = capture.group(1)
+        for required in ("OperatingMode::MAINTENANCE", "build::kServoPowerAvailable",
+                         "CONFIRM_Q0_POSE", "servoDiagnosticBusy()",
+                         "modules_.q0_capture->start(config)"):
+            if required not in text:
+                fail(f"{rpath}: q0 capture command lost gate {required!r}")
+        for forbidden in ("authority->request", "startSession(", "activate(", "safeOff(",
+                          "EnableTorque", "GoalPosition", "WritePos", "PositionOffset",
+                          "CalibrationOfs"):
+            if forbidden in text:
+                fail(f"{rpath}: q0 capture command contains {forbidden!r} - read-only capture "
+                     f"must not acquire motion authority or write hardware")
+
+    # STATUS must remain cached presentation only.
+    printer = re.search(r"void CommandRouter::printCalibrationQ0Status\(\)\s*\{(.*?)\n\}",
+                        rcode, re.DOTALL)
+    if not printer:
+        fail(f"{rpath}: printCalibrationQ0Status() not found")
+    else:
+        for forbidden in ("readRuntimeState", "servo_bus", "startScan(", "safeOff("):
+            if forbidden in printer.group(1):
+                fail(f"{rpath}: q0 STATUS contains {forbidden!r} - status is cached only")
+
+    # CR2-B reserves ordinary servo diagnostics so no other read/scan is
+    # interleaved into its evidence bundle. Inspect the actual parser branches,
+    # not nearby comments/help text.
+    diagnostic_branches = (
+        ("@SERVO SCAN",
+         r'upper\.startsWith\("@SERVO SCAN"\)\s*\)\s*\{(.*?)\}\s*else'),
+        ("@SERVO CENSUS",
+         r'upper == "@SERVO CENSUS"\s*\)\s*\{(.*?)\}\s*else'),
+        ("@SERVO PREFLIGHT",
+         r'upper == "@SERVO PREFLIGHT"\s*\)\s*\{(.*?)\}\s*else'),
+        ("@SERVO READ",
+         r'upper\.startsWith\("@SERVO READ"\)\s*\)\s*\{(.*?)\}\s*else'),
+    )
+    for command, pattern in diagnostic_branches:
+        branch = re.search(pattern, rcode, re.DOTALL)
+        if not branch:
+            fail(f"{rpath}: could not locate {command} branch for CR2-B audit")
+        elif "CALIBRATION_Q0_CAPTURE_ACTIVE" not in branch.group(1):
+            fail(f"{rpath}: {command} is not refused while CR2-B owns servo diagnostics")
+
+    # SAFE_OFF is the deliberate exception: a de-escalation must stay
+    # reachable even during a read-only capture and must not consult it.
+    safe = re.search(r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
+                     rcode, re.DOTALL)
+    if not safe:
+        fail(f"{rpath}: @SERVO SAFE_OFF branch not found for CR2-B audit")
+    else:
+        for forbidden in ("q0_capture", "Q0Capture", "CALIBRATION_Q0"):
+            if forbidden in safe.group(1):
+                fail(f"{rpath}: SAFE_OFF consults CR2-B via {forbidden!r} - de-escalation "
+                     f"must remain independent")
+
+def check_calibration_q0_bootstrap(files, sketch_dir):
+    """CR2 read-only q0 candidate builder stays pure and non-operational."""
+    by_name = {path.name: (path, code) for path, code in files}
+    header = by_name.get("CalibrationQ0Bootstrap.h")
+    source = by_name.get("CalibrationQ0Bootstrap.cpp")
+    if header is None or source is None:
+        fail(f"{sketch_dir / 'src' / 'actuator'}: CR2 q0 bootstrap unit missing")
+        return
+
+    for path, code in (header, source):
+        for forbidden in ("#include <Arduino.h>", "#include \"../servo/ServoBus.h\"",
+                          "HardwareSerial", "Serial.", "millis(", "readRuntimeState(",
+                          "EnableTorque", "WritePos", "GoalPosition", "SyncWrite",
+                          "RegWrite", "CalibrationOfs", "PositionOffset", "unLockEprom",
+                          "LockEprom"):
+            if forbidden in code:
+                fail(f"{path}: CR2 q0 bootstrap contains {forbidden!r} - it must reduce "
+                     f"already-read evidence and must never own transport, motion or EEPROM")
+
+    path, code = source
+    for required in (
+        "populationIsCurrentPass(population)",
+        "profile.provenanceMatches(expected_provenance)",
+        "profile.provenanceTag() == kNoGeometryProvenance",
+        "profile.findJoint(request.identity)",
+        "joint->bus_id != request.bus_id",
+        "request.nominal_zero_pose_confirmed",
+        "!request.stability_budget_specified",
+        "sample_count < kQ0BootstrapMinSamples",
+        "sample_count > kQ0BootstrapMaxSamples",
+        "!sample.read_ok",
+        "sample.torque_enable != 0",
+        "sample.raw_tick < kRawMin",
+        "sample.raw_tick > kRawMax",
+        "spread > request.max_stability_spread_ticks",
+        "Q0Estimator::MANUAL_ZERO_POSE",
+        "EvidenceState::CANDIDATE",
+        "CalibrationOrigin::LIVE_SESSION",
+        "accepted_by_gate = false",
+    ):
+        if required not in code:
+            fail(f"{path}: CR2 lost required q0 bootstrap gate {required!r}")
+
+    # Candidate construction must not be able to promote or install itself.
+    for forbidden in ("EvidenceState::PROMOTED", "JointTransformTable", ".admit("):
+        if forbidden in code:
+            fail(f"{path}: CR2 q0 bootstrap contains {forbidden!r} - CR2 ends at CANDIDATE; "
+                 f"CR3 owns acceptance/promotion and transform admission")
+
+    # 2048 may be recorded as a diagnostic distance only, never used to decide
+    # whether the captured q0 is acceptable.
+    if re.search(r"if\s*\([^)]*kServoRawCenter", code):
+        fail(f"{path}: CR2 gates candidate acceptance against raw centre 2048 - the bootstrap "
+             f"contract requires measure first, derive the plausibility window later")
+
+    # CR2-B is the sole reviewed production consumer. Hardware-facing
+    # Controller/parser/servo code must never call the reducer directly.
+    # Mask only CR2-A's public prototype, not arbitrary header code.
+    for path, code in files:
+        if "scripts" in path.parts or path.name == "CalibrationQ0Bootstrap.cpp":
+            continue
+        inspected = code
+        if path.name == "CalibrationQ0Bootstrap.h":
+            inspected = re.sub(
+                r"Q0BootstrapCandidate\s+buildQ0BootstrapCandidate\s*"
+                r"\([^;]*\);",
+                "",
+                inspected,
+                flags=re.DOTALL,
+            )
+        if "buildQ0BootstrapCandidate(" not in inspected:
+            continue
+        if path.name != "CalibrationQ0CaptureSession.cpp":
+            fail(f"{path}: calls CR2-A outside the reviewed CR2-B acquisition coordinator")
+
 def check_evidence_geometry_binding(files, sketch_dir):
     """B1: calibration evidence is bound to the geometry it was measured under.
 
@@ -2333,6 +2662,108 @@ def check_evidence_geometry_binding(files, sketch_dir):
             fail(f"{path}: {call.group(0)} looks evidence up without the current geometry "
                  f"tag - identity alone is not enough to make a record current")
 
+
+def check_calibration_readiness_contract(sketch_dir):
+    """CR0 - calibration-readiness repository contract.
+
+    This is deliberately a documentation/source-truth audit, not a motion
+    implementation. It prevents the three ambiguities closed on 2026-09-27
+    from silently returning while all existing actuator fail-closed checks
+    continue to enforce zero production write reachability:
+
+      1. motorDirection is current URDF/Geometry V5 contract data;
+      2. Full Calibration does not require the 16 beyond-URDF hip/lower
+         diagnostic contacts to become executable;
+      3. future calibration-motion permission is distinct from final
+         hardware_motion_authorized.
+
+    Historical development logs and CHANGELOG are intentionally not scanned:
+    they are records of what was believed at their date, not current contracts.
+    """
+    required_docs = {
+        "CALIBRATION_READINESS.md": sketch_dir / "CALIBRATION_READINESS.md",
+        "DEVELOPMENT_GATES.md": sketch_dir / "DEVELOPMENT_GATES.md",
+        "CALIBRATION_BOOTSTRAP.md": sketch_dir / "CALIBRATION_BOOTSTRAP.md",
+        "CALIBRATION_SOURCE_PRECEDENCE.md": sketch_dir / "CALIBRATION_SOURCE_PRECEDENCE.md",
+    }
+    docs = {}
+    for name, path in required_docs.items():
+        if not path.is_file():
+            fail(f"{path}: CR0 current-contract document missing")
+            continue
+        docs[name] = path.read_text(encoding="utf-8")
+
+    readiness = docs.get("CALIBRATION_READINESS.md", "")
+    for token, why in (
+        ("CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: IMPLEMENTED / OFFLINE + BUILD VALIDATED",
+         "same-session q0 orchestration passed offline/build validation but remains hardware-unvalidated"),
+        ("@CALIBRATION Q0 CAPTURE <samples 3..32> <stability_ticks 0..2047> CONFIRM_Q0_POSE",
+         "the read-only q0 capture command must remain explicit and pose-confirmed"),
+        ("motorDirection  = current URDF / hardware-contract data",
+         "production direction must remain bound to the current URDF/geometry contract"),
+        ("8  upper-leg endpoints  EXECUTABLE_URDF_DOMAIN",
+         "the executable V5 endpoint population must remain explicit"),
+        ("16 hip/lower endpoints  DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS",
+         "the beyond-URDF diagnostic population must remain explicit"),
+        ("CALIBRATION_MOTION_PERMIT", "the separate calibration-motion concept must stay named"),
+        ("!= hardware_motion_authorized",
+         "calibration motion must not collapse back into final operational authorization"),
+        ("remains false throughout readiness work",
+         "CR0 must not authorize normal motion as part of readiness"),
+    ):
+        if token not in readiness:
+            fail(f"{required_docs['CALIBRATION_READINESS.md']}: missing CR0 invariant {token!r} - {why}")
+
+    # CR2-B is now implemented. Current contracts must not regress to
+    # describing the same-session Controller orchestration as future work.
+    for stale in (
+        "CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: TO_IMPLEMENT",
+        "CR2-B same-session read-only Controller orchestration remains TO_IMPLEMENT",
+        "same-session Controller read orchestration remains **TO_IMPLEMENT**",
+    ):
+        for name in ("CALIBRATION_READINESS.md", "DEVELOPMENT_GATES.md",
+                     "CALIBRATION_BOOTSTRAP.md"):
+            if stale in docs.get(name, ""):
+                fail(f"{required_docs[name]}: stale CR2-B readiness state {stale!r}")
+
+    # Current-contract docs must not regress to the superseded pre-9aae03d
+    # direction model. Exact historical logs are intentionally left untouched.
+    gates = docs.get("DEVELOPMENT_GATES.md", "")
+    for stale in (
+        "direction witnesses",
+        "direction measurement (",
+        "accepted q0/direction transform",
+    ):
+        if stale in gates:
+            fail(f"{required_docs['DEVELOPMENT_GATES.md']}: stale CR0 direction contract {stale!r}")
+
+    bootstrap = docs.get("CALIBRATION_BOOTSTRAP.md", "")
+    for stale in (
+        "current direction verification            TO_IMPLEMENT",
+        "current q0/direction",
+    ):
+        if stale in bootstrap:
+            fail(f"{required_docs['CALIBRATION_BOOTSTRAP.md']}: stale CR0 direction prerequisite {stale!r}")
+    for required in (
+        "current motorDirection from URDF/V5       REUSED / CONTRACT DATA",
+        "8 upper endpoints are `REQUIRED_FOR_FINAL_CALIBRATION`",
+        "a 12-joint direction campaign",
+    ):
+        if required not in bootstrap:
+            fail(f"{required_docs['CALIBRATION_BOOTSTRAP.md']}: missing CR0 bootstrap evidence {required!r}")
+
+    precedence = docs.get("CALIBRATION_SOURCE_PRECEDENCE.md", "")
+    if "`MEASURED_CANDIDATE` and `ACCEPTED` are **TO_IMPLEMENT**" in precedence:
+        fail(f"{required_docs['CALIBRATION_SOURCE_PRECEDENCE.md']}: legacy DirectionEvidence "
+             f"vocabulary is still presented as a production TO_IMPLEMENT prerequisite")
+    for required in (
+        "production no longer needs one",
+        "current URDF/Geometry V5 contract",
+        "check_direction_is_contractual()",
+    ):
+        if required not in precedence:
+            fail(f"{required_docs['CALIBRATION_SOURCE_PRECEDENCE.md']}: missing CR0 source-precedence "
+                 f"statement {required!r}")
 
 def check_direction_is_contractual(files, sketch_dir):
     """Joint direction is hardware-contract data, not a recalibration datum.
@@ -2985,6 +3416,9 @@ def check_host_tests(sketch_dir):
     profile_suite = sketch_dir / "scripts" / "tests" / "test_servo_profile.cpp"
     calibration_suites = [
         sketch_dir / "scripts" / "tests" / "test_calibration_domain.cpp",
+        sketch_dir / "scripts" / "tests" / "test_calibration_population_evidence.cpp",
+        sketch_dir / "scripts" / "tests" / "test_calibration_q0_bootstrap.cpp",
+        sketch_dir / "scripts" / "tests" / "test_calibration_q0_capture_session.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
     ]
     led_status_suite = sketch_dir / "scripts" / "tests" / "test_led_status_policy.cpp"
@@ -3059,7 +3493,9 @@ def check_host_tests(sketch_dir):
     for binary in ("test_servo_population", "test_daly_protocol", "test_wifi_policy",
                    "test_ota_policy", "test_actuator_authority", "test_actuator_write_policy",
                    "test_calibration_geometry", "test_servo_profile",
-                   "test_calibration_domain", "test_calibration_manager",
+                   "test_calibration_domain", "test_calibration_population_evidence",
+                   "test_calibration_q0_bootstrap", "test_calibration_q0_capture_session",
+                   "test_calibration_manager",
                    "test_led_status_policy", "test_actuator_runtime",
                    "test_calibration_execution_engine", "test_service_readiness",
                    "test_hmac256", "test_ota_session", "test_http_mailbox"):
@@ -3566,7 +4002,12 @@ def main():
     check_servo_profile_contract(files, SKETCH_DIR)
     check_servo_profile_export(SKETCH_DIR)
     check_h0_preflight_boundaries(files, SKETCH_DIR)
+    check_calibration_population_evidence(files, SKETCH_DIR)
+    check_calibration_q0_capture_session(files, SKETCH_DIR)
+    check_calibration_q0_production_wiring(files, SKETCH_DIR)
+    check_calibration_q0_bootstrap(files, SKETCH_DIR)
     check_evidence_geometry_binding(files, SKETCH_DIR)
+    check_calibration_readiness_contract(SKETCH_DIR)
     check_direction_is_contractual(files, SKETCH_DIR)
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)

@@ -16,7 +16,7 @@ manual placement at nominal URDF q=0     operator, no motion
         ↓
 read-only q0 capture, torque OFF         TO_IMPLEMENT
         ↓
-current direction verification            TO_IMPLEMENT
+current motorDirection from URDF/V5       REUSED / CONTRACT DATA
         ↓
 raw encoder ↔ URDF q transform            TO_IMPLEMENT
         ↓
@@ -289,9 +289,9 @@ unnecessary.
 
 ### 8.4 The question answered directly
 
-> Can the already-conservative URDF limits for HIP/LOWER, together with current q0/direction
-> and Geometry V5, support the first safe operational envelope without first reaching the
-> mechanical contact beyond URDF?
+> Can the already-conservative URDF limits for HIP/LOWER, together with current q0,
+> current URDF `motorDirection` and Geometry V5, support the first safe operational envelope
+> without first reaching the mechanical contact beyond URDF?
 
 **Yes — and by a wide margin. But the envelope must not be the URDF limit itself.**
 
@@ -309,8 +309,8 @@ Three reasons the URDF limit is the wrong envelope, in descending order of sever
 
 **The defensible first operational envelope is the stand trajectory's own range plus a working
 margin**, which sits ~199 ticks clear of every URDF limit and further still from every contact.
-It needs current q0, current direction, and the V5 collision validation that already exists —
-and it needs **no contact endpoint at all**.
+It needs current q0, current URDF `motorDirection`, and the V5 collision validation that already
+exists — and it needs **no contact endpoint at all**.
 
 Deriving that envelope is the next design step. **No code is added for it in this branch**, and
 nothing here changes `DIRECTION_VERIFY budget = 0`, hardware motion `BLOCKED`, or default write
@@ -366,6 +366,28 @@ No automatic motion is used to find q0. Each candidate binds: joint identity, **
 unit**, bus id *as transport metadata only*, raw tick, geometry/profile provenance, session id
 and evidence state. A bus-id-only association is not expressible — `JointIdentity` has no bus
 id field.
+
+**CR2-A foundation, 2026-09-27:** `CalibrationQ0Bootstrap.*` implements the pure
+observation→candidate reduction and is offline validated. It requires formal current population
+evidence, matching Geometry V5 provenance, operator-confirmed nominal q=0, an explicit stability
+budget and repeated Torque-OFF raw samples. It emits `Q0Estimator::MANUAL_ZERO_POSE` evidence at
+`EvidenceState::CANDIDATE` only. It has no `ServoBus`, no transport and no promotion/transform
+admission path.
+
+**CR2-B orchestration, 2026-09-27:** the same-session Controller path is now implemented but not
+yet offline/build validated. `CalibrationQ0CaptureSession` sequences a fresh existing census, a
+fresh existing preflight, CR1 formal population construction and round-robin calls to the existing
+`ServoBus::readRuntimeState()`. It is not a `CalibrationManager` live session and acquires no
+actuator authority. Its only output is twelve CR2-A candidates; no acceptance, persistence,
+transform admission or motion authorization occurs. The command is explicit, MAINTENANCE-only,
+ROBOT_POWERED-only and requires the literal `CONFIRM_Q0_POSE` token.
+
+Therefore the flow diagram's "read-only q0 capture" now has a production implementation, but it
+must not be used on hardware until CR2-B static/host tests and both firmware-profile builds pass.
+
+The historical Station digital-zero utility is **not** revived: its PositionOffset/EEPROM phase,
+historical IDs and measured values are superseded. Only its read-only sampling method
+(multi-sample + Torque OFF + circular median + stability spread) informed CR2-A.
 
 `2048` is a **sanity prior**, never an imposed q0: `JointTransform::q0_tick` defaults to 0 with
 `present == false`, and a transform carrying 2048 without provenance is refused exactly like
@@ -484,6 +506,10 @@ The envelope below is what bounds that diagnostic when it IS authorised. It is n
 prerequisite.
 
 ### How V5 supplies the envelope — answered from the existing artifacts
+
+CR0 (2026-09-27) makes this section binding for readiness: normal calibration consumes this
+current contract data and does not wait for a direction-measurement campaign. See
+[`CALIBRATION_READINESS.md`](CALIBRATION_READINESS.md).
 
 No new compiler run was needed. Each canonical endpoint search already sweeps **one joint from
 q=0 with every other joint at q=0**, which is exactly the pose family a direction-verification
