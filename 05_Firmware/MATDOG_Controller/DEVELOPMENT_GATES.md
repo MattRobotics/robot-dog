@@ -393,9 +393,16 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     `2e5cbfa43378ed8d0e76e1c2a942886ef34a89db` passed CR2-B 467/467, all host suites,
     `USB_ONLY` build and `ROBOT_POWERED` build; audit-only follow-up
     `9ff046f0302928dfd2833d848206f3d66ca75228` passed static audit over 114 source files with
-    clean diff/worktree. **No live q0 capture is claimed yet and no hardware authorization changed.**
-    The next gate is CR2-C, prepared but not authorized/executed in
-    [`CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md`](CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md).
+    clean diff/worktree.
+  - **CR2-C current-installation hardware q0 capture (2026-09-27): PASS.** The authorized
+    ROBOT_POWERED read-only campaign on build `315d4ade6ff0` produced a fresh formal
+    population PASS (12/12) and twelve q0 `CANDIDATE` records, nine samples per joint, with
+    maximum measured spread 0 ticks. Final closeout preserved authority NONE,
+    `hardware_motion=BLOCKED`, `accepted=NO`, `promoted=NO`,
+    `transform_admitted=NO`, `motion_authorized=NO`, `runtime_resets=0`, and final
+    SAFE_OFF readback PASS for all 13 installed servos. Evidence:
+    [`../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/`](../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/).
+    **Next: CR3 acceptance/persistence/promotion policy; no motion authorization changes.**
 
 ## HostLink semantic layer
 

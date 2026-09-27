@@ -1,0 +1,16 @@
+CALIBRATION_Q0 state=COMPLETE failure=NONE session=1 sample_passes=9/9 next_joint=0 candidates=12/12
+CALIBRATION_Q0_POPULATION status=PASS verdict=PASS observed=12/12
+  Q0 bus=11 leg=LF joint=LOWER unit=M33 tick=2087 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=12 leg=LF joint=UPPER unit=ELR01 tick=2100 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=13 leg=LF joint=HIP unit=M22 tick=1996 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=21 leg=RF joint=LOWER unit=NEW03 tick=1985 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=22 leg=RF joint=UPPER unit=ELR03 tick=2092 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=23 leg=RF joint=HIP unit=NEW01 tick=2030 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=31 leg=RH joint=LOWER unit=NEW05 tick=2034 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=32 leg=RH joint=UPPER unit=ELR02 tick=2042 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=33 leg=RH joint=HIP unit=NEW06 tick=2081 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=41 leg=LH joint=LOWER unit=M41 tick=2073 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=42 leg=LH joint=UPPER unit=M42 tick=2089 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+  Q0 bus=43 leg=LH joint=HIP unit=M43 tick=2035 spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE
+CALIBRATION_Q0_RESULT=12_CANDIDATES_ONLY
+CALIBRATION_Q0_NOTE accepted=NO promoted=NO transform_admitted=NO motion_authorized=NO

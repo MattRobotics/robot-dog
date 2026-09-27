@@ -1,0 +1,38 @@
+>>> @SYSTEM SOURCE_SIGNATURE
+SOURCE_SIGNATURE build_id=315d4ade6ff0 firmware=MATDOG Controller version=0.1.0 profile=ROBOT_POWERED board=YD-ESP32-S3 N16R8
+  ota_running_build_id=315d4ade6ff0 ota_running_image_state=UNDEFINED reset_reason=OTHER
+  partition=app0 address=0x010000 size=0x300000
+
+>>> @STATUS
+SYSTEM health=READY power_state=RUN mode=MAINTENANCE authority=NONE uptime_ms=977758 profile=ROBOT_POWERED
+BNO085 init=OK detected=ONLINE expected=REQUIRED result=PASS
+DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS
+SERVO  init=OK detected=ONLINE expected=REQUIRED result=PASS
+LED    init=OK detected=UNKNOWN expected=OPTIONAL result=PASS
+SERVO_POP canonical=17 expected_now=13 absent_by_design=4 last_census=NOT_RUN
+WIFI  state=CONNECTED connected=YES ip=192.168.1.156 rssi_dbm=-72 fault=NONE
+  heap_free=238372 heap_min_free=233412
+
+>>> @AUTHORITY STATUS
+AUTHORITY owner=NONE generation=0 last_result=RELEASED
+AUTHORITY_INHIBIT active=NO reason=NONE
+AUTHORITY_MODE operating_mode=MAINTENANCE motion_allowed=NO service_allowed=YES
+AUTHORITY_LAST_CLEAR BOOT
+AUTHORITY_COUNTERS grants=0 already_owned=0 releases=0 rejections=0 stale=0 force_clears=0 inhibits=0
+AUTHORITY_NOTE SAFE_OFF is outside arbitration and always reachable
+
+>>> @CALIBRATION STATUS
+CALIBRATION_CURRENT state=STALE_PENDING_FULL_RECALIBRATION hardware_motion=BLOCKED
+CALIBRATION_NOTE source_of_truth=MATDOG_JOINT_CALIBRATION.yaml calibration_reset:
+CALIBRATION_SESSION state=NO_SESSION origin=NONE leg=LF last_result=OK
+CALIBRATION_AUTHORITY held=NO generation=0
+CALIBRATION_POPULATION verdict=NOT_EVALUATED observed=0/12 mask=0x000
+CALIBRATION_PHASE reported=NO last=PREFLIGHT contacts=0
+CALIBRATION_RESTORE required=NO torque_off_required=YES cause=NONE
+CALIBRATION_COUNTERS started=0 completed=0 aborted=0 failed=0
+CALIBRATION_LF_V25=HISTORICAL_HARDWARE_ORACLE (not current calibration)
+
+>>> @CALIBRATION Q0 STATUS
+CALIBRATION_Q0 state=IDLE failure=NONE session=0 sample_passes=0/0 next_joint=0 candidates=0/12
+CALIBRATION_Q0_POPULATION status=NOT_EVALUATED verdict=NOT_EVALUATED observed=0/12
+CALIBRATION_Q0_RESULT=IN_PROGRESS_OR_NOT_RUN

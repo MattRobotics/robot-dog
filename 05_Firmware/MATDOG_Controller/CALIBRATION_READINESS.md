@@ -316,9 +316,33 @@ authorize flashing or live capture by itself, and does not change
 
 ### CR2-C — first hardware q0 capture
 
-**PREPARED / NOT AUTHORIZED / NOT EXECUTED.**
+**PASS — HARDWARE READ-ONLY CAPTURE COMPLETE (2026-09-27).**
 
-The operator procedure is frozen in
-[`CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md`](CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md).
-It preserves the existing powered-session/flash authorization boundary and permits only a
-Torque-OFF, no-motion, no-EEPROM acquisition of twelve ephemeral q0 candidates.
+The authorized procedure in
+[`CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md`](CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md)
+was executed on source/build `315d4ade6ff0de59f6f3032f9864accb1680c669`.
+
+Result:
+
+```text
+fresh same-session population evidence = PASS 12/12
+q0 capture state                       = COMPLETE
+q0 failure                             = NONE
+q0 candidates                          = 12/12
+samples per joint                      = 9
+maximum measured spread                = 0 ticks
+accepted                               = NO
+promoted                               = NO
+transform_admitted                     = NO
+motion_authorized                      = NO
+```
+
+All twelve measured joints were verified Torque OFF immediately before acquisition. Final closeout
+again returned `VERIFIED_OFF` for all 13 installed servos, authority remained NONE,
+`runtime_resets=0`, and hardware motion remained BLOCKED.
+
+Evidence package:
+[`../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/`](../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/).
+
+CR2-C therefore closes the first current-installation q0 measurement gate. It does not make any q0
+operational. CR3 owns acceptance, persistence and promotion policy.

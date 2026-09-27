@@ -4,7 +4,7 @@
 **Branch:** `feat/calibration-readiness-v1`
 **Authorization:** RECEIVED from operator
 **Authorization phrase:** `AUTORIZZO CR2-C READ-ONLY Q0 HARDWARE SESSION`
-**Execution status:** PRE-FLIGHT / NOT YET FLASHED / NOT YET CAPTURED
+**Execution status:** COMPLETE / CR2-C PASS
 
 ## Authorized scope
 
@@ -160,3 +160,83 @@ No flash write was performed during CR2-C.2.
 
 Offline structural validation and creation of the companion recovery manifest remain the next
 sub-gate before any build/flash action.
+
+
+## CR2-C.2b - recovery structural gate
+
+**Result: PASS**
+
+Fresh 16 MiB dump SHA256:
+`339c01f7805b9f44c113074bf9a82b460e14b8fe55e6796ca25b0f24323cb7ce`.
+Partition table/otadata validation selected `app0 @ 0x010000`; the recovery manifest passed
+`backup_gate_logic.py`.
+
+## CR2-C.3 - exact ROBOT_POWERED build gate
+
+**Result: PASS**
+
+```text
+SOURCE_COMMIT=315d4ade6ff0de59f6f3032f9864accb1680c669
+BUILD_ID=315d4ade6ff0
+HARDWARE_PROFILE=ROBOT_POWERED
+OTA_INGEST_ENABLED=0
+APPLICATION_SIZE=1036560
+APPLICATION_SHA256=753936ac1dc12d4af11f6ffaed51a8aaeda5b76f260e35e188a3d065f9f52b59
+```
+
+Static audit, all host suites and the explicit ROBOT_POWERED build passed.
+
+## CR2-C.4 - application-only flash
+
+**Result: PASS**
+
+The reviewed script wrote only the selected `app0` application partition and verify-flash
+confirmed the digest. No bootloader, partition table, NVS or servo EEPROM write occurred.
+
+## CR2-C.5 - post-flash identity and safe-state gate
+
+**Result: PASS**
+
+Running build `315d4ade6ff0`, ROBOT_POWERED, `app0 @ 0x010000`, MAINTENANCE, authority NONE,
+hardware motion BLOCKED, null production ActuatorBackend and q0 IDLE were all confirmed. All 13
+installed servos returned `VERIFIED_OFF`.
+
+## CR2-C.6 - current-installation q0 capture
+
+**Result: PASS**
+
+Operator established nominal URDF q=0 manually using square/jigs and mechanical support; raw 2048
+was not used as the placement target. Command:
+`@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE`.
+
+Fresh population evidence passed 12/12. Twelve CANDIDATE q0 records were produced with spread 0
+ticks on every joint. Exact values are preserved in the validation package.
+
+## CR2-C.7 - final closeout
+
+**Result: PASS**
+
+```text
+SYSTEM health=READY
+mode=MAINTENANCE
+authority=NONE
+runtime_resets=0
+hardware_motion=BLOCKED
+q0=12_CANDIDATES_ONLY
+SAFE_OFF=13/13 VERIFIED_OFF
+pack_v=11.3 V
+soc=66.3 %
+cell_delta=9 mV
+alarms=0000 0000 0000 0000
+```
+
+Opening pack voltage was not captured in a dedicated BMS snapshot and is recorded as NOT_CAPTURED,
+not reconstructed.
+
+## Final CR2-C verdict
+
+**CR2-C = PASS.**
+
+Current 12-joint population and current-installation q0 have been measured under Torque OFF with
+current identity/geometry provenance. No evidence was accepted/promoted and no motion was
+authorized. CR3 starts from the immutable evidence package.
