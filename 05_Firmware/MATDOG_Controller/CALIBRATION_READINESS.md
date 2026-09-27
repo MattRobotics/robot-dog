@@ -250,7 +250,7 @@ write phase. CR2 reuses only the non-authoritative **measurement method** alread
 there — repeated read-only samples, Torque OFF, circular median and stability spread — while
 discarding its IDs, q0 values, offsets, EEPROM logic and tolerances.
 
-**CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: IMPLEMENTED / OFFLINE VALIDATION PENDING.**
+**CR2-B SAME-SESSION READ-ONLY ORCHESTRATION: IMPLEMENTED / OFFLINE + BUILD VALIDATED.**
 
 `CalibrationQ0CaptureSession.*` now owns one explicit evidence-acquisition transaction, separate
 from `CalibrationManager`. This separation is intentional: `CalibrationManager::startSession(
@@ -302,5 +302,14 @@ ephemeral evidence for the later CR3 acceptance/persistence gate.
 CR2-A passed the synchronized local host/static gate on 2026-09-27 at
 `5daefc73f824797d3052c75002a495bed21b58f3`: static audit PASS (111 source files), dedicated
 CR2-A suite 52/52 PASS, all host suites PASS, `git diff --check` clean and working tree clean.
-CR2-B now requires a fresh full static/host gate **and both USB_ONLY and ROBOT_POWERED firmware
-compile gates** before any flash or live read-only capture is considered.
+CR2-B passed its complete local validation sequence on 2026-09-27. The functional firmware at
+`2e5cbfa43378ed8d0e76e1c2a942886ef34a89db` passed the dedicated CR2-B host suite
+(467/467), every host suite, the source-default `USB_ONLY` firmware build and the explicit
+`ROBOT_POWERED` firmware build; the final local build artifact was restored to `USB_ONLY`.
+The subsequent audit-only correction at `9ff046f0302928dfd2833d848206f3d66ca75228` changed
+only `scripts/static_audit.py`; on that exact HEAD the static audit passed over 114 source
+files, `git diff --check` was clean and the working tree was clean.
+
+Therefore CR2-B is **offline + build validated**. This is still not hardware validation, does not
+authorize flashing or live capture by itself, and does not change
+`hardware_motion_authorized=false`.
