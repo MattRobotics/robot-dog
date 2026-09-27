@@ -239,11 +239,11 @@ static void test_the_two_q0_estimators_are_not_interchangeable() {
 }
 
 // ---------------------------------------------------------------------------
-// Direction — evidence, not a sign convention
+// DirectionEvidence — legacy/oracle vocabulary, isolated from production direction
 // ---------------------------------------------------------------------------
 
-static void test_direction_is_unknown_until_measured() {
-  g_case = "direction_is_unknown_until_measured";
+static void test_legacy_direction_evidence_is_isolated_from_production_contract() {
+  g_case = "legacy_direction_evidence_is_isolated_from_production_contract";
   DirectionEvidence d{};
   CHECK_EQ((int)d.state, (int)DirectionState::UNKNOWN);
   CHECK_EQ(d.sign, 0);
@@ -264,7 +264,9 @@ static void test_direction_is_unknown_until_measured() {
     CHECK(!spec.isCurrentCalibrationEvidence());   // current calibration may not
   }
 
-  // A measured candidate is not yet accepted.
+  // The recovered vocabulary still has candidate/accepted states for oracle
+  // and optional-diagnostic representation. Production motorDirection does not
+  // consult them (enforced separately by check_direction_is_contractual).
   DirectionEvidence candidate{};
   candidate.state = DirectionState::MEASURED_CANDIDATE;
   candidate.sign = -1;
@@ -854,7 +856,7 @@ int main() {
   test_q0_never_defaults_to_the_raw_servo_centre();
   test_the_three_meanings_of_2048_stay_separate();
   test_the_two_q0_estimators_are_not_interchangeable();
-  test_direction_is_unknown_until_measured();
+  test_legacy_direction_evidence_is_isolated_from_production_contract();
   test_contact_witness_band();
   test_contact_state_classification();
   test_evidence_lifecycle_has_no_shortcuts();

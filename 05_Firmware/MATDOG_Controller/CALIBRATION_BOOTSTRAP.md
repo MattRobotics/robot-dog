@@ -16,7 +16,7 @@ manual placement at nominal URDF q=0     operator, no motion
         ↓
 read-only q0 capture, torque OFF         TO_IMPLEMENT
         ↓
-current direction verification            TO_IMPLEMENT
+current motorDirection from URDF/V5       REUSED / CONTRACT DATA
         ↓
 raw encoder ↔ URDF q transform            TO_IMPLEMENT
         ↓
@@ -289,9 +289,9 @@ unnecessary.
 
 ### 8.4 The question answered directly
 
-> Can the already-conservative URDF limits for HIP/LOWER, together with current q0/direction
-> and Geometry V5, support the first safe operational envelope without first reaching the
-> mechanical contact beyond URDF?
+> Can the already-conservative URDF limits for HIP/LOWER, together with current q0,
+> current URDF `motorDirection` and Geometry V5, support the first safe operational envelope
+> without first reaching the mechanical contact beyond URDF?
 
 **Yes — and by a wide margin. But the envelope must not be the URDF limit itself.**
 
@@ -309,8 +309,8 @@ Three reasons the URDF limit is the wrong envelope, in descending order of sever
 
 **The defensible first operational envelope is the stand trajectory's own range plus a working
 margin**, which sits ~199 ticks clear of every URDF limit and further still from every contact.
-It needs current q0, current direction, and the V5 collision validation that already exists —
-and it needs **no contact endpoint at all**.
+It needs current q0, current URDF `motorDirection`, and the V5 collision validation that already
+exists — and it needs **no contact endpoint at all**.
 
 Deriving that envelope is the next design step. **No code is added for it in this branch**, and
 nothing here changes `DIRECTION_VERIFY budget = 0`, hardware motion `BLOCKED`, or default write
@@ -484,6 +484,10 @@ The envelope below is what bounds that diagnostic when it IS authorised. It is n
 prerequisite.
 
 ### How V5 supplies the envelope — answered from the existing artifacts
+
+CR0 (2026-09-27) makes this section binding for readiness: normal calibration consumes this
+current contract data and does not wait for a direction-measurement campaign. See
+[`CALIBRATION_READINESS.md`](CALIBRATION_READINESS.md).
 
 No new compiler run was needed. Each canonical endpoint search already sweeps **one joint from
 q=0 with every other joint at q=0**, which is exactly the pose family a direction-verification

@@ -296,8 +296,10 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   robot.
 - **ENTRY** — G3 formal PASS (including the census repeat); G3.1 PASS; Authority model PASS;
   powered bus health proven.
-- **ALLOWED** — H1 census semantics, q0 evidence capture, direction witnesses, characterization,
-  then staged calibration motion **each with its own session authorization**.
+- **ALLOWED** — H1 census semantics, q0 evidence capture, current `motorDirection` resolved from
+  the bound URDF / Geometry V5 contract, characterization, then staged calibration motion
+  **each with its own session authorization**. `DIRECTION_VERIFY` is optional diagnostic work,
+  not a calibration prerequisite.
 - **FORBIDDEN** — merging the archived calibrator tree
   (`archive/2026-08-29/full-leg-calibrator-v1-h0`) wholesale; duplicating `ServoBus`/UART/
   scheduler/`SAFE_OFF`; auto-promoting measurements; assuming `q0 = 2048`; any H2+ motion before a
@@ -311,7 +313,11 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   the current plans park at 35.000 / 64.1667 / 93.3333 degrees. Of the 24 endpoints only the
   **8 upper-leg** ones are `EXECUTABLE_URDF_DOMAIN`; the 16 hip and lower-leg endpoints contact
   beyond the declared URDF limit and are diagnostic evidence, never motion targets, whatever
-  their clearance verdict. See [`CALIBRATION_BOOTSTRAP.md`](CALIBRATION_BOOTSTRAP.md).
+  their clearance verdict. Full operational calibration therefore does **not** mean 24 contact
+  motions: the eight upper contacts are the current physical contact-calibration set, while
+  hip/lower require conservative current operational envelopes without beyond-URDF probing.
+  See [`CALIBRATION_BOOTSTRAP.md`](CALIBRATION_BOOTSTRAP.md) and
+  [`CALIBRATION_READINESS.md`](CALIBRATION_READINESS.md).
 - **STATUS** — **BLOCKED** by `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION`. Last formal H1 was
   6/12 and is **not** superseded by a Controller census.
   - **Offline foundation: IMPLEMENTED / COMPILED / OFFLINE TESTED.** `src/calibration/` holds a
@@ -322,10 +328,14 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     `EnableTorque(id, 0)` in `safeOff()`. Torque, `GoalPosition`, `SyncWrite`, EEPROM,
     `PositionOffset`, ID recode and provisioning are all absent from the subsystem and
     audit-forbidden inside it.
-  - **Hardware motion is compile-time blocked.** `MATDOG_CALIBRATION_HARDWARE_MOTION_AUTHORIZED`
-    defaults to `0`, mirroring the YAML's `hardware_motion_authorized: false`; a live session is
-    refused before the arbiter is even asked. Unblocking requires a real recalibration and a
-    reviewed YAML change, not a flag flip.
+  - **Operational hardware motion is compile-time blocked.**
+    `MATDOG_CALIBRATION_HARDWARE_MOTION_AUTHORIZED` defaults to `0`, mirroring the YAML's
+    `hardware_motion_authorized: false`; the current live-session entry therefore refuses before
+    the arbiter is even asked. **CR0 (2026-09-27) closes the semantic loop without changing this
+    flag:** future controlled calibration motion requires a distinct, session-scoped
+    calibration-motion permit; final `hardware_motion_authorized=true` remains a separate
+    post-calibration state transition. No permit implementation or motion path exists yet. See
+    [`CALIBRATION_READINESS.md`](CALIBRATION_READINESS.md).
   - **LF V25 replay: RECOVERED / REPLAYED / MATCHED, offline only.** 58 steps, six LF contacts of
     the twenty-four, the documented fine sequences, and the one documented failure (the
     cable-obstructed M12 MAX rejected by the witness band). Every replayed record carries
@@ -348,10 +358,12 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     motion" true without a special-cased guard. It owns no session state, no persistence and no
     geometry profile of its own — full record and adversarial test list in
     [`../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md`](../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md).
-  - **Still TO_IMPLEMENT** — direction measurement (`MEASURED_CANDIDATE`/`ACCEPTED`: no historical
-    mechanism exists to recover) and the persistence boundary (**TO_DESIGN**: whether an accepted
-    calibration is written by `PROVISIONING` or by a separate transaction — deliberately not
-    decided by I5).
+  - **CR0 direction contract CLOSED (2026-09-27)** — normal calibration does not measure
+    `motorDirection`. Commit `9aae03d` made the current URDF / Geometry V5 profile the single
+    production authority and kept `DIRECTION_VERIFY` diagnostic-only; the older
+    `MEASURED_CANDIDATE`/`ACCEPTED` direction vocabulary is legacy/oracle-domain state, not a
+    production readiness prerequisite. **Still TO_DESIGN** — the persistence/promotion boundary
+    (whether accepted calibration is written by `PROVISIONING` or by a separate transaction).
 
 ## HostLink semantic layer
 
@@ -512,8 +524,9 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   `CommandRouter` does: both compiled profiles are byte-identical with and without the adapter
   present, because the linker dead-code-eliminates it entirely. The three geometry-authorised
   operations have no raw-tick target yet and always resolve to `ExecuteResult::NO_RAW_TARGET` —
-  that conversion needs an accepted q0/direction transform applied by a real execution engine,
-  deferred to I5. The only actuator write in the firmware is still torque OFF inside
+  that conversion needs an accepted current q0 transform plus `motorDirection` resolved from
+  the bound current geometry profile. CR0 assigns this to one future checked q↔raw target
+  resolver; it must not be duplicated across layers. The only actuator write in the firmware is still torque OFF inside
   `ServoBus::safeOff()`. Audit and design: [`SAFE_ACTUATOR_LAYER.md`](SAFE_ACTUATOR_LAYER.md),
   [`../../09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md`](../../09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md).
   **I4/I5 Controller wiring (2026-09-25, objective change):** `Controller` now owns real

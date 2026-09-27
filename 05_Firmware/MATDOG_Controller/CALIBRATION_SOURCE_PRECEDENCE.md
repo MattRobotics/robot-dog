@@ -5,6 +5,9 @@
 **Amended:** 2026-09-25 — I1 repository-truth reconciliation carried six legacy open items
 forward from the historical `REPOSITORY_VERIFICATION_INDEX.md` snapshot into this current-truth
 document; see §9.
+**Amended:** 2026-09-27 — CR0 reconciles the direction contract with commit `9aae03d` and
+[`CALIBRATION_READINESS.md`](CALIBRATION_READINESS.md): production direction is current
+URDF/Geometry V5 contract data; direction measurement is not a calibration prerequisite.
 
 This document records the C0 evidence audit that preceded the native calibration
 foundation. It exists so the next person does not have to re-derive which of several
@@ -115,12 +118,14 @@ archive. In the current repository it means (a) the Full-Leg population gate ove
 the Controller's own first hardware test in `VALIDATION.md`. New code therefore uses
 **leg population gate**; historical documents keep their wording.
 
-**D2 — there is no "direction witness".** `direction` is a compile-time `JointSpec`
-constant used arithmetically (`tick = HOME_TICK + direction × q_delta`), never
-measured. The witness that exists is the **contact witness**. The model records
-direction provenance so a spec constant can never be mistaken for evidence;
-`MEASURED_CANDIDATE` and `ACCEPTED` are **TO_IMPLEMENT** — no historical mechanism
-exists to recover.
+**D2 — there is no historical "direction witness", and production no longer needs one.**
+LF V25's `direction` is a compile-time `JointSpec` constant, not measured evidence; the witness
+that exists in that archive is the **contact witness**. Commit `9aae03d` subsequently closed the
+current production question: `motorDirection` is resolved from the current bound URDF / Geometry
+V5 profile and is hardware-contract data, while q0 remains current-installation calibration data.
+`DIRECTION_VERIFY` is optional diagnostic-only. The legacy `MEASURED_CANDIDATE`/`ACCEPTED`
+direction vocabulary remains in the recovered domain for oracle/diagnostic representation; it is
+**not** a TO_IMPLEMENT prerequisite for current calibration acceptance.
 
 **D3 — three evidence vocabularies.** See §4.
 
@@ -172,7 +177,7 @@ or on hardware; RF/RH/LH profiles never finished.
 | `LegSessionStateMachine` | replace the LF-only machine | partly | no | **REDESIGN** — still holds `LfSessionState` and `contacts[3]`, and its `mode` field is `#[allow(dead_code)]` "until the legacy modes migrate". The migration never happened |
 | `RawLegCalibrationSpec` | inert, leg-agnostic spec data | yes | no | **PORT SELECTIVELY** — the data/behaviour split is the good idea |
 | `ArmableLfSessionSpec` + `validate_lf_v25` | sealed, single-producer spec | yes | no | **PORT SELECTIVELY (concept only)** — the sealing discipline is excellent; the rules are not portable, see below |
-| `LFID-1..LFID-9` identity rules | reject a malformed spec | yes | no | **SUPERSEDED** — LFID-3 hard-codes motor IDs 13/12/11 and LFID-4 the directions. Both are exactly what the 2026-08-27 reassembly invalidated |
+| `LFID-1..LFID-9` identity rules | reject a malformed spec | yes | no | **SUPERSEDED** — LFID-3 hard-codes historical motor IDs 13/12/11; LFID-4 hard-codes direction inside a historical spec instead of resolving the current URDF/geometry contract. Neither is a current authority. |
 | `GoalNode` / `GoalWriteRoute` / `EmittedGoal` | one owner for `GoalPosition` writes | yes | no | **PORT SELECTIVELY** — maps onto the future Safe Actuator Layer, not onto this phase |
 | `ContactVerdict` / `FreshObservation` | make single-owner telemetry explicit | yes | no | **REUSE AS-IS (concept)** — thin `motor_id` + payload wrappers |
 | `ContactState` detector | contact detection state machine | yes | **yes, via LF V25** | **REUSE AS-IS** — already recovered into the domain |
@@ -229,7 +234,7 @@ future Calibration Execution Engine (`I5`).
 | 1 | `robot.calibration_status: DIGITAL_ZERO_CALIBRATED_AND_VERIFIED` in `MATDOG_JOINT_CALIBRATION.yaml` vs. the loader requirement `VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION` (`matdog_leg_fk_live.py`, `matdog_visual_zero_pose_probe.py`, `matdog_apply_visual_zero.py`, `matdog_calibration_gate.py`, `matdog_calibration_validate.py`, `matdog_live_joint_monitor.py` — six consumers) | **KNOWN / DOCUMENTED, not fixed.** The enum is deliberately left stale — see §2 above and the YAML's own header comment. `calibration_reset:` is authoritative; the enum is not. | **TO_DESIGN.** A real fix changes the enum and all six consumers in one reviewed change, not a string edit. Not required before the current-installation stand revalidation, which does not read this enum. |
 | 2 | 8 unresolved conservative clearance lower bounds, all `DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS`, outside the executable target domain | **OPEN, tracked.** See [`CALIBRATION_BOOTSTRAP.md`](CALIBRATION_BOOTSTRAP.md) §7, "still current, and still not PASS." | Geometry Compiler V5 / Phase 2B-2C scope, unchanged by this integration branch. |
 | 3 | RF/RH/LH have no hardware-oracle evidence equivalent to LF V25 | **OPEN, unresolved.** Only LF V25 is mechanically hardware-validated (§6 above: "RF/RH/LH profiles never finished"). | Requires a dedicated per-leg hardware calibration campaign; not an offline-software gate. |
-| 4 | Do not copy LF V25 measured spans (q0, direction, thresholds) into RF/RH/LH as if they were current truth | **RULE, enforced by convention, not by a runtime guard.** Consistent with §1 source precedence and 15.11 of the NextGen handoff. | No code currently attempts this copy; the constraint is a review discipline for the future execution engine, not a present defect. |
+| 4 | Do not copy LF V25 q0, direction fields or thresholds into RF/RH/LH as if they were current truth | **RULE.** q0 must be measured on the current installation; production `motorDirection` comes from the current URDF/Geometry V5 contract, not from LF V25. | Enforced for production direction by `check_direction_is_contractual()`; LF V25 remains historical replay/regression data only. |
 | 5 | FRONT/HIND geometry is not interchangeable by mechanical convention | **RULE, no violation found.** No current code merges front/hind endpoint or parking data. | Future Geometry V5 consumers must preserve the distinction; nothing to fix today. |
 | 6 | A fitted affine diagnostic must never erase the raw model-vs-hardware discrepancy it was fitted from | **RULE, no violation found.** No affine-fit diagnostic exists in the current Controller or calibration domain; the constraint applies if/when one is built. | Binding on any future diagnostic that fits LF V25's measured q0 (2067/2040/2074) against the nominal model. |
 
