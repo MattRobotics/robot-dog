@@ -367,6 +367,18 @@ unit**, bus id *as transport metadata only*, raw tick, geometry/profile provenan
 and evidence state. A bus-id-only association is not expressible — `JointIdentity` has no bus
 id field.
 
+**CR2-A foundation, 2026-09-27:** `CalibrationQ0Bootstrap.*` now implements the pure
+observation→candidate reduction offline. It requires formal current population evidence, matching
+Geometry V5 provenance, operator-confirmed nominal q=0, an explicit stability budget and repeated
+Torque-OFF raw samples. It emits `Q0Estimator::MANUAL_ZERO_POSE` evidence at
+`EvidenceState::CANDIDATE` only. It has no `ServoBus`, no transport and no promotion/transform
+admission path. The actual same-session Controller read orchestration remains **TO_IMPLEMENT**,
+so the flow diagram's "read-only q0 capture" is not yet a live production capability.
+
+The historical Station digital-zero utility is **not** revived: its PositionOffset/EEPROM phase,
+historical IDs and measured values are superseded. Only its read-only sampling method
+(multi-sample + Torque OFF + circular median + stability spread) informed CR2-A.
+
 `2048` is a **sanity prior**, never an imposed q0: `JointTransform::q0_tick` defaults to 0 with
 `present == false`, and a transform carrying 2048 without provenance is refused exactly like
 one carrying any other number.
