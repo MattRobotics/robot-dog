@@ -79,3 +79,50 @@ ROBOT_POWERED domain energized
 
 No hardware command had been executed before this correction. The runbook was amended before
 continuing.
+
+## CR2-C.1 — pre-flash powered SAFE_OFF verification
+
+**Result: PASS**
+
+The operator executed the no-reset native USB CDC session with the robot in the validated
+`ROBOT_POWERED` topology.
+
+Observed before SAFE_OFF:
+
+```text
+SYSTEM health=BOOTING power_state=RUN mode=MAINTENANCE authority=NONE
+profile=ROBOT_POWERED
+runtime_resets=0
+```
+
+The following 13 installed servo IDs were then commanded through the existing de-escalation-only
+`@SERVO SAFE_OFF` path:
+
+```text
+11 12 13 21 22 23 31 32 33 41 42 43 51
+```
+
+Every one returned:
+
+```text
+result=VERIFIED_OFF
+```
+
+Terminal result:
+
+```text
+CR2C_SAFE_OFF=PASS verified=13/13 ids=11,12,13,21,22,23,31,32,33,41,42,43,51
+```
+
+Final cached system state:
+
+```text
+SYSTEM health=READY power_state=RUN mode=MAINTENANCE authority=NONE
+SERVO init=OK detected=ONLINE expected=REQUIRED result=PASS
+runtime_resets=0
+```
+
+No servo motion was reported. No Torque ON, GoalPosition, EEPROM, PositionOffset or CalibrationOfs
+operation was performed.
+
+The powered bus is therefore in the required pre-esptool safe state for CR2-C.2 recovery backup.
