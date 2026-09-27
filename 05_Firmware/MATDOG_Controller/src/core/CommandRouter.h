@@ -99,6 +99,8 @@ class CommandRouter {
 
  private:
   void handleLine(String line);
+  bool q0CaptureOwnsServoDiagnostics() const;
+  bool servoDiagnosticBusy() const;
   void printHelp();
   void printStatus();
   void printImuStatus();
