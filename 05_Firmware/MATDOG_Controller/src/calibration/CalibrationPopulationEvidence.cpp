@@ -59,12 +59,23 @@ bool semanticIdentityFromCanonical(const servo::CanonicalServo& canonical,
 }
 
 bool censusCompleteForFormalEvidence(const servo::CensusResult& census) {
+  const uint8_t expected_now = servo::expectedNowCount();
+  const uint8_t absent_by_design = servo::absentByDesignCount();
   return census.scan_lo <= servo::kCanonicalScanLo &&
          census.scan_hi >= servo::kCanonicalScanHi &&
          census.not_probed == 0 &&
          !census.truncated &&
          census.canonical_allocated == servo::canonicalAllocatedCount() &&
-         census.expected_now == servo::expectedNowCount();
+         census.expected_now == expected_now &&
+         static_cast<uint16_t>(census.present_expected) + census.missing_expected ==
+             expected_now &&
+         static_cast<uint16_t>(census.absent_by_design) +
+                 census.absent_by_design_present ==
+             absent_by_design &&
+         census.missing_id_count == census.missing_expected &&
+         census.unexpected_id_count == census.unexpected_id &&
+         census.absent_by_design_present_id_count ==
+             census.absent_by_design_present;
 }
 
 uint16_t busAnomalyCount(const servo::CensusResult& census) {
@@ -92,7 +103,7 @@ bool recordQualifies(const servo::JointPreflightRecord& record,
   if (!recordMatchesCanonical(record, canonical)) return false;
   if (record.result != servo::JointPreflightResult::PASS) return false;
   if (record.observed_bus_id != canonical.bus_id) return false;
-  if (record.model < 0) return false;
+  if (record.model != servo::profile_data::kInvariants.model_expected) return false;
   if (!record.position_offset_read || record.position_offset != 0) return false;
   if (record.profile != servo::ProfileVerdict::MATCH) return false;
   if (record.profile_registers_read != servo::profile_data::kPersistentRegisterCount) return false;
@@ -139,7 +150,11 @@ PopulationEvidenceBuildResult buildCurrentLegPopulationEvidence(
   }
 
   if (!preflight.complete ||
-      preflight.joints_evaluated != servo::kLegPreflightCount) {
+      preflight.joints_evaluated != servo::kLegPreflightCount ||
+      preflight.pass_count != servo::kLegPreflightCount ||
+      preflight.no_response_count != 0 ||
+      preflight.mismatch_count != 0 ||
+      preflight.incomplete_count != 0) {
     out.status = PopulationEvidenceBuildStatus::REJECT_PREFLIGHT_INCOMPLETE;
     return out;
   }
