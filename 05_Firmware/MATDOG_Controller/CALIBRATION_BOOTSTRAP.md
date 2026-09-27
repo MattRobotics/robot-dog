@@ -367,13 +367,23 @@ unit**, bus id *as transport metadata only*, raw tick, geometry/profile provenan
 and evidence state. A bus-id-only association is not expressible — `JointIdentity` has no bus
 id field.
 
-**CR2-A foundation, 2026-09-27:** `CalibrationQ0Bootstrap.*` now implements the pure
-observation→candidate reduction offline. It requires formal current population evidence, matching
-Geometry V5 provenance, operator-confirmed nominal q=0, an explicit stability budget and repeated
-Torque-OFF raw samples. It emits `Q0Estimator::MANUAL_ZERO_POSE` evidence at
+**CR2-A foundation, 2026-09-27:** `CalibrationQ0Bootstrap.*` implements the pure
+observation→candidate reduction and is offline validated. It requires formal current population
+evidence, matching Geometry V5 provenance, operator-confirmed nominal q=0, an explicit stability
+budget and repeated Torque-OFF raw samples. It emits `Q0Estimator::MANUAL_ZERO_POSE` evidence at
 `EvidenceState::CANDIDATE` only. It has no `ServoBus`, no transport and no promotion/transform
-admission path. The actual same-session Controller read orchestration remains **TO_IMPLEMENT**,
-so the flow diagram's "read-only q0 capture" is not yet a live production capability.
+admission path.
+
+**CR2-B orchestration, 2026-09-27:** the same-session Controller path is now implemented but not
+yet offline/build validated. `CalibrationQ0CaptureSession` sequences a fresh existing census, a
+fresh existing preflight, CR1 formal population construction and round-robin calls to the existing
+`ServoBus::readRuntimeState()`. It is not a `CalibrationManager` live session and acquires no
+actuator authority. Its only output is twelve CR2-A candidates; no acceptance, persistence,
+transform admission or motion authorization occurs. The command is explicit, MAINTENANCE-only,
+ROBOT_POWERED-only and requires the literal `CONFIRM_Q0_POSE` token.
+
+Therefore the flow diagram's "read-only q0 capture" now has a production implementation, but it
+must not be used on hardware until CR2-B static/host tests and both firmware-profile builds pass.
 
 The historical Station digital-zero utility is **not** revived: its PositionOffset/EEPROM phase,
 historical IDs and measured values are superseded. Only its read-only sampling method
