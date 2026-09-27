@@ -2299,6 +2299,67 @@ def check_calibration_population_evidence(files, sketch_dir):
             fail(f"{entry[0]}: CR1 producer is wired into production before its session "
                  f"freshness/orchestration gate is implemented")
 
+def check_calibration_q0_bootstrap(files, sketch_dir):
+    """CR2 read-only q0 candidate builder stays pure and non-operational."""
+    by_name = {path.name: (path, code) for path, code in files}
+    header = by_name.get("CalibrationQ0Bootstrap.h")
+    source = by_name.get("CalibrationQ0Bootstrap.cpp")
+    if header is None or source is None:
+        fail(f"{sketch_dir / 'src' / 'actuator'}: CR2 q0 bootstrap unit missing")
+        return
+
+    for path, code in (header, source):
+        for forbidden in ("#include <Arduino.h>", "#include \"../servo/ServoBus.h\"",
+                          "HardwareSerial", "Serial.", "millis(", "readRuntimeState(",
+                          "EnableTorque", "WritePos", "GoalPosition", "SyncWrite",
+                          "RegWrite", "CalibrationOfs", "PositionOffset", "unLockEprom",
+                          "LockEprom"):
+            if forbidden in code:
+                fail(f"{path}: CR2 q0 bootstrap contains {forbidden!r} - it must reduce "
+                     f"already-read evidence and must never own transport, motion or EEPROM")
+
+    path, code = source
+    for required in (
+        "populationIsCurrentPass(population)",
+        "profile.provenanceMatches(expected_provenance)",
+        "profile.provenanceTag() == kNoGeometryProvenance",
+        "profile.findJoint(request.identity)",
+        "joint->bus_id != request.bus_id",
+        "request.nominal_zero_pose_confirmed",
+        "sample_count < kQ0BootstrapMinSamples",
+        "sample_count > kQ0BootstrapMaxSamples",
+        "!sample.read_ok",
+        "sample.torque_enable != 0",
+        "sample.raw_tick < kRawMin",
+        "sample.raw_tick > kRawMax",
+        "spread > request.max_stability_spread_ticks",
+        "Q0Estimator::MANUAL_ZERO_POSE",
+        "EvidenceState::CANDIDATE",
+        "CalibrationOrigin::LIVE_SESSION",
+        "accepted_by_gate = false",
+    ):
+        if required not in code:
+            fail(f"{path}: CR2 lost required q0 bootstrap gate {required!r}")
+
+    # Candidate construction must not be able to promote or install itself.
+    for forbidden in ("EvidenceState::PROMOTED", "JointTransformTable", ".admit("):
+        if forbidden in code:
+            fail(f"{path}: CR2 q0 bootstrap contains {forbidden!r} - CR2 ends at CANDIDATE; "
+                 f"CR3 owns acceptance/promotion and transform admission")
+
+    # 2048 may be recorded as a diagnostic distance only, never used to decide
+    # whether the captured q0 is acceptable.
+    if re.search(r"if\s*\([^)]*kServoRawCenter", code):
+        fail(f"{path}: CR2 gates candidate acceptance against raw centre 2048 - the bootstrap "
+             f"contract requires measure first, derive the plausibility window later")
+
+    # Foundation only: no production path may invoke the builder yet.
+    for name in ("Controller.cpp", "CommandRouter.cpp", "ServoPreflight.cpp", "ServoBus.cpp"):
+        entry = by_name.get(name)
+        if entry is not None and "buildQ0BootstrapCandidate(" in entry[1]:
+            fail(f"{entry[0]}: CR2 q0 builder is production-wired before the read-only "
+                 f"same-session capture/orchestration gate is implemented")
+
 def check_evidence_geometry_binding(files, sketch_dir):
     """B1: calibration evidence is bound to the geometry it was measured under.
 
@@ -3132,6 +3193,7 @@ def check_host_tests(sketch_dir):
     calibration_suites = [
         sketch_dir / "scripts" / "tests" / "test_calibration_domain.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_population_evidence.cpp",
+        sketch_dir / "scripts" / "tests" / "test_calibration_q0_bootstrap.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
     ]
     led_status_suite = sketch_dir / "scripts" / "tests" / "test_led_status_policy.cpp"
@@ -3207,7 +3269,7 @@ def check_host_tests(sketch_dir):
                    "test_ota_policy", "test_actuator_authority", "test_actuator_write_policy",
                    "test_calibration_geometry", "test_servo_profile",
                    "test_calibration_domain", "test_calibration_population_evidence",
-                   "test_calibration_manager",
+                   "test_calibration_q0_bootstrap", "test_calibration_manager",
                    "test_led_status_policy", "test_actuator_runtime",
                    "test_calibration_execution_engine", "test_service_readiness",
                    "test_hmac256", "test_ota_session", "test_http_mailbox"):
@@ -3715,6 +3777,7 @@ def main():
     check_servo_profile_export(SKETCH_DIR)
     check_h0_preflight_boundaries(files, SKETCH_DIR)
     check_calibration_population_evidence(files, SKETCH_DIR)
+    check_calibration_q0_bootstrap(files, SKETCH_DIR)
     check_evidence_geometry_binding(files, SKETCH_DIR)
     check_calibration_readiness_contract(SKETCH_DIR)
     check_direction_is_contractual(files, SKETCH_DIR)
