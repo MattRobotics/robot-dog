@@ -787,6 +787,14 @@ static void test_leg_population_gate() {
   CHECK_EQ((int)evaluateLegPopulation(full_live), (int)PopulationVerdict::PASS);
   CHECK(populationIsCurrentPass(full_live));
 
+  // A complete mask plus an anomalous responder is NOT a formal PASS. The
+  // archived H1 gate failed closed on unexpected responders; unexpected_count
+  // exists precisely so that information cannot be dropped by the domain gate.
+  LegPopulationEvidence anomalous_live = full_live;
+  anomalous_live.unexpected_count = 1;
+  CHECK_EQ((int)evaluateLegPopulation(anomalous_live), (int)PopulationVerdict::FAIL);
+  CHECK(!populationIsCurrentPass(anomalous_live));
+
   // The last formal result on record is 6/12 and it is HISTORICAL.
   LegPopulationEvidence six_of_twelve =
       makePopulation(0x003Fu, CalibrationOrigin::HISTORICAL_REPLAY);

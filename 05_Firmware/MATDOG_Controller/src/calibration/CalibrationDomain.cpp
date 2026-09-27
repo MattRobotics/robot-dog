@@ -154,6 +154,12 @@ PopulationVerdict evaluateLegPopulation(const LegPopulationEvidence& evidence) {
       static_cast<uint16_t>((1u << kLegServoSlotCount) - 1u);
   if ((evidence.observed_mask & ~kAllSlots) != 0) return PopulationVerdict::INVALID;
   if (evidence.origin == CalibrationOrigin::NONE) return PopulationVerdict::INVALID;
+  // Formal population evidence is not only "twelve expected slots answered".
+  // The recovered H1 oracle refused a census when any unexpected responder
+  // was present. Keep that safety property in the domain model itself so no
+  // producer can accidentally create PASS evidence by filling all twelve bits
+  // while also reporting an anomalous bus population.
+  if (evidence.unexpected_count != 0) return PopulationVerdict::FAIL;
   return observedLegSlotCount(evidence) == kLegServoSlotCount ? PopulationVerdict::PASS
                                                               : PopulationVerdict::FAIL;
 }
