@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 #include "../calibration/CalibrationManager.h"
+#include "../calibration/CalibrationQ0CaptureSession.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/WifiManager.h"
 #include "../power/DalyBms.h"
@@ -69,6 +70,9 @@ class CommandRouter {
     // state: the router asks, it does not remember.
     ActuatorAuthorityArbiter* authority;
     calibration::CalibrationManager* calibration;
+    // CR2-B read-only evidence-acquisition coordinator. It carries no
+    // actuator authority and produces CANDIDATE q0 evidence only.
+    calibration::CalibrationQ0CaptureSession* q0_capture;
     // I4/I5 fail-closed status infrastructure (2026-09-25 objective change).
     // Read-only status only — see ControllerService.h and
     // scripts/static_audit.py's check_actuator_infrastructure_wired_fail_closed().
@@ -147,6 +151,7 @@ class CommandRouter {
   // no command that starts, runs or moves anything: no write path exists, and
   // the repository declares hardware motion unauthorized.
   void printCalibrationStatus();
+  void printCalibrationQ0Status();
   // Read-only presentation of the Safe Actuator policy (I4/I5 fail-closed
   // infrastructure, 2026-09-25 objective change). There is deliberately no
   // command that plans, commits, executes or aborts anything through it —
@@ -169,6 +174,7 @@ class CommandRouter {
   bool servo_scan_result_pending_ = false;
   bool servo_census_result_pending_ = false;
   bool servo_preflight_result_pending_ = false;
+  bool q0_capture_result_pending_ = false;
 
   static constexpr size_t kLineBufSize = 96;
   char line_buf_[kLineBufSize] = {0};
