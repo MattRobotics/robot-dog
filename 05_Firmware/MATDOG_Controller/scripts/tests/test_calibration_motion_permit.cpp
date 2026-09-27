@@ -1,0 +1,137 @@
+#include <cstdio>
+
+#include "../../src/calibration/CalibrationMotionPermit.h"
+
+using namespace matdog::calibration;
+using namespace matdog::core;
+
+static int g_checks = 0;
+static int g_failures = 0;
+
+static void check(bool ok, const char* label) {
+  ++g_checks;
+  if (!ok) {
+    ++g_failures;
+    std::printf("FAIL: %s\n", label);
+  }
+}
+
+static CalibrationMotionPermitFacts goodFacts() {
+  CalibrationMotionPermitFacts f{};
+  f.explicit_operator_authorization = true;
+  f.robot_powered_profile = true;
+  f.mode = OperatingMode::MAINTENANCE;
+  f.system_health = SystemHealth::READY;
+  f.session_active = true;
+  f.origin = CalibrationOrigin::LIVE_SESSION;
+  f.session_id = 44;
+  f.current_population_pass = true;
+  f.current_geometry_bound = true;
+  f.promoted_transforms_complete = true;
+  f.authority = ActuatorAuthority::CALIBRATION;
+  f.authority_generation = 7;
+  f.authority_inhibited = false;
+  return f;
+}
+
+static void test_grant_requires_every_fact() {
+  CalibrationMotionPermit permit;
+  CalibrationMotionPermitToken token{};
+  auto f = goodFacts();
+
+  check(permit.grant(f, &token) == CalibrationPermitStatus::ACTIVE,
+        "complete prerequisites grant");
+  check(token.valid(), "grant returns bound token");
+  check(permit.check(f, token) == CalibrationPermitStatus::ACTIVE,
+        "current token validates");
+
+  struct Mutation {
+    const char* label;
+    void (*apply)(CalibrationMotionPermitFacts&);
+    CalibrationPermitStatus expected;
+  };
+  const Mutation cases[] = {
+      {"operator", [](auto& x){ x.explicit_operator_authorization=false; },
+       CalibrationPermitStatus::REJECT_NO_OPERATOR_AUTH},
+      {"profile", [](auto& x){ x.robot_powered_profile=false; },
+       CalibrationPermitStatus::REJECT_PROFILE},
+      {"mode", [](auto& x){ x.mode=OperatingMode::RUN; },
+       CalibrationPermitStatus::REJECT_MODE},
+      {"health", [](auto& x){ x.system_health=SystemHealth::FAULT; },
+       CalibrationPermitStatus::REJECT_SYSTEM_HEALTH},
+      {"session", [](auto& x){ x.session_active=false; },
+       CalibrationPermitStatus::REJECT_SESSION},
+      {"origin", [](auto& x){ x.origin=CalibrationOrigin::HISTORICAL_REPLAY; },
+       CalibrationPermitStatus::REJECT_SESSION},
+      {"population", [](auto& x){ x.current_population_pass=false; },
+       CalibrationPermitStatus::REJECT_POPULATION},
+      {"geometry", [](auto& x){ x.current_geometry_bound=false; },
+       CalibrationPermitStatus::REJECT_GEOMETRY},
+      {"transforms", [](auto& x){ x.promoted_transforms_complete=false; },
+       CalibrationPermitStatus::REJECT_TRANSFORMS},
+      {"authority", [](auto& x){ x.authority=ActuatorAuthority::NONE; },
+       CalibrationPermitStatus::REJECT_AUTHORITY},
+      {"inhibit", [](auto& x){ x.authority_inhibited=true; },
+       CalibrationPermitStatus::REJECT_INHIBITED},
+  };
+
+  for (const auto& c : cases) {
+    CalibrationMotionPermit p;
+    CalibrationMotionPermitToken t{};
+    auto bad = goodFacts();
+    c.apply(bad);
+    check(p.grant(bad, &t) == c.expected, c.label);
+    check(!p.active(), "failed grant leaves no permit active");
+    check(!t.valid(), "failed grant returns no token");
+  }
+}
+
+static void test_session_and_authority_binding() {
+  CalibrationMotionPermit permit;
+  CalibrationMotionPermitToken token{};
+  auto f = goodFacts();
+  check(permit.grant(f, &token) == CalibrationPermitStatus::ACTIVE, "grant for binding test");
+
+  auto changed = f;
+  changed.session_id++;
+  check(permit.check(changed, token) == CalibrationPermitStatus::REJECT_SESSION,
+        "new session cannot reuse token");
+
+  changed = f;
+  changed.authority_generation++;
+  check(permit.check(changed, token) == CalibrationPermitStatus::REJECT_AUTHORITY,
+        "new authority generation cannot reuse token");
+
+  CalibrationMotionPermitToken copied = token;
+  permit.reset();
+  check(permit.check(f, copied) == CalibrationPermitStatus::REVOKED,
+        "reset invalidates copied token");
+}
+
+static void test_revoke_is_final_for_token() {
+  CalibrationMotionPermit permit;
+  CalibrationMotionPermitToken token{};
+  auto f = goodFacts();
+  permit.grant(f, &token);
+  permit.revoke(CalibrationPermitRevokeReason::SESSION_ENDED);
+  check(!permit.active(), "session end revokes");
+  check(permit.lastRevokeReason() == CalibrationPermitRevokeReason::SESSION_ENDED,
+        "revoke reason retained");
+  check(permit.check(f, token) == CalibrationPermitStatus::REVOKED,
+        "revoked token stays unusable");
+
+  CalibrationMotionPermitToken token2{};
+  check(permit.grant(f, &token2) == CalibrationPermitStatus::ACTIVE,
+        "new explicit grant is possible");
+  check(token2.permit_generation != token.permit_generation,
+        "new permit has new generation");
+}
+
+int main() {
+  test_grant_requires_every_fact();
+  test_session_and_authority_binding();
+  test_revoke_is_final_for_token();
+  std::printf("test_calibration_motion_permit: %d checks, %d failures\n",
+              g_checks, g_failures);
+  return g_failures == 0 ? 0 : 1;
+}

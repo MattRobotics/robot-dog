@@ -147,6 +147,14 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
 
+# CR3-M4 session-scoped calibration motion permit is pure policy: no
+# ServoBus, Arduino or device IO. It deliberately remains un-wired in production
+# until the first-motion hardware authorization gate.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_motion_permit" \
+  "$SCRIPT_DIR/test_calibration_motion_permit.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationMotionPermit.cpp"
+
 # The OTA suite links the REAL OTA-B gate and the REAL arbiter, so the
 # authorization path it exercises is the shipped one, not a stub.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -254,6 +262,7 @@ done
 "$OUT/test_calibration_q0_bootstrap"
 "$OUT/test_calibration_q0_capture_session"
 "$OUT/test_cr3_q0_transform"
+"$OUT/test_calibration_motion_permit"
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_population_evidence"
