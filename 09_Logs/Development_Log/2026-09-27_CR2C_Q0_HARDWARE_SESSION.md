@@ -41,3 +41,41 @@ CR2-B: OFFLINE + BUILD VALIDATED
 CR2-C: AUTHORIZED / PRE-FLIGHT
 
 No hardware action had been performed by this CR2-C session at the time this log was created.
+
+## Power-topology correction before execution
+
+Before the operator executed the first CR2-C command block, they identified an incorrect
+assumption in the initial runbook/guidance: MATDOG does not have an independently powered ESP32
+with a switchable/dead servo rail.
+
+Current validated hardware truth:
+
+```text
+battery + main fuse/disconnect + DALY KEY ON
+  -> DALY protected B+/P- domain energized
+  -> ESP32-S3 / TECNOIOT 5 V powered
+  -> servo rail powered
+  -> LED rail powered
+```
+
+This is the intended post-2026-09-24 wiring and is consistent with the existing G3
+`ROBOT_POWERED` validation.
+
+CR2-C safety was therefore corrected from:
+
+```text
+controller powered + servo rail 0 V
+```
+
+to:
+
+```text
+ROBOT_POWERED domain energized
++ charger disconnected
++ robot mechanically supported
++ all 13 installed servos VERIFIED_OFF before esptool reset/read/flash
++ no Torque ON / GoalPosition / motion path
+```
+
+No hardware command had been executed before this correction. The runbook was amended before
+continuing.
