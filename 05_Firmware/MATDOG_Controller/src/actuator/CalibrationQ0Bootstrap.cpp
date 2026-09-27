@@ -47,6 +47,7 @@ void insertionSort(int32_t* values, uint8_t count) {
 bool requestWellFormed(const Q0BootstrapRequest& request) {
   if (!request.identity.valid() || !request.identity.unitKnown()) return false;
   if (request.capture_session_id == 0) return false;
+  if (!request.stability_budget_specified) return false;
   // 2048 would make any circular sample cloud stable by definition.
   if (request.max_stability_spread_ticks >= kRawHalfTurn) return false;
   return true;
