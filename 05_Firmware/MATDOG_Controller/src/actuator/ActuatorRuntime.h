@@ -38,9 +38,9 @@
 // future Calibration Execution Engine (I5), explicitly [NOT IMPLEMENTED]
 // per ActuatorWritePolicy.h's own architecture diagram. Guessing that
 // conversion here would be exactly the kind of unreviewed architectural
-// decision the NextGen handoff says to stop for rather than invent. See
-// backendCallFor() below: those three operations always resolve to
-// BackendCallKind::NONE today.
+// CR3 supplies the checked q<->raw target before the policy plan. The three
+// calibration move classes therefore carry an absolute unsigned target_tick
+// and map to the same one WRITE_GOAL_POSITION backend call.
 //
 // SAFE_OFF IS OUTSIDE THIS LAYER, STRUCTURALLY
 // --------------------------------------------

@@ -12,6 +12,7 @@ BackendCallKind backendCallFor(ActuatorOperation operation) {
     case ActuatorOperation::CALIBRATION_CONTACT_PROBE:
     case ActuatorOperation::DIRECTION_VERIFY:
     case ActuatorOperation::CALIBRATION_AUXILIARY_MOVE:
+      return BackendCallKind::WRITE_GOAL_POSITION;
     case ActuatorOperation::NONE:
       return BackendCallKind::NONE;
   }

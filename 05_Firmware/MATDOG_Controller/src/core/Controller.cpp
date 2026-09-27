@@ -84,7 +84,8 @@ void Controller::begin() {
   // structurally, not merely by this comment.
   actuator_policy_.begin(&authority_);
   actuator_runtime_.begin(&actuator_policy_, /*backend=*/nullptr);
-  calibration_execution_.begin(&actuator_policy_, &actuator_runtime_);
+  calibration_execution_.begin(&actuator_policy_, &actuator_runtime_,
+                               /*geometry=*/nullptr, /*expected_provenance=*/nullptr);
 
   printBootBanner();
 

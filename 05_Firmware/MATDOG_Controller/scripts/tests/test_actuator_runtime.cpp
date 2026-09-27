@@ -163,14 +163,12 @@ void testBackendCallForCoversEveryOperation() {
           (int)BackendCallKind::ENABLE_TORQUE);
   CHECK_EQ((int)backendCallFor(ActuatorOperation::POSITION_COMMAND),
           (int)BackendCallKind::WRITE_GOAL_POSITION);
-  // The three geometry-authorised operations have no raw tick target yet —
-  // see ActuatorRuntime.h's file comment. This is the one place that fact
-  // is pinned down for all three at once.
   CHECK_EQ((int)backendCallFor(ActuatorOperation::CALIBRATION_CONTACT_PROBE),
-          (int)BackendCallKind::NONE);
-  CHECK_EQ((int)backendCallFor(ActuatorOperation::DIRECTION_VERIFY), (int)BackendCallKind::NONE);
+          (int)BackendCallKind::WRITE_GOAL_POSITION);
+  CHECK_EQ((int)backendCallFor(ActuatorOperation::DIRECTION_VERIFY),
+          (int)BackendCallKind::WRITE_GOAL_POSITION);
   CHECK_EQ((int)backendCallFor(ActuatorOperation::CALIBRATION_AUXILIARY_MOVE),
-          (int)BackendCallKind::NONE);
+          (int)BackendCallKind::WRITE_GOAL_POSITION);
   CHECK_EQ((int)backendCallFor(ActuatorOperation::NONE), (int)BackendCallKind::NONE);
 }
 
@@ -227,11 +225,11 @@ void testTorqueEnableAcceptWrittenThroughToBackend() {
   SafeActuatorPolicy policy;
   policy.begin(&arbiter);
   const AuthorityLease lease =
-      grant(arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+      grant(arbiter, ActuatorAuthority::MOTION, OperatingMode::RUN);
 
   ActuatorTransaction txn{};
   CHECK_EQ((int)policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
-                            OperatingMode::MAINTENANCE, &txn),
+                            OperatingMode::RUN, &txn),
           (int)WriteDecision::ACCEPT);
 
   ActuatorRuntime runtime;
@@ -257,11 +255,11 @@ void testPositionCommandAcceptWrittenThroughToBackendWithExactTick() {
   policy.bindGeometry(&profile, &geometry_data::kProvenance);
   CHECK(policy.limits().admit(acceptedLimit(lfLower(), 1800, 2300)));
   const AuthorityLease lease =
-      grant(arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+      grant(arbiter, ActuatorAuthority::MOTION, OperatingMode::RUN);
 
   ActuatorTransaction txn{};
   CHECK_EQ((int)policy.plan(command(ActuatorOperation::POSITION_COMMAND, lfLower(), 2048), lease,
-                            OperatingMode::MAINTENANCE, &txn),
+                            OperatingMode::RUN, &txn),
           (int)WriteDecision::ACCEPT);
 
   ActuatorRuntime runtime;
@@ -284,11 +282,11 @@ void testAcceptWithNoBackendIsFailClosed() {
   SafeActuatorPolicy policy;
   policy.begin(&arbiter);
   const AuthorityLease lease =
-      grant(arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+      grant(arbiter, ActuatorAuthority::MOTION, OperatingMode::RUN);
 
   ActuatorTransaction txn{};
   CHECK_EQ((int)policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
-                            OperatingMode::MAINTENANCE, &txn),
+                            OperatingMode::RUN, &txn),
           (int)WriteDecision::ACCEPT);
 
   ActuatorRuntime runtime;
@@ -307,11 +305,11 @@ void testBackendFailureIsReportedNotSwallowed() {
   SafeActuatorPolicy policy;
   policy.begin(&arbiter);
   const AuthorityLease lease =
-      grant(arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+      grant(arbiter, ActuatorAuthority::MOTION, OperatingMode::RUN);
 
   ActuatorTransaction txn{};
   CHECK_EQ((int)policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
-                            OperatingMode::MAINTENANCE, &txn),
+                            OperatingMode::RUN, &txn),
           (int)WriteDecision::ACCEPT);
 
   ActuatorRuntime runtime;
