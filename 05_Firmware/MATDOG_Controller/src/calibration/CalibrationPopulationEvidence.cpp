@@ -17,8 +17,8 @@ bool sameText(const char* a, const char* b) {
   return strcmp(a, b) == 0;
 }
 
-bool semanticIdentityFromCanonical(const servo::CanonicalServo& canonical,
-                                   JointIdentity* out) {
+bool semanticIdentityFromCanonicalImpl(const servo::CanonicalServo& canonical,
+                                       JointIdentity* out) {
   if (out == nullptr || canonical.joint == nullptr ||
       canonical.physical_unit == nullptr ||
       canonical.current_config != servo::CurrentConfig::INSTALLED) {
@@ -114,6 +114,11 @@ bool recordQualifies(const servo::JointPreflightRecord& record,
 }
 
 }  // namespace
+
+bool semanticIdentityFromCanonical(const servo::CanonicalServo& canonical,
+                                   JointIdentity* out) {
+  return semanticIdentityFromCanonicalImpl(canonical, out);
+}
 
 PopulationEvidenceBuildResult buildCurrentLegPopulationEvidence(
     const servo::CensusResult& census,
