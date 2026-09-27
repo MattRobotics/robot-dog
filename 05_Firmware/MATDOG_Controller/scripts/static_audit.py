@@ -2348,6 +2348,124 @@ def check_calibration_q0_capture_session(files, sketch_dir):
         fail(f"{path}: CR2-B must stamp current_observation_bundle exactly once, only after "
              f"its own census+preflight sequence")
 
+def check_calibration_q0_production_wiring(files, sketch_dir):
+    """CR2-B production wiring is read-only, single-owner and authority-free."""
+    by_name = {path.name: (path, code) for path, code in files}
+    controller_h = by_name.get("Controller.h")
+    controller_cpp = by_name.get("Controller.cpp")
+    router_h = by_name.get("CommandRouter.h")
+    router_cpp = by_name.get("CommandRouter.cpp")
+    service_h = by_name.get("ControllerService.h")
+    if any(x is None for x in (controller_h, controller_cpp, router_h, router_cpp, service_h)):
+        fail(f"{sketch_dir / 'src' / 'core'}: CR2-B production wiring source missing")
+        return
+
+    # Exactly one coordinator instance, owned by Controller. Tests may create
+    # locals; production must not gain a second session state machine.
+    owners = []
+    for path, code in files:
+        if "scripts" in path.parts:
+            continue
+        for m in re.finditer(r"CalibrationQ0CaptureSession\s+(\w+)\s*[;{]", code):
+            owners.append((path.name, m.group(1)))
+    if owners != [("Controller.h", "q0_capture_")]:
+        fail(f"CR2-B coordinator instances={owners!r}; expected exactly Controller.h:q0_capture_")
+
+    # Controller orchestration may start the existing census/preflight and
+    # take one existing runtime READ. Nothing in this function may acquire
+    # actuator authority, enter a motion session or write a servo.
+    cpath, ccode = controller_cpp
+    body = re.search(r"void Controller::updateQ0Capture\(\)\s*\{(.*?)\n\}",
+                     ccode, re.DOTALL)
+    if not body:
+        fail(f"{cpath}: updateQ0Capture() not found")
+    else:
+        text = body.group(1)
+        for required in (
+            "OperatingMode::MAINTENANCE",
+            "servo_census_.start()",
+            "servo_preflight_.start()",
+            "servo_bus_.readRuntimeState",
+            "Q0CaptureFailure::MODE_NOT_MAINTENANCE",
+            "Q0CaptureFailure::CENSUS_START_REFUSED",
+            "Q0CaptureFailure::PREFLIGHT_START_REFUSED",
+        ):
+            if required not in text:
+                fail(f"{cpath}: CR2-B Controller wiring lost {required!r}")
+        for forbidden in (
+            "safeOff(", "EnableTorque", "WritePos", "GoalPosition", "SyncWrite",
+            "RegWrite", "PositionOffset", "CalibrationOfs", "authority_.request",
+            "calibration_.startSession", "calibration_.activate", ".plan(",
+            ".commit(", ".execute(",
+        ):
+            if forbidden in text:
+                fail(f"{cpath}: updateQ0Capture() contains {forbidden!r} - q0 acquisition "
+                     f"must remain read-only and authority-free")
+
+    # Never automatic at boot. Controller may own/update it only after an
+    # explicit command starts the transaction.
+    begin = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", ccode, re.DOTALL)
+    if begin and re.search(r"q0_capture_\s*\.\s*start\s*\(", begin.group(1)):
+        fail(f"{cpath}: q0 capture starts from Controller::begin() - hardware diagnostics must "
+             f"never auto-start at boot")
+
+    rpath, rcode = router_cpp
+
+    # CAPTURE: explicit physical/USB command, maintenance-only, powered-profile
+    # only, exact pose confirmation, and refuses any competing servo diagnostic.
+    capture = re.search(
+        r'upper\.startsWith\("@CALIBRATION Q0 CAPTURE"\)\s*\)\s*\{(.*?)\}\s*else',
+        rcode, re.DOTALL)
+    if not capture:
+        fail(f"{rpath}: @CALIBRATION Q0 CAPTURE branch not found")
+    else:
+        text = capture.group(1)
+        for required in ("OperatingMode::MAINTENANCE", "build::kServoPowerAvailable",
+                         "CONFIRM_Q0_POSE", "servoDiagnosticBusy()",
+                         "modules_.q0_capture->start(config)"):
+            if required not in text:
+                fail(f"{rpath}: q0 capture command lost gate {required!r}")
+        for forbidden in ("authority->request", "startSession(", "activate(", "safeOff(",
+                          "EnableTorque", "GoalPosition", "WritePos", "PositionOffset",
+                          "CalibrationOfs"):
+            if forbidden in text:
+                fail(f"{rpath}: q0 capture command contains {forbidden!r} - read-only capture "
+                     f"must not acquire motion authority or write hardware")
+
+    # STATUS must remain cached presentation only.
+    printer = re.search(r"void CommandRouter::printCalibrationQ0Status\(\)\s*\{(.*?)\n\}",
+                        rcode, re.DOTALL)
+    if not printer:
+        fail(f"{rpath}: printCalibrationQ0Status() not found")
+    else:
+        for forbidden in ("readRuntimeState", "servo_bus", "startScan(", "safeOff("):
+            if forbidden in printer.group(1):
+                fail(f"{rpath}: q0 STATUS contains {forbidden!r} - status is cached only")
+
+    # CR2-B reserves ordinary servo diagnostics so no other read/scan is
+    # interleaved into its evidence bundle.
+    for command, token in (
+        ("@SERVO SCAN", "CALIBRATION_Q0_CAPTURE_ACTIVE"),
+        ("@SERVO CENSUS", "CALIBRATION_Q0_CAPTURE_ACTIVE"),
+        ("@SERVO PREFLIGHT", "CALIBRATION_Q0_CAPTURE_ACTIVE"),
+        ("@SERVO READ", "CALIBRATION_Q0_CAPTURE_ACTIVE"),
+    ):
+        pos = rcode.find(command)
+        if pos < 0 or token not in rcode[pos:pos + 2600]:
+            fail(f"{rpath}: {command} is not refused while CR2-B owns servo diagnostics")
+
+    # SAFE_OFF is the deliberate exception: a de-escalation must stay
+    # reachable even during a read-only capture and must not consult it.
+    safe = re.search(r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
+                     rcode, re.DOTALL)
+    if not safe:
+        fail(f"{rpath}: @SERVO SAFE_OFF branch not found for CR2-B audit")
+    else:
+        for forbidden in ("q0_capture", "Q0Capture", "CALIBRATION_Q0"):
+            if forbidden in safe.group(1):
+                fail(f"{rpath}: SAFE_OFF consults CR2-B via {forbidden!r} - de-escalation "
+                     f"must remain independent")
+
 def check_calibration_q0_bootstrap(files, sketch_dir):
     """CR2 read-only q0 candidate builder stays pure and non-operational."""
     by_name = {path.name: (path, code) for path, code in files}
@@ -3830,6 +3948,7 @@ def main():
     check_h0_preflight_boundaries(files, SKETCH_DIR)
     check_calibration_population_evidence(files, SKETCH_DIR)
     check_calibration_q0_capture_session(files, SKETCH_DIR)
+    check_calibration_q0_production_wiring(files, SKETCH_DIR)
     check_calibration_q0_bootstrap(files, SKETCH_DIR)
     check_evidence_geometry_binding(files, SKETCH_DIR)
     check_calibration_readiness_contract(SKETCH_DIR)
