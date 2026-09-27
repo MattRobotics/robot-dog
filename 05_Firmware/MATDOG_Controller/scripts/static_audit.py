@@ -162,7 +162,6 @@ def check_forbidden_literals(files):
         "unLockEprom",
         "LockEprom",
         "sh2_saveDcdNow",
-        "WritePosEx",
         "RegWritePosEx",
         "SyncWritePosEx",
         "WheelMode",
@@ -184,13 +183,67 @@ def check_forbidden_literals(files):
 
 
 def check_torque_enable(files):
+    """CR3-M3: exactly one reviewed torque-on primitive may exist, and only
+    inside ServoBus::enableTorqueOn(). SAFE_OFF remains the separate torque-off
+    path. No other source may call EnableTorque(..., nonzero)."""
     pattern = re.compile(r"EnableTorque\([^,]+,\s*([^)]+)\)")
+    torque_on = []
     for path, code in files:
         for match in pattern.finditer(code):
             arg = match.group(1).strip()
-            if arg not in {"0"}:
-                fail(f"{path}: EnableTorque called with non-zero argument {arg!r} "
-                     f"(automatic/host torque-on is forbidden)")
+            if arg == "0":
+                continue
+            torque_on.append((path, arg, match.start()))
+            if path.name != "ServoBus.cpp" or arg != "1":
+                fail(f"{path}: unreviewed EnableTorque non-zero call {arg!r}; CR3 permits "
+                     f"exactly ServoBus::enableTorqueOn(id) -> EnableTorque(..., 1)")
+    if len(torque_on) != 1:
+        fail(f"CR3 torque-on surface must contain exactly one reviewed non-zero "
+             f"EnableTorque call, found {len(torque_on)}")
+    else:
+        path, _, pos = torque_on[0]
+        code = next(c for p, c in files if p == path)
+        body = re.search(r"bool ServoBus::enableTorqueOn\(int id\)\s*\{(.*?)\n\}",
+                         code, re.DOTALL)
+        if not body or not (body.start() <= pos <= body.end()):
+            fail(f"{path}: the one torque-on call is not inside ServoBus::enableTorqueOn()")
+        elif "SMS_STS_TORQUE_ENABLE" not in body.group(1) or "readByte" not in body.group(1):
+            fail(f"{path}: enableTorqueOn() must independently read back TorqueEnable")
+
+
+def check_servo_motion_write_surface(files):
+    """CR3-M3: one and only one GoalPosition primitive exists, in ServoBus.
+
+    It must use unsigned-domain validation and the fixed conservative
+    WritePosEx speed/acceleration constants. Direct writeWord/writeByte,
+    RegWrite/SyncWrite and every additional WritePosEx call remain forbidden.
+    """
+    hits = []
+    for path, code in files:
+        for m in re.finditer(r"\bWritePosEx\s*\(", code):
+            hits.append((path, m.start()))
+    if len(hits) != 1:
+        fail(f"CR3 GoalPosition surface must contain exactly one WritePosEx call, found {len(hits)}")
+        return
+    path, pos = hits[0]
+    if path.name != "ServoBus.cpp":
+        fail(f"{path}: WritePosEx may exist only in ServoBus::writeGoalPosition()")
+        return
+    code = next(c for p, c in files if p == path)
+    body = re.search(r"bool ServoBus::writeGoalPosition\(int id, uint16_t target_tick\)\s*\{"
+                     r"(.*?)\n\}", code, re.DOTALL)
+    if not body or not (body.start() <= pos <= body.end()):
+        fail(f"{path}: WritePosEx is not inside ServoBus::writeGoalPosition()")
+        return
+    text = body.group(1)
+    for required in ("target_tick >= 4096u", "kOperationalTimeoutMs",
+                     "kBoundedWriteSpeed", "kBoundedWriteAcceleration",
+                     "ack != 1", "status != 0"):
+        if required not in text:
+            fail(f"{path}: writeGoalPosition() missing reviewed CR3 guard {required!r}")
+    for forbidden in ("RegWrite", "SyncWrite", "writeByte(", "writeWord("):
+        if forbidden in text:
+            fail(f"{path}: writeGoalPosition() contains forbidden primitive {forbidden!r}")
 
 
 def check_servo_id_write(files):
@@ -782,8 +835,9 @@ def check_actuator_runtime_boundaries(files):
     """I4: the Safe Actuator runtime adapter (src/actuator/ActuatorRuntime.*)
     must stay host-linkable exactly like ActuatorWritePolicy itself, and its
     mere existence must not make ordinary physical motion reachable. There is
-    still no production ActuatorBackend anywhere in this firmware - ServoBus
-    exposes exactly one write, safeOff() (torque OFF).
+    CR3-M3 adds exactly one production ServoBusActuatorBackend and two narrow
+    ServoBus write primitives, but Controller remains null-wired until the
+    separately reviewed activation gate.
 
     2026-09-25 objective change: Controller.{h,cpp} may now own an
     ActuatorRuntime instance as fail-closed status/lifecycle infrastructure
@@ -806,7 +860,8 @@ def check_actuator_runtime_boundaries(files):
                      f"host-linkable, the same contract as ActuatorWritePolicy itself")
 
     allowed_dirs = {"actuator", "calibration", "tests"}
-    allowed_names = {"ActuatorRuntime.h", "ActuatorRuntime.cpp", "Controller.h", "Controller.cpp"}
+    allowed_names = {"ActuatorRuntime.h", "ActuatorRuntime.cpp", "Controller.h", "Controller.cpp",
+                     "ServoBusActuatorBackend.h", "ServoBusActuatorBackend.cpp"}
     for path, code in files:
         if path.name in allowed_names:
             continue
@@ -907,8 +962,9 @@ def check_actuator_infrastructure_wired_fail_closed(files):
     # the single fact this whole check exists to pin down.
     m = re.search(r"actuator_runtime_\.begin\(([^)]*)\)", code)
     if not m or "nullptr" not in m.group(1):
-        fail(f"{path}: actuator_runtime_.begin() must pass nullptr as the backend - no "
-             f"production ActuatorBackend may ever be wired into Controller")
+        fail(f"{path}: actuator_runtime_.begin() must still pass nullptr at CR3-M3/M4 - "
+             f"the production backend exists but activation requires the separate permit "
+             f"and first-motion review")
 
     # No geometry may be bound, no limit or transform admitted, no live
     # bootstrap context set, from Controller - those are exactly what would
@@ -3965,6 +4021,7 @@ def main():
 
     check_forbidden_literals(files)
     check_torque_enable(files)
+    check_servo_motion_write_surface(files)
     check_servo_id_write(files)
     check_daly_write(files)
     check_bms_command_surface(files)

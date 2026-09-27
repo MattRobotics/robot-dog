@@ -105,6 +105,11 @@ def run_torque_checks(files):
     audit.check_forbidden_literals(files)
     return list(audit.failures)
 
+def run_motion_surface_checks(files):
+    audit.failures.clear()
+    audit.check_servo_motion_write_surface(files)
+    return list(audit.failures)
+
 
 def mutate(filename, pattern, repl):
     """Returns BASE with exactly one regex substitution applied in `filename`."""
@@ -160,6 +165,7 @@ def main():
     # be meaningless.
     expect_pass("baseline", run_boundary_checks(BASE))
     expect_pass("baseline torque/literals", run_torque_checks(BASE))
+    expect_pass("baseline CR3 motion surface", run_motion_surface_checks(BASE))
 
     # --- purity of the decision core --------------------------------------
     case("policy gains Arduino", POLICY_H,
@@ -439,14 +445,18 @@ def main():
          "  if (parking_planned && !parked_here) return WriteDecision::REJECT_PARKING_REQUIRED;",
          "OPTIONAL diagnostic budget", runner=run_direction_checks)
 
-    # --- the pre-existing torque guard still bites -------------------------
-    # "No Torque ON path reachable in the default build" is this phase's claim
-    # as much as the previous one's, so it is re-proven here rather than
-    # assumed to still hold.
-    case("torque-on in the servo transport", "ServoBus.cpp",
+    # --- the reviewed CR3 transport surface stays singular ----------------
+    # The one torque-on call is ServoBus::enableTorqueOn(). Turning SAFE_OFF
+    # into a second torque-on call must therefore fail the exact-one gate.
+    case("second torque-on in the servo transport", "ServoBus.cpp",
          r"st_\.EnableTorque\(static_cast<uint8_t>\(id\), 0\);",
          "st_.EnableTorque(static_cast<uint8_t>(id), 1);",
-         "non-zero argument", runner=run_torque_checks)
+         "exactly one", runner=run_torque_checks)
+    case("second GoalPosition primitive appears", "ServoBus.cpp",
+         r"bool ServoBus::readRuntimeState\(int id, RuntimeState\* out\) \{",
+         "bool ServoBus::extraWrite(int id) { st_.WritePosEx((uint8_t)id, 2048, 40, 10); return true; }\n"
+         "bool ServoBus::readRuntimeState(int id, RuntimeState* out) {",
+         "exactly one", runner=run_motion_surface_checks)
 
     if failures:
         print(f"SAFE_ACTUATOR_AUDIT_MUTATION_TESTS = FAIL ({len(failures)})")

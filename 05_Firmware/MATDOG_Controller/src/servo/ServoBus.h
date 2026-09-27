@@ -156,6 +156,22 @@ class ServoBus {
   // MAINTENANCE-only absence detection.
   SafeOffResult safeOff(int id);
 
+  // CR3-M3 production write primitives. These are intentionally narrow and
+  // remain unreachable from CommandRouter/Controller while ActuatorRuntime is
+  // still wired with a null backend. SAFE_OFF remains separate and ungated.
+  //
+  // enableTorqueOn() verifies TorqueEnable by an independent readback; the
+  // SCServo write ACK alone is never treated as proof.
+  bool enableTorqueOn(int id);
+
+  // One bounded unsigned GoalPosition primitive. No modulo/signed-wrap is
+  // accepted. WritePosEx supplies a deliberately conservative speed/accel
+  // ceiling for calibration bring-up; higher-performance motion belongs to a
+  // later reviewed motion backend, not this calibration bootstrap.
+  static constexpr uint16_t kBoundedWriteSpeed = 40;
+  static constexpr uint8_t kBoundedWriteAcceleration = 10;
+  bool writeGoalPosition(int id, uint16_t target_tick);
+
   // Read-only runtime snapshot (present position/speed/load/voltage/temp).
   // Returns false if the servo does not answer within the bounded timeout.
   // Uses kOperationalTimeoutMs, NOT the diagnostic timeout (Session 2.3
