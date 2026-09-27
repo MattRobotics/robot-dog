@@ -1,7 +1,7 @@
 # MATDOG Controller — Development Gates
 
 **Canonical owner of the technical pass/fail authorization criteria for each Controller
-development gate.** Last updated 2026-09-24.
+development gate.** Last updated 2026-09-27.
 
 This file answers *what must be true before this stage may begin, what it may and may not do, and
 what proves it passed*. It is not a narrative roadmap and not an evidence log:
@@ -347,6 +347,16 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     historical; historical evidence can never produce a current PASS). Evidence lifecycle
     `MEASURED → CANDIDATE → ACCEPTED → PROMOTED`: **IMPLEMENTED and offline-tested**, with every
     shortcut refused.
+  - **CR0/CR1 readiness closure (2026-09-27):** CR0 contract closure is implemented and
+    audit-enforced. CR1 adds a pure `CalibrationPopulationEvidence` producer over the existing
+    structured census + preflight results; it performs no bus transaction and is deliberately
+    not wired into `Controller` yet. It refuses cached/non-current bundles, incomplete or
+    internally inconsistent census/preflight evidence, anomalous responders, missing leg IDs,
+    semantic/current-allocation identity mismatches, duplicate leg slots, non-PASS profile data,
+    nonzero offset, torque-on state, wrong model and raw position outside 0..4095. The domain gate
+    now also rejects `unexpected_count != 0`. **TESTS ADDED; local host/static execution still
+    required before CR1 is called offline-validated.** The recent Controller
+    `@SERVO PREFLIGHT 12/12 PASS` is unchanged evidence and has not been relabelled formal H1.
   - **I5 (2026-09-25):** a generic, intent-based Calibration Execution boundary is now
     **IMPLEMENTED / OFFLINE TESTED** — `src/calibration/CalibrationExecutionEngine.*`. Per V3
     handoff §15.11 (binding): the LF V25 18-phase sequence is a **HISTORICAL_REPLAY / ORACLE**,
