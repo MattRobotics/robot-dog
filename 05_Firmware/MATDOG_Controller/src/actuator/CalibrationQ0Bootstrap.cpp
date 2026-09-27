@@ -13,8 +13,8 @@ constexpr int32_t kRawHalfTurn = 2048;
 int32_t circularEncoderDelta(int32_t value, int32_t reference) {
   int32_t delta = value - reference;
   // Match the historical read-only capture semantics at the wrap boundary:
-  // +2048 is represented as -2048. This is encoder measurement arithmetic,
-  // never GoalPosition target arithmetic.
+  // +2048 is represented as -2048. This is observation-reduction arithmetic,
+  // never actuator-target arithmetic.
   while (delta >= kRawHalfTurn) delta -= kRawModulus;
   while (delta < -kRawHalfTurn) delta += kRawModulus;
   return delta;
