@@ -3,7 +3,7 @@
 **Date:** 2026-09-27  
 **Branch:** `feat/calibration-readiness-v1`  
 **Scope:** production wiring for read-only q0 evidence acquisition  
-**Status:** IMPLEMENTED / OFFLINE + FIRMWARE BUILD VALIDATION PENDING  
+**Status:** IMPLEMENTED / OFFLINE + FIRMWARE BUILD VALIDATED  
 **Hardware action performed in this gate:** NONE  
 **Flash performed:** NONE  
 **Motion:** NONE  
@@ -305,26 +305,53 @@ PositionOffset write forbidden
 SAFE_OFF independent
 ```
 
-## 13. Required validation before any hardware use
+## 13. Validation closure
 
-Because CR2-B now touches `Controller` and `CommandRouter`, host tests alone are insufficient.
+The required local validation completed successfully on 2026-09-27.
 
-Required next checkpoint:
+At functional firmware SHA
+`2e5cbfa43378ed8d0e76e1c2a942886ef34a89db`:
 
 ```text
-python3 scripts/static_audit.py
-bash scripts/tests/run_host_tests.sh
+CALIBRATION_Q0_CAPTURE_SESSION_TESTS = PASS
+checks_run=467 failures=0
 
-bash scripts/build.sh
-MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh
-bash scripts/build.sh   # restore resting USB_ONLY artifact
+all remaining host suites = PASS
 
-git diff --check
-git status --short --branch
-git rev-parse HEAD
+USB_ONLY firmware build = PASS
+ROBOT_POWERED firmware build = PASS
+final resting artifact restored to USB_ONLY
 ```
 
-No flash belongs to this checkpoint.
+The first static-audit run exposed two audit false positives: CR1/CR2-A public function
+prototypes in their own headers were being mistaken for production call sites. No firmware or
+calibration implementation changed. The audit was narrowed to mask only those two declarations.
 
-Only after every gate above passes may a separately authorized read-only hardware capture be
-considered.
+At audit-fix SHA
+`9ff046f0302928dfd2833d848206f3d66ca75228`:
+
+```text
+Scanned 114 source files
+STATIC_AUDIT = PASS
+git diff --check = clean
+working tree = clean
+```
+
+Because the only delta from `2e5cbfa...` to `9ff046f...` is
+`scripts/static_audit.py`, the successful firmware builds remain valid evidence for the same
+CR2-B implementation.
+
+CR2-B is therefore **OFFLINE + BUILD VALIDATED**.
+
+This closure does **not** constitute:
+
+```text
+hardware validation
+live q0 capture
+evidence acceptance or promotion
+JointTransform admission
+hardware motion authorization
+permission to flash or move the robot
+```
+
+A separately authorized read-only hardware gate is next.
