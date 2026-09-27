@@ -36,7 +36,10 @@ enum class Q0CaptureFailure : uint8_t {
   TORQUE_NOT_OFF = 6,
   RAW_DOMAIN = 7,
   CANDIDATE_REJECTED = 8,
-  EXTERNAL_ABORT = 9,
+  MODE_NOT_MAINTENANCE = 9,
+  CENSUS_START_REFUSED = 10,
+  PREFLIGHT_START_REFUSED = 11,
+  EXTERNAL_ABORT = 12,
 };
 
 struct Q0CaptureConfig {
