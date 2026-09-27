@@ -2294,10 +2294,21 @@ def check_calibration_population_evidence(files, sketch_dir):
 
     # CR2-B is now the ONE reviewed production freshness owner. No parser,
     # Controller body or other module may manufacture a current bundle directly.
+    # Mask only CR1's own public declaration; an inline/header call anywhere
+    # else must still be treated as a production call site.
     for path, code in files:
         if "scripts" in path.parts or path.name == "CalibrationPopulationEvidence.cpp":
             continue
-        if "buildCurrentLegPopulationEvidence(" not in code:
+        inspected = code
+        if path.name == "CalibrationPopulationEvidence.h":
+            inspected = re.sub(
+                r"PopulationEvidenceBuildResult\s+buildCurrentLegPopulationEvidence\s*"
+                r"\([^;]*\);",
+                "",
+                inspected,
+                flags=re.DOTALL,
+            )
+        if "buildCurrentLegPopulationEvidence(" not in inspected:
             continue
         if path.name != "CalibrationQ0CaptureSession.cpp":
             fail(f"{path}: calls the CR1 producer outside the reviewed CR2-B same-session "
@@ -2539,10 +2550,20 @@ def check_calibration_q0_bootstrap(files, sketch_dir):
 
     # CR2-B is the sole reviewed production consumer. Hardware-facing
     # Controller/parser/servo code must never call the reducer directly.
+    # Mask only CR2-A's public prototype, not arbitrary header code.
     for path, code in files:
         if "scripts" in path.parts or path.name == "CalibrationQ0Bootstrap.cpp":
             continue
-        if "buildQ0BootstrapCandidate(" not in code:
+        inspected = code
+        if path.name == "CalibrationQ0Bootstrap.h":
+            inspected = re.sub(
+                r"Q0BootstrapCandidate\s+buildQ0BootstrapCandidate\s*"
+                r"\([^;]*\);",
+                "",
+                inspected,
+                flags=re.DOTALL,
+            )
+        if "buildQ0BootstrapCandidate(" not in inspected:
             continue
         if path.name != "CalibrationQ0CaptureSession.cpp":
             fail(f"{path}: calls CR2-A outside the reviewed CR2-B acquisition coordinator")
