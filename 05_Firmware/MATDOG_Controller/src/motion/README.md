@@ -2,6 +2,8 @@
 
 For the G2 physical contact, stand trajectory and motion lifecycle additions,
 see [CONTACT_STAND.md](CONTACT_STAND.md). The G1 API described here is unchanged.
+For G3 startup gating, body/world transforms and timed semantic stand samples,
+see [STARTUP_TIMING.md](STARTUP_TIMING.md).
 
 This module maps semantic URDF joint angles to `foot_link` poses and solves
 position IK for LF, RF, RH, LH. It is pure C++17 with fixed storage, no heap,

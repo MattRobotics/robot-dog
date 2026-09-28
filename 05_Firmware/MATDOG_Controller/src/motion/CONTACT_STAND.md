@@ -1,5 +1,9 @@
 # G2 contact-space stand foundation
 
+G3 preserves the contact and geometric path contracts below. Its
+[startup/timing contract](STARTUP_TIMING.md) supersedes G2's caller-supplied
+entry/completion events: only `StandTransition` can enter or complete stand.
+
 G2 adds canonical physical contact geometry, contact FK/IK, a C4 stand
 reference, an incremental contact-locked stand trajectory, and a minimal pure
 motion lifecycle. All data are metres and semantic URDF radians. Everything
