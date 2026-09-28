@@ -63,11 +63,32 @@ rejection reason on both builders.
   `esp32:esp32:esp32s3:...`, `USB_ONLY` profile, no upload). 1,039,747 bytes
   (33%) program storage, 62,820 bytes (19%) dynamic memory — **unchanged**
   from the Priority 1 (M5) build despite Priority 3/4/5/6 adding ~2,700 lines
-  across 8 new source files, confirming the linker's dead-code stripping
-  removes all four modules from the shipped binary entirely (nothing in
-  `Controller.cpp` references them) — a stronger guarantee than "logically
-  unreachable": they are **physically absent** from the image that would be
-  flashed.
+  across 8 new source files.
+
+  **Correction (next session, Objective F):** identical binary size alone
+  was asserted as "confirming" dead-code stripping without inspecting build
+  artifacts — that was circumstantial, not proof. Verified directly instead,
+  using `xtensa-esp32s3-elf-nm` against the actual build output
+  (`build/esp32.esp32.esp32s3/MATDOG_Controller.ino.elf` and the per-file
+  `.o` objects under the arduino-cli sketch cache):
+    - Each `.cpp.o` for `FirstMotionExecutor`, `ContactProbeEngine`,
+      `MotionDeadman` and `OperationalEnvelope` contains real defined text
+      (code) symbols (10, 15, 5 and 5 respectively) — confirming they ARE
+      compiled, not skipped.
+    - `xtensa-esp32s3-elf-nm -C` against the final linked `.ino.elf` (10,887
+      total defined symbols) returns **zero** matches for any of the four
+      modules' class/function names.
+    - `esp32:esp32:3.3.11`'s `platform.txt` passes `-Wl,--gc-sections`
+      (confirmed via `grep`), the linker flag responsible for removing
+      unreferenced code sections — explaining the mechanism, not just the
+      symptom.
+
+  This is now a **verified, reproducible fact**, not an inference from size:
+  as of this HEAD, the four modules are compiled but contain zero surviving
+  symbols in the linked binary — physically absent from the image that would
+  be flashed. (Note: `FirstMotionExecutor` is wired into `Controller.cpp` in
+  the following session, Objective C — at that point its symbols legitimately
+  appear in the ELF; this finding describes this commit's state only.)
 - Hardware touched across the entire CR3 offline session: **no**. No serial
   port opened, no ESP32 reset/flash, no servo/BMS command issued,
   `hardware_motion_authorized` remains `0` (compile-time default, audited).
