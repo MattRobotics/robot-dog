@@ -116,6 +116,14 @@ FirstMotionContext liveContext(const AuthorityLease& lease, OperatingMode mode) 
   ctx.origin = CalibrationOrigin::LIVE_SESSION;
   ctx.lease = lease;
   ctx.mode = mode;
+
+  // Fresh dynamic continuation facts. Production Controller supplies these
+  // every tick; tests must model the same live state rather than relying on
+  // the refusing defaults.
+  ctx.motion_permit_active = true;
+  ctx.authority = ActuatorAuthority::CALIBRATION;
+  ctx.authority_generation = lease.generation;
+  ctx.authority_inhibited = false;
   return ctx;
 }
 
@@ -443,6 +451,81 @@ void test_false_positive_progress_keeps_continuing() {
 }
 
 // ---------------------------------------------------------------------------
+// Dynamic prerequisite loss while MONITORING must not wait for deadman/
+// timeout. Torque is already on, therefore every such loss requires SAFE_OFF.
+// ---------------------------------------------------------------------------
+
+void test_permit_loss_during_monitoring_requires_safe_off_immediately() {
+  g_case = "permit loss while monitoring";
+  Rig rig;
+  CHECK(rig.policy.transforms().admit(promotedTransform(lfUpper())));
+  const AuthorityLease lease =
+      grant(rig.arbiter, ActuatorAuthority::CALIBRATION,
+            OperatingMode::MAINTENANCE);
+  armCalibrationPermit(rig.policy, lease);
+  FirstMotionContext ctx =
+      liveContext(lease, OperatingMode::MAINTENANCE);
+
+  CHECK(rig.executor.start(request(), ctx, 1000));
+  reachMonitoring(rig, ctx);
+
+  ctx.motion_permit_active = false;
+  rig.executor.update(ctx, 1030, false, TelemetrySample{});
+
+  CHECK_EQ((int)rig.executor.status().state,
+           (int)FirstMotionState::SAFE_OFF_REQUIRED);
+  CHECK_EQ((int)rig.executor.status().failure,
+           (int)FirstMotionFailure::DYNAMIC_PREREQUISITE_LOST);
+}
+
+void test_authority_loss_during_monitoring_requires_safe_off_immediately() {
+  g_case = "authority loss while monitoring";
+  Rig rig;
+  CHECK(rig.policy.transforms().admit(promotedTransform(lfUpper())));
+  const AuthorityLease lease =
+      grant(rig.arbiter, ActuatorAuthority::CALIBRATION,
+            OperatingMode::MAINTENANCE);
+  armCalibrationPermit(rig.policy, lease);
+  FirstMotionContext ctx =
+      liveContext(lease, OperatingMode::MAINTENANCE);
+
+  CHECK(rig.executor.start(request(), ctx, 1000));
+  reachMonitoring(rig, ctx);
+
+  ctx.authority = ActuatorAuthority::NONE;
+  ctx.authority_generation = lease.generation + 1;
+  rig.executor.update(ctx, 1030, false, TelemetrySample{});
+
+  CHECK_EQ((int)rig.executor.status().state,
+           (int)FirstMotionState::SAFE_OFF_REQUIRED);
+  CHECK_EQ((int)rig.executor.status().failure,
+           (int)FirstMotionFailure::DYNAMIC_PREREQUISITE_LOST);
+}
+
+void test_session_loss_before_torque_needs_no_safe_off() {
+  g_case = "session loss before torque";
+  Rig rig;
+  CHECK(rig.policy.transforms().admit(promotedTransform(lfUpper())));
+  const AuthorityLease lease =
+      grant(rig.arbiter, ActuatorAuthority::CALIBRATION,
+            OperatingMode::MAINTENANCE);
+  armCalibrationPermit(rig.policy, lease);
+  FirstMotionContext ctx =
+      liveContext(lease, OperatingMode::MAINTENANCE);
+
+  CHECK(rig.executor.start(request(), ctx, 1000));
+
+  ctx.session_active = false;
+  rig.executor.update(ctx, 1001, false, TelemetrySample{});
+
+  CHECK_EQ((int)rig.executor.status().state,
+           (int)FirstMotionState::FAILED_NO_MOTION);
+  CHECK_EQ((int)rig.executor.status().failure,
+           (int)FirstMotionFailure::DYNAMIC_PREREQUISITE_LOST);
+  CHECK_EQ(rig.backend.totalCalls(), 0);
+}
+
+// ---------------------------------------------------------------------------
 // abort() safety: routes to SAFE_OFF_REQUIRED iff torque was already on.
 // ---------------------------------------------------------------------------
 
@@ -545,6 +628,9 @@ int main() {
   test_timeout_during_monitoring_requires_safe_off();
   test_communication_lost_during_monitoring_requires_safe_off();
   test_false_positive_progress_keeps_continuing();
+  test_permit_loss_during_monitoring_requires_safe_off_immediately();
+  test_authority_loss_during_monitoring_requires_safe_off_immediately();
+  test_session_loss_before_torque_needs_no_safe_off();
   test_abort_before_torque_confirmed_needs_no_safe_off();
   test_abort_after_torque_confirmed_requires_safe_off();
   test_abort_during_monitoring_requires_safe_off();

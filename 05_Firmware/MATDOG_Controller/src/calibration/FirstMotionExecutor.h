@@ -128,6 +128,7 @@ enum class FirstMotionFailure : uint8_t {
   STALLED                    = 10,
   MOTION_TIMEOUT              = 11,
   OPERATOR_ABORT              = 12,
+  DYNAMIC_PREREQUISITE_LOST   = 13,
 };
 
 struct FirstMotionConfig {
@@ -152,6 +153,16 @@ struct FirstMotionContext {
   CalibrationOrigin origin = CalibrationOrigin::NONE;
   core::AuthorityLease lease{};
   core::OperatingMode mode = core::OperatingMode::MAINTENANCE;
+
+  // Dynamic continuation gates, supplied fresh by Controller every tick.
+  // These are intentionally not cached by the executor. In particular,
+  // MONITORING must not continue merely because the position command was
+  // valid when it was issued: permit/session/authority may disappear while
+  // the servo is still moving.
+  bool motion_permit_active = false;
+  core::ActuatorAuthority authority = core::ActuatorAuthority::NONE;
+  uint32_t authority_generation = 0;
+  bool authority_inhibited = false;
 };
 
 class FirstMotionExecutor {
@@ -185,6 +196,11 @@ class FirstMotionExecutor {
   void abort();
 
   const FirstMotionStatus& status() const { return status_; }
+  // The bus id the CURRENT (or most recently started) attempt targets -
+  // valid from the moment start() returns true, including after a terminal
+  // state, so a caller can still address SAFE_OFF correctly once active()
+  // has become false. 0 (never a valid ST3215 id) before the first start().
+  uint8_t busId() const { return bus_id_; }
   bool active() const {
     return status_.state != FirstMotionState::IDLE &&
           status_.state != FirstMotionState::COMPLETE &&

@@ -46,6 +46,33 @@ bool FirstMotionExecutor::start(const FirstMotionRequest& request,
 void FirstMotionExecutor::update(const FirstMotionContext& context, uint32_t now_ms,
                                  bool telemetry_available,
                                  const actuator::TelemetrySample& telemetry) {
+  // Dynamic prerequisites are not only start/plan gates. A permit, live
+  // session or authority may disappear while the servo is already moving.
+  // Re-evaluate them on every tick, including MONITORING.
+  const bool continuation_ok =
+      context.session_active &&
+      context.origin == CalibrationOrigin::LIVE_SESSION &&
+      context.mode == core::OperatingMode::MAINTENANCE &&
+      context.motion_permit_active &&
+      context.lease.valid() &&
+      context.lease.owner == core::ActuatorAuthority::CALIBRATION &&
+      context.authority == core::ActuatorAuthority::CALIBRATION &&
+      context.authority_generation == context.lease.generation &&
+      !context.authority_inhibited;
+
+  if (active() && !continuation_ok) {
+    // Before TorqueEnable has been attempted there is nothing from this
+    // attempt to switch off. From POSITION_COMMAND_PENDING onward torque was
+    // already VERIFIED applied, so any lost prerequisite requires SAFE_OFF.
+    const bool torque_may_be_on =
+        status_.state != FirstMotionState::TORQUE_ENABLE_PENDING;
+    finish(torque_may_be_on ? FirstMotionState::SAFE_OFF_REQUIRED
+                            : FirstMotionState::FAILED_NO_MOTION,
+           FirstMotionFailure::DYNAMIC_PREREQUISITE_LOST,
+           status_.last_policy_decision);
+    return;
+  }
+
   switch (status_.state) {
     case FirstMotionState::TORQUE_ENABLE_PENDING:
       stepTorqueEnable(context, now_ms);
@@ -262,6 +289,8 @@ const char* toString(FirstMotionFailure failure) {
     case FirstMotionFailure::STALLED:                    return "STALLED";
     case FirstMotionFailure::MOTION_TIMEOUT:              return "MOTION_TIMEOUT";
     case FirstMotionFailure::OPERATOR_ABORT:              return "OPERATOR_ABORT";
+    case FirstMotionFailure::DYNAMIC_PREREQUISITE_LOST:
+      return "DYNAMIC_PREREQUISITE_LOST";
   }
   return "UNKNOWN";
 }
