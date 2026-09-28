@@ -234,6 +234,23 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# CR3 Priority 5: the contact-probe engine. Links the REAL policy, runtime,
+# CalibrationExecutionEngine, arbiter and checked target resolver against a
+# fake backend and synthetic telemetry - no fabricated physical measurement.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_contact_probe_engine" \
+  "$SCRIPT_DIR/test_contact_probe_engine.cpp" \
+  "$SKETCH_DIR/src/calibration/ContactProbeEngine.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
+  "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
 # The HostLink readiness classifier suite links the REAL pure classifier -
 # no module pointer, no hardware call - I6 (2026-09-25 objective change).
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -308,6 +325,7 @@ done
 "$OUT/test_actuator_runtime"
 "$OUT/test_calibration_execution_engine"
 "$OUT/test_first_motion_executor"
+"$OUT/test_contact_probe_engine"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"
 "$OUT/test_led_ring_manager_USB_ONLY"

@@ -92,6 +92,13 @@ class MotionDeadmanMonitor {
 
   uint32_t lastGoodSampleAtMs() const { return last_good_sample_ms_; }
   bool began() const { return began_; }
+  // The position this monitor was tracking for stall purposes, valid once a
+  // STALLED verdict has been returned (from either evaluate() or poll()) -
+  // -1 if no progress sample has been recorded yet. Exists so a caller that
+  // treats STALLED as a meaningful physical event (e.g. a contact-probe
+  // engine, where a stall IS the signal being sought) can record WHERE it
+  // occurred without this class inventing its own evidence type.
+  int32_t lastProgressPosition() const { return last_progress_position_; }
 
  private:
   MotionDeadmanVerdict evaluateAgainstClockOnly(uint32_t now_ms) const;
