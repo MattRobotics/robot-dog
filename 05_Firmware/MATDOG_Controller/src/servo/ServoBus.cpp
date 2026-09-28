@@ -159,6 +159,44 @@ SafeOffResult ServoBus::safeOff(int id) {
   return (torque_enable == 0) ? SafeOffResult::VERIFIED_OFF : SafeOffResult::VERIFY_FAILED;
 }
 
+ServoWriteVerifyResult ServoBus::enableTorqueOn(int id) {
+  if (id < 0 || id > 253) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
+
+  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+  st_.EnableTorque(static_cast<uint8_t>(id), 1);
+
+  // Independent readback is the sole authority, matching safeOff()'s rule:
+  // the write's own ACK/status is informational only and is never the
+  // verdict - see ServoWriteVerifyResult's file comment for why a lost ACK
+  // on this half-duplex bus cannot be read as "not applied".
+  const int torque_enable = st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE);
+  last_detected_ = (torque_enable < 0) ? core::DetectedState::NO_RESPONSE
+                                       : core::DetectedState::ONLINE;
+  return classifyServoWriteVerify(torque_enable, 1);
+}
+
+ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick) {
+  if (id < 0 || id > 253) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
+  if (target_tick >= 4096u) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
+
+  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+  st_.WritePosEx(
+      static_cast<uint8_t>(id),
+      static_cast<s16>(target_tick),
+      kBoundedWriteSpeed,
+      kBoundedWriteAcceleration);
+
+  // Verified by reading back the internal GoalPosition register itself, not
+  // present_position: present_position only catches up to the target over
+  // the joint's physical travel time, so it cannot prove anything about a
+  // write that was just issued. GoalPosition is a register latch with no
+  // travel delay, exactly like PositionOffset's own read-back verification.
+  const int goal_readback = st_.readWord(static_cast<uint8_t>(id), SMS_STS_GOAL_POSITION_L);
+  last_detected_ = (goal_readback < 0) ? core::DetectedState::NO_RESPONSE
+                                       : core::DetectedState::ONLINE;
+  return classifyServoWriteVerify(goal_readback, static_cast<int32_t>(target_tick));
+}
+
 bool ServoBus::readRuntimeState(int id, RuntimeState* out) {
   if (id < 0 || id > 253 || out == nullptr) return false;
 
@@ -182,6 +220,7 @@ bool ServoBus::readRuntimeState(int id, RuntimeState* out) {
   out->present_voltage     = st_.readByte(static_cast<uint8_t>(id), SMS_STS_PRESENT_VOLTAGE);
   out->present_temperature = st_.readByte(static_cast<uint8_t>(id), SMS_STS_PRESENT_TEMPERATURE);
   out->torque_enable       = st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE);
+  out->present_current     = st_.readWord(static_cast<uint8_t>(id), SMS_STS_PRESENT_CURRENT_L);
 
   return true;
 }

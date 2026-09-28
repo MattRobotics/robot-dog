@@ -120,13 +120,13 @@ AuthorityLease grant(ActuatorAuthorityArbiter& arbiter, ActuatorAuthority owner,
 
 class FakeActuatorBackend : public actuator::ActuatorBackend {
  public:
-  bool enableTorque(uint8_t) override {
+  actuator::BackendWriteOutcome enableTorque(uint8_t) override {
     ++calls;
-    return true;
+    return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
-  bool writeGoalPosition(uint8_t, uint16_t) override {
+  actuator::BackendWriteOutcome writeGoalPosition(uint8_t, uint16_t) override {
     ++calls;
-    return true;
+    return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
   int calls = 0;
 };
@@ -140,14 +140,40 @@ struct Rig {
   ActuatorRuntime runtime;
   CalibrationExecutionEngine engine;
   FakeActuatorBackend backend;
+  CalibrationGeometryProfile profile;
 
   Rig() {
     arbiter.reset(AuthorityClearReason::BOOT);
+    profile = boundProfile();
     policy.begin(&arbiter);
+    policy.bindGeometry(&profile, &actuator::geometry_data::kProvenance);
     runtime.begin(&policy, &backend);
-    engine.begin(&policy, &runtime);
+    engine.begin(&policy, &runtime, &profile, &actuator::geometry_data::kProvenance);
   }
 };
+
+actuator::JointTransform promotedTransform(JointIdentity id, uint16_t q0 = 2048) {
+  actuator::JointTransform t{};
+  t.identity = id;
+  t.geometry = actuator::geometryProvenanceTag(actuator::geometry_data::kProvenance);
+  t.state = EvidenceState::PROMOTED;
+  t.origin = CalibrationOrigin::LIVE_SESSION;
+  t.q0_tick = q0;
+  t.present = true;
+  return t;
+}
+
+void armCalibrationPermit(Rig& rig, const AuthorityLease& lease, int32_t budget = 64) {
+  actuator::CalibrationBootstrapContext bootstrap{};
+  bootstrap.session_active = true;
+  bootstrap.origin = CalibrationOrigin::LIVE_SESSION;
+  bootstrap.motion_permit_active = true;
+  bootstrap.motion_permit_generation = 1;
+  bootstrap.motion_permit_session_id = 1;
+  bootstrap.motion_permit_authority_generation = lease.generation;
+  bootstrap.direction_verify_tick_budget = budget;
+  rig.policy.setBootstrapContext(bootstrap);
+}
 
 CalibrationExecutionContext liveContext(const AuthorityLease& lease, OperatingMode mode) {
   CalibrationExecutionContext ctx{};
@@ -214,6 +240,8 @@ void test_stale_authority_generation_rejected() {
   const AuthorityLease second = grant(rig.arbiter, ActuatorAuthority::CALIBRATION,
                                       OperatingMode::MAINTENANCE);
   CHECK(first.generation != second.generation);
+  CHECK(rig.policy.transforms().admit(promotedTransform(lfUpper(), 2100)));
+  armCalibrationPermit(rig, second);
 
   CalibrationExecutionRequest req{};
   req.intent = CalibrationIntent::DIRECTION_VERIFY;
@@ -234,9 +262,6 @@ void test_stale_authority_generation_rejected() {
 void test_diagnostic_endpoint_cannot_become_executable() {
   g_case = "diagnostic endpoint refused";
   Rig rig;
-  CalibrationGeometryProfile profile = boundProfile();
-  rig.policy.bindGeometry(&profile, &actuator::geometry_data::kProvenance);
-
   actuator::CalibrationBootstrapContext bootstrap{};
   bootstrap.session_active = true;
   bootstrap.origin = CalibrationOrigin::LIVE_SESSION;
@@ -244,6 +269,8 @@ void test_diagnostic_endpoint_cannot_become_executable() {
 
   const AuthorityLease lease = grant(rig.arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  CHECK(rig.policy.transforms().admit(promotedTransform(lfHip(), 1996)));
+  armCalibrationPermit(rig, lease);
 
   // LF HIP MIN_SIDE is DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS — a clean
   // request that is refused purely because this endpoint is never a motion
@@ -265,30 +292,31 @@ void test_diagnostic_endpoint_cannot_become_executable() {
 void test_wrong_geometry_provenance_rejected() {
   g_case = "wrong geometry provenance";
   Rig rig;
-  CalibrationGeometryProfile profile = boundProfile();
   GeometryProvenance impostor = actuator::geometry_data::kProvenance;
   impostor.urdf_sha256[0] = (impostor.urdf_sha256[0] == 'a') ? 'b' : 'a';
-  rig.policy.bindGeometry(&profile, &impostor);
+  rig.policy.bindGeometry(&rig.profile, &impostor);
 
   const AuthorityLease lease = grant(rig.arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  armCalibrationPermit(rig, lease);
 
   const CalibrationExecutionRequest req =
       contactProbe(lfUpper(), Leg::LF, JointKind::UPPER, ContactSide::MIN_SIDE);
   const CalibrationExecutionResult result =
-      rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), /*bus_id=*/12);
-
-  CHECK_EQ((int)result.outcome, (int)CalibrationExecutionOutcome::ROUTED_TO_POLICY);
-  CHECK_EQ((int)result.policy_decision, (int)WriteDecision::REJECT_GEOMETRY_PROVENANCE);
+      rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), 12);
+  CHECK_EQ((int)result.outcome,
+           (int)CalibrationExecutionOutcome::REJECT_NO_GEOMETRY_BINDING);
   CHECK_EQ(rig.backend.calls, 0);
 
-  // Completely unbound geometry is the same refusal family, different member.
   Rig rig2;
+  rig2.policy.bindGeometry(nullptr, nullptr);
   const AuthorityLease lease2 = grant(rig2.arbiter, ActuatorAuthority::CALIBRATION,
                                       OperatingMode::MAINTENANCE);
+  armCalibrationPermit(rig2, lease2);
   const CalibrationExecutionResult unbound =
-      rig2.engine.execute(req, liveContext(lease2, OperatingMode::MAINTENANCE), /*bus_id=*/12);
-  CHECK_EQ((int)unbound.policy_decision, (int)WriteDecision::REJECT_NO_GEOMETRY_PROFILE);
+      rig2.engine.execute(req, liveContext(lease2, OperatingMode::MAINTENANCE), 12);
+  CHECK_EQ((int)unbound.outcome,
+           (int)CalibrationExecutionOutcome::REJECT_NO_GEOMETRY_BINDING);
   CHECK_EQ(rig2.backend.calls, 0);
 }
 
@@ -329,16 +357,9 @@ void test_historical_replay_origin_refused_before_the_policy_is_even_asked() {
 void test_no_accepted_transform_means_no_raw_target() {
   g_case = "no accepted transform";
   Rig rig;
-  CalibrationGeometryProfile profile = boundProfile();
-  rig.policy.bindGeometry(&profile, &actuator::geometry_data::kProvenance);
-
-  actuator::CalibrationBootstrapContext bootstrap{};
-  bootstrap.session_active = true;
-  bootstrap.origin = CalibrationOrigin::LIVE_SESSION;
-  rig.policy.setBootstrapContext(bootstrap);
-
   const AuthorityLease lease = grant(rig.arbiter, ActuatorAuthority::CALIBRATION,
                                      OperatingMode::MAINTENANCE);
+  armCalibrationPermit(rig, lease);
   CHECK(rig.policy.transforms().empty());  // the shipped state: nothing admitted
 
   // LF UPPER MIN_SIDE is EXECUTABLE with no parking required, so this
@@ -350,8 +371,7 @@ void test_no_accepted_transform_means_no_raw_target() {
   const CalibrationExecutionResult result =
       rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), /*bus_id=*/12);
 
-  CHECK_EQ((int)result.outcome, (int)CalibrationExecutionOutcome::ROUTED_TO_POLICY);
-  CHECK_EQ((int)result.policy_decision, (int)WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM);
+  CHECK_EQ((int)result.outcome, (int)CalibrationExecutionOutcome::REJECT_NO_TRANSFORM);
   CHECK_EQ(rig.backend.calls, 0);
 }
 
@@ -371,6 +391,7 @@ void test_contact_probe_eligible_only_for_calibration_owner() {
   for (ActuatorAuthority owner : {ActuatorAuthority::DIAGNOSTICS, ActuatorAuthority::QC,
                                   ActuatorAuthority::PROVISIONING}) {
     Rig rig;
+    CHECK(rig.policy.transforms().admit(promotedTransform(lfUpper(), 2100)));
     const AuthorityLease lease = grant(rig.arbiter, owner, OperatingMode::MAINTENANCE);
     const CalibrationExecutionResult result =
         rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), /*bus_id=*/12);
@@ -387,6 +408,7 @@ void test_contact_probe_eligible_only_for_calibration_owner() {
 void test_motion_cannot_execute_contact_probe() {
   g_case = "motion cannot probe";
   Rig rig;
+  CHECK(rig.policy.transforms().admit(promotedTransform(lfUpper(), 2100)));
   const AuthorityLease motion = grant(rig.arbiter, ActuatorAuthority::MOTION, OperatingMode::RUN);
 
   const CalibrationExecutionRequest req =

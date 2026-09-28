@@ -38,9 +38,9 @@
 // future Calibration Execution Engine (I5), explicitly [NOT IMPLEMENTED]
 // per ActuatorWritePolicy.h's own architecture diagram. Guessing that
 // conversion here would be exactly the kind of unreviewed architectural
-// decision the NextGen handoff says to stop for rather than invent. See
-// backendCallFor() below: those three operations always resolve to
-// BackendCallKind::NONE today.
+// CR3 supplies the checked q<->raw target before the policy plan. The three
+// calibration move classes therefore carry an absolute unsigned target_tick
+// and map to the same one WRITE_GOAL_POSITION backend call.
 //
 // SAFE_OFF IS OUTSIDE THIS LAYER, STRUCTURALLY
 // --------------------------------------------
@@ -68,6 +68,20 @@ enum class BackendCallKind : uint8_t {
 
 BackendCallKind backendCallFor(ActuatorOperation operation);
 
+// What a backend call proved about the write it just attempted. Three states,
+// never a bool: a failed/absent acknowledgement on a real transport does not
+// prove the command was not applied (see servo::ServoWriteVerifyResult, which
+// this mirrors at the transport-independent layer), so "uncertain" must stay
+// distinguishable from "verified not applied" all the way up to the caller
+// that decides whether to escalate to SAFE_OFF.
+enum class BackendWriteOutcome : uint8_t {
+  VERIFIED_APPLIED     = 0,  // the backend independently confirmed the write took effect
+  VERIFIED_NOT_APPLIED = 1,  // the backend independently confirmed it did not - proven safe
+  UNCERTAIN            = 2,  // no independent confirmation was possible either way
+};
+
+const char* toString(BackendWriteOutcome outcome);
+
 // Everything a real transport must supply to execute an ACCEPTed write.
 // Deliberately minimal: SafeActuatorPolicy and backendCallFor() have
 // already reduced every currently-executable ActuatorOperation to "apply
@@ -78,19 +92,24 @@ class ActuatorBackend {
 
   // APPLY torque only — never removes it. Bus id, not physical-unit label:
   // identity resolution already happened before execute() was called.
-  virtual bool enableTorque(uint8_t bus_id) = 0;
+  virtual BackendWriteOutcome enableTorque(uint8_t bus_id) = 0;
 
   // Unsigned 0..4095 domain, exactly the GoalPosition contract — signed
   // wrap is forbidden and this interface cannot express one.
-  virtual bool writeGoalPosition(uint8_t bus_id, uint16_t target_tick) = 0;
+  virtual BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick) = 0;
 };
 
 enum class ExecuteResult : uint8_t {
   NOT_EXECUTED     = 0,  // commit() did not return ACCEPT — nothing was sent
   NO_BACKEND       = 1,  // ACCEPT, but no backend installed — fail closed
   NO_RAW_TARGET    = 2,  // ACCEPT, but this operation has no raw tick target yet
-  WRITTEN          = 3,  // ACCEPT, backend call returned true
-  BACKEND_REJECTED = 4,  // ACCEPT, backend call returned false
+  WRITTEN          = 3,  // ACCEPT, backend independently verified the write applied
+  BACKEND_REJECTED = 4,  // ACCEPT, backend independently verified it did NOT apply
+  // ACCEPT, but the backend could not verify the outcome either way. The
+  // actuator's resulting state is unknown and MUST be treated as potentially
+  // energized/moved - the caller that owns the real transport is responsible
+  // for escalating to an independent SAFE_OFF immediately on seeing this.
+  UNCERTAIN_REQUIRES_SAFE_OFF = 5,
 };
 
 // Bridges SafeActuatorPolicy's decision to an ActuatorBackend. Holds no

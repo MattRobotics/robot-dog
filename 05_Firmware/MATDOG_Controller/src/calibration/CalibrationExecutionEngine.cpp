@@ -21,10 +21,15 @@ actuator::ActuatorOperation operationForIntent(CalibrationIntent intent) {
   return actuator::ActuatorOperation::NONE;
 }
 
-void CalibrationExecutionEngine::begin(actuator::SafeActuatorPolicy* policy,
-                                       actuator::ActuatorRuntime* runtime) {
+void CalibrationExecutionEngine::begin(
+    actuator::SafeActuatorPolicy* policy,
+    actuator::ActuatorRuntime* runtime,
+    const actuator::CalibrationGeometryProfile* geometry,
+    const actuator::GeometryProvenance* expected_provenance) {
   policy_ = policy;
   runtime_ = runtime;
+  geometry_ = geometry;
+  expected_provenance_ = expected_provenance;
 }
 
 CalibrationExecutionResult CalibrationExecutionEngine::execute(
@@ -64,6 +69,26 @@ CalibrationExecutionResult CalibrationExecutionEngine::execute(
     return result;
   }
 
+  if (policy_ == nullptr || geometry_ == nullptr || expected_provenance_ == nullptr ||
+      !geometry_->bound() || !geometry_->provenanceMatches(*expected_provenance_) ||
+      policy_->currentGeometryTag() != geometry_->provenanceTag()) {
+    result.outcome = CalibrationExecutionOutcome::REJECT_NO_GEOMETRY_BINDING;
+    return result;
+  }
+
+  const actuator::GeometryJointRecord* joint = geometry_->findJoint(request.joint);
+  if (joint == nullptr || joint->bus_id != bus_id) {
+    result.outcome = CalibrationExecutionOutcome::REJECT_BUS_BINDING;
+    return result;
+  }
+
+  const actuator::JointTransform* transform =
+      policy_->transforms().find(request.joint, policy_->currentGeometryTag());
+  if (transform == nullptr) {
+    result.outcome = CalibrationExecutionOutcome::REJECT_NO_TRANSFORM;
+    return result;
+  }
+
   actuator::ActuatorCommand command{};
   command.operation = operation;
   command.joint = request.joint;
@@ -71,10 +96,22 @@ CalibrationExecutionResult CalibrationExecutionEngine::execute(
   command.endpoint_joint = request.endpoint_joint;
   command.endpoint_side = request.endpoint_side;
   command.delta_ticks = request.direction_verify_delta_ticks;
-  // target_tick / target_urad deliberately left at their zero default — see
-  // the file comment: this class never computes a raw<->q conversion, so
-  // every command it builds carries only what SafeActuatorPolicy's own
-  // accepted-transform/accepted-limit checks can independently validate.
+  command.target_urad = request.target_urad;
+
+  actuator::TargetResolveStatus resolve = actuator::TargetResolveStatus::REJECT_TRANSFORM;
+  if (operation == actuator::ActuatorOperation::DIRECTION_VERIFY) {
+    resolve = actuator::resolveDeltaFromQ0(
+        *geometry_, *expected_provenance_, *transform,
+        request.direction_verify_delta_ticks, &command.target_tick);
+  } else {
+    resolve = actuator::resolveUrdfQToRaw(
+        *geometry_, *expected_provenance_, *transform,
+        request.target_urad, &command.target_tick);
+  }
+  if (resolve != actuator::TargetResolveStatus::OK) {
+    result.outcome = CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION;
+    return result;
+  }
 
   actuator::ActuatorTransaction transaction{};
   const actuator::WriteDecision plan_decision =
@@ -131,6 +168,14 @@ const char* toString(CalibrationExecutionOutcome outcome) {
       return "ABORT_IS_LIFECYCLE_NOT_MOTION";
     case CalibrationExecutionOutcome::ROUTED_TO_POLICY:
       return "ROUTED_TO_POLICY";
+    case CalibrationExecutionOutcome::REJECT_NO_GEOMETRY_BINDING:
+      return "REJECT_NO_GEOMETRY_BINDING";
+    case CalibrationExecutionOutcome::REJECT_NO_TRANSFORM:
+      return "REJECT_NO_TRANSFORM";
+    case CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION:
+      return "REJECT_TARGET_RESOLUTION";
+    case CalibrationExecutionOutcome::REJECT_BUS_BINDING:
+      return "REJECT_BUS_BINDING";
   }
   return "UNKNOWN";
 }

@@ -119,6 +119,22 @@ at the final pre-transmit check: DalyBms::update() takes the live mode from
 the Controller on every loop and the check must use it (never `true`, a
 constant, or the mode seen when the command arrived).
 
+CR3 uncertain-write safety (2026-09-28) addition: a failed/absent ACK on the
+servo bus does not prove a write was not applied - the ST3215 applies a
+register write before it transmits any reply, so a lost/garbled reply is
+indistinguishable, at the ACK layer, from the command never having arrived at
+all. enableTorqueOn()/writeGoalPosition() must therefore return the three-way
+servo::ServoWriteVerifyResult, classified ONLY from an independent readback of
+the register just written (TorqueEnable / the GoalPosition register itself,
+never present_position, which lags behind a write by the joint's travel time)
+- the write's own ACK/status may never be the verdict, the same rule Session
+2.2 Finding D already established for safeOff(). The uncertain state must
+survive unflattened up through actuator::BackendWriteOutcome and
+actuator::ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF: nothing may collapse it
+into either a "written" or a "rejected" outcome. Reading (never writing) the
+GoalPosition register is confined to exactly one accessor, the same
+read-only-through-one-accessor shape as PositionOffset.
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
@@ -154,6 +170,18 @@ def fail(msg):
     failures.append(msg)
 
 
+def contains_ws(haystack, needle):
+    """Substring containment tolerant of reformatting: clang-format may wrap
+    a long boolean/comparison expression across lines, which turns the
+    single run of whitespace an exact-token check expects into a newline
+    plus indentation. Collapsing every run of whitespace in both operands to
+    one space makes the check pin the SAME token semantically regardless of
+    where the formatter chose to break the line - see CR3 continuation
+    audit-anchor fix (2026-09-28)."""
+    normalize = lambda s: re.sub(r"\s+", " ", s)
+    return normalize(needle) in normalize(haystack)
+
+
 def check_forbidden_literals(files):
     forbidden = [
         "CalibrationOfs",
@@ -162,11 +190,18 @@ def check_forbidden_literals(files):
         "unLockEprom",
         "LockEprom",
         "sh2_saveDcdNow",
-        "WritePosEx",
         "RegWritePosEx",
         "SyncWritePosEx",
         "WheelMode",
-        "SMS_STS_GOAL_POSITION",
+        # SMS_STS_GOAL_POSITION_L is NOT banned outright any more (CR3
+        # uncertain-write safety), for exactly the same reason SMS_STS_OFS_L
+        # was narrowed below: a total ban on the register would also have
+        # blocked reading back what was just written, which is the only way
+        # to verify a GoalPosition write actually landed. check_
+        # goal_position_register_boundary() replaces the ban with a narrower
+        # rule: one approved read site, inside writeGoalPosition() only, via
+        # readWord() only, and no write ever targets it.
+        "SMS_STS_GOAL_POSITION_H",
         # SMS_STS_OFS_L is NOT banned outright any more. A total ban blocked
         # reading PositionOffset as well as writing it, and left the Controller
         # unable to verify the single most safety-relevant provisioning fact.
@@ -184,13 +219,146 @@ def check_forbidden_literals(files):
 
 
 def check_torque_enable(files):
+    """CR3-M3: exactly one reviewed torque-on primitive may exist, and only
+    inside ServoBus::enableTorqueOn(). SAFE_OFF remains the separate torque-off
+    path. No other source may call EnableTorque(..., nonzero).
+
+    CR3 uncertain-write safety additionally requires that the verdict come
+    ONLY from the independent TorqueEnable readback via
+    servo::classifyServoWriteVerify() - never from EnableTorque()'s own
+    return value or st_.Error, which Session 2.2 Finding D already proved
+    cannot even observe failure (SCS::Ack() returns 0, not -1, on failure)."""
     pattern = re.compile(r"EnableTorque\([^,]+,\s*([^)]+)\)")
+    torque_on = []
     for path, code in files:
         for match in pattern.finditer(code):
             arg = match.group(1).strip()
-            if arg not in {"0"}:
-                fail(f"{path}: EnableTorque called with non-zero argument {arg!r} "
-                     f"(automatic/host torque-on is forbidden)")
+            if arg == "0":
+                continue
+            torque_on.append((path, arg, match.start()))
+            if path.name != "ServoBus.cpp" or arg != "1":
+                fail(f"{path}: unreviewed EnableTorque non-zero call {arg!r}; CR3 permits "
+                     f"exactly ServoBus::enableTorqueOn(id) -> EnableTorque(..., 1)")
+    if len(torque_on) != 1:
+        fail(f"CR3 torque-on surface must contain exactly one reviewed non-zero "
+             f"EnableTorque call, found {len(torque_on)}")
+    else:
+        path, _, pos = torque_on[0]
+        code = next(c for p, c in files if p == path)
+        body = re.search(
+            r"ServoWriteVerifyResult ServoBus::enableTorqueOn\(int id\)\s*\{(.*?)\n\}",
+            code, re.DOTALL)
+        if not body or not (body.start() <= pos <= body.end()):
+            fail(f"{path}: the one torque-on call is not inside "
+                 f"ServoBus::enableTorqueOn(), or it no longer returns "
+                 f"ServoWriteVerifyResult")
+        else:
+            text = body.group(1)
+            if "SMS_STS_TORQUE_ENABLE" not in text or "readByte" not in text:
+                fail(f"{path}: enableTorqueOn() must independently read back TorqueEnable")
+            if "classifyServoWriteVerify" not in text:
+                fail(f"{path}: enableTorqueOn() must classify strictly via "
+                     f"classifyServoWriteVerify(readback, ...), not by hand")
+            if re.search(r"\bst_\.Error\b", text) or re.search(r"==\s*1\s*&&", text):
+                fail(f"{path}: enableTorqueOn() appears to condition its verdict on the "
+                     f"write's own ACK/status again - the readback alone must decide "
+                     f"(CR3 uncertain-write safety)")
+
+
+def check_servo_motion_write_surface(files):
+    """CR3-M3: one and only one GoalPosition primitive exists, in ServoBus.
+
+    It must use unsigned-domain validation and the fixed conservative
+    WritePosEx speed/acceleration constants. Direct writeWord/writeByte,
+    RegWrite/SyncWrite and every additional WritePosEx call remain forbidden.
+
+    CR3 uncertain-write safety additionally requires the verdict to come ONLY
+    from independently reading the GoalPosition register back and comparing
+    it to the commanded tick via servo::classifyServoWriteVerify() - never
+    from WritePosEx()'s own ACK/status, for the same reason as the torque-on
+    primitive: a lost/garbled ACK on this half-duplex bus does not prove the
+    write was not applied.
+    """
+    hits = []
+    for path, code in files:
+        for m in re.finditer(r"\bWritePosEx\s*\(", code):
+            hits.append((path, m.start()))
+    if len(hits) != 1:
+        fail(f"CR3 GoalPosition surface must contain exactly one WritePosEx call, found {len(hits)}")
+        return
+    path, pos = hits[0]
+    if path.name != "ServoBus.cpp":
+        fail(f"{path}: WritePosEx may exist only in ServoBus::writeGoalPosition()")
+        return
+    code = next(c for p, c in files if p == path)
+    body = re.search(
+        r"ServoWriteVerifyResult ServoBus::writeGoalPosition\(int id, uint16_t target_tick\)"
+        r"\s*\{(.*?)\n\}", code, re.DOTALL)
+    if not body or not (body.start() <= pos <= body.end()):
+        fail(f"{path}: WritePosEx is not inside ServoBus::writeGoalPosition(), or it no "
+             f"longer returns ServoWriteVerifyResult")
+        return
+    text = body.group(1)
+    for required in ("target_tick >= 4096u", "kOperationalTimeoutMs",
+                     "kBoundedWriteSpeed", "kBoundedWriteAcceleration",
+                     "SMS_STS_GOAL_POSITION_L", "readWord", "classifyServoWriteVerify"):
+        if required not in text:
+            fail(f"{path}: writeGoalPosition() missing reviewed CR3 guard {required!r}")
+    for forbidden in ("RegWrite", "SyncWrite", "writeByte(", "writeWord("):
+        if forbidden in text:
+            fail(f"{path}: writeGoalPosition() contains forbidden primitive {forbidden!r}")
+    if re.search(r"\bst_\.Error\b", text):
+        fail(f"{path}: writeGoalPosition() reads st_.Error again - the independent "
+             f"GoalPosition readback alone must decide (CR3 uncertain-write safety)")
+
+
+def check_goal_position_register_boundary(files, sketch_dir):
+    """CR3 uncertain-write safety: SMS_STS_GOAL_POSITION_L may be READ, and
+    only inside writeGoalPosition()'s own verification step - the exact same
+    read-only-through-one-accessor shape check_position_offset_boundary()
+    already enforces for PositionOffset."""
+    by_name = {path.name: (path, code) for path, code in files}
+    entry = by_name.get("ServoBus.cpp")
+    if entry is None:
+        fail(f"{sketch_dir / 'src' / 'servo' / 'ServoBus.cpp'}: not found")
+        return
+    bus_path, bus_code = entry
+
+    for path, code in files:
+        if "SMS_STS_GOAL_POSITION_L" not in code:
+            continue
+        if path.name != "ServoBus.cpp":
+            fail(f"{path}: names SMS_STS_GOAL_POSITION_L - the GoalPosition register may "
+                 f"only be touched by ServoBus::writeGoalPosition()'s own verification read, "
+                 f"so every access to it is in one auditable place")
+
+    body = re.search(
+        r"ServoWriteVerifyResult ServoBus::writeGoalPosition\(int id, uint16_t target_tick\)"
+        r"\s*\{(.*?)\n\}", bus_code, re.DOTALL)
+    if not body:
+        fail(f"{bus_path}: ServoBus::writeGoalPosition() not found")
+        return
+    text = body.group(1)
+    if "readWord(static_cast<uint8_t>(id), SMS_STS_GOAL_POSITION_L)" not in \
+            re.sub(r"\s+", " ", text):
+        fail(f"{bus_path}: writeGoalPosition() does not read back "
+             f"SMS_STS_GOAL_POSITION_L via readWord() - the write's own ACK is not proof "
+             f"the command was applied")
+    for forbidden in ("writeByte", "writeWord", "genWrite", "regWrite", "RegWrite"):
+        if forbidden in text and "readWord" not in forbidden:
+            fail(f"{bus_path}: writeGoalPosition()'s verification step contains write "
+                 f"primitive {forbidden!r} where a read was expected")
+
+    # No PositionOffset-style write ever targets this register under any
+    # spelling, anywhere in the tree.
+    goal_write = re.compile(
+        r"(writeByte|writeWord|genWrite|regWrite|RegWrite)\s*\([^;]*?"
+        r"SMS_STS_GOAL_POSITION")
+    for path, code in files:
+        if goal_write.search(code):
+            fail(f"{path}: a direct GoalPosition register WRITE is expressible here - the "
+                 f"one reviewed write path is WritePosEx() inside writeGoalPosition(), never "
+                 f"a raw register write")
 
 
 def check_servo_id_write(files):
@@ -778,12 +946,60 @@ def check_led_anti_back_power(files):
         fail(f"{path}: direct GPIO output bypasses the guarded WS2812 transport")
 
 
+def check_uncertain_write_propagation(files, sketch_dir):
+    """CR3 uncertain-write safety: an unverifiable backend outcome must reach
+    the caller as a DISTINCT result, never silently folded into "written" or
+    "rejected" at any layer of the chain
+    (ServoWriteVerifyResult -> BackendWriteOutcome -> ExecuteResult)."""
+    by_name = {path.name: (path, code) for path, code in files}
+
+    runtime = by_name.get("ActuatorRuntime.cpp")
+    if runtime is None:
+        fail(f"{sketch_dir / 'src' / 'actuator' / 'ActuatorRuntime.cpp'}: not found")
+    else:
+        path, code = runtime
+        execute = re.search(r"ExecuteResult ActuatorRuntime::execute\(.*?\n\}", code,
+                            re.DOTALL)
+        if not execute:
+            fail(f"{path}: ActuatorRuntime::execute() not found")
+        else:
+            text = execute.group(0)
+            if "BackendWriteOutcome::UNCERTAIN" not in text or \
+                    "ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF" not in text:
+                fail(f"{path}: execute() does not map BackendWriteOutcome::UNCERTAIN to "
+                     f"ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF")
+
+    backend = by_name.get("ServoBusActuatorBackend.h")
+    if backend is None:
+        fail(f"{sketch_dir / 'src' / 'servo' / 'ServoBusActuatorBackend.h'}: not found")
+    else:
+        path, code = backend
+        if "ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE" not in code or \
+                "BackendWriteOutcome::UNCERTAIN" not in code:
+            fail(f"{path}: does not translate "
+                 f"ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE to "
+                 f"BackendWriteOutcome::UNCERTAIN - an unverifiable transport-level result "
+                 f"must not be able to become a verified one on its way up")
+
+    # The three-value shape itself must not quietly shrink back to a bool
+    # anywhere in the chain.
+    policy_h = by_name.get("ActuatorRuntime.h")
+    if policy_h is not None:
+        path, code = policy_h
+        iface = re.search(r"class ActuatorBackend\s*\{(.*?)\n\};", code, re.DOTALL)
+        if not iface or "BackendWriteOutcome enableTorque" not in iface.group(1) or \
+                "BackendWriteOutcome writeGoalPosition" not in iface.group(1):
+            fail(f"{path}: ActuatorBackend::enableTorque()/writeGoalPosition() must return "
+                 f"BackendWriteOutcome, not bool - a bool cannot express 'uncertain'")
+
+
 def check_actuator_runtime_boundaries(files):
     """I4: the Safe Actuator runtime adapter (src/actuator/ActuatorRuntime.*)
     must stay host-linkable exactly like ActuatorWritePolicy itself, and its
     mere existence must not make ordinary physical motion reachable. There is
-    still no production ActuatorBackend anywhere in this firmware - ServoBus
-    exposes exactly one write, safeOff() (torque OFF).
+    CR3-M3 adds exactly one production ServoBusActuatorBackend and two narrow
+    ServoBus write primitives, but Controller remains null-wired until the
+    separately reviewed activation gate.
 
     2026-09-25 objective change: Controller.{h,cpp} may now own an
     ActuatorRuntime instance as fail-closed status/lifecycle infrastructure
@@ -806,7 +1022,8 @@ def check_actuator_runtime_boundaries(files):
                      f"host-linkable, the same contract as ActuatorWritePolicy itself")
 
     allowed_dirs = {"actuator", "calibration", "tests"}
-    allowed_names = {"ActuatorRuntime.h", "ActuatorRuntime.cpp", "Controller.h", "Controller.cpp"}
+    allowed_names = {"ActuatorRuntime.h", "ActuatorRuntime.cpp", "Controller.h", "Controller.cpp",
+                     "ServoBusActuatorBackend.h", "ServoBusActuatorBackend.cpp"}
     for path, code in files:
         if path.name in allowed_names:
             continue
@@ -865,6 +1082,215 @@ def check_calibration_execution_engine_boundaries(files):
                  f"infrastructure only) or the offline test suite")
 
 
+
+def check_first_motion_command_wiring(files):
+    """CR3 first physical-motion command surface.
+
+    This is deliberately NOT a generic motion API. Exactly one command may
+    arm FirstMotionExecutor: LF_UPPER, current semantic identity, bus 12,
+    fixed +16 raw-tick excursion. Session start and permit grant are likewise
+    exact commands. All physical write execution remains below Controller's
+    reviewed FirstMotionExecutor path; CommandRouter itself may never perform
+    ServoBus/ActuatorRuntime writes.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+
+    router_item = by_name.get("CommandRouter.cpp")
+    controller_item = by_name.get("Controller.cpp")
+    if router_item is None or controller_item is None:
+        fail("CommandRouter.cpp/Controller.cpp missing - cannot audit CR3 first-motion wiring")
+        return
+
+    router_path, router = router_item
+    controller_path, controller = controller_item
+
+    handle_match = re.search(
+        r"void CommandRouter::handleLine\(String line\)\s*\{(.*?)\n\}",
+        router, re.DOTALL)
+    if not handle_match:
+        fail(f"{router_path}: handleLine() not found for CR3 command audit")
+        return
+    handle = handle_match.group(1)
+
+    def branch_for(command):
+        marker = f'"{command}"'
+        start = handle.find(marker)
+        if start < 0:
+            return ""
+        end = handle.find("} else if", start + len(marker))
+        if end < 0:
+            end = len(handle)
+        return handle[start:end]
+
+    # ------------------------------------------------------------------
+    # Exact first-motion command: no parser, no arbitrary servo/delta.
+    # ------------------------------------------------------------------
+    motion_cmd = (
+        "@CALIBRATION MOTION DIRECTION_VERIFY "
+        "LF_UPPER +16 CONFIRM_FIRST_MOTION"
+    )
+    if handle.count(f'"{motion_cmd}"') != 1:
+        fail(f"{router_path}: exact command {motion_cmd!r} must appear exactly once "
+             f"in handleLine()")
+    if 'upper.startsWith("@CALIBRATION MOTION DIRECTION_VERIFY")' in handle:
+        fail(f"{router_path}: DIRECTION_VERIFY may not use startsWith(); "
+             f"the first-motion command must remain exact")
+
+    motion = branch_for(motion_cmd)
+    if not motion:
+        fail(f"{router_path}: exact first-motion command branch not found")
+    else:
+        required = (
+            "constexpr uint8_t kFirstMotionBusId = 12;",
+            "identity.leg != calibration::Leg::LF",
+            "identity.joint != calibration::JointKind::UPPER",
+            "modules_.geometry_profile->withinDirectionVerifyEnvelope(identity, 16)",
+            "request.bus_id = kFirstMotionBusId;",
+            "request.delta_ticks = 16;",
+            "modules_.motion_permit->active()",
+            "modules_.motion_authorization->operator_authorized",
+            "modules_.motion_authorization->token.valid()",
+            "modules_.motion_authorization->direction_verify_tick_budget != 16",
+            "context.motion_permit_active = modules_.motion_permit->active()",
+            "context.authority = modules_.authority->current()",
+            "context.authority_generation = modules_.authority->generation()",
+            "context.authority_inhibited = modules_.authority->inhibited()",
+            "modules_.first_motion->start(request, context, millis())",
+        )
+        for token in required:
+            if token not in motion:
+                fail(f"{router_path}: first-motion branch missing pinned token {token!r}")
+
+        for token in ("sscanf(", "strtol(", "atoi(", ".toInt(", ".substring("):
+            if token in motion:
+                fail(f"{router_path}: first-motion branch contains runtime parser {token!r}; "
+                     f"servo/joint/delta must not become caller-selectable")
+
+        for token in ("writeGoalPosition(", "enableTorqueOn(", "safeOff(",
+                      "->plan(", "->commit(", "->execute("):
+            if token in motion:
+                fail(f"{router_path}: first-motion command handler contains direct "
+                     f"write/transaction primitive {token!r}; it may only call "
+                     f"FirstMotionExecutor::start()")
+
+    start_calls = sum(
+        code.count("modules_.first_motion->start(")
+        for _, code in files
+    )
+    if start_calls != 1:
+        fail(f"CR3 must contain exactly one production first_motion->start() call; "
+             f"found {start_calls}")
+
+    # ------------------------------------------------------------------
+    # Exact permit command: shared live fact-builder, ROBOT_POWERED only.
+    # ------------------------------------------------------------------
+    permit_cmd = "@CALIBRATION MOTION PERMIT GRANT 16 CONFIRM_FIRST_MOTION"
+    if handle.count(f'"{permit_cmd}"') != 1:
+        fail(f"{router_path}: exact permit grant command must appear exactly once")
+
+    permit = branch_for(permit_cmd)
+    if not permit:
+        fail(f"{router_path}: exact permit grant branch not found")
+    else:
+        required = (
+            "modules_.motion_authorization->operator_authorized = true;",
+            "modules_.motion_authorization->direction_verify_tick_budget = 16;",
+            "build::kHardwareProfile == config::HardwareProfile::ROBOT_POWERED",
+            "inputs.session_active = modules_.calibration->sessionLive()",
+            "inputs.session_id = session.session_id",
+            "inputs.current_population_pass =",
+            "inputs.current_geometry_bound =",
+            "inputs.promoted_transforms_complete =",
+            "inputs.authority = modules_.authority->current()",
+            "inputs.authority_generation = modules_.authority->generation()",
+            "inputs.authority_inhibited = modules_.authority->inhibited()",
+            "calibration::buildCalibrationMotionPermitFacts(inputs)",
+            "modules_.motion_permit->grant(facts, &token)",
+        )
+        for token in required:
+            if token not in permit:
+                fail(f"{router_path}: permit grant branch missing required live gate {token!r}")
+
+        for token in ("sscanf(", "strtol(", "atoi(", ".toInt(", ".substring("):
+            if token in permit:
+                fail(f"{router_path}: permit grant contains runtime parser {token!r}; "
+                     f"the first-motion budget must remain fixed at 16 ticks")
+
+    # ------------------------------------------------------------------
+    # Session start must reuse current Q0 population evidence.
+    # ------------------------------------------------------------------
+    session_cmd = "@CALIBRATION SESSION START LF CONFIRM_CURRENT_Q0"
+    if handle.count(f'"{session_cmd}"') != 1:
+        fail(f"{router_path}: exact CR3 session-start command must appear exactly once")
+
+    session = branch_for(session_cmd)
+    if not session:
+        fail(f"{router_path}: CR3 session-start branch not found")
+    else:
+        for token in (
+            "Q0CaptureState::COMPLETE",
+            "modules_.q0_capture->populationResult()",
+            "modules_.actuator_policy->currentGeometryTag()",
+            "modules_.actuator_policy->transforms().size()",
+            "calibration::startCalibrationSessionFromQ0Evidence(",
+            "calibration::Leg::LF",
+        ):
+            if token not in session:
+                fail(f"{router_path}: session-start branch missing required gate {token!r}")
+
+        for token in ("EnableTorque", "writeGoalPosition", "safeOff(",
+                      "->plan(", "->commit(", "->execute("):
+            if token in session:
+                fail(f"{router_path}: session start contains physical write primitive "
+                     f"{token!r}")
+
+    # The orchestrator itself must remain pure and cannot secretly grant
+    # permits or touch the actuator transport.
+    for name in ("CalibrationSessionOrchestrator.h",
+                 "CalibrationSessionOrchestrator.cpp"):
+        item = by_name.get(name)
+        if item is None:
+            fail(f"{name}: CR3 session orchestrator unit missing")
+            continue
+        path, code = item
+        for token in ("ServoBus", "FirstMotionExecutor",
+                      "CalibrationMotionPermit", "motion_permit",
+                      "EnableTorque", "writeGoalPosition", "safeOff("):
+            if token in code:
+                fail(f"{path}: session orchestrator contains {token!r}; "
+                     f"starting a session must never grant or execute motion")
+
+    # ------------------------------------------------------------------
+    # Per-tick first-motion continuation + independent SAFE_OFF.
+    # ------------------------------------------------------------------
+    update = re.search(
+        r"void Controller::updateFirstMotion\(uint32_t now_ms\)\s*\{(.*?)\n\}",
+        controller, re.DOTALL)
+    if not update:
+        fail(f"{controller_path}: updateFirstMotion() not found")
+    else:
+        body = update.group(1)
+        required = (
+            "context.motion_permit_active = motion_permit_.active()",
+            "context.authority = authority_.current()",
+            "context.authority_generation = authority_.generation()",
+            "context.authority_inhibited = authority_.inhibited()",
+            "first_motion_.update(context, now_ms",
+            "calibration::FirstMotionState::SAFE_OFF_REQUIRED",
+            "calibration::FirstMotionState::COMPLETE",
+            "first_motion_safe_off_result_ != servo::SafeOffResult::VERIFIED_OFF",
+            "servo_bus_.safeOff(first_motion_.busId())",
+        )
+        for token in required:
+            if not contains_ws(body, token):
+                fail(f"{controller_path}: updateFirstMotion() missing safety token {token!r}")
+
+    # The command layer must never turn the final operational flag on.
+    if re.search(r"hardware_motion_authorized\s*=\s*true", router):
+        fail(f"{router_path}: command surface attempts to enable final global "
+             f"hardware_motion_authorized; CR3 calibration permit must remain separate")
+
+
 def check_service_readiness_is_host_linkable(files):
     """I6: the HostLink readiness classifier must stay pure and
     host-linkable, the same contract as every other decision core in this
@@ -886,59 +1312,157 @@ def check_service_readiness_is_host_linkable(files):
 
 
 def check_actuator_infrastructure_wired_fail_closed(files):
-    """I4/I5 Controller wiring (2026-09-25 objective change): SafeActuatorPolicy,
-    ActuatorRuntime and CalibrationExecutionEngine may be owned by Controller
-    as status/lifecycle infrastructure, but wiring them in must never make
-    Torque ON, GoalPosition, contact motion or calibration motion reachable.
-    This enforces the specific fail-closed choices that make that true
-    structurally, not merely by review."""
-    controller_cpp = None
-    for path, code in files:
-        if path.name == "Controller.cpp":
-            controller_cpp = (path, code)
-            break
+    """I4/I5/CR3 production composition.
+
+    The backend, Geometry V5, execution engine and permit core are now REAL
+    production objects. Fail-closed therefore no longer means "motion code is
+    unreachable by absence". CR3 intentionally exposes exactly one reviewed
+    activation chain:
+
+      completed current Q0 evidence
+        -> live CalibrationManager session
+        -> explicit RAM-only motion permit
+        -> exact LF_UPPER +16 DIRECTION_VERIFY first-motion request
+
+    This function pins Controller-owned composition and the per-tick permit
+    refresh. check_first_motion_command_wiring() separately pins the ONLY
+    reviewed command-level exceptions. Controller itself must never implicitly
+    grant a permit or start a session merely because prerequisites become
+    healthy."""
+
+    by_name = {path.name: (path, code) for path, code in files}
+    controller_cpp = by_name.get("Controller.cpp")
     if controller_cpp is None:
         fail("Controller.cpp not found - cannot audit fail-closed actuator wiring")
         return
     path, code = controller_cpp
 
-    # The runtime adapter must be given no backend. That alone makes every
-    # ACCEPT decision resolve to NO_BACKEND, independent of anything else -
-    # the single fact this whole check exists to pin down.
-    m = re.search(r"actuator_runtime_\.begin\(([^)]*)\)", code)
-    if not m or "nullptr" not in m.group(1):
-        fail(f"{path}: actuator_runtime_.begin() must pass nullptr as the backend - no "
-             f"production ActuatorBackend may ever be wired into Controller")
-
-    # No geometry may be bound, no limit or transform admitted, no live
-    # bootstrap context set, from Controller - those are exactly what would
-    # turn "infrastructure present" into "a target is reachable".
-    for forbidden in ("bindGeometry(", ".admit(", "setBootstrapContext("):
-        if forbidden in code:
-            fail(f"{path}: contains {forbidden!r} - Controller may own the Safe Actuator/"
-                 f"Calibration Execution infrastructure but must never bind geometry, admit a "
-                 f"limit/transform, or set a live bootstrap context; doing so would make a "
-                 f"target reachable, not merely present")
-
-    # No command path may trigger a decision or a write - only read-only
-    # status/counters accessors are permitted from CommandRouter or
-    # ControllerService. Matches BOTH call syntaxes - modules_.actuator_policy
-    # is a pointer (-> ), while a hypothetical value member would use '.' -
-    # a dot-only check silently misses every real call site in this codebase,
-    # which is exactly the gap a manual mutation check (temporarily injecting
+    # --- (1) the transaction methods remain unreachable from any command ---
+    # unchanged from CR3-M3/M4: still the single strongest guarantee, kept
+    # exactly as strict now that the infrastructure behind it is real.
+    # Matches BOTH call syntaxes - modules_.actuator_policy is a pointer
+    # (-> ), while a hypothetical value member would use '.' - a dot-only
+    # check silently misses every real call site in this codebase, which is
+    # exactly the gap a manual mutation check (temporarily injecting
     # modules_.actuator_policy->plan(...) into CommandRouter.cpp) caught
-    # during I4/I5 Controller-wiring review.
-    forbidden_call = re.compile(r"(?:\.|->)\s*(plan|commit|execute|abort)\s*\(")
+    # during the original I4/I5 Controller-wiring review.
+    # CR3 continuation: FirstMotionExecutor::abort() and
+    # FullLegCalibrationExecutor::abort() are the reviewed, session-scoped,
+    # operator-facing de-escalation primitives the
+    # @CALIBRATION MOTION|SESSION|FULL LEG ABORT command handlers call -
+    # check_first_motion_command_wiring() separately pins their ONE
+    # production start() call site each. This is deliberately NOT the same
+    # door as SafeActuatorPolicy::abort(ActuatorTransaction*) /
+    # ActuatorRuntime, which remains forbidden below: the receiver name is
+    # checked, not just the method name, so only these two exact, already-
+    # reviewed objects' abort() is exempt.
+    allowed_abort_receivers = ("first_motion", "full_leg_calibration")
+    forbidden_call = re.compile(r"(\w+)\s*(?:\.|->)\s*(plan|commit|execute|abort)\s*\(")
     for path2, code2 in files:
         if path2.name not in ("CommandRouter.cpp", "ControllerService.h", "Controller.cpp"):
             continue
-        m = forbidden_call.search(code2)
-        if m:
-            fail(f"{path2}: contains a call to {m.group(1)}() - CommandRouter/ControllerService/"
+        found = None
+        for m in forbidden_call.finditer(code2):
+            receiver, method = m.group(1), m.group(2)
+            if method == "abort" and receiver in allowed_abort_receivers:
+                continue
+            found = m
+            break
+        if found:
+            fail(f"{path2}: contains a call to {found.group(2)}() - CommandRouter/ControllerService/"
                  f"Controller may only read status from the Safe Actuator/Calibration "
                  f"Execution infrastructure, never plan, commit, execute or abort a "
                  f"transaction; that belongs to a future, separately reviewed activation "
                  f"gate")
+
+    # --- the backend and geometry must be the REAL production ones --------
+    m = re.search(r"actuator_runtime_\.begin\(([^)]*)\)", code)
+    if not m or re.sub(r"\s+", "", m.group(1)) != "&actuator_policy_,&actuator_backend_":
+        fail(f"{path}: actuator_runtime_.begin() must be given the real "
+             f"&actuator_policy_, &actuator_backend_ - CR3-M5 production composition "
+             f"requires a real backend to exist (guarantee (1) above is what keeps that safe, "
+             f"not the backend's absence)")
+    if code.count("actuator_backend_.begin(&servo_bus_)") != 1:
+        fail(f"{path}: actuator_backend_ must be bound to the one Controller-owned "
+             f"servo_bus_ exactly once")
+    if code.count("geometry_profile_.bind(&actuator::geometry_data::kProvenance") != 1:
+        fail(f"{path}: geometry_profile_ must be bound to the real generated Geometry V5 "
+             f"data (actuator::geometry_data) exactly once")
+    if code.count("actuator_policy_.bindGeometry(&geometry_profile_, "
+                 "&actuator::geometry_data::kProvenance)") != 1:
+        fail(f"{path}: actuator_policy_ must be bound to geometry_profile_/the real expected "
+             f"provenance exactly once")
+    if code.count("calibration_execution_.begin(&actuator_policy_, &actuator_runtime_, "
+                 "&geometry_profile_,") != 1:
+        fail(f"{path}: calibration_execution_ must be bound to the same real geometry_profile_")
+
+    # --- Controller never implicitly authorises calibration motion ----------
+    # Explicit grant/session start now exist ONLY in CommandRouter and are
+    # pinned by check_first_motion_command_wiring(). The periodic Controller
+    # lifecycle may check/revoke an existing permit, never create one.
+    if re.search(r"motion_authorization_\.operator_authorized\s*=\s*true", code):
+        fail(f"{path}: Controller must never set operator_authorized=true implicitly; "
+             f"only the exact reviewed CommandRouter permit command may do so")
+    if "motion_permit_.grant(" in code:
+        fail(f"{path}: Controller must never call motion_permit_.grant(); "
+             f"per-tick lifecycle may check/revoke only")
+
+    for forbidden in ("calibration_.startSession(",
+                      "calibration_.activate(",
+                      "calibration_.submitPopulationEvidence("):
+        if forbidden in code:
+            fail(f"{path}: Controller contains {forbidden!r}; live-session start is "
+                 f"allowed only through the reviewed Q0 session orchestrator command")
+
+    # --- the permit refresh itself must be real, not a stub -----------------
+    refresh = re.search(r"void Controller::updateCalibrationMotionPermit\(\)\s*\{(.*?)\n\}",
+                        code, re.DOTALL)
+    if not refresh:
+        fail(f"{path}: updateCalibrationMotionPermit() not found")
+    else:
+        body = refresh.group(1)
+        for required in (
+            "inputs.operator_calibration_motion_authorized = motion_authorization_.operator_authorized",
+            "inputs.session_active = calibration_.sessionLive()",
+            "inputs.current_geometry_bound =",
+            "actuator_policy_.currentGeometryTag() != actuator::kNoGeometryProvenance",
+            "inputs.promoted_transforms_complete =",
+            "actuator_policy_.transforms().size() == calibration::kLegServoSlotCount",
+            "inputs.authority = authority_.current()",
+            "inputs.authority_generation = authority_.generation()",
+            "inputs.authority_inhibited = authority_.inhibited()",
+            "calibration::buildCalibrationMotionPermitFacts(inputs)",
+            "motion_permit_.check(facts, motion_authorization_.token)",
+            "ctx.motion_permit_active = motion_permit_.active()",
+            "actuator_policy_.setBootstrapContext(ctx)",
+        ):
+            if required not in body:
+                fail(f"{path}: updateCalibrationMotionPermit() missing required live fact "
+                     f"{required!r} - every fact must be read fresh from its real source, "
+                     f"never hardcoded or cached")
+        if re.search(r"(?:facts|inputs)\.\w+\s*=\s*true\b", body):
+            fail(f"{path}: updateCalibrationMotionPermit() hardcodes a fact to true instead "
+                 f"of reading it from live state")
+        if "motion_permit_.grant(" in body:
+            fail(f"{path}: updateCalibrationMotionPermit() must never grant() - it may only "
+                 f"check() an already-granted permit; granting implicitly from facts turning "
+                 f"healthy is exactly what CalibrationMotionPermit.h forbids")
+
+    # updateCalibrationMotionPermit() must run unconditionally, every tick,
+    # before command_router_.update() can act on what it just computed.
+    update_fn = re.search(r"void Controller::update\(uint32_t now_ms\)\s*\{(.*?)\n\}",
+                          code, re.DOTALL)
+    if not update_fn:
+        fail(f"{path}: Controller::update(uint32_t now_ms) not found")
+    else:
+        body = update_fn.group(1)
+        permit_pos = body.find("updateCalibrationMotionPermit();")
+        router_pos = body.find("command_router_.update(now_ms);")
+        if permit_pos < 0 or router_pos < 0 or permit_pos > router_pos:
+            fail(f"{path}: Controller::update() must call updateCalibrationMotionPermit() "
+                 f"unconditionally, before command_router_.update(now_ms) - a command "
+                 f"processed against a stale permit snapshot is exactly the hazard this "
+                 f"orders against")
 
 
 def check_led_status_boundaries(files):
@@ -2493,6 +3017,58 @@ def check_calibration_q0_production_wiring(files, sketch_dir):
                 fail(f"{rpath}: SAFE_OFF consults CR2-B via {forbidden!r} - de-escalation "
                      f"must remain independent")
 
+
+def check_calibration_q0_promotion_wiring(files, sketch_dir):
+    """CR3-M5: @CALIBRATION Q0 PROMOTE is the one reviewed path that may call
+    transforms().admit() in production. MAINTENANCE-gated, exact-confirmation-
+    gated, goes through the exact reviewed prepareCurrentQ0Evidence() pipeline,
+    acquires no authority, issues no bus transaction, writes no EEPROM."""
+    by_name = {path.name: (path, code) for path, code in files}
+    router = by_name.get("CommandRouter.cpp")
+    if router is None:
+        fail(f"{sketch_dir / 'src' / 'core' / 'CommandRouter.cpp'}: not found")
+        return
+    rpath, rcode = router
+
+    branch = re.search(
+        r'upper == "@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION"\)\s*\{(.*?)'
+        r'\}\s*else if\s*\(upper == "@CALIBRATION STATUS"\)', rcode, re.DOTALL)
+    if not branch:
+        fail(f"{rpath}: @CALIBRATION Q0 PROMOTE branch not found (exact confirmation text "
+             f"required, immediately followed by the @CALIBRATION STATUS branch)")
+    else:
+        text = branch.group(1)
+        for required in ("OperatingMode::MAINTENANCE", "prepareCurrentQ0Evidence(",
+                         "prepared.ready()", "transforms().admit("):
+            if required not in text:
+                fail(f"{rpath}: @CALIBRATION Q0 PROMOTE lost required gate {required!r}")
+        for forbidden in ("authority->request", "authority_->request", "startSession(",
+                          "activate(", "safeOff(", "EnableTorque", "GoalPosition",
+                          "WritePos", "PositionOffset", "CalibrationOfs",
+                          ".plan(", ".commit(", ".execute("):
+            if forbidden in text:
+                fail(f"{rpath}: @CALIBRATION Q0 PROMOTE contains {forbidden!r} - transform "
+                     f"promotion must not acquire authority, start a session or touch "
+                     f"hardware")
+
+    # transforms().admit(/limits().admit( may be called ONLY from this one
+    # branch, anywhere in the production tree (tests are exempt - they drive
+    # SafeActuatorPolicy directly, the same contract as every other suite).
+    admit_call = re.compile(r"(?:transforms|limits)\(\)\.admit\(")
+    for path, code in files:
+        if "scripts" in path.parts and path.name != "CommandRouter.cpp":
+            continue
+        if path.name == "CommandRouter.cpp":
+            remaining = code.replace(branch.group(1), "") if branch else code
+            if admit_call.search(remaining):
+                fail(f"{rpath}: transforms()/limits().admit( appears outside the one "
+                     f"reviewed @CALIBRATION Q0 PROMOTE branch")
+            continue
+        if admit_call.search(code):
+            fail(f"{path}: transforms()/limits().admit( is only permitted inside "
+                 f"CommandRouter.cpp's @CALIBRATION Q0 PROMOTE branch")
+
+
 def check_calibration_q0_bootstrap(files, sketch_dir):
     """CR2 read-only q0 candidate builder stays pure and non-operational."""
     by_name = {path.name: (path, code) for path, code in files}
@@ -3420,6 +3996,7 @@ def check_host_tests(sketch_dir):
         sketch_dir / "scripts" / "tests" / "test_calibration_q0_bootstrap.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_q0_capture_session.cpp",
         sketch_dir / "scripts" / "tests" / "test_calibration_manager.cpp",
+        sketch_dir / "scripts" / "tests" / "test_calibration_session_orchestrator.cpp",
     ]
     led_status_suite = sketch_dir / "scripts" / "tests" / "test_led_status_policy.cpp"
     led_driver_suite = sketch_dir / "scripts" / "tests" / "test_led_ring_manager.cpp"
@@ -3495,7 +4072,7 @@ def check_host_tests(sketch_dir):
                    "test_calibration_geometry", "test_servo_profile",
                    "test_calibration_domain", "test_calibration_population_evidence",
                    "test_calibration_q0_bootstrap", "test_calibration_q0_capture_session",
-                   "test_calibration_manager",
+                   "test_calibration_manager", "test_calibration_session_orchestrator",
                    "test_led_status_policy", "test_actuator_runtime",
                    "test_calibration_execution_engine", "test_service_readiness",
                    "test_hmac256", "test_ota_session", "test_http_mailbox"):
@@ -3965,6 +4542,7 @@ def main():
 
     check_forbidden_literals(files)
     check_torque_enable(files)
+    check_servo_motion_write_surface(files)
     check_servo_id_write(files)
     check_daly_write(files)
     check_bms_command_surface(files)
@@ -3979,12 +4557,15 @@ def main():
     check_actuator_runtime_boundaries(files)
     check_calibration_execution_engine_boundaries(files)
     check_actuator_infrastructure_wired_fail_closed(files)
+    check_first_motion_command_wiring(files)
     check_service_readiness_is_host_linkable(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)
     check_servo_timeout_not_global(files)
     check_servo_timeout_categories_finding1(files)
     check_safe_off_verifies_readback(files)
+    check_goal_position_register_boundary(files, SKETCH_DIR)
+    check_uncertain_write_propagation(files, SKETCH_DIR)
     check_hardware_profile_authority(files, SKETCH_DIR)
     check_servo_population_model(files, SKETCH_DIR)
     check_g2_state_is_transport_independent(files)
@@ -4005,6 +4586,7 @@ def main():
     check_calibration_population_evidence(files, SKETCH_DIR)
     check_calibration_q0_capture_session(files, SKETCH_DIR)
     check_calibration_q0_production_wiring(files, SKETCH_DIR)
+    check_calibration_q0_promotion_wiring(files, SKETCH_DIR)
     check_calibration_q0_bootstrap(files, SKETCH_DIR)
     check_evidence_geometry_binding(files, SKETCH_DIR)
     check_calibration_readiness_contract(SKETCH_DIR)

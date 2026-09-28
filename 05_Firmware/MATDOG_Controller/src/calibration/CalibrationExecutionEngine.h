@@ -5,6 +5,7 @@
 
 #include "../actuator/ActuatorRuntime.h"
 #include "../actuator/ActuatorWritePolicy.h"
+#include "../actuator/CalibrationTargetResolver.h"
 #include "CalibrationDomain.h"
 
 // The Calibration Execution boundary — I5, V3 handoff §13/§15.11.
@@ -52,17 +53,9 @@
 // transaction remains TO_DESIGN (CALIBRATION_SOURCE_PRECEDENCE.md §7) — I5
 // does not decide it, and this class has no durable-write path of any kind.
 //
-// Does NOT resolve geometry itself. `CalibrationExecutionRequest` carries
-// only the endpoint KEY (leg/joint/side) and the auxiliary/direction-verify
-// joint identity — the same reference `ActuatorCommand.endpoint_*` already
-// uses to look a plan up in the bound CalibrationGeometryProfile.
-// `target_urad` is deliberately left at its zero default: populating it
-// correctly needs the accepted raw<->q transform this build does not have,
-// and computing one here would risk silently disagreeing with
-// SafeActuatorPolicy::evaluateEndpointPlan()'s own reviewed arithmetic — a
-// second copy of that logic this design avoids entirely by never writing
-// one. The existing REJECT_NO_ACCEPTED_TRANSFORM / REJECT_NO_ENDPOINT_PLAN
-// refusals already do the right thing with a zeroed target.
+// CR3 resolves the final absolute raw target here through the ONE checked
+// CalibrationTargetResolver. The policy remains the authority/geometry
+// decision core; this layer performs no duplicate kinematic arithmetic.
 //
 // Does NOT resolve a joint identity to a bus id — exactly the same boundary
 // ActuatorRuntime already draws; the caller supplies it.
@@ -142,6 +135,10 @@ struct CalibrationExecutionRequest {
   // inside SafeActuatorPolicy — this class invents no value and applies no
   // threshold of its own.
   int32_t direction_verify_delta_ticks = 0;
+
+  // CONTACT_PROBE / AUXILIARY_MOVE: requested URDF-frame target. The policy
+  // still checks the endpoint, parking and contact-side safety constraints.
+  actuator::MicroRad target_urad = 0;
 };
 
 enum class CalibrationExecutionOutcome : uint8_t {
@@ -150,7 +147,11 @@ enum class CalibrationExecutionOutcome : uint8_t {
   REJECT_REPLAY_ORIGIN           = 2,  // HISTORICAL_REPLAY may never execute
   RESTORE_ACKNOWLEDGED_NO_MOTION = 3,  // RESTORE: state only, see RestorePlan
   ABORT_IS_LIFECYCLE_NOT_MOTION  = 4,  // ABORT: relay to CalibrationManager, not a move
-  ROUTED_TO_POLICY               = 5,  // see policy_decision / execute_result for the real outcome
+  ROUTED_TO_POLICY               = 5,
+  REJECT_NO_GEOMETRY_BINDING      = 6,
+  REJECT_NO_TRANSFORM             = 7,
+  REJECT_TARGET_RESOLUTION        = 8,
+  REJECT_BUS_BINDING              = 9,
 };
 
 struct CalibrationExecutionResult {
@@ -165,7 +166,9 @@ class CalibrationExecutionEngine {
   // Neither pointer is owned; both may be nullptr, which is a refusal
   // (ROUTED_TO_POLICY -> REJECT_NO_ARBITER via the policy's own fail-closed
   // handling), never a permission.
-  void begin(actuator::SafeActuatorPolicy* policy, actuator::ActuatorRuntime* runtime);
+  void begin(actuator::SafeActuatorPolicy* policy, actuator::ActuatorRuntime* runtime,
+             const actuator::CalibrationGeometryProfile* geometry,
+             const actuator::GeometryProvenance* expected_provenance);
 
   // Translates one intent into at most one policy plan()+commit() and at
   // most one backend call — never more, and never any at all for
@@ -177,6 +180,8 @@ class CalibrationExecutionEngine {
  private:
   actuator::SafeActuatorPolicy* policy_ = nullptr;
   actuator::ActuatorRuntime* runtime_ = nullptr;
+  const actuator::CalibrationGeometryProfile* geometry_ = nullptr;
+  const actuator::GeometryProvenance* expected_provenance_ = nullptr;
 };
 
 const char* toString(CalibrationIntent intent);

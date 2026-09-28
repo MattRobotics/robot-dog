@@ -26,7 +26,24 @@ namespace actuator {
 // only a pointer is needed here, and ActuatorWritePolicy.h is a large
 // include CommandRouter.h itself has no other reason to pull in.
 class SafeActuatorPolicy;
+// Forward-declared for the same reason: only a pointer is needed to pass
+// the already-bound profile through to actuator::prepareCurrentQ0Evidence()
+// (@CALIBRATION Q0 PROMOTE). CommandRouter never binds/clears it and never
+// reads a joint/endpoint record out of it directly.
+class CalibrationGeometryProfile;
 }  // namespace actuator
+
+namespace calibration {
+// Forward-declared for the same reason: CommandRouter.cpp includes the full
+// headers wherever it actually builds/parses request structs; this header
+// only needs pointer storage. See CalibrationMotionPermit.h for why
+// CalibrationMotionAuthorizationState is a separate type from
+// CalibrationMotionPermit itself.
+class CalibrationMotionPermit;
+struct CalibrationMotionAuthorizationState;
+class FirstMotionExecutor;
+class FullLegCalibrationExecutor;
+}  // namespace calibration
 
 namespace network {
 // Forward-declared, not included: HttpTransport.h pulls in
@@ -73,10 +90,35 @@ class CommandRouter {
     // CR2-B read-only evidence-acquisition coordinator. It carries no
     // actuator authority and produces CANDIDATE q0 evidence only.
     calibration::CalibrationQ0CaptureSession* q0_capture;
-    // I4/I5 fail-closed status infrastructure (2026-09-25 objective change).
-    // Read-only status only — see ControllerService.h and
-    // scripts/static_audit.py's check_actuator_infrastructure_wired_fail_closed().
+    // I4/I5 CR3-M5 production composition (2026-09-28). Read-only status
+    // commands remain the norm — see ControllerService.h and
+    // scripts/static_audit.py's check_actuator_infrastructure_wired_fail_closed()
+    // — with exactly one reviewed exception: @CALIBRATION Q0 PROMOTE admits
+    // the frozen, re-verified q0 transforms via transforms().admit(). That
+    // is RAM-only evidence admission, never a plan()/commit()/execute()/
+    // abort() call, and the audit function enforces that distinction too.
     actuator::SafeActuatorPolicy* actuator_policy;
+    // The current, already-bound Geometry V5 profile (Controller::geometry_profile_).
+    // Read-only here as well: passed straight through to
+    // actuator::prepareCurrentQ0Evidence(), never mutated.
+    const actuator::CalibrationGeometryProfile* geometry_profile;
+    // CR3 continuation. @CALIBRATION MOTION PERMIT GRANT/REVOKE are the only
+    // command handlers that call motion_permit->grant()/revoke() or write
+    // motion_authorization's fields — every other command (including the
+    // first-motion one below) only reads calibration/actuator_policy/
+    // operating_mode, exactly like every command before this session.
+    calibration::CalibrationMotionPermit* motion_permit;
+    calibration::CalibrationMotionAuthorizationState* motion_authorization;
+    // CR3 continuation, Objective C. @CALIBRATION MOTION DIRECTION_VERIFY is
+    // the one reviewed command that calls first_motion->start() — see
+    // check_first_motion_command_wiring() in scripts/static_audit.py for
+    // what is mechanically pinned about this one call site.
+    calibration::FirstMotionExecutor* first_motion;
+    // CR3 continuation: @CALIBRATION FULL LEG LF CONFIRM_FULL_CALIBRATION is
+    // the one reviewed command that calls full_leg_calibration->start() —
+    // see check_full_leg_calibration_command_wiring() in
+    // scripts/static_audit.py.
+    calibration::FullLegCalibrationExecutor* full_leg_calibration;
     // The transport-neutral telemetry layer (I6) — read-only status
     // commands route through this instead of the pointers above directly.
     // Action/write commands still use the module pointers above; see
@@ -100,6 +142,12 @@ class CommandRouter {
  private:
   void handleLine(String line);
   bool q0CaptureOwnsServoDiagnostics() const;
+  // True while either motion executor (the DIRECTION_VERIFY first-motion
+  // path or the Full Leg Calibration sequence) is actively using the one
+  // shared ServoBus/UART - see servoDiagnosticBusy()'s own comment for why a
+  // diagnostic scan/census/preflight/q0-capture transaction must never
+  // interleave with it.
+  bool motionExecutorBusy() const;
   bool servoDiagnosticBusy() const;
   void printHelp();
   void printStatus();
@@ -160,6 +208,13 @@ class CommandRouter {
   // see ControllerService.h and scripts/static_audit.py's
   // check_actuator_infrastructure_wired_fail_closed().
   void printActuatorStatus();
+  // Read-only presentation of the Full Leg Calibration sequencer — phase,
+  // failure, both bus ids, both SAFE_OFF-pending flags and (once available)
+  // both sides' witnessed evidence plus the derived operational envelopes.
+  // The ONLY long-running (many-second) command in this router, so unlike
+  // every other action handler's own inline response line, this one is also
+  // worth polling BETWEEN ticks - hence a dedicated STATUS command.
+  void printFullLegCalibrationStatus();
   // Read-only presentation of the HTTP transport's own lifecycle state
   // (I7/I8). Never reports OTA session secrets or in-flight request
   // contents — those live only in HttpTransport's cross-thread mailbox,

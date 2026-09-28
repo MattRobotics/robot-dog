@@ -5,14 +5,19 @@
 
 #include "../actuator/ActuatorRuntime.h"
 #include "../actuator/ActuatorWritePolicy.h"
+#include "../actuator/CalibrationGeometryProfileData.h"
 #include "../calibration/CalibrationExecutionEngine.h"
 #include "../calibration/CalibrationManager.h"
+#include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/CalibrationQ0CaptureSession.h"
+#include "../calibration/FirstMotionExecutor.h"
+#include "../calibration/FullLegCalibrationExecutor.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/HttpTransport.h"
 #include "../network/WifiManager.h"
 #include "../power/DalyBms.h"
 #include "../servo/ServoBus.h"
+#include "../servo/ServoBusActuatorBackend.h"
 #include "../servo/ServoCensus.h"
 #include "../servo/ServoPreflight.h"
 #include "../status/LedRing.h"
@@ -39,6 +44,27 @@ class Controller {
  private:
   void printBootBanner();
   void updateQ0Capture();
+  // Every tick, before any command is processed: rebuilds
+  // CalibrationMotionPermitFacts from live state, re-checks the permit
+  // against them, and pushes the (possibly just-revoked) result into
+  // actuator_policy_'s bootstrap context. This is what keeps the policy from
+  // ever authorising a write against a stale/cached permit snapshot - see
+  // 09_Logs/Development_Log for the production-composition rationale.
+  void updateCalibrationMotionPermit();
+  // Every tick: advances first_motion_ by at most one backend call while an
+  // attempt is in progress (mirrors updateQ0Capture()'s bounded per-tick
+  // discipline), and independently keeps retrying the real, ungated
+  // ServoBus::safeOff() every tick once the executor reports
+  // SAFE_OFF_REQUIRED, until VERIFIED_OFF - regardless of policy, session,
+  // authority or permit state. See the CR3 development log for why this is
+  // the one place SAFE_OFF is actually invoked from this activation path.
+  void updateFirstMotion(uint32_t now_ms);
+  // Same per-tick contract as updateFirstMotion(), generalized to the two
+  // SAFE_OFF-servicing phases (primary bus, then primary+auxiliary bus)
+  // FullLegCalibrationExecutor reports - see its own file comment for why
+  // SAFE_OFF for BOTH joints is forced independently of policy/session,
+  // authority or permit, every tick, until each one VERIFIED_OFF.
+  void updateFullLegCalibration(uint32_t now_ms);
 
   servo::ServoBus servo_bus_;
   servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-start
@@ -73,19 +99,69 @@ class Controller {
   // session and owns no actuator authority. It sequences the existing census,
   // preflight and ServoBus read-only runtime snapshots from Controller.
   calibration::CalibrationQ0CaptureSession q0_capture_;
-  // Safe Actuator / Calibration Execution infrastructure (I4/I5), owned here
-  // as fail-closed status/lifecycle infrastructure only — 2026-09-25
-  // objective change. actuator_runtime_ is wired with a null backend (see
-  // begin()): every ACCEPT decision it could ever reach resolves to
-  // NO_BACKEND, independent of anything else. No geometry is bound, no
-  // limit or transform is admitted, no live bootstrap context is set —
+  // Safe Actuator / Calibration Execution infrastructure (I4/I5), CR3-M5
+  // production composition, extended by the CR3 continuation session to
+  // wire the one reviewed DIRECTION_VERIFY command path all the way to
+  // first_motion_ below. actuator_policy_ is bound to the REAL current
+  // Geometry V5 profile and actuator_runtime_ to a REAL production backend.
+  // Both are safe to be real, and calibration_.startSession()/first_motion_
+  // are now safe to be REACHABLE (CR3-M5 kept them structurally
+  // unreachable; this continuation instead layers explicit, independently
+  // fail-closed gates in front of the one reviewed path — see
   // scripts/static_audit.py's check_actuator_infrastructure_wired_fail_closed()
-  // enforces all of this structurally. No command path reaches plan()/
-  // commit()/execute()/abort() on any of the three; only read-only status
-  // (ControllerService) is exposed.
+  // and check_first_motion_command_wiring() for what is mechanically
+  // enforced): a live session requires CURRENT population evidence
+  // (Objective A), physical motion additionally requires a FRESH,
+  // explicitly-granted CalibrationMotionPermit (Objective B) that only
+  // @CALIBRATION MOTION PERMIT GRANT can produce, and every one of those
+  // gates is re-verified from live state on every tick and on every
+  // plan()/commit() call — never trusted from a cached snapshot.
+  actuator::CalibrationGeometryProfile geometry_profile_;
+  servo::ServoBusActuatorBackend actuator_backend_;
   actuator::SafeActuatorPolicy actuator_policy_;
   actuator::ActuatorRuntime actuator_runtime_;
   calibration::CalibrationExecutionEngine calibration_execution_;
+  // CR3-M5: the session-scoped, RAM-only physical-motion permit — distinct
+  // from the final hardware_motion_authorized flag, which stays false
+  // throughout (CalibrationManager.h). Reset at boot.
+  // motion_authorization_ is the shared, mutable bookkeeping BOTH
+  // CommandRouter's @CALIBRATION MOTION PERMIT GRANT/REVOKE handlers (which
+  // write it) and updateCalibrationMotionPermit()'s per-tick refresh (which
+  // reads it) use — see CalibrationMotionPermit.h's own comment on why that
+  // split exists. No persistent storage anywhere: both live only in RAM and
+  // are zero-initialized at boot, so "do not infer authorization from a
+  // previous boot/session" holds by construction, not by convention.
+  calibration::CalibrationMotionPermit motion_permit_;
+  calibration::CalibrationMotionAuthorizationState motion_authorization_;
+  // CR3 continuation, Objective C: the first bounded-motion executor
+  // (DIRECTION_VERIFY chain). Real backend, real policy, real geometry —
+  // safe to wire because reaching plan()/commit()/execute() through it still
+  // requires a live session (Objective A) AND a fresh, explicitly granted
+  // permit (Objective B), both themselves gated on their own explicit
+  // MAINTENANCE-only commands with exact confirmation phrases. See the CR3
+  // development log for the full fail-closed argument.
+  calibration::FirstMotionExecutor first_motion_;
+  // Tracks whether the real, independent SAFE_OFF this Controller forces on
+  // SAFE_OFF_REQUIRED has been verified yet — see updateFirstMotion(). Reset
+  // to UNVERIFIED_NO_RESPONSE at the start of every fresh first_motion_
+  // attempt, never by anything else, so a past VERIFIED_OFF can never be
+  // mistaken for proof about a NEW attempt.
+  servo::SafeOffResult first_motion_safe_off_result_ = servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
+  // CR3 continuation: the LF_UPPER two-endpoint contact sequence (MIN, then
+  // MAX with the ONE named auxiliary parked) that a Full Leg Calibration
+  // needs — see FullLegCalibrationExecutor.h. Real backend, real policy,
+  // real geometry, same reachability argument as first_motion_ above: only
+  // @CALIBRATION FULL LEG LF CONFIRM_FULL_CALIBRATION can start it, and it
+  // still requires the SAME live session (Objective A) and fresh permit
+  // (Objective B) as every other motion path.
+  calibration::FullLegCalibrationExecutor full_leg_calibration_;
+  // Same convention as first_motion_safe_off_result_ above, one per bus this
+  // path may energize. Both reset to UNVERIFIED_NO_RESPONSE at the start of
+  // every fresh full_leg_calibration_ attempt.
+  servo::SafeOffResult full_leg_primary_safe_off_result_ =
+      servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
+  servo::SafeOffResult full_leg_auxiliary_safe_off_result_ =
+      servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
   // The transport-neutral telemetry layer (I6) — see ControllerService.h.
   // Bound to the same module pointers CommandRouter already holds; adds no
   // module ownership of its own.

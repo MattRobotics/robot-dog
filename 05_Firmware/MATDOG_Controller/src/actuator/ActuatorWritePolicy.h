@@ -257,6 +257,13 @@ struct CalibrationBootstrapContext {
   // A replay session authorises nothing physical, however complete it looks.
   calibration::CalibrationOrigin origin = calibration::CalibrationOrigin::NONE;
 
+  // Snapshot of a separately validated RAM-only calibration motion permit.
+  // Defaults refuse every CALIBRATION-owned write.
+  bool motion_permit_active = false;
+  uint32_t motion_permit_generation = 0;
+  uint32_t motion_permit_session_id = 0;
+  uint32_t motion_permit_authority_generation = 0;
+
   // OPTIONAL DIAGNOSTIC BUDGET. NOT a calibration prerequisite and NOT a gate
   // anything waits on.
   //
@@ -318,6 +325,7 @@ enum class WriteDecision : uint8_t {
   // Evidence exists for this joint and is well-formed, but it was measured
   // under a DIFFERENT geometry model. It stays on record; it is not current.
   REJECT_EVIDENCE_GEOMETRY_MISMATCH = 28,
+  REJECT_NO_CALIBRATION_MOTION_PERMIT = 29,
 };
 
 // ---------------------------------------------------------------------------
@@ -339,7 +347,8 @@ struct ActuatorCommand {
   // calibrated - that is the whole point of the class.
   calibration::JointIdentity joint{};
 
-  // POSITION_COMMAND only. Meaningless for every other operation.
+  // Absolute unsigned ST3215 target. CR3 resolves calibration geometry
+  // operations through the one checked q<->raw resolver before planning.
   uint16_t target_tick = 0;
 
   // DIRECTION_VERIFY only: a SIGNED excursion from the captured q0 tick. Ticks,

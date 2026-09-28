@@ -105,6 +105,23 @@ def run_torque_checks(files):
     audit.check_forbidden_literals(files)
     return list(audit.failures)
 
+def run_motion_surface_checks(files):
+    audit.failures.clear()
+    audit.check_servo_motion_write_surface(files)
+    return list(audit.failures)
+
+
+def run_first_motion_command_checks(files):
+    audit.failures.clear()
+    audit.check_first_motion_command_wiring(files)
+    return list(audit.failures)
+
+
+def run_actuator_infrastructure_checks(files):
+    audit.failures.clear()
+    audit.check_actuator_infrastructure_wired_fail_closed(files)
+    return list(audit.failures)
+
 
 def mutate(filename, pattern, repl):
     """Returns BASE with exactly one regex substitution applied in `filename`."""
@@ -160,6 +177,11 @@ def main():
     # be meaningless.
     expect_pass("baseline", run_boundary_checks(BASE))
     expect_pass("baseline torque/literals", run_torque_checks(BASE))
+    expect_pass("baseline CR3 motion surface", run_motion_surface_checks(BASE))
+    expect_pass("baseline CR3 first-motion command",
+                run_first_motion_command_checks(BASE))
+    expect_pass("baseline CR3 actuator infrastructure fail-closed",
+                run_actuator_infrastructure_checks(BASE))
 
     # --- purity of the decision core --------------------------------------
     case("policy gains Arduino", POLICY_H,
@@ -439,14 +461,73 @@ def main():
          "  if (parking_planned && !parked_here) return WriteDecision::REJECT_PARKING_REQUIRED;",
          "OPTIONAL diagnostic budget", runner=run_direction_checks)
 
-    # --- the pre-existing torque guard still bites -------------------------
-    # "No Torque ON path reachable in the default build" is this phase's claim
-    # as much as the previous one's, so it is re-proven here rather than
-    # assumed to still hold.
-    case("torque-on in the servo transport", "ServoBus.cpp",
+    # --- CR3 exact first-motion command surface ----------------------------
+    case("first-motion bus drifts", ROUTER_CPP,
+         r"constexpr uint8_t kFirstMotionBusId = 12;",
+         "constexpr uint8_t kFirstMotionBusId = 13;",
+         "kFirstMotionBusId = 12",
+         runner=run_first_motion_command_checks)
+
+    case("first-motion delta drifts", ROUTER_CPP,
+         r"request\.delta_ticks = 16;",
+         "request.delta_ticks = 32;",
+         "request.delta_ticks = 16",
+         runner=run_first_motion_command_checks)
+
+    case("first-motion command becomes +32", ROUTER_CPP,
+         r"@CALIBRATION MOTION DIRECTION_VERIFY LF_UPPER \+16 CONFIRM_FIRST_MOTION",
+         "@CALIBRATION MOTION DIRECTION_VERIFY LF_UPPER +32 CONFIRM_FIRST_MOTION",
+         "exact command",
+         runner=run_first_motion_command_checks)
+
+    case("first-motion branch gains runtime parser", ROUTER_CPP,
+         r"calibration::FirstMotionRequest request\{\};",
+         'int parsed = 0; sscanf(upper.c_str(), "%d", &parsed);\n'
+         '    calibration::FirstMotionRequest request{};',
+         "runtime parser",
+         runner=run_first_motion_command_checks)
+
+    case("second first-motion start call appears", ROUTER_CPP,
+         r"if \(!modules_\.first_motion->start\(request, context, millis\(\)\)\) \{",
+         "modules_.first_motion->start(request, context, millis());\n"
+         "    if (!modules_.first_motion->start(request, context, millis())) {",
+         "exactly one production first_motion->start()",
+         runner=run_first_motion_command_checks)
+
+    case("permit bypasses common fact builder", ROUTER_CPP,
+         r"calibration::buildCalibrationMotionPermitFacts\(inputs\)",
+         "calibration::CalibrationMotionPermitFacts{}",
+         "buildCalibrationMotionPermitFacts(inputs)",
+         runner=run_first_motion_command_checks)
+
+    case("success no longer requests safe off", "Controller.cpp",
+         r"terminal_state\s*==\s*calibration::FirstMotionState::COMPLETE",
+         "false",
+         "FirstMotionState::COMPLETE",
+         runner=run_first_motion_command_checks)
+
+    # --- the low-level transaction door stays shut, even next to the two ---
+    # --- exempt executor-level abort() calls this same file now contains ---
+    case("router reaches the low-level policy transaction door", ROUTER_CPP,
+         r"void CommandRouter::printServoSafeOff\(int id\) \{",
+         "void CommandRouter::printServoSafeOff(int id) {\n"
+         "  modules_.actuator_policy->plan(actuator::ActuatorCommand{}, "
+         "core::AuthorityLease{}, core::OperatingMode::MAINTENANCE, nullptr);",
+         "contains a call to plan()",
+         runner=run_actuator_infrastructure_checks)
+
+    # --- the reviewed CR3 transport surface stays singular ----------------
+    # The one torque-on call is ServoBus::enableTorqueOn(). Turning SAFE_OFF
+    # into a second torque-on call must therefore fail the exact-one gate.
+    case("second torque-on in the servo transport", "ServoBus.cpp",
          r"st_\.EnableTorque\(static_cast<uint8_t>\(id\), 0\);",
          "st_.EnableTorque(static_cast<uint8_t>(id), 1);",
-         "non-zero argument", runner=run_torque_checks)
+         "exactly one", runner=run_torque_checks)
+    case("second GoalPosition primitive appears", "ServoBus.cpp",
+         r"bool ServoBus::readRuntimeState\(int id, RuntimeState\* out\) \{",
+         "bool ServoBus::extraWrite(int id) { st_.WritePosEx((uint8_t)id, 2048, 40, 10); return true; }\n"
+         "bool ServoBus::readRuntimeState(int id, RuntimeState* out) {",
+         "exactly one", runner=run_motion_surface_checks)
 
     if failures:
         print(f"SAFE_ACTUATOR_AUDIT_MUTATION_TESTS = FAIL ({len(failures)})")

@@ -7,6 +7,7 @@
 #include "../config/BuildConfig.h"
 #include "../core/Availability.h"
 #include "../core/SystemState.h"
+#include "ServoProfile.h"
 
 namespace matdog {
 namespace servo {
@@ -156,6 +157,32 @@ class ServoBus {
   // MAINTENANCE-only absence detection.
   SafeOffResult safeOff(int id);
 
+  // CR3-M3 production write primitives. These are intentionally narrow and
+  // remain unreachable from CommandRouter/Controller while ActuatorRuntime is
+  // still wired with a null backend. SAFE_OFF remains separate and ungated.
+  //
+  // Uncertain-write safety (CR3): on this half-duplex bus the servo applies a
+  // register write before it transmits any reply, so a lost/garbled ACK does
+  // not prove the command was not applied - see
+  // servo::ServoWriteVerifyResult. Both primitives below therefore classify
+  // strictly from an INDEPENDENT readback of the register they just wrote,
+  // exactly like safeOff() already does; the write's own ACK/status is never
+  // the verdict, only a diagnostic.
+  //
+  // enableTorqueOn() verifies TorqueEnable by an independent readback; the
+  // SCServo write ACK alone is never treated as proof.
+  ServoWriteVerifyResult enableTorqueOn(int id);
+
+  // One bounded unsigned GoalPosition primitive. No modulo/signed-wrap is
+  // accepted. WritePosEx supplies a deliberately conservative speed/accel
+  // ceiling for calibration bring-up; higher-performance motion belongs to a
+  // later reviewed motion backend, not this calibration bootstrap. Verifies
+  // by independently reading back the GoalPosition register itself (not
+  // present_position, which lags behind a write by the joint's travel time).
+  static constexpr uint16_t kBoundedWriteSpeed = 40;
+  static constexpr uint8_t kBoundedWriteAcceleration = 10;
+  ServoWriteVerifyResult writeGoalPosition(int id, uint16_t target_tick);
+
   // Read-only runtime snapshot (present position/speed/load/voltage/temp).
   // Returns false if the servo does not answer within the bounded timeout.
   // Uses kOperationalTimeoutMs, NOT the diagnostic timeout (Session 2.3
@@ -171,6 +198,13 @@ class ServoBus {
     int present_voltage = -1;
     int present_temperature = -1;
     int torque_enable = -1;
+    // SMS_STS_PRESENT_CURRENT_L (register 69) - present on this SCServo
+    // family's register map, unlike model/PositionOffset/profile registers
+    // it has no MATDOG bench characterization behind it yet. Exposed raw
+    // (unspecified unit/scale until a real unit measurement pins one down),
+    // read-only, alongside the other telemetry this same call already
+    // fetches - never a new bus transaction of its own.
+    int present_current = -1;
   };
   bool readRuntimeState(int id, RuntimeState* out);
 

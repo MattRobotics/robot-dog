@@ -71,20 +71,65 @@ void Controller::begin() {
   // stale and hardware motion unauthorized, it refuses to open a live one.
   calibration_.begin(&authority_);
 
-  // Safe Actuator / Calibration Execution infrastructure (I4/I5), bound as
-  // fail-closed status/lifecycle infrastructure only — 2026-09-25 objective
-  // change. actuator_policy_ is bound to the real arbiter (read-only
-  // authority checks, same as calibration_ above): no geometry is bound, no
-  // limit or transform is ever admitted, so every position-class or
-  // geometry-authorised operation refuses at the earliest possible gate.
-  // actuator_runtime_ is given nullptr as its backend, deliberately: even a
-  // hypothetical future ACCEPT can never reach a write, because there is
-  // nothing to write to. scripts/static_audit.py's
-  // check_actuator_infrastructure_wired_fail_closed() enforces both facts
-  // structurally, not merely by this comment.
+  // Safe Actuator / Calibration Execution infrastructure (I4/I5), CR3-M5
+  // production composition — see Controller.h's member comment for why
+  // binding the real profile/backend here stays fail-closed. Binding the
+  // profile only makes its provenance tag MATCHABLE; it admits no limit or
+  // transform (that still requires the explicit @CALIBRATION Q0 PROMOTE
+  // command, itself gated on an explicit currentness confirmation) and
+  // starts no session.
+  geometry_profile_.bind(&actuator::geometry_data::kProvenance, actuator::geometry_data::kJoints,
+                         actuator::geometry_data::kJointCount, actuator::geometry_data::kEndpoints,
+                         actuator::geometry_data::kEndpointCount);
+  actuator_backend_.begin(&servo_bus_);
   actuator_policy_.begin(&authority_);
-  actuator_runtime_.begin(&actuator_policy_, /*backend=*/nullptr);
-  calibration_execution_.begin(&actuator_policy_, &actuator_runtime_);
+  actuator_policy_.bindGeometry(&geometry_profile_, &actuator::geometry_data::kProvenance);
+  actuator_runtime_.begin(&actuator_policy_, &actuator_backend_);
+  calibration_execution_.begin(&actuator_policy_, &actuator_runtime_, &geometry_profile_,
+                               &actuator::geometry_data::kProvenance);
+  // A reboot/default construction always starts revoked (CalibrationMotionPermit.h)
+  // — reset() is explicit here anyway so the boot sequence never depends on
+  // that default staying true by accident.
+  motion_permit_.reset();
+  motion_authorization_.revoke();
+
+  // CR3 continuation, Objective 3/4 config: max_telemetry_age_ms (3000) and
+  // motion_timeout_ms (12000) reuse CalibrationDomain.h's own documented LF
+  // V25 precedents (CalibrationFailure::TELEMETRY_STALE "MAX_TELEMETRY_AGE
+  // = 3 s", CalibrationFailure::MOTION_TIMEOUT "MOTION_TIMEOUT = 12 s") —
+  // reused, not invented. stall_window_ms/stall_progress_ticks/
+  // arrival_tolerance_ticks have no such historical precedent (LF V25 never
+  // defined a live-monitoring stall detector); the outer motion_timeout_ms
+  // above remains the true safety backstop regardless of how these three
+  // are tuned, so getting them imprecise cannot itself make a bounded move
+  // unsafe — only less responsive. See MotionDeadman.h and the CR3
+  // development log.
+  {
+    actuator::MotionDeadmanConfig deadman{};
+    deadman.max_telemetry_age_ms = 3000;
+    deadman.motion_timeout_ms = 12000;
+    deadman.stall_window_ms = 2000;
+    deadman.stall_progress_ticks = 2;
+    deadman.arrival_tolerance_ticks = 4;
+    calibration::FirstMotionConfig first_motion_config{};
+    first_motion_config.deadman = deadman;
+    first_motion_.begin(&actuator_policy_, &actuator_runtime_, &geometry_profile_,
+                        &actuator::geometry_data::kProvenance, first_motion_config);
+
+    // The Full Leg Calibration sequencer reuses the SAME reviewed deadman
+    // figures for all three of its own monitored moves (MIN approach/
+    // backoff, MAX approach/backoff via the same ContactProbeEngine, and the
+    // auxiliary park) rather than inventing per-phase numbers — none of them
+    // has a documented LF V25 precedent of its own either, and the outer
+    // motion_timeout_ms remains the real backstop regardless.
+    calibration::FullLegCalibrationConfig full_leg_config{};
+    full_leg_config.probe_approach_deadman = deadman;
+    full_leg_config.probe_backoff_deadman = deadman;
+    full_leg_config.aux_move_deadman = deadman;
+    full_leg_calibration_.begin(&actuator_policy_, &actuator_runtime_, &calibration_execution_,
+                               &geometry_profile_, &actuator::geometry_data::kProvenance,
+                               full_leg_config);
+  }
 
   printBootBanner();
 
@@ -129,6 +174,11 @@ void Controller::begin() {
       &system_state_,
       &power_state_, &operating_mode_, &authority_, &calibration_, &q0_capture_,
       &actuator_policy_,
+      &geometry_profile_,
+      &motion_permit_,
+      &motion_authorization_,
+      &first_motion_,
+      &full_leg_calibration_,
       &service_,
       &http_transport_,
   };
@@ -234,6 +284,235 @@ void Controller::updateQ0Capture() {
   }
 }
 
+// CR3-M5, extended by the CR3 continuation session. Every field below is
+// read fresh from the live module it names — none is cached across ticks —
+// so a permit that was ACTIVE last tick cannot out-live the fact that
+// revoked it: the very next call sees the change and, through
+// motion_permit_.check() below, revokes before this tick's command (if any)
+// is processed by command_router_.update() (see update()'s call order).
+// motion_authorization_.operator_authorized is written ONLY by
+// CommandRouter's @CALIBRATION MOTION PERMIT GRANT/REVOKE handlers (via the
+// modules_.motion_authorization pointer) — this function reads it, never
+// sets it, matching the SAME split CalibrationMotionPermit.h documents for
+// buildCalibrationMotionPermitFacts()'s two call sites.
+void Controller::updateCalibrationMotionPermit() {
+  calibration::CalibrationMotionPermitLiveInputs inputs{};
+  inputs.operator_calibration_motion_authorized = motion_authorization_.operator_authorized;
+  inputs.robot_powered_profile = build::kServoPowerAvailable;
+  inputs.mode = operating_mode_.mode();
+  inputs.system_health = system_state_.systemHealth();
+  inputs.session_active = calibration_.sessionLive();
+  inputs.origin = calibration_.status().origin;
+  inputs.session_id = calibration_.status().session_id;
+  inputs.current_population_pass =
+      calibration::populationIsCurrentPass(calibration_.status().population);
+  inputs.current_geometry_bound =
+      actuator_policy_.currentGeometryTag() != actuator::kNoGeometryProvenance;
+  inputs.promoted_transforms_complete =
+      actuator_policy_.transforms().size() == calibration::kLegServoSlotCount;
+  inputs.authority = authority_.current();
+  inputs.authority_generation = authority_.generation();
+  inputs.authority_inhibited = authority_.inhibited();
+  const calibration::CalibrationMotionPermitFacts facts =
+      calibration::buildCalibrationMotionPermitFacts(inputs);
+
+  // grant() is deliberately never called here: a permit is never resurrected
+  // or (re-)issued implicitly from facts turning healthy. check() only
+  // re-verifies an ALREADY-granted permit and revokes on any mismatch;
+  // grant() is called from exactly one place, the @CALIBRATION MOTION
+  // PERMIT GRANT command handler.
+  if (motion_permit_.active()) {
+    motion_permit_.check(facts, motion_authorization_.token);
+  }
+
+  actuator::CalibrationBootstrapContext ctx{};
+  ctx.session_active = facts.session_active;
+  ctx.origin = facts.origin;
+  ctx.motion_permit_active = motion_permit_.active();
+  ctx.motion_permit_generation = motion_permit_.generation();
+  ctx.motion_permit_session_id = motion_authorization_.token.session_id;
+  ctx.motion_permit_authority_generation = motion_authorization_.token.authority_generation;
+  // The operator-approved DIRECTION_VERIFY excursion ceiling granted
+  // alongside the permit — independent of motion_permit_active on purpose:
+  // SafeActuatorPolicy::evaluate() already refuses any CALIBRATION-owned
+  // operation without an active permit BEFORE this budget is ever
+  // consulted, so threading it through unconditionally cannot widen access.
+  ctx.direction_verify_tick_budget = motion_authorization_.direction_verify_tick_budget;
+  // Mirrors full_leg_calibration_.auxiliaryParked() exactly: true for the
+  // ONE tick window (the MAX-side probe) where the compiled LF_UPPER:MAX
+  // plan requires the named auxiliary already parked — false before and
+  // after, same as the executor's own accessor. See
+  // SafeActuatorPolicy::evaluateEndpointPlan() for how these four fields are
+  // consumed; unconditionally threading them through cannot widen access
+  // for the same reason the tick budget above cannot.
+  ctx.auxiliary_parked = full_leg_calibration_.auxiliaryParked();
+  ctx.parked_leg = calibration::Leg::LF;
+  ctx.parked_joint = calibration::JointKind::UPPER;
+  ctx.parked_side = calibration::ContactSide::MAX_SIDE;
+  actuator_policy_.setBootstrapContext(ctx);
+}
+
+// CR3 continuation, Objective C/D. first_motion_ never touches ServoBus (it
+// has no reference to it — see FirstMotionExecutor.h); this is the one place
+// its decisions turn into a real bus transaction, and the one place the
+// real, independent ServoBus::safeOff() is ever called from this path.
+void Controller::updateFirstMotion(uint32_t now_ms) {
+  if (first_motion_.active()) {
+    // A fresh/current attempt is in progress. A previous attempt's VERIFIED_OFF
+    // can never be reused as proof for this one.
+    first_motion_safe_off_result_ =
+        servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
+
+    // Every continuation prerequisite is sampled fresh on EVERY Controller
+    // tick. FirstMotionExecutor re-checks this snapshot before advancing any
+    // active state, including MONITORING.
+    calibration::FirstMotionContext context{};
+    context.session_active = calibration_.sessionLive();
+    context.origin = calibration_.status().origin;
+    context.lease = calibration_.authorityLease();
+    context.mode = operating_mode_.mode();
+    context.motion_permit_active = motion_permit_.active();
+    context.authority = authority_.current();
+    context.authority_generation = authority_.generation();
+    context.authority_inhibited = authority_.inhibited();
+
+    actuator::TelemetrySample sample{};
+    bool telemetry_available = false;
+
+    // Runtime telemetry is needed only once the GoalPosition has actually
+    // been written. Do not add a bus read in front of TorqueEnable or the
+    // GoalPosition transaction.
+    if (first_motion_.status().state ==
+        calibration::FirstMotionState::MONITORING) {
+      servo::ServoBus::RuntimeState state{};
+      const bool read_ok =
+          servo_bus_.readRuntimeState(first_motion_.busId(), &state);
+
+      telemetry_available = true;
+      sample.read_ok = read_ok;
+      sample.sampled_at_ms = now_ms;
+
+      if (read_ok) {
+        sample.present_position = state.present_position;
+        sample.torque_enable = state.torque_enable;
+      }
+    }
+
+    // At most one state-machine advance / backend write per tick.
+    // If this call reaches COMPLETE or SAFE_OFF_REQUIRED, do NOT return:
+    // the independent SAFE_OFF path below executes in this SAME Controller
+    // tick.
+    first_motion_.update(context, now_ms, telemetry_available, sample);
+  }
+
+  const calibration::FirstMotionState terminal_state =
+      first_motion_.status().state;
+
+  // SAFE_OFF is deliberately outside policy/session/authority/permit.
+  //
+  // Failure path:
+  //   anything after verified Torque ON -> SAFE_OFF_REQUIRED -> SAFE_OFF.
+  //
+  // Success path:
+  //   target ARRIVED -> COMPLETE -> SAFE_OFF.
+  //
+  // The first CR3 motion therefore NEVER leaves LF_UPPER indefinitely
+  // energised after the bounded direction verification. No automatic return
+  // to q0 is attempted here: SAFE_OFF is not RESTORE.
+  if ((terminal_state ==
+           calibration::FirstMotionState::SAFE_OFF_REQUIRED ||
+       terminal_state ==
+           calibration::FirstMotionState::COMPLETE) &&
+      first_motion_safe_off_result_ !=
+          servo::SafeOffResult::VERIFIED_OFF) {
+    first_motion_safe_off_result_ =
+        servo_bus_.safeOff(first_motion_.busId());
+  }
+}
+
+// CR3 continuation. Same contract as updateFirstMotion(), generalized to two
+// buses: full_leg_calibration_ never touches ServoBus itself (no reference
+// to it exists — see FullLegCalibrationExecutor.h), so this is the one place
+// its decisions turn into real bus transactions, including the two
+// independent, ungated ServoBus::safeOff() calls its two SAFE_OFF-servicing
+// phases wait on.
+void Controller::updateFullLegCalibration(uint32_t now_ms) {
+  if (!full_leg_calibration_.active()) return;
+
+  // Read BEFORE this tick's update() call: whether the executor was already
+  // waiting on one or both SAFE_OFF confirmations coming into this tick, and
+  // therefore whether a cached VERIFIED_OFF from a PRIOR tick is still valid
+  // evidence to hand it as this call's primary/auxiliary_safe_off_verified
+  // input. A phase that was not yet waiting cannot have valid evidence, so
+  // its cached result is cleared first - the same "never reuse a past
+  // VERIFIED_OFF for a new requirement" rule updateFirstMotion() applies.
+  const bool was_primary_pending = full_leg_calibration_.primarySafeOffPending();
+  const bool was_auxiliary_pending = full_leg_calibration_.auxiliarySafeOffPending();
+  if (!was_primary_pending) {
+    full_leg_primary_safe_off_result_ = servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
+  }
+  if (!was_auxiliary_pending) {
+    full_leg_auxiliary_safe_off_result_ = servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
+  }
+  const bool primary_verified =
+      was_primary_pending && full_leg_primary_safe_off_result_ == servo::SafeOffResult::VERIFIED_OFF;
+  const bool auxiliary_verified =
+      was_auxiliary_pending &&
+      full_leg_auxiliary_safe_off_result_ == servo::SafeOffResult::VERIFIED_OFF;
+
+  calibration::FullLegCalibrationContext context{};
+  context.session_active = calibration_.sessionLive();
+  context.origin = calibration_.status().origin;
+  context.lease = calibration_.authorityLease();
+  context.mode = operating_mode_.mode();
+  context.motion_permit_active = motion_permit_.active();
+  context.authority = authority_.current();
+  context.authority_generation = authority_.generation();
+  context.authority_inhibited = authority_.inhibited();
+
+  // Telemetry is read from whichever bus the CURRENT (pre-update) phase is
+  // actually monitoring - the auxiliary while it is being parked, the
+  // primary (probed) joint at every other point, including both
+  // ContactProbeEngine phases and both SAFE_OFF-servicing waits (harmless
+  // there: the executor ignores the sample outside a monitoring phase,
+  // exactly like FirstMotionExecutor does).
+  const bool aux_phase =
+      full_leg_calibration_.status().phase == calibration::FullLegCalibrationPhase::AUX_MOVE_PENDING ||
+      full_leg_calibration_.status().phase ==
+          calibration::FullLegCalibrationPhase::AUX_MOVE_MONITORING;
+  const uint8_t telemetry_bus_id = aux_phase ? full_leg_calibration_.auxiliaryBusId()
+                                             : full_leg_calibration_.primaryBusId();
+  servo::ServoBus::RuntimeState state{};
+  const bool read_ok = servo_bus_.readRuntimeState(telemetry_bus_id, &state);
+  actuator::TelemetrySample sample{};
+  sample.read_ok = read_ok;
+  sample.sampled_at_ms = now_ms;
+  if (read_ok) {
+    sample.present_position = state.present_position;
+    sample.torque_enable = state.torque_enable;
+  }
+
+  // At most one state-machine advance / backend write per tick. If this call
+  // reaches a SAFE_OFF-servicing phase (including transitioning into one
+  // just now), do NOT return: the independent SAFE_OFF forcing below runs in
+  // this SAME Controller tick, exactly like updateFirstMotion().
+  full_leg_calibration_.update(context, now_ms, /*telemetry_available=*/true, sample,
+                               primary_verified, auxiliary_verified);
+
+  // SAFE_OFF is deliberately outside policy/session/authority/permit: forced
+  // every tick either phase is pending (POST-update, so a transition into a
+  // SAFE_OFF phase this very tick is still serviced this very tick), retried
+  // until VERIFIED_OFF.
+  if (full_leg_calibration_.primarySafeOffPending()) {
+    full_leg_primary_safe_off_result_ =
+        servo_bus_.safeOff(full_leg_calibration_.primaryBusId());
+  }
+  if (full_leg_calibration_.auxiliarySafeOffPending()) {
+    full_leg_auxiliary_safe_off_result_ =
+        servo_bus_.safeOff(full_leg_calibration_.auxiliaryBusId());
+  }
+}
+
 void Controller::printBootBanner() {
   Serial.println();
   Serial.println("====================================");
@@ -304,6 +583,10 @@ void Controller::printBootBanner() {
 }
 
 void Controller::update(uint32_t now_ms) {
+  // First, unconditionally: the freshest possible permit/bootstrap state
+  // must exist before command_router_.update() can act on it this tick.
+  updateCalibrationMotionPermit();
+
   command_router_.update(now_ms);
 
   imu_.update(now_ms);
@@ -325,6 +608,13 @@ void Controller::update(uint32_t now_ms) {
   // CR2-B: advances at most one read-only acquisition action per tick.
   // It never acquires actuator authority and never writes the servo bus.
   updateQ0Capture();
+  // CR3 continuation: advances the first-motion attempt (if any) by at most
+  // one backend call, and independently forces real SAFE_OFF retries while
+  // one is required — see updateFirstMotion()'s own comment.
+  updateFirstMotion(now_ms);
+  // CR3 continuation: same bounded, at-most-one-backend-call-per-tick
+  // discipline, for the LF Full Leg Calibration sequence (if any is active).
+  updateFullLegCalibration(now_ms);
   system_state_.setServoHealth(servo_bus_.health());
 
   system_state_.update();

@@ -136,6 +136,56 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
   "$SKETCH_DIR/src/servo/ServoPopulation.cpp"
 
+# CR3-M1/M2: pure q0 acceptance/promotion plus the one checked q<->raw
+# resolver. Links real generated Geometry V5 data; no ServoBus/Arduino/device IO.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_cr3_q0_transform" \
+  "$SCRIPT_DIR/test_cr3_q0_transform.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Promotion.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
+
+# CR3 persisted q0 evidence rehydration. The frozen source geometry is
+# compared to current Geometry V5 before the real M1 accept/promote path runs.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_cr3_q0_evidence_preparation" \
+  "$SCRIPT_DIR/test_cr3_q0_evidence_preparation.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0EvidencePreparation.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Promotion.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
+
+# CR3-M4 session-scoped calibration motion permit is pure policy: no
+# ServoBus, Arduino or device IO. It deliberately remains un-wired in production
+# until the first-motion hardware authorization gate.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_motion_permit" \
+  "$SCRIPT_DIR/test_calibration_motion_permit.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationMotionPermit.cpp"
+
+# CR3 continuation Objective A: the session-start orchestrator is pure.
+# It links the REAL CalibrationManager + REAL ActuatorAuthority arbiter.
+# No ServoBus, Arduino or physical backend is present in this binary.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_session_orchestrator" \
+  "$SCRIPT_DIR/test_calibration_session_orchestrator.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationSessionOrchestrator.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationManager.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
+# CR3 Priority 4: the telemetry/deadman monitor shared by the first-motion
+# executor and the contact-probe engine. Pure: no ServoBus/Arduino/device IO,
+# every sample is synthetic.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -o "$OUT/test_motion_deadman" \
+  "$SCRIPT_DIR/test_motion_deadman.cpp" \
+  "$SKETCH_DIR/src/actuator/MotionDeadman.cpp"
+
 # The OTA suite links the REAL OTA-B gate and the REAL arbiter, so the
 # authorization path it exercises is the shipped one, not a stub.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -174,6 +224,71 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
+# CR3 Priority 3: the first-motion executor. Links the REAL policy, runtime,
+# arbiter and checked target resolver against a fake backend and synthetic
+# telemetry - the same contract as test_calibration_execution_engine.cpp.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_first_motion_executor" \
+  "$SCRIPT_DIR/test_first_motion_executor.cpp" \
+  "$SKETCH_DIR/src/calibration/FirstMotionExecutor.cpp" \
+  "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
+# CR3 Priority 5: the contact-probe engine. Links the REAL policy, runtime,
+# CalibrationExecutionEngine, arbiter and checked target resolver against a
+# fake backend and synthetic telemetry - no fabricated physical measurement.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_contact_probe_engine" \
+  "$SCRIPT_DIR/test_contact_probe_engine.cpp" \
+  "$SKETCH_DIR/src/calibration/ContactProbeEngine.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
+  "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
+# CR3 Priority 6: the operational-envelope builder. Links the REAL geometry
+# profile, checked target resolver and calibration domain predicates - no
+# fabricated contact measurement anywhere in this suite.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_operational_envelope" \
+  "$SCRIPT_DIR/test_operational_envelope.cpp" \
+  "$SKETCH_DIR/src/actuator/OperationalEnvelope.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
+
+# CR3 continuation: the Full Leg Calibration sequencer. Links the REAL
+# policy, runtime, CalibrationExecutionEngine, ContactProbeEngine, envelope
+# builder, arbiter and checked target resolver against a fake backend and
+# synthetic telemetry - no fabricated physical measurement anywhere here.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_full_leg_calibration_executor" \
+  "$SCRIPT_DIR/test_full_leg_calibration_executor.cpp" \
+  "$SKETCH_DIR/src/calibration/FullLegCalibrationExecutor.cpp" \
+  "$SKETCH_DIR/src/calibration/ContactProbeEngine.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
+  "$SKETCH_DIR/src/actuator/OperationalEnvelope.cpp" \
+  "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
@@ -242,12 +357,21 @@ done
 "$OUT/test_calibration_geometry"
 "$OUT/test_calibration_q0_bootstrap"
 "$OUT/test_calibration_q0_capture_session"
+"$OUT/test_cr3_q0_transform"
+"$OUT/test_cr3_q0_evidence_preparation"
+"$OUT/test_calibration_motion_permit"
+"$OUT/test_motion_deadman"
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_population_evidence"
 "$OUT/test_calibration_manager"
+"$OUT/test_calibration_session_orchestrator"
 "$OUT/test_actuator_runtime"
 "$OUT/test_calibration_execution_engine"
+"$OUT/test_first_motion_executor"
+"$OUT/test_contact_probe_engine"
+"$OUT/test_operational_envelope"
+"$OUT/test_full_leg_calibration_executor"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"
 "$OUT/test_led_ring_manager_USB_ONLY"

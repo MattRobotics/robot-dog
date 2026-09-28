@@ -12,6 +12,7 @@ BackendCallKind backendCallFor(ActuatorOperation operation) {
     case ActuatorOperation::CALIBRATION_CONTACT_PROBE:
     case ActuatorOperation::DIRECTION_VERIFY:
     case ActuatorOperation::CALIBRATION_AUXILIARY_MOVE:
+      return BackendCallKind::WRITE_GOAL_POSITION;
     case ActuatorOperation::NONE:
       return BackendCallKind::NONE;
   }
@@ -32,18 +33,25 @@ ExecuteResult ActuatorRuntime::execute(ActuatorTransaction* transaction, uint8_t
   if (backend_ == nullptr) return ExecuteResult::NO_BACKEND;
 
   const ActuatorCommand& cmd = transaction->command;
-  bool ok = false;
+  BackendWriteOutcome outcome = BackendWriteOutcome::UNCERTAIN;
   switch (backendCallFor(cmd.operation)) {
     case BackendCallKind::ENABLE_TORQUE:
-      ok = backend_->enableTorque(bus_id);
+      outcome = backend_->enableTorque(bus_id);
       break;
     case BackendCallKind::WRITE_GOAL_POSITION:
-      ok = backend_->writeGoalPosition(bus_id, cmd.target_tick);
+      outcome = backend_->writeGoalPosition(bus_id, cmd.target_tick);
       break;
     case BackendCallKind::NONE:
       return ExecuteResult::NO_RAW_TARGET;
   }
-  return ok ? ExecuteResult::WRITTEN : ExecuteResult::BACKEND_REJECTED;
+  switch (outcome) {
+    case BackendWriteOutcome::VERIFIED_APPLIED:     return ExecuteResult::WRITTEN;
+    case BackendWriteOutcome::VERIFIED_NOT_APPLIED: return ExecuteResult::BACKEND_REJECTED;
+    case BackendWriteOutcome::UNCERTAIN:            return ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF;
+  }
+  // Fail closed on a corrupted enum value exactly like isKnownOperation():
+  // an outcome this code does not recognise must never be read as success.
+  return ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF;
 }
 
 const char* toString(ExecuteResult result) {
@@ -53,6 +61,16 @@ const char* toString(ExecuteResult result) {
     case ExecuteResult::NO_RAW_TARGET:    return "NO_RAW_TARGET";
     case ExecuteResult::WRITTEN:          return "WRITTEN";
     case ExecuteResult::BACKEND_REJECTED: return "BACKEND_REJECTED";
+    case ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF: return "UNCERTAIN_REQUIRES_SAFE_OFF";
+  }
+  return "UNKNOWN";
+}
+
+const char* toString(BackendWriteOutcome outcome) {
+  switch (outcome) {
+    case BackendWriteOutcome::VERIFIED_APPLIED:     return "VERIFIED_APPLIED";
+    case BackendWriteOutcome::VERIFIED_NOT_APPLIED: return "VERIFIED_NOT_APPLIED";
+    case BackendWriteOutcome::UNCERTAIN:            return "UNCERTAIN";
   }
   return "UNKNOWN";
 }
