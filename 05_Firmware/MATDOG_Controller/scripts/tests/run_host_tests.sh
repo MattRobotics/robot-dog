@@ -204,6 +204,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \

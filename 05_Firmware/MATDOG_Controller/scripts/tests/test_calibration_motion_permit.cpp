@@ -96,13 +96,22 @@ static void test_session_and_authority_binding() {
   changed.session_id++;
   check(permit.check(changed, token) == CalibrationPermitStatus::REJECT_SESSION,
         "new session cannot reuse token");
+  check(!permit.active(), "session drift revokes the permit, not just this one check");
+
+  // check() revokes as a side effect of ANY mismatch - by design, a stale
+  // permit must require a fresh explicit grant rather than resume (Priority 1
+  // invariant). Re-grant before isolating the next, independent mismatch, or
+  // this second check would trivially return REVOKED from the first one.
+  CalibrationMotionPermitToken token2{};
+  check(permit.grant(f, &token2) == CalibrationPermitStatus::ACTIVE,
+        "fresh grant before the authority-generation case");
 
   changed = f;
   changed.authority_generation++;
-  check(permit.check(changed, token) == CalibrationPermitStatus::REJECT_AUTHORITY,
+  check(permit.check(changed, token2) == CalibrationPermitStatus::REJECT_AUTHORITY,
         "new authority generation cannot reuse token");
 
-  CalibrationMotionPermitToken copied = token;
+  CalibrationMotionPermitToken copied = token2;
   permit.reset();
   check(permit.check(f, copied) == CalibrationPermitStatus::REVOKED,
         "reset invalidates copied token");

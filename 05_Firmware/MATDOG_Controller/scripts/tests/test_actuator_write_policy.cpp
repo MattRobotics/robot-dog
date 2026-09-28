@@ -370,6 +370,16 @@ static void test_calibration_lease_without_motion_permit_rejects() {
   const AuthorityLease lease =
       grant(arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
 
+  // A live session, isolating the one fact under test: no motion permit was
+  // ever granted. Without an active session too, the more fundamental
+  // REJECT_NO_CALIBRATION_SESSION would fire first (evaluate() orders session
+  // existence ahead of permit possession) and this test would no longer be
+  // exercising what its name claims.
+  CalibrationBootstrapContext ctx{};
+  ctx.session_active = true;
+  ctx.origin = CalibrationOrigin::LIVE_SESSION;
+  policy.setBootstrapContext(ctx);
+
   ActuatorTransaction txn{};
   CHECK_DECISION(policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
                              OperatingMode::MAINTENANCE, &txn),

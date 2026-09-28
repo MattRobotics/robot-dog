@@ -413,9 +413,14 @@ WriteDecision SafeActuatorPolicy::evaluate(const ActuatorCommand& command,
   }
 
   if (lease.owner == core::ActuatorAuthority::CALIBRATION) {
-    if (!bootstrap_.session_active ||
-        !calibration::mayPromote(bootstrap_.origin) ||
-        !bootstrap_.motion_permit_active ||
+    // Ordered from the most fundamental fact to the most specific one, so a
+    // caller with no session at all learns THAT rather than the more
+    // specific-sounding but less true "no motion permit" - the same
+    // diagnostic precedence geometryPreconditions() already uses below.
+    if (!bootstrap_.session_active || !calibration::mayPromote(bootstrap_.origin)) {
+      return WriteDecision::REJECT_NO_CALIBRATION_SESSION;
+    }
+    if (!bootstrap_.motion_permit_active ||
         bootstrap_.motion_permit_generation == 0 ||
         bootstrap_.motion_permit_session_id == 0 ||
         bootstrap_.motion_permit_authority_generation != lease.generation) {
