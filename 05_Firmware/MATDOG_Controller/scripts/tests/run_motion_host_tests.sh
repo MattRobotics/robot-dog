@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# G1 offline only: compile the production core, then use existing Python oracles.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKETCH_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_DIR="$(cd "$SKETCH_DIR/../.." && pwd)"
+CXX="${CXX:-g++}"
+OUT="$(mktemp -d)"
+trap 'rm -rf "$OUT"' EXIT
+
+python3 "$REPO_DIR/06_Software/Matdog_Core/kinematics/matdog_motion_geometry_export.py" --check
+for TEST in test_motion_kinematics motion_oracle_driver; do
+  "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -fno-exceptions -fno-rtti \
+    -o "$OUT/$TEST" "$SCRIPT_DIR/$TEST.cpp" \
+    "$SKETCH_DIR/src/motion/LegKinematics.cpp" \
+    "$SKETCH_DIR/src/motion/LegInverseKinematics.cpp"
+done
+"$OUT/test_motion_kinematics"
+python3 "$SCRIPT_DIR/test_motion_oracle.py" "$OUT/motion_oracle_driver"

@@ -255,3 +255,7 @@ done
 "$OUT/test_hmac256"
 "$OUT/test_ota_session"
 "$OUT/test_http_mailbox"
+
+# G1 motion core: canonical geometry check, C++ guards and Python differential
+# FK/IK/C4 contact validation. No firmware build or device access.
+bash "$SCRIPT_DIR/run_motion_host_tests.sh"
