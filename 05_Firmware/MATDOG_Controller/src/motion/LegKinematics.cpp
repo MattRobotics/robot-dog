@@ -1,5 +1,6 @@
 #include "LegKinematics.h"
 #include "LegGeometryData.h"
+#include "LegKinematicsInternal.h"
 
 #include <cmath>
 
@@ -14,9 +15,15 @@ const LegModel* legModel(LegId leg) {
 const char* geometrySourceSha256() { return generated::kUrdfSha256; }
 
 FkResult forwardKinematics(LegId leg, const LegJointAngles& q) {
-  FkResult result;
   const LegModel* model = legModel(leg);
-  if (!model || !std::isfinite(q.hip) || !std::isfinite(q.upper) ||
+  return model ? detail::forwardWithModel(*model, q, 0.0) : FkResult{};
+}
+
+FkResult detail::forwardWithModel(const LegModel& geometry, const LegJointAngles& q,
+                                   double hipFrameZ) {
+  FkResult result;
+  const LegModel* model = &geometry;
+  if (!std::isfinite(q.hip) || !std::isfinite(q.upper) ||
       !std::isfinite(q.lower)) return result;
   const double values[3] = {q.hip, q.upper, q.lower};
   for (unsigned i = 0; i < 3; ++i) {
@@ -36,7 +43,7 @@ FkResult forwardKinematics(LegId leg, const LegJointAngles& q) {
                    model->footOrigin.x * ct + model->footOrigin.z * st;
   const double y = model->upperOrigin.y + model->footOrigin.y;
   const double z = model->lowerOrigin.z * cu -
-                   model->footOrigin.x * st + model->footOrigin.z * ct;
+                   model->footOrigin.x * st + model->footOrigin.z * ct + hipFrameZ;
   result.footOriginM = {model->hipOrigin.x + x,
                        model->hipOrigin.y + ch * y - sh * z,
                        model->hipOrigin.z + sh * y + ch * z};

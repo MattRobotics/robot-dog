@@ -185,7 +185,7 @@ def main():
 
     # Check the pure module's actual include closure and absence of allocation/I/O.
     source_dir = ROOT / "05_Firmware/MATDOG_Controller/src/motion"
-    allowed = {'"LegKinematics.h"', '"LegGeometryData.h"', '<stdint.h>', '<cmath>', '<limits>'}
+    allowed = {'"LegKinematics.h"', '"LegGeometryData.h"', '<stdint.h>', '<cmath>', '<limits>', '"LegKinematicsInternal.h"'}
     for path in source_dir.iterdir():
         for line in path.read_text().splitlines():
             if line.startswith("#include "):
