@@ -10,10 +10,10 @@ bool MotionStateMachine::apply(MotionEvent event) {
       if (event == MotionEvent::ENABLE) { state_=MotionState::IDLE; return true; }
       break;
     case MotionState::IDLE:
-      if (event == MotionEvent::BEGIN_STAND) { state_=MotionState::STAND_TRANSITION; return true; }
+
       break;
     case MotionState::STAND_TRANSITION:
-      if (event == MotionEvent::STAND_COMPLETE) { state_=MotionState::STAND; return true; }
+
       if (event == MotionEvent::STOP) { state_=MotionState::STOPPING; return true; }
       break;
     case MotionState::STAND:
@@ -24,5 +24,13 @@ bool MotionStateMachine::apply(MotionEvent event) {
       break;
   }
   return false;  // invalid event/state pair leaves state unchanged
+}
+bool MotionStateMachine::beginVerifiedStand() {
+  if(state_!=MotionState::IDLE)return false;
+  state_=MotionState::STAND_TRANSITION;return true;
+}
+bool MotionStateMachine::completeVerifiedStand() {
+  if(state_!=MotionState::STAND_TRANSITION)return false;
+  state_=MotionState::STAND;return true;
 }
 } }

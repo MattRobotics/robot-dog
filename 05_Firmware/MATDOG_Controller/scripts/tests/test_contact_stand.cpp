@@ -9,18 +9,6 @@ using namespace matdog::motion;
 static unsigned checks=0, failures=0;
 #define CHECK(c) do { ++checks; if (!(c)) { ++failures; std::printf("FAIL %d: %s\n",__LINE__,#c); } } while(0)
 static double distance(Vector3 a,Vector3 b) { return std::hypot(std::hypot(a.x-b.x,a.y-b.y),a.z-b.z); }
-static MotionStateMachine at(MotionState state) {
-  MotionStateMachine m;
-  if (state == MotionState::OFF) return m;
-  m.apply(MotionEvent::ENABLE);
-  if (state == MotionState::IDLE) return m;
-  m.apply(MotionEvent::BEGIN_STAND);
-  if (state == MotionState::STAND_TRANSITION) return m;
-  m.apply(MotionEvent::STAND_COMPLETE);
-  if (state == MotionState::STAND) return m;
-  m.apply(MotionEvent::STOP);
-  return m;
-}
 int main() {
   const double nan=std::numeric_limits<double>::quiet_NaN();
   for (unsigned i=0;i<4;++i) {
@@ -78,7 +66,7 @@ int main() {
   CHECK(b.initialize(d)==StandStatus::OK);
   MotionStateMachine lifecycle;
   CHECK(lifecycle.apply(MotionEvent::ENABLE));
-  CHECK(lifecycle.apply(MotionEvent::BEGIN_STAND));
+  CHECK(!lifecycle.apply(MotionEvent::BEGIN_STAND)); // G3 requires verified coordinator entry
   for (unsigned index=0;index<51;++index) {
     const auto x=a.next(),y=b.next();
     CHECK(x.status==StandStatus::OK && x.target.valid);
@@ -101,15 +89,15 @@ int main() {
     }
   }
   CHECK(a.next().status==StandStatus::COMPLETE && !a.next().target.valid);
-  CHECK(lifecycle.apply(MotionEvent::STAND_COMPLETE));
-  CHECK(lifecycle.state()==MotionState::STAND);
+  CHECK(!lifecycle.apply(MotionEvent::STAND_COMPLETE));
+  CHECK(lifecycle.state()==MotionState::IDLE);
   CHECK(a.metrics().emittedSamples==51);
   CHECK(a.metrics().maxJointDeltaRad<0.025);
   CHECK(a.metrics().minJointLimitMarginRad>0);
   for(unsigned i=0;i<4;++i) CHECK(a.metrics().branchChanges[i]==0);
-  CHECK(lifecycle.apply(MotionEvent::STOP));a.stop();
+  CHECK(!lifecycle.apply(MotionEvent::STOP));a.stop();
   CHECK(a.next().status==StandStatus::NOT_READY);
-  CHECK(lifecycle.apply(MotionEvent::STOP_COMPLETE));
+  CHECK(!lifecycle.apply(MotionEvent::STOP_COMPLETE));
   CHECK(lifecycle.state()==MotionState::IDLE);
   CHECK(a.initialize(d)==StandStatus::OK);
   CHECK(a.next().target.sequence==0);
@@ -129,18 +117,8 @@ int main() {
     CHECK(a.initialize(bad)!=StandStatus::OK);
     CHECK(!a.next().target.valid);
   }
-  // Exhaustive state/event matrix, including invalid enum; rejects leave state intact.
-  for(unsigned s=0;s<5;++s) for(unsigned e=0;e<8;++e) {
-    const auto state=static_cast<MotionState>(s);
-    const auto event=static_cast<MotionEvent>(e);
-    auto machine=at(state);
-    const bool accepted=machine.apply(event);
-    const int table[5][8]={{1,0,-1,-1,-1,-1,0,-1},{-1,0,2,-1,-1,-1,0,-1},
-                          {-1,0,-1,3,4,-1,0,-1},{-1,0,-1,-1,4,-1,0,-1},
-                          {-1,0,-1,-1,-1,1,0,-1}};
-    CHECK(accepted==(table[s][e]>=0));
-    CHECK(machine.state()==(table[s][e]<0?state:static_cast<MotionState>(table[s][e])));
-  }
-  std::printf("CONTACT_STAND: %u checks, %u failures (40 state/event pairs)\n",checks,failures);
+  // G3 moves the complete state/event matrix to test_startup_timed_stand.cpp,
+  // where every transition state is reached through the verified coordinator.
+  std::printf("CONTACT_STAND: %u checks, %u failures\n",checks,failures);
   return failures?1:0;
 }
