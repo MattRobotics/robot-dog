@@ -71,21 +71,26 @@ void Controller::begin() {
   // stale and hardware motion unauthorized, it refuses to open a live one.
   calibration_.begin(&authority_);
 
-  // Safe Actuator / Calibration Execution infrastructure (I4/I5), bound as
-  // fail-closed status/lifecycle infrastructure only — 2026-09-25 objective
-  // change. actuator_policy_ is bound to the real arbiter (read-only
-  // authority checks, same as calibration_ above): no geometry is bound, no
-  // limit or transform is ever admitted, so every position-class or
-  // geometry-authorised operation refuses at the earliest possible gate.
-  // actuator_runtime_ is given nullptr as its backend, deliberately: even a
-  // hypothetical future ACCEPT can never reach a write, because there is
-  // nothing to write to. scripts/static_audit.py's
-  // check_actuator_infrastructure_wired_fail_closed() enforces both facts
-  // structurally, not merely by this comment.
+  // Safe Actuator / Calibration Execution infrastructure (I4/I5), CR3-M5
+  // production composition — see Controller.h's member comment for why
+  // binding the real profile/backend here stays fail-closed. Binding the
+  // profile only makes its provenance tag MATCHABLE; it admits no limit or
+  // transform (that still requires the explicit @CALIBRATION Q0 PROMOTE
+  // command, itself gated on an explicit currentness confirmation) and
+  // starts no session.
+  geometry_profile_.bind(&actuator::geometry_data::kProvenance, actuator::geometry_data::kJoints,
+                         actuator::geometry_data::kJointCount, actuator::geometry_data::kEndpoints,
+                         actuator::geometry_data::kEndpointCount);
+  actuator_backend_.begin(&servo_bus_);
   actuator_policy_.begin(&authority_);
-  actuator_runtime_.begin(&actuator_policy_, /*backend=*/nullptr);
-  calibration_execution_.begin(&actuator_policy_, &actuator_runtime_,
-                               /*geometry=*/nullptr, /*expected_provenance=*/nullptr);
+  actuator_policy_.bindGeometry(&geometry_profile_, &actuator::geometry_data::kProvenance);
+  actuator_runtime_.begin(&actuator_policy_, &actuator_backend_);
+  calibration_execution_.begin(&actuator_policy_, &actuator_runtime_, &geometry_profile_,
+                               &actuator::geometry_data::kProvenance);
+  // A reboot/default construction always starts revoked (CalibrationMotionPermit.h)
+  // — reset() is explicit here anyway so the boot sequence never depends on
+  // that default staying true by accident.
+  motion_permit_.reset();
 
   printBootBanner();
 
@@ -130,6 +135,7 @@ void Controller::begin() {
       &system_state_,
       &power_state_, &operating_mode_, &authority_, &calibration_, &q0_capture_,
       &actuator_policy_,
+      &geometry_profile_,
       &service_,
       &http_transport_,
   };
@@ -235,6 +241,57 @@ void Controller::updateQ0Capture() {
   }
 }
 
+// CR3-M5. Every field below is read fresh from the live module it names —
+// none is cached across ticks — so a permit that was ACTIVE last tick cannot
+// out-live the fact that revoked it: the very next call sees the change and,
+// through motion_permit_.check() below, revokes before this tick's command
+// (if any) is processed by command_router_.update() (see update()'s call
+// order). operator_calibration_motion_authorized_ has no setter anywhere in
+// this file, so explicit_operator_authorization is always false today — the
+// fresh per-session grant path is deliberately left for the reviewed
+// hardware-authorization gate, not invented here.
+void Controller::updateCalibrationMotionPermit() {
+  calibration::CalibrationMotionPermitFacts facts{};
+  facts.explicit_operator_authorization = operator_calibration_motion_authorized_;
+  facts.robot_powered_profile = build::kServoPowerAvailable;
+  facts.mode = operating_mode_.mode();
+  facts.system_health = system_state_.systemHealth();
+  facts.session_active = calibration_.sessionLive();
+  facts.origin = calibration_.status().origin;
+  facts.session_id = calibration_.status().session_id;
+  facts.current_population_pass =
+      calibration::populationIsCurrentPass(calibration_.status().population);
+  facts.current_geometry_bound =
+      actuator_policy_.currentGeometryTag() != actuator::kNoGeometryProvenance;
+  facts.promoted_transforms_complete =
+      actuator_policy_.transforms().size() == calibration::kLegServoSlotCount;
+  facts.authority = authority_.current();
+  facts.authority_generation = authority_.generation();
+  facts.authority_inhibited = authority_.inhibited();
+
+  // grant() is deliberately never called here: a permit is never resurrected
+  // or (re-)issued implicitly from facts turning healthy. check() only
+  // re-verifies an ALREADY-granted permit and revokes on any mismatch; with
+  // no grant() call site anywhere in this build, motion_permit_.active() can
+  // only ever be false.
+  if (motion_permit_.active()) {
+    motion_permit_.check(facts, motion_permit_token_);
+  }
+
+  actuator::CalibrationBootstrapContext ctx{};
+  ctx.session_active = facts.session_active;
+  ctx.origin = facts.origin;
+  ctx.motion_permit_active = motion_permit_.active();
+  ctx.motion_permit_generation = motion_permit_.generation();
+  ctx.motion_permit_session_id = motion_permit_token_.session_id;
+  ctx.motion_permit_authority_generation = motion_permit_token_.authority_generation;
+  // direction_verify_tick_budget / auxiliary parking stay at their
+  // zero/refusing defaults: no operator budget grant and no parking
+  // sequencer exist in this build yet, so every operation that would consult
+  // them refuses rather than silently inheriting a stale value.
+  actuator_policy_.setBootstrapContext(ctx);
+}
+
 void Controller::printBootBanner() {
   Serial.println();
   Serial.println("====================================");
@@ -305,6 +362,10 @@ void Controller::printBootBanner() {
 }
 
 void Controller::update(uint32_t now_ms) {
+  // First, unconditionally: the freshest possible permit/bootstrap state
+  // must exist before command_router_.update() can act on it this tick.
+  updateCalibrationMotionPermit();
+
   command_router_.update(now_ms);
 
   imu_.update(now_ms);

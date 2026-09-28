@@ -6,6 +6,8 @@
 #include <cstring>
 
 #include "../servo/ServoProfileData.h"
+#include "../actuator/CalibrationGeometryProfileData.h"
+#include "../actuator/CalibrationQ0EvidencePreparation.h"
 
 #include "../config/BuildConfig.h"
 #include "../config/Pins.h"
@@ -302,6 +304,41 @@ void CommandRouter::handleLine(String line) {
                   (unsigned)config.max_stability_spread_ticks);
     Serial.println("CALIBRATION_Q0_NOTE read-only; torque must already be OFF; "
                    "no motion/authority/EEPROM write");
+  } else if (upper == "@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION") {
+    // CR3-M5: rehydrates the frozen CR2-C q0 CANDIDATE package and re-runs it
+    // through the exact CR3 acceptance/promotion functions, then admits the
+    // resulting PROMOTED transforms into the production limit/transform
+    // store. No bus transaction, no authority, no EEPROM write - the operator
+    // confirmation asserts only that no servo/mechanical reassembly happened
+    // since the 2026-09-27 capture (CalibrationQ0EvidencePreparation.h).
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
+      Serial.println("CALIBRATION_Q0_PROMOTE=BLOCKED");
+      Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
+      return;
+    }
+    if (modules_.geometry_profile == nullptr || modules_.actuator_policy == nullptr) {
+      Serial.println("CALIBRATION_Q0_PROMOTE=REFUSED");
+      Serial.println("REASON=INFRASTRUCTURE_NOT_BOUND");
+      return;
+    }
+    const actuator::Q0EvidencePreparation prepared = actuator::prepareCurrentQ0Evidence(
+        *modules_.geometry_profile, actuator::geometry_data::kProvenance,
+        /*explicit_current_installation_confirmation=*/true);
+    if (!prepared.ready()) {
+      Serial.println("CALIBRATION_Q0_PROMOTE=REFUSED");
+      Serial.printf("REASON=%s\n", actuator::toString(prepared.status));
+      Serial.printf("FAILED_RECORD_INDEX=%u\n", (unsigned)prepared.failed_record_index);
+      return;
+    }
+    uint8_t admitted = 0;
+    for (uint8_t i = 0; i < prepared.transform_count; ++i) {
+      if (modules_.actuator_policy->transforms().admit(prepared.transforms[i])) ++admitted;
+    }
+    Serial.printf("CALIBRATION_Q0_PROMOTE=%s admitted=%u/%u\n",
+                 admitted == prepared.transform_count ? "OK" : "PARTIAL",
+                 (unsigned)admitted, (unsigned)prepared.transform_count);
+    Serial.println("CALIBRATION_Q0_PROMOTE_NOTE RAM-only; no EEPROM write; no motion; "
+                   "no authority acquired; a promoted transform alone authorizes no write");
   } else if (upper == "@CALIBRATION STATUS") {
     printCalibrationStatus();
   } else if (upper == "@ACTUATOR STATUS") {
@@ -489,6 +526,9 @@ void CommandRouter::printHelp() {
   Serial.println("  @CALIBRATION Q0 ABORT  (stop future q0 reads; no actuator command)");
   Serial.println("  @CALIBRATION Q0 CAPTURE <samples> <stability_ticks> CONFIRM_Q0_POSE");
   Serial.println("                           (ROBOT_POWERED + MAINTENANCE; read-only)");
+  Serial.println("  @CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION");
+  Serial.println("                           (MAINTENANCE only; RAM-only transform admission,");
+  Serial.println("                           no bus transaction, no authority, no EEPROM write)");
   Serial.println("  @ACTUATOR STATUS       (read-only; no command can plan/commit/execute)");
   Serial.println("  @SYSTEM SOURCE_SIGNATURE  (read-only build/source identity)");
   Serial.println("  @HOSTLINK READINESS    (read-only; BLOCKED/TO_TEST/READY per capability)");
@@ -697,8 +737,9 @@ void CommandRouter::printActuatorStatus() {
                 (unsigned long)c.plans, (unsigned long)c.plan_rejections,
                 (unsigned long)c.commits, (unsigned long)c.commit_rejections,
                 (unsigned long)c.aborts, (unsigned long)c.resets);
-  Serial.println("ACTUATOR_NOTE runtime adapter has no production backend "
-                 "(nullptr) - no ACCEPT can ever reach a write");
+  Serial.println("ACTUATOR_NOTE production backend is bound, but no command path reaches "
+                 "plan()/commit()/execute()/abort() on it - see @CALIBRATION STATUS for the "
+                 "session/authority facts a future activation gate would still require");
   Serial.printf("ACTUATOR_NOTE hardware_motion_authorized=%s\n",
                 calibration::CalibrationManager::hardwareMotionAuthorized() ? "YES" : "NO");
 }

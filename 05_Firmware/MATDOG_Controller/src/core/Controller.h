@@ -5,14 +5,17 @@
 
 #include "../actuator/ActuatorRuntime.h"
 #include "../actuator/ActuatorWritePolicy.h"
+#include "../actuator/CalibrationGeometryProfileData.h"
 #include "../calibration/CalibrationExecutionEngine.h"
 #include "../calibration/CalibrationManager.h"
+#include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/CalibrationQ0CaptureSession.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/HttpTransport.h"
 #include "../network/WifiManager.h"
 #include "../power/DalyBms.h"
 #include "../servo/ServoBus.h"
+#include "../servo/ServoBusActuatorBackend.h"
 #include "../servo/ServoCensus.h"
 #include "../servo/ServoPreflight.h"
 #include "../status/LedRing.h"
@@ -39,6 +42,13 @@ class Controller {
  private:
   void printBootBanner();
   void updateQ0Capture();
+  // Every tick, before any command is processed: rebuilds
+  // CalibrationMotionPermitFacts from live state, re-checks the permit
+  // against them, and pushes the (possibly just-revoked) result into
+  // actuator_policy_'s bootstrap context. This is what keeps the policy from
+  // ever authorising a write against a stale/cached permit snapshot - see
+  // 09_Logs/Development_Log for the production-composition rationale.
+  void updateCalibrationMotionPermit();
 
   servo::ServoBus servo_bus_;
   servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-start
@@ -73,19 +83,34 @@ class Controller {
   // session and owns no actuator authority. It sequences the existing census,
   // preflight and ServoBus read-only runtime snapshots from Controller.
   calibration::CalibrationQ0CaptureSession q0_capture_;
-  // Safe Actuator / Calibration Execution infrastructure (I4/I5), owned here
-  // as fail-closed status/lifecycle infrastructure only — 2026-09-25
-  // objective change. actuator_runtime_ is wired with a null backend (see
-  // begin()): every ACCEPT decision it could ever reach resolves to
-  // NO_BACKEND, independent of anything else. No geometry is bound, no
-  // limit or transform is admitted, no live bootstrap context is set —
-  // scripts/static_audit.py's check_actuator_infrastructure_wired_fail_closed()
-  // enforces all of this structurally. No command path reaches plan()/
-  // commit()/execute()/abort() on any of the three; only read-only status
-  // (ControllerService) is exposed.
+  // Safe Actuator / Calibration Execution infrastructure (I4/I5), CR3-M5
+  // production composition. actuator_policy_ is bound to the REAL current
+  // Geometry V5 profile below and actuator_runtime_ is bound to a REAL
+  // production backend — both are safe to be real because no command path
+  // anywhere reaches plan()/commit()/execute()/abort() on any of the three
+  // (scripts/static_audit.py's
+  // check_actuator_infrastructure_wired_fail_closed() enforces this
+  // structurally); every geometry-authorised operation independently also
+  // requires a live CALIBRATION session, which nothing in this Controller
+  // can start yet (calibration_.startSession() has no caller here — the
+  // same audit function enforces that too), so the fail-closed guarantee
+  // does not rest on any single one of these facts alone.
+  actuator::CalibrationGeometryProfile geometry_profile_;
+  servo::ServoBusActuatorBackend actuator_backend_;
   actuator::SafeActuatorPolicy actuator_policy_;
   actuator::ActuatorRuntime actuator_runtime_;
   calibration::CalibrationExecutionEngine calibration_execution_;
+  // CR3-M5: the session-scoped, RAM-only physical-motion permit — distinct
+  // from the final hardware_motion_authorized flag, which stays false
+  // throughout (CalibrationManager.h). Reset at boot; motion_permit_token_
+  // is the credential from the most recent grant() and is never mutated
+  // outside one. operator_calibration_motion_authorized_ has no setter
+  // anywhere in this build (see updateCalibrationMotionPermit()'s file
+  // comment) — a fresh explicit per-session grant path is deliberately left
+  // for the reviewed hardware-authorization gate, not wired here.
+  calibration::CalibrationMotionPermit motion_permit_;
+  calibration::CalibrationMotionPermitToken motion_permit_token_;
+  bool operator_calibration_motion_authorized_ = false;
   // The transport-neutral telemetry layer (I6) — see ControllerService.h.
   // Bound to the same module pointers CommandRouter already holds; adds no
   // module ownership of its own.

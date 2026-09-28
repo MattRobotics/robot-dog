@@ -26,6 +26,11 @@ namespace actuator {
 // only a pointer is needed here, and ActuatorWritePolicy.h is a large
 // include CommandRouter.h itself has no other reason to pull in.
 class SafeActuatorPolicy;
+// Forward-declared for the same reason: only a pointer is needed to pass
+// the already-bound profile through to actuator::prepareCurrentQ0Evidence()
+// (@CALIBRATION Q0 PROMOTE). CommandRouter never binds/clears it and never
+// reads a joint/endpoint record out of it directly.
+class CalibrationGeometryProfile;
 }  // namespace actuator
 
 namespace network {
@@ -73,10 +78,18 @@ class CommandRouter {
     // CR2-B read-only evidence-acquisition coordinator. It carries no
     // actuator authority and produces CANDIDATE q0 evidence only.
     calibration::CalibrationQ0CaptureSession* q0_capture;
-    // I4/I5 fail-closed status infrastructure (2026-09-25 objective change).
-    // Read-only status only — see ControllerService.h and
-    // scripts/static_audit.py's check_actuator_infrastructure_wired_fail_closed().
+    // I4/I5 CR3-M5 production composition (2026-09-28). Read-only status
+    // commands remain the norm — see ControllerService.h and
+    // scripts/static_audit.py's check_actuator_infrastructure_wired_fail_closed()
+    // — with exactly one reviewed exception: @CALIBRATION Q0 PROMOTE admits
+    // the frozen, re-verified q0 transforms via transforms().admit(). That
+    // is RAM-only evidence admission, never a plan()/commit()/execute()/
+    // abort() call, and the audit function enforces that distinction too.
     actuator::SafeActuatorPolicy* actuator_policy;
+    // The current, already-bound Geometry V5 profile (Controller::geometry_profile_).
+    // Read-only here as well: passed straight through to
+    // actuator::prepareCurrentQ0Evidence(), never mutated.
+    const actuator::CalibrationGeometryProfile* geometry_profile;
     // The transport-neutral telemetry layer (I6) — read-only status
     // commands route through this instead of the pointers above directly.
     // Action/write commands still use the module pointers above; see

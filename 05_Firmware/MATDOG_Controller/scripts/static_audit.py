@@ -1091,49 +1091,43 @@ def check_service_readiness_is_host_linkable(files):
 
 
 def check_actuator_infrastructure_wired_fail_closed(files):
-    """I4/I5 Controller wiring (2026-09-25 objective change): SafeActuatorPolicy,
-    ActuatorRuntime and CalibrationExecutionEngine may be owned by Controller
-    as status/lifecycle infrastructure, but wiring them in must never make
-    Torque ON, GoalPosition, contact motion or calibration motion reachable.
-    This enforces the specific fail-closed choices that make that true
+    """I4/I5/CR3-M5 Controller wiring (2026-09-28 objective change):
+    SafeActuatorPolicy/ActuatorRuntime/CalibrationExecutionEngine now own a
+    REAL current Geometry V5 profile and a REAL production ServoBusActuatorBackend,
+    and CalibrationMotionPermit is refreshed every tick from live facts - but
+    wiring all of that in must still never make Torque ON, GoalPosition,
+    contact motion or calibration motion reachable. Unlike the CR3-M3/M4 shape
+    this replaces (fail-closed by ABSENCE: nullptr backend, unbound geometry),
+    the fail-closed guarantee here is layered and redundant on purpose - any
+    ONE of the following independently blocks every write, so no single future
+    one-line edit can silently open the path:
+
+      1. no command path reaches plan()/commit()/execute()/abort() on any of
+         the three (unchanged from CR3-M3/M4 - still the strongest guarantee);
+      2. operator_calibration_motion_authorized_ has no setter, so
+         CalibrationMotionPermit can never grant();
+      3. calibration_.startSession()/.activate() have no caller, so no session
+         can ever go ACTIVE, so CalibrationMotionPermitFacts.session_active is
+         always false even if (2) somehow stopped holding.
+
+    This enforces the specific fail-closed choices that make all three true
     structurally, not merely by review."""
-    controller_cpp = None
-    for path, code in files:
-        if path.name == "Controller.cpp":
-            controller_cpp = (path, code)
-            break
+    by_name = {path.name: (path, code) for path, code in files}
+    controller_cpp = by_name.get("Controller.cpp")
     if controller_cpp is None:
         fail("Controller.cpp not found - cannot audit fail-closed actuator wiring")
         return
     path, code = controller_cpp
 
-    # The runtime adapter must be given no backend. That alone makes every
-    # ACCEPT decision resolve to NO_BACKEND, independent of anything else -
-    # the single fact this whole check exists to pin down.
-    m = re.search(r"actuator_runtime_\.begin\(([^)]*)\)", code)
-    if not m or "nullptr" not in m.group(1):
-        fail(f"{path}: actuator_runtime_.begin() must still pass nullptr at CR3-M3/M4 - "
-             f"the production backend exists but activation requires the separate permit "
-             f"and first-motion review")
-
-    # No geometry may be bound, no limit or transform admitted, no live
-    # bootstrap context set, from Controller - those are exactly what would
-    # turn "infrastructure present" into "a target is reachable".
-    for forbidden in ("bindGeometry(", ".admit(", "setBootstrapContext("):
-        if forbidden in code:
-            fail(f"{path}: contains {forbidden!r} - Controller may own the Safe Actuator/"
-                 f"Calibration Execution infrastructure but must never bind geometry, admit a "
-                 f"limit/transform, or set a live bootstrap context; doing so would make a "
-                 f"target reachable, not merely present")
-
-    # No command path may trigger a decision or a write - only read-only
-    # status/counters accessors are permitted from CommandRouter or
-    # ControllerService. Matches BOTH call syntaxes - modules_.actuator_policy
-    # is a pointer (-> ), while a hypothetical value member would use '.' -
-    # a dot-only check silently misses every real call site in this codebase,
-    # which is exactly the gap a manual mutation check (temporarily injecting
+    # --- (1) the transaction methods remain unreachable from any command ---
+    # unchanged from CR3-M3/M4: still the single strongest guarantee, kept
+    # exactly as strict now that the infrastructure behind it is real.
+    # Matches BOTH call syntaxes - modules_.actuator_policy is a pointer
+    # (-> ), while a hypothetical value member would use '.' - a dot-only
+    # check silently misses every real call site in this codebase, which is
+    # exactly the gap a manual mutation check (temporarily injecting
     # modules_.actuator_policy->plan(...) into CommandRouter.cpp) caught
-    # during I4/I5 Controller-wiring review.
+    # during the original I4/I5 Controller-wiring review.
     forbidden_call = re.compile(r"(?:\.|->)\s*(plan|commit|execute|abort)\s*\(")
     for path2, code2 in files:
         if path2.name not in ("CommandRouter.cpp", "ControllerService.h", "Controller.cpp"):
@@ -1145,6 +1139,96 @@ def check_actuator_infrastructure_wired_fail_closed(files):
                  f"Execution infrastructure, never plan, commit, execute or abort a "
                  f"transaction; that belongs to a future, separately reviewed activation "
                  f"gate")
+
+    # --- the backend and geometry must be the REAL production ones --------
+    m = re.search(r"actuator_runtime_\.begin\(([^)]*)\)", code)
+    if not m or re.sub(r"\s+", "", m.group(1)) != "&actuator_policy_,&actuator_backend_":
+        fail(f"{path}: actuator_runtime_.begin() must be given the real "
+             f"&actuator_policy_, &actuator_backend_ - CR3-M5 production composition "
+             f"requires a real backend to exist (guarantee (1) above is what keeps that safe, "
+             f"not the backend's absence)")
+    if code.count("actuator_backend_.begin(&servo_bus_)") != 1:
+        fail(f"{path}: actuator_backend_ must be bound to the one Controller-owned "
+             f"servo_bus_ exactly once")
+    if code.count("geometry_profile_.bind(&actuator::geometry_data::kProvenance") != 1:
+        fail(f"{path}: geometry_profile_ must be bound to the real generated Geometry V5 "
+             f"data (actuator::geometry_data) exactly once")
+    if code.count("actuator_policy_.bindGeometry(&geometry_profile_, "
+                 "&actuator::geometry_data::kProvenance)") != 1:
+        fail(f"{path}: actuator_policy_ must be bound to geometry_profile_/the real expected "
+             f"provenance exactly once")
+    if code.count("calibration_execution_.begin(&actuator_policy_, &actuator_runtime_, "
+                 "&geometry_profile_,") != 1:
+        fail(f"{path}: calibration_execution_ must be bound to the same real geometry_profile_")
+
+    # --- (2) no path may ever set the operator-authorization fact true -----
+    if re.search(r"operator_calibration_motion_authorized_\s*=\s*true", code):
+        fail(f"{path}: assigns operator_calibration_motion_authorized_ = true - no explicit "
+             f"per-session operator-authorization path is wired in this build; adding one is "
+             f"a separately reviewed hardware-authorization gate, not a quiet default flip")
+    if "motion_permit_.grant(" in code:
+        fail(f"{path}: calls motion_permit_.grant() - with no operator-authorization setter "
+             f"(guarantee (2)) this can never legitimately succeed, and adding the call site "
+             f"without the setter would just be dead code inviting a future mismatch")
+
+    # --- (3) no path may ever start or activate a live session -------------
+    for forbidden in ("calibration_.startSession(", "calibration_.activate(",
+                      "calibration_.submitPopulationEvidence("):
+        if forbidden in code:
+            fail(f"{path}: contains {forbidden!r} - no live CALIBRATION session can be "
+                 f"started from this Controller; session_active therefore stays false "
+                 f"independent of guarantee (2), by design (see the CR3 development log for "
+                 f"the reviewed session-start design left for the hardware-authorization "
+                 f"session)")
+
+    # --- the permit refresh itself must be real, not a stub -----------------
+    refresh = re.search(r"void Controller::updateCalibrationMotionPermit\(\)\s*\{(.*?)\n\}",
+                        code, re.DOTALL)
+    if not refresh:
+        fail(f"{path}: updateCalibrationMotionPermit() not found")
+    else:
+        body = refresh.group(1)
+        for required in (
+            "facts.explicit_operator_authorization = operator_calibration_motion_authorized_",
+            "facts.session_active = calibration_.sessionLive()",
+            "facts.current_geometry_bound =",
+            "actuator_policy_.currentGeometryTag() != actuator::kNoGeometryProvenance",
+            "facts.promoted_transforms_complete =",
+            "actuator_policy_.transforms().size() == calibration::kLegServoSlotCount",
+            "facts.authority = authority_.current()",
+            "facts.authority_generation = authority_.generation()",
+            "facts.authority_inhibited = authority_.inhibited()",
+            "motion_permit_.check(facts, motion_permit_token_)",
+            "ctx.motion_permit_active = motion_permit_.active()",
+            "actuator_policy_.setBootstrapContext(ctx)",
+        ):
+            if required not in body:
+                fail(f"{path}: updateCalibrationMotionPermit() missing required live fact "
+                     f"{required!r} - every fact must be read fresh from its real source, "
+                     f"never hardcoded or cached")
+        if re.search(r"facts\.\w+\s*=\s*true\b", body):
+            fail(f"{path}: updateCalibrationMotionPermit() hardcodes a fact to true instead "
+                 f"of reading it from live state")
+        if "motion_permit_.grant(" in body:
+            fail(f"{path}: updateCalibrationMotionPermit() must never grant() - it may only "
+                 f"check() an already-granted permit; granting implicitly from facts turning "
+                 f"healthy is exactly what CalibrationMotionPermit.h forbids")
+
+    # updateCalibrationMotionPermit() must run unconditionally, every tick,
+    # before command_router_.update() can act on what it just computed.
+    update_fn = re.search(r"void Controller::update\(uint32_t now_ms\)\s*\{(.*?)\n\}",
+                          code, re.DOTALL)
+    if not update_fn:
+        fail(f"{path}: Controller::update(uint32_t now_ms) not found")
+    else:
+        body = update_fn.group(1)
+        permit_pos = body.find("updateCalibrationMotionPermit();")
+        router_pos = body.find("command_router_.update(now_ms);")
+        if permit_pos < 0 or router_pos < 0 or permit_pos > router_pos:
+            fail(f"{path}: Controller::update() must call updateCalibrationMotionPermit() "
+                 f"unconditionally, before command_router_.update(now_ms) - a command "
+                 f"processed against a stale permit snapshot is exactly the hazard this "
+                 f"orders against")
 
 
 def check_led_status_boundaries(files):
@@ -2699,6 +2783,58 @@ def check_calibration_q0_production_wiring(files, sketch_dir):
                 fail(f"{rpath}: SAFE_OFF consults CR2-B via {forbidden!r} - de-escalation "
                      f"must remain independent")
 
+
+def check_calibration_q0_promotion_wiring(files, sketch_dir):
+    """CR3-M5: @CALIBRATION Q0 PROMOTE is the one reviewed path that may call
+    transforms().admit() in production. MAINTENANCE-gated, exact-confirmation-
+    gated, goes through the exact reviewed prepareCurrentQ0Evidence() pipeline,
+    acquires no authority, issues no bus transaction, writes no EEPROM."""
+    by_name = {path.name: (path, code) for path, code in files}
+    router = by_name.get("CommandRouter.cpp")
+    if router is None:
+        fail(f"{sketch_dir / 'src' / 'core' / 'CommandRouter.cpp'}: not found")
+        return
+    rpath, rcode = router
+
+    branch = re.search(
+        r'upper == "@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION"\)\s*\{(.*?)'
+        r'\}\s*else if\s*\(upper == "@CALIBRATION STATUS"\)', rcode, re.DOTALL)
+    if not branch:
+        fail(f"{rpath}: @CALIBRATION Q0 PROMOTE branch not found (exact confirmation text "
+             f"required, immediately followed by the @CALIBRATION STATUS branch)")
+    else:
+        text = branch.group(1)
+        for required in ("OperatingMode::MAINTENANCE", "prepareCurrentQ0Evidence(",
+                         "prepared.ready()", "transforms().admit("):
+            if required not in text:
+                fail(f"{rpath}: @CALIBRATION Q0 PROMOTE lost required gate {required!r}")
+        for forbidden in ("authority->request", "authority_->request", "startSession(",
+                          "activate(", "safeOff(", "EnableTorque", "GoalPosition",
+                          "WritePos", "PositionOffset", "CalibrationOfs",
+                          ".plan(", ".commit(", ".execute("):
+            if forbidden in text:
+                fail(f"{rpath}: @CALIBRATION Q0 PROMOTE contains {forbidden!r} - transform "
+                     f"promotion must not acquire authority, start a session or touch "
+                     f"hardware")
+
+    # transforms().admit(/limits().admit( may be called ONLY from this one
+    # branch, anywhere in the production tree (tests are exempt - they drive
+    # SafeActuatorPolicy directly, the same contract as every other suite).
+    admit_call = re.compile(r"(?:transforms|limits)\(\)\.admit\(")
+    for path, code in files:
+        if "scripts" in path.parts and path.name != "CommandRouter.cpp":
+            continue
+        if path.name == "CommandRouter.cpp":
+            remaining = code.replace(branch.group(1), "") if branch else code
+            if admit_call.search(remaining):
+                fail(f"{rpath}: transforms()/limits().admit( appears outside the one "
+                     f"reviewed @CALIBRATION Q0 PROMOTE branch")
+            continue
+        if admit_call.search(code):
+            fail(f"{path}: transforms()/limits().admit( is only permitted inside "
+                 f"CommandRouter.cpp's @CALIBRATION Q0 PROMOTE branch")
+
+
 def check_calibration_q0_bootstrap(files, sketch_dir):
     """CR2 read-only q0 candidate builder stays pure and non-operational."""
     by_name = {path.name: (path, code) for path, code in files}
@@ -4214,6 +4350,7 @@ def main():
     check_calibration_population_evidence(files, SKETCH_DIR)
     check_calibration_q0_capture_session(files, SKETCH_DIR)
     check_calibration_q0_production_wiring(files, SKETCH_DIR)
+    check_calibration_q0_promotion_wiring(files, SKETCH_DIR)
     check_calibration_q0_bootstrap(files, SKETCH_DIR)
     check_evidence_geometry_binding(files, SKETCH_DIR)
     check_calibration_readiness_contract(SKETCH_DIR)
