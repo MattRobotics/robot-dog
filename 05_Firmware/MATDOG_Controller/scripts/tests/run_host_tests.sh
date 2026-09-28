@@ -251,6 +251,17 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# CR3 Priority 6: the operational-envelope builder. Links the REAL geometry
+# profile, checked target resolver and calibration domain predicates - no
+# fabricated contact measurement anywhere in this suite.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_operational_envelope" \
+  "$SCRIPT_DIR/test_operational_envelope.cpp" \
+  "$SKETCH_DIR/src/actuator/OperationalEnvelope.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
+
 # The HostLink readiness classifier suite links the REAL pure classifier -
 # no module pointer, no hardware call - I6 (2026-09-25 objective change).
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -326,6 +337,7 @@ done
 "$OUT/test_calibration_execution_engine"
 "$OUT/test_first_motion_executor"
 "$OUT/test_contact_probe_engine"
+"$OUT/test_operational_envelope"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"
 "$OUT/test_led_ring_manager_USB_ONLY"
