@@ -133,6 +133,25 @@ void CalibrationMotionPermit::reset() {
   last_revoke_reason_ = CalibrationPermitRevokeReason::RESET;
 }
 
+CalibrationMotionPermitFacts buildCalibrationMotionPermitFacts(
+    const CalibrationMotionPermitLiveInputs& inputs) {
+  CalibrationMotionPermitFacts facts{};
+  facts.explicit_operator_authorization = inputs.operator_calibration_motion_authorized;
+  facts.robot_powered_profile = inputs.robot_powered_profile;
+  facts.mode = inputs.mode;
+  facts.system_health = inputs.system_health;
+  facts.session_active = inputs.session_active;
+  facts.origin = inputs.origin;
+  facts.session_id = inputs.session_id;
+  facts.current_population_pass = inputs.current_population_pass;
+  facts.current_geometry_bound = inputs.current_geometry_bound;
+  facts.promoted_transforms_complete = inputs.promoted_transforms_complete;
+  facts.authority = inputs.authority;
+  facts.authority_generation = inputs.authority_generation;
+  facts.authority_inhibited = inputs.authority_inhibited;
+  return facts;
+}
+
 const char* toString(CalibrationPermitStatus status) {
   switch (status) {
     case CalibrationPermitStatus::REVOKED: return "REVOKED";

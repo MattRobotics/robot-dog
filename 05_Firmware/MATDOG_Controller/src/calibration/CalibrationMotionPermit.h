@@ -76,6 +76,62 @@ struct CalibrationMotionPermitToken {
   }
 };
 
+// Reduces live Controller state to the exact facts grant()/check() need.
+// Both the per-tick refresh (Controller::updateCalibrationMotionPermit())
+// and the explicit grant command (CommandRouter's @CALIBRATION MOTION
+// PERMIT GRANT) must derive facts IDENTICALLY from live state - this is the
+// one place that mapping happens, so the two call sites cannot silently
+// diverge. Kept free of any actuator:: dependency by taking already-reduced
+// booleans for the two facts that would otherwise require it
+// (current_geometry_bound, promoted_transforms_complete) - the same
+// layering CalibrationMotionPermitFacts itself already respects.
+struct CalibrationMotionPermitLiveInputs {
+  bool operator_calibration_motion_authorized = false;
+  bool robot_powered_profile = false;
+  core::OperatingMode mode = core::OperatingMode::MAINTENANCE;
+  core::SystemHealth system_health = core::SystemHealth::BOOTING;
+  bool session_active = false;
+  CalibrationOrigin origin = CalibrationOrigin::NONE;
+  uint32_t session_id = 0;
+  bool current_population_pass = false;
+  bool current_geometry_bound = false;
+  bool promoted_transforms_complete = false;
+  core::ActuatorAuthority authority = core::ActuatorAuthority::NONE;
+  uint32_t authority_generation = 0;
+  bool authority_inhibited = false;
+};
+
+CalibrationMotionPermitFacts buildCalibrationMotionPermitFacts(
+    const CalibrationMotionPermitLiveInputs& inputs);
+
+// The Controller-owned, RAM-only state the explicit operator-authorization
+// command surface and the per-tick permit refresh share. Deliberately NOT
+// part of CalibrationMotionPermit itself: that class is the reviewed
+// decision core (grant/check/revoke), tested in isolation; this is the
+// thin, mutable bookkeeping a command handler needs to write to and the
+// per-tick refresh needs to read - separating them is what keeps the
+// decision core free of any notion of "who is allowed to call grant()".
+//
+// operator_authorized has no meaning on its own: CalibrationMotionPermit::
+// check() re-verifies it (among everything else) every tick via
+// buildCalibrationMotionPermitFacts(), so clearing it here is what makes an
+// already-granted permit unusable on the very next tick - no separate
+// invalidation path is needed. direction_verify_tick_budget is the
+// operator-approved excursion ceiling granted alongside the permit (see
+// ActuatorWritePolicy.h's CalibrationBootstrapContext field of the same
+// name) - both reset to their refusing defaults on revoke().
+struct CalibrationMotionAuthorizationState {
+  bool operator_authorized = false;
+  int32_t direction_verify_tick_budget = 0;
+  CalibrationMotionPermitToken token{};
+
+  void revoke() {
+    operator_authorized = false;
+    direction_verify_tick_budget = 0;
+    token = CalibrationMotionPermitToken{};
+  }
+};
+
 class CalibrationMotionPermit {
  public:
   // Explicit grant only. A grant never happens implicitly from facts becoming
