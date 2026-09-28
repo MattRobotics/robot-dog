@@ -119,6 +119,22 @@ at the final pre-transmit check: DalyBms::update() takes the live mode from
 the Controller on every loop and the check must use it (never `true`, a
 constant, or the mode seen when the command arrived).
 
+CR3 uncertain-write safety (2026-09-28) addition: a failed/absent ACK on the
+servo bus does not prove a write was not applied - the ST3215 applies a
+register write before it transmits any reply, so a lost/garbled reply is
+indistinguishable, at the ACK layer, from the command never having arrived at
+all. enableTorqueOn()/writeGoalPosition() must therefore return the three-way
+servo::ServoWriteVerifyResult, classified ONLY from an independent readback of
+the register just written (TorqueEnable / the GoalPosition register itself,
+never present_position, which lags behind a write by the joint's travel time)
+- the write's own ACK/status may never be the verdict, the same rule Session
+2.2 Finding D already established for safeOff(). The uncertain state must
+survive unflattened up through actuator::BackendWriteOutcome and
+actuator::ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF: nothing may collapse it
+into either a "written" or a "rejected" outcome. Reading (never writing) the
+GoalPosition register is confined to exactly one accessor, the same
+read-only-through-one-accessor shape as PositionOffset.
+
 Usage: python3 static_audit.py [sketch_dir]
 Exit code 0 = PASS, 1 = FAIL.
 """
@@ -165,7 +181,15 @@ def check_forbidden_literals(files):
         "RegWritePosEx",
         "SyncWritePosEx",
         "WheelMode",
-        "SMS_STS_GOAL_POSITION",
+        # SMS_STS_GOAL_POSITION_L is NOT banned outright any more (CR3
+        # uncertain-write safety), for exactly the same reason SMS_STS_OFS_L
+        # was narrowed below: a total ban on the register would also have
+        # blocked reading back what was just written, which is the only way
+        # to verify a GoalPosition write actually landed. check_
+        # goal_position_register_boundary() replaces the ban with a narrower
+        # rule: one approved read site, inside writeGoalPosition() only, via
+        # readWord() only, and no write ever targets it.
+        "SMS_STS_GOAL_POSITION_H",
         # SMS_STS_OFS_L is NOT banned outright any more. A total ban blocked
         # reading PositionOffset as well as writing it, and left the Controller
         # unable to verify the single most safety-relevant provisioning fact.
@@ -185,7 +209,13 @@ def check_forbidden_literals(files):
 def check_torque_enable(files):
     """CR3-M3: exactly one reviewed torque-on primitive may exist, and only
     inside ServoBus::enableTorqueOn(). SAFE_OFF remains the separate torque-off
-    path. No other source may call EnableTorque(..., nonzero)."""
+    path. No other source may call EnableTorque(..., nonzero).
+
+    CR3 uncertain-write safety additionally requires that the verdict come
+    ONLY from the independent TorqueEnable readback via
+    servo::classifyServoWriteVerify() - never from EnableTorque()'s own
+    return value or st_.Error, which Session 2.2 Finding D already proved
+    cannot even observe failure (SCS::Ack() returns 0, not -1, on failure)."""
     pattern = re.compile(r"EnableTorque\([^,]+,\s*([^)]+)\)")
     torque_on = []
     for path, code in files:
@@ -203,12 +233,24 @@ def check_torque_enable(files):
     else:
         path, _, pos = torque_on[0]
         code = next(c for p, c in files if p == path)
-        body = re.search(r"bool ServoBus::enableTorqueOn\(int id\)\s*\{(.*?)\n\}",
-                         code, re.DOTALL)
+        body = re.search(
+            r"ServoWriteVerifyResult ServoBus::enableTorqueOn\(int id\)\s*\{(.*?)\n\}",
+            code, re.DOTALL)
         if not body or not (body.start() <= pos <= body.end()):
-            fail(f"{path}: the one torque-on call is not inside ServoBus::enableTorqueOn()")
-        elif "SMS_STS_TORQUE_ENABLE" not in body.group(1) or "readByte" not in body.group(1):
-            fail(f"{path}: enableTorqueOn() must independently read back TorqueEnable")
+            fail(f"{path}: the one torque-on call is not inside "
+                 f"ServoBus::enableTorqueOn(), or it no longer returns "
+                 f"ServoWriteVerifyResult")
+        else:
+            text = body.group(1)
+            if "SMS_STS_TORQUE_ENABLE" not in text or "readByte" not in text:
+                fail(f"{path}: enableTorqueOn() must independently read back TorqueEnable")
+            if "classifyServoWriteVerify" not in text:
+                fail(f"{path}: enableTorqueOn() must classify strictly via "
+                     f"classifyServoWriteVerify(readback, ...), not by hand")
+            if re.search(r"\bst_\.Error\b", text) or re.search(r"==\s*1\s*&&", text):
+                fail(f"{path}: enableTorqueOn() appears to condition its verdict on the "
+                     f"write's own ACK/status again - the readback alone must decide "
+                     f"(CR3 uncertain-write safety)")
 
 
 def check_servo_motion_write_surface(files):
@@ -217,6 +259,13 @@ def check_servo_motion_write_surface(files):
     It must use unsigned-domain validation and the fixed conservative
     WritePosEx speed/acceleration constants. Direct writeWord/writeByte,
     RegWrite/SyncWrite and every additional WritePosEx call remain forbidden.
+
+    CR3 uncertain-write safety additionally requires the verdict to come ONLY
+    from independently reading the GoalPosition register back and comparing
+    it to the commanded tick via servo::classifyServoWriteVerify() - never
+    from WritePosEx()'s own ACK/status, for the same reason as the torque-on
+    primitive: a lost/garbled ACK on this half-duplex bus does not prove the
+    write was not applied.
     """
     hits = []
     for path, code in files:
@@ -230,20 +279,74 @@ def check_servo_motion_write_surface(files):
         fail(f"{path}: WritePosEx may exist only in ServoBus::writeGoalPosition()")
         return
     code = next(c for p, c in files if p == path)
-    body = re.search(r"bool ServoBus::writeGoalPosition\(int id, uint16_t target_tick\)\s*\{"
-                     r"(.*?)\n\}", code, re.DOTALL)
+    body = re.search(
+        r"ServoWriteVerifyResult ServoBus::writeGoalPosition\(int id, uint16_t target_tick\)"
+        r"\s*\{(.*?)\n\}", code, re.DOTALL)
     if not body or not (body.start() <= pos <= body.end()):
-        fail(f"{path}: WritePosEx is not inside ServoBus::writeGoalPosition()")
+        fail(f"{path}: WritePosEx is not inside ServoBus::writeGoalPosition(), or it no "
+             f"longer returns ServoWriteVerifyResult")
         return
     text = body.group(1)
     for required in ("target_tick >= 4096u", "kOperationalTimeoutMs",
                      "kBoundedWriteSpeed", "kBoundedWriteAcceleration",
-                     "ack != 1", "status != 0"):
+                     "SMS_STS_GOAL_POSITION_L", "readWord", "classifyServoWriteVerify"):
         if required not in text:
             fail(f"{path}: writeGoalPosition() missing reviewed CR3 guard {required!r}")
     for forbidden in ("RegWrite", "SyncWrite", "writeByte(", "writeWord("):
         if forbidden in text:
             fail(f"{path}: writeGoalPosition() contains forbidden primitive {forbidden!r}")
+    if re.search(r"\bst_\.Error\b", text):
+        fail(f"{path}: writeGoalPosition() reads st_.Error again - the independent "
+             f"GoalPosition readback alone must decide (CR3 uncertain-write safety)")
+
+
+def check_goal_position_register_boundary(files, sketch_dir):
+    """CR3 uncertain-write safety: SMS_STS_GOAL_POSITION_L may be READ, and
+    only inside writeGoalPosition()'s own verification step - the exact same
+    read-only-through-one-accessor shape check_position_offset_boundary()
+    already enforces for PositionOffset."""
+    by_name = {path.name: (path, code) for path, code in files}
+    entry = by_name.get("ServoBus.cpp")
+    if entry is None:
+        fail(f"{sketch_dir / 'src' / 'servo' / 'ServoBus.cpp'}: not found")
+        return
+    bus_path, bus_code = entry
+
+    for path, code in files:
+        if "SMS_STS_GOAL_POSITION_L" not in code:
+            continue
+        if path.name != "ServoBus.cpp":
+            fail(f"{path}: names SMS_STS_GOAL_POSITION_L - the GoalPosition register may "
+                 f"only be touched by ServoBus::writeGoalPosition()'s own verification read, "
+                 f"so every access to it is in one auditable place")
+
+    body = re.search(
+        r"ServoWriteVerifyResult ServoBus::writeGoalPosition\(int id, uint16_t target_tick\)"
+        r"\s*\{(.*?)\n\}", bus_code, re.DOTALL)
+    if not body:
+        fail(f"{bus_path}: ServoBus::writeGoalPosition() not found")
+        return
+    text = body.group(1)
+    if "readWord(static_cast<uint8_t>(id), SMS_STS_GOAL_POSITION_L)" not in \
+            re.sub(r"\s+", " ", text):
+        fail(f"{bus_path}: writeGoalPosition() does not read back "
+             f"SMS_STS_GOAL_POSITION_L via readWord() - the write's own ACK is not proof "
+             f"the command was applied")
+    for forbidden in ("writeByte", "writeWord", "genWrite", "regWrite", "RegWrite"):
+        if forbidden in text and "readWord" not in forbidden:
+            fail(f"{bus_path}: writeGoalPosition()'s verification step contains write "
+                 f"primitive {forbidden!r} where a read was expected")
+
+    # No PositionOffset-style write ever targets this register under any
+    # spelling, anywhere in the tree.
+    goal_write = re.compile(
+        r"(writeByte|writeWord|genWrite|regWrite|RegWrite)\s*\([^;]*?"
+        r"SMS_STS_GOAL_POSITION")
+    for path, code in files:
+        if goal_write.search(code):
+            fail(f"{path}: a direct GoalPosition register WRITE is expressible here - the "
+                 f"one reviewed write path is WritePosEx() inside writeGoalPosition(), never "
+                 f"a raw register write")
 
 
 def check_servo_id_write(files):
@@ -829,6 +932,53 @@ def check_led_anti_back_power(files):
             fail(f"{path}: USB_ONLY begin() must retain GPIO47 INPUT")
     if re.search(r"pinMode\([^,]+,\s*OUTPUT\)", code):
         fail(f"{path}: direct GPIO output bypasses the guarded WS2812 transport")
+
+
+def check_uncertain_write_propagation(files, sketch_dir):
+    """CR3 uncertain-write safety: an unverifiable backend outcome must reach
+    the caller as a DISTINCT result, never silently folded into "written" or
+    "rejected" at any layer of the chain
+    (ServoWriteVerifyResult -> BackendWriteOutcome -> ExecuteResult)."""
+    by_name = {path.name: (path, code) for path, code in files}
+
+    runtime = by_name.get("ActuatorRuntime.cpp")
+    if runtime is None:
+        fail(f"{sketch_dir / 'src' / 'actuator' / 'ActuatorRuntime.cpp'}: not found")
+    else:
+        path, code = runtime
+        execute = re.search(r"ExecuteResult ActuatorRuntime::execute\(.*?\n\}", code,
+                            re.DOTALL)
+        if not execute:
+            fail(f"{path}: ActuatorRuntime::execute() not found")
+        else:
+            text = execute.group(0)
+            if "BackendWriteOutcome::UNCERTAIN" not in text or \
+                    "ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF" not in text:
+                fail(f"{path}: execute() does not map BackendWriteOutcome::UNCERTAIN to "
+                     f"ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF")
+
+    backend = by_name.get("ServoBusActuatorBackend.h")
+    if backend is None:
+        fail(f"{sketch_dir / 'src' / 'servo' / 'ServoBusActuatorBackend.h'}: not found")
+    else:
+        path, code = backend
+        if "ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE" not in code or \
+                "BackendWriteOutcome::UNCERTAIN" not in code:
+            fail(f"{path}: does not translate "
+                 f"ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE to "
+                 f"BackendWriteOutcome::UNCERTAIN - an unverifiable transport-level result "
+                 f"must not be able to become a verified one on its way up")
+
+    # The three-value shape itself must not quietly shrink back to a bool
+    # anywhere in the chain.
+    policy_h = by_name.get("ActuatorRuntime.h")
+    if policy_h is not None:
+        path, code = policy_h
+        iface = re.search(r"class ActuatorBackend\s*\{(.*?)\n\};", code, re.DOTALL)
+        if not iface or "BackendWriteOutcome enableTorque" not in iface.group(1) or \
+                "BackendWriteOutcome writeGoalPosition" not in iface.group(1):
+            fail(f"{path}: ActuatorBackend::enableTorque()/writeGoalPosition() must return "
+                 f"BackendWriteOutcome, not bool - a bool cannot express 'uncertain'")
 
 
 def check_actuator_runtime_boundaries(files):
@@ -4042,6 +4192,8 @@ def main():
     check_servo_timeout_not_global(files)
     check_servo_timeout_categories_finding1(files)
     check_safe_off_verifies_readback(files)
+    check_goal_position_register_boundary(files, SKETCH_DIR)
+    check_uncertain_write_propagation(files, SKETCH_DIR)
     check_hardware_profile_authority(files, SKETCH_DIR)
     check_servo_population_model(files, SKETCH_DIR)
     check_g2_state_is_transport_independent(files)

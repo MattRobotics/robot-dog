@@ -120,13 +120,13 @@ AuthorityLease grant(ActuatorAuthorityArbiter& arbiter, ActuatorAuthority owner,
 
 class FakeActuatorBackend : public actuator::ActuatorBackend {
  public:
-  bool enableTorque(uint8_t) override {
+  actuator::BackendWriteOutcome enableTorque(uint8_t) override {
     ++calls;
-    return true;
+    return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
-  bool writeGoalPosition(uint8_t, uint16_t) override {
+  actuator::BackendWriteOutcome writeGoalPosition(uint8_t, uint16_t) override {
     ++calls;
-    return true;
+    return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
   int calls = 0;
 };

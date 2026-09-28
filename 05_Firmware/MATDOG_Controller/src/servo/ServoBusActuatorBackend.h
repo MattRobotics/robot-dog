@@ -22,15 +22,34 @@ class ServoBusActuatorBackend final : public actuator::ActuatorBackend {
   void begin(ServoBus* bus) { bus_ = bus; }
   bool bound() const { return bus_ != nullptr; }
 
-  bool enableTorque(uint8_t bus_id) override {
-    return bus_ != nullptr && bus_->enableTorqueOn(bus_id);
+  actuator::BackendWriteOutcome enableTorque(uint8_t bus_id) override {
+    if (bus_ == nullptr) return actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
+    return translate(bus_->enableTorqueOn(bus_id));
   }
 
-  bool writeGoalPosition(uint8_t bus_id, uint16_t target_tick) override {
-    return bus_ != nullptr && bus_->writeGoalPosition(bus_id, target_tick);
+  actuator::BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick) override {
+    if (bus_ == nullptr) return actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
+    return translate(bus_->writeGoalPosition(bus_id, target_tick));
   }
 
  private:
+  // ServoBus's transport-level verdict and the actuator layer's
+  // transport-independent one are deliberately the same three states under
+  // different names (this class is the one place that is allowed to know
+  // both vocabularies) - see ServoWriteVerifyResult's file comment for why
+  // UNVERIFIED_NO_RESPONSE must never be collapsed into either verified case.
+  static actuator::BackendWriteOutcome translate(ServoWriteVerifyResult result) {
+    switch (result) {
+      case ServoWriteVerifyResult::VERIFIED_APPLIED:
+        return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
+      case ServoWriteVerifyResult::VERIFIED_NOT_APPLIED:
+        return actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
+      case ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE:
+        return actuator::BackendWriteOutcome::UNCERTAIN;
+    }
+    return actuator::BackendWriteOutcome::UNCERTAIN;
+  }
+
   ServoBus* bus_ = nullptr;
 };
 

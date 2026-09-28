@@ -34,6 +34,12 @@ int16_t decodePositionOffset(uint16_t raw) {
   return static_cast<int16_t>(raw);
 }
 
+ServoWriteVerifyResult classifyServoWriteVerify(int32_t readback, int32_t expected) {
+  if (readback < 0) return ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE;
+  return readback == expected ? ServoWriteVerifyResult::VERIFIED_APPLIED
+                              : ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
+}
+
 const char* toString(RegisterCheck check) {
   switch (check) {
     case RegisterCheck::NOT_READ:  return "NOT_READ";
@@ -50,6 +56,15 @@ const char* toString(ProfileVerdict verdict) {
     case ProfileVerdict::MATCH:      return "MATCH";
     case ProfileVerdict::MISMATCH:   return "MISMATCH";
     case ProfileVerdict::INCOMPLETE: return "INCOMPLETE";
+  }
+  return "UNKNOWN";
+}
+
+const char* toString(ServoWriteVerifyResult result) {
+  switch (result) {
+    case ServoWriteVerifyResult::VERIFIED_APPLIED:       return "VERIFIED_APPLIED";
+    case ServoWriteVerifyResult::VERIFIED_NOT_APPLIED:   return "VERIFIED_NOT_APPLIED";
+    case ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE: return "UNVERIFIED_NO_RESPONSE";
   }
   return "UNKNOWN";
 }

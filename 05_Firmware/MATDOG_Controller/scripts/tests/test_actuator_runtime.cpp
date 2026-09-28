@@ -127,16 +127,16 @@ AuthorityLease grant(ActuatorAuthorityArbiter& arbiter, ActuatorAuthority owner,
 }
 
 // Records every call it receives; each method's return value is
-// independently steerable so BACKEND_REJECTED and WRITTEN are both
-// reachable without a second fixture.
+// independently steerable so VERIFIED_APPLIED, VERIFIED_NOT_APPLIED and
+// UNCERTAIN are all reachable without a second fixture.
 class FakeActuatorBackend : public ActuatorBackend {
  public:
-  bool enableTorque(uint8_t bus_id) override {
+  BackendWriteOutcome enableTorque(uint8_t bus_id) override {
     ++enable_torque_calls;
     last_bus_id = bus_id;
     return enable_torque_result;
   }
-  bool writeGoalPosition(uint8_t bus_id, uint16_t target_tick) override {
+  BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick) override {
     ++write_goal_position_calls;
     last_bus_id = bus_id;
     last_target_tick = target_tick;
@@ -147,8 +147,8 @@ class FakeActuatorBackend : public ActuatorBackend {
   int write_goal_position_calls = 0;
   uint8_t last_bus_id = 0;
   uint16_t last_target_tick = 0;
-  bool enable_torque_result = true;
-  bool write_goal_position_result = true;
+  BackendWriteOutcome enable_torque_result = BackendWriteOutcome::VERIFIED_APPLIED;
+  BackendWriteOutcome write_goal_position_result = BackendWriteOutcome::VERIFIED_APPLIED;
 
   int totalCalls() const { return enable_torque_calls + write_goal_position_calls; }
 };
@@ -314,7 +314,7 @@ void testBackendFailureIsReportedNotSwallowed() {
 
   ActuatorRuntime runtime;
   FakeActuatorBackend backend;
-  backend.enable_torque_result = false;  // the transport refused/timed out
+  backend.enable_torque_result = BackendWriteOutcome::VERIFIED_NOT_APPLIED;  // readback proved it off
   runtime.begin(&policy, &backend);
   WriteDecision decision = WriteDecision::REJECT_NO_ARBITER;
   const ExecuteResult result = runtime.execute(&txn, /*bus_id=*/13, &decision);
@@ -322,6 +322,67 @@ void testBackendFailureIsReportedNotSwallowed() {
   CHECK_EQ((int)decision, (int)WriteDecision::ACCEPT);
   CHECK_EQ((int)result, (int)ExecuteResult::BACKEND_REJECTED);
   CHECK_EQ(backend.enable_torque_calls, 1);  // it WAS attempted, just failed
+}
+
+// The safety property Priority 2 exists for: a backend that cannot verify
+// its write either way must surface as a DISTINCT result from a verified
+// failure, never silently collapse into "rejected" (which a caller could
+// read as "safely did nothing"). The actuator may be energized/moved and
+// the caller owning the real transport must escalate to SAFE_OFF on this.
+void testUncertainBackendOutcomeIsDistinctFromRejection() {
+  g_case = "uncertain write is not swallowed as rejection";
+  ActuatorAuthorityArbiter arbiter;
+  arbiter.reset(AuthorityClearReason::BOOT);
+  SafeActuatorPolicy policy;
+  policy.begin(&arbiter);
+  const AuthorityLease lease =
+      grant(arbiter, ActuatorAuthority::MOTION, OperatingMode::RUN);
+
+  ActuatorTransaction txn{};
+  CHECK_EQ((int)policy.plan(command(ActuatorOperation::TORQUE_ENABLE, lfLower()), lease,
+                            OperatingMode::RUN, &txn),
+          (int)WriteDecision::ACCEPT);
+
+  ActuatorRuntime runtime;
+  FakeActuatorBackend backend;
+  backend.enable_torque_result = BackendWriteOutcome::UNCERTAIN;  // no readback response
+  runtime.begin(&policy, &backend);
+  WriteDecision decision = WriteDecision::REJECT_NO_ARBITER;
+  const ExecuteResult result = runtime.execute(&txn, /*bus_id=*/13, &decision);
+
+  CHECK_EQ((int)decision, (int)WriteDecision::ACCEPT);  // the policy still decided
+  CHECK_EQ((int)result, (int)ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF);
+  CHECK(result != ExecuteResult::BACKEND_REJECTED);
+  CHECK(result != ExecuteResult::WRITTEN);
+  CHECK_EQ(backend.enable_torque_calls, 1);
+}
+
+void testUncertainGoalPositionOutcomeIsDistinctFromRejection() {
+  g_case = "uncertain goal-position write is not swallowed as rejection";
+  ActuatorAuthorityArbiter arbiter;
+  arbiter.reset(AuthorityClearReason::BOOT);
+  SafeActuatorPolicy policy;
+  CalibrationGeometryProfile profile = boundProfile();
+  policy.begin(&arbiter);
+  policy.bindGeometry(&profile, &geometry_data::kProvenance);
+  CHECK(policy.limits().admit(acceptedLimit(lfLower(), 1800, 2300)));
+  const AuthorityLease lease =
+      grant(arbiter, ActuatorAuthority::MOTION, OperatingMode::RUN);
+
+  ActuatorTransaction txn{};
+  CHECK_EQ((int)policy.plan(command(ActuatorOperation::POSITION_COMMAND, lfLower(), 2048), lease,
+                            OperatingMode::RUN, &txn),
+          (int)WriteDecision::ACCEPT);
+
+  ActuatorRuntime runtime;
+  FakeActuatorBackend backend;
+  backend.write_goal_position_result = BackendWriteOutcome::UNCERTAIN;
+  runtime.begin(&policy, &backend);
+  WriteDecision decision = WriteDecision::REJECT_NO_ARBITER;
+  const ExecuteResult result = runtime.execute(&txn, /*bus_id=*/11, &decision);
+
+  CHECK_EQ((int)result, (int)ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF);
+  CHECK_EQ(backend.write_goal_position_calls, 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -335,12 +396,18 @@ void testToStringCoversEveryValue() {
   CHECK_STR(toString(ExecuteResult::NO_RAW_TARGET), "NO_RAW_TARGET");
   CHECK_STR(toString(ExecuteResult::WRITTEN), "WRITTEN");
   CHECK_STR(toString(ExecuteResult::BACKEND_REJECTED), "BACKEND_REJECTED");
+  CHECK_STR(toString(ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF), "UNCERTAIN_REQUIRES_SAFE_OFF");
   CHECK_STR(toString(static_cast<ExecuteResult>(200)), "UNKNOWN");
 
   CHECK_STR(toString(BackendCallKind::NONE), "NONE");
   CHECK_STR(toString(BackendCallKind::ENABLE_TORQUE), "ENABLE_TORQUE");
   CHECK_STR(toString(BackendCallKind::WRITE_GOAL_POSITION), "WRITE_GOAL_POSITION");
   CHECK_STR(toString(static_cast<BackendCallKind>(200)), "UNKNOWN");
+
+  CHECK_STR(toString(BackendWriteOutcome::VERIFIED_APPLIED), "VERIFIED_APPLIED");
+  CHECK_STR(toString(BackendWriteOutcome::VERIFIED_NOT_APPLIED), "VERIFIED_NOT_APPLIED");
+  CHECK_STR(toString(BackendWriteOutcome::UNCERTAIN), "UNCERTAIN");
+  CHECK_STR(toString(static_cast<BackendWriteOutcome>(200)), "UNKNOWN");
 }
 
 }  // namespace
@@ -353,6 +420,8 @@ int main() {
   testPositionCommandAcceptWrittenThroughToBackendWithExactTick();
   testAcceptWithNoBackendIsFailClosed();
   testBackendFailureIsReportedNotSwallowed();
+  testUncertainBackendOutcomeIsDistinctFromRejection();
+  testUncertainGoalPositionOutcomeIsDistinctFromRejection();
   testToStringCoversEveryValue();
 
   std::printf("test_actuator_runtime: %d checks, %d failures\n", g_checks, g_failures);

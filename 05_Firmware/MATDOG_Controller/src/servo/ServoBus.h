@@ -7,6 +7,7 @@
 #include "../config/BuildConfig.h"
 #include "../core/Availability.h"
 #include "../core/SystemState.h"
+#include "ServoProfile.h"
 
 namespace matdog {
 namespace servo {
@@ -160,17 +161,27 @@ class ServoBus {
   // remain unreachable from CommandRouter/Controller while ActuatorRuntime is
   // still wired with a null backend. SAFE_OFF remains separate and ungated.
   //
+  // Uncertain-write safety (CR3): on this half-duplex bus the servo applies a
+  // register write before it transmits any reply, so a lost/garbled ACK does
+  // not prove the command was not applied - see
+  // servo::ServoWriteVerifyResult. Both primitives below therefore classify
+  // strictly from an INDEPENDENT readback of the register they just wrote,
+  // exactly like safeOff() already does; the write's own ACK/status is never
+  // the verdict, only a diagnostic.
+  //
   // enableTorqueOn() verifies TorqueEnable by an independent readback; the
   // SCServo write ACK alone is never treated as proof.
-  bool enableTorqueOn(int id);
+  ServoWriteVerifyResult enableTorqueOn(int id);
 
   // One bounded unsigned GoalPosition primitive. No modulo/signed-wrap is
   // accepted. WritePosEx supplies a deliberately conservative speed/accel
   // ceiling for calibration bring-up; higher-performance motion belongs to a
-  // later reviewed motion backend, not this calibration bootstrap.
+  // later reviewed motion backend, not this calibration bootstrap. Verifies
+  // by independently reading back the GoalPosition register itself (not
+  // present_position, which lags behind a write by the joint's travel time).
   static constexpr uint16_t kBoundedWriteSpeed = 40;
   static constexpr uint8_t kBoundedWriteAcceleration = 10;
-  bool writeGoalPosition(int id, uint16_t target_tick);
+  ServoWriteVerifyResult writeGoalPosition(int id, uint16_t target_tick);
 
   // Read-only runtime snapshot (present position/speed/load/voltage/temp).
   // Returns false if the servo does not answer within the bounded timeout.

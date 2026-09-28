@@ -91,8 +91,28 @@ RegisterCheck checkRegister(const ProfileRegister& expected, int32_t observed);
 // large negative offset into a large positive one.
 int16_t decodePositionOffset(uint16_t raw);
 
+// The verdict for one commanded write (TorqueEnable or GoalPosition), proven
+// or disproven only by an INDEPENDENT readback of the register the write
+// targeted - never by the write's own ACK/status. On this half-duplex bus the
+// servo applies a register write before it transmits any reply, so a lost or
+// garbled ACK does not prove the command was not applied: the two failure
+// modes ("never received" and "received and applied, reply lost") produce the
+// identical ACK-side symptom and are distinguishable only by reading the
+// register back. See ServoBus::safeOff(), which established this rule first.
+enum class ServoWriteVerifyResult : uint8_t {
+  VERIFIED_APPLIED       = 0,  // readback confirms the register now holds the commanded value
+  VERIFIED_NOT_APPLIED   = 1,  // readback confirms it does not - proven safe, not merely assumed
+  UNVERIFIED_NO_RESPONSE = 2,  // readback did not answer - the outcome cannot be ruled out either way
+};
+
+// `readback` is the raw register value just read (negative means no answer,
+// matching every other read primitive in this codebase), `expected` is the
+// value the write commanded (TorqueEnable 1, or a GoalPosition tick).
+ServoWriteVerifyResult classifyServoWriteVerify(int32_t readback, int32_t expected);
+
 const char* toString(RegisterCheck check);
 const char* toString(ProfileVerdict verdict);
+const char* toString(ServoWriteVerifyResult result);
 
 }  // namespace servo
 }  // namespace matdog
