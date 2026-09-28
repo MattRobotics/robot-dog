@@ -187,7 +187,8 @@ def main():
     source_dir = ROOT / "05_Firmware/MATDOG_Controller/src/motion"
     allowed = {'"LegKinematics.h"', '"LegGeometryData.h"', '<stdint.h>', '<cmath>', '<limits>', '"LegKinematicsInternal.h"',
                '"FootContact.h"', '"FootContactData.h"', '"StandTrajectory.h"',
-               '"StandReferenceData.h"', '"MotionState.h"'}
+               '"StandReferenceData.h"', '"MotionState.h"', '"BodyPose.h"',
+               '"StartupAcquisition.h"', '"TimedStand.h"', '"StandTransition.h"'}
     for path in source_dir.iterdir():
         for line in path.read_text().splitlines():
             if line.startswith("#include "):

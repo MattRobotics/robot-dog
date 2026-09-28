@@ -16,7 +16,7 @@ struct StandDefinition {
   uint16_t samples;
 };
 const StandDefinition& canonicalStandDefinition();
-enum class StandStatus : uint8_t { OK, INVALID_DEFINITION, CONTACT_FAILURE, NOT_READY, COMPLETE };
+enum class StandStatus : uint8_t { OK, INVALID_DEFINITION, CONTACT_FAILURE, NOT_READY, COMPLETE, INVALID_PROGRESS };
 struct StandSample {
   StandStatus status = StandStatus::NOT_READY;
   ContactStatus contactStatus = ContactStatus::INVALID_INPUT;
@@ -39,6 +39,11 @@ struct StandMetrics {
   uint32_t branchChanges[4]{};
   uint16_t emittedSamples = 0;
 };
+// Continuous version of the same C4-C geometry, independent of any time law.
+// progress is [0,1]; preferredSeeds must contain all four previous valid legs.
+StandSample sampleStandPath(const StandDefinition& definition, double progress,
+                           const LegJointAngles preferredSeeds[4]);
+
 // C4-A target solution, using the definition's preferred semantic seeds.
 StandSample generateStandTarget(const StandDefinition& definition);
 

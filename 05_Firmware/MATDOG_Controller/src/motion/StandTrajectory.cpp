@@ -54,6 +54,17 @@ StandSample solve(const StandDefinition& d, double height, const LegJointAngles 
 }
 }
 const StandDefinition& canonicalStandDefinition() { return generated::kStand; }
+StandSample sampleStandPath(const StandDefinition& d, double progress, const LegJointAngles seeds[4]) {
+  if (!validDefinition(d) || !seeds) {
+    StandSample result; result.status=StandStatus::INVALID_DEFINITION; return result;
+  }
+  if (!std::isfinite(progress) || progress<0 || progress>1) {
+    StandSample result; result.status=StandStatus::INVALID_PROGRESS; return result;
+  }
+  const double height=progress==0 ? d.lowBodyHeightM : (progress==1 ? d.standBodyHeightM :
+                      d.lowBodyHeightM+progress*(d.standBodyHeightM-d.lowBodyHeightM));
+  return solve(d,height,seeds);
+}
 StandSample generateStandTarget(const StandDefinition& d) {
   if (!validDefinition(d)) {
     StandSample result; result.status = StandStatus::INVALID_DEFINITION; return result;
