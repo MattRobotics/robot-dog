@@ -166,6 +166,18 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_calibration_motion_permit.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationMotionPermit.cpp"
 
+# CR3 continuation Objective A: the session-start orchestrator is pure.
+# It links the REAL CalibrationManager + REAL ActuatorAuthority arbiter.
+# No ServoBus, Arduino or physical backend is present in this binary.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_session_orchestrator" \
+  "$SCRIPT_DIR/test_calibration_session_orchestrator.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationSessionOrchestrator.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationManager.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
 # CR3 Priority 4: the telemetry/deadman monitor shared by the first-motion
 # executor and the contact-probe engine. Pure: no ServoBus/Arduino/device IO,
 # every sample is synthetic.
@@ -262,6 +274,26 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
 
+# CR3 continuation: the Full Leg Calibration sequencer. Links the REAL
+# policy, runtime, CalibrationExecutionEngine, ContactProbeEngine, envelope
+# builder, arbiter and checked target resolver against a fake backend and
+# synthetic telemetry - no fabricated physical measurement anywhere here.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_full_leg_calibration_executor" \
+  "$SCRIPT_DIR/test_full_leg_calibration_executor.cpp" \
+  "$SKETCH_DIR/src/calibration/FullLegCalibrationExecutor.cpp" \
+  "$SKETCH_DIR/src/calibration/ContactProbeEngine.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
+  "$SKETCH_DIR/src/actuator/OperationalEnvelope.cpp" \
+  "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
 # The HostLink readiness classifier suite links the REAL pure classifier -
 # no module pointer, no hardware call - I6 (2026-09-25 objective change).
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -333,11 +365,13 @@ done
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_population_evidence"
 "$OUT/test_calibration_manager"
+"$OUT/test_calibration_session_orchestrator"
 "$OUT/test_actuator_runtime"
 "$OUT/test_calibration_execution_engine"
 "$OUT/test_first_motion_executor"
 "$OUT/test_contact_probe_engine"
 "$OUT/test_operational_envelope"
+"$OUT/test_full_leg_calibration_executor"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"
 "$OUT/test_led_ring_manager_USB_ONLY"
