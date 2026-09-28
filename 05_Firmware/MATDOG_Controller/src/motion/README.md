@@ -1,5 +1,8 @@
 # G1 motion kinematics core
 
+For the G2 physical contact, stand trajectory and motion lifecycle additions,
+see [CONTACT_STAND.md](CONTACT_STAND.md). The G1 API described here is unchanged.
+
 This module maps semantic URDF joint angles to `foot_link` poses and solves
 position IK for LF, RF, RH, LH. It is pure C++17 with fixed storage, no heap,
 exceptions, mutable global state, transport or controller integration.
