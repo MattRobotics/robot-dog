@@ -8,6 +8,11 @@
 #include "../servo/ServoProfileData.h"
 #include "../actuator/CalibrationGeometryProfileData.h"
 #include "../actuator/CalibrationQ0EvidencePreparation.h"
+#include "../calibration/CalibrationSessionOrchestrator.h"
+#include "../calibration/CalibrationMotionPermit.h"
+#include "../calibration/FirstMotionExecutor.h"
+#include "../calibration/FullLegCalibrationExecutor.h"
+#include "../actuator/OperationalEnvelope.h"
 
 #include "../config/BuildConfig.h"
 #include "../config/Pins.h"
@@ -26,8 +31,12 @@ bool CommandRouter::q0CaptureOwnsServoDiagnostics() const {
   return modules_.q0_capture != nullptr && modules_.q0_capture->active();
 }
 
+bool CommandRouter::motionExecutorBusy() const {
+  return modules_.first_motion->active() || modules_.full_leg_calibration->active();
+}
+
 bool CommandRouter::servoDiagnosticBusy() const {
-  if (q0CaptureOwnsServoDiagnostics()) return true;
+  if (q0CaptureOwnsServoDiagnostics() || motionExecutorBusy()) return true;
   return modules_.servo_bus->scanState() == servo::ScanState::RUNNING ||
          modules_.servo_census->state() == servo::ServoCensus::State::RUNNING ||
          modules_.servo_preflight->state() == servo::ServoPreflight::State::RUNNING;
@@ -339,6 +348,380 @@ void CommandRouter::handleLine(String line) {
                  (unsigned)admitted, (unsigned)prepared.transform_count);
     Serial.println("CALIBRATION_Q0_PROMOTE_NOTE RAM-only; no EEPROM write; no motion; "
                    "no authority acquired; a promoted transform alone authorizes no write");
+  } else if (upper == "@CALIBRATION SESSION START LF CONFIRM_CURRENT_Q0") {
+    // CR3 activation gate A: creates only a LIVE CalibrationManager session.
+    // It performs no ServoBus transaction and grants no motion permit.
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
+      Serial.println("CALIBRATION_SESSION=REFUSED");
+      Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
+      return;
+    }
+    if (modules_.system_state->systemHealth() != SystemHealth::READY) {
+      Serial.println("CALIBRATION_SESSION=REFUSED");
+      Serial.printf("REASON=SYSTEM_HEALTH_%s\n",
+                    toString(modules_.system_state->systemHealth()));
+      return;
+    }
+    if (modules_.q0_capture->status().state !=
+        calibration::Q0CaptureState::COMPLETE) {
+      Serial.println("CALIBRATION_SESSION=REFUSED");
+      Serial.println("REASON=CURRENT_BOOT_Q0_CAPTURE_NOT_COMPLETE");
+      return;
+    }
+    if (modules_.actuator_policy->currentGeometryTag() ==
+            actuator::kNoGeometryProvenance ||
+        modules_.actuator_policy->transforms().size() !=
+            calibration::kLegServoSlotCount) {
+      Serial.println("CALIBRATION_SESSION=REFUSED");
+      Serial.println("REASON=GEOMETRY_OR_PROMOTED_TRANSFORMS_NOT_CURRENT");
+      return;
+    }
+
+    const calibration::SessionStartFromQ0Result result =
+        calibration::startCalibrationSessionFromQ0Evidence(
+            *modules_.calibration,
+            modules_.q0_capture->status().state,
+            modules_.q0_capture->populationResult(),
+            calibration::Leg::LF,
+            modules_.operating_mode->mode());
+
+    if (result.status != calibration::SessionStartFromQ0Status::STARTED) {
+      Serial.println("CALIBRATION_SESSION=REFUSED");
+      Serial.printf("REASON=%s manager=%s\n",
+                    calibration::toString(result.status),
+                    calibration::toString(result.manager_result));
+      return;
+    }
+
+    Serial.printf("CALIBRATION_SESSION=ACTIVE leg=LF session=%lu authority_generation=%lu\n",
+                  (unsigned long)modules_.calibration->status().session_id,
+                  (unsigned long)modules_.calibration->status().lease_generation);
+    Serial.println("CALIBRATION_SESSION_NOTE motion_permit=NOT_GRANTED "
+                   "hardware_motion_authorized=FALSE");
+
+  } else if (upper ==
+             "@CALIBRATION MOTION PERMIT GRANT 16 CONFIRM_FIRST_MOTION") {
+    // CR3 activation gate B: one exact, boot/session-local authorization.
+    // The 16-tick value is deliberately fixed for the first hardware proof;
+    // there is no generic budget parser in this command surface.
+    if (modules_.motion_permit->active()) {
+      Serial.println("CALIBRATION_MOTION_PERMIT=REFUSED");
+      Serial.println("REASON=PERMIT_ALREADY_ACTIVE_REVOKE_FIRST");
+      return;
+    }
+
+    modules_.motion_authorization->revoke();
+    modules_.motion_authorization->operator_authorized = true;
+    modules_.motion_authorization->direction_verify_tick_budget = 16;
+
+    const calibration::CalibrationSessionStatus& session =
+        modules_.calibration->status();
+
+    calibration::CalibrationMotionPermitLiveInputs inputs{};
+    inputs.operator_calibration_motion_authorized =
+        modules_.motion_authorization->operator_authorized;
+    inputs.robot_powered_profile =
+        build::kHardwareProfile == config::HardwareProfile::ROBOT_POWERED;
+    inputs.mode = modules_.operating_mode->mode();
+    inputs.system_health = modules_.system_state->systemHealth();
+    inputs.session_active = modules_.calibration->sessionLive();
+    inputs.origin = session.origin;
+    inputs.session_id = session.session_id;
+    inputs.current_population_pass =
+        calibration::populationIsCurrentPass(session.population);
+    inputs.current_geometry_bound =
+        modules_.actuator_policy->currentGeometryTag() !=
+        actuator::kNoGeometryProvenance;
+    inputs.promoted_transforms_complete =
+        modules_.actuator_policy->transforms().size() ==
+        calibration::kLegServoSlotCount;
+    inputs.authority = modules_.authority->current();
+    inputs.authority_generation = modules_.authority->generation();
+    inputs.authority_inhibited = modules_.authority->inhibited();
+
+    const calibration::CalibrationMotionPermitFacts facts =
+        calibration::buildCalibrationMotionPermitFacts(inputs);
+
+    calibration::CalibrationMotionPermitToken token{};
+    const calibration::CalibrationPermitStatus permit =
+        modules_.motion_permit->grant(facts, &token);
+
+    if (permit != calibration::CalibrationPermitStatus::ACTIVE ||
+        !token.valid()) {
+      modules_.motion_authorization->revoke();
+      Serial.println("CALIBRATION_MOTION_PERMIT=REFUSED");
+      Serial.printf("REASON=%s\n", calibration::toString(permit));
+      return;
+    }
+
+    modules_.motion_authorization->token = token;
+
+    Serial.printf(
+        "CALIBRATION_MOTION_PERMIT=ACTIVE generation=%lu session=%lu "
+        "authority_generation=%lu direction_verify_budget_ticks=16\n",
+        (unsigned long)token.permit_generation,
+        (unsigned long)token.session_id,
+        (unsigned long)token.authority_generation);
+    Serial.println("CALIBRATION_MOTION_PERMIT_NOTE RAM_ONLY "
+                   "global_hardware_motion_authorized=FALSE");
+
+  } else if (upper == "@CALIBRATION MOTION PERMIT REVOKE") {
+    // Safety de-escalation: always allowed. If a first-motion attempt is
+    // underway, the next Controller tick observes the lost permit and routes
+    // it to SAFE_OFF_REQUIRED before any further progress.
+    modules_.motion_permit->revoke(
+        calibration::CalibrationPermitRevokeReason::EXPLICIT);
+    modules_.motion_authorization->revoke();
+
+    Serial.println("CALIBRATION_MOTION_PERMIT=REVOKED");
+    Serial.println("CALIBRATION_MOTION_NOTE active_motion_if_any_will_SAFE_OFF");
+
+  } else if (upper == "@CALIBRATION MOTION ABORT") {
+    // Deliberately implemented by withdrawing the prerequisite rather than by
+    // calling FirstMotionExecutor/FullLegCalibrationExecutor's own abort()
+    // directly (CommandRouter/Controller may only read status from the Safe
+    // Actuator/Calibration Execution infrastructure - see
+    // check_actuator_infrastructure_wired_fail_closed()). This still takes
+    // effect the SAME Controller tick, not one tick later: both executors'
+    // context.motion_permit_active is read from motion_permit_.active()
+    // fresh in updateFirstMotion()/updateFullLegCalibration(), which run
+    // AFTER command_router_.update() in Controller::update()'s call order -
+    // see the CR3 development log. If torque was ever verified on, that
+    // path requires SAFE_OFF.
+    modules_.motion_permit->revoke(
+        calibration::CalibrationPermitRevokeReason::EXPLICIT);
+    modules_.motion_authorization->revoke();
+
+    Serial.println("CALIBRATION_MOTION_ABORT=REQUESTED");
+    Serial.println("CALIBRATION_MOTION_ABORT_NOTE permit_revoked=YES");
+
+  } else if (upper ==
+             "@CALIBRATION MOTION DIRECTION_VERIFY LF_UPPER +16 CONFIRM_FIRST_MOTION") {
+    // CR3 activation gate C: exactly ONE first-motion primitive is exposed.
+    // No raw servo ID, arbitrary target or arbitrary delta is accepted.
+    if (modules_.calibration->status().state !=
+        calibration::SessionState::ACTIVE) {
+      Serial.println("CALIBRATION_FIRST_MOTION=REFUSED");
+      Serial.println("REASON=NO_ACTIVE_CALIBRATION_SESSION");
+      return;
+    }
+    if (!modules_.motion_permit->active() ||
+        !modules_.motion_authorization->operator_authorized ||
+        !modules_.motion_authorization->token.valid() ||
+        modules_.motion_authorization->direction_verify_tick_budget != 16) {
+      Serial.println("CALIBRATION_FIRST_MOTION=REFUSED");
+      Serial.println("REASON=NO_CURRENT_EXACT_MOTION_PERMIT");
+      return;
+    }
+    if (modules_.first_motion->active() || modules_.full_leg_calibration->active()) {
+      Serial.println("CALIBRATION_FIRST_MOTION=REFUSED");
+      Serial.println("REASON=MOTION_EXECUTOR_ALREADY_ACTIVE");
+      return;
+    }
+
+    // Resolve the current semantic identity from the canonical allocation,
+    // then cross-check it against Geometry V5. Bus ID alone is never identity.
+    constexpr uint8_t kFirstMotionBusId = 12;
+    const servo::CanonicalServo* canonical =
+        servo::findCanonical(kFirstMotionBusId);
+
+    calibration::JointIdentity identity{};
+    if (canonical == nullptr ||
+        !calibration::semanticIdentityFromCanonical(*canonical, &identity) ||
+        identity.leg != calibration::Leg::LF ||
+        identity.joint != calibration::JointKind::UPPER) {
+      Serial.println("CALIBRATION_FIRST_MOTION=REFUSED");
+      Serial.println("REASON=CANONICAL_IDENTITY_MISMATCH");
+      return;
+    }
+
+    const actuator::GeometryJointRecord* geometry_joint =
+        modules_.geometry_profile->findJoint(identity);
+    if (geometry_joint == nullptr ||
+        geometry_joint->bus_id != kFirstMotionBusId ||
+        !modules_.geometry_profile->withinDirectionVerifyEnvelope(identity, 16)) {
+      Serial.println("CALIBRATION_FIRST_MOTION=REFUSED");
+      Serial.println("REASON=GEOMETRY_V5_ENVELOPE_OR_IDENTITY_MISMATCH");
+      return;
+    }
+
+    calibration::FirstMotionRequest request{};
+    request.joint = identity;
+    request.bus_id = kFirstMotionBusId;
+    request.delta_ticks = 16;
+
+    calibration::FirstMotionContext context{};
+    context.session_active = modules_.calibration->sessionLive();
+    context.origin = modules_.calibration->status().origin;
+    context.lease = modules_.calibration->authorityLease();
+    context.mode = modules_.operating_mode->mode();
+    context.motion_permit_active = modules_.motion_permit->active();
+    context.authority = modules_.authority->current();
+    context.authority_generation = modules_.authority->generation();
+    context.authority_inhibited = modules_.authority->inhibited();
+
+    if (!modules_.first_motion->start(request, context, millis())) {
+      Serial.println("CALIBRATION_FIRST_MOTION=REFUSED");
+      Serial.println("REASON=FIRST_MOTION_EXECUTOR_START_REFUSED");
+      return;
+    }
+
+    Serial.println(
+        "CALIBRATION_FIRST_MOTION=ARMED joint=LF_UPPER bus=12 delta_ticks=+16");
+    Serial.println(
+        "CALIBRATION_FIRST_MOTION_NOTE no_write_in_command_handler; "
+        "next_Controller_tick_revalidates_all_dynamic_prerequisites");
+
+  } else if (upper == "@CALIBRATION SESSION ABORT") {
+    // Complete de-escalation. SAFE_OFF itself remains outside the manager and
+    // outside authority; permit revocation alone is same-tick effective for
+    // either executor - see @CALIBRATION MOTION ABORT above. abortSession()
+    // additionally drops CALIBRATION authority itself, a second independent
+    // continuation_ok clause either executor also re-checks every tick.
+    modules_.motion_permit->revoke(
+        calibration::CalibrationPermitRevokeReason::EXPLICIT);
+    modules_.motion_authorization->revoke();
+    modules_.calibration->abortSession();
+
+    Serial.println("CALIBRATION_SESSION_ABORT=OK");
+    Serial.println("CALIBRATION_SESSION_ABORT_NOTE permit=REVOKED authority=RELEASED");
+
+  } else if (upper == "@CALIBRATION FULL LEG LF CONFIRM_FULL_CALIBRATION") {
+    // The LF UPPER two-endpoint contact sequence (MIN, then MAX with
+    // LH_UPPER parked) a Full Leg Calibration needs - see
+    // FullLegCalibrationExecutor.h. Exactly the same live-session and
+    // fresh-permit gates as @CALIBRATION MOTION DIRECTION_VERIFY, reused
+    // rather than re-derived; mutually exclusive with it (both would
+    // otherwise contend for bus 12).
+    if (modules_.calibration->status().state != calibration::SessionState::ACTIVE ||
+        modules_.calibration->status().leg != calibration::Leg::LF) {
+      Serial.println("CALIBRATION_FULL_LEG=REFUSED");
+      Serial.println("REASON=NO_ACTIVE_LF_CALIBRATION_SESSION");
+      return;
+    }
+    if (!modules_.motion_permit->active() ||
+        !modules_.motion_authorization->operator_authorized ||
+        !modules_.motion_authorization->token.valid()) {
+      Serial.println("CALIBRATION_FULL_LEG=REFUSED");
+      Serial.println("REASON=NO_CURRENT_MOTION_PERMIT");
+      return;
+    }
+    if (modules_.first_motion->active() || modules_.full_leg_calibration->active()) {
+      Serial.println("CALIBRATION_FULL_LEG=REFUSED");
+      Serial.println("REASON=MOTION_EXECUTOR_ALREADY_ACTIVE");
+      return;
+    }
+
+    // Resolve + cross-check BOTH joints' current semantic identity from the
+    // canonical allocation against Geometry V5 - bus id alone is never
+    // identity, exactly like @CALIBRATION MOTION DIRECTION_VERIFY.
+    constexpr uint8_t kProbeBusId = 12;
+    constexpr uint8_t kAuxiliaryBusId = 42;
+    const servo::CanonicalServo* probe_canonical = servo::findCanonical(kProbeBusId);
+    const servo::CanonicalServo* aux_canonical = servo::findCanonical(kAuxiliaryBusId);
+
+    calibration::JointIdentity probe_identity{};
+    calibration::JointIdentity aux_identity{};
+    if (probe_canonical == nullptr || aux_canonical == nullptr ||
+        !calibration::semanticIdentityFromCanonical(*probe_canonical, &probe_identity) ||
+        !calibration::semanticIdentityFromCanonical(*aux_canonical, &aux_identity) ||
+        probe_identity.leg != calibration::Leg::LF ||
+        probe_identity.joint != calibration::JointKind::UPPER ||
+        aux_identity.leg != calibration::Leg::LH ||
+        aux_identity.joint != calibration::JointKind::UPPER) {
+      Serial.println("CALIBRATION_FULL_LEG=REFUSED");
+      Serial.println("REASON=CANONICAL_IDENTITY_MISMATCH");
+      return;
+    }
+
+    // Both endpoint plans come straight from the bound Geometry V5 profile -
+    // never a hand-typed contact/backoff/park number. MIN must be directly
+    // executable; MAX must be executable AND name LH_UPPER as its own
+    // auxiliary, exactly the plan SafeActuatorPolicy::evaluateEndpointPlan()
+    // will itself re-check at commit time.
+    const actuator::GeometryEndpointRecord* min_endpoint = modules_.geometry_profile->findEndpoint(
+        calibration::Leg::LF, calibration::JointKind::UPPER, calibration::ContactSide::MIN_SIDE);
+    const actuator::GeometryEndpointRecord* max_endpoint = modules_.geometry_profile->findEndpoint(
+        calibration::Leg::LF, calibration::JointKind::UPPER, calibration::ContactSide::MAX_SIDE);
+    if (min_endpoint == nullptr || max_endpoint == nullptr ||
+        !actuator::isExecutable(*min_endpoint) || !actuator::isExecutable(*max_endpoint) ||
+        !max_endpoint->has_auxiliary ||
+        max_endpoint->auxiliary_leg != calibration::Leg::LH ||
+        max_endpoint->auxiliary_joint != calibration::JointKind::UPPER) {
+      Serial.println("CALIBRATION_FULL_LEG=REFUSED");
+      Serial.println("REASON=GEOMETRY_V5_ENDPOINT_PLAN_MISMATCH");
+      return;
+    }
+
+    // CalibrationDomain.h's CalibrationFailure::REPEATABILITY_EXCEEDED cites
+    // the LF V25 precedent "REPEATABILITY_TOLERANCE_TICKS = 16" - reused for
+    // both sides, not invented. Deliberately NOT
+    // ContactWitness's own file-comment tolerance (24): that one is
+    // documented as measured on a single leg on a physical installation
+    // that no longer exists, and the archive explicitly warns against
+    // promoting it to a universal parameter.
+    constexpr uint16_t kRepeatabilityToleranceTicks = 16;
+
+    calibration::FullLegCalibrationRequest request{};
+    request.probe_joint = probe_identity;
+    request.probe_bus_id = kProbeBusId;
+    request.endpoint_leg = calibration::Leg::LF;
+    request.endpoint_joint = calibration::JointKind::UPPER;
+    request.min_approach_urad = min_endpoint->contact;
+    // MIN has no compiled "far clear" point of its own (its `clear` field is
+    // the bisection's tiny last-sampled-before-contact value, ticks away —
+    // not a re-approach starting point). -700000 urad reuses, verbatim, the
+    // SAME clearly-distant, clearly-safe backoff already reviewed and
+    // committed for this exact endpoint in
+    // scripts/tests/test_contact_probe_engine.cpp's own request() fixture.
+    request.min_backoff_urad = -700000;
+    request.min_repeatability_tolerance_ticks = kRepeatabilityToleranceTicks;
+    request.max_approach_urad = max_endpoint->contact;
+    // MAX's own `clear` field IS a principled, far-distant, geometry-
+    // compiler-verified point on this side (the PATH_OBSTRUCTION_BRACKET
+    // clearance boundary, validated with the auxiliary at its parked pose)
+    // - reused directly rather than picking a second arbitrary number.
+    request.max_backoff_urad = max_endpoint->clear;
+    request.max_repeatability_tolerance_ticks = kRepeatabilityToleranceTicks;
+    request.auxiliary_joint = aux_identity;
+    request.auxiliary_bus_id = kAuxiliaryBusId;
+    request.auxiliary_park_target_urad = max_endpoint->auxiliary_target;
+
+    calibration::FullLegCalibrationContext context{};
+    context.session_active = modules_.calibration->sessionLive();
+    context.origin = modules_.calibration->status().origin;
+    context.lease = modules_.calibration->authorityLease();
+    context.mode = modules_.operating_mode->mode();
+    context.motion_permit_active = modules_.motion_permit->active();
+    context.authority = modules_.authority->current();
+    context.authority_generation = modules_.authority->generation();
+    context.authority_inhibited = modules_.authority->inhibited();
+
+    if (!modules_.full_leg_calibration->start(request, context, millis())) {
+      Serial.println("CALIBRATION_FULL_LEG=REFUSED");
+      Serial.println("REASON=FULL_LEG_EXECUTOR_START_REFUSED");
+      return;
+    }
+
+    Serial.println("CALIBRATION_FULL_LEG=ARMED leg=LF joint=UPPER phase=UPPER_MIN_PROBE "
+                   "auxiliary=LH_UPPER aux_bus=42");
+    Serial.println("CALIBRATION_FULL_LEG_NOTE no_write_in_command_handler; "
+                   "next_Controller_tick_revalidates_all_dynamic_prerequisites; "
+                   "poll with @CALIBRATION FULL LEG STATUS");
+
+  } else if (upper == "@CALIBRATION FULL LEG STATUS") {
+    printFullLegCalibrationStatus();
+  } else if (upper == "@CALIBRATION FULL LEG ABORT") {
+    // Always allowed, exactly like @CALIBRATION MOTION ABORT - a safety
+    // de-escalation is not gated on the same preconditions that started it.
+    if (modules_.full_leg_calibration->active()) {
+      modules_.full_leg_calibration->abort();
+      Serial.println("CALIBRATION_FULL_LEG_ABORT=OK");
+    } else {
+      Serial.println("CALIBRATION_FULL_LEG_ABORT=NO_ACTIVE_SEQUENCE");
+    }
+    printFullLegCalibrationStatus();
+
   } else if (upper == "@CALIBRATION STATUS") {
     printCalibrationStatus();
   } else if (upper == "@ACTUATOR STATUS") {
@@ -373,9 +756,10 @@ void CommandRouter::handleLine(String line) {
     }
     printWebStatus();
   } else if (upper.startsWith("@SERVO SCAN")) {
-    if (q0CaptureOwnsServoDiagnostics()) {
+    if (q0CaptureOwnsServoDiagnostics() || motionExecutorBusy()) {
       Serial.println("SERVO_SCAN=BLOCKED");
-      Serial.println("REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
+      Serial.println(motionExecutorBusy() ? "REASON=MOTION_EXECUTOR_ACTIVE"
+                                          : "REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
       return;
     }
     if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
@@ -396,9 +780,10 @@ void CommandRouter::handleLine(String line) {
       Serial.println("ERROR=USAGE @SERVO SCAN <lo> <hi>");
     }
   } else if (upper == "@SERVO CENSUS") {
-    if (q0CaptureOwnsServoDiagnostics()) {
+    if (q0CaptureOwnsServoDiagnostics() || motionExecutorBusy()) {
       Serial.println("SERVO_CENSUS=BLOCKED");
-      Serial.println("REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
+      Serial.println(motionExecutorBusy() ? "REASON=MOTION_EXECUTOR_ACTIVE"
+                                          : "REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
       return;
     }
     // Same bounded per-ID blocking as @SERVO SCAN (it drives the same
@@ -417,9 +802,10 @@ void CommandRouter::handleLine(String line) {
       Serial.println("ERROR=SCAN_ALREADY_RUNNING");
     }
   } else if (upper == "@SERVO PREFLIGHT") {
-    if (q0CaptureOwnsServoDiagnostics()) {
+    if (q0CaptureOwnsServoDiagnostics() || motionExecutorBusy()) {
       Serial.println("SERVO_PREFLIGHT=BLOCKED");
-      Serial.println("REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
+      Serial.println(motionExecutorBusy() ? "REASON=MOTION_EXECUTOR_ACTIVE"
+                                          : "REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
       return;
     }
     // H0 leg preflight. Strictly read-only: Ping plus register reads, no
@@ -440,9 +826,10 @@ void CommandRouter::handleLine(String line) {
       Serial.println("ERROR=PREFLIGHT_ALREADY_RUNNING");
     }
   } else if (upper.startsWith("@SERVO READ")) {
-    if (q0CaptureOwnsServoDiagnostics()) {
+    if (q0CaptureOwnsServoDiagnostics() || motionExecutorBusy()) {
       Serial.println("SERVO_READ=BLOCKED");
-      Serial.println("REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
+      Serial.println(motionExecutorBusy() ? "REASON=MOTION_EXECUTOR_ACTIVE"
+                                          : "REASON=CALIBRATION_Q0_CAPTURE_ACTIVE");
       return;
     }
     if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
@@ -529,6 +916,20 @@ void CommandRouter::printHelp() {
   Serial.println("  @CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION");
   Serial.println("                           (MAINTENANCE only; RAM-only transform admission,");
   Serial.println("                           no bus transaction, no authority, no EEPROM write)");
+  Serial.println("  @CALIBRATION SESSION START LF CONFIRM_CURRENT_Q0");
+  Serial.println("                           (starts LF live session from current-boot Q0 population)");
+  Serial.println("  @CALIBRATION MOTION PERMIT GRANT 16 CONFIRM_FIRST_MOTION");
+  Serial.println("                           (ROBOT_POWERED; exact RAM-only +16 tick permit)");
+  Serial.println("  @CALIBRATION MOTION DIRECTION_VERIFY LF_UPPER +16 CONFIRM_FIRST_MOTION");
+  Serial.println("                           (ONLY reviewed first-motion command; no arbitrary target)");
+  Serial.println("  @CALIBRATION MOTION ABORT");
+  Serial.println("  @CALIBRATION MOTION PERMIT REVOKE");
+  Serial.println("  @CALIBRATION SESSION ABORT");
+  Serial.println("  @CALIBRATION FULL LEG LF CONFIRM_FULL_CALIBRATION");
+  Serial.println("                           (LF_UPPER MIN+MAX contact, LH_UPPER parked for MAX,");
+  Serial.println("                           HIP/LOWER envelopes derived; many-second sequence)");
+  Serial.println("  @CALIBRATION FULL LEG STATUS   (poll while the sequence runs)");
+  Serial.println("  @CALIBRATION FULL LEG ABORT");
   Serial.println("  @ACTUATOR STATUS       (read-only; no command can plan/commit/execute)");
   Serial.println("  @SYSTEM SOURCE_SIGNATURE  (read-only build/source identity)");
   Serial.println("  @HOSTLINK READINESS    (read-only; BLOCKED/TO_TEST/READY per capability)");
@@ -737,11 +1138,137 @@ void CommandRouter::printActuatorStatus() {
                 (unsigned long)c.plans, (unsigned long)c.plan_rejections,
                 (unsigned long)c.commits, (unsigned long)c.commit_rejections,
                 (unsigned long)c.aborts, (unsigned long)c.resets);
-  Serial.println("ACTUATOR_NOTE production backend is bound, but no command path reaches "
-                 "plan()/commit()/execute()/abort() on it - see @CALIBRATION STATUS for the "
-                 "session/authority facts a future activation gate would still require");
+  Serial.println("ACTUATOR_NOTE production backend is bound; the only command-reachable "
+                 "motion path is the exact CR3 LF_UPPER +16 DIRECTION_VERIFY gate, "
+                 "requiring live session + fresh RAM permit + Geometry V5 + current authority");
   Serial.printf("ACTUATOR_NOTE hardware_motion_authorized=%s\n",
                 calibration::CalibrationManager::hardwareMotionAuthorized() ? "YES" : "NO");
+}
+
+namespace {
+// Shared by printFullLegCalibrationStatus() for both the HIP and LOWER
+// geometry-derived envelopes: resolves a bus id's CURRENT semantic identity
+// through the same canonical-allocation cross-check every motion command in
+// this router already uses, so no physical-unit label is ever hand-typed.
+bool resolveLegJointIdentity(uint8_t bus_id, calibration::Leg expect_leg,
+                             calibration::JointKind expect_joint,
+                             calibration::JointIdentity* out) {
+  const servo::CanonicalServo* canonical = servo::findCanonical(bus_id);
+  return canonical != nullptr && calibration::semanticIdentityFromCanonical(*canonical, out) &&
+        out->leg == expect_leg && out->joint == expect_joint;
+}
+}  // namespace
+
+void CommandRouter::printFullLegCalibrationStatus() {
+  const calibration::FullLegCalibrationStatus& s = modules_.full_leg_calibration->status();
+  Serial.printf("CALIBRATION_FULL_LEG phase=%s failure=%s last_decision=%s\n",
+                calibration::toString(s.phase), calibration::toString(s.failure),
+                actuator::toString(s.last_policy_decision));
+  Serial.printf("CALIBRATION_FULL_LEG_BUS primary=%u auxiliary=%u\n",
+                (unsigned)modules_.full_leg_calibration->primaryBusId(),
+                (unsigned)modules_.full_leg_calibration->auxiliaryBusId());
+  Serial.printf("CALIBRATION_FULL_LEG_SAFE_OFF primary_pending=%s auxiliary_pending=%s "
+                "auxiliary_parked=%s\n",
+                modules_.full_leg_calibration->primarySafeOffPending() ? "YES" : "NO",
+                modules_.full_leg_calibration->auxiliarySafeOffPending() ? "YES" : "NO",
+                modules_.full_leg_calibration->auxiliaryParked() ? "YES" : "NO");
+
+  const calibration::ContactEvidence& min_evidence = modules_.full_leg_calibration->minSideEvidence();
+  const calibration::ContactEvidence& max_evidence = modules_.full_leg_calibration->maxSideEvidence();
+  Serial.printf("CALIBRATION_FULL_LEG_UPPER_MIN measured=%s fine_tick=%u witness_accepted=%s\n",
+                min_evidence.has_measurement ? "YES" : "NO", (unsigned)min_evidence.fine_tick_1,
+                min_evidence.witness.accepted() ? "YES" : "NO");
+  Serial.printf("CALIBRATION_FULL_LEG_UPPER_MAX measured=%s fine_tick=%u witness_accepted=%s\n",
+                max_evidence.has_measurement ? "YES" : "NO", (unsigned)max_evidence.fine_tick_1,
+                max_evidence.witness.accepted() ? "YES" : "NO");
+
+  actuator::OperationalEnvelope upper_envelope{};
+  bool upper_present = false;
+  calibration::JointIdentity upper_identity{};
+  const bool upper_identity_ok =
+      resolveLegJointIdentity(modules_.full_leg_calibration->primaryBusId() != 0
+                                  ? modules_.full_leg_calibration->primaryBusId()
+                                  : 12,
+                              calibration::Leg::LF, calibration::JointKind::UPPER,
+                              &upper_identity);
+  if (min_evidence.has_measurement && max_evidence.has_measurement && upper_identity_ok) {
+    actuator::ContactDerivedEnvelopeRequest req{};
+    req.joint = upper_identity;
+    req.min_side_evidence = min_evidence;
+    req.max_side_evidence = max_evidence;
+    req.min_side_geometry = modules_.actuator_policy->currentGeometryTag();
+    req.max_side_geometry = modules_.actuator_policy->currentGeometryTag();
+    req.safety_margin_ticks = 8;  // conservative placeholder inset; see file NOTE below
+    const actuator::EnvelopeBuildStatus status = actuator::buildContactDerivedEnvelope(
+        *modules_.geometry_profile, actuator::geometry_data::kProvenance, req, &upper_envelope);
+    upper_present = status == actuator::EnvelopeBuildStatus::READY;
+    Serial.printf("CALIBRATION_FULL_LEG_ENVELOPE_UPPER status=%s present=%s min_tick=%u "
+                  "max_tick=%u\n",
+                  actuator::toString(status), upper_present ? "YES" : "NO",
+                  (unsigned)upper_envelope.min_tick, (unsigned)upper_envelope.max_tick);
+  } else {
+    Serial.printf("CALIBRATION_FULL_LEG_ENVELOPE_UPPER status=%s present=NO\n",
+                  upper_identity_ok ? "REJECT_MISSING_CONTACT_EVIDENCE"
+                                    : "CANONICAL_IDENTITY_MISMATCH");
+  }
+
+  // HIP/LOWER: pure geometry arithmetic, no motion, no dependency on the
+  // sequencer above being COMPLETE - computed whenever current q0 transforms
+  // exist. NOTE: required_min/max_urad below is the joint's own FULL URDF
+  // domain (never a fabricated stand/gait figure - see
+  // OperationalEnvelope.h's own file comment on why that number is not
+  // invented here), inset by a fixed conservative margin. This is reported
+  // evidence, not a motion authorization: nothing in this build commands
+  // HIP or LOWER to either bound.
+  constexpr actuator::MicroRad kPlaceholderMarginUrad = 50000;
+  bool hip_present = false;
+  bool lower_present = false;
+  for (int i = 0; i < 2; ++i) {
+    const bool is_hip = (i == 0);
+    const uint8_t bus_id = is_hip ? 13 : 11;
+    const calibration::JointKind kind =
+        is_hip ? calibration::JointKind::HIP : calibration::JointKind::LOWER;
+    const char* label = is_hip ? "HIP" : "LOWER";
+
+    calibration::JointIdentity identity{};
+    if (!resolveLegJointIdentity(bus_id, calibration::Leg::LF, kind, &identity)) {
+      Serial.printf("CALIBRATION_FULL_LEG_ENVELOPE_%s status=CANONICAL_IDENTITY_MISMATCH "
+                    "present=NO\n", label);
+      continue;
+    }
+    const actuator::GeometryJointRecord* joint_record = modules_.geometry_profile->findJoint(identity);
+    const actuator::JointTransform* transform =
+        modules_.actuator_policy->transforms().find(identity, modules_.actuator_policy->currentGeometryTag());
+    if (joint_record == nullptr || transform == nullptr) {
+      Serial.printf("CALIBRATION_FULL_LEG_ENVELOPE_%s status=REJECT_NO_TRANSFORM present=NO\n",
+                    label);
+      continue;
+    }
+    actuator::GeometryDerivedEnvelopeRequest req{};
+    req.joint = identity;
+    req.required_min_urad = joint_record->urdf_lower;
+    req.required_max_urad = joint_record->urdf_upper;
+    req.safety_margin_urad = kPlaceholderMarginUrad;
+    actuator::OperationalEnvelope envelope{};
+    const actuator::EnvelopeBuildStatus status = actuator::buildGeometryDerivedEnvelope(
+        *modules_.geometry_profile, actuator::geometry_data::kProvenance, *transform, req,
+        &envelope);
+    const bool present = status == actuator::EnvelopeBuildStatus::READY;
+    if (is_hip) hip_present = present; else lower_present = present;
+    Serial.printf("CALIBRATION_FULL_LEG_ENVELOPE_%s status=%s present=%s min_tick=%u "
+                  "max_tick=%u margin_urad=%ld\n",
+                  label, actuator::toString(status), present ? "YES" : "NO",
+                  (unsigned)envelope.min_tick, (unsigned)envelope.max_tick,
+                  (long)kPlaceholderMarginUrad);
+  }
+  Serial.println("CALIBRATION_FULL_LEG_ENVELOPE_NOTE HIP/LOWER workspace=FULL_URDF_DOMAIN "
+                 "margin=PLACEHOLDER_PENDING_REVIEWED_STAND_GAIT_SPEC; no motion commanded "
+                 "to either bound by this build");
+
+  const bool leg_pass = upper_present && hip_present && lower_present;
+  Serial.printf("CALIBRATION_FULL_LEG_RESULT leg=LF verdict=%s upper=%s hip=%s lower=%s\n",
+                leg_pass ? "PASS" : "FAIL", upper_present ? "YES" : "NO",
+                hip_present ? "YES" : "NO", lower_present ? "YES" : "NO");
 }
 
 void CommandRouter::printAuthorityStatus() {
@@ -1113,6 +1640,27 @@ void CommandRouter::printServoSafeOff(int id) {
   // no servo even connected.
   servo::SafeOffResult result = modules_.servo_bus->safeOff(id);
   Serial.printf("SERVO_SAFE_OFF id=%d result=%s\n", id, servo::toString(result));
+
+  // CR3 continuation: a manual SAFE_OFF on a bus a motion executor currently
+  // owns must never let that executor resume motion afterward. Cutting
+  // torque alone is not enough — a *_PENDING phase (not yet monitoring
+  // telemetry) would otherwise notice nothing and issue its next planned
+  // write on the following tick. Revoking the permit (rather than calling
+  // either executor's own abort() from here - CommandRouter/Controller may
+  // only read status from the Safe Actuator/Calibration Execution
+  // infrastructure, see check_actuator_infrastructure_wired_fail_closed())
+  // is same-tick effective for exactly the reason @CALIBRATION MOTION ABORT
+  // documents.
+  const uint8_t safe_off_id = static_cast<uint8_t>(id);
+  const bool owns_bus =
+      (modules_.first_motion->active() && modules_.first_motion->busId() == safe_off_id) ||
+      (modules_.full_leg_calibration->active() &&
+       (modules_.full_leg_calibration->primaryBusId() == safe_off_id ||
+        modules_.full_leg_calibration->auxiliaryBusId() == safe_off_id));
+  if (owns_bus) {
+    modules_.motion_permit->revoke(calibration::CalibrationPermitRevokeReason::EXPLICIT);
+    modules_.motion_authorization->revoke();
+  }
 }
 
 }  // namespace core
