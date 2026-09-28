@@ -1100,9 +1100,11 @@ void CommandRouter::printServoRead(int id) {
     return;
   }
 
-  Serial.printf("SERVO_READ id=%d position=%d speed=%d load=%d voltage=%d temp=%d torque=%d\n",
+  Serial.printf("SERVO_READ id=%d position=%d speed=%d load=%d voltage=%d temp=%d torque=%d "
+                "current=%d\n",
                 id, state.present_position, state.present_speed, state.present_load,
-                state.present_voltage, state.present_temperature, state.torque_enable);
+                state.present_voltage, state.present_temperature, state.torque_enable,
+                state.present_current);
 }
 
 void CommandRouter::printServoSafeOff(int id) {

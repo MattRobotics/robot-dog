@@ -166,6 +166,14 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_calibration_motion_permit.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationMotionPermit.cpp"
 
+# CR3 Priority 4: the telemetry/deadman monitor shared by the first-motion
+# executor and the contact-probe engine. Pure: no ServoBus/Arduino/device IO,
+# every sample is synthetic.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -o "$OUT/test_motion_deadman" \
+  "$SCRIPT_DIR/test_motion_deadman.cpp" \
+  "$SKETCH_DIR/src/actuator/MotionDeadman.cpp"
+
 # The OTA suite links the REAL OTA-B gate and the REAL arbiter, so the
 # authorization path it exercises is the shipped one, not a stub.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -202,6 +210,22 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_calibration_execution_engine" \
   "$SCRIPT_DIR/test_calibration_execution_engine.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
+# CR3 Priority 3: the first-motion executor. Links the REAL policy, runtime,
+# arbiter and checked target resolver against a fake backend and synthetic
+# telemetry - the same contract as test_calibration_execution_engine.cpp.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_first_motion_executor" \
+  "$SCRIPT_DIR/test_first_motion_executor.cpp" \
+  "$SKETCH_DIR/src/calibration/FirstMotionExecutor.cpp" \
+  "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
@@ -276,12 +300,14 @@ done
 "$OUT/test_cr3_q0_transform"
 "$OUT/test_cr3_q0_evidence_preparation"
 "$OUT/test_calibration_motion_permit"
+"$OUT/test_motion_deadman"
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_population_evidence"
 "$OUT/test_calibration_manager"
 "$OUT/test_actuator_runtime"
 "$OUT/test_calibration_execution_engine"
+"$OUT/test_first_motion_executor"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"
 "$OUT/test_led_ring_manager_USB_ONLY"

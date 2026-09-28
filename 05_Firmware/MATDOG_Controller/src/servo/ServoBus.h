@@ -198,6 +198,13 @@ class ServoBus {
     int present_voltage = -1;
     int present_temperature = -1;
     int torque_enable = -1;
+    // SMS_STS_PRESENT_CURRENT_L (register 69) - present on this SCServo
+    // family's register map, unlike model/PositionOffset/profile registers
+    // it has no MATDOG bench characterization behind it yet. Exposed raw
+    // (unspecified unit/scale until a real unit measurement pins one down),
+    // read-only, alongside the other telemetry this same call already
+    // fetches - never a new bus transaction of its own.
+    int present_current = -1;
   };
   bool readRuntimeState(int id, RuntimeState* out);
 

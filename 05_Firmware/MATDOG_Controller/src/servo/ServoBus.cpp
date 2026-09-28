@@ -220,6 +220,7 @@ bool ServoBus::readRuntimeState(int id, RuntimeState* out) {
   out->present_voltage     = st_.readByte(static_cast<uint8_t>(id), SMS_STS_PRESENT_VOLTAGE);
   out->present_temperature = st_.readByte(static_cast<uint8_t>(id), SMS_STS_PRESENT_TEMPERATURE);
   out->torque_enable       = st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE);
+  out->present_current     = st_.readWord(static_cast<uint8_t>(id), SMS_STS_PRESENT_CURRENT_L);
 
   return true;
 }
