@@ -6,6 +6,11 @@
 // against a fake backend and synthetic telemetry - the same contract as
 // test_contact_probe_engine.cpp and test_first_motion_executor.cpp.
 //
+// 4-leg generalization: the LF (aux LH_UPPER), RF (aux RH_UPPER), RH (no aux)
+// and LH (no aux) sequences are all driven here. The per-leg bus ids / units
+// below are this test's own ORACLE (config/MATDOG_SERVO_ALLOCATION.yaml),
+// deliberately literal so a wrong dynamic lookup in production cannot hide.
+//
 // NO HARDWARE VALIDATION, and no fabricated physical measurement: every
 // "contact" and every "arrival" in this file is a synthetic value this test
 // constructs, never presented as a real endpoint result.
@@ -15,6 +20,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 
 #include "../../src/actuator/CalibrationGeometryProfileData.h"
 #include "../../src/actuator/OperationalEnvelope.h"
@@ -80,6 +86,37 @@ JointIdentity lhUpper() {
   setPhysicalUnit(&id, "M42");
   return id;
 }
+
+JointIdentity upperOf(Leg leg, const char* unit) {
+  JointIdentity id{};
+  id.leg = leg;
+  id.joint = JointKind::UPPER;
+  setPhysicalUnit(&id, unit);
+  return id;
+}
+
+// The test oracle for the four UPPER servos and the parking matrix Geometry V5
+// currently resolves: LF -> LH_UPPER, RF -> RH_UPPER, RH/LH -> none.
+struct LegFixture {
+  Leg leg;
+  JointIdentity upper;
+  uint8_t upper_bus;
+  bool aux_required;
+  JointIdentity aux;
+  uint8_t aux_bus;
+};
+
+LegFixture fixtureFor(Leg leg) {
+  switch (leg) {
+    case Leg::LF: return {leg, upperOf(Leg::LF, "ELR01"), 12, true, upperOf(Leg::LH, "M42"), 42};
+    case Leg::RF: return {leg, upperOf(Leg::RF, "ELR03"), 22, true, upperOf(Leg::RH, "ELR02"), 32};
+    case Leg::RH: return {leg, upperOf(Leg::RH, "ELR02"), 32, false, JointIdentity{}, 0};
+    case Leg::LH: return {leg, upperOf(Leg::LH, "M42"), 42, false, JointIdentity{}, 0};
+  }
+  return {};
+}
+
+constexpr Leg kAllLegs[4] = {Leg::LF, Leg::RF, Leg::RH, Leg::LH};
 
 CalibrationGeometryProfile boundProfile() {
   CalibrationGeometryProfile profile;
@@ -152,11 +189,13 @@ class FakeActuatorBackend : public actuator::ActuatorBackend {
   BackendWriteOutcome enableTorque(uint8_t bus_id) override {
     ++enable_torque_calls;
     last_bus_id = bus_id;
+    touched[bus_id] = true;
     return enable_torque_result;
   }
   BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick) override {
     ++write_goal_position_calls;
     last_bus_id = bus_id;
+    touched[bus_id] = true;
     last_target_tick = target_tick;
     return write_goal_position_result;
   }
@@ -165,6 +204,7 @@ class FakeActuatorBackend : public actuator::ActuatorBackend {
   int write_goal_position_calls = 0;
   uint8_t last_bus_id = 0;
   uint16_t last_target_tick = 0;
+  bool touched[256] = {false};  // every bus id any write ever addressed
   BackendWriteOutcome enable_torque_result = BackendWriteOutcome::VERIFIED_APPLIED;
   BackendWriteOutcome write_goal_position_result = BackendWriteOutcome::VERIFIED_APPLIED;
 };
@@ -193,19 +233,21 @@ struct Rig {
   }
 };
 
-// Both transforms a full leg run needs on the current installation: the
-// probed joint AND the one named auxiliary.
-void primeTransforms(Rig& rig) {
-  CHECK(rig.policy.transforms().admit(promotedTransform(lfUpper())));
-  CHECK(rig.policy.transforms().admit(promotedTransform(lhUpper())));
+// Every transform a full leg run needs on the current installation: the
+// probed joint AND, when one is required, the one named auxiliary.
+void primeTransforms(Rig& rig, const LegFixture& f) {
+  CHECK(rig.policy.transforms().admit(promotedTransform(f.upper)));
+  if (f.aux_required) CHECK(rig.policy.transforms().admit(promotedTransform(f.aux)));
 }
+void primeTransforms(Rig& rig) { primeTransforms(rig, fixtureFor(Leg::LF)); }
 
 // Mirrors what Controller's own per-tick bootstrap-context refresh does in
 // production: rebuilds the ENTIRE CalibrationBootstrapContext from live
 // state on every call, including the auxiliary-parked fields, which track
 // full.auxiliaryParked() exactly the way Controller reads it from
 // full_leg_calibration_.auxiliaryParked() every tick.
-void refreshBootstrap(Rig& rig, const AuthorityLease& lease, bool auxiliary_parked) {
+void refreshBootstrap(Rig& rig, const AuthorityLease& lease, bool auxiliary_parked,
+                      Leg leg = Leg::LF) {
   actuator::CalibrationBootstrapContext bootstrap{};
   bootstrap.session_active = true;
   bootstrap.origin = CalibrationOrigin::LIVE_SESSION;
@@ -214,7 +256,7 @@ void refreshBootstrap(Rig& rig, const AuthorityLease& lease, bool auxiliary_park
   bootstrap.motion_permit_session_id = 1;
   bootstrap.motion_permit_authority_generation = lease.generation;
   bootstrap.auxiliary_parked = auxiliary_parked;
-  bootstrap.parked_leg = Leg::LF;
+  bootstrap.parked_leg = leg;
   bootstrap.parked_joint = JointKind::UPPER;
   bootstrap.parked_side = ContactSide::MAX_SIDE;
   rig.policy.setBootstrapContext(bootstrap);
@@ -233,48 +275,67 @@ FullLegCalibrationContext liveContext(const AuthorityLease& lease, OperatingMode
   return ctx;
 }
 
-// The exact CR3 LF_UPPER values: MIN/MAX contact and clear targets from the
-// compiled Geometry V5 bundle, and the ONE named auxiliary parked pose
-// (610865 urad, LH_UPPER) the LF_UPPER:MAX endpoint plan requires exactly.
-FullLegCalibrationRequest request() {
+// The Geometry V5 contact targets and the ONE named auxiliary parked pose
+// (610865 urad) - read from the compiled data, exactly as the production
+// plan resolver reads them; the backoff is the generic midpoint rule
+// (contact/2 = halfway back to q0), NOT a per-leg hand-typed number.
+FullLegCalibrationRequest requestFor(const LegFixture& f) {
+  const actuator::CalibrationGeometryProfile profile = boundProfile();
+  const actuator::GeometryEndpointRecord* min_ep =
+      profile.findEndpoint(f.leg, JointKind::UPPER, ContactSide::MIN_SIDE);
+  const actuator::GeometryEndpointRecord* max_ep =
+      profile.findEndpoint(f.leg, JointKind::UPPER, ContactSide::MAX_SIDE);
+  CHECK(min_ep != nullptr && max_ep != nullptr);
   FullLegCalibrationRequest r{};
-  r.probe_joint = lfUpper();
-  r.probe_bus_id = 12;
-  r.endpoint_leg = Leg::LF;
+  r.probe_joint = f.upper;
+  r.probe_bus_id = f.upper_bus;
+  r.endpoint_leg = f.leg;
   r.endpoint_joint = JointKind::UPPER;
-  r.min_approach_urad = -909889;
-  r.min_backoff_urad = -700000;
+  r.min_approach_urad = min_ep->contact;
+  r.min_backoff_urad = min_ep->contact / 2;
   r.min_repeatability_tolerance_ticks = 16;
-  r.max_approach_urad = 2127120;
-  r.max_backoff_urad = 1500000;
+  r.max_approach_urad = max_ep->contact;
+  r.max_backoff_urad = max_ep->contact / 2;
   r.max_repeatability_tolerance_ticks = 16;
-  r.auxiliary_joint = lhUpper();
-  r.auxiliary_bus_id = 42;
-  r.auxiliary_park_target_urad = 610865;
+  r.auxiliary_required = f.aux_required;
+  if (f.aux_required) {
+    r.auxiliary_joint = f.aux;
+    r.auxiliary_bus_id = f.aux_bus;
+    r.auxiliary_park_target_urad = max_ep->auxiliary_target;
+  }
   return r;
 }
 
+FullLegCalibrationRequest request() { return requestFor(fixtureFor(Leg::LF)); }
+
+// +1 when the backoff tick is above the approach tick (stall lies above the
+// approach), -1 otherwise: keeps the synthetic stall between backoff and
+// approach whichever way the joint's URDF direction maps urad to ticks.
+int towardBackoff(uint16_t approach, uint16_t backoff) { return backoff > approach ? 1 : -1; }
+
 // Drives start() through the MIN-side two-pass probe to its COMPLETE
-// terminal (UPPER_MIN_SAFE_OFF), then services that SAFE_OFF so the caller
-// lands at AUX_TORQUE_ENABLE - the common prefix every AUX/MAX-phase test
-// below needs, factored out once rather than repeated per test.
-void driveMinProbeAndSafeOff(Rig& rig, const FullLegCalibrationContext& ctx, uint32_t* t) {
-  const FullLegCalibrationRequest req = request();
-  const uint16_t min_approach = resolvedTick(req.min_approach_urad, lfUpper());
-  const uint16_t min_backoff = resolvedTick(req.min_backoff_urad, lfUpper());
+// terminal (UPPER_MIN_SAFE_OFF), then services that SAFE_OFF (primary only).
+// The caller inspects the phase it lands in: AUX_TORQUE_ENABLE with an
+// auxiliary, UPPER_MAX_PROBE without one.
+void driveMinProbeThenSafeOff(Rig& rig, const LegFixture& f, const FullLegCalibrationContext& ctx,
+                              uint32_t* t) {
+  const FullLegCalibrationRequest req = requestFor(f);
+  const uint16_t min_approach = resolvedTick(req.min_approach_urad, f.upper);
+  const uint16_t min_backoff = resolvedTick(req.min_backoff_urad, f.upper);
+  const int dir = towardBackoff(min_approach, min_backoff);
 
   CHECK(rig.full.start(req, ctx, *t));
   *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, false, false);  // torque enable
   *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, false, false);  // approach1 command
   CHECK_EQ(rig.backend.last_target_tick, min_approach);
-  const uint16_t stall1 = min_approach + 20;
+  const uint16_t stall1 = static_cast<uint16_t>(min_approach + dir * 20);
   *t = 1500; rig.full.update(ctx, *t, true, telemetry(stall1, 1, *t), false, false);
   *t = 3500; rig.full.update(ctx, *t, true, telemetry(stall1, 1, *t), false, false);  // -> backoff
   *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, false, false);  // backoff command
   CHECK_EQ(rig.backend.last_target_tick, min_backoff);
   *t += 90; rig.full.update(ctx, *t, true, telemetry(min_backoff, 1, *t), false, false);  // arrival -> approach2
   *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, false, false);  // approach2 command
-  const uint16_t stall2 = stall1 + 6;
+  const uint16_t stall2 = static_cast<uint16_t>(stall1 + dir * 6);
   *t += 490; rig.full.update(ctx, *t, true, telemetry(stall2, 1, *t), false, false);
   *t += 2000; rig.full.update(ctx, *t, true, telemetry(stall2, 1, *t), false, false);  // -> COMPLETE
 
@@ -282,7 +343,37 @@ void driveMinProbeAndSafeOff(Rig& rig, const FullLegCalibrationContext& ctx, uin
   CHECK_EQ((int)rig.full.status().failure, (int)FullLegCalibrationFailure::NONE);
 
   *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, /*primary=*/true, false);
+}
+
+// The LF-with-auxiliary common prefix every AUX/MAX-phase test below needs.
+void driveMinProbeAndSafeOff(Rig& rig, const FullLegCalibrationContext& ctx, uint32_t* t) {
+  driveMinProbeThenSafeOff(rig, fixtureFor(Leg::LF), ctx, t);
   CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::AUX_TORQUE_ENABLE);
+}
+
+// Drives the MAX-side two-pass probe (already started: phase UPPER_MAX_PROBE)
+// through its COMPLETE terminal, landing in FINAL_SAFE_OFF.
+void driveMaxProbeToFinalSafeOff(Rig& rig, const LegFixture& f,
+                                 const FullLegCalibrationContext& ctx, uint32_t* t) {
+  const FullLegCalibrationRequest req = requestFor(f);
+  const uint16_t max_approach = resolvedTick(req.max_approach_urad, f.upper);
+  const uint16_t max_backoff = resolvedTick(req.max_backoff_urad, f.upper);
+  const int dir = towardBackoff(max_approach, max_backoff);
+
+  *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, false, false);  // MAX torque enable
+  *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, false, false);  // MAX approach1 command
+  CHECK_EQ(rig.backend.last_bus_id, f.upper_bus);
+  CHECK_EQ(rig.backend.last_target_tick, max_approach);
+  const uint16_t stall1 = static_cast<uint16_t>(max_approach + dir * 20);
+  *t += 500; rig.full.update(ctx, *t, true, telemetry(stall1, 1, *t), false, false);
+  *t += 2000; rig.full.update(ctx, *t, true, telemetry(stall1, 1, *t), false, false);  // -> backoff
+  *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, false, false);  // backoff command
+  CHECK_EQ(rig.backend.last_target_tick, max_backoff);
+  *t += 90; rig.full.update(ctx, *t, true, telemetry(max_backoff, 1, *t), false, false);  // -> approach2
+  *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, false, false);  // approach2 command
+  const uint16_t stall2 = static_cast<uint16_t>(stall1 + dir * 6);
+  *t += 490; rig.full.update(ctx, *t, true, telemetry(stall2, 1, *t), false, false);
+  *t += 2000; rig.full.update(ctx, *t, true, telemetry(stall2, 1, *t), false, false);  // -> probe COMPLETE
 }
 
 // ---------------------------------------------------------------------------
@@ -694,6 +785,291 @@ void test_witness_empty_before_complete() {
   CHECK(!rig.full.maxSideEvidence().has_measurement);
 }
 
+// ---------------------------------------------------------------------------
+// 4-leg generalization. The oracle above (fixtureFor) says LF -> aux LH_UPPER,
+// RF -> aux RH_UPPER, RH/LH -> no auxiliary. Every leg is driven end to end.
+// ---------------------------------------------------------------------------
+
+// Drives one complete, successful full-leg sequence for `f` and returns the
+// terminal phase. Asserts along the way that the auxiliary phases happen if,
+// and only if, the leg needs an auxiliary, and that no write ever addresses
+// any bus other than the leg's own UPPER (and, if required, its ONE auxiliary).
+void runCompleteLeg(Rig& rig, const LegFixture& f, uint32_t* t) {
+  primeTransforms(rig, f);
+  const AuthorityLease lease =
+      grant(rig.arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+  refreshBootstrap(rig, lease, false, f.leg);
+  const FullLegCalibrationContext ctx = liveContext(lease, OperatingMode::MAINTENANCE);
+  const FullLegCalibrationRequest req = requestFor(f);
+
+  driveMinProbeThenSafeOff(rig, f, ctx, t);
+  CHECK_EQ(rig.full.primaryBusId(), f.upper_bus);
+  CHECK_EQ(rig.full.auxiliaryBusId(), f.aux_bus);  // 0 when no auxiliary
+  CHECK_EQ(rig.full.auxiliaryRequired(), f.aux_required);
+
+  if (f.aux_required) {
+    CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::AUX_TORQUE_ENABLE);
+    const uint16_t aux_target = resolvedTick(req.auxiliary_park_target_urad, f.aux);
+    *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, false, false);
+    CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::AUX_MOVE_PENDING);
+    CHECK_EQ(rig.backend.last_bus_id, f.aux_bus);
+    *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, false, false);
+    CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::AUX_MOVE_MONITORING);
+    CHECK_EQ(rig.backend.last_bus_id, f.aux_bus);
+    CHECK_EQ(rig.backend.last_target_tick, aux_target);
+    *t += 200; rig.full.update(ctx, *t, true, telemetry(aux_target, 1, *t), false, false);
+    CHECK(rig.full.auxiliaryParked());
+    refreshBootstrap(rig, lease, true, f.leg);
+  } else {
+    // NOT_NEEDED: straight to the MAX probe, no AUX_* phase, never parked.
+    CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::UPPER_MAX_PROBE);
+    CHECK(!rig.full.auxiliaryParked());
+    CHECK(!rig.full.auxiliarySafeOffPending());
+    refreshBootstrap(rig, lease, false, f.leg);
+  }
+  CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::UPPER_MAX_PROBE);
+
+  driveMaxProbeToFinalSafeOff(rig, f, ctx, t);
+  CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::FINAL_SAFE_OFF);
+  CHECK_EQ((int)rig.full.status().failure, (int)FullLegCalibrationFailure::NONE);
+  CHECK(rig.full.primarySafeOffPending());
+  CHECK_EQ(rig.full.auxiliarySafeOffPending(), f.aux_required);
+
+  if (f.aux_required) {
+    // Both must be verified: the primary alone is not enough.
+    *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, true, false);
+    CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::FINAL_SAFE_OFF);
+    *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, false, true);
+    CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::FINAL_SAFE_OFF);
+    *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, true, true);
+  } else {
+    // The auxiliary flag is irrelevant and must not be needed: the primary
+    // alone completes the leg.
+    *t += 10; rig.full.update(ctx, *t, false, TelemetrySample{}, true, false);
+  }
+  CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::COMPLETE);
+  CHECK(!rig.full.active());
+  CHECK(rig.full.minSideEvidence().has_measurement);
+  CHECK(rig.full.maxSideEvidence().has_measurement);
+  CHECK(rig.full.minSideEvidence().witness.accepted());
+  CHECK(rig.full.maxSideEvidence().witness.accepted());
+  CHECK((int)rig.full.minSideEvidence().key.leg == (int)f.leg);
+  CHECK((int)rig.full.maxSideEvidence().key.leg == (int)f.leg);
+
+  // Bus discipline: writes reached ONLY the primary and (if required) the
+  // one named auxiliary; never bus 0.
+  int touched_count = 0;
+  for (int b = 0; b < 256; ++b) {
+    if (!rig.backend.touched[b]) continue;
+    ++touched_count;
+    CHECK(b == f.upper_bus || (f.aux_required && b == f.aux_bus));
+  }
+  CHECK(!rig.backend.touched[0]);
+  CHECK_EQ(touched_count, f.aux_required ? 2 : 1);
+}
+
+void test_every_leg_completes_with_the_right_auxiliary_matrix() {
+  for (const Leg leg : kAllLegs) {
+    g_case = "4-leg complete sequence";
+    Rig rig;
+    uint32_t t = 1000;
+    runCompleteLeg(rig, fixtureFor(leg), &t);
+  }
+}
+
+// The evidence a leg produces is bound to ITS OWN leg's UPPER identity and a
+// READY contact-derived envelope builds from it for all four legs.
+void test_every_leg_evidence_builds_a_ready_upper_envelope() {
+  for (const Leg leg : kAllLegs) {
+    g_case = "4-leg evidence builds envelope";
+    const LegFixture f = fixtureFor(leg);
+    Rig rig;
+    uint32_t t = 1000;
+    runCompleteLeg(rig, f, &t);
+    actuator::ContactDerivedEnvelopeRequest env_req{};
+    env_req.joint = f.upper;
+    env_req.min_side_evidence = rig.full.minSideEvidence();
+    env_req.max_side_evidence = rig.full.maxSideEvidence();
+    env_req.min_side_geometry =
+        actuator::geometryProvenanceTag(actuator::geometry_data::kProvenance);
+    env_req.max_side_geometry = env_req.min_side_geometry;
+    env_req.safety_margin_ticks = 8;
+    actuator::OperationalEnvelope envelope{};
+    const actuator::EnvelopeBuildStatus st = actuator::buildContactDerivedEnvelope(
+        rig.profile, actuator::geometry_data::kProvenance, env_req, &envelope);
+    CHECK(st == actuator::EnvelopeBuildStatus::READY);
+    CHECK(envelope.present);
+    CHECK(envelope.ordered());
+  }
+}
+
+void test_start_accepts_no_auxiliary_and_rejects_bad_required_auxiliary() {
+  g_case = "start(): auxiliary requirement validation";
+  const LegFixture rh = fixtureFor(Leg::RH);
+  const LegFixture lf = fixtureFor(Leg::LF);
+
+  {  // no auxiliary: empty identity + bus 0 is accepted
+    Rig rig;
+    primeTransforms(rig, rh);
+    const AuthorityLease lease =
+        grant(rig.arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+    refreshBootstrap(rig, lease, false, rh.leg);
+    const FullLegCalibrationContext ctx = liveContext(lease, OperatingMode::MAINTENANCE);
+    FullLegCalibrationRequest r = requestFor(rh);
+    CHECK(!r.auxiliary_required);
+    CHECK_EQ(r.auxiliary_bus_id, 0);
+    CHECK(!r.auxiliary_joint.unitKnown());
+    CHECK(rig.full.start(r, ctx, 1000));
+  }
+  {  // no auxiliary: a stray non-empty auxiliary field is ignored, never used
+    Rig rig;
+    primeTransforms(rig, rh);
+    const AuthorityLease lease =
+        grant(rig.arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+    refreshBootstrap(rig, lease, false, rh.leg);
+    const FullLegCalibrationContext ctx = liveContext(lease, OperatingMode::MAINTENANCE);
+    FullLegCalibrationRequest r = requestFor(rh);
+    r.auxiliary_joint = fixtureFor(Leg::LH).upper;
+    r.auxiliary_bus_id = 42;
+    CHECK(rig.full.start(r, ctx, 1000));
+    CHECK_EQ(rig.full.auxiliaryBusId(), 0);
+    CHECK(!rig.full.auxiliarySafeOffPending());
+  }
+  {  // aux required, but empty identity
+    Rig rig;
+    primeTransforms(rig, lf);
+    const AuthorityLease lease =
+        grant(rig.arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+    refreshBootstrap(rig, lease, false, lf.leg);
+    const FullLegCalibrationContext ctx = liveContext(lease, OperatingMode::MAINTENANCE);
+    FullLegCalibrationRequest r = requestFor(lf);
+    r.auxiliary_joint = JointIdentity{};
+    CHECK(!rig.full.start(r, ctx, 1000));
+  }
+  {  // aux required, but bus 0
+    Rig rig;
+    primeTransforms(rig, lf);
+    const AuthorityLease lease =
+        grant(rig.arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+    refreshBootstrap(rig, lease, false, lf.leg);
+    const FullLegCalibrationContext ctx = liveContext(lease, OperatingMode::MAINTENANCE);
+    FullLegCalibrationRequest r = requestFor(lf);
+    r.auxiliary_bus_id = 0;
+    CHECK(!rig.full.start(r, ctx, 1000));
+  }
+  {  // aux required, but the same bus as the primary
+    Rig rig;
+    primeTransforms(rig, lf);
+    const AuthorityLease lease =
+        grant(rig.arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+    refreshBootstrap(rig, lease, false, lf.leg);
+    const FullLegCalibrationContext ctx = liveContext(lease, OperatingMode::MAINTENANCE);
+    FullLegCalibrationRequest r = requestFor(lf);
+    r.auxiliary_bus_id = r.probe_bus_id;
+    CHECK(!rig.full.start(r, ctx, 1000));
+  }
+  {  // the default is fail-closed: a value-initialised request requires an auxiliary
+    FullLegCalibrationRequest r{};
+    CHECK(r.auxiliary_required);
+  }
+}
+
+// Without an auxiliary the final SAFE_OFF services exactly ONE servo: the
+// executor asks for the primary only and never reports the auxiliary pending,
+// so the Controller can never be led to safeOff(0).
+void test_no_auxiliary_final_safe_off_is_primary_only_and_never_bus_zero() {
+  g_case = "no-aux SAFE_OFF primary only";
+  for (const Leg leg : {Leg::RH, Leg::LH}) {
+    const LegFixture f = fixtureFor(leg);
+    Rig rig;
+    uint32_t t = 1000;
+    primeTransforms(rig, f);
+    const AuthorityLease lease =
+        grant(rig.arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+    refreshBootstrap(rig, lease, false, f.leg);
+    const FullLegCalibrationContext ctx = liveContext(lease, OperatingMode::MAINTENANCE);
+
+    driveMinProbeThenSafeOff(rig, f, ctx, &t);
+    CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::UPPER_MAX_PROBE);
+    rig.full.abort();  // mid MAX probe
+    CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::FINAL_SAFE_OFF);
+    CHECK(rig.full.primarySafeOffPending());
+    CHECK(!rig.full.auxiliarySafeOffPending());
+    CHECK_EQ(rig.full.auxiliaryBusId(), 0);
+    t += 10; rig.full.update(ctx, t, false, TelemetrySample{}, true, false);
+    CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::FAILED);
+    CHECK_EQ((int)rig.full.status().failure, (int)FullLegCalibrationFailure::OPERATOR_ABORT);
+  }
+}
+
+// A no-aux leg whose MAX probe is refused by the policy at its first command
+// (here: the approach target lies outside the URDF domain) must SAFE_OFF the
+// primary alone and end FAILED - never an AUX_* phase, never a stuck
+// FINAL_SAFE_OFF, and the already-witnessed MIN side stays untouched.
+void test_no_auxiliary_max_probe_refused_ends_failed_after_primary_safe_off() {
+  g_case = "no-aux MAX probe refused";
+  const LegFixture f = fixtureFor(Leg::RH);
+  Rig rig;
+  primeTransforms(rig, f);
+  const AuthorityLease lease =
+      grant(rig.arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+  refreshBootstrap(rig, lease, false, f.leg);
+  const FullLegCalibrationContext ctx = liveContext(lease, OperatingMode::MAINTENANCE);
+  FullLegCalibrationRequest req = requestFor(f);
+  req.max_approach_urad = 900000000;  // far outside every URDF domain
+
+  uint32_t t = 1000;
+  const uint16_t min_approach = resolvedTick(req.min_approach_urad, f.upper);
+  const uint16_t min_backoff = resolvedTick(req.min_backoff_urad, f.upper);
+  const int dir = towardBackoff(min_approach, min_backoff);
+  CHECK(rig.full.start(req, ctx, t));
+  t += 10; rig.full.update(ctx, t, false, TelemetrySample{}, false, false);
+  t += 10; rig.full.update(ctx, t, false, TelemetrySample{}, false, false);
+  const uint16_t stall1 = static_cast<uint16_t>(min_approach + dir * 20);
+  t = 1500; rig.full.update(ctx, t, true, telemetry(stall1, 1, t), false, false);
+  t = 3500; rig.full.update(ctx, t, true, telemetry(stall1, 1, t), false, false);
+  t += 10; rig.full.update(ctx, t, false, TelemetrySample{}, false, false);
+  t += 90; rig.full.update(ctx, t, true, telemetry(min_backoff, 1, t), false, false);
+  t += 10; rig.full.update(ctx, t, false, TelemetrySample{}, false, false);
+  const uint16_t stall2 = static_cast<uint16_t>(stall1 + dir * 6);
+  t += 490; rig.full.update(ctx, t, true, telemetry(stall2, 1, t), false, false);
+  t += 2000; rig.full.update(ctx, t, true, telemetry(stall2, 1, t), false, false);
+  CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::UPPER_MIN_SAFE_OFF);
+  t += 10; rig.full.update(ctx, t, false, TelemetrySample{}, true, false);
+  CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::UPPER_MAX_PROBE);
+
+  // MAX torque enable, then the refused approach command.
+  t += 10; rig.full.update(ctx, t, false, TelemetrySample{}, false, false);
+  t += 10; rig.full.update(ctx, t, false, TelemetrySample{}, false, false);
+  CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::FINAL_SAFE_OFF);
+  CHECK_EQ((int)rig.full.status().failure, (int)FullLegCalibrationFailure::UPPER_MAX_PROBE_FAILED);
+  CHECK(rig.full.primarySafeOffPending());
+  CHECK(!rig.full.auxiliarySafeOffPending());
+  CHECK(rig.full.minSideEvidence().has_measurement);
+  CHECK(!rig.full.maxSideEvidence().has_measurement);
+
+  t += 10; rig.full.update(ctx, t, false, TelemetrySample{}, true, false);
+  CHECK_EQ((int)rig.full.status().phase, (int)FullLegCalibrationPhase::FAILED);
+  CHECK(!rig.backend.touched[0]);
+}
+
+// RF's auxiliary is RH_UPPER (bus 32), never LH_UPPER, and its park pose is
+// resolved through RH_UPPER's own transform (dir -1), not LF's.
+void test_rf_auxiliary_is_rh_upper_with_its_own_transform() {
+  g_case = "RF aux is RH_UPPER bus 32";
+  const LegFixture f = fixtureFor(Leg::RF);
+  CHECK_EQ(f.upper_bus, 22);
+  CHECK_EQ(f.aux_bus, 32);
+  CHECK((int)f.aux.leg == (int)Leg::RH);
+  Rig rig;
+  uint32_t t = 1000;
+  runCompleteLeg(rig, f, &t);
+  CHECK(rig.backend.touched[22]);
+  CHECK(rig.backend.touched[32]);
+  CHECK(!rig.backend.touched[42]);
+  CHECK(!rig.backend.touched[12]);
+}
+
 }  // namespace
 
 int main() {
@@ -709,6 +1085,12 @@ int main() {
   test_second_start_refused_while_active();
   test_bus_id_and_parked_accessors();
   test_witness_empty_before_complete();
+  test_every_leg_completes_with_the_right_auxiliary_matrix();
+  test_every_leg_evidence_builds_a_ready_upper_envelope();
+  test_start_accepts_no_auxiliary_and_rejects_bad_required_auxiliary();
+  test_no_auxiliary_final_safe_off_is_primary_only_and_never_bus_zero();
+  test_no_auxiliary_max_probe_refused_ends_failed_after_primary_safe_off();
+  test_rf_auxiliary_is_rh_upper_with_its_own_transform();
 
   std::printf("test_full_leg_calibration_executor: %d checks, %d failures\n", g_checks,
              g_failures);

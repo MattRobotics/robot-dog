@@ -56,11 +56,17 @@ bool FullLegCalibrationExecutor::start(const FullLegCalibrationRequest& request,
                                        uint32_t now_ms) {
   if (active()) return false;
 
+  // The auxiliary fields are only judged when an auxiliary is actually
+  // required: a NOT_NEEDED MAX side has no auxiliary identity and no auxiliary
+  // bus, and that must not be a start() refusal.
+  const bool auxiliary_ok =
+      !request.auxiliary_required ||
+      (request.auxiliary_joint.valid() && request.auxiliary_joint.unitKnown() &&
+       request.auxiliary_bus_id != 0 && request.probe_bus_id != request.auxiliary_bus_id);
+
   if (policy_ == nullptr || runtime_ == nullptr || engine_ == nullptr || geometry_ == nullptr ||
       expected_provenance_ == nullptr || !request.probe_joint.valid() ||
-      !request.probe_joint.unitKnown() || !request.auxiliary_joint.valid() ||
-      !request.auxiliary_joint.unitKnown() || request.probe_bus_id == 0 ||
-      request.auxiliary_bus_id == 0 || request.probe_bus_id == request.auxiliary_bus_id ||
+      !request.probe_joint.unitKnown() || !auxiliary_ok || request.probe_bus_id == 0 ||
       request.min_repeatability_tolerance_ticks == 0 ||
       request.max_repeatability_tolerance_ticks == 0) {
     request_ = request;
@@ -147,9 +153,20 @@ void FullLegCalibrationExecutor::update(const FullLegCalibrationContext& context
       return;
     case FullLegCalibrationPhase::UPPER_MIN_SAFE_OFF:
       if (primary_safe_off_verified) {
-        status_.phase = (status_.failure == FullLegCalibrationFailure::NONE)
-                            ? FullLegCalibrationPhase::AUX_TORQUE_ENABLE
-                            : FullLegCalibrationPhase::FAILED;
+        if (status_.failure != FullLegCalibrationFailure::NONE) {
+          status_.phase = FullLegCalibrationPhase::FAILED;
+        } else if (request_.auxiliary_required) {
+          status_.phase = FullLegCalibrationPhase::AUX_TORQUE_ENABLE;
+        } else if (startMaxProbe(context, now_ms)) {
+          // NOT_NEEDED MAX side: no AUX_TORQUE_ENABLE / AUX_MOVE_* at all.
+          status_.phase = FullLegCalibrationPhase::UPPER_MAX_PROBE;
+        } else {
+          // The primary's SAFE_OFF was just verified, but a probe that
+          // refused to start may not have enabled torque either way: FINAL
+          // SAFE_OFF re-verifies the primary (idempotent, never wrong).
+          status_.failure = FullLegCalibrationFailure::UPPER_MAX_PROBE_FAILED;
+          status_.phase = FullLegCalibrationPhase::FINAL_SAFE_OFF;
+        }
       }
       return;
     case FullLegCalibrationPhase::AUX_TORQUE_ENABLE:
@@ -166,7 +183,10 @@ void FullLegCalibrationExecutor::update(const FullLegCalibrationContext& context
       if (!probe_.active()) handleMaxProbeTerminal();
       return;
     case FullLegCalibrationPhase::FINAL_SAFE_OFF:
-      if (primary_safe_off_verified && auxiliary_safe_off_verified) {
+      // Without an auxiliary the primary alone is the whole population: the
+      // auxiliary flag is not consulted (and auxiliaryBusId() is 0).
+      if (primary_safe_off_verified &&
+          (!request_.auxiliary_required || auxiliary_safe_off_verified)) {
         status_.phase = (status_.failure == FullLegCalibrationFailure::NONE)
                             ? FullLegCalibrationPhase::COMPLETE
                             : FullLegCalibrationPhase::FAILED;
@@ -177,6 +197,22 @@ void FullLegCalibrationExecutor::update(const FullLegCalibrationContext& context
     case FullLegCalibrationPhase::FAILED:
       return;
   }
+}
+
+bool FullLegCalibrationExecutor::startMaxProbe(const FullLegCalibrationContext& context,
+                                               uint32_t now_ms) {
+  // probe_ is terminal (COMPLETE) from the MIN side, so active() is false and
+  // start() is callable again on the SAME owned engine.
+  ContactProbeRequest max_request{};
+  max_request.joint = request_.probe_joint;
+  max_request.bus_id = request_.probe_bus_id;
+  max_request.endpoint_leg = request_.endpoint_leg;
+  max_request.endpoint_joint = request_.endpoint_joint;
+  max_request.endpoint_side = ContactSide::MAX_SIDE;
+  max_request.approach_target_urad = request_.max_approach_urad;
+  max_request.backoff_target_urad = request_.max_backoff_urad;
+  max_request.repeatability_tolerance_ticks = request_.max_repeatability_tolerance_ticks;
+  return probe_.start(max_request, toContactProbeContext(context), now_ms);
 }
 
 void FullLegCalibrationExecutor::handleMinProbeTerminal() {
@@ -304,28 +340,17 @@ void FullLegCalibrationExecutor::stepAuxMoveMonitoring(const FullLegCalibrationC
   switch (verdict) {
     case actuator::MotionDeadmanVerdict::CONTINUE:
       return;
-    case actuator::MotionDeadmanVerdict::ARRIVED: {
+    case actuator::MotionDeadmanVerdict::ARRIVED:
       // The auxiliary now holds its parked pose (torque stays ON - that IS
-      // the park); start the SAME owned probe_ again, this time for the
-      // MAX side. probe_ is terminal (COMPLETE) from the MIN side, so
-      // active() is false and start() is callable.
-      ContactProbeRequest max_request{};
-      max_request.joint = request_.probe_joint;
-      max_request.bus_id = request_.probe_bus_id;
-      max_request.endpoint_leg = request_.endpoint_leg;
-      max_request.endpoint_joint = request_.endpoint_joint;
-      max_request.endpoint_side = ContactSide::MAX_SIDE;
-      max_request.approach_target_urad = request_.max_approach_urad;
-      max_request.backoff_target_urad = request_.max_backoff_urad;
-      max_request.repeatability_tolerance_ticks = request_.max_repeatability_tolerance_ticks;
-      if (!probe_.start(max_request, toContactProbeContext(context), now_ms)) {
+      // the park); start the SAME owned probe_ again, this time for the MAX
+      // side.
+      if (!startMaxProbe(context, now_ms)) {
         status_.failure = FullLegCalibrationFailure::UPPER_MAX_PROBE_FAILED;
         status_.phase = FullLegCalibrationPhase::FINAL_SAFE_OFF;
         return;
       }
       status_.phase = FullLegCalibrationPhase::UPPER_MAX_PROBE;
       return;
-    }
     case actuator::MotionDeadmanVerdict::STALLED:
       status_.failure = FullLegCalibrationFailure::AUX_MOVE_STALLED;
       break;

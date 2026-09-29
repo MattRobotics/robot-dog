@@ -1122,6 +1122,19 @@ def check_first_motion_command_wiring(files):
             end = len(handle)
         return handle[start:end]
 
+    def branch_for_marker(marker):
+        """Branch whose opening condition contains `marker` (whitespace-
+        tolerant), up to the next '} else if'."""
+        normalized = re.sub(r"\s+", " ", handle)
+        needle = re.sub(r"\s+", " ", marker)
+        start = normalized.find(needle)
+        if start < 0:
+            return ""
+        end = normalized.find("} else if", start + len(needle))
+        if end < 0:
+            end = len(normalized)
+        return normalized[start:end]
+
     # ------------------------------------------------------------------
     # Exact first-motion command: no parser, no arbitrary servo/delta.
     # ------------------------------------------------------------------
@@ -1145,6 +1158,8 @@ def check_first_motion_command_wiring(files):
             "identity.leg != calibration::Leg::LF",
             "identity.joint != calibration::JointKind::UPPER",
             "modules_.geometry_profile->withinDirectionVerifyEnvelope(identity, 16)",
+            "modules_.calibration->status().leg != calibration::Leg::LF",
+            "REASON=ACTIVE_SESSION_IS_NOT_LF",
             "request.bus_id = kFirstMotionBusId;",
             "request.delta_ticks = 16;",
             "modules_.motion_permit->active()",
@@ -1217,13 +1232,18 @@ def check_first_motion_command_wiring(files):
                      f"the first-motion budget must remain fixed at 16 ticks")
 
     # ------------------------------------------------------------------
-    # Session start must reuse current Q0 population evidence.
+    # Session start must reuse current Q0 population evidence. It is the
+    # four-leg command: the leg comes ONLY from the strict matchLegCommand()
+    # table (see check_full_leg_calibration_wiring), never from a parser.
     # ------------------------------------------------------------------
-    session_cmd = "@CALIBRATION SESSION START LF CONFIRM_CURRENT_Q0"
-    if handle.count(f'"{session_cmd}"') != 1:
-        fail(f"{router_path}: exact CR3 session-start command must appear exactly once")
+    session_marker = ('matchLegCommand(upper, "@CALIBRATION SESSION START ", '
+                      '" CONFIRM_CURRENT_Q0"')
+    if handle.count('"@CALIBRATION SESSION START ') != 1 or \
+            not contains_ws(handle, session_marker):
+        fail(f"{router_path}: the session-start command must appear exactly once in "
+             f"handleLine(), as the strict four-leg matchLegCommand() match")
 
-    session = branch_for(session_cmd)
+    session = branch_for_marker(session_marker)
     if not session:
         fail(f"{router_path}: CR3 session-start branch not found")
     else:
@@ -1233,9 +1253,10 @@ def check_first_motion_command_wiring(files):
             "modules_.actuator_policy->currentGeometryTag()",
             "modules_.actuator_policy->transforms().size()",
             "calibration::startCalibrationSessionFromQ0Evidence(",
-            "calibration::Leg::LF",
+            "command_leg",
+            "modules_.calibration->status().leg != command_leg",
         ):
-            if token not in session:
+            if not contains_ws(session, token):
                 fail(f"{router_path}: session-start branch missing required gate {token!r}")
 
         for token in ("EnableTorque", "writeGoalPosition", "safeOff(",
@@ -1289,6 +1310,303 @@ def check_first_motion_command_wiring(files):
     if re.search(r"hardware_motion_authorized\s*=\s*true", router):
         fail(f"{router_path}: command surface attempts to enable final global "
              f"hardware_motion_authorized; CR3 calibration permit must remain separate")
+
+
+def check_full_leg_calibration_wiring(files):
+    """Four-leg Full Calibration: command, Controller and finalizer wiring.
+
+    One build must calibrate LF, RF, RH and LH in one session, so the leg has
+    to be an input of exactly two strict commands and NOTHING else in the
+    path may be typed per leg:
+      - matchLegCommand() is a table of exactly the four legs and an equality
+        test - no parser, no prefix match, no number;
+      - the SESSION START / FULL LEG branches name the leg only as
+        `command_leg`; bus ids, identities, MIN/MAX endpoints, the auxiliary
+        decision and the re-approach point come from resolveFullLegPlan();
+      - exactly one full_leg_calibration->start() exists, armed BEFORE
+        full_leg_run->arm() can be reached;
+      - Controller closes the evidence lifecycle from ONE pure finalizer, on
+        every terminal executor, with the production parameters that are
+        pinned UNAPPROVED (no approved stand/gait spec exists), so a hardware
+        run can end at HARDWARE_CONTACT_CALIBRATED and never at
+        FINAL_OPERATIONAL_ENVELOPE_ACCEPTED;
+      - JointLimit admission stays confined to the policy units and that
+        finalizer.
+    """
+    by_name = {path.name: (path, code) for path, code in files}
+    needed = ("CommandRouter.cpp", "Controller.cpp", "FullLegCalibrationFinalizer.h",
+              "FullLegCalibrationFinalizer.cpp", "FullLegCalibrationPlan.cpp",
+              "FullLegCalibrationExecutor.h")
+    missing = [n for n in needed if n not in by_name]
+    if missing:
+        fail(f"four-leg Full Calibration units missing: {missing}")
+        return
+    router_path, router = by_name["CommandRouter.cpp"]
+    controller_path, controller = by_name["Controller.cpp"]
+    fin_h_path, fin_h = by_name["FullLegCalibrationFinalizer.h"]
+    fin_c_path, fin_c = by_name["FullLegCalibrationFinalizer.cpp"]
+    plan_c_path, plan_c = by_name["FullLegCalibrationPlan.cpp"]
+
+    normalize = lambda text: re.sub(r"\s+", " ", text)
+    parsers = ("sscanf(", "strtol(", "atoi(", ".toInt(", ".substring(", ".indexOf(",
+               ".startsWith(", ".endsWith(")
+    writers = ("writeGoalPosition(", "enableTorqueOn(", "EnableTorque", "safeOff(",
+               "->plan(", ".plan(", "->commit(", ".commit(", "->execute(", ".execute(")
+
+    # ---- the strict four-token matcher ------------------------------------
+    matcher = re.search(r"bool matchLegCommand\(.*?\n\}", router, re.DOTALL)
+    if not matcher:
+        fail(f"{router_path}: matchLegCommand() not found")
+    else:
+        body = matcher.group(0)
+        entries = re.findall(r'\{"([A-Z]+)",\s*calibration::Leg::([A-Z]+)\}', body)
+        if entries != [("LF", "LF"), ("RF", "RF"), ("RH", "RH"), ("LH", "LH")]:
+            fail(f"{router_path}: matchLegCommand() table must be exactly "
+                 f"LF/RF/RH/LH mapped to their own calibration::Leg, got {entries}")
+        if "line == candidate" not in body:
+            fail(f"{router_path}: matchLegCommand() must compare the whole line for "
+                 f"equality")
+        for token in parsers:
+            if token in body:
+                fail(f"{router_path}: matchLegCommand() contains {token!r}; the leg "
+                     f"token must be an exact table match, never parsed")
+
+    handle_match = re.search(
+        r"void CommandRouter::handleLine\(String line\)\s*\{(.*?)\n\}", router, re.DOTALL)
+    if not handle_match:
+        fail(f"{router_path}: handleLine() not found for four-leg command audit")
+        return
+    handle = normalize(handle_match.group(1))
+
+    if handle.count("matchLegCommand(") != 2:
+        fail(f"{router_path}: handleLine() must call matchLegCommand() exactly twice "
+             f"(SESSION START, FULL LEG); found {handle.count('matchLegCommand(')}")
+    for prefix in ("@CALIBRATION FULL LEG ", "@CALIBRATION SESSION START "):
+        if handle.count(f'"{prefix}"') != 1:
+            fail(f"{router_path}: the {prefix.strip()!r} prefix must appear exactly once "
+                 f"in handleLine()")
+        if f'startsWith("{prefix}' in handle:
+            fail(f"{router_path}: {prefix.strip()!r} may not use startsWith(); the leg "
+                 f"token must stay a strict four-token match")
+
+    def branch(marker):
+        needle = normalize(marker)
+        start = handle.find(needle)
+        if start < 0:
+            return ""
+        end = handle.find("} else if", start + len(needle))
+        return handle[start:end if end >= 0 else len(handle)]
+
+    session = branch('matchLegCommand(upper, "@CALIBRATION SESSION START "')
+    full = branch('matchLegCommand(upper, "@CALIBRATION FULL LEG "')
+    if not session or not full:
+        fail(f"{router_path}: SESSION START / FULL LEG four-leg branches not found")
+        return
+
+    # ---- SESSION START: cleanup gates between legs ------------------------
+    for token in ("modules_.operating_mode->mode() != OperatingMode::MAINTENANCE",
+                  "modules_.system_state->systemHealth() != SystemHealth::READY",
+                  "motionExecutorBusy()",
+                  "modules_.full_leg_run->armed",
+                  "modules_.calibration->sessionLive()",
+                  "modules_.motion_permit->active()",
+                  "modules_.authority->current() != ActuatorAuthority::NONE",
+                  "modules_.motion_authorization->revoke()",
+                  "modules_.calibration->status().leg != command_leg",
+                  "modules_.calibration->abortSession()"):
+        if token not in session:
+            fail(f"{router_path}: SESSION START branch missing between-leg gate {token!r}")
+
+    # ---- FULL LEG ----------------------------------------------------------
+    for token in ("modules_.calibration->status().state != calibration::SessionState::ACTIVE",
+                  "modules_.calibration->status().leg != command_leg",
+                  "modules_.motion_permit->active()",
+                  "modules_.motion_authorization->operator_authorized",
+                  "modules_.motion_authorization->token.valid()",
+                  "modules_.first_motion->active() || modules_.full_leg_calibration->active()",
+                  "modules_.full_leg_run->armed",
+                  "calibration::resolveFullLegPlan(",
+                  "actuator::geometry_data::kProvenance",
+                  "modules_.actuator_policy->transforms(), command_leg, &plan",
+                  "plan_status != calibration::FullLegPlanStatus::OK",
+                  "context.session_active = modules_.calibration->sessionLive()",
+                  "context.motion_permit_active = modules_.motion_permit->active()",
+                  "context.authority = modules_.authority->current()",
+                  "context.authority_generation = modules_.authority->generation()",
+                  "context.authority_inhibited = modules_.authority->inhibited()",
+                  "modules_.full_leg_calibration->start(plan.request, context, millis())",
+                  "modules_.full_leg_run->arm(plan,"):
+        if token not in full:
+            fail(f"{router_path}: FULL LEG branch missing pinned token {token!r}")
+    start_at = full.find("modules_.full_leg_calibration->start(")
+    arm_at = full.find("modules_.full_leg_run->arm(")
+    if start_at < 0 or arm_at < 0 or arm_at < start_at:
+        fail(f"{router_path}: FULL LEG must arm the run record only AFTER the executor "
+             f"accepted start()")
+
+    for name, text in (("SESSION START", session), ("FULL LEG", full)):
+        for token in parsers:
+            if token in text:
+                fail(f"{router_path}: {name} branch contains runtime parser {token!r}")
+        for token in writers:
+            if token in text:
+                fail(f"{router_path}: {name} branch contains write/transaction "
+                     f"primitive {token!r}; it may only call the executor's start()")
+        if re.search(r"calibration::Leg::[A-Z]", text):
+            fail(f"{router_path}: {name} branch names a leg literal; the leg may only "
+                 f"be `command_leg`")
+        if "-700000" in text or "findCanonical(" in text or "kFirstMotionBusId" in text:
+            fail(f"{router_path}: {name} branch hard-codes a per-leg bus/backoff value; "
+                 f"resolveFullLegPlan() is the only source")
+        if re.search(r"(?<![\w.])(?:1[1-3]|2[1-3]|3[1-3]|4[1-3]|51)(?![\w.])", text):
+            fail(f"{router_path}: {name} branch contains a literal servo bus id")
+    if re.search(r"(?:request|plan)\.\w+\s*=[^=]", full):
+        fail(f"{router_path}: FULL LEG branch assigns into the plan/request; the plan "
+             f"must come whole from resolveFullLegPlan()")
+    if "modules_.full_leg_calibration->start(" in session or \
+            "modules_.first_motion->start(" in session:
+        fail(f"{router_path}: SESSION START may not start an executor")
+
+    starts = sum(code.count("modules_.full_leg_calibration->start(") for _, code in files)
+    if starts != 1:
+        fail(f"exactly one production full_leg_calibration->start() call is allowed; "
+             f"found {starts}")
+
+    # ---- the plan resolver: canonical -> identity -> Geometry V5 ----------
+    for token in ("legServoAt(", "semanticIdentityFromCanonical(", "findJoint(",
+                  "findEndpoint(", "->bus_id"):
+        if token not in plan_c:
+            fail(f"{plan_c_path}: resolveFullLegPlan() lost {token!r}; identity and bus "
+                 f"must come from the canonical allocation cross-checked with Geometry V5")
+    for token in ("Leg::LF", "Leg::RF", "Leg::RH", "Leg::LH", "-700000"):
+        if token in plan_c:
+            fail(f"{plan_c_path}: resolveFullLegPlan() names {token!r}; nothing in the "
+                 f"plan may be special-cased per leg")
+
+    # ---- Controller: parked context + finalization ------------------------
+    permit_fn = re.search(r"void Controller::updateCalibrationMotionPermit\(\)\s*\{(.*?)\n\}",
+                          controller, re.DOTALL)
+    if not permit_fn:
+        fail(f"{controller_path}: updateCalibrationMotionPermit() not found")
+    else:
+        body = permit_fn.group(1)
+        for token in ("ctx.parked_leg = full_leg_calibration_.endpointLeg()",
+                      "ctx.parked_joint = full_leg_calibration_.endpointJoint()",
+                      "ctx.parked_side = calibration::ContactSide::MAX_SIDE",
+                      "ctx.auxiliary_parked = full_leg_calibration_.auxiliaryParked()"):
+            if not contains_ws(body, token):
+                fail(f"{controller_path}: parked-endpoint context lost {token!r}")
+        if re.search(r"parked_leg\s*=\s*calibration::Leg::", body):
+            fail(f"{controller_path}: parked_leg is hard-coded; it must follow the "
+                 f"running request's endpoint")
+
+    step_fn = re.search(r"void Controller::updateFullLegCalibration\(uint32_t now_ms\)\s*\{(.*?)\n\}",
+                        controller, re.DOTALL)
+    if not step_fn:
+        fail(f"{controller_path}: updateFullLegCalibration() not found")
+    else:
+        body = normalize(step_fn.group(1))
+        safe_offs = re.findall(r"safeOff\(\s*([\w.]+\(\))\s*\)", body)
+        if safe_offs != ["full_leg_calibration_.primaryBusId()",
+                         "full_leg_calibration_.auxiliaryBusId()"]:
+            fail(f"{controller_path}: updateFullLegCalibration() must call safeOff() "
+                 f"exactly for primaryBusId() then auxiliaryBusId(), got {safe_offs}")
+        for token in ("if (full_leg_calibration_.primarySafeOffPending()) {",
+                      "if (full_leg_calibration_.auxiliarySafeOffPending()) {"):
+            if token not in body:
+                fail(f"{controller_path}: SAFE_OFF servicing lost its pending guard "
+                     f"{token!r}; an unneeded auxiliary must never be sent SAFE_OFF")
+
+    final_fn = re.search(r"void Controller::updateFullLegFinalization\(\)\s*\{(.*?)\n\}",
+                         controller, re.DOTALL)
+    if not final_fn:
+        fail(f"{controller_path}: updateFullLegFinalization() not found")
+    else:
+        body = normalize(final_fn.group(1))
+        for token in ("if (!full_leg_run_.armed) return;",
+                      "FullLegCalibrationPhase::COMPLETE",
+                      "FullLegCalibrationPhase::FAILED",
+                      "context.manager = &calibration_",
+                      "context.policy = &actuator_policy_",
+                      "context.geometry = &geometry_profile_",
+                      "context.expected_provenance = &actuator::geometry_data::kProvenance",
+                      "context.permit = &motion_permit_",
+                      "context.authorization = &motion_authorization_",
+                      "context.arbiter = &authority_",
+                      "context.parameters = calibration::productionEnvelopeParameters()",
+                      "calibration::outcomeFromExecutor(",
+                      "calibration::finalizeFullLeg(context, full_leg_run_.plan, outcome, &record)",
+                      "full_leg_evidence_.put(record)",
+                      "full_leg_run_.clear()"):
+            if token not in body:
+                fail(f"{controller_path}: updateFullLegFinalization() missing {token!r}")
+        if body.find("finalizeFullLeg(") > body.find("full_leg_run_.clear()"):
+            fail(f"{controller_path}: the run record may be cleared only after it was "
+                 f"finalized")
+        for token in writers + ("startSession(", ".activate(", "motion_permit_.grant(",
+                                ".admit(", "admitOperationalLimit("):
+            if token in body:
+                fail(f"{controller_path}: updateFullLegFinalization() contains {token!r}; "
+                     f"it only hands live collaborators to the pure finalizer")
+    update_fn = re.search(r"\nvoid Controller::update\(uint32_t now_ms\)\s*\{(.*?)\n\}",
+                          controller, re.DOTALL)
+    if not update_fn or not re.search(
+            r"updateFullLegCalibration\(now_ms\);.*?updateFullLegFinalization\(\);",
+            update_fn.group(1), re.DOTALL):
+        fail(f"{controller_path}: update() must call updateFullLegFinalization() right "
+             f"after updateFullLegCalibration(now_ms)")
+
+    # ---- finalizer: pure, ordered, unapproved -----------------------------
+    if normalize(fin_h).count("constexpr bool kFullLegOperationalParametersApproved = false;") != 1:
+        fail(f"{fin_h_path}: kFullLegOperationalParametersApproved must be declared "
+             f"exactly once and be false - no approved stand/gait specification exists, "
+             f"so the production envelope parameters are placeholders and a hardware run "
+             f"ends at HARDWARE_CONTACT_CALIBRATED, never FINAL_OPERATIONAL_ENVELOPE_ACCEPTED")
+    if "parameters.approved = kFullLegOperationalParametersApproved;" not in normalize(fin_c):
+        fail(f"{fin_c_path}: productionEnvelopeParameters() must take `approved` from "
+             f"kFullLegOperationalParametersApproved")
+    if re.search(r"approved\s*=\s*true", fin_c) or re.search(r"approved\s*=\s*true", fin_h):
+        fail(f"{fin_c_path}: envelope parameters must never be marked approved in code")
+    for path, code in ((fin_h_path, fin_h), (fin_c_path, fin_c)):
+        for token in ("ServoBus", "servo::", "Arduino.h", "Serial", "EnableTorque",
+                      "writeGoalPosition(", "enableTorqueOn(", "safeOff(", "millis("):
+            if token in code:
+                fail(f"{path}: the finalizer contains {token!r}; it is a pure decision "
+                     f"unit that never touches the bus")
+    order = ("manager.recordContact(outcome.min_contact)",
+             "manager.recordContact(outcome.max_contact)",
+             "actuator::buildContactDerivedEnvelope(",
+             "policy.validateOperationalLimit(",
+             "policy.admitOperationalLimit(",
+             "manager.noteExecutionPhase(CalibrationPhase::TORQUE_OFF)",
+             "manager.completeSession()",
+             "context.permit->revoke(",
+             "context.authorization->revoke()")
+    fin_norm = normalize(fin_c)
+    last = -1
+    for token in order:
+        at = fin_norm.find(token)
+        if at < 0:
+            fail(f"{fin_c_path}: evidence lifecycle lost {token!r}")
+            break
+        if at < last:
+            fail(f"{fin_c_path}: evidence lifecycle out of order at {token!r}: contacts "
+                 f"-> envelopes -> limit validate -> admit -> completeSession -> "
+                 f"permit/authorization revoke")
+        last = at
+    if fin_c.count("admitOperationalLimit(") != 1:
+        fail(f"{fin_c_path}: the finalizer must have exactly one admitOperationalLimit() "
+             f"call site")
+
+    # ---- JointLimit admission confinement ---------------------------------
+    allowed = {"ActuatorWritePolicy.h", "ActuatorWritePolicy.cpp",
+               "FullLegCalibrationFinalizer.cpp"}
+    for path, code in files:
+        if "scripts" in path.parts:
+            continue
+        if "admitOperationalLimit(" in code and path.name not in allowed:
+            fail(f"{path}: admitOperationalLimit() may only be called from the "
+                 f"policy units and FullLegCalibrationFinalizer.cpp")
 
 
 def check_service_readiness_is_host_linkable(files):
@@ -4558,6 +4876,7 @@ def main():
     check_calibration_execution_engine_boundaries(files)
     check_actuator_infrastructure_wired_fail_closed(files)
     check_first_motion_command_wiring(files)
+    check_full_leg_calibration_wiring(files)
     check_service_readiness_is_host_linkable(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)

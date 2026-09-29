@@ -12,11 +12,13 @@
 #include "ContactProbeEngine.h"
 
 // CR3 continuation — the ONE UPPER-endpoint hardware sequence a Full Leg
-// Calibration needs: MIN contact (unobstructed) then MAX contact (obstructed
-// in the current Geometry V5 bundle; requires parking a named auxiliary
-// joint first). Composes ContactProbeEngine (Priority 5) and
-// CalibrationExecutionEngine's AUXILIARY_MOVE path — reused whole, not
-// reimplemented.
+// Calibration needs: MIN contact (unobstructed) then MAX contact. Whether the
+// MAX side needs a named auxiliary joint parked first is a per-leg fact the
+// caller reads from Geometry V5 and states in FullLegCalibrationRequest
+// (auxiliary_required): LF/RF MAX are obstructed (LH_UPPER/RH_UPPER park
+// first), RH/LH MAX are NOT_NEEDED and skip every AUX_* phase. Composes
+// ContactProbeEngine (Priority 5) and CalibrationExecutionEngine's
+// AUXILIARY_MOVE path — reused whole, not reimplemented.
 //
 // Pure: <stdint.h> plus already-pure MATDOG units. No Arduino, no ServoBus,
 // no clock of its own — same contract as FirstMotionExecutor.h and
@@ -36,10 +38,11 @@
 //     evidence, it does not decide what a safe range is.
 //   - the exact endpoint/auxiliary numbers (bus ids, contact/backoff/park
 //     targets): supplied by the caller in FullLegCalibrationRequest, exactly
-//     as ContactProbeRequest already does. CommandRouter hard-pins the CR3
-//     LF_UPPER constants into ONE exact command; this class stays generic.
+//     as ContactProbeRequest already does. The caller resolves them from the
+//     canonical allocation and Geometry V5 (FullLegCalibrationPlan); this
+//     class stays generic and carries no leg-specific constant.
 //
-// SAFE_OFF IS OUTSIDE THIS LAYER, STRUCTURALLY, FOR *TWO* SERVOS
+// SAFE_OFF IS OUTSIDE THIS LAYER, STRUCTURALLY, FOR UP TO *TWO* SERVOS
 // -----------------------------------------------------------------
 // No ServoBus reference exists here, so this class cannot call safeOff() for
 // either the probed joint OR the parked auxiliary. UPPER_MIN_SAFE_OFF and
@@ -48,6 +51,13 @@
 // (primarySafeOffVerified / auxiliarySafeOffVerified, supplied to update()
 // exactly like telemetry is) — see primaryBusId()/auxiliaryBusId() and the
 // Controller-side forcing loop this mirrors (updateFirstMotion()).
+//
+// WITHOUT AN AUXILIARY (auxiliary_required == false) THERE IS ONLY ONE SERVO
+// -----------------------------------------------------------------
+// auxiliaryBusId() is 0, auxiliarySafeOffPending() is never true and
+// FINAL_SAFE_OFF waits for the primary alone. auxiliaryBusId() == 0 is a
+// sentinel for "no auxiliary", never an address: a caller that would pass it
+// to a SAFE_OFF must first check auxiliaryRequired().
 //
 // EVERY FAILURE ROUTES THROUGH A SAFE_OFF-SERVICING PHASE FIRST
 // -----------------------------------------------------------------
@@ -65,11 +75,11 @@ enum class FullLegCalibrationPhase : uint8_t {
   IDLE                = 0,
   UPPER_MIN_PROBE     = 1,  // delegates to an owned ContactProbeEngine
   UPPER_MIN_SAFE_OFF  = 2,  // caller must verify SAFE_OFF on primaryBusId()
-  AUX_TORQUE_ENABLE   = 3,  // TorqueEnable on the auxiliary joint
+  AUX_TORQUE_ENABLE   = 3,  // TorqueEnable on the auxiliary joint (skipped without one)
   AUX_MOVE_PENDING    = 4,  // AUXILIARY_MOVE to the compiler's parked pose
   AUX_MOVE_MONITORING = 5,  // wait for ARRIVED; no stall-as-signal here
   UPPER_MAX_PROBE     = 6,  // delegates to the SAME owned ContactProbeEngine
-  FINAL_SAFE_OFF      = 7,  // caller must verify SAFE_OFF on BOTH bus ids
+  FINAL_SAFE_OFF      = 7,  // caller must verify SAFE_OFF on every servo in use
   // --- terminal states ---------------------------------------------------
   COMPLETE            = 8,  // both sides witnessed; evidence is ready
   FAILED              = 9,
@@ -101,7 +111,7 @@ struct FullLegCalibrationConfig {
 };
 
 struct FullLegCalibrationRequest {
-  // The joint being calibrated (CR3: LF_UPPER).
+  // The joint being calibrated (the UPPER of the leg under calibration).
   JointIdentity probe_joint{};
   uint8_t probe_bus_id = 0;
   Leg endpoint_leg = Leg::LF;
@@ -112,15 +122,23 @@ struct FullLegCalibrationRequest {
   actuator::MicroRad min_backoff_urad = 0;
   uint16_t min_repeatability_tolerance_ticks = 0;
 
-  // MAX side — obstructed; requires the auxiliary parked first.
+  // MAX side — obstructed on LF/RF (the auxiliary is parked first), direct on
+  // RH/LH (auxiliary_required == false).
   actuator::MicroRad max_approach_urad = 0;
   actuator::MicroRad max_backoff_urad = 0;
   uint16_t max_repeatability_tolerance_ticks = 0;
 
+  // Whether the MAX side needs an auxiliary joint parked first. Set from the
+  // Geometry V5 MAX endpoint record's has_auxiliary by the caller — never
+  // hard-coded per leg. Defaults to TRUE (fail-closed: forgetting to state it
+  // keeps the stricter, two-servo sequence and its start() checks).
+  bool auxiliary_required = true;
+
   // The auxiliary joint the compiler's own plan names for the MAX side, and
   // its exact parked pose — cross-checked against the bound geometry's own
   // endpoint record by SafeActuatorPolicy::evaluateEndpointPlan(), never
-  // re-derived here.
+  // re-derived here. Ignored (may be empty / bus 0) when auxiliary_required
+  // is false.
   JointIdentity auxiliary_joint{};
   uint8_t auxiliary_bus_id = 0;
   actuator::MicroRad auxiliary_park_target_urad = 0;
@@ -189,13 +207,25 @@ class FullLegCalibrationExecutor {
   // meaningful once the AUX phases begin; it is still safe to read (and
   // safe to SAFE_OFF) before that, since 0 addresses nothing.
   uint8_t primaryBusId() const { return request_.probe_bus_id; }
-  uint8_t auxiliaryBusId() const { return request_.auxiliary_bus_id; }
+  // The endpoint (leg, joint) the current/last run probes: what
+  // SafeActuatorPolicy's parked-auxiliary context must name while
+  // auxiliaryParked() is true.
+  Leg endpointLeg() const { return request_.endpoint_leg; }
+  JointKind endpointJoint() const { return request_.endpoint_joint; }
+  // 0 when no auxiliary is required (never an address — see file comment).
+  uint8_t auxiliaryBusId() const {
+    return request_.auxiliary_required ? request_.auxiliary_bus_id : 0;
+  }
+  bool auxiliaryRequired() const { return request_.auxiliary_required; }
 
-  // True only while the MAX-side probe is actually running — the one window
-  // SafeActuatorPolicy's bootstrap context must report the auxiliary as
-  // parked. False before and after: SAFE_OFF never consults it either way.
+  // True only while the MAX-side probe is actually running WITH an auxiliary
+  // parked — the one window SafeActuatorPolicy's bootstrap context must
+  // report the auxiliary as parked. Always false when no auxiliary is
+  // required (a NOT_NEEDED direct path must be validated with nothing
+  // parked). False before and after: SAFE_OFF never consults it either way.
   bool auxiliaryParked() const {
-    return status_.phase == FullLegCalibrationPhase::UPPER_MAX_PROBE;
+    return request_.auxiliary_required &&
+           status_.phase == FullLegCalibrationPhase::UPPER_MAX_PROBE;
   }
 
   bool primarySafeOffPending() const {
@@ -203,7 +233,8 @@ class FullLegCalibrationExecutor {
           status_.phase == FullLegCalibrationPhase::FINAL_SAFE_OFF;
   }
   bool auxiliarySafeOffPending() const {
-    return status_.phase == FullLegCalibrationPhase::FINAL_SAFE_OFF;
+    return request_.auxiliary_required &&
+           status_.phase == FullLegCalibrationPhase::FINAL_SAFE_OFF;
   }
 
   // Valid once status().phase == COMPLETE (or, for whichever side actually
@@ -215,6 +246,9 @@ class FullLegCalibrationExecutor {
 
  private:
   void routeToSafeOffAfterLoss();
+  // Starts the shared probe_ for the MAX side. False leaves probe_ inactive
+  // and the failure/phase untouched — the caller records UPPER_MAX_PROBE_FAILED.
+  bool startMaxProbe(const FullLegCalibrationContext& context, uint32_t now_ms);
   void handleMinProbeTerminal();
   void handleMaxProbeTerminal();
   void stepAuxTorqueEnable(const FullLegCalibrationContext& context);

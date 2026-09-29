@@ -231,6 +231,25 @@ void SafeActuatorPolicy::reset() {
   last_decision_ = WriteDecision::REJECT_TRANSACTION_STATE;
 }
 
+LimitAdmission SafeActuatorPolicy::validateOperationalLimit(const JointLimit& limit) const {
+  if (!limit.usableProvenance()) return LimitAdmission::REJECT_NOT_OPERATIONAL;
+  if (limit.max_tick > 4095) return LimitAdmission::REJECT_TICK_OUT_OF_RANGE;
+  const GeometryProvenanceTag current = currentGeometryTag();
+  if (current == kNoGeometryProvenance || limit.geometry != current) {
+    return LimitAdmission::REJECT_GEOMETRY_NOT_CURRENT;
+  }
+  if (transforms_.find(limit.identity, currentGeometryTag()) == nullptr) {
+    return LimitAdmission::REJECT_NO_TRANSFORM;
+  }
+  return LimitAdmission::ADMITTED;
+}
+
+LimitAdmission SafeActuatorPolicy::admitOperationalLimit(const JointLimit& limit) {
+  const LimitAdmission verdict = validateOperationalLimit(limit);
+  if (verdict != LimitAdmission::ADMITTED) return verdict;
+  return limits_.admit(limit) ? LimitAdmission::ADMITTED : LimitAdmission::REJECT_TABLE_REJECTED;
+}
+
 GeometryProvenanceTag SafeActuatorPolicy::currentGeometryTag() const {
   if (geometry_ == nullptr || expected_provenance_ == nullptr) return kNoGeometryProvenance;
   if (!geometry_->bound()) return kNoGeometryProvenance;
@@ -619,6 +638,18 @@ const char* toString(WriteDecision decision) {
       return "REJECT_EVIDENCE_GEOMETRY_MISMATCH";
     case WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT:
       return "REJECT_NO_CALIBRATION_MOTION_PERMIT";
+  }
+  return "UNKNOWN";
+}
+
+const char* toString(LimitAdmission admission) {
+  switch (admission) {
+    case LimitAdmission::ADMITTED:                    return "ADMITTED";
+    case LimitAdmission::REJECT_NOT_OPERATIONAL:      return "REJECT_NOT_OPERATIONAL";
+    case LimitAdmission::REJECT_TICK_OUT_OF_RANGE:    return "REJECT_TICK_OUT_OF_RANGE";
+    case LimitAdmission::REJECT_GEOMETRY_NOT_CURRENT: return "REJECT_GEOMETRY_NOT_CURRENT";
+    case LimitAdmission::REJECT_NO_TRANSFORM:         return "REJECT_NO_TRANSFORM";
+    case LimitAdmission::REJECT_TABLE_REJECTED:       return "REJECT_TABLE_REJECTED";
   }
   return "UNKNOWN";
 }

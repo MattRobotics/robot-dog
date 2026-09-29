@@ -181,6 +181,8 @@ void Controller::begin() {
       &full_leg_calibration_,
       &service_,
       &http_transport_,
+      &full_leg_run_,
+      &full_leg_evidence_,
   };
   service_.begin(modules);
   // Never starts the listening socket here — see network/HttpTransport.h.
@@ -339,15 +341,17 @@ void Controller::updateCalibrationMotionPermit() {
   // consulted, so threading it through unconditionally cannot widen access.
   ctx.direction_verify_tick_budget = motion_authorization_.direction_verify_tick_budget;
   // Mirrors full_leg_calibration_.auxiliaryParked() exactly: true for the
-  // ONE tick window (the MAX-side probe) where the compiled LF_UPPER:MAX
+  // ONE tick window (the MAX-side probe) where the compiled <leg>_UPPER:MAX
   // plan requires the named auxiliary already parked — false before and
-  // after, same as the executor's own accessor. See
-  // SafeActuatorPolicy::evaluateEndpointPlan() for how these four fields are
-  // consumed; unconditionally threading them through cannot widen access
-  // for the same reason the tick budget above cannot.
+  // after, and always false for a leg whose MAX endpoint needs no auxiliary
+  // (a NOT_NEEDED plan must be validated with nothing parked). The endpoint
+  // named is the one the running request probes, read from the executor
+  // itself. See SafeActuatorPolicy::evaluateEndpointPlan() for how these four
+  // fields are consumed; unconditionally threading them through cannot widen
+  // access for the same reason the tick budget above cannot.
   ctx.auxiliary_parked = full_leg_calibration_.auxiliaryParked();
-  ctx.parked_leg = calibration::Leg::LF;
-  ctx.parked_joint = calibration::JointKind::UPPER;
+  ctx.parked_leg = full_leg_calibration_.endpointLeg();
+  ctx.parked_joint = full_leg_calibration_.endpointJoint();
   ctx.parked_side = calibration::ContactSide::MAX_SIDE;
   actuator_policy_.setBootstrapContext(ctx);
 }
@@ -513,6 +517,45 @@ void Controller::updateFullLegCalibration(uint32_t now_ms) {
   }
 }
 
+// Closes the evidence lifecycle of the armed Full Leg run, exactly once, on
+// the tick its executor turns terminal. Everything that decides the verdict
+// lives in calibration::finalizeFullLeg() (pure, host-tested); this only
+// hands it the live collaborators and keeps the record. The permit and
+// authorization it revokes are the same RAM objects the per-tick refresh
+// already re-checks, so cleanup between legs is finished before the next
+// command line is processed.
+void Controller::updateFullLegFinalization() {
+  if (!full_leg_run_.armed) return;
+  const calibration::FullLegCalibrationPhase phase = full_leg_calibration_.status().phase;
+  if (phase != calibration::FullLegCalibrationPhase::COMPLETE &&
+      phase != calibration::FullLegCalibrationPhase::FAILED) {
+    return;
+  }
+
+  calibration::FullLegFinalizeContext context{};
+  context.manager = &calibration_;
+  context.policy = &actuator_policy_;
+  context.geometry = &geometry_profile_;
+  context.expected_provenance = &actuator::geometry_data::kProvenance;
+  context.permit = &motion_permit_;
+  context.authorization = &motion_authorization_;
+  context.arbiter = &authority_;
+  context.parameters = calibration::productionEnvelopeParameters();
+
+  const calibration::FullLegRunOutcome outcome = calibration::outcomeFromExecutor(
+      full_leg_calibration_, full_leg_run_.geometry_at_start, full_leg_run_.session_id_at_start);
+
+  calibration::FullLegRecord record{};
+  const calibration::FullLegFinalizeFailure failure =
+      calibration::finalizeFullLeg(context, full_leg_run_.plan, outcome, &record);
+  full_leg_evidence_.put(record);
+  full_leg_run_.clear();
+
+  Serial.printf("CALIBRATION_FULL_LEG_RESULT leg=%s verdict=%s failure=%s\n",
+                calibration::toString(record.leg), calibration::toString(record.verdict),
+                calibration::toString(failure));
+}
+
 void Controller::printBootBanner() {
   Serial.println();
   Serial.println("====================================");
@@ -613,8 +656,11 @@ void Controller::update(uint32_t now_ms) {
   // one is required — see updateFirstMotion()'s own comment.
   updateFirstMotion(now_ms);
   // CR3 continuation: same bounded, at-most-one-backend-call-per-tick
-  // discipline, for the LF Full Leg Calibration sequence (if any is active).
+  // discipline, for the Full Leg Calibration sequence (if any is active).
   updateFullLegCalibration(now_ms);
+  // Same tick the executor turned terminal: record, complete the session,
+  // revoke the permit. See updateFullLegFinalization().
+  updateFullLegFinalization();
   system_state_.setServoHealth(servo_bus_.health());
 
   system_state_.update();
