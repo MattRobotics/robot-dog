@@ -1,5 +1,27 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — current-boot q0 promotion — 2026-09-29
+
+**IMPLEMENTED / OFFLINE-VALIDATED. Never run on hardware.** `@CALIBRATION Q0 PROMOTE
+CONFIRM_CURRENT_INSTALLATION` used to rehydrate the frozen CR2-C package, so a fresh capture
+never reached `JointTransformTable`. It now promotes the twelve candidates of the current-boot
+capture.
+
+- `CalibrationQ0CaptureSession::freshCapture()` exposes the capture as a plain-data
+  `FreshQ0Capture`; `prepareFreshQ0Evidence` runs it through the shared CR3 accept-and-promote
+  rule, all twelve or none, and `JointTransformTable::admit` replaces the previous q0 in place.
+  `prepareCurrentQ0Evidence` (frozen CR2-C) stays as a regression oracle only; the static audit
+  forbids any production use.
+- PROMOTE is refused while a capture, a session, an armed Full Leg run or motion is active
+  (`BUSY`); `SESSION START` refuses (`CURRENT_BOOT_Q0_NOT_PROMOTED`) unless the table holds exactly
+  the current capture's q0. Reply: `CALIBRATION_Q0_PROMOTE=OK admitted=12/12
+  source=CURRENT_BOOT_CAPTURE capture_session=<n>`. RAM only; no EEPROM/NVS write, no motion.
+- New host suite `test_cr3_q0_fresh_promotion` (338 checks) and twelve static-audit mutation
+  cases. The four-leg runbook now promotes the current capture and treats CR2-C as comparison
+  only.
+- No persistence exists: **Calibration Persistence V1** is the gate after the hardware Full
+  Calibration PASS ([`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md)).
+
 ## Unreleased — Full Calibration generalized to LF → RF → RH → LH — 2026-09-29
 
 **IMPLEMENTED / OFFLINE-VALIDATED. Never run on hardware.** One `ROBOT_POWERED` build can

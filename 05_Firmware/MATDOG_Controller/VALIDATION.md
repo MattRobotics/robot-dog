@@ -45,7 +45,13 @@ checkboxes are not current project status and are intentionally not rewritten.
   POWER GATE A–E, MANUAL CHARGING & EXTERNAL USB SERVICE PORT below;
 - **External USB service/programming port (GPIO19/GPIO20, no host VBUS) — VALIDATED (2026-09-24):**
   enumeration, CDC RX/TX, and the `esptool` reset/flash-identification path all confirmed through
-  the external connector alone.
+  the external connector alone;
+- **LED Status Manager V2 — focused hardware PASS (2026-09-26, source `88062e1`):** SOC bar,
+  BOOTING breathing and `@LED SOC TEST`; live charging animations remain **TO_TEST**;
+- **Read-only q0 capture on the robot — CR2-C PASS (2026-09-27, build `315d4ade6ff0`):** fresh
+  formal population 12/12, twelve q0 `CANDIDATE` records, nine samples per joint, maximum spread
+  0 ticks, Torque OFF throughout, final `SAFE_OFF` `VERIFIED_OFF` on all 13. It validates the
+  capture path only — nothing was accepted, promoted or moved.
 
 Powered build on the robot at G3/G3.1 closure (2026-09-18, superseded by the row below):
 
@@ -56,7 +62,8 @@ Powered build on the robot at G3/G3.1 closure (2026-09-18, superseded by the row
 | Application | 387808 bytes, SHA256 `e2b474b5c07e98649fbaf31d3d08970d022ffbdb5f1212d6b606dc28cac065d2` |
 | Flash path | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`, `app0 @ 0x010000` |
 
-Powered build currently on the robot, as of the 2026-09-24 session — the DALY KEY write flash
+Powered build on the robot as of the 2026-09-24 session (superseded by the two flashes recorded
+in the note after this table) — the DALY KEY write flash
 (2026-09-19) superseded the G3/G3.1 image above, and no commit since has touched firmware source
 (`4604e36`, `efba2dc`, `19fe837` are test-only or docs-only — see § POWER GATE A–E, MANUAL CHARGING
 & EXTERNAL USB SERVICE PORT below):
@@ -67,6 +74,12 @@ Powered build currently on the robot, as of the 2026-09-24 session — the DALY 
 | Hardware profile | `ROBOT_POWERED` build override; the source default remains `USB_ONLY` |
 | Application SHA256 | `e9283ced5801d87d5fe44f95411ead2de6d6f6dad2101c88b210c31cd0e645b6` (per § EVIDENCE PROVENANCE below) |
 | Flash path | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`, `app0 @ 0x010000` |
+
+Later flashes: `88062e1` (LED V2 hardware validation, 2026-09-26) and then `315d4ade6ff0` (CR2-C
+read-only q0 capture, 2026-09-27) — the last build recorded as running on the robot. **The
+current `main` (four-leg Full Calibration, current-boot q0 promotion) is not flashed**; the
+hardware Full Calibration session starts from a clean-merged-`main` `ROBOT_POWERED` build whose manifest is
+kept with the evidence.
 
 ### OPEN
 
@@ -91,15 +104,31 @@ Powered build currently on the robot, as of the 2026-09-24 session — the DALY 
 ### Next
 
 ```text
-G4 Diagnostics / Maintenance
+Full Calibration HW Validation      (LF -> RF -> RH -> LH, one attended ROBOT_POWERED session)
+  -> Calibration Persistence V1     (NEXT AFTER hardware Full Calibration PASS)
+  -> Operational Envelopes / JointLimits
+  -> Stand / Gait hardware
 ```
+
+The four-leg Full Calibration is **IMPLEMENTED / OFFLINE TESTED** on `main` (host suite, static
+audit, Safe Actuator / DALY / LED mutation suites, and both `USB_ONLY` and `ROBOT_POWERED`
+builds PASS) but has **never run on hardware**; nothing in this file claims it is hardware
+validated. The best outcome a hardware run can honestly claim is `HARDWARE_CONTACT_CALIBRATED`;
+`FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` is unavailable until a stand/gait workspace is approved, so
+0/12 final JointLimits are admitted on purpose. Calibration results are RAM-only until
+Calibration Persistence V1 exists. Procedure and stop conditions:
+[`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md); the
+sequence and its dependencies are owned by
+[`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md).
 
 Charging hardware qualification beyond the one attended manual session (autonomous dock/contact,
 reverse-polarity protection, unattended charge acceptance/termination, future Jetson charging) is
 a separate FUTURE/OPEN gate.
 
-No motion, calibration or write-capable service capability exists in the firmware. Every later
-stage has its own gate in [`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md).
+No stand, gait or general-purpose motion exists in the firmware. Bounded calibration motion
+exists in code only, behind `ActuatorAuthority`, a live session and a fresh permit, and is
+hardware **TO_TEST**. Every later stage has its own gate in
+[`DEVELOPMENT_GATES.md`](DEVELOPMENT_GATES.md).
 
 The expected installed servo IDs are `11,12,13,21,22,23,31,32,33,41,42,43,51`: 12 legs plus
 `NECK_ROTATION` ID51. IDs 52 `NECK_PITCH`, 53 `HEAD_ROTATION`, 54 `HEAD_PITCH` and 55 `JAW` remain
@@ -108,10 +137,11 @@ The allocation authority is
 [`MATDOG_SERVO_ALLOCATION.yaml`](../../06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml),
 while the root [`README.md`](../../README.md) owns the current physical-population snapshot.
 
-This gate requires separate hardware authorization. It permits read-only inspection plus the
-existing torque-off-only `SAFE_OFF` command and forbids motion, torque-on, servo EEPROM/ID writes,
-BNO085 DCD writes and DALY writes. Passing earlier single-device bench campaigns does not constitute
-passing this assembled, concurrent ROBOT_POWERED gate.
+The hardware Full Calibration requires its own separate, attended authorization. It permits the
+runbook's read-only q0 capture and RAM promotion, and the session-scoped, permit-gated calibration
+motion of the four legs; `SAFE_OFF` stays reachable throughout. It forbids servo EEPROM/`PositionOffset`
+and ID writes, NVS writes, BNO085 DCD writes and DALY writes. Passing earlier single-device bench
+campaigns, or the read-only CR2-C capture, does not constitute passing this gate.
 
 ## Session 1 — 2026-09-15, USB-only bench state
 

@@ -411,6 +411,10 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` stays unreachable until an approved stand/gait
   workspace turns `kFullLegOperationalParametersApproved` on (audit-pinned `false`). Procedure:
   [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md).
+  `@CALIBRATION Q0 PROMOTE` promotes the **current-boot** capture (not the frozen CR2-C package).
+  **Next after a hardware Full Calibration PASS: Calibration Persistence V1** (versioned,
+  atomic, fail-closed at boot, no ST3215 EEPROM writes) — TO_DESIGN, not started; see
+  [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md).
 
 ## HostLink semantic layer
 
