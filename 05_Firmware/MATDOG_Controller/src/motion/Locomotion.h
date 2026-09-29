@@ -3,6 +3,10 @@
 #include "Gait.h"
 #include "StandTransition.h"
 namespace matdog { namespace motion {
+// G4 coordinator states are separate from the accepted G3 gate's state type.
+// The first five map explicitly by value; startup state changes remain private
+// to StandTransition. Pose identifiers never enter either state enumeration.
+enum class LocomotionState : uint8_t { OFF, IDLE, STAND_TRANSITION, STAND, STOPPING, GAIT_START, WALK, TROT };
 struct MotionCommand { GaitParameters gait{}; double periodS=1,stampS=0; uint32_t sequence=0; };
 enum class CommandStatus : uint8_t { FRESH, STALE, INVALID, ZERO, CHANGED };
 class CommandWatchdog {
@@ -20,7 +24,7 @@ class CommandWatchdog {
 // Times are supplied by the caller; no device clock or actuator output exists.
 class Locomotion {
  public:
-  MotionState state() const {return state_;}
+  LocomotionState state() const {return state_;}
   bool apply(MotionEvent event);
   bool beginStartup(const StartupObservation& observation,const TimingSpec& timing);
   TimedStandSample nextStartup();
@@ -32,7 +36,7 @@ class Locomotion {
   CommandStatus commandStatus() const {return commandStatus_;}
  private:
   StandTransition startup_{};
-  MotionState state_=MotionState::OFF;
+  LocomotionState state_=LocomotionState::OFF;
   GaitStatus status_=GaitStatus::STATE_ERROR;
   CommandStatus commandStatus_=CommandStatus::INVALID;
   CommandWatchdog watchdog_{};

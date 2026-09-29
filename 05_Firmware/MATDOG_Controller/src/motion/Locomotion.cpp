@@ -32,24 +32,24 @@ CommandStatus CommandWatchdog::check(double now){
   lastNow_=now;clockSeen_=true;return now-command_.stampS>timeout_?CommandStatus::STALE:zero(command_)?CommandStatus::ZERO:CommandStatus::FRESH;
 }
 bool Locomotion::apply(MotionEvent e){
-  if(e==MotionEvent::DISABLE||e==MotionEvent::FAULT){startup_.apply(e);state_=MotionState::OFF;gaitActive_=false;previous_={};origin_={};status_=GaitStatus::CANCELLED;return true;}
-  if(e==MotionEvent::STOP&&(state_==MotionState::GAIT_START||state_==MotionState::WALK||state_==MotionState::TROT||(state_==MotionState::STOPPING&&gaitActive_)))return requestStop();
-  if(state_==MotionState::GAIT_START||state_==MotionState::WALK||state_==MotionState::TROT||(state_==MotionState::STOPPING&&gaitActive_))return false;
+  if(e==MotionEvent::DISABLE||e==MotionEvent::FAULT){startup_.apply(e);state_=LocomotionState::OFF;gaitActive_=false;previous_={};origin_={};status_=GaitStatus::CANCELLED;return true;}
+  if(e==MotionEvent::STOP&&(state_==LocomotionState::GAIT_START||state_==LocomotionState::WALK||state_==LocomotionState::TROT||(state_==LocomotionState::STOPPING&&gaitActive_)))return requestStop();
+  if(state_==LocomotionState::GAIT_START||state_==LocomotionState::WALK||state_==LocomotionState::TROT||(state_==LocomotionState::STOPPING&&gaitActive_))return false;
   if(!startup_.apply(e))return false;
-  state_=startup_.state();return true;
+  state_=static_cast<LocomotionState>(startup_.state());return true;
 }
 bool Locomotion::beginStartup(const StartupObservation& o,const TimingSpec& t){
-  if(state_!=MotionState::IDLE||!startup_.begin(o,t))return false;
-  state_=startup_.state();return true;
+  if(state_!=LocomotionState::IDLE||!startup_.begin(o,t))return false;
+  state_=static_cast<LocomotionState>(startup_.state());origin_={};return true;
 }
-TimedStandSample Locomotion::nextStartup(){if(state_!=MotionState::STAND_TRANSITION)return {};auto f=startup_.next();state_=startup_.state();return f;}
+TimedStandSample Locomotion::nextStartup(){if(state_!=LocomotionState::STAND_TRANSITION)return {};auto f=startup_.next();state_=static_cast<LocomotionState>(startup_.state());return f;}
 bool Locomotion::start(const MotionCommand& c,double now,double timeout){
-  if(state_!=MotionState::STAND||!watchdog_.configure(timeout))return false;
+  if(state_!=LocomotionState::STAND||!watchdog_.configure(timeout))return false;
   commandStatus_=watchdog_.accept(c,now);if(commandStatus_!=CommandStatus::FRESH)return false;
   active_=c;startTime_=lastTime_=now;stopCycle_=-1;stopRequested_=holdOnlyStop_=false;
   auto initial=gaitHold(c.gait,0,canonicalStandDefinition().standBodyHeightM,0);relocate(initial,origin_);
   previous_=solveGait(c.gait,initial);status_=previous_.status;if(!previous_.target.valid)return false;
-  state_=MotionState::GAIT_START;gaitActive_=true;return true;
+  state_=LocomotionState::GAIT_START;gaitActive_=true;return true;
 }
 CommandStatus Locomotion::command(const MotionCommand& c,double now){
   commandStatus_=watchdog_.accept(c,now);
@@ -57,15 +57,17 @@ CommandStatus Locomotion::command(const MotionCommand& c,double now){
   return commandStatus_;
 }
 bool Locomotion::requestStop(){
-  if(state_!=MotionState::GAIT_START&&state_!=MotionState::WALK&&state_!=MotionState::TROT&&state_!=MotionState::STOPPING)return false;
+  if(!gaitActive_)return false;
+  if(state_!=LocomotionState::GAIT_START&&state_!=LocomotionState::WALK&&state_!=LocomotionState::TROT&&state_!=LocomotionState::STOPPING)return false;
   if(!stopRequested_){stopRequested_=true;double elapsed=(lastTime_-startTime_)/active_.periodS;
     holdOnlyStop_=elapsed<1;stopCycle_=elapsed<3?1:std::ceil(elapsed-2);
   }
-  state_=MotionState::STOPPING;return true;
+  state_=LocomotionState::STOPPING;return true;
 }
 LocomotionFrame Locomotion::sample(double now){
   LocomotionFrame failure;
-  if(state_!=MotionState::GAIT_START&&state_!=MotionState::WALK&&state_!=MotionState::TROT&&state_!=MotionState::STOPPING)return failure;
+  if(!gaitActive_)return failure;
+  if(state_!=LocomotionState::GAIT_START&&state_!=LocomotionState::WALK&&state_!=LocomotionState::TROT&&state_!=LocomotionState::STOPPING)return failure;
   if(!std::isfinite(now)||now<lastTime_){failure.status=GaitStatus::STATE_ERROR;status_=failure.status;return failure;}
   // Expiry starts the stop from the last emitted valid configuration, never
   // from an unobserved phase. The resulting path remains defined across gaps.
@@ -86,12 +88,12 @@ LocomotionFrame Locomotion::sample(double now){
         cart=gaitCartesian(p,stopCycle_+2*(u-integral(u)),(1-law.progress)/T,-law.velocity/T,terminal);
       }else{double u=std::fmin(1.,t-stopStart-2);auto law=quinticTimeLaw(u,T);double dz=canonicalStandDefinition().standBodyHeightM-p.heightM;
         cart=gaitHold(p,terminal,p.heightM+dz*law.progress,initialShift*(1-law.progress),dz*law.velocity,-initialShift*law.velocity,dz*law.acceleration,-initialShift*law.acceleration);finished=u==1;}
-    }else{cart=gaitCartesian(p,t-2,1/T,0);if(!stopRequested_)state_=p.type==GaitType::WALK?MotionState::WALK:MotionState::TROT;}
+    }else{cart=gaitCartesian(p,t-2,1/T,0);if(!stopRequested_)state_=p.type==GaitType::WALK?LocomotionState::WALK:LocomotionState::TROT;}
   }
   relocate(cart,origin_);auto out=solveGait(p,cart,&previous_);status_=out.status;
-  if(!out.target.valid){state_=MotionState::OFF;startup_.apply(MotionEvent::FAULT);return out;}
+  if(!out.target.valid){state_=LocomotionState::OFF;startup_.apply(MotionEvent::FAULT);return out;}
   out.target.sequence=previous_.target.sequence+1;previous_=out;lastTime_=now;
-  if(finished){state_=MotionState::STAND;gaitActive_=false;origin_=out.cartesian.body;origin_.translationM.z=0;}
+  if(finished){state_=LocomotionState::STAND;gaitActive_=false;origin_=out.cartesian.body;origin_.translationM.z=0;}
   return out;
 }
 } }

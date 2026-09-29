@@ -13,7 +13,7 @@ static StartupObservation ready(){StartupObservation o;const auto& d=canonicalSt
   o.fresh=o.stationary=o.fourFootSupportConfirmed=o.flatGroundConfirmed=o.collisionClearanceReviewed=o.supportAndLoadReviewed=true;return o;}
 static Locomotion standing(){Locomotion x;CHECK(x.apply(MotionEvent::ENABLE));CHECK(x.beginStartup(ready(),{1,2}));
   for(unsigned i=0;i<3;++i){CHECK(x.nextStartup().status==TimedStatus::OK);}
-  CHECK(x.state()==MotionState::STAND);return x;}
+  CHECK(x.state()==LocomotionState::STAND);return x;}
 int main(){
  const double nan=std::numeric_limits<double>::quiet_NaN();GaitParameters p;
  CHECK(validGaitParameters(p));CHECK(!validGaitPeriod(0));CHECK(!validGaitPeriod(nan));CHECK(!validGaitPeriod(1e-300));
@@ -60,8 +60,8 @@ int main(){
  command.sequence=3;command.gait.advanceXM=.01;CHECK(w.accept(command,1.01)==CommandStatus::CHANGED);CHECK(w.check(.5)==CommandStatus::INVALID);
  for(unsigned kind=0;kind<2;++kind)for(unsigned when=0;when<4;++when){
   auto x=standing();MotionCommand c;c.gait.type=kind?GaitType::TROT:GaitType::WALK;c.gait.duty=kind?.6:.8;c.gait.heightM=.1;c.gait.swayXM=kind?0:.004;c.sequence=1;
-  CHECK(x.start(c,0,100));CHECK(x.state()==MotionState::GAIT_START);CHECK(!x.apply(MotionEvent::STAND_COMPLETE));
-  CHECK(x.nextStartup().status!=TimedStatus::OK&&x.state()==MotionState::GAIT_START);
+  CHECK(x.start(c,0,100));CHECK(x.state()==LocomotionState::GAIT_START);CHECK(!x.apply(MotionEvent::STAND_COMPLETE));
+  CHECK(x.nextStartup().status!=TimedStatus::OK&&x.state()==LocomotionState::GAIT_START);
   auto first=x.sample(0);CHECK(first.target.valid);auto stand=generateStandTarget(canonicalStandDefinition());
   for(unsigned i=0;i<4;++i)for(unsigned j=0;j<3;++j){CHECK(near(v(first.target.legs[i],j),v(stand.target.legs[i],j)));CHECK(v(first.velocityRadS[i],j)==0);}
   double stopTime=when==0?.4:when==1?1.6:when==2?3.15:4.0;auto prev=first;bool ended=false;
@@ -69,14 +69,15 @@ int main(){
    if(t>=stopTime&&!ended){CHECK(x.requestStop());CHECK(!x.apply(MotionEvent::STOP_COMPLETE));ended=true;}
    auto f=x.sample(t);CHECK(f.target.valid);if(!f.target.valid)break;
    for(unsigned i=0;i<4;++i)for(unsigned j=0;j<3;++j)CHECK(std::abs(v(f.target.legs[i],j)-v(prev.target.legs[i],j))<.05);
-   prev=f;if(x.state()==MotionState::STAND){for(unsigned i=0;i<4;++i)for(unsigned j=0;j<3;++j){CHECK(near(v(f.target.legs[i],j),v(stand.target.legs[i],j)));CHECK(near(v(f.velocityRadS[i],j),0));CHECK(near(v(f.accelerationRadS2[i],j),0));}break;}
-  }CHECK(x.state()==MotionState::STAND);
+   prev=f;if(x.state()==LocomotionState::STAND){for(unsigned i=0;i<4;++i)for(unsigned j=0;j<3;++j){CHECK(near(v(f.target.legs[i],j),v(stand.target.legs[i],j)));CHECK(near(v(f.velocityRadS[i],j),0));CHECK(near(v(f.accelerationRadS2[i],j),0));}break;}
+  }CHECK(x.state()==LocomotionState::STAND);
   c.stampS=20;c.sequence=2;CHECK(x.start(c,20,100));auto restart=x.sample(20);CHECK(restart.target.valid);
   for(unsigned i=0;i<4;++i)CHECK(near(restart.cartesian.feet[i].x,prev.cartesian.feet[i].x));
-  CHECK(x.apply(MotionEvent::DISABLE));CHECK(x.state()==MotionState::OFF);CHECK(!x.sample(21).target.valid);
+  CHECK(x.apply(MotionEvent::DISABLE));CHECK(x.state()==LocomotionState::OFF);CHECK(!x.sample(21).target.valid);
  }
- auto timeout=standing();command={};command.sequence=1;CHECK(timeout.start(command,0,.1));CHECK(timeout.sample(0).target.valid);CHECK(timeout.sample(.11).target.valid);CHECK(timeout.state()==MotionState::STOPPING);
- auto changed=standing();CHECK(changed.start(command,0,1));command.sequence=2;command.gait.type=GaitType::TROT;CHECK(changed.command(command,0)==CommandStatus::CHANGED);CHECK(changed.state()==MotionState::STOPPING);
- auto idle=standing();MotionCommand z;z.gait.advanceXM=0;CHECK(!idle.start(z,0,1));CHECK(idle.state()==MotionState::STAND);
+ auto timeout=standing();command={};command.sequence=1;CHECK(timeout.start(command,0,.1));CHECK(timeout.sample(0).target.valid);CHECK(timeout.sample(.11).target.valid);CHECK(timeout.state()==LocomotionState::STOPPING);
+ auto changed=standing();CHECK(changed.start(command,0,1));command.sequence=2;command.gait.type=GaitType::TROT;CHECK(changed.command(command,0)==CommandStatus::CHANGED);CHECK(changed.state()==LocomotionState::STOPPING);
+ auto held=standing();CHECK(held.apply(MotionEvent::STOP));CHECK(!held.sample(0).target.valid);CHECK(!held.requestStop());CHECK(held.apply(MotionEvent::STOP_COMPLETE));CHECK(held.state()==LocomotionState::IDLE);
+ auto idle=standing();MotionCommand z;z.gait.advanceXM=0;CHECK(!idle.start(z,0,1));CHECK(idle.state()==LocomotionState::STAND);
  std::printf("GAIT_HOST = %s: %u checks, %u failures\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;
 }

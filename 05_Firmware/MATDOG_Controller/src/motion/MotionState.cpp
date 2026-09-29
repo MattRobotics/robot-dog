@@ -19,10 +19,6 @@ bool MotionStateMachine::apply(MotionEvent event) {
     case MotionState::STAND:
       if (event == MotionEvent::STOP) { state_=MotionState::STOPPING; return true; }
       break;
-    case MotionState::GAIT_START:
-    case MotionState::WALK:
-    case MotionState::TROT:
-      break;  // Owned only by Locomotion, not injectable into the G3 machine.
     case MotionState::STOPPING:
       if (event == MotionEvent::STOP_COMPLETE) { state_=MotionState::IDLE; return true; }
       break;
