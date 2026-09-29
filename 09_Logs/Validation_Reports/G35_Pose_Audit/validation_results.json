@@ -1,0 +1,177 @@
+{
+  "all_passed": true,
+  "gates": [
+    {
+      "classification_and_sample_data_identical_to_saved": true,
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/pose_audit/revalidate.py --output revalidation_check",
+      "name": "revalidate_preserved_corpus",
+      "output_line_count": 1,
+      "output_sha256": "7dc6df9f43c4d642985f87ef9b5087fb92f4de7c4232c3b64319431dea4c4296",
+      "output_tail": [
+        "REVALIDATION 1220 1011 classification changes 0"
+      ],
+      "passed": true,
+      "returncode": 0,
+      "saved_artifact": "revalidation.json",
+      "saved_artifact_provenance_refreshed_to_current_generator": false,
+      "seconds": 104.5,
+      "summary": "REVALIDATION 1220 1011 classification changes 0"
+    },
+    {
+      "classification_and_sample_data_identical_to_saved": true,
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/pose_audit/revalidate.py --sources equivalent_stand --output equivalent_stand_revalidation_check",
+      "name": "revalidate_equivalent_stand",
+      "output_line_count": 1,
+      "output_sha256": "733fc429e5b8dbade7869697fa893b4948ef11f7ebc6c3cbb9ccc15d1b812bf6",
+      "output_tail": [
+        "REVALIDATION 203 203 classification changes 0"
+      ],
+      "passed": true,
+      "returncode": 0,
+      "saved_artifact": "equivalent_stand_revalidation.json",
+      "saved_artifact_provenance_refreshed_to_current_generator": false,
+      "seconds": 24.2,
+      "summary": "REVALIDATION 203 203 classification changes 0"
+    },
+    {
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/pose_audit/pose_export.py --check",
+      "name": "pose_export_freshness",
+      "output_line_count": 1,
+      "output_sha256": "37b1aee0b4dd4f017307083333e5c1226f76cb08799a32ae1037ca3f55e3921f",
+      "output_tail": [
+        "POSE_DATA_FRESHNESS = PASS"
+      ],
+      "passed": true,
+      "returncode": 0,
+      "seconds": 0.1,
+      "summary": "POSE_DATA_FRESHNESS = PASS"
+    },
+    {
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/pose_audit/test_pose_audit.py",
+      "name": "pose_audit_tests",
+      "output_line_count": 23,
+      "output_sha256": "4f53b1267d2eac021c5f9d03bf15f123d3538d47c63d3cfa258e6a7bdbd9d491",
+      "output_tail": [
+        "test_sources_and_saved_keyframes (__main__.AuditTests.test_sources_and_saved_keyframes) ... ok",
+        "test_support_policies (__main__.AuditTests.test_support_policies) ... ok",
+        "test_251_route_is_recomputed_not_copied (__main__.ConnectivityTests.test_251_route_is_recomputed_not_copied) ... ok",
+        "test_body_only_connection_absence_is_bounded_not_proved (__main__.ConnectivityTests.test_body_only_connection_absence_is_bounded_not_proved) ... ok",
+        "test_components_recomputed_from_validated_edges (__main__.ConnectivityTests.test_components_recomputed_from_validated_edges) ... ok",
+        "test_lower_envelope_classification_is_recomputed (__main__.ConnectivityTests.test_lower_envelope_classification_is_recomputed) ... ok",
+        "test_xgo_per_action_audit_fields (__main__.ConnectivityTests.test_xgo_per_action_audit_fields) ... ok",
+        "test_recorded_provenance_hashes_match_files (__main__.ReportTests.test_recorded_provenance_hashes_match_files) ... ok",
+        "test_report_answers_every_required_question_and_states_safety (__main__.ReportTests.test_report_answers_every_required_question_and_states_safety) ... ok",
+        "----------------------------------------------------------------------",
+        "Ran 20 tests in 13.068s",
+        "OK"
+      ],
+      "passed": true,
+      "returncode": 0,
+      "seconds": 13.8,
+      "summary": "Ran 20 tests in 13.068s; OK"
+    },
+    {
+      "command": "bash /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/tests/run_motion_host_tests.sh",
+      "name": "host_motion_runner_g1_g2_g3_pose",
+      "output_line_count": 26,
+      "output_sha256": "bbb21b836428746d12c8d86fb3cbba73ff36f16685d5a1329d999dcd6bbad74c",
+      "output_tail": [
+        "C4-A max joint difference=5.498188095520e-07 rad; C4-C=2.110450133915e-04 rad; refined Python IK=3.730215580866e-10 rad; delta difference=2.108700418759e-04 rad",
+        "STAND_METRICS {\"branch_changes\": [0, 0, 0, 0], \"max_delta\": [[0, 0.012288128068594917, 0.0225291444407838], [2.220446049250313e-16, 0.012288128068594917, 0.0225291444407838], [2.220446049250313e-16, 0.010920836394428535, 0.016688362809624158], [2.220446049250313e-16, 0.010920836394428535, 0.016688362809624158]], \"max_drift\": 9.813077866773594e-17, \"max_joint_delta\": 0.0225291444407838, \"max_residual\": 7.473417450352271e-17, \"min_margin\": 0.3049188401684514, \"samples\": 51}",
+        "C4_POLICY = PASS 52/52 poses; min non-foot ground=2.708862337240e-03 m; min knee/contact=8.775925732693e-02 m",
+        "STARTUP_TIMED_STAND: 12225 checks, 0 failures; 40 state/event pairs",
+        "STARTUP_TIMED_ORACLE = PASS: 303 timed frames; 101 distinct C4 ground/knee/support evaluations; 80 Python contact IK derivative solves",
+        "contact residual=6.206335383118e-17 m; drift=8.673617379884e-17 m; non-foot clearance=2.708862337240e-03 m; knee/contact=8.775925732693e-02 m; support-proxy margin=7.400000000000e-02 m",
+        "derivative comparison max velocity error=2.983287304692e-09 rad/s; acceleration error=5.634461444082e-07 rad/s^2",
+        "G3_METRICS {\"acceleration\": [[9.96774041247902e-17, 0.7758230157055311, 1.422762505887935], [7.709385414424723e-17, 0.7758230157055311, 1.422762505887935], [8.755757739420554e-17, 0.7473849735272482, 1.1120368779921843], [1.099143093391754e-16, 0.7473849735272482, 1.1120368779921843]], \"branch_changes\": [0, 0, 0, 0], \"drift\": 9.813077866773594e-17, \"duration\": 2, \"margin\": 0.3049188401684514, \"residual\": 6.938893903907228e-17, \"samples\": 101, \"velocity\": [[6.116397076639973e-17, 0.41576475595867446, 0.7610655115442959], [6.062396013738201e-17, 0.41576475595867446, 0.7610655115442959], [6.928544069841861e-17, 0.4648755494203885, 0.6409645508813887], [6.949519702622074e-17, 0.4648755494203885, 0.6409645508813886]]}",
+        "G3_METRICS {\"acceleration\": [[1.5948384659966434e-17, 0.124131682512885, 0.2276420009420696], [1.2335016663079559e-17, 0.124131682512885, 0.2276420009420696], [1.4009212383072888e-17, 0.11958159576435971, 0.17792590047874954], [1.7586289494268067e-17, 0.11958159576435971, 0.17792590047874954]], \"branch_changes\": [0, 0, 0, 0], \"drift\": 9.813077866773594e-17, \"duration\": 5, \"margin\": 0.3049188401684514, \"residual\": 6.938893903907228e-17, \"samples\": 101, \"velocity\": [[2.4465588306559896e-17, 0.16630590238346982, 0.3044262046177184], [2.4249584054952805e-17, 0.16630590238346982, 0.3044262046177184], [2.7714176279367444e-17, 0.1859502197681554, 0.2563858203525555], [2.77980788104883e-17, 0.1859502197681554, 0.25638582035255547]]}",
+        "G3_METRICS {\"acceleration\": [[3.9870961649916086e-18, 0.03103292062822125, 0.0569105002355174], [3.0837541657698896e-18, 0.03103292062822125, 0.0569105002355174], [3.502303095768222e-18, 0.02989539894108993, 0.044481475119687384], [4.396572373567017e-18, 0.02989539894108993, 0.044481475119687384]], \"branch_changes\": [0, 0, 0, 0], \"drift\": 9.813077866773594e-17, \"duration\": 10, \"margin\": 0.3049188401684514, \"residual\": 6.938893903907228e-17, \"samples\": 101, \"velocity\": [[1.2232794153279948e-17, 0.08315295119173491, 0.1522131023088592], [1.2124792027476402e-17, 0.08315295119173491, 0.1522131023088592], [1.3857088139683722e-17, 0.0929751098840777, 0.12819291017627776], [1.389903940524415e-17, 0.0929751098840777, 0.12819291017627774]]}",
+        "POSE_DATA_FRESHNESS = PASS",
+        "POSE_SUPPORT = PASS: 448 policy combinations; ground classes, invalid inputs, 6 static targets, unchanged startup gate"
+      ],
+      "passed": true,
+      "returncode": 0,
+      "seconds": 270.3,
+      "summary": "POSE_SUPPORT = PASS: 448 policy combinations; ground classes, invalid inputs, 6 static targets, unchanged startup gate"
+    },
+    {
+      "command": "bash /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/tests/run_host_tests.sh",
+      "name": "full_host_suite",
+      "output_line_count": 74,
+      "output_sha256": "608b8c8126b5d5a59973b4bd28c87646bb5189cd0052cea3266e1553b1b70032",
+      "output_tail": [
+        "C4-A max joint difference=5.498188095520e-07 rad; C4-C=2.110450133915e-04 rad; refined Python IK=3.730215580866e-10 rad; delta difference=2.108700418759e-04 rad",
+        "STAND_METRICS {\"branch_changes\": [0, 0, 0, 0], \"max_delta\": [[0, 0.012288128068594917, 0.0225291444407838], [2.220446049250313e-16, 0.012288128068594917, 0.0225291444407838], [2.220446049250313e-16, 0.010920836394428535, 0.016688362809624158], [2.220446049250313e-16, 0.010920836394428535, 0.016688362809624158]], \"max_drift\": 9.813077866773594e-17, \"max_joint_delta\": 0.0225291444407838, \"max_residual\": 7.473417450352271e-17, \"min_margin\": 0.3049188401684514, \"samples\": 51}",
+        "C4_POLICY = PASS 52/52 poses; min non-foot ground=2.708862337240e-03 m; min knee/contact=8.775925732693e-02 m",
+        "STARTUP_TIMED_STAND: 12225 checks, 0 failures; 40 state/event pairs",
+        "STARTUP_TIMED_ORACLE = PASS: 303 timed frames; 101 distinct C4 ground/knee/support evaluations; 80 Python contact IK derivative solves",
+        "contact residual=6.206335383118e-17 m; drift=8.673617379884e-17 m; non-foot clearance=2.708862337240e-03 m; knee/contact=8.775925732693e-02 m; support-proxy margin=7.400000000000e-02 m",
+        "derivative comparison max velocity error=2.983287304692e-09 rad/s; acceleration error=5.634461444082e-07 rad/s^2",
+        "G3_METRICS {\"acceleration\": [[9.96774041247902e-17, 0.7758230157055311, 1.422762505887935], [7.709385414424723e-17, 0.7758230157055311, 1.422762505887935], [8.755757739420554e-17, 0.7473849735272482, 1.1120368779921843], [1.099143093391754e-16, 0.7473849735272482, 1.1120368779921843]], \"branch_changes\": [0, 0, 0, 0], \"drift\": 9.813077866773594e-17, \"duration\": 2, \"margin\": 0.3049188401684514, \"residual\": 6.938893903907228e-17, \"samples\": 101, \"velocity\": [[6.116397076639973e-17, 0.41576475595867446, 0.7610655115442959], [6.062396013738201e-17, 0.41576475595867446, 0.7610655115442959], [6.928544069841861e-17, 0.4648755494203885, 0.6409645508813887], [6.949519702622074e-17, 0.4648755494203885, 0.6409645508813886]]}",
+        "G3_METRICS {\"acceleration\": [[1.5948384659966434e-17, 0.124131682512885, 0.2276420009420696], [1.2335016663079559e-17, 0.124131682512885, 0.2276420009420696], [1.4009212383072888e-17, 0.11958159576435971, 0.17792590047874954], [1.7586289494268067e-17, 0.11958159576435971, 0.17792590047874954]], \"branch_changes\": [0, 0, 0, 0], \"drift\": 9.813077866773594e-17, \"duration\": 5, \"margin\": 0.3049188401684514, \"residual\": 6.938893903907228e-17, \"samples\": 101, \"velocity\": [[2.4465588306559896e-17, 0.16630590238346982, 0.3044262046177184], [2.4249584054952805e-17, 0.16630590238346982, 0.3044262046177184], [2.7714176279367444e-17, 0.1859502197681554, 0.2563858203525555], [2.77980788104883e-17, 0.1859502197681554, 0.25638582035255547]]}",
+        "G3_METRICS {\"acceleration\": [[3.9870961649916086e-18, 0.03103292062822125, 0.0569105002355174], [3.0837541657698896e-18, 0.03103292062822125, 0.0569105002355174], [3.502303095768222e-18, 0.02989539894108993, 0.044481475119687384], [4.396572373567017e-18, 0.02989539894108993, 0.044481475119687384]], \"branch_changes\": [0, 0, 0, 0], \"drift\": 9.813077866773594e-17, \"duration\": 10, \"margin\": 0.3049188401684514, \"residual\": 6.938893903907228e-17, \"samples\": 101, \"velocity\": [[1.2232794153279948e-17, 0.08315295119173491, 0.1522131023088592], [1.2124792027476402e-17, 0.08315295119173491, 0.1522131023088592], [1.3857088139683722e-17, 0.0929751098840777, 0.12819291017627776], [1.389903940524415e-17, 0.0929751098840777, 0.12819291017627774]]}",
+        "POSE_DATA_FRESHNESS = PASS",
+        "POSE_SUPPORT = PASS: 448 policy combinations; ground classes, invalid inputs, 6 static targets, unchanged startup gate"
+      ],
+      "passed": true,
+      "returncode": 0,
+      "seconds": 285.4,
+      "summary": "POSE_SUPPORT = PASS: 448 policy combinations; ground classes, invalid inputs, 6 static targets, unchanged startup gate"
+    },
+    {
+      "command": "python3 /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/static_audit.py",
+      "name": "static_audit",
+      "output_line_count": 2,
+      "output_sha256": "3e0609413353547347de7aa1f10f77b6897d1161cf91f25dcae73fa841b2e441",
+      "output_tail": [
+        "Scanned 143 source files under /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller",
+        "STATIC_AUDIT = PASS"
+      ],
+      "passed": true,
+      "returncode": 0,
+      "seconds": 323.0,
+      "summary": "STATIC_AUDIT = PASS"
+    },
+    {
+      "command": "g++ -std=c++17 -O1 -g -fno-exceptions -fno-rtti -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -no-pie -o /tmp/matdog-g35-asan-lw0xcr6i/test_pose_support_asan /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/tests/test_pose_support.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp",
+      "name": "sanitizer_build_asan_ubsan",
+      "output_line_count": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output_tail": [],
+      "passed": true,
+      "returncode": 0,
+      "seconds": 3.2,
+      "summary": ""
+    },
+    {
+      "command": "/tmp/matdog-g35-asan-lw0xcr6i/test_pose_support_asan",
+      "name": "sanitizer_run_asan_ubsan",
+      "output_line_count": 1,
+      "output_sha256": "e82c6ba5bcadcee44ee6cd6a83361da58c066179c24bdcfd2fc9f081116cb9dd",
+      "output_tail": [
+        "POSE_SUPPORT = PASS: 448 policy combinations; ground classes, invalid inputs, 6 static targets, unchanged startup gate"
+      ],
+      "passed": true,
+      "returncode": 0,
+      "seconds": 0.0,
+      "summary": "POSE_SUPPORT = PASS: 448 policy combinations; ground classes, invalid inputs, 6 static targets, unchanged startup gate"
+    },
+    {
+      "command": "git diff --check HEAD",
+      "name": "git_diff_check",
+      "output_line_count": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output_tail": [],
+      "passed": true,
+      "returncode": 0,
+      "seconds": 0.0,
+      "summary": ""
+    }
+  ],
+  "provenance": {
+    "generator_sha256": "b57a877d4288a4ada45dae9eff329cd5c8e742ba450707c205764bea8e4256b9"
+  },
+  "scope": "offline software gates only: host compiler, Python, git; no hardware, serial device, ServoBus, servo command, Torque, flashing or EEPROM access",
+  "source_digest": "1faca16f2023f0cca9908cafbdf7dcd5574fa3fea5af2c32f74f6d3d3039403f",
+  "source_digest_file_count": 93
+}
