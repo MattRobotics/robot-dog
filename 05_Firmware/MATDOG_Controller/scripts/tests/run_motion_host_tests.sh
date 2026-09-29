@@ -59,3 +59,9 @@ python3 "$REPO_DIR/06_Software/Matdog_Core/pose_audit/pose_export.py" --check
   "$SKETCH_DIR/src/motion/BodyPose.cpp" \
   "$SKETCH_DIR/src/motion/StartupAcquisition.cpp"
 "$OUT/test_pose_support"
+
+# G4 normalized Cartesian gait and semantic locomotion lifecycle.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -fno-exceptions -fno-rtti \
+  -o "$OUT/test_gait" "$SCRIPT_DIR/test_gait.cpp" \
+  "$SKETCH_DIR"/src/motion/*.cpp
+"$OUT/test_gait"

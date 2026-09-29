@@ -1,0 +1,401 @@
+{
+  "source_commit": "a1b34a8594e5bc76c76b1e3ddf89a3aef2b98298",
+  "view": "read-only git archive; original checkout untouched",
+  "firmware_sha256": "71032255ffac656c75234c2dcf6a40b307aefc753a92a04c1d0f707d67db6b0e",
+  "inventory": [
+    {
+      "path": "docs/reverse/milestone_g1_proof_completeness.md",
+      "sha256": "5636c98b7ed36ab5ade45597e02fc4d76749a8d8284dcb9f7b0ae16c81693b58"
+    },
+    {
+      "path": "docs/reverse/milestone_g1_writer_equation_closeout.md",
+      "sha256": "ce25dedceac7040f105c62e0b28b4f72b0939a75992009ff3d5d921985563538"
+    },
+    {
+      "path": "docs/reverse/milestone_g21_semantic_reconciliation.md",
+      "sha256": "b0942abcf573067bd0146cd723e590fb8147c4a25e6d0d7c07c320aa3065f22e"
+    },
+    {
+      "path": "docs/reverse/milestone_g2_gait_writer_mathematics.md",
+      "sha256": "aa10351c3aaa02829fe5c8821e4bea05ff4e86b542c675793643c6332d56e14d"
+    },
+    {
+      "path": "docs/reverse/milestone_g2_runtime_binding.md",
+      "sha256": "644bdd5fd5ae8dc14915c35809ef425144a8643f93a3d91030a24c802479c349"
+    },
+    {
+      "path": "docs/reverse/milestone_g2_runtime_writer_closeout.md",
+      "sha256": "380bd809affd0f7f94b321e4501a5d1aedb47544224dd899efd16339092666cb"
+    },
+    {
+      "path": "docs/reverse/milestone_g_gait_scheduler_reconstruction.md",
+      "sha256": "c10ecfcfb44a7e517fb31f0350004e02b69684e72be0dfd1c80f8043f6ac3c70"
+    },
+    {
+      "path": "docs/reverse/milestone_h1_clean_room_interface_specification.md",
+      "sha256": "006bc311d755afdcb28274475f7625b83b6912c2cbb13a11322d572d747dc84d"
+    },
+    {
+      "path": "docs/reverse/milestone_h2_matdog_transfer_boundary.md",
+      "sha256": "aead97776d9aa807d9d2cd3daa1a1a3425bdf95cc4b7bf9f9e4e757e442aa140"
+    },
+    {
+      "path": "evidence/gait/milestone_g1_address_reconciliation.csv",
+      "sha256": "f34fabce5ad826eeb64aba5e4a90e35e42526cde54ac7ee099cbcc152b7799ef",
+      "rows": 23,
+      "classifications": [
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g1_e0_document_crosswalk.csv",
+      "sha256": "2d3758da758a3bd54750261221601c3617f0176a68e5764a1a41d014db9ec894",
+      "rows": 24,
+      "classifications": [
+        "CORROBORATED",
+        "UNKNOWN"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g1_unresolved.csv",
+      "sha256": "e2ee5c06e413d800ea7bff773949d3f9383969338352e74acfcdad5ba05bb436",
+      "rows": 11,
+      "classifications": [
+        "UNKNOWN"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g1_writer_equations.csv",
+      "sha256": "b730e60e4d9c8246d502cdbe65732b2ed5ff43d000b7a50a5711957537b55160",
+      "rows": 75,
+      "classifications": [
+        "CORROBORATED",
+        "UNKNOWN"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g2_constant_pool.csv",
+      "sha256": "567c64611fb20612e702a7582e0543c49cdd27fd272d19343dc5c31bb773c70e",
+      "rows": 89,
+      "classifications": [
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g2_e0_symbolic_crosswalk.csv",
+      "sha256": "4fbffa90ea13aa78346df4a9c1e1c334edffced6f16e77f33782ff220e3db1e9",
+      "rows": 7,
+      "classifications": [
+        "CORROBORATED",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g2_helper_map.csv",
+      "sha256": "3914e1d8536320b9e8e0d24a174151b07f5c40178d4a6eb1388b4fbdf2ca96ae",
+      "rows": 17,
+      "classifications": [
+        "CORROBORATED",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g2_unresolved.csv",
+      "sha256": "92698c57e9462d5a1f47cd2bc9a43a3f0bcc9d85e579cebf2185998638684ae7",
+      "rows": 5,
+      "classifications": [
+        "UNKNOWN"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g2_writer_continuity.csv",
+      "sha256": "a45e79ea469837bdb63fba0aa7a8c6f064e943eaae99469ead5a845e23d1766f",
+      "rows": 40,
+      "classifications": [
+        "CORROBORATED",
+        "UNKNOWN",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g2_writer_formulas.csv",
+      "sha256": "f6418e9adb692ef8127809678e2b47d4fe40459119fdf67956894cc17174cc19",
+      "rows": 102,
+      "classifications": [
+        "CORROBORATED",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g_cartesian_target_writer_map.csv",
+      "sha256": "94e17d6bd7be2df1f27cab504b3590e9860b56b6a1d9e7b5c9b001ccf807d5e7",
+      "rows": 10,
+      "classifications": [
+        "CORROBORATED",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g_command_state_map.csv",
+      "sha256": "4407b8cafba6cbda62043fd5ce2696494f556e0039c6d9bcd69ea806d529cada",
+      "rows": 11,
+      "classifications": [
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g_e0_crosswalk.csv",
+      "sha256": "0efe0c289e6b5b997eb357f9e03873544cf0b17658b1fba3701192f6ae71d561",
+      "rows": 11,
+      "classifications": [
+        "CORROBORATED",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g_function_map.csv",
+      "sha256": "8f5713ed6c3ff514237a9776ccc90c969172e32f5164a27e2b0e33d35d5fa51e",
+      "rows": 17,
+      "classifications": [
+        "CORROBORATED",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g_gait_mode_dispatch.csv",
+      "sha256": "9895ea2885b84a0cc4fb64df5d203e29b916f4cee0e22cf22e64be4dd5dc8439",
+      "rows": 7,
+      "classifications": [
+        "CORROBORATED",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g_ik_convergence_map.csv",
+      "sha256": "6a5b0355f0145103aff970fa211af78609f01d3d0e4ee28ceff35247a5068dd0",
+      "rows": 7,
+      "classifications": [
+        "CORROBORATED",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g_leg_phase_order_map.csv",
+      "sha256": "6f72805cc5f87e3136118a7966fcd090f14252d1935a45f8a49e740388d807fd",
+      "rows": 6,
+      "classifications": [
+        "CORROBORATED",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g_phase_state_map.csv",
+      "sha256": "7073b159d6a4366d60ed5808be74a8dcdc21bee5fda0bc253b4e9aef198c099b",
+      "rows": 9,
+      "classifications": [
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g_scheduler_timing_map.csv",
+      "sha256": "a34127c4f8e2981432a6c26c77159a305ec96b48f99581324b954adebe8c6f46",
+      "rows": 7,
+      "classifications": [
+        "CORROBORATED",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g_trajectory_equation_map.csv",
+      "sha256": "8ed1030b075ce70e311eb3da7b003b9e419479cfd8ed737e844d308d404080ca",
+      "rows": 9,
+      "classifications": [
+        "CORROBORATED",
+        "UNKNOWN",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/gait/milestone_g_unresolved.csv",
+      "sha256": "65d7bd64be76ce1e336a6c7ad338698f4ffed8777516cd9eead6a008304b1025",
+      "rows": 9,
+      "classifications": [
+        "UNKNOWN"
+      ]
+    },
+    {
+      "path": "evidence/runtime/milestone_g2_address_mapping.csv",
+      "sha256": "43994f568f70fdc3a10350c7a5bbf9bcfb1dd1d523147e5baceb202a1c09a4c6",
+      "rows": 11,
+      "classifications": [
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/runtime/milestone_g2_function_pointer_map.csv",
+      "sha256": "9478f214557b1e3f9160156d22d7ce60ae07c64e1d72df84c1c1c72ba8fbfcf4",
+      "rows": 10,
+      "classifications": [
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/runtime/milestone_g2_packet_validation_map.csv",
+      "sha256": "c7986205b7032ed194c6fbc75ae35fb6c857d33809fce88856c956cc3128333b",
+      "rows": 18,
+      "classifications": [
+        "UNKNOWN",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/runtime/milestone_g2_receive_edge_map.csv",
+      "sha256": "338ca2abe333afa4d6032ab2f80416a63852a22160063544955450db8f8c187d",
+      "rows": 26,
+      "classifications": [
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/runtime/milestone_g2_receive_function_map.csv",
+      "sha256": "f3db16a2eda5913a1d4de1b8a5578cadba586b9f4a1e4de6521d36160a69a2fb",
+      "rows": 20,
+      "classifications": [
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/runtime/milestone_g2_runtime_unresolved.csv",
+      "sha256": "cb82401ef0fb17bc8b4986f586c2a6f06cbf3e2cfbb3f467ae62ac08c0bdc3f5",
+      "rows": 11,
+      "classifications": [
+        "UNKNOWN"
+      ]
+    },
+    {
+      "path": "evidence/runtime/milestone_g2_sdk_wrapper_map.csv",
+      "sha256": "4bd77802d491adba70e151d1e5ce5faa02a2d4454fa999afd4da4c1c3039a717",
+      "rows": 8,
+      "classifications": [
+        "CORROBORATED",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/runtime/milestone_g2_task_creation_map.csv",
+      "sha256": "5053a14373fca4fc7398fcca93897678f9ec63b2664a223d075ce64f1f2215df",
+      "rows": 5,
+      "classifications": [
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/runtime/milestone_g2_tick_rate_map.csv",
+      "sha256": "93fd3c27686599d82e6b8a9ad708aa668c62992177a35ce642cf3dcec7590f15",
+      "rows": 16,
+      "classifications": [
+        "CORROBORATED",
+        "UNKNOWN",
+        "VERIFIED"
+      ]
+    },
+    {
+      "path": "evidence/vendor/yahboom_gait_mode_map.csv",
+      "sha256": "f3cd7dc88fadede30e544e635caf0389b55a0b569a136c77c5a9b7bf633e5a71",
+      "rows": 4,
+      "classifications": [
+        "CORROBORATED"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "topic": "phase",
+      "confidence": "VERIFIED",
+      "evidence": "milestone_g_phase_state_map.csv PHASE-G-001..009",
+      "decision": "Four phase slots, shared increment, strict >P reset; MATDOG uses normalized modulo and supplied time."
+    },
+    {
+      "topic": "walk",
+      "confidence": "VERIFIED local / CORROBORATED physical",
+      "evidence": "milestone_g_leg_phase_order_map.csv LEGPH-G-002; milestone_g21_semantic_reconciliation.md",
+      "decision": "Quarter-spaced logical slots. MATDOG chooses canonical rear/front alternating sequence and studies support."
+    },
+    {
+      "topic": "trot",
+      "confidence": "VERIFIED local / CORROBORATED physical",
+      "evidence": "LEGPH-G-001,005,006; G2.1",
+      "decision": "Alternating slot pairs; physical mode and leg mapping remain corroborated."
+    },
+    {
+      "topic": "writers",
+      "confidence": "VERIFIED / mode 2 CORROBORATED",
+      "evidence": "milestone_g2_writer_formulas.csv MG2-F-001..102",
+      "decision": "Six explicit writers including mark-time/high-walk candidate; geometry/signs/units unbound."
+    },
+    {
+      "topic": "continuity",
+      "confidence": "VERIFIED local",
+      "evidence": "milestone_g2_writer_continuity.csv",
+      "decision": "Piecewise endpoints and integer-floor residuals; MATDOG instead uses explicit C2 swing."
+    },
+    {
+      "topic": "commands",
+      "confidence": "VERIFIED local",
+      "evidence": "milestone_g_command_state_map.csv",
+      "decision": "Translation/yaw/body command writers, mode dispatch, phase reset. No numeric transfer."
+    },
+    {
+      "topic": "interpolation",
+      "confidence": "VERIFIED",
+      "evidence": "milestone_g_trajectory_equation_map.csv; milestone_g_cartesian_target_writer_map.csv",
+      "decision": "Linear previous-to-target interpolation; MATDOG quintic."
+    },
+    {
+      "topic": "body before IK",
+      "confidence": "VERIFIED call order / CORROBORATED role",
+      "evidence": "milestone_g_ik_convergence_map.csv",
+      "decision": "Body correction then Cartesian controller/interpolation then IK component. No IMU transfer."
+    },
+    {
+      "topic": "zero and stop",
+      "confidence": "VERIFIED local / UNKNOWN complete physical contract",
+      "evidence": "milestone_g_gait_mode_dispatch.csv MODE-G-007",
+      "decision": "Zero components clear phase initialization; smoothing exists. No proof of world-locked phase-consistent terminal stand."
+    },
+    {
+      "topic": "watchdog",
+      "confidence": "UNKNOWN locomotion expiry",
+      "evidence": "G/G2/G2.1 bounded evidence search; H2 host trace",
+      "decision": "Host response timeout is not command expiry. MATDOG freshness contract independently specified."
+    },
+    {
+      "topic": "timing",
+      "confidence": "VERIFIED requested delay / UNKNOWN actual cadence",
+      "evidence": "milestone_g2_runtime_binding.md; runtime tick/task maps",
+      "decision": "G2 linked mapping and 2 ms requested delay supersede G historical uncertainty; no timing value transferred."
+    },
+    {
+      "topic": "crawl and mark-time",
+      "confidence": "UNKNOWN physical crawl / VERIFIED mark-time local writer",
+      "evidence": "MG2-F-001..012; mode dispatch",
+      "decision": "No recovered crawl physical pose assumed; zero MATDOG command requests stop, not mark-time."
+    }
+  ],
+  "excluded_transfer": [
+    "geometry",
+    "joint angles",
+    "zeros",
+    "signs",
+    "joint limits",
+    "stride",
+    "lift",
+    "duty",
+    "period",
+    "gains",
+    "body height",
+    "velocity limits",
+    "acceleration limits",
+    "IMU tuning"
+  ]
+}

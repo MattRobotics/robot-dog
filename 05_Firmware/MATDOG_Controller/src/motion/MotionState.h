@@ -2,7 +2,7 @@
 #define MATDOG_MOTION_MOTION_STATE_H
 #include <stdint.h>
 namespace matdog { namespace motion {
-enum class MotionState : uint8_t { OFF, IDLE, STAND_TRANSITION, STAND, STOPPING };
+enum class MotionState : uint8_t { OFF, IDLE, STAND_TRANSITION, STAND, STOPPING, GAIT_START, WALK, TROT };
 enum class MotionEvent : uint8_t { ENABLE, DISABLE, BEGIN_STAND, STAND_COMPLETE, STOP, STOP_COMPLETE, FAULT };
 // G3: BEGIN_STAND/STAND_COMPLETE cannot be injected as public events.
 // StandTransition alone commits verified entry and successful full completion.
