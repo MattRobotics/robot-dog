@@ -1,0 +1,101 @@
+{
+  "status": "INCOMPLETE_CHECKPOINT_INVENTORY",
+  "checkpoint_sha": "aa621bff14ff16bab428d5eeec58787677e8224d",
+  "excludes": [
+    "checkpoint_manifest.json (self)"
+  ],
+  "files": {
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/G4_CHECKPOINT_REQUEST.txt": {
+      "sha256": "aca394ac518ae77111d63753a4a77d9e33a3fdbf841ffa3d60b85032589884bb",
+      "bytes": 10522
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/G4_CLAUDE_HANDOFF_2026-09-29.md": {
+      "sha256": "d2f118a2b264346969b0c0216c69c478b73096e8fa9ada41c139e168b2a9f441",
+      "bytes": 28416
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/G4_ORIGINAL_REQUEST.txt": {
+      "sha256": "5c555eb8ca35da8f77bc2b33641889c568746b09ec2a83025ce81072fc433588",
+      "bytes": 27341
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-full.log": {
+      "sha256": "f13e3ec81a8b56dd7c3b2d84b948714dc73b6e16a2ddccb3978b9e27fd5a176a",
+      "bytes": 689
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-lifecycle.log": {
+      "sha256": "b9e116011238a391f6143e4482803c5a74f97805d87fbb09bc6dbf4ab8d90e6d",
+      "bytes": 127
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-manifest.log": {
+      "sha256": "9f22884d623df2927a415198cf3d5f24f59a32d9211487eca984e43c2997a49d",
+      "bytes": 44
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-oracle.log": {
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "bytes": 684
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-pose-regression.log": {
+      "sha256": "c5dca781dbcc8663ea502a70e19442204ee261e300a188794d1e6fb9070f8ec1",
+      "bytes": 3001
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-refine.log": {
+      "sha256": "5af71af44e409510620903f8248771a2dbb0061d317be82b26b82f726aae9bd8",
+      "bytes": 370
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-sanitizer.log": {
+      "sha256": "bea572b2d3723d21a530915a7cc4c738b0e53e8310120d6232d6f2a18996b5af",
+      "bytes": 44
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-screen.log": {
+      "sha256": "edf0cdf330c51a4d7f86b2c75dafbd6e98688f07a02e90fcb912aa9b647623d9",
+      "bytes": 566
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-static.log": {
+      "sha256": "622fc95fe2b2ff2f85573f48b57ea3a6492e1b65e27008b7885c4bc827ded82e",
+      "bytes": 143
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/targeted_checkpoint_validation.log": {
+      "sha256": "c9bd09f1fe3df5eef47a3dfe8d10ed23fe87187e72ad052c3d5f1a1862ee9745",
+      "bytes": 330
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/definitions.json": {
+      "sha256": "6f6c7ebd273797a0331390ad4768aa200f9c403bbade55d7efe791ec57652da6",
+      "bytes": 4764
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/envelope_grid.csv": {
+      "sha256": "198db73446dbf5be9efb183bf62606487f4f47b646e3b7e0bc5a822a06247557",
+      "bytes": 150741
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/full_cases.json": {
+      "sha256": "cdd1d29da08a726120bf962cfc527356bcade5a16fcccde34c44b7f69957ff3a",
+      "bytes": 8435622
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/handoff_state.json": {
+      "sha256": "cc30f7a653e68bdde95f17acbd0e744888a6877b563709d1390f3db80a3b1670",
+      "bytes": 52278
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/lifecycle_audit.json": {
+      "sha256": "37cdda86a0e3c4e822779b93ee031cac2387b9118de6c8711f0c88a19fbc83ec",
+      "bytes": 1156904
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/oracle_results.json": {
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "bytes": 684
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/refinement_full.json": {
+      "sha256": "020ac10bc6b327a427be3e2da362e69f708cd63e3fdbac98b17d34ca72e7a24f",
+      "bytes": 4562995
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/refinement_screen.json": {
+      "sha256": "4de3e6eacd399ef0e5eef0acc12349b8551ddf697a7cf0d7c66f93c4cd834539",
+      "bytes": 605147
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/screen.json": {
+      "sha256": "2c72b6a73492961f1f866b079e725882b74234b4f431d78248c3347554b87cef",
+      "bytes": 3912844
+    },
+    "09_Logs/Validation_Reports/G4_Gait_Envelope/xgo_architecture.json": {
+      "sha256": "4abb64c8adb4f17300f612edbd115344a78e6a521a09445c43626f991b24dcd6",
+      "bytes": 13100
+    }
+  }
+}
