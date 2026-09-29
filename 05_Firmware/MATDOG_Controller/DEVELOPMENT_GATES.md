@@ -404,6 +404,14 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     [`../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/`](../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/).
     **Next: CR3 acceptance/persistence/promotion policy; no motion authorization changes.**
 
+- **Four-leg Full Calibration (2026-09-29): IMPLEMENTED / OFFLINE-VALIDATED, hardware TO_TEST.**
+  One build runs LF → RF → RH → LH, each as its own session + fresh permit, through the same
+  `FullLegCalibrationExecutor`/`ContactProbeEngine`/`CalibrationManager`/`SafeActuatorPolicy`.
+  The end state a hardware run can honestly claim is `HARDWARE_CONTACT_CALIBRATED`;
+  `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` stays unreachable until an approved stand/gait
+  workspace turns `kFullLegOperationalParametersApproved` on (audit-pinned `false`). Procedure:
+  [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md).
+
 ## HostLink semantic layer
 
 - **PURPOSE** — one semantic command/service contract independent of transport.

@@ -3108,3 +3108,12 @@ RF/data-plane and OTA network end-to-end validation; separate full calibration w
 
 Full observations, flash provenance and recovery-backup reference:
 [`2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md`](../../09_Logs/Development_Log/2026-09-26_LED_STATUS_MANAGER_V2_HW_VALIDATION.md).
+
+## Full Calibration four-leg generalization — offline validation — 2026-09-29
+
+**OFFLINE-VALIDATED; hardware TO_TEST.** Host suite green (executor 695, plan 550, finalizer
+2616 checks); static audit PASS with the new `check_full_leg_calibration_wiring` and its mutation
+cases; USB_ONLY build and ROBOT_POWERED compile clean. No hardware access, flash or motion.
+A hardware run is expected to end each leg at `HARDWARE_CONTACT_CALIBRATED` with
+`envelope_accepted=0` and 0 of 12 JointLimits admitted (unapproved placeholder parameters).
+Procedure: [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md).

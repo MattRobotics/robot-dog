@@ -293,6 +293,18 @@ Unblocking it needs a real recalibration and a reviewed change to
 
 ---
 
+## 9.1 Operational-limit admission (four-leg Full Calibration)
+
+`SafeActuatorPolicy::validateOperationalLimit()` / `admitOperationalLimit()` are the only door
+through which a calibration result reaches the `POSITION_COMMAND` limit table: the limit must be
+`PROMOTED`, `LIVE_SESSION`-origin, bound to the current geometry and backed by a transform
+found under `currentGeometryTag()`. The only production caller is
+`FullLegCalibrationFinalizer.cpp` (audit-confined), and only when the envelope parameters are
+approved - they are not, so a hardware run admits no limit and ends at
+`HARDWARE_CONTACT_CALIBRATED`. See the 2026-09-29 development log.
+
+---
+
 ## 10. Related
 
 - [`CALIBRATION_SOURCE_PRECEDENCE.md`](CALIBRATION_SOURCE_PRECEDENCE.md) — source precedence, §7 EEPROM boundary

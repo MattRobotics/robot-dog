@@ -1,5 +1,24 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — Full Calibration generalized to LF → RF → RH → LH — 2026-09-29
+
+**IMPLEMENTED / OFFLINE-VALIDATED. Never run on hardware.** One `ROBOT_POWERED` build can
+calibrate all four legs in one session.
+
+- `@CALIBRATION SESSION START <LF|RF|RH|LH> CONFIRM_CURRENT_Q0` and
+  `@CALIBRATION FULL LEG <LF|RF|RH|LH> CONFIRM_FULL_CALIBRATION` are strict four-token
+  commands; buses, identities, MIN/MAX endpoints and parking are derived (canonical allocation →
+  Geometry V5), not typed. Parking: LF→LH_UPPER, RF→RH_UPPER, RH none, LH none. The
+  `DIRECTION_VERIFY LF_UPPER +16` diagnostic stays exact and LF-only.
+- Evidence lifecycle closes at COMPLETE (contacts → envelopes → limit admission →
+  `completeSession()` → permit revoked → authority NONE) into a RAM record per leg;
+  `@CALIBRATION EVIDENCE EXPORT` prints all four deterministically.
+- **`HARDWARE_CONTACT_CALIBRATED` ≠ `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED`.** No approved
+  stand/gait workspace exists, so production envelope parameters are unapproved placeholders and
+  hardware runs end at the first level; 0 of 12 JointLimits are admitted.
+- Runbook: [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md).
+  Log: [`2026-09-29_CALIBRATION_FULL_4LEG.md`](../../09_Logs/Development_Log/2026-09-29_CALIBRATION_FULL_4LEG.md).
+
 ## Unreleased — LED V2 focused hardware validation recorded — 2026-09-26
 
 **Focused HARDWARE PASS; live charging-specific animations remain TO_TEST.**
