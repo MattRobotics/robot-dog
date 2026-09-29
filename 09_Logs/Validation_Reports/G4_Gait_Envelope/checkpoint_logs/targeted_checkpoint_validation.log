@@ -1,0 +1,6 @@
+Current checkpoint targeted validation:
+C++17 -O1 -Wall -Wextra -Werror -fno-exceptions -fno-rtti, all src/motion/*.cpp
+GAIT_HOST = PASS: 148291 checks, 0 failures
+ARTIFACT_MANIFEST OK 80 artifacts; historical generator revisions: 1
+git diff --check: PASS
+All current JSON artifacts parsed successfully. No live G4 jobs remained.

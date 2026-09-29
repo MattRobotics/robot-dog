@@ -57,3 +57,56 @@ lower-controller physical safety guarantee is inferred from names.
 
 No XGO geometry, joint angles, zeros, signs, limits, stride, lift, duty,
 period, gain, height or rate is transferred. No XGO code is executed.
+
+## Runtime contracts
+
+`Locomotion` owns a `StandTransition`. Its `LocomotionState` includes G4's
+GAIT_START/WALK/TROT while the accepted G3 `MotionState` and startup source
+files remain byte-identical. Public completion events cannot establish STAND.
+DISABLE/FAULT cancels semantic output; it is not a physical stop command.
+
+A start has one period of four-contact preparation, then two periods of
+quintic phase-speed acceleration (one geometric cycle). A stop finishes the
+current cycle and uses two periods to decelerate through one final cycle.
+Only future swing endpoints are planned to meet the canonical terminal stance;
+an in-flight swing is never retargeted. One final period recenters body height
+and fore/aft shift with four contacts locked. A stop during preparation returns
+through a four-contact hold. A new start retains the terminal world pose.
+The preparation and terminal joins have zero joint velocity and acceleration.
+
+The watchdog requires finite monotonic caller time, finite non-future command
+stamps, increasing sequence numbers and nondecreasing stamps. Equality at the
+configured expiry is fresh; strictly greater age is stale. Zero, stale,
+invalid or changed mode/geometry/period requests a semantic stop. A changed
+command is not applied mid-cycle; restart must be explicit from STAND.
+Invalid time produces an invalid frame. The phase range of one million cycles
+is a floating-point/resource boundary, not an actuator-rate limit.
+
+All defaults are study parameters, not approved physical operation values.
+`solveGait` yields only a kinematic candidate; `assessGait` consumes explicit
+collision/contact/support results. Full triangle and solid-containment checks
+are performed by the offline Python model. TROT's static support margin remains
+recorded but does not certify or reject its unproven dynamics.
+
+## Reproduction
+
+Use the pinned G3.5 Python environment (`pose_audit/requirements.txt`). From the
+repository root:
+
+```sh
+python 06_Software/Matdog_Core/gait_audit/xgo_evidence.py
+python 06_Software/Matdog_Core/gait_audit/oracle.py
+python 06_Software/Matdog_Core/gait_audit/survey.py --stage screen
+python 06_Software/Matdog_Core/gait_audit/survey.py --stage full
+python 06_Software/Matdog_Core/gait_audit/refine.py
+python 06_Software/Matdog_Core/gait_audit/lifecycle_audit.py
+python 06_Software/Matdog_Core/gait_audit/render.py
+```
+
+Screen results explicitly omit self-collision checks and reject at the first
+failure; their metrics cover only that prefix. Full results test every saved
+sample against all 17 meshes and all 120 nonadjacent pairs. The 16 assembly
+adjacency exclusions remain unchanged. A passing finite set does not prove
+continuous collision clearance or physical contact loads. Finer sampling can
+expose failures missed by the coarse screen. Envelope bounds are maximum tested
+passing values, not proven global limits or a continuous box of valid commands.

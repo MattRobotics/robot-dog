@@ -1,0 +1,33 @@
+test_accepted_geometry (__main__.AuditTests.test_accepted_geometry) ... ok
+test_asymmetry (__main__.AuditTests.test_asymmetry) ... ok
+test_collision_exclusions (__main__.AuditTests.test_collision_exclusions) ... ok
+test_contact_patch_distance (__main__.AuditTests.test_contact_patch_distance) ... ok
+test_deterministic_retarget_and_ik (__main__.AuditTests.test_deterministic_retarget_and_ik) ... ok
+test_evidence_cannot_promote (__main__.AuditTests.test_evidence_cannot_promote) ... ok
+test_freshness (__main__.AuditTests.test_freshness) ... ok
+test_height_bound (__main__.AuditTests.test_height_bound) ... ok
+test_independent_fk_and_com (__main__.AuditTests.test_independent_fk_and_com) ... ok
+test_sampled_contact_route (__main__.AuditTests.test_sampled_contact_route) ... ok
+test_six_promoted_poses_exact_contract (__main__.AuditTests.test_six_promoted_poses_exact_contract) ... ok
+test_sources_and_saved_keyframes (__main__.AuditTests.test_sources_and_saved_keyframes) ... ok
+test_support_policies (__main__.AuditTests.test_support_policies) ... ok
+test_251_route_classification_preserves_metrics (__main__.CloseoutTests.test_251_route_classification_preserves_metrics) ... ok
+test_components_by_edge_class_view (__main__.CloseoutTests.test_components_by_edge_class_view) ... ok
+test_edge_classes_are_explicit_and_consistent (__main__.CloseoutTests.test_edge_classes_are_explicit_and_consistent) ... ok
+test_four_foot_height_concepts_are_separate (__main__.CloseoutTests.test_four_foot_height_concepts_are_separate) ... ok
+test_g3_startup_and_motion_state_are_unchanged (__main__.CloseoutTests.test_g3_startup_and_motion_state_are_unchanged) ... ok
+test_pose_roles_separate_targets_from_motion_states (__main__.CloseoutTests.test_pose_roles_separate_targets_from_motion_states) ... ok
+test_report_carries_the_closeout_wording (__main__.CloseoutTests.test_report_carries_the_closeout_wording) ... ok
+test_xgo_and_base_link_wording (__main__.CloseoutTests.test_xgo_and_base_link_wording) ... ok
+test_251_route_is_recomputed_not_copied (__main__.ConnectivityTests.test_251_route_is_recomputed_not_copied) ... ok
+test_body_only_connection_absence_is_bounded_not_proved (__main__.ConnectivityTests.test_body_only_connection_absence_is_bounded_not_proved) ... ok
+test_components_recomputed_from_validated_edges (__main__.ConnectivityTests.test_components_recomputed_from_validated_edges) ... ok
+test_lower_envelope_classification_is_recomputed (__main__.ConnectivityTests.test_lower_envelope_classification_is_recomputed) ... ok
+test_xgo_per_action_audit_fields (__main__.ConnectivityTests.test_xgo_per_action_audit_fields) ... ok
+test_recorded_provenance_hashes_match_files (__main__.ReportTests.test_recorded_provenance_hashes_match_files) ... ok
+test_report_answers_every_required_question_and_states_safety (__main__.ReportTests.test_report_answers_every_required_question_and_states_safety) ... ok
+
+----------------------------------------------------------------------
+Ran 28 tests in 39.506s
+
+OK

@@ -1,0 +1,1070 @@
+We are resuming the MATDOG gait/motion workstream after a temporary handoff to
+Claude Code.
+
+Claude completed G3.5 and the G3.5.1 classification/contract closeout in the
+same gait worktree.
+
+Do NOT resume the old unfinished G3.5 task.
+
+The accepted gait worktree is:
+
+/home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine
+
+Branch:
+
+feat/gait-engine-offline-v1
+
+Expected accepted G3.5.1 HEAD:
+
+c4befbe
+
+Before implementing anything, independently verify the live state:
+
+- git status --short --branch
+- git rev-parse HEAD
+- git log -15 --oneline
+- git diff --stat
+- git diff --cached --stat
+- git ls-files --others --exclude-standard
+
+If HEAD is exactly c4befbe and the worktree is clean, treat G3.5/G3.5.1 as the
+accepted starting point for G4.
+
+If the gait worktree legitimately contains later commits, inspect them before
+continuing and do not overwrite them.
+
+Do NOT reset, clean, discard or rewrite history.
+
+============================================================
+IMPORTANT PARALLEL-WORK BOUNDARY
+============================================================
+
+A separate Claude Code session is currently working on MATDOG hardware
+calibration preparation.
+
+That workstream is independent from G4.
+
+Do NOT:
+
+- modify the calibration branch/worktree;
+- merge calibration work into the gait branch;
+- cherry-pick calibration commits;
+- edit q0;
+- edit motorDirection;
+- edit calibration transforms;
+- edit actuator provisioning;
+- edit servo configuration;
+- access hardware;
+- access serial devices;
+- run ServoBus;
+- send ST3215 commands;
+- flash firmware.
+
+If another worktree contains uncommitted calibration work, leave it completely
+untouched.
+
+G4 is restricted to the gait/motion worktree and offline semantic motion
+development.
+
+============================================================
+G3.5 / G3.5.1 ACCEPTED STATE
+============================================================
+
+The following conclusions were closed by the Claude handoff and must be read
+from the committed repository artifacts before G4 work begins.
+
+Important final G3.5.1 classifications include:
+
+- REST_GROUND is a real BODY_SUPPORT semantic pose in the mathematical model.
+- BODY_ONLY REST_GROUND -> autonomous STAND is NOT validated.
+- G3 runtime StartupAcquisition remains active and is NOT yet superseded.
+- LOW_C4 is not the geometric lower limit of MATDOG posture space.
+- The 1.001 µm PURE_FOOT_SUPPORT result is a tolerance-dependent mathematical
+  search boundary, NOT a physically robust locomotion clearance.
+- Engineering-robust minimum pure-foot height remains NOT ESTABLISHED.
+- The 251-sample BODY_AND_FOUR_FEET -> equivalent-stand route is
+  GEOMETRIC_PATH_CANDIDATE / RESEARCH ONLY.
+- It is NOT a validated transition to canonical STAND and must not be used for
+  startup.
+- The validated transition graph has 16 components when computed only from
+  VALIDATED edges.
+- Absence of a validated graph edge is NOT proof of physical impossibility.
+- The STAND validated component contains:
+    CRAWL_READY
+    LOW_C4
+    LOW_CROUCH
+    STAND
+    STRETCH
+- REST_GROUND is not currently in that validated STAND component.
+- Semantic pose targets and MotionState are separate concepts.
+- XGO pose/action/controller evidence may inform topology and architecture, but
+  no XGO physical joint configuration has sufficient sign/zero/scale binding to
+  be copied directly into MATDOG.
+- Approximate XGO/MATDOG geometric similarity must NOT be used as a numerical
+  1.5x conversion rule.
+
+For transition interpretation, use:
+
+09_Logs/Validation_Reports/G35_Pose_Audit/connectivity.json
+
+as the interpreted edge-classification source.
+
+Do NOT interpret VALID_SEQUENCE_CANDIDATE entries in older
+transition_graph.json as VALIDATED edges.
+
+Read at minimum:
+
+09_Logs/Validation_Reports/G35_Pose_Audit/REPORT.md
+09_Logs/Validation_Reports/G35_Pose_Audit/connectivity.json
+09_Logs/Validation_Reports/G35_Pose_Audit/closeout_classification.json
+09_Logs/Validation_Reports/G35_Pose_Audit/validation_results.json
+
+and the pose_audit README before starting implementation.
+
+Do not redo G3.5 research unless a concrete contradiction is found.
+
+============================================================
+NEXT MILESTONE
+============================================================
+
+Now proceed with:
+
+G4 — MATDOG NORMALIZED GAIT SCHEDULER, CARTESIAN WALK/TROT & GAIT ENVELOPE
+
+Use the full G4 requirements provided below.
+
+
+
+G3.5 / G3.5.1 review accepted.
+
+Proceed with the next isolated milestone:
+
+G4 — MATDOG NORMALIZED GAIT SCHEDULER, CARTESIAN WALK/TROT & GAIT ENVELOPE
+
+Current branch:
+
+feat/gait-engine-offline-v1
+
+Expected starting HEAD:
+
+c4befbe
+
+Worktree:
+
+/home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine
+
+First verify the live repository state.
+
+Do not assume HEAD if the repository has legitimately advanced.
+
+============================================================
+MISSION
+============================================================
+
+Implement and validate the first MATDOG locomotion engine offline.
+
+The objective is NOT yet to command the physical robot.
+
+The objective is to build a mathematically coherent, parameterized gait system:
+
+MotionCommand
+    ↓
+CommandWatchdog semantics
+    ↓
+MotionState / locomotion lifecycle
+    ↓
+Normalized Gait Scheduler
+    ↓
+per-leg phase
+    ↓
+STANCE / SWING foot trajectories
+    ↓
+BodyPose trajectory
+    ↓
+MATDOG physical contact / Cartesian targets
+    ↓
+existing MATDOG IK
+    ↓
+12 semantic URDF-radian joint targets
+    ↓
+offline collision / support / derivative analysis
+
+No actuator conversion.
+
+No raw ticks.
+
+No hardware.
+
+============================================================
+ACCEPTED FOUNDATION — DO NOT REOPEN WITHOUT CONTRADICTION
+============================================================
+
+G1:
+- canonical MATDOG FK;
+- analytic IK;
+- semantic URDF-radian joint targets.
+
+G2:
+- physical foot-contact FK/IK;
+- exact MATDOG foot-contact semantics;
+- C4 stand foundation;
+- semantic 12-joint frame.
+
+G3:
+- BodyPose;
+- timed trajectory semantics;
+- startup gate;
+- STAND lifecycle;
+- semantic velocity/acceleration.
+
+G3.5 / G3.5.1:
+- multiple support regimes;
+- REST_GROUND is distinct from foot-supported locomotion;
+- LOW_C4 is not the minimum geometrically possible posture;
+- BODY_ONLY REST_GROUND is NOT currently connected by a validated autonomous
+  route to STAND;
+- current G3 startup runtime gate remains active;
+- STAND belongs to the validated component:
+    {CRAWL_READY, LOW_C4, LOW_CROUCH, STAND, STRETCH};
+- pose support/collision/COM tooling exists offline;
+- XGO behavior may guide architecture and gait semantics but XGO physical joint
+  values are NOT directly transferable.
+
+Do not modify REST_GROUND startup behavior in G4.
+
+G4 locomotion starts from a valid STAND condition.
+
+============================================================
+IMPORTANT G3.5 GRAPH SOURCE BOUNDARY
+============================================================
+
+For support/transition status:
+
+09_Logs/Validation_Reports/G35_Pose_Audit/connectivity.json
+
+is the authoritative interpreted classification of graph edges.
+
+The older:
+
+transition_graph.json
+
+contains research-route terminology such as VALID_SEQUENCE_CANDIDATE.
+
+That wording MUST NOT be interpreted as VALIDATED.
+
+In particular the ~251-sample BODY_AND_FOUR_FEET route remains:
+
+GEOMETRIC_PATH_CANDIDATE / RESEARCH ONLY
+
+and must not become a locomotion/startup edge.
+
+============================================================
+HARDWARE SAFETY BOUNDARY
+============================================================
+
+OFFLINE SOFTWARE ONLY.
+
+Forbidden:
+
+- physical robot motion;
+- serial access;
+- ServoBus;
+- ST3215 commands;
+- Torque ON;
+- GoalPosition;
+- EEPROM;
+- firmware upload/flashing;
+- Arduino upload;
+- raw servo ticks;
+- q0 modification;
+- calibration modification;
+- motorDirection modification;
+- actuator integration.
+
+No push.
+No merge.
+
+============================================================
+PART A — DEEP XGO GAIT REFERENCE AUDIT
+============================================================
+
+Before implementing new gait logic, inspect the canonical XGO reverse repository:
+
+/home/matteo-manicardi/robotics-reverse/xgolite-low-level-reconstruction
+
+Do NOT modify its original local checkout.
+
+Reuse a safe read-only / clean origin/main view.
+
+This time focus specifically on locomotion architecture.
+
+Inspect all existing evidence for:
+
+- gait scheduler;
+- phase accumulator;
+- leg phase offsets;
+- stance/swing split;
+- WALK;
+- TROT;
+- HIGH_WALK;
+- MOVE_MODE / gait type;
+- Cartesian foot trajectory generation;
+- interpolation;
+- step height;
+- stride;
+- translational velocity commands;
+- yaw commands;
+- body translation during gait;
+- command timeout/watchdog;
+- gait start/stop;
+- transitions to/from stand;
+- mark-time;
+- crawl if relevant;
+- body compensation before IK;
+- lower-controller state machines.
+
+Use the already reconstructed evidence.
+
+Do not redo XGO reverse engineering unnecessarily.
+
+If stronger evidence is already present in:
+
+docs/reverse/
+evidence/
+prompts/milestone_g/
+prompts/milestone_g2/
+prompts/milestone_g21/
+
+use it directly.
+
+============================================================
+XGO TRANSFER RULE
+============================================================
+
+Transfer ONLY architectural concepts supported by evidence, such as:
+
+- normalized phase;
+- per-leg phase offsets;
+- stance/swing states;
+- phase wrapping;
+- command/state separation;
+- Cartesian target construction;
+- continuous interpolation;
+- watchdog semantics;
+- body correction before IK;
+- start/stop lifecycle.
+
+DO NOT copy:
+
+- XGO geometry;
+- servo angles;
+- physical zero;
+- signs;
+- joint limits;
+- step length;
+- step height;
+- duty factor;
+- gait frequency;
+- gains;
+- body height;
+- velocity limits;
+- acceleration limits;
+- IMU tuning.
+
+All MATDOG physical parameters must be derived or explicitly parameterized.
+
+============================================================
+PART B — GAIT CORE ARCHITECTURE
+============================================================
+
+Implement a small pure C++17 gait core under the existing motion module.
+
+Keep:
+
+namespace matdog::motion
+
+Requirements:
+
+- deterministic;
+- fixed-size structures;
+- no heap allocation in normal operation;
+- no exceptions;
+- no RTTI;
+- no Arduino/framework dependency;
+- no servo/calibration dependency;
+- no mutable global state.
+
+Introduce only the minimum abstractions necessary.
+
+Potential concepts:
+
+GaitType
+GaitParameters
+GaitPhase
+LegPhase
+GaitScheduler
+FootTrajectory
+LocomotionFrame
+MotionCommand
+
+Use better names if the existing architecture suggests them.
+
+============================================================
+PART C — NORMALIZED PHASE SCHEDULER
+============================================================
+
+Use normalized cycle phase:
+
+phi ∈ [0,1)
+
+Keep cycle phase independent of physical duration.
+
+Physical time must enter through an external gait period/frequency parameter.
+
+For each leg derive local phase from:
+
+global phase + leg phase offset
+
+with deterministic wrapping.
+
+Implement at least:
+
+WALK
+TROT
+
+Do not implement gallop/bound yet unless required structurally.
+
+============================================================
+PART D — WALK FOOTFALL PATTERN
+============================================================
+
+Define a WALK phase relationship that provides a quasi-static support opportunity.
+
+Do not blindly copy XGO offsets.
+
+Use XGO only as an architectural reference.
+
+Select/document a MATDOG walk pattern and validate:
+
+- phase order;
+- leg offsets;
+- duty factor parameterization;
+- support count;
+- contact transitions;
+- cyclic continuity.
+
+Prefer a pattern where one leg swings at a time for the initial WALK study.
+
+The implementation should allow duty factor to remain a parameter where
+reasonable.
+
+============================================================
+PART E — TROT FOOTFALL PATTERN
+============================================================
+
+Implement diagonal pairing:
+
+LF + RH
+RF + LH
+
+or demonstrate from the canonical coordinate/leg ordering if another
+representation is used.
+
+TROT is NOT quasi-static by default.
+
+Do not claim static stability merely because the COM projection leaves a support
+line/polygon.
+
+For G4 TROT validate:
+
+- phase geometry;
+- IK;
+- collisions;
+- continuity;
+- semantic joint derivatives;
+
+but classify dynamic stability as NOT YET PROVEN.
+
+Dynamic stabilization belongs to a later milestone.
+
+============================================================
+PART F — CARTESIAN FOOT TRAJECTORIES
+============================================================
+
+Generate feet in Cartesian/contact space first.
+
+Do not generate gait by interpolating joint angles.
+
+For STANCE:
+
+the foot should remain fixed in WORLD while the body progresses relative to it,
+within the intended planar gait model.
+
+For SWING:
+
+generate a continuous foot path from lift-off to touchdown.
+
+Use a simple mathematically explicit trajectory.
+
+At minimum require:
+
+- continuous position;
+- no ground penetration;
+- zero vertical velocity at lift-off/touchdown where appropriate;
+- exact start/end contact positions;
+- configurable step height;
+- configurable fore/aft step length;
+- optional lateral displacement;
+- optional yaw-induced target displacement.
+
+Do not tune values from XGO.
+
+============================================================
+PART G — BODY MOTION MODEL
+============================================================
+
+Initial G4 scope:
+
+- flat ground;
+- level body;
+- roll = 0;
+- pitch = 0;
+- planar X/Y/Yaw body motion only.
+
+Do not add IMU stabilization yet.
+
+BodyPose may vary in:
+
+x
+y
+yaw
+
+and maintain a chosen nominal standing height.
+
+Keep the current G2 limitation explicit.
+
+Do not silently claim arbitrary terrain support.
+
+============================================================
+PART H — WORLD-LOCKED STANCE VALIDATION
+============================================================
+
+This is mandatory.
+
+For every stance leg verify that its physical contact point remains fixed in the
+world within numerical tolerance while the body progresses.
+
+Report maximum stance-foot drift.
+
+This is a primary correctness criterion.
+
+Do not merely verify foot targets in base_link coordinates.
+
+============================================================
+PART I — YAW / TURNING
+============================================================
+
+Support commanded planar yaw geometrically.
+
+Turning should arise from the rigid-body transformation between world contacts
+and moving base pose, not arbitrary per-leg angle offsets.
+
+Test:
+
+- straight forward;
+- straight backward;
+- lateral motion if supported;
+- left/right yaw;
+- combined planar commands where feasible.
+
+Do not implement nonholonomic assumptions unless justified.
+
+============================================================
+PART J — GAIT PARAMETER SPACE
+============================================================
+
+Do NOT choose one "good" gait and stop.
+
+Define a parameterized gait space including at least:
+
+- body height;
+- stride/step length;
+- step height;
+- gait period;
+- duty factor where applicable;
+- X displacement/cycle;
+- Y displacement/cycle;
+- yaw/cycle.
+
+Separate:
+
+GEOMETRIC PARAMETERS
+
+from
+
+TIME PARAMETERS.
+
+============================================================
+PART K — MATDOG GAIT ENVELOPE SEARCH
+============================================================
+
+Perform an offline systematic survey.
+
+For WALK and TROT determine regions that are:
+
+KINEMATICALLY_VALID
+JOINT_LIMIT_BLOCKED
+IK_UNREACHABLE
+GROUND_COLLISION
+SELF_COLLISION
+CONTACT_INVALID
+SUPPORT_INVALID
+NUMERICALLY_ILL_CONDITIONED
+
+Do not pretend the complete physical operating envelope is known.
+
+This is an OFFLINE GEOMETRIC/KINEMATIC envelope.
+
+Explore enough of the useful space to answer:
+
+- maximum validated forward stride for selected standing heights;
+- maximum backward stride;
+- useful step-height range;
+- lateral range if implemented;
+- yaw/cycle range;
+- minimum joint-limit margins;
+- IK conditioning;
+- collision margins.
+
+Use deterministic grids/adaptive refinement where appropriate.
+
+Do not use arbitrary XGO limits as MATDOG bounds.
+
+============================================================
+PART L — BODY HEIGHTS
+============================================================
+
+Do not restrict gait investigation to a single 150 mm body height.
+
+Use the validated G3.5 foot-supported pose information to investigate multiple
+plausible gait heights.
+
+However:
+
+do not use the 1.001 µm mathematical pure-foot boundary as an engineering gait
+height.
+
+It is a tolerance-dependent search result, not a robust locomotion stance.
+
+Identify a reasonable geometric study interval from existing validated data.
+
+Do not invent a final physical operating height.
+
+============================================================
+PART M — FULL COLLISION VALIDATION
+============================================================
+
+Use G3.5 offline collision tooling.
+
+For sampled gait cycles check:
+
+- base-ground;
+- hip-ground;
+- upper-leg-ground;
+- lower-leg-ground;
+- foot-ground;
+- non-adjacent self-collision.
+
+STANCE foot contact is intentional.
+
+SWING foot ground contact is forbidden except exact touchdown/lift-off
+boundaries.
+
+Maintain the existing collision-pair exclusions only where justified.
+
+============================================================
+PART N — COM / SUPPORT ANALYSIS
+============================================================
+
+For WALK:
+
+use actual URDF aggregate COM and active stance contacts.
+
+Compute quasi-static support margin over the cycle.
+
+Identify phases with:
+
+- four-foot support;
+- three-foot support;
+- any lower support count.
+
+A WALK sample may be marked quasi-statically valid only when the modeled COM
+projection lies within the intended stance support region with positive margin.
+
+Do not claim dynamic safety.
+
+For TROT:
+
+report support geometry but do NOT reject or approve the entire gait based only
+on static polygon margin.
+
+TROT requires later dynamic/stabilization work.
+
+============================================================
+PART O — SEMANTIC JOINT DERIVATIVES
+============================================================
+
+Use the existing time parameterization principles.
+
+For sampled cycles compute:
+
+q
+q_dot
+q_ddot
+
+in semantic URDF radians.
+
+Report peak requirements per joint for selected parameter sets.
+
+These remain semantic requirements.
+
+Do NOT compare them against ST3215 actuator limits unless a canonical approved
+MATDOG actuator-limit source is separately introduced later.
+
+============================================================
+PART P — GAIT START / STOP
+============================================================
+
+Do not instantly switch from static STAND to arbitrary nonzero gait phase.
+
+Design pure semantic transition behavior:
+
+STAND
+   ↓
+GAIT_START
+   ↓
+cyclic WALK/TROT
+   ↓
+GAIT_STOP
+   ↓
+STAND
+
+Requirements:
+
+- deterministic initial phase;
+- no instantaneous semantic joint jump;
+- phase-consistent stop;
+- valid foot contacts at terminal STAND;
+- explicit cancellation/failure status.
+
+No physical braking claims.
+
+============================================================
+PART Q — MOTION STATE
+============================================================
+
+Extend the state model only if justified.
+
+Likely conceptual states:
+
+OFF
+IDLE
+STAND_TRANSITION
+STAND
+WALK
+TROT
+STOPPING
+
+Do not create states for every pose target.
+
+Semantic poses and motion states remain separate concepts.
+
+REST_GROUND is not part of G4 locomotion startup.
+
+============================================================
+PART R — COMMAND WATCHDOG
+============================================================
+
+Implement a pure command-freshness/watchdog abstraction if not already present.
+
+No hardware clock dependency.
+
+Caller supplies time/timestamps.
+
+Define behavior for:
+
+- fresh command;
+- stale command;
+- invalid command;
+- zero-motion command;
+- mode change.
+
+On timeout, generate a semantic safe stop request/state transition.
+
+Do not claim actual physical stop until actuator execution exists.
+
+============================================================
+PART S — FAILURE SEMANTICS
+============================================================
+
+Every gait sample must be able to fail explicitly due to:
+
+- invalid parameter;
+- IK failure;
+- joint limit;
+- branch discontinuity;
+- collision;
+- nonfinite value;
+- conditioning threshold;
+- state/lifecycle error.
+
+Do not silently clip a geometrically invalid trajectory into validity.
+
+If parameter clamping is introduced, make it explicit and tested.
+
+============================================================
+PART T — XGO COMPARISON AFTER IMPLEMENTATION
+============================================================
+
+After MATDOG gait generation works independently, compare architectural behavior
+against XGO evidence.
+
+Report:
+
+- which scheduler concepts match;
+- which intentionally differ;
+- what XGO evidence informed the architecture;
+- what MATDOG values were independently derived.
+
+Do not retro-fit MATDOG values to make them look like XGO.
+
+============================================================
+PART U — TEST MATRIX
+============================================================
+
+Add strong host/offline tests.
+
+At minimum:
+
+1. phase wrapping;
+
+2. per-leg phase offsets;
+
+3. WALK footfall order;
+
+4. TROT diagonal pairing;
+
+5. stance/swing classification;
+
+6. cycle periodicity;
+
+7. exact cycle boundary continuity;
+
+8. swing trajectory endpoints;
+
+9. no swing ground penetration;
+
+10. stance world-locking;
+
+11. straight forward motion;
+
+12. backward motion;
+
+13. yaw left/right symmetry where appropriate;
+
+14. zero-command gait behavior;
+
+15. deterministic reruns;
+
+16. IK success/failure classification;
+
+17. joint-limit margin;
+
+18. branch continuity;
+
+19. collision checks;
+
+20. WALK support margin;
+
+21. TROT marked dynamic-uncertified;
+
+22. q/q_dot/q_ddot finite and deterministic;
+
+23. expected 1/T and 1/T² derivative scaling;
+
+24. gait start continuity;
+
+25. gait stop continuity;
+
+26. watchdog stale-command behavior;
+
+27. invalid parameters rejected;
+
+28. no servo/calibration/raw-tick dependency;
+
+29. G1/G2/G3/G3.5 regression gates remain green.
+
+Use independent Python/oracle checks where useful.
+
+Run sanitizers for new C++ code.
+
+============================================================
+PART V — VISUAL VALIDATION
+============================================================
+
+Generate deterministic engineering visualizations for representative cycles.
+
+At minimum:
+
+WALK:
+- side view;
+- top view;
+- representative phase/contact diagram.
+
+TROT:
+- side view;
+- top view;
+- diagonal contact-phase diagram.
+
+Where practical generate a frame sequence or data suitable for animation.
+
+Use canonical MATDOG geometry.
+
+Do not modify source meshes.
+
+============================================================
+PART W — MACHINE-READABLE OUTPUT
+============================================================
+
+Produce artifacts for:
+
+- gait definitions;
+- phase offsets;
+- parameter sets;
+- envelope grid/results;
+- representative cycles;
+- collision metrics;
+- support metrics;
+- derivative metrics;
+- failed parameter sets;
+- XGO architectural comparison.
+
+Include provenance/source hashes.
+
+============================================================
+DO NOT IMPLEMENT YET
+============================================================
+
+Do NOT implement:
+
+- BNO085 stabilization;
+- roll/pitch feedback;
+- dynamic state estimation;
+- torque control;
+- actuator-rate enforcement;
+- ST3215 transport;
+- calibrated q->raw conversion;
+- hardware gait execution;
+- ROS 2 runtime integration.
+
+Those are later milestones.
+
+============================================================
+FINAL REQUIRED QUESTIONS
+============================================================
+
+The G4 final report must explicitly answer:
+
+1. What normalized scheduler architecture is implemented?
+
+2. What are the WALK leg phase offsets and why?
+
+3. What are the TROT leg phase offsets and why?
+
+4. What duty factors were evaluated?
+
+5. How is stance represented in world coordinates?
+
+6. What is maximum measured stance-foot drift?
+
+7. What swing trajectory is used?
+
+8. What body heights were evaluated?
+
+9. What forward/backward stride envelope was found?
+
+10. What lateral envelope was found, if implemented?
+
+11. What yaw/cycle envelope was found?
+
+12. What ultimately limits each envelope?
+
+13. What minimum joint-limit margin occurs?
+
+14. What minimum self-collision separation occurs?
+
+15. What minimum non-foot ground clearance occurs?
+
+16. For WALK, what is minimum quasi-static COM/support margin?
+
+17. At which phases/support counts is WALK weakest?
+
+18. Why is TROT not yet dynamically certified?
+
+19. What peak q_dot/q_ddot requirements result for representative parameter
+    sets?
+
+20. How do they scale with gait period?
+
+21. Are there any IK branch changes?
+
+22. How are STAND->gait and gait->STAND handled?
+
+23. How does command timeout behave semantically?
+
+24. Which XGO gait concepts were reused architecturally?
+
+25. Which XGO physical values were explicitly NOT transferred?
+
+26. Which MATDOG gait parameters remain tuning candidates rather than approved
+    physical parameters?
+
+27. What is the current safest next milestone before hardware walking?
+
+============================================================
+REPORT / COMMITS
+============================================================
+
+Use small local commits.
+
+Do not push.
+Do not merge.
+
+Final response must include:
+
+- starting HEAD;
+- final HEAD;
+- commits;
+- files changed;
+- XGO evidence inspected;
+- WALK model;
+- TROT model;
+- parameter envelope;
+- representative validated parameter sets;
+- failed regions and causes;
+- collision/support results;
+- semantic derivative results;
+- state/watchdog behavior;
+- all tests/static audit/sanitizer results;
+- git status;
+- explicit hardware safety confirmation.
+
+Proceed autonomously.
+
+Do not stop for normal progress updates.
+
+Stop only for:
+- canonical-geometry contradiction;
+- repository integrity problem;
+- unresolved evidence contradiction requiring arbitrary choice;
+- or safety-boundary violation.

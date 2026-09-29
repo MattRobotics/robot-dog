@@ -1,0 +1,16 @@
+full 18 ['KINEMATICALLY_VALID'] samples 81
+full 34 ['SUPPORT_INVALID'] samples 81
+full 222 ['KINEMATICALLY_VALID'] samples 81
+full 226 ['GROUND_COLLISION'] samples 81
+full 287 ['KINEMATICALLY_VALID'] samples 201
+full 416 ['KINEMATICALLY_VALID'] samples 81
+full 426 ['KINEMATICALLY_VALID'] samples 81
+full 925 ['GROUND_COLLISION'] samples 81
+full 1040 ['KINEMATICALLY_VALID'] samples 81
+full 1046 ['KINEMATICALLY_VALID'] samples 81
+full 1230 ['KINEMATICALLY_VALID'] samples 81
+full 1238 ['KINEMATICALLY_VALID'] samples 81
+full 1311 ['CONTACT_INVALID'] samples 201
+full 1435 ['GROUND_COLLISION'] samples 81
+full 1441 ['GROUND_COLLISION'] samples 81
+full 1948 ['GROUND_COLLISION'] samples 81

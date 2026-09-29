@@ -47,7 +47,20 @@ int main(){
   CHECK(solveGait(p,gaitCartesian(p,1.2,1,0),&branch).status==GaitStatus::BRANCH_CHANGE);
   auto b=p;b.maxCondition=1;CHECK(solveGait(b,gaitCartesian(b,1.2,1,0)).status==GaitStatus::ILL_CONDITIONED);
   b=p;b.heightM=1;CHECK(solveGait(b,gaitCartesian(b,1.2,1,0)).status==GaitStatus::IK_UNREACHABLE);
+  auto limitCart=gaitCartesian(p,1.2,1,0);const auto& model=*legModel(LegId::LF);
+  double r=footContactModel().radiusM,reach=-model.lowerOrigin.z+std::hypot(model.footOrigin.x,model.footOrigin.z+r)+r;
+  Vector3 extended={model.hipOrigin.x,model.hipOrigin.y+model.upperOrigin.y+model.footOrigin.y,model.hipOrigin.z-reach};
+  pointToWorld(limitCart.body,extended,limitCart.feet[0]);CHECK(solveGait(p,limitCart).status==GaitStatus::JOINT_LIMIT);
+  for(double boundary:{1.,1.05,1.25,1.3,1.5,1.55,1.75,1.8,2.}){
+   auto center=solveGait(p,gaitCartesian(p,boundary,1,0));
+   auto left=solveGait(p,gaitCartesian(p,boundary-1e-8,1,0),&center),right=solveGait(p,gaitCartesian(p,boundary+1e-8,1,0),&center);
+   CHECK(left.target.valid&&right.target.valid);
+   for(unsigned i=0;i<4;++i)for(unsigned j=0;j<3;++j){CHECK(near(v(left.target.legs[i],j),v(right.target.legs[i],j),1e-6));CHECK(near(v(left.velocityRadS[i],j),v(right.velocityRadS[i],j),1e-5));CHECK(near(v(left.accelerationRadS2[i],j),v(right.accelerationRadS2[i],j),.001));}
+  }
   auto cart=gaitCartesian(p,1.2,1,0);cart.feet[2].x=nan;CHECK(solveGait(p,cart).status==GaitStatus::NONFINITE);
+  auto phaseBad=gaitCartesian(p,1.2,1,0);phaseBad.phases[0].phase=nan;CHECK(solveGait(p,phaseBad).status==GaitStatus::NONFINITE);
+  auto contactBad=base;CHECK(assessGait(contactBad,p.type,{true,false,true})==GaitStatus::CONTACT_INVALID);
+  auto supportBad=base;CHECK(assessGait(supportBad,p.type,{true,true,false})==(kind?GaitStatus::OK:GaitStatus::SUPPORT_INVALID));
   CHECK(assessGait(base,p.type,{false,true,true})==GaitStatus::COLLISION&&!base.target.valid);
  }
  // Every start retains the G3 evidence gate; public completion cannot forge it.

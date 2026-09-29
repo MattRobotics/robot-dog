@@ -127,10 +127,14 @@ LocomotionFrame solveGait(const GaitParameters& p,const CartesianSample& s,const
   LocomotionFrame out;out.cartesian=s;
   if(!validGaitParameters(p)){out.status=GaitStatus::INVALID_PARAMETER;return out;}
   if(!s.valid||(prev&&!prev->target.valid)){out.status=GaitStatus::STATE_ERROR;return out;}
-  if(!supportsFlatContactIk(s.body)||!finite(s.bodyVelocity)||!finite(s.bodyAcceleration)||
+  if(!std::isfinite(s.cycles)||!finite(s.body.translationM)||!finite(s.bodyVelocity)||!finite(s.bodyAcceleration)||
      !std::isfinite(s.yawVelocity)||!std::isfinite(s.yawAcceleration)){out.status=GaitStatus::NONFINITE;return out;}
+  for(const auto& row:s.body.rotation)for(double value:row)if(!std::isfinite(value)){out.status=GaitStatus::NONFINITE;return out;}
+  if(!supportsFlatContactIk(s.body)){out.status=GaitStatus::INVALID_PARAMETER;return out;}
   out.minJointMarginRad=std::numeric_limits<double>::infinity();
   for(unsigned i=0;i<4;++i){out.failedLeg=i;LegId leg=static_cast<LegId>(i);
+    if(!std::isfinite(s.phases[i].phase)||!std::isfinite(s.phases[i].swingProgress)){out.status=GaitStatus::NONFINITE;return out;}
+    if(s.phases[i].phase<0||s.phases[i].phase>=1||s.phases[i].swingProgress<0||s.phases[i].swingProgress>1){out.status=GaitStatus::INVALID_PARAMETER;return out;}
     if(!finite(s.feet[i])||!finite(s.velocity[i])||!finite(s.acceleration[i])){out.status=GaitStatus::NONFINITE;return out;}
     ContactIkOptions opts;opts.kinematics.seed=prev?prev->target.legs[i]:canonicalStandDefinition().standSeed[i];
     opts.requireNominalStrip=s.phases[i].stance||s.phases[i].boundary;
@@ -151,7 +155,8 @@ LocomotionFrame solveGait(const GaitParameters& p,const CartesianSample& s,const
 }
 GaitStatus assessGait(LocomotionFrame& f,GaitType t,const GaitAssessment& a){
   if(!f.target.valid)return f.status;
-  if(!a.collisionFree)f.status=GaitStatus::COLLISION;
+  if(t!=GaitType::WALK&&t!=GaitType::TROT)f.status=GaitStatus::INVALID_PARAMETER;
+  else if(!a.collisionFree)f.status=GaitStatus::COLLISION;
   else if(!a.contactsValid)f.status=GaitStatus::CONTACT_INVALID;
   else if(t==GaitType::WALK&&!a.positiveWalkSupport)f.status=GaitStatus::SUPPORT_INVALID;
   f.target.valid=f.status==GaitStatus::OK;return f.status;

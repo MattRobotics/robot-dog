@@ -1,0 +1,373 @@
+We have very little Codex quota remaining.
+
+DO NOT try to complete the whole G4 milestone now.
+
+Your priority is to preserve and close the current work safely so that another
+agent (Claude Code) can resume from the filesystem and Git without losing
+anything.
+
+Worktree:
+
+/home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine
+
+Branch:
+
+feat/gait-engine-offline-v1
+
+Accepted G4 baseline:
+
+c4befbe90b3121d60ba1b9ba09dc1082364c8d88
+
+============================================================
+NEW PRIORITY: G4 CHECKPOINT + HANDOFF
+============================================================
+
+Use the remaining time ONLY for:
+
+1. reconstructing the exact current Git/filesystem state;
+2. preserving all valid G4 work already produced;
+3. checking whether existing background jobs/results completed;
+4. running only SHORT, targeted validation needed to avoid committing obviously
+   broken work;
+5. making a coherent LOCAL checkpoint commit or small commits;
+6. writing a complete Claude handoff file;
+7. leaving the worktree in a known state.
+
+DO NOT launch any new large survey, refinement sweep, oracle corpus, full
+validation suite or long-running research job unless it is already running and
+only needs its result collected.
+
+Do not spend quota rediscovering XGO evidence.
+
+============================================================
+FIRST: INSPECT CURRENT STATE
+============================================================
+
+Run:
+
+git status --short --branch
+git rev-parse HEAD
+git log -12 --oneline
+git diff --stat
+git diff
+git diff --cached --stat
+git ls-files --others --exclude-standard
+ps -eo pid,etime,pcpu,args | rg 'gait_audit|matdog-g4|test_gait|survey|refine|oracle'
+
+Do NOT reset, clean, revert, discard or overwrite anything.
+
+If previous background processes finished, collect their existing output.
+Do NOT rerun them just for completeness.
+
+============================================================
+KNOWN G4 WORK TO PRESERVE
+============================================================
+
+The interrupted run had already implemented or produced work around:
+
+- normalized WALK/TROT scheduler;
+- WALK with one swing leg at a time;
+- TROT diagonal pairs;
+- world-locked stance contacts;
+- Cartesian swing trajectories;
+- semantic q/qdot/qddot;
+- gait start/stop lifecycle;
+- command watchdog semantics;
+- IK branch-continuity tests;
+- period derivative-scaling tests;
+- G4 gait C++ tests;
+- independent Python oracle;
+- broad deterministic gait survey;
+- refinement survey;
+- XGO gait architecture evidence;
+- lifecycle audit;
+- collision/contact/support classification;
+- README/runtime contract documentation.
+
+Existing paths include at least:
+
+05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
+05_Firmware/MATDOG_Controller/scripts/tests/test_gait.cpp
+
+06_Software/Matdog_Core/gait_audit/
+06_Software/Matdog_Core/gait_audit/refine.py
+06_Software/Matdog_Core/gait_audit/README.md
+
+09_Logs/Validation_Reports/G4_Gait_Envelope/
+
+Inspect the repository for the complete actual set.
+
+============================================================
+IMPORTANT RESULTS TO RECORD IN THE HANDOFF
+============================================================
+
+Recover exact values from artifacts where available.
+
+Do not rely only on this summary.
+
+Previously observed:
+
+- independent oracle checked approximately 3,872 samples;
+- contact error approximately 1.2e-16 m;
+- stance-anchor drift approximately 1.7e-16 m;
+- broad parameter grid approximately 2,044 configurations;
+- study included forward/backward/lateral/yaw/body height/duty factor;
+- preliminary useful cycles appeared around approximately 80–120 mm body
+  height;
+- higher-height cases exposed micrometre-scale differences between G2 analytic
+  cylindrical contact and tessellated foot mesh;
+- some coarse-screen cases failed denser full-mesh validation;
+- start/stop was continuous in joint space, but some STAND-to-study-height
+  samples failed the existing 1 µm mesh/contact policy;
+- existing G3 startup files remained unchanged;
+- steady-state gait validity and lifecycle validity therefore need separate
+  classifications.
+
+Record which of these are:
+VERIFIED_FROM_ARTIFACT
+PROVISIONAL
+INCOMPLETE
+
+============================================================
+NO NEW MODEL CHANGES
+============================================================
+
+Do NOT:
+
+- widen the 1 µm contact tolerance;
+- alter G2 contact semantics;
+- move targets to make tests pass;
+- invent approved gait heights;
+- invent actuator limits;
+- touch calibration/q0/motorDirection;
+- change the hardware workstream.
+
+If the current work contains a known unresolved issue, document it rather than
+trying to solve it under the remaining quota.
+
+============================================================
+QUICK VALIDATION ONLY
+============================================================
+
+Run only short checks needed to assess the current code.
+
+Prefer:
+
+git diff --check
+
+and, if compilation is currently inexpensive:
+
+g++ -std=c++17 -O1 -Wall -Wextra -Werror -fno-exceptions -fno-rtti \
+  05_Firmware/MATDOG_Controller/scripts/tests/test_gait.cpp \
+  05_Firmware/MATDOG_Controller/src/motion/*.cpp \
+  -o /tmp/matdog-g4-test
+
+/tmp/matdog-g4-test
+
+Also run any very short artifact sanity/check command already present.
+
+Do NOT start a 15–30 minute full validation suite now.
+
+If a previously completed validation result exists, preserve and cite its
+artifact path in the handoff instead.
+
+============================================================
+CHECKPOINT COMMITS
+============================================================
+
+If the current code is coherent enough to preserve:
+
+create one or more LOCAL checkpoint commits.
+
+It is acceptable for the milestone to remain incomplete.
+
+Use clear commit messages, for example:
+
+G4: checkpoint normalized gait core and lifecycle
+G4: checkpoint gait audit artifacts and survey tooling
+G4: add Claude handoff for incomplete gait milestone
+
+Do not fake a final milestone commit.
+
+Do not claim G4 is complete.
+
+If some generated artifacts are incomplete or corrupted, do not commit them as
+authoritative results; document them in the handoff.
+
+No push.
+No merge.
+No rebase.
+
+============================================================
+MANDATORY CLAUDE HANDOFF FILE
+============================================================
+
+Create:
+
+09_Logs/Validation_Reports/G4_Gait_Envelope/
+G4_CLAUDE_HANDOFF_2026-09-29.md
+
+This file is the highest-priority deliverable.
+
+It must contain:
+
+1. repository/worktree/branch;
+
+2. accepted starting SHA:
+   c4befbe90b3121d60ba1b9ba09dc1082364c8d88;
+
+3. checkpoint/final current SHA;
+
+4. exact local commits created during G4;
+
+5. complete files added/modified;
+
+6. what G4 architecture is already implemented;
+
+7. exact current WALK definition;
+
+8. exact current TROT definition;
+
+9. phase offsets and duty-factor semantics;
+
+10. world-locked stance semantics;
+
+11. swing trajectory formula/semantics;
+
+12. BodyPose / planar motion semantics;
+
+13. start/stop lifecycle semantics;
+
+14. watchdog semantics;
+
+15. exact GaitStatus/failure classifications;
+
+16. XGO architectural evidence already inspected and what was transferred vs
+    deliberately not transferred;
+
+17. oracle results and artifact paths;
+
+18. survey/refinement result files and exact completed case counts;
+
+19. which results are only screen-valid;
+
+20. which results received full mesh checking;
+
+21. best currently known steady-state WALK cases;
+
+22. best currently known steady-state TROT cases;
+
+23. body heights investigated;
+
+24. forward/backward/lateral/yaw envelope findings so far;
+
+25. collision minima/support margins/joint-limit margins already known;
+
+26. qdot/qddot findings already known;
+
+27. current STAND -> gait -> STAND lifecycle status;
+
+28. exact unresolved 1 µm analytic-contact vs mesh-contact issue;
+
+29. which transitions fail and where;
+
+30. all incomplete work still required to finish original G4;
+
+31. exact commands Claude should run next, in the correct order;
+
+32. expensive jobs that should NOT be rerun unless their saved artifacts are
+    stale;
+
+33. validation already completed;
+
+34. validation still missing;
+
+35. explicit statement:
+    G4 IS NOT COMPLETE.
+
+============================================================
+ALSO WRITE MACHINE-READABLE STATE
+============================================================
+
+If time permits, also create:
+
+09_Logs/Validation_Reports/G4_Gait_Envelope/
+handoff_state.json
+
+with at least:
+
+{
+  "milestone": "G4",
+  "status": "INCOMPLETE_CHECKPOINT",
+  "baseline_sha": "...",
+  "checkpoint_sha": "...",
+  "branch": "...",
+  "completed_components": [...],
+  "pending_components": [...],
+  "artifacts": [...],
+  "known_blockers": [...],
+  "recommended_next_commands": [...]
+}
+
+Do not spend time on this JSON if it risks not completing the Markdown handoff.
+
+============================================================
+HANDOFF TO CLAUDE — IMPORTANT OPEN QUESTIONS
+============================================================
+
+Explicitly tell Claude that it still needs to finish the original G4 acceptance
+work, including:
+
+- final WALK envelope;
+- final TROT envelope;
+- representative FULL_MESH_VALIDATED parameter sets;
+- steady-state vs lifecycle classification;
+- full support/COM metrics;
+- complete derivative metrics;
+- final deterministic visual artifacts;
+- final XGO comparison;
+- final G4 report;
+- all 27 original G4 questions;
+- additional questions about full-mesh validity and complete
+  STAND -> WALK/TROT -> STAND lifecycle;
+- final regressions/static audit/sanitizers;
+- final clean Git status.
+
+============================================================
+PARALLEL WORK BOUNDARY
+============================================================
+
+A separate Claude session is working on hardware calibration preparation.
+
+Do NOT touch its worktree/branch.
+
+No hardware.
+No serial.
+No ServoBus.
+No ST3215.
+No Torque ON.
+No flashing.
+No EEPROM.
+No q0.
+No calibration.
+No raw ticks.
+
+============================================================
+FINAL RESPONSE BEFORE QUOTA ENDS
+============================================================
+
+Do not spend remaining time writing a long conversational answer.
+
+Return a compact checkpoint summary containing:
+
+- current HEAD;
+- commits made;
+- handoff file path;
+- whether worktree is clean;
+- short validation status;
+- key unresolved G4 blockers;
+- confirmation that G4 is INCOMPLETE and ready for Claude takeover.
+
+Prioritize filesystem persistence over explanation.
+
+Proceed now.

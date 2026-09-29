@@ -1,0 +1,76 @@
+{
+  "leg_order": [
+    "lf",
+    "rf",
+    "rh",
+    "lh"
+  ],
+  "walk_offsets": [
+    0,
+    0.5,
+    0.75,
+    0.25
+  ],
+  "trot_offsets": [
+    0,
+    0.5,
+    0,
+    0.5
+  ],
+  "walk_order": [
+    "rh",
+    "rf",
+    "lh",
+    "lf"
+  ],
+  "periods_evaluated_s": [
+    0.5,
+    1,
+    2,
+    4
+  ],
+  "heights_m": [
+    0.08,
+    0.1,
+    0.12,
+    0.14,
+    0.15
+  ],
+  "stance": "WORLD_LOCKED_G2_REFERENCE",
+  "swing": "quintic XY; 64 h u^3(1-u)^3 Z",
+  "support": "CAD/URDF COM, intentional finite mesh patches",
+  "trot_dynamic_stability": "NOT_YET_PROVEN",
+  "canonical_sources": {
+    "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+    "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
+    "06_Software/Matdog_Core/gait_audit/core.py": "3bd288deb467d7e1dc4c91d640dd4c68dfeb2847c468ba06649ff7e79e3d6d4b",
+    "06_Software/Matdog_Core/gait_audit/lifecycle_audit.py": "c28d816c1414dfbf06ae76f85dc6f3bfc126e5be01e7a1499327474acac1ea68",
+    "06_Software/Matdog_Core/gait_audit/oracle.py": "9441315c7242593224950df3ce14c4c5b09f7e830bca170dda250d782904c73c",
+    "06_Software/Matdog_Core/gait_audit/refine.py": "6d670d73e7535d33160a7873b521e16a6c8ce7b42e7c980d0e373f04a0cb7900",
+    "06_Software/Matdog_Core/gait_audit/render.py": "9a6e86033c9d877260eddc78b5a2231bca31308d4ee8971d116d67ed0e9a5ba2",
+    "06_Software/Matdog_Core/gait_audit/survey.py": "606f1cf29b8ccc1c85816d5af09c2e2a4922a723beae4484dc6e44b645c5ec05",
+    "06_Software/Matdog_Core/gait_audit/xgo_evidence.py": "d6b704a106163e46b4a783e63830980fdebc90c5d2eda5c495ddf96f3f06d5d8",
+    "06_Software/Matdog_Core/gait_audit/bridge.cpp": "79f4a3bcda03dbfb4605614e58788eedda205f0e0c2244af2e4e0b86bf40a9ed",
+    "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "68f1b4efcf3460502a83f89c1e96ff621cecc25111bd55d8ab9f479fd4226510",
+    "05_Firmware/MATDOG_Controller/src/motion/Gait.h": "e308c64acff060b8be78796c5db21078a4de5f2b3b9b38f26d186ed0e6173914",
+    "05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp": "2a9a6df04b23a1ec3823f196a9547167d7f1469b25e5f401dc47650ded12e6de",
+    "05_Firmware/MATDOG_Controller/src/motion/Locomotion.h": "0b29b56bfa69b7cb190a45b21a9b9ceb9342ba2068950af33444c6bd2dce6501"
+  }
+}
