@@ -802,6 +802,10 @@ void CommandRouter::handleLine(String line) {
                     "phase=UPPER_MIN_PROBE auxiliary=NONE aux_bus=0\n",
                     leg_name, (unsigned)plan.request.probe_bus_id);
     }
+    Serial.printf("CALIBRATION_FULL_LEG_PROBE_BOUND approach_overtravel_ticks=%u max=%u "
+                  "scope=CONTACT_PROBE_APPROACH_ONLY contact=GEOMETRY_V5_CANONICAL\n",
+                  (unsigned)plan.request.approach_overtravel_ticks,
+                  (unsigned)actuator::kContactProbeMaxOvertravelTicks);
     Serial.println("CALIBRATION_FULL_LEG_NOTE no_write_in_command_handler; "
                    "next_Controller_tick_revalidates_all_dynamic_prerequisites; "
                    "poll with @CALIBRATION FULL LEG STATUS");

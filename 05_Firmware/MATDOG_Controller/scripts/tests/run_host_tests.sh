@@ -96,6 +96,7 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_actuator_write_policy" \
   "$SCRIPT_DIR/test_actuator_write_policy.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
@@ -109,6 +110,7 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_calibration_geometry" \
   "$SCRIPT_DIR/test_calibration_geometry.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
@@ -157,6 +159,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
@@ -232,6 +235,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_actuator_runtime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \

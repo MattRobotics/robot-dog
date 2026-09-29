@@ -97,12 +97,25 @@ CalibrationExecutionResult CalibrationExecutionEngine::execute(
   command.endpoint_side = request.endpoint_side;
   command.delta_ticks = request.direction_verify_delta_ticks;
   command.target_urad = request.target_urad;
+  command.contact_probe_overtravel_ticks = request.contact_probe_overtravel_ticks;
+
+  // The overtravel allowance belongs to CONTACT_PROBE alone; the policy
+  // refuses it anywhere else too, this just fails closed one layer earlier.
+  if (request.contact_probe_overtravel_ticks != 0 &&
+      operation != actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE) {
+    result.outcome = CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION;
+    return result;
+  }
 
   actuator::TargetResolveStatus resolve = actuator::TargetResolveStatus::REJECT_TRANSFORM;
   if (operation == actuator::ActuatorOperation::DIRECTION_VERIFY) {
     resolve = actuator::resolveDeltaFromQ0(
         *geometry_, *expected_provenance_, *transform,
         request.direction_verify_delta_ticks, &command.target_tick);
+  } else if (request.contact_probe_overtravel_ticks != 0) {
+    resolve = actuator::resolveContactProbeApproachToRaw(
+        *geometry_, *expected_provenance_, *transform, request.target_urad,
+        request.endpoint_side, request.contact_probe_overtravel_ticks, &command.target_tick);
   } else {
     resolve = actuator::resolveUrdfQToRaw(
         *geometry_, *expected_provenance_, *transform,

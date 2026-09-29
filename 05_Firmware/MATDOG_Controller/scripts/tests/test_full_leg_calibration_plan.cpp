@@ -317,6 +317,12 @@ void test_plan_carries_dynamic_identity_endpoints_and_tolerances() {
     CHECK_EQ(r.max_approach_urad, hi->contact);
     CHECK_EQ(r.min_backoff_urad, lo->contact / 2);
     CHECK_EQ(r.max_backoff_urad, hi->contact / 2);
+    // Hardware finding 2026-09-29: both approach passes run 16 raw ticks past
+    // the canonical contact; the contact numbers above stay the Geometry V5
+    // ones and the backoff stays contact/2.
+    CHECK_EQ(r.approach_overtravel_ticks, 16);
+    CHECK_EQ(r.approach_overtravel_ticks, kFullLegApproachOvertravelTicks);
+    CHECK(r.approach_overtravel_ticks <= actuator::kContactProbeMaxOvertravelTicks);
 
     // No LF-only residue: the old hard-coded MIN backoff must not survive.
     CHECK(r.min_backoff_urad != -700000);
@@ -350,6 +356,20 @@ void test_plan_targets_pass_the_checked_resolver_for_every_leg() {
     const int min_travel = kFullLegRepeatabilityToleranceTicks * kFullLegMinReapproachToleranceMultiple;
     CHECK(std::abs(static_cast<int>(raw[0]) - static_cast<int>(raw[1])) >= min_travel);
     CHECK(std::abs(static_cast<int>(raw[2]) - static_cast<int>(raw[3])) >= min_travel);
+    // The commanded approach points: exactly 16 raw ticks past each contact,
+    // further from q0 than the contact on both sides.
+    const ContactSide sides[2] = {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE};
+    for (int k = 0; k < 2; ++k) {
+      uint16_t approach = 0;
+      CHECK(actuator::resolveContactProbeApproachToRaw(
+                profile, actuator::geometry_data::kProvenance, *t, targets[k * 2], sides[k],
+                plan.request.approach_overtravel_ticks, &approach) ==
+            actuator::TargetResolveStatus::OK);
+      const int contact = raw[k * 2];
+      CHECK_EQ(std::abs(static_cast<int>(approach) - contact), 16);
+      CHECK_EQ(std::abs(static_cast<int>(approach) - static_cast<int>(t->q0_tick)),
+               std::abs(contact - static_cast<int>(t->q0_tick)) + 16);
+    }
     if (plan.request.auxiliary_required) {
       const actuator::JointTransform* at = table.find(plan.request.auxiliary_joint, tag);
       CHECK(at != nullptr);

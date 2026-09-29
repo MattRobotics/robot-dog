@@ -128,6 +128,11 @@ struct FullLegCalibrationRequest {
   actuator::MicroRad max_backoff_urad = 0;
   uint16_t max_repeatability_tolerance_ticks = 0;
 
+  // Both sides, both approach passes: raw ticks past the canonical contact
+  // (min/max_approach_urad stay exactly the Geometry V5 contacts) - see
+  // ContactProbeRequest::approach_overtravel_ticks. Never the backoff.
+  uint16_t approach_overtravel_ticks = 0;
+
   // Whether the MAX side needs an auxiliary joint parked first. Set from the
   // Geometry V5 MAX endpoint record's has_auxiliary by the caller — never
   // hard-coded per leg. Defaults to TRUE (fail-closed: forgetting to state it

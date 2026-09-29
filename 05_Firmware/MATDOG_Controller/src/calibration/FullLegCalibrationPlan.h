@@ -55,6 +55,18 @@ constexpr uint16_t kFullLegRepeatabilityToleranceTicks = 16;
 // the repeatability check would prove nothing.
 constexpr uint16_t kFullLegMinReapproachToleranceMultiple = 8;
 
+// Hardware finding 2026-09-29 (operator-approved): LF_UPPER's MIN stop sat 4-5
+// ticks short of the Geometry V5 contact, inside the 4-tick arrival tolerance,
+// so an approach commanded exactly to the contact could "arrive" on the stop
+// and read as NO_CONTACT_DETECTED. Both approach passes of both sides are
+// therefore commanded this many raw ticks past the canonical contact (which
+// itself is unchanged and stays the evidence reference); the backoff is not.
+// Equal to the reviewed repeatability tolerance; never above the policy's
+// actuator::kContactProbeMaxOvertravelTicks.
+constexpr uint16_t kFullLegApproachOvertravelTicks = 16;
+static_assert(kFullLegApproachOvertravelTicks <= actuator::kContactProbeMaxOvertravelTicks,
+              "the Full-Leg approach allowance may never exceed the policy's maximum");
+
 struct FullLegJointRef {
   JointIdentity identity{};
   uint8_t bus_id = 0;  // 0 = unresolved (never a valid ST3215 id)

@@ -75,6 +75,14 @@ struct ContactProbeRequest {
   // (see ContactWitness's own file comment: a band of zero tolerance is
   // never assumed valid, and neither is any other unreviewed value).
   uint16_t repeatability_tolerance_ticks = 0;
+  // Operator-approved allowance (hardware finding 2026-09-29): BOTH approach
+  // passes are commanded this many raw ticks past approach_target_urad (the
+  // canonical contact) in endpoint_side's direction, and arrival is judged
+  // against that same point - so a stop at the modelled contact stalls the
+  // joint instead of reading as arrival. Never applied to the backoff. At most
+  // actuator::kContactProbeMaxOvertravelTicks (start() refuses more); reaching
+  // it without a stall is still NO_CONTACT_DETECTED. 0 = the canonical contact.
+  uint16_t approach_overtravel_ticks = 0;
 };
 
 enum class ContactProbePhase : uint8_t {
@@ -182,6 +190,9 @@ class ContactProbeEngine {
   void stepBackoffMonitoring(uint32_t now_ms, bool telemetry_available,
                             const actuator::TelemetrySample& telemetry);
   bool resolveTarget(actuator::MicroRad target_urad, uint16_t* raw_tick_out) const;
+  // The approach point both passes command and monitor: the canonical contact
+  // plus request_.approach_overtravel_ticks (see ContactProbeRequest).
+  bool resolveApproachTarget(uint16_t* raw_tick_out) const;
 
   actuator::SafeActuatorPolicy* policy_ = nullptr;
   actuator::ActuatorRuntime* runtime_ = nullptr;

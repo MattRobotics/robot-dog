@@ -124,11 +124,13 @@ class FakeActuatorBackend : public actuator::ActuatorBackend {
     ++calls;
     return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
-  actuator::BackendWriteOutcome writeGoalPosition(uint8_t, uint16_t) override {
+  actuator::BackendWriteOutcome writeGoalPosition(uint8_t, uint16_t target_tick) override {
     ++calls;
+    last_target_tick = target_tick;
     return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
   int calls = 0;
+  uint16_t last_target_tick = 0;
 };
 
 // One fully-wired rig: real arbiter, real policy, real runtime, real
@@ -515,7 +517,278 @@ void test_to_string_fails_closed_on_corrupted_value() {
 
 }  // namespace
 
+// ---------------------------------------------------------------------------
+// Contact-probe overtravel allowance (hardware finding 2026-09-29,
+// operator-approved): LF_UPPER's MIN stop sat 4-5 ticks short of the Geometry V5
+// contact, inside the 4-tick arrival tolerance. Both approach passes may now be
+// commanded at most 16 raw ticks PAST the canonical contact - CONTACT_PROBE
+// only, anchored on exactly the contact, never the backoff.
+// ---------------------------------------------------------------------------
+
+struct UpperCase {
+  Leg leg;
+  const char* unit;
+  uint8_t bus;
+  uint16_t q0;  // the 2026-09-29 current-boot capture
+};
+constexpr UpperCase kUppers[4] = {{Leg::LF, "ELR01", 12, 2088},
+                                  {Leg::RF, "ELR03", 22, 2108},
+                                  {Leg::RH, "ELR02", 32, 2042},
+                                  {Leg::LH, "M42", 42, 2088}};
+
+// A live CALIBRATION rig for one UPPER joint and side: transform admitted,
+// permit armed, and the auxiliary reported parked exactly when the compiled
+// plan for that endpoint requires it (LF/RF MAX).
+void armProbeRig(Rig& rig, const UpperCase& u, ContactSide side, AuthorityLease* lease_out) {
+  CHECK(rig.policy.transforms().admit(
+      promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0)));
+  const AuthorityLease lease =
+      grant(rig.arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+  const actuator::GeometryEndpointRecord* ep =
+      rig.profile.findEndpoint(u.leg, JointKind::UPPER, side);
+  CHECK(ep != nullptr);
+  actuator::CalibrationBootstrapContext bootstrap{};
+  bootstrap.session_active = true;
+  bootstrap.origin = CalibrationOrigin::LIVE_SESSION;
+  bootstrap.motion_permit_active = true;
+  bootstrap.motion_permit_generation = 1;
+  bootstrap.motion_permit_session_id = 1;
+  bootstrap.motion_permit_authority_generation = lease.generation;
+  bootstrap.auxiliary_parked =
+      ep != nullptr && ep->parking == actuator::ParkingOutcome::FEASIBLE_1DOF_PLAN_FOUND;
+  bootstrap.parked_leg = u.leg;
+  bootstrap.parked_joint = JointKind::UPPER;
+  bootstrap.parked_side = side;
+  rig.policy.setBootstrapContext(bootstrap);
+  *lease_out = lease;
+}
+
+uint16_t contactTick(const Rig& rig, const UpperCase& u, ContactSide side) {
+  const actuator::GeometryEndpointRecord* ep =
+      rig.profile.findEndpoint(u.leg, JointKind::UPPER, side);
+  uint16_t tick = 0;
+  CHECK(actuator::resolveUrdfQToRaw(rig.profile, actuator::geometry_data::kProvenance,
+                                    promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0),
+                                    ep->contact, &tick) == actuator::TargetResolveStatus::OK);
+  return tick;
+}
+
+void test_overtravel_lands_exactly_16_ticks_past_the_contact_both_sides_all_legs() {
+  g_case = "overtravel: +16 raw ticks past the canonical contact, MIN and MAX, 4 legs";
+  for (const UpperCase& u : kUppers) {
+    for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
+      Rig rig;
+      AuthorityLease lease{};
+      armProbeRig(rig, u, side, &lease);
+      const actuator::GeometryEndpointRecord* ep =
+          rig.profile.findEndpoint(u.leg, JointKind::UPPER, side);
+      CalibrationExecutionRequest req =
+          contactProbe(joint(u.leg, JointKind::UPPER, u.unit), u.leg, JointKind::UPPER, side);
+      req.target_urad = ep->contact;  // the canonical contact, unchanged
+      req.contact_probe_overtravel_ticks = 16;
+      const CalibrationExecutionResult r =
+          rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
+      CHECK_EQ((int)r.outcome, (int)CalibrationExecutionOutcome::ROUTED_TO_POLICY);
+      CHECK_EQ((int)r.policy_decision, (int)WriteDecision::ACCEPT);
+      CHECK_EQ((int)r.execute_result, (int)actuator::ExecuteResult::WRITTEN);
+      const int contact = contactTick(rig, u, side);
+      const int written = rig.backend.last_target_tick;
+      // Exactly 16 raw ticks, and on the FAR side of the contact from q0 -
+      // i.e. further into the stop, whichever way this joint's raw axis runs.
+      CHECK_EQ(written > contact ? written - contact : contact - written, 16);
+      const int q0 = u.q0;
+      const int contact_travel = contact > q0 ? contact - q0 : q0 - contact;
+      const int written_travel = written > q0 ? written - q0 : q0 - written;
+      CHECK_EQ(written_travel, contact_travel + 16);
+    }
+  }
+}
+
+void test_zero_overtravel_is_exactly_the_canonical_contact() {
+  g_case = "overtravel 0: unchanged canonical contact target";
+  for (const UpperCase& u : kUppers) {
+    for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
+      Rig rig;
+      AuthorityLease lease{};
+      armProbeRig(rig, u, side, &lease);
+      CalibrationExecutionRequest req =
+          contactProbe(joint(u.leg, JointKind::UPPER, u.unit), u.leg, JointKind::UPPER, side);
+      req.target_urad = rig.profile.findEndpoint(u.leg, JointKind::UPPER, side)->contact;
+      const CalibrationExecutionResult r =
+          rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
+      CHECK_EQ((int)r.policy_decision, (int)WriteDecision::ACCEPT);
+      CHECK_EQ(rig.backend.last_target_tick, contactTick(rig, u, side));
+    }
+  }
+}
+
+void test_overtravel_above_16_refused_at_every_layer() {
+  g_case = "overtravel: the bound cannot exceed 16";
+  const UpperCase& u = kUppers[0];
+  const JointIdentity id = joint(u.leg, JointKind::UPPER, u.unit);
+  for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
+    Rig rig;
+    AuthorityLease lease{};
+    armProbeRig(rig, u, side, &lease);
+    const actuator::MicroRad contact = rig.profile.findEndpoint(u.leg, JointKind::UPPER, side)->contact;
+    const actuator::JointTransform t = promotedTransform(id, u.q0);
+
+    // Resolver: 16 is the ceiling, 17 is not a number it will produce.
+    uint16_t tick16 = 0, tick17 = 0;
+    CHECK(actuator::resolveContactProbeApproachToRaw(rig.profile, actuator::geometry_data::kProvenance,
+                                                     t, contact, side, 16, &tick16) ==
+          actuator::TargetResolveStatus::OK);
+    CHECK(actuator::resolveContactProbeApproachToRaw(rig.profile, actuator::geometry_data::kProvenance,
+                                                     t, contact, side, 17, &tick17) ==
+          actuator::TargetResolveStatus::REJECT_OVERTRAVEL);
+    CHECK_EQ((int)actuator::kContactProbeMaxOvertravelTicks, 16);
+
+    // Engine: 17 cannot even be resolved - nothing reaches the backend.
+    CalibrationExecutionRequest req = contactProbe(id, u.leg, JointKind::UPPER, side);
+    req.target_urad = contact;
+    req.contact_probe_overtravel_ticks = 17;
+    CalibrationExecutionResult r =
+        rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
+    CHECK_EQ((int)r.outcome, (int)CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION);
+    CHECK_EQ(rig.backend.calls, 0);
+
+    // Policy, called directly with a hand-built command: 17 ticks, a tick one
+    // past what 16 resolves to, and a tick short of it are all refused.
+    const int step = (tick16 > contactTick(rig, u, side)) ? 1 : -1;
+    struct { uint16_t overtravel; int tick; } bad[] = {
+        {17, tick16 + step}, {16, tick16 + step}, {16, tick16 - step}, {200, tick16}};
+    for (const auto& b : bad) {
+      actuator::ActuatorCommand cmd{};
+      cmd.operation = actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE;
+      cmd.joint = id;
+      cmd.endpoint_leg = u.leg;
+      cmd.endpoint_joint = JointKind::UPPER;
+      cmd.endpoint_side = side;
+      cmd.target_urad = contact;
+      cmd.target_tick = static_cast<uint16_t>(b.tick);
+      cmd.contact_probe_overtravel_ticks = b.overtravel;
+      actuator::ActuatorTransaction txn{};
+      CHECK_EQ((int)rig.policy.plan(cmd, lease, OperatingMode::MAINTENANCE, &txn),
+               (int)WriteDecision::REJECT_PROBE_OVERTRAVEL);
+    }
+    // ...and exactly the resolved 16-tick point is accepted.
+    actuator::ActuatorCommand ok{};
+    ok.operation = actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE;
+    ok.joint = id;
+    ok.endpoint_leg = u.leg;
+    ok.endpoint_joint = JointKind::UPPER;
+    ok.endpoint_side = side;
+    ok.target_urad = contact;
+    ok.target_tick = tick16;
+    ok.contact_probe_overtravel_ticks = 16;
+    actuator::ActuatorTransaction txn{};
+    CHECK_EQ((int)rig.policy.plan(ok, lease, OperatingMode::MAINTENANCE, &txn),
+             (int)WriteDecision::ACCEPT);
+    rig.policy.abort(&txn);
+  }
+}
+
+void test_overtravel_is_contact_probe_only() {
+  g_case = "overtravel: non-CONTACT_PROBE commands can never carry it";
+  const UpperCase& u = kUppers[0];
+  const JointIdentity id = joint(u.leg, JointKind::UPPER, u.unit);
+  Rig rig;
+  AuthorityLease lease{};
+  armProbeRig(rig, u, ContactSide::MAX_SIDE, &lease);
+
+  // Engine: AUXILIARY_MOVE and DIRECTION_VERIFY refuse it before the policy
+  // (the auxiliary's own transform is admitted so that refusal, not a missing
+  // transform, is what is exercised).
+  CHECK(rig.policy.transforms().admit(promotedTransform(joint(Leg::LH, JointKind::UPPER, "M42"), 2088)));
+  CalibrationExecutionRequest aux{};
+  aux.intent = CalibrationIntent::AUXILIARY_MOVE;
+  aux.joint = joint(Leg::LH, JointKind::UPPER, "M42");
+  aux.endpoint_leg = Leg::LF;
+  aux.endpoint_joint = JointKind::UPPER;
+  aux.endpoint_side = ContactSide::MAX_SIDE;
+  aux.target_urad = 610865;
+  aux.contact_probe_overtravel_ticks = 16;
+  CHECK_EQ((int)rig.engine.execute(aux, liveContext(lease, OperatingMode::MAINTENANCE), 42).outcome,
+           (int)CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION);
+  CalibrationExecutionRequest dv{};
+  dv.intent = CalibrationIntent::DIRECTION_VERIFY;
+  dv.joint = id;
+  dv.direction_verify_delta_ticks = 16;
+  dv.contact_probe_overtravel_ticks = 16;
+  CHECK_EQ((int)rig.engine.execute(dv, liveContext(lease, OperatingMode::MAINTENANCE), u.bus).outcome,
+           (int)CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION);
+  CHECK_EQ(rig.backend.calls, 0);
+
+  // Policy, directly: every other operation, for every owner that could hold
+  // it - including the future stand/gait POSITION_COMMAND under MOTION.
+  for (actuator::ActuatorOperation op :
+       {actuator::ActuatorOperation::TORQUE_ENABLE, actuator::ActuatorOperation::POSITION_COMMAND,
+        actuator::ActuatorOperation::DIRECTION_VERIFY,
+        actuator::ActuatorOperation::CALIBRATION_AUXILIARY_MOVE}) {
+    actuator::ActuatorCommand cmd{};
+    cmd.operation = op;
+    cmd.joint = id;
+    cmd.endpoint_leg = u.leg;
+    cmd.endpoint_joint = JointKind::UPPER;
+    cmd.endpoint_side = ContactSide::MAX_SIDE;
+    cmd.target_tick = 2048;
+    cmd.contact_probe_overtravel_ticks = 1;
+    actuator::ActuatorTransaction txn{};
+    CHECK_EQ((int)rig.policy.plan(cmd, lease, OperatingMode::MAINTENANCE, &txn),
+             (int)WriteDecision::REJECT_PROBE_OVERTRAVEL);
+  }
+  {
+    Rig motion_rig;
+    CHECK(motion_rig.policy.transforms().admit(promotedTransform(id, u.q0)));
+    const AuthorityLease motion =
+        grant(motion_rig.arbiter, ActuatorAuthority::MOTION, OperatingMode::RUN);
+    actuator::ActuatorCommand cmd{};
+    cmd.operation = actuator::ActuatorOperation::POSITION_COMMAND;
+    cmd.joint = id;
+    cmd.target_tick = 2048;
+    cmd.contact_probe_overtravel_ticks = 16;
+    actuator::ActuatorTransaction txn{};
+    CHECK_EQ((int)motion_rig.policy.plan(cmd, motion, OperatingMode::RUN, &txn),
+             (int)WriteDecision::REJECT_PROBE_OVERTRAVEL);
+  }
+}
+
+void test_backoff_can_never_carry_the_overtravel() {
+  g_case = "overtravel: the backoff target is unchanged and cannot carry it";
+  for (const UpperCase& u : kUppers) {
+    for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
+      Rig rig;
+      AuthorityLease lease{};
+      armProbeRig(rig, u, side, &lease);
+      const JointIdentity id = joint(u.leg, JointKind::UPPER, u.unit);
+      const actuator::MicroRad backoff =
+          rig.profile.findEndpoint(u.leg, JointKind::UPPER, side)->contact / 2;
+      CalibrationExecutionRequest req = contactProbe(id, u.leg, JointKind::UPPER, side);
+      req.target_urad = backoff;
+      req.contact_probe_overtravel_ticks = 16;
+      CalibrationExecutionResult r =
+          rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
+      CHECK_EQ((int)r.policy_decision, (int)WriteDecision::REJECT_PROBE_OVERTRAVEL);
+      CHECK_EQ(rig.backend.calls, 0);
+      // Without it, the backoff resolves exactly as before.
+      req.contact_probe_overtravel_ticks = 0;
+      r = rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
+      CHECK_EQ((int)r.policy_decision, (int)WriteDecision::ACCEPT);
+      uint16_t expected = 0;
+      CHECK(actuator::resolveUrdfQToRaw(rig.profile, actuator::geometry_data::kProvenance,
+                                        promotedTransform(id, u.q0), backoff, &expected) ==
+            actuator::TargetResolveStatus::OK);
+      CHECK_EQ(rig.backend.last_target_tick, expected);
+    }
+  }
+}
+
 int main() {
+  test_overtravel_lands_exactly_16_ticks_past_the_contact_both_sides_all_legs();
+  test_zero_overtravel_is_exactly_the_canonical_contact();
+  test_overtravel_above_16_refused_at_every_layer();
+  test_overtravel_is_contact_probe_only();
+  test_backoff_can_never_carry_the_overtravel();
   test_authority_loss_produces_zero_restore_motion();
   test_stale_authority_generation_rejected();
   test_diagnostic_endpoint_cannot_become_executable();

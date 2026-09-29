@@ -1,5 +1,7 @@
 #include "FullLegCalibrationPlan.h"
 
+#include <initializer_list>
+
 #include "../servo/ServoPopulation.h"
 #include "CalibrationPopulationEvidence.h"
 
@@ -164,6 +166,7 @@ FullLegPlanStatus resolveFullLegPlan(const actuator::CalibrationGeometryProfile&
   request.max_repeatability_tolerance_ticks = kFullLegRepeatabilityToleranceTicks;
   request.min_approach_urad = min_endpoint->contact;
   request.max_approach_urad = max_endpoint->contact;
+  request.approach_overtravel_ticks = kFullLegApproachOvertravelTicks;
 
   s = deriveBackoffUrad(profile, expected_provenance, *upper_transform, *min_endpoint,
                         kFullLegRepeatabilityToleranceTicks, &request.min_backoff_urad);
@@ -171,6 +174,17 @@ FullLegPlanStatus resolveFullLegPlan(const actuator::CalibrationGeometryProfile&
   s = deriveBackoffUrad(profile, expected_provenance, *upper_transform, *max_endpoint,
                         kFullLegRepeatabilityToleranceTicks, &request.max_backoff_urad);
   if (s != FullLegPlanStatus::OK) return s;
+
+  // Both commanded approach points (contact + allowance) must exist in the raw
+  // domain for this installation's q0 before anything moves.
+  for (const actuator::GeometryEndpointRecord* endpoint : {min_endpoint, max_endpoint}) {
+    uint16_t approach_raw = 0;
+    if (actuator::resolveContactProbeApproachToRaw(
+            profile, expected_provenance, *upper_transform, endpoint->contact, endpoint->side,
+            kFullLegApproachOvertravelTicks, &approach_raw) != actuator::TargetResolveStatus::OK) {
+      return FullLegPlanStatus::REJECT_TARGET_RESOLUTION;
+    }
+  }
 
   request.auxiliary_required = max_needs_auxiliary;
   if (max_needs_auxiliary) {

@@ -139,6 +139,11 @@ struct CalibrationExecutionRequest {
   // CONTACT_PROBE / AUXILIARY_MOVE: requested URDF-frame target. The policy
   // still checks the endpoint, parking and contact-side safety constraints.
   actuator::MicroRad target_urad = 0;
+
+  // CONTACT_PROBE approach only: raw ticks past the canonical contact named by
+  // target_urad (actuator::resolveContactProbeApproachToRaw). 0 everywhere
+  // else; any other intent carrying it is refused before the policy.
+  uint16_t contact_probe_overtravel_ticks = 0;
 };
 
 enum class CalibrationExecutionOutcome : uint8_t {

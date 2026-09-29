@@ -22,7 +22,16 @@ enum class TargetResolveStatus : uint8_t {
   REJECT_DIRECTION = 5,
   REJECT_URDF_LIMIT = 6,
   REJECT_RAW_DOMAIN = 7,
+  REJECT_OVERTRAVEL = 8,  // contact-probe allowance above kContactProbeMaxOvertravelTicks
 };
+
+// Hardware finding 2026-09-29, operator-approved: the most a CONTACT_PROBE
+// approach may be commanded PAST the canonical Geometry V5 contact, in raw
+// ticks, so the stall detector can observe a physical stop lying at (or a few
+// ticks short of) the modelled contact instead of "arriving" on it. It is an
+// allowance on the probe's commanded boundary only: the canonical contact, the
+// backoff, every other operation and every envelope/limit are untouched.
+constexpr uint16_t kContactProbeMaxOvertravelTicks = 16;
 
 TargetResolveStatus resolveUrdfQToRaw(const CalibrationGeometryProfile& profile,
                                       const GeometryProvenance& expected_provenance,
@@ -44,6 +53,22 @@ TargetResolveStatus resolveDeltaFromQ0(const CalibrationGeometryProfile& profile
                                        const JointTransform& transform,
                                        int32_t delta_ticks,
                                        uint16_t* raw_tick_out);
+
+// The ONE sanctioned way to command a GoalPosition past a Geometry V5
+// contact. Resolves `contact_urad` exactly like resolveUrdfQToRaw() (so the
+// contact itself must lie inside the URDF domain), then continues
+// `overtravel_ticks` further in `side`'s approach direction - q decreasing for
+// MIN_SIDE, increasing for MAX_SIDE - in the raw domain. overtravel_ticks
+// above kContactProbeMaxOvertravelTicks is REJECT_OVERTRAVEL; the result must
+// stay inside 0..4095 (no wrap). overtravel_ticks == 0 is exactly
+// resolveUrdfQToRaw(contact_urad).
+TargetResolveStatus resolveContactProbeApproachToRaw(const CalibrationGeometryProfile& profile,
+                                                     const GeometryProvenance& expected_provenance,
+                                                     const JointTransform& transform,
+                                                     MicroRad contact_urad,
+                                                     calibration::ContactSide side,
+                                                     uint16_t overtravel_ticks,
+                                                     uint16_t* raw_tick_out);
 
 const char* toString(TargetResolveStatus status);
 

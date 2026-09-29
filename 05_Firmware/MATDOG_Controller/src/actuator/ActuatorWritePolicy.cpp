@@ -1,5 +1,7 @@
 #include "ActuatorWritePolicy.h"
 
+#include "CalibrationTargetResolver.h"
+
 namespace matdog {
 namespace actuator {
 
@@ -386,10 +388,33 @@ WriteDecision SafeActuatorPolicy::evaluateEndpointPlan(const ActuatorCommand& co
     return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
   }
 
-  if (transforms_.find(command.joint, currentGeometryTag()) == nullptr) {
+  const JointTransform* transform = transforms_.find(command.joint, currentGeometryTag());
+  if (transform == nullptr) {
     return transforms_.findAny(command.joint) != nullptr
                ? WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH
                : WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
+  }
+
+  // The one exception to "never past the contact" (hardware finding
+  // 2026-09-29, operator-approved): an approach anchored on EXACTLY the
+  // canonical contact may be commanded at most kContactProbeMaxOvertravelTicks
+  // raw ticks further, so a physical stop at the modelled contact stalls the
+  // joint instead of being indistinguishable from arrival. The tick is
+  // re-derived here from the policy's own geometry and transform; the caller's
+  // target_tick must match it exactly. A backoff (target short of the contact)
+  // can never carry the allowance.
+  if (command.contact_probe_overtravel_ticks != 0) {
+    if (command.contact_probe_overtravel_ticks > kContactProbeMaxOvertravelTicks ||
+        command.target_urad != contact || expected_provenance_ == nullptr) {
+      return WriteDecision::REJECT_PROBE_OVERTRAVEL;
+    }
+    uint16_t allowed_tick = 0;
+    if (resolveContactProbeApproachToRaw(*geometry_, *expected_provenance_, *transform, contact,
+                                         endpoint->side, command.contact_probe_overtravel_ticks,
+                                         &allowed_tick) != TargetResolveStatus::OK ||
+        command.target_tick != allowed_tick) {
+      return WriteDecision::REJECT_PROBE_OVERTRAVEL;
+    }
   }
   return WriteDecision::ACCEPT;
 }
@@ -402,6 +427,14 @@ WriteDecision SafeActuatorPolicy::evaluate(const ActuatorCommand& command,
   if (arbiter_ == nullptr) return WriteDecision::REJECT_NO_ARBITER;
 
   if (!isCommandOperation(command.operation)) return WriteDecision::REJECT_UNKNOWN_OPERATION;
+
+  // The contact-probe overtravel allowance exists for exactly one operation.
+  // Checked before anything else can accept, so no route - accepted limits,
+  // bootstrap envelope or auxiliary move - can ever carry it.
+  if (command.contact_probe_overtravel_ticks != 0 &&
+      command.operation != ActuatorOperation::CALIBRATION_CONTACT_PROBE) {
+    return WriteDecision::REJECT_PROBE_OVERTRAVEL;
+  }
 
   // A bus id is an address, not an identity (CalibrationDomain.h): after the
   // 2026-08-27 reassembly, the slot alone no longer says which servo answers.
@@ -638,6 +671,8 @@ const char* toString(WriteDecision decision) {
       return "REJECT_EVIDENCE_GEOMETRY_MISMATCH";
     case WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT:
       return "REJECT_NO_CALIBRATION_MOTION_PERMIT";
+    case WriteDecision::REJECT_PROBE_OVERTRAVEL:
+      return "REJECT_PROBE_OVERTRAVEL";
   }
   return "UNKNOWN";
 }

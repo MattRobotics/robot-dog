@@ -25,6 +25,7 @@
 #include "../../src/actuator/CalibrationGeometryProfileData.h"
 #include "../../src/actuator/OperationalEnvelope.h"
 #include "../../src/calibration/FullLegCalibrationExecutor.h"
+#include "../../src/calibration/FullLegCalibrationPlan.h"
 
 using namespace matdog;
 using namespace matdog::calibration;
@@ -1124,10 +1125,18 @@ struct SimServo {
   bool has_stops = false;
   double lo_stop = 0;
   double hi_stop = 4095;
+  double lo_seen = 4096;
+  double hi_seen = -1;
 };
 
 class KinematicBackend : public actuator::ActuatorBackend {
  public:
+  KinematicBackend() {
+    for (int b = 0; b < 256; ++b) {
+      min_goal[b] = 4096;
+      max_goal[b] = -1;
+    }
+  }
   BackendWriteOutcome enableTorque(uint8_t bus_id) override {
     ++writes[bus_id];
     SimServo& s = servo[bus_id];
@@ -1138,6 +1147,8 @@ class KinematicBackend : public actuator::ActuatorBackend {
   BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick) override {
     ++writes[bus_id];
     servo[bus_id].target = target_tick;
+    if (target_tick < min_goal[bus_id]) min_goal[bus_id] = target_tick;
+    if (target_tick > max_goal[bus_id]) max_goal[bus_id] = target_tick;
     return BackendWriteOutcome::VERIFIED_APPLIED;
   }
   void advance(uint32_t dt_ms) {
@@ -1150,12 +1161,16 @@ class KinematicBackend : public actuator::ActuatorBackend {
         if (s.pos < s.lo_stop) s.pos = s.lo_stop;
         if (s.pos > s.hi_stop) s.pos = s.hi_stop;
       }
+      if (s.pos < s.lo_seen) s.lo_seen = s.pos;
+      if (s.pos > s.hi_seen) s.hi_seen = s.pos;
     }
   }
   int32_t tick(uint8_t bus) const { return static_cast<int32_t>(servo[bus].pos + 0.5); }
 
   SimServo servo[256];
   int writes[256] = {0};
+  int min_goal[256];
+  int max_goal[256];
 };
 
 struct KinematicResult {
@@ -1172,9 +1187,29 @@ struct KinematicResult {
   bool aux_torque_off = true;
   ContactEvidence min_evidence{};
   ContactEvidence max_evidence{};
+  int32_t min_contact = 0;       // canonical contact ticks for this q0
+  int32_t max_contact = 0;
+  int32_t min_approach_goal = 0;  // contact + overtravel, per side
+  int32_t max_approach_goal = 0;
+  double primary_lo_seen = 0;
+  double primary_hi_seen = 0;
+  int primary_min_goal = 0;
+  int primary_max_goal = 0;
+  int32_t min_backoff = 0;
+  int32_t max_backoff = 0;
 };
 
-KinematicResult runKinematicLeg(const LegFixture& f, uint16_t nominal_rate) {
+struct KinematicOptions {
+  uint16_t nominal_rate = 40;
+  uint16_t overtravel = 0;
+  // Where the physical stops sit, in ticks SHORT of each canonical contact
+  // (toward q0). The 2026-09-29 LF_UPPER MIN stop: 4-5.
+  int stop_inset = kSimStopInsetTicks;
+  bool has_stops = true;
+};
+
+KinematicResult runKinematicLeg(const LegFixture& f, const KinematicOptions& o) {
+  const uint16_t nominal_rate = o.nominal_rate;
   KinematicResult out{};
   ActuatorAuthorityArbiter arbiter;
   SafeActuatorPolicy policy;
@@ -1202,16 +1237,25 @@ KinematicResult runKinematicLeg(const LegFixture& f, uint16_t nominal_rate) {
   }
 
   FullLegCalibrationRequest req = requestFor(f);
+  req.approach_overtravel_ticks = o.overtravel;
   const int32_t min_contact = resolvedTick(req.min_approach_urad, f.upper, q0);
   const int32_t min_backoff = resolvedTick(req.min_backoff_urad, f.upper, q0);
   const int32_t max_contact = resolvedTick(req.max_approach_urad, f.upper, q0);
   const int32_t max_backoff = resolvedTick(req.max_backoff_urad, f.upper, q0);
-  out.min_stop = min_contact + kSimStopInsetTicks * (min_backoff > min_contact ? 1 : -1);
-  out.max_stop = max_contact + kSimStopInsetTicks * (max_backoff > max_contact ? 1 : -1);
+  const int min_toward_q0 = min_backoff > min_contact ? 1 : -1;
+  const int max_toward_q0 = max_backoff > max_contact ? 1 : -1;
+  out.min_stop = min_contact + o.stop_inset * min_toward_q0;
+  out.max_stop = max_contact + o.stop_inset * max_toward_q0;
+  out.min_contact = min_contact;
+  out.max_contact = max_contact;
+  out.min_backoff = min_backoff;
+  out.max_backoff = max_backoff;
+  out.min_approach_goal = min_contact - static_cast<int>(o.overtravel) * min_toward_q0;
+  out.max_approach_goal = max_contact - static_cast<int>(o.overtravel) * max_toward_q0;
 
   SimServo& primary = backend.servo[f.upper_bus];
   primary.pos = q0;
-  primary.has_stops = true;
+  primary.has_stops = o.has_stops;
   primary.lo_stop = out.min_stop < out.max_stop ? out.min_stop : out.max_stop;
   primary.hi_stop = out.min_stop < out.max_stop ? out.max_stop : out.min_stop;
   if (f.aux_required) backend.servo[f.aux_bus].pos = hardwareQ0(f.aux_bus);
@@ -1281,7 +1325,17 @@ KinematicResult runKinematicLeg(const LegFixture& f, uint16_t nominal_rate) {
   if (f.aux_required) out.aux_torque_off = !backend.servo[f.aux_bus].torque;
   out.min_evidence = full.minSideEvidence();
   out.max_evidence = full.maxSideEvidence();
+  out.primary_lo_seen = backend.servo[f.upper_bus].lo_seen;
+  out.primary_hi_seen = backend.servo[f.upper_bus].hi_seen;
+  out.primary_min_goal = backend.min_goal[f.upper_bus];
+  out.primary_max_goal = backend.max_goal[f.upper_bus];
   return out;
+}
+
+KinematicResult runKinematicLeg(const LegFixture& f, uint16_t nominal_rate) {
+  KinematicOptions o{};
+  o.nominal_rate = nominal_rate;
+  return runKinematicLeg(f, o);
 }
 
 // The exact 14881cd production figures (fixed 12 s): reproduces the hardware
@@ -1333,6 +1387,135 @@ void test_kinematic_travel_aware_budget_completes_every_leg() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Hardware finding 2026-09-29 #2: LF_UPPER's MIN stop sat 4-5 ticks SHORT of the
+// Geometry V5 contact. Commanded exactly to the contact, pass 1 stalled 5 ticks
+// out (1500 vs 1495) and pass 2 "arrived" 4 ticks out (1499) -> NO_CONTACT_DETECTED.
+// The operator-approved fix commands both approach passes 16 raw ticks past the
+// canonical contact (Full-Leg plan: kFullLegApproachOvertravelTicks).
+// ---------------------------------------------------------------------------
+
+// A stop 4 ticks short of the contact is inside the arrival tolerance: without
+// the allowance the approach reads as arrival - the hardware failure.
+void test_kinematic_stop_4_ticks_short_without_allowance_is_no_contact() {
+  g_case = "kinematic: stop 4 ticks short, no allowance -> NO_CONTACT (hw repro #2)";
+  KinematicOptions o{};
+  o.overtravel = 0;
+  o.stop_inset = 4;
+  const KinematicResult r = runKinematicLeg(fixtureFor(Leg::LF), o);
+  CHECK_EQ((int)r.phase, (int)FullLegCalibrationPhase::FAILED);
+  CHECK_EQ((int)r.failure, (int)FullLegCalibrationFailure::UPPER_MIN_PROBE_FAILED);
+  CHECK_EQ((int)r.probe.failure, (int)ContactProbeFailure::NO_CONTACT_DETECTED);
+  CHECK(r.primary_torque_off);
+}
+
+// With the allowance, the same stops (4 and 5 ticks short, the observed
+// range) are detected as a sustained STALL on BOTH passes of BOTH sides, on
+// all four legs - MIN and MAX, both raw directions (LF/LH +1, RF/RH -1).
+void test_kinematic_stop_short_of_contact_with_allowance_completes_every_leg() {
+  for (const int inset : {4, 5}) {
+    for (const Leg leg : kAllLegs) {
+      g_case = "kinematic: stop 4-5 ticks short + 16-tick allowance -> STALL both passes, all legs";
+      const LegFixture f = fixtureFor(leg);
+      KinematicOptions o{};
+      o.overtravel = kFullLegApproachOvertravelTicks;
+      o.stop_inset = inset;
+      const KinematicResult r = runKinematicLeg(f, o);
+      CHECK_EQ((int)r.phase, (int)FullLegCalibrationPhase::COMPLETE);
+      CHECK_EQ((int)r.failure, (int)FullLegCalibrationFailure::NONE);
+      CHECK(r.min_evidence.witness.accepted() && r.max_evidence.witness.accepted());
+      // The witnessed ticks are the physical stops, not the commanded points.
+      CHECK(r.min_evidence.coarse_tick >= r.min_stop - 2 && r.min_evidence.coarse_tick <= r.min_stop + 2);
+      CHECK(r.max_evidence.coarse_tick >= r.max_stop - 2 && r.max_evidence.coarse_tick <= r.max_stop + 2);
+      CHECK(r.min_evidence.fine_tick_1 >= r.min_stop - 2 && r.min_evidence.fine_tick_1 <= r.min_stop + 2);
+      CHECK(r.max_evidence.fine_tick_1 >= r.max_stop - 2 && r.max_evidence.fine_tick_1 <= r.max_stop + 2);
+      // Commanded extremes: exactly contact +16 on each side, never further.
+      const int lo_goal = r.min_approach_goal < r.max_approach_goal ? r.min_approach_goal : r.max_approach_goal;
+      const int hi_goal = r.min_approach_goal < r.max_approach_goal ? r.max_approach_goal : r.min_approach_goal;
+      CHECK_EQ(r.primary_min_goal, lo_goal);
+      CHECK_EQ(r.primary_max_goal, hi_goal);
+      CHECK_EQ(r.min_approach_goal > r.min_contact ? r.min_approach_goal - r.min_contact
+                                                   : r.min_contact - r.min_approach_goal, 16);
+      CHECK_EQ(r.max_approach_goal > r.max_contact ? r.max_approach_goal - r.max_contact
+                                                   : r.max_contact - r.max_approach_goal, 16);
+      CHECK_EQ(r.primary_writes, 8);
+      CHECK(r.primary_torque_off && r.aux_torque_off);
+    }
+  }
+}
+
+// No physical stop at all: the joint reaches contact+16, ARRIVES, and the
+// probe fails NO_CONTACT_DETECTED with SAFE_OFF - it never travels further,
+// and nothing is ever commanded further.
+void test_kinematic_no_stop_fails_at_contact_plus_16_and_never_beyond() {
+  for (const Leg leg : kAllLegs) {
+    g_case = "kinematic: no stop -> NO_CONTACT at exactly contact+16, never beyond";
+    const LegFixture f = fixtureFor(leg);
+    KinematicOptions o{};
+    o.overtravel = kFullLegApproachOvertravelTicks;
+    o.has_stops = false;
+    const KinematicResult r = runKinematicLeg(f, o);
+    CHECK_EQ((int)r.phase, (int)FullLegCalibrationPhase::FAILED);
+    CHECK_EQ((int)r.failure, (int)FullLegCalibrationFailure::UPPER_MIN_PROBE_FAILED);
+    CHECK_EQ((int)r.probe.failure, (int)ContactProbeFailure::NO_CONTACT_DETECTED);
+    CHECK_EQ(r.probe.pass, 1);
+    CHECK(r.primary_torque_off);
+    CHECK_EQ(r.primary_writes, 2);  // TorqueEnable + the one approach, nothing else
+    const bool min_is_low = r.min_approach_goal < r.min_contact;
+    if (min_is_low) {
+      CHECK_EQ(r.primary_min_goal, r.min_approach_goal);
+      CHECK(r.primary_lo_seen >= r.min_approach_goal - 0.001);
+    } else {
+      CHECK_EQ(r.primary_max_goal, r.min_approach_goal);
+      CHECK(r.primary_hi_seen <= r.min_approach_goal + 0.001);
+    }
+    // It did get within the arrival tolerance of contact+16 - that is WHY it
+    // failed - but no closer to anything beyond it.
+    const int final_gap = r.primary_final_tick > r.min_approach_goal
+                              ? r.primary_final_tick - r.min_approach_goal
+                              : r.min_approach_goal - r.primary_final_tick;
+    CHECK(final_gap <= 4);
+  }
+}
+
+// The backoff is untouched by the allowance: same tick with or without it.
+void test_kinematic_backoff_unchanged_by_allowance() {
+  g_case = "kinematic: backoff targets identical with and without the allowance";
+  for (const Leg leg : kAllLegs) {
+    KinematicOptions with{};
+    with.overtravel = kFullLegApproachOvertravelTicks;
+    KinematicOptions without{};
+    without.overtravel = 0;
+    const KinematicResult a = runKinematicLeg(fixtureFor(leg), with);
+    const KinematicResult b = runKinematicLeg(fixtureFor(leg), without);
+    CHECK_EQ(a.min_backoff, b.min_backoff);
+    CHECK_EQ(a.max_backoff, b.max_backoff);
+    CHECK_EQ(a.min_contact, b.min_contact);  // canonical contact unchanged
+    CHECK_EQ(a.max_contact, b.max_contact);
+  }
+}
+
+// Above the policy maximum is refused before anything moves, at both layers.
+void test_allowance_above_16_refused_at_start() {
+  g_case = "allowance > 16 refused by the executor and the probe engine";
+  CHECK_EQ((int)kFullLegApproachOvertravelTicks, 16);
+  CHECK((int)kFullLegApproachOvertravelTicks <= (int)actuator::kContactProbeMaxOvertravelTicks);
+  Rig rig;
+  primeTransforms(rig);
+  const AuthorityLease lease =
+      grant(rig.arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+  refreshBootstrap(rig, lease, false);
+  const FullLegCalibrationContext ctx = liveContext(lease, OperatingMode::MAINTENANCE);
+  FullLegCalibrationRequest req = request();
+  req.approach_overtravel_ticks = 17;
+  CHECK(!rig.full.start(req, ctx, 1000));
+  CHECK_EQ((int)rig.full.status().failure, (int)FullLegCalibrationFailure::REJECT_PRECONDITIONS);
+  CHECK_EQ(rig.backend.enable_torque_calls + rig.backend.write_goal_position_calls, 0);
+  req.approach_overtravel_ticks = 16;
+  CHECK(rig.full.start(req, ctx, 1000));
+  rig.full.abort();
+}
+
 int main() {
   test_happy_path_full_leg_completes_with_evidence_both_sides();
   test_min_probe_failure_never_reaches_aux_or_max();
@@ -1354,6 +1537,11 @@ int main() {
   test_rf_auxiliary_is_rh_upper_with_its_own_transform();
   test_kinematic_fixed_budget_reproduces_hardware_min_timeout();
   test_kinematic_travel_aware_budget_completes_every_leg();
+  test_kinematic_stop_4_ticks_short_without_allowance_is_no_contact();
+  test_kinematic_stop_short_of_contact_with_allowance_completes_every_leg();
+  test_kinematic_no_stop_fails_at_contact_plus_16_and_never_beyond();
+  test_kinematic_backoff_unchanged_by_allowance();
+  test_allowance_above_16_refused_at_start();
 
   std::printf("test_full_leg_calibration_executor: %d checks, %d failures\n", g_checks,
              g_failures);

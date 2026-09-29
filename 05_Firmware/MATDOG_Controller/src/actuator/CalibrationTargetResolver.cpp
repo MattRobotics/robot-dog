@@ -121,6 +121,39 @@ TargetResolveStatus resolveDeltaFromQ0(const CalibrationGeometryProfile& profile
   return TargetResolveStatus::OK;
 }
 
+TargetResolveStatus resolveContactProbeApproachToRaw(const CalibrationGeometryProfile& profile,
+                                                     const GeometryProvenance& expected_provenance,
+                                                     const JointTransform& transform,
+                                                     MicroRad contact_urad,
+                                                     calibration::ContactSide side,
+                                                     uint16_t overtravel_ticks,
+                                                     uint16_t* raw_tick_out) {
+  if (raw_tick_out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
+  if (overtravel_ticks > kContactProbeMaxOvertravelTicks) {
+    return TargetResolveStatus::REJECT_OVERTRAVEL;
+  }
+
+  uint16_t contact_raw = 0;
+  const TargetResolveStatus contact_status =
+      resolveUrdfQToRaw(profile, expected_provenance, transform, contact_urad, &contact_raw);
+  if (contact_status != TargetResolveStatus::OK) return contact_status;
+
+  // resolveUrdfQToRaw() already validated the transform, so the direction is
+  // known good here. Beyond the contact means q further from 0 on this side:
+  // negative for MIN, positive for MAX, then mapped through the joint's raw
+  // direction exactly as the forward conversion does.
+  const int8_t direction = jointDirection(profile, transform.identity);
+  const int64_t q_sign = (side == calibration::ContactSide::MIN_SIDE) ? -1 : 1;
+  const int64_t raw = static_cast<int64_t>(contact_raw) +
+                      static_cast<int64_t>(direction) * q_sign *
+                          static_cast<int64_t>(overtravel_ticks);
+  if (raw < 0 || raw >= kTicksPerRevolution) {
+    return TargetResolveStatus::REJECT_RAW_DOMAIN;
+  }
+  *raw_tick_out = static_cast<uint16_t>(raw);
+  return TargetResolveStatus::OK;
+}
+
 const char* toString(TargetResolveStatus status) {
   switch (status) {
     case TargetResolveStatus::OK: return "OK";
@@ -131,6 +164,7 @@ const char* toString(TargetResolveStatus status) {
     case TargetResolveStatus::REJECT_DIRECTION: return "REJECT_DIRECTION";
     case TargetResolveStatus::REJECT_URDF_LIMIT: return "REJECT_URDF_LIMIT";
     case TargetResolveStatus::REJECT_RAW_DOMAIN: return "REJECT_RAW_DOMAIN";
+    case TargetResolveStatus::REJECT_OVERTRAVEL: return "REJECT_OVERTRAVEL";
   }
   return "UNKNOWN";
 }

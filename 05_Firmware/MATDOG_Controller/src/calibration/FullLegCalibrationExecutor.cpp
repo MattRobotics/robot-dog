@@ -68,7 +68,8 @@ bool FullLegCalibrationExecutor::start(const FullLegCalibrationRequest& request,
       expected_provenance_ == nullptr || !request.probe_joint.valid() ||
       !request.probe_joint.unitKnown() || !auxiliary_ok || request.probe_bus_id == 0 ||
       request.min_repeatability_tolerance_ticks == 0 ||
-      request.max_repeatability_tolerance_ticks == 0) {
+      request.max_repeatability_tolerance_ticks == 0 ||
+      request.approach_overtravel_ticks > actuator::kContactProbeMaxOvertravelTicks) {
     request_ = request;
     status_ = FullLegCalibrationStatus{};
     status_.phase = FullLegCalibrationPhase::FAILED;
@@ -95,6 +96,7 @@ bool FullLegCalibrationExecutor::start(const FullLegCalibrationRequest& request,
   probe_request.approach_target_urad = request_.min_approach_urad;
   probe_request.backoff_target_urad = request_.min_backoff_urad;
   probe_request.repeatability_tolerance_ticks = request_.min_repeatability_tolerance_ticks;
+  probe_request.approach_overtravel_ticks = request_.approach_overtravel_ticks;
 
   if (!probe_.start(probe_request, toContactProbeContext(context), now_ms)) {
     status_.phase = FullLegCalibrationPhase::FAILED;
@@ -212,6 +214,7 @@ bool FullLegCalibrationExecutor::startMaxProbe(const FullLegCalibrationContext& 
   max_request.approach_target_urad = request_.max_approach_urad;
   max_request.backoff_target_urad = request_.max_backoff_urad;
   max_request.repeatability_tolerance_ticks = request_.max_repeatability_tolerance_ticks;
+  max_request.approach_overtravel_ticks = request_.approach_overtravel_ticks;
   return probe_.start(max_request, toContactProbeContext(context), now_ms);
 }
 

@@ -1312,6 +1312,98 @@ def check_first_motion_command_wiring(files):
              f"hardware_motion_authorized; CR3 calibration permit must remain separate")
 
 
+def check_contact_probe_overtravel_allowance(files):
+    """Hardware finding 2026-09-29 (operator-approved): the ONE bounded way a
+    GoalPosition may be commanded past a Geometry V5 contact.
+
+    LF_UPPER's MIN stop sat 4-5 ticks short of the modelled contact, inside the
+    4-tick arrival tolerance, so an approach commanded exactly to the contact
+    could arrive on the stop and read as NO_CONTACT_DETECTED. The approved fix
+    lets a CONTACT_PROBE approach run at most 16 raw ticks past the canonical
+    contact. Pinned here so it can never widen or leak:
+      - kContactProbeMaxOvertravelTicks is exactly 16, and the Full-Leg plan's
+        allowance is exactly 16 and statically bounded by it;
+      - evaluate() refuses the allowance on every non-CONTACT_PROBE operation
+        BEFORE any route (accepted limits, bootstrap envelope, auxiliary move)
+        can accept;
+      - evaluateEndpointPlan() bounds it, anchors it on exactly the canonical
+        contact (so a backoff cannot carry it) and re-derives the exact tick;
+      - the execution engine refuses it on every other intent;
+      - only the reviewed calibration units ever call the resolver."""
+    by_name = {path.name: (path, code) for path, code in files}
+    normalize = lambda text: re.sub(r"\s+", " ", text)
+    for name in ("CalibrationTargetResolver.h", "ActuatorWritePolicy.cpp",
+                 "CalibrationExecutionEngine.cpp", "FullLegCalibrationPlan.h"):
+        if name not in by_name:
+            fail(f"{name} not found - cannot audit the contact-probe overtravel allowance")
+            return
+
+    path, code = by_name["CalibrationTargetResolver.h"]
+    if normalize(code).count("constexpr uint16_t kContactProbeMaxOvertravelTicks = 16;") != 1:
+        fail(f"{path}: kContactProbeMaxOvertravelTicks must be exactly 16 raw ticks "
+             f"(operator-approved 2026-09-29); it may never be widened silently")
+
+    path, code = by_name["FullLegCalibrationPlan.h"]
+    body = normalize(code)
+    if body.count("constexpr uint16_t kFullLegApproachOvertravelTicks = 16;") != 1:
+        fail(f"{path}: the Full-Leg approach allowance must be exactly 16 raw ticks")
+    if "static_assert(kFullLegApproachOvertravelTicks <= actuator::kContactProbeMaxOvertravelTicks" \
+            not in body:
+        fail(f"{path}: the Full-Leg approach allowance lost its static bound by the "
+             f"policy's kContactProbeMaxOvertravelTicks")
+
+    path, code = by_name["ActuatorWritePolicy.cpp"]
+    evaluate = re.search(r"WriteDecision SafeActuatorPolicy::evaluate\(const ActuatorCommand& "
+                         r"command,.*?\n\}", code, re.DOTALL)
+    gate = ("if (command.contact_probe_overtravel_ticks != 0 && command.operation != "
+            "ActuatorOperation::CALIBRATION_CONTACT_PROBE) { return "
+            "WriteDecision::REJECT_PROBE_OVERTRAVEL; }")
+    if not evaluate:
+        fail(f"{path}: SafeActuatorPolicy::evaluate() not found")
+    else:
+        ev = normalize(evaluate.group(0))
+        at = ev.find(gate)
+        if at < 0:
+            fail(f"{path}: evaluate() must refuse the contact-probe overtravel allowance on "
+                 f"every operation other than CALIBRATION_CONTACT_PROBE")
+        else:
+            for route in ("operationUsesAcceptedLimits(", "evaluateEndpointPlan(",
+                          "evaluateBootstrapEnvelope("):
+                if 0 <= ev.find(route) < at:
+                    fail(f"{path}: the overtravel refusal must precede {route!r} so no route "
+                         f"can accept a command carrying it")
+    plan_route = re.search(r"WriteDecision SafeActuatorPolicy::evaluateEndpointPlan"
+                           r"\(.*?\n\}", code, re.DOTALL)
+    if not plan_route:
+        fail(f"{path}: evaluateEndpointPlan() not found")
+    else:
+        body = normalize(plan_route.group(0))
+        for token in ("command.contact_probe_overtravel_ticks > kContactProbeMaxOvertravelTicks",
+                      "command.target_urad != contact",
+                      "resolveContactProbeApproachToRaw(",
+                      "command.target_tick != allowed_tick"):
+            if token not in body:
+                fail(f"{path}: evaluateEndpointPlan() lost the overtravel check {token!r} - "
+                     f"the allowance must be bounded, anchored on exactly the canonical "
+                     f"contact and re-derived to the exact tick")
+
+    path, code = by_name["CalibrationExecutionEngine.cpp"]
+    if ("if (request.contact_probe_overtravel_ticks != 0 && operation != "
+            "actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE) {") not in normalize(code):
+        fail(f"{path}: execute() must refuse the overtravel allowance on every intent other "
+             f"than CONTACT_PROBE")
+
+    allowed = {"CalibrationTargetResolver.h", "CalibrationTargetResolver.cpp",
+               "ActuatorWritePolicy.cpp", "CalibrationExecutionEngine.cpp",
+               "ContactProbeEngine.cpp", "FullLegCalibrationPlan.cpp"}
+    for path2, code2 in files:
+        if "tests" in path2.parts:
+            continue  # host suites exercise it on purpose; production is what is pinned
+        if "resolveContactProbeApproachToRaw(" in code2 and path2.name not in allowed:
+            fail(f"{path2}: calls resolveContactProbeApproachToRaw() - only the reviewed "
+                 f"calibration units may resolve a target past a Geometry V5 contact")
+
+
 def check_full_leg_calibration_wiring(files):
     """Four-leg Full Calibration: command, Controller and finalizer wiring.
 
@@ -4948,6 +5040,7 @@ def main():
     check_actuator_infrastructure_wired_fail_closed(files)
     check_first_motion_command_wiring(files)
     check_full_leg_calibration_wiring(files)
+    check_contact_probe_overtravel_allowance(files)
     check_service_readiness_is_host_linkable(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)

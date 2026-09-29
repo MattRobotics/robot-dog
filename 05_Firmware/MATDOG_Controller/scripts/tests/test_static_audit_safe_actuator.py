@@ -117,6 +117,12 @@ def run_first_motion_command_checks(files):
     return list(audit.failures)
 
 
+def run_overtravel_checks(files):
+    audit.failures.clear()
+    audit.check_contact_probe_overtravel_allowance(files)
+    return list(audit.failures)
+
+
 def run_full_leg_wiring_checks(files):
     audit.failures.clear()
     audit.check_full_leg_calibration_wiring(files)
@@ -199,6 +205,7 @@ def main():
                 run_first_motion_command_checks(BASE))
     expect_pass("baseline four-leg Full Calibration wiring",
                 run_full_leg_wiring_checks(BASE))
+    expect_pass("unmutated tree: contact-probe overtravel allowance", run_overtravel_checks(BASE))
     expect_pass("baseline CR3 actuator infrastructure fail-closed",
                 run_actuator_infrastructure_checks(BASE))
     expect_pass("baseline current-boot q0 promotion", run_q0_promotion_checks(BASE))
@@ -538,6 +545,52 @@ def main():
          "if (false) {",
          "status().leg != command_leg",
          runner=run_first_motion_command_checks)
+
+    # --- contact-probe overtravel allowance (hardware finding 2026-09-29) ----
+    case("overtravel maximum widened to 32", "CalibrationTargetResolver.h",
+         r"constexpr uint16_t kContactProbeMaxOvertravelTicks = 16;",
+         "constexpr uint16_t kContactProbeMaxOvertravelTicks = 32;",
+         "must be exactly 16", runner=run_overtravel_checks)
+
+    case("Full-Leg allowance raised to 24", "FullLegCalibrationPlan.h",
+         r"constexpr uint16_t kFullLegApproachOvertravelTicks = 16;",
+         "constexpr uint16_t kFullLegApproachOvertravelTicks = 24;",
+         "exactly 16 raw ticks", runner=run_overtravel_checks)
+
+    case("policy stops refusing overtravel on non-probe operations", POLICY_CPP,
+         r"if \(command\.contact_probe_overtravel_ticks != 0 &&\s*command\.operation != "
+         r"ActuatorOperation::CALIBRATION_CONTACT_PROBE\)",
+         "if (false)",
+         "every operation other than", runner=run_overtravel_checks)
+
+    case("policy lets a backoff (non-contact anchor) carry the overtravel", POLICY_CPP,
+         r"\|\|\s*command\.target_urad != contact",
+         "",
+         "command.target_urad != contact", runner=run_overtravel_checks)
+
+    case("policy no longer re-derives the exact overtravel tick", POLICY_CPP,
+         r"\|\|\s*command\.target_tick != allowed_tick",
+         "",
+         "command.target_tick != allowed_tick", runner=run_overtravel_checks)
+
+    case("policy overtravel bound removed", POLICY_CPP,
+         r"command\.contact_probe_overtravel_ticks > kContactProbeMaxOvertravelTicks \|\|",
+         "",
+         "kContactProbeMaxOvertravelTicks", runner=run_overtravel_checks)
+
+    case("engine stops refusing overtravel on other intents", "CalibrationExecutionEngine.cpp",
+         r"if \(request\.contact_probe_overtravel_ticks != 0 &&\s*operation != "
+         r"actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE\) \{",
+         "if (false) {",
+         "every intent other", runner=run_overtravel_checks)
+
+    case("CommandRouter resolves a target past the contact", ROUTER_CPP,
+         r"void CommandRouter::printServoRead\(int id\) \{",
+         "void CommandRouter::printServoRead(int id) {\n  uint16_t x = 0; (void)"
+         "actuator::resolveContactProbeApproachToRaw(*modules_.geometry_profile, "
+         "actuator::geometry_data::kProvenance, actuator::JointTransform{}, 0, "
+         "calibration::ContactSide::MIN_SIDE, 16, &x);",
+         "only the reviewed", runner=run_overtravel_checks)
 
     # --- Full-Leg deadman budget (hardware finding 2026-09-29) --------------
     case("Full-Leg deadman loses its travel-aware rate", CONTROLLER_CPP,

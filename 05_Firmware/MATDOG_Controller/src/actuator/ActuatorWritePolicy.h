@@ -326,6 +326,10 @@ enum class WriteDecision : uint8_t {
   // under a DIFFERENT geometry model. It stays on record; it is not current.
   REJECT_EVIDENCE_GEOMETRY_MISMATCH = 28,
   REJECT_NO_CALIBRATION_MOTION_PERMIT = 29,
+  // A contact-probe overtravel allowance on anything but a CONTACT_PROBE
+  // approach to the canonical contact, above kContactProbeMaxOvertravelTicks,
+  // or not landing on exactly the tick that allowance resolves to.
+  REJECT_PROBE_OVERTRAVEL = 30,
 };
 
 // ---------------------------------------------------------------------------
@@ -367,6 +371,13 @@ struct ActuatorCommand {
   calibration::Leg endpoint_leg = calibration::Leg::LF;
   calibration::JointKind endpoint_joint = calibration::JointKind::HIP;
   calibration::ContactSide endpoint_side = calibration::ContactSide::MIN_SIDE;
+
+  // CALIBRATION_CONTACT_PROBE approach only (hardware finding 2026-09-29,
+  // operator-approved): raw ticks the commanded target_tick lies PAST the
+  // canonical contact `target_urad` names, in the endpoint side's approach
+  // direction - see resolveContactProbeApproachToRaw(). 0 for every other
+  // command; non-zero anywhere else is REJECT_PROBE_OVERTRAVEL.
+  uint16_t contact_probe_overtravel_ticks = 0;
 };
 
 // What a planned write knows about the world it was planned in. Every field is

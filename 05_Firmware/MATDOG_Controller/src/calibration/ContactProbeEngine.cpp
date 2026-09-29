@@ -27,7 +27,8 @@ bool ContactProbeEngine::start(const ContactProbeRequest& request,
 
   if (policy_ == nullptr || runtime_ == nullptr || engine_ == nullptr || geometry_ == nullptr ||
       expected_provenance_ == nullptr || !request.joint.valid() ||
-      !request.joint.unitKnown() || request.repeatability_tolerance_ticks == 0) {
+      !request.joint.unitKnown() || request.repeatability_tolerance_ticks == 0 ||
+      request.approach_overtravel_ticks > actuator::kContactProbeMaxOvertravelTicks) {
     status_ = ContactProbeStatus{};
     status_.phase = ContactProbePhase::FAILED_NO_MOTION;
     status_.failure = ContactProbeFailure::REJECT_PRECONDITIONS;
@@ -105,6 +106,16 @@ bool ContactProbeEngine::resolveTarget(actuator::MicroRad target_urad,
                                      raw_tick_out) == actuator::TargetResolveStatus::OK;
 }
 
+bool ContactProbeEngine::resolveApproachTarget(uint16_t* raw_tick_out) const {
+  const actuator::JointTransform* transform =
+      policy_->transforms().find(request_.joint, policy_->currentGeometryTag());
+  if (transform == nullptr) return false;
+  return actuator::resolveContactProbeApproachToRaw(
+             *geometry_, *expected_provenance_, *transform, request_.approach_target_urad,
+             request_.endpoint_side, request_.approach_overtravel_ticks,
+             raw_tick_out) == actuator::TargetResolveStatus::OK;
+}
+
 void ContactProbeEngine::stepTorqueEnable(const ContactProbeContext& context, uint32_t now_ms) {
   (void)now_ms;
   actuator::ActuatorCommand cmd{};
@@ -159,7 +170,7 @@ void ContactProbeEngine::stepApproachPending(const ContactProbeContext& context,
   // Reached only after TorqueEnable was VERIFIED applied - every exit below
   // is therefore SAFE_OFF_REQUIRED, never FAILED_NO_MOTION.
   uint16_t target_tick = 0;
-  if (!resolveTarget(request_.approach_target_urad, &target_tick)) {
+  if (!resolveApproachTarget(&target_tick)) {
     finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::REJECT_TARGET_RESOLUTION,
           actuator::WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM);
     return;
@@ -172,6 +183,7 @@ void ContactProbeEngine::stepApproachPending(const ContactProbeContext& context,
   req.endpoint_joint = request_.endpoint_joint;
   req.endpoint_side = request_.endpoint_side;
   req.target_urad = request_.approach_target_urad;
+  req.contact_probe_overtravel_ticks = request_.approach_overtravel_ticks;
 
   const CalibrationExecutionResult result =
       engine_->execute(req, toExecutionContext(context), request_.bus_id);
