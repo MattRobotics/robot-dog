@@ -117,6 +117,12 @@ def run_first_motion_command_checks(files):
     return list(audit.failures)
 
 
+def run_full_leg_wiring_checks(files):
+    audit.failures.clear()
+    audit.check_full_leg_calibration_wiring(files)
+    return list(audit.failures)
+
+
 def run_actuator_infrastructure_checks(files):
     audit.failures.clear()
     audit.check_actuator_infrastructure_wired_fail_closed(files)
@@ -170,6 +176,10 @@ SERVO_PROFILE_DATA_H = "ServoProfileData.h"
 PREFLIGHT_CPP = "ServoPreflight.cpp"
 POPULATION_H = "ServoPopulation.h"
 ROUTER_CPP = "CommandRouter.cpp"
+CONTROLLER_CPP = "Controller.cpp"
+FINALIZER_H = "FullLegCalibrationFinalizer.h"
+FINALIZER_CPP = "FullLegCalibrationFinalizer.cpp"
+PLAN_CPP = "FullLegCalibrationPlan.cpp"
 
 
 def main():
@@ -180,6 +190,8 @@ def main():
     expect_pass("baseline CR3 motion surface", run_motion_surface_checks(BASE))
     expect_pass("baseline CR3 first-motion command",
                 run_first_motion_command_checks(BASE))
+    expect_pass("baseline four-leg Full Calibration wiring",
+                run_full_leg_wiring_checks(BASE))
     expect_pass("baseline CR3 actuator infrastructure fail-closed",
                 run_actuator_infrastructure_checks(BASE))
 
@@ -505,6 +517,214 @@ def main():
          "false",
          "FirstMotionState::COMPLETE",
          runner=run_first_motion_command_checks)
+
+    # --- DIRECTION_VERIFY stays the pinned LF-only diagnostic --------------
+    case("direction verify accepts a non-LF session", ROUTER_CPP,
+         r"status\(\)\.leg != calibration::Leg::LF",
+         "status().leg != calibration::Leg::RF",
+         "first-motion branch missing pinned token",
+         runner=run_first_motion_command_checks)
+
+    case("session start loses the leg cross-check", ROUTER_CPP,
+         r"if \(modules_\.calibration->status\(\)\.leg != command_leg\) \{",
+         "if (false) {",
+         "status().leg != command_leg",
+         runner=run_first_motion_command_checks)
+
+    # --- four-leg Full Calibration: command surface ------------------------
+    case("leg matcher gains a fifth token", ROUTER_CPP,
+         r'\{"LH", calibration::Leg::LH\},',
+         '{"LH", calibration::Leg::LH},\n      {"XX", calibration::Leg::LH},',
+         "table must be exactly",
+         runner=run_full_leg_wiring_checks)
+
+    case("leg matcher maps a name to another leg", ROUTER_CPP,
+         r'\{"RH", calibration::Leg::RH\}',
+         '{"RH", calibration::Leg::LH}',
+         "table must be exactly",
+         runner=run_full_leg_wiring_checks)
+
+    case("leg matcher becomes a prefix match", ROUTER_CPP,
+         r"if \(line == candidate\) \{",
+         "if (line.startsWith(candidate)) {",
+         "whole line for equality",
+         runner=run_full_leg_wiring_checks)
+
+    case("full leg is matched with startsWith", ROUTER_CPP,
+         r'matchLegCommand\(upper, "@CALIBRATION FULL LEG ", " CONFIRM_FULL_CALIBRATION",\s*&command_leg\)',
+         'upper.startsWith("@CALIBRATION FULL LEG ")',
+         "may not use startsWith",
+         runner=run_full_leg_wiring_checks)
+
+    case("session start drops the permit-released gate", ROUTER_CPP,
+         r'if \(modules_\.motion_permit->active\(\)\) \{\s*Serial\.println\("CALIBRATION_SESSION=REFUSED"\);',
+         'if (false) {\n      Serial.println("CALIBRATION_SESSION=REFUSED");',
+         "between-leg gate",
+         runner=run_full_leg_wiring_checks)
+
+    case("session start drops the finalized-run gate", ROUTER_CPP,
+         r'if \(modules_\.full_leg_run->armed\) \{\s*Serial\.println\("CALIBRATION_SESSION=REFUSED"\);',
+         'if (false) {\n      Serial.println("CALIBRATION_SESSION=REFUSED");',
+         "between-leg gate",
+         runner=run_full_leg_wiring_checks)
+
+    case("session start drops the authority-NONE gate", ROUTER_CPP,
+         r"modules_\.authority->current\(\) != ActuatorAuthority::NONE\) \{",
+         "false) {",
+         "between-leg gate",
+         runner=run_full_leg_wiring_checks)
+
+    case("session start hard-codes LF", ROUTER_CPP,
+         r"command_leg,\s*modules_\.operating_mode->mode\(\)\);",
+         "calibration::Leg::LF, modules_.operating_mode->mode());",
+         "names a leg literal",
+         runner=run_full_leg_wiring_checks)
+
+    case("full leg hard-codes a bus id", ROUTER_CPP,
+         r"calibration::FullLegPlan plan\{\};",
+         "calibration::FullLegPlan plan{};\n    plan.request.probe_bus_id = 12;",
+         "assigns into the plan/request",
+         runner=run_full_leg_wiring_checks)
+
+    case("full leg restores the LF backoff residue", ROUTER_CPP,
+         r"calibration::FullLegPlan plan\{\};",
+         "calibration::FullLegPlan plan{};\n    const int32_t kBackoff = -700000;",
+         "hard-codes a per-leg bus/backoff",
+         runner=run_full_leg_wiring_checks)
+
+    case("full leg names a leg literal", ROUTER_CPP,
+         r"calibration::FullLegPlan plan\{\};",
+         "calibration::FullLegPlan plan{};\n    const calibration::Leg fixed = calibration::Leg::LF;",
+         "names a leg literal",
+         runner=run_full_leg_wiring_checks)
+
+    case("full leg gains a runtime parser", ROUTER_CPP,
+         r"calibration::FullLegPlan plan\{\};",
+         'calibration::FullLegPlan plan{};\n    int parsed = 0; sscanf(upper.c_str(), "%d", &parsed);',
+         "runtime parser",
+         runner=run_full_leg_wiring_checks)
+
+    case("full leg writes to the bus from the handler", ROUTER_CPP,
+         r"calibration::FullLegPlan plan\{\};",
+         "calibration::FullLegPlan plan{};\n    modules_.servo_bus->safeOff(12);",
+         "write/transaction primitive",
+         runner=run_full_leg_wiring_checks)
+
+    case("full leg arms the run before the executor accepts", ROUTER_CPP,
+         r"if \(!modules_\.full_leg_calibration->start\(plan\.request, context, millis\(\)\)\) \{",
+         "modules_.full_leg_run->arm(plan, 0, 0);\n"
+         "    if (!modules_.full_leg_calibration->start(plan.request, context, millis())) {",
+         "arm the run record only AFTER",
+         runner=run_full_leg_wiring_checks)
+
+    case("second full leg start call appears", ROUTER_CPP,
+         r"if \(!modules_\.full_leg_calibration->start\(plan\.request, context, millis\(\)\)\) \{",
+         "modules_.full_leg_calibration->start(plan.request, context, millis());\n"
+         "    if (!modules_.full_leg_calibration->start(plan.request, context, millis())) {",
+         "exactly one production full_leg_calibration->start()",
+         runner=run_full_leg_wiring_checks)
+
+    case("full leg stops resolving the plan", ROUTER_CPP,
+         r"calibration::resolveFullLegPlan\(",
+         "calibration::resolveFullLegPlanUnchecked(",
+         "resolveFullLegPlan(",
+         runner=run_full_leg_wiring_checks)
+
+    case("plan resolver special-cases a leg", PLAN_CPP,
+         r"const actuator::GeometryJointRecord\* record = profile\.findJoint\(found\.identity\);",
+         "const bool lf_only = (leg == Leg::LF);\n"
+         "  const actuator::GeometryJointRecord* record = profile.findJoint(found.identity);",
+         "nothing in the plan may be special-cased",
+         runner=run_full_leg_wiring_checks)
+
+    # --- four-leg Full Calibration: Controller -----------------------------
+    case("parked endpoint leg is hard-coded again", CONTROLLER_CPP,
+         r"ctx\.parked_leg = full_leg_calibration_\.endpointLeg\(\);",
+         "ctx.parked_leg = calibration::Leg::LF;",
+         "parked-endpoint context lost",
+         runner=run_full_leg_wiring_checks)
+
+    case("finalization is never called", CONTROLLER_CPP,
+         r"\n  updateFullLegFinalization\(\);",
+         "",
+         "must call updateFullLegFinalization()",
+         runner=run_full_leg_wiring_checks)
+
+    case("finalization uses ad-hoc envelope parameters", CONTROLLER_CPP,
+         r"context\.parameters = calibration::productionEnvelopeParameters\(\);",
+         "context.parameters = calibration::FullLegEnvelopeParameters{};",
+         "productionEnvelopeParameters()",
+         runner=run_full_leg_wiring_checks)
+
+    case("finalization result is not stored", CONTROLLER_CPP,
+         r"full_leg_evidence_\.put\(record\);",
+         "(void)record;",
+         "full_leg_evidence_.put(record)",
+         runner=run_full_leg_wiring_checks)
+
+    case("finalization writes to the bus", CONTROLLER_CPP,
+         r"full_leg_run_\.clear\(\);",
+         "full_leg_run_.clear();\n  servo_bus_.safeOff(12);",
+         "updateFullLegFinalization() contains",
+         runner=run_full_leg_wiring_checks)
+
+    case("finalization admits a limit itself", CONTROLLER_CPP,
+         r"void Controller::printBootBanner\(\) \{",
+         "void Controller::printBootBanner() {\n"
+         "  actuator_policy_.admitOperationalLimit(actuator::JointLimit{});",
+         "admitOperationalLimit() may only be called",
+         runner=run_full_leg_wiring_checks)
+
+    case("final SAFE_OFF targets a fixed bus", CONTROLLER_CPP,
+         r"servo_bus_\.safeOff\(full_leg_calibration_\.auxiliaryBusId\(\)\);",
+         "servo_bus_.safeOff(0);",
+         "must call safeOff() exactly",
+         runner=run_full_leg_wiring_checks)
+
+    case("auxiliary SAFE_OFF loses its pending guard", CONTROLLER_CPP,
+         r"if \(full_leg_calibration_\.auxiliarySafeOffPending\(\)\) \{",
+         "if (true) {",
+         "pending guard",
+         runner=run_full_leg_wiring_checks)
+
+    # --- four-leg Full Calibration: finalizer ------------------------------
+    case("production envelope parameters become approved", FINALIZER_H,
+         r"constexpr bool kFullLegOperationalParametersApproved = false;",
+         "constexpr bool kFullLegOperationalParametersApproved = true;",
+         "kFullLegOperationalParametersApproved must be declared",
+         runner=run_full_leg_wiring_checks)
+
+    case("finalizer no longer completes the session", FINALIZER_CPP,
+         r"manager\.completeSession\(\)",
+         "manager.abortSession()",
+         "lost 'manager.completeSession()'",
+         runner=run_full_leg_wiring_checks)
+
+    case("finalizer stops revoking the permit", FINALIZER_CPP,
+         r"if \(context\.permit != nullptr\) context\.permit->revoke\(CalibrationPermitRevokeReason::EXPLICIT\);",
+         "",
+         "lost 'context.permit->revoke('",
+         runner=run_full_leg_wiring_checks)
+
+    case("finalizer skips the contact recording", FINALIZER_CPP,
+         r"manager\.recordContact\(outcome\.max_contact\)",
+         "manager.recordContactSkipped(outcome.max_contact)",
+         "lost 'manager.recordContact(outcome.max_contact)'",
+         runner=run_full_leg_wiring_checks)
+
+    case("finalizer admits limits before the envelopes", FINALIZER_CPP,
+         r"const actuator::GeometryProvenanceTag current = policy\.currentGeometryTag\(\);",
+         "policy.admitOperationalLimit(actuator::JointLimit{});\n"
+         "  const actuator::GeometryProvenanceTag current = policy.currentGeometryTag();",
+         "exactly one admitOperationalLimit() call site",
+         runner=run_full_leg_wiring_checks)
+
+    case("finalizer touches the servo bus", FINALIZER_CPP,
+         r"const FullLegJointRef& planJoint",
+         "void bad() { servo::ServoBus* bus = nullptr; (void)bus; }\n"
+         "const FullLegJointRef& planJoint",
+         "pure decision unit",
+         runner=run_full_leg_wiring_checks)
 
     # --- the low-level transaction door stays shut, even next to the two ---
     # --- exempt executor-level abort() calls this same file now contains ---

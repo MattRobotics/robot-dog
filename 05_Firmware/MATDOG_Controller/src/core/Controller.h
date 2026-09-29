@@ -12,6 +12,7 @@
 #include "../calibration/CalibrationQ0CaptureSession.h"
 #include "../calibration/FirstMotionExecutor.h"
 #include "../calibration/FullLegCalibrationExecutor.h"
+#include "../calibration/FullLegCalibrationFinalizer.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/HttpTransport.h"
 #include "../network/WifiManager.h"
@@ -65,6 +66,13 @@ class Controller {
   // SAFE_OFF for BOTH joints is forced independently of policy/session,
   // authority or permit, every tick, until each one VERIFIED_OFF.
   void updateFullLegCalibration(uint32_t now_ms);
+  // Every tick, after updateFullLegCalibration(): once the armed run's
+  // executor is terminal (COMPLETE or FAILED - including a run the operator
+  // aborted or whose session was lost), closes its evidence lifecycle exactly
+  // once via calibration::finalizeFullLeg() and keeps the record in RAM. It
+  // never touches a servo: SAFE_OFF was the executor's, verified before the
+  // executor turned terminal.
+  void updateFullLegFinalization();
 
   servo::ServoBus servo_bus_;
   servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-start
@@ -147,14 +155,20 @@ class Controller {
   // attempt, never by anything else, so a past VERIFIED_OFF can never be
   // mistaken for proof about a NEW attempt.
   servo::SafeOffResult first_motion_safe_off_result_ = servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
-  // CR3 continuation: the LF_UPPER two-endpoint contact sequence (MIN, then
-  // MAX with the ONE named auxiliary parked) that a Full Leg Calibration
-  // needs — see FullLegCalibrationExecutor.h. Real backend, real policy,
+  // CR3 continuation: the UPPER two-endpoint contact sequence (MIN, then
+  // MAX, with the Geometry V5 auxiliary parked first where the MAX endpoint
+  // names one) that a Full Leg Calibration needs, for any of the four legs —
+  // see FullLegCalibrationExecutor.h. Real backend, real policy,
   // real geometry, same reachability argument as first_motion_ above: only
-  // @CALIBRATION FULL LEG LF CONFIRM_FULL_CALIBRATION can start it, and it
+  // @CALIBRATION FULL LEG <LF|RF|RH|LH> CONFIRM_FULL_CALIBRATION can start it, and it
   // still requires the SAME live session (Objective A) and fresh permit
   // (Objective B) as every other motion path.
   calibration::FullLegCalibrationExecutor full_leg_calibration_;
+  // The run in flight (armed by the FULL LEG command once the executor
+  // accepted it) and the RAM-only record of every leg run in this power-up.
+  // Neither is persisted: a reboot starts with an empty store.
+  calibration::FullLegRunState full_leg_run_;
+  calibration::FullLegEvidenceStore full_leg_evidence_;
   // Same convention as first_motion_safe_off_result_ above, one per bus this
   // path may energize. Both reset to UNVERIFIED_NO_RESPONSE at the start of
   // every fresh full_leg_calibration_ attempt.

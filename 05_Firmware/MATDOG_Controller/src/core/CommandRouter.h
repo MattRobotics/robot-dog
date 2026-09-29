@@ -43,6 +43,8 @@ class CalibrationMotionPermit;
 struct CalibrationMotionAuthorizationState;
 class FirstMotionExecutor;
 class FullLegCalibrationExecutor;
+struct FullLegRunState;
+class FullLegEvidenceStore;
 }  // namespace calibration
 
 namespace network {
@@ -114,9 +116,9 @@ class CommandRouter {
     // check_first_motion_command_wiring() in scripts/static_audit.py for
     // what is mechanically pinned about this one call site.
     calibration::FirstMotionExecutor* first_motion;
-    // CR3 continuation: @CALIBRATION FULL LEG LF CONFIRM_FULL_CALIBRATION is
-    // the one reviewed command that calls full_leg_calibration->start() —
-    // see check_full_leg_calibration_command_wiring() in
+    // CR3 continuation: @CALIBRATION FULL LEG <LF|RF|RH|LH>
+    // CONFIRM_FULL_CALIBRATION is the one reviewed command that calls
+    // full_leg_calibration->start() — see check_full_leg_command_wiring() in
     // scripts/static_audit.py.
     calibration::FullLegCalibrationExecutor* full_leg_calibration;
     // The transport-neutral telemetry layer (I6) — read-only status
@@ -129,6 +131,13 @@ class CommandRouter {
     // reaches into its OTA session or HTTP internals. See
     // network/HttpTransport.h.
     network::HttpTransport* http_transport;
+    // Four-leg Full Calibration bookkeeping, both owned by Controller. The
+    // router ARMS full_leg_run only after full_leg_calibration->start()
+    // accepted the run and reads full_leg_evidence for status/export; only
+    // Controller finalizes a run and stores its record. Appended last: this
+    // struct is aggregate-initialized positionally in Controller::begin().
+    calibration::FullLegRunState* full_leg_run;
+    calibration::FullLegEvidenceStore* full_leg_evidence;
   };
 
   void begin(const Modules& modules);
@@ -215,6 +224,10 @@ class CommandRouter {
   // every other action handler's own inline response line, this one is also
   // worth polling BETWEEN ticks - hence a dedicated STATUS command.
   void printFullLegCalibrationStatus();
+  // Deterministic key=value export of the RAM evidence for all four legs of
+  // this power-up (@CALIBRATION EVIDENCE EXPORT). Read-only.
+  void printFullLegEvidenceExport();
+  void pumpFullLegEvidenceExport();
   // Read-only presentation of the HTTP transport's own lifecycle state
   // (I7/I8). Never reports OTA session secrets or in-flight request
   // contents — those live only in HttpTransport's cross-thread mailbox,
@@ -232,6 +245,8 @@ class CommandRouter {
   bool servo_census_result_pending_ = false;
   bool servo_preflight_result_pending_ = false;
   bool q0_capture_result_pending_ = false;
+  bool evidence_export_pending_ = false;
+  uint16_t evidence_export_next_ = 0;
 
   static constexpr size_t kLineBufSize = 96;
   char line_buf_[kLineBufSize] = {0};
