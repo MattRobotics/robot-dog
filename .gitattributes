@@ -2,3 +2,6 @@
 *.usp filter=lfs diff=lfs merge=lfs -text
 
 *.xlsx -text -diff
+
+# Verbatim, hash-pinned decompiler text extracts (G3.5 XGO evidence): never normalize whitespace.
+09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/*.txt -whitespace -text
