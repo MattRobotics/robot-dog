@@ -1,0 +1,54 @@
+400d7d08 FUN_400d7d08
+
+void FUN_400d7d08(char param_1)
+
+{
+  undefined *puVar1;
+  undefined1 uVar2;
+  
+  FUN_400d7c40();
+  FUN_400d7c28();
+  if (param_1 == '\x01') {
+    if (*DAT_400d01dc != 0) {
+      *DAT_400d0520 = 1;
+    }
+    uVar2 = 0;
+    puVar1 = DAT_400d010c;
+  }
+  else {
+    if (param_1 != '\x02') {
+      return;
+    }
+    *DAT_400d01dc = 0;
+    *DAT_400d010c = 0;
+    uVar2 = 1;
+    puVar1 = PTR_DAT_400d0524;
+  }
+  *puVar1 = uVar2;
+  return;
+}
+
+
+400d7d08 entry a1,0x20
+400d7d0b extui a2,a2,0x0,0x8
+400d7d0e call8 0x400d7c40
+400d7d11 call8 0x400d7c28
+400d7d14 bnei a2,0x1,0x400d7d30
+400d7d17 l32r a8,0x400d01dc
+400d7d1a l32i.n a8,a8,0x0
+400d7d1c beqz a8,0x400d7d25
+400d7d1f l32r a8,0x400d0520
+400d7d22 s8i a2,a8,0x0
+400d7d25 l32r a2,0x400d010c
+400d7d28 movi.n a8,0x0
+400d7d2a s8i a8,a2,0x0
+400d7d2d retw.n
+400d7d30 bnei a2,0x2,0x400d7d2d
+400d7d33 l32r a8,0x400d01dc
+400d7d36 movi.n a2,0x0
+400d7d38 s32i.n a2,a8,0x0
+400d7d3a l32r a8,0x400d010c
+400d7d3d s8i a2,a8,0x0
+400d7d40 l32r a2,0x400d0524
+400d7d43 movi.n a8,0x1
+400d7d45 j 0x400d7d2a

@@ -1,0 +1,342 @@
+400d91fc FUN_400d91fc
+
+void FUN_400d91fc(void)
+
+{
+  byte bVar1;
+  byte *pbVar2;
+  char cVar3;
+  uint uVar4;
+  char *pcVar5;
+  int iVar6;
+  uint uVar7;
+  
+  pbVar2 = DAT_400d010c;
+  if ((*DAT_400d0520 != '\0') && (iVar6 = *DAT_400d01dc, iVar6 != 0)) {
+    cVar3 = *DAT_400d0520 + '\x01';
+    pcVar5 = DAT_400d0520;
+    if (cVar3 == '\x1e') {
+      *DAT_400d0520 = '\0';
+      pcVar5 = PTR_DAT_400d0524;
+      bVar1 = *PTR_DAT_400d0524;
+      uVar4 = (uint)bVar1;
+      if (iVar6 == 1) {
+        *pbVar2 = PTR_DAT_400d0660[uVar4];
+        uVar7 = 0x16;
+      }
+      else {
+        *pbVar2 = PTR_DAT_400d0664[uVar4];
+        uVar7 = 0xd;
+      }
+      if (uVar4 == uVar7) {
+        cVar3 = '\0';
+      }
+      else {
+        cVar3 = bVar1 + 1;
+      }
+    }
+    *pcVar5 = cVar3;
+  }
+  bVar1 = *pbVar2;
+  if (bVar1 == 0xe) {
+    FUN_400d83b0();
+    return;
+  }
+  if (bVar1 < 0xf) {
+    if (bVar1 == 6) {
+      FUN_400d7f04();
+      return;
+    }
+    if (6 < bVar1) {
+      if (bVar1 == 10) {
+        FUN_400d8084();
+        return;
+      }
+      if (10 < bVar1) {
+        if (bVar1 == 0xc) {
+          FUN_400d8214();
+          return;
+        }
+        if (bVar1 < 0xd) {
+          FUN_400d810c();
+          return;
+        }
+        FUN_400d82a0();
+        return;
+      }
+      if (bVar1 == 8) {
+        FUN_400d7fec();
+        return;
+      }
+      if (bVar1 < 9) {
+        FUN_400d7fa0();
+        return;
+      }
+      FUN_400d8038();
+      return;
+    }
+    if (bVar1 == 2) {
+      FUN_400d7df4();
+      return;
+    }
+    if (2 < bVar1) {
+      if (bVar1 == 4) {
+        FUN_400d7eac();
+        return;
+      }
+      if (bVar1 < 5) {
+        FUN_400d7e40();
+        return;
+      }
+      FUN_400d7ef8();
+      return;
+    }
+    if (bVar1 == 0) {
+      FUN_400d7c28();
+      return;
+    }
+    if (bVar1 == 1) {
+      FUN_400d7da8();
+      return;
+    }
+  }
+  else {
+    if (bVar1 == 0x16) {
+      FUN_400d8aec();
+      return;
+    }
+    if (bVar1 < 0x17) {
+      if (bVar1 == 0x12) {
+        FUN_400d8714();
+        return;
+      }
+      if (0x12 < bVar1) {
+        if (bVar1 == 0x14) {
+          FUN_400d8a50();
+          return;
+        }
+        if (bVar1 < 0x15) {
+          FUN_400d8930();
+          return;
+        }
+        FUN_400d8bf4();
+        return;
+      }
+      if (bVar1 == 0x10) {
+        FUN_400d8560();
+        return;
+      }
+      if (bVar1 < 0x11) {
+        FUN_400d8460();
+        return;
+      }
+      FUN_400d865c();
+      return;
+    }
+    if (bVar1 == 0x81) {
+      FUN_400d8dac();
+      return;
+    }
+    if (bVar1 < 0x82) {
+      if (bVar1 == 0x18) {
+        FUN_400d8ba4();
+        return;
+      }
+      if (bVar1 < 0x18) {
+        FUN_400d8b54();
+        return;
+      }
+      if (bVar1 == 0x80) {
+        FUN_400d8cdc();
+        return;
+      }
+    }
+    else {
+      if (bVar1 == 0x90) {
+        FUN_400d8f54();
+        return;
+      }
+      if (bVar1 == 0xff) {
+        FUN_400d7d08(2);
+        return;
+      }
+      if (bVar1 == 0x82) {
+        FUN_400d8e80();
+        return;
+      }
+    }
+  }
+  *pbVar2 = 0;
+  return;
+}
+
+
+400d91fc entry a1,0x20
+400d91ff l32r a10,0x400d0520
+400d9202 l32r a9,0x400d010c
+400d9205 l8ui a8,a10,0x0
+400d9208 beqz.n a8,0x400d9220
+400d920a l32r a11,0x400d01dc
+400d920d l32i.n a11,a11,0x0
+400d920f beqz.n a11,0x400d9220
+400d9211 addi a8,a8,0x1
+400d9214 extui a8,a8,0x0,0x8
+400d9217 movi a12,0x1e
+400d921a beq a8,a12,0x400d9254
+400d921d s8i a8,a10,0x0
+400d9220 l8ui a8,a9,0x0
+400d9223 movi.n a10,0xe
+400d9225 bne a8,a10,0x400d922b
+400d9228 j 0x400d93bd
+400d922b bgeu a10,a8,0x400d9231
+400d922e j 0x400d92d6
+400d9231 bnei a8,0x6,0x400d9237
+400d9234 j 0x400d938d
+400d9237 bgeui a8,0x7,0x400d92a1
+400d923a bnei a8,0x2,0x400d9240
+400d923d j 0x400d9374
+400d9240 bgeui a8,0x3,0x400d928d
+400d9243 beqz a8,0x400d9365
+400d9246 bnei a8,0x1,0x400d924c
+400d9249 j 0x400d936d
+400d924c movi.n a8,0x0
+400d924e s8i a8,a9,0x0
+400d9251 j 0x400d9368
+400d9254 movi.n a8,0x0
+400d9256 s8i a8,a10,0x0
+400d9259 l32r a10,0x400d0524
+400d925c l8ui a8,a10,0x0
+400d925f bnei a11,0x1,0x400d9278
+400d9262 l32r a11,0x400d0660
+400d9265 add.n a11,a11,a8
+400d9267 l8ui a11,a11,0x0
+400d926a s8i a11,a9,0x0
+400d926d movi.n a11,0x16
+400d926f bne a8,a11,0x400d9288
+400d9272 movi.n a8,0x0
+400d9274 j 0x400d921d
+400d9278 l32r a11,0x400d0664
+400d927b add.n a11,a11,a8
+400d927d l8ui a11,a11,0x0
+400d9280 s8i a11,a9,0x0
+400d9283 movi.n a11,0xd
+400d9285 j 0x400d926f
+400d9288 addi.n a8,a8,0x1
+400d928a j 0x400d921d
+400d928d bnei a8,0x4,0x400d9293
+400d9290 j 0x400d9384
+400d9293 bgeui a8,0x5,0x400d9299
+400d9296 j 0x400d937d
+400d9299 call8 0x400d7ef8
+400d929c j 0x400d9368
+400d92a1 bnei a8,0xa,0x400d92a7
+400d92a4 j 0x400d93a4
+400d92a7 movi.n a9,0xa
+400d92a9 bltu a9,a8,0x400d92c0
+400d92ac bnei a8,0x8,0x400d92b2
+400d92af j 0x400d939d
+400d92b2 movi.n a9,0x8
+400d92b4 bltu a9,a8,0x400d92ba
+400d92b7 j 0x400d9394
+400d92ba call8 0x400d8038
+400d92bd j 0x400d9368
+400d92c0 bnei a8,0xc,0x400d92c6
+400d92c3 j 0x400d93b4
+400d92c6 movi.n a9,0xc
+400d92c8 bltu a9,a8,0x400d92ce
+400d92cb j 0x400d93ad
+400d92ce call8 0x400d82a0
+400d92d1 j 0x400d9368
+400d92d6 movi a10,0x16
+400d92d9 bne a8,a10,0x400d92df
+400d92dc j 0x400d93ec
+400d92df bltu a10,a8,0x400d9318
+400d92e2 movi a9,0x12
+400d92e5 bne a8,a9,0x400d92eb
+400d92e8 j 0x400d93d6
+400d92eb bltu a9,a8,0x400d9304
+400d92ee bnei a8,0x10,0x400d92f4
+400d92f1 j 0x400d93cd
+400d92f4 movi a9,0x10
+400d92f7 bltu a9,a8,0x400d92fd
+400d92fa j 0x400d93c4
+400d92fd call8 0x400d865c
+400d9300 j 0x400d9368
+400d9304 movi.n a9,0x14
+400d9306 bne a8,a9,0x400d930c
+400d9309 j 0x400d93e5
+400d930c bltu a9,a8,0x400d9312
+400d930f j 0x400d93dc
+400d9312 call8 0x400d8bf4
+400d9315 j 0x400d9368
+400d9318 movi a10,0x81
+400d931b bne a8,a10,0x400d9321
+400d931e j 0x400d9405
+400d9321 bltu a10,a8,0x400d9341
+400d9324 movi.n a10,0x18
+400d9326 bne a8,a10,0x400d932c
+400d9329 j 0x400d93fc
+400d932c bgeu a8,a10,0x400d9332
+400d932f j 0x400d93f5
+400d9332 beqi a8,0x80,0x400d9338
+400d9335 j 0x400d924c
+400d9338 call8 0x400d8cdc
+400d933b j 0x400d9368
+400d9341 movi a10,0x90
+400d9344 bne a8,a10,0x400d934a
+400d9347 j 0x400d940c
+400d934a movi a10,0xff
+400d934d bne a8,a10,0x400d9353
+400d9350 j 0x400d9415
+400d9353 movi a10,0x82
+400d9356 beq a8,a10,0x400d935c
+400d9359 j 0x400d924c
+400d935c call8 0x400d8e80
+400d935f j 0x400d9368
+400d9365 call8 0x400d7c28
+400d9368 retw.n
+400d936d call8 0x400d7da8
+400d9370 j 0x400d9368
+400d9374 call8 0x400d7df4
+400d9377 j 0x400d9368
+400d937d call8 0x400d7e40
+400d9380 j 0x400d9368
+400d9384 call8 0x400d7eac
+400d9387 j 0x400d9368
+400d938d call8 0x400d7f04
+400d9390 j 0x400d9368
+400d9394 call8 0x400d7fa0
+400d9397 j 0x400d9368
+400d939d call8 0x400d7fec
+400d93a0 j 0x400d9368
+400d93a4 call8 0x400d8084
+400d93a7 j 0x400d9368
+400d93ad call8 0x400d810c
+400d93b0 j 0x400d9368
+400d93b4 call8 0x400d8214
+400d93b7 j 0x400d9368
+400d93bd call8 0x400d83b0
+400d93c0 j 0x400d9368
+400d93c4 call8 0x400d8460
+400d93c7 j 0x400d9368
+400d93cd call8 0x400d8560
+400d93d0 j 0x400d9368
+400d93d6 call8 0x400d8714
+400d93d9 j 0x400d9368
+400d93dc call8 0x400d8930
+400d93df j 0x400d9368
+400d93e5 call8 0x400d8a50
+400d93e8 j 0x400d9368
+400d93ec call8 0x400d8aec
+400d93ef j 0x400d9368
+400d93f5 call8 0x400d8b54
+400d93f8 j 0x400d9368
+400d93fc call8 0x400d8ba4
+400d93ff j 0x400d9368
+400d9405 call8 0x400d8dac
+400d9408 j 0x400d9368
+400d940c call8 0x400d8f54
+400d940f j 0x400d9368
+400d9415 movi.n a10,0x2
+400d9417 call8 0x400d7d08
+400d941a j 0x400d9368

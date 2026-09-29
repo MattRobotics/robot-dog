@@ -1,0 +1,21 @@
+400d7d48 FUN_400d7d48
+
+void FUN_400d7d48(undefined1 *param_1)
+
+{
+  *PTR_DAT_400d0258 = *param_1;
+  return;
+}
+
+
+400d7d48 entry a1,0x20
+400d7d4b l32r a12,0x400d0258
+400d7d4e movi.n a8,0x0
+400d7d50 movi.n a9,0xc
+400d7d52 loop a9,0x400d7d61
+400d7d55 add.n a10,a2,a8
+400d7d57 l8ui a11,a10,0x0
+400d7d5a add.n a10,a8,a12
+400d7d5c s8i a11,a10,0x0
+400d7d5f addi.n a8,a8,0x1
+400d7d61 retw.n

@@ -1,0 +1,14 @@
+400d7ef8 FUN_400d7ef8
+
+void FUN_400d7ef8(void)
+
+{
+  FUN_400d7d08(1);
+  return;
+}
+
+
+400d7ef8 entry a1,0x20
+400d7efb movi.n a10,0x1
+400d7efd call8 0x400d7d08
+400d7f00 retw.n

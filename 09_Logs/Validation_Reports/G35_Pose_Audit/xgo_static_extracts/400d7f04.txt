@@ -1,0 +1,97 @@
+400d7f04 FUN_400d7f04
+
+void FUN_400d7f04(void)
+
+{
+  int iVar1;
+  undefined1 uVar2;
+  float fVar3;
+  
+  iVar1 = DAT_400d0510;
+  fVar3 = (float)*(ushort *)(DAT_400d0510 + 0xc) / 1.0;
+  if (fVar3 == DAT_400d00d4) {
+    FUN_400d7d08(0);
+    PTR_DAT_400d0214[2] = 0;
+    FUN_400da840(0x80);
+    goto LAB_400d7f31;
+  }
+  if (fVar3 == DAT_400d0530) {
+LAB_400d7f48:
+    uVar2 = 0xd0;
+  }
+  else {
+    if (fVar3 != DAT_400d0308) {
+      if (fVar3 != DAT_400d033c) {
+        if (fVar3 == DAT_400d052c) goto LAB_400d7f60;
+        if (fVar3 != DAT_400d0538) {
+          if (fVar3 == DAT_400d04b4) {
+            FUN_400d7d08(1);
+          }
+          goto LAB_400d7f31;
+        }
+      }
+      goto LAB_400d7f48;
+    }
+LAB_400d7f60:
+    uVar2 = 0;
+  }
+  PTR_DAT_400d0214[2] = uVar2;
+LAB_400d7f31:
+  *(short *)(iVar1 + 0xc) = *(short *)(iVar1 + 0xc) + 1;
+  return;
+}
+
+
+400d7f04 entry a1,0x20
+400d7f07 l32r a2,0x400d0510
+400d7f0a l32r a3,0x400d00d4
+400d7f0d l16ui a8,a2,0xc
+400d7f10 wfr f1,a3
+400d7f13 float.s f0,a8,0x0
+400d7f16 oeq.s b0,f0,f1
+400d7f19 bf b0,0x400d7f3c
+400d7f1c movi a10,0x0
+400d7f1f call8 0x400d7d08
+400d7f22 l32r a8,0x400d0214
+400d7f25 movi a9,0x0
+400d7f28 movi a10,0x80
+400d7f2b s8i a9,a8,0x2
+400d7f2e call8 0x400da840
+400d7f31 l16ui a8,a2,0xc
+400d7f34 addi.n a8,a8,0x1
+400d7f36 s16i a8,a2,0xc
+400d7f39 retw.n
+400d7f3c l32r a3,0x400d0530
+400d7f3f wfr f1,a3
+400d7f42 oeq.s b0,f0,f1
+400d7f45 bf b0,0x400d7f54
+400d7f48 l32r a8,0x400d0214
+400d7f4b movi a9,-0x30
+400d7f4e s8i a9,a8,0x2
+400d7f51 j 0x400d7f31
+400d7f54 l32r a3,0x400d0308
+400d7f57 wfr f1,a3
+400d7f5a oeq.s b0,f0,f1
+400d7f5d bf b0,0x400d7f68
+400d7f60 l32r a8,0x400d0214
+400d7f63 movi.n a9,0x0
+400d7f65 j 0x400d7f4e
+400d7f68 l32r a3,0x400d033c
+400d7f6b wfr f1,a3
+400d7f6e oeq.s b0,f0,f1
+400d7f71 bt b0,0x400d7f48
+400d7f74 l32r a3,0x400d052c
+400d7f77 wfr f1,a3
+400d7f7a oeq.s b0,f0,f1
+400d7f7d bt b0,0x400d7f60
+400d7f80 l32r a3,0x400d0538
+400d7f83 wfr f1,a3
+400d7f86 oeq.s b0,f0,f1
+400d7f89 bt b0,0x400d7f48
+400d7f8c l32r a3,0x400d04b4
+400d7f8f wfr f1,a3
+400d7f92 oeq.s b0,f0,f1
+400d7f95 bf b0,0x400d7f31
+400d7f98 movi.n a10,0x1
+400d7f9a call8 0x400d7d08
+400d7f9d j 0x400d7f31

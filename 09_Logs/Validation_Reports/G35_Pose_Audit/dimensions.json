@@ -1,0 +1,151 @@
+{
+  "conclusion": "1.5 is supported for template front/rear spacing and upper-link length; it is not a single scale across dimensions. Exact Lite similarity remains unproved.",
+  "exact_lite_host_ranges": {
+    "classification": "EXACT_LITE_HOST_API_ONLY",
+    "source": "LuwuDynamics/xgo_doglib cf72514273dc703284d3c47e46c67ce238caae11 xgolib/xgolib_dog.py changePara xgolite",
+    "translation_z": [
+      60,
+      110
+    ],
+    "unit": "documented host millimetres, not proven ground/body frame datum"
+  },
+  "provenance": {
+    "generator_sha256": "c936b50ab33118ef3fbb29341cb62aca313cb505a377eac6bd2c64b9f6821969",
+    "matdog_sources": {
+      "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966"
+    },
+    "xgo_commit": "674e3f2703b69ef182017eb72a4e3e2ee7dab72c",
+    "xgo_lower_mesh_sha256": "68216e790a713f021d070cc1fee98fec039424388b3633cd2179bc77373c1b5a",
+    "xgo_sha256": "cf68448c4b7650889a7e8ff8b0801ed81fe7befad7933791589e9b724576fad4",
+    "xgo_source": "/home/matteo-manicardi/robotics-reverse/work/milestone_h2_sources_20260728/JoseManuelLuque_DOGZILLA/urdf/xgo_rviz.xacro"
+  },
+  "rows": [
+    {
+      "dimension": "front_rear_hip_spacing",
+      "matdog_m": 0.225,
+      "meaning": "direct geometric distance",
+      "ratio": 1.5,
+      "xgo_identity": "GENERIC_TEMPLATE",
+      "xgo_m": 0.15
+    },
+    {
+      "dimension": "left_right_front_hip_spacing",
+      "matdog_m": 0.095,
+      "meaning": "direct geometric distance",
+      "ratio": 2.114682575015582,
+      "xgo_identity": "GENERIC_TEMPLATE",
+      "xgo_m": 0.044924
+    },
+    {
+      "dimension": "hip_upper_axis_lateral_offset",
+      "matdog_m": 0.048,
+      "meaning": "direct geometric distance",
+      "ratio": 0.9733741609717519,
+      "xgo_identity": "GENERIC_TEMPLATE",
+      "xgo_m": 0.049313
+    },
+    {
+      "dimension": "hip_upper_origin_distance",
+      "matdog_m": 0.048,
+      "meaning": "origins use different frame conventions; vector components also reported",
+      "ratio": 0.9124127267872038,
+      "xgo_identity": "GENERIC_TEMPLATE",
+      "xgo_m": 0.05260777123201476
+    },
+    {
+      "dimension": "upper_link_joint_axis_distance",
+      "matdog_m": 0.09,
+      "meaning": "direct geometric distance",
+      "ratio": 1.502495962703466,
+      "xgo_identity": "GENERIC_TEMPLATE",
+      "xgo_m": 0.05990032734468151
+    },
+    {
+      "dimension": "front_hip_frame_height",
+      "matdog_m": 0.0465,
+      "meaning": "frame-dependent, not scale-invariant",
+      "ratio": 3.1980742778541953,
+      "xgo_identity": "GENERIC_TEMPLATE",
+      "xgo_m": 0.01454
+    },
+    {
+      "dimension": "rear_hip_frame_height",
+      "matdog_m": 0.0265,
+      "meaning": "frame-dependent, not scale-invariant",
+      "ratio": 1.8225584594222832,
+      "xgo_identity": "GENERIC_TEMPLATE",
+      "xgo_m": 0.01454
+    },
+    {
+      "dimension": "distal_mesh_extent_below_knee",
+      "matdog_m": 0.0499,
+      "meaning": "mesh extent versus URDF foot origin Z; unlike endpoints, not a usable similarity ratio",
+      "ratio": null,
+      "xgo_identity": "GENERIC_TEMPLATE",
+      "xgo_m": 0.08149997889995575
+    },
+    {
+      "dimension": "foot_cylinder_radius",
+      "ratio": null,
+      "reason": "No source-bound exact Lite geometry/limits recovered; family CAD and host command ranges cannot supply this",
+      "xgo_identity": "UNKNOWN"
+    },
+    {
+      "dimension": "foot_support_width",
+      "ratio": null,
+      "reason": "No source-bound exact Lite geometry/limits recovered; family CAD and host command ranges cannot supply this",
+      "xgo_identity": "UNKNOWN"
+    },
+    {
+      "dimension": "physical_joint_ranges",
+      "ratio": null,
+      "reason": "No source-bound exact Lite geometry/limits recovered; family CAD and host command ranges cannot supply this",
+      "xgo_identity": "UNKNOWN"
+    },
+    {
+      "dimension": "exact_lite_link_lengths",
+      "ratio": null,
+      "reason": "No source-bound exact Lite geometry/limits recovered; family CAD and host command ranges cannot supply this",
+      "xgo_identity": "UNKNOWN"
+    }
+  ],
+  "source_correction": {
+    "canonical_h2_inventory": "urdf_joint_inventory.csv",
+    "issue": "Summary CSV reports hip Z=0, upper origin=0 and lower Z=-0.049313; those disagree with the hash-matching pinned xacro and expanded URDF. This audit uses parsed primary XML, not that summary.",
+    "primary_values": {
+      "lf_hip": [
+        0.09332,
+        0.022407,
+        0.01454
+      ],
+      "lf_lower_origin": [
+        0.0,
+        -0.00072,
+        -0.059896
+      ],
+      "lf_upper_origin": [
+        -0.018325,
+        0.049313,
+        0.0
+      ]
+    }
+  }
+}

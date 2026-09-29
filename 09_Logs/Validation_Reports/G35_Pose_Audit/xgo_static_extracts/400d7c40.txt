@@ -1,0 +1,111 @@
+400d7c40 FUN_400d7c40
+
+void FUN_400d7c40(void)
+
+{
+  undefined4 uVar1;
+  undefined *puVar2;
+  undefined1 *puVar3;
+  undefined *puVar4;
+  undefined4 *puVar5;
+  undefined4 uVar6;
+  
+  puVar2 = PTR_DAT_400d0214;
+  PTR_DAT_400d0214[2] = 0x8d;
+  *puVar2 = 0x80;
+  puVar2[3] = 0x80;
+  puVar2[4] = 0x80;
+  puVar2[5] = 0x80;
+  puVar2[0xc] = 0;
+  puVar2[0xd] = 0;
+  puVar2[0xe] = 0;
+  puVar2[0x10] = 0;
+  puVar2[0x11] = 0;
+  puVar2[0x12] = 0;
+  puVar2[1] = 0x80;
+  puVar2[7] = 0x80;
+  puVar2[6] = 0x80;
+  puVar2[8] = 0x80;
+  uVar6 = DAT_400d021c;
+  puVar3 = DAT_400d01f4;
+  *(undefined4 *)PTR_DAT_400d0514 = DAT_400d021c;
+  uVar1 = DAT_400d00d4;
+  *(undefined4 *)PTR_DAT_400d0518 = uVar6;
+  puVar2 = PTR_DAT_400d051c;
+  *puVar3 = 0;
+  puVar4 = PTR_DAT_400d01f8;
+  *(undefined4 *)puVar2 = uVar6;
+  puVar5 = DAT_400d0218;
+  *(undefined4 *)(puVar4 + 0x40) = uVar1;
+  *(undefined4 *)(puVar4 + 0x34) = uVar1;
+  *(undefined4 *)(puVar4 + 0x38) = uVar1;
+  *(undefined4 *)(puVar4 + 0x3c) = uVar1;
+  *puVar5 = uVar1;
+  *DAT_400d022c = 0;
+  FUN_400da840(0x32);
+  FUN_400d79d4();
+  puVar2 = PTR_DAT_400d0130;
+  *(short *)(puVar4 + 0x50) = (short)DAT_400d01fc;
+  *puVar2 = 1;
+  *(undefined2 *)PTR_DAT_400d020c = 400;
+  *DAT_400d0204 = 0;
+  *PTR_DAT_400d02b8 = 1;
+  return;
+}
+
+
+400d7c40 entry a1,0x20
+400d7c43 l32r a8,0x400d0214
+400d7c46 movi a2,0x0
+400d7c49 movi a9,-0x80
+400d7c4c movi a11,-0x73
+400d7c4f s8i a11,a8,0x2
+400d7c52 s8i a9,a8,0x0
+400d7c55 s8i a9,a8,0x3
+400d7c58 s8i a9,a8,0x4
+400d7c5b s8i a9,a8,0x5
+400d7c5e s8i a2,a8,0xc
+400d7c61 s8i a2,a8,0xd
+400d7c64 s8i a2,a8,0xe
+400d7c67 s8i a2,a8,0x10
+400d7c6a s8i a2,a8,0x11
+400d7c6d s8i a2,a8,0x12
+400d7c70 s8i a9,a8,0x1
+400d7c73 s8i a9,a8,0x7
+400d7c76 s8i a9,a8,0x6
+400d7c79 s8i a9,a8,0x8
+400d7c7c l32r a8,0x400d021c
+400d7c7f l32r a9,0x400d0514
+400d7c82 l32r a3,0x400d01f4
+400d7c85 s32i a8,a9,0x0
+400d7c88 l32r a9,0x400d0518
+400d7c8b l32r a10,0x400d00d4
+400d7c8e s32i.n a8,a9,0x0
+400d7c90 l32r a9,0x400d051c
+400d7c93 s8i a2,a3,0x0
+400d7c96 l32r a3,0x400d01f8
+400d7c99 s32i.n a8,a9,0x0
+400d7c9b l32r a8,0x400d0218
+400d7c9e s32i a10,a3,0x40
+400d7ca1 s32i.n a10,a3,0x34
+400d7ca3 s32i.n a10,a3,0x38
+400d7ca5 s32i.n a10,a3,0x3c
+400d7ca7 s32i.n a10,a8,0x0
+400d7ca9 l32r a8,0x400d022c
+400d7cac movi.n a10,0x32
+400d7cae s8i a2,a8,0x0
+400d7cb1 call8 0x400da840
+400d7cb4 call8 0x400d79d4
+400d7cb7 l32r a4,0x400d01fc
+400d7cba l32r a8,0x400d0130
+400d7cbd s16i a4,a3,0x50
+400d7cc0 movi.n a3,0x1
+400d7cc2 s8i a3,a8,0x0
+400d7cc5 l32r a8,0x400d020c
+400d7cc8 movi a9,0x190
+400d7ccb s16i a9,a8,0x0
+400d7cce l32r a8,0x400d0204
+400d7cd1 s8i a2,a8,0x0
+400d7cd4 l32r a2,0x400d02b8
+400d7cd7 s8i a3,a2,0x0
+400d7cda retw.n

@@ -1,0 +1,2276 @@
+{
+  "actions": [
+    {
+      "action_id": 0,
+      "aliases": [
+        "internal idle"
+      ],
+      "alternate_documented_duration_s": null,
+      "canonical_name": "Idle / clear action",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": null,
+      "duration_is_hardware_bound": false,
+      "evidence_class": "E",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d7c30",
+      "handler_export_address": "0x400d7c28",
+      "handler_sha256": "a9677cf4e3060f42cb617cefd066675df2e8a5957bc423eba25ee190b816cb76",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NOT_TRANSFERABLE",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "CONTROL_OR_MANIPULATION"
+    },
+    {
+      "action_id": 1,
+      "aliases": [
+        "Lie_Down"
+      ],
+      "alternate_documented_duration_s": "3",
+      "canonical_name": "Lie down",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "3",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d7db0",
+      "handler_export_address": "0x400d7da8",
+      "handler_sha256": "917de9376722a531d2f9f4de98eb3d84bfe9ce09d059968d211642e1bee6d9d3",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Body height command minimum; no proof of underside floor support",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "ENDPOINT_AND_RECOVERY"
+    },
+    {
+      "action_id": 2,
+      "aliases": [
+        "Stand_Up"
+      ],
+      "alternate_documented_duration_s": "3",
+      "canonical_name": "Stand up",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "3",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d7dfc",
+      "handler_export_address": "0x400d7df4",
+      "handler_sha256": "b040a331cfaf9a28a5cee9e4a7a19c8c37cdda24face8ab35b3fac98e0129917",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Body height command maximum",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "ENDPOINT_AND_RECOVERY"
+    },
+    {
+      "action_id": 3,
+      "aliases": [
+        "Crawl"
+      ],
+      "alternate_documented_duration_s": "5",
+      "canonical_name": "Crawl",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "5",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d7e48",
+      "handler_export_address": "0x400d7e40",
+      "handler_sha256": "d01c385faf793e3be66dc5ccab7c2c549f53f208e0bb0d01073c9581ca88a4fc",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Low body height plus forward motion command; dynamic crawl",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 4,
+      "aliases": [
+        "Turn_Around"
+      ],
+      "alternate_documented_duration_s": "5",
+      "canonical_name": "Turn in a circle",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "5",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d7eb4",
+      "handler_export_address": "0x400d7eac",
+      "handler_sha256": "0e8498e71065079c3bb5c559a8cbf0e385b101f155674f41341c7f5ec4f558c1",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 5,
+      "aliases": [
+        "Mark_Time"
+      ],
+      "alternate_documented_duration_s": "4",
+      "canonical_name": "Mini is stepping",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "4",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "D",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d7f00",
+      "handler_export_address": "0x400d7ef8",
+      "handler_sha256": "4357f688796d4b8193ed1d4e1de932274e6c68e2787f9141a33e963b2ba40cc2",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Analyzed handler immediately calls common completion; documented stepping is not implemented here as a distinct sequence",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 6,
+      "aliases": [
+        "Squat"
+      ],
+      "alternate_documented_duration_s": "4",
+      "canonical_name": "Squat",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "4",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d7f0c",
+      "handler_export_address": "0x400d7f04",
+      "handler_sha256": "e058c570f0bbe35e89d41f99141f035d46b6b519ba66689e8ab334d9c4ea5e09",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Repeated height command changes",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 7,
+      "aliases": [
+        "Turn_Roll"
+      ],
+      "alternate_documented_duration_s": "4",
+      "canonical_name": "Roll",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "4",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d7fa8",
+      "handler_export_address": "0x400d7fa0",
+      "handler_sha256": "51570392b2662c99557342419ff2a7089eb72fb43f59da6469eb2421565b7f20",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Periodic roll command, not a proven full rollover",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 8,
+      "aliases": [
+        "Turn_Pitch"
+      ],
+      "alternate_documented_duration_s": "4",
+      "canonical_name": "Turn Pitch",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "4",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d7ff4",
+      "handler_export_address": "0x400d7fec",
+      "handler_sha256": "44793ffbced2c3a8ede4839e38a27303afa23b982b251010f614dfbfcf2e82c5",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 9,
+      "aliases": [
+        "Turn_Yaw"
+      ],
+      "alternate_documented_duration_s": "4",
+      "canonical_name": "Yaw",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "4",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8040",
+      "handler_export_address": "0x400d8038",
+      "handler_sha256": "4256906e5883609c73dee8a2daac6d38619a8f4845c3dd90ad0f0b757f57f64e",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 10,
+      "aliases": [
+        "3_Axis"
+      ],
+      "alternate_documented_duration_s": "7",
+      "canonical_name": "Three-axis rotation",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "7",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d808c",
+      "handler_export_address": "0x400d8084",
+      "handler_sha256": "4f3653c069dc40bfe945c206131d9ce24a31766c1e6735511047f52f2be161a8",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 11,
+      "aliases": [
+        "Pee"
+      ],
+      "alternate_documented_duration_s": "7",
+      "canonical_name": "Pee",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "7",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8114",
+      "handler_export_address": "0x400d810c",
+      "handler_sha256": "98f41b0546ce8005c3535509790527b0c3a032c7afd6ab5b5d6865a5daf895c7",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [
+        {
+          "controller_slots_u8": [
+            250,
+            150,
+            10,
+            250,
+            150,
+            10,
+            250,
+            150,
+            100,
+            255,
+            128,
+            100
+          ],
+          "literal": "0x400d0540",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.9803921568627451,
+            0.5882352941176471,
+            0.0392156862745098,
+            0.9803921568627451,
+            0.5882352941176471,
+            0.0392156862745098,
+            0.9803921568627451,
+            0.5882352941176471,
+            0.39215686274509803,
+            1.0,
+            0.5019607843137255,
+            0.39215686274509803
+          ],
+          "table_address": "0x3f40026c"
+        },
+        {
+          "controller_slots_u8": [
+            255,
+            128,
+            100,
+            255,
+            128,
+            100,
+            255,
+            128,
+            100,
+            255,
+            110,
+            140
+          ],
+          "literal": "0x400d0544",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            1.0,
+            0.5019607843137255,
+            0.39215686274509803,
+            1.0,
+            0.5019607843137255,
+            0.39215686274509803,
+            1.0,
+            0.5019607843137255,
+            0.39215686274509803,
+            1.0,
+            0.43137254901960786,
+            0.5490196078431373
+          ],
+          "table_address": "0x3f400278"
+        },
+        {
+          "controller_slots_u8": [
+            220,
+            146,
+            140,
+            220,
+            146,
+            100,
+            255,
+            110,
+            100,
+            255,
+            110,
+            140
+          ],
+          "literal": "0x400d0548",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.8627450980392157,
+            0.5725490196078431,
+            0.5490196078431373,
+            0.8627450980392157,
+            0.5725490196078431,
+            0.39215686274509803,
+            1.0,
+            0.43137254901960786,
+            0.39215686274509803,
+            1.0,
+            0.43137254901960786,
+            0.5490196078431373
+          ],
+          "table_address": "0x3f400284"
+        },
+        {
+          "controller_slots_u8": [
+            220,
+            146,
+            150,
+            220,
+            255,
+            100,
+            255,
+            110,
+            100,
+            255,
+            110,
+            140
+          ],
+          "literal": "0x400d0550",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.8627450980392157,
+            0.5725490196078431,
+            0.5882352941176471,
+            0.8627450980392157,
+            1.0,
+            0.39215686274509803,
+            1.0,
+            0.43137254901960786,
+            0.39215686274509803,
+            1.0,
+            0.43137254901960786,
+            0.5490196078431373
+          ],
+          "table_address": "0x3f400290"
+        }
+      ],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 12,
+      "aliases": [
+        "Sit_Down"
+      ],
+      "alternate_documented_duration_s": "5",
+      "canonical_name": "Sit",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "5",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d821c",
+      "handler_export_address": "0x400d8214",
+      "handler_sha256": "45504f477a76397eff5593703945a98002281df72a5ac4424bb2f7157ba2debf",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [
+        {
+          "controller_slots_u8": [
+            220,
+            146,
+            120,
+            220,
+            255,
+            100,
+            255,
+            110,
+            245,
+            170,
+            128,
+            245
+          ],
+          "literal": "0x400d0568",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.8627450980392157,
+            0.5725490196078431,
+            0.47058823529411764,
+            0.8627450980392157,
+            1.0,
+            0.39215686274509803,
+            1.0,
+            0.43137254901960786,
+            0.9607843137254902,
+            0.6666666666666666,
+            0.5019607843137255,
+            0.9607843137254902
+          ],
+          "table_address": "0x3f40029c"
+        }
+      ],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Twelve-slot motor-domain endpoint then common recovery",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "ENDPOINT_AND_RECOVERY"
+    },
+    {
+      "action_id": 13,
+      "aliases": [
+        "Wave_Hand"
+      ],
+      "alternate_documented_duration_s": "7",
+      "canonical_name": "Wave",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "7",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d82a8",
+      "handler_export_address": "0x400d82a0",
+      "handler_sha256": "ae588f61d869d30d8eb1a28781af195c2af00302b086ad8c14f440e58da7029e",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [
+        {
+          "controller_slots_u8": [
+            170,
+            128,
+            80,
+            225,
+            128,
+            80,
+            225,
+            128,
+            160,
+            170,
+            128,
+            160
+          ],
+          "literal": "0x400d056c",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6666666666666666,
+            0.5019607843137255,
+            0.3137254901960784,
+            0.8823529411764706,
+            0.5019607843137255,
+            0.3137254901960784,
+            0.8823529411764706,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.6666666666666666,
+            0.5019607843137255,
+            0.6274509803921569
+          ],
+          "table_address": "0x3f4002a8"
+        },
+        {
+          "controller_slots_u8": [
+            170,
+            25,
+            150,
+            165,
+            128,
+            150,
+            165,
+            128,
+            90,
+            50,
+            128,
+            160
+          ],
+          "literal": "0x400d0574",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6666666666666666,
+            0.09803921568627451,
+            0.5882352941176471,
+            0.6470588235294118,
+            0.5019607843137255,
+            0.5882352941176471,
+            0.6470588235294118,
+            0.5019607843137255,
+            0.35294117647058826,
+            0.19607843137254902,
+            0.5019607843137255,
+            0.6274509803921569
+          ],
+          "table_address": "0x3f4002b4"
+        },
+        {
+          "controller_slots_u8": [
+            170,
+            25,
+            150,
+            165,
+            128,
+            150,
+            165,
+            128,
+            90,
+            50,
+            80,
+            160
+          ],
+          "literal": "0x400d057c",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6666666666666666,
+            0.09803921568627451,
+            0.5882352941176471,
+            0.6470588235294118,
+            0.5019607843137255,
+            0.5882352941176471,
+            0.6470588235294118,
+            0.5019607843137255,
+            0.35294117647058826,
+            0.19607843137254902,
+            0.3137254901960784,
+            0.6274509803921569
+          ],
+          "table_address": "0x3f4002c0"
+        },
+        {
+          "controller_slots_u8": [
+            170,
+            25,
+            150,
+            165,
+            128,
+            150,
+            165,
+            128,
+            90,
+            50,
+            200,
+            160
+          ],
+          "literal": "0x400d0584",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6666666666666666,
+            0.09803921568627451,
+            0.5882352941176471,
+            0.6470588235294118,
+            0.5019607843137255,
+            0.5882352941176471,
+            0.6470588235294118,
+            0.5019607843137255,
+            0.35294117647058826,
+            0.19607843137254902,
+            0.7843137254901961,
+            0.6274509803921569
+          ],
+          "table_address": "0x3f4002cc"
+        },
+        {
+          "controller_slots_u8": [
+            170,
+            25,
+            150,
+            165,
+            128,
+            150,
+            165,
+            128,
+            148,
+            180,
+            128,
+            160
+          ],
+          "literal": "0x400d0594",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6666666666666666,
+            0.09803921568627451,
+            0.5882352941176471,
+            0.6470588235294118,
+            0.5019607843137255,
+            0.5882352941176471,
+            0.6470588235294118,
+            0.5019607843137255,
+            0.5803921568627451,
+            0.7058823529411765,
+            0.5019607843137255,
+            0.6274509803921569
+          ],
+          "table_address": "0x3f4002d8"
+        }
+      ],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 14,
+      "aliases": [
+        "Stretch"
+      ],
+      "alternate_documented_duration_s": "10",
+      "canonical_name": "Stretch",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "10",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d83b8",
+      "handler_export_address": "0x400d83b0",
+      "handler_sha256": "7e67dc9ae33eb7d182d4b8ac77f05ee244bb151d6cc7c776764361765a17f61a",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [
+        {
+          "controller_slots_u8": [
+            170,
+            25,
+            150,
+            165,
+            128,
+            150,
+            165,
+            128,
+            255,
+            30,
+            128,
+            255
+          ],
+          "literal": "0x400d059c",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6666666666666666,
+            0.09803921568627451,
+            0.5882352941176471,
+            0.6470588235294118,
+            0.5019607843137255,
+            0.5882352941176471,
+            0.6470588235294118,
+            0.5019607843137255,
+            1.0,
+            0.11764705882352941,
+            0.5019607843137255,
+            1.0
+          ],
+          "table_address": "0x3f4002e4"
+        },
+        {
+          "controller_slots_u8": [
+            30,
+            128,
+            160,
+            190,
+            128,
+            160,
+            190,
+            128,
+            225,
+            160,
+            128,
+            225
+          ],
+          "literal": "0x400d05a0",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.11764705882352941,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.7450980392156863,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.7450980392156863,
+            0.5019607843137255,
+            0.8823529411764706,
+            0.6274509803921569,
+            0.5019607843137255,
+            0.8823529411764706
+          ],
+          "table_address": "0x3f4002f0"
+        },
+        {
+          "controller_slots_u8": [
+            160,
+            128,
+            160,
+            190,
+            128,
+            160,
+            190,
+            128,
+            235,
+            180,
+            128,
+            235
+          ],
+          "literal": "0x400d05a4",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6274509803921569,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.7450980392156863,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.7450980392156863,
+            0.5019607843137255,
+            0.9215686274509803,
+            0.7058823529411765,
+            0.5019607843137255,
+            0.9215686274509803
+          ],
+          "table_address": "0x3f4002fc"
+        }
+      ],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Three twelve-slot motor-domain keyframes then common recovery",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 15,
+      "aliases": [
+        "Wave_Body"
+      ],
+      "alternate_documented_duration_s": "6",
+      "canonical_name": "Wave",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "6",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8468",
+      "handler_export_address": "0x400d8460",
+      "handler_sha256": "94704c1966ec6012c4a2b161c5b0f38d64b588909a8be2e549336b47304bd671",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 16,
+      "aliases": [
+        "Swing"
+      ],
+      "alternate_documented_duration_s": "6",
+      "canonical_name": "Sway",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "6",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8568",
+      "handler_export_address": "0x400d8560",
+      "handler_sha256": "e25e81fcd1995607c6389c9942672ee5802b709c6776c47929da8957ec5698ec",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 17,
+      "aliases": [
+        "Pray"
+      ],
+      "alternate_documented_duration_s": "6",
+      "canonical_name": "Beg",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "6",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8664",
+      "handler_export_address": "0x400d865c",
+      "handler_sha256": "4c54791edc6f5f876d8864d50f76107c21565e58927aeb54a5ff81338f52fdb0",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Pitch/height posture plus yaw modulation; support set unspecified",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 18,
+      "aliases": [
+        "Seek"
+      ],
+      "alternate_documented_duration_s": "6",
+      "canonical_name": "Find food",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "6",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d871c",
+      "handler_export_address": "0x400d8714",
+      "handler_sha256": "1788610e26e48398add04ac42eaa57b2da02b723c1154ff7f07c770c1a89c76c",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 19,
+      "aliases": [
+        "Handshake"
+      ],
+      "alternate_documented_duration_s": "10",
+      "canonical_name": "Shake hands",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "10",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8938",
+      "handler_export_address": "0x400d8930",
+      "handler_sha256": "dbd354359a36c148dd3ad7e7823e07ab111323ef12a38faac0bd21c9eb44ae77",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [
+        {
+          "controller_slots_u8": [
+            220,
+            146,
+            120,
+            220,
+            255,
+            100,
+            255,
+            110,
+            245,
+            170,
+            128,
+            245
+          ],
+          "literal": "0x400d0568",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.8627450980392157,
+            0.5725490196078431,
+            0.47058823529411764,
+            0.8627450980392157,
+            1.0,
+            0.39215686274509803,
+            1.0,
+            0.43137254901960786,
+            0.9607843137254902,
+            0.6666666666666666,
+            0.5019607843137255,
+            0.9607843137254902
+          ],
+          "table_address": "0x3f40029c"
+        },
+        {
+          "controller_slots_u8": [
+            180,
+            128,
+            255,
+            240,
+            128,
+            255,
+            240,
+            128,
+            245,
+            130,
+            128,
+            245
+          ],
+          "literal": "0x400d05dc",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.7058823529411765,
+            0.5019607843137255,
+            1.0,
+            0.9411764705882353,
+            0.5019607843137255,
+            1.0,
+            0.9411764705882353,
+            0.5019607843137255,
+            0.9607843137254902,
+            0.5098039215686274,
+            0.5019607843137255,
+            0.9607843137254902
+          ],
+          "table_address": "0x3f400308"
+        },
+        {
+          "controller_slots_u8": [
+            170,
+            60,
+            80,
+            225,
+            128,
+            80,
+            225,
+            128,
+            130,
+            130,
+            128,
+            245
+          ],
+          "literal": "0x400d05e4",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6666666666666666,
+            0.23529411764705882,
+            0.3137254901960784,
+            0.8823529411764706,
+            0.5019607843137255,
+            0.3137254901960784,
+            0.8823529411764706,
+            0.5019607843137255,
+            0.5098039215686274,
+            0.5098039215686274,
+            0.5019607843137255,
+            0.9607843137254902
+          ],
+          "table_address": "0x3f400314"
+        },
+        {
+          "controller_slots_u8": [
+            170,
+            60,
+            80,
+            225,
+            128,
+            80,
+            225,
+            128,
+            160,
+            130,
+            128,
+            245
+          ],
+          "literal": "0x400d05e8",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6666666666666666,
+            0.23529411764705882,
+            0.3137254901960784,
+            0.8823529411764706,
+            0.5019607843137255,
+            0.3137254901960784,
+            0.8823529411764706,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.5098039215686274,
+            0.5019607843137255,
+            0.9607843137254902
+          ],
+          "table_address": "0x3f400320"
+        }
+      ],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 20,
+      "aliases": [
+        "Chicken head"
+      ],
+      "alternate_documented_duration_s": "9",
+      "canonical_name": "Chicken head",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "9",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8a58",
+      "handler_export_address": "0x400d8a50",
+      "handler_sha256": "69a2e7b04b3cc1b5aa10ca4c6b1f6eb32d67565c5b39e81c60c91474f50576cc",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 21,
+      "aliases": [
+        "Chicken head push up"
+      ],
+      "alternate_documented_duration_s": "8",
+      "canonical_name": "Push-ups",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "8",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8bfc",
+      "handler_export_address": "0x400d8bf4",
+      "handler_sha256": "c02f7f4ccb88b04ddba47f5230c0b3b9fded5803df68dca7b62fff20f71fa361",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [
+        {
+          "controller_slots_u8": [
+            255,
+            128,
+            60,
+            160,
+            128,
+            60,
+            160,
+            128,
+            235,
+            160,
+            128,
+            235
+          ],
+          "literal": "0x400d05ec",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            1.0,
+            0.5019607843137255,
+            0.23529411764705882,
+            0.6274509803921569,
+            0.5019607843137255,
+            0.23529411764705882,
+            0.6274509803921569,
+            0.5019607843137255,
+            0.9215686274509803,
+            0.6274509803921569,
+            0.5019607843137255,
+            0.9215686274509803
+          ],
+          "table_address": "0x3f400380"
+        },
+        {
+          "controller_slots_u8": [
+            160,
+            128,
+            255,
+            240,
+            128,
+            255,
+            240,
+            128,
+            35,
+            250,
+            128,
+            35
+          ],
+          "literal": "0x400d05f0",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6274509803921569,
+            0.5019607843137255,
+            1.0,
+            0.9411764705882353,
+            0.5019607843137255,
+            1.0,
+            0.9411764705882353,
+            0.5019607843137255,
+            0.13725490196078433,
+            0.9803921568627451,
+            0.5019607843137255,
+            0.13725490196078433
+          ],
+          "table_address": "0x3f40038c"
+        }
+      ],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Alternating two motor-domain keyframes then common recovery",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 22,
+      "aliases": [
+        "Look around"
+      ],
+      "alternate_documented_duration_s": "7",
+      "canonical_name": "Look around",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "8",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8af4",
+      "handler_export_address": "0x400d8aec",
+      "handler_sha256": "35d9071ea2512b4997438543e1db900d45eb4da3465c886a73667ca43e516630",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 23,
+      "aliases": [
+        "Dance"
+      ],
+      "alternate_documented_duration_s": "6",
+      "canonical_name": "Dance",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "6",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8b5c",
+      "handler_export_address": "0x400d8b54",
+      "handler_sha256": "f488b11e528d8f14788ef76ec3705cbdc33cc6e6cc4338fb77e23820fd431b89",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 24,
+      "aliases": [
+        "Naughty"
+      ],
+      "alternate_documented_duration_s": "7",
+      "canonical_name": "Playful",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "7",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "C",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8bac",
+      "handler_export_address": "0x400d8ba4",
+      "handler_sha256": "538cc58066546e67eca01e8b4fea5a6f1f1a00e9705a8a69721df209c08fa65e",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NO_DIRECT_JOINT_TRANSFER",
+      "semantics": "Periodic translation/rotation command fields",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "DYNAMIC_SEQUENCE"
+    },
+    {
+      "action_id": 128,
+      "aliases": [
+        "Grab it"
+      ],
+      "alternate_documented_duration_s": "10",
+      "canonical_name": "Grab up",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "10",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "E",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8ce4",
+      "handler_export_address": "0x400d8cdc",
+      "handler_sha256": "0ab9421eeb2c46f41f720d158237df6ceb9d3cef9420c7901e165177b6772137",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NOT_TRANSFERABLE",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "CONTROL_OR_MANIPULATION"
+    },
+    {
+      "action_id": 129,
+      "aliases": [
+        "Middle it"
+      ],
+      "alternate_documented_duration_s": "10",
+      "canonical_name": "Catch",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "10",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "E",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8db4",
+      "handler_export_address": "0x400d8dac",
+      "handler_sha256": "e09002b997a567a71617eb40f4a29a13ba26f740c40ea8c5cf0c3f153686dde2",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NOT_TRANSFERABLE",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "CONTROL_OR_MANIPULATION"
+    },
+    {
+      "action_id": 130,
+      "aliases": [
+        "Get down"
+      ],
+      "alternate_documented_duration_s": "10",
+      "canonical_name": "Grab",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": "10",
+      "duration_is_hardware_bound": false,
+      "evidence_class": "E",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8e88",
+      "handler_export_address": "0x400d8e80",
+      "handler_sha256": "ade4bc75e728bef90341e6ca618a5f9e9d64ce5e88319bee887938842ce7965b",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NOT_TRANSFERABLE",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "CONTROL_OR_MANIPULATION"
+    },
+    {
+      "action_id": 144,
+      "aliases": [
+        "Climb the stairs"
+      ],
+      "alternate_documented_duration_s": null,
+      "canonical_name": "not tabulated; note requires firmware >=V4.3.2",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": null,
+      "duration_is_hardware_bound": false,
+      "evidence_class": "E",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d8f5c",
+      "handler_export_address": "0x400d8f54",
+      "handler_sha256": "64b811f0a8b002ecd631fc08f4fcdaa345fa245257b8f2ed13cdb912e0e0fd7a",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [
+        {
+          "controller_slots_u8": [
+            250,
+            128,
+            255,
+            240,
+            128,
+            255,
+            240,
+            128,
+            160,
+            175,
+            128,
+            160
+          ],
+          "literal": "0x400d0600",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.9803921568627451,
+            0.5019607843137255,
+            1.0,
+            0.9411764705882353,
+            0.5019607843137255,
+            1.0,
+            0.9411764705882353,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.6862745098039216,
+            0.5019607843137255,
+            0.6274509803921569
+          ],
+          "table_address": "0x3f400398"
+        },
+        {
+          "controller_slots_u8": [
+            175,
+            128,
+            160,
+            135,
+            128,
+            160,
+            135,
+            128,
+            160,
+            210,
+            128,
+            160
+          ],
+          "literal": "0x400d0604",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6862745098039216,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.8235294117647058,
+            0.5019607843137255,
+            0.6274509803921569
+          ],
+          "table_address": "0x3f4003a4"
+        },
+        {
+          "controller_slots_u8": [
+            190,
+            40,
+            160,
+            135,
+            128,
+            160,
+            135,
+            128,
+            20,
+            210,
+            128,
+            160
+          ],
+          "literal": "0x400d0608",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.7450980392156863,
+            0.1568627450980392,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.0784313725490196,
+            0.8235294117647058,
+            0.5019607843137255,
+            0.6274509803921569
+          ],
+          "table_address": "0x3f4003b0"
+        },
+        {
+          "controller_slots_u8": [
+            190,
+            40,
+            160,
+            135,
+            128,
+            160,
+            135,
+            128,
+            148,
+            111,
+            128,
+            160
+          ],
+          "literal": "0x400d060c",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.7450980392156863,
+            0.1568627450980392,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.5803921568627451,
+            0.43529411764705883,
+            0.5019607843137255,
+            0.6274509803921569
+          ],
+          "table_address": "0x3f4003bc"
+        },
+        {
+          "controller_slots_u8": [
+            190,
+            40,
+            160,
+            135,
+            128,
+            160,
+            135,
+            128,
+            148,
+            111,
+            128,
+            21
+          ],
+          "literal": "0x400d0610",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.7450980392156863,
+            0.1568627450980392,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.5803921568627451,
+            0.43529411764705883,
+            0.5019607843137255,
+            0.08235294117647059
+          ],
+          "table_address": "0x3f4003c8"
+        },
+        {
+          "controller_slots_u8": [
+            239,
+            127,
+            160,
+            135,
+            128,
+            160,
+            135,
+            128,
+            148,
+            111,
+            128,
+            21
+          ],
+          "literal": "0x400d0614",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.9372549019607843,
+            0.4980392156862745,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.5803921568627451,
+            0.43529411764705883,
+            0.5019607843137255,
+            0.08235294117647059
+          ],
+          "table_address": "0x3f4003d4"
+        },
+        {
+          "controller_slots_u8": [
+            111,
+            127,
+            160,
+            135,
+            128,
+            160,
+            135,
+            128,
+            170,
+            111,
+            128,
+            170
+          ],
+          "literal": "0x400d0618",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.43529411764705883,
+            0.4980392156862745,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.6666666666666666,
+            0.43529411764705883,
+            0.5019607843137255,
+            0.6666666666666666
+          ],
+          "table_address": "0x3f4003e0"
+        },
+        {
+          "controller_slots_u8": [
+            111,
+            127,
+            160,
+            135,
+            128,
+            160,
+            135,
+            128,
+            75,
+            175,
+            128,
+            75
+          ],
+          "literal": "0x400d0620",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.43529411764705883,
+            0.4980392156862745,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.6274509803921569,
+            0.5294117647058824,
+            0.5019607843137255,
+            0.29411764705882354,
+            0.6862745098039216,
+            0.5019607843137255,
+            0.29411764705882354
+          ],
+          "table_address": "0x3f4003ec"
+        },
+        {
+          "controller_slots_u8": [
+            175,
+            128,
+            155,
+            180,
+            128,
+            155,
+            180,
+            128,
+            75,
+            175,
+            128,
+            75
+          ],
+          "literal": "0x400d0628",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6862745098039216,
+            0.5019607843137255,
+            0.6078431372549019,
+            0.7058823529411765,
+            0.5019607843137255,
+            0.6078431372549019,
+            0.7058823529411765,
+            0.5019607843137255,
+            0.29411764705882354,
+            0.6862745098039216,
+            0.5019607843137255,
+            0.29411764705882354
+          ],
+          "table_address": "0x3f4003f8"
+        },
+        {
+          "controller_slots_u8": [
+            175,
+            128,
+            20,
+            240,
+            128,
+            155,
+            180,
+            128,
+            75,
+            175,
+            128,
+            75
+          ],
+          "literal": "0x400d0630",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6862745098039216,
+            0.5019607843137255,
+            0.0784313725490196,
+            0.9411764705882353,
+            0.5019607843137255,
+            0.6078431372549019,
+            0.7058823529411765,
+            0.5019607843137255,
+            0.29411764705882354,
+            0.6862745098039216,
+            0.5019607843137255,
+            0.29411764705882354
+          ],
+          "table_address": "0x3f400404"
+        },
+        {
+          "controller_slots_u8": [
+            175,
+            128,
+            20,
+            127,
+            128,
+            155,
+            180,
+            128,
+            75,
+            175,
+            128,
+            75
+          ],
+          "literal": "0x400d0638",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6862745098039216,
+            0.5019607843137255,
+            0.0784313725490196,
+            0.4980392156862745,
+            0.5019607843137255,
+            0.6078431372549019,
+            0.7058823529411765,
+            0.5019607843137255,
+            0.29411764705882354,
+            0.6862745098039216,
+            0.5019607843137255,
+            0.29411764705882354
+          ],
+          "table_address": "0x3f400410"
+        },
+        {
+          "controller_slots_u8": [
+            175,
+            128,
+            127,
+            127,
+            128,
+            155,
+            180,
+            128,
+            75,
+            175,
+            128,
+            75
+          ],
+          "literal": "0x400d0640",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6862745098039216,
+            0.5019607843137255,
+            0.4980392156862745,
+            0.4980392156862745,
+            0.5019607843137255,
+            0.6078431372549019,
+            0.7058823529411765,
+            0.5019607843137255,
+            0.29411764705882354,
+            0.6862745098039216,
+            0.5019607843137255,
+            0.29411764705882354
+          ],
+          "table_address": "0x3f40041c"
+        },
+        {
+          "controller_slots_u8": [
+            175,
+            128,
+            127,
+            127,
+            128,
+            21,
+            239,
+            128,
+            75,
+            175,
+            128,
+            75
+          ],
+          "literal": "0x400d0648",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6862745098039216,
+            0.5019607843137255,
+            0.4980392156862745,
+            0.4980392156862745,
+            0.5019607843137255,
+            0.08235294117647059,
+            0.9372549019607843,
+            0.5019607843137255,
+            0.29411764705882354,
+            0.6862745098039216,
+            0.5019607843137255,
+            0.29411764705882354
+          ],
+          "table_address": "0x3f400428"
+        },
+        {
+          "controller_slots_u8": [
+            175,
+            128,
+            127,
+            127,
+            128,
+            21,
+            127,
+            128,
+            50,
+            210,
+            128,
+            50
+          ],
+          "literal": "0x400d0650",
+          "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+          "normalized_slots": [
+            0.6862745098039216,
+            0.5019607843137255,
+            0.4980392156862745,
+            0.4980392156862745,
+            0.5019607843137255,
+            0.08235294117647059,
+            0.4980392156862745,
+            0.5019607843137255,
+            0.19607843137254902,
+            0.8235294117647058,
+            0.5019607843137255,
+            0.19607843137254902
+          ],
+          "table_address": "0x3f400434"
+        }
+      ],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NOT_TRANSFERABLE",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "CONTROL_OR_MANIPULATION"
+    },
+    {
+      "action_id": 255,
+      "aliases": [
+        "Reset"
+      ],
+      "alternate_documented_duration_s": null,
+      "canonical_name": "reset",
+      "confidence": "VERIFIED",
+      "confidence_scope": "source identity, action dispatch and numeric control writes; physical pose reconstruction remains qualified",
+      "contact_support_semantics": "UNKNOWN: no force/contact sensing or declared support set recovered",
+      "documented_duration_s": null,
+      "duration_is_hardware_bound": false,
+      "evidence_class": "E",
+      "evidence_layer": [
+        "VENDOR_DOCUMENTATION",
+        "FIRMWARE_PRIMARY_STATIC_EXPORT"
+      ],
+      "handler_canonical_address": "0x400d7d10",
+      "handler_export_address": "0x400d7d08",
+      "handler_sha256": "25b608958f5ef49599d3d23a96c3b708b99e31b02607d94c69a25c94832cf318",
+      "recovered_body_pose": null,
+      "recovered_controller_tables": [],
+      "recovered_joint_targets": null,
+      "recovered_leg_targets": null,
+      "remaining_unknowns": [
+        "exact physical joint slot mapping/zero/signs",
+        "physical body frame and achieved pose",
+        "ground/self collision and contact set",
+        "achieved interpolation timing"
+      ],
+      "retarget_eligibility": "NOT_TRANSFERABLE",
+      "semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound",
+      "source": "xgo origin/main a1b34a8 evidence/h2/lite_action_catalog.csv plus fresh action handler export",
+      "static_dynamic": "CONTROL_OR_MANIPULATION"
+    }
+  ],
+  "additional_host_pose_apis": [
+    {
+      "evidence_class": "A",
+      "loop_delay_requested_s": 0.15,
+      "name": "APP_PRESS_UP",
+      "repetitions": 6,
+      "scope": "EXACT_HOST_CARTESIAN_COMMAND_SEQUENCE, not lower-firmware preset 21 geometry",
+      "sequence": [
+        {
+          "counter": 1,
+          "translation_z": 75
+        },
+        {
+          "counter": 5,
+          "translation_z": 100
+        },
+        {
+          "counter": 10,
+          "reset_counter": 0
+        }
+      ],
+      "source": "CM4 app_dogzilla.py task_press_up_handle",
+      "unknowns": [
+        "actual scheduling",
+        "body frame height datum",
+        "interaction with simultaneous preset 21"
+      ]
+    },
+    {
+      "evidence_class": "B",
+      "name": "APP_LEG_RESET",
+      "scope": "EXACT_HOST_CARTESIAN_ENDPOINT",
+      "source": "CM4 app_dogzilla.py dogzilla_leg_reset",
+      "targets_host_leg_coordinates": [
+        [
+          0,
+          0,
+          108
+        ],
+        [
+          0,
+          0,
+          108
+        ],
+        [
+          0,
+          0,
+          108
+        ],
+        [
+          0,
+          0,
+          108
+        ]
+      ],
+      "unknowns": [
+        "physical frame mapping to MATDOG"
+      ]
+    },
+    {
+      "evidence_class": "C",
+      "name": "body_translation",
+      "scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes",
+      "source": "pinned Luwu xgolib/xgolib_dog.py changePara and matching methods",
+      "unknowns": [
+        "exact physical frame binding"
+      ]
+    },
+    {
+      "evidence_class": "C",
+      "name": "body_attitude",
+      "scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes",
+      "source": "pinned Luwu xgolib/xgolib_dog.py changePara and matching methods",
+      "unknowns": [
+        "exact physical frame binding"
+      ]
+    },
+    {
+      "evidence_class": "C",
+      "name": "periodic_translation",
+      "scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes",
+      "source": "pinned Luwu xgolib/xgolib_dog.py changePara and matching methods",
+      "unknowns": [
+        "exact physical frame binding"
+      ]
+    },
+    {
+      "evidence_class": "C",
+      "name": "periodic_rotation",
+      "scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes",
+      "source": "pinned Luwu xgolib/xgolib_dog.py changePara and matching methods",
+      "unknowns": [
+        "exact physical frame binding"
+      ]
+    },
+    {
+      "evidence_class": "C",
+      "name": "single_leg_cartesian",
+      "scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes",
+      "source": "pinned Luwu xgolib/xgolib_dog.py changePara and matching methods",
+      "unknowns": [
+        "exact physical frame binding"
+      ]
+    },
+    {
+      "evidence_class": "C",
+      "name": "mark_time_register",
+      "scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes",
+      "source": "pinned Luwu xgolib/xgolib_dog.py changePara and matching methods",
+      "unknowns": [
+        "exact physical frame binding"
+      ]
+    }
+  ],
+  "class_counts": {
+    "C": 23,
+    "D": 1,
+    "E": 6
+  },
+  "provenance": {
+    "current_pdf_matches_pinned": true,
+    "current_preset_pdf_sha256": "a9d1531bd59fb5b55e942f8956d92b6f3ec9cd464f2edcd3f46b37921a6f8a3a",
+    "current_yahboom_commit": "8a2cee0be163d7b095868699b360a1badfa2e852",
+    "firmware_sha256": "71032255ffac656c75234c2dcf6a40b307aefc753a92a04c1d0f707d67db6b0e",
+    "reverse_commit": "a1b34a8594e5bc76c76b1e3ddf89a3aef2b98298"
+  }
+}

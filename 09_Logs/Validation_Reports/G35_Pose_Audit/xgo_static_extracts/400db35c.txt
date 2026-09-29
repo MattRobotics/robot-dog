@@ -1,0 +1,60 @@
+400db35c FUN_400db35c
+
+void FUN_400db35c(void)
+
+{
+  char *pcVar1;
+  char cVar2;
+  char cVar3;
+  
+  FUN_400d96bc();
+  *DAT_400d07d8 = 1;
+  cVar3 = '\0';
+  do {
+    while( true ) {
+      cVar2 = cVar3 + '\x01';
+      FUN_400daca4();
+      if (cVar3 == '\x19') {
+        FUN_400d91fc();
+        cVar2 = '\0';
+      }
+      FUN_400e2f94(2);
+      pcVar1 = DAT_400d011c;
+      cVar3 = cVar2;
+      if (*DAT_400d011c != '\0') break;
+      FUN_400d96f4();
+    }
+    if (*DAT_400d011c == '\x01') {
+      FUN_400d79d4();
+      *pcVar1 = '\x02';
+    }
+  } while( true );
+}
+
+
+400db35c entry a1,0x20
+400db35f call8 0x400d96bc
+400db362 l32r a2,0x400d07d8
+400db365 movi a3,0x1
+400db368 s8i a3,a2,0x0
+400db36b movi.n a4,0x19
+400db36d movi.n a3,0x0
+400db36f addi.n a2,a3,0x1
+400db371 call8 0x400daca4
+400db374 extui a2,a2,0x0,0x8
+400db377 bne a3,a4,0x400db380
+400db37a call8 0x400d91fc
+400db37d movi a2,0x0
+400db380 movi a10,0x2
+400db383 call8 0x400e2f94
+400db386 l32r a3,0x400d011c
+400db389 l8ui a8,a3,0x0
+400db38c bnez a8,0x400db398
+400db38f call8 0x400d96f4
+400db392 mov.n a3,a2
+400db394 j 0x400db36f
+400db398 bnei a8,0x1,0x400db392
+400db39b call8 0x400d79d4
+400db39e movi.n a8,0x2
+400db3a0 s8i a8,a3,0x0
+400db3a3 j 0x400db392

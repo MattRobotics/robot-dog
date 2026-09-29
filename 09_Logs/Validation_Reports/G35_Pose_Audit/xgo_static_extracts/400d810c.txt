@@ -1,0 +1,147 @@
+400d810c FUN_400d810c
+
+void FUN_400d810c(void)
+
+{
+  int *piVar1;
+  int iVar2;
+  undefined *puVar3;
+  float fVar4;
+  undefined1 auStack_30 [12];
+  int iStack_24;
+  
+  iVar2 = DAT_400d0510;
+  piVar1 = DAT_400d0034;
+  memw();
+  iStack_24 = *DAT_400d0034;
+  memw();
+  fVar4 = (float)*(ushort *)(DAT_400d0510 + 0x16) / 1.0;
+  if (fVar4 != DAT_400d00d4) goto LAB_400d8170;
+  FUN_400d7d08(0);
+  FUN_400da840(0x32);
+  puVar3 = PTR_DAT_400d0540;
+  *PTR_DAT_400d0130 = 3;
+LAB_400d814b:
+  do {
+    FUN_40090a8c(auStack_30,puVar3,0xc);
+    FUN_400d7d48(auStack_30);
+    while( true ) {
+      *(short *)(iVar2 + 0x16) = *(short *)(iVar2 + 0x16) + 1;
+      memw();
+      memw();
+      iVar2 = *piVar1;
+      if (iStack_24 == iVar2) {
+        return;
+      }
+      FUN_400edd34();
+LAB_400d8170:
+      puVar3 = PTR_DAT_400d0544;
+      if ((fVar4 == DAT_400d0308) || (puVar3 = PTR_DAT_400d0548, fVar4 == DAT_400d052c))
+      goto LAB_400d814b;
+      if (fVar4 == DAT_400d054c) break;
+      if ((((fVar4 == DAT_400d0554) || (puVar3 = PTR_DAT_400d0550, fVar4 == DAT_400d0558)) ||
+          (puVar3 = PTR_DAT_400d0548, fVar4 == DAT_400d055c)) ||
+         (puVar3 = PTR_DAT_400d0550, fVar4 == DAT_400d0560)) goto LAB_400d814b;
+      if (fVar4 == DAT_400d0564) {
+        FUN_400d7cdc();
+      }
+      else if (fVar4 == DAT_400d053c) {
+        FUN_400d7d08(1);
+      }
+    }
+    FUN_400da840(0);
+    puVar3 = PTR_DAT_400d0550;
+  } while( true );
+}
+
+
+400d810c entry a1,0x30
+400d810f l32r a3,0x400d0034
+400d8112 l32r a4,0x400d00d4
+400d8115 memw
+400d8118 l32i a2,a3,0x0
+400d811b wfr f1,a4
+400d811e memw
+400d8121 s32i a2,a1,0xc
+400d8124 l32r a2,0x400d0510
+400d8127 l16ui a8,a2,0x16
+400d812a float.s f0,a8,0x0
+400d812d oeq.s b0,f0,f1
+400d8130 bf b0,0x400d8170
+400d8133 movi a10,0x0
+400d8136 call8 0x400d7d08
+400d8139 movi.n a10,0x32
+400d813b call8 0x400da840
+400d813e l32r a8,0x400d0130
+400d8141 movi.n a9,0x3
+400d8143 l32r a11,0x400d0540
+400d8146 s8i a9,a8,0x0
+400d8149 movi.n a12,0xc
+400d814b mov.n a10,a1
+400d814d call8 0x40090a8c
+400d8150 mov.n a10,a1
+400d8152 call8 0x400d7d48
+400d8155 l16ui a8,a2,0x16
+400d8158 addi.n a8,a8,0x1
+400d815a s16i a8,a2,0x16
+400d815d memw
+400d8160 l32i.n a8,a1,0xc
+400d8162 memw
+400d8165 l32i.n a2,a3,0x0
+400d8167 bne a8,a2,0x400d816d
+400d816a j 0x400d8210
+400d816d call8 0x400edd34
+400d8170 l32r a4,0x400d0308
+400d8173 wfr f1,a4
+400d8176 oeq.s b0,f0,f1
+400d8179 bf b0,0x400d8184
+400d817c movi.n a12,0xc
+400d817e l32r a11,0x400d0544
+400d8181 j 0x400d814b
+400d8184 l32r a4,0x400d052c
+400d8187 wfr f1,a4
+400d818a oeq.s b0,f0,f1
+400d818d bf b0,0x400d8198
+400d8190 movi.n a12,0xc
+400d8192 l32r a11,0x400d0548
+400d8195 j 0x400d814b
+400d8198 l32r a4,0x400d054c
+400d819b wfr f1,a4
+400d819e oeq.s b0,f0,f1
+400d81a1 bf b0,0x400d81b4
+400d81a4 movi.n a10,0x0
+400d81a6 call8 0x400da840
+400d81a9 movi.n a12,0xc
+400d81ab l32r a11,0x400d0550
+400d81ae j 0x400d814b
+400d81b4 l32r a4,0x400d0554
+400d81b7 wfr f1,a4
+400d81ba oeq.s b0,f0,f1
+400d81bd bt b0,0x400d8190
+400d81c0 l32r a4,0x400d0558
+400d81c3 wfr f1,a4
+400d81c6 oeq.s b0,f0,f1
+400d81c9 bt b0,0x400d81a9
+400d81cc l32r a4,0x400d055c
+400d81cf wfr f1,a4
+400d81d2 oeq.s b0,f0,f1
+400d81d5 bt b0,0x400d8190
+400d81d8 l32r a4,0x400d0560
+400d81db wfr f1,a4
+400d81de oeq.s b0,f0,f1
+400d81e1 bt b0,0x400d81a9
+400d81e4 l32r a4,0x400d0564
+400d81e7 wfr f1,a4
+400d81ea oeq.s b0,f0,f1
+400d81ed bf b0,0x400d81f9
+400d81f0 call8 0x400d7cdc
+400d81f3 j 0x400d8155
+400d81f9 l32r a4,0x400d053c
+400d81fc wfr f1,a4
+400d81ff oeq.s b0,f0,f1
+400d8202 bt b0,0x400d8208
+400d8205 j 0x400d8155
+400d8208 movi.n a10,0x1
+400d820a call8 0x400d7d08
+400d820d j 0x400d8155
+400d8210 retw.n

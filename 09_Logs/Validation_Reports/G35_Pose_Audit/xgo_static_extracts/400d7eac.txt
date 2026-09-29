@@ -1,0 +1,49 @@
+400d7eac FUN_400d7eac
+
+void FUN_400d7eac(void)
+
+{
+  int iVar1;
+  float fVar2;
+  
+  iVar1 = DAT_400d0510;
+  fVar2 = (float)*(ushort *)(DAT_400d0510 + 8) / 1.0;
+  if (fVar2 == DAT_400d00d4) {
+    FUN_400d7d08(0);
+    FUN_400da840(0);
+    *DAT_400d0218 = DAT_400d0534;
+  }
+  else if (fVar2 == DAT_400d0174) {
+    FUN_400d7d08(1);
+  }
+  *(short *)(iVar1 + 8) = *(short *)(iVar1 + 8) + 1;
+  return;
+}
+
+
+400d7eac entry a1,0x20
+400d7eaf l32r a2,0x400d0510
+400d7eb2 l32r a3,0x400d00d4
+400d7eb5 l16ui a8,a2,0x8
+400d7eb8 wfr f1,a3
+400d7ebb float.s f0,a8,0x0
+400d7ebe oeq.s b0,f0,f1
+400d7ec1 bf b0,0x400d7ee4
+400d7ec4 movi a10,0x0
+400d7ec7 call8 0x400d7d08
+400d7eca movi a10,0x0
+400d7ecd call8 0x400da840
+400d7ed0 l32r a8,0x400d0218
+400d7ed3 l32r a9,0x400d0534
+400d7ed6 s32i.n a9,a8,0x0
+400d7ed8 l16ui a8,a2,0x8
+400d7edb addi.n a8,a8,0x1
+400d7edd s16i a8,a2,0x8
+400d7ee0 retw.n
+400d7ee4 l32r a3,0x400d0174
+400d7ee7 wfr f1,a3
+400d7eea oeq.s b0,f0,f1
+400d7eed bf b0,0x400d7ed8
+400d7ef0 movi.n a10,0x1
+400d7ef2 call8 0x400d7d08
+400d7ef5 j 0x400d7ed8

@@ -1,0 +1,34 @@
+400da840 FUN_400da840
+
+void FUN_400da840(undefined1 param_1)
+
+{
+  undefined2 uVar1;
+  undefined8 uVar2;
+  
+  uVar2 = (*DAT_400d00e4)(param_1);
+  uVar2 = (*DAT_400d00e8)((int)uVar2,(int)((ulonglong)uVar2 >> 0x20),DAT_400d00d4,DAT_400d00dc);
+  (*DAT_400d00ec)((int)uVar2,(int)((ulonglong)uVar2 >> 0x20),DAT_400d00d4,DAT_400d0268);
+  uVar1 = (*DAT_400d00f0)();
+  *(undefined2 *)(PTR_DAT_400d0264 + 0xc4) = uVar1;
+  return;
+}
+
+
+400da840 entry a1,0x20
+400da843 extui a10,a2,0x0,0x8
+400da846 l32r a8,0x400d00e4
+400da849 callx8 a8
+400da84c l32r a12,0x400d00d4
+400da84f l32r a13,0x400d00dc
+400da852 l32r a8,0x400d00e8
+400da855 callx8 a8
+400da858 l32r a12,0x400d00d4
+400da85b l32r a13,0x400d0268
+400da85e l32r a8,0x400d00ec
+400da861 callx8 a8
+400da864 l32r a8,0x400d00f0
+400da867 callx8 a8
+400da86a l32r a8,0x400d0264
+400da86d s16i a10,a8,0xc4
+400da870 retw.n

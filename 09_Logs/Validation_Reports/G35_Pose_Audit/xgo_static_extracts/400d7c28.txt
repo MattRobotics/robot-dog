@@ -1,0 +1,19 @@
+400d7c28 FUN_400d7c28
+
+void FUN_400d7c28(void)
+
+{
+  *DAT_400d0510 = 0;
+  return;
+}
+
+
+400d7c28 entry a1,0x20
+400d7c2b l32r a9,0x400d0510
+400d7c2e movi.n a10,0x0
+400d7c30 movi a8,0xff
+400d7c33 nop.n
+400d7c35 loop a8,0x400d7c3d
+400d7c38 s16i a10,a9,0x0
+400d7c3b addi.n a9,a9,0x2
+400d7c3d retw.n

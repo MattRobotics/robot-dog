@@ -1,0 +1,87 @@
+400d8a50 FUN_400d8a50
+
+void FUN_400d8a50(void)
+
+{
+  undefined *puVar1;
+  int iVar2;
+  float fVar3;
+  
+  iVar2 = DAT_400d0510;
+  fVar3 = (float)*(ushort *)(DAT_400d0510 + 0x28) / 1.0;
+  if (fVar3 == DAT_400d00d4) {
+    FUN_400d7d08(0);
+    FUN_400da840(0xa0);
+    PTR_DAT_400d0260[0x1a] = 1;
+    *DAT_400d0250 = 0;
+    puVar1 = PTR_DAT_400d0254;
+    *PTR_DAT_400d0254 = 0xb9;
+    puVar1[1] = 0x89;
+  }
+  else if (fVar3 == DAT_400d0308) {
+    FUN_400da840(0);
+    PTR_DAT_400d0214[0x12] = 0xb0;
+  }
+  else if (fVar3 == DAT_400d04b4) {
+    PTR_DAT_400d0214[0xd] = 0x70;
+  }
+  else if (fVar3 == DAT_400d05a8) {
+    FUN_400d7d08(1);
+  }
+  *(short *)(iVar2 + 0x28) = *(short *)(iVar2 + 0x28) + 1;
+  return;
+}
+
+
+400d8a50 entry a1,0x20
+400d8a53 l32r a2,0x400d0510
+400d8a56 l32r a3,0x400d00d4
+400d8a59 l16ui a8,a2,0x28
+400d8a5c wfr f1,a3
+400d8a5f float.s f0,a8,0x0
+400d8a62 oeq.s b0,f0,f1
+400d8a65 bf b0,0x400d8aa0
+400d8a68 movi a10,0x0
+400d8a6b call8 0x400d7d08
+400d8a6e movi a10,0xa0
+400d8a71 call8 0x400da840
+400d8a74 l32r a8,0x400d0260
+400d8a77 movi a9,0x1
+400d8a7a s8i a9,a8,0x1a
+400d8a7d l32r a8,0x400d0250
+400d8a80 movi.n a9,0x0
+400d8a82 s8i a9,a8,0x0
+400d8a85 l32r a8,0x400d0254
+400d8a88 movi a9,-0x47
+400d8a8b s8i a9,a8,0x0
+400d8a8e movi a9,-0x77
+400d8a91 s8i a9,a8,0x1
+400d8a94 l16ui a8,a2,0x28
+400d8a97 addi.n a8,a8,0x1
+400d8a99 s16i a8,a2,0x28
+400d8a9c retw.n
+400d8aa0 l32r a3,0x400d0308
+400d8aa3 wfr f1,a3
+400d8aa6 oeq.s b0,f0,f1
+400d8aa9 bf b0,0x400d8ac0
+400d8aac movi.n a10,0x0
+400d8aae call8 0x400da840
+400d8ab1 l32r a8,0x400d0214
+400d8ab4 movi a9,-0x50
+400d8ab7 s8i a9,a8,0x12
+400d8aba j 0x400d8a94
+400d8ac0 l32r a3,0x400d04b4
+400d8ac3 wfr f1,a3
+400d8ac6 oeq.s b0,f0,f1
+400d8ac9 bf b0,0x400d8ad8
+400d8acc l32r a8,0x400d0214
+400d8acf movi a9,0x70
+400d8ad2 s8i a9,a8,0xd
+400d8ad5 j 0x400d8a94
+400d8ad8 l32r a3,0x400d05a8
+400d8adb wfr f1,a3
+400d8ade oeq.s b0,f0,f1
+400d8ae1 bf b0,0x400d8a94
+400d8ae4 movi.n a10,0x1
+400d8ae6 call8 0x400d7d08
+400d8ae9 j 0x400d8a94

@@ -1,0 +1,4684 @@
+{
+  "consumer_trace": [
+    "12-byte copy proven by hardware loop at export 0x400d7d52",
+    "mode3 bounded affine conversion at 0x400daca4 into common 16-bit target slots",
+    "0x400db1f8 reads target+0x10+2*i and parameter+0xc4 in output call; inspected statically only"
+  ],
+  "interpolation_boundary": "For direct motor mode no Cartesian interpolation is proven. Helper 0x400da840 sets common output parameter +0xc4; naming it a recovered physical interpolation duration would overstate evidence. Body mode uses Cartesian pipeline including 0x400da40c before IK.",
+  "physical_unknowns": [
+    "metric/sign/zero binding of post-IK target slots",
+    "loaded per-slot physical range correspondence",
+    "achieved temporal interpolation",
+    "foot geometry and support contacts for firmware poses"
+  ],
+  "provenance": {
+    "catalogue_sha256": "2de8cd2b1e753188dc272fea6c20af513dab0a37f415b352520bd22abb837066",
+    "generator_sha256": "9627cb4f5a200321ad4eda3ddedb585cf3df9f0fddafca99de9b4630a18e1f9f",
+    "manual_static_sources": [
+      {
+        "canonical_address": "0x400d7d50",
+        "export_address": "400d7d48",
+        "sha256": "4812cf1c5cf78fba943b003fc2a7955d867b0914a19bedf18f6d7a1ac174b795",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7d48.txt"
+      },
+      {
+        "canonical_address": "0x400dacac",
+        "export_address": "400daca4",
+        "sha256": "97a9ab67489f95dc1145c2f7ca34ec2ec7b873f0b8b959f7f399473bf882a691",
+        "source": "/tmp/matdog-g35-ghidra-export/400daca4.txt"
+      },
+      {
+        "canonical_address": "0x400da848",
+        "export_address": "400da840",
+        "sha256": "8d780da07ed93b98b5bbc57c430bb22939304e049615abf7bf7ce4f4c3a61d2d",
+        "source": "/tmp/matdog-g35-ghidra-export/400da840.txt"
+      },
+      {
+        "canonical_address": "0x400db200",
+        "export_address": "400db1f8",
+        "sha256": "42824854e5346f9b8ae4059b96ad280f552bdcabe8c02cd1ee3ae7a330c2580c",
+        "source": "/tmp/matdog-g35-ghidra-export/400db1f8.txt"
+      },
+      {
+        "canonical_address": "0x400db364",
+        "export_address": "400db35c",
+        "sha256": "94719f81551ba0c542f5a3d20089cc3347e893aa71261d25e6aea54b5c3a64db",
+        "source": "/tmp/matdog-g35-ghidra-export/400db35c.txt"
+      },
+      {
+        "canonical_address": "0x400d9204",
+        "export_address": "400d91fc",
+        "sha256": "c48ad4f1c81efb0a3f880128a1551c0487b97619729500bb280f4a206439216e",
+        "source": "/tmp/matdog-g35-ghidra-export/400d91fc.txt"
+      },
+      {
+        "canonical_address": "0x400d7ce4",
+        "export_address": "400d7cdc",
+        "sha256": "61fda2c35378287077b7836a435b3ff6baa1271c7d66056863f306e35bf1bd48",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7cdc.txt"
+      },
+      {
+        "canonical_address": "0x400d7c48",
+        "export_address": "400d7c40",
+        "sha256": "fcfedc24564e69de40915e0b365edbd0d7cf3133b38db73b7bb4cfe649a14fd0",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7c40.txt"
+      },
+      {
+        "canonical_address": "0x400d7c30",
+        "export_address": "400d7c28",
+        "sha256": "a9677cf4e3060f42cb617cefd066675df2e8a5957bc423eba25ee190b816cb76",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7c28.txt"
+      },
+      {
+        "canonical_address": "0x400d7db0",
+        "export_address": "400d7da8",
+        "sha256": "917de9376722a531d2f9f4de98eb3d84bfe9ce09d059968d211642e1bee6d9d3",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7da8.txt"
+      },
+      {
+        "canonical_address": "0x400d7dfc",
+        "export_address": "400d7df4",
+        "sha256": "b040a331cfaf9a28a5cee9e4a7a19c8c37cdda24face8ab35b3fac98e0129917",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7df4.txt"
+      },
+      {
+        "canonical_address": "0x400d7e48",
+        "export_address": "400d7e40",
+        "sha256": "d01c385faf793e3be66dc5ccab7c2c549f53f208e0bb0d01073c9581ca88a4fc",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7e40.txt"
+      },
+      {
+        "canonical_address": "0x400d7eb4",
+        "export_address": "400d7eac",
+        "sha256": "0e8498e71065079c3bb5c559a8cbf0e385b101f155674f41341c7f5ec4f558c1",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7eac.txt"
+      },
+      {
+        "canonical_address": "0x400d7f00",
+        "export_address": "400d7ef8",
+        "sha256": "4357f688796d4b8193ed1d4e1de932274e6c68e2787f9141a33e963b2ba40cc2",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7ef8.txt"
+      },
+      {
+        "canonical_address": "0x400d7f0c",
+        "export_address": "400d7f04",
+        "sha256": "e058c570f0bbe35e89d41f99141f035d46b6b519ba66689e8ab334d9c4ea5e09",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7f04.txt"
+      },
+      {
+        "canonical_address": "0x400d7fa8",
+        "export_address": "400d7fa0",
+        "sha256": "51570392b2662c99557342419ff2a7089eb72fb43f59da6469eb2421565b7f20",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7fa0.txt"
+      },
+      {
+        "canonical_address": "0x400d7ff4",
+        "export_address": "400d7fec",
+        "sha256": "44793ffbced2c3a8ede4839e38a27303afa23b982b251010f614dfbfcf2e82c5",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7fec.txt"
+      },
+      {
+        "canonical_address": "0x400d8040",
+        "export_address": "400d8038",
+        "sha256": "4256906e5883609c73dee8a2daac6d38619a8f4845c3dd90ad0f0b757f57f64e",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8038.txt"
+      },
+      {
+        "canonical_address": "0x400d808c",
+        "export_address": "400d8084",
+        "sha256": "4f3653c069dc40bfe945c206131d9ce24a31766c1e6735511047f52f2be161a8",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8084.txt"
+      },
+      {
+        "canonical_address": "0x400d8114",
+        "export_address": "400d810c",
+        "sha256": "98f41b0546ce8005c3535509790527b0c3a032c7afd6ab5b5d6865a5daf895c7",
+        "source": "/tmp/matdog-g35-ghidra-export/400d810c.txt"
+      },
+      {
+        "canonical_address": "0x400d821c",
+        "export_address": "400d8214",
+        "sha256": "45504f477a76397eff5593703945a98002281df72a5ac4424bb2f7157ba2debf",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8214.txt"
+      },
+      {
+        "canonical_address": "0x400d82a8",
+        "export_address": "400d82a0",
+        "sha256": "ae588f61d869d30d8eb1a28781af195c2af00302b086ad8c14f440e58da7029e",
+        "source": "/tmp/matdog-g35-ghidra-export/400d82a0.txt"
+      },
+      {
+        "canonical_address": "0x400d83b8",
+        "export_address": "400d83b0",
+        "sha256": "7e67dc9ae33eb7d182d4b8ac77f05ee244bb151d6cc7c776764361765a17f61a",
+        "source": "/tmp/matdog-g35-ghidra-export/400d83b0.txt"
+      },
+      {
+        "canonical_address": "0x400d8468",
+        "export_address": "400d8460",
+        "sha256": "94704c1966ec6012c4a2b161c5b0f38d64b588909a8be2e549336b47304bd671",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8460.txt"
+      },
+      {
+        "canonical_address": "0x400d8568",
+        "export_address": "400d8560",
+        "sha256": "e25e81fcd1995607c6389c9942672ee5802b709c6776c47929da8957ec5698ec",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8560.txt"
+      },
+      {
+        "canonical_address": "0x400d8664",
+        "export_address": "400d865c",
+        "sha256": "4c54791edc6f5f876d8864d50f76107c21565e58927aeb54a5ff81338f52fdb0",
+        "source": "/tmp/matdog-g35-ghidra-export/400d865c.txt"
+      },
+      {
+        "canonical_address": "0x400d871c",
+        "export_address": "400d8714",
+        "sha256": "1788610e26e48398add04ac42eaa57b2da02b723c1154ff7f07c770c1a89c76c",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8714.txt"
+      },
+      {
+        "canonical_address": "0x400d8938",
+        "export_address": "400d8930",
+        "sha256": "dbd354359a36c148dd3ad7e7823e07ab111323ef12a38faac0bd21c9eb44ae77",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8930.txt"
+      },
+      {
+        "canonical_address": "0x400d8a58",
+        "export_address": "400d8a50",
+        "sha256": "69a2e7b04b3cc1b5aa10ca4c6b1f6eb32d67565c5b39e81c60c91474f50576cc",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8a50.txt"
+      },
+      {
+        "canonical_address": "0x400d8bfc",
+        "export_address": "400d8bf4",
+        "sha256": "c02f7f4ccb88b04ddba47f5230c0b3b9fded5803df68dca7b62fff20f71fa361",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8bf4.txt"
+      },
+      {
+        "canonical_address": "0x400d8af4",
+        "export_address": "400d8aec",
+        "sha256": "35d9071ea2512b4997438543e1db900d45eb4da3465c886a73667ca43e516630",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8aec.txt"
+      },
+      {
+        "canonical_address": "0x400d8b5c",
+        "export_address": "400d8b54",
+        "sha256": "f488b11e528d8f14788ef76ec3705cbdc33cc6e6cc4338fb77e23820fd431b89",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8b54.txt"
+      },
+      {
+        "canonical_address": "0x400d8bac",
+        "export_address": "400d8ba4",
+        "sha256": "538cc58066546e67eca01e8b4fea5a6f1f1a00e9705a8a69721df209c08fa65e",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8ba4.txt"
+      },
+      {
+        "canonical_address": "0x400d8ce4",
+        "export_address": "400d8cdc",
+        "sha256": "0ab9421eeb2c46f41f720d158237df6ceb9d3cef9420c7901e165177b6772137",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8cdc.txt"
+      },
+      {
+        "canonical_address": "0x400d8db4",
+        "export_address": "400d8dac",
+        "sha256": "e09002b997a567a71617eb40f4a29a13ba26f740c40ea8c5cf0c3f153686dde2",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8dac.txt"
+      },
+      {
+        "canonical_address": "0x400d8e88",
+        "export_address": "400d8e80",
+        "sha256": "ade4bc75e728bef90341e6ca618a5f9e9d64ce5e88319bee887938842ce7965b",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8e80.txt"
+      },
+      {
+        "canonical_address": "0x400d8f5c",
+        "export_address": "400d8f54",
+        "sha256": "64b811f0a8b002ecd631fc08f4fcdaa345fa245257b8f2ed13cdb912e0e0fd7a",
+        "source": "/tmp/matdog-g35-ghidra-export/400d8f54.txt"
+      },
+      {
+        "canonical_address": "0x400d7d10",
+        "export_address": "400d7d08",
+        "sha256": "25b608958f5ef49599d3d23a96c3b708b99e31b02607d94c69a25c94832cf318",
+        "source": "/tmp/matdog-g35-ghidra-export/400d7d08.txt"
+      }
+    ],
+    "slot_evidence_sha256": "6bfcf0b3aadaa6179696fa1b50c6703be19b541631b5c05646a59eca64f0ed8a"
+  },
+  "selected_schedules": {
+    "12": [
+      {
+        "counter": 0,
+        "table": "0x3f40029c"
+      },
+      {
+        "common_recovery": true,
+        "counter": 60
+      },
+      {
+        "complete": true,
+        "counter": 70
+      }
+    ],
+    "14": [
+      {
+        "counter": 0,
+        "table": "0x3f4002e4"
+      },
+      {
+        "counter": 80,
+        "table": "0x3f4002f0"
+      },
+      {
+        "counter": 90,
+        "table": "0x3f4002fc"
+      },
+      {
+        "common_recovery": true,
+        "counter": 160
+      },
+      {
+        "complete": true,
+        "counter": 170
+      }
+    ],
+    "21": [
+      {
+        "counter": 0,
+        "table": "0x3f400380"
+      },
+      {
+        "counter": 40,
+        "table": "0x3f40038c"
+      },
+      {
+        "counter": 56,
+        "table": "0x3f400380"
+      },
+      {
+        "counter": 72,
+        "table": "0x3f40038c"
+      },
+      {
+        "counter": 88,
+        "table": "0x3f400380"
+      },
+      {
+        "counter": 104,
+        "table": "0x3f40038c"
+      },
+      {
+        "counter": 120,
+        "table": "0x3f400380"
+      },
+      {
+        "common_recovery": true,
+        "counter": 130
+      },
+      {
+        "complete": true,
+        "counter": 140
+      }
+    ]
+  },
+  "tables": [
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 11,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        250,
+        150,
+        10,
+        250,
+        150,
+        10,
+        250,
+        150,
+        100,
+        255,
+        128,
+        100
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0540",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.9803921568627451,
+        0.5882352941176471,
+        0.0392156862745098,
+        0.9803921568627451,
+        0.5882352941176471,
+        0.0392156862745098,
+        0.9803921568627451,
+        0.5882352941176471,
+        0.39215686274509803,
+        1.0,
+        0.5019607843137255,
+        0.39215686274509803
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f40026c",
+      "table_index_in_address_order": 0,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 11,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        255,
+        128,
+        100,
+        255,
+        128,
+        100,
+        255,
+        128,
+        100,
+        255,
+        110,
+        140
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0544",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        1.0,
+        0.5019607843137255,
+        0.39215686274509803,
+        1.0,
+        0.5019607843137255,
+        0.39215686274509803,
+        1.0,
+        0.5019607843137255,
+        0.39215686274509803,
+        1.0,
+        0.43137254901960786,
+        0.5490196078431373
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400278",
+      "table_index_in_address_order": 1,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 11,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        220,
+        146,
+        140,
+        220,
+        146,
+        100,
+        255,
+        110,
+        100,
+        255,
+        110,
+        140
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0548",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.8627450980392157,
+        0.5725490196078431,
+        0.5490196078431373,
+        0.8627450980392157,
+        0.5725490196078431,
+        0.39215686274509803,
+        1.0,
+        0.43137254901960786,
+        0.39215686274509803,
+        1.0,
+        0.43137254901960786,
+        0.5490196078431373
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400284",
+      "table_index_in_address_order": 2,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 11,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        220,
+        146,
+        150,
+        220,
+        255,
+        100,
+        255,
+        110,
+        100,
+        255,
+        110,
+        140
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0550",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.8627450980392157,
+        0.5725490196078431,
+        0.5882352941176471,
+        0.8627450980392157,
+        1.0,
+        0.39215686274509803,
+        1.0,
+        0.43137254901960786,
+        0.39215686274509803,
+        1.0,
+        0.43137254901960786,
+        0.5490196078431373
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400290",
+      "table_index_in_address_order": 3,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 12,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        220,
+        146,
+        120,
+        220,
+        255,
+        100,
+        255,
+        110,
+        245,
+        170,
+        128,
+        245
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0568",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.8627450980392157,
+        0.5725490196078431,
+        0.47058823529411764,
+        0.8627450980392157,
+        1.0,
+        0.39215686274509803,
+        1.0,
+        0.43137254901960786,
+        0.9607843137254902,
+        0.6666666666666666,
+        0.5019607843137255,
+        0.9607843137254902
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f40029c",
+      "table_index_in_address_order": 0,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 13,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        170,
+        128,
+        80,
+        225,
+        128,
+        80,
+        225,
+        128,
+        160,
+        170,
+        128,
+        160
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d056c",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6666666666666666,
+        0.5019607843137255,
+        0.3137254901960784,
+        0.8823529411764706,
+        0.5019607843137255,
+        0.3137254901960784,
+        0.8823529411764706,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.6666666666666666,
+        0.5019607843137255,
+        0.6274509803921569
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4002a8",
+      "table_index_in_address_order": 0,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 13,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        170,
+        25,
+        150,
+        165,
+        128,
+        150,
+        165,
+        128,
+        90,
+        50,
+        128,
+        160
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0574",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6666666666666666,
+        0.09803921568627451,
+        0.5882352941176471,
+        0.6470588235294118,
+        0.5019607843137255,
+        0.5882352941176471,
+        0.6470588235294118,
+        0.5019607843137255,
+        0.35294117647058826,
+        0.19607843137254902,
+        0.5019607843137255,
+        0.6274509803921569
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4002b4",
+      "table_index_in_address_order": 1,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 13,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        170,
+        25,
+        150,
+        165,
+        128,
+        150,
+        165,
+        128,
+        90,
+        50,
+        80,
+        160
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d057c",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6666666666666666,
+        0.09803921568627451,
+        0.5882352941176471,
+        0.6470588235294118,
+        0.5019607843137255,
+        0.5882352941176471,
+        0.6470588235294118,
+        0.5019607843137255,
+        0.35294117647058826,
+        0.19607843137254902,
+        0.3137254901960784,
+        0.6274509803921569
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4002c0",
+      "table_index_in_address_order": 2,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 13,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        170,
+        25,
+        150,
+        165,
+        128,
+        150,
+        165,
+        128,
+        90,
+        50,
+        200,
+        160
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0584",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6666666666666666,
+        0.09803921568627451,
+        0.5882352941176471,
+        0.6470588235294118,
+        0.5019607843137255,
+        0.5882352941176471,
+        0.6470588235294118,
+        0.5019607843137255,
+        0.35294117647058826,
+        0.19607843137254902,
+        0.7843137254901961,
+        0.6274509803921569
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4002cc",
+      "table_index_in_address_order": 3,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 13,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        170,
+        25,
+        150,
+        165,
+        128,
+        150,
+        165,
+        128,
+        148,
+        180,
+        128,
+        160
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0594",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6666666666666666,
+        0.09803921568627451,
+        0.5882352941176471,
+        0.6470588235294118,
+        0.5019607843137255,
+        0.5882352941176471,
+        0.6470588235294118,
+        0.5019607843137255,
+        0.5803921568627451,
+        0.7058823529411765,
+        0.5019607843137255,
+        0.6274509803921569
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4002d8",
+      "table_index_in_address_order": 4,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 14,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        170,
+        25,
+        150,
+        165,
+        128,
+        150,
+        165,
+        128,
+        255,
+        30,
+        128,
+        255
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d059c",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6666666666666666,
+        0.09803921568627451,
+        0.5882352941176471,
+        0.6470588235294118,
+        0.5019607843137255,
+        0.5882352941176471,
+        0.6470588235294118,
+        0.5019607843137255,
+        1.0,
+        0.11764705882352941,
+        0.5019607843137255,
+        1.0
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4002e4",
+      "table_index_in_address_order": 0,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 14,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        30,
+        128,
+        160,
+        190,
+        128,
+        160,
+        190,
+        128,
+        225,
+        160,
+        128,
+        225
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d05a0",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.11764705882352941,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.7450980392156863,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.7450980392156863,
+        0.5019607843137255,
+        0.8823529411764706,
+        0.6274509803921569,
+        0.5019607843137255,
+        0.8823529411764706
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4002f0",
+      "table_index_in_address_order": 1,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 14,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        160,
+        128,
+        160,
+        190,
+        128,
+        160,
+        190,
+        128,
+        235,
+        180,
+        128,
+        235
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d05a4",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6274509803921569,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.7450980392156863,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.7450980392156863,
+        0.5019607843137255,
+        0.9215686274509803,
+        0.7058823529411765,
+        0.5019607843137255,
+        0.9215686274509803
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4002fc",
+      "table_index_in_address_order": 2,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 19,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        220,
+        146,
+        120,
+        220,
+        255,
+        100,
+        255,
+        110,
+        245,
+        170,
+        128,
+        245
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0568",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.8627450980392157,
+        0.5725490196078431,
+        0.47058823529411764,
+        0.8627450980392157,
+        1.0,
+        0.39215686274509803,
+        1.0,
+        0.43137254901960786,
+        0.9607843137254902,
+        0.6666666666666666,
+        0.5019607843137255,
+        0.9607843137254902
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f40029c",
+      "table_index_in_address_order": 0,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 19,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        180,
+        128,
+        255,
+        240,
+        128,
+        255,
+        240,
+        128,
+        245,
+        130,
+        128,
+        245
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d05dc",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.7058823529411765,
+        0.5019607843137255,
+        1.0,
+        0.9411764705882353,
+        0.5019607843137255,
+        1.0,
+        0.9411764705882353,
+        0.5019607843137255,
+        0.9607843137254902,
+        0.5098039215686274,
+        0.5019607843137255,
+        0.9607843137254902
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400308",
+      "table_index_in_address_order": 1,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 19,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        170,
+        60,
+        80,
+        225,
+        128,
+        80,
+        225,
+        128,
+        130,
+        130,
+        128,
+        245
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d05e4",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6666666666666666,
+        0.23529411764705882,
+        0.3137254901960784,
+        0.8823529411764706,
+        0.5019607843137255,
+        0.3137254901960784,
+        0.8823529411764706,
+        0.5019607843137255,
+        0.5098039215686274,
+        0.5098039215686274,
+        0.5019607843137255,
+        0.9607843137254902
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400314",
+      "table_index_in_address_order": 2,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 19,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        170,
+        60,
+        80,
+        225,
+        128,
+        80,
+        225,
+        128,
+        160,
+        130,
+        128,
+        245
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d05e8",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6666666666666666,
+        0.23529411764705882,
+        0.3137254901960784,
+        0.8823529411764706,
+        0.5019607843137255,
+        0.3137254901960784,
+        0.8823529411764706,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.5098039215686274,
+        0.5019607843137255,
+        0.9607843137254902
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400320",
+      "table_index_in_address_order": 3,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 21,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        255,
+        128,
+        60,
+        160,
+        128,
+        60,
+        160,
+        128,
+        235,
+        160,
+        128,
+        235
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d05ec",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        1.0,
+        0.5019607843137255,
+        0.23529411764705882,
+        0.6274509803921569,
+        0.5019607843137255,
+        0.23529411764705882,
+        0.6274509803921569,
+        0.5019607843137255,
+        0.9215686274509803,
+        0.6274509803921569,
+        0.5019607843137255,
+        0.9215686274509803
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400380",
+      "table_index_in_address_order": 0,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 21,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        160,
+        128,
+        255,
+        240,
+        128,
+        255,
+        240,
+        128,
+        35,
+        250,
+        128,
+        35
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d05f0",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6274509803921569,
+        0.5019607843137255,
+        1.0,
+        0.9411764705882353,
+        0.5019607843137255,
+        1.0,
+        0.9411764705882353,
+        0.5019607843137255,
+        0.13725490196078433,
+        0.9803921568627451,
+        0.5019607843137255,
+        0.13725490196078433
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f40038c",
+      "table_index_in_address_order": 1,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        250,
+        128,
+        255,
+        240,
+        128,
+        255,
+        240,
+        128,
+        160,
+        175,
+        128,
+        160
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0600",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.9803921568627451,
+        0.5019607843137255,
+        1.0,
+        0.9411764705882353,
+        0.5019607843137255,
+        1.0,
+        0.9411764705882353,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.6862745098039216,
+        0.5019607843137255,
+        0.6274509803921569
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400398",
+      "table_index_in_address_order": 0,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        175,
+        128,
+        160,
+        135,
+        128,
+        160,
+        135,
+        128,
+        160,
+        210,
+        128,
+        160
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0604",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6862745098039216,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.8235294117647058,
+        0.5019607843137255,
+        0.6274509803921569
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4003a4",
+      "table_index_in_address_order": 1,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        190,
+        40,
+        160,
+        135,
+        128,
+        160,
+        135,
+        128,
+        20,
+        210,
+        128,
+        160
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0608",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.7450980392156863,
+        0.1568627450980392,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.0784313725490196,
+        0.8235294117647058,
+        0.5019607843137255,
+        0.6274509803921569
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4003b0",
+      "table_index_in_address_order": 2,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        190,
+        40,
+        160,
+        135,
+        128,
+        160,
+        135,
+        128,
+        148,
+        111,
+        128,
+        160
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d060c",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.7450980392156863,
+        0.1568627450980392,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.5803921568627451,
+        0.43529411764705883,
+        0.5019607843137255,
+        0.6274509803921569
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4003bc",
+      "table_index_in_address_order": 3,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        190,
+        40,
+        160,
+        135,
+        128,
+        160,
+        135,
+        128,
+        148,
+        111,
+        128,
+        21
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0610",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.7450980392156863,
+        0.1568627450980392,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.5803921568627451,
+        0.43529411764705883,
+        0.5019607843137255,
+        0.08235294117647059
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4003c8",
+      "table_index_in_address_order": 4,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        239,
+        127,
+        160,
+        135,
+        128,
+        160,
+        135,
+        128,
+        148,
+        111,
+        128,
+        21
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0614",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.9372549019607843,
+        0.4980392156862745,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.5803921568627451,
+        0.43529411764705883,
+        0.5019607843137255,
+        0.08235294117647059
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4003d4",
+      "table_index_in_address_order": 5,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        111,
+        127,
+        160,
+        135,
+        128,
+        160,
+        135,
+        128,
+        170,
+        111,
+        128,
+        170
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0618",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.43529411764705883,
+        0.4980392156862745,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.6666666666666666,
+        0.43529411764705883,
+        0.5019607843137255,
+        0.6666666666666666
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4003e0",
+      "table_index_in_address_order": 6,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        111,
+        127,
+        160,
+        135,
+        128,
+        160,
+        135,
+        128,
+        75,
+        175,
+        128,
+        75
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0620",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.43529411764705883,
+        0.4980392156862745,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.6274509803921569,
+        0.5294117647058824,
+        0.5019607843137255,
+        0.29411764705882354,
+        0.6862745098039216,
+        0.5019607843137255,
+        0.29411764705882354
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4003ec",
+      "table_index_in_address_order": 7,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        175,
+        128,
+        155,
+        180,
+        128,
+        155,
+        180,
+        128,
+        75,
+        175,
+        128,
+        75
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0628",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6862745098039216,
+        0.5019607843137255,
+        0.6078431372549019,
+        0.7058823529411765,
+        0.5019607843137255,
+        0.6078431372549019,
+        0.7058823529411765,
+        0.5019607843137255,
+        0.29411764705882354,
+        0.6862745098039216,
+        0.5019607843137255,
+        0.29411764705882354
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f4003f8",
+      "table_index_in_address_order": 8,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        175,
+        128,
+        20,
+        240,
+        128,
+        155,
+        180,
+        128,
+        75,
+        175,
+        128,
+        75
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0630",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6862745098039216,
+        0.5019607843137255,
+        0.0784313725490196,
+        0.9411764705882353,
+        0.5019607843137255,
+        0.6078431372549019,
+        0.7058823529411765,
+        0.5019607843137255,
+        0.29411764705882354,
+        0.6862745098039216,
+        0.5019607843137255,
+        0.29411764705882354
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400404",
+      "table_index_in_address_order": 9,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        175,
+        128,
+        20,
+        127,
+        128,
+        155,
+        180,
+        128,
+        75,
+        175,
+        128,
+        75
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0638",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6862745098039216,
+        0.5019607843137255,
+        0.0784313725490196,
+        0.4980392156862745,
+        0.5019607843137255,
+        0.6078431372549019,
+        0.7058823529411765,
+        0.5019607843137255,
+        0.29411764705882354,
+        0.6862745098039216,
+        0.5019607843137255,
+        0.29411764705882354
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400410",
+      "table_index_in_address_order": 10,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        175,
+        128,
+        127,
+        127,
+        128,
+        155,
+        180,
+        128,
+        75,
+        175,
+        128,
+        75
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0640",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6862745098039216,
+        0.5019607843137255,
+        0.4980392156862745,
+        0.4980392156862745,
+        0.5019607843137255,
+        0.6078431372549019,
+        0.7058823529411765,
+        0.5019607843137255,
+        0.29411764705882354,
+        0.6862745098039216,
+        0.5019607843137255,
+        0.29411764705882354
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f40041c",
+      "table_index_in_address_order": 11,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        175,
+        128,
+        127,
+        127,
+        128,
+        21,
+        239,
+        128,
+        75,
+        175,
+        128,
+        75
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0648",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6862745098039216,
+        0.5019607843137255,
+        0.4980392156862745,
+        0.4980392156862745,
+        0.5019607843137255,
+        0.08235294117647059,
+        0.9372549019607843,
+        0.5019607843137255,
+        0.29411764705882354,
+        0.6862745098039216,
+        0.5019607843137255,
+        0.29411764705882354
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400428",
+      "table_index_in_address_order": 12,
+      "unit": "dimensionless bounded controller code, 0..255"
+    },
+    {
+      "absolute_or_relative": "absolute endpoint in per-slot normalized target range",
+      "action_id": 144,
+      "consumer_canonical": "0x400dacac",
+      "consumer_export": "0x400daca4 mode3 -> target base+0x10+2*i",
+      "controller_slots_u8": [
+        175,
+        128,
+        127,
+        127,
+        128,
+        21,
+        127,
+        128,
+        50,
+        210,
+        128,
+        50
+      ],
+      "data_type": "uint8[12]",
+      "frame": "controller slot coordinates, no Cartesian frame",
+      "keyframe_semantics": "ordered action endpoint/control state; address order does not itself establish temporal order",
+      "literal": "0x400d0650",
+      "logical_order": [
+        {
+          "index": 0,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 1,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 2,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 0,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LF"
+        },
+        {
+          "index": 3,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 4,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 5,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 1,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RF"
+        },
+        {
+          "index": 6,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 7,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 8,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 2,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "RH"
+        },
+        {
+          "index": 9,
+          "joint_documentary": "lower",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 10,
+          "joint_documentary": "upper",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        },
+        {
+          "index": 11,
+          "joint_documentary": "hip",
+          "logical_leg_slot": 3,
+          "physical_binding_confidence": "CORROBORATED, sign/zero/unit UNKNOWN",
+          "physical_leg_documentary": "LH"
+        }
+      ],
+      "meaning": "12 normalized motor-domain command slots; physical leg/frame/zero binding remains unproved",
+      "normalized_slots": [
+        0.6862745098039216,
+        0.5019607843137255,
+        0.4980392156862745,
+        0.4980392156862745,
+        0.5019607843137255,
+        0.08235294117647059,
+        0.4980392156862745,
+        0.5019607843137255,
+        0.19607843137254902,
+        0.8235294117647058,
+        0.5019607843137255,
+        0.19607843137254902
+      ],
+      "physical_recovery": "PARTIAL_GEOMETRY; exact controller keyframe bytes recovered, physical joint sequence not recovered",
+      "pre_or_post_IK": "mode 3 bypasses Cartesian IK, writes same downstream target slot domain",
+      "scale": "bounded affine map from [0,255] into stored slot endpoints; not URDF radians",
+      "sign": "physical direction/zero UNKNOWN; positive code traverses stored endpoint order",
+      "table_address": "0x3f400434",
+      "table_index_in_address_order": 13,
+      "unit": "dimensionless bounded controller code, 0..255"
+    }
+  ],
+  "timing": "counters are action-task invocations; 26 main-loop iterations with requested delay 2 do not prove wall-clock seconds"
+}

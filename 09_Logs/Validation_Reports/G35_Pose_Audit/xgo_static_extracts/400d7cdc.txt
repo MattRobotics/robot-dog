@@ -1,0 +1,34 @@
+400d7cdc FUN_400d7cdc
+
+void FUN_400d7cdc(void)
+
+{
+  undefined *puVar1;
+  
+  FUN_400da840(0x32);
+  puVar1 = PTR_DAT_400d0214;
+  *PTR_DAT_400d0214 = 0x5a;
+  puVar1[1] = 0x80;
+  puVar1[2] = 100;
+  puVar1[7] = 0x40;
+  *PTR_DAT_400d0130 = 1;
+  return;
+}
+
+
+400d7cdc entry a1,0x20
+400d7cdf movi.n a10,0x32
+400d7ce1 call8 0x400da840
+400d7ce4 l32r a8,0x400d0214
+400d7ce7 movi.n a9,0x5a
+400d7ce9 s8i a9,a8,0x0
+400d7cec movi a9,-0x80
+400d7cef s8i a9,a8,0x1
+400d7cf2 movi a9,0x64
+400d7cf5 s8i a9,a8,0x2
+400d7cf8 movi.n a9,0x40
+400d7cfa s8i a9,a8,0x7
+400d7cfd l32r a8,0x400d0130
+400d7d00 movi.n a9,0x1
+400d7d02 s8i a9,a8,0x0
+400d7d05 retw.n

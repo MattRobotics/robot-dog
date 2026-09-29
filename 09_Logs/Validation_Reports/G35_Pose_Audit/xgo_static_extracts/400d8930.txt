@@ -1,0 +1,163 @@
+400d8930 FUN_400d8930
+
+void FUN_400d8930(void)
+
+{
+  int *piVar1;
+  int iVar2;
+  uint uVar3;
+  undefined *puVar4;
+  float fVar5;
+  undefined1 auStack_30 [12];
+  int iStack_24;
+  
+  iVar2 = DAT_400d0510;
+  piVar1 = DAT_400d0034;
+  memw();
+  iStack_24 = *DAT_400d0034;
+  memw();
+  fVar5 = (float)*(ushort *)(DAT_400d0510 + 0x26) / 1.0;
+  if (fVar5 != DAT_400d00d4) goto LAB_400d8993;
+  FUN_400d7d08(0);
+  FUN_400da840(0x32);
+  FUN_40090a8c(auStack_30,PTR_DAT_400d0568,0xc);
+  FUN_400d7d48(auStack_30);
+  *PTR_DAT_400d0130 = 3;
+LAB_400d8978:
+  do {
+    while( true ) {
+      *(short *)(iVar2 + 0x26) = *(short *)(iVar2 + 0x26) + 1;
+      memw();
+      memw();
+      iVar2 = *piVar1;
+      if (iStack_24 == iVar2) {
+        return;
+      }
+      FUN_400edd34();
+LAB_400d8993:
+      if (fVar5 != DAT_400d0168) break;
+      FUN_400da840(0x3c);
+      puVar4 = PTR_DAT_400d05dc;
+LAB_400d89a9:
+      FUN_40090a8c(auStack_30,puVar4,0xc);
+      FUN_400d7d48(auStack_30);
+    }
+    if (((DAT_400d033c <= fVar5) && (fVar5 <= DAT_400d0560)) ||
+       ((DAT_400d053c <= fVar5 && (fVar5 <= DAT_400d05a8)))) {
+      FUN_400da840(0x3c);
+      uVar3 = (uint)*(ushort *)(iVar2 + 0x26) +
+              (uint)((ulonglong)(uint)*(ushort *)(iVar2 + 0x26) * (ulonglong)DAT_400d05e0 >> 0x23) *
+              -10 & 0xffff;
+      puVar4 = PTR_DAT_400d05e4;
+      if ((uVar3 == 0) || (puVar4 = PTR_DAT_400d05e8, uVar3 == 5)) goto LAB_400d89a9;
+      goto LAB_400d8978;
+    }
+    if (fVar5 == DAT_400d05ac) {
+      FUN_400d7cdc();
+    }
+    else if (fVar5 == DAT_400d04c0) {
+      FUN_400d7d08(1);
+    }
+  } while( true );
+}
+
+
+400d8930 entry a1,0x30
+400d8933 l32r a3,0x400d0034
+400d8936 l32r a4,0x400d00d4
+400d8939 memw
+400d893c l32i a2,a3,0x0
+400d893f wfr f1,a4
+400d8942 memw
+400d8945 s32i a2,a1,0xc
+400d8948 l32r a2,0x400d0510
+400d894b l16ui a8,a2,0x26
+400d894e float.s f0,a8,0x0
+400d8951 oeq.s b0,f0,f1
+400d8954 bf b0,0x400d8993
+400d8957 movi.n a10,0x0
+400d8959 call8 0x400d7d08
+400d895c movi.n a10,0x32
+400d895e call8 0x400da840
+400d8961 l32r a11,0x400d0568
+400d8964 movi.n a12,0xc
+400d8966 mov.n a10,a1
+400d8968 call8 0x40090a8c
+400d896b mov.n a10,a1
+400d896d call8 0x400d7d48
+400d8970 l32r a8,0x400d0130
+400d8973 movi.n a9,0x3
+400d8975 s8i a9,a8,0x0
+400d8978 l16ui a8,a2,0x26
+400d897b addi.n a8,a8,0x1
+400d897d s16i a8,a2,0x26
+400d8980 memw
+400d8983 l32i.n a8,a1,0xc
+400d8985 memw
+400d8988 l32i.n a2,a3,0x0
+400d898a bne a8,a2,0x400d8990
+400d898d j 0x400d8a4c
+400d8990 call8 0x400edd34
+400d8993 l32r a4,0x400d0168
+400d8996 wfr f1,a4
+400d8999 oeq.s b0,f0,f1
+400d899c bf b0,0x400d89b8
+400d899f movi.n a10,0x3c
+400d89a1 call8 0x400da840
+400d89a4 l32r a11,0x400d05dc
+400d89a7 movi.n a12,0xc
+400d89a9 mov a10,a1
+400d89ac call8 0x40090a8c
+400d89af mov a10,a1
+400d89b2 call8 0x400d7d48
+400d89b5 j 0x400d8978
+400d89b8 l32r a4,0x400d033c
+400d89bb wfr f1,a4
+400d89be ole.s b0,f1,f0
+400d89c1 bf b0,0x400d89d0
+400d89c4 l32r a4,0x400d0560
+400d89c7 wfr f1,a4
+400d89ca ole.s b0,f0,f1
+400d89cd bt b0,0x400d89e8
+400d89d0 l32r a4,0x400d053c
+400d89d3 wfr f1,a4
+400d89d6 ole.s b0,f1,f0
+400d89d9 bf b0,0x400d8a20
+400d89dc l32r a4,0x400d05a8
+400d89df wfr f1,a4
+400d89e2 ole.s b0,f0,f1
+400d89e5 bf b0,0x400d8a20
+400d89e8 movi a10,0x3c
+400d89eb call8 0x400da840
+400d89ee l16ui a8,a2,0x26
+400d89f1 l32r a9,0x400d05e0
+400d89f4 movi a12,0xc
+400d89f7 muluh a9,a8,a9
+400d89fa l32r a11,0x400d05e4
+400d89fd srli a9,a9,0x3
+400d8a00 slli a10,a9,0x2
+400d8a03 add a9,a10,a9
+400d8a06 slli a9,a9,0x1
+400d8a09 sub a8,a8,a9
+400d8a0c extui a8,a8,0x0,0x10
+400d8a0f beqz a8,0x400d89a9
+400d8a12 beqi a8,0x5,0x400d8a18
+400d8a15 j 0x400d8978
+400d8a18 movi.n a12,0xc
+400d8a1a l32r a11,0x400d05e8
+400d8a1d j 0x400d89a9
+400d8a20 l32r a4,0x400d05ac
+400d8a23 wfr f1,a4
+400d8a26 oeq.s b0,f0,f1
+400d8a29 bf b0,0x400d8a35
+400d8a2c call8 0x400d7cdc
+400d8a2f j 0x400d8978
+400d8a35 l32r a4,0x400d04c0
+400d8a38 wfr f1,a4
+400d8a3b oeq.s b0,f0,f1
+400d8a3e bt b0,0x400d8a44
+400d8a41 j 0x400d8978
+400d8a44 movi.n a10,0x1
+400d8a46 call8 0x400d7d08
+400d8a49 j 0x400d8978
+400d8a4c retw.n
