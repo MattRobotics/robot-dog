@@ -1,0 +1,5722 @@
+{
+  "aliases": {
+    "CRAWL_READY": "LOW_CROUCH",
+    "SQUAT": "LOW_CROUCH"
+  },
+  "poses": [
+    {
+      "active_feet": [],
+      "base_contact": true,
+      "body": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          1.0,
+          1.0999563076780766e-16
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "collisions": [],
+      "com_world_m": [
+        -0.02481960813948998,
+        -0.0003360080645161269,
+        0.043698286866491826
+      ],
+      "contact_axis_tilt_rad": {
+        "lf": 0.26,
+        "lh": 0.0,
+        "rf": 0.26,
+        "rh": 0.0
+      },
+      "contacts": [
+        [
+          -0.0790480897737816,
+          0.09549577312412638,
+          0.0469565334062131
+        ],
+        [
+          -0.0790480897737816,
+          -0.09549577312412638,
+          0.0469565334062131
+        ],
+        [
+          -0.2992231968535797,
+          -0.094,
+          0.01730422064638879
+        ],
+        [
+          -0.2992231968535797,
+          0.094,
+          0.01730422064638879
+        ]
+      ],
+      "diagnostics": {
+        "collision_details": [],
+        "conditioning": {
+          "lf": {
+            "condition_number": 19.447754953751947,
+            "jacobian_determinant": -7.454060100357601e-05,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.22522585760076083,
+              0.028577607371959267,
+              0.011581072372433882
+            ]
+          },
+          "lh": {
+            "condition_number": 24.610556959670628,
+            "jacobian_determinant": -6.681157255993496e-05,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.22043984277295123,
+              0.033837085680393446,
+              0.008957125315537818
+            ]
+          },
+          "rf": {
+            "condition_number": 19.447754953751943,
+            "jacobian_determinant": -7.454060100357601e-05,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.22522585760076078,
+              0.028577607371959267,
+              0.011581072372433882
+            ]
+          },
+          "rh": {
+            "condition_number": 24.61055695967064,
+            "jacobian_determinant": -6.681157255993496e-05,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.22043984277295123,
+              0.033837085680393425,
+              0.008957125315537814
+            ]
+          }
+        },
+        "conditioning_scope": "central-difference analytical G2 cross-section reference FK Jacobian; not nonsmooth mesh-edge IK Jacobian",
+        "feet": {
+          "lf": {
+            "actual_ground_patch_world_m": [],
+            "analytical_reference_world_m": [
+              -0.0790480897737816,
+              0.09549577312412638,
+              0.0469565334062131
+            ],
+            "centroid_displacement_m": 0.00559321265027152,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.00559321265027152,
+            "lowest_patch_centroid_world_m": [
+              -0.07852779906965762,
+              0.09008876355370701,
+              0.04562327692685405
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              -0.07852779906965762,
+              0.09008876355370701,
+              0.04562327692685405
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.07852779906965762,
+              0.09008876355370701,
+              0.04562327692685405
+            ],
+            "reference_to_nearest_patch_m": [
+              0.000520290704123974,
+              -0.005407009570419369,
+              -0.0013332564793590504
+            ],
+            "reference_to_patch_centroid_m": [
+              0.000520290704123974,
+              -0.005407009570419369,
+              -0.0013332564793590504
+            ],
+            "vertical_discrepancy_m": -0.0013332564793590504
+          },
+          "lh": {
+            "actual_ground_patch_world_m": [],
+            "analytical_reference_world_m": [
+              -0.2992231968535797,
+              0.094,
+              0.01730422064638879
+            ],
+            "centroid_displacement_m": 0.003622060395082599,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 7.428258260839945e-06,
+            "lowest_patch_centroid_world_m": [
+              -0.29915556223733114,
+              0.09762142876216343,
+              0.017303334708294076
+            ],
+            "lowest_patch_extent_m": [
+              0.001069083044669239,
+              0.009999999999999995,
+              9.46996431419947e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.29928960336500393,
+              0.09905000019073486,
+              0.017298788526273305
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.2992294099851985,
+              0.09400066421864046,
+              0.017308237464765914
+            ],
+            "reference_to_nearest_patch_m": [
+              -6.213131618804102e-06,
+              6.642186404642869e-07,
+              4.016818377125531e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              6.763461624853528e-05,
+              0.0036214287621634256,
+              -8.859380947121021e-07
+            ],
+            "vertical_discrepancy_m": -5.432120115483191e-06
+          },
+          "rf": {
+            "actual_ground_patch_world_m": [],
+            "analytical_reference_world_m": [
+              -0.0790480897737816,
+              -0.09549577312412638,
+              0.0469565334062131
+            ],
+            "centroid_displacement_m": 0.005668923841194042,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.005668923841194042,
+            "lowest_patch_centroid_world_m": [
+              -0.07852872501812573,
+              -0.09000895979485465,
+              0.045629191228187094
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              -0.07852872501812573,
+              -0.09000895979485465,
+              0.045629191228187094
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.07852872501812573,
+              -0.09000895979485465,
+              0.045629191228187094
+            ],
+            "reference_to_nearest_patch_m": [
+              0.0005193647556558656,
+              0.005486813329271728,
+              -0.0013273421780260058
+            ],
+            "reference_to_patch_centroid_m": [
+              0.0005193647556558656,
+              0.005486813329271728,
+              -0.0013273421780260058
+            ],
+            "vertical_discrepancy_m": -0.0013273421780260058
+          },
+          "rh": {
+            "actual_ground_patch_world_m": [],
+            "analytical_reference_world_m": [
+              -0.2992231968535797,
+              -0.094,
+              0.01730422064638879
+            ],
+            "centroid_displacement_m": 0.003622060395082613,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 7.428258260839945e-06,
+            "lowest_patch_centroid_world_m": [
+              -0.29915556223733114,
+              -0.09037857123783656,
+              0.017303334708294076
+            ],
+            "lowest_patch_extent_m": [
+              0.001069083044669239,
+              0.009999999999999995,
+              9.46996431419947e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.29928960336500393,
+              -0.08894999980926514,
+              0.017298788526273305
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.2992294099851985,
+              -0.09399933578135954,
+              0.017308237464765914
+            ],
+            "reference_to_nearest_patch_m": [
+              -6.213131618804102e-06,
+              6.642186404642869e-07,
+              4.016818377125531e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              6.763461624853528e-05,
+              0.0036214287621634395,
+              -8.859380947121021e-07
+            ],
+            "vertical_discrepancy_m": -5.432120115483191e-06
+          }
+        },
+        "joint_margins_rad": [
+          0.525398163397,
+          0.17966624652882346,
+          0.06647651121567633,
+          0.525398163397,
+          0.17966624652882346,
+          0.06647651121567633,
+          0.785398163397,
+          0.08983312326441206,
+          0.19942953364702964,
+          0.785398163397,
+          0.08983312326441206,
+          0.19942953364702964
+        ]
+      },
+      "embedded_target": true,
+      "errors": [],
+      "evidence": "VALIDATED_STATIC",
+      "ground_min_m": {
+        "base_link": 0.0,
+        "lf_foot_link": 0.04562327692685405,
+        "lf_hip_link": 0.03528531205897937,
+        "lf_lower_leg_link": 0.04415884047322441,
+        "lf_upper_leg_link": 0.04161643688379417,
+        "lh_foot_link": 0.017298788526273305,
+        "lh_hip_link": 0.01525000000000011,
+        "lh_lower_leg_link": 0.016623135887577634,
+        "lh_upper_leg_link": 0.01234933906589536,
+        "rf_foot_link": 0.045629191228187094,
+        "rf_hip_link": 0.03528531205897937,
+        "rf_lower_leg_link": 0.04415884047322441,
+        "rf_upper_leg_link": 0.04161643791121733,
+        "rh_foot_link": 0.017298788526273305,
+        "rh_hip_link": 0.01525000000000011,
+        "rh_lower_leg_link": 0.016623135887577634,
+        "rh_upper_leg_link": 0.01234933906589536
+      },
+      "joint_margin_rad": 0.06647651121567633,
+      "mass_kg": 2.48,
+      "min_separation": {
+        "distance_m": 0.0006616348473246629,
+        "pair": [
+          "rf_foot_link",
+          "rh_hip_link"
+        ]
+      },
+      "name": "REST_GROUND",
+      "normalized": {
+        "active_feet": [],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          5.28663538112787e-16
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            -0.9206228479412487,
+            0.2306783920155976,
+            0.002194201388823504
+          ],
+          [
+            -0.9206228479412487,
+            -0.2306783920155976,
+            0.002194201388823504
+          ],
+          [
+            -0.8974333362815201,
+            -0.22348937272005934,
+            -0.0441969668690466
+          ],
+          [
+            -0.8974333362815201,
+            0.22348937272005934,
+            -0.0441969668690466
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "BODY_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "q": [
+        0.26,
+        1.9583620871641767,
+        0.5880219582823236,
+        -0.26,
+        1.9583620871641767,
+        0.5880219582823236,
+        0.0,
+        2.048195210428588,
+        0.4550689358509703,
+        -0.0,
+        2.048195210428588,
+        0.4550689358509703
+      ],
+      "regime": "BODY_SUPPORT",
+      "scope": "canonical rigid CAD geometry and quasi-static URDF COM; not physical startup evidence",
+      "source": "rest_search.json: joint-margin-first body-only candidate",
+      "support_margin_m": 0.04062313043261297,
+      "support_polygon": [
+        [
+          -0.13080000305175782,
+          0.04551471710205078
+        ],
+        [
+          -0.13080000305175782,
+          -0.04551471710205078
+        ],
+        [
+          -0.09480000305175781,
+          -0.04551471710205078
+        ],
+        [
+          0.11771299743652344,
+          -0.0319322681427002
+        ],
+        [
+          0.11771299743652344,
+          0.0319322681427002
+        ],
+        [
+          -0.09480000305175781,
+          0.04551471710205078
+        ]
+      ],
+      "valid": true
+    },
+    {
+      "active_feet": [],
+      "base_contact": true,
+      "body": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          1.0,
+          1.0999563076780766e-16
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "collisions": [],
+      "com_world_m": [
+        -0.025302946406872206,
+        -0.0003360080645161269,
+        0.043077157775628275
+      ],
+      "contact_axis_tilt_rad": {
+        "lf": 0.26,
+        "lh": 0.0,
+        "rf": 0.26,
+        "rh": 0.0
+      },
+      "contacts": [
+        [
+          -0.08086909105195611,
+          0.09363001039171942,
+          0.053970111029662954
+        ],
+        [
+          -0.08086909105195611,
+          -0.09363001039171942,
+          0.053970111029662954
+        ],
+        [
+          -0.3040480897737816,
+          -0.094,
+          0.014602409465206887
+        ],
+        [
+          -0.3040480897737816,
+          0.094,
+          0.014602409465206887
+        ]
+      ],
+      "diagnostics": {
+        "collision_details": [],
+        "conditioning": {
+          "lf": {
+            "condition_number": 50.061510165812685,
+            "jacobian_determinant": -2.6552413015400166e-05,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.2273153603869683,
+              0.025724703311420075,
+              0.004540721197464063
+            ]
+          },
+          "lh": {
+            "condition_number": 19.447754961423122,
+            "jacobian_determinant": -7.454060106229751e-05,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.22522585760364108,
+              0.028577607405013625,
+              0.011581072368013826
+            ]
+          },
+          "rf": {
+            "condition_number": 50.06151016581267,
+            "jacobian_determinant": -2.6552413015400166e-05,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.2273153603869683,
+              0.025724703311420072,
+              0.0045407211974640635
+            ]
+          },
+          "rh": {
+            "condition_number": 19.447754961423122,
+            "jacobian_determinant": -7.454060106229751e-05,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.22522585760364108,
+              0.028577607405013635,
+              0.011581072368013826
+            ]
+          }
+        },
+        "conditioning_scope": "central-difference analytical G2 cross-section reference FK Jacobian; not nonsmooth mesh-edge IK Jacobian",
+        "feet": {
+          "lf": {
+            "actual_ground_patch_world_m": [],
+            "analytical_reference_world_m": [
+              -0.08086909105195611,
+              0.09363001039171942,
+              0.053970111029662954
+            ],
+            "centroid_displacement_m": 0.005588213760708393,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.005588213760708393,
+            "lowest_patch_centroid_world_m": [
+              -0.08133297173135859,
+              0.08822348301742026,
+              0.052635041929727816
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              -0.08133297173135859,
+              0.08822348301742026,
+              0.052635041929727816
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.08133297173135859,
+              0.08822348301742026,
+              0.052635041929727816
+            ],
+            "reference_to_nearest_patch_m": [
+              -0.00046388067940247857,
+              -0.005406527374299155,
+              -0.0013350690999351378
+            ],
+            "reference_to_patch_centroid_m": [
+              -0.00046388067940247857,
+              -0.005406527374299155,
+              -0.0013350690999351378
+            ],
+            "vertical_discrepancy_m": -0.0013350690999351378
+          },
+          "lh": {
+            "actual_ground_patch_world_m": [],
+            "analytical_reference_world_m": [
+              -0.3040480897737816,
+              0.094,
+              0.014602409465206887
+            ],
+            "centroid_displacement_m": 0.001720194267207102,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 4.534170920129382e-05,
+            "lowest_patch_centroid_world_m": [
+              -0.30393798691299223,
+              0.09571666685740153,
+              0.014603169516077147
+            ],
+            "lowest_patch_extent_m": [
+              0.0009327618663114712,
+              0.009999999999999995,
+              8.884384457456124e-06
+            ],
+            "lowest_patch_vertex_count": 6,
+            "lowest_vertex_world_m": [
+              -0.3041570963117987,
+              0.09905000019073486,
+              0.014597291616400467
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.304002951189922,
+              0.09400406303887039,
+              0.014603777147764998
+            ],
+            "reference_to_nearest_patch_m": [
+              4.5138583859627435e-05,
+              4.063038870391611e-06,
+              1.367682558111108e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00011010286078938503,
+              0.0017166668574015304,
+              7.600508702600844e-07
+            ],
+            "vertical_discrepancy_m": -5.117848806419911e-06
+          },
+          "rf": {
+            "actual_ground_patch_world_m": [],
+            "analytical_reference_world_m": [
+              -0.08086909105195611,
+              -0.09363001039171942,
+              0.053970111029662954
+            ],
+            "centroid_displacement_m": 0.005664001163214933,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.005664001163214933,
+            "lowest_patch_centroid_world_m": [
+              -0.0813321531390238,
+              -0.08814367834088153,
+              0.052640959680730265
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              -0.0813321531390238,
+              -0.08814367834088153,
+              0.052640959680730265
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.0813321531390238,
+              -0.08814367834088153,
+              0.052640959680730265
+            ],
+            "reference_to_nearest_patch_m": [
+              -0.0004630620870676866,
+              0.005486332050837886,
+              -0.001329151348932689
+            ],
+            "reference_to_patch_centroid_m": [
+              -0.0004630620870676866,
+              0.005486332050837886,
+              -0.001329151348932689
+            ],
+            "vertical_discrepancy_m": -0.001329151348932689
+          },
+          "rh": {
+            "actual_ground_patch_world_m": [],
+            "analytical_reference_world_m": [
+              -0.3040480897737816,
+              -0.094,
+              0.014602409465206887
+            ],
+            "centroid_displacement_m": 0.001720194267207102,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 4.534170920129382e-05,
+            "lowest_patch_centroid_world_m": [
+              -0.30393798691299223,
+              -0.09228333314259847,
+              0.014603169516077147
+            ],
+            "lowest_patch_extent_m": [
+              0.0009327618663114712,
+              0.009999999999999995,
+              8.884384457456124e-06
+            ],
+            "lowest_patch_vertex_count": 6,
+            "lowest_vertex_world_m": [
+              -0.3041570963117987,
+              -0.08894999980926514,
+              0.014597291616400467
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.304002951189922,
+              -0.09399593696112961,
+              0.014603777147764998
+            ],
+            "reference_to_nearest_patch_m": [
+              4.5138583859627435e-05,
+              4.063038870391611e-06,
+              1.367682558111108e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00011010286078938503,
+              0.0017166668574015304,
+              7.600508702600844e-07
+            ],
+            "vertical_discrepancy_m": -5.117848806419911e-06
+          }
+        },
+        "joint_margins_rad": [
+          0.525398163397,
+          0.17966624652882346,
+          0.0,
+          0.525398163397,
+          0.17966624652882346,
+          0.0,
+          0.785398163397,
+          0.17966624652882346,
+          0.06647651121567633,
+          0.785398163397,
+          0.17966624652882346,
+          0.06647651121567633
+        ]
+      },
+      "embedded_target": true,
+      "errors": [],
+      "evidence": "VALIDATED_STATIC",
+      "ground_min_m": {
+        "base_link": 0.0,
+        "lf_foot_link": 0.052635041929727816,
+        "lf_hip_link": 0.03528531205897937,
+        "lf_lower_leg_link": 0.05100521577980921,
+        "lf_upper_leg_link": 0.04161643688379417,
+        "lh_foot_link": 0.014597291616400467,
+        "lh_hip_link": 0.01525000000000011,
+        "lh_lower_leg_link": 0.013788693001207261,
+        "lh_upper_leg_link": 0.01248745554146685,
+        "rf_foot_link": 0.052640959680730265,
+        "rf_hip_link": 0.03528531205897937,
+        "rf_lower_leg_link": 0.05100521577980921,
+        "rf_upper_leg_link": 0.04161643791121733,
+        "rh_foot_link": 0.014597291616400467,
+        "rh_hip_link": 0.01525000000000011,
+        "rh_lower_leg_link": 0.013788693001207261,
+        "rh_upper_leg_link": 0.01248745554146685
+      },
+      "joint_margin_rad": 0.0,
+      "mass_kg": 2.48,
+      "min_separation": {
+        "distance_m": 0.005755373507261348,
+        "pair": [
+          "lf_lower_leg_link",
+          "lh_hip_link"
+        ]
+      },
+      "name": "REST_GROUND_MAX_SEPARATION",
+      "normalized": {
+        "active_feet": [],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          5.28663538112787e-16
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            -0.9293749862935421,
+            0.22171112012935898,
+            0.03590301996061388
+          ],
+          [
+            -0.9293749862935421,
+            -0.22171112012935898,
+            0.03590301996061388
+          ],
+          [
+            -0.9206228479412488,
+            -0.22348937272005934,
+            -0.05718247409679684
+          ],
+          [
+            -0.9206228479412488,
+            0.22348937272005934,
+            -0.05718247409679684
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "BODY_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "q": [
+        0.26,
+        1.9583620871641767,
+        0.654498469498,
+        -0.26,
+        1.9583620871641767,
+        0.654498469498,
+        0.0,
+        1.9583620871641767,
+        0.5880219582823236,
+        -0.0,
+        1.9583620871641767,
+        0.5880219582823236
+      ],
+      "regime": "BODY_SUPPORT",
+      "scope": "canonical rigid CAD geometry and quasi-static URDF COM; not physical startup evidence",
+      "source": "rest_search.json:selected; reaches a joint limit",
+      "support_margin_m": 0.04065395936845188,
+      "support_polygon": [
+        [
+          -0.13080000305175782,
+          0.04551471710205078
+        ],
+        [
+          -0.13080000305175782,
+          -0.04551471710205078
+        ],
+        [
+          -0.09480000305175781,
+          -0.04551471710205078
+        ],
+        [
+          0.11771299743652344,
+          -0.0319322681427002
+        ],
+        [
+          0.11771299743652344,
+          0.0319322681427002
+        ],
+        [
+          -0.09480000305175781,
+          0.04551471710205078
+        ]
+      ],
+      "valid": true
+    },
+    {
+      "active_feet": [
+        "lf",
+        "rf",
+        "rh",
+        "lh"
+      ],
+      "base_contact": false,
+      "body": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          1.0,
+          0.06
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "collisions": [],
+      "com_world_m": [
+        -0.014818507418790847,
+        -0.0003360080645161297,
+        0.08574296396341764
+      ],
+      "contact_axis_tilt_rad": {
+        "lf": 0.0,
+        "lh": 0.0,
+        "rf": 0.0,
+        "rh": 0.0
+      },
+      "contacts": [
+        [
+          0.13013523134577848,
+          0.094,
+          1.734723475976807e-18
+        ],
+        [
+          0.13013523134577848,
+          -0.094,
+          1.734723475976807e-18
+        ],
+        [
+          -0.14371695348630728,
+          -0.094,
+          5.204170427930421e-18
+        ],
+        [
+          -0.14371695348630728,
+          0.094,
+          5.204170427930421e-18
+        ]
+      ],
+      "diagnostics": {
+        "collision_details": [],
+        "conditioning": {
+          "lf": {
+            "condition_number": 2.490757937346669,
+            "jacobian_determinant": -0.0008666735250737004,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.14247889734225688,
+              0.10633738157962418,
+              0.05720302852634305
+            ]
+          },
+          "lh": {
+            "condition_number": 2.6708804858991395,
+            "jacobian_determinant": -0.0006044833561868079,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.12666010189713278,
+              0.10063733704075352,
+              0.04742260185951123
+            ]
+          },
+          "rf": {
+            "condition_number": 2.4907579373466713,
+            "jacobian_determinant": -0.0008666735250737004,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.14247889734225694,
+              0.1063373815796242,
+              0.05720302852634302
+            ]
+          },
+          "rh": {
+            "condition_number": 2.6708804858991386,
+            "jacobian_determinant": -0.0006044833561868079,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.12666010189713273,
+              0.10063733704075352,
+              0.04742260185951122
+            ]
+          }
+        },
+        "conditioning_scope": "central-difference analytical G2 cross-section reference FK Jacobian; not nonsmooth mesh-edge IK Jacobian",
+        "feet": {
+          "lf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.12991618963547222,
+                0.08905000019073486,
+                4.403323895768975e-06
+              ],
+              [
+                0.13021078746793854,
+                0.08905000019073486,
+                2.8840275679621087e-06
+              ],
+              [
+                0.13051626597123073,
+                0.09905000019073486,
+                7.460775288725891e-06
+              ],
+              [
+                0.13021624320167055,
+                0.09905000019073486,
+                2.910799422478096e-06
+              ],
+              [
+                0.12991618963547222,
+                0.09905000019073486,
+                4.403323895768975e-06
+              ],
+              [
+                0.12999804227730594,
+                0.09905000019073486,
+                5.898477756106679e-06
+              ],
+              [
+                0.12978533800717004,
+                0.09905000019073486,
+                9.449054719874462e-06
+              ],
+              [
+                0.13021077576325324,
+                0.09905000019073486,
+                5.385550469253842e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13013523134577848,
+              0.094,
+              1.734723475976807e-18
+            ],
+            "centroid_displacement_m": 0.002550304054887777,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 6.128904801870654e-06,
+            "lowest_patch_centroid_world_m": [
+              0.1300962289949392,
+              0.09655000019073486,
+              5.349416626992379e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0007309279640606847,
+              0.009999999999999995,
+              6.565027151912353e-06
+            ],
+            "lowest_patch_vertex_count": 8,
+            "lowest_vertex_world_m": [
+              0.13021078746793854,
+              0.08905000019073486,
+              2.8840275679621087e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13013524801763882,
+              0.09399999712568541,
+              6.128881452418782e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              1.6671860336714417e-08,
+              -2.8743145918941337e-09,
+              6.128881452417048e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -3.9002350839284494e-05,
+              0.002550000190734855,
+              5.349416626990644e-06
+            ],
+            "vertical_discrepancy_m": 2.884027567960374e-06
+          },
+          "lh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.14361364991190578,
+                0.08905000019073486,
+                -1.3936655048410462e-07
+              ],
+              [
+                -0.1434172643107141,
+                0.09905000019073486,
+                2.440953568093665e-06
+              ],
+              [
+                -0.14401734839226726,
+                0.09905000019073486,
+                2.6870093419121416e-06
+              ],
+              [
+                -0.14371730735443086,
+                0.09905000019073486,
+                -4.574835989019574e-07
+              ],
+              [
+                -0.1438264004398238,
+                0.09905000019073486,
+                2.4882923175669966e-06
+              ],
+              [
+                -0.14361366671906878,
+                0.09905000019073486,
+                2.362636079712016e-06
+              ],
+              [
+                -0.14403911137505263,
+                0.09905000019073486,
+                5.652609260730496e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.14371695348630728,
+              0.094,
+              5.204170427930421e-18
+            ],
+            "centroid_displacement_m": 0.003621573407165151,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 2.173460372495624e-06,
+            "lowest_patch_centroid_world_m": [
+              -0.14374924978618048,
+              0.09762142876216343,
+              2.147807202661322e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006218470643385154,
+              0.009999999999999995,
+              6.110092859632453e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.14371730735443086,
+              0.09905000019073486,
+              -4.574835989019574e-07
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.1437169422611794,
+              0.09399999921873982,
+              2.17343124505193e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              1.122512788276353e-08,
+              -7.812601815482267e-10,
+              2.1734312450467257e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -3.229629987319682e-05,
+              0.0036214287621634256,
+              2.1478072026561177e-06
+            ],
+            "vertical_discrepancy_m": -4.5748359890716156e-07
+          },
+          "rf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.12991618963547222,
+                -0.09894999980926514,
+                4.403323895768975e-06
+              ],
+              [
+                0.13021078746793854,
+                -0.09894999980926514,
+                2.8840275679621087e-06
+              ],
+              [
+                0.13051626597123073,
+                -0.08894999980926514,
+                7.460775288725891e-06
+              ],
+              [
+                0.13021624320167055,
+                -0.08894999980926514,
+                2.910799422478096e-06
+              ],
+              [
+                0.12991618963547222,
+                -0.08894999980926514,
+                4.403323895768975e-06
+              ],
+              [
+                0.12999804227730594,
+                -0.08894999980926514,
+                5.898477756106679e-06
+              ],
+              [
+                0.12978533800717004,
+                -0.08894999980926514,
+                9.449054719874462e-06
+              ],
+              [
+                0.13021077576325324,
+                -0.08894999980926514,
+                5.385550469253842e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13013523134577848,
+              -0.094,
+              1.734723475976807e-18
+            ],
+            "centroid_displacement_m": 0.0025503040548877907,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 6.128904801870654e-06,
+            "lowest_patch_centroid_world_m": [
+              0.1300962289949392,
+              -0.09144999980926513,
+              5.349416626992379e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0007309279640606847,
+              0.009999999999999995,
+              6.565027151912353e-06
+            ],
+            "lowest_patch_vertex_count": 8,
+            "lowest_vertex_world_m": [
+              0.13021078746793854,
+              -0.09894999980926514,
+              2.8840275679621087e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13013524801763882,
+              -0.09400000287431459,
+              6.128881452418782e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              1.6671860336714417e-08,
+              -2.8743145918941337e-09,
+              6.128881452417048e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -3.9002350839284494e-05,
+              0.002550000190734869,
+              5.349416626990644e-06
+            ],
+            "vertical_discrepancy_m": 2.884027567960374e-06
+          },
+          "rh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.14361364991190578,
+                -0.09894999980926514,
+                -1.3936655048410462e-07
+              ],
+              [
+                -0.1434172643107141,
+                -0.08894999980926514,
+                2.440953568093665e-06
+              ],
+              [
+                -0.14401734839226726,
+                -0.08894999980926514,
+                2.6870093419121416e-06
+              ],
+              [
+                -0.14371730735443086,
+                -0.08894999980926514,
+                -4.574835989019574e-07
+              ],
+              [
+                -0.1438264004398238,
+                -0.08894999980926514,
+                2.4882923175669966e-06
+              ],
+              [
+                -0.14361366671906878,
+                -0.08894999980926514,
+                2.362636079712016e-06
+              ],
+              [
+                -0.14403911137505263,
+                -0.08894999980926514,
+                5.652609260730496e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.14371695348630728,
+              -0.094,
+              5.204170427930421e-18
+            ],
+            "centroid_displacement_m": 0.0036215734071651648,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 2.173460372495624e-06,
+            "lowest_patch_centroid_world_m": [
+              -0.14374924978618048,
+              -0.09037857123783656,
+              2.147807202661322e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006218470643385154,
+              0.009999999999999995,
+              6.110092859632453e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.14371730735443086,
+              -0.08894999980926514,
+              -4.574835989019574e-07
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.1437169422611794,
+              -0.09400000078126018,
+              2.17343124505193e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              1.122512788276353e-08,
+              -7.812601815482267e-10,
+              2.1734312450467257e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -3.229629987319682e-05,
+              0.0036214287621634395,
+              2.1478072026561177e-06
+            ],
+            "vertical_discrepancy_m": -4.5748359890716156e-07
+          }
+        },
+        "joint_margins_rad": [
+          0.785398163397,
+          1.0057978387947268,
+          0.6513684204799322,
+          0.785398163397,
+          1.0057978387947268,
+          0.6513684204799322,
+          0.785398163397,
+          0.2649162208519722,
+          0.4798675885470096,
+          0.785398163397,
+          0.2649162208519722,
+          0.4798675885470096
+        ]
+      },
+      "embedded_target": true,
+      "errors": [],
+      "evidence": "VALIDATED_STATIC",
+      "ground_min_m": {
+        "base_link": 0.05999999999999989,
+        "lf_foot_link": 2.8840275679621087e-06,
+        "lf_hip_link": 0.09525,
+        "lf_lower_leg_link": 0.0024365070297446834,
+        "lf_upper_leg_link": 0.054177352693352526,
+        "lh_foot_link": -4.574835989019574e-07,
+        "lh_hip_link": 0.07525,
+        "lh_lower_leg_link": 0.002887066197672511,
+        "lh_upper_leg_link": 0.07272305776064947,
+        "rf_foot_link": 2.8840275679621087e-06,
+        "rf_hip_link": 0.09525,
+        "rf_lower_leg_link": 0.0024365070297446834,
+        "rf_upper_leg_link": 0.054177352693352526,
+        "rh_foot_link": -4.574835989019574e-07,
+        "rh_hip_link": 0.07525,
+        "rh_lower_leg_link": 0.002887066197672511,
+        "rh_upper_leg_link": 0.07272305776064947
+      },
+      "joint_margin_rad": 0.2649162208519722,
+      "mass_kg": 2.48,
+      "min_separation": {
+        "distance_m": 0.013787832260131826,
+        "pair": [
+          "base_link",
+          "lf_upper_leg_link"
+        ]
+      },
+      "name": "LOW_CROUCH",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.28837338415491526
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.08475885572561634,
+            0.22348937272005934,
+            -0.5118627568749746
+          ],
+          [
+            0.08475885572561634,
+            -0.22348937272005934,
+            -0.5118627568749746
+          ],
+          [
+            -0.15003564199755018,
+            -0.22348937272005934,
+            -0.41573829549000285
+          ],
+          [
+            -0.15003564199755018,
+            0.22348937272005934,
+            -0.41573829549000285
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "q": [
+        0.0,
+        1.1322304948982733,
+        -0.9543344913550678,
+        0.0,
+        1.1322304948982733,
+        -0.9543344913550678,
+        0.0,
+        1.873112112841028,
+        -1.1258353232879903,
+        0.0,
+        1.873112112841028,
+        -1.1258353232879903
+      ],
+      "regime": "FOOT_SUPPORT",
+      "scope": "canonical rigid CAD geometry and quasi-static URDF COM; not physical startup evidence",
+      "source": "envelope.json:poses/LOW_CROUCH",
+      "support_margin_m": 0.09861399174474901,
+      "support_polygon": [
+        [
+          -0.14403911137505263,
+          0.09905000019073486
+        ],
+        [
+          -0.14403911137505263,
+          -0.08894999980926514
+        ],
+        [
+          -0.14361364991190578,
+          -0.09894999980926514
+        ],
+        [
+          0.13021078746793854,
+          -0.09894999980926514
+        ],
+        [
+          0.13051626597123073,
+          -0.08894999980926514
+        ],
+        [
+          0.13051626597123073,
+          0.09905000019073486
+        ]
+      ],
+      "valid": true
+    },
+    {
+      "active_feet": [
+        "lf",
+        "rf",
+        "rh",
+        "lh"
+      ],
+      "base_contact": false,
+      "body": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          1.0,
+          0.1
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "collisions": [],
+      "com_world_m": [
+        -0.013710707433039593,
+        -0.0003360080645161297,
+        0.11709476506697221
+      ],
+      "contact_axis_tilt_rad": {
+        "lf": 0.0,
+        "lh": 0.0,
+        "rf": 2.220446049250313e-16,
+        "rh": 0.0
+      },
+      "contacts": [
+        [
+          0.1301352313457785,
+          0.094,
+          -1.0408340855860843e-17
+        ],
+        [
+          0.1301352313457785,
+          -0.09399999999999997,
+          -1.0408340855860843e-17
+        ],
+        [
+          -0.14371695348630728,
+          -0.094,
+          -3.469446951953614e-18
+        ],
+        [
+          -0.14371695348630728,
+          0.094,
+          -3.469446951953614e-18
+        ]
+      ],
+      "diagnostics": {
+        "collision_details": [],
+        "conditioning": {
+          "lf": {
+            "condition_number": 2.88630892096574,
+            "jacobian_determinant": -0.0014663729878793765,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.16915068949495068,
+              0.147924366736118,
+              0.05860449942355927
+            ]
+          },
+          "lh": {
+            "condition_number": 2.5373166227682087,
+            "jacobian_determinant": -0.0011945536223991805,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.1491329569632397,
+              0.13628029226090146,
+              0.05877585620376217
+            ]
+          },
+          "rf": {
+            "condition_number": 2.8863089209657398,
+            "jacobian_determinant": -0.0014663729878793765,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.16915068949495066,
+              0.14792436673611797,
+              0.05860449942355926
+            ]
+          },
+          "rh": {
+            "condition_number": 2.537316622768209,
+            "jacobian_determinant": -0.0011945536223991805,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.1491329569632397,
+              0.13628029226090144,
+              0.05877585620376216
+            ]
+          }
+        },
+        "conditioning_scope": "central-difference analytical G2 cross-section reference FK Jacobian; not nonsmooth mesh-edge IK Jacobian",
+        "feet": {
+          "lf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.13048869599459634,
+                0.08905000019073486,
+                5.658615563986684e-06
+              ],
+              [
+                0.13039051346743963,
+                0.09905000019073486,
+                3.689192068466896e-06
+              ],
+              [
+                0.13009046317010003,
+                0.09905000019073486,
+                1.681144168700537e-06
+              ],
+              [
+                0.12979043272794719,
+                0.09905000019073486,
+                5.71577448632175e-06
+              ],
+              [
+                0.12985048028443566,
+                0.09905000019073486,
+                6.926512242855102e-06
+              ],
+              [
+                0.13006319788070264,
+                0.09905000019073486,
+                4.299809801000705e-06
+              ],
+              [
+                0.1304886373448293,
+                0.09905000019073486,
+                8.159569029491266e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.1301352313457785,
+              0.094,
+              -1.0408340855860843e-17
+            ],
+            "centroid_displacement_m": 0.0036215636587342403,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 9.657344563390502e-06,
+            "lowest_patch_centroid_world_m": [
+              0.13016606012429296,
+              0.09762142876216343,
+              5.161516765831848e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006982632666491517,
+              0.009999999999999995,
+              6.478424860790729e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              0.13009046317010003,
+              0.09905000019073486,
+              1.681144168700537e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13014301772900064,
+              0.09400054366203263,
+              5.686912336965912e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              7.786383222130322e-06,
+              5.436620326287889e-07,
+              5.68691233697632e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              3.0828778514457866e-05,
+              0.0036214287621634256,
+              5.161516765842257e-06
+            ],
+            "vertical_discrepancy_m": 1.6811441687109453e-06
+          },
+          "lh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.1431787172333054,
+                0.08905000019073486,
+                9.22679955582973e-06
+              ],
+              [
+                -0.14358232616700395,
+                0.09905000019073486,
+                2.6688406619922167e-07
+              ],
+              [
+                -0.14328232121025633,
+                0.09905000019073486,
+                5.882767670445464e-06
+              ],
+              [
+                -0.14418237067148817,
+                0.09905000019073486,
+                7.161926318128425e-06
+              ],
+              [
+                -0.14339145379555832,
+                0.09905000019073486,
+                5.642556072055303e-06
+              ],
+              [
+                -0.1436041664485453,
+                0.09905000019073486,
+                2.5958977607214336e-06
+              ],
+              [
+                -0.14402961251829016,
+                0.09905000019073486,
+                5.614922339908582e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.14371695348630728,
+              0.094,
+              -3.469446951953614e-18
+            ],
+            "centroid_displacement_m": 0.003623092784997297,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 4.202917283131971e-05,
+            "lowest_patch_centroid_world_m": [
+              -0.1436072811492068,
+              0.09762142876216343,
+              5.1988219690411654e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.001003653438182761,
+              0.009999999999999995,
+              8.959915489630509e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.14358232616700395,
+              0.09905000019073486,
+              2.6688406619922167e-07
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.14367593898346234,
+              0.09400411812866791,
+              8.203837001184337e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              4.101450284493824e-05,
+              4.118128667907062e-06,
+              8.203837001187807e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00010967233710049151,
+              0.0036214287621634256,
+              5.198821969044635e-06
+            ],
+            "vertical_discrepancy_m": 2.668840662026911e-07
+          },
+          "rf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.13048869599459634,
+                -0.09894999980926511,
+                5.658615563985383e-06
+              ],
+              [
+                0.13039051346743963,
+                -0.0889499998092651,
+                3.6891920684681972e-06
+              ],
+              [
+                0.13009046317010003,
+                -0.0889499998092651,
+                1.681144168701838e-06
+              ],
+              [
+                0.12979043272794719,
+                -0.0889499998092651,
+                5.715774486323051e-06
+              ],
+              [
+                0.12985048028443566,
+                -0.0889499998092651,
+                6.926512242856403e-06
+              ],
+              [
+                0.13006319788070264,
+                -0.0889499998092651,
+                4.299809801002006e-06
+              ],
+              [
+                0.1304886373448293,
+                -0.0889499998092651,
+                8.159569029492567e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.1301352313457785,
+              -0.09399999999999997,
+              -1.0408340855860843e-17
+            ],
+            "centroid_displacement_m": 0.0036215636587342546,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 9.657344563390496e-06,
+            "lowest_patch_centroid_world_m": [
+              0.13016606012429296,
+              -0.09037857123783653,
+              5.161516765832778e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006982632666491517,
+              0.010000000000000009,
+              6.478424860790729e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              0.13009046317010003,
+              -0.0889499998092651,
+              1.681144168701838e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13014301772900064,
+              -0.09399945633796734,
+              5.686912336965899e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              7.786383222130322e-06,
+              5.436620326287889e-07,
+              5.6869123369763075e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              3.0828778514457866e-05,
+              0.0036214287621634395,
+              5.161516765843186e-06
+            ],
+            "vertical_discrepancy_m": 1.6811441687122463e-06
+          },
+          "rh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.1431787172333054,
+                -0.09894999980926514,
+                9.22679955582973e-06
+              ],
+              [
+                -0.14358232616700395,
+                -0.08894999980926514,
+                2.6688406619922167e-07
+              ],
+              [
+                -0.14328232121025633,
+                -0.08894999980926514,
+                5.882767670445464e-06
+              ],
+              [
+                -0.14418237067148817,
+                -0.08894999980926514,
+                7.161926318128425e-06
+              ],
+              [
+                -0.14339145379555832,
+                -0.08894999980926514,
+                5.642556072055303e-06
+              ],
+              [
+                -0.1436041664485453,
+                -0.08894999980926514,
+                2.5958977607214336e-06
+              ],
+              [
+                -0.14402961251829016,
+                -0.08894999980926514,
+                5.614922339908582e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.14371695348630728,
+              -0.094,
+              -3.469446951953614e-18
+            ],
+            "centroid_displacement_m": 0.0036230927849973107,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 4.202917283131971e-05,
+            "lowest_patch_centroid_world_m": [
+              -0.1436072811492068,
+              -0.09037857123783656,
+              5.1988219690411654e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.001003653438182761,
+              0.009999999999999995,
+              8.959915489630509e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.14358232616700395,
+              -0.08894999980926514,
+              2.6688406619922167e-07
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.14367593898346234,
+              -0.0939958818713321,
+              8.203837001184337e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              4.101450284493824e-05,
+              4.118128667907062e-06,
+              8.203837001187807e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00010967233710049151,
+              0.0036214287621634395,
+              5.198821969044635e-06
+            ],
+            "vertical_discrepancy_m": 2.668840662026911e-07
+          }
+        },
+        "joint_margins_rad": [
+          0.785398163397,
+          1.2783417001827737,
+          1.1264328124459295,
+          0.7853981633969997,
+          1.2783417001827737,
+          1.1264328124459295,
+          0.785398163397,
+          0.7329107903591758,
+          0.9186652155142294,
+          0.785398163397,
+          0.7329107903591758,
+          0.9186652155142294
+        ]
+      },
+      "embedded_target": true,
+      "errors": [],
+      "evidence": "VALIDATED_STATIC",
+      "ground_min_m": {
+        "base_link": 0.0999999999999999,
+        "lf_foot_link": 1.681144168700537e-06,
+        "lf_hip_link": 0.13525,
+        "lf_lower_leg_link": 0.0027088623372401033,
+        "lf_upper_leg_link": 0.07368904898286514,
+        "lh_foot_link": 2.6688406619922167e-07,
+        "lh_hip_link": 0.11525,
+        "lh_lower_leg_link": 0.0028870282425769445,
+        "lh_upper_leg_link": 0.09824836257642244,
+        "rf_foot_link": 1.681144168701838e-06,
+        "rf_hip_link": 0.13525,
+        "rf_lower_leg_link": 0.0027088623372401033,
+        "rf_upper_leg_link": 0.07368904898286514,
+        "rh_foot_link": 2.6688406619922167e-07,
+        "rh_hip_link": 0.11525,
+        "rh_lower_leg_link": 0.0028870282425769445,
+        "rh_upper_leg_link": 0.09824836257642244
+      },
+      "joint_margin_rad": 0.7329107903591758,
+      "mass_kg": 2.48,
+      "min_separation": {
+        "distance_m": 0.013787832260131826,
+        "pair": [
+          "base_link",
+          "lf_upper_leg_link"
+        ]
+      },
+      "name": "LOW_C4",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.48062230692485886
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.08475885572561648,
+            0.22348937272005934,
+            -0.7041116796449183
+          ],
+          [
+            0.08475885572561648,
+            -0.2234893727200592,
+            -0.7041116796449183
+          ],
+          [
+            -0.15003564199755018,
+            -0.22348937272005934,
+            -0.6079872182599464
+          ],
+          [
+            -0.15003564199755018,
+            0.22348937272005934,
+            -0.6079872182599464
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "q": [
+        0.0,
+        0.8596866335102265,
+        -0.4719343429479297,
+        2.220446049250313e-16,
+        0.8596866335102265,
+        -0.4719343429479297,
+        0.0,
+        1.4051175433338243,
+        -0.6870376963207705,
+        0.0,
+        1.4051175433338243,
+        -0.6870376963207705
+      ],
+      "regime": "FOOT_SUPPORT",
+      "scope": "canonical rigid CAD geometry and quasi-static URDF COM; not physical startup evidence",
+      "source": "envelope.json:poses/LOW_C4",
+      "support_margin_m": 0.098613991744749,
+      "support_polygon": [
+        [
+          -0.14418237067148817,
+          0.09905000019073486
+        ],
+        [
+          -0.14418237067148817,
+          -0.08894999980926514
+        ],
+        [
+          -0.1431787172333054,
+          -0.09894999980926514
+        ],
+        [
+          0.13048869599459634,
+          -0.09894999980926511
+        ],
+        [
+          0.13048869599459634,
+          0.08905000019073486
+        ],
+        [
+          0.1304886373448293,
+          0.09905000019073486
+        ]
+      ],
+      "valid": true
+    },
+    {
+      "active_feet": [
+        "lf",
+        "rf",
+        "rh",
+        "lh"
+      ],
+      "base_contact": false,
+      "body": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          1.0,
+          0.15
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "collisions": [],
+      "com_world_m": [
+        -0.008534115345403943,
+        -0.0003360080645161325,
+        0.15779166890624602
+      ],
+      "contact_axis_tilt_rad": {
+        "lf": 0.0,
+        "lh": 0.0,
+        "rf": 0.0,
+        "rh": 2.220446049250313e-16
+      },
+      "contacts": [
+        [
+          0.13013523134577845,
+          0.094,
+          -6.938893903907228e-18
+        ],
+        [
+          0.13013523134577845,
+          -0.094,
+          -6.938893903907228e-18
+        ],
+        [
+          -0.14371695348630734,
+          -0.09400000000000004,
+          5.204170427930421e-18
+        ],
+        [
+          -0.14371695348630734,
+          0.094,
+          5.204170427930421e-18
+        ]
+      ],
+      "diagnostics": {
+        "collision_details": [],
+        "conditioning": {
+          "lf": {
+            "condition_number": 5.797619775376566,
+            "jacobian_determinant": -0.001565842165827606,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.213061212355268,
+              0.1999810874584922,
+              0.03674977328802652
+            ]
+          },
+          "lh": {
+            "condition_number": 4.0150724172639976,
+            "jacobian_determinant": -0.0016992597426656478,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.19310857099844334,
+              0.18295743004522388,
+              0.0480959123347603
+            ]
+          },
+          "rf": {
+            "condition_number": 5.797619775376562,
+            "jacobian_determinant": -0.001565842165827606,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.213061212355268,
+              0.1999810874584922,
+              0.03674977328802654
+            ]
+          },
+          "rh": {
+            "condition_number": 4.015072417275322,
+            "jacobian_determinant": -0.0016992597425988425,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.19310857099841963,
+              0.18295743003859222,
+              0.04809591233461874
+            ]
+          }
+        },
+        "conditioning_scope": "central-difference analytical G2 cross-section reference FK Jacobian; not nonsmooth mesh-edge IK Jacobian",
+        "feet": {
+          "lf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.1300571229773826,
+                0.08905000019073486,
+                -2.927438993109016e-07
+              ],
+              [
+                0.13025352543818974,
+                0.09905000019073486,
+                -1.0354499571131603e-07
+              ],
+              [
+                0.12965348882694427,
+                0.09905000019073486,
+                7.448318481330027e-06
+              ],
+              [
+                0.1299534693443598,
+                0.09905000019073486,
+                6.511578323747241e-07
+              ],
+              [
+                0.12984442020814793,
+                0.09905000019073486,
+                4.924887789267349e-06
+              ],
+              [
+                0.13005713663252275,
+                0.09905000019073486,
+                2.209277919017205e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13013523134577845,
+              0.094,
+              -6.938893903907228e-18
+            ],
+            "centroid_displacement_m": 0.003387373516951596,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 4.14290948038719e-08,
+            "lowest_patch_centroid_world_m": [
+              0.12996986057125784,
+              0.0973833335240682,
+              2.472892187827848e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006000366112454691,
+              0.009999999999999995,
+              7.741062380640928e-06
+            ],
+            "lowest_patch_vertex_count": 6,
+            "lowest_vertex_world_m": [
+              0.1300571229773826,
+              0.08905000019073486,
+              -2.927438993109016e-07
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13013523186715012,
+              0.09399999998897636,
+              4.142581255396693e-08
+            ],
+            "reference_to_nearest_patch_m": [
+              5.213716680607661e-10,
+              -1.1023640333895912e-11,
+              4.142581256090582e-08
+            ],
+            "reference_to_patch_centroid_m": [
+              -0.00016537077452061233,
+              0.003383333524068194,
+              2.4728921878347868e-06
+            ],
+            "vertical_discrepancy_m": -2.927438993039627e-07
+          },
+          "lh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.1441739399365677,
+                0.08905000019073486,
+                5.858960870915898e-06
+              ],
+              [
+                -0.14387940369785593,
+                0.09905000019073486,
+                -3.762663149005363e-07
+              ],
+              [
+                -0.1432793432798592,
+                0.09905000019073486,
+                4.939530505389429e-06
+              ],
+              [
+                -0.1441793927641909,
+                0.09905000019073486,
+                6.029354438188278e-06
+              ],
+              [
+                -0.1433230373646881,
+                0.09905000019073486,
+                6.238555843805435e-06
+              ],
+              [
+                -0.14374846495223295,
+                0.09905000019073486,
+                1.2241597371707297e-06
+              ],
+              [
+                -0.1441738623560802,
+                0.09905000019073486,
+                8.359717257910501e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.14371695348630734,
+              0.094,
+              5.204170427930421e-18
+            ],
+            "centroid_displacement_m": 0.0036229692139570354,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 1.5104485661033472e-05,
+            "lowest_patch_centroid_world_m": [
+              -0.14382249205021072,
+              0.09762142876216343,
+              4.610573191211391e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0009000494843316997,
+              0.009999999999999995,
+              8.735983572811037e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.14387940369785593,
+              0.09905000019073486,
+              -3.762663149005363e-07
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.14373100213235257,
+              0.09400125728401343,
+              5.403727259007035e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              -1.4048646045233815e-05,
+              1.2572840134283947e-06,
+              5.403727259001831e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -0.00010553856390338456,
+              0.0036214287621634256,
+              4.610573191206187e-06
+            ],
+            "vertical_discrepancy_m": -3.7626631490574047e-07
+          },
+          "rf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.1300571229773826,
+                -0.09894999980926514,
+                -2.927438993109016e-07
+              ],
+              [
+                0.13025352543818974,
+                -0.08894999980926514,
+                -1.0354499571131603e-07
+              ],
+              [
+                0.12965348882694427,
+                -0.08894999980926514,
+                7.448318481330027e-06
+              ],
+              [
+                0.1299534693443598,
+                -0.08894999980926514,
+                6.511578323747241e-07
+              ],
+              [
+                0.12984442020814793,
+                -0.08894999980926514,
+                4.924887789267349e-06
+              ],
+              [
+                0.13005713663252275,
+                -0.08894999980926514,
+                2.209277919017205e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13013523134577845,
+              -0.094,
+              -6.938893903907228e-18
+            ],
+            "centroid_displacement_m": 0.003387373516951596,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 4.14290948038719e-08,
+            "lowest_patch_centroid_world_m": [
+              0.12996986057125784,
+              -0.0906166664759318,
+              2.472892187827848e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006000366112454691,
+              0.009999999999999995,
+              7.741062380640928e-06
+            ],
+            "lowest_patch_vertex_count": 6,
+            "lowest_vertex_world_m": [
+              0.1300571229773826,
+              -0.09894999980926514,
+              -2.927438993109016e-07
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13013523186715012,
+              -0.09400000001102364,
+              4.142581255396693e-08
+            ],
+            "reference_to_nearest_patch_m": [
+              5.213716680607661e-10,
+              -1.1023640333895912e-11,
+              4.142581256090582e-08
+            ],
+            "reference_to_patch_centroid_m": [
+              -0.00016537077452061233,
+              0.003383333524068194,
+              2.4728921878347868e-06
+            ],
+            "vertical_discrepancy_m": -2.927438993039627e-07
+          },
+          "rh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.1441739399365677,
+                -0.09894999980926518,
+                5.858960870917633e-06
+              ],
+              [
+                -0.14387940369785593,
+                -0.08894999980926518,
+                -3.76266314902271e-07
+              ],
+              [
+                -0.1432793432798592,
+                -0.08894999980926518,
+                4.9395305053876945e-06
+              ],
+              [
+                -0.1441793927641909,
+                -0.08894999980926518,
+                6.029354438186543e-06
+              ],
+              [
+                -0.1433230373646881,
+                -0.08894999980926518,
+                6.2385558438037e-06
+              ],
+              [
+                -0.14374846495223295,
+                -0.08894999980926518,
+                1.224159737168995e-06
+              ],
+              [
+                -0.1441738623560802,
+                -0.08894999980926518,
+                8.359717257908766e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.14371695348630734,
+              -0.09400000000000004,
+              5.204170427930421e-18
+            ],
+            "centroid_displacement_m": 0.0036229692139570216,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 1.5104485661033477e-05,
+            "lowest_patch_centroid_world_m": [
+              -0.14382249205021072,
+              -0.09037857123783663,
+              4.610573191210152e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0009000494843316997,
+              0.009999999999999995,
+              8.735983572811037e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.14387940369785593,
+              -0.08894999980926518,
+              -3.76266314902271e-07
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.14373100213235257,
+              -0.09399874271598661,
+              5.403727259007051e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              -1.4048646045233815e-05,
+              1.2572840134283947e-06,
+              5.403727259001847e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -0.00010553856390338456,
+              0.0036214287621634117,
+              4.6105731912049475e-06
+            ],
+            "vertical_discrepancy_m": -3.762663149074752e-07
+          }
+        },
+        "joint_margins_rad": [
+          0.785398163397,
+          1.3261699887577916,
+          0.3049188401684514,
+          0.785398163397,
+          1.3261699887577916,
+          0.3049188401684514,
+          0.7853981633969997,
+          1.2396944843876827,
+          0.6537165321930881,
+          0.785398163397,
+          1.2396944843876827,
+          0.6537165321930881
+        ]
+      },
+      "embedded_target": true,
+      "errors": [],
+      "evidence": "VALIDATED_STATIC",
+      "ground_min_m": {
+        "base_link": 0.14999999999999988,
+        "lf_foot_link": -2.927438993109016e-07,
+        "lf_hip_link": 0.18525,
+        "lf_lower_leg_link": 0.0028899086215558867,
+        "lf_upper_leg_link": 0.10110988921512258,
+        "lh_foot_link": -3.762663149005363e-07,
+        "lh_hip_link": 0.16524999999999998,
+        "lh_lower_leg_link": 0.0028660015754113505,
+        "lh_upper_leg_link": 0.10631528003515689,
+        "rf_foot_link": -2.927438993109016e-07,
+        "rf_hip_link": 0.18525,
+        "rf_lower_leg_link": 0.0028899086215558867,
+        "rf_upper_leg_link": 0.10110988921512258,
+        "rh_foot_link": -3.76266314902271e-07,
+        "rh_hip_link": 0.16524999999999998,
+        "rh_lower_leg_link": 0.0028660015754113505,
+        "rh_upper_leg_link": 0.10631528003515689
+      },
+      "joint_margin_rad": 0.3049188401684514,
+      "mass_kg": 2.48,
+      "min_separation": {
+        "distance_m": 0.013787832260131826,
+        "pair": [
+          "base_link",
+          "lf_upper_leg_link"
+        ]
+      },
+      "name": "STAND",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.7209334603872882
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.0847588557256162,
+            0.22348937272005934,
+            -0.9444228331073476
+          ],
+          [
+            0.0847588557256162,
+            -0.22348937272005934,
+            -0.9444228331073476
+          ],
+          [
+            -0.15003564199755046,
+            -0.22348937272005956,
+            -0.8482983717223758
+          ],
+          [
+            -0.15003564199755046,
+            0.22348937272005934,
+            -0.8482983717223758
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "q": [
+        0.0,
+        0.40987213146079154,
+        0.34957962932954856,
+        0.0,
+        0.40987213146079154,
+        0.34957962932954856,
+        -2.220446049250313e-16,
+        0.8983338493053175,
+        0.0007819373049118283,
+        0.0,
+        0.8983338493053175,
+        0.0007819373049118283
+      ],
+      "regime": "FOOT_SUPPORT",
+      "scope": "canonical rigid CAD geometry and quasi-static URDF COM; not physical startup evidence",
+      "source": "envelope.json:poses/STAND",
+      "support_margin_m": 0.09861399174474902,
+      "support_polygon": [
+        [
+          -0.1441793927641909,
+          0.09905000019073486
+        ],
+        [
+          -0.1441793927641909,
+          -0.08894999980926518
+        ],
+        [
+          -0.1441739399365677,
+          -0.09894999980926518
+        ],
+        [
+          0.1300571229773826,
+          -0.09894999980926514
+        ],
+        [
+          0.13025352543818974,
+          -0.08894999980926514
+        ],
+        [
+          0.13025352543818974,
+          0.09905000019073486
+        ]
+      ],
+      "valid": true
+    },
+    {
+      "active_feet": [
+        "lf",
+        "rf",
+        "rh",
+        "lh"
+      ],
+      "base_contact": false,
+      "body": [
+        [
+          0.9800665778412416,
+          0.0,
+          0.19866933079506122,
+          -0.03
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          -0.19866933079506122,
+          0.0,
+          0.9800665778412416,
+          0.1
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "collisions": [],
+      "com_world_m": [
+        -0.034160781681433286,
+        -0.0003360080645400937,
+        0.11210459129385843
+      ],
+      "contact_axis_tilt_rad": {
+        "lf": 2.8321205900278633e-16,
+        "lh": 8.290496284093895e-12,
+        "rf": 4.689861760820055e-16,
+        "rh": 3.6413282331024675e-12
+      },
+      "contacts": [
+        [
+          0.13013523134577848,
+          0.09399999999999996,
+          -3.2597590916491614e-06
+        ],
+        [
+          0.13013523134577837,
+          -0.09399999999999994,
+          -3.2597590916352837e-06
+        ],
+        [
+          -0.14371695348613436,
+          -0.09399999999945347,
+          -6.377406283411546e-07
+        ],
+        [
+          -0.14371695348599567,
+          0.09399999999875568,
+          -6.377378982385523e-07
+        ]
+      ],
+      "diagnostics": {
+        "collision_details": [],
+        "conditioning": {
+          "lf": {
+            "condition_number": 2.596027812783991,
+            "jacobian_determinant": -0.0010632556294157215,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.15851427174127572,
+              0.10985258784474063,
+              0.061060313360543066
+            ]
+          },
+          "lh": {
+            "condition_number": 2.9065979066663283,
+            "jacobian_determinant": -0.0014751234657001098,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.16985000912961387,
+              0.14862168437608025,
+              0.05843601852876182
+            ]
+          },
+          "rf": {
+            "condition_number": 2.5960278133288885,
+            "jacobian_determinant": -0.001063255629210612,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.15851427174404178,
+              0.10985258784277326,
+              0.06106031334879221
+            ]
+          },
+          "rh": {
+            "condition_number": 2.906597906079057,
+            "jacobian_determinant": -0.0014751234656892867,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.16985000911709353,
+              0.14862168436687231,
+              0.05843601853626111
+            ]
+          }
+        },
+        "conditioning_scope": "central-difference analytical G2 cross-section reference FK Jacobian; not nonsmooth mesh-edge IK Jacobian",
+        "feet": {
+          "lf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.12988254391746284,
+                0.08905000019073482,
+                2.140816014155481e-06
+              ],
+              [
+                0.1303898976212037,
+                0.09905000019073482,
+                2.010228924867523e-06
+              ],
+              [
+                0.13008984706137272,
+                0.09905000019073482,
+                8.666163489948198e-17
+              ],
+              [
+                0.12978981685481572,
+                0.09905000019073482,
+                4.032314974674345e-06
+              ],
+              [
+                0.13009531019798648,
+                0.09905000019073482,
+                2.4841728148376746e-06
+              ],
+              [
+                0.13030804239708343,
+                0.09905000019073482,
+                3.364131780999162e-06
+              ],
+              [
+                0.12988258714160647,
+                0.09905000019073482,
+                4.642007505813666e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13013523134577848,
+              0.09399999999999996,
+              -3.2597590916491614e-06
+            ],
+            "centroid_displacement_m": 0.003622162329223373,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 5.555208829449082e-06,
+            "lowest_patch_centroid_world_m": [
+              0.1300625778845045,
+              0.0976214287621634,
+              2.667667430776359e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006000807663879837,
+              0.009999999999999995,
+              4.642007505727004e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              0.13008984706137272,
+              0.09905000019073482,
+              8.666163489948198e-17
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13013368796744873,
+              0.09400007837355155,
+              2.076174383991295e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              -1.5433783297491566e-06,
+              7.837355159301396e-08,
+              5.3359334756404564e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -7.265346127396932e-05,
+              0.0036214287621634395,
+              5.92742652242552e-06
+            ],
+            "vertical_discrepancy_m": 3.259759091735823e-06
+          },
+          "lh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.14408716973768265,
+                0.09905000018948996,
+                4.55050414634086e-06
+              ],
+              [
+                -0.143787147213646,
+                0.09905000018949042,
+                5.4521808075247424e-12
+              ],
+              [
+                -0.14348709329366344,
+                0.09905000018949095,
+                1.49151942267561e-06
+              ],
+              [
+                -0.1438362255490149,
+                0.09905000018949037,
+                2.832193236049045e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.14371695348599567,
+              0.09399999999875568,
+              -6.377378982385523e-07
+            ],
+            "centroid_displacement_m": 0.005050674112247831,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.005050001269582056,
+            "lowest_patch_centroid_world_m": [
+              -0.14379940894850174,
+              0.09905000018949042,
+              2.2185555643115806e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006000764440192152,
+              9.853229343548264e-16,
+              4.550498694160052e-06
+            ],
+            "lowest_patch_vertex_count": 4,
+            "lowest_vertex_world_m": [
+              -0.143787147213646,
+              0.09905000018949042,
+              5.4521808075247424e-12
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.14371693665903998,
+              0.09905000018949058,
+              2.6631823841700586e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              1.6826955689941414e-08,
+              0.005050000190734899,
+              3.300920282408611e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -8.245546250607028e-05,
+              0.005050000190734746,
+              2.856293462550133e-06
+            ],
+            "vertical_discrepancy_m": 6.377433504193598e-07
+          },
+          "rf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.12988254391746273,
+                -0.09894999980926508,
+                2.140816014164968e-06
+              ],
+              [
+                0.1303898976212036,
+                -0.08894999980926509,
+                2.0102289248841924e-06
+              ],
+              [
+                0.1300898470613726,
+                -0.08894999980926509,
+                1.0353453120878764e-16
+              ],
+              [
+                0.1297898168548156,
+                -0.08894999980926509,
+                4.032314974691421e-06
+              ],
+              [
+                0.1300953101979864,
+                -0.08894999980926509,
+                2.484172814854534e-06
+              ],
+              [
+                0.13030804239708332,
+                -0.08894999980926509,
+                3.3641317810158587e-06
+              ],
+              [
+                0.12988258714160636,
+                -0.08894999980926509,
+                4.642007505830661e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13013523134577837,
+              -0.09399999999999994,
+              -3.2597590916352837e-06
+            ],
+            "centroid_displacement_m": 0.0036221623292233586,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 5.55520882944828e-06,
+            "lowest_patch_centroid_world_m": [
+              0.1300625778845044,
+              -0.09037857123783652,
+              2.667667430792167e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006000807663879837,
+              0.009999999999999995,
+              4.642007505727126e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              0.1300898470613726,
+              -0.08894999980926509,
+              1.0353453120878764e-16
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13013368796744862,
+              -0.09399992162644835,
+              2.076174384004337e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              -1.5433783297491566e-06,
+              7.837355159301396e-08,
+              5.335933475639621e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -7.265346127396932e-05,
+              0.0036214287621634256,
+              5.927426522427451e-06
+            ],
+            "vertical_discrepancy_m": 3.259759091738818e-06
+          },
+          "rh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.14408716973802613,
+                -0.08894999980871836,
+                4.550501481887133e-06
+              ],
+              [
+                -0.14378714721398952,
+                -0.08894999980871857,
+                2.783356878310883e-12
+              ],
+              [
+                -0.14348709329400697,
+                -0.08894999980871879,
+                1.491516749479744e-06
+              ],
+              [
+                -0.1438362255493584,
+                -0.08894999980871854,
+                2.8321905679393883e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.14371695348613436,
+              -0.09399999999945347,
+              -6.377406283411546e-07
+            ],
+            "centroid_displacement_m": 0.005050674112251362,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.005050001269582039,
+            "lowest_patch_centroid_world_m": [
+              -0.14379940894884524,
+              -0.08894999980871857,
+              2.218552895665786e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006000764440191597,
+              4.3021142204224816e-16,
+              4.5504986985302545e-06
+            ],
+            "lowest_patch_vertex_count": 4,
+            "lowest_vertex_world_m": [
+              -0.14378714721398952,
+              -0.08894999980871857,
+              2.783356878310883e-12
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.1437169366591664,
+              -0.08894999980871862,
+              2.6631797132160524e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              1.6826967957905836e-08,
+              0.0050500001907348435,
+              3.300920341557207e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -8.245546271087867e-05,
+              0.005050000190734899,
+              2.8562935240069405e-06
+            ],
+            "vertical_discrepancy_m": 6.377434116980329e-07
+          }
+        },
+        "joint_margins_rad": [
+          0.7853981633969996,
+          1.491279127024927,
+          0.9163903122615833,
+          0.7853981633969995,
+          1.4912791270249288,
+          0.9163903122615824,
+          0.7853981633932846,
+          1.287622239316963,
+          1.1140477785558893,
+          0.7853981633885408,
+          1.2876222392921726,
+          1.114047778595248
+        ]
+      },
+      "embedded_target": true,
+      "errors": [],
+      "evidence": "VALIDATED_STATIC",
+      "ground_min_m": {
+        "base_link": 0.07651585049547603,
+        "lf_foot_link": 8.666163489948198e-17,
+        "lf_hip_link": 0.1067336405575952,
+        "lf_lower_leg_link": 0.002277879889412235,
+        "lf_upper_leg_link": 0.04502028650564767,
+        "lh_foot_link": 5.4521808075247424e-12,
+        "lh_hip_link": 0.1318329084294726,
+        "lh_lower_leg_link": 0.0028601407887307584,
+        "lh_upper_leg_link": 0.08939595791302264,
+        "rf_foot_link": 1.0353453120878764e-16,
+        "rf_hip_link": 0.1067336405575952,
+        "rf_lower_leg_link": 0.002277879889412242,
+        "rf_upper_leg_link": 0.04502028650564775,
+        "rh_foot_link": 2.783356878310883e-12,
+        "rh_hip_link": 0.1318329084295772,
+        "rh_lower_leg_link": 0.002860140786035928,
+        "rh_upper_leg_link": 0.08939595791134075
+      },
+      "joint_margin_rad": 0.7853981633885408,
+      "mass_kg": 2.48,
+      "min_separation": {
+        "distance_m": 0.013787832260002762,
+        "pair": [
+          "base_link",
+          "lh_upper_leg_link"
+        ]
+      },
+      "name": "STRETCH",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          -0.14418669207745763,
+          0.0,
+          0.48062230692485886
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.3090919009466843,
+            0.22348937272005914,
+            -0.5416416022691837
+          ],
+          [
+            0.3090919009466838,
+            -0.2234893727200591,
+            -0.5416416022691837
+          ],
+          [
+            0.10053116395738897,
+            -0.22348937271743258,
+            -0.7069923080009081
+          ],
+          [
+            0.10053116395543546,
+            0.22348937271407884,
+            -0.7069923079879158
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            0.9800665778412416,
+            0.0,
+            0.19866933079506122
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.19866933079506122,
+            0.0,
+            0.9800665778412416
+          ]
+        ]
+      },
+      "q": [
+        -2.889722651563199e-16,
+        0.5749812697279272,
+        -0.6893125995734166,
+        4.785248131969003e-16,
+        0.5749812697279288,
+        -0.6893125995734175,
+        3.715388643415526e-12,
+        0.8504060943760373,
+        -0.45954930905788943,
+        -8.459115402501616e-12,
+        0.8504060944008275,
+        -0.4595493090972482
+      ],
+      "regime": "FOOT_SUPPORT",
+      "scope": "canonical rigid CAD geometry and quasi-static URDF COM; not physical startup evidence",
+      "source": "envelope.json:poses/STRETCH_CANDIDATE",
+      "support_margin_m": 0.0925647067773516,
+      "support_polygon": [
+        [
+          -0.14408716973802613,
+          -0.08894999980871836
+        ],
+        [
+          0.12988254391746273,
+          -0.09894999980926508
+        ],
+        [
+          0.1303898976212036,
+          -0.08894999980926509
+        ],
+        [
+          0.1303898976212037,
+          0.09905000019073482
+        ],
+        [
+          0.12978981685481572,
+          0.09905000019073482
+        ],
+        [
+          -0.14408716973768265,
+          0.09905000018948996
+        ]
+      ],
+      "valid": true
+    },
+    {
+      "active_feet": [
+        "lf",
+        "rf",
+        "rh",
+        "lh"
+      ],
+      "base_contact": false,
+      "body": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.955336489125606,
+          -0.29552020666133955,
+          0.0
+        ],
+        [
+          -0.0,
+          0.29552020666133955,
+          0.955336489125606,
+          0.1
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "collisions": [],
+      "com_world_m": [
+        -0.013568477367707986,
+        -0.008533922039296241,
+        0.11609448879777802
+      ],
+      "contact_axis_tilt_rad": {
+        "lf": 0.09865677101725345,
+        "lh": 0.07064667589952477,
+        "rf": 0.0906511892449987,
+        "rh": 0.0519398869894424
+      },
+      "contacts": [
+        [
+          0.1301352313457784,
+          0.09399999999999999,
+          0.00048613177065309765
+        ],
+        [
+          0.1301352313457785,
+          -0.09399999999999999,
+          0.0004426190635676234
+        ],
+        [
+          -0.14371695348630698,
+          -0.09400000000000001,
+          0.00023987989667985897
+        ],
+        [
+          -0.1437169534863073,
+          0.09399999999999999,
+          0.00034990611009643423
+        ]
+      ],
+      "diagnostics": {
+        "collision_details": [],
+        "conditioning": {
+          "lf": {
+            "condition_number": 3.3610371148779077,
+            "jacobian_determinant": -0.001650064018109501,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.18305649738614863,
+              0.16550221316193398,
+              0.054464289184976256
+            ]
+          },
+          "lh": {
+            "condition_number": 2.7853233311577994,
+            "jacobian_determinant": -0.0014237713907100237,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.16192373817539263,
+              0.1512498094473998,
+              0.058134628882774764
+            ]
+          },
+          "rf": {
+            "condition_number": 2.572552971472193,
+            "jacobian_determinant": -0.0011735591442887361,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.15429052363745177,
+              0.12682089154583814,
+              0.05997564495208667
+            ]
+          },
+          "rh": {
+            "condition_number": 2.4488637558496182,
+            "jacobian_determinant": -0.0009260170650867697,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.1374130235960157,
+              0.12009580071241027,
+              0.056112972094824076
+            ]
+          }
+        },
+        "conditioning_scope": "central-difference analytical G2 cross-section reference FK Jacobian; not nonsmooth mesh-edge IK Jacobian",
+        "feet": {
+          "lf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.13062801599855747,
+                0.08907318668395367,
+                7.49921238301374e-06
+              ],
+              [
+                0.13002797898343987,
+                0.08907392894176755,
+                2.8796409701215e-16
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.1301352313457784,
+              0.09399999999999999,
+              0.00048613177065309765
+            ],
+            "centroid_displacement_m": 0.004953754531924265,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.00495000059055723,
+            "lowest_patch_centroid_world_m": [
+              0.13032799749099866,
+              0.08907355781286061,
+              3.7496061916508523e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006000370151175993,
+              7.422578138793767e-07,
+              7.499212382725776e-06
+            ],
+            "lowest_patch_vertex_count": 2,
+            "lowest_vertex_world_m": [
+              0.13002797898343987,
+              0.08907392894176755,
+              2.8796409701215e-16
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.1301351964201163,
+              0.08907379631164948,
+              1.3399945481417482e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              -3.492566208462833e-08,
+              -0.004926203688350506,
+              -0.0004847917761049559
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00019276614522026336,
+              -0.0049264421871393765,
+              -0.0004823821644614468
+            ],
+            "vertical_discrepancy_m": -0.0004861317706528097
+          },
+          "lh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.14372009729204457,
+                0.08906238275349476,
+                1.734723475976807e-17
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.1437169534863073,
+              0.09399999999999999,
+              0.00034990611009643423
+            ],
+            "centroid_displacement_m": 0.0049500008325638846,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.0049500008325638846,
+            "lowest_patch_centroid_world_m": [
+              -0.14372009729204457,
+              0.08906238275349476,
+              1.734723475976807e-17
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              -0.14372009729204457,
+              0.08906238275349476,
+              1.734723475976807e-17
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.14372009729204457,
+              0.08906238275349476,
+              1.734723475976807e-17
+            ],
+            "reference_to_nearest_patch_m": [
+              -3.1438057372656925e-06,
+              -0.004937617246505224,
+              -0.0003499061100964169
+            ],
+            "reference_to_patch_centroid_m": [
+              -3.1438057372656925e-06,
+              -0.004937617246505224,
+              -0.0003499061100964169
+            ],
+            "vertical_discrepancy_m": -0.0003499061100964169
+          },
+          "rf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.13045444629863195,
+                -0.09893017412119064,
+                1.1319070680748666e-16
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.1301352313457785,
+              -0.09399999999999999,
+              0.0004426190635676234
+            ],
+            "centroid_displacement_m": 0.004960284940083242,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.004960284940083242,
+            "lowest_patch_centroid_world_m": [
+              0.13045444629863195,
+              -0.09893017412119064,
+              1.1319070680748666e-16
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              0.13045444629863195,
+              -0.09893017412119064,
+              1.1319070680748666e-16
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13045444629863195,
+              -0.09893017412119064,
+              1.1319070680748666e-16
+            ],
+            "reference_to_nearest_patch_m": [
+              0.00031921495285344714,
+              -0.00493017412119065,
+              -0.0004426190635675102
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00031921495285344714,
+              -0.00493017412119065,
+              -0.0004426190635675102
+            ],
+            "vertical_discrepancy_m": -0.0004426190635675102
+          },
+          "rh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.14459555068116936,
+                -0.09894467680303444,
+                8.907971048507067e-06
+              ],
+              [
+                -0.14299237992125557,
+                -0.09894421370751107,
+                9.913944665207453e-16
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.14371695348630698,
+              -0.09400000000000001,
+              0.00023987989667985897
+            ],
+            "centroid_displacement_m": 0.004950645923681813,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.0049500450411544645,
+            "lowest_patch_centroid_world_m": [
+              -0.14379396530121247,
+              -0.09894444525527275,
+              4.453985524749231e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0016031707599137857,
+              4.6309552337309157e-07,
+              8.907971047515673e-06
+            ],
+            "lowest_patch_vertex_count": 2,
+            "lowest_vertex_world_m": [
+              -0.14299237992125557,
+              -0.09894421370751107,
+              9.913944665207453e-16
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.14371683574758706,
+              -0.09894442297545585,
+              4.025417434697643e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              1.1773871991249685e-07,
+              -0.004944422975455831,
+              -0.00023585447924516132
+            ],
+            "reference_to_patch_centroid_m": [
+              -7.701181490549214e-05,
+              -0.004944445255272739,
+              -0.00023542591115510974
+            ],
+            "vertical_discrepancy_m": -0.00023987989667886758
+          }
+        },
+        "joint_margins_rad": [
+          0.5840549344142535,
+          1.40700068762105,
+          0.8928789709594231,
+          0.5760493526419987,
+          1.1368412624352031,
+          0.8803133022684664,
+          0.5373380503864423,
+          0.5432604980531532,
+          0.7164981560576669,
+          0.5560448392965247,
+          0.8948120334802752,
+          1.116907337675566
+        ]
+      },
+      "embedded_target": false,
+      "errors": [],
+      "evidence": "RESEARCH_ONLY",
+      "ground_min_m": {
+        "base_link": 0.08632981081795144,
+        "lf_foot_link": 2.8796409701215e-16,
+        "lf_hip_link": 0.14724824130933278,
+        "lf_lower_leg_link": 0.0025341009016709715,
+        "lf_upper_leg_link": 0.08134154532257117,
+        "lh_foot_link": 1.734723475976807e-17,
+        "lh_hip_link": 0.12813168921339294,
+        "lh_lower_leg_link": 0.002702503194595196,
+        "lh_upper_leg_link": 0.09907308943536793,
+        "rf_foot_link": 1.1319070680748666e-16,
+        "rf_hip_link": 0.11252838883688707,
+        "rf_lower_leg_link": 0.0023311735883361356,
+        "rf_upper_leg_link": 0.06237305932068045,
+        "rh_foot_link": 9.913944665207453e-16,
+        "rh_hip_link": 0.09622851314454922,
+        "rh_lower_leg_link": 0.002736557427962333,
+        "rh_upper_leg_link": 0.09332541018518338
+      },
+      "joint_margin_rad": 0.5373380503864423,
+      "mass_kg": 2.48,
+      "min_separation": {
+        "distance_m": 0.010547467470801765,
+        "pair": [
+          "base_link",
+          "lh_upper_leg_link"
+        ]
+      },
+      "name": "ROLL_PREP_RESEARCH",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.48062230692485886
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.08475885572561594,
+            0.06196793686913313,
+            -0.8139248839479383
+          ],
+          [
+            0.08475885572561648,
+            -0.3447160055290139,
+            -0.5471015006444095
+          ],
+          [
+            -0.1500356419975487,
+            -0.34500396327338667,
+            -0.4519079283638867
+          ],
+          [
+            -0.15003564199755032,
+            0.06177445065459575,
+            -0.7184259108941323
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.955336489125606,
+            -0.29552020666133955
+          ],
+          [
+            -0.0,
+            0.29552020666133955,
+            0.955336489125606
+          ]
+        ]
+      },
+      "q": [
+        -0.2013432289827465,
+        0.7310276460719504,
+        -0.23838050146142317,
+        -0.20934881075500128,
+        1.001187071257797,
+        -0.7253896095665335,
+        -0.2480601130105576,
+        1.594767835639847,
+        -0.889204755777333,
+        -0.2293533241004752,
+        1.243216300212725,
+        -0.4887955741594339
+      ],
+      "regime": "FOOT_SUPPORT",
+      "scope": "canonical rigid CAD geometry and quasi-static URDF COM; not physical startup evidence",
+      "source": "envelope.json:poses/ROLL_PREPARATION",
+      "support_margin_m": 0.09040384591609782,
+      "support_polygon": [
+        [
+          0.13062801599855747,
+          0.08907318668395367
+        ],
+        [
+          0.13002797898343987,
+          0.08907392894176755
+        ],
+        [
+          -0.14372009729204457,
+          0.08906238275349476
+        ],
+        [
+          -0.14459555068116936,
+          -0.09894467680303444
+        ],
+        [
+          0.13045444629863195,
+          -0.09893017412119064
+        ]
+      ],
+      "valid": true
+    },
+    {
+      "active_feet": [
+        "lf",
+        "rf",
+        "rh",
+        "lh"
+      ],
+      "base_contact": false,
+      "body": [
+        [
+          0.9396926207859084,
+          -0.0,
+          -0.3420201433256687,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          -0.0,
+          0.0
+        ],
+        [
+          0.3420201433256687,
+          0.0,
+          0.9396926207859084,
+          0.12
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "collisions": [],
+      "com_world_m": [
+        -0.018972414613497045,
+        -0.0003360080661758709,
+        0.13417528200262888
+      ],
+      "contact_axis_tilt_rad": {
+        "lf": 2.731811053980856e-10,
+        "lh": 1.279058328636507e-12,
+        "rf": 4.125653677793495e-11,
+        "rh": 3.1956742123812606e-13
+      },
+      "contacts": [
+        [
+          0.13013523129360266,
+          0.09399999994076091,
+          4.5598745224487147e-07
+        ],
+        [
+          0.13013523133556917,
+          -0.09399999999105356,
+          4.557866481059297e-07
+        ],
+        [
+          -0.14371695348627,
+          -0.09400000000003064,
+          -6.999470447167921e-08
+        ],
+        [
+          -0.14371695348617888,
+          0.09400000000012265,
+          -6.999482350840414e-08
+        ]
+      ],
+      "diagnostics": {
+        "collision_details": [],
+        "conditioning": {
+          "lf": {
+            "condition_number": 7.958033501808844,
+            "jacobian_determinant": -0.0012770140140402491,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.22055963353315822,
+              0.20890525432617865,
+              0.027715343681705473
+            ]
+          },
+          "lh": {
+            "condition_number": 2.5694300540928396,
+            "jacobian_determinant": -0.0007498678134096053,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.13465050736869927,
+              0.10626873822891988,
+              0.05240481528353526
+            ]
+          },
+          "rf": {
+            "condition_number": 7.958033580416051,
+            "jacobian_determinant": -0.0012770140054683822,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.22055963378016666,
+              0.20890525451951086,
+              0.02771534343898002
+            ]
+          },
+          "rh": {
+            "condition_number": 2.5694300535541843,
+            "jacobian_determinant": -0.0007498678132586753,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.13465050734939307,
+              0.10626873821572613,
+              0.0524048152870076
+            ]
+          }
+        },
+        "conditioning_scope": "central-difference analytical G2 cross-section reference FK Jacobian; not nonsmooth mesh-edge IK Jacobian",
+        "feet": {
+          "lf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.13023166846353204,
+                0.08905000013148613,
+                2.7059924397054846e-07
+              ],
+              [
+                0.13042805523394788,
+                0.0990500001314673,
+                2.7604164838136713e-06
+              ],
+              [
+                0.1298279713295015,
+                0.0990500001315271,
+                3.2830074398202194e-06
+              ],
+              [
+                0.13012801088641063,
+                0.09905000013149637,
+                2.476909163884322e-10
+              ],
+              [
+                0.13001891917009564,
+                0.09905000013150804,
+                2.9962963813594604e-06
+              ],
+              [
+                0.13023165281035656,
+                0.09905000013148682,
+                2.7726066218931866e-06
+              ],
+              [
+                0.12980620971565676,
+                0.09905000013153008,
+                6.258636023289896e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13013523129360266,
+              0.09399999994076091,
+              4.5598745224487147e-07
+            ],
+            "centroid_displacement_m": 0.0036216411469374627,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 2.1364162203888224e-06,
+            "lowest_patch_centroid_world_m": [
+              0.13009606965850012,
+              0.09762142870292885,
+              2.620258555009053e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006218455182911142,
+              0.010000000000043946,
+              6.258388332373507e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              0.13012801088641063,
+              0.09905000013149637,
+              2.476909163884322e-10
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.1301352433119159,
+              0.093999999172817,
+              2.592369730103781e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              1.2018313233497224e-08,
+              -7.679439167906921e-10,
+              2.1363822778589096e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -3.91616351025359e-05,
+              0.003621428762167936,
+              2.1642711027641814e-06
+            ],
+            "vertical_discrepancy_m": -4.5573976132848304e-07
+          },
+          "lh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.14424399237191265,
+                0.08905000019085726,
+                9.377627209990191e-06
+              ],
+              [
+                -0.14424399237191732,
+                0.09905000019085726,
+                9.377627222781175e-06
+              ],
+              [
+                -0.14364398170326076,
+                0.09905000019085755,
+                -1.5826099111770908e-13
+              ],
+              [
+                -0.1439440344082681,
+                0.09905000019085741,
+                1.6679250811166453e-06
+              ],
+              [
+                -0.1441294115789162,
+                0.09905000019085732,
+                8.22153956313472e-06
+              ],
+              [
+                -0.1434912673946786,
+                0.09905000019085762,
+                3.973228258340178e-06
+              ],
+              [
+                -0.14391672448156761,
+                0.09905000019085741,
+                3.7680090859549924e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.14371695348617888,
+              0.09400000000012265,
+              -6.999482350840414e-08
+            ],
+            "centroid_displacement_m": 0.003628591369468218,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.00015415292727568054,
+            "lowest_patch_centroid_world_m": [
+              -0.14394477204436015,
+              0.09762142876228598,
+              5.197993751865273e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0007527249772387168,
+              0.010000000000000356,
+              9.377627381042166e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.14364398170326076,
+              0.09905000019085755,
+              -1.5826099111770908e-13
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.14387052312953436,
+              0.09401156322747446,
+              6.696200602626345e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              -0.0001535696433554723,
+              1.1563227351810146e-05,
+              6.766195426134749e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -0.00022781855818126973,
+              0.0036214287621633284,
+              5.267988575373677e-06
+            ],
+            "vertical_discrepancy_m": 6.999466524741302e-08
+          },
+          "rf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.13023166846293005,
+                -0.09894999980031724,
+                2.7039660418365363e-07
+              ],
+              [
+                0.13042805523220866,
+                -0.08894999980031439,
+                2.7602164198760326e-06
+              ],
+              [
+                0.12982797132776377,
+                -0.08894999980032342,
+                3.282809113084109e-06
+              ],
+              [
+                0.1301280108846634,
+                -0.08894999980031879,
+                4.8495586886521114e-11
+              ],
+              [
+                0.1300189191683571,
+                -0.08894999980032053,
+                2.996097501843306e-06
+              ],
+              [
+                0.13023165280861734,
+                -0.08894999980031734,
+                2.7724071265267797e-06
+              ],
+              [
+                0.12980620971392764,
+                -0.08894999980032386,
+                6.258437759552871e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13013523133556917,
+              -0.09399999999105356,
+              4.557866481059297e-07
+            ],
+            "centroid_displacement_m": 0.0036216411474038713,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 2.136415977734721e-06,
+            "lowest_patch_centroid_world_m": [
+              0.130096069656924,
+              -0.0903785712288908,
+              2.62005900295052e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006218455182810112,
+              0.010000000000002854,
+              6.258389263965984e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              0.1301280108846634,
+              -0.08894999980031879,
+              4.8495586886521114e-11
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13013524335388724,
+              -0.09400000075899806,
+              2.5921686832795047e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              1.2018318062967381e-08,
+              -7.6794449965778e-10,
+              2.136382035173575e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -3.916167864517761e-05,
+              0.0036214287621627594,
+              2.16427235484459e-06
+            ],
+            "vertical_discrepancy_m": -4.557381525190432e-07
+          },
+          "rh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.14424399237202484,
+                -0.09894999980929572,
+                9.377627337584307e-06
+              ],
+              [
+                -0.14424399237202368,
+                -0.08894999980929572,
+                9.37762733438808e-06
+              ],
+              [
+                -0.14364398170336715,
+                -0.0889499998092958,
+                -4.738744119325844e-14
+              ],
+              [
+                -0.1439440344083745,
+                -0.08894999980929576,
+                1.6679251923562219e-06
+              ],
+              [
+                -0.1441294115790226,
+                -0.08894999980929573,
+                8.221539674600677e-06
+              ],
+              [
+                -0.143491267394785,
+                -0.08894999980929581,
+                3.973228369027245e-06
+              ],
+              [
+                -0.14391672448167397,
+                -0.08894999980929576,
+                3.768009197161609e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.14371695348627,
+              -0.09400000000003064,
+              -6.999470447167921e-08
+            ],
+            "centroid_displacement_m": 0.0036285913694693458,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.00015415292729382537,
+            "lowest_patch_centroid_world_m": [
+              -0.14394477204446737,
+              -0.09037857123786719,
+              5.1979938653900995e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0007527249772398548,
+              0.010000000000000009,
+              9.377627384971748e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.14364398170336715,
+              -0.0889499998092958,
+              -4.738744119325844e-14
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.14387052312964357,
+              -0.09398843677267738,
+              6.696200721831177e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              -0.00015356964337356893,
+              1.1563227353267314e-05,
+              6.7661954263028565e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -0.00022781855819736796,
+              0.0036214287621634533,
+              5.267988569861779e-06
+            ],
+            "vertical_discrepancy_m": 6.999465708423802e-08
+          }
+        },
+        "joint_margins_rad": [
+          0.7853981631062867,
+          1.4252936068007773,
+          0.0666907515981836,
+          0.7853981633530956,
+          1.4252936030775527,
+          0.0666907449800277,
+          0.7853981633966599,
+          0.18382753253600526,
+          0.6825094827301756,
+          0.7853981633956388,
+          0.18382753253865336,
+          0.6825094827316024
+        ]
+      },
+      "embedded_target": false,
+      "errors": [],
+      "evidence": "RESEARCH_ONLY",
+      "ground_min_m": {
+        "base_link": 0.07514437027568362,
+        "lf_foot_link": 2.476909163884322e-10,
+        "lf_hip_link": 0.18219587706156057,
+        "lf_lower_leg_link": 0.002887597348128143,
+        "lf_upper_leg_link": 0.10206764742381626,
+        "lh_foot_link": -1.5826099111770908e-13,
+        "lh_hip_link": 0.08644749240139146,
+        "lh_lower_leg_link": 0.0028985644156364204,
+        "lh_upper_leg_link": 0.09203675424865124,
+        "rf_foot_link": 4.8495586886521114e-11,
+        "rf_hip_link": 0.1821958770648075,
+        "rf_lower_leg_link": 0.0028875971494972535,
+        "rf_upper_leg_link": 0.10206764741020419,
+        "rh_foot_link": -4.738744119325844e-14,
+        "rh_hip_link": 0.08644749240139146,
+        "rh_lower_leg_link": 0.0028985644157637214,
+        "rh_upper_leg_link": 0.0920367542486035
+      },
+      "joint_margin_rad": 0.0666907449800277,
+      "mass_kg": 2.48,
+      "min_separation": {
+        "distance_m": 0.013787832255696318,
+        "pair": [
+          "base_link",
+          "lf_upper_leg_link"
+        ]
+      },
+      "name": "PITCHED_CROUCH_RESEARCH",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.5767467683098305
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            -0.15021919744812778,
+            0.2234893724353431,
+            -0.9793715555388799
+          ],
+          [
+            -0.15021919758867822,
+            -0.22348937267706076,
+            -0.9793715565147718
+          ],
+          [
+            -0.30563830737102504,
+            -0.2234893727202066,
+            -0.4330843738327559
+          ],
+          [
+            -0.30563830737080916,
+            0.22348937272064884,
+            -0.4330843738334433
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            0.9396926207859084,
+            -0.0,
+            -0.3420201433256687
+          ],
+          [
+            0.0,
+            1.0,
+            -0.0
+          ],
+          [
+            0.3420201433256687,
+            0.0,
+            0.9396926207859084
+          ]
+        ]
+      },
+      "q": [
+        -2.907132602250421e-10,
+        0.5089957495037774,
+        0.5878077178998163,
+        4.390428940841336e-11,
+        0.5089957457805528,
+        0.5878077245179723,
+        -3.400765464890605e-13,
+        1.954200801156995,
+        -0.9231934291048243,
+        1.3611454430351614e-12,
+        1.9542008011543468,
+        -0.9231934291033975
+      ],
+      "regime": "FOOT_SUPPORT",
+      "scope": "canonical rigid CAD geometry and quasi-static URDF COM; not physical startup evidence",
+      "source": "expanded_envelope.json:most negative valid pitch; not recovered XGO SIT",
+      "support_margin_m": 0.09861399173902205,
+      "support_polygon": [
+        [
+          0.13042805523394788,
+          0.0990500001314673
+        ],
+        [
+          -0.1434912673946786,
+          0.09905000019085762
+        ],
+        [
+          -0.14424399237191732,
+          0.09905000019085726
+        ],
+        [
+          -0.14424399237202368,
+          -0.08894999980929572
+        ],
+        [
+          -0.14424399237202484,
+          -0.09894999980929572
+        ],
+        [
+          0.13023166846293005,
+          -0.09894999980031724
+        ],
+        [
+          0.13042805523220866,
+          -0.08894999980031439
+        ]
+      ],
+      "valid": true
+    },
+    {
+      "active_feet": [
+        "lf",
+        "rf",
+        "rh",
+        "lh"
+      ],
+      "base_contact": false,
+      "body": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          1.0,
+          0.08181818181818182
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "collisions": [],
+      "com_world_m": [
+        -0.014550226595941167,
+        -0.0003360080645161297,
+        0.1026565431288285
+      ],
+      "contact_axis_tilt_rad": {
+        "lf": 0.0,
+        "lh": 0.0,
+        "rf": 0.0,
+        "rh": 2.220446049250313e-16
+      },
+      "contacts": [
+        [
+          0.13013523134577848,
+          0.094,
+          -1.734723475976807e-18
+        ],
+        [
+          0.13013523134577848,
+          -0.094,
+          -1.734723475976807e-18
+        ],
+        [
+          -0.1437169534863073,
+          -0.09400000000000003,
+          1.5612511283791264e-17
+        ],
+        [
+          -0.1437169534863073,
+          0.094,
+          1.734723475976807e-18
+        ]
+      ],
+      "diagnostics": {
+        "collision_details": [],
+        "conditioning": {
+          "lf": {
+            "condition_number": 2.5938948632421437,
+            "jacobian_determinant": -0.0012052486596502412,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.15569284437056588,
+              0.12897089703537984,
+              0.06002280453879435
+            ]
+          },
+          "lh": {
+            "condition_number": 2.4492970344354026,
+            "jacobian_determinant": -0.0009191682430473368,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.13714938459549408,
+              0.11968748506014278,
+              0.05599540711774427
+            ]
+          },
+          "rf": {
+            "condition_number": 2.593894863242143,
+            "jacobian_determinant": -0.0012052486596502412,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.15569284437056582,
+              0.1289708970353798,
+              0.06002280453879434
+            ]
+          },
+          "rh": {
+            "condition_number": 2.4492970344676293,
+            "jacobian_determinant": -0.0009191682429884542,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.13714938459510884,
+              0.11968748505472279,
+              0.05599540711685022
+            ]
+          }
+        },
+        "conditioning_scope": "central-difference analytical G2 cross-section reference FK Jacobian; not nonsmooth mesh-edge IK Jacobian",
+        "feet": {
+          "lf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.13029285603238364,
+                0.08905000019073486,
+                2.9262272163263665e-06
+              ],
+              [
+                0.1303965037051751,
+                0.09905000019073486,
+                4.3461718914011935e-06
+              ],
+              [
+                0.12979642221788937,
+                0.09905000019073486,
+                6.123776121953837e-06
+              ],
+              [
+                0.1300964542595897,
+                0.09905000019073486,
+                2.2135841776761093e-06
+              ],
+              [
+                0.12986737662355144,
+                0.09905000019073486,
+                7.155427320855901e-06
+              ],
+              [
+                0.13029283030599378,
+                0.09905000019073486,
+                5.427741249972983e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13013523134577848,
+              0.094,
+              -1.734723475976807e-18
+            ],
+            "centroid_displacement_m": 0.0033833563000352927,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 4.24798930393351e-06,
+            "lowest_patch_centroid_world_m": [
+              0.13012374052409717,
+              0.0973833335240682,
+              4.698821329697732e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006000814872857418,
+              0.009999999999999995,
+              4.941843143179791e-06
+            ],
+            "lowest_patch_vertex_count": 6,
+            "lowest_vertex_world_m": [
+              0.1300964542595897,
+              0.09905000019073486,
+              2.2135841776761093e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13013524392942033,
+              0.09399999926638515,
+              4.247970602544913e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              1.2583641850749672e-08,
+              -7.336148494241357e-10,
+              4.247970602546648e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -1.1490821681309216e-05,
+              0.003383333524068194,
+              4.698821329699467e-06
+            ],
+            "vertical_discrepancy_m": 2.213584177677844e-06
+          },
+          "lh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.14339774390638718,
+                0.09905000019073486,
+                3.0782815628556046e-06
+              ],
+              [
+                -0.14399782778217826,
+                0.09905000019073486,
+                2.5388513650113215e-06
+              ],
+              [
+                -0.143419611365884,
+                0.09905000019073486,
+                5.136537560176697e-06
+              ],
+              [
+                -0.143845062186813,
+                0.09905000019073486,
+                2.8844848152338384e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.1437169534863073,
+              0.094,
+              1.734723475976807e-18
+            ],
+            "centroid_displacement_m": 0.005051159262804381,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.005050003317115217,
+            "lowest_patch_centroid_world_m": [
+              -0.14360896940559836,
+              0.09905000019073486,
+              6.8854996796733215e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.00119992471696595,
+              0.0,
+              9.871640169295884e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.14399782778217826,
+              0.09905000019073486,
+              2.5388513650113215e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.14371701511801066,
+              0.09905000019073486,
+              5.618954896147891e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              -6.163170335193868e-08,
+              0.005050000190734857,
+              5.618954896146156e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00010798408070894494,
+              0.005050000190734857,
+              6.885499679671587e-06
+            ],
+            "vertical_discrepancy_m": 2.5388513650095867e-06
+          },
+          "rf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.13029285603238364,
+                -0.09894999980926514,
+                2.9262272163263665e-06
+              ],
+              [
+                0.1303965037051751,
+                -0.08894999980926514,
+                4.3461718914011935e-06
+              ],
+              [
+                0.12979642221788937,
+                -0.08894999980926514,
+                6.123776121953837e-06
+              ],
+              [
+                0.1300964542595897,
+                -0.08894999980926514,
+                2.2135841776761093e-06
+              ],
+              [
+                0.12986737662355144,
+                -0.08894999980926514,
+                7.155427320855901e-06
+              ],
+              [
+                0.13029283030599378,
+                -0.08894999980926514,
+                5.427741249972983e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13013523134577848,
+              -0.094,
+              -1.734723475976807e-18
+            ],
+            "centroid_displacement_m": 0.0033833563000352927,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 4.24798930393351e-06,
+            "lowest_patch_centroid_world_m": [
+              0.13012374052409717,
+              -0.0906166664759318,
+              4.698821329697732e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0006000814872857418,
+              0.009999999999999995,
+              4.941843143179791e-06
+            ],
+            "lowest_patch_vertex_count": 6,
+            "lowest_vertex_world_m": [
+              0.1300964542595897,
+              -0.08894999980926514,
+              2.2135841776761093e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13013524392942033,
+              -0.09400000073361485,
+              4.247970602544913e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              1.2583641850749672e-08,
+              -7.336148494241357e-10,
+              4.247970602546648e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              -1.1490821681309216e-05,
+              0.003383333524068194,
+              4.698821329699467e-06
+            ],
+            "vertical_discrepancy_m": 2.213584177677844e-06
+          },
+          "rh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.14339774390638718,
+                -0.08894999980926517,
+                3.078281562868615e-06
+              ],
+              [
+                -0.14399782778217826,
+                -0.08894999980926517,
+                2.538851365024332e-06
+              ],
+              [
+                -0.143419611365884,
+                -0.08894999980926517,
+                5.136537560189707e-06
+              ],
+              [
+                -0.143845062186813,
+                -0.08894999980926517,
+                2.884484815246849e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.1437169534863073,
+              -0.09400000000000003,
+              1.5612511283791264e-17
+            ],
+            "centroid_displacement_m": 0.005051159262804366,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.005050003317115217,
+            "lowest_patch_centroid_world_m": [
+              -0.14360896940559836,
+              -0.08894999980926518,
+              6.885499679686332e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.00119992471696595,
+              0.0,
+              9.871640169295884e-06
+            ],
+            "lowest_patch_vertex_count": 7,
+            "lowest_vertex_world_m": [
+              -0.14399782778217826,
+              -0.08894999980926517,
+              2.538851365024332e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.14371701511801066,
+              -0.08894999980926517,
+              5.618954896160901e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              -6.163170335193868e-08,
+              0.005050000190734857,
+              5.618954896145289e-06
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00010798408070894494,
+              0.0050500001907348435,
+              6.885499679670719e-06
+            ],
+            "vertical_discrepancy_m": 2.5388513650087194e-06
+          }
+        },
+        "joint_margins_rad": [
+          0.785398163397,
+          1.1508406551135903,
+          0.9051606448595839,
+          0.785398163397,
+          1.1508406551135903,
+          0.9051606448595839,
+          0.7853981633969997,
+          0.5381342221701946,
+          0.7114993438546826,
+          0.785398163397,
+          0.5381342221701946,
+          0.7114993438546826
+        ]
+      },
+      "embedded_target": false,
+      "errors": [],
+      "evidence": "RESEARCH_ONLY",
+      "ground_min_m": {
+        "base_link": 0.0818181818181817,
+        "lf_foot_link": 2.2135841776761093e-06,
+        "lf_hip_link": 0.11706818181818184,
+        "lf_lower_leg_link": 0.002592703674047611,
+        "lf_upper_leg_link": 0.06455797820155383,
+        "lh_foot_link": 2.5388513650113215e-06,
+        "lh_hip_link": 0.09706818181818182,
+        "lh_lower_leg_link": 0.002889909636451443,
+        "lh_upper_leg_link": 0.09389632047042856,
+        "rf_foot_link": 2.2135841776761093e-06,
+        "rf_hip_link": 0.11706818181818184,
+        "rf_lower_leg_link": 0.002592703674047611,
+        "rf_upper_leg_link": 0.06455797820155383,
+        "rh_foot_link": 2.538851365024332e-06,
+        "rh_hip_link": 0.09706818181818182,
+        "rh_lower_leg_link": 0.002889909636451457,
+        "rh_upper_leg_link": 0.09389632047042859
+      },
+      "joint_margin_rad": 0.5381342221701946,
+      "mass_kg": 2.48,
+      "min_separation": {
+        "distance_m": 0.013787832260131826,
+        "pair": [
+          "base_link",
+          "lf_upper_leg_link"
+        ]
+      },
+      "name": "XGO_HEIGHT_RATIO_RESEARCH",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.39323643293852084
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.08475885572561634,
+            0.22348937272005934,
+            -0.6167258056585803
+          ],
+          [
+            0.08475885572561634,
+            -0.22348937272005934,
+            -0.6167258056585803
+          ],
+          [
+            -0.15003564199755032,
+            -0.22348937272005948,
+            -0.5206013442736084
+          ],
+          [
+            -0.15003564199755032,
+            0.22348937272005934,
+            -0.5206013442736084
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "q": [
+        0.0,
+        0.9871876785794098,
+        -0.700542266975416,
+        0.0,
+        0.9871876785794098,
+        -0.700542266975416,
+        -2.220446049250313e-16,
+        1.5998941115228056,
+        -0.8942035679803173,
+        0.0,
+        1.5998941115228056,
+        -0.8942035679803173
+      ],
+      "regime": "FOOT_SUPPORT",
+      "scope": "canonical rigid CAD geometry and quasi-static URDF COM; not physical startup evidence",
+      "source": "envelope.json:XGO_HEIGHT_LOW_INTENT; assumed 60/110 host-height ratio, not recovered ground datum",
+      "support_margin_m": 0.09327138423073604,
+      "support_polygon": [
+        [
+          -0.14399782778217826,
+          0.09905000019073486
+        ],
+        [
+          -0.14399782778217826,
+          -0.08894999980926517
+        ],
+        [
+          0.13029285603238364,
+          -0.09894999980926514
+        ],
+        [
+          0.1303965037051751,
+          -0.08894999980926514
+        ],
+        [
+          0.1303965037051751,
+          0.09905000019073486
+        ]
+      ],
+      "valid": true
+    },
+    {
+      "active_feet": [
+        "lf",
+        "rf",
+        "rh",
+        "lh"
+      ],
+      "base_contact": true,
+      "body": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          1.0,
+          1.0999563076780766e-16
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "collisions": [],
+      "com_world_m": [
+        -0.012996839340284895,
+        -0.0003360080645161288,
+        0.035413508951833796
+      ],
+      "contact_axis_tilt_rad": {
+        "lf": 0.5890486225477501,
+        "lh": 0.3926990816985,
+        "rf": 0.5890486225477501,
+        "rh": 0.3926990816985
+      },
+      "contacts": [
+        [
+          0.14022804477154033,
+          0.13243604432759118,
+          0.003082015352952029
+        ],
+        [
+          0.14022804477154033,
+          -0.13243604432759118,
+          0.003082015352952029
+        ],
+        [
+          -0.0931002179435798,
+          -0.10796466265203199,
+          0.0020357471146267726
+        ],
+        [
+          -0.0931002179435798,
+          0.10796466265203199,
+          0.0020357471146267726
+        ]
+      ],
+      "diagnostics": {
+        "collision_details": [],
+        "conditioning": {
+          "lf": {
+            "condition_number": 2.6490331521771138,
+            "jacobian_determinant": -0.0005519808288403081,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.13465487855412764,
+              0.08064309786253637,
+              0.05083170757733297
+            ]
+          },
+          "lh": {
+            "condition_number": 5.396245708756328,
+            "jacobian_determinant": -0.0001303245020079919,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.12535259034085913,
+              0.044755989646901306,
+              0.02322959277733651
+            ]
+          },
+          "rf": {
+            "condition_number": 2.6490331521771138,
+            "jacobian_determinant": -0.0005519808288403081,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.13465487855412767,
+              0.08064309786253639,
+              0.05083170757733298
+            ]
+          },
+          "rh": {
+            "condition_number": 5.396245708756328,
+            "jacobian_determinant": -0.0001303245020079919,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.1253525903408591,
+              0.0447559896469013,
+              0.023229592777336504
+            ]
+          }
+        },
+        "conditioning_scope": "central-difference analytical G2 cross-section reference FK Jacobian; not nonsmooth mesh-edge IK Jacobian",
+        "feet": {
+          "lf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.140351041290938,
+                0.12712822039255978,
+                -1.4216058885629934e-15
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.14022804477154033,
+              0.13243604432759118,
+              0.003082015352952029
+            ],
+            "centroid_displacement_m": 0.006138969107669216,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.006138969107669216,
+            "lowest_patch_centroid_world_m": [
+              0.140351041290938,
+              0.12712822039255978,
+              -1.4216058885629934e-15
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              0.140351041290938,
+              0.12712822039255978,
+              -1.4216058885629934e-15
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.140351041290938,
+              0.12712822039255978,
+              -1.4216058885629934e-15
+            ],
+            "reference_to_nearest_patch_m": [
+              0.00012299651939767786,
+              -0.005307823935031403,
+              -0.0030820153529534508
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00012299651939767786,
+              -0.005307823935031403,
+              -0.0030820153529534508
+            ],
+            "vertical_discrepancy_m": -0.0030820153529534508
+          },
+          "lh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.09266880201912367,
+                0.10277915665502878,
+                4.691547604556562e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.0931002179435798,
+              0.10796466265203199,
+              0.0020357471146267726
+            ],
+            "centroid_displacement_m": 0.005585765736330384,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.005585765736330384,
+            "lowest_patch_centroid_world_m": [
+              -0.09266880201912367,
+              0.10277915665502878,
+              4.691547604556562e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              -0.09266880201912367,
+              0.10277915665502878,
+              4.691547604556562e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.09266880201912367,
+              0.10277915665502878,
+              4.691547604556562e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              0.0004314159244561272,
+              -0.005185505997003209,
+              -0.002031055567022216
+            ],
+            "reference_to_patch_centroid_m": [
+              0.0004314159244561272,
+              -0.005185505997003209,
+              -0.002031055567022216
+            ],
+            "vertical_discrepancy_m": -0.002031055567022216
+          },
+          "rf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.14035074697355548,
+                -0.12706828658902208,
+                3.255181603684966e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.14022804477154033,
+              -0.13243604432759118,
+              0.003082015352952029
+            ],
+            "centroid_displacement_m": 0.0061892360726529625,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.0061892360726529625,
+            "lowest_patch_centroid_world_m": [
+              0.14035074697355548,
+              -0.12706828658902208,
+              3.255181603684966e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              0.14035074697355548,
+              -0.12706828658902208,
+              3.255181603684966e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.14035074697355548,
+              -0.12706828658902208,
+              3.255181603684966e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              0.00012270220201515691,
+              0.0053677577385690955,
+              -0.003078760171348344
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00012270220201515691,
+              0.0053677577385690955,
+              -0.003078760171348344
+            ],
+            "vertical_discrepancy_m": -0.003078760171348344
+          },
+          "rh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.0926695594640617,
+                -0.10269926991570394,
+                1.9081958235744878e-16
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.0931002179435798,
+              -0.10796466265203199,
+              0.0020357471146267726
+            ],
+            "centroid_displacement_m": 0.005661633484116351,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.005661633484116351,
+            "lowest_patch_centroid_world_m": [
+              -0.0926695594640617,
+              -0.10269926991570394,
+              1.9081958235744878e-16
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              -0.0926695594640617,
+              -0.10269926991570394,
+              1.9081958235744878e-16
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.0926695594640617,
+              -0.10269926991570394,
+              1.9081958235744878e-16
+            ],
+            "reference_to_nearest_patch_m": [
+              0.00043065847951809233,
+              0.005265392736328048,
+              -0.0020357471146265817
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00043065847951809233,
+              0.005265392736328048,
+              -0.0020357471146265817
+            ],
+            "vertical_discrepancy_m": -0.0020357471146265817
+          }
+        },
+        "joint_margins_rad": [
+          0.19634954084924994,
+          1.0181087303299996,
+          0.43175525649788016,
+          0.19634954084924994,
+          1.0181087303299996,
+          0.43175525649788016,
+          0.3926990816985,
+          0.6108652381979998,
+          0.0038231398520600646,
+          0.3926990816985,
+          0.6108652381979998,
+          0.0038231398520600646
+        ]
+      },
+      "embedded_target": false,
+      "errors": [],
+      "evidence": "RESEARCH_ONLY",
+      "ground_min_m": {
+        "base_link": 0.0,
+        "lf_foot_link": -1.4216058885629934e-15,
+        "lf_hip_link": 0.03526232153118111,
+        "lf_lower_leg_link": 0.00016851196889857561,
+        "lf_upper_leg_link": 0.02073669448652663,
+        "lh_foot_link": 4.691547604556562e-06,
+        "lh_hip_link": 0.015255476756161505,
+        "lh_lower_leg_link": 0.0008093858077572041,
+        "lh_upper_leg_link": 0.020626656742267196,
+        "rf_foot_link": 3.255181603684966e-06,
+        "rf_hip_link": 0.03526232153118111,
+        "rf_lower_leg_link": 0.00016851196889857561,
+        "rf_upper_leg_link": 0.02073669448652663,
+        "rh_foot_link": 1.9081958235744878e-16,
+        "rh_hip_link": 0.015255476756161505,
+        "rh_lower_leg_link": 0.0008093858077572041,
+        "rh_upper_leg_link": 0.020626656742267196
+      },
+      "joint_margin_rad": 0.0038231398520600646,
+      "mass_kg": 2.48,
+      "min_separation": {
+        "distance_m": 0.007368754720401629,
+        "pair": [
+          "rh_upper_leg_link",
+          "rh_foot_link"
+        ]
+      },
+      "name": "BODY_FOUR_FEET_RESEARCH_1",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          5.28663538112787e-16
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.13326716844613481,
+            0.4082215756579894,
+            -0.2086765194309235
+          ],
+          [
+            0.13326716844613481,
+            -0.4082215756579894,
+            -0.2086765194309235
+          ],
+          [
+            0.09323968005796161,
+            -0.29060665651252965,
+            -0.11758065658961266
+          ],
+          [
+            0.09323968005796161,
+            0.29060665651252965,
+            -0.11758065658961266
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "BODY_AND_FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "q": [
+        0.58904862254775,
+        1.1199196033630006,
+        -1.1739476553371198,
+        -0.58904862254775,
+        1.1199196033630006,
+        -1.1739476553371198,
+        -0.3926990816985,
+        1.5271630954950004,
+        -1.6018797719829398,
+        0.3926990816985,
+        1.5271630954950004,
+        -1.6018797719829398
+      ],
+      "regime": "BODY_AND_FOOT_SUPPORT",
+      "scope": "canonical rigid CAD geometry and quasi-static URDF COM; not physical startup evidence",
+      "source": "contact_modes.json:lift_off_attempts/0/endpoint",
+      "support_margin_m": 0.11009494691563693,
+      "support_polygon": [
+        [
+          0.14035074697355548,
+          -0.12706828658902208
+        ],
+        [
+          0.140351041290938,
+          0.12712822039255978
+        ],
+        [
+          -0.09266880201912367,
+          0.10277915665502878
+        ],
+        [
+          -0.13080000305175782,
+          0.04551471710205078
+        ],
+        [
+          -0.13080000305175782,
+          -0.04551471710205078
+        ],
+        [
+          -0.0926695594640617,
+          -0.10269926991570394
+        ]
+      ],
+      "valid": true
+    },
+    {
+      "active_feet": [
+        "lf",
+        "rf",
+        "rh",
+        "lh"
+      ],
+      "base_contact": true,
+      "body": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          1.0,
+          1.0999563076780766e-16
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "collisions": [],
+      "com_world_m": [
+        -0.013589184512669057,
+        -0.0003360080645161288,
+        0.03613637385903152
+      ],
+      "contact_axis_tilt_rad": {
+        "lf": 0.5890486225477501,
+        "lh": 0.3926990816985,
+        "rf": 0.5890486225477501,
+        "rh": 0.3926990816985
+      },
+      "contacts": [
+        [
+          0.13403487265724592,
+          0.13244331428935233,
+          0.003071135086285884
+        ],
+        [
+          0.13403487265724592,
+          -0.13244331428935233,
+          0.003071135086285884
+        ],
+        [
+          -0.0931002179435798,
+          -0.10796466265203199,
+          0.0020357471146267726
+        ],
+        [
+          -0.0931002179435798,
+          0.10796466265203199,
+          0.0020357471146267726
+        ]
+      ],
+      "diagnostics": {
+        "collision_details": [],
+        "conditioning": {
+          "lf": {
+            "condition_number": 2.7107463495259343,
+            "jacobian_determinant": -0.0005371113201934829,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.13346513097615673,
+              0.08173678536638306,
+              0.049235566064489075
+            ]
+          },
+          "lh": {
+            "condition_number": 5.396245708756328,
+            "jacobian_determinant": -0.0001303245020079919,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.12535259034085913,
+              0.044755989646901306,
+              0.02322959277733651
+            ]
+          },
+          "rf": {
+            "condition_number": 2.710746349525934,
+            "jacobian_determinant": -0.0005371113201934829,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.13346513097615673,
+              0.08173678536638308,
+              0.04923556606448908
+            ]
+          },
+          "rh": {
+            "condition_number": 5.396245708756328,
+            "jacobian_determinant": -0.0001303245020079919,
+            "near_singular": false,
+            "singular_values_m_per_rad": [
+              0.1253525903408591,
+              0.0447559896469013,
+              0.023229592777336504
+            ]
+          }
+        },
+        "conditioning_scope": "central-difference analytical G2 cross-section reference FK Jacobian; not nonsmooth mesh-edge IK Jacobian",
+        "feet": {
+          "lf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.13467515656245882,
+                0.12712822039255878,
+                3.903127820947816e-18
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13403487265724592,
+              0.13244331428935233,
+              0.003071135086285884
+            ],
+            "centroid_displacement_m": 0.006171876321607789,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.006171876321607789,
+            "lowest_patch_centroid_world_m": [
+              0.13467515656245882,
+              0.12712822039255878,
+              3.903127820947816e-18
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              0.13467515656245882,
+              0.12712822039255878,
+              3.903127820947816e-18
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.13467515656245882,
+              0.12712822039255878,
+              3.903127820947816e-18
+            ],
+            "reference_to_nearest_patch_m": [
+              0.0006402839052128961,
+              -0.005315093896793549,
+              -0.00307113508628588
+            ],
+            "reference_to_patch_centroid_m": [
+              0.0006402839052128961,
+              -0.005315093896793549,
+              -0.00307113508628588
+            ],
+            "vertical_discrepancy_m": -0.00307113508628588
+          },
+          "lh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.09266880201912367,
+                0.10277915665502878,
+                4.691547604556562e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.0931002179435798,
+              0.10796466265203199,
+              0.0020357471146267726
+            ],
+            "centroid_displacement_m": 0.005585765736330384,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.005585765736330384,
+            "lowest_patch_centroid_world_m": [
+              -0.09266880201912367,
+              0.10277915665502878,
+              4.691547604556562e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              -0.09266880201912367,
+              0.10277915665502878,
+              4.691547604556562e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.09266880201912367,
+              0.10277915665502878,
+              4.691547604556562e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              0.0004314159244561272,
+              -0.005185505997003209,
+              -0.002031055567022216
+            ],
+            "reference_to_patch_centroid_m": [
+              0.0004314159244561272,
+              -0.005185505997003209,
+              -0.002031055567022216
+            ],
+            "vertical_discrepancy_m": -0.002031055567022216
+          },
+          "rf": {
+            "actual_ground_patch_world_m": [
+              [
+                0.1346735800999701,
+                -0.12706830512090755,
+                3.2274466770752797e-06
+              ]
+            ],
+            "analytical_reference_world_m": [
+              0.13403487265724592,
+              -0.13244331428935233,
+              0.003071135086285884
+            ],
+            "centroid_displacement_m": 0.006221794599906582,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.006221794599906582,
+            "lowest_patch_centroid_world_m": [
+              0.1346735800999701,
+              -0.12706830512090755,
+              3.2274466770752797e-06
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              0.1346735800999701,
+              -0.12706830512090755,
+              3.2274466770752797e-06
+            ],
+            "nearest_lowest_patch_world_m": [
+              0.1346735800999701,
+              -0.12706830512090755,
+              3.2274466770752797e-06
+            ],
+            "reference_to_nearest_patch_m": [
+              0.000638707442724179,
+              0.005375009168444772,
+              -0.0030679076396088086
+            ],
+            "reference_to_patch_centroid_m": [
+              0.000638707442724179,
+              0.005375009168444772,
+              -0.0030679076396088086
+            ],
+            "vertical_discrepancy_m": -0.0030679076396088086
+          },
+          "rh": {
+            "actual_ground_patch_world_m": [
+              [
+                -0.0926695594640617,
+                -0.10269926991570394,
+                1.9081958235744878e-16
+              ]
+            ],
+            "analytical_reference_world_m": [
+              -0.0931002179435798,
+              -0.10796466265203199,
+              0.0020357471146267726
+            ],
+            "centroid_displacement_m": 0.005661633484116351,
+            "definition": "nearest point on convex hull of vertices within 10 um of lowest Z; separate centroid is tessellation-dependent and its migration is not material-point slip",
+            "discrepancy_m": 0.005661633484116351,
+            "lowest_patch_centroid_world_m": [
+              -0.0926695594640617,
+              -0.10269926991570394,
+              1.9081958235744878e-16
+            ],
+            "lowest_patch_extent_m": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "lowest_patch_vertex_count": 1,
+            "lowest_vertex_world_m": [
+              -0.0926695594640617,
+              -0.10269926991570394,
+              1.9081958235744878e-16
+            ],
+            "nearest_lowest_patch_world_m": [
+              -0.0926695594640617,
+              -0.10269926991570394,
+              1.9081958235744878e-16
+            ],
+            "reference_to_nearest_patch_m": [
+              0.00043065847951809233,
+              0.005265392736328048,
+              -0.0020357471146265817
+            ],
+            "reference_to_patch_centroid_m": [
+              0.00043065847951809233,
+              0.005265392736328048,
+              -0.0020357471146265817
+            ],
+            "vertical_discrepancy_m": -0.0020357471146265817
+          }
+        },
+        "joint_margins_rad": [
+          0.19634954084924994,
+          0.916297857297,
+          0.40855924806672217,
+          0.19634954084924994,
+          0.916297857297,
+          0.40855924806672217,
+          0.3926990816985,
+          0.6108652381979998,
+          0.0038231398520600646,
+          0.3926990816985,
+          0.6108652381979998,
+          0.0038231398520600646
+        ]
+      },
+      "embedded_target": false,
+      "errors": [],
+      "evidence": "RESEARCH_ONLY",
+      "ground_min_m": {
+        "base_link": 0.0,
+        "lf_foot_link": 3.903127820947816e-18,
+        "lf_hip_link": 0.03526232153118111,
+        "lf_lower_leg_link": 0.00029183787975142067,
+        "lf_upper_leg_link": 0.027009654223190654,
+        "lh_foot_link": 4.691547604556562e-06,
+        "lh_hip_link": 0.015255476756161505,
+        "lh_lower_leg_link": 0.0008093858077572041,
+        "lh_upper_leg_link": 0.020626656742267196,
+        "rf_foot_link": 3.2274466770752797e-06,
+        "rf_hip_link": 0.03526232153118111,
+        "rf_lower_leg_link": 0.00029183787975142067,
+        "rf_upper_leg_link": 0.027009654223190654,
+        "rh_foot_link": 1.9081958235744878e-16,
+        "rh_hip_link": 0.015255476756161505,
+        "rh_lower_leg_link": 0.0008093858077572041,
+        "rh_upper_leg_link": 0.020626656742267196
+      },
+      "joint_margin_rad": 0.0038231398520600646,
+      "mass_kg": 2.48,
+      "min_separation": {
+        "distance_m": 0.007368754720401629,
+        "pair": [
+          "rh_upper_leg_link",
+          "rh_foot_link"
+        ]
+      },
+      "name": "BODY_FOUR_FEET_RESEARCH_2",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          5.28663538112787e-16
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.10350140175858599,
+            0.4082565167159184,
+            -0.20872881241957392
+          ],
+          [
+            0.10350140175858599,
+            -0.4082565167159184,
+            -0.20872881241957392
+          ],
+          [
+            0.09323968005796161,
+            -0.29060665651252965,
+            -0.11758065658961266
+          ],
+          [
+            0.09323968005796161,
+            0.29060665651252965,
+            -0.11758065658961266
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "BODY_AND_FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "q": [
+        0.58904862254775,
+        1.2217304763960002,
+        -1.1971436637682777,
+        -0.58904862254775,
+        1.2217304763960002,
+        -1.1971436637682777,
+        -0.3926990816985,
+        1.5271630954950004,
+        -1.6018797719829398,
+        0.3926990816985,
+        1.5271630954950004,
+        -1.6018797719829398
+      ],
+      "regime": "BODY_AND_FOOT_SUPPORT",
+      "scope": "canonical rigid CAD geometry and quasi-static URDF COM; not physical startup evidence",
+      "source": "contact_modes.json:lift_off_attempts/1/endpoint",
+      "support_margin_m": 0.11020860057600268,
+      "support_polygon": [
+        [
+          0.1346735800999701,
+          -0.12706830512090755
+        ],
+        [
+          0.13467515656245882,
+          0.12712822039255878
+        ],
+        [
+          -0.09266880201912367,
+          0.10277915665502878
+        ],
+        [
+          -0.13080000305175782,
+          0.04551471710205078
+        ],
+        [
+          -0.13080000305175782,
+          -0.04551471710205078
+        ],
+        [
+          -0.0926695594640617,
+          -0.10269926991570394
+        ]
+      ],
+      "valid": true
+    }
+  ],
+  "provenance": {
+    "canonical_sources": {
+      "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966"
+    },
+    "diagnostics_sha256": "86f546aa45c32ec4f057a641b43a634563ecb792bf55d7d5b23e7a1644ad3232",
+    "generator_sha256": "d8aa1ebfed57a0a964be20d49a41a6e39296e9400f136acc2efea3c4a7e1cafb",
+    "inputs": {
+      "contact_modes.json": "8272f9b084a95c3a60e0bbd1c9c7fcd0acb91def1743dc3afc8f3f00b8e5afaa",
+      "envelope.json": "5ac2f97b1f21d5c1be6001452c2f85ca9e5bb1f53208549421445477b5cb9a1b",
+      "expanded_envelope.json": "65c772c02b6f032460b1c4803777df1629d5706251b393a25670884b4f1b7983",
+      "rest_search.json": "52299f097cb3ae725e680d9eddc2d03756a1a9579bc73f0dc82c1e877bac182a"
+    },
+    "model_sha256": "d9866cd8e98debff5ca5e7cfb86bd7d69f4edc1dd450b5ec1d5da9bc65f87698"
+  },
+  "rejected_or_unknown": [
+    {
+      "name": "SIT",
+      "reason": "pitched crouch exists, but XGO SIT physical endpoint/support is unbound; initial -0.3 rad, 70 mm candidate IK failed"
+    },
+    {
+      "name": "BEG",
+      "reason": "tested -0.6 rad, 70 mm candidate IK failed; two-foot static support not validated"
+    },
+    {
+      "name": "MARK_TIME",
+      "reason": "preset 5 is completion-only in analyzed firmware; separate mark-time API geometry not recovered"
+    },
+    {
+      "name": "CALIBRATION_REFERENCE",
+      "reason": "q=0 is a reference, not a validated ground-supported target"
+    },
+    {
+      "name": "XGO_DIRECT_JOINT_TABLE",
+      "reason": "controller bytes have no proven physical sign/zero binding to MATDOG"
+    }
+  ],
+  "startup_authority": false
+}
