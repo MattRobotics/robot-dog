@@ -1072,6 +1072,267 @@ void test_rf_auxiliary_is_rh_upper_with_its_own_transform() {
 
 }  // namespace
 
+// ---------------------------------------------------------------------------
+// Hardware finding 2026-09-29: KINEMATIC reproduction at the real bounded
+// write speed. Every other case in this file teleports the synthetic servo
+// (stall/arrival samples on the very next tick), so travel TIME was never
+// modelled - and on hardware every LF first MIN approach ended TIMED_OUT
+// ~480 ticks into a ~590-tick move (40 ticks/s x 12 s), before the joint
+// could reach its stop: UPPER_MIN_PROBE_FAILED, exactly two backend writes
+// (TorqueEnable + first approach) per attempt, no backoff ever written.
+//
+// This rig moves every energized servo toward its GoalPosition at exactly
+// ServoBus::kBoundedWriteSpeed (40 ticks/s) on 20 ms ticks, pins the probed
+// UPPER against a hard stop 6 ticks short of each Geometry V5 contact (inside
+// the 4-tick arrival tolerance, so the approach stalls instead of arriving),
+// starts every joint at this installation's real current-boot q0, and
+// services both SAFE_OFF phases exactly like Controller::
+// updateFullLegCalibration() (pending flags read before update(), SAFE_OFF
+// forced after it). The deadman figures are Controller::begin()'s.
+// ---------------------------------------------------------------------------
+
+constexpr uint32_t kSimTickMs = 20;
+constexpr double kSimTicksPerSecond = 40.0;  // servo::ServoBus::kBoundedWriteSpeed
+constexpr int kSimStopInsetTicks = 6;
+
+// Current-boot q0 captured on hardware 2026-09-29 (capture_session=1).
+uint16_t hardwareQ0(uint8_t bus) {
+  switch (bus) {
+    case 12: return 2100;
+    case 22: return 2108;
+    case 32: return 2042;
+    case 42: return 2088;
+  }
+  return 2048;
+}
+
+MotionDeadmanConfig controllerFullLegDeadman(uint16_t nominal_rate) {
+  MotionDeadmanConfig c{};
+  c.max_telemetry_age_ms = 3000;
+  c.motion_timeout_ms = 12000;
+  c.stall_window_ms = 2000;
+  c.stall_progress_ticks = 2;
+  c.arrival_tolerance_ticks = 4;
+  c.nominal_travel_ticks_per_s = nominal_rate;
+  return c;
+}
+
+struct SimServo {
+  double pos = 2048;
+  uint16_t target = 2048;
+  bool torque = false;
+  bool has_stops = false;
+  double lo_stop = 0;
+  double hi_stop = 4095;
+};
+
+class KinematicBackend : public actuator::ActuatorBackend {
+ public:
+  BackendWriteOutcome enableTorque(uint8_t bus_id) override {
+    ++writes[bus_id];
+    SimServo& s = servo[bus_id];
+    s.torque = true;
+    s.target = static_cast<uint16_t>(s.pos + 0.5);  // TorqueEnable holds position
+    return BackendWriteOutcome::VERIFIED_APPLIED;
+  }
+  BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick) override {
+    ++writes[bus_id];
+    servo[bus_id].target = target_tick;
+    return BackendWriteOutcome::VERIFIED_APPLIED;
+  }
+  void advance(uint32_t dt_ms) {
+    const double step = kSimTicksPerSecond * dt_ms / 1000.0;
+    for (SimServo& s : servo) {
+      if (!s.torque) continue;
+      const double d = s.target - s.pos;
+      s.pos += (d > step) ? step : (d < -step ? -step : d);
+      if (s.has_stops) {
+        if (s.pos < s.lo_stop) s.pos = s.lo_stop;
+        if (s.pos > s.hi_stop) s.pos = s.hi_stop;
+      }
+    }
+  }
+  int32_t tick(uint8_t bus) const { return static_cast<int32_t>(servo[bus].pos + 0.5); }
+
+  SimServo servo[256];
+  int writes[256] = {0};
+};
+
+struct KinematicResult {
+  FullLegCalibrationPhase phase = FullLegCalibrationPhase::IDLE;
+  FullLegCalibrationFailure failure = FullLegCalibrationFailure::NONE;
+  ContactProbeStatus probe{};
+  uint32_t elapsed_ms = 0;
+  int32_t primary_final_tick = 0;
+  int32_t min_stop = 0;
+  int32_t max_stop = 0;
+  int primary_writes = 0;
+  int aux_writes = 0;
+  bool primary_torque_off = false;
+  bool aux_torque_off = true;
+  ContactEvidence min_evidence{};
+  ContactEvidence max_evidence{};
+};
+
+KinematicResult runKinematicLeg(const LegFixture& f, uint16_t nominal_rate) {
+  KinematicResult out{};
+  ActuatorAuthorityArbiter arbiter;
+  SafeActuatorPolicy policy;
+  ActuatorRuntime runtime;
+  CalibrationExecutionEngine engine;
+  KinematicBackend backend;
+  CalibrationGeometryProfile profile = boundProfile();
+  FullLegCalibrationExecutor full;
+
+  arbiter.reset(AuthorityClearReason::BOOT);
+  policy.begin(&arbiter);
+  policy.bindGeometry(&profile, &actuator::geometry_data::kProvenance);
+  runtime.begin(&policy, &backend);
+  engine.begin(&policy, &runtime, &profile, &actuator::geometry_data::kProvenance);
+  FullLegCalibrationConfig config{};
+  config.probe_approach_deadman = controllerFullLegDeadman(nominal_rate);
+  config.probe_backoff_deadman = controllerFullLegDeadman(nominal_rate);
+  config.aux_move_deadman = controllerFullLegDeadman(nominal_rate);
+  full.begin(&policy, &runtime, &engine, &profile, &actuator::geometry_data::kProvenance, config);
+
+  const uint16_t q0 = hardwareQ0(f.upper_bus);
+  CHECK(policy.transforms().admit(promotedTransform(f.upper, q0)));
+  if (f.aux_required) {
+    CHECK(policy.transforms().admit(promotedTransform(f.aux, hardwareQ0(f.aux_bus))));
+  }
+
+  FullLegCalibrationRequest req = requestFor(f);
+  const int32_t min_contact = resolvedTick(req.min_approach_urad, f.upper, q0);
+  const int32_t min_backoff = resolvedTick(req.min_backoff_urad, f.upper, q0);
+  const int32_t max_contact = resolvedTick(req.max_approach_urad, f.upper, q0);
+  const int32_t max_backoff = resolvedTick(req.max_backoff_urad, f.upper, q0);
+  out.min_stop = min_contact + kSimStopInsetTicks * (min_backoff > min_contact ? 1 : -1);
+  out.max_stop = max_contact + kSimStopInsetTicks * (max_backoff > max_contact ? 1 : -1);
+
+  SimServo& primary = backend.servo[f.upper_bus];
+  primary.pos = q0;
+  primary.has_stops = true;
+  primary.lo_stop = out.min_stop < out.max_stop ? out.min_stop : out.max_stop;
+  primary.hi_stop = out.min_stop < out.max_stop ? out.max_stop : out.min_stop;
+  if (f.aux_required) backend.servo[f.aux_bus].pos = hardwareQ0(f.aux_bus);
+
+  const AuthorityLease lease = grant(arbiter, ActuatorAuthority::CALIBRATION,
+                                     OperatingMode::MAINTENANCE);
+  const FullLegCalibrationContext ctx = liveContext(lease, OperatingMode::MAINTENANCE);
+  auto refresh = [&]() {
+    actuator::CalibrationBootstrapContext b{};
+    b.session_active = true;
+    b.origin = CalibrationOrigin::LIVE_SESSION;
+    b.motion_permit_active = true;
+    b.motion_permit_generation = 1;
+    b.motion_permit_session_id = 1;
+    b.motion_permit_authority_generation = lease.generation;
+    b.auxiliary_parked = full.auxiliaryParked();
+    b.parked_leg = full.endpointLeg();
+    b.parked_joint = full.endpointJoint();
+    b.parked_side = ContactSide::MAX_SIDE;
+    policy.setBootstrapContext(b);
+  };
+
+  uint32_t t = 1000;
+  refresh();
+  CHECK(full.start(req, ctx, t));
+  const uint32_t started = t;
+  bool primary_verified_cache = false;
+  bool aux_verified_cache = false;
+  while (full.active() && t - started < 400000) {
+    t += kSimTickMs;
+    backend.advance(kSimTickMs);
+    refresh();  // Controller::updateCalibrationMotionPermit(), every tick
+
+    const bool was_primary_pending = full.primarySafeOffPending();
+    const bool was_aux_pending = full.auxiliarySafeOffPending();
+    if (!was_primary_pending) primary_verified_cache = false;
+    if (!was_aux_pending) aux_verified_cache = false;
+    const bool primary_verified = was_primary_pending && primary_verified_cache;
+    const bool aux_verified = was_aux_pending && aux_verified_cache;
+
+    const FullLegCalibrationPhase p = full.status().phase;
+    const bool aux_phase = p == FullLegCalibrationPhase::AUX_MOVE_PENDING ||
+                           p == FullLegCalibrationPhase::AUX_MOVE_MONITORING;
+    const uint8_t bus = aux_phase ? full.auxiliaryBusId() : full.primaryBusId();
+    const TelemetrySample sample =
+        telemetry(backend.tick(bus), backend.servo[bus].torque ? 1 : 0, t);
+    full.update(ctx, t, true, sample, primary_verified, aux_verified);
+
+    if (full.primarySafeOffPending()) {
+      backend.servo[full.primaryBusId()].torque = false;
+      primary_verified_cache = true;
+    }
+    if (full.auxiliarySafeOffPending()) {
+      backend.servo[full.auxiliaryBusId()].torque = false;
+      aux_verified_cache = true;
+    }
+  }
+
+  out.phase = full.status().phase;
+  out.failure = full.status().failure;
+  out.probe = full.probeStatus();
+  out.elapsed_ms = t - started;
+  out.primary_final_tick = backend.tick(f.upper_bus);
+  out.primary_writes = backend.writes[f.upper_bus];
+  out.aux_writes = f.aux_required ? backend.writes[f.aux_bus] : 0;
+  out.primary_torque_off = !backend.servo[f.upper_bus].torque;
+  if (f.aux_required) out.aux_torque_off = !backend.servo[f.aux_bus].torque;
+  out.min_evidence = full.minSideEvidence();
+  out.max_evidence = full.maxSideEvidence();
+  return out;
+}
+
+// The exact 14881cd production figures (fixed 12 s): reproduces the hardware
+// failure signature bit for bit.
+void test_kinematic_fixed_budget_reproduces_hardware_min_timeout() {
+  g_case = "kinematic 40 t/s, fixed 12 s budget: LF MIN first approach TIMED_OUT (hw repro)";
+  const LegFixture f = fixtureFor(Leg::LF);
+  const KinematicResult r = runKinematicLeg(f, /*nominal_rate=*/0);
+  CHECK_EQ((int)r.phase, (int)FullLegCalibrationPhase::FAILED);
+  CHECK_EQ((int)r.failure, (int)FullLegCalibrationFailure::UPPER_MIN_PROBE_FAILED);
+  CHECK_EQ((int)r.probe.phase, (int)ContactProbePhase::SAFE_OFF_REQUIRED);
+  CHECK_EQ((int)r.probe.failure, (int)ContactProbeFailure::MOTION_TIMEOUT);
+  CHECK_EQ(r.probe.pass, 1);
+  // TorqueEnable + first approach only - the hardware ACTUATOR_COUNTERS delta.
+  CHECK_EQ(r.primary_writes, 2);
+  CHECK_EQ(r.aux_writes, 0);
+  CHECK(r.primary_torque_off);
+  // Stopped ~480 ticks into the move, still well short of the MIN stop.
+  CHECK(r.primary_final_tick > r.min_stop + 100);
+  CHECK(2100 - r.primary_final_tick >= 470 && 2100 - r.primary_final_tick <= 490);
+  CHECK(!r.min_evidence.has_measurement);
+}
+
+// The fix: the same run with the travel-aware budget Controller now
+// configures completes on all four legs, both contacts at the physical stop.
+void test_kinematic_travel_aware_budget_completes_every_leg() {
+  for (const Leg leg : kAllLegs) {
+    g_case = "kinematic 40 t/s, travel-aware budget: leg completes at the physical stops";
+    const LegFixture f = fixtureFor(leg);
+    const KinematicResult r = runKinematicLeg(f, /*nominal_rate=*/40);
+    CHECK_EQ((int)r.phase, (int)FullLegCalibrationPhase::COMPLETE);
+    CHECK_EQ((int)r.failure, (int)FullLegCalibrationFailure::NONE);
+    CHECK_EQ((int)r.probe.failure, (int)ContactProbeFailure::NONE);
+    CHECK(r.min_evidence.has_measurement && r.min_evidence.witness.accepted());
+    CHECK(r.max_evidence.has_measurement && r.max_evidence.witness.accepted());
+    // Contact ticks are where the joint physically stopped (stall-progress
+    // quantization: within the 2-tick progress step of the stop).
+    CHECK(r.min_evidence.coarse_tick >= r.min_stop - 2 && r.min_evidence.coarse_tick <= r.min_stop + 2);
+    CHECK(r.max_evidence.coarse_tick >= r.max_stop - 2 && r.max_evidence.coarse_tick <= r.max_stop + 2);
+    CHECK(r.min_evidence.witness.max_deviation_ticks <= 2);
+    CHECK(r.max_evidence.witness.max_deviation_ticks <= 2);
+    // Per side: TorqueEnable + approach + backoff + re-approach; aux: 2.
+    CHECK_EQ(r.primary_writes, 8);
+    CHECK_EQ(r.aux_writes, f.aux_required ? 2 : 0);
+    CHECK(r.primary_torque_off);
+    CHECK(r.aux_torque_off);
+    // The whole leg at 3.5 deg/s is a couple of minutes, not unbounded.
+    CHECK(r.elapsed_ms > 100000 && r.elapsed_ms < 200000);
+  }
+}
+
 int main() {
   test_happy_path_full_leg_completes_with_evidence_both_sides();
   test_min_probe_failure_never_reaches_aux_or_max();
@@ -1091,6 +1352,8 @@ int main() {
   test_no_auxiliary_final_safe_off_is_primary_only_and_never_bus_zero();
   test_no_auxiliary_max_probe_refused_ends_failed_after_primary_safe_off();
   test_rf_auxiliary_is_rh_upper_with_its_own_transform();
+  test_kinematic_fixed_budget_reproduces_hardware_min_timeout();
+  test_kinematic_travel_aware_budget_completes_every_leg();
 
   std::printf("test_full_leg_calibration_executor: %d checks, %d failures\n", g_checks,
              g_failures);

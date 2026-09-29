@@ -122,10 +122,21 @@ void Controller::begin() {
     // auxiliary park) rather than inventing per-phase numbers — none of them
     // has a documented LF V25 precedent of its own either, and the outer
     // motion_timeout_ms remains the real backstop regardless.
+    //
+    // One difference, from the 2026-09-29 hardware session: a Full Leg move
+    // travels hundreds to ~2000 ticks at the bounded write speed, far beyond
+    // what 12 s covers at kBoundedWriteSpeed (every first approach TIMED_OUT
+    // before reaching the stop). Its budget is therefore travel-aware: the
+    // same 12 s ON TOP OF the nominal travel time at the speed ServoBus
+    // actually commands (see MotionDeadmanConfig::nominal_travel_ticks_per_s).
+    // Stall, telemetry-age, torque and communication checks are unchanged.
+    // The 16-tick DIRECTION_VERIFY above keeps the fixed budget.
+    actuator::MotionDeadmanConfig full_leg_deadman = deadman;
+    full_leg_deadman.nominal_travel_ticks_per_s = servo::ServoBus::kBoundedWriteSpeed;
     calibration::FullLegCalibrationConfig full_leg_config{};
-    full_leg_config.probe_approach_deadman = deadman;
-    full_leg_config.probe_backoff_deadman = deadman;
-    full_leg_config.aux_move_deadman = deadman;
+    full_leg_config.probe_approach_deadman = full_leg_deadman;
+    full_leg_config.probe_backoff_deadman = full_leg_deadman;
+    full_leg_config.aux_move_deadman = full_leg_deadman;
     full_leg_calibration_.begin(&actuator_policy_, &actuator_runtime_, &calibration_execution_,
                                &geometry_profile_, &actuator::geometry_data::kProvenance,
                                full_leg_config);
@@ -551,6 +562,15 @@ void Controller::updateFullLegFinalization() {
   full_leg_evidence_.put(record);
   full_leg_run_.clear();
 
+  // Printed BEFORE the terminal RESULT record so a host that stops reading at
+  // RESULT still has the probe-level cause of any UPPER_*_PROBE_FAILED.
+  const calibration::ContactProbeStatus& probe = full_leg_calibration_.probeStatus();
+  Serial.printf("CALIBRATION_FULL_LEG_PROBE_FINAL leg=%s executor_failure=%s probe_phase=%s "
+                "probe_failure=%s pass=%u coarse_tick=%u fine_tick=%u\n",
+                calibration::toString(record.leg),
+                calibration::toString(full_leg_calibration_.status().failure),
+                calibration::toString(probe.phase), calibration::toString(probe.failure),
+                (unsigned)probe.pass, (unsigned)probe.coarse_tick, (unsigned)probe.fine_tick_1);
   Serial.printf("CALIBRATION_FULL_LEG_RESULT leg=%s verdict=%s failure=%s\n",
                 calibration::toString(record.leg), calibration::toString(record.verdict),
                 calibration::toString(failure));

@@ -539,6 +539,31 @@ def main():
          "status().leg != command_leg",
          runner=run_first_motion_command_checks)
 
+    # --- Full-Leg deadman budget (hardware finding 2026-09-29) --------------
+    case("Full-Leg deadman loses its travel-aware rate", CONTROLLER_CPP,
+         r"full_leg_deadman\.nominal_travel_ticks_per_s = servo::ServoBus::kBoundedWriteSpeed;",
+         "",
+         "travel-aware at exactly",
+         runner=run_full_leg_wiring_checks)
+
+    case("Full-Leg deadman rate typed instead of the ServoBus constant", CONTROLLER_CPP,
+         r"full_leg_deadman\.nominal_travel_ticks_per_s = servo::ServoBus::kBoundedWriteSpeed;",
+         "full_leg_deadman.nominal_travel_ticks_per_s = 400;",
+         "travel-aware at exactly",
+         runner=run_full_leg_wiring_checks)
+
+    case("Full-Leg approach deadman falls back to the fixed budget", CONTROLLER_CPP,
+         r"full_leg_config\.probe_approach_deadman = full_leg_deadman;",
+         "full_leg_config.probe_approach_deadman = deadman;",
+         "must use the travel-aware",
+         runner=run_full_leg_wiring_checks)
+
+    case("Full-Leg aux-park deadman falls back to the fixed budget", CONTROLLER_CPP,
+         r"full_leg_config\.aux_move_deadman = full_leg_deadman;",
+         "full_leg_config.aux_move_deadman = deadman;",
+         "must use the travel-aware",
+         runner=run_full_leg_wiring_checks)
+
     # --- four-leg Full Calibration: command surface ------------------------
     case("leg matcher gains a fifth token", ROUTER_CPP,
          r'\{"LH", calibration::Leg::LH\},',

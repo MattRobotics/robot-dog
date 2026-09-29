@@ -217,6 +217,138 @@ void testIrregularSampleIntervalsDoNotFalselyStallOrStale() {
   CHECK_EQ((int)m.evaluate(good(2060, 1, 3820), 3820), (int)MotionDeadmanVerdict::CONTINUE);
 }
 
+// ---- travel-aware budget (hardware finding 2026-09-29) --------------------
+// The real LF_UPPER MIN first approach: q0 raw 2100 -> Geometry V5 contact
+// raw 1507 (593 ticks) at the bounded 40 ticks/s the backend writes. The
+// fixed 12 s budget covers 480 ticks, so the joint was still ~113 ticks
+// short of the stop when TIMED_OUT fired.
+MotionDeadmanConfig travelConfig() {
+  MotionDeadmanConfig c = config();
+  c.stall_progress_ticks = 2;
+  c.arrival_tolerance_ticks = 4;
+  c.nominal_travel_ticks_per_s = 40;
+  return c;
+}
+
+// Position of a joint moving at exactly 40 ticks/s from `from` toward `to`,
+// stopped by a hard stop at `stop` (between from and to), t ms after start.
+int32_t kinematic(int32_t from, int32_t to, int32_t stop, uint32_t t_ms) {
+  const int32_t dir = to < from ? -1 : 1;
+  const int32_t travelled = static_cast<int32_t>((t_ms * 40u) / 1000u);
+  int32_t pos = from + dir * travelled;
+  if (dir < 0 && pos < stop) pos = stop;
+  if (dir > 0 && pos > stop) pos = stop;
+  return pos;
+}
+
+// Drives a monitor at 20 ms ticks until a non-CONTINUE verdict or `limit_ms`.
+MotionDeadmanVerdict driveKinematic(MotionDeadmanMonitor& m, int32_t from, int32_t to,
+                                    int32_t stop, uint32_t start_ms, uint32_t limit_ms,
+                                    uint32_t* at_ms) {
+  for (uint32_t t = 20; t <= limit_ms; t += 20) {
+    const MotionDeadmanVerdict v =
+        m.evaluate(good(kinematic(from, to, stop, t), 1, start_ms + t), start_ms + t);
+    if (v != MotionDeadmanVerdict::CONTINUE) {
+      *at_ms = t;
+      return v;
+    }
+  }
+  *at_ms = limit_ms;
+  return MotionDeadmanVerdict::CONTINUE;
+}
+
+void testFixedBudgetReproducesHardwareTimeout() {
+  g_case = "fixed 12 s budget times out short of the LF_UPPER MIN stop (hardware repro)";
+  MotionDeadmanConfig c = travelConfig();
+  c.nominal_travel_ticks_per_s = 0;  // the 14881cd production config
+  MotionDeadmanMonitor m;
+  m.begin(c, /*target_tick=*/1507, /*started_at_ms=*/0);
+  uint32_t at = 0;
+  CHECK_EQ((int)driveKinematic(m, 2100, 1507, /*stop=*/1512, 0, 60000, &at),
+           (int)MotionDeadmanVerdict::TIMED_OUT);
+  CHECK_EQ((long)at, 12000L);
+  CHECK_EQ((long)m.motionBudgetMs(), 12000L);
+  // Where the joint was when the budget ran out: 480 ticks from q0, ~113
+  // ticks short of the stop - "moved ~20 deg or more" and no contact.
+  CHECK_EQ(kinematic(2100, 1507, 1512, 12000), 1620);
+}
+
+void testTravelAwareBudgetReachesTheStopAndStalls() {
+  g_case = "travel-aware budget lets the same approach reach the stop and STALL";
+  MotionDeadmanMonitor m;
+  m.begin(travelConfig(), /*target_tick=*/1507, /*started_at_ms=*/0);
+  uint32_t at = 0;
+  CHECK_EQ((int)driveKinematic(m, 2100, 1507, /*stop=*/1512, 0, 60000, &at),
+           (int)MotionDeadmanVerdict::STALLED);
+  // Fixed from the first in-range sample (2100 - 0 ticks at t=20 ms): 12 s
+  // plus ceil(593 * 1000 / 40) = 14825 ms.
+  CHECK_EQ((long)m.motionBudgetMs(), 12000L + 14825L);
+  CHECK_EQ(m.lastProgressPosition() >= 1512 && m.lastProgressPosition() <= 1513, 1);
+  // Reached the stop at ~14.7 s, stall confirmed one stall window later.
+  CHECK_EQ(at > 14700 && at < 17000, 1);
+}
+
+void testTravelAwareBudgetStillTimesOut() {
+  g_case = "travel-aware budget is still a hard backstop";
+  MotionDeadmanMonitor m;
+  m.begin(travelConfig(), /*target_tick=*/1507, /*started_at_ms=*/0);
+  // Creeps 3 ticks every 100 ms forever (never stalls, never arrives): a
+  // hunting joint. The extended budget must still end it, exactly on time.
+  MotionDeadmanVerdict v = MotionDeadmanVerdict::CONTINUE;
+  uint32_t t = 0;
+  int32_t pos = 2103;  // first sample is 2100: travel 593 -> budget 26825 ms
+  while (v == MotionDeadmanVerdict::CONTINUE && t < 100000) {
+    t += 100;
+    pos = (pos == 2100) ? 2103 : 2100;
+    v = m.evaluate(good(pos, 1, t), t);
+  }
+  CHECK_EQ((int)v, (int)MotionDeadmanVerdict::TIMED_OUT);
+  CHECK_EQ((long)m.motionBudgetMs(), 12000L + 14825L);
+  CHECK_EQ((long)t, 26900L);  // first 100 ms tick at/after 26825
+  CHECK_EQ((int)m.poll(t), (int)MotionDeadmanVerdict::TIMED_OUT);
+}
+
+void testOutOfRangeFirstSampleDoesNotExtendBudget() {
+  g_case = "a -1/garbage position never defines the travel";
+  MotionDeadmanMonitor m;
+  m.begin(travelConfig(), /*target_tick=*/1507, /*started_at_ms=*/0);
+  CHECK_EQ((int)m.evaluate(good(-1, 1, 20), 20), (int)MotionDeadmanVerdict::CONTINUE);
+  CHECK_EQ((long)m.motionBudgetMs(), 12000L);
+  CHECK_EQ((int)m.evaluate(good(4096, 1, 40), 40), (int)MotionDeadmanVerdict::CONTINUE);
+  CHECK_EQ((long)m.motionBudgetMs(), 12000L);
+  // A failed read never fixes it either.
+  CHECK_EQ((int)m.evaluate(failed(60), 60), (int)MotionDeadmanVerdict::CONTINUE);
+  CHECK_EQ((long)m.motionBudgetMs(), 12000L);
+  // The first in-range one does - and only once.
+  CHECK_EQ((int)m.evaluate(good(2100, 1, 80), 80), (int)MotionDeadmanVerdict::CONTINUE);
+  CHECK_EQ((long)m.motionBudgetMs(), 12000L + 14825L);
+  CHECK_EQ((int)m.evaluate(good(2098, 1, 100), 100), (int)MotionDeadmanVerdict::CONTINUE);
+  CHECK_EQ((long)m.motionBudgetMs(), 12000L + 14825L);
+}
+
+void testLateFirstSampleOnlyShortensBudget() {
+  g_case = "a late first sample yields a shorter budget, never a longer one";
+  MotionDeadmanMonitor m;
+  m.begin(travelConfig(), /*target_tick=*/1507, /*started_at_ms=*/0);
+  // First good sample 2 s in: the joint has already covered 80 ticks.
+  CHECK_EQ((int)m.evaluate(failed(1000), 1000), (int)MotionDeadmanVerdict::CONTINUE);
+  CHECK_EQ((int)m.evaluate(good(2020, 1, 2000), 2000), (int)MotionDeadmanVerdict::CONTINUE);
+  CHECK_EQ((long)m.motionBudgetMs(), 12000L + 12825L);
+}
+
+void testZeroRateKeepsTheFixedBudgetBitForBit() {
+  g_case = "nominal_travel_ticks_per_s == 0 keeps the fixed budget (DIRECTION_VERIFY)";
+  MotionDeadmanMonitor m;
+  m.begin(config(), /*target_tick=*/2116, /*started_at_ms=*/0);
+  CHECK_EQ((int)m.evaluate(good(2100, 1, 20), 20), (int)MotionDeadmanVerdict::CONTINUE);
+  CHECK_EQ((long)m.motionBudgetMs(), 12000L);
+  CHECK_EQ((int)m.evaluate(good(2104, 1, 11999), 11999), (int)MotionDeadmanVerdict::CONTINUE);
+  CHECK_EQ((int)m.evaluate(good(2108, 1, 12000), 12000), (int)MotionDeadmanVerdict::TIMED_OUT);
+  MotionDeadmanMonitor fresh;
+  fresh.begin(config(), 2116, 0);
+  CHECK_EQ((int)fresh.poll(12000), (int)MotionDeadmanVerdict::TIMED_OUT);
+}
+
 void testToStringCoversEveryValue() {
   g_case = "to_string";
   CHECK_STR(toString(MotionDeadmanVerdict::CONTINUE), "CONTINUE");
@@ -245,6 +377,12 @@ int main() {
   testTimeoutViaPollToo();
   testIrregularSampleIntervalsDoNotFalselyStallOrStale();
   testToStringCoversEveryValue();
+  testFixedBudgetReproducesHardwareTimeout();
+  testTravelAwareBudgetReachesTheStopAndStalls();
+  testTravelAwareBudgetStillTimesOut();
+  testOutOfRangeFirstSampleDoesNotExtendBudget();
+  testLateFirstSampleOnlyShortensBudget();
+  testZeroRateKeepsTheFixedBudgetBitForBit();
 
   std::printf("test_motion_deadman: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;

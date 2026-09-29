@@ -1556,6 +1556,27 @@ def check_full_leg_calibration_wiring(files):
         fail(f"{controller_path}: update() must call updateFullLegFinalization() right "
              f"after updateFullLegCalibration(now_ms)")
 
+    # ---- Controller: Full-Leg deadman budget (hardware finding 2026-09-29) --
+    # Every Full-Leg monitored move runs at ServoBus::kBoundedWriteSpeed. A
+    # fixed 12 s budget caps a move at ~480 ticks, shorter than the Geometry V5
+    # UPPER contact travel, so every first approach timed out before reaching
+    # the stop. All three Full-Leg deadman configs must carry the travel-aware
+    # rate, and it must be the very constant ServoBus writes - never a typed
+    # number that can drift from it.
+    begin_fn = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", controller, re.DOTALL)
+    if not begin_fn:
+        fail(f"{controller_path}: Controller::begin() not found")
+    else:
+        body = normalize(begin_fn.group(1))
+        if body.count("full_leg_deadman.nominal_travel_ticks_per_s = "
+                      "servo::ServoBus::kBoundedWriteSpeed;") != 1:
+            fail(f"{controller_path}: the Full-Leg deadman must be travel-aware at exactly "
+                 f"servo::ServoBus::kBoundedWriteSpeed (2026-09-29 MOTION_TIMEOUT finding)")
+        for field in ("probe_approach_deadman", "probe_backoff_deadman", "aux_move_deadman"):
+            if f"full_leg_config.{field} = full_leg_deadman;" not in body:
+                fail(f"{controller_path}: full_leg_config.{field} must use the travel-aware "
+                     f"full_leg_deadman, not the fixed-budget one")
+
     # ---- finalizer: pure, ordered, unapproved -----------------------------
     if normalize(fin_h).count("constexpr bool kFullLegOperationalParametersApproved = false;") != 1:
         fail(f"{fin_h_path}: kFullLegOperationalParametersApproved must be declared "

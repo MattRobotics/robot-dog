@@ -1261,6 +1261,14 @@ void CommandRouter::printFullLegCalibrationStatus() {
   Serial.printf("CALIBRATION_FULL_LEG phase=%s failure=%s last_decision=%s\n",
                 calibration::toString(s.phase), calibration::toString(s.failure),
                 actuator::toString(s.last_policy_decision));
+  // The owned contact probe's own verdict for the side that ran last - the
+  // detail behind UPPER_MIN/MAX_PROBE_FAILED (e.g. MOTION_TIMEOUT vs
+  // NO_CONTACT_DETECTED), invisible on hardware before 2026-09-29.
+  const calibration::ContactProbeStatus& probe = modules_.full_leg_calibration->probeStatus();
+  Serial.printf("CALIBRATION_FULL_LEG_PROBE phase=%s failure=%s pass=%u coarse_tick=%u "
+                "fine_tick=%u\n",
+                calibration::toString(probe.phase), calibration::toString(probe.failure),
+                (unsigned)probe.pass, (unsigned)probe.coarse_tick, (unsigned)probe.fine_tick_1);
   Serial.printf("CALIBRATION_FULL_LEG_RUN armed=%s executor_active=%s endpoint=%s_%s\n",
                 modules_.full_leg_run->armed ? "YES" : "NO",
                 modules_.full_leg_calibration->active() ? "YES" : "NO",

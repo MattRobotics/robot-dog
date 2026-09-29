@@ -64,6 +64,8 @@ struct MotionDeadmanConfig {
   uint32_t max_telemetry_age_ms = 0;
   // Overall wall-clock budget for one bounded move, independent of whether
   // telemetry looks healthy along the way. Outranks every other verdict.
+  // With nominal_travel_ticks_per_s == 0 this IS the whole budget; otherwise
+  // it is the budget ON TOP OF the move's nominal travel time (see below).
   uint32_t motion_timeout_ms = 0;
   // A window over which SOME minimum position progress is required once
   // motion has been commanded; catches a joint that keeps answering every
@@ -71,6 +73,19 @@ struct MotionDeadmanConfig {
   uint32_t stall_window_ms = 0;
   uint16_t stall_progress_ticks = 0;
   uint16_t arrival_tolerance_ticks = 0;
+  // The speed the backend actually commands for this move, in ticks/s
+  // (servo::ServoBus::kBoundedWriteSpeed for every calibration move). 0 keeps
+  // the fixed motion_timeout_ms budget. Non-zero makes the budget
+  // travel-aware: the first successful in-range (0..4095) sample fixes the
+  // start position, and the budget becomes motion_timeout_ms PLUS the
+  // nominal time to cover |target - start| at this rate. Hardware finding
+  // 2026-09-29: at the bounded 40 ticks/s a fixed 12 s budget caps any move
+  // at ~480 ticks (~42 deg), shorter than the Geometry V5 UPPER contact
+  // travel (MIN ~590 ticks, MAX up to ~1980), so every Full-Leg first
+  // approach ended TIMED_OUT before it could reach the stop. The start is
+  // fixed once and never re-derived: a late first sample (the joint already
+  // under way) can only yield a SHORTER budget, never a longer one.
+  uint16_t nominal_travel_ticks_per_s = 0;
 };
 
 // A small state machine, not a filter: it remembers the last known-good
@@ -92,6 +107,10 @@ class MotionDeadmanMonitor {
 
   uint32_t lastGoodSampleAtMs() const { return last_good_sample_ms_; }
   bool began() const { return began_; }
+  // The overall budget currently enforced: motion_timeout_ms until a
+  // travel-aware budget (nominal_travel_ticks_per_s != 0) has been fixed by
+  // the first in-range sample, the extended budget afterwards.
+  uint32_t motionBudgetMs() const { return motion_budget_ms_; }
   // The position this monitor was tracking for stall purposes, valid once a
   // STALLED verdict has been returned (from either evaluate() or poll()) -
   // -1 if no progress sample has been recorded yet. Exists so a caller that
@@ -102,10 +121,15 @@ class MotionDeadmanMonitor {
 
  private:
   MotionDeadmanVerdict evaluateAgainstClockOnly(uint32_t now_ms) const;
+  // Fixes the travel-aware budget from the first in-range sample (no-op when
+  // nominal_travel_ticks_per_s is 0 or the budget is already fixed).
+  void fixTravelBudget(int32_t present_position);
 
   MotionDeadmanConfig config_{};
   uint16_t target_tick_ = 0;
   uint32_t started_at_ms_ = 0;
+  uint32_t motion_budget_ms_ = 0;
+  bool travel_budget_fixed_ = false;
   uint32_t last_good_sample_ms_ = 0;
   uint32_t last_progress_ms_ = 0;
   int32_t last_progress_position_ = -1;  // negative: no progress sample yet

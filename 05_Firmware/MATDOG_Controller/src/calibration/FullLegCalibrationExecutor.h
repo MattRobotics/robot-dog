@@ -88,7 +88,7 @@ enum class FullLegCalibrationPhase : uint8_t {
 enum class FullLegCalibrationFailure : uint8_t {
   NONE                             = 0,
   REJECT_PRECONDITIONS             = 1,  // start() itself refused
-  UPPER_MIN_PROBE_FAILED           = 2,  // see minSideProbeFailure() detail
+  UPPER_MIN_PROBE_FAILED           = 2,  // detail: probeStatus()
   AUX_TORQUE_ENABLE_REJECTED       = 3,
   AUX_TORQUE_ENABLE_UNCERTAIN      = 4,
   AUX_MOVE_REJECTED                = 5,
@@ -99,7 +99,7 @@ enum class FullLegCalibrationFailure : uint8_t {
   AUX_MOVE_TORQUE_UNEXPECTEDLY_OFF = 10,
   AUX_MOVE_STALLED                 = 11,
   AUX_MOVE_TIMEOUT                 = 12,
-  UPPER_MAX_PROBE_FAILED           = 13,  // see maxSideProbeFailure() detail
+  UPPER_MAX_PROBE_FAILED           = 13,  // detail: probeStatus()
   DYNAMIC_PREREQUISITE_LOST        = 14,  // permit/session/authority lost mid-sequence
   OPERATOR_ABORT                   = 15,
 };
@@ -195,6 +195,12 @@ class FullLegCalibrationExecutor {
   void abort();
 
   const FullLegCalibrationStatus& status() const { return status_; }
+  // The owned ContactProbeEngine's own status (phase, failure, pass, coarse/
+  // fine stall ticks) for the side that ran last: the MIN side while/after
+  // it runs, the MAX side once that has started. Read-only diagnostics - it
+  // is what distinguishes a MOTION_TIMEOUT from a NO_CONTACT_DETECTED behind
+  // an UPPER_*_PROBE_FAILED on hardware.
+  const ContactProbeStatus& probeStatus() const { return probe_.status(); }
   bool active() const {
     return status_.phase != FullLegCalibrationPhase::IDLE &&
           status_.phase != FullLegCalibrationPhase::COMPLETE &&

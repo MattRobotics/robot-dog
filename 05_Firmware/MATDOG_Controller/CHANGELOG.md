@@ -1,5 +1,31 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — Full-Leg motion budget fix (hardware finding) — 2026-09-29
+
+**HARDWARE-DISCOVERED DEFECT, FIXED OFFLINE; hardware re-test pending.** Both LF Full-Leg
+attempts of the 2026-09-29 session (`14881cd`) ended `UPPER_MIN_PROBE_FAILED`: every monitored
+Full-Leg move had the fixed 12 s deadman budget, but `ServoBus::writeGoalPosition()` commands the
+bounded 40 ticks/s (~3.5 deg/s), so no move could exceed ~480 ticks (~42 deg). The Geometry V5
+UPPER contacts need ~590 ticks (MIN first approach) and up to ~1980 (MAX first approach); the
+probe hit `MOTION_TIMEOUT` before reaching the stop. The offline suites teleported the synthetic
+servo, so travel time was never modelled.
+
+- `MotionDeadmanConfig::nominal_travel_ticks_per_s` (default 0 = unchanged fixed budget). When
+  set, the first in-range sample fixes the start and the budget becomes `motion_timeout_ms` plus
+  the nominal travel time at that rate; fixed once, so a late sample can only shorten it. Stall,
+  telemetry-age, torque and communication checks are unchanged; so are the write speed, travel,
+  contact targets and repeatability tolerance.
+- `Controller::begin()` sets it to `servo::ServoBus::kBoundedWriteSpeed` for the three Full-Leg
+  deadman configs only; the 16-tick DIRECTION_VERIFY keeps the fixed 12 s. Pinned by
+  `check_full_leg_calibration_wiring` plus four mutation cases.
+- Observability: `FullLegCalibrationExecutor::probeStatus()`; `@CALIBRATION FULL LEG STATUS`
+  prints `CALIBRATION_FULL_LEG_PROBE …`, and the terminal output prints
+  `CALIBRATION_FULL_LEG_PROBE_FINAL …` just before `CALIBRATION_FULL_LEG_RESULT`, so a probe
+  failure's cause (e.g. `MOTION_TIMEOUT` vs `NO_CONTACT_DETECTED`) is visible on hardware.
+- Tests: six `test_motion_deadman` cases; a kinematic 40 ticks/s executor rig that reproduces
+  the hardware signature bit for bit with the old budget (probe `MOTION_TIMEOUT`, pass 1, two
+  writes) and completes all four legs at the physical stops with the new one.
+
 ## Unreleased — current-boot q0 promotion — 2026-09-29
 
 **IMPLEMENTED / OFFLINE-VALIDATED. Never run on hardware.** `@CALIBRATION Q0 PROMOTE
