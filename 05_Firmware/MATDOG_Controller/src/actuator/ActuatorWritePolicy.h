@@ -328,7 +328,7 @@ enum class WriteDecision : uint8_t {
   REJECT_NO_CALIBRATION_MOTION_PERMIT = 29,
   // A contact-probe overtravel allowance on anything but a CONTACT_PROBE
   // approach to the canonical contact, above kContactProbeMaxOvertravelTicks,
-  // or not landing on exactly the tick that allowance resolves to.
+  // or not landing on exactly the URDF-clamped tick that allowance resolves to.
   REJECT_PROBE_OVERTRAVEL = 30,
 };
 
@@ -373,10 +373,12 @@ struct ActuatorCommand {
   calibration::ContactSide endpoint_side = calibration::ContactSide::MIN_SIDE;
 
   // CALIBRATION_CONTACT_PROBE approach only (hardware finding 2026-09-29,
-  // operator-approved): raw ticks the commanded target_tick lies PAST the
-  // canonical contact `target_urad` names, in the endpoint side's approach
-  // direction - see resolveContactProbeApproachToRaw(). 0 for every other
-  // command; non-zero anywhere else is REJECT_PROBE_OVERTRAVEL.
+  // operator-approved): the requested ceiling, in raw ticks, on how far past
+  // the canonical contact `target_urad` names target_tick may lie in the
+  // endpoint side's approach direction. The tick actually commanded is that
+  // ceiling clamped to the URDF joint limit - see
+  // resolveContactProbeApproachToRaw(). 0 for every other command; non-zero
+  // anywhere else is REJECT_PROBE_OVERTRAVEL.
   uint16_t contact_probe_overtravel_ticks = 0;
 };
 

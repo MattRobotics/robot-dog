@@ -1320,9 +1320,13 @@ def check_contact_probe_overtravel_allowance(files):
     4-tick arrival tolerance, so an approach commanded exactly to the contact
     could arrive on the stop and read as NO_CONTACT_DETECTED. The approved fix
     lets a CONTACT_PROBE approach run at most 16 raw ticks past the canonical
-    contact. Pinned here so it can never widen or leak:
+    contact, CLAMPED to the declared URDF joint limit (operator decision: never
+    beyond the URDF limit). Pinned here so it can never widen or leak:
       - kContactProbeMaxOvertravelTicks is exactly 16, and the Full-Leg plan's
-        allowance is exactly 16 and statically bounded by it;
+        allowance ceiling is exactly 16 and statically bounded by it;
+      - resolveContactProbeApproachToRaw() clamps through the checked raw->q
+        conversion (resolveRawToUrdfQ), so it can never yield a tick outside
+        the URDF domain;
       - evaluate() refuses the allowance on every non-CONTACT_PROBE operation
         BEFORE any route (accepted limits, bootstrap envelope, auxiliary move)
         can accept;
@@ -1332,8 +1336,9 @@ def check_contact_probe_overtravel_allowance(files):
       - only the reviewed calibration units ever call the resolver."""
     by_name = {path.name: (path, code) for path, code in files}
     normalize = lambda text: re.sub(r"\s+", " ", text)
-    for name in ("CalibrationTargetResolver.h", "ActuatorWritePolicy.cpp",
-                 "CalibrationExecutionEngine.cpp", "FullLegCalibrationPlan.h"):
+    for name in ("CalibrationTargetResolver.h", "CalibrationTargetResolver.cpp",
+                 "ActuatorWritePolicy.cpp", "CalibrationExecutionEngine.cpp",
+                 "FullLegCalibrationPlan.h"):
         if name not in by_name:
             fail(f"{name} not found - cannot audit the contact-probe overtravel allowance")
             return
@@ -1342,6 +1347,21 @@ def check_contact_probe_overtravel_allowance(files):
     if normalize(code).count("constexpr uint16_t kContactProbeMaxOvertravelTicks = 16;") != 1:
         fail(f"{path}: kContactProbeMaxOvertravelTicks must be exactly 16 raw ticks "
              f"(operator-approved 2026-09-29); it may never be widened silently")
+
+    path, code = by_name["CalibrationTargetResolver.cpp"]
+    resolver = re.search(r"TargetResolveStatus resolveContactProbeApproachToRaw\(.*?\n\}",
+                         code, re.DOTALL)
+    if not resolver:
+        fail(f"{path}: resolveContactProbeApproachToRaw() not found")
+    else:
+        body = normalize(resolver.group(0))
+        if "resolveRawToUrdfQ(" not in body or "continue;" not in body:
+            fail(f"{path}: resolveContactProbeApproachToRaw() lost its URDF clamp - every "
+                 f"candidate tick must convert back inside the URDF domain through "
+                 f"resolveRawToUrdfQ() or be skipped; the allowance may never cross the "
+                 f"URDF joint limit")
+        if "overtravel_ticks > kContactProbeMaxOvertravelTicks" not in body:
+            fail(f"{path}: resolveContactProbeApproachToRaw() lost its 16-tick ceiling")
 
     path, code = by_name["FullLegCalibrationPlan.h"]
     body = normalize(code)
@@ -1380,6 +1400,9 @@ def check_contact_probe_overtravel_allowance(files):
         body = normalize(plan_route.group(0))
         for token in ("command.contact_probe_overtravel_ticks > kContactProbeMaxOvertravelTicks",
                       "command.target_urad != contact",
+                      "resolveRawToUrdfQ(*geometry_, *expected_provenance_, *transform, "
+                      "command.target_tick,",
+                      "return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;",
                       "resolveContactProbeApproachToRaw(",
                       "command.target_tick != allowed_tick"):
             if token not in body:

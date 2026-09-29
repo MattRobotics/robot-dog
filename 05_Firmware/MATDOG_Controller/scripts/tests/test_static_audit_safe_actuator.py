@@ -573,6 +573,21 @@ def main():
          "",
          "command.target_tick != allowed_tick", runner=run_overtravel_checks)
 
+    case("resolver loses its URDF clamp (allowance could cross the URDF limit)",
+         "CalibrationTargetResolver.cpp",
+         r"if \(resolveRawToUrdfQ\(profile, expected_provenance, transform, "
+         r"static_cast<uint16_t>\(raw\),\s*&q_back\) != TargetResolveStatus::OK\) \{\s*"
+         r"continue;\s*\}",
+         "",
+         "lost its URDF clamp", runner=run_overtravel_checks)
+
+    case("policy drops its independent URDF check on the commanded tick", POLICY_CPP,
+         r"if \(resolveRawToUrdfQ\(\*geometry_, \*expected_provenance_, \*transform, "
+         r"command\.target_tick,\s*&commanded_q\) != TargetResolveStatus::OK\) \{\s*"
+         r"return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;\s*\}",
+         "",
+         "resolveRawToUrdfQ", runner=run_overtravel_checks)
+
     case("policy overtravel bound removed", POLICY_CPP,
          r"command\.contact_probe_overtravel_ticks > kContactProbeMaxOvertravelTicks \|\|",
          "",

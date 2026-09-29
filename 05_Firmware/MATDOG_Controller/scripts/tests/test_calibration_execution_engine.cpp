@@ -19,6 +19,7 @@
 // pass/fail tally. Run via scripts/tests/run_host_tests.sh.
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <initializer_list>
 
@@ -521,8 +522,13 @@ void test_to_string_fails_closed_on_corrupted_value() {
 // Contact-probe overtravel allowance (hardware finding 2026-09-29,
 // operator-approved): LF_UPPER's MIN stop sat 4-5 ticks short of the Geometry V5
 // contact, inside the 4-tick arrival tolerance. Both approach passes may now be
-// commanded at most 16 raw ticks PAST the canonical contact - CONTACT_PROBE
-// only, anchored on exactly the contact, never the backoff.
+// commanded past the canonical contact by at most 16 raw ticks, CLAMPED to the
+// URDF joint limit - CONTACT_PROBE only, anchored on exactly the contact, never
+// the backoff. Hand-computed oracle (1 tick = 1533.98 urad, independent of q0
+// and of the raw direction): UPPER MIN contact -909889 urad is 593 ticks out,
+// the URDF lower limit -916298 still admits 597 (598 converts to -917321) ->
+// 4 ticks of room; MAX contact 2127120 is 1387 ticks out, the URDF upper
+// 2138028 admits 1393 (1394 converts to 2138369) -> 6 ticks of room.
 // ---------------------------------------------------------------------------
 
 struct UpperCase {
@@ -563,6 +569,18 @@ void armProbeRig(Rig& rig, const UpperCase& u, ContactSide side, AuthorityLease*
   *lease_out = lease;
 }
 
+constexpr int kUpperMinRoomTicks = 4;
+constexpr int kUpperMaxRoomTicks = 6;
+
+bool insideUrdf(const Rig& rig, const UpperCase& u, int tick) {
+  if (tick < 0 || tick > 4095) return false;
+  actuator::MicroRad q = 0;
+  return actuator::resolveRawToUrdfQ(rig.profile, actuator::geometry_data::kProvenance,
+                                     promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0),
+                                     static_cast<uint16_t>(tick), &q) ==
+         actuator::TargetResolveStatus::OK;
+}
+
 uint16_t contactTick(const Rig& rig, const UpperCase& u, ContactSide side) {
   const actuator::GeometryEndpointRecord* ep =
       rig.profile.findEndpoint(u.leg, JointKind::UPPER, side);
@@ -573,8 +591,8 @@ uint16_t contactTick(const Rig& rig, const UpperCase& u, ContactSide side) {
   return tick;
 }
 
-void test_overtravel_lands_exactly_16_ticks_past_the_contact_both_sides_all_legs() {
-  g_case = "overtravel: +16 raw ticks past the canonical contact, MIN and MAX, 4 legs";
+void test_overtravel_clamped_to_urdf_limit_both_sides_all_legs() {
+  g_case = "overtravel: min(16, room to the URDF limit) past the contact, MIN and MAX, 4 legs";
   for (const UpperCase& u : kUppers) {
     for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
       Rig rig;
@@ -593,13 +611,20 @@ void test_overtravel_lands_exactly_16_ticks_past_the_contact_both_sides_all_legs
       CHECK_EQ((int)r.execute_result, (int)actuator::ExecuteResult::WRITTEN);
       const int contact = contactTick(rig, u, side);
       const int written = rig.backend.last_target_tick;
-      // Exactly 16 raw ticks, and on the FAR side of the contact from q0 -
-      // i.e. further into the stop, whichever way this joint's raw axis runs.
-      CHECK_EQ(written > contact ? written - contact : contact - written, 16);
+      const int applied = written > contact ? written - contact : contact - written;
+      // The oracle's room, not the 16-tick ceiling.
+      CHECK_EQ(applied, side == ContactSide::MIN_SIDE ? kUpperMinRoomTicks : kUpperMaxRoomTicks);
+      CHECK(applied <= 16);
+      // On the FAR side of the contact from q0, whichever way the raw axis runs.
       const int q0 = u.q0;
       const int contact_travel = contact > q0 ? contact - q0 : q0 - contact;
       const int written_travel = written > q0 ? written - q0 : q0 - written;
-      CHECK_EQ(written_travel, contact_travel + 16);
+      CHECK_EQ(written_travel, contact_travel + applied);
+      // Never beyond the URDF limit: the commanded tick is inside, the next one
+      // further is not (the clamp is tight, not merely conservative).
+      const int further = written + (written > contact ? 1 : -1);
+      CHECK(insideUrdf(rig, u, written));
+      CHECK(!insideUrdf(rig, u, further));
     }
   }
 }
@@ -618,6 +643,47 @@ void test_zero_overtravel_is_exactly_the_canonical_contact() {
           rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
       CHECK_EQ((int)r.policy_decision, (int)WriteDecision::ACCEPT);
       CHECK_EQ(rig.backend.last_target_tick, contactTick(rig, u, side));
+    }
+  }
+}
+
+void test_overtravel_ceiling_is_not_a_travel_amount() {
+  g_case = "overtravel: 16 is an absolute ceiling, not a mandatory travel amount";
+  const UpperCase& u = kUppers[0];
+  Rig rig;
+  const actuator::JointTransform t = promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0);
+  const actuator::GeometryProvenance& prov = actuator::geometry_data::kProvenance;
+  struct { actuator::MicroRad contact; ContactSide side; } deep[] = {
+      {-800000, ContactSide::MIN_SIDE},   // ~75 ticks of room before the URDF lower limit
+      {2000000, ContactSide::MAX_SIDE}};  // ~90 ticks of room before the URDF upper limit
+  for (const auto& d : deep) {
+    uint16_t base = 0;
+    CHECK(actuator::resolveUrdfQToRaw(rig.profile, prov, t, d.contact, &base) ==
+          actuator::TargetResolveStatus::OK);
+    for (uint16_t want : {0, 1, 8, 16}) {
+      uint16_t tick = 0, applied = 999;
+      CHECK(actuator::resolveContactProbeApproachToRaw(rig.profile, prov, t, d.contact, d.side,
+                                                       want, &tick, &applied) ==
+            actuator::TargetResolveStatus::OK);
+      CHECK_EQ(applied, want);  // plenty of room: exactly what was asked, never more
+      CHECK_EQ(std::abs((int)tick - (int)base), (int)want);
+    }
+    uint16_t tick = 0;
+    CHECK(actuator::resolveContactProbeApproachToRaw(rig.profile, prov, t, d.contact, d.side, 17,
+                                                     &tick) ==
+          actuator::TargetResolveStatus::REJECT_OVERTRAVEL);
+  }
+  // At the real UPPER contacts a request below the room is honoured as-is and
+  // one above it is clamped to the room - never raised to 16.
+  for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
+    const actuator::MicroRad contact = rig.profile.findEndpoint(u.leg, JointKind::UPPER, side)->contact;
+    const int room = side == ContactSide::MIN_SIDE ? kUpperMinRoomTicks : kUpperMaxRoomTicks;
+    for (uint16_t want : {0, 2, 16}) {
+      uint16_t tick = 0, applied = 999;
+      CHECK(actuator::resolveContactProbeApproachToRaw(rig.profile, prov, t, contact, side, want,
+                                                       &tick, &applied) ==
+            actuator::TargetResolveStatus::OK);
+      CHECK_EQ((int)applied, (int)want < room ? (int)want : room);
     }
   }
 }
@@ -653,10 +719,16 @@ void test_overtravel_above_16_refused_at_every_layer() {
     CHECK_EQ(rig.backend.calls, 0);
 
     // Policy, called directly with a hand-built command: 17 ticks, a tick one
-    // past what 16 resolves to, and a tick short of it are all refused.
-    const int step = (tick16 > contactTick(rig, u, side)) ? 1 : -1;
-    struct { uint16_t overtravel; int tick; } bad[] = {
-        {17, tick16 + step}, {16, tick16 + step}, {16, tick16 - step}, {200, tick16}};
+    // past the clamped point (outside the URDF domain), the UNclamped
+    // contact+16, a tick short of the clamped point and 200 are all refused.
+    const int contact_tick = contactTick(rig, u, side);
+    const int step = (tick16 > contact_tick) ? 1 : -1;
+    struct { uint16_t overtravel; int tick; WriteDecision expected; } bad[] = {
+        {17, tick16 + step, WriteDecision::REJECT_PROBE_OVERTRAVEL},
+        {16, tick16 + step, WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS},
+        {16, contact_tick + 16 * step, WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS},
+        {16, tick16 - step, WriteDecision::REJECT_PROBE_OVERTRAVEL},
+        {200, tick16, WriteDecision::REJECT_PROBE_OVERTRAVEL}};
     for (const auto& b : bad) {
       actuator::ActuatorCommand cmd{};
       cmd.operation = actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE;
@@ -669,9 +741,9 @@ void test_overtravel_above_16_refused_at_every_layer() {
       cmd.contact_probe_overtravel_ticks = b.overtravel;
       actuator::ActuatorTransaction txn{};
       CHECK_EQ((int)rig.policy.plan(cmd, lease, OperatingMode::MAINTENANCE, &txn),
-               (int)WriteDecision::REJECT_PROBE_OVERTRAVEL);
+               (int)b.expected);
     }
-    // ...and exactly the resolved 16-tick point is accepted.
+    // ...and exactly the URDF-clamped point is accepted.
     actuator::ActuatorCommand ok{};
     ok.operation = actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE;
     ok.joint = id;
@@ -784,7 +856,8 @@ void test_backoff_can_never_carry_the_overtravel() {
 }
 
 int main() {
-  test_overtravel_lands_exactly_16_ticks_past_the_contact_both_sides_all_legs();
+  test_overtravel_clamped_to_urdf_limit_both_sides_all_legs();
+  test_overtravel_ceiling_is_not_a_travel_amount();
   test_zero_overtravel_is_exactly_the_canonical_contact();
   test_overtravel_above_16_refused_at_every_layer();
   test_overtravel_is_contact_probe_only();

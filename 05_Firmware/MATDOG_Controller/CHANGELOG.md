@@ -1,6 +1,6 @@
 # MATDOG Controller — Changelog
 
-## Unreleased — bounded contact-probe overtravel (hardware finding #2) — 2026-09-29
+## Unreleased — URDF-clamped contact-probe overtravel (hardware finding #2) — 2026-09-29
 
 **OPERATOR-APPROVED, OFFLINE-VALIDATED; hardware re-test pending.** With the motion budget fixed
 (`b646631`), LF's MIN first approach reached its stop and stalled at tick 1500, but the stop sits
@@ -10,28 +10,37 @@ pressed on the intended stop both times.
 
 - `actuator::kContactProbeMaxOvertravelTicks = 16` and
   `resolveContactProbeApproachToRaw()`: the only way to command past a contact. It resolves the
-  canonical contact through the URDF-checked resolver, then moves at most 16 raw ticks further in
-  the side's approach direction, with no wrap. Anything larger returns `REJECT_OVERTRAVEL`.
-- `ActuatorCommand` / `CalibrationExecutionRequest` / `ContactProbeRequest` /
-  `FullLegCalibrationRequest` gain the allowance field (default 0). Both approach passes use it
-  for the command and for the arrival point; the backoff never does. The Full-Leg plan sets
-  `kFullLegApproachOvertravelTicks = 16`, statically bounded by the policy maximum.
+  canonical contact through the URDF-checked resolver, then moves by min(16, room to the URDF
+  joint limit) raw ticks in the side's approach direction. The room is the furthest tick that
+  still converts back inside the URDF domain (`resolveRawToUrdfQ`). It never crosses the URDF
+  limit and never wraps; asking for more than 16 returns `REJECT_OVERTRAVEL`. 16 is a ceiling,
+  not a travel amount. For every UPPER joint today the room is **4 ticks (MIN)** and
+  **6 ticks (MAX)**, independent of q0.
+- The ceiling field flows plan → executor → probe → engine → policy (default 0). Both approach
+  passes use the clamped point for the command and for arrival; the backoff never does. The plan
+  sets `kFullLegApproachOvertravelTicks = 16` (ceiling), statically bounded by the maximum, and
+  records per side `contact_tick`, `target_tick`, `urdf_limit_tick` and
+  `applied_overtravel_ticks`.
 - `SafeActuatorPolicy`: `REJECT_PROBE_OVERTRAVEL` for any non-CONTACT_PROBE command carrying the
-  allowance. It is checked before any route can accept, including the future stand/gait
-  `POSITION_COMMAND`. For CONTACT_PROBE, the target must be exactly the canonical contact and
-  `target_tick` must equal the tick the policy re-derives. The execution engine refuses it on
-  other intents too.
-- Unchanged: Geometry V5 contacts (still the evidence reference), backoff, arrival tolerance,
-  stall window/progress, repeatability 16, aux parking, envelopes/JointLimits. Because the UPPER
-  URDF limits are only ~4 ticks (MIN) and ~7 ticks (MAX) past the contacts, contact+16 is up to
-  ~12 / ~9 ticks outside the modelled URDF range. That is inherent to the approved 16-tick bound
-  and is confined to this one operation.
-- `CALIBRATION_FULL_LEG_PROBE_BOUND approach_overtravel_ticks=16 max=16 …` is printed on ARMED.
-- Tests: policy/engine cases (all four UPPER joints, MIN and MAX, exact +16 landing, >16 refused
-  at resolver/engine/policy/executor/probe, CONTACT_PROBE-only, backoff cannot carry it);
-  kinematic cases (a stop 4 ticks short without the allowance reproduces `NO_CONTACT_DETECTED`;
-  stops 4–5 ticks short with it complete all four legs; with no stop the run fails at exactly
-  contact+16 and never goes further); plan pins; an audit rule plus eight mutation cases.
+  ceiling, checked before any route can accept (including the future stand/gait
+  `POSITION_COMMAND`). For CONTACT_PROBE the anchor must be exactly the canonical contact. The
+  commanded tick must independently convert back inside the URDF domain
+  (`REJECT_TARGET_OUTSIDE_URDF_LIMITS`) and equal the policy's own clamped re-derivation. The
+  execution engine also refuses the ceiling on other intents.
+- Unchanged: Geometry V5 contacts (still the evidence reference), URDF limits, backoff, arrival
+  tolerance, stall window/progress, repeatability 16, aux parking, envelopes/JointLimits.
+- ARMED prints `CALIBRATION_FULL_LEG_PROBE_BOUND side=MIN|MAX contact_tick=… target_tick=…
+  urdf_limit_tick=… applied_overtravel_ticks=… ceiling_ticks=16 …`.
+- Revision history: `e5c0a3c` first let the allowance reach contact+16 past the URDF limit. It was
+  flashed but never ran a motion. On the operator's decision it was revised to clamp at the URDF
+  limit before any hardware use.
+- Tests: policy/engine cases (four UPPER joints, MIN and MAX, applied 4/6 from a hand-computed
+  oracle; the clamp is tight; the unclamped contact+16 is refused; >16 is refused at every layer;
+  16 is only a ceiling; CONTACT_PROBE only; the backoff cannot carry it); kinematic cases (a stop
+  4 ticks short without the allowance reproduces `NO_CONTACT_DETECTED`; stops 4–5 ticks short
+  stall on both passes of both sides on all four legs, target-to-stop 8–9 MIN / 10–11 MAX; with
+  no stop the run fails at the clamped point and never goes further); plan pins; an audit rule
+  and ten mutation cases.
 
 ## Unreleased — Full-Leg motion budget fix (hardware finding) — 2026-09-29
 

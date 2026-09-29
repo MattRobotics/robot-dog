@@ -317,9 +317,9 @@ void test_plan_carries_dynamic_identity_endpoints_and_tolerances() {
     CHECK_EQ(r.max_approach_urad, hi->contact);
     CHECK_EQ(r.min_backoff_urad, lo->contact / 2);
     CHECK_EQ(r.max_backoff_urad, hi->contact / 2);
-    // Hardware finding 2026-09-29: both approach passes run 16 raw ticks past
-    // the canonical contact; the contact numbers above stay the Geometry V5
-    // ones and the backoff stays contact/2.
+    // Hardware finding 2026-09-29: both approach passes may run up to 16 raw
+    // ticks past the canonical contact, clamped to the URDF limit; the contact
+    // numbers above stay the Geometry V5 ones and the backoff stays contact/2.
     CHECK_EQ(r.approach_overtravel_ticks, 16);
     CHECK_EQ(r.approach_overtravel_ticks, kFullLegApproachOvertravelTicks);
     CHECK(r.approach_overtravel_ticks <= actuator::kContactProbeMaxOvertravelTicks);
@@ -356,19 +356,29 @@ void test_plan_targets_pass_the_checked_resolver_for_every_leg() {
     const int min_travel = kFullLegRepeatabilityToleranceTicks * kFullLegMinReapproachToleranceMultiple;
     CHECK(std::abs(static_cast<int>(raw[0]) - static_cast<int>(raw[1])) >= min_travel);
     CHECK(std::abs(static_cast<int>(raw[2]) - static_cast<int>(raw[3])) >= min_travel);
-    // The commanded approach points: exactly 16 raw ticks past each contact,
-    // further from q0 than the contact on both sides.
-    const ContactSide sides[2] = {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE};
+    // The commanded approach points the plan records: past each contact by
+    // the URDF room (4 MIN / 6 MAX, see test_calibration_execution_engine.cpp),
+    // not by the 16-tick ceiling; further from q0 than the contact; inside the
+    // URDF domain with the next tick outside it; the URDF-limit tick within a
+    // rounding tick of the target.
+    const FullLegProbeBoundary* bounds[2] = {&plan.min_probe, &plan.max_probe};
+    const int room[2] = {4, 6};
     for (int k = 0; k < 2; ++k) {
-      uint16_t approach = 0;
-      CHECK(actuator::resolveContactProbeApproachToRaw(
-                profile, actuator::geometry_data::kProvenance, *t, targets[k * 2], sides[k],
-                plan.request.approach_overtravel_ticks, &approach) ==
-            actuator::TargetResolveStatus::OK);
+      const FullLegProbeBoundary& b = *bounds[k];
       const int contact = raw[k * 2];
-      CHECK_EQ(std::abs(static_cast<int>(approach) - contact), 16);
-      CHECK_EQ(std::abs(static_cast<int>(approach) - static_cast<int>(t->q0_tick)),
-               std::abs(contact - static_cast<int>(t->q0_tick)) + 16);
+      const int q0 = static_cast<int>(t->q0_tick);
+      CHECK_EQ(b.contact_tick, contact);
+      CHECK_EQ(b.applied_overtravel_ticks, room[k]);
+      CHECK_EQ(std::abs(static_cast<int>(b.target_tick) - contact), room[k]);
+      CHECK_EQ(std::abs(static_cast<int>(b.target_tick) - q0), std::abs(contact - q0) + room[k]);
+      actuator::MicroRad q = 0;
+      CHECK(actuator::resolveRawToUrdfQ(profile, actuator::geometry_data::kProvenance, *t,
+                                        b.target_tick, &q) == actuator::TargetResolveStatus::OK);
+      const int further = static_cast<int>(b.target_tick) + (static_cast<int>(b.target_tick) > contact ? 1 : -1);
+      CHECK(actuator::resolveRawToUrdfQ(profile, actuator::geometry_data::kProvenance, *t,
+                                        static_cast<uint16_t>(further), &q) ==
+            actuator::TargetResolveStatus::REJECT_URDF_LIMIT);
+      CHECK(std::abs(static_cast<int>(b.urdf_limit_tick) - static_cast<int>(b.target_tick)) <= 1);
     }
     if (plan.request.auxiliary_required) {
       const actuator::JointTransform* at = table.find(plan.request.auxiliary_joint, tag);

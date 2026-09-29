@@ -76,12 +76,14 @@ struct ContactProbeRequest {
   // never assumed valid, and neither is any other unreviewed value).
   uint16_t repeatability_tolerance_ticks = 0;
   // Operator-approved allowance (hardware finding 2026-09-29): BOTH approach
-  // passes are commanded this many raw ticks past approach_target_urad (the
-  // canonical contact) in endpoint_side's direction, and arrival is judged
-  // against that same point - so a stop at the modelled contact stalls the
-  // joint instead of reading as arrival. Never applied to the backoff. At most
+  // passes are commanded up to this many raw ticks past approach_target_urad
+  // (the canonical contact) in endpoint_side's direction, clamped to the URDF
+  // joint limit, and arrival is judged against that same point - so a stop at
+  // the modelled contact stalls the joint instead of reading as arrival. Never
+  // applied to the backoff. A ceiling of at most
   // actuator::kContactProbeMaxOvertravelTicks (start() refuses more); reaching
-  // it without a stall is still NO_CONTACT_DETECTED. 0 = the canonical contact.
+  // the clamped point without a stall is still NO_CONTACT_DETECTED. 0 = the
+  // canonical contact.
   uint16_t approach_overtravel_ticks = 0;
 };
 

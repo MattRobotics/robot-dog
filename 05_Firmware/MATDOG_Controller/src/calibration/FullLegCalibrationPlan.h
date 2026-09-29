@@ -59,9 +59,10 @@ constexpr uint16_t kFullLegMinReapproachToleranceMultiple = 8;
 // ticks short of the Geometry V5 contact, inside the 4-tick arrival tolerance,
 // so an approach commanded exactly to the contact could "arrive" on the stop
 // and read as NO_CONTACT_DETECTED. Both approach passes of both sides are
-// therefore commanded this many raw ticks past the canonical contact (which
-// itself is unchanged and stays the evidence reference); the backoff is not.
-// Equal to the reviewed repeatability tolerance; never above the policy's
+// therefore commanded past the canonical contact (which itself is unchanged
+// and stays the evidence reference) by up to this many raw ticks, clamped to
+// the URDF joint limit - a ceiling, not a travel amount (UPPER today: ~4 MIN,
+// ~6 MAX). The backoff is not. Never above the policy's
 // actuator::kContactProbeMaxOvertravelTicks.
 constexpr uint16_t kFullLegApproachOvertravelTicks = 16;
 static_assert(kFullLegApproachOvertravelTicks <= actuator::kContactProbeMaxOvertravelTicks,
@@ -72,6 +73,16 @@ struct FullLegJointRef {
   uint8_t bus_id = 0;  // 0 = unresolved (never a valid ST3215 id)
 };
 
+// What one side's approach passes will actually command, for this
+// installation's q0 - reported on ARMED so a hardware run carries its own
+// geometry evidence (all raw ticks).
+struct FullLegProbeBoundary {
+  uint16_t contact_tick = 0;             // canonical Geometry V5 contact
+  uint16_t target_tick = 0;              // commanded by both approach passes
+  uint16_t urdf_limit_tick = 0;          // nearest tick to the URDF limit on this side
+  uint16_t applied_overtravel_ticks = 0; // |target - contact| = min(ceiling, room)
+};
+
 struct FullLegPlan {
   Leg leg = Leg::LF;
   FullLegJointRef upper{};
@@ -80,6 +91,8 @@ struct FullLegPlan {
   // Fully populated; request.auxiliary_required / auxiliary_* come from the
   // Geometry V5 MAX endpoint record, never from the caller.
   FullLegCalibrationRequest request{};
+  FullLegProbeBoundary min_probe{};
+  FullLegProbeBoundary max_probe{};
 };
 
 // One (leg, joint) -> semantic identity + bus id, from the canonical allocation,

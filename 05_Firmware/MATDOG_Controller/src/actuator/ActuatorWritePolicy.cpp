@@ -397,16 +397,22 @@ WriteDecision SafeActuatorPolicy::evaluateEndpointPlan(const ActuatorCommand& co
 
   // The one exception to "never past the contact" (hardware finding
   // 2026-09-29, operator-approved): an approach anchored on EXACTLY the
-  // canonical contact may be commanded at most kContactProbeMaxOvertravelTicks
-  // raw ticks further, so a physical stop at the modelled contact stalls the
-  // joint instead of being indistinguishable from arrival. The tick is
-  // re-derived here from the policy's own geometry and transform; the caller's
-  // target_tick must match it exactly. A backoff (target short of the contact)
-  // can never carry the allowance.
+  // canonical contact may be commanded up to kContactProbeMaxOvertravelTicks
+  // raw ticks further - clamped to the URDF joint limit - so a physical stop
+  // at the modelled contact stalls the joint instead of being
+  // indistinguishable from arrival. The commanded tick must itself convert
+  // back inside the URDF domain, AND equal the tick re-derived here from the
+  // policy's own geometry and transform. A backoff (target short of the
+  // contact) can never carry the allowance.
   if (command.contact_probe_overtravel_ticks != 0) {
     if (command.contact_probe_overtravel_ticks > kContactProbeMaxOvertravelTicks ||
         command.target_urad != contact || expected_provenance_ == nullptr) {
       return WriteDecision::REJECT_PROBE_OVERTRAVEL;
+    }
+    MicroRad commanded_q = 0;
+    if (resolveRawToUrdfQ(*geometry_, *expected_provenance_, *transform, command.target_tick,
+                          &commanded_q) != TargetResolveStatus::OK) {
+      return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
     }
     uint16_t allowed_tick = 0;
     if (resolveContactProbeApproachToRaw(*geometry_, *expected_provenance_, *transform, contact,

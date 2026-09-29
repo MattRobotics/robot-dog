@@ -19,6 +19,7 @@
 // pass/fail tally. Run via scripts/tests/run_host_tests.sh.
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <initializer_list>
 
@@ -1189,8 +1190,10 @@ struct KinematicResult {
   ContactEvidence max_evidence{};
   int32_t min_contact = 0;       // canonical contact ticks for this q0
   int32_t max_contact = 0;
-  int32_t min_approach_goal = 0;  // contact + overtravel, per side
+  int32_t min_approach_goal = 0;  // contact + URDF-clamped overtravel, per side
   int32_t max_approach_goal = 0;
+  uint16_t min_applied = 0;       // ticks actually past the contact
+  uint16_t max_applied = 0;
   double primary_lo_seen = 0;
   double primary_hi_seen = 0;
   int primary_min_goal = 0;
@@ -1250,8 +1253,35 @@ KinematicResult runKinematicLeg(const LegFixture& f, const KinematicOptions& o) 
   out.max_contact = max_contact;
   out.min_backoff = min_backoff;
   out.max_backoff = max_backoff;
-  out.min_approach_goal = min_contact - static_cast<int>(o.overtravel) * min_toward_q0;
-  out.max_approach_goal = max_contact - static_cast<int>(o.overtravel) * max_toward_q0;
+  // The commanded approach points come from the ONE production resolver
+  // (URDF-clamped); independently, each must lie further from q0 than its
+  // contact, by at most the ceiling, and inside the URDF domain.
+  {
+    const actuator::JointTransform t = promotedTransform(f.upper, q0);
+    uint16_t goal = 0, applied = 0;
+    CHECK(actuator::resolveContactProbeApproachToRaw(
+              profile, actuator::geometry_data::kProvenance, t, req.min_approach_urad,
+              ContactSide::MIN_SIDE, o.overtravel, &goal, &applied) ==
+          actuator::TargetResolveStatus::OK);
+    out.min_approach_goal = goal;
+    out.min_applied = applied;
+    CHECK(actuator::resolveContactProbeApproachToRaw(
+              profile, actuator::geometry_data::kProvenance, t, req.max_approach_urad,
+              ContactSide::MAX_SIDE, o.overtravel, &goal, &applied) ==
+          actuator::TargetResolveStatus::OK);
+    out.max_approach_goal = goal;
+    out.max_applied = applied;
+    CHECK_EQ(out.min_approach_goal, min_contact - static_cast<int>(out.min_applied) * min_toward_q0);
+    CHECK_EQ(out.max_approach_goal, max_contact - static_cast<int>(out.max_applied) * max_toward_q0);
+    CHECK(out.min_applied <= o.overtravel && out.max_applied <= o.overtravel);
+    actuator::MicroRad q = 0;
+    CHECK(actuator::resolveRawToUrdfQ(profile, actuator::geometry_data::kProvenance, t,
+                                      static_cast<uint16_t>(out.min_approach_goal), &q) ==
+          actuator::TargetResolveStatus::OK);
+    CHECK(actuator::resolveRawToUrdfQ(profile, actuator::geometry_data::kProvenance, t,
+                                      static_cast<uint16_t>(out.max_approach_goal), &q) ==
+          actuator::TargetResolveStatus::OK);
+  }
 
   SimServo& primary = backend.servo[f.upper_bus];
   primary.pos = q0;
@@ -1391,8 +1421,12 @@ void test_kinematic_travel_aware_budget_completes_every_leg() {
 // Hardware finding 2026-09-29 #2: LF_UPPER's MIN stop sat 4-5 ticks SHORT of the
 // Geometry V5 contact. Commanded exactly to the contact, pass 1 stalled 5 ticks
 // out (1500 vs 1495) and pass 2 "arrived" 4 ticks out (1499) -> NO_CONTACT_DETECTED.
-// The operator-approved fix commands both approach passes 16 raw ticks past the
-// canonical contact (Full-Leg plan: kFullLegApproachOvertravelTicks).
+// The operator-approved fix commands both approach passes past the canonical
+// contact by up to kFullLegApproachOvertravelTicks (16), CLAMPED to the URDF
+// joint limit: 4 ticks of room on UPPER MIN, 6 on UPPER MAX (see
+// test_calibration_execution_engine.cpp for the hand-computed oracle). The
+// target then sits 8-9 (MIN) / 10-11 (MAX) ticks past a stop 4-5 ticks short
+// of the contact - beyond the 4-tick arrival tolerance.
 // ---------------------------------------------------------------------------
 
 // A stop 4 ticks short of the contact is inside the arrival tolerance: without
@@ -1415,7 +1449,7 @@ void test_kinematic_stop_4_ticks_short_without_allowance_is_no_contact() {
 void test_kinematic_stop_short_of_contact_with_allowance_completes_every_leg() {
   for (const int inset : {4, 5}) {
     for (const Leg leg : kAllLegs) {
-      g_case = "kinematic: stop 4-5 ticks short + 16-tick allowance -> STALL both passes, all legs";
+      g_case = "kinematic: stop 4-5 ticks short + URDF-clamped allowance -> STALL both passes, all legs";
       const LegFixture f = fixtureFor(leg);
       KinematicOptions o{};
       o.overtravel = kFullLegApproachOvertravelTicks;
@@ -1429,27 +1463,32 @@ void test_kinematic_stop_short_of_contact_with_allowance_completes_every_leg() {
       CHECK(r.max_evidence.coarse_tick >= r.max_stop - 2 && r.max_evidence.coarse_tick <= r.max_stop + 2);
       CHECK(r.min_evidence.fine_tick_1 >= r.min_stop - 2 && r.min_evidence.fine_tick_1 <= r.min_stop + 2);
       CHECK(r.max_evidence.fine_tick_1 >= r.max_stop - 2 && r.max_evidence.fine_tick_1 <= r.max_stop + 2);
-      // Commanded extremes: exactly contact +16 on each side, never further.
+      // Commanded extremes: exactly the URDF-clamped approach points (4 ticks
+      // past the MIN contact, 6 past the MAX), never further.
       const int lo_goal = r.min_approach_goal < r.max_approach_goal ? r.min_approach_goal : r.max_approach_goal;
       const int hi_goal = r.min_approach_goal < r.max_approach_goal ? r.max_approach_goal : r.min_approach_goal;
       CHECK_EQ(r.primary_min_goal, lo_goal);
       CHECK_EQ(r.primary_max_goal, hi_goal);
-      CHECK_EQ(r.min_approach_goal > r.min_contact ? r.min_approach_goal - r.min_contact
-                                                   : r.min_contact - r.min_approach_goal, 16);
-      CHECK_EQ(r.max_approach_goal > r.max_contact ? r.max_approach_goal - r.max_contact
-                                                   : r.max_contact - r.max_approach_goal, 16);
+      CHECK_EQ(r.min_applied, 4);
+      CHECK_EQ(r.max_applied, 6);
+      // Target-to-stop distance is beyond the 4-tick arrival tolerance.
+      CHECK_EQ(std::abs(r.min_approach_goal - r.min_stop), inset + 4);
+      CHECK_EQ(std::abs(r.max_approach_goal - r.max_stop), inset + 6);
+      CHECK(std::abs(r.min_approach_goal - r.min_stop) > 4);
+      CHECK(std::abs(r.max_approach_goal - r.max_stop) > 4);
       CHECK_EQ(r.primary_writes, 8);
       CHECK(r.primary_torque_off && r.aux_torque_off);
     }
   }
 }
 
-// No physical stop at all: the joint reaches contact+16, ARRIVES, and the
-// probe fails NO_CONTACT_DETECTED with SAFE_OFF - it never travels further,
-// and nothing is ever commanded further.
-void test_kinematic_no_stop_fails_at_contact_plus_16_and_never_beyond() {
+// No physical stop at all: the joint reaches the URDF-clamped approach point,
+// ARRIVES, and the probe fails NO_CONTACT_DETECTED with SAFE_OFF - it never
+// travels further, and nothing is ever commanded further (in particular never
+// past the URDF limit).
+void test_kinematic_no_stop_fails_at_clamped_point_and_never_beyond() {
   for (const Leg leg : kAllLegs) {
-    g_case = "kinematic: no stop -> NO_CONTACT at exactly contact+16, never beyond";
+    g_case = "kinematic: no stop -> NO_CONTACT at the URDF-clamped point, never beyond";
     const LegFixture f = fixtureFor(leg);
     KinematicOptions o{};
     o.overtravel = kFullLegApproachOvertravelTicks;
@@ -1469,8 +1508,9 @@ void test_kinematic_no_stop_fails_at_contact_plus_16_and_never_beyond() {
       CHECK_EQ(r.primary_max_goal, r.min_approach_goal);
       CHECK(r.primary_hi_seen <= r.min_approach_goal + 0.001);
     }
-    // It did get within the arrival tolerance of contact+16 - that is WHY it
-    // failed - but no closer to anything beyond it.
+    CHECK_EQ(r.min_applied, 4);  // clamped by the URDF limit, not 16
+    // It did get within the arrival tolerance of the clamped point - that is
+    // WHY it failed - but no closer to anything beyond it.
     const int final_gap = r.primary_final_tick > r.min_approach_goal
                               ? r.primary_final_tick - r.min_approach_goal
                               : r.min_approach_goal - r.primary_final_tick;
@@ -1539,7 +1579,7 @@ int main() {
   test_kinematic_travel_aware_budget_completes_every_leg();
   test_kinematic_stop_4_ticks_short_without_allowance_is_no_contact();
   test_kinematic_stop_short_of_contact_with_allowance_completes_every_leg();
-  test_kinematic_no_stop_fails_at_contact_plus_16_and_never_beyond();
+  test_kinematic_no_stop_fails_at_clamped_point_and_never_beyond();
   test_kinematic_backoff_unchanged_by_allowance();
   test_allowance_above_16_refused_at_start();
 

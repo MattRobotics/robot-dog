@@ -175,13 +175,24 @@ FullLegPlanStatus resolveFullLegPlan(const actuator::CalibrationGeometryProfile&
                         kFullLegRepeatabilityToleranceTicks, &request.max_backoff_urad);
   if (s != FullLegPlanStatus::OK) return s;
 
-  // Both commanded approach points (contact + allowance) must exist in the raw
-  // domain for this installation's q0 before anything moves.
+  // Both commanded approach points (contact + URDF-clamped allowance) must
+  // resolve for this installation's q0 before anything moves; recorded with
+  // the contact and URDF-limit ticks they were derived from.
+  const actuator::GeometryJointRecord* upper_record = profile.findJoint(plan.upper.identity);
+  if (upper_record == nullptr) return FullLegPlanStatus::REJECT_GEOMETRY_JOINT;
   for (const actuator::GeometryEndpointRecord* endpoint : {min_endpoint, max_endpoint}) {
-    uint16_t approach_raw = 0;
-    if (actuator::resolveContactProbeApproachToRaw(
+    const bool min_side = endpoint->side == ContactSide::MIN_SIDE;
+    FullLegProbeBoundary* bound = min_side ? &plan.min_probe : &plan.max_probe;
+    if (actuator::resolveUrdfQToRaw(profile, expected_provenance, *upper_transform,
+                                    endpoint->contact, &bound->contact_tick) !=
+            actuator::TargetResolveStatus::OK ||
+        actuator::resolveUrdfQToRaw(profile, expected_provenance, *upper_transform,
+                                    min_side ? upper_record->urdf_lower : upper_record->urdf_upper,
+                                    &bound->urdf_limit_tick) != actuator::TargetResolveStatus::OK ||
+        actuator::resolveContactProbeApproachToRaw(
             profile, expected_provenance, *upper_transform, endpoint->contact, endpoint->side,
-            kFullLegApproachOvertravelTicks, &approach_raw) != actuator::TargetResolveStatus::OK) {
+            kFullLegApproachOvertravelTicks, &bound->target_tick,
+            &bound->applied_overtravel_ticks) != actuator::TargetResolveStatus::OK) {
       return FullLegPlanStatus::REJECT_TARGET_RESOLUTION;
     }
   }

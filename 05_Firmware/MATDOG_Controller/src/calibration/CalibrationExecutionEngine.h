@@ -140,9 +140,10 @@ struct CalibrationExecutionRequest {
   // still checks the endpoint, parking and contact-side safety constraints.
   actuator::MicroRad target_urad = 0;
 
-  // CONTACT_PROBE approach only: raw ticks past the canonical contact named by
-  // target_urad (actuator::resolveContactProbeApproachToRaw). 0 everywhere
-  // else; any other intent carrying it is refused before the policy.
+  // CONTACT_PROBE approach only: ceiling on the raw ticks past the canonical
+  // contact named by target_urad, clamped to the URDF joint limit
+  // (actuator::resolveContactProbeApproachToRaw). 0 everywhere else; any
+  // other intent carrying it is refused before the policy.
   uint16_t contact_probe_overtravel_ticks = 0;
 };
 

@@ -28,9 +28,12 @@ enum class TargetResolveStatus : uint8_t {
 // Hardware finding 2026-09-29, operator-approved: the most a CONTACT_PROBE
 // approach may be commanded PAST the canonical Geometry V5 contact, in raw
 // ticks, so the stall detector can observe a physical stop lying at (or a few
-// ticks short of) the modelled contact instead of "arriving" on it. It is an
-// allowance on the probe's commanded boundary only: the canonical contact, the
-// backoff, every other operation and every envelope/limit are untouched.
+// ticks short of) the modelled contact instead of "arriving" on it. A CEILING,
+// never a travel amount: the commanded point is additionally clamped to the
+// declared URDF joint limit (resolveContactProbeApproachToRaw), which for the
+// UPPER endpoints leaves ~4 ticks (MIN) and ~6 ticks (MAX). It is an allowance
+// on the probe's commanded boundary only: the canonical contact, the backoff,
+// every other operation and every envelope/limit are untouched.
 constexpr uint16_t kContactProbeMaxOvertravelTicks = 16;
 
 TargetResolveStatus resolveUrdfQToRaw(const CalibrationGeometryProfile& profile,
@@ -56,19 +59,22 @@ TargetResolveStatus resolveDeltaFromQ0(const CalibrationGeometryProfile& profile
 
 // The ONE sanctioned way to command a GoalPosition past a Geometry V5
 // contact. Resolves `contact_urad` exactly like resolveUrdfQToRaw() (so the
-// contact itself must lie inside the URDF domain), then continues
-// `overtravel_ticks` further in `side`'s approach direction - q decreasing for
-// MIN_SIDE, increasing for MAX_SIDE - in the raw domain. overtravel_ticks
-// above kContactProbeMaxOvertravelTicks is REJECT_OVERTRAVEL; the result must
-// stay inside 0..4095 (no wrap). overtravel_ticks == 0 is exactly
-// resolveUrdfQToRaw(contact_urad).
+// contact itself must lie inside the URDF domain), then continues in `side`'s
+// approach direction - q decreasing for MIN_SIDE, increasing for MAX_SIDE -
+// by min(overtravel_ticks, the room left before the URDF joint limit) raw
+// ticks: the result is the furthest tick, at most overtravel_ticks past the
+// contact, that still converts back inside the URDF domain
+// (resolveRawToUrdfQ). It never crosses the URDF limit and never wraps.
+// overtravel_ticks above kContactProbeMaxOvertravelTicks is REJECT_OVERTRAVEL.
+// `applied_overtravel_ticks_out` (optional) receives the ticks actually used.
 TargetResolveStatus resolveContactProbeApproachToRaw(const CalibrationGeometryProfile& profile,
                                                      const GeometryProvenance& expected_provenance,
                                                      const JointTransform& transform,
                                                      MicroRad contact_urad,
                                                      calibration::ContactSide side,
                                                      uint16_t overtravel_ticks,
-                                                     uint16_t* raw_tick_out);
+                                                     uint16_t* raw_tick_out,
+                                                     uint16_t* applied_overtravel_ticks_out = nullptr);
 
 const char* toString(TargetResolveStatus status);
 

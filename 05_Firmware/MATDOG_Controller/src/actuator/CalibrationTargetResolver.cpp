@@ -127,7 +127,8 @@ TargetResolveStatus resolveContactProbeApproachToRaw(const CalibrationGeometryPr
                                                      MicroRad contact_urad,
                                                      calibration::ContactSide side,
                                                      uint16_t overtravel_ticks,
-                                                     uint16_t* raw_tick_out) {
+                                                     uint16_t* raw_tick_out,
+                                                     uint16_t* applied_overtravel_ticks_out) {
   if (raw_tick_out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
   if (overtravel_ticks > kContactProbeMaxOvertravelTicks) {
     return TargetResolveStatus::REJECT_OVERTRAVEL;
@@ -144,14 +145,28 @@ TargetResolveStatus resolveContactProbeApproachToRaw(const CalibrationGeometryPr
   // direction exactly as the forward conversion does.
   const int8_t direction = jointDirection(profile, transform.identity);
   const int64_t q_sign = (side == calibration::ContactSide::MIN_SIDE) ? -1 : 1;
-  const int64_t raw = static_cast<int64_t>(contact_raw) +
-                      static_cast<int64_t>(direction) * q_sign *
-                          static_cast<int64_t>(overtravel_ticks);
-  if (raw < 0 || raw >= kTicksPerRevolution) {
-    return TargetResolveStatus::REJECT_RAW_DOMAIN;
+  const int64_t step = static_cast<int64_t>(direction) * q_sign;
+
+  // Clamp to the URDF joint limit (operator decision 2026-09-29): the largest
+  // n <= overtravel_ticks whose tick still converts back INSIDE the declared
+  // URDF domain through the one checked raw->q conversion. The allowance is a
+  // ceiling, never a travel amount; nothing past the URDF limit is ever
+  // produced. q is monotonic in n, so the first valid n from the top is it.
+  for (int32_t n = overtravel_ticks; n >= 0; --n) {
+    const int64_t raw = static_cast<int64_t>(contact_raw) + step * n;
+    if (raw < 0 || raw >= kTicksPerRevolution) continue;
+    MicroRad q_back = 0;
+    if (resolveRawToUrdfQ(profile, expected_provenance, transform, static_cast<uint16_t>(raw),
+                          &q_back) != TargetResolveStatus::OK) {
+      continue;
+    }
+    *raw_tick_out = static_cast<uint16_t>(raw);
+    if (applied_overtravel_ticks_out != nullptr) {
+      *applied_overtravel_ticks_out = static_cast<uint16_t>(n);
+    }
+    return TargetResolveStatus::OK;
   }
-  *raw_tick_out = static_cast<uint16_t>(raw);
-  return TargetResolveStatus::OK;
+  return TargetResolveStatus::REJECT_URDF_LIMIT;
 }
 
 const char* toString(TargetResolveStatus status) {
