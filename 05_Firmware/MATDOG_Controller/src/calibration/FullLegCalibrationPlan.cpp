@@ -1,7 +1,5 @@
 #include "FullLegCalibrationPlan.h"
 
-#include <initializer_list>
-
 #include "../servo/ServoPopulation.h"
 #include "CalibrationPopulationEvidence.h"
 
@@ -9,16 +7,6 @@ namespace matdog {
 namespace calibration {
 
 namespace {
-
-// Half of a signed micro-radian value, rounded toward zero. The result is
-// never farther from q=0 than the input, so the rule cannot overshoot the
-// contact by rounding.
-actuator::MicroRad halfTowardZero(actuator::MicroRad value) { return value / 2; }
-
-int64_t absTicksBetween(uint16_t a, uint16_t b) {
-  const int64_t d = static_cast<int64_t>(a) - static_cast<int64_t>(b);
-  return d < 0 ? -d : d;
-}
 
 bool sameJoint(const JointIdentity& a, const JointIdentity& b) {
   return a.leg == b.leg && a.joint == b.joint;
@@ -57,52 +45,6 @@ FullLegPlanStatus resolveLegJoint(const actuator::CalibrationGeometryProfile& pr
   }
 
   *out = found;
-  return FullLegPlanStatus::OK;
-}
-
-FullLegPlanStatus deriveBackoffUrad(const actuator::CalibrationGeometryProfile& profile,
-                                    const actuator::GeometryProvenance& expected_provenance,
-                                    const actuator::JointTransform& transform,
-                                    const actuator::GeometryEndpointRecord& endpoint,
-                                    uint16_t repeatability_tolerance_ticks,
-                                    actuator::MicroRad* backoff_urad_out) {
-  if (backoff_urad_out == nullptr) return FullLegPlanStatus::REJECT_NULL_OUTPUT;
-  *backoff_urad_out = 0;
-
-  const actuator::MicroRad contact = endpoint.contact;
-  const actuator::MicroRad clear = endpoint.clear;
-  const actuator::MicroRad backoff = halfTowardZero(contact);
-
-  // Same side as the contact and strictly between q=0 and it.
-  const bool positive = endpoint.side == ContactSide::MAX_SIDE;
-  if (positive) {
-    if (!(contact > 0 && backoff > 0 && backoff < contact)) return FullLegPlanStatus::REJECT_BACKOFF;
-    // Inside the region the geometry compiler proved clear on this side.
-    if (!(clear > 0 && backoff <= clear)) return FullLegPlanStatus::REJECT_BACKOFF;
-  } else {
-    if (!(contact < 0 && backoff < 0 && backoff > contact)) return FullLegPlanStatus::REJECT_BACKOFF;
-    if (!(clear < 0 && backoff >= clear)) return FullLegPlanStatus::REJECT_BACKOFF;
-  }
-
-  // Both points must survive the one checked URDF-q -> raw conversion.
-  uint16_t contact_raw = 0;
-  uint16_t backoff_raw = 0;
-  if (actuator::resolveUrdfQToRaw(profile, expected_provenance, transform, contact,
-                                  &contact_raw) != actuator::TargetResolveStatus::OK ||
-      actuator::resolveUrdfQToRaw(profile, expected_provenance, transform, backoff,
-                                  &backoff_raw) != actuator::TargetResolveStatus::OK) {
-    return FullLegPlanStatus::REJECT_TARGET_RESOLUTION;
-  }
-
-  // A re-approach shorter than a few repeatability tolerances proves nothing.
-  const int64_t minimum_travel = static_cast<int64_t>(repeatability_tolerance_ticks) *
-                                 static_cast<int64_t>(kFullLegMinReapproachToleranceMultiple);
-  if (repeatability_tolerance_ticks == 0 ||
-      absTicksBetween(contact_raw, backoff_raw) < minimum_travel) {
-    return FullLegPlanStatus::REJECT_BACKOFF;
-  }
-
-  *backoff_urad_out = backoff;
   return FullLegPlanStatus::OK;
 }
 
@@ -164,37 +106,22 @@ FullLegPlanStatus resolveFullLegPlan(const actuator::CalibrationGeometryProfile&
   request.endpoint_joint = JointKind::UPPER;
   request.min_repeatability_tolerance_ticks = kFullLegRepeatabilityToleranceTicks;
   request.max_repeatability_tolerance_ticks = kFullLegRepeatabilityToleranceTicks;
-  request.min_approach_urad = min_endpoint->contact;
-  request.max_approach_urad = max_endpoint->contact;
-  request.approach_overtravel_ticks = kFullLegApproachOvertravelTicks;
 
-  s = deriveBackoffUrad(profile, expected_provenance, *upper_transform, *min_endpoint,
-                        kFullLegRepeatabilityToleranceTicks, &request.min_backoff_urad);
-  if (s != FullLegPlanStatus::OK) return s;
-  s = deriveBackoffUrad(profile, expected_provenance, *upper_transform, *max_endpoint,
-                        kFullLegRepeatabilityToleranceTicks, &request.max_backoff_urad);
-  if (s != FullLegPlanStatus::OK) return s;
-
-  // Both commanded approach points (contact + URDF-clamped allowance) must
-  // resolve for this installation's q0 before anything moves; recorded with
-  // the contact and URDF-limit ticks they were derived from.
-  const actuator::GeometryJointRecord* upper_record = profile.findJoint(plan.upper.identity);
-  if (upper_record == nullptr) return FullLegPlanStatus::REJECT_GEOMETRY_JOINT;
-  for (const actuator::GeometryEndpointRecord* endpoint : {min_endpoint, max_endpoint}) {
-    const bool min_side = endpoint->side == ContactSide::MIN_SIDE;
-    FullLegProbeBoundary* bound = min_side ? &plan.min_probe : &plan.max_probe;
-    if (actuator::resolveUrdfQToRaw(profile, expected_provenance, *upper_transform,
-                                    endpoint->contact, &bound->contact_tick) !=
-            actuator::TargetResolveStatus::OK ||
-        actuator::resolveUrdfQToRaw(profile, expected_provenance, *upper_transform,
-                                    min_side ? upper_record->urdf_lower : upper_record->urdf_upper,
-                                    &bound->urdf_limit_tick) != actuator::TargetResolveStatus::OK ||
-        actuator::resolveContactProbeApproachToRaw(
-            profile, expected_provenance, *upper_transform, endpoint->contact, endpoint->side,
-            kFullLegApproachOvertravelTicks, &bound->target_tick,
-            &bound->applied_overtravel_ticks) != actuator::TargetResolveStatus::OK) {
-      return FullLegPlanStatus::REJECT_TARGET_RESOLUTION;
-    }
+  // The staged search's corridor for each side, for this installation's q0
+  // (canonical contact, URDF limit, entry = limit - 64, guard = limit + 64).
+  const actuator::TargetResolveStatus min_corridor = actuator::resolveCalibrationSearchCorridor(
+      profile, expected_provenance, *upper_transform, leg, JointKind::UPPER,
+      ContactSide::MIN_SIDE, &request.min_search);
+  const actuator::TargetResolveStatus max_corridor = actuator::resolveCalibrationSearchCorridor(
+      profile, expected_provenance, *upper_transform, leg, JointKind::UPPER,
+      ContactSide::MAX_SIDE, &request.max_search);
+  if (min_corridor == actuator::TargetResolveStatus::REJECT_SEARCH_CORRIDOR ||
+      max_corridor == actuator::TargetResolveStatus::REJECT_SEARCH_CORRIDOR) {
+    return FullLegPlanStatus::REJECT_SEARCH_CORRIDOR;
+  }
+  if (min_corridor != actuator::TargetResolveStatus::OK ||
+      max_corridor != actuator::TargetResolveStatus::OK) {
+    return FullLegPlanStatus::REJECT_TARGET_RESOLUTION;
   }
 
   request.auxiliary_required = max_needs_auxiliary;
@@ -239,7 +166,7 @@ const char* toString(FullLegPlanStatus status) {
     case FullLegPlanStatus::REJECT_MAX_PLAN_INCONSISTENT: return "REJECT_MAX_PLAN_INCONSISTENT";
     case FullLegPlanStatus::REJECT_AUXILIARY_IDENTITY: return "REJECT_AUXILIARY_IDENTITY";
     case FullLegPlanStatus::REJECT_NO_TRANSFORM: return "REJECT_NO_TRANSFORM";
-    case FullLegPlanStatus::REJECT_BACKOFF: return "REJECT_BACKOFF";
+    case FullLegPlanStatus::REJECT_SEARCH_CORRIDOR: return "REJECT_SEARCH_CORRIDOR";
     case FullLegPlanStatus::REJECT_TARGET_RESOLUTION: return "REJECT_TARGET_RESOLUTION";
   }
   return "UNKNOWN";

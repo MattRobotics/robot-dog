@@ -412,6 +412,16 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   workspace turns `kFullLegOperationalParametersApproved` on (audit-pinned `false`). Procedure:
   [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md).
   `@CALIBRATION Q0 PROMOTE` promotes the **current-boot** capture (not the frozen CR2-C package).
+  2026-09-29 hardware session:
+  - LF exposed a fixed-timeout defect (fixed) and servo settling 4–5 ticks short of any goal.
+  - It also exposed a real MIN stop ~23 ticks past the model contact.
+  - The endpoint search was replaced by the **staged LF V25-oracle search** (coarse transit →
+    8-tick fine search in URDF ± 64 → backoff 96 → pass 2 within 16). Mapping:
+    [`2026-09-29_FULL_CALIBRATION_V25_ORACLE_TRACEABILITY.md`](../../09_Logs/Development_Log/2026-09-29_FULL_CALIBRATION_V25_ORACLE_TRACEABILITY.md).
+  - Gates: host tests, static audit (includes the runner suite), the Safe Actuator/DALY/LED audit
+    mutation suites, and `scripts/tests/test_calibration_search_behaviour_mutations.py`. The last
+    runs explicitly: every behavioural mutation must fail the host tests.
+  - Hardware validation of the staged search: **PENDING**.
   **Next after a hardware Full Calibration PASS: Calibration Persistence V1** (versioned,
   atomic, fail-closed at boot, no ST3215 EEPROM writes) — TO_DESIGN, not started; see
   [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md).

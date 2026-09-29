@@ -66,6 +66,14 @@ enum class SafeOffResult : uint8_t {
 
 const char* toString(SafeOffResult result);
 
+// Which of the two reviewed WritePosEx speed/acceleration pairs a GoalPosition
+// uses - see ServoBus::kBoundedWrite* / kSearchEnvelope*. No other value is
+// ever written.
+enum class GoalMotionProfile : uint8_t {
+  BOUNDED = 0,
+  SEARCH_ENVELOPE = 1,
+};
+
 // Lean operational transport around the hardware-proven ST3215 / SCServo
 // path (05_Firmware/ST3215_Bench_Tools/Bench_QC_V6_1/matdog_servo_commissioning.ino,
 // SHA256 74656fb9187fd2024f8251276b49676d8be9c6455f542c49500cfb30d25630cd).
@@ -181,7 +189,15 @@ class ServoBus {
   // present_position, which lags behind a write by the joint's travel time).
   static constexpr uint16_t kBoundedWriteSpeed = 40;
   static constexpr uint8_t kBoundedWriteAcceleration = 10;
-  ServoWriteVerifyResult writeGoalPosition(int id, uint16_t target_tick);
+  // The LF V25 hardware-proven endpoint-search envelope (matdog.rs
+  // GOAL_SPEED=160, ACCELERATION=8, adopted there after supervised LF
+  // hardware passes). Only reachable as GoalMotionProfile::SEARCH_ENVELOPE;
+  // SafeActuatorPolicy grants that to its two endpoint-search moves alone
+  // (REJECT_MOTION_PROFILE everywhere else).
+  static constexpr uint16_t kSearchEnvelopeSpeed = 160;
+  static constexpr uint8_t kSearchEnvelopeAcceleration = 8;
+  ServoWriteVerifyResult writeGoalPosition(int id, uint16_t target_tick,
+                                           GoalMotionProfile profile);
 
   // Read-only runtime snapshot (present position/speed/load/voltage/temp).
   // Returns false if the servo does not answer within the bounded timeout.

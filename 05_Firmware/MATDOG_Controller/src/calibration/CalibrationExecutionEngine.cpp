@@ -97,11 +97,12 @@ CalibrationExecutionResult CalibrationExecutionEngine::execute(
   command.endpoint_side = request.endpoint_side;
   command.delta_ticks = request.direction_verify_delta_ticks;
   command.target_urad = request.target_urad;
-  command.contact_probe_overtravel_ticks = request.contact_probe_overtravel_ticks;
+  command.calibration_search = request.calibration_search;
+  command.motion_profile = request.motion_profile;
 
-  // The overtravel allowance belongs to CONTACT_PROBE alone; the policy
-  // refuses it anywhere else too, this just fails closed one layer earlier.
-  if (request.contact_probe_overtravel_ticks != 0 &&
+  // A search step belongs to CONTACT_PROBE alone; the policy refuses it
+  // anywhere else too, this just fails closed one layer earlier.
+  if (request.calibration_search &&
       operation != actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE) {
     result.outcome = CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION;
     return result;
@@ -112,10 +113,11 @@ CalibrationExecutionResult CalibrationExecutionEngine::execute(
     resolve = actuator::resolveDeltaFromQ0(
         *geometry_, *expected_provenance_, *transform,
         request.direction_verify_delta_ticks, &command.target_tick);
-  } else if (request.contact_probe_overtravel_ticks != 0) {
-    resolve = actuator::resolveContactProbeApproachToRaw(
-        *geometry_, *expected_provenance_, *transform, request.target_urad,
-        request.endpoint_side, request.contact_probe_overtravel_ticks, &command.target_tick);
+  } else if (request.calibration_search) {
+    // Already a raw tick; the policy re-derives the corridor that bounds it.
+    command.target_tick = request.search_target_tick;
+    resolve = request.search_target_tick < 4096u ? actuator::TargetResolveStatus::OK
+                                                 : actuator::TargetResolveStatus::REJECT_RAW_DOMAIN;
   } else {
     resolve = actuator::resolveUrdfQToRaw(
         *geometry_, *expected_provenance_, *transform,

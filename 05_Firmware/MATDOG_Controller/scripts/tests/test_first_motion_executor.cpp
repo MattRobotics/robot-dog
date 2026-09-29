@@ -157,12 +157,15 @@ class FakeActuatorBackend : public actuator::ActuatorBackend {
     last_bus_id = bus_id;
     return enable_torque_result;
   }
-  BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick) override {
+  BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick,
+                                        actuator::MotionProfile profile) override {
     ++write_goal_position_calls;
     last_bus_id = bus_id;
     last_target_tick = target_tick;
+    last_profile = profile;
     return write_goal_position_result;
   }
+  actuator::MotionProfile last_profile = actuator::MotionProfile::BOUNDED_DEFAULT;
 
   int enable_torque_calls = 0;
   int write_goal_position_calls = 0;
@@ -232,6 +235,8 @@ void test_happy_path_one_backend_call_per_tick_then_arrives() {
   CHECK_EQ(rig.backend.enable_torque_calls, 1);
   CHECK_EQ(rig.backend.write_goal_position_calls, 1);
   CHECK_EQ(rig.backend.last_target_tick, 2080);
+  // DIRECTION_VERIFY never inherits the calibration search speed profile.
+  CHECK((int)rig.backend.last_profile == (int)actuator::MotionProfile::BOUNDED_DEFAULT);
   CHECK_EQ((int)rig.executor.status().state, (int)FirstMotionState::MONITORING);
   CHECK_EQ(rig.executor.status().target_tick, 2080);
 

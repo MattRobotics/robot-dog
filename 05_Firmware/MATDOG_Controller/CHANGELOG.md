@@ -1,8 +1,77 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — staged calibration endpoint search (LF V25 oracle) — 2026-09-29
+
+**OFFLINE-VALIDATED, FLASH-READY; HARDWARE VALIDATION PENDING. Never run on hardware.**
+Supersedes the contact+16 / URDF-clamp probe (`e5c0a3c`, `67cd3cb`, entry below). The clamped
+run (1489) arrived 4 ticks short, like every earlier target. The operator then found the real
+LF_UPPER MIN stop by hand, torque off: **~23 ticks past the Geometry V5 contact / URDF limit**.
+No single target at or near the model contact can witness that stop, and "no progress 4–5 ticks
+short" is servo settling, not contact. The search is now a port of the only
+hardware-validated calibrator's *behaviour*, LF V25 (`matdog.rs`), made generic over
+LF/RF/RH/LH; see
+`09_Logs/Development_Log/2026-09-29_FULL_CALIBRATION_V25_ORACLE_TRACEABILITY.md`.
+
+- **Search corridor** (`actuator::resolveCalibrationSearchCorridor`): entry = URDF limit − 64,
+  guard = URDF limit + 64 along the probe direction (V25 `GUARD_OVERSHOOT_TICKS`,
+  `contact_acceptance_bounds`). Geometry V5 contacts and the URDF domain are unchanged. The
+  corridor is a calibration-search bound only.
+- **SafeActuatorPolicy**: `REJECT_CALIBRATION_SEARCH` covers a search flag on any operation other
+  than `CALIBRATION_CONTACT_PROBE`, and a search target outside [opposite URDF limit, guard].
+  `REJECT_MOTION_PROFILE` covers `MotionProfile::CALIBRATION_SEARCH` on any operation other than
+  CONTACT_PROBE / AUXILIARY_MOVE (never `POSITION_COMMAND`, stand, gait, first motion). Both are
+  checked before any route can accept. The legacy µrad path (`REJECT_TARGET_OUTSIDE_URDF_LIMITS`,
+  contact check) is unchanged for everything else.
+- **Speed profile**: `ServoBus::writeGoalPosition(id, tick, GoalMotionProfile)`:
+  BOUNDED 40/10 (unchanged default) or SEARCH_ENVELOPE 160/8 (V25 `GOAL_SPEED`/`ACCELERATION`),
+  plumbed through `ActuatorRuntime` → `ActuatorBackend`. An unknown profile is never written.
+- **ContactProbeEngine** (rewritten): COARSE_TRANSIT (64-tick steps, clamped at the entry) →
+  FINE_SEARCH (8-tick target steps) → contact #1 → BACKOFF 96 (current must recover to the
+  transit baseline, median + max(4·MAD, 5)) → FINE_SEARCH pass 2 → contact #2 within 16 of #1.
+  A pass-2 candidate > 8 ticks short of #1 is a friction plateau and is stepped past; pass 2
+  accepts up to 32 ticks HOME-ward of #1. `ContactSearchDetector` ports V25's
+  `HybridContactDetector` rule for rule: 4 startup samples, 24 ticks travel, progress ≤ 2,
+  |speed| ≤ 10, goal error > 10 inside / > 16 outside, target ahead, 3 samples. Stalls outside
+  the corridor are `EARLY_STALL_OUTSIDE_CORRIDOR`. Current is never part of contact admission.
+  Other V25 figures: 20 ms consumption cadence, 900 ms settle window, tracking limit
+  max(step + 4, 16), hard current ≥ 200 raw, temperature > 70 °C. A step past the guard is never
+  issued: `NO_CONTACT_BEFORE_GUARD`. Every failure after TorqueEnable is SAFE_OFF_REQUIRED.
+- **Full Leg executor/plan**: per-side `CalibrationSearchCorridor`s replace approach/backoff µrad
+  and overtravel (`REJECT_SEARCH_CORRIDOR`). Evidence ticks = pass 1 / pass 2 contacts. The
+  auxiliary park runs at 160/8 with the travel-aware deadman at V25's 80 ticks/s, arrival 10.
+  The backoff arrival is 12. The parking matrix, SAFE_OFF paths, finalizer and
+  HARDWARE_CONTACT_CALIBRATED semantics are unchanged.
+- **Observability**: ARMED prints `CALIBRATION_FULL_LEG_SEARCH_CORRIDOR side=… entry=… guard=…`.
+  Every step/state change prints `CALIBRATION_SEARCH …` (stage, target, pos, beyond_contact,
+  speed, current, baseline, p1/p2, bypass). `PROBE_FINAL` and STATUS carry the same fields.
+- **Removed**: `kContactProbeMaxOvertravelTicks`, `resolveContactProbeApproachToRaw`,
+  `REJECT_PROBE_OVERTRAVEL`, and the contact+16 / URDF-clamped single target. No compatibility
+  path is left.
+- **Not ported from V25 (documented in the traceability file)**: RAM TorqueLimit 500; the coarse
+  contact scout; `confirm_kinematic_plateau`; per-sample goal/status readback; holding
+  HIP/LOWER at q0; drift monitoring of the other joints; the 400 ms stable-target gate.
+- **Runner**: `scripts/calibration_hw_session.py` is a one-shot, fail-closed session:
+  build/manifest check → app-only flash → no-reset serial → signature/MAINTENANCE → SAFE_OFF
+  13/13 → Q0 CAPTURE (half-tooth 82 stop vs CR2-C) → PROMOTE 12 → LF, RF, RH, LH → SAFE_OFF 13/13
+  → EVIDENCE EXPORT check. Terminal detection is exact
+  `CALIBRATION_FULL_LEG_RESULT leg=<LEG> verdict=… failure=…` only. Tests:
+  `test_calibration_hw_session.py`.
+- Tests:
+  - `test_contact_probe_engine` (10 148 checks) on a kinematic ST3215 model
+    (`kinematic_servo_sim.h`);
+  - `test_full_leg_calibration_executor` (4 288);
+  - plan/engine/q0-promotion/runtime/first-motion/policy suites updated;
+  - `check_calibration_search_boundaries` plus 17 static mutation cases;
+  - `test_calibration_search_behaviour_mutations.py`: source mutations, each of which must make
+    the host tests fail.
+
 ## Unreleased — URDF-clamped contact-probe overtravel (hardware finding #2) — 2026-09-29
 
-**OPERATOR-APPROVED, OFFLINE-VALIDATED; hardware re-test pending.** With the motion budget fixed
+**SUPERSEDED by the staged endpoint search above; the mechanism below was removed.** Flashed as
+`67cd3cb` and run once on LF. The clamped target (1489) arrived 4 short (1493), and the real
+stop proved to be ~23 ticks past the contact, beyond any single URDF-bounded target.
+
+*Original entry:* **OPERATOR-APPROVED, OFFLINE-VALIDATED; hardware re-test pending.** With the motion budget fixed
 (`b646631`), LF's MIN first approach reached its stop and stalled at tick 1500, but the stop sits
 4–5 ticks short of the Geometry V5 contact (target 1495). Pass 2 ended within the 4-tick arrival
 tolerance (1499), so it read as arrival: `NO_CONTACT_DETECTED`. The operator confirmed the leg
@@ -44,7 +113,12 @@ pressed on the intended stop both times.
 
 ## Unreleased — Full-Leg motion budget fix (hardware finding) — 2026-09-29
 
-**HARDWARE-DISCOVERED DEFECT, FIXED OFFLINE; hardware re-test pending.** Both LF Full-Leg
+**PARTLY SUPERSEDED.** The travel-aware deadman stays, and the backoff and auxiliary park use it at
+V25's 80 ticks/s. The probe's steps are now monitored by the staged search, and
+`PROBE_FINAL` has new fields (entry above). Verified on hardware: the MIN first approach reached
+the stop instead of timing out (`b646631` run).
+
+*Original entry:* **HARDWARE-DISCOVERED DEFECT, FIXED OFFLINE; hardware re-test pending.** Both LF Full-Leg
 attempts of the 2026-09-29 session (`14881cd`) ended `UPPER_MIN_PROBE_FAILED`: every monitored
 Full-Leg move had the fixed 12 s deadman budget, but `ServoBus::writeGoalPosition()` commands the
 bounded 40 ticks/s (~3.5 deg/s), so no move could exceed ~480 ticks (~42 deg). The Geometry V5

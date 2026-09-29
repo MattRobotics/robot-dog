@@ -456,18 +456,21 @@ void test_full_leg_plan_consumes_the_new_q0() {
     CHECK(ta != nullptr && tb != nullptr && tc != nullptr);
     if (ta == nullptr || tb == nullptr || tc == nullptr) continue;
 
-    const MicroRad sides[2] = {a.request.min_approach_urad, a.request.max_approach_urad};
-    for (MicroRad q : sides) {
-      uint16_t raw_a = 0, raw_b = 0, raw_c = 0;
-      CHECK(resolveUrdfQToRaw(p, geometry_data::kProvenance, *ta, q, &raw_a) ==
-            TargetResolveStatus::OK);
-      CHECK(resolveUrdfQToRaw(p, geometry_data::kProvenance, *tb, q, &raw_b) ==
-            TargetResolveStatus::OK);
-      CHECK(resolveUrdfQToRaw(p, geometry_data::kProvenance, *tc, q, &raw_c) ==
-            TargetResolveStatus::OK);
-      CHECK_EQ((long)raw_b - (long)raw_a, (long)tb->q0_tick - (long)ta->q0_tick);
-      CHECK_EQ((long)raw_a - (long)raw_c, (long)ta->q0_tick - (long)tc->q0_tick);
-      CHECK(raw_a != raw_c);  // the plan is not silently on the frozen values
+    // Every raw point of both search corridors (canonical contact, entry,
+    // guard) moves by exactly the change of q0 - the plan is never silently
+    // on the frozen values.
+    const int32_t d_ab = (int32_t)tb->q0_tick - (int32_t)ta->q0_tick;
+    const int32_t d_ac = (int32_t)ta->q0_tick - (int32_t)tc->q0_tick;
+    for (int side = 0; side < 2; ++side) {
+      const actuator::CalibrationSearchCorridor& ca = side ? a.request.max_search : a.request.min_search;
+      const actuator::CalibrationSearchCorridor& cb = side ? b.request.max_search : b.request.min_search;
+      const actuator::CalibrationSearchCorridor& cc = side ? c.request.max_search : c.request.min_search;
+      CHECK_EQ((long)cb.contact_tick - (long)ca.contact_tick, (long)d_ab);
+      CHECK_EQ((long)ca.contact_tick - (long)cc.contact_tick, (long)d_ac);
+      CHECK_EQ((long)cb.guard_tick - (long)ca.guard_tick, (long)d_ab);
+      CHECK_EQ((long)cb.entry_tick - (long)ca.entry_tick, (long)d_ab);
+      CHECK_EQ(ca.home_tick, ta->q0_tick);
+      CHECK(ca.contact_tick != cc.contact_tick);
     }
 
     if (a.request.auxiliary_required) {

@@ -1,8 +1,10 @@
 # Full Calibration — four-leg hardware runbook (LF → RF → RH → LH, one build, one session)
 
-Date: 2026-09-29
-Status: PROCEDURE — OFFLINE-VALIDATED, NEVER RUN ON HARDWARE
-Firmware: ONE `ROBOT_POWERED` build from clean merged `main` (manifest `SOURCE_STATE=CLEAN`).
+Date: 2026-09-29 (revised the same night for the staged endpoint search)
+Status: PROCEDURE — OFFLINE-VALIDATED; the staged endpoint search has NEVER RUN ON HARDWARE
+Firmware: ONE `ROBOT_POWERED` build, OTA ingest 0, manifest `SOURCE_STATE=CLEAN`. That is clean
+merged `main` once the staged-search PR is merged. Its first hardware validation runs from the
+PR's final commit (branch `fix/calibration-hw-session-20260929`) before merge.
 
 This document is a procedure, not an authorization. Building, flashing, energizing the servo
 rail, every `@CALIBRATION` command below and every servo motion need the operator's explicit
@@ -38,6 +40,70 @@ decision and its park target are derived by the firmware: canonical allocation �
 
 UPPER MIN needs no auxiliary on any leg. SAFE_OFF after a leg covers the primary, plus the
 auxiliary only where one was used (never a `safeOff(0)`).
+
+### How one side is measured — staged endpoint search (LF V25 oracle)
+
+Hardware, 2026-09-29: a position-controlled ST3215 settles **4–5 ticks short of any goal**. LF_UPPER's
+real MIN stop sits **~23 ticks past** the Geometry V5 contact / URDF limit (found by hand, torque
+off). A single target at the model contact therefore never witnesses the stop. Each side is
+searched the way the hardware-validated LF V25 calibrator did (full mapping in
+`09_Logs/Development_Log/2026-09-29_FULL_CALIBRATION_V25_ORACLE_TRACEABILITY.md`):
+
+1. **COARSE_TRANSIT** — 64-tick target steps at speed 160 / acc 8 (calibration-only profile) up to
+   the corridor **entry = URDF limit − 64**.
+2. **FINE_SEARCH** — 8-tick target steps through the corridor, at most to the
+   **guard = URDF limit + 64**. Contact = V25's kinematic rule, all at once, 3 consecutive 20 ms
+   samples:
+   - ≥ 24 ticks travelled;
+   - progress ≤ 2;
+   - |speed| ≤ 10;
+   - goal error > 10;
+   - target still ahead.
+
+   Current is **not** part of contact admission. A stall before the entry = `EARLY_STALL_OUTSIDE_CORRIDOR`.
+   The step that would pass the guard is never sent = `NO_CONTACT_BEFORE_GUARD`.
+3. **BACKOFF** — 96 ticks back toward q0. Current must fall back to the transit baseline.
+4. **FINE_SEARCH pass 2** — 8-tick steps again. A candidate > 8 ticks short of pass 1 is a friction
+   plateau and is stepped past. Pass-2 contact must be within **16 ticks** of pass 1.
+5. SAFE_OFF (executor). Then (LF/RF) the auxiliary park before MAX, and the same search on MAX.
+
+Hard aborts to SAFE_OFF:
+- current ≥ 200 raw;
+- > 70 °C;
+- torque unexpectedly off;
+- stale telemetry / failed reads for 3 s;
+- tracking error > max(step + 4, 16) after 900 ms;
+- backoff obstruction;
+- policy refusal.
+
+Every commanded target stays inside [opposite URDF limit, guard]. The policy refuses the corridor
+to anything but `CALIBRATION_CONTACT_PROBE`, and the 160/8 profile to anything but the probe and
+its auxiliary park.
+
+Corridors for the 2026-09-29 22:05 q0 (they move 1:1 with the promoted q0; ARMED prints the live
+ones as `CALIBRATION_FULL_LEG_SEARCH_CORRIDOR …`):
+
+| Leg | bus | side | q0 | contact | URDF limit | entry | guard | guard past contact |
+|---|---|---|---|---|---|---|---|---|
+| LF | 12 | MIN | 2086 | 1493 | 1489 | 1553 | 1425 | 68 |
+| LF | 12 | MAX | 2086 | 3473 | 3480 | 3416 | 3544 | 71 |
+| RF | 22 | MIN | 2108 | 2701 | 2705 | 2641 | 2769 | 68 |
+| RF | 22 | MAX | 2108 | 721 | 714 | 778 | 650 | 71 |
+| RH | 32 | MIN | 2042 | 2635 | 2639 | 2575 | 2703 | 68 |
+| RH | 32 | MAX | 2042 | 655 | 648 | 712 | 584 | 71 |
+| LH | 42 | MIN | 2072 | 1479 | 1475 | 1539 | 1411 | 68 |
+| LH | 42 | MAX | 2072 | 3459 | 3466 | 3402 | 3530 | 71 |
+
+LF MIN is expected about **+23 past contact (~1470)**. Every other stop is unknown until
+witnessed. Only UPPER is energized, plus the parked auxiliary for LF/RF MAX. **HIP and LOWER of the
+leg are torque-off** (V25 held them at q0): watch that they stay out of the UPPER's path.
+
+Every step prints one line:
+```
+CALIBRATION_SEARCH exec=<phase> side=MIN|MAX pass=1|2 stage=COARSE_TRANSIT|FINE_SEARCH|BACKOFF
+  probe=<phase> target=<t> pos=<p> beyond_contact=<d> contact=… entry=… guard=… speed=…
+  current=… baseline=<median>/<threshold> steps=… bypass=… p1=… p2=… failure=…
+```
 
 ### Two levels of "calibrated" — never conflated
 
@@ -120,7 +186,8 @@ For `<L>` in this order:
    `CALIBRATION_SESSION=ACTIVE leg=<L> …`. It is refused while the previous leg's run is not
    finalized, a session is live, a permit is active or authority is not NONE.
 2. `@CALIBRATION MOTION PERMIT GRANT 16 CONFIRM_FIRST_MOTION` → `CALIBRATION_MOTION_PERMIT=ACTIVE`.
-3. **LF only, once:** `@CALIBRATION MOTION DIRECTION_VERIFY LF_UPPER +16 CONFIRM_FIRST_MOTION`
+3. *(Optional; not a FULL LEG prerequisite, and the one-shot runner does not send it.)*
+   **LF only, once:** `@CALIBRATION MOTION DIRECTION_VERIFY LF_UPPER +16 CONFIRM_FIRST_MOTION`
    (bus 12, +16 ticks). Wait for its own SAFE_OFF, then `@SERVO SAFE_OFF 12` →
    `VERIFIED_OFF`. The command refuses in any other leg's session
    (`REASON=ACTIVE_SESSION_IS_NOT_LF`). Nothing revokes the permit when it finishes; if step 4
@@ -128,10 +195,15 @@ For `<L>` in this order:
    `PERMIT_ALREADY_ACTIVE_REVOKE_FIRST` while one is still active — that is fine).
 4. `@CALIBRATION FULL LEG <L> CONFIRM_FULL_CALIBRATION` →
    `CALIBRATION_FULL_LEG=ARMED leg=<L> joint=UPPER bus=<12|22|32|42> … auxiliary=<LH_UPPER|
-   RH_UPPER|NONE> aux_bus=<42|32|0>` — check the printed bus/aux against the matrix above.
-5. Poll `@CALIBRATION FULL LEG STATUS` until the run ends (many seconds). Then
+   RH_UPPER|NONE> aux_bus=<42|32|0>` — check the printed bus/aux against the matrix above,
+   and the two `CALIBRATION_FULL_LEG_SEARCH_CORRIDOR` lines against the corridor table (shifted by
+   the q0 change).
+5. Poll `@CALIBRATION FULL LEG STATUS` until the run ends (tens of seconds; the offline model
+   needs < 60 s per leg). Then
    `CALIBRATION_FULL_LEG_RESULT leg=<L> verdict=HARDWARE_CONTACT_CALIBRATED failure=NONE` prints
-   on its own. `FULL LEG ABORT` / `SESSION ABORT` are always allowed.
+   on its own. **Only that exact record is a result.** The informational
+   `CALIBRATION_FULL_LEG_NOTE HARDWARE_CONTACT_CALIBRATED = …` line never is.
+   `FULL LEG ABORT` / `SESSION ABORT` are always allowed.
 6. Confirm the cleanup before the next leg:
    - `@SERVO SAFE_OFF <primary>` (and `<aux>` for LF/RF) → `VERIFIED_OFF`;
    - `@AUTHORITY STATUS` → owner NONE; `@CALIBRATION STATUS` → session COMPLETED (terminal);
@@ -168,4 +240,37 @@ session_completed=1 permit_revoked=1 authority_released=1`, and 13/13 `VERIFIED_
 - envelope build failure (`UPPER_ENVELOPE_NOT_READY`) or any admission failure;
 - cleanup not clean: `authority_released=0` / `permit_revoked=0` / `session_completed=0`.
 
+- `EARLY_STALL_OUTSIDE_CORRIDOR`, `NO_CONTACT_BEFORE_GUARD`, `REPEATABILITY_FAILED`,
+  `HARD_CURRENT_ABORT`, `CURRENT_NOT_RECOVERED`, `UNEXPECTED_STALL_DURING_BACKOFF`,
+  `TRACKING_FAILED` in `CALIBRATION_FULL_LEG_PROBE_FINAL`. Report them, never retry blindly;
+- LF MIN contact far from the hand-found stop (outside +7…+39 past contact);
+- a torque-off HIP/LOWER segment moving into the UPPER's path, any unexpected noise or contact.
+
 Do not continue to the next leg after a stop without an explicit decision.
+
+## One-shot runner (`scripts/calibration_hw_session.py`)
+
+It performs §0–§3 exactly as written above, and stops at the first failed check.
+- Build/manifest check, then the app-only flash.
+- Waits for USB re-enumeration, then a no-reset serial open.
+- Signature, MAINTENANCE, SAFE_OFF 13/13.
+- Q0 CAPTURE with the CR2-C table and the 82-tick stop, then PROMOTE (`transforms_admitted=12`).
+- LF → RF → RH → LH, each with its cleanup checks.
+- SAFE_OFF 13/13, then EVIDENCE EXPORT, verifying the `END` summary.
+
+On any failure it sends FULL LEG ABORT and SESSION ABORT, does SAFE_OFF on all 13, and runs a
+read-only export. It sends only operator commands that the firmware re-checks. Terminal detection
+is the exact `CALIBRATION_FULL_LEG_RESULT` record. Everything is logged to
+`<evidence-dir>/hw_session_<stamp>.log`.
+
+```
+python3 scripts/calibration_hw_session.py --evidence-dir <dir> \
+    --backup <fresh full-flash backup .bin> --backup-sha256 <its authorized SHA256> \
+    --confirm-q0-pose
+```
+
+- `--confirm-q0-pose` is the operator's statement that all four legs are at the manual q=0 pose.
+- `--backup-sha256` is passed to `flash_app_only.sh` as `MATDOG_FLASH_BACKUP_SHA256`. A non-default
+  backup is never accepted without it.
+- `--legs LF` runs one leg.
+- `--no-flash` is for when the board already runs the manifest build.

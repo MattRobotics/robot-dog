@@ -175,16 +175,21 @@ ServoWriteVerifyResult ServoBus::enableTorqueOn(int id) {
   return classifyServoWriteVerify(torque_enable, 1);
 }
 
-ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick) {
+ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick,
+                                                   GoalMotionProfile profile) {
   if (id < 0 || id > 253) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
   if (target_tick >= 4096u) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
+  if (profile != GoalMotionProfile::BOUNDED && profile != GoalMotionProfile::SEARCH_ENVELOPE) {
+    return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;  // corrupted value: write nothing
+  }
+  const bool search = profile == GoalMotionProfile::SEARCH_ENVELOPE;
 
   ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
   st_.WritePosEx(
       static_cast<uint8_t>(id),
       static_cast<s16>(target_tick),
-      kBoundedWriteSpeed,
-      kBoundedWriteAcceleration);
+      search ? kSearchEnvelopeSpeed : kBoundedWriteSpeed,
+      search ? kSearchEnvelopeAcceleration : kBoundedWriteAcceleration);
 
   // Verified by reading back the internal GoalPosition register itself, not
   // present_position: present_position only catches up to the target over

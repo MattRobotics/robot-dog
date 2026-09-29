@@ -40,6 +40,14 @@ struct TelemetrySample {
   uint32_t sampled_at_ms = 0;
   int32_t present_position = -1;
   int32_t torque_enable = -1;
+  // Raw ST3215 registers, -1 = not read. Not consulted by this monitor; the
+  // calibration endpoint search (ContactProbeEngine) uses them exactly as the
+  // LF V25 hardware oracle did: speed magnitude for its kinematic contact
+  // detector, current for the hard-current abort and the post-backoff
+  // recovery check, temperature for the thermal abort.
+  int32_t present_speed = -1;
+  int32_t present_current = -1;
+  int32_t present_temperature = -1;
 };
 
 // Ordered so a caller can treat CONTINUE/ARRIVED as "keep going" and

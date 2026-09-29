@@ -95,8 +95,10 @@ class ActuatorBackend {
   virtual BackendWriteOutcome enableTorque(uint8_t bus_id) = 0;
 
   // Unsigned 0..4095 domain, exactly the GoalPosition contract — signed
-  // wrap is forbidden and this interface cannot express one.
-  virtual BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick) = 0;
+  // wrap is forbidden and this interface cannot express one. `profile` is the
+  // policy-checked MotionProfile of the command (see REJECT_MOTION_PROFILE).
+  virtual BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick,
+                                                MotionProfile profile) = 0;
 };
 
 enum class ExecuteResult : uint8_t {

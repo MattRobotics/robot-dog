@@ -73,6 +73,8 @@ class Controller {
   // never touches a servo: SAFE_OFF was the executor's, verified before the
   // executor turned terminal.
   void updateFullLegFinalization();
+  // Evidence line per search step / probe transition (see its definition).
+  void printFullLegSearchEvent();
 
   servo::ServoBus servo_bus_;
   servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-start
@@ -172,6 +174,12 @@ class Controller {
   // Same convention as first_motion_safe_off_result_ above, one per bus this
   // path may energize. Both reset to UNVERIFIED_NO_RESPONSE at the start of
   // every fresh full_leg_calibration_ attempt.
+  // Last state printFullLegSearchEvent() reported.
+  uint16_t search_event_steps_ = 0;
+  uint8_t search_event_probe_phase_ = 0;
+  uint8_t search_event_exec_phase_ = 0;
+  uint8_t search_event_pass_ = 0;
+  uint16_t search_event_bypass_ = 0;
   servo::SafeOffResult full_leg_primary_safe_off_result_ =
       servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
   servo::SafeOffResult full_leg_auxiliary_safe_off_result_ =

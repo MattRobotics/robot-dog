@@ -292,8 +292,8 @@ def check_servo_motion_write_surface(files):
         return
     code = next(c for p, c in files if p == path)
     body = re.search(
-        r"ServoWriteVerifyResult ServoBus::writeGoalPosition\(int id, uint16_t target_tick\)"
-        r"\s*\{(.*?)\n\}", code, re.DOTALL)
+        r"ServoWriteVerifyResult ServoBus::writeGoalPosition\(int id, uint16_t target_tick,"
+        r"\s*GoalMotionProfile profile\)\s*\{(.*?)\n\}", code, re.DOTALL)
     if not body or not (body.start() <= pos <= body.end()):
         fail(f"{path}: WritePosEx is not inside ServoBus::writeGoalPosition(), or it no "
              f"longer returns ServoWriteVerifyResult")
@@ -301,9 +301,20 @@ def check_servo_motion_write_surface(files):
     text = body.group(1)
     for required in ("target_tick >= 4096u", "kOperationalTimeoutMs",
                      "kBoundedWriteSpeed", "kBoundedWriteAcceleration",
+                     "kSearchEnvelopeSpeed", "kSearchEnvelopeAcceleration",
                      "SMS_STS_GOAL_POSITION_L", "readWord", "classifyServoWriteVerify"):
         if required not in text:
             fail(f"{path}: writeGoalPosition() missing reviewed CR3 guard {required!r}")
+    # Exactly the two reviewed speed/acceleration pairs: the bounded bring-up
+    # envelope and the LF V25 hardware-proven endpoint-search envelope.
+    header = next((c for p, c in files if p.name == "ServoBus.h"), "")
+    for pinned in ("static constexpr uint16_t kBoundedWriteSpeed = 40;",
+                   "static constexpr uint8_t kBoundedWriteAcceleration = 10;",
+                   "static constexpr uint16_t kSearchEnvelopeSpeed = 160;",
+                   "static constexpr uint8_t kSearchEnvelopeAcceleration = 8;"):
+        if re.sub(r"\s+", " ", header).count(pinned) != 1:
+            fail(f"ServoBus.h: GoalPosition speed envelope must be exactly {pinned!r} "
+                 f"(bounded 40/10; LF V25 search envelope 160/8)")
     for forbidden in ("RegWrite", "SyncWrite", "writeByte(", "writeWord("):
         if forbidden in text:
             fail(f"{path}: writeGoalPosition() contains forbidden primitive {forbidden!r}")
@@ -333,8 +344,8 @@ def check_goal_position_register_boundary(files, sketch_dir):
                  f"so every access to it is in one auditable place")
 
     body = re.search(
-        r"ServoWriteVerifyResult ServoBus::writeGoalPosition\(int id, uint16_t target_tick\)"
-        r"\s*\{(.*?)\n\}", bus_code, re.DOTALL)
+        r"ServoWriteVerifyResult ServoBus::writeGoalPosition\(int id, uint16_t target_tick,"
+        r"\s*GoalMotionProfile profile\)\s*\{(.*?)\n\}", bus_code, re.DOTALL)
     if not body:
         fail(f"{bus_path}: ServoBus::writeGoalPosition() not found")
         return
@@ -1312,119 +1323,131 @@ def check_first_motion_command_wiring(files):
              f"hardware_motion_authorized; CR3 calibration permit must remain separate")
 
 
-def check_contact_probe_overtravel_allowance(files):
-    """Hardware finding 2026-09-29 (operator-approved): the ONE bounded way a
-    GoalPosition may be commanded past a Geometry V5 contact.
-
-    LF_UPPER's MIN stop sat 4-5 ticks short of the modelled contact, inside the
-    4-tick arrival tolerance, so an approach commanded exactly to the contact
-    could arrive on the stop and read as NO_CONTACT_DETECTED. The approved fix
-    lets a CONTACT_PROBE approach run at most 16 raw ticks past the canonical
-    contact, CLAMPED to the declared URDF joint limit (operator decision: never
-    beyond the URDF limit). Pinned here so it can never widen or leak:
-      - kContactProbeMaxOvertravelTicks is exactly 16, and the Full-Leg plan's
-        allowance ceiling is exactly 16 and statically bounded by it;
-      - resolveContactProbeApproachToRaw() clamps through the checked raw->q
-        conversion (resolveRawToUrdfQ), so it can never yield a tick outside
-        the URDF domain;
-      - evaluate() refuses the allowance on every non-CONTACT_PROBE operation
-        BEFORE any route (accepted limits, bootstrap envelope, auxiliary move)
-        can accept;
-      - evaluateEndpointPlan() bounds it, anchors it on exactly the canonical
-        contact (so a backoff cannot carry it) and re-derives the exact tick;
-      - the execution engine refuses it on every other intent;
-      - only the reviewed calibration units ever call the resolver."""
+def check_calibration_search_boundaries(files):
+    """2026-09-29 staged endpoint search (LF V25 hardware oracle, operator
+    decision after LF_UPPER's real MIN stop was found ~23 ticks past the
+    modelled contact). Pinned so the search can never widen or leak:
+      - the corridor: guard = URDF limit + 64, entry = URDF limit - 64;
+      - the V25 search constants, each exactly its V25 value;
+      - evaluate() refuses the search flag on every non-CONTACT_PROBE command
+        and the calibration speed profile on everything but CONTACT_PROBE /
+        AUXILIARY_MOVE, BEFORE any route can accept;
+      - evaluateEndpointPlan() bounds a search step by a corridor it re-derives
+        itself; the execution engine refuses the flag on other intents;
+      - the probe never issues a step past the guard, steps 8 ticks in fine
+        search, and treats a stall outside the corridor as EARLY_STALL;
+      - only the reviewed calibration units may resolve a corridor or set the
+        calibration speed profile."""
     by_name = {path.name: (path, code) for path, code in files}
     normalize = lambda text: re.sub(r"\s+", " ", text)
-    for name in ("CalibrationTargetResolver.h", "CalibrationTargetResolver.cpp",
-                 "ActuatorWritePolicy.cpp", "CalibrationExecutionEngine.cpp",
-                 "FullLegCalibrationPlan.h"):
+    needed = ("CalibrationTargetResolver.h", "ContactProbeEngine.h", "ContactProbeEngine.cpp",
+              "ActuatorWritePolicy.cpp", "CalibrationExecutionEngine.cpp")
+    for name in needed:
         if name not in by_name:
-            fail(f"{name} not found - cannot audit the contact-probe overtravel allowance")
+            fail(f"{name} not found - cannot audit the calibration search boundaries")
             return
 
     path, code = by_name["CalibrationTargetResolver.h"]
-    if normalize(code).count("constexpr uint16_t kContactProbeMaxOvertravelTicks = 16;") != 1:
-        fail(f"{path}: kContactProbeMaxOvertravelTicks must be exactly 16 raw ticks "
-             f"(operator-approved 2026-09-29); it may never be widened silently")
-
-    path, code = by_name["CalibrationTargetResolver.cpp"]
-    resolver = re.search(r"TargetResolveStatus resolveContactProbeApproachToRaw\(.*?\n\}",
-                         code, re.DOTALL)
-    if not resolver:
-        fail(f"{path}: resolveContactProbeApproachToRaw() not found")
-    else:
-        body = normalize(resolver.group(0))
-        if "resolveRawToUrdfQ(" not in body or "continue;" not in body:
-            fail(f"{path}: resolveContactProbeApproachToRaw() lost its URDF clamp - every "
-                 f"candidate tick must convert back inside the URDF domain through "
-                 f"resolveRawToUrdfQ() or be skipped; the allowance may never cross the "
-                 f"URDF joint limit")
-        if "overtravel_ticks > kContactProbeMaxOvertravelTicks" not in body:
-            fail(f"{path}: resolveContactProbeApproachToRaw() lost its 16-tick ceiling")
-
-    path, code = by_name["FullLegCalibrationPlan.h"]
     body = normalize(code)
-    if body.count("constexpr uint16_t kFullLegApproachOvertravelTicks = 16;") != 1:
-        fail(f"{path}: the Full-Leg approach allowance must be exactly 16 raw ticks")
-    if "static_assert(kFullLegApproachOvertravelTicks <= actuator::kContactProbeMaxOvertravelTicks" \
-            not in body:
-        fail(f"{path}: the Full-Leg approach allowance lost its static bound by the "
-             f"policy's kContactProbeMaxOvertravelTicks")
+    for pinned in ("constexpr uint16_t kCalibrationSearchGuardOvershootTicks = 64;",
+                   "constexpr uint16_t kCalibrationSearchAcceptanceInnerTicks = 64;"):
+        if body.count(pinned) != 1:
+            fail(f"{path}: the calibration search corridor must stay {pinned!r} "
+                 f"(V25 GUARD_OVERSHOOT_TICKS / CONTACT_ACCEPTANCE_INNER_TICKS)")
+
+    path, code = by_name["ContactProbeEngine.h"]
+    body = normalize(code)
+    v25 = {"kSearchCoarseStepTicks": ("uint16_t", 64), "kSearchFineStepTicks": ("uint16_t", 8),
+           "kSearchBackoffTicks": ("uint16_t", 96), "kSearchStaticToleranceTicks": ("uint16_t", 10),
+           "kSearchOutsideCorridorSettleToleranceTicks": ("uint16_t", 16),
+           "kSearchTrackingErrorFloorTicks": ("uint16_t", 16),
+           "kSearchMinContactTravelTicks": ("uint16_t", 24), "kSearchMaxProgressTicks": ("uint16_t", 2),
+           "kSearchMaxVelocityRaw": ("uint16_t", 10), "kSearchPersistenceSamples": ("uint8_t", 3),
+           "kSearchTargetStartupSamples": ("uint8_t", 4), "kSearchSettleWindowMs": ("uint32_t", 900),
+           "kSearchSampleIntervalMs": ("uint32_t", 20), "kSearchMaxTelemetryAgeMs": ("uint32_t", 3000),
+           "kSearchHardCurrentAbortRaw": ("int32_t", 200), "kSearchTemperatureLimitC": ("int32_t", 70),
+           "kSearchFineScoutLagToleranceTicks": ("uint16_t", 8),
+           "kSearchAdaptiveScoutTicks": ("uint16_t", 32), "kSearchBaselineTravelTicks": ("uint16_t", 64),
+           "kSearchBaselineMinSamples": ("uint8_t", 6),
+           "kSearchMinExpectedTicksPerSecond": ("uint16_t", 80)}
+    for name, (ctype, value) in v25.items():
+        if body.count(f"constexpr {ctype} {name} = {value};") != 1:
+            fail(f"{path}: {name} must be exactly the LF V25 value {value}")
 
     path, code = by_name["ActuatorWritePolicy.cpp"]
     evaluate = re.search(r"WriteDecision SafeActuatorPolicy::evaluate\(const ActuatorCommand& "
                          r"command,.*?\n\}", code, re.DOTALL)
-    gate = ("if (command.contact_probe_overtravel_ticks != 0 && command.operation != "
-            "ActuatorOperation::CALIBRATION_CONTACT_PROBE) { return "
-            "WriteDecision::REJECT_PROBE_OVERTRAVEL; }")
+    gates = ("if (command.calibration_search && command.operation != "
+             "ActuatorOperation::CALIBRATION_CONTACT_PROBE) { return "
+             "WriteDecision::REJECT_CALIBRATION_SEARCH; }",
+             "if (command.motion_profile != MotionProfile::BOUNDED_DEFAULT && "
+             "!(command.motion_profile == MotionProfile::CALIBRATION_SEARCH && "
+             "(command.operation == ActuatorOperation::CALIBRATION_CONTACT_PROBE || "
+             "command.operation == ActuatorOperation::CALIBRATION_AUXILIARY_MOVE))) { return "
+             "WriteDecision::REJECT_MOTION_PROFILE; }")
     if not evaluate:
         fail(f"{path}: SafeActuatorPolicy::evaluate() not found")
     else:
         ev = normalize(evaluate.group(0))
-        at = ev.find(gate)
-        if at < 0:
-            fail(f"{path}: evaluate() must refuse the contact-probe overtravel allowance on "
-                 f"every operation other than CALIBRATION_CONTACT_PROBE")
-        else:
+        for gate in gates:
+            at = ev.find(gate)
+            if at < 0:
+                fail(f"{path}: evaluate() lost the calibration-only gate {gate[:60]!r}...")
+                continue
             for route in ("operationUsesAcceptedLimits(", "evaluateEndpointPlan(",
                           "evaluateBootstrapEnvelope("):
                 if 0 <= ev.find(route) < at:
-                    fail(f"{path}: the overtravel refusal must precede {route!r} so no route "
-                         f"can accept a command carrying it")
+                    fail(f"{path}: a calibration-only gate must precede {route!r}")
     plan_route = re.search(r"WriteDecision SafeActuatorPolicy::evaluateEndpointPlan"
                            r"\(.*?\n\}", code, re.DOTALL)
     if not plan_route:
         fail(f"{path}: evaluateEndpointPlan() not found")
     else:
         body = normalize(plan_route.group(0))
-        for token in ("command.contact_probe_overtravel_ticks > kContactProbeMaxOvertravelTicks",
-                      "command.target_urad != contact",
-                      "resolveRawToUrdfQ(*geometry_, *expected_provenance_, *transform, "
-                      "command.target_tick,",
-                      "return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;",
-                      "resolveContactProbeApproachToRaw(",
-                      "command.target_tick != allowed_tick"):
+        for token in ("if (command.calibration_search) {", "resolveCalibrationSearchCorridor(",
+                      "!searchCorridorAdmits(corridor, command.target_tick)",
+                      "return WriteDecision::REJECT_CALIBRATION_SEARCH;"):
             if token not in body:
-                fail(f"{path}: evaluateEndpointPlan() lost the overtravel check {token!r} - "
-                     f"the allowance must be bounded, anchored on exactly the canonical "
-                     f"contact and re-derived to the exact tick")
+                fail(f"{path}: evaluateEndpointPlan() lost the search-corridor bound {token!r}")
 
     path, code = by_name["CalibrationExecutionEngine.cpp"]
-    if ("if (request.contact_probe_overtravel_ticks != 0 && operation != "
+    if ("if (request.calibration_search && operation != "
             "actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE) {") not in normalize(code):
-        fail(f"{path}: execute() must refuse the overtravel allowance on every intent other "
-             f"than CONTACT_PROBE")
+        fail(f"{path}: execute() must refuse a search step on every intent other than CONTACT_PROBE")
 
-    allowed = {"CalibrationTargetResolver.h", "CalibrationTargetResolver.cpp",
-               "ActuatorWritePolicy.cpp", "CalibrationExecutionEngine.cpp",
-               "ContactProbeEngine.cpp", "FullLegCalibrationPlan.cpp"}
+    path, code = by_name["ContactProbeEngine.cpp"]
+    body = normalize(code)
+    for token, why in (("next_depth = target_depth + kSearchFineStepTicks;", "fine steps are 8 ticks"),
+                       ("next_depth = target_depth + kSearchCoarseStepTicks;", "coarse steps are 64 ticks"),
+                       ("if (next_depth > entry_depth) next_depth = entry_depth;",
+                        "coarse transit never enters the corridor"),
+                       ("if (next_depth > guard_depth) { failSafeOff(ContactProbeFailure::NO_CONTACT_BEFORE_GUARD);",
+                        "the step past the guard is never issued"),
+                       ("return inside_acceptance ? ContactDetectorState::CONTACT_CONFIRMED "
+                        ": ContactDetectorState::EARLY_STALL;",
+                        "a stall outside the corridor is never contact"),
+                       ("if (has_cadence_sample_ && now_ms - last_cadence_ms_ < kSearchSampleIntervalMs) return;",
+                        "V25 sample cadence"),
+                       ("const int32_t backoff_depth = depth(status_.pass1_contact_tick) - kSearchBackoffTicks;",
+                        "V25 backoff"),
+                       ("req.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;",
+                        "search steps use the V25 envelope")):
+        if token not in body:
+            fail(f"{path}: the staged search lost {token!r} ({why})")
+
+    corridor_callers = {"CalibrationTargetResolver.h", "CalibrationTargetResolver.cpp",
+                        "ActuatorWritePolicy.cpp", "FullLegCalibrationPlan.cpp"}
+    profile_setters = {"ContactProbeEngine.cpp", "FullLegCalibrationExecutor.cpp"}
     for path2, code2 in files:
         if "tests" in path2.parts:
-            continue  # host suites exercise it on purpose; production is what is pinned
-        if "resolveContactProbeApproachToRaw(" in code2 and path2.name not in allowed:
-            fail(f"{path2}: calls resolveContactProbeApproachToRaw() - only the reviewed "
-                 f"calibration units may resolve a target past a Geometry V5 contact")
+            continue  # host suites exercise both on purpose
+        if "resolveCalibrationSearchCorridor(" in code2 and path2.name not in corridor_callers:
+            fail(f"{path2}: calls resolveCalibrationSearchCorridor() - only the reviewed "
+                 f"calibration units may derive a search corridor")
+        if re.search(r"=\s*(actuator::)?MotionProfile::CALIBRATION_SEARCH\s*;", code2) and \
+                path2.name not in profile_setters:
+            fail(f"{path2}: sets MotionProfile::CALIBRATION_SEARCH - only the calibration "
+                 f"search and its auxiliary park may request the V25 envelope")
 
 
 def check_full_leg_calibration_wiring(files):
@@ -1671,26 +1694,25 @@ def check_full_leg_calibration_wiring(files):
         fail(f"{controller_path}: update() must call updateFullLegFinalization() right "
              f"after updateFullLegCalibration(now_ms)")
 
-    # ---- Controller: Full-Leg deadman budget (hardware finding 2026-09-29) --
-    # Every Full-Leg monitored move runs at ServoBus::kBoundedWriteSpeed. A
-    # fixed 12 s budget caps a move at ~480 ticks, shorter than the Geometry V5
-    # UPPER contact travel, so every first approach timed out before reaching
-    # the stop. All three Full-Leg deadman configs must carry the travel-aware
-    # rate, and it must be the very constant ServoBus writes - never a typed
-    # number that can drift from it.
+    # ---- Controller: the Full-Leg long moves (2026-09-29 staged search) -----
+    # The 96-tick backoff and the auxiliary park run at the V25 search speed;
+    # their deadmans must be travel-aware at V25's conservative floor and
+    # arrive within V25's settle tolerances (a servo settles 4-5 ticks short).
     begin_fn = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", controller, re.DOTALL)
     if not begin_fn:
         fail(f"{controller_path}: Controller::begin() not found")
     else:
         body = normalize(begin_fn.group(1))
-        if body.count("full_leg_deadman.nominal_travel_ticks_per_s = "
-                      "servo::ServoBus::kBoundedWriteSpeed;") != 1:
-            fail(f"{controller_path}: the Full-Leg deadman must be travel-aware at exactly "
-                 f"servo::ServoBus::kBoundedWriteSpeed (2026-09-29 MOTION_TIMEOUT finding)")
-        for field in ("probe_approach_deadman", "probe_backoff_deadman", "aux_move_deadman"):
-            if f"full_leg_config.{field} = full_leg_deadman;" not in body:
-                fail(f"{controller_path}: full_leg_config.{field} must use the travel-aware "
-                     f"full_leg_deadman, not the fixed-budget one")
+        for token in ("full_leg_move.nominal_travel_ticks_per_s = "
+                      "calibration::kSearchMinExpectedTicksPerSecond;",
+                      "full_leg_backoff.arrival_tolerance_ticks = "
+                      "calibration::kSearchStaticToleranceTicks + 2;",
+                      "full_leg_park.arrival_tolerance_ticks = calibration::kSearchStaticToleranceTicks;",
+                      "full_leg_config.probe_backoff_deadman = full_leg_backoff;",
+                      "full_leg_config.aux_move_deadman = full_leg_park;"):
+            if body.count(token) != 1:
+                fail(f"{controller_path}: the Full-Leg long-move deadman lost {token!r} "
+                     f"(V25 travel-aware floor / settle tolerance)")
 
     # ---- finalizer: pure, ordered, unapproved -----------------------------
     if normalize(fin_h).count("constexpr bool kFullLegOperationalParametersApproved = false;") != 1:
@@ -4620,6 +4642,30 @@ def check_safe_actuator_audit_mutation_suite(sketch_dir):
              f"(stdout={result.stdout!r} stderr={result.stderr!r})")
 
 
+def check_calibration_hw_session_runner(sketch_dir):
+    """The one-shot calibration hardware runner (2026-09-29) is tested offline
+    against a fake Controller that speaks the firmware's real record formats:
+    exact whole-line terminal records only (never the NOTE text that caused
+    the 2026-09-29 EXECUTOR_FAILED), nothing but STATUS polls mid-run, stop +
+    ABORT + SAFE_OFF on any failure, q0 half-tooth hard stop."""
+    runner = sketch_dir / "scripts" / "calibration_hw_session.py"
+    suite = sketch_dir / "scripts" / "tests" / "test_calibration_hw_session.py"
+    if not runner.exists() or not suite.exists():
+        fail(f"{runner} / {suite}: calibration hardware runner or its offline suite missing")
+        return
+    code = runner.read_text(encoding="utf-8")
+    for token in ("terminal.fullmatch(text)", "import serial"):
+        if token == "import serial":
+            if re.search(r"^\s*(import serial|from serial)", code, re.MULTILINE):
+                fail(f"{runner}: must not use pyserial (DTR/RTS toggling resets the ESP32-S3)")
+        elif token not in code:
+            fail(f"{runner}: the terminal result must be matched as a whole line ({token!r})")
+    result = subprocess.run([sys.executable, str(suite)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{suite}: calibration hardware runner offline tests FAILED "
+             f"(stdout={result.stdout[-2000:]!r} stderr={result.stderr[-2000:]!r})")
+
+
 def check_led_audit_mutation_suite(sketch_dir):
     """Proves LED tripwires and linked policy tests reject targeted mutations."""
     suite = sketch_dir / "scripts" / "tests" / "test_static_audit_led.py"
@@ -5063,7 +5109,7 @@ def main():
     check_actuator_infrastructure_wired_fail_closed(files)
     check_first_motion_command_wiring(files)
     check_full_leg_calibration_wiring(files)
-    check_contact_probe_overtravel_allowance(files)
+    check_calibration_search_boundaries(files)
     check_service_readiness_is_host_linkable(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)
@@ -5100,6 +5146,7 @@ def main():
     check_host_tests(SKETCH_DIR)
     check_daly_audit_mutation_suite(SKETCH_DIR)
     check_safe_actuator_audit_mutation_suite(SKETCH_DIR)
+    check_calibration_hw_session_runner(SKETCH_DIR)
     check_led_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
     check_backup_gate_provenance(SKETCH_DIR)

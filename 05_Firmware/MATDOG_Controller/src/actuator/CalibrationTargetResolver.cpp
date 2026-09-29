@@ -121,52 +121,83 @@ TargetResolveStatus resolveDeltaFromQ0(const CalibrationGeometryProfile& profile
   return TargetResolveStatus::OK;
 }
 
-TargetResolveStatus resolveContactProbeApproachToRaw(const CalibrationGeometryProfile& profile,
+int32_t searchDepth(const CalibrationSearchCorridor& corridor, uint16_t tick) {
+  return (static_cast<int32_t>(tick) - static_cast<int32_t>(corridor.home_tick)) *
+         static_cast<int32_t>(corridor.probe_sign);
+}
+
+bool searchCorridorAdmits(const CalibrationSearchCorridor& corridor, uint16_t tick) {
+  if (!corridor.valid() || tick >= kTicksPerRevolution) return false;
+  const int32_t depth = searchDepth(corridor, tick);
+  return depth >= searchDepth(corridor, corridor.opposite_limit_tick) &&
+         depth <= searchDepth(corridor, corridor.guard_tick);
+}
+
+bool searchCorridorAccepts(const CalibrationSearchCorridor& corridor, uint16_t tick) {
+  if (!corridor.valid() || tick >= kTicksPerRevolution) return false;
+  const int32_t depth = searchDepth(corridor, tick);
+  return depth >= searchDepth(corridor, corridor.entry_tick) &&
+         depth <= searchDepth(corridor, corridor.guard_tick);
+}
+
+TargetResolveStatus resolveCalibrationSearchCorridor(const CalibrationGeometryProfile& profile,
                                                      const GeometryProvenance& expected_provenance,
                                                      const JointTransform& transform,
-                                                     MicroRad contact_urad,
+                                                     calibration::Leg endpoint_leg,
+                                                     calibration::JointKind endpoint_joint,
                                                      calibration::ContactSide side,
-                                                     uint16_t overtravel_ticks,
-                                                     uint16_t* raw_tick_out,
-                                                     uint16_t* applied_overtravel_ticks_out) {
-  if (raw_tick_out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
-  if (overtravel_ticks > kContactProbeMaxOvertravelTicks) {
-    return TargetResolveStatus::REJECT_OVERTRAVEL;
+                                                     CalibrationSearchCorridor* out) {
+  if (out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
+  *out = CalibrationSearchCorridor{};
+
+  const GeometryJointRecord* joint = nullptr;
+  int8_t direction = 0;
+  const TargetResolveStatus common =
+      commonChecks(profile, expected_provenance, transform, &joint, &direction);
+  if (common != TargetResolveStatus::OK) return common;
+  // The corridor belongs to the probed joint itself.
+  if (transform.identity.leg != endpoint_leg || transform.identity.joint != endpoint_joint) {
+    return TargetResolveStatus::REJECT_JOINT;
   }
+  const GeometryEndpointRecord* endpoint = profile.findEndpoint(endpoint_leg, endpoint_joint, side);
+  if (endpoint == nullptr) return TargetResolveStatus::REJECT_SEARCH_CORRIDOR;
 
-  uint16_t contact_raw = 0;
-  const TargetResolveStatus contact_status =
-      resolveUrdfQToRaw(profile, expected_provenance, transform, contact_urad, &contact_raw);
-  if (contact_status != TargetResolveStatus::OK) return contact_status;
+  const bool min_side = side == calibration::ContactSide::MIN_SIDE;
+  CalibrationSearchCorridor c{};
+  c.probe_sign = static_cast<int8_t>(direction * (min_side ? -1 : 1));
+  c.home_tick = transform.q0_tick;
+  TargetResolveStatus s =
+      resolveUrdfQToRaw(profile, expected_provenance, transform, endpoint->contact, &c.contact_tick);
+  if (s != TargetResolveStatus::OK) return s;
+  s = resolveUrdfQToRaw(profile, expected_provenance, transform,
+                        min_side ? joint->urdf_lower : joint->urdf_upper, &c.urdf_limit_tick);
+  if (s != TargetResolveStatus::OK) return s;
+  s = resolveUrdfQToRaw(profile, expected_provenance, transform,
+                        min_side ? joint->urdf_upper : joint->urdf_lower, &c.opposite_limit_tick);
+  if (s != TargetResolveStatus::OK) return s;
 
-  // resolveUrdfQToRaw() already validated the transform, so the direction is
-  // known good here. Beyond the contact means q further from 0 on this side:
-  // negative for MIN, positive for MAX, then mapped through the joint's raw
-  // direction exactly as the forward conversion does.
-  const int8_t direction = jointDirection(profile, transform.identity);
-  const int64_t q_sign = (side == calibration::ContactSide::MIN_SIDE) ? -1 : 1;
-  const int64_t step = static_cast<int64_t>(direction) * q_sign;
-
-  // Clamp to the URDF joint limit (operator decision 2026-09-29): the largest
-  // n <= overtravel_ticks whose tick still converts back INSIDE the declared
-  // URDF domain through the one checked raw->q conversion. The allowance is a
-  // ceiling, never a travel amount; nothing past the URDF limit is ever
-  // produced. q is monotonic in n, so the first valid n from the top is it.
-  for (int32_t n = overtravel_ticks; n >= 0; --n) {
-    const int64_t raw = static_cast<int64_t>(contact_raw) + step * n;
-    if (raw < 0 || raw >= kTicksPerRevolution) continue;
-    MicroRad q_back = 0;
-    if (resolveRawToUrdfQ(profile, expected_provenance, transform, static_cast<uint16_t>(raw),
-                          &q_back) != TargetResolveStatus::OK) {
-      continue;
-    }
-    *raw_tick_out = static_cast<uint16_t>(raw);
-    if (applied_overtravel_ticks_out != nullptr) {
-      *applied_overtravel_ticks_out = static_cast<uint16_t>(n);
-    }
-    return TargetResolveStatus::OK;
+  const int64_t entry = static_cast<int64_t>(c.urdf_limit_tick) -
+                        static_cast<int64_t>(c.probe_sign) * kCalibrationSearchAcceptanceInnerTicks;
+  const int64_t guard = static_cast<int64_t>(c.urdf_limit_tick) +
+                        static_cast<int64_t>(c.probe_sign) * kCalibrationSearchGuardOvershootTicks;
+  if (entry < 0 || entry >= kTicksPerRevolution || guard < 0 || guard >= kTicksPerRevolution) {
+    return TargetResolveStatus::REJECT_RAW_DOMAIN;
   }
-  return TargetResolveStatus::REJECT_URDF_LIMIT;
+  c.entry_tick = static_cast<uint16_t>(entry);
+  c.guard_tick = static_cast<uint16_t>(guard);
+
+  // home < entry <= contact <= guard along the probe axis; the other side's
+  // limit behind home. Anything else is a geometry/q0 combination this search
+  // was never designed for, and is refused rather than improvised around.
+  const int32_t entry_depth = searchDepth(c, c.entry_tick);
+  const int32_t contact_depth = searchDepth(c, c.contact_tick);
+  const int32_t guard_depth = searchDepth(c, c.guard_tick);
+  if (!(entry_depth > 0 && entry_depth <= contact_depth && contact_depth <= guard_depth &&
+        searchDepth(c, c.opposite_limit_tick) < 0)) {
+    return TargetResolveStatus::REJECT_SEARCH_CORRIDOR;
+  }
+  *out = c;
+  return TargetResolveStatus::OK;
 }
 
 const char* toString(TargetResolveStatus status) {
@@ -179,7 +210,7 @@ const char* toString(TargetResolveStatus status) {
     case TargetResolveStatus::REJECT_DIRECTION: return "REJECT_DIRECTION";
     case TargetResolveStatus::REJECT_URDF_LIMIT: return "REJECT_URDF_LIMIT";
     case TargetResolveStatus::REJECT_RAW_DOMAIN: return "REJECT_RAW_DOMAIN";
-    case TargetResolveStatus::REJECT_OVERTRAVEL: return "REJECT_OVERTRAVEL";
+    case TargetResolveStatus::REJECT_SEARCH_CORRIDOR: return "REJECT_SEARCH_CORRIDOR";
   }
   return "UNKNOWN";
 }

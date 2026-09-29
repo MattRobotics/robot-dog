@@ -21,12 +21,13 @@ ContactEvidence buildEvidence(const ContactProfileKey& key, const ContactProbeEn
   evidence.origin = CalibrationOrigin::LIVE_SESSION;
   evidence.detection = ContactState::CONTACT_CONFIRMED;
   evidence.witness = probe.witness();
-  evidence.coarse_tick = probe.status().coarse_tick;
-  evidence.fine_tick_1 = probe.status().fine_tick_1;
-  // Only one independent repeat exists in ContactProbeEngine's two-pass
-  // design (see its own file comment) - reported as both the second AND
-  // third measurement rather than fabricating an unmeasured one.
-  evidence.fine_tick_2 = probe.status().fine_tick_1;
+  // First fine-search contact, then the repeatability-confirming second one.
+  // Only one independent repeat exists in the two-pass search (see
+  // ContactProbeEngine.h) - reported as both the second AND third
+  // measurement rather than fabricating an unmeasured one.
+  evidence.coarse_tick = probe.status().pass1_contact_tick;
+  evidence.fine_tick_1 = probe.status().pass2_contact_tick;
+  evidence.fine_tick_2 = probe.status().pass2_contact_tick;
   evidence.repeatability_ticks = evidence.witness.max_deviation_ticks;
   evidence.has_measurement = true;
   return evidence;
@@ -68,8 +69,8 @@ bool FullLegCalibrationExecutor::start(const FullLegCalibrationRequest& request,
       expected_provenance_ == nullptr || !request.probe_joint.valid() ||
       !request.probe_joint.unitKnown() || !auxiliary_ok || request.probe_bus_id == 0 ||
       request.min_repeatability_tolerance_ticks == 0 ||
-      request.max_repeatability_tolerance_ticks == 0 ||
-      request.approach_overtravel_ticks > actuator::kContactProbeMaxOvertravelTicks) {
+      request.max_repeatability_tolerance_ticks == 0 || !request.min_search.valid() ||
+      !request.max_search.valid()) {
     request_ = request;
     status_ = FullLegCalibrationStatus{};
     status_.phase = FullLegCalibrationPhase::FAILED;
@@ -83,7 +84,6 @@ bool FullLegCalibrationExecutor::start(const FullLegCalibrationRequest& request,
   max_evidence_ = ContactEvidence{};
 
   ContactProbeConfig probe_config{};
-  probe_config.approach_deadman = config_.probe_approach_deadman;
   probe_config.backoff_deadman = config_.probe_backoff_deadman;
   probe_.begin(policy_, runtime_, engine_, geometry_, expected_provenance_, probe_config);
 
@@ -93,10 +93,8 @@ bool FullLegCalibrationExecutor::start(const FullLegCalibrationRequest& request,
   probe_request.endpoint_leg = request_.endpoint_leg;
   probe_request.endpoint_joint = request_.endpoint_joint;
   probe_request.endpoint_side = ContactSide::MIN_SIDE;
-  probe_request.approach_target_urad = request_.min_approach_urad;
-  probe_request.backoff_target_urad = request_.min_backoff_urad;
+  probe_request.corridor = request_.min_search;
   probe_request.repeatability_tolerance_ticks = request_.min_repeatability_tolerance_ticks;
-  probe_request.approach_overtravel_ticks = request_.approach_overtravel_ticks;
 
   if (!probe_.start(probe_request, toContactProbeContext(context), now_ms)) {
     status_.phase = FullLegCalibrationPhase::FAILED;
@@ -211,10 +209,8 @@ bool FullLegCalibrationExecutor::startMaxProbe(const FullLegCalibrationContext& 
   max_request.endpoint_leg = request_.endpoint_leg;
   max_request.endpoint_joint = request_.endpoint_joint;
   max_request.endpoint_side = ContactSide::MAX_SIDE;
-  max_request.approach_target_urad = request_.max_approach_urad;
-  max_request.backoff_target_urad = request_.max_backoff_urad;
+  max_request.corridor = request_.max_search;
   max_request.repeatability_tolerance_ticks = request_.max_repeatability_tolerance_ticks;
-  max_request.approach_overtravel_ticks = request_.approach_overtravel_ticks;
   return probe_.start(max_request, toContactProbeContext(context), now_ms);
 }
 
@@ -304,6 +300,10 @@ void FullLegCalibrationExecutor::stepAuxMovePending(const FullLegCalibrationCont
   req.endpoint_joint = request_.endpoint_joint;
   req.endpoint_side = ContactSide::MAX_SIDE;
   req.target_urad = request_.auxiliary_park_target_urad;
+  // The same V25 calibration envelope as the search (GOAL_SPEED 160): V25
+  // moved its prerequisites at that speed too. The park target itself is the
+  // compiler's exact validated pose, unchanged.
+  req.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;
 
   CalibrationExecutionContext exec_ctx{};
   exec_ctx.session_active = context.session_active;

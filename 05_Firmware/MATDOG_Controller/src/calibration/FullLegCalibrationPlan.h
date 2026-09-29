@@ -11,12 +11,13 @@
 // The pure resolver that turns "calibrate leg <LF|RF|RH|LH>" into the one
 // FullLegCalibrationRequest the executor runs. It is the ONLY place a leg name
 // becomes a servo bus id, an endpoint record, an auxiliary decision or a
-// contact/backoff/park number:
+// contact/search-corridor/park number:
 //
 //   canonical allocation  ->  JointIdentity + bus id        (per leg, per joint)
 //   Geometry V5 profile   ->  cross-check (identity AND bus id must agree)
 //   Geometry V5 endpoints ->  MIN/MAX contact, clearance, auxiliary requirement
-//   generic backoff rule  ->  re-approach point, geometrically verified
+//   search corridor       ->  actuator::resolveCalibrationSearchCorridor() per
+//                             side, for this installation's promoted q0
 //
 // Nothing here is a per-leg table. The parking matrix
 // (LF -> LH_UPPER, RF -> RH_UPPER, RH -> none, LH -> none) is what the
@@ -42,7 +43,7 @@ enum class FullLegPlanStatus : uint8_t {
   REJECT_MAX_PLAN_INCONSISTENT = 9,  // parking outcome and has_auxiliary disagree
   REJECT_AUXILIARY_IDENTITY = 10,
   REJECT_NO_TRANSFORM = 11,          // no current promoted q0 for a joint the plan needs
-  REJECT_BACKOFF = 12,               // the generic backoff rule could not be verified
+  REJECT_SEARCH_CORRIDOR = 12,       // a side's calibration search corridor is not coherent
   REJECT_TARGET_RESOLUTION = 13,     // the checked resolver refused a plan target
 };
 
@@ -50,37 +51,9 @@ enum class FullLegPlanStatus : uint8_t {
 // reused for both sides of every leg - not re-derived per leg.
 constexpr uint16_t kFullLegRepeatabilityToleranceTicks = 16;
 
-// A re-approach that travels less than this many repeatability tolerances is
-// not a re-approach: both passes would stall within noise of each other and
-// the repeatability check would prove nothing.
-constexpr uint16_t kFullLegMinReapproachToleranceMultiple = 8;
-
-// Hardware finding 2026-09-29 (operator-approved): LF_UPPER's MIN stop sat 4-5
-// ticks short of the Geometry V5 contact, inside the 4-tick arrival tolerance,
-// so an approach commanded exactly to the contact could "arrive" on the stop
-// and read as NO_CONTACT_DETECTED. Both approach passes of both sides are
-// therefore commanded past the canonical contact (which itself is unchanged
-// and stays the evidence reference) by up to this many raw ticks, clamped to
-// the URDF joint limit - a ceiling, not a travel amount (UPPER today: ~4 MIN,
-// ~6 MAX). The backoff is not. Never above the policy's
-// actuator::kContactProbeMaxOvertravelTicks.
-constexpr uint16_t kFullLegApproachOvertravelTicks = 16;
-static_assert(kFullLegApproachOvertravelTicks <= actuator::kContactProbeMaxOvertravelTicks,
-              "the Full-Leg approach allowance may never exceed the policy's maximum");
-
 struct FullLegJointRef {
   JointIdentity identity{};
   uint8_t bus_id = 0;  // 0 = unresolved (never a valid ST3215 id)
-};
-
-// What one side's approach passes will actually command, for this
-// installation's q0 - reported on ARMED so a hardware run carries its own
-// geometry evidence (all raw ticks).
-struct FullLegProbeBoundary {
-  uint16_t contact_tick = 0;             // canonical Geometry V5 contact
-  uint16_t target_tick = 0;              // commanded by both approach passes
-  uint16_t urdf_limit_tick = 0;          // nearest tick to the URDF limit on this side
-  uint16_t applied_overtravel_ticks = 0; // |target - contact| = min(ceiling, room)
 };
 
 struct FullLegPlan {
@@ -91,8 +64,6 @@ struct FullLegPlan {
   // Fully populated; request.auxiliary_required / auxiliary_* come from the
   // Geometry V5 MAX endpoint record, never from the caller.
   FullLegCalibrationRequest request{};
-  FullLegProbeBoundary min_probe{};
-  FullLegProbeBoundary max_probe{};
 };
 
 // One (leg, joint) -> semantic identity + bus id, from the canonical allocation,
@@ -100,22 +71,6 @@ struct FullLegPlan {
 // bus id must agree). Exactly one canonical row must match.
 FullLegPlanStatus resolveLegJoint(const actuator::CalibrationGeometryProfile& profile, Leg leg,
                                   JointKind joint, FullLegJointRef* out);
-
-// The generic backoff (re-approach) point for one endpoint: halfway between
-// URDF q=0 and the contact angle, on the contact's side. VERIFIED, not assumed:
-//   - same side as the contact, strictly between q=0 and the contact;
-//   - no farther from q=0 than the compiled `clear` angle on that side (so it
-//     lies inside the region the geometry compiler proved clear);
-//   - both the contact and the backoff resolve through the checked
-//     URDF-q -> raw resolver with this joint's q0 transform;
-//   - the raw travel between them is at least kFullLegMinReapproachToleranceMultiple
-//     repeatability tolerances.
-FullLegPlanStatus deriveBackoffUrad(const actuator::CalibrationGeometryProfile& profile,
-                                    const actuator::GeometryProvenance& expected_provenance,
-                                    const actuator::JointTransform& transform,
-                                    const actuator::GeometryEndpointRecord& endpoint,
-                                    uint16_t repeatability_tolerance_ticks,
-                                    actuator::MicroRad* backoff_urad_out);
 
 FullLegPlanStatus resolveFullLegPlan(const actuator::CalibrationGeometryProfile& profile,
                                      const actuator::GeometryProvenance& expected_provenance,

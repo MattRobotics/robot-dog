@@ -377,6 +377,32 @@ WriteDecision SafeActuatorPolicy::evaluateEndpointPlan(const ActuatorCommand& co
     return WriteDecision::REJECT_UNEXPECTED_PARKING;
   }
 
+  const JointTransform* transform = transforms_.find(command.joint, currentGeometryTag());
+
+  // A step of the staged endpoint search (2026-09-29): a raw tick bounded by
+  // the endpoint's calibration search corridor - never past URDF limit + 64
+  // on the probe side, never past the other side's URDF limit - re-derived
+  // here from the policy's own geometry and transform, never taken from the
+  // caller. The canonical contact and the URDF domain themselves are not
+  // widened for anything else.
+  if (command.calibration_search) {
+    if (transform == nullptr) {
+      return transforms_.findAny(command.joint) != nullptr
+                 ? WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH
+                 : WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
+    }
+    CalibrationSearchCorridor corridor{};
+    if (expected_provenance_ == nullptr ||
+        resolveCalibrationSearchCorridor(*geometry_, *expected_provenance_, *transform,
+                                         command.endpoint_leg, command.endpoint_joint,
+                                         command.endpoint_side, &corridor) !=
+            TargetResolveStatus::OK ||
+        !searchCorridorAdmits(corridor, command.target_tick)) {
+      return WriteDecision::REJECT_CALIBRATION_SEARCH;
+    }
+    return WriteDecision::ACCEPT;
+  }
+
   if (command.target_urad < moving->urdf_lower || command.target_urad > moving->urdf_upper) {
     return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
   }
@@ -388,39 +414,10 @@ WriteDecision SafeActuatorPolicy::evaluateEndpointPlan(const ActuatorCommand& co
     return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
   }
 
-  const JointTransform* transform = transforms_.find(command.joint, currentGeometryTag());
   if (transform == nullptr) {
     return transforms_.findAny(command.joint) != nullptr
                ? WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH
                : WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
-  }
-
-  // The one exception to "never past the contact" (hardware finding
-  // 2026-09-29, operator-approved): an approach anchored on EXACTLY the
-  // canonical contact may be commanded up to kContactProbeMaxOvertravelTicks
-  // raw ticks further - clamped to the URDF joint limit - so a physical stop
-  // at the modelled contact stalls the joint instead of being
-  // indistinguishable from arrival. The commanded tick must itself convert
-  // back inside the URDF domain, AND equal the tick re-derived here from the
-  // policy's own geometry and transform. A backoff (target short of the
-  // contact) can never carry the allowance.
-  if (command.contact_probe_overtravel_ticks != 0) {
-    if (command.contact_probe_overtravel_ticks > kContactProbeMaxOvertravelTicks ||
-        command.target_urad != contact || expected_provenance_ == nullptr) {
-      return WriteDecision::REJECT_PROBE_OVERTRAVEL;
-    }
-    MicroRad commanded_q = 0;
-    if (resolveRawToUrdfQ(*geometry_, *expected_provenance_, *transform, command.target_tick,
-                          &commanded_q) != TargetResolveStatus::OK) {
-      return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
-    }
-    uint16_t allowed_tick = 0;
-    if (resolveContactProbeApproachToRaw(*geometry_, *expected_provenance_, *transform, contact,
-                                         endpoint->side, command.contact_probe_overtravel_ticks,
-                                         &allowed_tick) != TargetResolveStatus::OK ||
-        command.target_tick != allowed_tick) {
-      return WriteDecision::REJECT_PROBE_OVERTRAVEL;
-    }
   }
   return WriteDecision::ACCEPT;
 }
@@ -434,12 +431,19 @@ WriteDecision SafeActuatorPolicy::evaluate(const ActuatorCommand& command,
 
   if (!isCommandOperation(command.operation)) return WriteDecision::REJECT_UNKNOWN_OPERATION;
 
-  // The contact-probe overtravel allowance exists for exactly one operation.
-  // Checked before anything else can accept, so no route - accepted limits,
-  // bootstrap envelope or auxiliary move - can ever carry it.
-  if (command.contact_probe_overtravel_ticks != 0 &&
+  // The calibration search corridor and the calibration speed profile exist
+  // for the calibration moves alone. Checked before anything else can accept,
+  // so no route - accepted limits, bootstrap envelope, a future stand/gait
+  // POSITION_COMMAND - can ever carry either.
+  if (command.calibration_search &&
       command.operation != ActuatorOperation::CALIBRATION_CONTACT_PROBE) {
-    return WriteDecision::REJECT_PROBE_OVERTRAVEL;
+    return WriteDecision::REJECT_CALIBRATION_SEARCH;
+  }
+  if (command.motion_profile != MotionProfile::BOUNDED_DEFAULT &&
+      !(command.motion_profile == MotionProfile::CALIBRATION_SEARCH &&
+        (command.operation == ActuatorOperation::CALIBRATION_CONTACT_PROBE ||
+         command.operation == ActuatorOperation::CALIBRATION_AUXILIARY_MOVE))) {
+    return WriteDecision::REJECT_MOTION_PROFILE;
   }
 
   // A bus id is an address, not an identity (CalibrationDomain.h): after the
@@ -677,8 +681,18 @@ const char* toString(WriteDecision decision) {
       return "REJECT_EVIDENCE_GEOMETRY_MISMATCH";
     case WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT:
       return "REJECT_NO_CALIBRATION_MOTION_PERMIT";
-    case WriteDecision::REJECT_PROBE_OVERTRAVEL:
-      return "REJECT_PROBE_OVERTRAVEL";
+    case WriteDecision::REJECT_CALIBRATION_SEARCH:
+      return "REJECT_CALIBRATION_SEARCH";
+    case WriteDecision::REJECT_MOTION_PROFILE:
+      return "REJECT_MOTION_PROFILE";
+  }
+  return "UNKNOWN";
+}
+
+const char* toString(MotionProfile profile) {
+  switch (profile) {
+    case MotionProfile::BOUNDED_DEFAULT:    return "BOUNDED_DEFAULT";
+    case MotionProfile::CALIBRATION_SEARCH: return "CALIBRATION_SEARCH";
   }
   return "UNKNOWN";
 }

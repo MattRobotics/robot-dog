@@ -313,19 +313,23 @@ void test_plan_carries_dynamic_identity_endpoints_and_tolerances() {
         profile.findEndpoint(leg, JointKind::UPPER, ContactSide::MAX_SIDE);
     CHECK(lo != nullptr && hi != nullptr);
     if (lo == nullptr || hi == nullptr) continue;
-    CHECK_EQ(r.min_approach_urad, lo->contact);
-    CHECK_EQ(r.max_approach_urad, hi->contact);
-    CHECK_EQ(r.min_backoff_urad, lo->contact / 2);
-    CHECK_EQ(r.max_backoff_urad, hi->contact / 2);
-    // Hardware finding 2026-09-29: both approach passes may run up to 16 raw
-    // ticks past the canonical contact, clamped to the URDF limit; the contact
-    // numbers above stay the Geometry V5 ones and the backoff stays contact/2.
-    CHECK_EQ(r.approach_overtravel_ticks, 16);
-    CHECK_EQ(r.approach_overtravel_ticks, kFullLegApproachOvertravelTicks);
-    CHECK(r.approach_overtravel_ticks <= actuator::kContactProbeMaxOvertravelTicks);
-
-    // No LF-only residue: the old hard-coded MIN backoff must not survive.
-    CHECK(r.min_backoff_urad != -700000);
+    // The staged search corridors (2026-09-29): canonical contact, URDF limit,
+    // entry = limit - 64, guard = limit + 64 - read from the records and the
+    // q0 transform, never typed.
+    for (const bool min_side : {true, false}) {
+      const actuator::CalibrationSearchCorridor& c = min_side ? r.min_search : r.max_search;
+      const actuator::GeometryEndpointRecord* e = min_side ? lo : hi;
+      CHECK(c.valid());
+      CHECK_EQ(c.home_tick, 2048);
+      uint16_t contact = 0;
+      CHECK(actuator::resolveUrdfQToRaw(profile, actuator::geometry_data::kProvenance,
+                                        *table.find(plan.upper.identity, profile.provenanceTag()),
+                                        e->contact, &contact) == actuator::TargetResolveStatus::OK);
+      CHECK_EQ(c.contact_tick, contact);
+      CHECK_EQ(actuator::searchDepth(c, c.guard_tick) - actuator::searchDepth(c, c.urdf_limit_tick), 64);
+      CHECK_EQ(actuator::searchDepth(c, c.urdf_limit_tick) - actuator::searchDepth(c, c.entry_tick), 64);
+    }
+    CHECK(r.min_search.probe_sign == -r.max_search.probe_sign);  // opposite sides
   }
 }
 
@@ -342,43 +346,24 @@ void test_plan_targets_pass_the_checked_resolver_for_every_leg() {
     const actuator::JointTransform* t = table.find(plan.upper.identity, tag);
     CHECK(t != nullptr);
     if (t == nullptr) continue;
-    const actuator::MicroRad targets[4] = {plan.request.min_approach_urad,
-                                           plan.request.min_backoff_urad,
-                                           plan.request.max_approach_urad,
-                                           plan.request.max_backoff_urad};
-    uint16_t raw[4] = {0, 0, 0, 0};
-    for (int i = 0; i < 4; ++i) {
-      CHECK(actuator::resolveUrdfQToRaw(profile, actuator::geometry_data::kProvenance, *t,
-                                        targets[i], &raw[i]) ==
-            actuator::TargetResolveStatus::OK);
-    }
-    // The backoff is a real re-approach: at least 8 tolerances from the contact.
-    const int min_travel = kFullLegRepeatabilityToleranceTicks * kFullLegMinReapproachToleranceMultiple;
-    CHECK(std::abs(static_cast<int>(raw[0]) - static_cast<int>(raw[1])) >= min_travel);
-    CHECK(std::abs(static_cast<int>(raw[2]) - static_cast<int>(raw[3])) >= min_travel);
-    // The commanded approach points the plan records: past each contact by
-    // the URDF room (4 MIN / 6 MAX, see test_calibration_execution_engine.cpp),
-    // not by the 16-tick ceiling; further from q0 than the contact; inside the
-    // URDF domain with the next tick outside it; the URDF-limit tick within a
-    // rounding tick of the target.
-    const FullLegProbeBoundary* bounds[2] = {&plan.min_probe, &plan.max_probe};
-    const int room[2] = {4, 6};
-    for (int k = 0; k < 2; ++k) {
-      const FullLegProbeBoundary& b = *bounds[k];
-      const int contact = raw[k * 2];
-      const int q0 = static_cast<int>(t->q0_tick);
-      CHECK_EQ(b.contact_tick, contact);
-      CHECK_EQ(b.applied_overtravel_ticks, room[k]);
-      CHECK_EQ(std::abs(static_cast<int>(b.target_tick) - contact), room[k]);
-      CHECK_EQ(std::abs(static_cast<int>(b.target_tick) - q0), std::abs(contact - q0) + room[k]);
-      actuator::MicroRad q = 0;
-      CHECK(actuator::resolveRawToUrdfQ(profile, actuator::geometry_data::kProvenance, *t,
-                                        b.target_tick, &q) == actuator::TargetResolveStatus::OK);
-      const int further = static_cast<int>(b.target_tick) + (static_cast<int>(b.target_tick) > contact ? 1 : -1);
-      CHECK(actuator::resolveRawToUrdfQ(profile, actuator::geometry_data::kProvenance, *t,
-                                        static_cast<uint16_t>(further), &q) ==
-            actuator::TargetResolveStatus::REJECT_URDF_LIMIT);
-      CHECK(std::abs(static_cast<int>(b.urdf_limit_tick) - static_cast<int>(b.target_tick)) <= 1);
+    // Both corridors are coherent for this q0: home < entry <= contact <=
+    // guard along the probe axis, guard/opposite limit admitted, one tick
+    // past either refused, entry..guard accepted as contact.
+    for (const bool min_side : {true, false}) {
+      const actuator::CalibrationSearchCorridor& c =
+          min_side ? plan.request.min_search : plan.request.max_search;
+      const int s_ = c.probe_sign;
+      CHECK(actuator::searchDepth(c, c.entry_tick) > 0);
+      CHECK(actuator::searchDepth(c, c.entry_tick) <= actuator::searchDepth(c, c.contact_tick));
+      CHECK(actuator::searchDepth(c, c.contact_tick) <= actuator::searchDepth(c, c.guard_tick));
+      CHECK(actuator::searchCorridorAdmits(c, c.guard_tick));
+      CHECK(!actuator::searchCorridorAdmits(c, static_cast<uint16_t>(c.guard_tick + s_)));
+      CHECK(actuator::searchCorridorAdmits(c, c.opposite_limit_tick));
+      CHECK(!actuator::searchCorridorAdmits(c, static_cast<uint16_t>(c.opposite_limit_tick - s_)));
+      CHECK(actuator::searchCorridorAccepts(c, c.entry_tick));
+      CHECK(!actuator::searchCorridorAccepts(c, static_cast<uint16_t>(c.entry_tick - s_)));
+      CHECK(actuator::searchCorridorAccepts(c, c.contact_tick));
+      CHECK(t->q0_tick == c.home_tick);
     }
     if (plan.request.auxiliary_required) {
       const actuator::JointTransform* at = table.find(plan.request.auxiliary_joint, tag);
@@ -391,99 +376,6 @@ void test_plan_targets_pass_the_checked_resolver_for_every_leg() {
       }
     }
   }
-}
-
-void test_backoff_rule_lies_inside_the_compiled_clear_region() {
-  g_case = "backoff inside clear region";
-  CalibrationGeometryProfile profile = boundProfile();
-  actuator::JointTransformTable table;
-  primeAll(table);
-  const actuator::GeometryProvenanceTag tag = profile.provenanceTag();
-  for (Leg leg : kAllLegs) {
-    const JointOracle& upper = oracleFor(leg, JointKind::UPPER);
-    const actuator::JointTransform* t = table.find(identityOf(upper), tag);
-    CHECK(t != nullptr);
-    if (t == nullptr) continue;
-    for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
-      const actuator::GeometryEndpointRecord* e =
-          profile.findEndpoint(leg, JointKind::UPPER, side);
-      CHECK(e != nullptr);
-      if (e == nullptr) continue;
-      actuator::MicroRad backoff = 0;
-      CHECK(deriveBackoffUrad(profile, actuator::geometry_data::kProvenance, *t, *e,
-                              kFullLegRepeatabilityToleranceTicks, &backoff) ==
-            FullLegPlanStatus::OK);
-      if (side == ContactSide::MAX_SIDE) {
-        CHECK(backoff > 0 && backoff < e->contact && backoff <= e->clear);
-      } else {
-        CHECK(backoff < 0 && backoff > e->contact && backoff >= e->clear);
-      }
-    }
-  }
-}
-
-void test_backoff_rule_rejects_unverifiable_points() {
-  g_case = "backoff refusals";
-  CalibrationGeometryProfile profile = boundProfile();
-  actuator::JointTransformTable table;
-  primeAll(table);
-  const actuator::GeometryProvenanceTag tag = profile.provenanceTag();
-  const JointOracle& lf = oracleFor(Leg::LF, JointKind::UPPER);
-  const actuator::JointTransform* t = table.find(identityOf(lf), tag);
-  CHECK(t != nullptr);
-  if (t == nullptr) return;
-
-  const actuator::GeometryEndpointRecord* real_max =
-      profile.findEndpoint(Leg::LF, JointKind::UPPER, ContactSide::MAX_SIDE);
-  CHECK(real_max != nullptr);
-  if (real_max == nullptr) return;
-
-  actuator::MicroRad out = 12345;
-  const uint16_t tol = kFullLegRepeatabilityToleranceTicks;
-  const actuator::GeometryProvenance& prov = actuator::geometry_data::kProvenance;
-
-  CHECK(deriveBackoffUrad(profile, prov, *t, *real_max, tol, nullptr) ==
-        FullLegPlanStatus::REJECT_NULL_OUTPUT);
-
-  // A `clear` that is not on the contact's side, or zero, leaves no verified
-  // clear region to back off into.
-  actuator::GeometryEndpointRecord e = *real_max;
-  e.clear = 0;
-  CHECK(deriveBackoffUrad(profile, prov, *t, e, tol, &out) == FullLegPlanStatus::REJECT_BACKOFF);
-  CHECK_EQ(out, 0);
-
-  // A backoff beyond the compiled clear angle is outside the proven region.
-  e = *real_max;
-  e.clear = real_max->contact / 4;
-  CHECK(deriveBackoffUrad(profile, prov, *t, e, tol, &out) == FullLegPlanStatus::REJECT_BACKOFF);
-
-  // A contact on the wrong side of q=0 for the endpoint's side.
-  e = *real_max;
-  e.contact = -real_max->contact;
-  CHECK(deriveBackoffUrad(profile, prov, *t, e, tol, &out) == FullLegPlanStatus::REJECT_BACKOFF);
-
-  // A contact so close to q=0 that the re-approach travels less than 8 tolerances.
-  e = *real_max;
-  e.contact = 100000;  // ~65 ticks, half is ~32 ticks of travel
-  e.clear = 100000;
-  CHECK(deriveBackoffUrad(profile, prov, *t, e, tol, &out) == FullLegPlanStatus::REJECT_BACKOFF);
-
-  // Zero tolerance can never verify a re-approach.
-  CHECK(deriveBackoffUrad(profile, prov, *t, *real_max, 0, &out) ==
-        FullLegPlanStatus::REJECT_BACKOFF);
-
-  // A contact past the URDF limit is refused by the checked resolver.
-  e = *real_max;
-  e.contact = 2200000;
-  e.clear = 2100000;
-  CHECK(deriveBackoffUrad(profile, prov, *t, e, tol, &out) ==
-        FullLegPlanStatus::REJECT_TARGET_RESOLUTION);
-
-  // A transform for another geometry cannot resolve anything.
-  actuator::JointTransform stale = *t;
-  stale.geometry = tag + 1;
-  CHECK(deriveBackoffUrad(profile, prov, stale, *real_max, tol, &out) ==
-        FullLegPlanStatus::REJECT_TARGET_RESOLUTION);
 }
 
 void test_plan_refuses_when_q0_would_push_a_target_out_of_the_raw_domain() {
@@ -665,7 +557,7 @@ void test_status_names_are_unique_and_stable() {
       FullLegPlanStatus::REJECT_MAX_PLAN_INCONSISTENT,
       FullLegPlanStatus::REJECT_AUXILIARY_IDENTITY,
       FullLegPlanStatus::REJECT_NO_TRANSFORM,
-      FullLegPlanStatus::REJECT_BACKOFF,
+      FullLegPlanStatus::REJECT_SEARCH_CORRIDOR,
       FullLegPlanStatus::REJECT_TARGET_RESOLUTION,
   };
   const int n = static_cast<int>(sizeof(all) / sizeof(all[0]));
@@ -685,8 +577,6 @@ int main() {
   test_parking_matrix_is_exactly_the_current_geometry_v5_result();
   test_plan_carries_dynamic_identity_endpoints_and_tolerances();
   test_plan_targets_pass_the_checked_resolver_for_every_leg();
-  test_backoff_rule_lies_inside_the_compiled_clear_region();
-  test_backoff_rule_rejects_unverifiable_points();
   test_plan_refuses_when_q0_would_push_a_target_out_of_the_raw_domain();
   test_plan_requires_current_transforms();
   test_plan_refuses_inconsistent_geometry_endpoint_records();

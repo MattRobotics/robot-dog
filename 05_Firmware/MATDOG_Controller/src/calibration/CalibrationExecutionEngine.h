@@ -140,11 +140,16 @@ struct CalibrationExecutionRequest {
   // still checks the endpoint, parking and contact-side safety constraints.
   actuator::MicroRad target_urad = 0;
 
-  // CONTACT_PROBE approach only: ceiling on the raw ticks past the canonical
-  // contact named by target_urad, clamped to the URDF joint limit
-  // (actuator::resolveContactProbeApproachToRaw). 0 everywhere else; any
-  // other intent carrying it is refused before the policy.
-  uint16_t contact_probe_overtravel_ticks = 0;
+  // CONTACT_PROBE only: a raw-tick step of the staged endpoint search. The
+  // policy bounds `search_target_tick` by the endpoint's calibration search
+  // corridor (actuator::resolveCalibrationSearchCorridor); target_urad is not
+  // used. Any other intent carrying it is refused before the policy.
+  bool calibration_search = false;
+  uint16_t search_target_tick = 0;
+
+  // The GoalPosition speed envelope (actuator::MotionProfile). The policy
+  // refuses CALIBRATION_SEARCH outside CONTACT_PROBE / AUXILIARY_MOVE.
+  actuator::MotionProfile motion_profile = actuator::MotionProfile::BOUNDED_DEFAULT;
 };
 
 enum class CalibrationExecutionOutcome : uint8_t {

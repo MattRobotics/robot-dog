@@ -117,9 +117,9 @@ def run_first_motion_command_checks(files):
     return list(audit.failures)
 
 
-def run_overtravel_checks(files):
+def run_search_checks(files):
     audit.failures.clear()
-    audit.check_contact_probe_overtravel_allowance(files)
+    audit.check_calibration_search_boundaries(files)
     return list(audit.failures)
 
 
@@ -183,6 +183,7 @@ PROFILE_H = "CalibrationGeometryProfile.h"
 PROFILE_CPP = "CalibrationGeometryProfile.cpp"
 PROFILE_DATA_H = "CalibrationGeometryProfileData.h"
 BUS_CPP = "ServoBus.cpp"
+BUS_H = "ServoBus.h"
 SERVO_PROFILE_CPP = "ServoProfile.cpp"
 SERVO_PROFILE_DATA_H = "ServoProfileData.h"
 PREFLIGHT_CPP = "ServoPreflight.cpp"
@@ -205,7 +206,7 @@ def main():
                 run_first_motion_command_checks(BASE))
     expect_pass("baseline four-leg Full Calibration wiring",
                 run_full_leg_wiring_checks(BASE))
-    expect_pass("unmutated tree: contact-probe overtravel allowance", run_overtravel_checks(BASE))
+    expect_pass("unmutated tree: calibration search boundaries", run_search_checks(BASE))
     expect_pass("baseline CR3 actuator infrastructure fail-closed",
                 run_actuator_infrastructure_checks(BASE))
     expect_pass("baseline current-boot q0 promotion", run_q0_promotion_checks(BASE))
@@ -546,91 +547,99 @@ def main():
          "status().leg != command_leg",
          runner=run_first_motion_command_checks)
 
-    # --- contact-probe overtravel allowance (hardware finding 2026-09-29) ----
-    case("overtravel maximum widened to 32", "CalibrationTargetResolver.h",
-         r"constexpr uint16_t kContactProbeMaxOvertravelTicks = 16;",
-         "constexpr uint16_t kContactProbeMaxOvertravelTicks = 32;",
-         "must be exactly 16", runner=run_overtravel_checks)
+    # --- staged calibration endpoint search (2026-09-29, LF V25 oracle) ------
+    case("search guard widened 64 -> 128", "CalibrationTargetResolver.h",
+         r"constexpr uint16_t kCalibrationSearchGuardOvershootTicks = 64;",
+         "constexpr uint16_t kCalibrationSearchGuardOvershootTicks = 128;",
+         "GUARD_OVERSHOOT_TICKS", runner=run_search_checks)
 
-    case("Full-Leg allowance raised to 24", "FullLegCalibrationPlan.h",
-         r"constexpr uint16_t kFullLegApproachOvertravelTicks = 16;",
-         "constexpr uint16_t kFullLegApproachOvertravelTicks = 24;",
-         "exactly 16 raw ticks", runner=run_overtravel_checks)
+    case("fine step widened 8 -> 16", "ContactProbeEngine.h",
+         r"constexpr uint16_t kSearchFineStepTicks = 8;",
+         "constexpr uint16_t kSearchFineStepTicks = 16;",
+         "kSearchFineStepTicks must be exactly", runner=run_search_checks)
 
-    case("policy stops refusing overtravel on non-probe operations", POLICY_CPP,
-         r"if \(command\.contact_probe_overtravel_ticks != 0 &&\s*command\.operation != "
+    case("hard-current abort raised 200 -> 400", "ContactProbeEngine.h",
+         r"constexpr int32_t kSearchHardCurrentAbortRaw = 200;",
+         "constexpr int32_t kSearchHardCurrentAbortRaw = 400;",
+         "kSearchHardCurrentAbortRaw must be exactly", runner=run_search_checks)
+
+    case("persistence weakened 3 -> 1 sample", "ContactProbeEngine.h",
+         r"constexpr uint8_t kSearchPersistenceSamples = 3;",
+         "constexpr uint8_t kSearchPersistenceSamples = 1;",
+         "kSearchPersistenceSamples must be exactly", runner=run_search_checks)
+
+    case("policy stops refusing the search flag on non-probe operations", POLICY_CPP,
+         r"if \(command\.calibration_search &&\s*command\.operation != "
          r"ActuatorOperation::CALIBRATION_CONTACT_PROBE\)",
          "if (false)",
-         "every operation other than", runner=run_overtravel_checks)
+         "calibration-only gate", runner=run_search_checks)
 
-    case("policy lets a backoff (non-contact anchor) carry the overtravel", POLICY_CPP,
-         r"\|\|\s*command\.target_urad != contact",
-         "",
-         "command.target_urad != contact", runner=run_overtravel_checks)
+    case("policy lets POSITION_COMMAND use the V25 speed profile", POLICY_CPP,
+         r"command\.operation == ActuatorOperation::CALIBRATION_AUXILIARY_MOVE\)\)\)",
+         "command.operation == ActuatorOperation::CALIBRATION_AUXILIARY_MOVE || "
+         "command.operation == ActuatorOperation::POSITION_COMMAND)))",
+         "calibration-only gate", runner=run_search_checks)
 
-    case("policy no longer re-derives the exact overtravel tick", POLICY_CPP,
-         r"\|\|\s*command\.target_tick != allowed_tick",
-         "",
-         "command.target_tick != allowed_tick", runner=run_overtravel_checks)
+    case("policy no longer bounds a search step by the corridor", POLICY_CPP,
+         r"!searchCorridorAdmits\(corridor, command\.target_tick\)",
+         "false",
+         "search-corridor bound", runner=run_search_checks)
 
-    case("resolver loses its URDF clamp (allowance could cross the URDF limit)",
-         "CalibrationTargetResolver.cpp",
-         r"if \(resolveRawToUrdfQ\(profile, expected_provenance, transform, "
-         r"static_cast<uint16_t>\(raw\),\s*&q_back\) != TargetResolveStatus::OK\) \{\s*"
-         r"continue;\s*\}",
-         "",
-         "lost its URDF clamp", runner=run_overtravel_checks)
-
-    case("policy drops its independent URDF check on the commanded tick", POLICY_CPP,
-         r"if \(resolveRawToUrdfQ\(\*geometry_, \*expected_provenance_, \*transform, "
-         r"command\.target_tick,\s*&commanded_q\) != TargetResolveStatus::OK\) \{\s*"
-         r"return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;\s*\}",
-         "",
-         "resolveRawToUrdfQ", runner=run_overtravel_checks)
-
-    case("policy overtravel bound removed", POLICY_CPP,
-         r"command\.contact_probe_overtravel_ticks > kContactProbeMaxOvertravelTicks \|\|",
-         "",
-         "kContactProbeMaxOvertravelTicks", runner=run_overtravel_checks)
-
-    case("engine stops refusing overtravel on other intents", "CalibrationExecutionEngine.cpp",
-         r"if \(request\.contact_probe_overtravel_ticks != 0 &&\s*operation != "
+    case("engine stops refusing a search step on other intents", "CalibrationExecutionEngine.cpp",
+         r"if \(request\.calibration_search &&\s*operation != "
          r"actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE\) \{",
          "if (false) {",
-         "every intent other", runner=run_overtravel_checks)
+         "refuse a search step", runner=run_search_checks)
 
-    case("CommandRouter resolves a target past the contact", ROUTER_CPP,
-         r"void CommandRouter::printServoRead\(int id\) \{",
-         "void CommandRouter::printServoRead(int id) {\n  uint16_t x = 0; (void)"
-         "actuator::resolveContactProbeApproachToRaw(*modules_.geometry_profile, "
-         "actuator::geometry_data::kProvenance, actuator::JointTransform{}, 0, "
-         "calibration::ContactSide::MIN_SIDE, 16, &x);",
-         "only the reviewed", runner=run_overtravel_checks)
+    case("probe issues the step past the guard", "ContactProbeEngine.cpp",
+         r"if \(next_depth > guard_depth\) \{",
+         "if (next_depth > guard_depth + 64) {",
+         "the step past the guard is never issued", runner=run_search_checks)
 
-    # --- Full-Leg deadman budget (hardware finding 2026-09-29) --------------
-    case("Full-Leg deadman loses its travel-aware rate", CONTROLLER_CPP,
-         r"full_leg_deadman\.nominal_travel_ticks_per_s = servo::ServoBus::kBoundedWriteSpeed;",
+    case("probe accepts a stall outside the corridor as contact", "ContactProbeEngine.cpp",
+         r"return inside_acceptance \? ContactDetectorState::CONTACT_CONFIRMED\s*"
+         r": ContactDetectorState::EARLY_STALL;",
+         "return ContactDetectorState::CONTACT_CONFIRMED;",
+         "a stall outside the corridor is never contact", runner=run_search_checks)
+
+    case("probe drops the V25 sample cadence", "ContactProbeEngine.cpp",
+         r"if \(has_cadence_sample_ && now_ms - last_cadence_ms_ < kSearchSampleIntervalMs\) return;",
          "",
-         "travel-aware at exactly",
-         runner=run_full_leg_wiring_checks)
+         "V25 sample cadence", runner=run_search_checks)
 
-    case("Full-Leg deadman rate typed instead of the ServoBus constant", CONTROLLER_CPP,
-         r"full_leg_deadman\.nominal_travel_ticks_per_s = servo::ServoBus::kBoundedWriteSpeed;",
-         "full_leg_deadman.nominal_travel_ticks_per_s = 400;",
-         "travel-aware at exactly",
-         runner=run_full_leg_wiring_checks)
+    case("CommandRouter derives its own search corridor", ROUTER_CPP,
+         r"void CommandRouter::printServoRead\(int id\) \{",
+         "void CommandRouter::printServoRead(int id) {\n  actuator::CalibrationSearchCorridor c{};\n"
+         "  (void)actuator::resolveCalibrationSearchCorridor(*modules_.geometry_profile, "
+         "actuator::geometry_data::kProvenance, actuator::JointTransform{}, calibration::Leg::LF, "
+         "calibration::JointKind::UPPER, calibration::ContactSide::MIN_SIDE, &c);",
+         "only the reviewed", runner=run_search_checks)
 
-    case("Full-Leg approach deadman falls back to the fixed budget", CONTROLLER_CPP,
-         r"full_leg_config\.probe_approach_deadman = full_leg_deadman;",
-         "full_leg_config.probe_approach_deadman = deadman;",
-         "must use the travel-aware",
-         runner=run_full_leg_wiring_checks)
+    case("FirstMotionExecutor requests the V25 speed profile", "FirstMotionExecutor.cpp",
+         r"cmd\.operation = actuator::ActuatorOperation::TORQUE_ENABLE;",
+         "cmd.operation = actuator::ActuatorOperation::TORQUE_ENABLE;\n"
+         "  cmd.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;",
+         "only the calibration", runner=run_search_checks)
 
-    case("Full-Leg aux-park deadman falls back to the fixed budget", CONTROLLER_CPP,
-         r"full_leg_config\.aux_move_deadman = full_leg_deadman;",
-         "full_leg_config.aux_move_deadman = deadman;",
-         "must use the travel-aware",
-         runner=run_full_leg_wiring_checks)
+    case("ServoBus search envelope raised 160 -> 400", BUS_H,
+         r"static constexpr uint16_t kSearchEnvelopeSpeed = 160;",
+         "static constexpr uint16_t kSearchEnvelopeSpeed = 400;",
+         "GoalPosition speed envelope", runner=run_motion_surface_checks)
+
+    case("ServoBus bounded speed raised 40 -> 80", BUS_H,
+         r"static constexpr uint16_t kBoundedWriteSpeed = 40;",
+         "static constexpr uint16_t kBoundedWriteSpeed = 80;",
+         "GoalPosition speed envelope", runner=run_motion_surface_checks)
+
+    case("Full-Leg backoff deadman falls back to the DIRECTION_VERIFY budget", CONTROLLER_CPP,
+         r"full_leg_config\.probe_backoff_deadman = full_leg_backoff;",
+         "full_leg_config.probe_backoff_deadman = deadman;",
+         "long-move deadman", runner=run_full_leg_wiring_checks)
+
+    case("Full-Leg long moves lose the travel-aware floor", CONTROLLER_CPP,
+         r"full_leg_move\.nominal_travel_ticks_per_s = calibration::kSearchMinExpectedTicksPerSecond;",
+         "",
+         "long-move deadman", runner=run_full_leg_wiring_checks)
 
     # --- four-leg Full Calibration: command surface ------------------------
     case("leg matcher gains a fifth token", ROUTER_CPP,
@@ -877,9 +886,9 @@ def main():
          runner=run_q0_promotion_checks)
 
     case("production code consumes the frozen CR2-C package", PLAN_CPP,
-         r"FullLegPlanStatus deriveBackoffUrad\(",
+         r"FullLegPlanStatus resolveFullLegPlan\(",
          "void bad() { actuator::prepareCurrentQ0Evidence(profile, prov, true); }\n"
-         "FullLegPlanStatus deriveBackoffUrad(",
+         "FullLegPlanStatus resolveFullLegPlan(",
          "historical regression oracle",
          runner=run_q0_promotion_checks)
 

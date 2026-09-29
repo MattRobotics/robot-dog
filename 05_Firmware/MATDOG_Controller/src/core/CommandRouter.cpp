@@ -802,16 +802,20 @@ void CommandRouter::handleLine(String line) {
                     "phase=UPPER_MIN_PROBE auxiliary=NONE aux_bus=0\n",
                     leg_name, (unsigned)plan.request.probe_bus_id);
     }
-    // What both approach passes of each side will command: the canonical
-    // contact plus the allowance ceiling, clamped to the URDF joint limit.
+    // The calibration search corridor of each side for this q0 (canonical
+    // contact, URDF limit, fine-search entry, guard) - the run's own geometry
+    // evidence, printed before anything moves.
     for (const bool min_side : {true, false}) {
-      const calibration::FullLegProbeBoundary& b = min_side ? plan.min_probe : plan.max_probe;
-      Serial.printf("CALIBRATION_FULL_LEG_PROBE_BOUND side=%s contact_tick=%u target_tick=%u "
-                    "urdf_limit_tick=%u applied_overtravel_ticks=%u ceiling_ticks=%u "
-                    "scope=CONTACT_PROBE_APPROACH_ONLY\n",
-                    min_side ? "MIN" : "MAX", (unsigned)b.contact_tick, (unsigned)b.target_tick,
-                    (unsigned)b.urdf_limit_tick, (unsigned)b.applied_overtravel_ticks,
-                    (unsigned)plan.request.approach_overtravel_ticks);
+      const actuator::CalibrationSearchCorridor& c =
+          min_side ? plan.request.min_search : plan.request.max_search;
+      Serial.printf("CALIBRATION_FULL_LEG_SEARCH_CORRIDOR side=%s probe_sign=%d q0=%u "
+                    "contact=%u urdf_limit=%u entry=%u guard=%u opposite_limit=%u "
+                    "guard_beyond_contact=%ld\n",
+                    min_side ? "MIN" : "MAX", (int)c.probe_sign, (unsigned)c.home_tick,
+                    (unsigned)c.contact_tick, (unsigned)c.urdf_limit_tick, (unsigned)c.entry_tick,
+                    (unsigned)c.guard_tick, (unsigned)c.opposite_limit_tick,
+                    (long)(actuator::searchDepth(c, c.guard_tick) -
+                           actuator::searchDepth(c, c.contact_tick)));
     }
     Serial.println("CALIBRATION_FULL_LEG_NOTE no_write_in_command_handler; "
                    "next_Controller_tick_revalidates_all_dynamic_prerequisites; "
@@ -1276,10 +1280,14 @@ void CommandRouter::printFullLegCalibrationStatus() {
   // detail behind UPPER_MIN/MAX_PROBE_FAILED (e.g. MOTION_TIMEOUT vs
   // NO_CONTACT_DETECTED), invisible on hardware before 2026-09-29.
   const calibration::ContactProbeStatus& probe = modules_.full_leg_calibration->probeStatus();
-  Serial.printf("CALIBRATION_FULL_LEG_PROBE phase=%s failure=%s pass=%u coarse_tick=%u "
-                "fine_tick=%u\n",
+  Serial.printf("CALIBRATION_FULL_LEG_PROBE phase=%s failure=%s pass=%u stage=%s target=%u "
+                "pos=%ld speed=%ld current=%ld steps=%u bypass=%u p1=%u p2=%u\n",
                 calibration::toString(probe.phase), calibration::toString(probe.failure),
-                (unsigned)probe.pass, (unsigned)probe.coarse_tick, (unsigned)probe.fine_tick_1);
+                (unsigned)probe.pass, calibration::toString(probe.stage),
+                (unsigned)probe.target_tick, (long)probe.last_position, (long)probe.last_speed,
+                (long)probe.last_current, (unsigned)probe.step_count,
+                (unsigned)probe.plateau_bypass_count, (unsigned)probe.pass1_contact_tick,
+                (unsigned)probe.pass2_contact_tick);
   Serial.printf("CALIBRATION_FULL_LEG_RUN armed=%s executor_active=%s endpoint=%s_%s\n",
                 modules_.full_leg_run->armed ? "YES" : "NO",
                 modules_.full_leg_calibration->active() ? "YES" : "NO",

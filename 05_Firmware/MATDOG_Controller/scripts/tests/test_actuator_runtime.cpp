@@ -136,12 +136,15 @@ class FakeActuatorBackend : public ActuatorBackend {
     last_bus_id = bus_id;
     return enable_torque_result;
   }
-  BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick) override {
+  BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick,
+                                        actuator::MotionProfile profile) override {
     ++write_goal_position_calls;
     last_bus_id = bus_id;
     last_target_tick = target_tick;
+    last_profile = profile;
     return write_goal_position_result;
   }
+  actuator::MotionProfile last_profile = actuator::MotionProfile::BOUNDED_DEFAULT;
 
   int enable_torque_calls = 0;
   int write_goal_position_calls = 0;

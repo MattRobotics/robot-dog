@@ -105,7 +105,8 @@ enum class FullLegCalibrationFailure : uint8_t {
 };
 
 struct FullLegCalibrationConfig {
-  actuator::MotionDeadmanConfig probe_approach_deadman{};
+  // The contact search's own 96-tick backoff (the steps have their own V25
+  // settle-window logic inside ContactProbeEngine).
   actuator::MotionDeadmanConfig probe_backoff_deadman{};
   actuator::MotionDeadmanConfig aux_move_deadman{};
 };
@@ -117,22 +118,17 @@ struct FullLegCalibrationRequest {
   Leg endpoint_leg = Leg::LF;
   JointKind endpoint_joint = JointKind::UPPER;
 
+  // Per side, the calibration search corridor (actuator::
+  // resolveCalibrationSearchCorridor(): canonical contact, URDF limit, entry =
+  // limit - 64, guard = limit + 64, probe sign, q0) the staged search runs in.
   // MIN side — unobstructed in the current Geometry V5 bundle.
-  actuator::MicroRad min_approach_urad = 0;
-  actuator::MicroRad min_backoff_urad = 0;
+  actuator::CalibrationSearchCorridor min_search{};
   uint16_t min_repeatability_tolerance_ticks = 0;
 
   // MAX side — obstructed on LF/RF (the auxiliary is parked first), direct on
   // RH/LH (auxiliary_required == false).
-  actuator::MicroRad max_approach_urad = 0;
-  actuator::MicroRad max_backoff_urad = 0;
+  actuator::CalibrationSearchCorridor max_search{};
   uint16_t max_repeatability_tolerance_ticks = 0;
-
-  // Both sides, both approach passes: ceiling on the raw ticks past the
-  // canonical contact, clamped per side to the URDF joint limit
-  // (min/max_approach_urad stay exactly the Geometry V5 contacts) - see
-  // ContactProbeRequest::approach_overtravel_ticks. Never the backoff.
-  uint16_t approach_overtravel_ticks = 0;
 
   // Whether the MAX side needs an auxiliary joint parked first. Set from the
   // Geometry V5 MAX endpoint record's has_auxiliary by the caller — never
@@ -207,6 +203,8 @@ class FullLegCalibrationExecutor {
   // is what distinguishes a MOTION_TIMEOUT from a NO_CONTACT_DETECTED behind
   // an UPPER_*_PROBE_FAILED on hardware.
   const ContactProbeStatus& probeStatus() const { return probe_.status(); }
+  // The side/corridor the owned probe is (or was last) searching.
+  const ContactProbeRequest& probeRequest() const { return probe_.request(); }
   bool active() const {
     return status_.phase != FullLegCalibrationPhase::IDLE &&
           status_.phase != FullLegCalibrationPhase::COMPLETE &&

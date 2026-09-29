@@ -39,7 +39,7 @@ ExecuteResult ActuatorRuntime::execute(ActuatorTransaction* transaction, uint8_t
       outcome = backend_->enableTorque(bus_id);
       break;
     case BackendCallKind::WRITE_GOAL_POSITION:
-      outcome = backend_->writeGoalPosition(bus_id, cmd.target_tick);
+      outcome = backend_->writeGoalPosition(bus_id, cmd.target_tick, cmd.motion_profile);
       break;
     case BackendCallKind::NONE:
       return ExecuteResult::NO_RAW_TARGET;

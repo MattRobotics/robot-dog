@@ -326,10 +326,23 @@ enum class WriteDecision : uint8_t {
   // under a DIFFERENT geometry model. It stays on record; it is not current.
   REJECT_EVIDENCE_GEOMETRY_MISMATCH = 28,
   REJECT_NO_CALIBRATION_MOTION_PERMIT = 29,
-  // A contact-probe overtravel allowance on anything but a CONTACT_PROBE
-  // approach to the canonical contact, above kContactProbeMaxOvertravelTicks,
-  // or not landing on exactly the URDF-clamped tick that allowance resolves to.
-  REJECT_PROBE_OVERTRAVEL = 30,
+  // A calibration search command on anything but CALIBRATION_CONTACT_PROBE,
+  // or a search target outside the endpoint's search corridor (past the
+  // URDF-limit+64 guard, or past the opposite URDF limit).
+  REJECT_CALIBRATION_SEARCH = 30,
+  // A motion profile other than BOUNDED_DEFAULT on anything but the two
+  // calibration moves, or an unknown profile value.
+  REJECT_MOTION_PROFILE = 31,
+};
+
+// How fast a GoalPosition is driven. BOUNDED_DEFAULT is the conservative
+// bring-up envelope every operation uses; CALIBRATION_SEARCH is the LF V25
+// hardware-proven calibration envelope (GOAL_SPEED 160, ACCELERATION 8) and is
+// refused for everything except CALIBRATION_CONTACT_PROBE and
+// CALIBRATION_AUXILIARY_MOVE - normal motion can never inherit it.
+enum class MotionProfile : uint8_t {
+  BOUNDED_DEFAULT    = 0,
+  CALIBRATION_SEARCH = 1,
 };
 
 // ---------------------------------------------------------------------------
@@ -372,14 +385,16 @@ struct ActuatorCommand {
   calibration::JointKind endpoint_joint = calibration::JointKind::HIP;
   calibration::ContactSide endpoint_side = calibration::ContactSide::MIN_SIDE;
 
-  // CALIBRATION_CONTACT_PROBE approach only (hardware finding 2026-09-29,
-  // operator-approved): the requested ceiling, in raw ticks, on how far past
-  // the canonical contact `target_urad` names target_tick may lie in the
-  // endpoint side's approach direction. The tick actually commanded is that
-  // ceiling clamped to the URDF joint limit - see
-  // resolveContactProbeApproachToRaw(). 0 for every other command; non-zero
-  // anywhere else is REJECT_PROBE_OVERTRAVEL.
-  uint16_t contact_probe_overtravel_ticks = 0;
+  // CALIBRATION_CONTACT_PROBE only (2026-09-29 staged endpoint search): the
+  // command is a raw-tick step of an endpoint search. target_tick is then
+  // bounded by the endpoint's calibration search corridor (re-derived by the
+  // policy, see resolveCalibrationSearchCorridor()) instead of by target_urad.
+  // Anywhere else it is REJECT_CALIBRATION_SEARCH.
+  bool calibration_search = false;
+
+  // See MotionProfile. Anything but BOUNDED_DEFAULT outside the two
+  // calibration moves is REJECT_MOTION_PROFILE.
+  MotionProfile motion_profile = MotionProfile::BOUNDED_DEFAULT;
 };
 
 // What a planned write knows about the world it was planned in. Every field is
@@ -516,6 +531,7 @@ class SafeActuatorPolicy {
 
 const char* toString(ActuatorOperation operation);
 const char* toString(WriteDecision decision);
+const char* toString(MotionProfile profile);
 const char* toString(TransactionState state);
 
 }  // namespace actuator

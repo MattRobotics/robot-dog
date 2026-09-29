@@ -125,13 +125,16 @@ class FakeActuatorBackend : public actuator::ActuatorBackend {
     ++calls;
     return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
-  actuator::BackendWriteOutcome writeGoalPosition(uint8_t, uint16_t target_tick) override {
+  actuator::BackendWriteOutcome writeGoalPosition(uint8_t, uint16_t target_tick,
+                                                  actuator::MotionProfile profile) override {
     ++calls;
     last_target_tick = target_tick;
+    last_profile = profile;
     return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
   int calls = 0;
   uint16_t last_target_tick = 0;
+  actuator::MotionProfile last_profile = actuator::MotionProfile::BOUNDED_DEFAULT;
 };
 
 // One fully-wired rig: real arbiter, real policy, real runtime, real
@@ -519,32 +522,24 @@ void test_to_string_fails_closed_on_corrupted_value() {
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// Contact-probe overtravel allowance (hardware finding 2026-09-29,
-// operator-approved): LF_UPPER's MIN stop sat 4-5 ticks short of the Geometry V5
-// contact, inside the 4-tick arrival tolerance. Both approach passes may now be
-// commanded past the canonical contact by at most 16 raw ticks, CLAMPED to the
-// URDF joint limit - CONTACT_PROBE only, anchored on exactly the contact, never
-// the backoff. Hand-computed oracle (1 tick = 1533.98 urad, independent of q0
-// and of the raw direction): UPPER MIN contact -909889 urad is 593 ticks out,
-// the URDF lower limit -916298 still admits 597 (598 converts to -917321) ->
-// 4 ticks of room; MAX contact 2127120 is 1387 ticks out, the URDF upper
-// 2138028 admits 1393 (1394 converts to 2138369) -> 6 ticks of room.
+// Staged endpoint search (2026-09-29): a CONTACT_PROBE step is a raw tick
+// bounded by the endpoint's calibration search corridor (URDF limit + 64 on
+// the probe side, the other URDF limit behind), re-derived by the policy. The
+// V25 calibration speed profile exists only for the calibration moves. The
+// contact+16 / URDF-clamp allowance this replaces is gone.
 // ---------------------------------------------------------------------------
 
 struct UpperCase {
   Leg leg;
   const char* unit;
   uint8_t bus;
-  uint16_t q0;  // the 2026-09-29 current-boot capture
+  uint16_t q0;  // the 2026-09-29 22:05 current-boot capture
 };
-constexpr UpperCase kUppers[4] = {{Leg::LF, "ELR01", 12, 2088},
+constexpr UpperCase kUppers[4] = {{Leg::LF, "ELR01", 12, 2086},
                                   {Leg::RF, "ELR03", 22, 2108},
                                   {Leg::RH, "ELR02", 32, 2042},
-                                  {Leg::LH, "M42", 42, 2088}};
+                                  {Leg::LH, "M42", 42, 2072}};
 
-// A live CALIBRATION rig for one UPPER joint and side: transform admitted,
-// permit armed, and the auxiliary reported parked exactly when the compiled
-// plan for that endpoint requires it (LF/RF MAX).
 void armProbeRig(Rig& rig, const UpperCase& u, ContactSide side, AuthorityLease* lease_out) {
   CHECK(rig.policy.transforms().admit(
       promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0)));
@@ -569,230 +564,129 @@ void armProbeRig(Rig& rig, const UpperCase& u, ContactSide side, AuthorityLease*
   *lease_out = lease;
 }
 
-constexpr int kUpperMinRoomTicks = 4;
-constexpr int kUpperMaxRoomTicks = 6;
-
-bool insideUrdf(const Rig& rig, const UpperCase& u, int tick) {
-  if (tick < 0 || tick > 4095) return false;
-  actuator::MicroRad q = 0;
-  return actuator::resolveRawToUrdfQ(rig.profile, actuator::geometry_data::kProvenance,
-                                     promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0),
-                                     static_cast<uint16_t>(tick), &q) ==
-         actuator::TargetResolveStatus::OK;
+actuator::CalibrationSearchCorridor corridorOf(const Rig& rig, const UpperCase& u, ContactSide side) {
+  actuator::CalibrationSearchCorridor c{};
+  CHECK(actuator::resolveCalibrationSearchCorridor(
+            rig.profile, actuator::geometry_data::kProvenance,
+            promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0), u.leg, JointKind::UPPER,
+            side, &c) == actuator::TargetResolveStatus::OK);
+  return c;
 }
 
-uint16_t contactTick(const Rig& rig, const UpperCase& u, ContactSide side) {
-  const actuator::GeometryEndpointRecord* ep =
-      rig.profile.findEndpoint(u.leg, JointKind::UPPER, side);
-  uint16_t tick = 0;
-  CHECK(actuator::resolveUrdfQToRaw(rig.profile, actuator::geometry_data::kProvenance,
-                                    promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0),
-                                    ep->contact, &tick) == actuator::TargetResolveStatus::OK);
-  return tick;
+CalibrationExecutionRequest searchStep(const UpperCase& u, ContactSide side, uint16_t tick) {
+  CalibrationExecutionRequest req =
+      contactProbe(joint(u.leg, JointKind::UPPER, u.unit), u.leg, JointKind::UPPER, side);
+  req.calibration_search = true;
+  req.search_target_tick = tick;
+  req.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;
+  return req;
 }
 
-void test_overtravel_clamped_to_urdf_limit_both_sides_all_legs() {
-  g_case = "overtravel: min(16, room to the URDF limit) past the contact, MIN and MAX, 4 legs";
+void test_corridor_is_v25_guard_and_entry_every_leg_both_sides() {
+  g_case = "corridor: guard = URDF limit + 64, entry = URDF limit - 64, contact inside";
   for (const UpperCase& u : kUppers) {
     for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
       Rig rig;
-      AuthorityLease lease{};
-      armProbeRig(rig, u, side, &lease);
-      const actuator::GeometryEndpointRecord* ep =
-          rig.profile.findEndpoint(u.leg, JointKind::UPPER, side);
-      CalibrationExecutionRequest req =
-          contactProbe(joint(u.leg, JointKind::UPPER, u.unit), u.leg, JointKind::UPPER, side);
-      req.target_urad = ep->contact;  // the canonical contact, unchanged
-      req.contact_probe_overtravel_ticks = 16;
-      const CalibrationExecutionResult r =
-          rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
-      CHECK_EQ((int)r.outcome, (int)CalibrationExecutionOutcome::ROUTED_TO_POLICY);
-      CHECK_EQ((int)r.policy_decision, (int)WriteDecision::ACCEPT);
-      CHECK_EQ((int)r.execute_result, (int)actuator::ExecuteResult::WRITTEN);
-      const int contact = contactTick(rig, u, side);
-      const int written = rig.backend.last_target_tick;
-      const int applied = written > contact ? written - contact : contact - written;
-      // The oracle's room, not the 16-tick ceiling.
-      CHECK_EQ(applied, side == ContactSide::MIN_SIDE ? kUpperMinRoomTicks : kUpperMaxRoomTicks);
-      CHECK(applied <= 16);
-      // On the FAR side of the contact from q0, whichever way the raw axis runs.
-      const int q0 = u.q0;
-      const int contact_travel = contact > q0 ? contact - q0 : q0 - contact;
-      const int written_travel = written > q0 ? written - q0 : q0 - written;
-      CHECK_EQ(written_travel, contact_travel + applied);
-      // Never beyond the URDF limit: the commanded tick is inside, the next one
-      // further is not (the clamp is tight, not merely conservative).
-      const int further = written + (written > contact ? 1 : -1);
-      CHECK(insideUrdf(rig, u, written));
-      CHECK(!insideUrdf(rig, u, further));
+      const actuator::CalibrationSearchCorridor c = corridorOf(rig, u, side);
+      const actuator::GeometryJointRecord* j = rig.profile.findJoint(joint(u.leg, JointKind::UPPER, u.unit));
+      uint16_t limit = 0;
+      CHECK(actuator::resolveUrdfQToRaw(rig.profile, actuator::geometry_data::kProvenance,
+                                        promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0),
+                                        side == ContactSide::MIN_SIDE ? j->urdf_lower : j->urdf_upper,
+                                        &limit) == actuator::TargetResolveStatus::OK);
+      CHECK_EQ(c.urdf_limit_tick, limit);
+      CHECK_EQ(c.guard_tick, limit + c.probe_sign * 64);
+      CHECK_EQ(c.entry_tick, limit - c.probe_sign * 64);
+      CHECK_EQ(c.home_tick, u.q0);
+      // Guard-to-contact room covers the hand-found LF MIN stop (~23 past contact).
+      CHECK(actuator::searchDepth(c, c.guard_tick) - actuator::searchDepth(c, c.contact_tick) >= 64);
+      // The raw direction follows the joint's URDF direction and the side.
+      const int dir = u.leg == Leg::RF || u.leg == Leg::RH ? -1 : 1;
+      CHECK_EQ(c.probe_sign, dir * (side == ContactSide::MIN_SIDE ? -1 : 1));
     }
+  }
+  {
+    Rig rig;  // a q0 that pushes the MAX guard past raw 4095 is refused, never wrapped
+    actuator::CalibrationSearchCorridor c{};
+    CHECK(actuator::resolveCalibrationSearchCorridor(
+              rig.profile, actuator::geometry_data::kProvenance,
+              promotedTransform(joint(Leg::LF, JointKind::UPPER, "ELR01"), 2700), Leg::LF,
+              JointKind::UPPER, ContactSide::MAX_SIDE, &c) != actuator::TargetResolveStatus::OK);
+    CHECK(!c.valid());
+  }
+  {
+    Rig rig;  // the corridor belongs to the probed joint itself
+    actuator::CalibrationSearchCorridor c{};
+    CHECK(actuator::resolveCalibrationSearchCorridor(
+              rig.profile, actuator::geometry_data::kProvenance,
+              promotedTransform(joint(Leg::LF, JointKind::UPPER, "ELR01"), 2086), Leg::RF,
+              JointKind::UPPER, ContactSide::MIN_SIDE, &c) == actuator::TargetResolveStatus::REJECT_JOINT);
   }
 }
 
-void test_zero_overtravel_is_exactly_the_canonical_contact() {
-  g_case = "overtravel 0: unchanged canonical contact target";
+void test_search_step_bounded_by_the_corridor_every_leg_both_sides() {
+  g_case = "search step: guard and opposite URDF limit admitted, one tick past either refused";
   for (const UpperCase& u : kUppers) {
     for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
+      const actuator::CalibrationSearchCorridor c = [&] { Rig r; return corridorOf(r, u, side); }();
+      const int s = c.probe_sign;
+      struct { int tick; bool ok; } cases[] = {{c.guard_tick, true},
+                                               {c.guard_tick + s, false},
+                                               {c.contact_tick, true},
+                                               {c.entry_tick, true},
+                                               {c.opposite_limit_tick, true},
+                                               {c.opposite_limit_tick - s, false}};
+      for (const auto& k : cases) {
+        Rig rig;
+        AuthorityLease lease{};
+        armProbeRig(rig, u, side, &lease);
+        const CalibrationExecutionResult r = rig.engine.execute(
+            searchStep(u, side, static_cast<uint16_t>(k.tick)),
+            liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
+        CHECK_EQ((int)r.outcome, (int)CalibrationExecutionOutcome::ROUTED_TO_POLICY);
+        CHECK_EQ((int)r.policy_decision,
+                 (int)(k.ok ? WriteDecision::ACCEPT : WriteDecision::REJECT_CALIBRATION_SEARCH));
+        CHECK_EQ(rig.backend.calls, k.ok ? 1 : 0);
+        if (k.ok) {
+          CHECK_EQ(rig.backend.last_target_tick, k.tick);
+          CHECK((int)rig.backend.last_profile == (int)actuator::MotionProfile::CALIBRATION_SEARCH);
+        }
+      }
+      // The non-search CONTACT_PROBE rule is unchanged: never past the contact.
       Rig rig;
       AuthorityLease lease{};
       armProbeRig(rig, u, side, &lease);
-      CalibrationExecutionRequest req =
+      CalibrationExecutionRequest legacy =
           contactProbe(joint(u.leg, JointKind::UPPER, u.unit), u.leg, JointKind::UPPER, side);
-      req.target_urad = rig.profile.findEndpoint(u.leg, JointKind::UPPER, side)->contact;
-      const CalibrationExecutionResult r =
-          rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
-      CHECK_EQ((int)r.policy_decision, (int)WriteDecision::ACCEPT);
-      CHECK_EQ(rig.backend.last_target_tick, contactTick(rig, u, side));
+      const actuator::MicroRad contact = rig.profile.findEndpoint(u.leg, JointKind::UPPER, side)->contact;
+      legacy.target_urad = contact + (side == ContactSide::MIN_SIDE ? -1 : 1);
+      CHECK_EQ((int)rig.engine.execute(legacy, liveContext(lease, OperatingMode::MAINTENANCE), u.bus)
+                   .policy_decision,
+               (int)WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS);
     }
   }
 }
 
-void test_overtravel_ceiling_is_not_a_travel_amount() {
-  g_case = "overtravel: 16 is an absolute ceiling, not a mandatory travel amount";
-  const UpperCase& u = kUppers[0];
-  Rig rig;
-  const actuator::JointTransform t = promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0);
-  const actuator::GeometryProvenance& prov = actuator::geometry_data::kProvenance;
-  struct { actuator::MicroRad contact; ContactSide side; } deep[] = {
-      {-800000, ContactSide::MIN_SIDE},   // ~75 ticks of room before the URDF lower limit
-      {2000000, ContactSide::MAX_SIDE}};  // ~90 ticks of room before the URDF upper limit
-  for (const auto& d : deep) {
-    uint16_t base = 0;
-    CHECK(actuator::resolveUrdfQToRaw(rig.profile, prov, t, d.contact, &base) ==
-          actuator::TargetResolveStatus::OK);
-    for (uint16_t want : {0, 1, 8, 16}) {
-      uint16_t tick = 0, applied = 999;
-      CHECK(actuator::resolveContactProbeApproachToRaw(rig.profile, prov, t, d.contact, d.side,
-                                                       want, &tick, &applied) ==
-            actuator::TargetResolveStatus::OK);
-      CHECK_EQ(applied, want);  // plenty of room: exactly what was asked, never more
-      CHECK_EQ(std::abs((int)tick - (int)base), (int)want);
-    }
-    uint16_t tick = 0;
-    CHECK(actuator::resolveContactProbeApproachToRaw(rig.profile, prov, t, d.contact, d.side, 17,
-                                                     &tick) ==
-          actuator::TargetResolveStatus::REJECT_OVERTRAVEL);
-  }
-  // At the real UPPER contacts a request below the room is honoured as-is and
-  // one above it is clamped to the room - never raised to 16.
-  for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
-    const actuator::MicroRad contact = rig.profile.findEndpoint(u.leg, JointKind::UPPER, side)->contact;
-    const int room = side == ContactSide::MIN_SIDE ? kUpperMinRoomTicks : kUpperMaxRoomTicks;
-    for (uint16_t want : {0, 2, 16}) {
-      uint16_t tick = 0, applied = 999;
-      CHECK(actuator::resolveContactProbeApproachToRaw(rig.profile, prov, t, contact, side, want,
-                                                       &tick, &applied) ==
-            actuator::TargetResolveStatus::OK);
-      CHECK_EQ((int)applied, (int)want < room ? (int)want : room);
-    }
-  }
-}
-
-void test_overtravel_above_16_refused_at_every_layer() {
-  g_case = "overtravel: the bound cannot exceed 16";
-  const UpperCase& u = kUppers[0];
-  const JointIdentity id = joint(u.leg, JointKind::UPPER, u.unit);
-  for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
-    Rig rig;
-    AuthorityLease lease{};
-    armProbeRig(rig, u, side, &lease);
-    const actuator::MicroRad contact = rig.profile.findEndpoint(u.leg, JointKind::UPPER, side)->contact;
-    const actuator::JointTransform t = promotedTransform(id, u.q0);
-
-    // Resolver: 16 is the ceiling, 17 is not a number it will produce.
-    uint16_t tick16 = 0, tick17 = 0;
-    CHECK(actuator::resolveContactProbeApproachToRaw(rig.profile, actuator::geometry_data::kProvenance,
-                                                     t, contact, side, 16, &tick16) ==
-          actuator::TargetResolveStatus::OK);
-    CHECK(actuator::resolveContactProbeApproachToRaw(rig.profile, actuator::geometry_data::kProvenance,
-                                                     t, contact, side, 17, &tick17) ==
-          actuator::TargetResolveStatus::REJECT_OVERTRAVEL);
-    CHECK_EQ((int)actuator::kContactProbeMaxOvertravelTicks, 16);
-
-    // Engine: 17 cannot even be resolved - nothing reaches the backend.
-    CalibrationExecutionRequest req = contactProbe(id, u.leg, JointKind::UPPER, side);
-    req.target_urad = contact;
-    req.contact_probe_overtravel_ticks = 17;
-    CalibrationExecutionResult r =
-        rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
-    CHECK_EQ((int)r.outcome, (int)CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION);
-    CHECK_EQ(rig.backend.calls, 0);
-
-    // Policy, called directly with a hand-built command: 17 ticks, a tick one
-    // past the clamped point (outside the URDF domain), the UNclamped
-    // contact+16, a tick short of the clamped point and 200 are all refused.
-    const int contact_tick = contactTick(rig, u, side);
-    const int step = (tick16 > contact_tick) ? 1 : -1;
-    struct { uint16_t overtravel; int tick; WriteDecision expected; } bad[] = {
-        {17, tick16 + step, WriteDecision::REJECT_PROBE_OVERTRAVEL},
-        {16, tick16 + step, WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS},
-        {16, contact_tick + 16 * step, WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS},
-        {16, tick16 - step, WriteDecision::REJECT_PROBE_OVERTRAVEL},
-        {200, tick16, WriteDecision::REJECT_PROBE_OVERTRAVEL}};
-    for (const auto& b : bad) {
-      actuator::ActuatorCommand cmd{};
-      cmd.operation = actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE;
-      cmd.joint = id;
-      cmd.endpoint_leg = u.leg;
-      cmd.endpoint_joint = JointKind::UPPER;
-      cmd.endpoint_side = side;
-      cmd.target_urad = contact;
-      cmd.target_tick = static_cast<uint16_t>(b.tick);
-      cmd.contact_probe_overtravel_ticks = b.overtravel;
-      actuator::ActuatorTransaction txn{};
-      CHECK_EQ((int)rig.policy.plan(cmd, lease, OperatingMode::MAINTENANCE, &txn),
-               (int)b.expected);
-    }
-    // ...and exactly the URDF-clamped point is accepted.
-    actuator::ActuatorCommand ok{};
-    ok.operation = actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE;
-    ok.joint = id;
-    ok.endpoint_leg = u.leg;
-    ok.endpoint_joint = JointKind::UPPER;
-    ok.endpoint_side = side;
-    ok.target_urad = contact;
-    ok.target_tick = tick16;
-    ok.contact_probe_overtravel_ticks = 16;
-    actuator::ActuatorTransaction txn{};
-    CHECK_EQ((int)rig.policy.plan(ok, lease, OperatingMode::MAINTENANCE, &txn),
-             (int)WriteDecision::ACCEPT);
-    rig.policy.abort(&txn);
-  }
-}
-
-void test_overtravel_is_contact_probe_only() {
-  g_case = "overtravel: non-CONTACT_PROBE commands can never carry it";
+void test_search_and_calibration_profile_are_calibration_only() {
+  g_case = "calibration search / speed profile: refused for every non-calibration command";
   const UpperCase& u = kUppers[0];
   const JointIdentity id = joint(u.leg, JointKind::UPPER, u.unit);
   Rig rig;
   AuthorityLease lease{};
   armProbeRig(rig, u, ContactSide::MAX_SIDE, &lease);
+  CHECK(rig.policy.transforms().admit(promotedTransform(joint(Leg::LH, JointKind::UPPER, "M42"), 2072)));
 
-  // Engine: AUXILIARY_MOVE and DIRECTION_VERIFY refuse it before the policy
-  // (the auxiliary's own transform is admitted so that refusal, not a missing
-  // transform, is what is exercised).
-  CHECK(rig.policy.transforms().admit(promotedTransform(joint(Leg::LH, JointKind::UPPER, "M42"), 2088)));
-  CalibrationExecutionRequest aux{};
-  aux.intent = CalibrationIntent::AUXILIARY_MOVE;
-  aux.joint = joint(Leg::LH, JointKind::UPPER, "M42");
-  aux.endpoint_leg = Leg::LF;
-  aux.endpoint_joint = JointKind::UPPER;
-  aux.endpoint_side = ContactSide::MAX_SIDE;
-  aux.target_urad = 610865;
-  aux.contact_probe_overtravel_ticks = 16;
-  CHECK_EQ((int)rig.engine.execute(aux, liveContext(lease, OperatingMode::MAINTENANCE), 42).outcome,
-           (int)CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION);
+  // Engine: a search step on another intent fails closed before the policy.
   CalibrationExecutionRequest dv{};
   dv.intent = CalibrationIntent::DIRECTION_VERIFY;
   dv.joint = id;
   dv.direction_verify_delta_ticks = 16;
-  dv.contact_probe_overtravel_ticks = 16;
+  dv.calibration_search = true;
   CHECK_EQ((int)rig.engine.execute(dv, liveContext(lease, OperatingMode::MAINTENANCE), u.bus).outcome,
            (int)CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION);
   CHECK_EQ(rig.backend.calls, 0);
 
-  // Policy, directly: every other operation, for every owner that could hold
-  // it - including the future stand/gait POSITION_COMMAND under MOTION.
+  // Policy, directly: the search flag on anything but CONTACT_PROBE...
   for (actuator::ActuatorOperation op :
        {actuator::ActuatorOperation::TORQUE_ENABLE, actuator::ActuatorOperation::POSITION_COMMAND,
         actuator::ActuatorOperation::DIRECTION_VERIFY,
@@ -800,16 +694,40 @@ void test_overtravel_is_contact_probe_only() {
     actuator::ActuatorCommand cmd{};
     cmd.operation = op;
     cmd.joint = id;
+    cmd.target_tick = 2048;
+    cmd.calibration_search = true;
+    actuator::ActuatorTransaction txn{};
+    CHECK_EQ((int)rig.policy.plan(cmd, lease, OperatingMode::MAINTENANCE, &txn),
+             (int)WriteDecision::REJECT_CALIBRATION_SEARCH);
+  }
+  // ...and the calibration speed profile on anything but the two calibration moves.
+  for (actuator::ActuatorOperation op :
+       {actuator::ActuatorOperation::TORQUE_ENABLE, actuator::ActuatorOperation::POSITION_COMMAND,
+        actuator::ActuatorOperation::DIRECTION_VERIFY}) {
+    actuator::ActuatorCommand cmd{};
+    cmd.operation = op;
+    cmd.joint = id;
+    cmd.target_tick = 2048;
+    cmd.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;
+    actuator::ActuatorTransaction txn{};
+    CHECK_EQ((int)rig.policy.plan(cmd, lease, OperatingMode::MAINTENANCE, &txn),
+             (int)WriteDecision::REJECT_MOTION_PROFILE);
+  }
+  {  // a corrupted profile value is refused even for CONTACT_PROBE
+    actuator::ActuatorCommand cmd{};
+    cmd.operation = actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE;
+    cmd.joint = id;
     cmd.endpoint_leg = u.leg;
     cmd.endpoint_joint = JointKind::UPPER;
     cmd.endpoint_side = ContactSide::MAX_SIDE;
-    cmd.target_tick = 2048;
-    cmd.contact_probe_overtravel_ticks = 1;
+    cmd.calibration_search = true;
+    cmd.target_tick = corridorOf(rig, u, ContactSide::MAX_SIDE).contact_tick;
+    cmd.motion_profile = static_cast<actuator::MotionProfile>(7);
     actuator::ActuatorTransaction txn{};
     CHECK_EQ((int)rig.policy.plan(cmd, lease, OperatingMode::MAINTENANCE, &txn),
-             (int)WriteDecision::REJECT_PROBE_OVERTRAVEL);
+             (int)WriteDecision::REJECT_MOTION_PROFILE);
   }
-  {
+  {  // stand/gait: MOTION owner, POSITION_COMMAND - neither flag, ever
     Rig motion_rig;
     CHECK(motion_rig.policy.transforms().admit(promotedTransform(id, u.q0)));
     const AuthorityLease motion =
@@ -818,50 +736,38 @@ void test_overtravel_is_contact_probe_only() {
     cmd.operation = actuator::ActuatorOperation::POSITION_COMMAND;
     cmd.joint = id;
     cmd.target_tick = 2048;
-    cmd.contact_probe_overtravel_ticks = 16;
+    cmd.calibration_search = true;
     actuator::ActuatorTransaction txn{};
     CHECK_EQ((int)motion_rig.policy.plan(cmd, motion, OperatingMode::RUN, &txn),
-             (int)WriteDecision::REJECT_PROBE_OVERTRAVEL);
+             (int)WriteDecision::REJECT_CALIBRATION_SEARCH);
+    cmd.calibration_search = false;
+    cmd.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;
+    CHECK_EQ((int)motion_rig.policy.plan(cmd, motion, OperatingMode::RUN, &txn),
+             (int)WriteDecision::REJECT_MOTION_PROFILE);
   }
-}
-
-void test_backoff_can_never_carry_the_overtravel() {
-  g_case = "overtravel: the backoff target is unchanged and cannot carry it";
-  for (const UpperCase& u : kUppers) {
-    for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
-      Rig rig;
-      AuthorityLease lease{};
-      armProbeRig(rig, u, side, &lease);
-      const JointIdentity id = joint(u.leg, JointKind::UPPER, u.unit);
-      const actuator::MicroRad backoff =
-          rig.profile.findEndpoint(u.leg, JointKind::UPPER, side)->contact / 2;
-      CalibrationExecutionRequest req = contactProbe(id, u.leg, JointKind::UPPER, side);
-      req.target_urad = backoff;
-      req.contact_probe_overtravel_ticks = 16;
-      CalibrationExecutionResult r =
-          rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
-      CHECK_EQ((int)r.policy_decision, (int)WriteDecision::REJECT_PROBE_OVERTRAVEL);
-      CHECK_EQ(rig.backend.calls, 0);
-      // Without it, the backoff resolves exactly as before.
-      req.contact_probe_overtravel_ticks = 0;
-      r = rig.engine.execute(req, liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
-      CHECK_EQ((int)r.policy_decision, (int)WriteDecision::ACCEPT);
-      uint16_t expected = 0;
-      CHECK(actuator::resolveUrdfQToRaw(rig.profile, actuator::geometry_data::kProvenance,
-                                        promotedTransform(id, u.q0), backoff, &expected) ==
-            actuator::TargetResolveStatus::OK);
-      CHECK_EQ(rig.backend.last_target_tick, expected);
-    }
+  {  // the auxiliary park may use the calibration profile, at its exact pose only
+    CalibrationExecutionRequest aux{};
+    aux.intent = CalibrationIntent::AUXILIARY_MOVE;
+    aux.joint = joint(Leg::LH, JointKind::UPPER, "M42");
+    aux.endpoint_leg = Leg::LF;
+    aux.endpoint_joint = JointKind::UPPER;
+    aux.endpoint_side = ContactSide::MAX_SIDE;
+    aux.target_urad = 610865;
+    aux.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;
+    const CalibrationExecutionResult r =
+        rig.engine.execute(aux, liveContext(lease, OperatingMode::MAINTENANCE), 42);
+    CHECK_EQ((int)r.policy_decision, (int)WriteDecision::ACCEPT);
+    CHECK((int)rig.backend.last_profile == (int)actuator::MotionProfile::CALIBRATION_SEARCH);
   }
+  CHECK(std::strcmp(actuator::toString(actuator::MotionProfile::CALIBRATION_SEARCH),
+                    "CALIBRATION_SEARCH") == 0);
+  CHECK(std::strcmp(actuator::toString(static_cast<actuator::MotionProfile>(7)), "UNKNOWN") == 0);
 }
 
 int main() {
-  test_overtravel_clamped_to_urdf_limit_both_sides_all_legs();
-  test_overtravel_ceiling_is_not_a_travel_amount();
-  test_zero_overtravel_is_exactly_the_canonical_contact();
-  test_overtravel_above_16_refused_at_every_layer();
-  test_overtravel_is_contact_probe_only();
-  test_backoff_can_never_carry_the_overtravel();
+  test_corridor_is_v25_guard_and_entry_every_leg_both_sides();
+  test_search_step_bounded_by_the_corridor_every_leg_both_sides();
+  test_search_and_calibration_profile_are_calibration_only();
   test_authority_loss_produces_zero_restore_motion();
   test_stale_authority_generation_rejected();
   test_diagnostic_endpoint_cannot_become_executable();
