@@ -294,6 +294,22 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# The pure four-leg plan resolver (canonical identity/bus, Geometry V5
+# endpoints, parking matrix, generic backoff rule). Links the REAL checked
+# target resolver, geometry profile and canonical allocation.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_full_leg_calibration_plan" \
+  "$SCRIPT_DIR/test_full_leg_calibration_plan.cpp" \
+  "$SKETCH_DIR/src/calibration/FullLegCalibrationPlan.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationPopulationEvidence.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
 # The HostLink readiness classifier suite links the REAL pure classifier -
 # no module pointer, no hardware call - I6 (2026-09-25 objective change).
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -372,6 +388,7 @@ done
 "$OUT/test_contact_probe_engine"
 "$OUT/test_operational_envelope"
 "$OUT/test_full_leg_calibration_executor"
+"$OUT/test_full_leg_calibration_plan"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"
 "$OUT/test_led_ring_manager_USB_ONLY"
