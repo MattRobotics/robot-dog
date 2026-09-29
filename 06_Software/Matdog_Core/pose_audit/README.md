@@ -50,7 +50,8 @@ are relative to `06_Software/Matdog_Core/pose_audit/`:
    `diagnostics.py --sources equivalent_stand --output equivalent_stand_diagnostics`
    and `revalidate.py --sources equivalent_stand --output equivalent_stand_revalidation`
 9. `pose_library.py`, `pose_export.py`, `retarget.py`
-10. `rest_connectivity.py` (body-only start connectivity), `lower_envelope.py`, `connectivity.py`, `transition_summary.py`
+10. `rest_connectivity.py` (body-only start connectivity), `lower_envelope.py`, `connectivity.py`, `transition_summary.py`,
+    then `closeout.py` (G3.5.1 classification; reads saved artifacts only, no search)
 11. `render.py`
 12. `validate.py` (runs and records every gate below), then `build_report.py`,
     then `artifact_manifest.py`
@@ -134,11 +135,30 @@ hashes and cross-checks recorded provenance. `pose_library.json` retains both co
 clearly marked research records. Only six validated static records enter
 `PoseReferenceData.h`. No new motion state or startup route is enabled.
 
-The validated transition graph (`connectivity.json`) unions only saved routes that
-passed the full offline policy. A missing edge means no validated route was found
-by the bounded searches, never a proof of impossibility; singleton nodes are
-untested, not proven disconnected. BODY_SUPPORT `REST_GROUND` is not connected to
-the stand component and is not authorized as a startup or transition source.
+The transition graph (`connectivity.json`) classifies every saved route as
+`VALIDATED` (all samples pass the offline policy and both endpoints are promoted
+static poses), `CANDIDATE` (`GEOMETRIC_PATH_CANDIDATE`: all samples pass but an
+endpoint is a research pose or route endpoint; research only), `FAILED` (a
+bounded search did not produce a valid route) or `UNTESTED` (no route sampled).
+Components are computed over `VALIDATED` edges only and describe the validated
+graph, not the physical configuration space. A missing validated edge means no
+validated route was found by the bounded searches, never a proof of impossibility;
+singleton nodes are untested, not proven disconnected. BODY_SUPPORT `REST_GROUND`
+is not connected to the stand component and is not authorized as a startup or
+transition source. No edge class authorizes startup.
+
+G3.5.1 closeout (`closeout_classification.json`, written by `closeout.py` from
+saved artifacts): separates the BODY_AND_FOOT_SUPPORT lower geometric boundary
+(0 m), the tolerance-bound PURE_FOOT_SUPPORT search boundary (~1 um, governed by
+the 1 um undeclared-contact tolerance, not a physical clearance) and the physically
+robust pure-foot stance (not established); classifies the 251-sample route as a
+`GEOMETRIC_PATH_CANDIDATE` (research only, not a validated edge, no startup
+authority); records G3 architecture as `GENERALIZATION JUSTIFIED` while the runtime
+startup gate is `STILL ACTIVE / NOT YET SUPERSEDED` and BODY_ONLY REST_GROUND to
+autonomous STAND is `NOT VALIDATED`; separates the six pose-library entries into
+semantic targets, motion-state candidates and research variants without changing
+`MotionState`; and states the XGO boundary (no XGO physical joint pose was
+recovered with sufficient sign/zero/scale binding to be copied to MATDOG).
 
 Finite search failures do not prove global impossibility. Sampled route success
 does not certify continuous collision clearance, friction, contact loads, rate

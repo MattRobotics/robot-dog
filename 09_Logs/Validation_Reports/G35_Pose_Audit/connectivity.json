@@ -1,5 +1,5 @@
 {
-  "components": [
+  "candidate_augmented_components": [
     {
       "component": 0,
       "contains_REST_GROUND": false,
@@ -117,10 +117,164 @@
       "size": 1
     }
   ],
+  "components": [
+    {
+      "component": 0,
+      "contains_REST_GROUND": false,
+      "contains_STAND": true,
+      "members": [
+        "CRAWL_READY",
+        "LOW_C4",
+        "LOW_CROUCH",
+        "STAND",
+        "STRETCH"
+      ],
+      "size": 5
+    },
+    {
+      "component": 1,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "BODY_FOUR_FEET_RESEARCH_1"
+      ],
+      "size": 1
+    },
+    {
+      "component": 2,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "BODY_FOUR_FEET_RESEARCH_2"
+      ],
+      "size": 1
+    },
+    {
+      "component": 3,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "BODY_ONLY_REST_CANDIDATE_48"
+      ],
+      "size": 1
+    },
+    {
+      "component": 4,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "BODY_ONLY_REST_CANDIDATE_49"
+      ],
+      "size": 1
+    },
+    {
+      "component": 5,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "BODY_ONLY_REST_CANDIDATE_52"
+      ],
+      "size": 1
+    },
+    {
+      "component": 6,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "BODY_ONLY_REST_CANDIDATE_53"
+      ],
+      "size": 1
+    },
+    {
+      "component": 7,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "EQUIVALENT_STAND_150MM_X10MM"
+      ],
+      "size": 1
+    },
+    {
+      "component": 8,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_1"
+      ],
+      "size": 1
+    },
+    {
+      "component": 9,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_2"
+      ],
+      "size": 1
+    },
+    {
+      "component": 10,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "FOUR_FEET_RISE0_ORIGINAL_FOOTPRINT_END"
+      ],
+      "size": 1
+    },
+    {
+      "component": 11,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "PITCHED_CROUCH_RESEARCH"
+      ],
+      "size": 1
+    },
+    {
+      "component": 12,
+      "contains_REST_GROUND": true,
+      "contains_STAND": false,
+      "members": [
+        "REST_GROUND"
+      ],
+      "size": 1
+    },
+    {
+      "component": 13,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "REST_GROUND_MAX_SEPARATION"
+      ],
+      "size": 1
+    },
+    {
+      "component": 14,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "ROLL_PREP_RESEARCH"
+      ],
+      "size": 1
+    },
+    {
+      "component": 15,
+      "contains_REST_GROUND": false,
+      "contains_STAND": false,
+      "members": [
+        "XGO_HEIGHT_RATIO_RESEARCH"
+      ],
+      "size": 1
+    }
+  ],
   "definition": "nodes are validated static poses or route endpoints; an edge exists only if every recorded sample of a saved sampled route passes the full offline policy. Reverse traversal is geometric only where transitions.json marks reversible_geometrically; timing, contact acquisition, friction and swept collision are unvalidated.",
   "edges": [
     {
+      "all_recorded_samples_valid": true,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "VALIDATED",
       "evidence": {
         "reason": null
       },
@@ -128,6 +282,7 @@
       "note": null,
       "sample_count": 51,
       "source": "transitions.json:/edges/0",
+      "source_status": "VALIDATED_SAMPLED_ROUTE",
       "status": "VALIDATED_SAMPLED_ROUTE",
       "to": "LOW_C4",
       "validated": true,
@@ -137,7 +292,11 @@
       ]
     },
     {
+      "all_recorded_samples_valid": true,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "VALIDATED",
       "evidence": {
         "reason": null
       },
@@ -145,6 +304,7 @@
       "note": null,
       "sample_count": 51,
       "source": "transitions.json:/edges/1",
+      "source_status": "VALIDATED_SAMPLED_ROUTE",
       "status": "VALIDATED_SAMPLED_ROUTE",
       "to": "STAND",
       "validated": true,
@@ -154,7 +314,11 @@
       ]
     },
     {
+      "all_recorded_samples_valid": true,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "VALIDATED",
       "evidence": {
         "reason": null
       },
@@ -162,6 +326,7 @@
       "note": null,
       "sample_count": 51,
       "source": "transitions.json:/edges/2",
+      "source_status": "VALIDATED_SAMPLED_ROUTE",
       "status": "VALIDATED_SAMPLED_ROUTE",
       "to": "STRETCH",
       "validated": true,
@@ -171,7 +336,11 @@
       ]
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "UNTESTED",
       "evidence": {
         "reason": null
       },
@@ -179,13 +348,18 @@
       "note": null,
       "sample_count": 0,
       "source": "transitions.json:/edges/3",
-      "status": "UNPROVEN_OR_REJECTED",
+      "source_status": "UNPROVEN_OR_REJECTED",
+      "status": "UNTESTED",
       "to": "SIT_CANDIDATE",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": true,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "VALIDATED",
       "evidence": {
         "reason": null
       },
@@ -193,6 +367,7 @@
       "note": null,
       "sample_count": 51,
       "source": "transitions.json:/edges/4",
+      "source_status": "VALIDATED_SAMPLED_ROUTE",
       "status": "VALIDATED_SAMPLED_ROUTE",
       "to": "CRAWL_READY",
       "validated": true,
@@ -202,7 +377,11 @@
       ]
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "UNTESTED",
       "evidence": {
         "reason": "Rear contact-at-body-height and connecting folded branch require further route search; no valid sampled route established"
       },
@@ -210,13 +389,23 @@
       "note": null,
       "sample_count": 0,
       "source": "transitions.json:/edges/5",
-      "status": "UNPROVEN_OR_REJECTED",
+      "source_status": "UNPROVEN_OR_REJECTED",
+      "status": "UNTESTED",
       "to": "LOW_C4",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": true,
+      "authorizes_startup": false,
+      "candidate_reasons": [
+        "ENDPOINT_NOT_PROMOTED_STATIC_POSE:BODY_FOUR_FEET_RESEARCH_1(LIBRARY_POSE)",
+        "ENDPOINT_NOT_PROMOTED_STATIC_POSE:FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_1(ROUTE_ENDPOINT)",
+        "SAMPLED_ONLY_SWEPT_COLLISION_NOT_PROVED",
+        "CONTACT_LOCK_NOT_PROVED"
+      ],
       "continuous_collision_free_proved": false,
+      "edge_class": "CANDIDATE",
       "evidence": {
         "body_height_range_m": [
           0.001,
@@ -228,15 +417,23 @@
       "note": null,
       "sample_count": 60,
       "source": "contact_modes.json:/lift_off_attempts/0",
-      "status": "VALIDATED_SAMPLED_ROUTE",
+      "source_status": "VALIDATED_SAMPLED_ROUTE",
+      "status": "GEOMETRIC_PATH_CANDIDATE",
       "to": "FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_1",
-      "validated": true,
-      "validated_directions": [
-        "forward"
-      ]
+      "validated": false,
+      "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": true,
+      "authorizes_startup": false,
+      "candidate_reasons": [
+        "ENDPOINT_NOT_PROMOTED_STATIC_POSE:BODY_FOUR_FEET_RESEARCH_2(LIBRARY_POSE)",
+        "ENDPOINT_NOT_PROMOTED_STATIC_POSE:FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_2(ROUTE_ENDPOINT)",
+        "SAMPLED_ONLY_SWEPT_COLLISION_NOT_PROVED",
+        "CONTACT_LOCK_NOT_PROVED"
+      ],
       "continuous_collision_free_proved": false,
+      "edge_class": "CANDIDATE",
       "evidence": {
         "body_height_range_m": [
           0.001,
@@ -248,15 +445,24 @@
       "note": null,
       "sample_count": 60,
       "source": "contact_modes.json:/lift_off_attempts/1",
-      "status": "VALIDATED_SAMPLED_ROUTE",
+      "source_status": "VALIDATED_SAMPLED_ROUTE",
+      "status": "GEOMETRIC_PATH_CANDIDATE",
       "to": "FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_2",
-      "validated": true,
-      "validated_directions": [
-        "forward"
-      ]
+      "validated": false,
+      "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": true,
+      "authorizes_startup": false,
+      "candidate_reasons": [
+        "ENDPOINT_NOT_PROMOTED_STATIC_POSE:BODY_FOUR_FEET_RESEARCH_1(LIBRARY_POSE)",
+        "ENDPOINT_NOT_PROMOTED_STATIC_POSE:FOUR_FEET_RISE0_ORIGINAL_FOOTPRINT_END(ROUTE_ENDPOINT)",
+        "ROUTE_ENDS_BELOW_150MM_AT_A_NON_STAND_ROUTE_ENDPOINT",
+        "SAMPLED_ONLY_SWEPT_COLLISION_NOT_PROVED",
+        "CONTACT_LOCK_NOT_PROVED"
+      ],
       "continuous_collision_free_proved": false,
+      "edge_class": "CANDIDATE",
       "evidence": {
         "complete_stand_route": false,
         "end_body_height_m": 0.14800133333333335,
@@ -269,15 +475,26 @@
       "note": null,
       "sample_count": 150,
       "source": "route_extension.json:/original_footprint_rises/0",
-      "status": "VALIDATED_SAMPLED_ROUTE",
+      "source_status": "VALIDATED_SAMPLED_ROUTE",
+      "status": "GEOMETRIC_PATH_CANDIDATE",
       "to": "FOUR_FEET_RISE0_ORIGINAL_FOOTPRINT_END",
-      "validated": true,
-      "validated_directions": [
-        "forward"
-      ]
+      "validated": false,
+      "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": true,
+      "authorizes_startup": false,
+      "candidate_reasons": [
+        "ENDPOINT_NOT_PROMOTED_STATIC_POSE:BODY_FOUR_FEET_RESEARCH_2(LIBRARY_POSE)",
+        "ENDPOINT_NOT_PROMOTED_STATIC_POSE:EQUIVALENT_STAND_150MM_X10MM(ROUTE_ENDPOINT)",
+        "ENDPOINT_IS_NOT_CANONICAL_STAND",
+        "INCLINED_EDGE_MESH_SUPPORT_WITH_PATCH_MIGRATION_OUTSIDE_G2_CONTACT_CONTRACT",
+        "NO_ACQUISITION_CONTRACT_FOR_BASE_PLUS_FOUR_FEET_START",
+        "SAMPLED_ONLY_SWEPT_COLLISION_NOT_PROVED",
+        "CONTACT_LOCK_NOT_PROVED"
+      ],
       "continuous_collision_free_proved": false,
+      "edge_class": "CANDIDATE",
       "evidence": {
         "metrics": "route_251"
       },
@@ -285,15 +502,18 @@
       "note": "original-footprint rise to about 149 mm then body-XY shift to +10 mm at 150 mm; mesh support patch migrates",
       "sample_count": 251,
       "source": "route_extension.json:/original_footprint_rises/1/frames + equivalent_stand.json:/routes/1/frames",
-      "status": "VALIDATED_SAMPLED_ROUTE",
+      "source_status": "VALIDATED_SAMPLED_ROUTE",
+      "status": "GEOMETRIC_PATH_CANDIDATE",
       "to": "EQUIVALENT_STAND_150MM_X10MM",
-      "validated": true,
-      "validated_directions": [
-        "forward"
-      ]
+      "validated": false,
+      "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "UNTESTED",
       "evidence": {
         "body_xy_offset_of_equivalent_stand_m": 0.009999999999999974,
         "canonical_STAND_body_height_m": 0.15,
@@ -324,16 +544,21 @@
         "validated_edge": null
       },
       "from": "EQUIVALENT_STAND_150MM_X10MM",
-      "note": null,
+      "note": "no route from the equivalent stand to canonical STAND was sampled; the footprint and body-X differences are recorded, not a proof of physical unreachability",
       "sample_count": 0,
       "source": "none",
-      "status": "NO_VALIDATED_ROUTE",
+      "source_status": "NO_VALIDATED_ROUTE",
+      "status": "UNTESTED",
       "to": "STAND",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -364,13 +589,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -409,13 +639,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -454,13 +689,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -499,13 +739,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -544,13 +789,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -584,13 +834,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_1",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -624,13 +879,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_2",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -661,13 +921,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -706,13 +971,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -751,13 +1021,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -796,13 +1071,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -841,13 +1121,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -881,13 +1166,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_1",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -921,13 +1211,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_2",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -958,13 +1253,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1003,13 +1303,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1048,13 +1353,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1093,13 +1403,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1138,13 +1453,18 @@
       "note": null,
       "sample_count": 2,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -1178,13 +1498,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_1",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -1218,13 +1543,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_2",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1255,13 +1585,18 @@
       "note": null,
       "sample_count": 8,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1300,13 +1635,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1345,13 +1685,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1390,13 +1735,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1435,13 +1785,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -1475,13 +1830,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_1",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -1515,13 +1875,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_2",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1552,13 +1917,18 @@
       "note": null,
       "sample_count": 8,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1597,13 +1967,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1642,13 +2017,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1687,13 +2067,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1732,13 +2117,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -1772,13 +2162,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_1",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -1812,13 +2207,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_2",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1849,13 +2249,18 @@
       "note": null,
       "sample_count": 8,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1894,13 +2299,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1939,13 +2349,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf@lf+rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -1984,13 +2399,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "first_failure": {
           "collisions": [
@@ -2029,13 +2449,18 @@
       "note": null,
       "sample_count": 3,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh@lf+rf+rh+lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -2069,13 +2494,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_1",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "attempts": [
           {
@@ -2109,13 +2539,18 @@
       "note": null,
       "sample_count": 1,
       "source": "rest_connectivity.json",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_FOUR_FEET_RESEARCH_2",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "collisions": [
           [
@@ -2135,13 +2570,18 @@
       "note": "original seeded start was REST_GROUND_MAX_SEPARATION",
       "sample_count": 8,
       "source": "contact_modes.json:/contact_addition_attempts/0",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "collisions": [
           [
@@ -2169,13 +2609,18 @@
       "note": "original seeded start was REST_GROUND_MAX_SEPARATION",
       "sample_count": 3,
       "source": "contact_modes.json:/contact_addition_attempts/1",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "collisions": [
           [
@@ -2203,13 +2648,18 @@
       "note": "original seeded start was REST_GROUND_MAX_SEPARATION",
       "sample_count": 3,
       "source": "contact_modes.json:/contact_addition_attempts/2",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "collisions": [
           [
@@ -2237,13 +2687,18 @@
       "note": "original seeded start was REST_GROUND_MAX_SEPARATION",
       "sample_count": 3,
       "source": "contact_modes.json:/contact_addition_attempts/3",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "collisions": [
           [
@@ -2271,13 +2726,18 @@
       "note": "original seeded start was REST_GROUND_MAX_SEPARATION",
       "sample_count": 3,
       "source": "contact_modes.json:/contact_addition_attempts/4",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "BODY_PLUS_lf_rf_rh_lh",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "all_samples_valid": false,
         "kind": "bounded support-transfer attempt; not required for the retained routes"
@@ -2286,13 +2746,18 @@
       "note": null,
       "sample_count": 61,
       "source": "transfer_search.json:/routes/0",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "SUPPORT_TRANSFER_TARGET_UNRESOLVED",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "all_samples_valid": false,
         "kind": "bounded support-transfer attempt; not required for the retained routes"
@@ -2301,13 +2766,18 @@
       "note": null,
       "sample_count": 61,
       "source": "transfer_search.json:/routes/1",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "SUPPORT_TRANSFER_TARGET_UNRESOLVED",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "all_samples_valid": false,
         "kind": "bounded support-transfer attempt; not required for the retained routes"
@@ -2316,13 +2786,18 @@
       "note": null,
       "sample_count": 151,
       "source": "support_transfer.json:/routes/0",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "SUPPORT_TRANSFER_TARGET_UNRESOLVED",
       "validated": false,
       "validated_directions": []
     },
     {
+      "all_recorded_samples_valid": false,
+      "authorizes_startup": false,
+      "candidate_reasons": [],
       "continuous_collision_free_proved": false,
+      "edge_class": "FAILED",
       "evidence": {
         "contact_model": "fixed cross-section reference XY and actual mesh minimum Z; patch migration permitted, not G2 strip-contact startup",
         "failure": "IK_FAILURE"
@@ -2331,6 +2806,7 @@
       "note": null,
       "sample_count": 100,
       "source": "equivalent_stand.json:/routes/0",
+      "source_status": "REJECTED_BOUNDED_SEARCH",
       "status": "REJECTED_BOUNDED_SEARCH",
       "to": "EQUIVALENT_STAND_150MM_FAMILY_0",
       "validated": false,
@@ -2385,6 +2861,8 @@
       "joint_hash": "5c53ddb2ed887b4f",
       "kind": "LIBRARY_POSE",
       "note": null,
+      "pose_evidence": "VALIDATED_STATIC",
+      "promoted": true,
       "regime": "BODY_SUPPORT"
     },
     {
@@ -2393,6 +2871,8 @@
       "joint_hash": "e9377bad1d1703d8",
       "kind": "LIBRARY_POSE",
       "note": null,
+      "pose_evidence": "VALIDATED_STATIC",
+      "promoted": true,
       "regime": "BODY_SUPPORT"
     },
     {
@@ -2401,6 +2881,8 @@
       "joint_hash": "805633432d17018c",
       "kind": "LIBRARY_POSE",
       "note": null,
+      "pose_evidence": "VALIDATED_STATIC",
+      "promoted": true,
       "regime": "FOOT_SUPPORT"
     },
     {
@@ -2409,6 +2891,8 @@
       "joint_hash": "90912b3bbb6264f9",
       "kind": "LIBRARY_POSE",
       "note": null,
+      "pose_evidence": "VALIDATED_STATIC",
+      "promoted": true,
       "regime": "FOOT_SUPPORT"
     },
     {
@@ -2417,6 +2901,8 @@
       "joint_hash": "e43f65d40d169685",
       "kind": "LIBRARY_POSE",
       "note": null,
+      "pose_evidence": "VALIDATED_STATIC",
+      "promoted": true,
       "regime": "FOOT_SUPPORT"
     },
     {
@@ -2425,6 +2911,8 @@
       "joint_hash": "4a589a5521947ce6",
       "kind": "LIBRARY_POSE",
       "note": null,
+      "pose_evidence": "VALIDATED_STATIC",
+      "promoted": true,
       "regime": "FOOT_SUPPORT"
     },
     {
@@ -2433,6 +2921,8 @@
       "joint_hash": "45465bf708fc5ac0",
       "kind": "LIBRARY_POSE",
       "note": null,
+      "pose_evidence": "RESEARCH_ONLY",
+      "promoted": false,
       "regime": "FOOT_SUPPORT"
     },
     {
@@ -2441,6 +2931,8 @@
       "joint_hash": "0c96a51591ed4c56",
       "kind": "LIBRARY_POSE",
       "note": null,
+      "pose_evidence": "RESEARCH_ONLY",
+      "promoted": false,
       "regime": "FOOT_SUPPORT"
     },
     {
@@ -2449,6 +2941,8 @@
       "joint_hash": "28c590a4dfa3dd01",
       "kind": "LIBRARY_POSE",
       "note": null,
+      "pose_evidence": "RESEARCH_ONLY",
+      "promoted": false,
       "regime": "FOOT_SUPPORT"
     },
     {
@@ -2457,6 +2951,8 @@
       "joint_hash": "4a9253cb5471f09c",
       "kind": "LIBRARY_POSE",
       "note": null,
+      "pose_evidence": "RESEARCH_ONLY",
+      "promoted": false,
       "regime": "BODY_AND_FOOT_SUPPORT"
     },
     {
@@ -2465,6 +2961,8 @@
       "joint_hash": "a893a62146b6814b",
       "kind": "LIBRARY_POSE",
       "note": null,
+      "pose_evidence": "RESEARCH_ONLY",
+      "promoted": false,
       "regime": "BODY_AND_FOOT_SUPPORT"
     },
     {
@@ -2473,6 +2971,8 @@
       "joint_hash": "805633432d17018c",
       "kind": "ALIAS_OF_LOW_CROUCH",
       "note": "library alias; envelope.json CRAWL_READY differs from LOW_CROUCH by ~3.2e-5 rad",
+      "pose_evidence": "VALIDATED_STATIC",
+      "promoted": true,
       "regime": "FOOT_SUPPORT"
     },
     {
@@ -2481,6 +2981,8 @@
       "joint_hash": "c9424d9bfa740caa",
       "kind": "BODY_ONLY_CANDIDATE",
       "note": null,
+      "pose_evidence": "NOT_PROMOTED_SEARCH_CANDIDATE",
+      "promoted": false,
       "regime": "BODY_SUPPORT"
     },
     {
@@ -2489,6 +2991,8 @@
       "joint_hash": "bfd90086c0d87c54",
       "kind": "BODY_ONLY_CANDIDATE",
       "note": null,
+      "pose_evidence": "NOT_PROMOTED_SEARCH_CANDIDATE",
+      "promoted": false,
       "regime": "BODY_SUPPORT"
     },
     {
@@ -2497,6 +3001,8 @@
       "joint_hash": "71ead6995d71ab78",
       "kind": "BODY_ONLY_CANDIDATE",
       "note": null,
+      "pose_evidence": "NOT_PROMOTED_SEARCH_CANDIDATE",
+      "promoted": false,
       "regime": "BODY_SUPPORT"
     },
     {
@@ -2505,6 +3011,8 @@
       "joint_hash": "8baf2a24fa61ade9",
       "kind": "BODY_ONLY_CANDIDATE",
       "note": null,
+      "pose_evidence": "NOT_PROMOTED_SEARCH_CANDIDATE",
+      "promoted": false,
       "regime": "BODY_SUPPORT"
     },
     {
@@ -2513,6 +3021,8 @@
       "joint_hash": "e41da15c54367a4f",
       "kind": "ROUTE_ENDPOINT",
       "note": null,
+      "pose_evidence": "ROUTE_ENDPOINT_NOT_A_LIBRARY_POSE",
+      "promoted": false,
       "regime": "FOOT_SUPPORT"
     },
     {
@@ -2521,6 +3031,8 @@
       "joint_hash": "d2f5fca9b6e93a93",
       "kind": "ROUTE_ENDPOINT",
       "note": null,
+      "pose_evidence": "ROUTE_ENDPOINT_NOT_A_LIBRARY_POSE",
+      "promoted": false,
       "regime": "FOOT_SUPPORT"
     },
     {
@@ -2529,6 +3041,8 @@
       "joint_hash": "c6c1a0222a4e640b",
       "kind": "ROUTE_ENDPOINT",
       "note": null,
+      "pose_evidence": "ROUTE_ENDPOINT_NOT_A_LIBRARY_POSE",
+      "promoted": false,
       "regime": "FOOT_SUPPORT"
     },
     {
@@ -2537,11 +3051,13 @@
       "joint_hash": "1a9e93001664fa95",
       "kind": "ROUTE_ENDPOINT",
       "note": null,
+      "pose_evidence": "ROUTE_ENDPOINT_NOT_A_LIBRARY_POSE",
+      "promoted": false,
       "regime": "FOOT_SUPPORT"
     }
   ],
   "provenance": {
-    "generator_sha256": "91803cd7252ad4865fc805abff6c94ad3054334b559cf25134cd0d213e061717",
+    "generator_sha256": "f610e57f0e05c0d3aaca05a212a6915488bc49785d723ef95fef99582b94fc5b",
     "inputs": {
       "candidate_diagnostics.json": "547fc21881bb0224288d396f176a073e0b78f52b02c3927cb292cc1c919e3b4f",
       "contact_modes.json": "8272f9b084a95c3a60e0bbd1c9c7fcd0acb91def1743dc3afc8f3f00b8e5afaa",
@@ -2557,6 +3073,22 @@
     }
   },
   "route_251_sample": {
+    "classification": {
+      "authorized_startup_path": false,
+      "edge_class": "CANDIDATE",
+      "metrics_preserved": "all metrics below are unchanged from G3.5",
+      "reasons": [
+        "END_IS_EQUIVALENT_STAND_NOT_CANONICAL_STAND: max joint difference 0.3011 rad, max reference-contact XY difference 52.51 mm, body X offset 10.0 mm",
+        "START_POSE_BODY_FOUR_FEET_RESEARCH_2_IS_RESEARCH_ONLY_AND_NOT_EMBEDDED",
+        "NOT_PROVEN_FULLY_COLLISION_FREE: sampled frames only, no swept-collision proof",
+        "NOT_PROVEN_CONTACT_LOCKED: inclined-edge mesh support with patch migration, no no-slip proof",
+        "NO_ACQUISITION_CONTRACT_FOR_BASE_PLUS_FOUR_FEET_START"
+      ],
+      "research_only": true,
+      "startup_authority": false,
+      "status": "GEOMETRIC_PATH_CANDIDATE",
+      "validated_transition_edge_to_STAND": false
+    },
     "equivalent_shift_frames_excluding_duplicate": 100,
     "family": 1,
     "limiting_constraint": "joint limit margin: lf_lower_leg_joint upper limit at frame 250 (0.003819 rad); nonadjacent separation and support margin are looser",
@@ -2792,20 +3324,75 @@
     "rise_frames": 151,
     "source": "BODY_FOUR_FEET_RESEARCH_2 -> EQUIVALENT_STAND_150MM_X10MM"
   },
-  "startup_reassessment": "G3 autonomous startup gate unchanged; route uses inclined-edge mesh support with patch migration, not the G2 strip-contact contract, and no acquisition contract exists for base+four-foot start",
+  "semantics": {
+    "absence_of_validated_edge": "not proof of physical disconnection or unreachability; a pair without a VALIDATED edge is FAILED within a bounded search, UNTESTED, or never attempted",
+    "candidate_augmented_components": "informational view that also joins CANDIDATE edges; candidate edges are not validated and must not be used for startup or transition authorization",
+    "components": "components are computed over VALIDATED edges only; they describe the validated graph, not the complete physical configuration space",
+    "edge_classes": {
+      "CANDIDATE": "GEOMETRIC_PATH_CANDIDATE: every recorded sample passes the offline policy but an endpoint is a research pose, a route endpoint or another non-promoted node; research only, not a validated transition edge, no startup authority",
+      "FAILED": "a bounded search or route attempt was executed and did not produce a valid route; evidence of failure within that search bound, not of impossibility",
+      "UNTESTED": "no route was sampled for this pair; listed for completeness",
+      "VALIDATED": "every recorded sample of a saved sampled route passes the full offline policy and both endpoints are promoted static poses (or the promoted LOW_CROUCH alias); still a sampled route, not a swept-collision, contact-lock or no-slip proof"
+    },
+    "no_edge_class_authorizes_startup_or_motion": true,
+    "search_level_status_crosswalk": {
+      "GEOMETRIC_PATH_CANDIDATE": "edge_class CANDIDATE",
+      "REJECTED / REJECTED_BOUNDED_SEARCH": "edge_class FAILED",
+      "UNPROVEN_OR_REJECTED / NO_VALIDATED_ROUTE": "edge_class UNTESTED (no route sampled)",
+      "VALIDATED_SAMPLED_ROUTE": "edge_class VALIDATED",
+      "VALID_SEQUENCE_CANDIDATE (transitions.json, transition_graph.json)": "search-level status meaning every recorded sample is valid; classified here as VALIDATED or CANDIDATE by the endpoint rule above"
+    }
+  },
+  "startup_reassessment": {
+    "A_architectural_evidence": {
+      "basis": "STAND is reachable by validated sampled routes from LOW_CROUCH and LOW_C4, so the entry contract can be a verified member of the stand-connected component rather than exactly LOW_C4; generalized entry is not implemented",
+      "g3_architecture": "GENERALIZATION JUSTIFIED"
+    },
+    "B_implemented_runtime_gate": {
+      "basis": "StartupAcquisition.h/.cpp are unchanged relative to the accepted G3 baseline 87c3e91 and still require the canonical LOW_C4 pose with all six external evidence assertions",
+      "g3_runtime_startup_gate": "STILL ACTIVE / NOT YET SUPERSEDED"
+    },
+    "body_only_rest_ground_to_autonomous_stand": "NOT VALIDATED",
+    "detail": "MATDOG must not autonomously stand from REST_GROUND: REST_GROUND has no validated route to any foot-supported pose, and the 251-sample route is a GEOMETRIC_PATH_CANDIDATE that does not reach canonical STAND",
+    "route_251_authorized_as_startup_path": false
+  },
   "summary": {
     "REST_GROUND_in_stand_component": false,
+    "REST_GROUND_in_stand_component_including_candidate_edges": false,
     "any_body_only_rest_in_stand_component": false,
-    "component_count": 12,
+    "candidate_augmented_component_count": 12,
+    "component_count": 16,
     "disconnection_meaning": "no validated route found by the bounded searches; not a proof that no route exists",
-    "nontrivial_component_count": 3,
+    "edge_class_counts": {
+      "CANDIDATE": 4,
+      "FAILED": 51,
+      "UNTESTED": 3,
+      "VALIDATED": 4
+    },
+    "edges_with_unresolved_or_non_node_target": 40,
+    "graph_scope": "components of the VALIDATED graph only; not the physical configuration space",
+    "node_pair_best_edge_class_counts": {
+      "CANDIDATE": 4,
+      "FAILED": 12,
+      "NO_ROUTE_ATTEMPT_RECORDED": 168,
+      "UNTESTED": 2,
+      "VALIDATED": 4
+    },
+    "node_pair_total": 190,
+    "nontrivial_component_count": 1,
     "rest_starts_with_valid_connection": [],
-    "singleton_component_count": 9,
+    "singleton_component_count": 15,
     "singleton_components_are_untested_not_proven_disconnected": [
+      "BODY_FOUR_FEET_RESEARCH_1",
+      "BODY_FOUR_FEET_RESEARCH_2",
       "BODY_ONLY_REST_CANDIDATE_48",
       "BODY_ONLY_REST_CANDIDATE_49",
       "BODY_ONLY_REST_CANDIDATE_52",
       "BODY_ONLY_REST_CANDIDATE_53",
+      "EQUIVALENT_STAND_150MM_X10MM",
+      "FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_1",
+      "FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_2",
+      "FOUR_FEET_RISE0_ORIGINAL_FOOTPRINT_END",
       "PITCHED_CROUCH_RESEARCH",
       "REST_GROUND",
       "REST_GROUND_MAX_SEPARATION",

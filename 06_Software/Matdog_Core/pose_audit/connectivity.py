@@ -1,7 +1,11 @@
-"""Validated support-mode connectivity graph, from saved artifacts only.
+"""Support-mode route graph with explicit edge classes, from saved artifacts only.
 
-Edges exist only for sampled routes whose every recorded sample passed the full offline policy.
-Missing edges mean "no validated route found by the bounded searches", never proof of absence.
+Edge classes: VALIDATED (every recorded sample passes the offline policy and both endpoints are promoted
+static poses), CANDIDATE (every recorded sample passes, but an endpoint is a research pose, a route
+endpoint or another non-promoted node), FAILED (a bounded search or route attempt was recorded and did not
+produce a valid route) and UNTESTED (no route was sampled). Components are computed over VALIDATED edges
+only and describe the validated graph, not the physical configuration space. Missing edges mean "no
+validated route found by the bounded searches", never proof of absence. No edge class authorizes startup.
 """
 import json
 import numpy as np
@@ -9,6 +13,8 @@ from model import Model,sha
 from survey import OUT,save
 
 LEG=('lf','rf','rh','lh')
+EDGE_CLASSES=('VALIDATED','CANDIDATE','FAILED','UNTESTED')
+CLASS_RANK={c:i for i,c in enumerate(EDGE_CLASSES)}
 def load(name):return json.loads((OUT/name).read_text())
 def qsha(q):return sha_bytes(np.round(np.array(q),12).tobytes())
 def sha_bytes(b):
@@ -72,20 +78,29 @@ def main():
   pure=[s for s in fam['samples'] if s['valid'] and s['regime']=='FOOT_SUPPORT'][:1]
   for s in pure:near.append({'family':fam['family'],'lowest_valid_pure_foot_height_above_body_ground_m':s['height_above_body_ground_m'],'max_abs_joint_difference_to_route_frame_1_rad':float(np.max(abs(np.array(s['q'])-np.array(rise[1]['q'])))) if fam['family']==family else None})
  nodes={};edges=[]
- def node(name,kind,record,regime=None,note=None):
-  nodes.setdefault(name,{'id':name,'kind':kind,'regime':regime or record.get('regime'),'body_height_m':record['body'][2][3] if record.get('body') else None,'joint_hash':qsha(record['q']),'note':note})
- for n,p in poses.items():node(n,'LIBRARY_POSE',p)
- node('CRAWL_READY','ALIAS_OF_LOW_CROUCH',poses['LOW_CROUCH'],note='library alias; envelope.json CRAWL_READY differs from LOW_CROUCH by ~3.2e-5 rad')
+ def node(name,kind,record,regime=None,note=None,promoted=False,pose_evidence=None):
+  nodes.setdefault(name,{'id':name,'kind':kind,'regime':regime or record.get('regime'),'body_height_m':record['body'][2][3] if record.get('body') else None,'joint_hash':qsha(record['q']),'promoted':promoted,'pose_evidence':pose_evidence,'note':note})
+ for n,p in poses.items():node(n,'LIBRARY_POSE',p,promoted=p['evidence']=='VALIDATED_STATIC' and p['embedded_target'] is True,pose_evidence=p['evidence'])
+ node('CRAWL_READY','ALIAS_OF_LOW_CROUCH',poses['LOW_CROUCH'],note='library alias; envelope.json CRAWL_READY differs from LOW_CROUCH by ~3.2e-5 rad',promoted=nodes['LOW_CROUCH']['promoted'],pose_evidence=poses['LOW_CROUCH']['evidence'])
  rest_ids={}
  for pointer in range(len(rest['candidates'])):
   v=rest['candidates'][pointer]
   if not (v.get('valid') and v.get('regime')=='BODY_SUPPORT'):continue
   match=[n for n in ('REST_GROUND','REST_GROUND_MAX_SEPARATION') if poses[n]['q']==v['q']]
   name=match[0] if match else 'BODY_ONLY_REST_CANDIDATE_%d'%pointer;rest_ids[pointer]=name
-  if not match:node(name,'BODY_ONLY_CANDIDATE',v)
- node('FOUR_FEET_RISE0_ORIGINAL_FOOTPRINT_END','ROUTE_ENDPOINT',rises[0]['frames'][-1]);node('EQUIVALENT_STAND_150MM_X10MM','ROUTE_ENDPOINT',final)
- for i in (0,1):node('FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_%d'%(i+1),'ROUTE_ENDPOINT',modes['lift_off_attempts'][i]['frames'][-1])
- def edge(a,b,status,source,sample_count,evidence,validated_directions=('forward',),note=None):edges.append({'from':a,'to':b,'status':status,'validated':status=='VALIDATED_SAMPLED_ROUTE','source':source,'sample_count':sample_count,'validated_directions':list(validated_directions) if status=='VALIDATED_SAMPLED_ROUTE' else [],'evidence':evidence,'note':note,'continuous_collision_free_proved':False})
+  if not match:node(name,'BODY_ONLY_CANDIDATE',v,pose_evidence='NOT_PROMOTED_SEARCH_CANDIDATE')
+ node('FOUR_FEET_RISE0_ORIGINAL_FOOTPRINT_END','ROUTE_ENDPOINT',rises[0]['frames'][-1],pose_evidence='ROUTE_ENDPOINT_NOT_A_LIBRARY_POSE');node('EQUIVALENT_STAND_150MM_X10MM','ROUTE_ENDPOINT',final,pose_evidence='ROUTE_ENDPOINT_NOT_A_LIBRARY_POSE')
+ for i in (0,1):node('FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_%d'%(i+1),'ROUTE_ENDPOINT',modes['lift_off_attempts'][i]['frames'][-1],pose_evidence='ROUTE_ENDPOINT_NOT_A_LIBRARY_POSE')
+ def edge(a,b,status,source,sample_count,evidence,validated_directions=('forward',),note=None,reasons=()):
+  sampled_ok=status=='VALIDATED_SAMPLED_ROUTE';candidate_reasons=[]
+  if sampled_ok:
+   unpromoted=[x for x in (a,b) if not nodes.get(x,{}).get('promoted')]
+   if unpromoted:
+    edge_class='CANDIDATE';candidate_reasons=['ENDPOINT_NOT_PROMOTED_STATIC_POSE:'+x+'('+nodes.get(x,{}).get('kind','UNRESOLVED')+')' for x in unpromoted]+list(reasons)+['SAMPLED_ONLY_SWEPT_COLLISION_NOT_PROVED','CONTACT_LOCK_NOT_PROVED']
+   else:edge_class='VALIDATED'
+  elif status in ('UNPROVEN_OR_REJECTED','NO_VALIDATED_ROUTE'):edge_class='UNTESTED'
+  else:edge_class='FAILED'
+  edges.append({'from':a,'to':b,'edge_class':edge_class,'status':{'VALIDATED':'VALIDATED_SAMPLED_ROUTE','CANDIDATE':'GEOMETRIC_PATH_CANDIDATE','UNTESTED':'UNTESTED'}.get(edge_class,status),'source_status':status,'validated':edge_class=='VALIDATED','all_recorded_samples_valid':sampled_ok,'candidate_reasons':candidate_reasons,'authorizes_startup':False,'source':source,'sample_count':sample_count,'validated_directions':list(validated_directions) if edge_class=='VALIDATED' else [],'evidence':evidence,'note':note,'continuous_collision_free_proved':False})
  names={'STRETCH_CANDIDATE':'STRETCH','SIT_CANDIDATE':'SIT'}
  for i,e in enumerate(trans['edges']):
   a,b=e['from'],names.get(e['to'],e['to']);ok=e['status']=='VALID_SEQUENCE_CANDIDATE'
@@ -93,9 +108,9 @@ def main():
   edge(a,b,'VALIDATED_SAMPLED_ROUTE' if ok else 'UNPROVEN_OR_REJECTED','transitions.json:/edges/%d'%i,len(e.get('frames',[])),{'reason':e.get('reason')},('forward','reverse_geometric') if ok and e.get('reversible_geometrically') else ('forward',))
  for i,l in enumerate(modes['lift_off_attempts']):
   edge('BODY_FOUR_FEET_RESEARCH_%d'%(i+1),'FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_%d'%(i+1),'VALIDATED_SAMPLED_ROUTE' if l['valid'] else 'REJECTED','contact_modes.json:/lift_off_attempts/%d'%i,len(l['frames']),{'body_height_range_m':[.001,.06],'contact_model':'original footprint reference XY, mesh Z'})
- edge('BODY_FOUR_FEET_RESEARCH_1','FOUR_FEET_RISE0_ORIGINAL_FOOTPRINT_END','VALIDATED_SAMPLED_ROUTE','route_extension.json:/original_footprint_rises/0',len(rises[0]['frames']),{'end_body_height_m':rises[0]['frames'][-1]['body'][2][3],'stop':rises[0]['failure'] or 'IK failure at next 1 mm step recorded by generator (no invalid sample stored)','complete_stand_route':False})
- edge('BODY_FOUR_FEET_RESEARCH_2','EQUIVALENT_STAND_150MM_X10MM','VALIDATED_SAMPLED_ROUTE','route_extension.json:/original_footprint_rises/1/frames + equivalent_stand.json:/routes/1/frames',metrics['sample_count'],{'metrics':'route_251'},note='original-footprint rise to about 149 mm then body-XY shift to +10 mm at 150 mm; mesh support patch migrates')
- edge('EQUIVALENT_STAND_150MM_X10MM','STAND','NO_VALIDATED_ROUTE','none',0,stand_gap)
+ edge('BODY_FOUR_FEET_RESEARCH_1','FOUR_FEET_RISE0_ORIGINAL_FOOTPRINT_END','VALIDATED_SAMPLED_ROUTE','route_extension.json:/original_footprint_rises/0',len(rises[0]['frames']),{'end_body_height_m':rises[0]['frames'][-1]['body'][2][3],'stop':rises[0]['failure'] or 'IK failure at next 1 mm step recorded by generator (no invalid sample stored)','complete_stand_route':False},reasons=['ROUTE_ENDS_BELOW_150MM_AT_A_NON_STAND_ROUTE_ENDPOINT'])
+ edge('BODY_FOUR_FEET_RESEARCH_2','EQUIVALENT_STAND_150MM_X10MM','VALIDATED_SAMPLED_ROUTE','route_extension.json:/original_footprint_rises/1/frames + equivalent_stand.json:/routes/1/frames',metrics['sample_count'],{'metrics':'route_251'},reasons=['ENDPOINT_IS_NOT_CANONICAL_STAND','INCLINED_EDGE_MESH_SUPPORT_WITH_PATCH_MIGRATION_OUTSIDE_G2_CONTACT_CONTRACT','NO_ACQUISITION_CONTRACT_FOR_BASE_PLUS_FOUR_FEET_START'],note='original-footprint rise to about 149 mm then body-XY shift to +10 mm at 150 mm; mesh support patch migrates')
+ edge('EQUIVALENT_STAND_150MM_X10MM','STAND','NO_VALIDATED_ROUTE','none',0,stand_gap,note='no route from the equivalent stand to canonical STAND was sampled; the footprint and body-X differences are recorded, not a proof of physical unreachability')
  for r in rc['starts']:
   name=rest_ids[int(r['source_pointer'].rsplit('/',1)[1])]
   for d in r['direct_contact_additions']:edge(name,d['target']+'@'+'+'.join(d['target_active_feet']),'REJECTED_BOUNDED_SEARCH','rest_connectivity.json',d['frames_evaluated'],{'first_failure':d['first_failure']})
@@ -108,23 +123,34 @@ def main():
  for file,label in (('transfer_search.json','SUPPORT_TRANSFER_TARGET'),('support_transfer.json','SUPPORT_TRANSFER_TARGET')):
   for i,d in enumerate(load(file)['routes']):edge(pose_name(d['start'],file+'_start_%d'%i),label+'_UNRESOLVED','REJECTED_BOUNDED_SEARCH','%s:/routes/%d'%(file,i),len(d['frames']),{'all_samples_valid':d['all_samples_valid'],'kind':'bounded support-transfer attempt; not required for the retained routes'})
  edge('FOUR_FEET_RISE0_ORIGINAL_FOOTPRINT_END','EQUIVALENT_STAND_150MM_FAMILY_0','REJECTED_BOUNDED_SEARCH','equivalent_stand.json:/routes/0',len(ends[0]['frames']),{'failure':ends[0]['failure'],'contact_model':ends[0]['contact_model']})
- uf=Union(nodes)
+ def component_view(classes):
+  uf=Union(nodes)
+  for e in edges:
+   if e['edge_class'] in classes:
+    assert e['from'] in nodes and e['to'] in nodes,(e['from'],e['to']);uf.join(e['from'],e['to'])
+  groups={}
+  for n in nodes:groups.setdefault(uf.find(n),[]).append(n)
+  comps=sorted(groups.values(),key=lambda g:(-len(g),g))
+  return [{'component':i,'members':sorted(g),'size':len(g),'contains_STAND':'STAND' in g,'contains_REST_GROUND':'REST_GROUND' in g} for i,g in enumerate(comps)]
+ components=component_view(('VALIDATED',));augmented=component_view(('VALIDATED','CANDIDATE'))
+ stand=[c for c in components if c['contains_STAND']][0];stand_augmented=[c for c in augmented if c['contains_STAND']][0]
+ class_counts={c:sum(e['edge_class']==c for e in edges) for c in EDGE_CLASSES}
+ pair_best={}
  for e in edges:
-  if e['validated']:
-   assert e['from'] in nodes and e['to'] in nodes,(e['from'],e['to']);uf.join(e['from'],e['to'])
- groups={}
- for n in nodes:groups.setdefault(uf.find(n),[]).append(n)
- comps=sorted(groups.values(),key=lambda g:(-len(g),g))
- components=[{'component':i,'members':sorted(g),'size':len(g),'contains_STAND':'STAND' in g,'contains_REST_GROUND':'REST_GROUND' in g} for i,g in enumerate(comps)]
- stand=[c for c in components if c['contains_STAND']][0]
+  if e['from'] in nodes and e['to'] in nodes:
+   key=tuple(sorted((e['from'],e['to'])));pair_best[key]=min(pair_best.get(key,e['edge_class']),e['edge_class'],key=CLASS_RANK.get)
+ pair_counts={c:sum(v==c for v in pair_best.values()) for c in EDGE_CLASSES};total_pairs=len(nodes)*(len(nodes)-1)//2;pair_counts['NO_ROUTE_ATTEMPT_RECORDED']=total_pairs-len(pair_best)
  result={'provenance':{'inputs':{n:sha(OUT/n) for n in ('pose_library.json','transitions.json','contact_modes.json','route_extension.json','equivalent_stand.json','rest_connectivity.json','rest_search.json','lower_envelope.json','candidate_diagnostics.json','equivalent_stand_diagnostics.json','transfer_search.json')},'generator_sha256':sha(__file__)},
   'definition':'nodes are validated static poses or route endpoints; an edge exists only if every recorded sample of a saved sampled route passes the full offline policy. Reverse traversal is geometric only where transitions.json marks reversible_geometrically; timing, contact acquisition, friction and swept collision are unvalidated.',
-  'nodes':list(nodes.values()),'edges':edges,'components':components,
-  'summary':{'component_count':len(components),'nontrivial_component_count':sum(c['size']>1 for c in components),'singleton_component_count':sum(c['size']==1 for c in components),'stand_component':stand['component'],'stand_component_members':stand['members'],'REST_GROUND_in_stand_component':'REST_GROUND' in stand['members'],'any_body_only_rest_in_stand_component':any(n in stand['members'] for n in nodes if n.startswith('BODY_ONLY_REST_CANDIDATE_') or n in ('REST_GROUND','REST_GROUND_MAX_SEPARATION')),'rest_starts_with_valid_connection':rc['starts_with_any_valid_connection'],
+  'semantics':{'edge_classes':{'VALIDATED':'every recorded sample of a saved sampled route passes the full offline policy and both endpoints are promoted static poses (or the promoted LOW_CROUCH alias); still a sampled route, not a swept-collision, contact-lock or no-slip proof','CANDIDATE':'GEOMETRIC_PATH_CANDIDATE: every recorded sample passes the offline policy but an endpoint is a research pose, a route endpoint or another non-promoted node; research only, not a validated transition edge, no startup authority','FAILED':'a bounded search or route attempt was executed and did not produce a valid route; evidence of failure within that search bound, not of impossibility','UNTESTED':'no route was sampled for this pair; listed for completeness'},
+   'components':'components are computed over VALIDATED edges only; they describe the validated graph, not the complete physical configuration space','absence_of_validated_edge':'not proof of physical disconnection or unreachability; a pair without a VALIDATED edge is FAILED within a bounded search, UNTESTED, or never attempted','candidate_augmented_components':'informational view that also joins CANDIDATE edges; candidate edges are not validated and must not be used for startup or transition authorization','no_edge_class_authorizes_startup_or_motion':True,
+   'search_level_status_crosswalk':{'VALID_SEQUENCE_CANDIDATE (transitions.json, transition_graph.json)':'search-level status meaning every recorded sample is valid; classified here as VALIDATED or CANDIDATE by the endpoint rule above','VALIDATED_SAMPLED_ROUTE':'edge_class VALIDATED','GEOMETRIC_PATH_CANDIDATE':'edge_class CANDIDATE','REJECTED / REJECTED_BOUNDED_SEARCH':'edge_class FAILED','UNPROVEN_OR_REJECTED / NO_VALIDATED_ROUTE':'edge_class UNTESTED (no route sampled)'}},
+  'nodes':list(nodes.values()),'edges':edges,'components':components,'candidate_augmented_components':augmented,
+  'summary':{'graph_scope':'components of the VALIDATED graph only; not the physical configuration space','component_count':len(components),'nontrivial_component_count':sum(c['size']>1 for c in components),'singleton_component_count':sum(c['size']==1 for c in components),'stand_component':stand['component'],'stand_component_members':stand['members'],'REST_GROUND_in_stand_component':'REST_GROUND' in stand['members'],'any_body_only_rest_in_stand_component':any(n in stand['members'] for n in nodes if n.startswith('BODY_ONLY_REST_CANDIDATE_') or n in ('REST_GROUND','REST_GROUND_MAX_SEPARATION')),'REST_GROUND_in_stand_component_including_candidate_edges':'REST_GROUND' in stand_augmented['members'],'edge_class_counts':class_counts,'edges_with_unresolved_or_non_node_target':sum(not(e['from'] in nodes and e['to'] in nodes) for e in edges),'node_pair_best_edge_class_counts':pair_counts,'node_pair_total':total_pairs,'candidate_augmented_component_count':len(augmented),'rest_starts_with_valid_connection':rc['starts_with_any_valid_connection'],
    'disconnection_meaning':'no validated route found by the bounded searches; not a proof that no route exists','singleton_components_are_untested_not_proven_disconnected':[c['members'][0] for c in components if c['size']==1]},
-  'route_251_sample':{'family':family,'source':'BODY_FOUR_FEET_RESEARCH_2 -> EQUIVALENT_STAND_150MM_X10MM','metrics':metrics,'rise_end_body_height_m':rise[-1]['body'][2][3],'rise_frames':len(rise),'equivalent_shift_frames_excluding_duplicate':len(tail)-1,'limiting_constraint':'joint limit margin: %s %s limit at frame %d (%.6f rad); nonadjacent separation and support margin are looser'%(metrics['min_joint_margin_at']['joint'],metrics['min_joint_margin_at']['limit_side'],metrics['min_joint_margin_at']['frame'],metrics['min_joint_margin_rad'])},
+  'route_251_sample':{'family':family,'source':'BODY_FOUR_FEET_RESEARCH_2 -> EQUIVALENT_STAND_150MM_X10MM','classification':{'edge_class':'CANDIDATE','status':'GEOMETRIC_PATH_CANDIDATE','research_only':True,'validated_transition_edge_to_STAND':False,'authorized_startup_path':False,'startup_authority':False,'reasons':['END_IS_EQUIVALENT_STAND_NOT_CANONICAL_STAND: max joint difference %.4f rad, max reference-contact XY difference %.2f mm, body X offset %.1f mm'%(stand_gap['max_abs_joint_difference_rad'],stand_gap['max_reference_contact_xy_difference_m']*1000,stand_gap['body_xy_offset_of_equivalent_stand_m']*1000),'START_POSE_BODY_FOUR_FEET_RESEARCH_2_IS_RESEARCH_ONLY_AND_NOT_EMBEDDED','NOT_PROVEN_FULLY_COLLISION_FREE: sampled frames only, no swept-collision proof','NOT_PROVEN_CONTACT_LOCKED: inclined-edge mesh support with patch migration, no no-slip proof','NO_ACQUISITION_CONTRACT_FOR_BASE_PLUS_FOUR_FEET_START'],'metrics_preserved':'all metrics below are unchanged from G3.5'},'metrics':metrics,'rise_end_body_height_m':rise[-1]['body'][2][3],'rise_frames':len(rise),'equivalent_shift_frames_excluding_duplicate':len(tail)-1,'limiting_constraint':'joint limit margin: %s %s limit at frame %d (%.6f rad); nonadjacent separation and support margin are looser'%(metrics['min_joint_margin_at']['joint'],metrics['min_joint_margin_at']['limit_side'],metrics['min_joint_margin_at']['frame'],metrics['min_joint_margin_rad'])},
   'equivalent_stand_vs_canonical_STAND':stand_gap,'lower_envelope_continuity_to_route':near,
-  'startup_reassessment':'G3 autonomous startup gate unchanged; route uses inclined-edge mesh support with patch migration, not the G2 strip-contact contract, and no acquisition contract exists for base+four-foot start'}
+  'startup_reassessment':{'A_architectural_evidence':{'g3_architecture':'GENERALIZATION JUSTIFIED','basis':'STAND is reachable by validated sampled routes from LOW_CROUCH and LOW_C4, so the entry contract can be a verified member of the stand-connected component rather than exactly LOW_C4; generalized entry is not implemented'},'B_implemented_runtime_gate':{'g3_runtime_startup_gate':'STILL ACTIVE / NOT YET SUPERSEDED','basis':'StartupAcquisition.h/.cpp are unchanged relative to the accepted G3 baseline 87c3e91 and still require the canonical LOW_C4 pose with all six external evidence assertions'},'body_only_rest_ground_to_autonomous_stand':'NOT VALIDATED','route_251_authorized_as_startup_path':False,'detail':'MATDOG must not autonomously stand from REST_GROUND: REST_GROUND has no validated route to any foot-supported pose, and the 251-sample route is a GEOMETRIC_PATH_CANDIDATE that does not reach canonical STAND'}}
  save('connectivity',result)
  print('CONNECTIVITY components',len(components),'stand',stand['members'],'route',metrics['sample_count'],flush=True)
 if __name__=='__main__':main()

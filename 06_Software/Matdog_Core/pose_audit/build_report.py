@@ -47,6 +47,7 @@ def main():
  validation=json.loads((OUT/'validation_results.json').read_text()) if (OUT/'validation_results.json').exists() else None
  route=conn['route_251_sample'];rm=route['metrics'];hips=hip_origin_z();joint_names=rm['start'].get('q_order')
  body_z=rest_search['body_patch']['height_m'];front_hip_z=hips['lf_hip_joint'][2];rear_hip_z=hips['rh_hip_joint'][2]
+ close=read('closeout_classification');hts=close['four_foot_height_terminology'];hA=hts['A_BODY_AND_FOOT_SUPPORT_lower_geometric_boundary'];hB=hts['B_PURE_FOOT_SUPPORT_mathematical_search_boundary'];hC=hts['C_physically_robust_engineering_usable_pure_foot_stance'];sens=hts['clearance_sensitivity'];startup=close['g3_startup'];roles=close['pose_library_roles'];xgo=close['xgo_retargeting_boundary'];baselink=close['base_link_z'];route_class=close['route_251_sample'];sem=close['transition_graph_semantics']
  stand_component=next(c for c in conn['components'] if c['contains_STAND']);summary=conn['summary']
  nontrivial=[c for c in conn['components'] if c['size']>1];singletons=[c for c in conn['components'] if c['size']==1]
  nodes={n['id']:n for n in conn['nodes']}
@@ -64,7 +65,7 @@ def main():
  first_failures=[d['first_failure'] for d in direct];failure_pairs=sorted({tuple(sorted(p)) for f in first_failures for p in f['collisions']})
  tree_nodes=[a['nodes'] for d in detours for a in d['attempts']];free=restc['isolated_leg_free_space']
  crawl=envelope['poses']['CRAWL_READY'];low=envelope['poses']['LOW_CROUCH'];alias_delta=max(abs(a-b) for a,b in zip(crawl['q'],low['q']))
- accepted=[c for c in conn['edges'] if c['validated']];rejected=[c for c in conn['edges'] if c['status']=='REJECTED_BOUNDED_SEARCH']
+ accepted=[c for c in conn['edges'] if c['edge_class']=='VALIDATED'];candidates=[c for c in conn['edges'] if c['edge_class']=='CANDIDATE'];failed=[c for c in conn['edges'] if c['edge_class']=='FAILED'];untested=[c for c in conn['edges'] if c['edge_class']=='UNTESTED']
  six=('REST_GROUND','REST_GROUND_MAX_SEPARATION','LOW_CROUCH','LOW_C4','STAND','STRETCH')
  counts={}
  for a in actions:counts[a['evidence_class']]=counts.get(a['evidence_class'],0)+1
@@ -81,12 +82,19 @@ def main():
   q=poses[name]['q'];asym_rows.append([name,rad(q[1],6),rad(q[7],6),rad(q[7]-q[1],6),rad(q[2],6),rad(q[8],6),rad(q[8]-q[2],6),rad(q[6]-q[0],6)])
  metric_rows=[[p['name'],p['evidence'],p['regime'],mm(p['body'][2][3]),rad(p['joint_margin_rad']),mm(p['min_separation']['distance_m']),mm(p['support_margin_m'])] for p in lib['poses']]
  six_rows=[[n,poses[n]['regime'],'base_link' if poses[n]['base_contact'] else ' '.join(poses[n]['active_feet']),mm(poses[n]['body'][2][3],3),rad(poses[n]['joint_margin_rad'],6),mm(poses[n]['min_separation']['distance_m'],3),mm(poses[n]['support_margin_m'],3),poses[n]['source']] for n in six]
+ lower_joint={(r['family'],r['height_above_body_ground_m']):r['limiting_joint'] for r in sens['lower_envelope_samples']}
  lower_rows=[]
  for fam,samples in by_height.items():
   for h,s in samples.items():
-   lower_rows.append([fam,f'{h:.3e}',s['regime'],yesno(s['valid']),', '.join(s['errors']) or '-',rad(s['joint_margin_rad'],6) if s['valid'] else '-',mm(s['support_margin_m'],3) if s['valid'] else '-',mm(s['min_separation']['distance_m'],3) if s['valid'] else '-'])
+   lj=lower_joint.get((fam,h)) or {'joints_tied_within_1e-9_rad':['-'],'limit_side':'-','margin_deg':float('nan')};lower_rows.append([fam,f'{h:.3e}',s['regime'],yesno(s['valid']),', '.join(s['errors']) or '-',rad(s['joint_margin_rad'],6) if s['valid'] else '-',f"{' / '.join(lj['joints_tied_within_1e-9_rad'])} ({lj['limit_side']}, {lj['margin_deg']:.3f} deg)" if s['valid'] else '-',mm(s['support_margin_m'],3) if s['valid'] else '-',mm(s['min_separation']['distance_m'],3) if s['valid'] else '-'])
  component_rows=[[c['component'],c['size'],', '.join(c['members']),yesno(c['contains_STAND']),yesno(c['contains_REST_GROUND'])] for c in conn['components']]
- edge_rows=[[e['from'],e['to'],nodes[e['from']]['regime']+' -> '+nodes[e['to']]['regime'] if e['from'] in nodes and e['to'] in nodes else '-',e['sample_count'],e['status'],e['source']] for e in accepted]
+ def regimes_of(e):return nodes[e['from']]['regime']+' -> '+nodes[e['to']]['regime'] if e['from'] in nodes and e['to'] in nodes else '-'
+ generic_reasons=('SAMPLED_ONLY_SWEPT_COLLISION_NOT_PROVED','CONTACT_LOCK_NOT_PROVED')
+ edge_rows=[[e['from'],e['to'],regimes_of(e),e['sample_count'],e['edge_class'],e['source']] for e in accepted]
+ candidate_rows=[[e['from'],e['to'],regimes_of(e),e['sample_count'],e['status'],'; '.join(r for r in e['candidate_reasons'] if r not in generic_reasons)] for e in candidates]
+ untested_rows=[[e['from'],e['to'],e['source_status'],e['note'] or (e['evidence'].get('reason') if isinstance(e['evidence'],dict) else '') or '-'] for e in untested]
+ role_rows=[[r['pose'],', '.join(r['roles']),r['motion_state_relation'],'; '.join(r['blockers']) or '-'] for r in roles['promoted_static_poses']]
+ route_sens_rows=[[r['frame'],f"{r['height_above_body_ground_m']*1000:.4f}",r['regime'],f"{' / '.join(r['limiting_joint']['joints_tied_within_1e-9_rad'])} ({r['limiting_joint']['limit_side']})",rad(r['limiting_joint']['margin_rad'],6),f"{r['limiting_joint']['margin_deg']:.3f}",mm(r['min_nonadjacent_separation_m'],3),mm(r['support_margin_m'],2)] for r in sens['route_251_rise_frames']]
  first_rows=[]
  for s in restc['starts']:
   fails=[x['first_failure']['frame'] for x in s['direct_contact_additions']];firsts=[a['nodes'] for d in s['body_supported_detours'] for a in d['attempts']]
@@ -115,13 +123,17 @@ def main():
 
 ## Outcome
 
-- **A true body-supported MATDOG ground rest exists in the canonical rigid model** (`REST_GROUND`, base_link on the ground, all feet clear). It is statically supported by the CAD/URDF COM, and it is an **isolated component**: no validated path connects it to LOW_C4, STAND or any four-foot pose.
-- **LOW_C4 is not the lowest four-foot stance.** The lowest validated four-foot configuration sits at body height **0 m** (base_link and all four feet on the ground, `BODY_AND_FOOT_SUPPORT`); the lowest *pure foot-support* height found is **{pure*1e6:.3f} µm**, a tolerance-bound value. The limiting constraint is **BODY_GROUND_CONTACT**.
-- A **{route['metrics']['sample_count']}-sample sampled route** takes the body-plus-four-feet family to an *equivalent* 150 mm stand at body X = +10 mm. That end is **not** the canonical STAND, and no route joins them.
-- The validated connectivity graph has **{summary['component_count']} components** ({summary['nontrivial_component_count']} non-trivial, {summary['singleton_component_count']} singletons). STAND's component is {{{', '.join(stand_component['members'])}}}. **No body-only rest is in it.**
-- **G3 startup is partially superseded**: the premise that LOW_C4 is the only or lowest stance is superseded. The implemented autonomous stand gate is unchanged and BODY_ONLY REST → STAND is **not** authorized.
-- XGO recovery is **partial for every one of the {len(actions)} dispatcher entries and full for none**. No XGO joint table is used as MATDOG joint geometry.
-- No production motion state, gait, actuator binding or calibration behaviour was added.
+- **A true body-supported MATDOG ground rest exists in the canonical rigid model** (`REST_GROUND`, base_link on the ground, all feet clear). It is statically supported by the CAD/URDF COM. In the *validated* graph it is an **isolated component**: no validated path connects it to LOW_C4, STAND or any four-foot pose. That is a bounded-search result, not a proof that no physical path exists.
+- **LOW_C4 is not the lowest four-foot stance, but three different "lowest" quantities must not be conflated** (Q10):
+  - **A. BODY_AND_FOOT_SUPPORT lower geometric boundary = {hA['height_above_body_ground_m']:.1f} m.** Base_link and all four feet on the ground; a **PROVEN LIMIT** of the level-body model. It is a ground rest with the feet down, not a foot-supported stance.
+  - **B. PURE_FOOT_SUPPORT mathematical/search boundary = {pure*1e6:.3f} µm** (**LOWEST FOUND SO FAR**). It is governed by the {hB['numerical_undeclared_contact_tolerance_m']*1e6:.0f} µm undeclared-contact tolerance and is **not** a physically meaningful clearance: a theoretical/search result with a numerical-tolerance dependency; physical robustness is **not established**.
+  - **C. Physically robust / engineering-usable pure-foot stance: NOT ESTABLISHED.** No hardware tolerance, compliance or acceptance threshold is available or assumed; only saved clearance-sensitivity data are reported.
+  The limiting constraint of the level-body model is **BODY_GROUND_CONTACT**.
+- The {route['metrics']['sample_count']}-sample path from `BODY_FOUR_FEET_RESEARCH_2` to an *equivalent* 150 mm stand at body X = +10 mm is classified **`{route_class['classification']}` (research only)**. It keeps its useful sampled metrics, but its end is **not the canonical STAND**, it is **not proven fully collision-free** and **not proven contact-locked**. It is **not a validated transition edge to STAND** and **not an authorized or validated startup path**.
+- The transition graph now carries explicit edge classes (VALIDATED / CANDIDATE / FAILED / UNTESTED). The **validated graph** has **{summary['component_count']} components** ({summary['nontrivial_component_count']} non-trivial, {summary['singleton_component_count']} singletons); these are components of the validated graph only, **not** a proof about the complete physical configuration space. STAND's component is {{{', '.join(stand_component['members'])}}}. **No body-only rest is in it.**
+- **G3 status, kept separate:** G3 architecture = **GENERALIZATION JUSTIFIED**; G3 runtime startup gate = **STILL ACTIVE / NOT YET SUPERSEDED**; BODY_ONLY REST_GROUND → autonomous STAND = **NOT VALIDATED**. MATDOG must not be assumed able to stand autonomously from REST_GROUND.
+- XGO recovery is **partial for every one of the {len(actions)} dispatcher entries and full for none**. XGO action internals and normalized post-IK controller-domain tables were recovered, but **{xgo['boundary_statement']}**
+- The six promoted static poses are **pose-library targets, not motion states**; `MotionState` is unchanged and no production motion state, gait, actuator binding or calibration behaviour was added.
 
 Everything below is offline, rigid-body, quasi-static and model-based (CAD/URDF MODEL COM, canonical collision meshes). None of it is a measurement, a clearance approval, a load/friction/stability claim, or actuator authorization.
 
@@ -130,6 +142,7 @@ Everything below is offline, rigid-body, quasi-static and model-based (CAD/URDF 
 - **PROVEN LIMIT** — a bound that follows from the model geometry itself, independent of the search that found the poses.
 - **LOWEST FOUND SO FAR** — the best value the bounded, finite searches reached; it can move with more search.
 - **Absence of a validated route** means "no route was found by the bounded searches that were run"; it is never a proof that no route exists. Sampled routes are not swept-collision certificates and do not prove contact lock or no-slip motion.
+- **Edge classes** — VALIDATED, CANDIDATE (`GEOMETRIC_PATH_CANDIDATE`), FAILED, UNTESTED (Q8). Components are components of the **validated graph only**; the absence of a validated edge is never a proof of physical disconnection or unreachability. No edge class authorizes startup or motion.
 - **Evidence classes (XGO)**: A = exact trajectory/keyframes recovered; B = exact/static endpoint recovered; C = constrained geometric semantics recovered; D = semantics/name only; E = unrelated/non-postural.
 
 ## The 22 required answers
@@ -140,7 +153,11 @@ Everything below is offline, rigid-body, quasi-static and model-based (CAD/URDF 
 
 ### Q2. What is the exact base_link world Z?
 
-`REST_GROUND_BODY_HEIGHT = {body_z:.17g} m`, the negative of the canonical base mesh minimum local Z (`{rest_search['body_patch']['minimum_local_z_m']:.17g} m`). It is effectively zero to mesh precision but was **derived from the collision mesh, not assigned by definition**. The bottom support patch (10 µm band) has {rest_search['body_patch']['patch_triangles']} triangles, one connected patch, area {rest_search['body_patch']['patch_area_m2']:.12f} m² and a six-vertex hull. Body orientation is identity.
+`REST_GROUND_BODY_HEIGHT = {body_z:.17g} m`, the negative of the canonical base mesh minimum local Z (`{rest_search['body_patch']['minimum_local_z_m']:.17g} m`); it was **derived from the collision mesh, not assigned by definition**. The bottom support patch (10 µm band) has {rest_search['body_patch']['patch_triangles']} triangles, one connected patch, area {rest_search['body_patch']['patch_area_m2']:.12f} m² and a six-vertex hull. Body orientation is identity.
+
+- **Nominal CAD/URDF geometry:** {baselink['nominal_cad_urdf_geometry']}.
+- **Real hardware contact height:** {baselink['real_hardware_contact_height']}.
+- {baselink['not_a_positioning_accuracy'][0].upper()+baselink['not_a_positioning_accuracy'][1:]}.
 
 ### Q3. Which links are intended to contact the ground?
 
@@ -148,7 +165,7 @@ For `REST_GROUND` and `REST_GROUND_MAX_SEPARATION`: **base_link only**; feet, hi
 
 ### Q4. What are the LF/RF/RH/LH semantic joint angles?
 
-Selected `REST_GROUND`, URDF radians (degrees for reading only), identity body rotation, translation (0, 0, {body_z:.3g}) m:
+Selected `REST_GROUND`, URDF radians (degrees for reading only), identity body rotation, translation (0, 0, {body_z:.3g}) m (nominal model geometry, effectively zero within numerical precision; see Q2):
 
 {table(['Leg','Hip rad','Upper rad','Lower rad','Hip deg','Upper deg','Lower deg'],angle_rows)}
 
@@ -173,39 +190,67 @@ Front and rear angles are never forced to be equal.
 - The original contact-mode and route searches seeded only `REST_GROUND_MAX_SEPARATION`. To close this, the preserved protocol was rerun from **all {len(restc['starts'])} valid body-only candidates including `REST_GROUND`** (`rest_connectivity.json`): {len(direct)} direct 51-sample interpolations to contact-mode endpoints and {len(detours)} rear-then-front single-leg detour searches (seeds 17/31/73, 2000 trials each). **{len(restc['starts_with_any_valid_connection'])} succeeded.**
 - Every direct interpolation fails within the first {max(x['frame'] for x in first_failures)+1} samples; the colliding pairs are {'; '.join(' / '.join(p) for p in failure_pairs)}. The first detour leg (RH) never finds a path: its search trees saturate at only {min(tree_nodes)}–{max(tree_nodes)} nodes. The front-leg detour is therefore never reached.
 - With base_link on the ground, only {free['rh']['isolated_leg_clear_fraction_at_base_ground_height']*100:.2f} % (RH) and {free['lf']['isolated_leg_clear_fraction_at_base_ground_height']*100:.2f} % (LF) of uniformly sampled single-leg joint boxes are clear even when the other legs are ignored. This explains the failures qualitatively; it is not a proof of disconnection.
-- The transition record `REST_GROUND → LOW_C4` remains `UNPROVEN_OR_REJECTED`.
+- The transition record `REST_GROUND → LOW_C4` is class `UNTESTED` (no direct route was sampled); every recorded search that starts at a body-only rest is class `FAILED` within its bound.
 
-A *different* family (base plus four feet) does connect to a 150 mm stand ({route['metrics']['sample_count']} samples), but its end differs from the canonical STAND (Q8, Q22), and the body-only rest does not reach that family.
+A *different* family (base plus four feet) has a sampled `{route_class['classification']}` to an equivalent 150 mm stand ({route['metrics']['sample_count']} samples), but that is a research candidate, not a validated edge: its end differs from the canonical STAND (Q8, Q22), and the body-only rest does not reach that family.
 
 ### Q8. Which support-mode transitions were validated?
 
-Validated means every recorded sample of a saved route passes the full offline policy (`VALIDATED_SAMPLED_ROUTE`). Each route is validated as an ordered sample sequence from the first to the second node; the union-find graph treats it as undirected, and reversed traversal reuses the same samples. Timing, contact acquisition, friction and swept collision are not validated.
+Every saved route carries one of four **edge classes** (`edge_class` in [connectivity.json](connectivity.json)):
 
-{table(['From','To','Regimes','Samples','Status','Source'],edge_rows)}
+- **VALIDATED** — {sem['edge_classes']['VALIDATED']}.
+- **CANDIDATE** (`GEOMETRIC_PATH_CANDIDATE`) — {sem['edge_classes']['CANDIDATE'].split(': ',1)[1]}.
+- **FAILED** — {sem['edge_classes']['FAILED']}.
+- **UNTESTED** — {sem['edge_classes']['UNTESTED']}.
 
-Support-mode changes that occur in validated routes: **`BODY_AND_FOOT_SUPPORT` → `FOOT_SUPPORT`** (base lift-off, the four foot patches stay declared) and `FOOT_SUPPORT` → `FOOT_SUPPORT` (G3-family waypoint routes). Attempted and **not** validated: `BODY_SUPPORT` → any foot-added mode (Q7); three-foot support transfer by RH/LH swing (unshifted margin −15.67 mm, a (+20,+20) mm shift permits the RH swing, the later LH swing fails IK); `EQUIVALENT_STAND` → canonical STAND (footprints differ by up to {mm(conn['equivalent_stand_vs_canonical_STAND']['max_reference_contact_xy_difference_m'],1)} mm; no route); STAND → SIT candidate. {len(rejected)} bounded searches were rejected and are kept in [connectivity.json](connectivity.json).
+Edge counts: VALIDATED {len(accepted)}, CANDIDATE {len(candidates)}, FAILED {len(failed)}, UNTESTED {len(untested)}. Of the {summary['node_pair_total']} unordered node pairs, {summary['node_pair_best_edge_class_counts']['NO_ROUTE_ATTEMPT_RECORDED']} have no recorded route attempt at all; the best recorded class per pair is VALIDATED {summary['node_pair_best_edge_class_counts']['VALIDATED']}, CANDIDATE {summary['node_pair_best_edge_class_counts']['CANDIDATE']}, FAILED {summary['node_pair_best_edge_class_counts']['FAILED']}, UNTESTED {summary['node_pair_best_edge_class_counts']['UNTESTED']}. The union-find graph treats every route as undirected and reversed traversal reuses the same samples. Timing, contact acquisition, friction and swept collision are not validated for any class.
+
+**Validated edges** (sampled routes between promoted static poses):
+
+{table(['From','To','Regimes','Samples','Class','Source'],edge_rows)}
+
+**Candidate edges** (research only; none is a validated transition edge and none authorizes startup; every one is additionally sampled-only, with swept collision and contact lock unproved):
+
+{table(['From','To','Regimes','Samples','Status','Why not validated'],candidate_rows)}
+
+**Untested edges** (no route sampled):
+
+{table(['From','To','Recorded status','Note'],untested_rows)}
+
+Support-mode changes: the validated routes are all `FOOT_SUPPORT` → `FOOT_SUPPORT` (G3-family waypoint routes). The `BODY_AND_FOOT_SUPPORT` → `FOOT_SUPPORT` base lift-off appears only in candidate routes, because its start is a research pose. Attempted and **not** validated: `BODY_SUPPORT` → any foot-added mode (Q7); three-foot support transfer by RH/LH swing (unshifted margin −15.67 mm, a (+20,+20) mm shift permits the RH swing, the later LH swing fails IK); `EQUIVALENT_STAND` → canonical STAND (footprints differ by up to {mm(conn['equivalent_stand_vs_canonical_STAND']['max_reference_contact_xy_difference_m'],1)} mm; no route was sampled, class `UNTESTED`); STAND → SIT candidate (`UNTESTED`; the SIT target itself was never solved). {len(failed)} bounded searches are class `FAILED` (evidence of failure within each search bound, not of impossibility) and are kept in [connectivity.json](connectivity.json). The search-level status `VALID_SEQUENCE_CANDIDATE` in `transitions.json` and `transition_graph.json` only means every recorded sample is valid; the classes above are applied in `connectivity.json`.
 
 ### Q9. Is LOW_C4 the lowest valid four-foot stance?
 
-**No.** LOW_C4 is a validated 100 mm waypoint. Four-foot poses were validated below it at 60 mm (LOW_CROUCH, also inside STAND's component) and down to **0 m** with base contact. The lowering constraint is BODY_GROUND_CONTACT, not a 100 mm leg limit (Q21). LOW_C4 is not preserved as mandatory for backward compatibility (Q16).
+**No.** LOW_C4 is a validated 100 mm waypoint. Foot-supported four-foot poses were validated below it at 60 mm (LOW_CROUCH, also inside STAND's component). With the base on the ground a level-body four-foot rest is valid down to **0 m** (`BODY_AND_FOOT_SUPPORT`, a research record). The lowering constraint is BODY_GROUND_CONTACT, not a 100 mm leg limit (Q21). LOW_C4 is not preserved as mandatory for backward compatibility (Q16).
 
 ### Q10. What is the lowest validated four-foot height?
 
-| Quantity | Value | Status |
-|---|---|---|
-| Lowest four-foot height, level body, base_link and four feet on ground (`BODY_AND_FOOT_SUPPORT`) | **{infimum:.1f} m** | **PROVEN LIMIT** for a level body: a lower body height places canonical base-mesh vertices below the ground. The pose itself is validated (all policies pass at exactly this height in both families). |
-| Lowest pure `FOOT_SUPPORT` (base clear, four feet only) | **{pure*1e6:.3f} µm** | **LOWEST FOUND SO FAR**, bound by the {lower['numerical_undeclared_contact_boundary_m']*1e6:.0f} µm undeclared-contact tolerance: heights from 10 nm to 1 µm are rejected as `UNDECLARED_GROUND_CONTACT:base_link`. It is a numerical model tolerance, not a physical clearance approval (`physical_clearance_approval = {str(lower['physical_clearance_approval']).lower()}`). |
-| Highest four-foot height found | {mm(max(c['body'][2][3] for c in expanded['high_candidates']),3)} mm | **HIGHEST FOUND SO FAR**; a necessary (relaxed) upper bound is {mm(expanded['necessary_body_height_upper_bound_m'],3)} mm, which is not a feasibility proof |
+**The loose phrase "lowest four-foot height" covers three different quantities, which must not be conflated.** Heights are the base_link bottom-plane height above the ground for a level body.
 
-Full resolution of the lower envelope (both foot families):
+| Concept | Value | Status | What it is not |
+|---|---|---|---|
+| **A. BODY_AND_FOOT_SUPPORT lower geometric boundary** (base_link and four feet on the ground) | **{hA['height_above_body_ground_m']:.1f} m** | **PROVEN LIMIT** of the level-body model: a lower body height places canonical base-mesh vertices below the ground. The pose itself is valid (all policies pass at exactly this height in both foot families). | Not a foot-supported stance: the base rests on the ground. |
+| **B. PURE_FOOT_SUPPORT mathematical/search boundary** (base clear, four feet only) | **{pure*1e6:.3f} µm** (lowest sampled valid height) | **LOWEST FOUND SO FAR.** Theoretical/search result; **numerical tolerance dependency**; **physical robustness NOT established**. `physical_clearance_approval = {str(lower['physical_clearance_approval']).lower()}`. | **Not a physically meaningful clearance**, not an achievable base-to-ground gap and not a safe height. |
+| **C. Physically robust / engineering-usable pure-foot stance** | **not established** | **NOT ESTABLISHED.** {hC['basis'][0].upper()+hC['basis'][1:]}. | No value is claimed. |
+| Highest four-foot height found | {mm(max(c['body'][2][3] for c in expanded['high_candidates']),3)} mm | **HIGHEST FOUND SO FAR**; a necessary (relaxed) upper bound is {mm(expanded['necessary_body_height_upper_bound_m'],3)} mm, which is not a feasibility proof | |
 
-{table(['Family','Height above body ground, m','Regime','Valid','Errors','Joint margin, rad','Support margin, mm','Min separation, mm'],lower_rows)}
+**Why B is a tolerance result.** The pure-foot boundary coincides with the configured {lower['numerical_undeclared_contact_boundary_m']*1e6:.0f} µm undeclared-contact tolerance: the sampled heights {', '.join(f'{h:.0e} m' for h in hB['rejected_sampled_heights_m'])} are rejected only as `{hB['rejection_code']}`, while the recorded joint-limit margin moves smoothly by just {abs(by_height[0][pure]['joint_margin_rad']-by_height[0][0.0]['joint_margin_rad']):.2e} rad between height 0 and {pure*1e6:.3f} µm. No geometric or physical event occurs at the boundary; it is where the model's contact classification changes. It is not a clearance the hardware could realise, and the audit does not invent a manufacturing tolerance to make it one.
+
+**Clearance sensitivity from saved samples** (no search or optimization was rerun; no acceptance threshold is applied; the joint margin is to the URDF limit of the limiting joint). Full resolution of the lower envelope (both foot families), with the limiting joint at each height:
+
+{table(['Family','Height above body ground, m','Regime','Valid','Errors','Joint margin, rad','Limiting joint (side, margin)','Support margin, mm','Min separation, mm'],lower_rows)}
+
+The same metrics at several heights along the saved {route['metrics']['sample_count']}-sample route (rise frames of family {route['family']}; foot-supported from frame 1):
+
+{table(['Frame','Body height, mm','Regime','Limiting joint','Min joint margin, rad','Margin, deg','Min separation, mm','Support margin, mm'],route_sens_rows)}
+
+{sens['reading'][0].upper()+sens['reading'][1:]}.
 
 Level-body scope: the proof covers identity body orientation. Pitched/rolled bodies were only sampled (24 seated/pitched experiments, 10 valid four-foot candidates, including pitch −20° at 120 mm). The fixed C4-footprint one-axis height slice passes {mm(envelope['extrema']['height'][0],0)}–{mm(envelope['extrema']['height'][1],0)} mm; these are observed slices, not proof that every combined pose is feasible.
 
 ### Q11. Full or partial XGO action recovery?
 
-**Partial for all; full for none.** The catalogue holds **{len(actions)} dispatcher entries**: 24 quadruped actions (IDs 1–24), three manipulation entries (128–130), stair action 144, reset 255 and internal idle 0. Physical-pose evidence classes: {', '.join(f'{k}={counts.get(k,0)}' for k in 'ABCDE')}. Eight separate host APIs add A=1, B=1, C=6 **at the host-command layer**; these are not preset trajectories.
+**Partial for all; full for none.** What was recovered is strong: {xgo['recovered']}. The boundary is equally explicit: **{xgo['boundary_statement']}** The catalogue holds **{len(actions)} dispatcher entries**: 24 quadruped actions (IDs 1–24), three manipulation entries (128–130), stair action 144, reset 255 and internal idle 0. Physical-pose evidence classes: {', '.join(f'{k}={counts.get(k,0)}' for k in 'ABCDE')}. Eight separate host APIs add A=1, B=1, C=6 **at the host-command layer**; these are not preset trajectories.
 
 - **Exact controller-domain keyframes** (12-byte uint8 tables) were recovered for actions {', '.join(str(i) for i in table_actions)}: **{len(tables['tables'])} table references, {unique_tables} unique tables**, with schedules and recovery counters for actions 12, 14 and 21. They stay class **C** at the physical-pose layer because their frame, signs, zeros and scale are unbound; a reviewer who grades the controller layer alone could regard them as A there.
 - For actions 1, 2, 3, 6, 7, 17 and 24 a body-height, pitch or periodic-command semantic was recovered from handler and consumer code; for the other dynamic entries only a numeric controller state sequence is known. No physical endpoint, contact set or achieved timing was recovered for any entry.
@@ -216,7 +261,7 @@ The complete per-action table is below (Q11 detail).
 
 ### Q12. Which XGO poses can be retargeted?
 
-**None can be retargeted as a physical joint configuration; {len([r for r in matrix['preset_actions'] if r['physical_retarget_result']=='RETARGET_UNDERDETERMINED'])} of the {len(matrix['preset_actions'])} presets can only be retargeted as geometric intent, and {len([r for r in matrix['preset_actions'] if r['physical_retarget_result']=='NOT_TRANSFERABLE'])} are not transferable.** A failed or underdetermined retarget is a valid result. Retarget outcomes across {len(matrix['preset_actions'])} presets and {len(matrix['host_apis'])} host APIs: {', '.join(f'{k}={v}' for k,v in sorted(retarget_result.items()))}. No XGO controller table is accepted as MATDOG joint geometry.
+**{xgo['boundary_statement']}** Therefore **none can be retargeted as a physical joint configuration; {len([r for r in matrix['preset_actions'] if r['physical_retarget_result']=='RETARGET_UNDERDETERMINED'])} of the {len(matrix['preset_actions'])} presets can only be retargeted as geometric intent, and {len([r for r in matrix['preset_actions'] if r['physical_retarget_result']=='NOT_TRANSFERABLE'])} are not transferable.** A failed or underdetermined retarget is a valid result. XGO behavior, topology and sequence semantics are reference evidence only; MATDOG joint geometry continues to come from the MATDOG URDF and MATDOG IK. Retarget outcomes across {len(matrix['preset_actions'])} presets and {len(matrix['host_apis'])} host APIs: {', '.join(f'{k}={v}' for k,v in sorted(retarget_result.items()))}. No XGO controller table is accepted as MATDOG joint geometry.
 
 Intent-level MATDOG counterparts solved independently (`VALID_STATIC` or research records): Lie down → `REST_GROUND` / `LOW_CROUCH`; Stand up → `STAND`; Squat and Crawl → `LOW_CROUCH` (aliases `SQUAT`, `CRAWL_READY`); Stretch → `STRETCH`; Turn-pitch and Find-food → `PITCHED_CROUCH_RESEARCH`; Roll → `ROLL_PREP_RESEARCH` (preparation only); the documented host height range 60–110 mm → `XGO_HEIGHT_RATIO_RESEARCH` (an assumed ratio {matrix['height_intent_experiment']['matdog_height_m']*1000:.3f} mm, explicitly not recovered geometry); Yaw / Three-axis / Look-around / Sway / Wave-body / Dance / Playful → orientation/translation envelope slices. Mark-time (ID 5), Beg and Sit are not retargeted (Q14). Manipulation, stair and reset entries are not transferable. See [retarget_matrix.json](retarget_matrix.json).
 
@@ -226,7 +271,7 @@ Intent-level MATDOG counterparts solved independently (`VALID_STATIC` or researc
 
 {table(['Dimension','Source identity','Generic family, mm','MATDOG, mm','Ratio','Meaning'],dimension_rows)}
 
-Source-identity tally: {', '.join(f'{k}={v}' for k,v in sorted(identity_counts.items()))}; **EXACT_LITE = 0** dimensions, **CORROBORATED_XGO_FAMILY = 0** dimensions, **GENERIC_TEMPLATE = {identity_counts.get('GENERIC_TEMPLATE',0)}**, **UNKNOWN = {identity_counts.get('UNKNOWN',0)}**. Front/rear hip spacing is exactly 1.5 and the upper-link axis distance 1.5025; left/right front hip spacing (2.11), the lateral hip offset (0.97) and hip-to-upper origin distance (0.91) do not follow 1.5, and frame heights are not similarity invariants. Exact Lite dimensions appear only as host-API ranges (`EXACT_LITE_HOST_API_ONLY`, translation Z 60–110 mm, unbound datum). The template CAD (JoseManuelLuque/DOGZILLA `{dims['provenance']['xgo_commit'][:12]}`) is generic; the hash-matching primary xacro is used and the conflicting derived H2 inventory CSV is not (see `source_correction` in [dimensions.json](dimensions.json)). Conclusion recorded by the audit: {dims['conclusion']}
+Source-identity tally: {', '.join(f'{k}={v}' for k,v in sorted(identity_counts.items()))}; **EXACT_LITE = 0** dimensions, **CORROBORATED_XGO_FAMILY = 0** dimensions, **GENERIC_TEMPLATE = {identity_counts.get('GENERIC_TEMPLATE',0)}**, **UNKNOWN = {identity_counts.get('UNKNOWN',0)}**. Front/rear hip spacing is exactly 1.5 and the upper-link axis distance 1.5025; left/right front hip spacing (2.11), the lateral hip offset (0.97) and hip-to-upper origin distance (0.91) do not follow 1.5, and frame heights are not similarity invariants. Exact Lite dimensions appear only as host-API ranges (`EXACT_LITE_HOST_API_ONLY`, translation Z 60–110 mm, unbound datum). The template CAD (JoseManuelLuque/DOGZILLA `{dims['provenance']['xgo_commit'][:12]}`) is generic; the hash-matching primary xacro is used and the conflicting derived H2 inventory CSV is not (see `source_correction` in [dimensions.json](dimensions.json)). **The ~1.5× similarity is not a numeric conversion rule and must not be used to convert any XGO value or pose to MATDOG.** Conclusion recorded by the audit: {dims['conclusion']}
 
 ### Q14. Which XGO poses fail on MATDOG, and why?
 
@@ -240,7 +285,11 @@ Source-identity tally: {', '.join(f'{k}={v}' for k,v in sorted(identity_counts.i
 
 ### Q15. Which MATDOG semantic poses should become first-class targets?
 
-**Six** static targets, embedded in `PoseReferenceData.h`: `REST_GROUND`, `REST_GROUND_MAX_SEPARATION` (explicitly at a joint boundary), `LOW_CROUCH`, `LOW_C4`, `STAND`, `STRETCH`. `CRAWL_READY` and `SQUAT` are semantic aliases of `LOW_CROUCH` (the alias joint difference is {alias_delta:.2e} rad), not separate states. Five records stay offline research: two body-plus-four-feet rests, `PITCHED_CROUCH_RESEARCH`, `ROLL_PREP_RESEARCH`, `XGO_HEIGHT_RATIO_RESEARCH`. No SIT or BEG target is invented from an action name, and **no new production motion state** is justified by static results.
+**Six** static pose targets are embedded in `PoseReferenceData.h`: `REST_GROUND`, `REST_GROUND_MAX_SEPARATION` (explicitly at a joint boundary), `LOW_CROUCH`, `LOW_C4`, `STAND`, `STRETCH`. They are **pose-library entries, not motion states.** The roles below are a design classification separating semantic pose targets from motion-state candidates and research variants; only the blockers are evidence-derived. `MotionState` is unchanged (enum values {roles['motion_state_enum'].replace(' (unchanged)','')}), and being a `MOTION_STATE_CANDIDATE` authorizes nothing.
+
+{table(['Pose','Roles','Relation to MotionState','Blockers / notes'],role_rows)}
+
+`CRAWL_READY` and `SQUAT` are semantic aliases of `LOW_CROUCH` (the alias joint difference is {alias_delta:.2e} rad), not separate poses or states. Five records stay offline `RESEARCH_VARIANT`: two body-plus-four-feet rests, `PITCHED_CROUCH_RESEARCH`, `ROLL_PREP_RESEARCH`, `XGO_HEIGHT_RATIO_RESEARCH`. No SIT or BEG target is invented from an action name, and **no new production motion state** is justified by static results.
 
 Verification of the six (independent FK/COM to 2e-15, full mesh policy re-evaluation, generated-header freshness, C++ policy test and G3 startup gate unchanged):
 
@@ -248,12 +297,19 @@ Verification of the six (independent FK/COM to 2e-15, full mesh policy re-evalua
 
 ### Q16. Is G3 startup unchanged, generalized, or partially superseded?
 
-**Partially superseded; the implemented gate is unchanged.**
+**Two separate statements, which must not be merged: architectural evidence (A) and the implemented runtime gate (B).**
 
-- *Superseded premise*: LOW_C4 is neither the lowest nor the only validated four-foot stance. STAND's validated component also contains `LOW_CROUCH` (60 mm), `STRETCH` and the `CRAWL_READY` alias, so the entry contract can be expressed as "a verified member of the stand-connected component" rather than "exactly LOW_C4". LOW_C4 is not kept mandatory for compatibility's sake.
-- *Unchanged*: `evaluateStartup` still returns `FLOOR_ACQUISITION_UNPROVEN` for feet placed on an unverified floor, `SUSPENDED_PATH_UNPROVEN`, `UNKNOWN_POSE`, and `READY` only for the verified canonical low stance with all six external evidence assertions. G3.5 does not change the G1/G2/G3 code, tests or history. The G3.5 routes use mesh IK, inclined-edge contact and patch migration; they are not G2 contact-locked paths and have no acquisition contract.
-- *Not authorized*: **BODY_ONLY REST → STAND** (no validated connected path; Q7) and the 251-sample family as a startup path (its end is the equivalent stand, not STAND).
-- *Architecture the evidence supports*: `verified stand-connected support component → STAND`, with BODY_ONLY REST kept as a separate component until a validated path and acquisition contract exist. A generalized G3 (entry set, LOW_CROUCH → LOW_C4 route under the G2 contact-locked reference, evidence assertions) is future work and is not implemented here.
+| Aspect | Status |
+|---|---|
+| **A. G3 architecture** (evidence) | **{startup['wording']['G3 architecture']}** |
+| **B. G3 runtime startup gate** (implemented) | **{startup['wording']['G3 runtime startup gate']}** |
+| BODY_ONLY REST_GROUND → autonomous STAND | **{startup['wording']['BODY_ONLY REST_GROUND -> autonomous STAND']}** |
+| The {route['metrics']['sample_count']}-sample route as a startup path | **NOT AUTHORIZED** (`{route_class['classification']}`, research only) |
+
+- *A, architectural evidence:* LOW_C4 is neither the lowest nor the only validated four-foot stance. STAND's validated component also contains `LOW_CROUCH` (60 mm), `STRETCH` and the `CRAWL_READY` alias, so the entry contract could be expressed as "a verified member of the stand-connected component" rather than "exactly LOW_C4". The generalized entry is **not implemented**; its supporting acquisition contract does not exist.
+- *B, implemented runtime gate:* `evaluateStartup` still returns `FLOOR_ACQUISITION_UNPROVEN` for feet placed on an unverified floor, `SUSPENDED_PATH_UNPROVEN`, `UNKNOWN_POSE`, and `READY` only for the verified canonical low stance with all six external evidence assertions. {startup['B_implemented_runtime_gate']['basis'][0].upper()+startup['B_implemented_runtime_gate']['basis'][1:]} (file hashes are recorded in [closeout_classification.json](closeout_classification.json)). G3.5 does not change the G1/G2/G3 code, tests or history. The G3.5 routes use mesh IK, inclined-edge contact and patch migration; they are not G2 contact-locked paths and have no acquisition contract.
+- *Not validated:* **BODY_ONLY REST → STAND** (no validated connected path; Q7). {startup['detail']}.
+- *Architecture the evidence supports:* `verified stand-connected support component → STAND`, with BODY_ONLY REST kept as a separate component until a validated path and acquisition contract exist. This is future work and is not implemented here.
 
 The implemented stand still requires, before the first autonomous stand, that the robot is already stationary in the canonical LOW_C4 body/joint/contact configuration on flat ground with fresh pose evidence, four confirmed feet, reviewed collision clearance and reviewed support/load. Software observations are not measurements or actuator authorization.
 
@@ -269,32 +325,36 @@ The implemented stand still requires, before the first autonomous stand, that th
 
 ### Q18. How many disconnected validated transition components exist?
 
-**{summary['component_count']} components** among {len(conn['nodes'])} nodes: {summary['nontrivial_component_count']} non-trivial and {summary['singleton_component_count']} singletons. The singletons are **untested, not proven disconnected**; a missing edge means "no validated route found by the bounded searches".
+**{summary['component_count']} components of the validated graph** among {len(conn['nodes'])} nodes: {summary['nontrivial_component_count']} non-trivial and {summary['singleton_component_count']} singletons. These are components of the graph of VALIDATED edges, **not** a statement about the complete physical configuration space. The singletons are **untested, not proven disconnected**; a missing validated edge means "no validated route found by the bounded searches". The earlier G3.5 count of {sem['previous_component_count_before_edge_classes']} also joined the four CANDIDATE research-route edges; an informational view that includes them has {summary['candidate_augmented_component_count']} components (see `candidate_augmented_components` in [connectivity.json](connectivity.json)), and the STAND component and the REST_GROUND singleton are the same in both views.
 
 {table(['#','Size','Members','Contains STAND','Contains REST_GROUND'],component_rows)}
 
 ### Q19. Which component contains STAND?
 
-Component {stand_component['component']}: **{{{', '.join(stand_component['members'])}}}**, joined by validated sampled routes LOW_CROUCH → LOW_C4 → STAND → STRETCH and STAND → CRAWL_READY (`CRAWL_READY` is the `LOW_CROUCH` alias; the two joint vectors differ by {alias_delta:.2e} rad).
+Component {stand_component['component']}: **{{{', '.join(stand_component['members'])}}}**, joined by VALIDATED sampled routes LOW_CROUCH → LOW_C4 → STAND → STRETCH and STAND → CRAWL_READY (`CRAWL_READY` is the `LOW_CROUCH` alias; the two joint vectors differ by {alias_delta:.2e} rad).
 
 ### Q20. Does BODY_ONLY REST_GROUND belong to it?
 
-**No.** `REST_GROUND_in_stand_component = {str(summary['REST_GROUND_in_stand_component']).lower()}` and `any_body_only_rest_in_stand_component = {str(summary['any_body_only_rest_in_stand_component']).lower()}`. All {len(restc['starts'])} valid body-only candidates were tested for a connection and none connects (Q7). This is a bounded-search result, not a proof of impossibility.
+**No.** `REST_GROUND_in_stand_component = {str(summary['REST_GROUND_in_stand_component']).lower()}` and `any_body_only_rest_in_stand_component = {str(summary['any_body_only_rest_in_stand_component']).lower()}`, and REST_GROUND is not in it even when CANDIDATE edges are included (`{str(summary['REST_GROUND_in_stand_component_including_candidate_edges']).lower()}`). All {len(restc['starts'])} valid body-only candidates were tested for a connection and none connects (Q7). This is a bounded-search result, not a proof of impossibility.
 
 ### Q21. What constraint sets the lowest four-foot configuration?
 
-**BODY_GROUND_CONTACT** (`limiting_constraint` in [lower_envelope.json](lower_envelope.json)): base_link reaches the ground. Below height 0 the base mesh penetrates the ground (proven for a level body); between 10 nm and 1 µm the pose is rejected for undeclared base contact; from {pure*1e6:.3f} µm upward it is valid `FOOT_SUPPORT`. Nothing else stops the body from going lower first: at height 0 the minimum non-adjacent separation is {mm(by_height[0][0.0]['min_separation']['distance_m'],3)} mm and the support margin {mm(by_height[0][0.0]['support_margin_m'],1)} mm (body and feet) / {mm(by_height[0][pure]['support_margin_m'],1)} mm (feet only); no self-collision, leg-ground collision, IK failure or singularity is active.
+**BODY_GROUND_CONTACT** (`limiting_constraint` in [lower_envelope.json](lower_envelope.json)): base_link reaches the ground. Below height 0 the base mesh penetrates the ground (proven for a level body); between 10 nm and 1 µm the pose is rejected for undeclared base contact (the configured tolerance, not a geometric or physical event; Q10); from {pure*1e6:.3f} µm upward it is valid `FOOT_SUPPORT`. Nothing else stops the body from going lower first: at height 0 the minimum non-adjacent separation is {mm(by_height[0][0.0]['min_separation']['distance_m'],3)} mm and the support margin {mm(by_height[0][0.0]['support_margin_m'],1)} mm (body and feet) / {mm(by_height[0][pure]['support_margin_m'],1)} mm (feet only); no self-collision, leg-ground collision, IK failure or singularity is active.
 
 **A joint limit is nearly active in the same configuration.** At the 251-sample route's start (family 1; family 0 reports the same minimum margin), {near_joint_names} are only **{near_joint_margin:.6f} rad ({math.degrees(near_joint_margin):.3f}°)** from their {near_joint_side} limit ({near_joint_limit:.6f} rad). That margin grows with height ({rad(margin_h0,6)} rad at 0 m, {rad(margin_h1,6)} rad at 10 µm; the trend, extrapolated linearly and not a computed result, would close it roughly {abs(margin_h0/slope)*1000:.2f} mm below ground level). So the lowest four-foot stance found is limited by base_link ground contact with the rear lower-leg joints barely inside their range for these footprints. Whether a different footprint would give more joint margin at height 0 was not exhaustively searched; base_link contact bounds the height regardless.
 
-### Q22. Exact metrics of the {route['metrics']['sample_count']}-sample BODY_AND_FOUR_FEET → STAND path
+### Q22. Exact metrics of the {route['metrics']['sample_count']}-sample BODY_AND_FOUR_FEET → equivalent-stand path (`{route_class['classification']}`)
 
-Source: `{route['source']}` — {route['rise_frames']} original-footprint rise frames plus {route['equivalent_shift_frames_excluding_duplicate']} equivalent-stand shift frames (duplicate joining frame removed). All values below are read from saved frames, not from rounded progress logs; `test_pose_audit.py` recomputes them.
+**Classification: `{route_class['classification']}`, research only.** {(lambda m:m[0].upper()+m[1:])(route_class['meaning'].split(': ',1)[1])}. It is **not** a validated transition edge to STAND and **not** an authorized or validated startup path (`validated_transition_edge_to_STAND = {str(route_class['validated_transition_edge_to_STAND']).lower()}`, `authorized_startup_path = {str(route_class['authorized_startup_path']).lower()}`). Reasons:
+
+{chr(10).join('- `'+r.split(':',1)[0]+'`'+(':'+r.split(':',1)[1] if ':' in r else '') for r in route_class['reasons'])}
+
+All metrics below are preserved unchanged from G3.5. Source: `{route['source']}` — {route['rise_frames']} original-footprint rise frames plus {route['equivalent_shift_frames_excluding_duplicate']} equivalent-stand shift frames (duplicate joining frame removed). All values below are read from saved frames, not from rounded progress logs; `test_pose_audit.py` recomputes them.
 
 {table(['Metric','Value'],[
 ['Samples / all valid',f"{rm['sample_count']} / {yesno(rm['all_samples_valid'])}"],
 ['Start (frame 0)',f"BODY_FOUR_FEET_RESEARCH_2 (route family index {route['family']}), {rm['start']['regime']}, contacts base_link + {' '.join(rm['start']['active_feet'])}"],
-['Start body height',f"{rm['start']['body_height_m']:.17g} m (base_link at ground level; translation {rm['start']['body_translation_m']})"],
+['Start body height',f"{rm['start']['body_height_m']:.17g} m (nominal CAD/URDF geometry: base_link at ground level, effectively zero within model/mesh numerical precision, not a hardware contact height; translation {rm['start']['body_translation_m']})"],
 [f"Final (frame {rm['final']['frame']})",f"{rm['final']['regime']}, four feet {' '.join(rm['final']['active_feet'])}, base_link contact {yesno(rm['final']['base_link_ground_contact'])}"],
 ['Final body height',f"{rm['final']['body_height_m']:.17g} m (translation {rm['final']['body_translation_m']})"],
 ['Body translation delta',f"({rm['body_translation_delta_m'][0]:.9f}, {rm['body_translation_delta_m'][1]:.3e}, {rm['body_translation_delta_m'][2]:.9f}) m; body rotation deviation from identity {rm['body_rotation_max_deviation_from_identity']:.1e}"],
@@ -318,15 +378,17 @@ Start and final joint vectors and per-joint margins (URDF radians; the last two 
 
 {table(['Joint','Start q','Final q','Max step per sample','Min margin','Frame of min margin'],joint_rows)}
 
-Relation to the canonical STAND: the route's end is at the same 0.15 m height but at body X = +10 mm with a different footprint; the maximum joint difference is {conn['equivalent_stand_vs_canonical_STAND']['max_abs_joint_difference_rad']:.4f} rad and the largest reference-contact XY difference is {conn['equivalent_stand_vs_canonical_STAND']['max_reference_contact_xy_difference_m']*1000:.2f} mm, so **no edge** joins them. The 1.001 µm foot-only sample of family 1 differs from route frame 1 by {conn['lower_envelope_continuity_to_route'][1]['max_abs_joint_difference_to_route_frame_1_rad']:.2e} rad at most, consistent with the route's first lift-off step.
+Relation to the canonical STAND: the route's end is at the same 0.15 m height but at body X = +10 mm with a different footprint; the maximum joint difference is {conn['equivalent_stand_vs_canonical_STAND']['max_abs_joint_difference_rad']:.4f} rad and the largest reference-contact XY difference is {conn['equivalent_stand_vs_canonical_STAND']['max_reference_contact_xy_difference_m']*1000:.2f} mm, so **no validated edge** joins them (the pair is `UNTESTED`). The 1.001 µm foot-only sample of family 1 differs from route frame 1 by {conn['lower_envelope_continuity_to_route'][1]['max_abs_joint_difference_to_route_frame_1_rad']:.2e} rad at most, consistent with the route's first lift-off step.
 
 ## Support-mode transition and connectivity detail
 
+Solid arrows are VALIDATED edges; dotted arrows are CANDIDATE, FAILED or UNTESTED and none of them is a validated or authorized route.
+
 ```mermaid
 flowchart LR
-  R[REST_GROUND body only] -. no validated route .-> BF[Body plus four feet]
-  BF -->|base lift-off, 251 samples| E[Equivalent 150 mm stand X+10 mm]
-  E -. no validated route .-> S
+  R[REST_GROUND body only] -. no validated route .-> BF[Body plus four feet research pose]
+  BF -. candidate path only 251 samples research only .-> E[Equivalent 150 mm stand X+10 mm not canonical STAND]
+  E -. untested no route sampled .-> S
   C[LOW_CROUCH 60 mm] --> C4[LOW_C4 100 mm]
   C4 --> S[STAND 150 mm]
   S --> T[STRETCH]
@@ -399,11 +461,11 @@ The pure C++ pose test checks every contact-policy combination, invalid inputs, 
 
 ## Resume and history
 
-Accepted G3 baseline: `87c3e914e068260170e7c19c5d664f727f5b03ce`, branch `feat/gait-engine-offline-v1`. The workstream was interrupted twice. The first resume recovered fourteen analysis sources, two draft C++ support files and eleven JSON reports (reconstructed Ghidra exports matched all 30 saved handler hashes) and committed the XGO trace, the mesh model, the contact-mode search and the pose-support layer (`024e626`, `274d8ad`, `51319b3`, `821c266`). The second resume reconstructed state from git and the filesystem without modification, kept every valid artifact, and added the closing evidence: `rest_connectivity.py` (needed to close Q7 and Q20 because the original searches seeded only one body-only start), `connectivity.py`, `lower_envelope.py`, `artifact_manifest.py`, `validate.py`, this generator and the extended tests. `git log 87c3e91..HEAD` lists the local commits.
+Accepted G3 baseline: `87c3e914e068260170e7c19c5d664f727f5b03ce`, branch `feat/gait-engine-offline-v1`. The workstream was interrupted twice. The first resume recovered fourteen analysis sources, two draft C++ support files and eleven JSON reports (reconstructed Ghidra exports matched all 30 saved handler hashes) and committed the XGO trace, the mesh model, the contact-mode search and the pose-support layer (`024e626`, `274d8ad`, `51319b3`, `821c266`). The second resume reconstructed state from git and the filesystem without modification, kept every valid artifact, and added the closing evidence: `rest_connectivity.py` (needed to close Q7 and Q20 because the original searches seeded only one body-only start), `connectivity.py`, `lower_envelope.py`, `artifact_manifest.py`, `validate.py`, this generator and the extended tests. `git log 87c3e91..HEAD` lists the local commits. The G3.5.1 closeout pass then reclassified terminology and edge classes without new searches: it added the edge classes to `connectivity.py`, the saved-artifact-only `closeout.py` and `closeout_classification.json`, and revised this report.
 
 ## Delivery boundaries and safety confirmation
 
-Only offline research, pure motion pose/contact definitions, tests and reports were changed. Existing G1/G2/G3 contracts and history are intact and the C4 policy is not weakened globally.
+Only offline research, pure motion pose/contact definitions, tests and reports were changed. The G3.5.1 closeout pass changed only offline audit tooling under `06_Software/Matdog_Core/pose_audit`, saved artifacts and this report; nothing under `05_Firmware` was touched. Existing G1/G2/G3 contracts and history are intact and the C4 policy is not weakened globally.
 
 - **No physical hardware was accessed.**
 - **No serial device was accessed.**

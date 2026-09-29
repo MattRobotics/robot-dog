@@ -1,11 +1,11 @@
 {
-  "artifact_count": 79,
+  "artifact_count": 80,
   "artifacts": [
     {
-      "bytes": 58917,
+      "bytes": 73733,
       "path": "REPORT.md",
       "producer": "build_report.py",
-      "sha256": "c73d3545607936215b390336ac4da0cecd39deb3f03cee1cfb7c8c2869475b86"
+      "sha256": "d42d119e9803beaa40cd9999643c633e754db931f881fb9ecde0ca35dee0eef9"
     },
     {
       "bytes": 12537676,
@@ -14,16 +14,22 @@
       "sha256": "547fc21881bb0224288d396f176a073e0b78f52b02c3927cb292cc1c919e3b4f"
     },
     {
+      "bytes": 42546,
+      "path": "closeout_classification.json",
+      "producer": "closeout.py",
+      "sha256": "aebc8ec5f86138f5d3910cf6cb05ced460ca987328cd6e7ab33b9fcd15410a38"
+    },
+    {
       "bytes": 40128,
       "path": "collision_policy.json",
       "producer": "policy_report.py",
       "sha256": "ceca89a9024d497c58447448894952cc2f588cd3a88ec102974bd249814c8d9e"
     },
     {
-      "bytes": 74036,
+      "bytes": 96127,
       "path": "connectivity.json",
       "producer": "connectivity.py",
-      "sha256": "a5b19d2be0b365f78d9116ca79d93d69070fa9c0804c7097397c0e4b1cace0c4"
+      "sha256": "9b87e5a81046f0a438a1e4a3edb4128fd78467db6a2c856ec9608257c3746400"
     },
     {
       "bytes": 846176,
@@ -134,10 +140,10 @@
       "sha256": "709f00a49f4a21ef4c62236166c00af27033f00c91568c7738bcc1e240f8764c"
     },
     {
-      "bytes": 16097,
+      "bytes": 16137,
       "path": "validation_results.json",
       "producer": "validate.py",
-      "sha256": "495d6af9f47fe85d967a49b9e18403e2aff2ceef7600f0c0f8b0373f74ffb8e4"
+      "sha256": "98ad107abd980629c26e5b643e636b6a695c92a334bceee32601c81f072d09e9"
     },
     {
       "bytes": 222978,
@@ -622,6 +628,38 @@
       "status": "MATCH"
     },
     {
+      "current_sha256": "01aa7fbf6badaa5b89f0ebb14068247e9093dbafe8ac7755ec0722d31c00e3ed",
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp",
+      "recorded_variants": [
+        "01aa7fbf6badaa5b89f0ebb14068247e9093dbafe8ac7755ec0722d31c00e3ed"
+      ],
+      "status": "MATCH"
+    },
+    {
+      "current_sha256": "ac332cdc7ea1882f73d914eb57b0ddc645891e64b3c5591c86a51b2ed2e19a35",
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionState.h",
+      "recorded_variants": [
+        "ac332cdc7ea1882f73d914eb57b0ddc645891e64b3c5591c86a51b2ed2e19a35"
+      ],
+      "status": "MATCH"
+    },
+    {
+      "current_sha256": "2d67616a9572a3101d57d895973287127a038d9fe49512c0477e19de0b43a479",
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp",
+      "recorded_variants": [
+        "2d67616a9572a3101d57d895973287127a038d9fe49512c0477e19de0b43a479"
+      ],
+      "status": "MATCH"
+    },
+    {
+      "current_sha256": "bc707de17c302e04031a35929f47d1600a788a2b3a4fd298c8cce27ca8862c75",
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.h",
+      "recorded_variants": [
+        "bc707de17c302e04031a35929f47d1600a788a2b3a4fd298c8cce27ca8862c75"
+      ],
+      "status": "MATCH"
+    },
+    {
       "current_sha256": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
       "path": "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml",
       "recorded_variants": [
@@ -634,6 +672,13 @@
     "artifact_manifest.json (self)"
   ],
   "generator_checks": [
+    {
+      "artifact": "closeout_classification.json",
+      "current_sha256": "2590580b9913190e89c17266c6a7c233bb2362e94cc3965d867502cd82c43e96",
+      "generator": "closeout.py",
+      "recorded_sha256": "2590580b9913190e89c17266c6a7c233bb2362e94cc3965d867502cd82c43e96",
+      "status": "CURRENT"
+    },
     {
       "artifact": "collision_policy.json",
       "current_sha256": "d9866cd8e98debff5ca5e7cfb86bd7d69f4edc1dd450b5ec1d5da9bc65f87698",
@@ -650,9 +695,9 @@
     },
     {
       "artifact": "connectivity.json",
-      "current_sha256": "91803cd7252ad4865fc805abff6c94ad3054334b559cf25134cd0d213e061717",
+      "current_sha256": "f610e57f0e05c0d3aaca05a212a6915488bc49785d723ef95fef99582b94fc5b",
       "generator": "connectivity.py",
-      "recorded_sha256": "91803cd7252ad4865fc805abff6c94ad3054334b559cf25134cd0d213e061717",
+      "recorded_sha256": "f610e57f0e05c0d3aaca05a212a6915488bc49785d723ef95fef99582b94fc5b",
       "status": "CURRENT"
     },
     {
@@ -886,6 +931,62 @@
       "current_sha256": "709f00a49f4a21ef4c62236166c00af27033f00c91568c7738bcc1e240f8764c",
       "input": "transitions.json",
       "recorded_sha256": "709f00a49f4a21ef4c62236166c00af27033f00c91568c7738bcc1e240f8764c",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "closeout_classification.json",
+      "current_sha256": "9b87e5a81046f0a438a1e4a3edb4128fd78467db6a2c856ec9608257c3746400",
+      "input": "connectivity.json",
+      "recorded_sha256": "9b87e5a81046f0a438a1e4a3edb4128fd78467db6a2c856ec9608257c3746400",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "closeout_classification.json",
+      "current_sha256": "940e6957b6983db139f6a37b658cae8a4773b9d891221dee8c2cc063d54d5f29",
+      "input": "equivalent_stand.json",
+      "recorded_sha256": "940e6957b6983db139f6a37b658cae8a4773b9d891221dee8c2cc063d54d5f29",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "closeout_classification.json",
+      "current_sha256": "ca5bd031bf3ddd778b31840a8f6e27d8346da9c51cd5b23e4696687636e04c99",
+      "input": "lower_envelope.json",
+      "recorded_sha256": "ca5bd031bf3ddd778b31840a8f6e27d8346da9c51cd5b23e4696687636e04c99",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "closeout_classification.json",
+      "current_sha256": "746f4393a2f9de5dc532c6b48e083f2089e3cc2fa25f381dc4ef9d08f9903a58",
+      "input": "pose_library.json",
+      "recorded_sha256": "746f4393a2f9de5dc532c6b48e083f2089e3cc2fa25f381dc4ef9d08f9903a58",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "closeout_classification.json",
+      "current_sha256": "52299f097cb3ae725e680d9eddc2d03756a1a9579bc73f0dc82c1e877bac182a",
+      "input": "rest_search.json",
+      "recorded_sha256": "52299f097cb3ae725e680d9eddc2d03756a1a9579bc73f0dc82c1e877bac182a",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "closeout_classification.json",
+      "current_sha256": "8ccc0753e6c3b545cfbd673fff51ee1596dafa918f5a54dd8cbb72205735500b",
+      "input": "retarget_matrix.json",
+      "recorded_sha256": "8ccc0753e6c3b545cfbd673fff51ee1596dafa918f5a54dd8cbb72205735500b",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "closeout_classification.json",
+      "current_sha256": "b75b71aab14dac33af28fa26a47ce32e979d39675b9657cd63d51d0a0e05e4d0",
+      "input": "route_extension.json",
+      "recorded_sha256": "b75b71aab14dac33af28fa26a47ce32e979d39675b9657cd63d51d0a0e05e4d0",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "closeout_classification.json",
+      "current_sha256": "8bc8e98dab5e348ef0b4401d8513acbb0ac405f308cac1617353995b50d3232c",
+      "input": "xgo_table_semantics.json",
+      "recorded_sha256": "8bc8e98dab5e348ef0b4401d8513acbb0ac405f308cac1617353995b50d3232c",
       "status": "MATCH"
     },
     {

@@ -1,0 +1,1022 @@
+{
+  "base_link_z": {
+    "REST_GROUND_base_link_world_z_m": 1.0999563076780766e-16,
+    "nominal_cad_urdf_geometry": "effectively zero within model/mesh numerical precision (double-precision arithmetic on the canonical mesh); derived from the mesh minimum local Z, not assigned",
+    "not_a_positioning_accuracy": "a physical robot cannot be positioned with 1e-16 m accuracy; the value is a numerical artifact of the nominal model, not a positioning tolerance",
+    "real_hardware_contact_height": "NOT ESTABLISHED: subject to construction and compliance; no hardware measurement exists",
+    "rest_search_body_patch_height_m": 1.0999563076780766e-16
+  },
+  "four_foot_height_terminology": {
+    "A_BODY_AND_FOOT_SUPPORT_lower_geometric_boundary": {
+      "basis": "below this height canonical base-mesh vertices are below the ground for a level body; the pose itself passes the full offline policy at exactly this height in both foot families",
+      "contact_set": "base_link plus four foot links on the ground",
+      "height_above_body_ground_m": 0.0,
+      "limiting_constraint": "BODY_GROUND_CONTACT",
+      "not_a_claim": "not a foot-supported stance: the base rests on the ground; it is a body-and-feet ground rest",
+      "status": "MODEL_GEOMETRIC_LIMIT_FOR_LEVEL_BODY",
+      "support_regime": "BODY_AND_FOOT_SUPPORT",
+      "valid_pose_at_this_height": true
+    },
+    "B_PURE_FOOT_SUPPORT_mathematical_search_boundary": {
+      "lowest_sampled_valid_height_m": 1.001e-06,
+      "must_not_be_described_as": "a physically meaningful clearance, a hardware-achievable base-to-ground gap or a safe height",
+      "numerical_undeclared_contact_tolerance_m": 1e-06,
+      "physical_clearance_approval": false,
+      "rejected_sampled_heights_m": [
+        1e-08,
+        1e-07,
+        5e-07,
+        1e-06
+      ],
+      "rejection_code": "UNDECLARED_GROUND_CONTACT:base_link",
+      "statement": "THEORETICAL/SEARCH RESULT; NUMERICAL TOLERANCE DEPENDENCY; PHYSICAL ROBUSTNESS NOT ESTABLISHED",
+      "status": "LOWEST_FOUND_SO_FAR_THEORETICAL_SEARCH_RESULT",
+      "support_regime": "FOOT_SUPPORT",
+      "tolerance_dependency": "the boundary is set by the configured 1e-6 m undeclared-contact tolerance: every sampled height in (0, 1e-6] m is rejected only as undeclared base contact, and the recorded joint margin changes by 6.060e-06 rad between height 0 and 1.001e-06 m, so no geometric constraint activates at the boundary"
+    },
+    "C_physically_robust_engineering_usable_pure_foot_stance": {
+      "basis": "no hardware measurement, construction tolerance, servo/mechanical compliance or terrain model exists in this offline audit; no physical manufacturing tolerance is assumed and no acceptance threshold is introduced",
+      "height_m": null,
+      "how_to_close": "requires reviewed hardware data outside this software-only audit",
+      "status": "NOT_ESTABLISHED",
+      "what_is_available": "clearance_sensitivity below: saved sampled heights with the joint-limit, separation and support metrics at each"
+    },
+    "clearance_sensitivity": {
+      "lower_envelope_samples": [
+        {
+          "errors": [],
+          "family": 0,
+          "height_above_body_ground_m": 0.0,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.21904977801131162,
+            "margin_rad": 0.0038231398520600646
+          },
+          "min_nonadjacent_separation_m": 0.007368754720401629,
+          "regime": "BODY_AND_FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 0",
+          "stored_joint_margin_rad": 0.0038231398520600646,
+          "support_margin_m": 0.11009500577872408,
+          "valid": true
+        },
+        {
+          "errors": [
+            "UNDECLARED_GROUND_CONTACT:base_link"
+          ],
+          "family": 0,
+          "height_above_body_ground_m": 1e-08,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.21905324687583247,
+            "margin_rad": 0.003823200395167259
+          },
+          "min_nonadjacent_separation_m": 0.007368759500405702,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 0",
+          "stored_joint_margin_rad": 0.003823200395167259,
+          "support_margin_m": 0.07967238969384931,
+          "valid": false
+        },
+        {
+          "errors": [
+            "UNDECLARED_GROUND_CONTACT:base_link"
+          ],
+          "family": 0,
+          "height_above_body_ground_m": 1e-07,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.21908446664415404,
+            "margin_rad": 0.00382374528291618
+          },
+          "min_nonadjacent_separation_m": 0.007368802520510432,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 0",
+          "stored_joint_margin_rad": 0.00382374528291618,
+          "support_margin_m": 0.07967239172428592,
+          "valid": false
+        },
+        {
+          "errors": [
+            "UNDECLARED_GROUND_CONTACT:base_link"
+          ],
+          "family": 0,
+          "height_above_body_ground_m": 5e-07,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.2192232212128252,
+            "margin_rad": 0.0038261670069916764
+          },
+          "min_nonadjacent_separation_m": 0.007368993722892514,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 0",
+          "stored_joint_margin_rad": 0.0038261670069916764,
+          "support_margin_m": 0.07967240074968591,
+          "valid": false
+        },
+        {
+          "errors": [
+            "UNDECLARED_GROUND_CONTACT:base_link"
+          ],
+          "family": 0,
+          "height_above_body_ground_m": 1e-06,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.21939666724387472,
+            "margin_rad": 0.003829194211308007
+          },
+          "min_nonadjacent_separation_m": 0.007369232734021045,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 0",
+          "stored_joint_margin_rad": 0.003829194211308007,
+          "support_margin_m": 0.07967241203097127,
+          "valid": false
+        },
+        {
+          "errors": [],
+          "family": 0,
+          "height_above_body_ground_m": 1.001e-06,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.2193970160075729,
+            "margin_rad": 0.003829200298382851
+          },
+          "min_nonadjacent_separation_m": 0.007369233214627203,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 0",
+          "stored_joint_margin_rad": 0.003829200298382851,
+          "support_margin_m": 0.07967241205128581,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "family": 0,
+          "height_above_body_ground_m": 1.01e-06,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.2194001380687877,
+            "margin_rad": 0.0038292547886304984
+          },
+          "min_nonadjacent_separation_m": 0.0073692375169160836,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 0",
+          "stored_joint_margin_rad": 0.0038292547886304984,
+          "support_margin_m": 0.07967241225433988,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "family": 0,
+          "height_above_body_ground_m": 2e-06,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.21974356943162582,
+            "margin_rad": 0.003835248796666635
+          },
+          "min_nonadjacent_separation_m": 0.007369710784446016,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 0",
+          "stored_joint_margin_rad": 0.003835248796666635,
+          "support_margin_m": 0.07967243459083442,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "family": 0,
+          "height_above_body_ground_m": 5e-06,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.22078432570173262,
+            "margin_rad": 0.0038534134202907744
+          },
+          "min_nonadjacent_separation_m": 0.007371145117914481,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 0",
+          "stored_joint_margin_rad": 0.0038534134202907744,
+          "support_margin_m": 0.07967250229034226,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "family": 0,
+          "height_above_body_ground_m": 1e-05,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.22251910382919252,
+            "margin_rad": 0.0038836910104065314
+          },
+          "min_nonadjacent_separation_m": 0.007373536306581557,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 0",
+          "stored_joint_margin_rad": 0.0038836910104065314,
+          "support_margin_m": 0.07967261516176745,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "family": 1,
+          "height_above_body_ground_m": 0.0,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.21904977801131162,
+            "margin_rad": 0.0038231398520600646
+          },
+          "min_nonadjacent_separation_m": 0.007368754720401629,
+          "regime": "BODY_AND_FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 1",
+          "stored_joint_margin_rad": 0.0038231398520600646,
+          "support_margin_m": 0.11020864512907652,
+          "valid": true
+        },
+        {
+          "errors": [
+            "UNDECLARED_GROUND_CONTACT:base_link"
+          ],
+          "family": 1,
+          "height_above_body_ground_m": 1e-08,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.21905324687583247,
+            "margin_rad": 0.003823200395167259
+          },
+          "min_nonadjacent_separation_m": 0.007368759500405702,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 1",
+          "stored_joint_margin_rad": 0.003823200395167259,
+          "support_margin_m": 0.07908004567525215,
+          "valid": false
+        },
+        {
+          "errors": [
+            "UNDECLARED_GROUND_CONTACT:base_link"
+          ],
+          "family": 1,
+          "height_above_body_ground_m": 1e-07,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.21908446664415404,
+            "margin_rad": 0.00382374528291618
+          },
+          "min_nonadjacent_separation_m": 0.007368802520510432,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 1",
+          "stored_joint_margin_rad": 0.00382374528291618,
+          "support_margin_m": 0.07908004777621191,
+          "valid": false
+        },
+        {
+          "errors": [
+            "UNDECLARED_GROUND_CONTACT:base_link"
+          ],
+          "family": 1,
+          "height_above_body_ground_m": 5e-07,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.2192232212128252,
+            "margin_rad": 0.0038261670069916764
+          },
+          "min_nonadjacent_separation_m": 0.007368993722892514,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 1",
+          "stored_joint_margin_rad": 0.0038261670069916764,
+          "support_margin_m": 0.07908005711505452,
+          "valid": false
+        },
+        {
+          "errors": [
+            "UNDECLARED_GROUND_CONTACT:base_link"
+          ],
+          "family": 1,
+          "height_above_body_ground_m": 1e-06,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.21939666724387472,
+            "margin_rad": 0.003829194211308007
+          },
+          "min_nonadjacent_separation_m": 0.007369232734021045,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 1",
+          "stored_joint_margin_rad": 0.003829194211308007,
+          "support_margin_m": 0.07908006878813678,
+          "valid": false
+        },
+        {
+          "errors": [],
+          "family": 1,
+          "height_above_body_ground_m": 1.001e-06,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.2193970160075729,
+            "margin_rad": 0.003829200298382851
+          },
+          "min_nonadjacent_separation_m": 0.007369233214627203,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 1",
+          "stored_joint_margin_rad": 0.003829200298382851,
+          "support_margin_m": 0.07908006880922053,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "family": 1,
+          "height_above_body_ground_m": 1.01e-06,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.2194001380687877,
+            "margin_rad": 0.0038292547886304984
+          },
+          "min_nonadjacent_separation_m": 0.0073692375169160836,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 1",
+          "stored_joint_margin_rad": 0.0038292547886304984,
+          "support_margin_m": 0.07908006901932685,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "family": 1,
+          "height_above_body_ground_m": 2e-06,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.21974356943162582,
+            "margin_rad": 0.003835248796666635
+          },
+          "min_nonadjacent_separation_m": 0.007369710784446016,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 1",
+          "stored_joint_margin_rad": 0.003835248796666635,
+          "support_margin_m": 0.07908009213162394,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "family": 1,
+          "height_above_body_ground_m": 5e-06,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.22078432570173262,
+            "margin_rad": 0.0038534134202907744
+          },
+          "min_nonadjacent_separation_m": 0.007371145117914481,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 1",
+          "stored_joint_margin_rad": 0.0038534134202907744,
+          "support_margin_m": 0.07908016218179653,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "family": 1,
+          "height_above_body_ground_m": 1e-05,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.22251910382919252,
+            "margin_rad": 0.0038836910104065314
+          },
+          "min_nonadjacent_separation_m": 0.007373536306581557,
+          "regime": "FOOT_SUPPORT",
+          "source": "lower_envelope.json:family 1",
+          "stored_joint_margin_rad": 0.0038836910104065314,
+          "support_margin_m": 0.07908027897102521,
+          "valid": true
+        }
+      ],
+      "no_acceptance_threshold_applied": true,
+      "observations": {
+        "joint_margin_rad_at_0_m": 0.0038231398520600646,
+        "joint_margin_rad_at_10_um": 0.0038836910104065314,
+        "joint_margin_rad_at_first_pure_foot_height": 0.003829200298382851,
+        "limiting_joint_at_0_m": {
+          "joint": "rh_lower_leg_joint",
+          "joints_tied_within_1e-9_rad": [
+            "rh_lower_leg_joint"
+          ],
+          "limit_side": "lower",
+          "margin_deg": 0.21904977801131162,
+          "margin_rad": 0.0038231398520600646
+        },
+        "route_frame_10_height_m": 0.009094,
+        "route_frame_150_height_m": 0.14900066666666667,
+        "route_frame_1_height_m": 0.0001,
+        "route_joint_margin_rad_at_frame_1": 0.00442937430838497,
+        "route_joint_margin_rad_at_frame_10": 0.0646909435500691,
+        "route_joint_margin_rad_at_frame_150": 0.0072731119481566076
+      },
+      "reading": "the pure-foot stance at ~1 um has essentially the joint-limit margin of the 0 m ground rest (a few micro-radians apart); along the saved route the minimum margin grows with body height and then falls again near 149 mm where a different joint limit (an upper limit) is the limiting one, so body height above ground alone is not a robustness measure",
+      "route_251_rise_frames": [
+        {
+          "errors": [],
+          "frame": 0,
+          "height_above_body_ground_m": 1.0999563076780766e-16,
+          "limiting_joint": {
+            "joint": "lh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "lh_lower_leg_joint",
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.21904977801131162,
+            "margin_rad": 0.0038231398520600646
+          },
+          "min_nonadjacent_separation_m": 0.007368754720401629,
+          "regime": "BODY_AND_FOOT_SUPPORT",
+          "source": "route_extension.json:/original_footprint_rises/1/frames/0",
+          "stored_joint_margin_rad": 0.0038231398520600646,
+          "support_margin_m": 0.11020860057600268,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "frame": 1,
+          "height_above_body_ground_m": 0.0001,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.2537844537541368,
+            "margin_rad": 0.00442937430838497
+          },
+          "min_nonadjacent_separation_m": 0.007416712593673807,
+          "regime": "FOOT_SUPPORT",
+          "source": "route_extension.json:/original_footprint_rises/1/frames/1",
+          "stored_joint_margin_rad": 0.00442937430838497,
+          "support_margin_m": 0.07908238960186884,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "frame": 2,
+          "height_above_body_ground_m": 0.0010993333333333335,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.6058709799576806,
+            "margin_rad": 0.0105744434425461
+          },
+          "min_nonadjacent_separation_m": 0.007911595978342595,
+          "regime": "FOOT_SUPPORT",
+          "source": "route_extension.json:/original_footprint_rises/1/frames/2",
+          "stored_joint_margin_rad": 0.0105744434425461,
+          "support_margin_m": 0.07910690167620853,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "frame": 3,
+          "height_above_body_ground_m": 0.0020986666666666666,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 0.9667078104905693,
+            "margin_rad": 0.016872234197805813
+          },
+          "min_nonadjacent_separation_m": 0.008181154532382925,
+          "regime": "FOOT_SUPPORT",
+          "source": "route_extension.json:/original_footprint_rises/1/frames/3",
+          "stored_joint_margin_rad": 0.016872234197805813,
+          "support_margin_m": 0.07913339776851559,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "frame": 5,
+          "height_above_body_ground_m": 0.004097333333333334,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 1.7130711648105053,
+            "margin_rad": 0.02989873214691774
+          },
+          "min_nonadjacent_separation_m": 0.00830502465482851,
+          "regime": "FOOT_SUPPORT",
+          "source": "route_extension.json:/original_footprint_rises/1/frames/5",
+          "stored_joint_margin_rad": 0.02989873214691774,
+          "support_margin_m": 0.07919236443999011,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "frame": 10,
+          "height_above_body_ground_m": 0.009094,
+          "limiting_joint": {
+            "joint": "lh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "lh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 3.7065180381380145,
+            "margin_rad": 0.0646909435500691
+          },
+          "min_nonadjacent_separation_m": 0.008636608041580946,
+          "regime": "FOOT_SUPPORT",
+          "source": "route_extension.json:/original_footprint_rises/1/frames/10",
+          "stored_joint_margin_rad": 0.0646909435500691,
+          "support_margin_m": 0.0793742651898489,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "frame": 20,
+          "height_above_body_ground_m": 0.019087333333333335,
+          "limiting_joint": {
+            "joint": "lh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "lh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 8.125060284926885,
+            "margin_rad": 0.14180905389500276
+          },
+          "min_nonadjacent_separation_m": 0.00931790696595642,
+          "regime": "FOOT_SUPPORT",
+          "source": "route_extension.json:/original_footprint_rises/1/frames/20",
+          "stored_joint_margin_rad": 0.14180905389500276,
+          "support_margin_m": 0.07987611386458005,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "frame": 50,
+          "height_above_body_ground_m": 0.04906733333333334,
+          "limiting_joint": {
+            "joint": "rh_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rh_lower_leg_joint"
+            ],
+            "limit_side": "lower",
+            "margin_deg": 23.506212255786235,
+            "margin_rad": 0.4102607985361133
+          },
+          "min_nonadjacent_separation_m": 0.011336085166410676,
+          "regime": "FOOT_SUPPORT",
+          "source": "route_extension.json:/original_footprint_rises/1/frames/50",
+          "stored_joint_margin_rad": 0.4102607985361133,
+          "support_margin_m": 0.08077211876571828,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "frame": 100,
+          "height_above_body_ground_m": 0.09903400000000001,
+          "limiting_joint": {
+            "joint": "lf_hip_joint",
+            "joints_tied_within_1e-9_rad": [
+              "lf_hip_joint"
+            ],
+            "limit_side": "upper",
+            "margin_deg": 30.6362046467608,
+            "margin_rad": 0.5347026414007623
+          },
+          "min_nonadjacent_separation_m": 0.01410312869653736,
+          "regime": "FOOT_SUPPORT",
+          "source": "route_extension.json:/original_footprint_rises/1/frames/100",
+          "stored_joint_margin_rad": 0.5347026414007623,
+          "support_margin_m": 0.08372925022849355,
+          "valid": true
+        },
+        {
+          "errors": [],
+          "frame": 150,
+          "height_above_body_ground_m": 0.14900066666666667,
+          "limiting_joint": {
+            "joint": "rf_lower_leg_joint",
+            "joints_tied_within_1e-9_rad": [
+              "rf_lower_leg_joint"
+            ],
+            "limit_side": "upper",
+            "margin_deg": 0.4167186185555456,
+            "margin_rad": 0.0072731119481566076
+          },
+          "min_nonadjacent_separation_m": 0.014665297700686987,
+          "regime": "FOOT_SUPPORT",
+          "source": "route_extension.json:/original_footprint_rises/1/frames/150",
+          "stored_joint_margin_rad": 0.0072731119481566076,
+          "support_margin_m": 0.08992120845894044,
+          "valid": true
+        }
+      ],
+      "scope": "saved samples only; no search or optimization was rerun; joint margin is measured to the URDF limit of the limiting joint"
+    }
+  },
+  "g3_startup": {
+    "A_architectural_evidence": {
+      "basis": "STAND is reachable by validated sampled routes from LOW_CROUCH and LOW_C4, so the entry contract can be a verified member of the stand-connected component rather than exactly LOW_C4; generalized entry is not implemented",
+      "g3_architecture": "GENERALIZATION JUSTIFIED"
+    },
+    "B_implemented_runtime_gate": {
+      "basis": "StartupAcquisition.h/.cpp are unchanged relative to the accepted G3 baseline 87c3e91 and still require the canonical LOW_C4 pose with all six external evidence assertions",
+      "g3_runtime_startup_gate": "STILL ACTIVE / NOT YET SUPERSEDED"
+    },
+    "body_only_rest_ground_to_autonomous_stand": "NOT VALIDATED",
+    "detail": "MATDOG must not autonomously stand from REST_GROUND: REST_GROUND has no validated route to any foot-supported pose, and the 251-sample route is a GEOMETRIC_PATH_CANDIDATE that does not reach canonical STAND",
+    "g3_baseline_commit": "87c3e914e068260170e7c19c5d664f727f5b03ce",
+    "pose_library_startup_authority": false,
+    "route_251_authorized_as_startup_path": false,
+    "runtime_gate_files_recorded": {
+      "05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp": "01aa7fbf6badaa5b89f0ebb14068247e9093dbafe8ac7755ec0722d31c00e3ed",
+      "05_Firmware/MATDOG_Controller/src/motion/MotionState.h": "ac332cdc7ea1882f73d914eb57b0ddc645891e64b3c5591c86a51b2ed2e19a35",
+      "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp": "2d67616a9572a3101d57d895973287127a038d9fe49512c0477e19de0b43a479",
+      "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.h": "bc707de17c302e04031a35929f47d1600a788a2b3a4fd298c8cce27ca8862c75"
+    },
+    "wording": {
+      "BODY_ONLY REST_GROUND -> autonomous STAND": "NOT VALIDATED",
+      "G3 architecture": "GENERALIZATION JUSTIFIED",
+      "G3 runtime startup gate": "STILL ACTIVE / NOT YET SUPERSEDED"
+    }
+  },
+  "pose_library_roles": {
+    "aliases": [
+      {
+        "alias": "CRAWL_READY",
+        "alias_of": "LOW_CROUCH",
+        "role": "SEMANTIC_ALIAS"
+      },
+      {
+        "alias": "SQUAT",
+        "alias_of": "LOW_CROUCH",
+        "role": "SEMANTIC_ALIAS"
+      }
+    ],
+    "basis": "DESIGN_CLASSIFICATION separating pose-library entries from motion states; not derived from measurements. The blockers are the only evidence-derived parts.",
+    "motion_state_enum": "OFF, IDLE, STAND_TRANSITION, STAND, STOPPING (unchanged)",
+    "motion_state_enum_file_sha256": "ac332cdc7ea1882f73d914eb57b0ddc645891e64b3c5591c86a51b2ed2e19a35",
+    "promoted_static_poses": [
+      {
+        "blockers": [
+          "singleton in the validated graph: no validated route to or from any foot-supported pose",
+          "no acquisition or contact contract for a body-supported start",
+          "the G3 runtime gate does not admit a body-supported start"
+        ],
+        "embedded_static_reference_target": true,
+        "in_stand_validated_component": false,
+        "motion_state_relation": "FUTURE_CANDIDATE_BLOCKED",
+        "pose": "REST_GROUND",
+        "regime": "BODY_SUPPORT",
+        "roles": [
+          "SEMANTIC_POSE_TARGET",
+          "MOTION_STATE_CANDIDATE"
+        ],
+        "validated_component_size": 1
+      },
+      {
+        "blockers": [
+          "alternative to REST_GROUND that sits exactly at a joint limit (joint margin 0.0 rad); it belongs in the pose library as a reference variant and does not deserve its own state"
+        ],
+        "embedded_static_reference_target": true,
+        "in_stand_validated_component": false,
+        "motion_state_relation": "NOT_A_STATE",
+        "pose": "REST_GROUND_MAX_SEPARATION",
+        "regime": "BODY_SUPPORT",
+        "roles": [
+          "RESEARCH_VARIANT"
+        ],
+        "validated_component_size": 1
+      },
+      {
+        "aliases": [
+          "CRAWL_READY",
+          "SQUAT"
+        ],
+        "blockers": [
+          "no production generator or acquisition contract reaches it yet; a state is justified only if a behaviour requires a stable low stance"
+        ],
+        "embedded_static_reference_target": true,
+        "in_stand_validated_component": true,
+        "motion_state_relation": "FUTURE_CANDIDATE_CONDITIONAL",
+        "pose": "LOW_CROUCH",
+        "regime": "FOOT_SUPPORT",
+        "roles": [
+          "SEMANTIC_POSE_TARGET",
+          "MOTION_STATE_CANDIDATE"
+        ],
+        "validated_component_size": 5
+      },
+      {
+        "blockers": [
+          "G3 canonical startup entry pose; the existing STAND_TRANSITION state already covers the LOW_C4 to STAND rise, so no separate state is needed"
+        ],
+        "embedded_static_reference_target": true,
+        "in_stand_validated_component": true,
+        "motion_state_relation": "WAYPOINT_OF_EXISTING_STAND_TRANSITION",
+        "pose": "LOW_C4",
+        "regime": "FOOT_SUPPORT",
+        "roles": [
+          "SEMANTIC_POSE_TARGET"
+        ],
+        "validated_component_size": 5
+      },
+      {
+        "blockers": [],
+        "embedded_static_reference_target": true,
+        "in_stand_validated_component": true,
+        "motion_state_relation": "EXISTING_STATE_STAND",
+        "pose": "STAND",
+        "regime": "FOOT_SUPPORT",
+        "roles": [
+          "SEMANTIC_POSE_TARGET"
+        ],
+        "validated_component_size": 5
+      },
+      {
+        "blockers": [
+          "a posture gesture reached from STAND (validated sampled route STAND to STRETCH); a behaviour sequence may reference it, a state is not needed"
+        ],
+        "embedded_static_reference_target": true,
+        "in_stand_validated_component": true,
+        "motion_state_relation": "NOT_A_STATE",
+        "pose": "STRETCH",
+        "regime": "FOOT_SUPPORT",
+        "roles": [
+          "SEMANTIC_POSE_TARGET"
+        ],
+        "validated_component_size": 5
+      }
+    ],
+    "research_records": [
+      {
+        "embedded_static_reference_target": false,
+        "evidence": "RESEARCH_ONLY",
+        "motion_state_relation": "NOT_A_STATE",
+        "pose": "BODY_FOUR_FEET_RESEARCH_1",
+        "roles": [
+          "RESEARCH_VARIANT"
+        ]
+      },
+      {
+        "embedded_static_reference_target": false,
+        "evidence": "RESEARCH_ONLY",
+        "motion_state_relation": "NOT_A_STATE",
+        "pose": "BODY_FOUR_FEET_RESEARCH_2",
+        "roles": [
+          "RESEARCH_VARIANT"
+        ]
+      },
+      {
+        "embedded_static_reference_target": false,
+        "evidence": "RESEARCH_ONLY",
+        "motion_state_relation": "NOT_A_STATE",
+        "pose": "PITCHED_CROUCH_RESEARCH",
+        "roles": [
+          "RESEARCH_VARIANT"
+        ]
+      },
+      {
+        "embedded_static_reference_target": false,
+        "evidence": "RESEARCH_ONLY",
+        "motion_state_relation": "NOT_A_STATE",
+        "pose": "ROLL_PREP_RESEARCH",
+        "roles": [
+          "RESEARCH_VARIANT"
+        ]
+      },
+      {
+        "embedded_static_reference_target": false,
+        "evidence": "RESEARCH_ONLY",
+        "motion_state_relation": "NOT_A_STATE",
+        "pose": "XGO_HEIGHT_RATIO_RESEARCH",
+        "roles": [
+          "RESEARCH_VARIANT"
+        ]
+      }
+    ],
+    "vocabulary": {
+      "MOTION_STATE_CANDIDATE": "could justify a future MotionState if a behaviour requires it; none is created or authorized here",
+      "RESEARCH_VARIANT": "alternative or exploratory record kept for evidence; never a state",
+      "SEMANTIC_POSE_TARGET": "a named static geometric reference the pose library may serve to a planner"
+    }
+  },
+  "provenance": {
+    "canonical_sources": {
+      "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp": "01aa7fbf6badaa5b89f0ebb14068247e9093dbafe8ac7755ec0722d31c00e3ed",
+      "05_Firmware/MATDOG_Controller/src/motion/MotionState.h": "ac332cdc7ea1882f73d914eb57b0ddc645891e64b3c5591c86a51b2ed2e19a35",
+      "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp": "2d67616a9572a3101d57d895973287127a038d9fe49512c0477e19de0b43a479",
+      "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.h": "bc707de17c302e04031a35929f47d1600a788a2b3a4fd298c8cce27ca8862c75"
+    },
+    "generator_sha256": "2590580b9913190e89c17266c6a7c233bb2362e94cc3965d867502cd82c43e96",
+    "inputs": {
+      "connectivity.json": "9b87e5a81046f0a438a1e4a3edb4128fd78467db6a2c856ec9608257c3746400",
+      "equivalent_stand.json": "940e6957b6983db139f6a37b658cae8a4773b9d891221dee8c2cc063d54d5f29",
+      "lower_envelope.json": "ca5bd031bf3ddd778b31840a8f6e27d8346da9c51cd5b23e4696687636e04c99",
+      "pose_library.json": "746f4393a2f9de5dc532c6b48e083f2089e3cc2fa25f381dc4ef9d08f9903a58",
+      "rest_search.json": "52299f097cb3ae725e680d9eddc2d03756a1a9579bc73f0dc82c1e877bac182a",
+      "retarget_matrix.json": "8ccc0753e6c3b545cfbd673fff51ee1596dafa918f5a54dd8cbb72205735500b",
+      "route_extension.json": "b75b71aab14dac33af28fa26a47ce32e979d39675b9657cd63d51d0a0e05e4d0",
+      "xgo_table_semantics.json": "8bc8e98dab5e348ef0b4401d8513acbb0ac405f308cac1617353995b50d3232c"
+    }
+  },
+  "route_251_sample": {
+    "all_recorded_samples_valid": true,
+    "authorized_startup_path": false,
+    "classification": "GEOMETRIC_PATH_CANDIDATE",
+    "continuous_collision_free_proved": false,
+    "edge_class": "CANDIDATE",
+    "material_contact_locked_proved": false,
+    "meaning": "GEOMETRIC_PATH_CANDIDATE: a sampled geometric path with useful metrics (BODY_FOUR_FEET_RESEARCH_2 to an equivalent 150 mm stand at body X +10 mm); the endpoint is not canonical STAND, the path is not proven fully collision-free and is not proven contact-locked",
+    "metrics_preserved": {
+      "end_vs_canonical_STAND_max_joint_difference_rad": 0.3011001851021937,
+      "end_vs_canonical_STAND_max_reference_contact_xy_difference_m": 0.05250776818707835,
+      "jacobian_global_min_abs_det": 0.0001303245020079919,
+      "jacobian_sign_changes_per_leg": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "max_abs_joint_delta_rad_per_sample": 0.0305917891681019,
+      "max_abs_mesh_foot_ground_residual_m": 4.691547604556562e-06,
+      "max_condition_number": 8.841139087409033,
+      "min_joint_margin_at": {
+        "frame": 250,
+        "joint": "lf_lower_leg_joint",
+        "limit_rad": 0.654498469498,
+        "limit_side": "upper",
+        "q_rad": 0.6506798144317423
+      },
+      "min_joint_margin_rad": 0.00381865506625767,
+      "min_nonadjacent_separation_m": 0.007368754720401629,
+      "min_separation_at": {
+        "frame": 0,
+        "pair": [
+          "rh_upper_leg_link",
+          "rh_foot_link"
+        ]
+      },
+      "min_static_support_margin_m": 0.07908238960186884,
+      "source": "connectivity.json:/route_251_sample/metrics"
+    },
+    "other_candidate_edges": [
+      {
+        "from": "BODY_FOUR_FEET_RESEARCH_1",
+        "sample_count": 60,
+        "status": "GEOMETRIC_PATH_CANDIDATE",
+        "to": "FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_1"
+      },
+      {
+        "from": "BODY_FOUR_FEET_RESEARCH_2",
+        "sample_count": 60,
+        "status": "GEOMETRIC_PATH_CANDIDATE",
+        "to": "FOOT_SUPPORT_60MM_FROM_BODY_FOUR_FEET_RESEARCH_2"
+      },
+      {
+        "from": "BODY_FOUR_FEET_RESEARCH_1",
+        "sample_count": 150,
+        "status": "GEOMETRIC_PATH_CANDIDATE",
+        "to": "FOUR_FEET_RISE0_ORIGINAL_FOOTPRINT_END"
+      },
+      {
+        "from": "BODY_FOUR_FEET_RESEARCH_2",
+        "sample_count": 251,
+        "status": "GEOMETRIC_PATH_CANDIDATE",
+        "to": "EQUIVALENT_STAND_150MM_X10MM"
+      }
+    ],
+    "reasons": [
+      "END_IS_EQUIVALENT_STAND_NOT_CANONICAL_STAND: max joint difference 0.3011 rad, max reference-contact XY difference 52.51 mm, body X offset 10.0 mm",
+      "START_POSE_BODY_FOUR_FEET_RESEARCH_2_IS_RESEARCH_ONLY_AND_NOT_EMBEDDED",
+      "NOT_PROVEN_FULLY_COLLISION_FREE: sampled frames only, no swept-collision proof",
+      "NOT_PROVEN_CONTACT_LOCKED: inclined-edge mesh support with patch migration, no no-slip proof",
+      "NO_ACQUISITION_CONTRACT_FOR_BASE_PLUS_FOUR_FEET_START"
+    ],
+    "research_only": true,
+    "sample_count": 251,
+    "startup_authority": false,
+    "transition_graph_json_note": "transition_graph.json keeps the search-level status VALID_SEQUENCE_CANDIDATE (every recorded sample valid) and startup_reassessment STILL_REQUIRED; it never marks the route validated or authorized. connectivity.json applies the edge classes.",
+    "validated_transition_edge_to_STAND": false
+  },
+  "scope": "G3.5.1 classification and contract consistency; software-only, saved artifacts only, no search rerun, no hardware, serial, servo, firmware, q0, calibration or actuator change",
+  "transition_graph_semantics": {
+    "absence_of_validated_edge": "not proof of physical disconnection or unreachability; a pair without a VALIDATED edge is FAILED within a bounded search, UNTESTED, or never attempted",
+    "candidate_augmented_component_count": 12,
+    "component_scope": "components are computed over VALIDATED edges only; they describe the validated graph, not the complete physical configuration space",
+    "edge_class_counts": {
+      "CANDIDATE": 4,
+      "FAILED": 51,
+      "UNTESTED": 3,
+      "VALIDATED": 4
+    },
+    "edge_classes": {
+      "CANDIDATE": "GEOMETRIC_PATH_CANDIDATE: every recorded sample passes the offline policy but an endpoint is a research pose, a route endpoint or another non-promoted node; research only, not a validated transition edge, no startup authority",
+      "FAILED": "a bounded search or route attempt was executed and did not produce a valid route; evidence of failure within that search bound, not of impossibility",
+      "UNTESTED": "no route was sampled for this pair; listed for completeness",
+      "VALIDATED": "every recorded sample of a saved sampled route passes the full offline policy and both endpoints are promoted static poses (or the promoted LOW_CROUCH alias); still a sampled route, not a swept-collision, contact-lock or no-slip proof"
+    },
+    "node_pair_best_edge_class_counts": {
+      "CANDIDATE": 4,
+      "FAILED": 12,
+      "NO_ROUTE_ATTEMPT_RECORDED": 168,
+      "UNTESTED": 2,
+      "VALIDATED": 4
+    },
+    "previous_component_count_before_edge_classes": 12,
+    "previous_count_explanation": "the G3.5 count of 12 also joined four CANDIDATE research-route edges (two base lift-offs, the original-footprint rise and the 251-sample route); the STAND component and the REST_GROUND singleton are unchanged",
+    "validated_component_count": 16
+  },
+  "xgo_retargeting_boundary": {
+    "boundary_statement": "NO XGO PHYSICAL JOINT POSE WAS RECOVERED WITH SUFFICIENT SIGN/ZERO/SCALE BINDING TO BE COPIED DIRECTLY TO MATDOG.",
+    "no_new_xgo_research": true,
+    "not_recovered": [
+      "metric/sign/zero binding of post-IK target slots",
+      "loaded per-slot physical range correspondence",
+      "achieved temporal interpolation",
+      "foot geometry and support contacts for firmware poses"
+    ],
+    "physical_retarget_results": [
+      "NOT_TRANSFERABLE",
+      "RETARGET_UNDERDETERMINED"
+    ],
+    "recovered": "XGO action internals and normalized post-IK controller-domain tables (33 table references, 32 unique 12-byte uint8 tables) were recovered from the firmware and static analysis",
+    "scaling_rule": "the ~1.5x similarity of two generic-template dimensions is not a numeric conversion rule and must not be used to convert any XGO value to MATDOG",
+    "use_of_xgo_evidence": "XGO behavior, topology and sequence semantics are reference evidence only; MATDOG joint geometry continues to come from the MATDOG URDF and the MATDOG IK"
+  }
+}

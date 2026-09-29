@@ -1,5 +1,5 @@
 """Independent FK/COM, mesh and evidence gates for G3.5 research."""
-import unittest,json,copy,math
+import unittest,json,copy,math,re,subprocess
 from pathlib import Path
 import numpy as np
 from model import Model,LEGS,transform,sha
@@ -137,6 +137,95 @@ class ConnectivityTests(unittest.TestCase):
   for a in cat['actions']:
    for key in ('action_id','aliases','canonical_name','documented_duration_s','handler_canonical_address','handler_export_address','handler_sha256','static_dynamic','evidence_class','recovered_controller_tables','contact_support_semantics','remaining_unknowns','retarget_eligibility','semantics'):self.assertIn(key,a,(a['action_id'],key))
    self.assertIn(a['evidence_class'],'ABCDE')
+class CloseoutTests(unittest.TestCase):
+ BOUNDARY='NO XGO PHYSICAL JOINT POSE WAS RECOVERED WITH SUFFICIENT SIGN/ZERO/SCALE BINDING TO BE COPIED DIRECTLY TO MATDOG.'
+ POSES=('REST_GROUND','REST_GROUND_MAX_SEPARATION','LOW_CROUCH','LOW_C4','STAND','STRETCH')
+ @classmethod
+ def setUpClass(cls):
+  load=lambda n:json.loads((OUT/(n+'.json')).read_text());cls.root=Path(__file__).resolve().parent.parents[2]
+  cls.conn=load('connectivity');cls.close=load('closeout_classification');cls.lib=load('pose_library');cls.lower=load('lower_envelope');cls.m=Model();cls.text=(OUT/'REPORT.md').read_text()
+ def components(self,classes):
+  parent={n['id']:n['id'] for n in self.conn['nodes']}
+  def find(x):
+   while parent[x]!=x:x=parent[x]
+   return x
+  for e in self.conn['edges']:
+   if e['edge_class'] in classes:parent[find(e['from'])]=find(e['to'])
+  groups={}
+  for n in parent:groups.setdefault(find(n),set()).add(n)
+  return sorted(sorted(g) for g in groups.values())
+ def test_edge_classes_are_explicit_and_consistent(self):
+  edges=self.conn['edges'];nodes={n['id']:n for n in self.conn['nodes']};classes=[e['edge_class'] for e in edges]
+  self.assertTrue(set(classes)<={'VALIDATED','CANDIDATE','FAILED','UNTESTED'});counts={k:classes.count(k) for k in set(classes)}
+  self.assertEqual(counts,{'VALIDATED':4,'CANDIDATE':4,'FAILED':51,'UNTESTED':3});self.assertEqual(counts,self.conn['summary']['edge_class_counts'])
+  for e in edges:
+   self.assertFalse(e['authorizes_startup']);self.assertFalse(e['continuous_collision_free_proved'])
+   if e['edge_class']=='VALIDATED':
+    self.assertTrue(e['validated'] and e['all_recorded_samples_valid'] and nodes[e['from']]['promoted'] and nodes[e['to']]['promoted'],(e['from'],e['to']))
+   else:self.assertFalse(e['validated'],(e['from'],e['to']))
+   if e['edge_class']=='CANDIDATE':
+    self.assertTrue(e['all_recorded_samples_valid'] and e['candidate_reasons'] and e['status']=='GEOMETRIC_PATH_CANDIDATE');self.assertIn('CONTACT_LOCK_NOT_PROVED',e['candidate_reasons'])
+   if e['edge_class']=='UNTESTED':self.assertEqual(e['sample_count'],0)
+  route=[e for e in edges if e['sample_count']==251];self.assertEqual(len(route),1);r=route[0]
+  self.assertEqual((r['from'],r['to'],r['edge_class'],r['status'],r['validated']),('BODY_FOUR_FEET_RESEARCH_2','EQUIVALENT_STAND_150MM_X10MM','CANDIDATE','GEOMETRIC_PATH_CANDIDATE',False))
+  for reason in ('ENDPOINT_IS_NOT_CANONICAL_STAND','NO_ACQUISITION_CONTRACT_FOR_BASE_PLUS_FOUR_FEET_START'):self.assertIn(reason,r['candidate_reasons'])
+  eq=[e for e in edges if e['from']=='EQUIVALENT_STAND_150MM_X10MM' and e['to']=='STAND'];self.assertEqual([e['edge_class'] for e in eq],['UNTESTED'])
+  self.assertFalse(any(e['edge_class']=='VALIDATED' and 'EQUIVALENT_STAND_150MM_X10MM' in (e['from'],e['to']) for e in edges))
+ def test_components_by_edge_class_view(self):
+  validated=self.components({'VALIDATED'});augmented=self.components({'VALIDATED','CANDIDATE'})
+  self.assertEqual(validated,sorted(sorted(c['members']) for c in self.conn['components']));self.assertEqual(len(validated),self.conn['summary']['component_count'])
+  self.assertEqual(len(augmented),self.conn['summary']['candidate_augmented_component_count']);self.assertGreater(len(validated),len(augmented))
+  for view in (validated,augmented):
+   stand=next(g for g in view if 'STAND' in g);self.assertEqual(stand,['CRAWL_READY','LOW_C4','LOW_CROUCH','STAND','STRETCH']);self.assertIn(['REST_GROUND'],view)
+  self.assertFalse(self.conn['summary']['REST_GROUND_in_stand_component_including_candidate_edges'])
+  self.assertIn('not the complete physical configuration space',self.close['transition_graph_semantics']['component_scope']);self.assertIn('not proof',self.close['transition_graph_semantics']['absence_of_validated_edge'])
+ def test_four_foot_height_concepts_are_separate(self):
+  h=self.close['four_foot_height_terminology'];a=h['A_BODY_AND_FOOT_SUPPORT_lower_geometric_boundary'];b=h['B_PURE_FOOT_SUPPORT_mathematical_search_boundary'];c=h['C_physically_robust_engineering_usable_pure_foot_stance']
+  self.assertEqual((a['height_above_body_ground_m'],a['support_regime']),(0.0,'BODY_AND_FOOT_SUPPORT'));self.assertEqual(a['status'],'MODEL_GEOMETRIC_LIMIT_FOR_LEVEL_BODY')
+  self.assertEqual((b['lowest_sampled_valid_height_m'],b['numerical_undeclared_contact_tolerance_m'],b['support_regime']),(1.001e-6,1e-6,'FOOT_SUPPORT'));self.assertFalse(b['physical_clearance_approval'])
+  self.assertEqual(b['statement'],'THEORETICAL/SEARCH RESULT; NUMERICAL TOLERANCE DEPENDENCY; PHYSICAL ROBUSTNESS NOT ESTABLISHED');self.assertEqual(b['rejected_sampled_heights_m'],[1e-8,1e-7,5e-7,1e-6]);self.assertIn('physically meaningful clearance',b['must_not_be_described_as'])
+  self.assertEqual((c['status'],c['height_m']),('NOT_ESTABLISHED',None));self.assertIn('no physical manufacturing tolerance is assumed',c['basis']);self.assertNotEqual(a['height_above_body_ground_m'],b['lowest_sampled_valid_height_m'])
+  sens=h['clearance_sensitivity'];self.assertTrue(sens['no_acceptance_threshold_applied']);rows=sens['lower_envelope_samples'];self.assertEqual(len(rows),sum(len(f['samples']) for f in self.lower['families']))
+  for row in rows:
+   fam=next(f for f in self.lower['families'] if 'family %d'%f['family'] in row['source']);sample=next(x for x in fam['samples'] if x['height_above_body_ground_m']==row['height_above_body_ground_m'])
+   self.assertEqual((row['valid'],row['regime']),(sample['valid'],sample['regime']))
+   q=np.array(sample['q']);margin=float(np.minimum(q-self.m.limits[:,0],self.m.limits[:,1]-q).min());self.assertAlmostEqual(row['limiting_joint']['margin_rad'],margin,12)
+   if sample['valid']:self.assertAlmostEqual(margin,sample['joint_margin_rad'],9)
+  frames=[r['frame'] for r in sens['route_251_rise_frames']];self.assertEqual(frames,[0,1,2,3,5,10,20,50,100,150])
+ def test_251_route_classification_preserves_metrics(self):
+  r=self.close['route_251_sample'];self.assertEqual((r['classification'],r['edge_class'],r['sample_count']),('GEOMETRIC_PATH_CANDIDATE','CANDIDATE',251))
+  for key in ('validated_transition_edge_to_STAND','authorized_startup_path','startup_authority','continuous_collision_free_proved','material_contact_locked_proved'):self.assertFalse(r[key],key)
+  self.assertTrue(r['research_only'] and r['all_recorded_samples_valid']);metrics=self.conn['route_251_sample']['metrics']
+  kept=r['metrics_preserved']
+  for key in ('min_joint_margin_rad','min_nonadjacent_separation_m','min_static_support_margin_m','max_abs_mesh_foot_ground_residual_m','max_abs_joint_delta_rad_per_sample'):self.assertEqual(kept[key],metrics[key],key)
+  self.assertEqual(kept['jacobian_global_min_abs_det'],metrics['jacobian_determinant']['global_min_abs']);self.assertEqual(kept['jacobian_sign_changes_per_leg'],[0,0,0,0]);self.assertEqual(kept['max_condition_number'],metrics['condition_number']['global_max'])
+  self.assertAlmostEqual(kept['end_vs_canonical_STAND_max_joint_difference_rad'],0.3011,4);self.assertAlmostEqual(kept['end_vs_canonical_STAND_max_reference_contact_xy_difference_m']*1000,52.51,2)
+  self.assertAlmostEqual(kept['min_joint_margin_rad'],0.003818655066258,12);self.assertAlmostEqual(kept['min_nonadjacent_separation_m']*1000,7.368754720,8)
+ def test_g3_startup_and_motion_state_are_unchanged(self):
+  g=self.close['g3_startup'];self.assertEqual(g['wording'],{'G3 architecture':'GENERALIZATION JUSTIFIED','G3 runtime startup gate':'STILL ACTIVE / NOT YET SUPERSEDED','BODY_ONLY REST_GROUND -> autonomous STAND':'NOT VALIDATED'})
+  self.assertFalse(g['pose_library_startup_authority'] or g['route_251_authorized_as_startup_path']);header=(self.root/'05_Firmware/MATDOG_Controller/src/motion/MotionState.h').read_text()
+  self.assertIn('enum class MotionState : uint8_t { OFF, IDLE, STAND_TRANSITION, STAND, STOPPING };',header)
+  for rel,digest in g['runtime_gate_files_recorded'].items():
+   self.assertEqual(sha(self.root/rel),digest,rel)
+   try:baseline=subprocess.run(['git','show','%s:%s'%(g['g3_baseline_commit'],rel)],cwd=self.root,capture_output=True,timeout=60)
+   except (OSError,subprocess.SubprocessError):continue
+   if baseline.returncode==0 and 'Startup' in rel:import hashlib;self.assertEqual(hashlib.sha256(baseline.stdout).hexdigest(),digest,rel)
+ def test_pose_roles_separate_targets_from_motion_states(self):
+  roles={p['pose']:p for p in self.close['pose_library_roles']['promoted_static_poses']};self.assertEqual(sorted(roles),sorted(self.POSES));vocab=set(self.close['pose_library_roles']['vocabulary'])
+  self.assertEqual(vocab,{'SEMANTIC_POSE_TARGET','MOTION_STATE_CANDIDATE','RESEARCH_VARIANT'})
+  for name,p in roles.items():self.assertTrue(p['roles'] and set(p['roles'])<=vocab,name);self.assertTrue(p['embedded_static_reference_target'],name)
+  self.assertEqual(roles['REST_GROUND_MAX_SEPARATION']['roles'],['RESEARCH_VARIANT']);self.assertEqual(roles['STAND']['motion_state_relation'],'EXISTING_STATE_STAND')
+  self.assertEqual(roles['REST_GROUND']['motion_state_relation'],'FUTURE_CANDIDATE_BLOCKED');self.assertTrue(roles['REST_GROUND']['blockers']);self.assertFalse(roles['REST_GROUND']['in_stand_validated_component'])
+  self.assertEqual([a['alias_of'] for a in self.close['pose_library_roles']['aliases']],['LOW_CROUCH','LOW_CROUCH'])
+ def test_xgo_and_base_link_wording(self):
+  x=self.close['xgo_retargeting_boundary'];self.assertEqual(x['boundary_statement'],self.BOUNDARY);self.assertTrue(x['no_new_xgo_research']);self.assertIn('not a numeric conversion rule',x['scaling_rule']);self.assertIn('reference evidence',x['use_of_xgo_evidence'])
+  z=self.close['base_link_z'];rest=next(p for p in self.lib['poses'] if p['name']=='REST_GROUND');self.assertEqual(z['REST_GROUND_base_link_world_z_m'],rest['body'][2][3])
+  self.assertIn('effectively zero within model/mesh numerical precision',z['nominal_cad_urdf_geometry']);self.assertIn('NOT ESTABLISHED',z['real_hardware_contact_height']);self.assertIn('cannot be positioned with 1e-16 m accuracy',z['not_a_positioning_accuracy'])
+ def test_report_carries_the_closeout_wording(self):
+  text=self.text;low=text.lower()
+  for phrase in (self.BOUNDARY,'GEOMETRIC_PATH_CANDIDATE','GENERALIZATION JUSTIFIED','STILL ACTIVE / NOT YET SUPERSEDED','NOT VALIDATED','SEMANTIC_POSE_TARGET','MOTION_STATE_CANDIDATE','RESEARCH_VARIANT','NOT ESTABLISHED','VALIDATED','CANDIDATE','FAILED','UNTESTED'):self.assertIn(phrase,text,phrase)
+  for phrase in ('body_and_foot_support lower geometric boundary','pure_foot_support mathematical/search boundary','not a physically meaningful clearance','numerical tolerance dependency','physical robustness not established','components of the validated graph','not a validated transition edge to stand','not an authorized or validated startup path','not a numeric conversion rule','effectively zero within model/mesh numerical precision','real hardware contact height'):self.assertIn(phrase,low,phrase)
+  for stale in ('G3 startup is partially superseded','Partially superseded; the implemented gate is unchanged','-->|base lift-off, 251 samples|','lowest validated four-foot configuration sits at body height','no route joins them'):self.assertNotIn(stale,text,stale)
 class ReportTests(unittest.TestCase):
  def test_report_answers_every_required_question_and_states_safety(self):
   text=(OUT/'REPORT.md').read_text()

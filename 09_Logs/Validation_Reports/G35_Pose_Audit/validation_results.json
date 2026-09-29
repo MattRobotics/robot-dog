@@ -14,7 +14,7 @@
       "returncode": 0,
       "saved_artifact": "revalidation.json",
       "saved_artifact_provenance_refreshed_to_current_generator": false,
-      "seconds": 104.5,
+      "seconds": 107.5,
       "summary": "REVALIDATION 1220 1011 classification changes 0"
     },
     {
@@ -30,7 +30,7 @@
       "returncode": 0,
       "saved_artifact": "equivalent_stand_revalidation.json",
       "saved_artifact_provenance_refreshed_to_current_generator": false,
-      "seconds": 24.2,
+      "seconds": 20.8,
       "summary": "REVALIDATION 203 203 classification changes 0"
     },
     {
@@ -49,11 +49,11 @@
     {
       "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/pose_audit/test_pose_audit.py",
       "name": "pose_audit_tests",
-      "output_line_count": 23,
-      "output_sha256": "4f53b1267d2eac021c5f9d03bf15f123d3538d47c63d3cfa258e6a7bdbd9d491",
+      "output_line_count": 31,
+      "output_sha256": "b70b4a73374b05ba14020f295141985c24b913277fef000092d79ae231106594",
       "output_tail": [
-        "test_sources_and_saved_keyframes (__main__.AuditTests.test_sources_and_saved_keyframes) ... ok",
-        "test_support_policies (__main__.AuditTests.test_support_policies) ... ok",
+        "test_report_carries_the_closeout_wording (__main__.CloseoutTests.test_report_carries_the_closeout_wording) ... ok",
+        "test_xgo_and_base_link_wording (__main__.CloseoutTests.test_xgo_and_base_link_wording) ... ok",
         "test_251_route_is_recomputed_not_copied (__main__.ConnectivityTests.test_251_route_is_recomputed_not_copied) ... ok",
         "test_body_only_connection_absence_is_bounded_not_proved (__main__.ConnectivityTests.test_body_only_connection_absence_is_bounded_not_proved) ... ok",
         "test_components_recomputed_from_validated_edges (__main__.ConnectivityTests.test_components_recomputed_from_validated_edges) ... ok",
@@ -62,13 +62,13 @@
         "test_recorded_provenance_hashes_match_files (__main__.ReportTests.test_recorded_provenance_hashes_match_files) ... ok",
         "test_report_answers_every_required_question_and_states_safety (__main__.ReportTests.test_report_answers_every_required_question_and_states_safety) ... ok",
         "----------------------------------------------------------------------",
-        "Ran 20 tests in 13.068s",
+        "Ran 28 tests in 14.862s",
         "OK"
       ],
       "passed": true,
       "returncode": 0,
-      "seconds": 13.8,
-      "summary": "Ran 20 tests in 13.068s; OK"
+      "seconds": 15.6,
+      "summary": "Ran 28 tests in 14.862s; OK"
     },
     {
       "command": "bash /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/tests/run_motion_host_tests.sh",
@@ -91,7 +91,7 @@
       ],
       "passed": true,
       "returncode": 0,
-      "seconds": 270.3,
+      "seconds": 270.1,
       "summary": "POSE_SUPPORT = PASS: 448 policy combinations; ground classes, invalid inputs, 6 static targets, unchanged startup gate"
     },
     {
@@ -115,7 +115,7 @@
       ],
       "passed": true,
       "returncode": 0,
-      "seconds": 285.4,
+      "seconds": 285.9,
       "summary": "POSE_SUPPORT = PASS: 448 policy combinations; ground classes, invalid inputs, 6 static targets, unchanged startup gate"
     },
     {
@@ -129,11 +129,11 @@
       ],
       "passed": true,
       "returncode": 0,
-      "seconds": 323.0,
+      "seconds": 321.7,
       "summary": "STATIC_AUDIT = PASS"
     },
     {
-      "command": "g++ -std=c++17 -O1 -g -fno-exceptions -fno-rtti -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -no-pie -o /tmp/matdog-g35-asan-lw0xcr6i/test_pose_support_asan /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/tests/test_pose_support.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp",
+      "command": "g++ -std=c++17 -O1 -g -fno-exceptions -fno-rtti -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -no-pie -o /tmp/matdog-g35-asan-ao6z9gru/test_pose_support_asan /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/tests/test_pose_support.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp",
       "name": "sanitizer_build_asan_ubsan",
       "output_line_count": 0,
       "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -144,7 +144,7 @@
       "summary": ""
     },
     {
-      "command": "/tmp/matdog-g35-asan-lw0xcr6i/test_pose_support_asan",
+      "command": "/tmp/matdog-g35-asan-ao6z9gru/test_pose_support_asan",
       "name": "sanitizer_run_asan_ubsan",
       "output_line_count": 1,
       "output_sha256": "e82c6ba5bcadcee44ee6cd6a83361da58c066179c24bdcfd2fc9f081116cb9dd",
@@ -172,6 +172,6 @@
     "generator_sha256": "b57a877d4288a4ada45dae9eff329cd5c8e742ba450707c205764bea8e4256b9"
   },
   "scope": "offline software gates only: host compiler, Python, git; no hardware, serial device, ServoBus, servo command, Torque, flashing or EEPROM access",
-  "source_digest": "1faca16f2023f0cca9908cafbdf7dcd5574fa3fea5af2c32f74f6d3d3039403f",
-  "source_digest_file_count": 93
+  "source_digest": "2536c2ed1f37fcb29db7a1a34831fa4316d5d0cbbf9f23a3e786fa928b543b86",
+  "source_digest_file_count": 94
 }
