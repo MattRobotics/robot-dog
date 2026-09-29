@@ -3339,8 +3339,11 @@ def check_calibration_q0_production_wiring(files, sketch_dir):
 def check_calibration_q0_promotion_wiring(files, sketch_dir):
     """CR3-M5: @CALIBRATION Q0 PROMOTE is the one reviewed path that may call
     transforms().admit() in production. MAINTENANCE-gated, exact-confirmation-
-    gated, goes through the exact reviewed prepareCurrentQ0Evidence() pipeline,
-    acquires no authority, issues no bus transaction, writes no EEPROM."""
+    gated, refused while a capture/session/run/motion is live, and it promotes
+    the CURRENT-BOOT capture (prepareFreshQ0Evidence over freshCapture()) - never
+    the frozen CR2-C package, which stays a regression oracle. It acquires no
+    authority, issues no bus transaction and writes no EEPROM. SESSION START
+    refuses unless the table holds exactly that capture's q0."""
     by_name = {path.name: (path, code) for path, code in files}
     router = by_name.get("CommandRouter.cpp")
     if router is None:
@@ -3350,17 +3353,23 @@ def check_calibration_q0_promotion_wiring(files, sketch_dir):
 
     branch = re.search(
         r'upper == "@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION"\)\s*\{(.*?)'
-        r'\}\s*else if\s*\(upper == "@CALIBRATION STATUS"\)', rcode, re.DOTALL)
+        r'\}\s*else if\s*\(matchLegCommand\(upper,\s*"@CALIBRATION SESSION START "',
+        rcode, re.DOTALL)
     if not branch:
         fail(f"{rpath}: @CALIBRATION Q0 PROMOTE branch not found (exact confirmation text "
-             f"required, immediately followed by the @CALIBRATION STATUS branch)")
+             f"required, immediately followed by the @CALIBRATION SESSION START branch)")
     else:
         text = branch.group(1)
-        for required in ("OperatingMode::MAINTENANCE", "prepareCurrentQ0Evidence(",
+        for required in ("OperatingMode::MAINTENANCE", "prepareFreshQ0Evidence(",
+                         "modules_.q0_capture->freshCapture()",
+                         "modules_.q0_capture->active()", "motionExecutorBusy()",
+                         "modules_.full_leg_run->armed", "modules_.calibration->sessionLive()",
                          "prepared.ready()", "transforms().admit("):
             if required not in text:
                 fail(f"{rpath}: @CALIBRATION Q0 PROMOTE lost required gate {required!r}")
-        for forbidden in ("authority->request", "authority_->request", "startSession(",
+        for forbidden in ("prepareCurrentQ0Evidence(", "q0_evidence_data",
+                          "CalibrationQ0EvidenceData", "authority->request",
+                          "authority_->request", "startSession(",
                           "activate(", "safeOff(", "EnableTorque", "GoalPosition",
                           "WritePos", "PositionOffset", "CalibrationOfs",
                           ".plan(", ".commit(", ".execute("):
@@ -3385,6 +3394,47 @@ def check_calibration_q0_promotion_wiring(files, sketch_dir):
         if admit_call.search(code):
             fail(f"{path}: transforms()/limits().admit( is only permitted inside "
                  f"CommandRouter.cpp's @CALIBRATION Q0 PROMOTE branch")
+
+    # The frozen CR2-C package is a regression oracle: nothing in the production
+    # tree except the preparation unit that owns it may consume it.
+    frozen_owner = {"CalibrationQ0EvidencePreparation.h", "CalibrationQ0EvidencePreparation.cpp",
+                    "CalibrationQ0EvidenceData.h"}
+    for path, code in files:
+        if "scripts" in path.parts or path.name in frozen_owner:
+            continue
+        for token in ("prepareCurrentQ0Evidence(", "q0_evidence_data::"):
+            if token in code:
+                fail(f"{path}: {token!r} - the frozen CR2-C q0 package is a historical "
+                     f"regression oracle and must not be consumed by production code; "
+                     f"promote the current-boot capture with prepareFreshQ0Evidence()")
+
+    # SESSION START may only run on the q0 that the current capture produced.
+    handle = re.search(r'matchLegCommand\(upper,\s*"@CALIBRATION SESSION START "(.*?)'
+                       r'\}\s*else if', rcode, re.DOTALL)
+    if not handle:
+        fail(f"{rpath}: SESSION START four-leg branch not found for the fresh-q0 gate")
+    else:
+        for required in ("freshQ0CaptureIsPromoted(", "modules_.q0_capture->freshCapture()",
+                         "currentGeometryTag()", "CURRENT_BOOT_Q0_NOT_PROMOTED"):
+            if required not in handle.group(1):
+                fail(f"{rpath}: SESSION START lost the fresh-q0 promotion gate {required!r}")
+
+    # The preparation unit stays pure: it reduces data already in RAM.
+    prep = [(path, code) for path, code in files
+            if path.name in ("CalibrationQ0EvidencePreparation.h",
+                             "CalibrationQ0EvidencePreparation.cpp")]
+    if len(prep) != 2:
+        fail(f"{sketch_dir / 'src' / 'actuator'}: CalibrationQ0EvidencePreparation unit missing")
+    for path, code in prep:
+        for forbidden in ("#include <Arduino.h>", "ServoBus", "HardwareSerial", "Serial.",
+                          "millis(", "readRuntimeState(", "EnableTorque", "WritePos",
+                          "GoalPosition", "SyncWrite", "RegWrite", "CalibrationOfs",
+                          "PositionOffset", "unLockEprom", "LockEprom", "EEPROM",
+                          "Preferences", "nvs_", "CalibrationQ0CaptureSession",
+                          "authority->request", ".admit("):
+            if forbidden in code:
+                fail(f"{path}: q0 preparation contains {forbidden!r} - it must stay a pure "
+                     f"reducer with no transport, EEPROM, authority or table mutation")
 
 
 def check_calibration_q0_bootstrap(files, sketch_dir):

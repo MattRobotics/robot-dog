@@ -27,9 +27,12 @@ MATDOG Controller
 └── status/          LedRing — WS2812B ring, boots OFF, non-blocking effects
 ```
 
-This is an **integration and platform milestone**, not a motion controller. No gait,
-IK, closed-loop stabilization, ROS 2/MoveIt 2 or autonomous behaviour is implemented
-here — see `VALIDATION.md` for the precise scope. A **Wi-Fi station runtime** (W1) and the
+**Current state (2026-09-29).** `ROBOT_POWERED` no-motion operation is hardware-validated. The
+Safe Actuator layer and the four-leg Full Calibration (LF, RF, RH, LH) are merged on `main`,
+**IMPLEMENTED / OFFLINE TESTED and never run on the robot** — see [Calibration on
+`main`](#calibration-on-main-2026-09-29). No stand, gait, IK, closed-loop stabilization, ROS
+2/MoveIt 2 or autonomous behaviour is implemented here — see `VALIDATION.md` for the precise
+scope. The historical scope statements in the sections below are kept as written. A **Wi-Fi station runtime** (W1) and the
 **OTA-A update core** (state machine, inactive-slot writer, first-boot rollback validation)
 are implemented and offline-tested but **not yet hardware-tested**, and OTA ships **no
 transport and no authentication**. See [Wi-Fi runtime](#wi-fi-runtime-w1) and
@@ -250,8 +253,17 @@ persistence and any `requestDischargeOff()` body fail the build; the mutation su
 @WIFI STATUS                                (cached snapshot; never queries the radio)
 @WIFI ON | @WIFI OFF                        (any mode; refused without credentials)
 @OTA STATUS                                 (read-only; OTA-A ships no transport)
-@AUTHORITY STATUS                           (read-only; no owner can be acquired yet)
-@CALIBRATION STATUS                         (read-only; no session can move hardware)
+@AUTHORITY STATUS                           (read-only)
+@ACTUATOR STATUS                            (read-only)
+@CALIBRATION STATUS                         (read-only)
+@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE          (MAINTENANCE + ROBOT_POWERED; read-only, Torque OFF)
+@CALIBRATION Q0 STATUS | Q0 ABORT
+@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION  (MAINTENANCE; RAM only; promotes THAT capture)
+@CALIBRATION SESSION START <LF|RF|RH|LH> CONFIRM_CURRENT_Q0
+@CALIBRATION MOTION PERMIT GRANT 16 CONFIRM_FIRST_MOTION | MOTION PERMIT REVOKE | MOTION ABORT
+@CALIBRATION FULL LEG <LF|RF|RH|LH> CONFIRM_FULL_CALIBRATION | FULL LEG STATUS | FULL LEG ABORT
+@CALIBRATION EVIDENCE EXPORT                (read-only, deterministic)
+@CALIBRATION SESSION ABORT
 @SERVO SCAN <lo> <hi> | @SERVO READ <id>   (MAINTENANCE mode only)
 @SERVO CENSUS                               (MAINTENANCE mode only)
 @SERVO SAFE_OFF <id>                        (always allowed, any mode)
@@ -554,9 +566,38 @@ every shortcut refused, and the LF V25 oracle replay; plus 322 manager checks ag
 `ActuatorAuthority`, including the end-to-end stale-lease scenario where a finished session's late
 events are fired at a live one and must not touch it.
 
+## Calibration on `main` (2026-09-29)
+
+**Status: IMPLEMENTED / OFFLINE TESTED. The four-leg Full Calibration has NOT been run on
+hardware.** The sections *Calibration foundation* and *Safe Actuator Layer* below are the
+historical record of how the foundation was built; where they say "no write path" or "runtime
+adapter TO_IMPLEMENT", this block is the current state.
+
+- **Write path.** A bounded production `ServoBusActuatorBackend` exists and is reachable only
+  through the Safe Actuator layer: `ActuatorAuthority` lease, a live calibration session, a fresh
+  RAM motion permit and Geometry V5 targets. Nothing writes servo EEPROM, `PositionOffset`, an
+  ID or NVS in this path; every calibration record is RAM.
+- **q0.** `@CALIBRATION Q0 CAPTURE` produces twelve `CANDIDATE` q0 records read-only (Torque
+  OFF, nine samples per joint). `@CALIBRATION Q0 PROMOTE` promotes **that same capture** —
+  `prepareFreshQ0Evidence` over the capture session's `FreshQ0Capture` view — through the one
+  shared CR3 accept-and-promote rule, all twelve or none, and **replaces** the previous q0 in
+  `JointTransformTable`. The frozen CR2-C package (`prepareCurrentQ0Evidence`) is kept only as a
+  regression oracle; production code and the static audit forbid using it. `SESSION START`
+  refuses (`CURRENT_BOOT_Q0_NOT_PROMOTED`) unless the table holds exactly the current capture.
+- **Full Leg Calibration.** Generalized to LF, RF, RH, LH: UPPER MIN contact, an optional
+  auxiliary park, UPPER MAX contact, `SAFE_OFF`, then the evidence lifecycle. Parking: LF→
+  `LH_UPPER` (bus 42), RF→`RH_UPPER` (bus 32), RH and LH none. Evidence export is deterministic.
+- **Acceptance levels.** `HARDWARE_CONTACT_CALIBRATED` is the next hardware acceptance level.
+  `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` is unavailable until an approved stand/gait workspace
+  sets `kFullLegOperationalParametersApproved` (audit-pinned `false`); 0/12 final
+  `JointLimits` are admitted on purpose.
+- **Persistence.** None yet. Calibration Persistence V1 is the gate after the hardware PASS
+  ([`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md)).
+- **Hardware procedure:** [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md).
+
 ## Calibration foundation
 
-**Status: implemented, compiled, offline-tested. NOT hardware-tested. NO write path added.**
+**Status (historical, 2026-09-24): implemented, compiled, offline-tested. NOT hardware-tested. NO write path added.**
 
 The installed robot's calibration is `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION` and hardware
 motion is **BLOCKED** — that is the repository's own declaration, and
@@ -843,8 +884,9 @@ cleared explicitly, or by the next boot.
 
 ## Safe Actuator Layer
 
-**Status: policy core implemented, compiled, offline-tested. Runtime adapter TO_IMPLEMENT.
-NO write path added.**
+**Status (historical, 2026-09-25): policy core implemented, compiled, offline-tested. Runtime adapter TO_IMPLEMENT.
+NO write path added.** *(Current: see [Calibration on `main`](#calibration-on-main-2026-09-29) —
+a bounded production backend now exists, calibration-only and hardware TO_TEST.)*
 
 `src/actuator/ActuatorWritePolicy.*` is the boundary every future actuator write must pass
 through. It is a **decision**, not a transport: there is no bus handle in it, so an `ACCEPT`
@@ -902,8 +944,10 @@ The direction-verify envelope is **symmetric and checked in tick space** — the
 tick delta needs neither q0 nor direction, which is what makes the move that measures the sign
 safe before the sign is known.
 
-Everything fails closed today: no q0 has been captured on the current installation, so no
-transform exists and every plan-bound move refuses. Audit and contract:
+Everything failed closed at the time of writing: no q0 had been captured on the current
+installation, so no transform existed and every plan-bound move refused. (Since 2026-09-27 a
+read-only q0 capture has run on the robot, and 2026-09-29 promotes the current capture; the
+plan-bound moves still refuse until a session, a promoted q0 and a fresh permit exist.) Audit and contract:
 [`CALIBRATION_BOOTSTRAP.md`](CALIBRATION_BOOTSTRAP.md).
 
 ## OTA-A (update core)

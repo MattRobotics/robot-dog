@@ -4,21 +4,28 @@ MATDOG is Matt Robotics' custom quadruped platform: a 17-DOF mechanical design w
 articulated head, an ESP32-S3 real-time controller, and a future Jetson-based high-level stack.
 This repository is the single active engineering repository for the robot.
 
-> **Current snapshot — 2026-09-25**
+> **Current snapshot — 2026-09-29**
 >
-> - **13 servos are physically installed:** all 12 leg servos plus `NECK_ROTATION` (ID 51).
-> - **17 servos remain canonically allocated.** IDs 52–55 are intentionally absent today.
-> - **MATDOG Controller V0.1 is the official firmware baseline.** `ROBOT_POWERED` no-motion
->   operation is now **VALIDATED** (G3/G3.1 PASS, 2026-09-17/18); the firmware actually installed
->   on the robot is still source `6322563` (2026-09-19) — everything below is not flashed.
-> - The active workstream is **software-only NextGen integration**
->   (branch `feat/controller-nextgen-integration-v1`, base `feat/h0-current-leg-preflight-v1`):
->   Wi-Fi/OTA core, `ActuatorAuthority`, the Safe Actuator policy core, the calibration domain/
->   manager foundation, and H0 leg preflight are all **IMPLEMENTED / OFFLINE TESTED**, none
->   **HARDWARE TESTED**. The main fuse is intentionally removed during this phase; no flashing,
->   motion, KEY operation or charger action is authorized until an integrated software freeze and a
->   dedicated hardware-validation authorization.
-> - Joint calibration remains reset. No stale calibration authorizes motion.
+> - **13 servos are physically installed** (all 12 leg servos plus `NECK_ROTATION`, ID 51);
+>   **17 remain canonically allocated** — IDs 52–55 are intentionally absent today.
+> - **MATDOG Controller V0.1 is the official firmware baseline**, and `ROBOT_POWERED` no-motion
+>   operation is **VALIDATED** (G3/G3.1, 2026-09-17/18).
+> - **The four-leg Full Calibration (LF, RF, RH, LH) is implemented and offline-tested on `main`,
+>   but it has never run on the robot.** That hardware session is the immediate gate.
+> - Gait exists only as an offline engine on a separate, unmerged feature branch. No stand or
+>   gait hardware motion is authorized.
+> - Joint calibration is not accepted. No stale calibration authorizes motion.
+
+| Track | State |
+|---|---|
+| `ROBOT_POWERED` no-motion baseline | **VALIDATED** |
+| Full 4-leg calibration software (LF / RF / RH / LH) | **IMPLEMENTED** — host, audit, mutation and build gates PASS |
+| Hardware calibration, LF → RF → RH → LH | **TO_TEST** — the immediate gate |
+| Calibration Persistence V1, then accepted stand/gait workspace and joint limits | **NEXT** |
+| Gait engine | **IN PROGRESS** — separate feature branch, not merged |
+
+The step-by-step route, and what blocks what, is in [`ROADMAP.md`](01_Docs/02_Architecture/ROADMAP.md);
+the calibration state in detail is under *Calibration on `main`* below.
 
 ## Status vocabulary
 
@@ -49,9 +56,13 @@ Every current-facing document uses these meanings:
   2026-09-18): the hardware profile, the servo population model (canonical 17 / expected-now 13 /
   absent-by-design 52-55) and structured census, live read-only DALY, live LED, two identical
   censuses, `SAFE_OFF` `VERIFIED_OFF` and `torque=0` on all 13, and a Controller loop independent
-  of USB CDC host presence. No motion or calibration capability exists yet.
+  of USB CDC host presence. That validation covers the firmware of that date; calibration
+  and motion software merged since is **IMPLEMENTED**, not hardware validated.
 - The post-rewire power gate (2026-09-24): the historical `B-`/`P-` bypass is corrected, and
   physical KEY OFF now measures 0 V on every protected rail with no charger and no USB present.
+- LED Status Manager V2 (2026-09-26, source `88062e1`) and the read-only q0 capture on the real
+  robot (CR2-C, 2026-09-27, build `315d4ade6ff0`): 12/12 joints, nine samples per joint, Torque
+  OFF, maximum spread 0 ticks. It proves the capture path, not calibration.
 - The external USB service/programming port (2026-09-24): GPIO19/GPIO20/GND, no host VBUS —
   enumeration, bidirectional CDC and the `esptool` reset/flash-identification handshake all
   confirmed with the onboard USB-C disconnected.
@@ -63,6 +74,11 @@ Every current-facing document uses these meanings:
 
 - One modular Controller image contains ServoBus diagnostics, BNO085 acquisition, read-only DALY
   telemetry, LED-ring control, USB diagnostics, health aggregation, and a power-state baseline.
+- Wi-Fi/OTA core, `ActuatorAuthority`, the Safe Actuator policy core and the calibration
+  domain/manager (**OFFLINE TESTED**; the calibration path is not yet exercised on hardware).
+- Four-leg Full Calibration on `main`: fresh read-only q0 capture and current-q0 promotion, the
+  Full Leg sequence for LF, RF, RH and LH, contact-evidence lifecycle and deterministic evidence
+  export — see *Calibration on `main`* below.
 
 ### DECIDED
 
@@ -81,6 +97,8 @@ Every current-facing document uses these meanings:
 
 ### TO_TEST
 
+- **Full 4-leg calibration on the robot (LF → RF → RH → LH)** — the immediate gate, runbook:
+  [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](05_Firmware/MATDOG_Controller/FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md).
 - BMS KEY-configuration persistence across a true DALY power cycle (see *Where we are* below).
 - Charging qualification beyond the one attended manual session (autonomous dock/contact hardware,
   reverse-polarity protection, unattended charge acceptance/termination).
@@ -88,9 +106,12 @@ Every current-facing document uses these meanings:
 ### TO_DESIGN
 
 - The host command/telemetry protocol carried over USB CDC.
-- Integrated maintenance, service, Servo QC, provisioning, and full-leg calibration workflows.
-- Motion control, operational IK, gait, stabilization, ROS 2/MoveIt 2, and complete Jetson
-  integration.
+- Calibration Persistence V1 (across reboot), the operational stand/gait workspace with its
+  joint limits and margins, and the integrated maintenance, service, Servo QC and provisioning
+  workflows.
+- Stand and gait motion on hardware, stabilization, ROS 2/MoveIt 2, and complete Jetson
+  integration. A gait engine exists offline on `feat/gait-engine-offline-v1`; it is not merged
+  and not operational.
 
 ### FROZEN, SUPERSEDED, and HISTORICAL
 
@@ -129,7 +150,8 @@ Seeed Bus Servo Driver
 All 17 allocated units were bench-provisioned with `PositionOffset = 0`, but that servo-level fact
 is not joint calibration. The active calibration state remains
 `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION`; the preserved joint values describe an earlier
-installation and cannot authorize motion.
+installation and cannot authorize motion. A live calibration session keeps its results in RAM
+only: nothing is persisted across a reboot yet and no servo EEPROM value is ever written.
 
 ## Official firmware baseline
 
@@ -139,6 +161,7 @@ installation and cannot authorize motion.
 | Tagged repository commit | `c54862f38a9cbd5e46d6b1770a6d109cc99b5c02` |
 | Hardware-validated firmware source | `5b371da5482f9b0bd2df1c37ed361250ea54ae8f` |
 | Validated hardware profile | `USB_ONLY` |
+| Build last flashed on the robot | `315d4ade6ff0` (2026-09-27, `ROBOT_POWERED`, read-only q0 capture); `main` is **not** flashed |
 | Detailed evidence | [`05_Firmware/MATDOG_Controller/VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md) |
 
 The tag identifies the official merged repository release. The earlier source SHA identifies the
@@ -167,7 +190,13 @@ OPEN       manual charging common-port behaviour VERIFIED electrically (2026-09-
                                                  of KEY state
 OPEN       autonomous dock/charging              OPEN — no dock hardware evidence beyond one
                                                  attended manual charging session
-THEN       G4 Diagnostics / Maintenance          NOT STARTED
+
+COMPLETE   read-only q0 capture on the robot     VALIDATED (CR2-C, 2026-09-27; 12/12, spread 0)
+COMPLETE   four-leg Full Calibration software    IMPLEMENTED / OFFLINE TESTED on main (2026-09-29)
+NEXT       Full 4-leg calibration on hardware    TO_TEST — LF -> RF -> RH -> LH, one attended session
+THEN       Calibration Persistence V1            NEXT AFTER hardware Full Calibration PASS
+THEN       Operational envelopes / JointLimits   BLOCKED until calibration is hardware accepted
+THEN       Stand / gait hardware                 BLOCKED
 ```
 
 Power domains, KEY semantics, every power state and the charging gates are owned by
@@ -177,6 +206,29 @@ Power domains, KEY semantics, every power state and the charging gates are owned
 expected servos present with 4 absent by design in two identical censuses, `SAFE_OFF`
 `VERIFIED_OFF` and `torque=0` on all 13. The Controller loop is independent of USB CDC host
 presence: BNO085 acquisition runs at 50.1 Hz with the port closed (G3.1). No commanded servo motion occurred and no robot motion was observed during validation.
+
+### Calibration on `main`
+
+- **Chain.** Every actuator write must pass the Safe Actuator layer: `ActuatorAuthority`, a fresh
+  motion permit, a live calibration session and Geometry V5 provenance. A promoted q0 alone
+  authorizes nothing.
+- **q0.** `@CALIBRATION Q0 CAPTURE` reads 12/12 servos read-only with Torque OFF.
+  `@CALIBRATION Q0 PROMOTE` then promotes **that same fresh capture** into the RAM transform
+  table and replaces the previous q0. The frozen CR2-C values remain a comparison reference and
+  are never promoted.
+- **Full Leg Calibration** is generalized to LF, RF, RH and LH: UPPER MIN contact, an optional
+  auxiliary park, UPPER MAX contact, `SAFE_OFF`, then the evidence lifecycle. Parking: LF parks
+  `LH_UPPER` (bus 42), RF parks `RH_UPPER` (bus 32), RH and LH need none. Contact evidence is
+  exported deterministically.
+- **Offline gates PASS:** host suite, static audit, Safe Actuator/DALY/LED mutation suites,
+  `USB_ONLY` and `ROBOT_POWERED` builds. **Hardware: the four-leg calibration has not been run.**
+- **Acceptance levels.** `HARDWARE_CONTACT_CALIBRATED` is the next hardware acceptance level.
+  `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` is **not** yet available: no stand/gait workspace and
+  margins are approved, so 0/12 final `JointLimits` are intentionally admitted — a boundary, not a
+  failure.
+- **Persistence.** Results live in RAM and are lost on reboot; nothing writes NVS, servo EEPROM,
+  `PositionOffset` or servo IDs. **Calibration Persistence V1** is the gate right after the
+  hardware Full Calibration PASS (see the roadmap).
 
 ### Open hardware notes
 
@@ -214,8 +266,9 @@ deliberately not duplicated here.
 ## Target architecture
 
 The permanent MATDOG Controller is the integration point for future Diagnostics, Maintenance,
-Service, Servo QC, Provisioning, Full Leg Calibration, Wi-Fi/OTA, and host transport. Motion, IK,
-gait, and stabilization come later, behind explicit safety and calibration gates.
+Service, Servo QC, Provisioning, Full Leg Calibration, Wi-Fi/OTA, and host transport. Calibration
+motion is implemented behind the Safe Actuator layer; stand, IK, gait, and stabilization come
+later, behind explicit safety and calibration gates.
 
 **DECIDED (2026-09-16):** MATDOG will also host a permanent **Embedded Web UI / Control & Service
 Dashboard** served by the ESP32-S3 and reached from a phone, tablet, the ASUS or a future Jetson.
@@ -268,6 +321,7 @@ capabilities are integrated into the Controller.
 ## Safety boundary
 
 - No motion from stale calibration; no stand, gait, or load-bearing attempt before recalibration.
+  The Full Calibration on hardware is a separately authorized, attended session.
 - No servo EEPROM/ID change or hardware reflash is authorized by this documentation.
 - `PositionOffset = 0` is the persistent baseline; mechanical mounting errors are corrected
   mechanically, not hidden in EEPROM.

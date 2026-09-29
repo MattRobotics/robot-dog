@@ -156,7 +156,31 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationQ0Promotion.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
-  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+
+# The CURRENT-BOOT q0 promotion: a real CalibrationQ0CaptureSession capture is
+# promoted (not the frozen CR2-C package), admitted into the real
+# JointTransformTable (a second promotion replaces the first) and consumed by
+# the real four-leg plan resolver. The frozen package is only a contrast oracle.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_cr3_q0_fresh_promotion" \
+  "$SCRIPT_DIR/test_cr3_q0_fresh_promotion.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0EvidencePreparation.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Promotion.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationPopulationEvidence.cpp" \
+  "$SKETCH_DIR/src/calibration/FullLegCalibrationPlan.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
+  "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
 # CR3-M4 session-scoped calibration motion permit is pure policy: no
 # ServoBus, Arduino or device IO. It deliberately remains un-wired in production
@@ -402,6 +426,7 @@ done
 "$OUT/test_calibration_q0_capture_session"
 "$OUT/test_cr3_q0_transform"
 "$OUT/test_cr3_q0_evidence_preparation"
+"$OUT/test_cr3_q0_fresh_promotion"
 "$OUT/test_calibration_motion_permit"
 "$OUT/test_motion_deadman"
 "$OUT/test_ota_policy"

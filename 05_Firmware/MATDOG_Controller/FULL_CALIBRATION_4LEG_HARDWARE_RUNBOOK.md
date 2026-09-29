@@ -14,7 +14,9 @@ evidence before any power cycle.**
 
 | Command (each exact, four-token) | Effect |
 |---|---|
-| `@CALIBRATION SESSION START <LF\|RF\|RH\|LH> CONFIRM_CURRENT_Q0` | live session for that leg from the current-boot q0 population evidence; no bus traffic |
+| `@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE` | read-only, Torque-OFF 12/12 q0 capture of the current installation (nine samples per joint) |
+| `@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION` | promotes **the twelve candidates of that capture** into the RAM transform table; replaces the previous q0 of every joint; no bus traffic |
+| `@CALIBRATION SESSION START <LF\|RF\|RH\|LH> CONFIRM_CURRENT_Q0` | live session for that leg; refused unless the transform table holds exactly the current capture's q0 |
 | `@CALIBRATION MOTION PERMIT GRANT 16 CONFIRM_FIRST_MOTION` | fresh RAM permit for the live session (same command for every leg) |
 | `@CALIBRATION FULL LEG <LF\|RF\|RH\|LH> CONFIRM_FULL_CALIBRATION` | UPPER MIN contact, (aux park), UPPER MAX contact, SAFE_OFF; then the evidence lifecycle |
 | `@CALIBRATION FULL LEG STATUS` / `ABORT` | poll / abort the running sequence |
@@ -56,7 +58,8 @@ auxiliary only where one was used (never a `safeOff(0)`).
 - Clean-merged-`main` `ROBOT_POWERED` binary, its manifest kept with the evening's evidence.
 - Robot supported so every leg can sweep its full UPPER range and both rear UPPER joints can
   park without touching the ground or the frame; rail power switch within reach.
-- Legs at the same nominal q0 pose used for CR2-C (`CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md`).
+- Legs at the same nominal q0 pose used for CR2-C (`CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md`); the
+  fresh capture of this session, not CR2-C, becomes the promoted q0.
 - Serial log captured to a file for the whole session.
 
 ## Sequence
@@ -71,12 +74,16 @@ auxiliary only where one was used (never a `safeOff(0)`).
 4. `@SERVO SAFE_OFF <id>` for **all 13 installed servos** — 11 12 13 21 22 23 31 32 33 41 42 43
    51 — each `SERVO_SAFE_OFF id=<id> result=VERIFIED_OFF`.
 
-### 1. Fresh q0, 12/12, then promotion
+### 1. Fresh q0, 12/12, then promotion of THAT capture
+
+The q0 the four legs are calibrated with is the one captured **in this boot**. The frozen CR2-C
+values (2026-09-27) are a **comparison/reference only**: nothing in the production firmware reads
+them any more, and promotion never falls back to them.
 
 1. `@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE`; wait for the unsolicited `CALIBRATION_Q0
    state=COMPLETE … candidates=12/12` and `CALIBRATION_Q0_POPULATION … observed=12/12`; no other
    servo command while it runs.
-2. Compare every fresh q0 with CR2-C:
+2. Compare every fresh q0 with CR2-C (reference, not an input):
 
    | leg | LOWER | UPPER | HIP |
    |---|---|---|---|
@@ -89,7 +96,21 @@ auxiliary only where one was used (never a `safeOff(0)`).
    (`CR3_Q0_ACCEPTANCE_PROMOTION_PLAN.md`); the operator judges each difference against a
    re-alignment they can account for. Hard stop for any |Δ| ≥ 82 ticks — the half-tooth
    ceiling (81.92): beyond it the difference is a different spline tooth, not noise.
-3. `@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION` → `admitted=12/12`.
+3. `@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION` →
+   `CALIBRATION_Q0_PROMOTE=OK admitted=12/12 source=CURRENT_BOOT_CAPTURE capture_session=<n>`.
+   The promoted `q0_tick` of every joint is the fresh capture's tick (the numbers compared in
+   step 2), acceptance is the unchanged CR3 rule (≥ 9 samples, spread ≤ 16, |tick − 2048| ≤ 80,
+   identity/bus/Geometry V5 bound) and any single bad candidate refuses all twelve
+   (`REASON=REJECT_CANDIDATE|REJECT_PROMOTION|REJECT_RECORD_DUPLICATE`, `FAILED_RECORD_INDEX`).
+   Refusals: `REASON=NOT_IN_MAINTENANCE_MODE`, `REJECT_FRESH_CAPTURE_NOT_COMPLETE` (no finished
+   12/12 capture in this boot), `REJECT_CAPTURE_POPULATION_NOT_PASS`; `BUSY` with
+   `CAPTURE_STILL_ACTIVE` or `CALIBRATION_SESSION_OR_MOTION_ACTIVE`.
+4. Re-capturing and promoting again is allowed between legs' sessions: the new promotion
+   **replaces** the previous q0 of the same twelve joints (RAM only; nothing is appended and
+   nothing is written to a servo). A completed capture that has not been promoted, or that was
+   superseded by a newer promotion, makes `SESSION START` refuse with
+   `REASON=CURRENT_BOOT_Q0_NOT_PROMOTED hint=@CALIBRATION_Q0_PROMOTE`. All four legs of one
+   evening run on ONE capture and ONE promotion.
 
 ### 2. Per-leg cycle (LF, then RF, then RH, then LH — never concurrently)
 
@@ -138,7 +159,8 @@ session_completed=1 permit_revoked=1 authority_released=1`, and 13/13 `VERIFIED_
 ## Immediate stop (send `@CALIBRATION FULL LEG ABORT`, `@CALIBRATION SESSION ABORT`, then
 ## `@SERVO SAFE_OFF` on every servo)
 
-- q0 mismatch the operator cannot account for, or any |Δ| ≥ 82 ticks; population ≠ 12/12;
+- q0 mismatch versus CR2-C the operator cannot account for, or any |Δ| ≥ 82 ticks; population ≠ 12/12;
+  `Q0 PROMOTE` not `admitted=12/12 source=CURRENT_BOOT_CAPTURE`;
 - identity or Geometry V5 mismatch (`REASON=FULL_LEG_PLAN_…`, `CANONICAL_IDENTITY_MISMATCH`);
 - any SAFE_OFF not `VERIFIED_OFF`;
 - permit/session mismatch (`NO_ACTIVE_<LEG>_CALIBRATION_SESSION`, `SESSION_LEG_MISMATCH`);

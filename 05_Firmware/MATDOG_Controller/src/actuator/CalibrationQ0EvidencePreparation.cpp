@@ -74,7 +74,111 @@ bool sameRecordIdentity(const q0_evidence_data::Q0CandidateRecord& a,
   return true;
 }
 
+bool sameCandidateSlot(const Q0BootstrapCandidate& a, const Q0BootstrapCandidate& b) {
+  return calibration::identityPermitsEvidenceReuse(a.evidence.identity, b.evidence.identity) ||
+         a.bus_id == b.bus_id;
+}
+
+// The single acceptance -> promotion step shared by the fresh and the frozen
+// path, so neither can drift from the CR3 rules.
+Q0EvidencePreparationStatus acceptAndPromote(
+    const CalibrationGeometryProfile& current_profile,
+    const GeometryProvenance& expected_current_geometry,
+    const Q0BootstrapCandidate& candidate, uint32_t capture_session_id,
+    JointTransform* transform_out) {
+  const AcceptedQ0 accepted =
+      acceptQ0Candidate(current_profile, expected_current_geometry, candidate);
+  if (!accepted.accepted()) return Q0EvidencePreparationStatus::REJECT_CANDIDATE;
+
+  Q0PromotionRequest request{};
+  request.explicit_currentness_confirmation = true;
+  request.capture_session_id = capture_session_id;
+  const PromotedQ0 promoted =
+      promoteAcceptedQ0(current_profile, expected_current_geometry, accepted, request);
+  if (!promoted.promoted()) return Q0EvidencePreparationStatus::REJECT_PROMOTION;
+
+  *transform_out = promoted.transform;
+  return Q0EvidencePreparationStatus::READY;
+}
+
 }  // namespace
+
+Q0EvidencePreparation prepareFreshQ0Evidence(
+    const CalibrationGeometryProfile& current_profile,
+    const GeometryProvenance& expected_current_geometry,
+    const FreshQ0Capture& capture,
+    bool explicit_current_installation_confirmation) {
+  Q0EvidencePreparation out{};
+
+  if (!explicit_current_installation_confirmation) {
+    out.status =
+        Q0EvidencePreparationStatus::REJECT_CURRENT_INSTALLATION_NOT_CONFIRMED;
+    return out;
+  }
+
+  if (!capture.complete || capture.candidates == nullptr ||
+      capture.candidate_count != calibration::kLegServoSlotCount ||
+      capture.capture_session_id == 0) {
+    out.status = Q0EvidencePreparationStatus::REJECT_FRESH_CAPTURE_NOT_COMPLETE;
+    return out;
+  }
+  if (!capture.population_pass) {
+    out.status = Q0EvidencePreparationStatus::REJECT_CAPTURE_POPULATION_NOT_PASS;
+    return out;
+  }
+
+  if (!current_profile.bound() ||
+      !current_profile.provenanceMatches(expected_current_geometry)) {
+    out.status = Q0EvidencePreparationStatus::REJECT_SOURCE_GEOMETRY;
+    return out;
+  }
+
+  for (uint8_t i = 0; i < capture.candidate_count; ++i) {
+    for (uint8_t j = 0; j < i; ++j) {
+      if (sameCandidateSlot(capture.candidates[i], capture.candidates[j])) {
+        out.status = Q0EvidencePreparationStatus::REJECT_RECORD_DUPLICATE;
+        out.transform_count = 0;
+        out.failed_record_index = i;
+        return out;
+      }
+    }
+
+    const Q0EvidencePreparationStatus step =
+        acceptAndPromote(current_profile, expected_current_geometry,
+                         capture.candidates[i], capture.capture_session_id,
+                         &out.transforms[out.transform_count]);
+    if (step != Q0EvidencePreparationStatus::READY) {
+      out.status = step;
+      out.transform_count = 0;
+      out.failed_record_index = i;
+      return out;
+    }
+    ++out.transform_count;
+  }
+
+  out.status = Q0EvidencePreparationStatus::READY;
+  return out;
+}
+
+bool freshQ0CaptureIsPromoted(const FreshQ0Capture& capture,
+                              const JointTransformTable& transforms,
+                              GeometryProvenanceTag current_geometry) {
+  if (!capture.complete || capture.candidates == nullptr ||
+      capture.candidate_count != calibration::kLegServoSlotCount ||
+      current_geometry == kNoGeometryProvenance) {
+    return false;
+  }
+  for (uint8_t i = 0; i < capture.candidate_count; ++i) {
+    const Q0BootstrapCandidate& candidate = capture.candidates[i];
+    const JointTransform* held = transforms.find(candidate.evidence.identity, current_geometry);
+    if (held == nullptr || !held->present ||
+        held->state != calibration::EvidenceState::PROMOTED ||
+        held->q0_tick != candidate.evidence.tick) {
+      return false;
+    }
+  }
+  return true;
+}
 
 Q0EvidencePreparation prepareCurrentQ0Evidence(
     const CalibrationGeometryProfile& current_profile,
@@ -115,6 +219,7 @@ Q0EvidencePreparation prepareCurrentQ0Evidence(
           q0_evidence_data::kRecords[i].bus_id ==
               q0_evidence_data::kRecords[j].bus_id) {
         out.status = Q0EvidencePreparationStatus::REJECT_RECORD_DUPLICATE;
+        out.transform_count = 0;
         out.failed_record_index = i;
         return out;
       }
@@ -122,26 +227,17 @@ Q0EvidencePreparation prepareCurrentQ0Evidence(
 
     const Q0BootstrapCandidate candidate =
         candidateFromFrozenRecord(q0_evidence_data::kRecords[i]);
-    const AcceptedQ0 accepted = acceptQ0Candidate(
-        current_profile, expected_current_geometry, candidate);
-    if (!accepted.accepted()) {
-      out.status = Q0EvidencePreparationStatus::REJECT_CANDIDATE;
+    const Q0EvidencePreparationStatus step =
+        acceptAndPromote(current_profile, expected_current_geometry, candidate,
+                         q0_evidence_data::kCaptureSessionId,
+                         &out.transforms[out.transform_count]);
+    if (step != Q0EvidencePreparationStatus::READY) {
+      out.status = step;
+      out.transform_count = 0;
       out.failed_record_index = i;
       return out;
     }
-
-    Q0PromotionRequest request{};
-    request.explicit_currentness_confirmation = true;
-    request.capture_session_id = q0_evidence_data::kCaptureSessionId;
-    const PromotedQ0 promoted = promoteAcceptedQ0(
-        current_profile, expected_current_geometry, accepted, request);
-    if (!promoted.promoted()) {
-      out.status = Q0EvidencePreparationStatus::REJECT_PROMOTION;
-      out.failed_record_index = i;
-      return out;
-    }
-
-    out.transforms[out.transform_count++] = promoted.transform;
+    ++out.transform_count;
   }
 
   out.status = Q0EvidencePreparationStatus::READY;
@@ -170,6 +266,8 @@ const char* toString(Q0EvidencePreparationStatus status) {
       return "REJECT_CAPTURE_Q0_POSE_NOT_CONFIRMED";
     case Q0EvidencePreparationStatus::REJECT_CAPTURE_TORQUE_NOT_OFF:
       return "REJECT_CAPTURE_TORQUE_NOT_OFF";
+    case Q0EvidencePreparationStatus::REJECT_FRESH_CAPTURE_NOT_COMPLETE:
+      return "REJECT_FRESH_CAPTURE_NOT_COMPLETE";
   }
   return "UNKNOWN";
 }
