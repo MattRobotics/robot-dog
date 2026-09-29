@@ -529,7 +529,7 @@ void test_run_not_terminal_touches_nothing() {
   CHECK(rig.arbiter.current() == ActuatorAuthority::CALIBRATION);
 
   FullLegEvidenceStore store;
-  store.commit(record);
+  store.put(record);
   CHECK_EQ(store.legsPresent(), 0);
 }
 
@@ -854,7 +854,7 @@ void test_four_legs_sequential_in_one_boot_session() {
     const FullLegRunOutcome outcome = rig.goodOutcome(leg);
     FullLegRecord record{};
     CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::NONE);
-    store.commit(record);
+    store.put(record);
     rig.expectCleanBetweenLegs();
     CHECK(record.verdict == FullLegVerdict::HARDWARE_CONTACT_CALIBRATED);
   }
@@ -888,7 +888,7 @@ void test_one_leg_failing_does_not_falsify_the_others() {
     FullLegRecord record{};
     const FullLegFinalizeFailure failure = finalizeFullLeg(rig.context, plan, outcome, &record);
     CHECK((failure == FullLegFinalizeFailure::NONE) == (leg != Leg::RF));
-    store.commit(record);
+    store.put(record);
     rig.expectCleanBetweenLegs();
   }
 
@@ -907,7 +907,7 @@ void test_one_leg_failing_does_not_falsify_the_others() {
   const FullLegRunOutcome outcome = rig.goodOutcome(Leg::RF);
   FullLegRecord record{};
   CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::NONE);
-  store.commit(record);
+  store.put(record);
   CHECK_EQ(store.find(Leg::RF)->attempts, 2);
   CHECK(store.find(Leg::RF)->verdict == FullLegVerdict::HARDWARE_CONTACT_CALIBRATED);
   CHECK_EQ(store.find(Leg::LF)->attempts, 1);
@@ -924,11 +924,11 @@ void test_store_reset_and_bounds() {
   FullLegRecord record{};
   record.leg = static_cast<Leg>(9);
   record.present = true;
-  store.commit(record);  // unknown leg: ignored
+  store.put(record);  // unknown leg: ignored
   CHECK_EQ(store.legsPresent(), 0);
 
   record.leg = Leg::RH;
-  store.commit(record);
+  store.put(record);
   CHECK_EQ(store.legsPresent(), 1);
   CHECK(store.find(Leg::RH) != nullptr);
   store.reset();
@@ -961,7 +961,7 @@ void test_export_is_deterministic_and_complete() {
     if (leg == Leg::RH) outcome.min_contact.detection = ContactState::CONTACT_SUSPECTED;
     FullLegRecord record{};
     finalizeFullLeg(rig.context, plan, outcome, &record);
-    store.commit(record);
+    store.put(record);
   }
 
   Lines first;

@@ -342,7 +342,7 @@ void FullLegEvidenceStore::reset() {
   for (uint8_t i = 0; i < kLegCount; ++i) records_[i] = FullLegRecord{};
 }
 
-void FullLegEvidenceStore::commit(const FullLegRecord& record) {
+void FullLegEvidenceStore::put(const FullLegRecord& record) {
   if (!record.present || !isKnownLeg(record.leg)) return;
   const uint8_t index = static_cast<uint8_t>(record.leg);
   const uint16_t attempts = static_cast<uint16_t>(records_[index].attempts + 1);

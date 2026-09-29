@@ -209,6 +209,31 @@ FullLegFinalizeFailure finalizeFullLeg(const FullLegFinalizeContext& context,
                                        FullLegRecord* record);
 
 // ---------------------------------------------------------------------------
+// The run in flight
+// ---------------------------------------------------------------------------
+//
+// What the command handler hands to the Controller when it starts a run, so the
+// Controller can finalize it when the executor turns terminal - including a run
+// the operator aborted or whose session was lost. `armed` is set only by a
+// start() that the executor accepted, and cleared only by finalization: while
+// it is set, no other leg may start a session.
+struct FullLegRunState {
+  bool armed = false;
+  FullLegPlan plan{};
+  actuator::GeometryProvenanceTag geometry_at_start = actuator::kNoGeometryProvenance;
+  uint32_t session_id_at_start = 0;
+
+  void arm(const FullLegPlan& run_plan, actuator::GeometryProvenanceTag geometry,
+           uint32_t session_id) {
+    armed = true;
+    plan = run_plan;
+    geometry_at_start = geometry;
+    session_id_at_start = session_id;
+  }
+  void clear() { *this = FullLegRunState(); }
+};
+
+// ---------------------------------------------------------------------------
 // The RAM record of every leg run in this power-up
 // ---------------------------------------------------------------------------
 //
@@ -221,7 +246,7 @@ class FullLegEvidenceStore {
   void reset();
 
   // Stores the record for `record.leg`, incrementing that leg's attempt count.
-  void commit(const FullLegRecord& record);
+  void put(const FullLegRecord& record);
 
   const FullLegRecord* find(Leg leg) const;
 

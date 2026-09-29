@@ -207,6 +207,11 @@ class FullLegCalibrationExecutor {
   // meaningful once the AUX phases begin; it is still safe to read (and
   // safe to SAFE_OFF) before that, since 0 addresses nothing.
   uint8_t primaryBusId() const { return request_.probe_bus_id; }
+  // The endpoint (leg, joint) the current/last run probes: what
+  // SafeActuatorPolicy's parked-auxiliary context must name while
+  // auxiliaryParked() is true.
+  Leg endpointLeg() const { return request_.endpoint_leg; }
+  JointKind endpointJoint() const { return request_.endpoint_joint; }
   // 0 when no auxiliary is required (never an address — see file comment).
   uint8_t auxiliaryBusId() const {
     return request_.auxiliary_required ? request_.auxiliary_bus_id : 0;
