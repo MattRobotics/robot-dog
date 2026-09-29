@@ -1,0 +1,1448 @@
+{
+  "height_intent_experiment": {
+    "mapping_is_assumption": true,
+    "matdog_height_m": 0.08181818181818182,
+    "scope": "endpoint-ratio experiment only; not evidence that XGO lie touches the body to ground",
+    "source_host_range": [
+      60,
+      110
+    ],
+    "source_units": "documented mm with unbound ground datum",
+    "status": "VALID_STATIC MATDOG research candidate"
+  },
+  "host_apis": [
+    {
+      "host_evidence_class": "A",
+      "matdog_intent_experiments": [
+        "LOW_CROUCH",
+        "STAND"
+      ],
+      "name": "APP_PRESS_UP",
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "reason": "host coordinate datum/contact binding unknown",
+      "recovery": "EXACT_KEYFRAMES_RECOVERED",
+      "recovery_scope": "EXACT_HOST_CARTESIAN_COMMAND_SEQUENCE, not lower-firmware preset 21 geometry"
+    },
+    {
+      "host_evidence_class": "B",
+      "matdog_intent_experiments": [
+        "pose envelope parameter slices"
+      ],
+      "name": "APP_LEG_RESET",
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "reason": "host coordinate datum/contact binding unknown",
+      "recovery": "ENDPOINT_RECOVERED",
+      "recovery_scope": "EXACT_HOST_CARTESIAN_ENDPOINT"
+    },
+    {
+      "host_evidence_class": "C",
+      "matdog_intent_experiments": [
+        "pose envelope parameter slices"
+      ],
+      "name": "body_translation",
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "reason": "host coordinate datum/contact binding unknown",
+      "recovery": "PARTIAL_GEOMETRY",
+      "recovery_scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes"
+    },
+    {
+      "host_evidence_class": "C",
+      "matdog_intent_experiments": [
+        "pose envelope parameter slices"
+      ],
+      "name": "body_attitude",
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "reason": "host coordinate datum/contact binding unknown",
+      "recovery": "PARTIAL_GEOMETRY",
+      "recovery_scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes"
+    },
+    {
+      "host_evidence_class": "C",
+      "matdog_intent_experiments": [
+        "pose envelope parameter slices"
+      ],
+      "name": "periodic_translation",
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "reason": "host coordinate datum/contact binding unknown",
+      "recovery": "PARTIAL_GEOMETRY",
+      "recovery_scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes"
+    },
+    {
+      "host_evidence_class": "C",
+      "matdog_intent_experiments": [
+        "pose envelope parameter slices"
+      ],
+      "name": "periodic_rotation",
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "reason": "host coordinate datum/contact binding unknown",
+      "recovery": "PARTIAL_GEOMETRY",
+      "recovery_scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes"
+    },
+    {
+      "host_evidence_class": "C",
+      "matdog_intent_experiments": [
+        "pose envelope parameter slices"
+      ],
+      "name": "single_leg_cartesian",
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "reason": "host coordinate datum/contact binding unknown",
+      "recovery": "PARTIAL_GEOMETRY",
+      "recovery_scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes"
+    },
+    {
+      "host_evidence_class": "C",
+      "matdog_intent_experiments": [
+        "pose envelope parameter slices"
+      ],
+      "name": "mark_time_register",
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "reason": "host coordinate datum/contact binding unknown",
+      "recovery": "PARTIAL_GEOMETRY",
+      "recovery_scope": "DOCUMENTED_PARAMETERIZED_API; not preset keyframes"
+    }
+  ],
+  "normalization_rule": "explicit characteristic length and body/hip frames; transfer orientation and ratios only after source geometry is known; solve all four canonical MATDOG legs independently",
+  "normalized_matdog_poses": [
+    {
+      "evidence": "VALIDATED_STATIC",
+      "name": "REST_GROUND",
+      "normalized": {
+        "active_feet": [],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          5.28663538112787e-16
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            -0.9206228479412487,
+            0.2306783920155976,
+            0.002194201388823504
+          ],
+          [
+            -0.9206228479412487,
+            -0.2306783920155976,
+            0.002194201388823504
+          ],
+          [
+            -0.8974333362815201,
+            -0.22348937272005934,
+            -0.0441969668690466
+          ],
+          [
+            -0.8974333362815201,
+            0.22348937272005934,
+            -0.0441969668690466
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "BODY_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "result": "VALID_STATIC",
+      "source": "pose_library.json"
+    },
+    {
+      "evidence": "VALIDATED_STATIC",
+      "name": "REST_GROUND_MAX_SEPARATION",
+      "normalized": {
+        "active_feet": [],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          5.28663538112787e-16
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            -0.9293749862935421,
+            0.22171112012935898,
+            0.03590301996061388
+          ],
+          [
+            -0.9293749862935421,
+            -0.22171112012935898,
+            0.03590301996061388
+          ],
+          [
+            -0.9206228479412488,
+            -0.22348937272005934,
+            -0.05718247409679684
+          ],
+          [
+            -0.9206228479412488,
+            0.22348937272005934,
+            -0.05718247409679684
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "BODY_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "result": "VALID_STATIC",
+      "source": "pose_library.json"
+    },
+    {
+      "evidence": "VALIDATED_STATIC",
+      "name": "LOW_CROUCH",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.28837338415491526
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.08475885572561634,
+            0.22348937272005934,
+            -0.5118627568749746
+          ],
+          [
+            0.08475885572561634,
+            -0.22348937272005934,
+            -0.5118627568749746
+          ],
+          [
+            -0.15003564199755018,
+            -0.22348937272005934,
+            -0.41573829549000285
+          ],
+          [
+            -0.15003564199755018,
+            0.22348937272005934,
+            -0.41573829549000285
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "result": "VALID_STATIC",
+      "source": "pose_library.json"
+    },
+    {
+      "evidence": "VALIDATED_STATIC",
+      "name": "LOW_C4",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.48062230692485886
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.08475885572561648,
+            0.22348937272005934,
+            -0.7041116796449183
+          ],
+          [
+            0.08475885572561648,
+            -0.2234893727200592,
+            -0.7041116796449183
+          ],
+          [
+            -0.15003564199755018,
+            -0.22348937272005934,
+            -0.6079872182599464
+          ],
+          [
+            -0.15003564199755018,
+            0.22348937272005934,
+            -0.6079872182599464
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "result": "VALID_STATIC",
+      "source": "pose_library.json"
+    },
+    {
+      "evidence": "VALIDATED_STATIC",
+      "name": "STAND",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.7209334603872882
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.0847588557256162,
+            0.22348937272005934,
+            -0.9444228331073476
+          ],
+          [
+            0.0847588557256162,
+            -0.22348937272005934,
+            -0.9444228331073476
+          ],
+          [
+            -0.15003564199755046,
+            -0.22348937272005956,
+            -0.8482983717223758
+          ],
+          [
+            -0.15003564199755046,
+            0.22348937272005934,
+            -0.8482983717223758
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "result": "VALID_STATIC",
+      "source": "pose_library.json"
+    },
+    {
+      "evidence": "VALIDATED_STATIC",
+      "name": "STRETCH",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          -0.14418669207745763,
+          0.0,
+          0.48062230692485886
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.3090919009466843,
+            0.22348937272005914,
+            -0.5416416022691837
+          ],
+          [
+            0.3090919009466838,
+            -0.2234893727200591,
+            -0.5416416022691837
+          ],
+          [
+            0.10053116395738897,
+            -0.22348937271743258,
+            -0.7069923080009081
+          ],
+          [
+            0.10053116395543546,
+            0.22348937271407884,
+            -0.7069923079879158
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            0.9800665778412416,
+            0.0,
+            0.19866933079506122
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.19866933079506122,
+            0.0,
+            0.9800665778412416
+          ]
+        ]
+      },
+      "result": "VALID_STATIC",
+      "source": "pose_library.json"
+    },
+    {
+      "evidence": "RESEARCH_ONLY",
+      "name": "ROLL_PREP_RESEARCH",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.48062230692485886
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.08475885572561594,
+            0.06196793686913313,
+            -0.8139248839479383
+          ],
+          [
+            0.08475885572561648,
+            -0.3447160055290139,
+            -0.5471015006444095
+          ],
+          [
+            -0.1500356419975487,
+            -0.34500396327338667,
+            -0.4519079283638867
+          ],
+          [
+            -0.15003564199755032,
+            0.06177445065459575,
+            -0.7184259108941323
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.955336489125606,
+            -0.29552020666133955
+          ],
+          [
+            -0.0,
+            0.29552020666133955,
+            0.955336489125606
+          ]
+        ]
+      },
+      "result": "VALID_STATIC",
+      "source": "pose_library.json"
+    },
+    {
+      "evidence": "RESEARCH_ONLY",
+      "name": "PITCHED_CROUCH_RESEARCH",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.5767467683098305
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            -0.15021919744812778,
+            0.2234893724353431,
+            -0.9793715555388799
+          ],
+          [
+            -0.15021919758867822,
+            -0.22348937267706076,
+            -0.9793715565147718
+          ],
+          [
+            -0.30563830737102504,
+            -0.2234893727202066,
+            -0.4330843738327559
+          ],
+          [
+            -0.30563830737080916,
+            0.22348937272064884,
+            -0.4330843738334433
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            0.9396926207859084,
+            -0.0,
+            -0.3420201433256687
+          ],
+          [
+            0.0,
+            1.0,
+            -0.0
+          ],
+          [
+            0.3420201433256687,
+            0.0,
+            0.9396926207859084
+          ]
+        ]
+      },
+      "result": "VALID_STATIC",
+      "source": "pose_library.json"
+    },
+    {
+      "evidence": "RESEARCH_ONLY",
+      "name": "XGO_HEIGHT_RATIO_RESEARCH",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          0.39323643293852084
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.08475885572561634,
+            0.22348937272005934,
+            -0.6167258056585803
+          ],
+          [
+            0.08475885572561634,
+            -0.22348937272005934,
+            -0.6167258056585803
+          ],
+          [
+            -0.15003564199755032,
+            -0.22348937272005948,
+            -0.5206013442736084
+          ],
+          [
+            -0.15003564199755032,
+            0.22348937272005934,
+            -0.5206013442736084
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "result": "VALID_STATIC",
+      "source": "pose_library.json"
+    },
+    {
+      "evidence": "RESEARCH_ONLY",
+      "name": "BODY_FOUR_FEET_RESEARCH_1",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          5.28663538112787e-16
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.13326716844613481,
+            0.4082215756579894,
+            -0.2086765194309235
+          ],
+          [
+            0.13326716844613481,
+            -0.4082215756579894,
+            -0.2086765194309235
+          ],
+          [
+            0.09323968005796161,
+            -0.29060665651252965,
+            -0.11758065658961266
+          ],
+          [
+            0.09323968005796161,
+            0.29060665651252965,
+            -0.11758065658961266
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "BODY_AND_FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "result": "VALID_STATIC",
+      "source": "pose_library.json"
+    },
+    {
+      "evidence": "RESEARCH_ONLY",
+      "name": "BODY_FOUR_FEET_RESEARCH_2",
+      "normalized": {
+        "active_feet": [
+          "lf",
+          "rf",
+          "rh",
+          "lh"
+        ],
+        "body_translation_over_L": [
+          0.0,
+          0.0,
+          5.28663538112787e-16
+        ],
+        "characteristic_length_m": 0.2080635845635732,
+        "contact_relative_to_hip_in_body_over_L": [
+          [
+            0.10350140175858599,
+            0.4082565167159184,
+            -0.20872881241957392
+          ],
+          [
+            0.10350140175858599,
+            -0.4082565167159184,
+            -0.20872881241957392
+          ],
+          [
+            0.09323968005796161,
+            -0.29060665651252965,
+            -0.11758065658961266
+          ],
+          [
+            0.09323968005796161,
+            0.29060665651252965,
+            -0.11758065658961266
+          ]
+        ],
+        "joint_order": "LF/RF/RH/LH hip/upper/lower URDF radians",
+        "length_definition": "upper axis separation plus lower-to-foot-origin vector norm; foot cylinder excluded",
+        "support_regime": "BODY_AND_FOOT_SUPPORT",
+        "transferable": "intent, orientation and dimensionless geometry after explicit frame binding; joint angles and contact mechanics require MATDOG re-solve",
+        "world_from_body_rotation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "result": "VALID_STATIC",
+      "source": "pose_library.json"
+    }
+  ],
+  "preset_actions": [
+    {
+      "action_id": 0,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "E",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [],
+      "name": "Idle / clear action",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "NOT_TRANSFERABLE",
+      "recovery": "NOT_TRANSFERABLE",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 1,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "REST_GROUND",
+        "LOW_CROUCH"
+      ],
+      "name": "Lie down",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Body height command minimum; no proof of underside floor support"
+    },
+    {
+      "action_id": 2,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "STAND"
+      ],
+      "name": "Stand up",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Body height command maximum"
+    },
+    {
+      "action_id": 3,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": "DYNAMIC_ONLY_NOT_STATIC",
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "LOW_CROUCH"
+      ],
+      "name": "Crawl",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Low body height plus forward motion command; dynamic crawl"
+    },
+    {
+      "action_id": 4,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": "DYNAMIC_ONLY_NOT_STATIC",
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [],
+      "name": "Turn in a circle",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 5,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": "DYNAMIC_ONLY_NOT_STATIC",
+      "evidence_class": "D",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [],
+      "name": "Mini is stepping",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "SEMANTICS_ONLY",
+      "source_semantics": "Analyzed handler immediately calls common completion; documented stepping is not implemented here as a distinct sequence"
+    },
+    {
+      "action_id": 6,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "LOW_CROUCH",
+        "STAND"
+      ],
+      "name": "Squat",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Repeated height command changes"
+    },
+    {
+      "action_id": 7,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "ROLL_PREP_RESEARCH"
+      ],
+      "name": "Roll",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Periodic roll command, not a proven full rollover"
+    },
+    {
+      "action_id": 8,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "PITCHED_CROUCH_RESEARCH"
+      ],
+      "name": "Turn Pitch",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 9,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "yaw envelope"
+      ],
+      "name": "Yaw",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 10,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "roll/pitch/yaw envelope"
+      ],
+      "name": "Three-axis rotation",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 11,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": "DYNAMIC_ONLY_NOT_STATIC",
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 4,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "support_transfer.json three-foot interval"
+      ],
+      "name": "Pee",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 12,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 1,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "PITCHED_CROUCH_RESEARCH",
+        "SIT_CANDIDATE failed"
+      ],
+      "name": "Sit",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Twelve-slot motor-domain endpoint then common recovery"
+    },
+    {
+      "action_id": 13,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": "DYNAMIC_ONLY_NOT_STATIC",
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 5,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "support_transfer.json three-foot interval"
+      ],
+      "name": "Wave",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 14,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 3,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "STRETCH"
+      ],
+      "name": "Stretch",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Three twelve-slot motor-domain keyframes then common recovery"
+    },
+    {
+      "action_id": 15,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "x/y envelope"
+      ],
+      "name": "Wave",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 16,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "roll envelope"
+      ],
+      "name": "Sway",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 17,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "BEG_CANDIDATE failed"
+      ],
+      "name": "Beg",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Pitch/height posture plus yaw modulation; support set unspecified"
+    },
+    {
+      "action_id": 18,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "PITCHED_CROUCH_RESEARCH"
+      ],
+      "name": "Find food",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 19,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": "DYNAMIC_ONLY_NOT_STATIC",
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 4,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "support_transfer.json three-foot interval"
+      ],
+      "name": "Shake hands",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 20,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "roll/pitch/yaw envelope"
+      ],
+      "name": "Chicken head",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 21,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 2,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "LOW_CROUCH",
+        "STAND"
+      ],
+      "name": "Push-ups",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Alternating two motor-domain keyframes then common recovery"
+    },
+    {
+      "action_id": 22,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "yaw envelope"
+      ],
+      "name": "Look around",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 23,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": "DYNAMIC_ONLY_NOT_STATIC",
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "x/y/roll/pitch envelope"
+      ],
+      "name": "Dance",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 24,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "C",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [
+        "x/y/roll/pitch envelope"
+      ],
+      "name": "Playful",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "RETARGET_UNDERDETERMINED",
+      "recovery": "PARTIAL_GEOMETRY",
+      "source_semantics": "Periodic translation/rotation command fields"
+    },
+    {
+      "action_id": 128,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "E",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [],
+      "name": "Grab up",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "NOT_TRANSFERABLE",
+      "recovery": "NOT_TRANSFERABLE",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 129,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "E",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [],
+      "name": "Catch",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "NOT_TRANSFERABLE",
+      "recovery": "NOT_TRANSFERABLE",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 130,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "E",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [],
+      "name": "Grab",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "NOT_TRANSFERABLE",
+      "recovery": "NOT_TRANSFERABLE",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 144,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "E",
+      "exact_controller_tables_recovered": 14,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [],
+      "name": "not tabulated; note requires firmware >=V4.3.2",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "NOT_TRANSFERABLE",
+      "recovery": "NOT_TRANSFERABLE",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    },
+    {
+      "action_id": 255,
+      "direct_geometry_transfer_allowed": false,
+      "dynamic_behavior": null,
+      "evidence_class": "E",
+      "exact_controller_tables_recovered": 0,
+      "intent_experiment_scope": "independently specified MATDOG geometry, not recovered XGO endpoints",
+      "matdog_intent_experiments": [],
+      "name": "reset",
+      "normalized_source": {
+        "body_orientation": null,
+        "contacts_relative_to_hip_over_leg_length": null,
+        "height_over_leg_length": null,
+        "physical_support_set": null,
+        "reason": "no source-bound physical frame/length/contact set; controller unit interval is not spatial normalization"
+      },
+      "physical_retarget_result": "NOT_TRANSFERABLE",
+      "recovery": "NOT_TRANSFERABLE",
+      "source_semantics": "Numeric action-specific controller state sequence recovered; physical endpoint/support not bound"
+    }
+  ],
+  "provenance": {
+    "generator_sha256": "478e07c2ab3f514edc45ad4e4fe0767f788eac2dd59951131347ed86a35137c9",
+    "sources": {
+      "dimensions.json": "a48cb093376ae57ac29ad3487777e7f3fba1d6d099775612f0542a7dad1dc100",
+      "pose_library.json": "746f4393a2f9de5dc532c6b48e083f2089e3cc2fa25f381dc4ef9d08f9903a58",
+      "xgo_catalogue.json": "2de8cd2b1e753188dc272fea6c20af513dab0a37f415b352520bd22abb837066"
+    }
+  }
+}

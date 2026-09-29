@@ -1,0 +1,42 @@
+{
+  "outputs": {
+    "views/BODY_FOUR_FEET_RESEARCH_1.png": "117a901fee51ead80a2c2a2d9263a7e516fa295b1b8be617bde92c0edc6b8eb5",
+    "views/BODY_FOUR_FEET_RESEARCH_2.png": "a5287db393dbcdb1be99701179c42b3c9ce6c83419045621bd33930025c22b3c",
+    "views/LOW_C4.png": "70c397139d22bae8c3f4ebafad22ebe6584c1e3198475b4a6263e9ea16ec4d3c",
+    "views/LOW_CROUCH.png": "381d8128141ee5d3f78aa6b7027d5007bda5e526b5baefeec982589fa30bc9e7",
+    "views/PITCHED_CROUCH_RESEARCH.png": "00250c31d1c2c5cf2073189222af173d92118b7780046771bbb51e980b6502c9",
+    "views/REST_GROUND.png": "d3f3b3f6aeabf10de0c452695fe6157daa8cccc527944188d95897d568a492d7",
+    "views/REST_GROUND_MAX_SEPARATION.png": "5d290cea14a1f6c9214e03c7f8a0c1fcbde07a2c36a3767ee3d05b62d7a40507",
+    "views/ROLL_PREP_RESEARCH.png": "2eef6d0fd456d67faefeeb72489aad7d7b33ce89828deb01ab00f0b9b090ef07",
+    "views/STAND.png": "a2d9d70ff8296ce1b7f0ecd27ad0d27c98d3e82f57bc76159c36283556640308",
+    "views/STRETCH.png": "d22044a75c79ba7b4bb44130339afadb30bc19a97b1283071fd7757e68615dee",
+    "views/XGO_HEIGHT_RATIO_RESEARCH.png": "b06bca62c72c51b13e1d7453712582f49e8d198a9f82f1337042fa775b1b7026",
+    "views/envelope.png": "b02bebd57fa6a9884c62c67a102a04aa8451c5990d9ff82c60a03db7133ea944"
+  },
+  "provenance": {
+    "canonical_sources": {
+      "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966"
+    },
+    "generator_sha256": "2f2e3765580e44866e11920bd6f13baa086e5a69bbd8560c08f7b669febf0a30",
+    "library_sha256": "746f4393a2f9de5dc532c6b48e083f2089e3cc2fa25f381dc4ef9d08f9903a58"
+  },
+  "scope": "actual triangle geometry; support hull and CAD COM overlay; failed SIT/Beg targets are not rendered as achieved poses"
+}

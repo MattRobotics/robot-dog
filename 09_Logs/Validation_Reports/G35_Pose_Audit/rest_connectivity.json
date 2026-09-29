@@ -1,0 +1,1834 @@
+{
+  "free_space_scope": "leg vs base_link/self and ground penetration only; other legs are ignored by the search and by this estimate",
+  "global_absence_claim": false,
+  "isolated_leg_free_space": {
+    "lf": {
+      "isolated_leg_clear_fraction_at_base_ground_height": 0.05,
+      "seed": 1,
+      "uniform_joint_box_samples": 300
+    },
+    "rh": {
+      "isolated_leg_clear_fraction_at_base_ground_height": 0.023333333333333334,
+      "seed": 1,
+      "uniform_joint_box_samples": 300
+    }
+  },
+  "protocol": "direct joint interpolation (51 samples) to every valid contact-mode endpoint plus body-supported single-leg RRT-style detours (rear then front, seeds 17/31/73, 2000 trials) to both four-foot endpoints; identical to contact_modes.py and route_extension.py but applied to every valid body-only start",
+  "provenance": {
+    "canonical_sources": {
+      "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966"
+    },
+    "generator_sha256": "ba9d202aa04add6cab4b4d78b408b74ae1eba1fe1d952b63f1d6b73f6cb8a725",
+    "inputs": {
+      "contact_modes.json": "8272f9b084a95c3a60e0bbd1c9c7fcd0acb91def1743dc3afc8f3f00b8e5afaa",
+      "pose_library.json": "746f4393a2f9de5dc532c6b48e083f2089e3cc2fa25f381dc4ef9d08f9903a58",
+      "rest_search.json": "52299f097cb3ae725e680d9eddc2d03756a1a9579bc73f0dc82c1e877bac182a"
+    },
+    "model_sha256": "d9866cd8e98debff5ca5e7cfb86bd7d69f4edc1dd450b5ec1d5da9bc65f87698",
+    "route_extension_sha256": "1f5b0a9dbd8762c42d6c4b548ff75448f20ac278e607c958935b7b63c2acd7f5"
+  },
+  "starts": [
+    {
+      "body_supported_detours": [
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 19,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 37,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 28,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 0
+        },
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 19,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 37,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 28,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 1
+        }
+      ],
+      "direct_contact_additions": [
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        }
+      ],
+      "is_REST_GROUND": false,
+      "is_REST_GROUND_MAX_SEPARATION": false,
+      "joint_margin_rad": 0.06647651121567633,
+      "min_separation_m": 0.0006616348473246629,
+      "q": [
+        0.26,
+        1.9583620871641767,
+        0.5880219582823236,
+        -0.26,
+        1.9583620871641767,
+        0.5880219582823236,
+        0.0,
+        1.9583620871641767,
+        0.5880219582823236,
+        -0.0,
+        1.9583620871641767,
+        0.5880219582823236
+      ],
+      "source_pointer": "/candidates/48",
+      "start_isolated_leg_clear": {
+        "lf": true,
+        "lh": true,
+        "rf": true,
+        "rh": true
+      },
+      "support_margin_m": 0.04065234469206486
+    },
+    {
+      "body_supported_detours": [
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 21,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 37,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 28,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 0
+        },
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 21,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 37,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 28,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 1
+        }
+      ],
+      "direct_contact_additions": [
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        }
+      ],
+      "is_REST_GROUND": false,
+      "is_REST_GROUND_MAX_SEPARATION": false,
+      "joint_margin_rad": 0.0,
+      "min_separation_m": 0.0006616348473246629,
+      "q": [
+        0.26,
+        1.9583620871641767,
+        0.5880219582823236,
+        -0.26,
+        1.9583620871641767,
+        0.5880219582823236,
+        0.0,
+        1.9583620871641767,
+        0.654498469498,
+        -0.0,
+        1.9583620871641767,
+        0.654498469498
+      ],
+      "source_pointer": "/candidates/49",
+      "start_isolated_leg_clear": {
+        "lf": true,
+        "lh": true,
+        "rf": true,
+        "rh": true
+      },
+      "support_margin_m": 0.04065395936845188
+    },
+    {
+      "body_supported_detours": [
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 19,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 38,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 27,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 0
+        },
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 19,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 38,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 27,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 1
+        }
+      ],
+      "direct_contact_additions": [
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 1,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.02
+          },
+          "frames_evaluated": 2,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        }
+      ],
+      "is_REST_GROUND": true,
+      "is_REST_GROUND_MAX_SEPARATION": false,
+      "joint_margin_rad": 0.06647651121567633,
+      "min_separation_m": 0.0006616348473246629,
+      "q": [
+        0.26,
+        1.9583620871641767,
+        0.5880219582823236,
+        -0.26,
+        1.9583620871641767,
+        0.5880219582823236,
+        0.0,
+        2.048195210428588,
+        0.4550689358509703,
+        -0.0,
+        2.048195210428588,
+        0.4550689358509703
+      ],
+      "source_pointer": "/candidates/50",
+      "start_isolated_leg_clear": {
+        "lf": true,
+        "lh": true,
+        "rf": true,
+        "rh": true
+      },
+      "support_margin_m": 0.04062313043261297
+    },
+    {
+      "body_supported_detours": [
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 19,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 37,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 28,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 0
+        },
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 19,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 37,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 28,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 1
+        }
+      ],
+      "direct_contact_additions": [
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 7,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.14
+          },
+          "frames_evaluated": 8,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        }
+      ],
+      "is_REST_GROUND": false,
+      "is_REST_GROUND_MAX_SEPARATION": true,
+      "joint_margin_rad": 0.0,
+      "min_separation_m": 0.005755373507261348,
+      "q": [
+        0.26,
+        1.9583620871641767,
+        0.654498469498,
+        -0.26,
+        1.9583620871641767,
+        0.654498469498,
+        0.0,
+        1.9583620871641767,
+        0.5880219582823236,
+        -0.0,
+        1.9583620871641767,
+        0.5880219582823236
+      ],
+      "source_pointer": "/candidates/51",
+      "start_isolated_leg_clear": {
+        "lf": true,
+        "lh": true,
+        "rf": true,
+        "rh": true
+      },
+      "support_margin_m": 0.04065395936845188
+    },
+    {
+      "body_supported_detours": [
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 21,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 37,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 28,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 0
+        },
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 21,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 37,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 28,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 1
+        }
+      ],
+      "direct_contact_additions": [
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 7,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.14
+          },
+          "frames_evaluated": 8,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        }
+      ],
+      "is_REST_GROUND": false,
+      "is_REST_GROUND_MAX_SEPARATION": false,
+      "joint_margin_rad": 0.0,
+      "min_separation_m": 0.005755373507261348,
+      "q": [
+        0.26,
+        1.9583620871641767,
+        0.654498469498,
+        -0.26,
+        1.9583620871641767,
+        0.654498469498,
+        0.0,
+        1.9583620871641767,
+        0.654498469498,
+        -0.0,
+        1.9583620871641767,
+        0.654498469498
+      ],
+      "source_pointer": "/candidates/52",
+      "start_isolated_leg_clear": {
+        "lf": true,
+        "lh": true,
+        "rf": true,
+        "rh": true
+      },
+      "support_margin_m": 0.0406555740448389
+    },
+    {
+      "body_supported_detours": [
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 19,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 38,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 27,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 0
+        },
+        {
+          "all_samples_valid": false,
+          "attempts": [
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 19,
+              "seed": 17
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 38,
+              "seed": 31
+            },
+            {
+              "found": false,
+              "iterations": 2000,
+              "leg": "rh",
+              "nodes": 27,
+              "seed": 73
+            }
+          ],
+          "failure": {
+            "reason": "no collision-free single-leg route within bounded search",
+            "stage": "leg_route_rh"
+          },
+          "frames_evaluated": 1,
+          "target_family": 1
+        }
+      ],
+      "direct_contact_additions": [
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 7,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.14
+          },
+          "frames_evaluated": 8,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf",
+          "target_active_feet": [
+            "lf",
+            "rf"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        },
+        {
+          "first_failure": {
+            "collisions": [
+              [
+                "lf_lower_leg_link",
+                "lh_hip_link"
+              ],
+              [
+                "lf_foot_link",
+                "lh_hip_link"
+              ],
+              [
+                "rf_lower_leg_link",
+                "rh_hip_link"
+              ],
+              [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            ],
+            "errors": [
+              "SELF_COLLISION"
+            ],
+            "frame": 2,
+            "min_separation": {
+              "distance_m": 0.0,
+              "pair": [
+                "rf_foot_link",
+                "rh_hip_link"
+              ]
+            },
+            "progress": 0.04
+          },
+          "frames_evaluated": 3,
+          "target": "BODY_PLUS_lf_rf_rh_lh",
+          "target_active_feet": [
+            "lf",
+            "rf",
+            "rh",
+            "lh"
+          ],
+          "valid": false
+        }
+      ],
+      "is_REST_GROUND": false,
+      "is_REST_GROUND_MAX_SEPARATION": false,
+      "joint_margin_rad": 0.0,
+      "min_separation_m": 0.005755373507261348,
+      "q": [
+        0.26,
+        1.9583620871641767,
+        0.654498469498,
+        -0.26,
+        1.9583620871641767,
+        0.654498469498,
+        0.0,
+        2.048195210428588,
+        0.4550689358509703,
+        -0.0,
+        2.048195210428588,
+        0.4550689358509703
+      ],
+      "source_pointer": "/candidates/53",
+      "start_isolated_leg_clear": {
+        "lf": true,
+        "lh": true,
+        "rf": true,
+        "rh": true
+      },
+      "support_margin_m": 0.040624745108999986
+    }
+  ],
+  "starts_with_any_valid_connection": [],
+  "tree_growth": "attempt records list RRT node counts; saturation at tens of nodes means the reachable clear component from the start is small under the 0.15 rad step"
+}
