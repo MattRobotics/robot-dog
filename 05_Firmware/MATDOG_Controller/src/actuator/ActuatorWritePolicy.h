@@ -393,6 +393,19 @@ struct ActuatorPolicyCounters {
   uint32_t resets = 0;
 };
 
+// The result of offering one measured operational bound to the policy. The
+// ONLY route into limits() from a live calibration run.
+enum class LimitAdmission : uint8_t {
+  ADMITTED                  = 0,
+  REJECT_NOT_OPERATIONAL    = 1,  // absent, unordered, unknown unit, or not LIVE_SESSION + PROMOTED
+  REJECT_TICK_OUT_OF_RANGE  = 2,  // outside the unsigned ST3215 domain 0..4095
+  REJECT_GEOMETRY_NOT_CURRENT = 3,  // no current geometry, or the bound names a different model
+  REJECT_NO_TRANSFORM       = 4,  // no current promoted q0 for this joint
+  REJECT_TABLE_REJECTED     = 5,  // the limit table itself refused (capacity)
+};
+
+const char* toString(LimitAdmission admission);
+
 class SafeActuatorPolicy {
  public:
   // arbiter may be nullptr; that is a refusal, not a permission.
@@ -423,6 +436,18 @@ class SafeActuatorPolicy {
   // Ends a transaction without committing. An aborted transaction can never be
   // resumed; a new one must be planned.
   void abort(ActuatorTransaction* transaction);
+
+  // Side-effect-free precheck of admitOperationalLimit(): the same verdict,
+  // nothing stored. A caller with several bounds to admit as a set validates
+  // them all first, so a late refusal cannot leave a partial set behind.
+  LimitAdmission validateOperationalLimit(const JointLimit& limit) const;
+
+  // Admits one MEASURED operational bound into limits(). Refuses, storing
+  // nothing, unless the bound carries operational provenance, sits inside the
+  // ST3215 raw domain, names EXACTLY the geometry this policy currently
+  // holds, and the joint has a current promoted q0. It is the only
+  // production route into limits(); static_audit.py confines its callers.
+  LimitAdmission admitOperationalLimit(const JointLimit& limit);
 
   ActuatorLimitTable& limits() { return limits_; }
   const ActuatorLimitTable& limits() const { return limits_; }
