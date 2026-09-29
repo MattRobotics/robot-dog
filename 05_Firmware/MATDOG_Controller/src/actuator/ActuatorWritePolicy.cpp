@@ -238,7 +238,7 @@ LimitAdmission SafeActuatorPolicy::validateOperationalLimit(const JointLimit& li
   if (current == kNoGeometryProvenance || limit.geometry != current) {
     return LimitAdmission::REJECT_GEOMETRY_NOT_CURRENT;
   }
-  if (transforms_.find(limit.identity, current) == nullptr) {
+  if (transforms_.find(limit.identity, currentGeometryTag()) == nullptr) {
     return LimitAdmission::REJECT_NO_TRANSFORM;
   }
   return LimitAdmission::ADMITTED;
