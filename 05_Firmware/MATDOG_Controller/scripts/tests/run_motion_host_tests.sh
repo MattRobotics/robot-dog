@@ -46,3 +46,16 @@ for TEST in test_startup_timed_stand startup_timed_oracle_driver; do
 done
 "$OUT/test_startup_timed_stand"
 python3 "$SCRIPT_DIR/test_startup_timed_oracle.py" "$OUT/startup_timed_oracle_driver"
+
+# G3.5 compact semantic pose/contact policy, with no mesh runtime dependency.
+python3 "$REPO_DIR/06_Software/Matdog_Core/pose_audit/pose_export.py" --check
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -fno-exceptions -fno-rtti \
+  -o "$OUT/test_pose_support" "$SCRIPT_DIR/test_pose_support.cpp" \
+  "$SKETCH_DIR/src/motion/PoseSupport.cpp" \
+  "$SKETCH_DIR/src/motion/LegKinematics.cpp" \
+  "$SKETCH_DIR/src/motion/LegInverseKinematics.cpp" \
+  "$SKETCH_DIR/src/motion/FootContact.cpp" \
+  "$SKETCH_DIR/src/motion/StandTrajectory.cpp" \
+  "$SKETCH_DIR/src/motion/BodyPose.cpp" \
+  "$SKETCH_DIR/src/motion/StartupAcquisition.cpp"
+"$OUT/test_pose_support"
