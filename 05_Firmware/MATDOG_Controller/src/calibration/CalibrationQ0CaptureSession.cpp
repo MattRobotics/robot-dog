@@ -241,6 +241,19 @@ bool CalibrationQ0CaptureSession::finalizeCandidates() {
   return true;
 }
 
+actuator::FreshQ0Capture CalibrationQ0CaptureSession::freshCapture() const {
+  actuator::FreshQ0Capture view{};
+  view.complete = status_.state == Q0CaptureState::COMPLETE &&
+                  status_.failure == Q0CaptureFailure::NONE &&
+                  status_.candidates_complete == kLegServoSlotCount;
+  view.population_pass = population_.status == PopulationEvidenceBuildStatus::PASS &&
+                         populationIsCurrentPass(population_.evidence);
+  view.capture_session_id = status_.capture_session_id;
+  view.candidates = candidates_;
+  view.candidate_count = kLegServoSlotCount;
+  return view;
+}
+
 void CalibrationQ0CaptureSession::fail(Q0CaptureFailure failure) {
   if (!active()) return;
   status_.state = Q0CaptureState::FAILED;

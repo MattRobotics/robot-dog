@@ -104,6 +104,10 @@ class CalibrationQ0CaptureSession {
   const PopulationEvidenceBuildResult& populationResult() const { return population_; }
   const actuator::Q0BootstrapCandidate* candidates() const { return candidates_; }
 
+  // The CR3 promotion view of this capture. `complete` is true only for a
+  // failure-free COMPLETE capture whose 12 candidates were all built.
+  actuator::FreshQ0Capture freshCapture() const;
+
  private:
   bool buildReadRequest(uint8_t joint_index, uint8_t sample_pass,
                         Q0ReadRequest* out) const;

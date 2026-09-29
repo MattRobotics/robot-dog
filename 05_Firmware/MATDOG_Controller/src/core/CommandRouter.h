@@ -27,7 +27,7 @@ namespace actuator {
 // include CommandRouter.h itself has no other reason to pull in.
 class SafeActuatorPolicy;
 // Forward-declared for the same reason: only a pointer is needed to pass
-// the already-bound profile through to actuator::prepareCurrentQ0Evidence()
+// the already-bound profile through to actuator::prepareFreshQ0Evidence()
 // (@CALIBRATION Q0 PROMOTE). CommandRouter never binds/clears it and never
 // reads a joint/endpoint record out of it directly.
 class CalibrationGeometryProfile;
@@ -96,13 +96,13 @@ class CommandRouter {
     // commands remain the norm — see ControllerService.h and
     // scripts/static_audit.py's check_actuator_infrastructure_wired_fail_closed()
     // — with exactly one reviewed exception: @CALIBRATION Q0 PROMOTE admits
-    // the frozen, re-verified q0 transforms via transforms().admit(). That
+    // the current-boot capture's re-verified q0 transforms via transforms().admit(). That
     // is RAM-only evidence admission, never a plan()/commit()/execute()/
     // abort() call, and the audit function enforces that distinction too.
     actuator::SafeActuatorPolicy* actuator_policy;
     // The current, already-bound Geometry V5 profile (Controller::geometry_profile_).
     // Read-only here as well: passed straight through to
-    // actuator::prepareCurrentQ0Evidence(), never mutated.
+    // actuator::prepareFreshQ0Evidence(), never mutated.
     const actuator::CalibrationGeometryProfile* geometry_profile;
     // CR3 continuation. @CALIBRATION MOTION PERMIT GRANT/REVOKE are the only
     // command handlers that call motion_permit->grant()/revoke() or write

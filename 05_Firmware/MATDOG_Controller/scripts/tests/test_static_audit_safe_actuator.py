@@ -123,6 +123,12 @@ def run_full_leg_wiring_checks(files):
     return list(audit.failures)
 
 
+def run_q0_promotion_checks(files):
+    audit.failures.clear()
+    audit.check_calibration_q0_promotion_wiring(files, SKETCH_DIR)
+    return list(audit.failures)
+
+
 def run_actuator_infrastructure_checks(files):
     audit.failures.clear()
     audit.check_actuator_infrastructure_wired_fail_closed(files)
@@ -180,6 +186,7 @@ CONTROLLER_CPP = "Controller.cpp"
 FINALIZER_H = "FullLegCalibrationFinalizer.h"
 FINALIZER_CPP = "FullLegCalibrationFinalizer.cpp"
 PLAN_CPP = "FullLegCalibrationPlan.cpp"
+Q0_PREP_CPP = "CalibrationQ0EvidencePreparation.cpp"
 
 
 def main():
@@ -194,6 +201,7 @@ def main():
                 run_full_leg_wiring_checks(BASE))
     expect_pass("baseline CR3 actuator infrastructure fail-closed",
                 run_actuator_infrastructure_checks(BASE))
+    expect_pass("baseline current-boot q0 promotion", run_q0_promotion_checks(BASE))
 
     # --- purity of the decision core --------------------------------------
     case("policy gains Arduino", POLICY_H,
@@ -725,6 +733,91 @@ def main():
          "const FullLegJointRef& planJoint",
          "pure decision unit",
          runner=run_full_leg_wiring_checks)
+
+    # --- current-boot q0 promotion ----------------------------------------
+    # PROMOTE must consume the capture of THIS boot, in RAM, through the one
+    # reviewed pipeline, and refuse while anything could be using the old q0.
+    case("PROMOTE goes back to the frozen CR2-C package", ROUTER_CPP,
+         r"actuator::prepareFreshQ0Evidence\(",
+         "actuator::prepareCurrentQ0Evidence(",
+         "lost required gate 'prepareFreshQ0Evidence('",
+         runner=run_q0_promotion_checks)
+
+    case("PROMOTE reads the frozen data directly", ROUTER_CPP,
+         r"const actuator::FreshQ0Capture fresh_capture = modules_\.q0_capture->freshCapture\(\);",
+         "const unsigned frozen = actuator::q0_evidence_data::kSampleCount;\n"
+         "    const actuator::FreshQ0Capture fresh_capture = modules_.q0_capture->freshCapture();",
+         "q0_evidence_data",
+         runner=run_q0_promotion_checks)
+
+    case("PROMOTE stops using the capture view", ROUTER_CPP,
+         r"const actuator::FreshQ0Capture fresh_capture = modules_\.q0_capture->freshCapture\(\);",
+         "const actuator::FreshQ0Capture fresh_capture = actuator::FreshQ0Capture{};",
+         "modules_.q0_capture->freshCapture()",
+         runner=run_q0_promotion_checks)
+
+    case("PROMOTE no longer refuses during a live capture", ROUTER_CPP,
+         r'if \(modules_\.q0_capture->active\(\)\) \{(\s*)Serial\.println\("CALIBRATION_Q0_PROMOTE=BUSY"\);',
+         'if (false) {\\1Serial.println("CALIBRATION_Q0_PROMOTE=BUSY");',
+         "modules_.q0_capture->active()",
+         runner=run_q0_promotion_checks)
+
+    case("PROMOTE no longer refuses under a live session or armed run", ROUTER_CPP,
+         r"modules_\.full_leg_run->armed \|\|(\s*)modules_\.calibration->sessionLive\(\)\) \{(\s*)"
+         r'Serial\.println\("CALIBRATION_Q0_PROMOTE=BUSY"\);',
+         'modules_.motion_permit->active()) {\\2Serial.println("CALIBRATION_Q0_PROMOTE=BUSY");',
+         "modules_.full_leg_run->armed",
+         runner=run_q0_promotion_checks)
+
+    case("PROMOTE touches the servo EEPROM", ROUTER_CPP,
+         r"if \(modules_\.actuator_policy->transforms\(\)\.admit\(prepared\.transforms\[i\]\)\) \+\+admitted;",
+         "{ CalibrationOfs(1, 0); modules_.actuator_policy->transforms().admit(prepared.transforms[i]); ++admitted; }",
+         "CalibrationOfs",
+         runner=run_q0_promotion_checks)
+
+    case("a second production transform admission site appears", FINALIZER_CPP,
+         r"const FullLegJointRef& planJoint",
+         "void bad(actuator::SafeActuatorPolicy& p) "
+         "{ p.transforms().admit(actuator::JointTransform{}); }\n"
+         "const FullLegJointRef& planJoint",
+         "only permitted inside",
+         runner=run_q0_promotion_checks)
+
+    case("production code consumes the frozen CR2-C package", PLAN_CPP,
+         r"FullLegPlanStatus deriveBackoffUrad\(",
+         "void bad() { actuator::prepareCurrentQ0Evidence(profile, prov, true); }\n"
+         "FullLegPlanStatus deriveBackoffUrad(",
+         "historical regression oracle",
+         runner=run_q0_promotion_checks)
+
+    case("SESSION START stops requiring the promoted current capture", ROUTER_CPP,
+         r"!actuator::freshQ0CaptureIsPromoted\(\s*modules_\.q0_capture->freshCapture\(\),\s*"
+         r"modules_\.actuator_policy->transforms\(\),\s*"
+         r"modules_\.actuator_policy->currentGeometryTag\(\)\)",
+         "false",
+         "SESSION START lost the fresh-q0 promotion gate",
+         runner=run_q0_promotion_checks)
+
+    case("q0 preparation gains Serial", Q0_PREP_CPP,
+         r"Q0EvidencePreparation prepareFreshQ0Evidence\(",
+         'void bad() { Serial.println("x"); }\n'
+         "Q0EvidencePreparation prepareFreshQ0Evidence(",
+         "q0 preparation contains 'Serial.'",
+         runner=run_q0_promotion_checks)
+
+    case("q0 preparation mutates the transform table itself", Q0_PREP_CPP,
+         r"Q0EvidencePreparation prepareFreshQ0Evidence\(",
+         "void bad(JointTransformTable& t) { t.admit(JointTransform{}); }\n"
+         "Q0EvidencePreparation prepareFreshQ0Evidence(",
+         "q0 preparation contains '.admit('",
+         runner=run_q0_promotion_checks)
+
+    case("q0 preparation depends on the capture session", Q0_PREP_CPP,
+         r'#include "CalibrationQ0EvidencePreparation\.h"',
+         '#include "CalibrationQ0EvidencePreparation.h"\n'
+         '#include "../calibration/CalibrationQ0CaptureSession.h"',
+         "q0 preparation contains 'CalibrationQ0CaptureSession'",
+         runner=run_q0_promotion_checks)
 
     # --- the low-level transaction door stays shut, even next to the two ---
     # --- exempt executor-level abort() calls this same file now contains ---

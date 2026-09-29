@@ -1,6 +1,7 @@
 #ifndef MATDOG_ACTUATOR_CALIBRATION_Q0_EVIDENCE_PREPARATION_H
 #define MATDOG_ACTUATOR_CALIBRATION_Q0_EVIDENCE_PREPARATION_H
 
+#include "ActuatorWritePolicy.h"
 #include "CalibrationQ0EvidenceData.h"
 
 namespace matdog {
@@ -18,6 +19,7 @@ enum class Q0EvidencePreparationStatus : uint8_t {
   REJECT_CAPTURE_POPULATION_NOT_PASS = 8,
   REJECT_CAPTURE_Q0_POSE_NOT_CONFIRMED = 9,
   REJECT_CAPTURE_TORQUE_NOT_OFF = 10,
+  REJECT_FRESH_CAPTURE_NOT_COMPLETE = 11,
 };
 
 struct Q0EvidencePackageFacts {
@@ -44,15 +46,39 @@ struct Q0EvidencePreparation {
   }
 };
 
-// Rehydrates the frozen CR2-C CANDIDATE summary, then goes through the exact
-// CR3 acceptance and promotion functions. It never directly manufactures a
-// PROMOTED JointTransform.
+// PRODUCTION PATH. Promotes the twelve q0 candidates of the CURRENT-BOOT
+// read-only capture (CalibrationQ0CaptureSession::freshCapture()) through the
+// exact CR3 acceptance and promotion functions. The frozen CR2-C package is
+// never consulted: a new maintenance capture replaces the previous q0 evidence
+// because the same joint identities are re-admitted over the old transforms.
 //
-// The explicit current-installation confirmation is deliberately required
-// every time a caller wants to promote this persisted evidence after boot.
-// It is the point at which an operator asserts that no servo/mechanical
-// reassembly occurred after the 2026-09-27 capture. Future persistence may
-// replace this with a stronger installation identity, but it must never vanish.
+// All twelve candidates are validated before any transform is returned, so a
+// single bad candidate refuses the whole set (transform_count stays 0). The
+// caller admits the returned transforms only when ready().
+//
+// The explicit confirmation asserts that the operator aligned the legs to the
+// nominal URDF q=0 pose for THIS capture and that nothing was reassembled since.
+Q0EvidencePreparation prepareFreshQ0Evidence(
+    const CalibrationGeometryProfile& current_profile,
+    const GeometryProvenance& expected_current_geometry,
+    const FreshQ0Capture& capture,
+    bool explicit_current_installation_confirmation);
+
+// True only when the transform table already holds, for every one of the
+// capture's twelve joints under the CURRENT geometry, a PROMOTED transform
+// whose q0 is exactly the capture's measured tick. A complete capture that was
+// never promoted (or was superseded) is therefore not "current" for
+// calibration. Stateless on purpose: nothing to reset, nothing to go stale.
+bool freshQ0CaptureIsPromoted(const FreshQ0Capture& capture,
+                              const JointTransformTable& transforms,
+                              GeometryProvenanceTag current_geometry);
+
+// HISTORICAL REFERENCE / REGRESSION ORACLE ONLY. Rehydrates the frozen CR2-C
+// (2026-09-27) CANDIDATE summary and pushes it through the same CR3 functions.
+// No production command calls it any more: promoting stale evidence over a
+// fresh capture was the bug this module's fresh path replaces. It stays so the
+// preserved CR2-C package keeps proving that the CR3 gates still accept the
+// physically validated q0 values.
 Q0EvidencePreparation prepareCurrentQ0Evidence(
     const CalibrationGeometryProfile& current_profile,
     const GeometryProvenance& expected_current_geometry,

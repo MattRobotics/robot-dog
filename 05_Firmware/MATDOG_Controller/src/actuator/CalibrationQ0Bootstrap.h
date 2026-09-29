@@ -81,6 +81,16 @@ struct Q0BootstrapCandidate {
   uint16_t stability_spread_ticks = 0;
 };
 
+// A finished current-boot CR2-B acquisition seen as plain data, so the CR3
+// promotion path can consume it without depending on the capture session.
+struct FreshQ0Capture {
+  bool complete = false;          // COMPLETE with no failure and every candidate built
+  bool population_pass = false;   // 12/12 current-boot population evidence PASS
+  uint32_t capture_session_id = 0;
+  const Q0BootstrapCandidate* candidates = nullptr;
+  uint8_t candidate_count = 0;
+};
+
 // Builds one current q0 candidate from repeated read-only observations.
 // expected_provenance is the model this build/session expects. The supplied
 // profile must already be bound to exactly that provenance.

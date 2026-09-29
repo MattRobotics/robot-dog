@@ -370,12 +370,14 @@ void CommandRouter::handleLine(String line) {
     Serial.println("CALIBRATION_Q0_NOTE read-only; torque must already be OFF; "
                    "no motion/authority/EEPROM write");
   } else if (upper == "@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION") {
-    // CR3-M5: rehydrates the frozen CR2-C q0 CANDIDATE package and re-runs it
-    // through the exact CR3 acceptance/promotion functions, then admits the
-    // resulting PROMOTED transforms into the production limit/transform
-    // store. No bus transaction, no authority, no EEPROM write - the operator
-    // confirmation asserts only that no servo/mechanical reassembly happened
-    // since the 2026-09-27 capture (CalibrationQ0EvidencePreparation.h).
+    // CR3-M5: promotes the twelve q0 candidates of the CURRENT-BOOT read-only
+    // capture (@CALIBRATION Q0 CAPTURE) through the exact CR3 acceptance and
+    // promotion functions, then admits the resulting PROMOTED transforms into
+    // the production transform table, replacing the previous entry of every
+    // joint. The frozen CR2-C package is NOT consulted (it stays a regression
+    // oracle only). No bus transaction, no authority, no EEPROM write - the
+    // operator confirmation asserts the legs were at the nominal q0 pose for
+    // this capture and nothing was reassembled since.
     if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
       Serial.println("CALIBRATION_Q0_PROMOTE=BLOCKED");
       Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
@@ -386,8 +388,22 @@ void CommandRouter::handleLine(String line) {
       Serial.println("REASON=INFRASTRUCTURE_NOT_BOUND");
       return;
     }
-    const actuator::Q0EvidencePreparation prepared = actuator::prepareCurrentQ0Evidence(
-        *modules_.geometry_profile, actuator::geometry_data::kProvenance,
+    // Swapping q0 under a live session, a running executor or an armed run
+    // would change the numbers a leg is being calibrated with.
+    if (modules_.q0_capture->active()) {
+      Serial.println("CALIBRATION_Q0_PROMOTE=BUSY");
+      Serial.println("REASON=CAPTURE_STILL_ACTIVE");
+      return;
+    }
+    if (motionExecutorBusy() || modules_.full_leg_run->armed ||
+        modules_.calibration->sessionLive()) {
+      Serial.println("CALIBRATION_Q0_PROMOTE=BUSY");
+      Serial.println("REASON=CALIBRATION_SESSION_OR_MOTION_ACTIVE");
+      return;
+    }
+    const actuator::FreshQ0Capture fresh_capture = modules_.q0_capture->freshCapture();
+    const actuator::Q0EvidencePreparation prepared = actuator::prepareFreshQ0Evidence(
+        *modules_.geometry_profile, actuator::geometry_data::kProvenance, fresh_capture,
         /*explicit_current_installation_confirmation=*/true);
     if (!prepared.ready()) {
       Serial.println("CALIBRATION_Q0_PROMOTE=REFUSED");
@@ -399,9 +415,11 @@ void CommandRouter::handleLine(String line) {
     for (uint8_t i = 0; i < prepared.transform_count; ++i) {
       if (modules_.actuator_policy->transforms().admit(prepared.transforms[i])) ++admitted;
     }
-    Serial.printf("CALIBRATION_Q0_PROMOTE=%s admitted=%u/%u\n",
+    Serial.printf("CALIBRATION_Q0_PROMOTE=%s admitted=%u/%u source=CURRENT_BOOT_CAPTURE "
+                  "capture_session=%lu\n",
                  admitted == prepared.transform_count ? "OK" : "PARTIAL",
-                 (unsigned)admitted, (unsigned)prepared.transform_count);
+                 (unsigned)admitted, (unsigned)prepared.transform_count,
+                 (unsigned long)fresh_capture.capture_session_id);
     Serial.println("CALIBRATION_Q0_PROMOTE_NOTE RAM-only; no EEPROM write; no motion; "
                    "no authority acquired; a promoted transform alone authorizes no write");
   } else if (matchLegCommand(upper, "@CALIBRATION SESSION START ", " CONFIRM_CURRENT_Q0",
@@ -437,6 +455,14 @@ void CommandRouter::handleLine(String line) {
             calibration::kLegServoSlotCount) {
       Serial.println("CALIBRATION_SESSION=REFUSED");
       Serial.println("REASON=GEOMETRY_OR_PROMOTED_TRANSFORMS_NOT_CURRENT");
+      return;
+    }
+    if (!actuator::freshQ0CaptureIsPromoted(
+            modules_.q0_capture->freshCapture(),
+            modules_.actuator_policy->transforms(),
+            modules_.actuator_policy->currentGeometryTag())) {
+      Serial.println("CALIBRATION_SESSION=REFUSED");
+      Serial.println("REASON=CURRENT_BOOT_Q0_NOT_PROMOTED hint=@CALIBRATION_Q0_PROMOTE");
       return;
     }
     if (motionExecutorBusy()) {
