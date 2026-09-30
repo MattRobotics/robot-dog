@@ -1401,11 +1401,29 @@ def check_calibration_search_boundaries(files):
       - the probe never issues a step past the guard, steps 8 ticks in fine
         search, and treats a stall outside the corridor as EARLY_STALL;
       - only the reviewed calibration units may resolve a corridor or set the
-        calibration speed profile."""
+        calibration speed profile.
+    2026-09-30, the LF V25 coarse contact scout restored (PR #35 D6 closed):
+      - every search is baseline -> 64-tick coarse scout (never clamped to the
+        corridor entry) -> release -> backoff -> fine 1 -> backoff -> fine 2;
+      - the scout is stored as reference evidence, no fine pass runs without
+        it, and both fine passes use it: the adaptive corridor (scout - 32),
+        the one-fine-step lag rule and the kinematic plateau (fine passes
+        only); repeatability and metrology are fine-to-fine;
+      - every backoff is arrived only through V25's StableTargetGate (<= 12
+        ticks, |speed| <= 4, 4 consecutive samples, >= 400 ms) before the
+        current-recovery check and the next fine pass; the search times out
+        after V25's TELEMETRY_TIMEOUT (2 s) without telemetry;
+      - no calibration target unit names the raw servo centre 2048;
+      - the engine is generic: it names no leg and no joint, and the 24-contact
+        executor owns exactly one of it; the executor records the scout as
+        coarse_tick and the fine passes as fine_tick_1/2, and the diagnostics
+        and the envelope read only the fine passes."""
     by_name = {path.name: (path, code) for path, code in files}
     normalize = lambda text: re.sub(r"\s+", " ", text)
     needed = ("CalibrationTargetResolver.h", "ContactProbeEngine.h", "ContactProbeEngine.cpp",
-              "ActuatorWritePolicy.cpp", "CalibrationExecutionEngine.cpp")
+              "ActuatorWritePolicy.cpp", "CalibrationExecutionEngine.cpp",
+              "FullLegCalibrationExecutor.h", "FullLegCalibrationExecutor.cpp",
+              "OperationalEnvelope.cpp")
     for name in needed:
         if name not in by_name:
             fail(f"{name} not found - cannot audit the calibration search boundaries")
@@ -1428,12 +1446,19 @@ def check_calibration_search_boundaries(files):
            "kSearchMinContactTravelTicks": ("uint16_t", 24), "kSearchMaxProgressTicks": ("uint16_t", 2),
            "kSearchMaxVelocityRaw": ("uint16_t", 10), "kSearchPersistenceSamples": ("uint8_t", 3),
            "kSearchTargetStartupSamples": ("uint8_t", 4), "kSearchSettleWindowMs": ("uint32_t", 900),
-           "kSearchSampleIntervalMs": ("uint32_t", 20), "kSearchMaxTelemetryAgeMs": ("uint32_t", 3000),
+           "kSearchSampleIntervalMs": ("uint32_t", 20), "kSearchTelemetryTimeoutMs": ("uint32_t", 2000),
            "kSearchHardCurrentAbortRaw": ("int32_t", 200), "kSearchTemperatureLimitC": ("int32_t", 70),
            "kSearchFineScoutLagToleranceTicks": ("uint16_t", 8),
            "kSearchAdaptiveScoutTicks": ("uint16_t", 32), "kSearchBaselineTravelTicks": ("uint16_t", 64),
            "kSearchBaselineMinSamples": ("uint8_t", 6),
-           "kSearchMinExpectedTicksPerSecond": ("uint16_t", 80)}
+           "kSearchMinExpectedTicksPerSecond": ("uint16_t", 80),
+           "kSearchBaselineTimeoutMs": ("uint32_t", 12000),
+           "kSearchKinematicPlateauSamples": ("uint8_t", 3),
+           "kSearchKinematicPlateauSpanTicks": ("uint16_t", 3),
+           "kSearchBackoffSettleToleranceTicks": ("uint16_t", 12),
+           "kSearchBackoffSettleMaxSpeedRaw": ("int32_t", 4),
+           "kSearchBackoffSettledSamples": ("uint8_t", 4),
+           "kSearchBackoffSettleWindowMs": ("uint32_t", 400)}
     for name, (ctype, value) in v25.items():
         if body.count(f"constexpr {ctype} {name} = {value};") != 1:
             fail(f"{path}: {name} must be exactly the LF V25 value {value}")
@@ -1487,8 +1512,6 @@ def check_calibration_search_boundaries(files):
     body = normalize(code)
     for token, why in (("next_depth = target_depth + kSearchFineStepTicks;", "fine steps are 8 ticks"),
                        ("next_depth = target_depth + kSearchCoarseStepTicks;", "coarse steps are 64 ticks"),
-                       ("if (next_depth > entry_depth) next_depth = entry_depth;",
-                        "coarse transit never enters the corridor"),
                        ("if (next_depth > guard_depth) { failSafeOff(ContactProbeFailure::NO_CONTACT_BEFORE_GUARD);",
                         "the step past the guard is never issued"),
                        ("return inside_acceptance ? ContactDetectorState::CONTACT_CONFIRMED "
@@ -1496,12 +1519,115 @@ def check_calibration_search_boundaries(files):
                         "a stall outside the corridor is never contact"),
                        ("if (has_cadence_sample_ && now_ms - last_cadence_ms_ < kSearchSampleIntervalMs) return;",
                         "V25 sample cadence"),
-                       ("const int32_t backoff_depth = depth(status_.pass1_contact_tick) - kSearchBackoffTicks;",
-                        "V25 backoff"),
+                       ("const int32_t backoff_depth = depth(contact_tick_) - kSearchBackoffTicks;",
+                        "V25 backoff_and_verify() from the contact just released"),
                        ("req.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;",
-                        "search steps use the V25 envelope")):
+                        "search steps use the V25 envelope"),
+                       ("const int32_t target_depth = depth(start) + kSearchBaselineTravelTicks;",
+                        "V25 baseline: one 64-tick move from the present pose"),
+                       ("beginPass(0, position);", "the coarse scout starts where the baseline ended"),
+                       ("stage = next_depth < depth(request_.corridor.entry_tick) ? "
+                        "ContactSearchStage::COARSE_TRANSIT : ContactSearchStage::COARSE_SCOUT;",
+                        "V25 coarse contact scout: free-space transit only short of the corridor"),
+                       ("status_.scout_tick = position; status_.scout_valid = true; beginRelease(position);",
+                        "the scout is stored, released and backed off from"),
+                       ("if (!status_.scout_valid) { failSafeOff(ContactProbeFailure::SCOUT_MISSING);",
+                        "no fine pass without a scout"),
+                       ("acceptance_entry = searchAdaptiveAcceptanceEntryDepth(request_.corridor, "
+                        "status_.scout_tick);", "V25 adaptive_contact_acceptance_bounds(scout)"),
+                       ("const int32_t adaptive = actuator::searchDepth(corridor, scout) - "
+                        "kSearchAdaptiveScoutTicks; return adaptive < entry ? adaptive : entry;",
+                        "the adaptive corridor extends HOME-ward only"),
+                       ("if (!searchFineContactReproducesScout(request_.corridor, position, "
+                        "status_.scout_tick)) {", "V25 fine_contact_reproduces_coarse_depth(scout)"),
+                       ("return searchScoutLagTicks(corridor, candidate, scout) <= "
+                        "static_cast<int32_t>(kSearchFineScoutLagToleranceTicks);",
+                        "the scout lag tolerance is one fine step"),
+                       ("if (status_.pass == 0) { failSafeOff(ContactProbeFailure::TRACKING_FAILED); return; } "
+                        "plateau_active_ = true;",
+                        "the kinematic plateau exists only for passes with a scout"),
+                       ("if (absDiff(status_.pass1_contact_tick, status_.pass2_contact_tick) <= "
+                        "static_cast<int32_t>(request_.repeatability_tolerance_ticks)) {",
+                        "V25 repeatability_spread(fine 1, fine 2)"),
+                       ("const bool qualifies = absDiff(position, target) <= "
+                        "static_cast<int32_t>(kSearchBackoffSettleToleranceTicks) && speed_magnitude >= 0 "
+                        "&& speed_magnitude <= kSearchBackoffSettleMaxSpeedRaw; if (!qualifies) { reset(); "
+                        "return false; }", "V25 StableTargetGate: band, speed, reset"),
+                       ("return consecutive_ >= kSearchBackoffSettledSamples && now_ms - first_ms_ >= "
+                        "kSearchBackoffSettleWindowMs;", "V25 StableTargetGate: 4 samples AND 400 ms"),
+                       ("if (!settle_.observe(static_cast<uint16_t>(sample.present_position), "
+                        "magnitude(sample.present_speed), status_.target_tick, now_ms)) { return; }",
+                        "the backoff is arrived only through the V25 StableTargetGate"),
+                       ("if (usable) settle_.reset();", "leaving the band restarts the settle gate"),
+                       ("settle_.reset(); status_.phase = ContactProbePhase::BACKOFF_MONITORING;",
+                        "every backoff starts its settle gate afresh"),
+                       ("if (!sampleSafe(telemetry)) return; } else if (telemetry_available) { "
+                        "sample.read_ok = false;",
+                        "the backoff checks the whole V25 readback on every sample")):
         if token not in body:
             fail(f"{path}: the staged search lost {token!r} ({why})")
+    # V25 TELEMETRY_TIMEOUT (2 s) ends every search stage without new telemetry.
+    if body.count("kSearchTelemetryTimeoutMs") < 3 or "kSearchMaxTelemetryAgeMs" in body:
+        fail(f"{path}: the search stale / communication timers must be V25 TELEMETRY_TIMEOUT "
+             f"(kSearchTelemetryTimeoutMs)")
+    # V25 has no transit clamp: the scout's steps are never cut at the entry.
+    if "next_depth = entry_depth" in body:
+        fail(f"{path}: the coarse scout is clamped to the corridor entry again (V25 steps 64 "
+             f"ticks from the baseline end, through the corridor)")
+    # One generic search for all 24 endpoints: no leg / joint is named in it.
+    if re.search(r"\b(Leg|JointKind)::", code):
+        fail(f"{path}: the contact search names a leg or joint - all 24 endpoints must run the "
+             f"same generic V25 search")
+
+    # The backoff deadman carries V25's figures (Controller::begin()).
+    ctrl = by_name.get("Controller.cpp")
+    if ctrl is None:
+        fail("Controller.cpp not found - cannot audit the search backoff configuration")
+    else:
+        cbody = normalize(ctrl[1])
+        for token in ("full_leg_backoff.max_telemetry_age_ms = calibration::kSearchTelemetryTimeoutMs;",
+                      "full_leg_backoff.arrival_tolerance_ticks = calibration::kSearchBackoffSettleToleranceTicks;",
+                      "full_leg_backoff.nominal_travel_ticks_per_s = calibration::kSearchMinExpectedTicksPerSecond;"):
+            if token not in cbody:
+                fail(f"{ctrl[0]}: the search backoff deadman lost {token!r} (V25 figures)")
+
+    # Recentred installation: 2048 is a servo/provisioning fact, never a q0,
+    # a target or a search origin - no calibration target unit may name it.
+    for unit in ("CalibrationTargetResolver.cpp", "FullLegCalibrationPlan.cpp",
+                 "FullLegCalibrationExecutor.cpp", "ContactProbeEngine.cpp",
+                 "CalibrationSequencePlan.cpp"):
+        if unit not in by_name:
+            fail(f"{unit} not found - cannot audit it for the raw servo centre")
+            continue
+        upath, ucode = by_name[unit]
+        stripped = re.sub(r"//[^\n]*", "", ucode)
+        if re.search(r"\b2048\b|kServoRawCenter|provisioned_center_raw", stripped):
+            fail(f"{upath}: a calibration target unit uses the raw servo centre (2048) - every "
+                 f"target must be the fresh promoted q0 + direction * q")
+
+    path, code = by_name["FullLegCalibrationExecutor.h"]
+    if len(re.findall(r"\bContactProbeEngine\s+\w+_\s*;", code)) != 1:
+        fail(f"{path}: the 24-contact executor must own exactly one ContactProbeEngine")
+    path, code = by_name["FullLegCalibrationExecutor.cpp"]
+    body = normalize(code)
+    for token, why in (("e.coarse_tick = probe_.status().scout_tick;", "the scout is recorded as coarse_tick"),
+                       ("e.fine_tick_1 = probe_.status().pass1_contact_tick;", "fine pass 1"),
+                       ("e.fine_tick_2 = probe_.status().pass2_contact_tick;", "fine pass 2"),
+                       ("if (probe_.status().phase != ContactProbePhase::COMPLETE || "
+                        "!probe_.status().scout_valid) {", "no evidence without a scout"),
+                       ("d.min_contact_tick = midpoint(min_side.fine_tick_1, min_side.fine_tick_2);",
+                        "V25 contact_result_tick(): the fine passes only"),
+                       ("d.max_contact_tick = midpoint(max_side.fine_tick_1, max_side.fine_tick_2);",
+                        "V25 contact_result_tick(): the fine passes only")):
+        if token not in body:
+            fail(f"{path}: the 24-contact evidence lost {token!r} ({why})")
+    path, code = by_name["OperationalEnvelope.cpp"]
+    body = normalize(code)
+    if ("const uint16_t lo = minTick(request.min_side_evidence.fine_tick_2, "
+            "request.max_side_evidence.fine_tick_2);") not in body or "coarse_tick" in \
+            re.sub(r"//[^\n]*", "", code):
+        fail(f"{path}: a contact-derived envelope must be bounded by the second fine passes, "
+             f"never the coarse scout")
 
     corridor_callers = {"CalibrationTargetResolver.h", "CalibrationTargetResolver.cpp",
                         "ActuatorWritePolicy.cpp", "FullLegCalibrationPlan.cpp"}
@@ -1844,7 +1970,9 @@ def check_full_leg_calibration_wiring(files):
         for token in ("full_leg_backoff.nominal_travel_ticks_per_s = "
                       "calibration::kSearchMinExpectedTicksPerSecond;",
                       "full_leg_backoff.arrival_tolerance_ticks = "
-                      "calibration::kSearchStaticToleranceTicks + 2;",
+                      "calibration::kSearchBackoffSettleToleranceTicks;",
+                      "full_leg_backoff.max_telemetry_age_ms = "
+                      "calibration::kSearchTelemetryTimeoutMs;",
                       "full_leg_config.probe_backoff_deadman = full_leg_backoff;"):
             if body.count(token) != 1:
                 fail(f"{controller_path}: the Full-Leg long-move deadman lost {token!r} "

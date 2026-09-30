@@ -140,6 +140,7 @@ ContactEvidence contactEvidence(Leg leg, JointKind kind, uint16_t fine_tick,
                                  witness_accepted ? 16 : 2);
   e.coarse_tick = static_cast<uint16_t>(fine_tick - 10);
   e.fine_tick_1 = fine_tick;
+  e.fine_tick_2 = fine_tick;
   e.has_measurement = true;
   return e;
 }

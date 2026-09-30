@@ -54,9 +54,24 @@ PREFLIGHT → INITIAL_RECOVERY (all 12 → q0, verified) → PARKING (front legs
 | RH | 33 / 32 / 31 | none | 90° | 90° / 90° | −39.99° |
 | LH | 43 / 42 / 41 | none | 90° | 90° / 90° | −39.99° |
 
-Every endpoint is searched with the staged LF V25 search: 64-tick coarse transit to the corridor
-entry (URDF limit − 64), 8-tick fine search to the guard (URDF limit + 64), backoff 96, second
-pass, repeatability ≤ 16. Contact is kinematic; current only aborts. On `ARMED` the firmware
+Every endpoint is searched with the LF V25 contact search (`measure_lf_contact_side_efficient`).
+The sequence:
+1. a 64-tick moving-current baseline;
+2. the **coarse contact scout** in 64-tick steps through the corridor [URDF limit − 64, guard =
+   URDF limit + 64]. Its steps short of the entry are free-space transit
+   (`stage=COARSE_TRANSIT`); the rest are `stage=COARSE_SCOUT`;
+3. release on the scout, backoff 96, fine pass 1 (8-tick steps), release, backoff 96, fine
+   pass 2, release; repeatability |fine 1 − fine 2| ≤ 16.
+
+   Each backoff counts as arrived only through V25's StableTargetGate: ≤ 12 ticks, |speed| ≤ 4,
+   4 consecutive samples, ≥ 400 ms. Only then are the current-recovery check and the next pass
+   allowed. Without new telemetry the search stops after 2 s (V25 `TELEMETRY_TIMEOUT`).
+
+Both fine passes use the scout: they accept down to scout − 32, and step past a plateau more
+than 8 ticks short of it. The scout is reference evidence only; the fine passes are the
+measurement. Contact is kinematic; current only aborts. A stop deeper than the scout's last
+64-tick target before the guard, minus 11, is not scouted (V25 property, risk R2):
+`NO_CONTACT_BEFORE_GUARD`, SAFE_OFF. Stop there and keep the evidence. On `ARMED` the firmware
 prints the six `CALIBRATION_FULL_LEG_SEARCH_CORRIDOR joint=… side=…` lines and the
 `CALIBRATION_FULL_LEG_PREREQUISITE pose=…` lines for this q0. It also prints one
 `CALIBRATION_SEQUENCE …` line per phase/step and one `CALIBRATION_SEARCH …` line per search step.
@@ -101,7 +116,19 @@ Expect `envelope_accepted=0`, `parameters_approved=0`. That is correct.
    | LH | 41 = 2073 | 42 = 2089 | 43 = 2035 |
 
    **Hard stop at any |Δ| ≥ 82** (half a spline tooth). Then `Q0 PROMOTE` → `admitted=12/12
-   source=CURRENT_BOOT_CAPTURE`, `transforms_admitted=12 geometry_bound=YES`.
+   source=CURRENT_BOOT_CAPTURE`, `transforms_admitted=12 geometry_bound=YES`. The promoted
+   **fresh** q0 is authoritative from here on; CR2-C is only this plausibility reference, and 2048
+   is never a q0.
+
+   **R2 reach report (read-only, before any GO).** From the promoted LF UPPER q0, compute with the
+   production resolver:
+   - the LF UPPER MIN corridor (canonical contact, URDF limit, entry, guard);
+   - the coarse-scout start depth, the deepest legal coarse-scout target and the reach (= that
+     target − 11);
+   - the depth of the hand-found stop (raw ≈ 1470, 2026-09-29) and the predicted margin.
+
+   If the margin is < 0, **stop before Full Calibration** and keep the evidence; nothing is
+   widened. Recompute it after step 4 with the measured rest position of LF UPPER (bus 12).
 4. `--phase recover` — LF `SESSION START` + `PERMIT GRANT`, then `INITIAL RECOVERY LF`: the 12
    targets must equal the promoted q0, and the run must end `verdict=PASS recovered=12/12`. Raw
    positions printed before and after. **Stops here:** LF session + permit live, every joint

@@ -425,13 +425,21 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   V25 mapping:
   [`2026-09-30_FULL_CALIBRATION_24_CONTACT_V25_TRACEABILITY.md`](../../09_Logs/Development_Log/2026-09-30_FULL_CALIBRATION_24_CONTACT_V25_TRACEABILITY.md).
   - Supersedes PR #34's UPPER-only "Full Leg" (2 contacts per leg, 8 in all), which is **not**
-    Full Calibration and stays unmerged. The staged endpoint search it introduced (coarse →
-    8-tick fine in URDF ± 64 → backoff 96 → pass 2 within 16) is kept and now drives all six
-    endpoints.
+    Full Calibration and stays unmerged. Its staged endpoint search had no coarse contact
+    scout (PR #35 D6); the corrective commit restores the V25 search exactly: baseline →
+    64-tick coarse scout → release → backoff 96 → fine 1 (8) → backoff → fine 2 (8), both fine
+    passes judged against the scout (adaptive corridor, lag bypass, kinematic plateau),
+    repeatability fine-to-fine ≤ 16. It drives all 24 endpoints.
   - Gates: host tests, static audit (incl. the runner suite and the plan-data re-derivation),
     the Safe Actuator/DALY/LED audit mutation suites, and
-    `scripts/tests/test_calibration_search_behaviour_mutations.py` (staged-search +
-    orchestration mutations, explicit run: every mutation must fail the host tests).
+    `scripts/tests/test_calibration_search_behaviour_mutations.py` (staged-search,
+    coarse-scout and orchestration mutations, explicit run: every mutation must fail the host
+    tests).
+  - Each backoff is arrived only through V25's StableTargetGate (≤ 12 ticks, |speed| ≤ 4, 4
+    samples, ≥ 400 ms); the search telemetry timeout is V25's 2 s.
+  - Known V25 property, risk R2: the coarse scout's reach near the guard depends on its 64-tick
+    grid phase and so on the fresh q0; a deeper stop fails closed (`NO_CONTACT_BEFORE_GUARD`). A
+    read-only LF UPPER MIN reach report from the promoted q0 gates the GO; margin < 0 = stop.
   - Known hardware risk R1: V25's LF HIP MAX contact sat exactly on the corridor entry (see the
     development log). If it recurs: stop, keep the evidence, decide from the measured stop.
   **Next after a hardware Full Calibration PASS: Calibration Persistence V1** (versioned,

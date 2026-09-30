@@ -37,6 +37,35 @@ MIN/MAX only, 2 of a leg's 6 contacts. It is superseded and is **not** Full Cali
   two block reads.
 - **ContactProbeEngine**: `start_torque_verified`, the V25 `stop_pressure` release, and
   `TORQUE_LIMIT_CHANGED` / `SERVO_STATUS_FAULT` / `GOAL_READBACK_MISMATCH`.
+- **ContactProbeEngine — the LF V25 coarse contact scout restored (corrective commit; closes PR
+  #35 D6 "no coarse scout, inherited from #34")**: every one of the 24 searches is now V25
+  `measure_lf_contact_side_efficient` stage for stage:
+  - BASELINE: one 64-tick moving-current move from the present pose (≥ 6 samples, 12 s).
+  - COARSE scout: 64-tick steps from the baseline end, never clamped at the entry; the static
+    corridor applies; pre-corridor steps are free-space transit, where a stall is EARLY_STALL.
+  - RELEASE (GoalPosition := the scout, read back), then BACKOFF 96.
+  - FINE 1 (8), RELEASE, BACKOFF 96, FINE 2 (8), RELEASE; repeatability |fine 1 − fine 2| ≤ 16.
+
+  Both fine passes are judged against the scout: the adaptive corridor (scout − 32), the
+  one-fine-step lag bypass (friction/chamfer plateau) and the V25 kinematic-plateau
+  confirmation. Evidence is `coarse_tick` = scout (reference only), `fine_tick_1/2` = the fine
+  passes. Diagnostics use the midpoint of the fine passes and the envelope the second fine pass;
+  the scout enters neither. New: `SCOUT_MISSING`, `BASELINE_PASSES_GUARD`; phases
+  `BASELINE_*`, `RELEASE_VERIFYING`; stages `BASELINE`, `COARSE_SCOUT`, `RELEASE`. Serial:
+  `CALIBRATION_SEARCH … kplateau= scout=`, `CALIBRATION_FULL_LEG_CONTACT … scout= fine1= fine2=`,
+  export `scout_tick= fine1_tick= fine2_tick=`. Known V25 property, risk R2: the scout's reach
+  near the guard depends on its 64-tick grid phase and hence on the fresh q0 (development log §3).
+- **Backoff = V25 StableTargetGate** (closes review H1): a backoff is arrived only after ≤ 12
+  ticks, |speed| ≤ 4, 4 consecutive samples and ≥ 400 ms (`SearchSettleGate`, reset by any bad
+  sample). Only then are the current recovery and the next fine pass allowed. TorqueEnable and
+  the whole readback are checked on every backoff sample.
+- **Search telemetry timeout 2 s** (V25 `TELEMETRY_TIMEOUT`; closes review M1): was the inherited
+  3 s, for the search stages and the backoff deadman.
+- **Recentred installation, proven**: every calibration raw target is the fresh promoted q0 +
+  direction · q. For two installations with different per-joint mounting offsets, identical URDF
+  commands, all 24 corridors, every prerequisite pose and the park move by exactly Δq0
+  (`test_recentred_installation_translation`). The audit refuses the raw centre 2048 in every
+  calibration target unit.
 - **Finalizer / evidence**: 6 contacts recorded per leg; UPPER/LOWER/HIP envelopes;
   `contacts_expected=6` and `contacts_accepted` (0 unless 6); four-leg result only at 24/24.
   Export `format=2`: `LEG` + `LEG_CLOSE`, six `CONTACT`, three `DIAG`, and the `END` line with
@@ -45,9 +74,10 @@ MIN/MAX only, 2 of a leg's 6 contacts. It is superseded and is **not** Full Cali
 - **Runner** `scripts/calibration_hw_session.py`: phases `prepare / q0 / recover / legs / all`.
   `legs` needs `--confirm-operator-go`. It requires 6/6 per leg and the 24/24 export; anchored
   whole-line records only.
-- **Gates**: host suites (executor end-to-end on four legs + ~30 adversarial cases, 24-profile
-  plan matrix, 24-contact finalizer), static audit (incl. plan-data re-derivation), Safe
-  Actuator / LED / DALY mutation suites, and behavioural orchestration mutations.
+- **Gates**: host suites (executor end-to-end on four legs + ~30 adversarial cases, the V25
+  search trace of all 24 endpoints, 24-profile plan matrix, 24-contact finalizer), static audit
+  (incl. plan-data re-derivation and the coarse-scout pins), Safe Actuator / LED / DALY mutation
+  suites, and behaviour mutations (staged search, coarse scout, orchestration).
 
 ### LED — DALY informational alarm bit is not a charging fault (presentation only)
 

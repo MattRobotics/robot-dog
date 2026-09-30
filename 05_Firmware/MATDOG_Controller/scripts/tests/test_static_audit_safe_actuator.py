@@ -639,6 +639,122 @@ def main():
          "",
          "V25 sample cadence", runner=run_search_checks)
 
+    # --- the LF V25 coarse contact scout (2026-09-30, PR #35 D6 closed) -------
+    case("coarse scout clamped to the corridor entry again", "ContactProbeEngine.cpp",
+         r"next_depth = target_depth \+ kSearchCoarseStepTicks;",
+         "next_depth = target_depth + kSearchCoarseStepTicks;\n"
+         "    const int32_t entry_depth = depth(request_.corridor.entry_tick);\n"
+         "    if (next_depth > entry_depth) next_depth = entry_depth;",
+         "clamped to the corridor entry", runner=run_search_checks)
+
+    case("fine pass allowed without a scout", "ContactProbeEngine.cpp",
+         r"if \(!status_\.scout_valid\) \{\s*failSafeOff\(ContactProbeFailure::SCOUT_MISSING\);",
+         "if (false) {\n      failSafeOff(ContactProbeFailure::SCOUT_MISSING);",
+         "no fine pass without a scout", runner=run_search_checks)
+
+    case("fine passes judged against fine pass 1 instead of the scout", "ContactProbeEngine.cpp",
+         r"if \(!searchFineContactReproducesScout\(request_\.corridor, position, status_\.scout_tick\)\) \{",
+         "if (!searchFineContactReproducesScout(request_.corridor, position, status_.pass1_contact_tick)) {",
+         "fine_contact_reproduces_coarse_depth", runner=run_search_checks)
+
+    case("adaptive corridor no longer bounded by the static entry", "ContactProbeEngine.cpp",
+         r"return adaptive < entry \? adaptive : entry;",
+         "return adaptive;",
+         "extends HOME-ward only", runner=run_search_checks)
+
+    case("scout-lag tolerance doubled", "ContactProbeEngine.cpp",
+         r"<=\s*static_cast<int32_t>\(kSearchFineScoutLagToleranceTicks\);",
+         "<= 2 * static_cast<int32_t>(kSearchFineScoutLagToleranceTicks);",
+         "one fine step", runner=run_search_checks)
+
+    case("kinematic plateau opened to the coarse scout", "ContactProbeEngine.cpp",
+         r"if \(status_\.pass == 0\) \{\s*failSafeOff\(ContactProbeFailure::TRACKING_FAILED\);\s*return;\s*\}",
+         "",
+         "exists only for passes with a scout", runner=run_search_checks)
+
+    case("backoff always from fine pass 1", "ContactProbeEngine.cpp",
+         r"depth\(contact_tick_\) - kSearchBackoffTicks;",
+         "depth(status_.pass1_contact_tick) - kSearchBackoffTicks;",
+         "V25 backoff", runner=run_search_checks)
+
+    case("the contact search branches on a leg", "ContactProbeEngine.cpp",
+         r"void ContactProbeEngine::onCandidate\(uint16_t position\) \{",
+         "void ContactProbeEngine::onCandidate(uint16_t position) {\n"
+         "  if (request_.endpoint_leg == Leg::LF) return;",
+         "names a leg or joint", runner=run_search_checks)
+
+    case("a second contact probe engine in the executor", "FullLegCalibrationExecutor.h",
+         r"ContactProbeEngine probe_;",
+         "ContactProbeEngine probe_;\n  ContactProbeEngine hip_probe_;",
+         "exactly one ContactProbeEngine", runner=run_search_checks)
+
+    case("executor records fine pass 1 as the scout", "FullLegCalibrationExecutor.cpp",
+         r"e\.coarse_tick = probe_\.status\(\)\.scout_tick;",
+         "e.coarse_tick = probe_.status().pass1_contact_tick;",
+         "the scout is recorded as coarse_tick", runner=run_search_checks)
+
+    case("executor accepts a contact without a scout", "FullLegCalibrationExecutor.cpp",
+         r" \|\| !probe_\.status\(\)\.scout_valid\) \{",
+         ") {",
+         "no evidence without a scout", runner=run_search_checks)
+
+    case("diagnostics read the coarse scout", "FullLegCalibrationExecutor.cpp",
+         r"midpoint\(min_side\.fine_tick_1, min_side\.fine_tick_2\)",
+         "midpoint(min_side.coarse_tick, min_side.fine_tick_1)",
+         "the fine passes only", runner=run_search_checks)
+
+    case("envelope bounded by the coarse scout", "OperationalEnvelope.cpp",
+         r"minTick\(request\.min_side_evidence\.fine_tick_2,\s*request\.max_side_evidence\.fine_tick_2\)",
+         "minTick(request.min_side_evidence.coarse_tick, request.max_side_evidence.coarse_tick)",
+         "second fine passes", runner=run_search_checks)
+
+    case("baseline deadline stretched 12 s -> 30 s", "ContactProbeEngine.h",
+         r"constexpr uint32_t kSearchBaselineTimeoutMs = 12000;",
+         "constexpr uint32_t kSearchBaselineTimeoutMs = 30000;",
+         "kSearchBaselineTimeoutMs must be exactly", runner=run_search_checks)
+
+    case("kinematic-plateau span widened 3 -> 8", "ContactProbeEngine.h",
+         r"constexpr uint16_t kSearchKinematicPlateauSpanTicks = 3;",
+         "constexpr uint16_t kSearchKinematicPlateauSpanTicks = 8;",
+         "kSearchKinematicPlateauSpanTicks must be exactly", runner=run_search_checks)
+
+    # --- V25 backoff StableTargetGate, TELEMETRY_TIMEOUT, recentred q0 ---------
+    case("backoff settle window 400 -> 0 ms", "ContactProbeEngine.h",
+         r"constexpr uint32_t kSearchBackoffSettleWindowMs = 400;",
+         "constexpr uint32_t kSearchBackoffSettleWindowMs = 0;",
+         "kSearchBackoffSettleWindowMs must be exactly", runner=run_search_checks)
+
+    case("backoff settle speed limit 4 -> 40 raw", "ContactProbeEngine.h",
+         r"constexpr int32_t kSearchBackoffSettleMaxSpeedRaw = 4;",
+         "constexpr int32_t kSearchBackoffSettleMaxSpeedRaw = 40;",
+         "kSearchBackoffSettleMaxSpeedRaw must be exactly", runner=run_search_checks)
+
+    case("search telemetry timeout back to 3 s", "ContactProbeEngine.h",
+         r"constexpr uint32_t kSearchTelemetryTimeoutMs = 2000;",
+         "constexpr uint32_t kSearchTelemetryTimeoutMs = 3000;",
+         "kSearchTelemetryTimeoutMs must be exactly", runner=run_search_checks)
+
+    case("backoff arrived on the first in-band sample (no settle gate)", "ContactProbeEngine.cpp",
+         r"if \(!settle_\.observe\(static_cast<uint16_t>\(sample\.present_position\),\s*"
+         r"magnitude\(sample\.present_speed\), status_\.target_tick, now_ms\)\) \{\s*return;\s*\}",
+         "(void)settle_;",
+         "through the V25 StableTargetGate", runner=run_search_checks)
+
+    case("settle gate keeps counting across a bad sample", "ContactProbeEngine.cpp",
+         r"if \(!qualifies\) \{\s*reset\(\);\s*return false;\s*\}",
+         "if (!qualifies) {\n    return false;\n  }",
+         "band, speed, reset", runner=run_search_checks)
+
+    case("backoff deadman telemetry age back to 3 s", "Controller.cpp",
+         r"full_leg_backoff\.max_telemetry_age_ms = calibration::kSearchTelemetryTimeoutMs;",
+         "full_leg_backoff.max_telemetry_age_ms = 3000;",
+         "V25 figures", runner=run_search_checks)
+
+    case("corridor home taken from the raw servo centre", "CalibrationTargetResolver.cpp",
+         r"c\.home_tick = transform\.q0_tick;",
+         "c.home_tick = 2048;",
+         "raw servo centre", runner=run_search_checks)
+
     case("CommandRouter derives its own search corridor", ROUTER_CPP,
          r"void CommandRouter::printServoRead\(int id\) \{",
          "void CommandRouter::printServoRead(int id) {\n  actuator::CalibrationSearchCorridor c{};\n"

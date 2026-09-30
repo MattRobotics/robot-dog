@@ -127,13 +127,16 @@ void Controller::begin() {
     // monitored move is the 96-tick backoff, at the V25 calibration speed
     // (160) with V25's figures: a travel-aware budget at its conservative
     // MIN_EXPECTED_MOTION_TICKS_PER_SECOND (80) on top of the same 12 s, and
-    // arrival within STATIC_TOLERANCE + 2 = 12 ticks - a position-controlled
+    // the arrival band STATIC_TOLERANCE + 2 = 12 ticks - a position-controlled
     // ST3215 settles a few ticks short of its goal (observed 4-5 on
     // LF_UPPER), which the 4-tick DIRECTION_VERIFY tolerance above would
-    // misread as a stall.
+    // misread as a stall. Inside that band ContactProbeEngine applies V25's
+    // StableTargetGate before the backoff counts as arrived.
     actuator::MotionDeadmanConfig full_leg_backoff = deadman;
     full_leg_backoff.nominal_travel_ticks_per_s = calibration::kSearchMinExpectedTicksPerSecond;
-    full_leg_backoff.arrival_tolerance_ticks = calibration::kSearchStaticToleranceTicks + 2;
+    full_leg_backoff.arrival_tolerance_ticks = calibration::kSearchBackoffSettleToleranceTicks;
+    // V25 TELEMETRY_TIMEOUT (2 s), as for every other search observation.
+    full_leg_backoff.max_telemetry_age_ms = calibration::kSearchTelemetryTimeoutMs;
     calibration::FullLegCalibrationConfig full_leg_config{};
     full_leg_config.probe_backoff_deadman = full_leg_backoff;
     full_leg_calibration_.begin(&actuator_policy_, &actuator_runtime_, &calibration_execution_,
@@ -552,9 +555,10 @@ void Controller::printFullLegSequenceEvent() {
 }
 
 // One unsolicited evidence line per search step / probe state change, so a
-// hardware run shows every stage (transit, fine search, contact, backoff,
-// second pass, release) with its geometry and telemetry, not only the
-// verdict. Print only; reads status, never state it could change.
+// hardware run shows every stage (baseline, coarse transit / scout, release,
+// backoff, fine pass 1, backoff, fine pass 2, release) with its geometry and
+// telemetry, not only the verdict. Print only; reads status, never state it
+// could change.
 void Controller::printFullLegSearchEvent() {
   const calibration::ContactProbeStatus& p = full_leg_calibration_.probeStatus();
   const uint8_t exec_phase = static_cast<uint8_t>(full_leg_calibration_.status().phase);
@@ -578,7 +582,7 @@ void Controller::printFullLegSearchEvent() {
                                         : 0L;
   Serial.printf("CALIBRATION_SEARCH exec=%s joint=%s side=%s pass=%u stage=%s probe=%s target=%u "
                 "pos=%ld beyond_contact=%ld contact=%u entry=%u guard=%u speed=%ld current=%ld "
-                "baseline=%u/%u steps=%u bypass=%u p1=%u p2=%u failure=%s\n",
+                "baseline=%u/%u steps=%u bypass=%u kplateau=%u scout=%u p1=%u p2=%u failure=%s\n",
                 calibration::toString(full_leg_calibration_.status().phase),
                 calibration::toString(r.endpoint_joint),
                 r.endpoint_side == calibration::ContactSide::MIN_SIDE ? "MIN" : "MAX",
@@ -589,6 +593,8 @@ void Controller::printFullLegSearchEvent() {
                 (unsigned)calibration::searchBaselineThreshold(p.baseline_median_current,
                                                                 p.baseline_mad_current),
                 (unsigned)p.step_count, (unsigned)p.plateau_bypass_count,
+                (unsigned)p.kinematic_plateau_count,
+                p.scout_valid ? (unsigned)p.scout_tick : 0u,
                 (unsigned)p.pass1_contact_tick, (unsigned)p.pass2_contact_tick,
                 calibration::toString(p.failure));
 }
@@ -649,7 +655,7 @@ void Controller::updateFullLegFinalization() {
   const calibration::ContactProbeRequest& pr = full_leg_calibration_.probeRequest();
   Serial.printf("CALIBRATION_FULL_LEG_PROBE_FINAL leg=%s joint=%s side=%s executor_failure=%s "
                 "failed_phase=%s probe_phase=%s probe_failure=%s pass=%u stage=%s target=%u "
-                "pos=%ld contact=%u guard=%u p1=%u p2=%u bypass=%u steps=%u\n",
+                "pos=%ld contact=%u guard=%u scout=%u p1=%u p2=%u bypass=%u steps=%u\n",
                 calibration::toString(record.leg), calibration::toString(pr.endpoint_joint),
                 pr.endpoint_side == calibration::ContactSide::MIN_SIDE ? "MIN" : "MAX",
                 calibration::toString(full_leg_calibration_.status().failure),
@@ -658,6 +664,7 @@ void Controller::updateFullLegFinalization() {
                 (unsigned)probe.pass, calibration::toString(probe.stage),
                 (unsigned)probe.target_tick, (long)probe.last_position,
                 (unsigned)pr.corridor.contact_tick, (unsigned)pr.corridor.guard_tick,
+                probe.scout_valid ? (unsigned)probe.scout_tick : 0u,
                 (unsigned)probe.pass1_contact_tick, (unsigned)probe.pass2_contact_tick,
                 (unsigned)probe.plateau_bypass_count, (unsigned)probe.step_count);
   Serial.printf("CALIBRATION_FULL_LEG_CONTACTS leg=%s expected=%u measured=%u accepted=%u "

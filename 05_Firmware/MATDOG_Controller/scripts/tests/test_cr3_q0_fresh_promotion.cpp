@@ -515,6 +515,162 @@ void test_full_leg_plan_consumes_the_new_q0() {
   }
 }
 
+// --- the mechanically recentred installation ------------------------------------
+//
+// Current MATDOG: every ST3215 was recentred near its raw mid-range (~2048)
+// before mounting, PositionOffset = 0, and the mounting puts URDF q=0 NEAR but
+// not AT raw 2048. 2048 is a servo/provisioning fact, never a q0. Installation
+// A below is such a mounting; installation B is the same robot with every
+// joint remounted by its own realistic offset. The calibration only ever
+// commands q0 + direction * q, so identical URDF commands move by exactly
+// each joint's q0 change, every search corridor is the same geometry
+// translated, and every prerequisite pose follows its own joint's q0.
+
+bool runCaptureTicks(CalibrationQ0CaptureSession& s, const int* ticks) {
+  if (!enterSampling(s)) return false;
+  for (uint8_t pass = 0; pass < kSamples; ++pass) {
+    for (uint8_t joint = 0; joint < kLegServoSlotCount; ++joint) {
+      Q0ReadRequest req{};
+      if (!s.nextReadRequest(&req)) return false;
+      Q0ReadObservation obs{};
+      obs.bus_id = req.bus_id;
+      obs.read_ok = true;
+      obs.raw_tick = ticks[joint];
+      obs.torque_enable = 0;
+      if (!s.recordRead(obs)) return false;
+    }
+  }
+  return s.status().state == Q0CaptureState::COMPLETE;
+}
+
+void test_recentred_installation_translation() {
+  g_case = "recentred installation: raw targets = fresh q0 + direction * q, nothing else";
+  static_assert(kLegServoSlotCount == 12, "one tick per leg joint");
+  // Near but never equal to 2048; B = A + a different offset per joint.
+  const int kA[12] = {2079, 2106, 2003, 1990, 2086, 2025, 2040, 2037, 2075, 2068, 2094, 2029};
+  const int kOffset[12] = {13, -21, 8, -5, 30, -17, 2, -9, 25, -14, 6, -28};
+  int kB[12];
+  for (int i = 0; i < 12; ++i) {
+    CHECK(kA[i] != (int)kServoRawCenter);
+    kB[i] = kA[i] + kOffset[i];
+    CHECK(kB[i] != (int)kServoRawCenter);
+  }
+  const CalibrationGeometryProfile p = boundProfile();
+  const GeometryProvenanceTag tag = p.provenanceTag();
+  CalibrationQ0CaptureSession ca, cb;
+  CHECK(runCaptureTicks(ca, kA));
+  CHECK(runCaptureTicks(cb, kB));
+  const Q0EvidencePreparation pa =
+      prepareFreshQ0Evidence(p, geometry_data::kProvenance, ca.freshCapture(), true);
+  const Q0EvidencePreparation pb =
+      prepareFreshQ0Evidence(p, geometry_data::kProvenance, cb.freshCapture(), true);
+  const Q0EvidencePreparation frozen = prepareCurrentQ0Evidence(p, geometry_data::kProvenance, true);
+  CHECK(pa.ready() && pb.ready() && frozen.ready());
+  JointTransformTable ta, tb;
+  CHECK(admitAll(&ta, pa));
+  CHECK(admitAll(&tb, pb));
+
+  // (1) All twelve joints: the promoted q0 IS the capture (not CR2-C, not
+  // 2048), and identical URDF commands differ by exactly the q0 change.
+  int joints = 0;
+  for (uint8_t i = 0; i < pa.transform_count; ++i) {
+    const JointTransform& a = pa.transforms[i];
+    const JointTransform* b = transformFor(pb, a.identity);
+    const JointTransform* f = transformFor(frozen, a.identity);
+    const GeometryJointRecord* g = p.findJoint(a.identity);
+    CHECK(b != nullptr && f != nullptr && g != nullptr);
+    if (b == nullptr || f == nullptr || g == nullptr) continue;
+    ++joints;
+    const JointTransform* pa_t = ta.find(a.identity, tag);
+    CHECK(pa_t != nullptr && pa_t->q0_tick == a.q0_tick);
+    CHECK(a.q0_tick != kServoRawCenter && b->q0_tick != kServoRawCenter);
+    const int32_t d = (int32_t)b->q0_tick - (int32_t)a.q0_tick;
+    CHECK(d != 0);
+    const MicroRad qs[] = {g->urdf_lower, g->urdf_lower / 2, 0, g->urdf_upper / 3,
+                           g->urdf_upper / 2, g->urdf_upper};
+    for (MicroRad q : qs) {
+      uint16_t ra = 0, rb = 0, rf = 0;
+      CHECK(resolveUrdfQToRaw(p, geometry_data::kProvenance, a, q, &ra) == TargetResolveStatus::OK);
+      CHECK(resolveUrdfQToRaw(p, geometry_data::kProvenance, *b, q, &rb) == TargetResolveStatus::OK);
+      CHECK(resolveUrdfQToRaw(p, geometry_data::kProvenance, *f, q, &rf) == TargetResolveStatus::OK);
+      CHECK_EQ((long)rb - (long)ra, (long)d);
+      CHECK_EQ((long)ra - (long)rf, (long)a.q0_tick - (long)f->q0_tick);
+      if (q == 0) CHECK_EQ(ra, a.q0_tick);  // URDF q=0 is the measured q0, not 2048
+    }
+  }
+  CHECK_EQ(joints, 12);
+
+  // (2) all 24 search corridors and (3) every prerequisite pose, per leg.
+  int corridors = 0;
+  const Leg legs[4] = {Leg::LF, Leg::RF, Leg::RH, Leg::LH};
+  for (Leg leg : legs) {
+    FullLegPlan a{}, b{};
+    CHECK(resolveFullLegPlan(p, geometry_data::kProvenance, ta, &kSeqPlan, leg, &a) == FullLegPlanStatus::OK);
+    CHECK(resolveFullLegPlan(p, geometry_data::kProvenance, tb, &kSeqPlan, leg, &b) == FullLegPlanStatus::OK);
+    for (int k = 0; k < (int)kJointKindCount; ++k) {
+      const JointTransform* qa = ta.find(a.request.joint[k].identity, tag);
+      const JointTransform* qb = tb.find(b.request.joint[k].identity, tag);
+      CHECK(qa != nullptr && qb != nullptr);
+      if (qa == nullptr || qb == nullptr) continue;
+      const long d = (long)qb->q0_tick - (long)qa->q0_tick;
+      for (int side = 0; side < 2; ++side) {
+        const CalibrationSearchCorridor& x = a.request.corridor[k][side];
+        const CalibrationSearchCorridor& y = b.request.corridor[k][side];
+        ++corridors;
+        CHECK_EQ(x.home_tick, qa->q0_tick);  // home = the fresh promoted q0
+        CHECK_EQ(y.home_tick, qb->q0_tick);
+        CHECK_EQ(x.probe_sign, y.probe_sign);
+        CHECK_EQ((long)y.contact_tick - (long)x.contact_tick, d);
+        CHECK_EQ((long)y.urdf_limit_tick - (long)x.urdf_limit_tick, d);
+        CHECK_EQ((long)y.opposite_limit_tick - (long)x.opposite_limit_tick, d);
+        CHECK_EQ((long)y.entry_tick - (long)x.entry_tick, d);
+        CHECK_EQ((long)y.guard_tick - (long)x.guard_tick, d);
+        // The search geometry itself is invariant under the common translation.
+        const uint16_t xs[5] = {x.contact_tick, x.urdf_limit_tick, x.opposite_limit_tick,
+                                x.entry_tick, x.guard_tick};
+        const uint16_t ys[5] = {y.contact_tick, y.urdf_limit_tick, y.opposite_limit_tick,
+                                y.entry_tick, y.guard_tick};
+        for (int n = 0; n < 5; ++n) CHECK_EQ(searchDepth(x, xs[n]), searchDepth(y, ys[n]));
+        CHECK_EQ(searchDepth(x, x.guard_tick) - searchDepth(x, x.urdf_limit_tick), 64);
+        CHECK_EQ(searchDepth(x, x.urdf_limit_tick) - searchDepth(x, x.entry_tick), 64);
+      }
+    }
+    const JointTransform* ua = ta.find(a.upper.identity, tag);
+    const JointTransform* ub = tb.find(b.upper.identity, tag);
+    const JointTransform* la = ta.find(a.lower.identity, tag);
+    const JointTransform* lb = tb.find(b.lower.identity, tag);
+    CHECK(ua && ub && la && lb);
+    if (ua && ub && la && lb) {
+      const long du = (long)ub->q0_tick - (long)ua->q0_tick;
+      const long dl = (long)lb->q0_tick - (long)la->q0_tick;
+      CHECK_EQ(a.request.upper_for_lower_urad, b.request.upper_for_lower_urad);  // same URDF command
+      CHECK_EQ((long)b.request.upper_for_lower_tick - (long)a.request.upper_for_lower_tick, du);
+      CHECK_EQ((long)b.request.upper_for_hip_min_tick - (long)a.request.upper_for_hip_min_tick, du);
+      CHECK_EQ((long)b.request.upper_for_hip_max_tick - (long)a.request.upper_for_hip_max_tick, du);
+      CHECK_EQ((long)b.request.lower_folded_tick - (long)a.request.lower_folded_tick, dl);
+    }
+    CHECK_EQ(a.request.has_rear_park, leg == Leg::LF || leg == Leg::RF);
+    if (a.request.has_rear_park) {
+      const JointTransform* pka = ta.find(a.request.park.identity, tag);
+      const JointTransform* pkb = tb.find(b.request.park.identity, tag);
+      CHECK(pka != nullptr && pkb != nullptr);
+      if (pka != nullptr && pkb != nullptr) {
+        CHECK_EQ(a.request.park.q0_tick, pka->q0_tick);
+        CHECK_EQ(a.request.park_target_urad, b.request.park_target_urad);
+        CHECK_EQ((long)b.request.park_target_tick - (long)a.request.park_target_tick,
+                 (long)pkb->q0_tick - (long)pka->q0_tick);
+      }
+    }
+    // INITIAL RECOVERY targets: every one of the 12 at its own fresh q0.
+    CHECK_EQ((long)a.request.population_count, 12L);
+    for (uint8_t i = 0; i < a.request.population_count; ++i) {
+      const JointTransform* t = ta.find(a.request.population[i].identity, tag);
+      CHECK(t != nullptr && t->q0_tick == a.request.population[i].q0_tick);
+    }
+  }
+  CHECK_EQ(corridors, 24);
+}
+
 void test_status_names() {
   g_case = "status names";
   CHECK(std::strcmp(toString(Q0EvidencePreparationStatus::REJECT_FRESH_CAPTURE_NOT_COMPLETE),
@@ -526,6 +682,7 @@ void test_status_names() {
 int main() {
   test_capture_view_lifecycle();
   test_fresh_capture_is_promoted_not_frozen();
+  test_recentred_installation_translation();
   test_twelve_of_twelve_admitted_and_replaced();
   test_promoted_check_is_strict();
   test_stale_or_wrong_state_refuses();

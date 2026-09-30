@@ -132,13 +132,14 @@ EnvelopeBuildStatus buildContactDerivedEnvelope(
     return reject;
   }
 
-  // fine_tick_1 is the SECOND, repeatability-confirming pass - the
-  // authoritative confirmed position once the witness has accepted both
-  // passes agree (see ContactProbeEngine's own file comment).
-  const uint16_t lo = minTick(request.min_side_evidence.fine_tick_1,
-                              request.max_side_evidence.fine_tick_1);
-  const uint16_t hi = maxTick(request.min_side_evidence.fine_tick_1,
-                              request.max_side_evidence.fine_tick_1);
+  // fine_tick_2 is the SECOND fine pass - the repeatability-confirming one
+  // the joint is released on, the authoritative confirmed position once the
+  // witness has accepted that both fine passes agree. The coarse scout
+  // (coarse_tick) is reference evidence and never bounds an envelope.
+  const uint16_t lo = minTick(request.min_side_evidence.fine_tick_2,
+                              request.max_side_evidence.fine_tick_2);
+  const uint16_t hi = maxTick(request.min_side_evidence.fine_tick_2,
+                              request.max_side_evidence.fine_tick_2);
 
   const int32_t margined_lo = static_cast<int32_t>(lo) + request.safety_margin_ticks;
   const int32_t margined_hi = static_cast<int32_t>(hi) - request.safety_margin_ticks;

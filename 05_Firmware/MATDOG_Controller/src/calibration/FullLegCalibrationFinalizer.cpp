@@ -521,12 +521,13 @@ void exportFullLegEvidence(const FullLegEvidenceStore& store,
         const ContactEvidence& c = joint.contact[si];
         snprintf(line, sizeof line,
                  "CALIBRATION_EVIDENCE_CONTACT leg=%s joint=%s side=%s recorded=%u measured=%u "
-                 "detection=%s state=%s origin=%s pass1_tick=%u pass2_tick=%u "
+                 "detection=%s state=%s origin=%s scout_tick=%u fine1_tick=%u fine2_tick=%u "
                  "repeatability_ticks=%u witness_accepted=%u",
                  toString(leg), toString(kind), si == 0 ? "MIN" : "MAX",
                  joint.contact_recorded[si] ? 1u : 0u, c.has_measurement ? 1u : 0u,
                  toString(c.detection), toString(c.state), toString(c.origin),
                  static_cast<unsigned>(c.coarse_tick), static_cast<unsigned>(c.fine_tick_1),
+                 static_cast<unsigned>(c.fine_tick_2),
                  static_cast<unsigned>(c.repeatability_ticks), c.witness.accepted() ? 1u : 0u);
         sink(user, line);
       }

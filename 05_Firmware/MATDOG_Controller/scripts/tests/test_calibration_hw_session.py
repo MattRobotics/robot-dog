@@ -247,7 +247,7 @@ class FakeController:
                 lines.append("CALIBRATION_SEARCH exec=LOWER_MIN joint=LOWER side=MIN pass=1 stage=FINE_SEARCH "
                              "probe=STEP_MONITORING target=1040 pos=1045 beyond_contact=3 contact=1040 "
                              "entry=1100 guard=972 speed=0 current=40 baseline=30/35 steps=12 bypass=0 "
-                             "p1=0 p2=0 failure=NONE")
+                             "kplateau=0 scout=1034 p1=0 p2=0 failure=NONE")
             else:
                 lines.append(f"CALIBRATION_SEQUENCE leg={leg} phase=INITIAL_RECOVERY step=MOVE_MONITOR joint=HIP "
                              f"bus=13 target=1981 held=0 contacts=0/6 recovered={run['polls']} "
@@ -268,7 +268,7 @@ class FakeController:
                 for side in ("MIN", "MAX"):
                     t = self.contact_tick(self.last_leg, joint, side)
                     lines.append(f"CALIBRATION_FULL_LEG_CONTACT joint={joint} side={side} measured=YES "
-                                 f"pass1={t} pass2={t} witness_accepted=YES")
+                                 f"scout={t} fine1={t} fine2={t} witness_accepted=YES")
         # Printed by EVERY status poll in the real firmware - never a result.
         lines.append("CALIBRATION_FULL_LEG_NOTE FULL CALIBRATION = 4 legs x 3 joints x MIN/MAX = 24 contacts; "
                      "HARDWARE_CONTACT_CALIBRATED = all 6 of a leg's contacts recorded")
@@ -303,8 +303,8 @@ class FakeController:
                 final.append(f"xCALIBRATION_FULL_LEG_RESULT leg={leg} verdict=FAILED failure=X")
             final.append(f"CALIBRATION_FULL_LEG_PROBE_FINAL leg={leg} joint=HIP side=MAX executor_failure="
                          f"{'HIP_MAX_PROBE_FAILED' if failed else 'NONE'} failed_phase=- probe_phase=COMPLETE "
-                         f"probe_failure=NONE pass=2 stage=FINE_SEARCH target=1 pos=1 contact=1 guard=1 p1=1 "
-                         f"p2=1 bypass=0 steps=40")
+                         f"probe_failure=NONE pass=2 stage=RELEASE target=1 pos=1 contact=1 guard=1 scout=1 "
+                         f"p1=1 p2=1 bypass=0 steps=40")
             final.append(f"CALIBRATION_FULL_LEG_CONTACTS leg={leg} expected=6 measured={measured} "
                          f"accepted={accepted} diagnostics_accepted={'NO' if failed else 'YES'}")
             final.append(f"CALIBRATION_FULL_LEG_RESULT leg={leg} verdict={verdict} failure={failure}")
@@ -339,7 +339,7 @@ class FakeController:
                     rec_ok = 1 if ok else 0
                     lines.append(f"CALIBRATION_EVIDENCE_CONTACT leg={leg} joint={joint} side={side} "
                                  f"recorded={rec_ok} measured={rec_ok} detection=CONTACT_CONFIRMED "
-                                 f"state=PROMOTED origin=LIVE_SESSION pass1_tick=1 pass2_tick=1 "
+                                 f"state=PROMOTED origin=LIVE_SESSION scout_tick=1 fine1_tick=1 fine2_tick=1 "
                                  f"repeatability_ticks=0 witness_accepted={rec_ok}")
         if self.export_short:
             total -= 1

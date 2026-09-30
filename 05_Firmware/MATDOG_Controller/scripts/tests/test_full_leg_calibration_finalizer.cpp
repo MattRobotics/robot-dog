@@ -414,8 +414,9 @@ void test_six_of_six_is_a_calibrated_leg_for_every_leg() {
       CHECK(j.limit == FullLegLimitAdmission::NOT_ADMITTED_UNAPPROVED_PARAMETERS);
       CHECK(j.diagnostics.accepted);
       CHECK(j.q0_present && j.q0_tick == oracleFor(leg, joint).q0);
-      // The envelope is the two contacts inset by the placeholder margin.
-      const uint16_t a = j.contact[0].fine_tick_1, b = j.contact[1].fine_tick_1;
+      // The envelope is the two sides' second fine passes inset by the
+      // placeholder margin; the coarse scout never bounds it.
+      const uint16_t a = j.contact[0].fine_tick_2, b = j.contact[1].fine_tick_2;
       CHECK_EQ(j.envelope.min_tick, (a < b ? a : b) + 8);
       CHECK_EQ(j.envelope.max_tick, (a < b ? b : a) - 8);
       // Unapproved: nothing offered to the policy.
@@ -831,7 +832,7 @@ void test_export_never_truncates() {
       j.q0_origin = CalibrationOrigin::HISTORICAL_REPLAY;
       for (ContactEvidence& c : j.contact) {
         c.detection = ContactState::CONTACT_CONFIRMED;
-        c.coarse_tick = c.fine_tick_1 = c.repeatability_ticks = 65535;
+        c.coarse_tick = c.fine_tick_1 = c.fine_tick_2 = c.repeatability_ticks = 65535;
       }
       j.diagnostics.min_contact_tick = j.diagnostics.max_contact_tick = 65535;
       j.envelope_status = actuator::EnvelopeBuildStatus::REJECT_CONTACT_GEOMETRY_MISMATCH;

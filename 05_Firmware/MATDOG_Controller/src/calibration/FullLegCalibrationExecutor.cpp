@@ -107,9 +107,10 @@ FullLegJointDiagnostics deriveFullLegJointDiagnostics(const FullLegCalibrationRe
   const int32_t dir = request.direction[k];
   if (dir != 1 && dir != -1) return d;
   d.evaluated = true;
-  // The fine contact of each side: midpoint of the two accepted passes.
-  d.min_contact_tick = midpoint(min_side.coarse_tick, min_side.fine_tick_1);
-  d.max_contact_tick = midpoint(max_side.coarse_tick, max_side.fine_tick_1);
+  // The contact of each side: V25 contact_result_tick() - the midpoint of
+  // the two FINE passes. The coarse scout never enters it.
+  d.min_contact_tick = midpoint(min_side.fine_tick_1, min_side.fine_tick_2);
+  d.max_contact_tick = midpoint(max_side.fine_tick_1, max_side.fine_tick_2);
   const int32_t min_delta = uradToTicks(request.urdf_lower[k]);  // URDF limits as the model
   const int32_t max_delta = uradToTicks(request.urdf_upper[k]);  // endpoints, as V25 did
   const int32_t expected = max_delta - min_delta;
@@ -954,7 +955,9 @@ void FullLegCalibrationExecutor::stepProbe(const FullLegCalibrationContext& ctx,
   if (probe_.active()) return;
 
   prerequisites_verified_ = false;
-  if (probe_.status().phase != ContactProbePhase::COMPLETE) {
+  // A COMPLETE probe always carries an accepted coarse scout; a contact
+  // without one is not the V25 search and never becomes evidence.
+  if (probe_.status().phase != ContactProbePhase::COMPLETE || !probe_.status().scout_valid) {
     fail(joint == JointKind::UPPER ? (side == ContactSide::MIN_SIDE ? FullLegFailure::UPPER_MIN_PROBE_FAILED
                                                                     : FullLegFailure::UPPER_MAX_PROBE_FAILED)
          : joint == JointKind::LOWER ? (side == ContactSide::MIN_SIDE ? FullLegFailure::LOWER_MIN_PROBE_FAILED
@@ -972,11 +975,10 @@ void FullLegCalibrationExecutor::stepProbe(const FullLegCalibrationContext& ctx,
   e.origin = CalibrationOrigin::LIVE_SESSION;
   e.detection = ContactState::CONTACT_CONFIRMED;
   e.witness = probe_.witness();
-  // The two accepted fine passes (no coarse contact scout exists): pass 1,
-  // then the repeatability-confirming pass 2, reported as both later fields
-  // rather than fabricating an unmeasured third one.
-  e.coarse_tick = probe_.status().pass1_contact_tick;
-  e.fine_tick_1 = probe_.status().pass2_contact_tick;
+  // V25 ContactResult: the coarse scout (reference evidence only, never
+  // metrology) and the two fine metrology passes.
+  e.coarse_tick = probe_.status().scout_tick;
+  e.fine_tick_1 = probe_.status().pass1_contact_tick;
   e.fine_tick_2 = probe_.status().pass2_contact_tick;
   e.repeatability_ticks = e.witness.max_deviation_ticks;
   e.has_measurement = true;

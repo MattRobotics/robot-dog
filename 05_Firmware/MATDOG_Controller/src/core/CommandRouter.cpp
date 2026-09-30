@@ -1401,15 +1401,16 @@ void CommandRouter::printFullLegCalibrationStatus() {
   const calibration::ContactProbeStatus& probe = ex.probeStatus();
   const calibration::ContactProbeRequest& pr = ex.probeRequest();
   Serial.printf("CALIBRATION_FULL_LEG_PROBE joint=%s side=%s phase=%s failure=%s pass=%u stage=%s "
-                "target=%u pos=%ld speed=%ld current=%ld steps=%u bypass=%u p1=%u p2=%u\n",
+                "target=%u pos=%ld speed=%ld current=%ld steps=%u bypass=%u scout=%u p1=%u p2=%u\n",
                 calibration::toString(pr.endpoint_joint),
                 pr.endpoint_side == calibration::ContactSide::MIN_SIDE ? "MIN" : "MAX",
                 calibration::toString(probe.phase), calibration::toString(probe.failure),
                 (unsigned)probe.pass, calibration::toString(probe.stage),
                 (unsigned)probe.target_tick, (long)probe.last_position, (long)probe.last_speed,
                 (long)probe.last_current, (unsigned)probe.step_count,
-                (unsigned)probe.plateau_bypass_count, (unsigned)probe.pass1_contact_tick,
-                (unsigned)probe.pass2_contact_tick);
+                (unsigned)probe.plateau_bypass_count,
+                probe.scout_valid ? (unsigned)probe.scout_tick : 0u,
+                (unsigned)probe.pass1_contact_tick, (unsigned)probe.pass2_contact_tick);
   const calibration::JointKind order[] = {calibration::JointKind::UPPER,
                                           calibration::JointKind::LOWER,
                                           calibration::JointKind::HIP};
@@ -1417,11 +1418,12 @@ void CommandRouter::printFullLegCalibrationStatus() {
     for (uint8_t side = 0; side < calibration::kContactSideCount; ++side) {
       const calibration::ContactEvidence& e =
           ex.contact(kind, static_cast<calibration::ContactSide>(side));
-      Serial.printf("CALIBRATION_FULL_LEG_CONTACT joint=%s side=%s measured=%s pass1=%u pass2=%u "
-                    "witness_accepted=%s\n",
+      Serial.printf("CALIBRATION_FULL_LEG_CONTACT joint=%s side=%s measured=%s scout=%u fine1=%u "
+                    "fine2=%u witness_accepted=%s\n",
                     calibration::toString(kind), side == 0 ? "MIN" : "MAX",
                     e.has_measurement ? "YES" : "NO", (unsigned)e.coarse_tick,
-                    (unsigned)e.fine_tick_1, e.witness.accepted() ? "YES" : "NO");
+                    (unsigned)e.fine_tick_1, (unsigned)e.fine_tick_2,
+                    e.witness.accepted() ? "YES" : "NO");
     }
   }
 

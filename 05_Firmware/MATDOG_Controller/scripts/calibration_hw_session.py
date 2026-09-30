@@ -471,24 +471,25 @@ class Session:
                       r"verdict=HARDWARE_CONTACT_CALIBRATED contacts_accepted=6/6 "
                       r"contact_calibrated=YES envelope_accepted=NO failure=NONE", mark, 5.0)
         rx = re.compile(r"CALIBRATION_FULL_LEG_CONTACT joint=(UPPER|LOWER|HIP) side=(MIN|MAX) "
-                        r"measured=YES pass1=(\d+) pass2=(\d+) witness_accepted=YES")
+                        r"measured=YES scout=(\d+) fine1=(\d+) fine2=(\d+) witness_accepted=YES")
         seen = {}
         deadline = self.clock() + 3.0
         while len(seen) < 6 and self.clock() < deadline:
             for text in self.lines_since(mark):
                 m = rx.fullmatch(text)
                 if m:
-                    seen[(m.group(1), m.group(2))] = (int(m.group(3)), int(m.group(4)))
+                    seen[(m.group(1), m.group(2))] = (int(m.group(3)), int(m.group(4)),
+                                                      int(m.group(5)))
             self.sleep(0.05)
         if sorted(seen) != sorted(CONTACT_ORDER):
             raise SessionFailure(f"{leg}: status shows {len(seen)}/6 accepted contacts")
         for key in CONTACT_ORDER:
             c = corridors[key]
             sign, contact = int(c.group(3)), int(c.group(5))
-            p1, p2 = seen[key]
-            beyond = (p2 - contact) * sign
-            self.log.say(f"      {leg} {key[0]:5s} {key[1]} contact pass1={p1} pass2={p2} "
-                         f"= canonical {beyond:+d}")
+            scout, f1, f2 = seen[key]
+            beyond = (f2 - contact) * sign
+            self.log.say(f"      {leg} {key[0]:5s} {key[1]} contact scout={scout} (reference) "
+                         f"fine1={f1} fine2={f2} = canonical {beyond:+d}")
             if leg == "LF" and key == ("UPPER", "MIN") and lf_crosscheck and \
                     not (LF_MIN_EXPECTED_BEYOND[0] <= beyond <= LF_MIN_EXPECTED_BEYOND[1]):
                 raise SessionFailure(

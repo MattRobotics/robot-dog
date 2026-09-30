@@ -3,11 +3,14 @@
 Maps every phase and mechanic of `FullLegCalibrationExecutor` (the LF V25 full-leg state machine
 generalized to four legs) to the oracle:
 [`09_Logs/Historical/NormaCore_MATDOG_Archive/LF_V25_Hardware_Oracle/`](../Historical/NormaCore_MATDOG_Archive/LF_V25_Hardware_Oracle/),
-`source/software/drivers/st3215/src/auto_calibrate/matdog.rs` (line numbers below). The staged
-contact search itself is mapped in
+`source/software/drivers/st3215/src/auto_calibrate/matdog.rs` (line numbers below). The contact
+search is mapped stage by stage in **§ Contact search** below; it supersedes the search section of
 [`2026-09-29_FULL_CALIBRATION_V25_ORACLE_TRACEABILITY.md`](2026-09-29_FULL_CALIBRATION_V25_ORACLE_TRACEABILITY.md)
-and is unchanged here except where noted. Deviations D1–D7 are explained in
-[`2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md`](2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md) §3.
+(which described the no-scout PR #34 search). Deviations D1–D9 are explained in
+[`2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md`](2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md) §3;
+D6 (no coarse scout) is **closed**. Where this log says "ported", the V25 rule is reproduced; every
+place where the port differs, even slightly, is listed under the table it belongs to. "Exact" is
+not claimed anywhere.
 
 V25 is evidence of hardware **behaviour**, not code to copy. Nothing below reintroduces its
 station-mediated architecture or an LF-only table.
@@ -24,7 +27,7 @@ station-mediated architecture or an LF-only table.
 | `UpperHorizontal`: "M12 directly from MAX contact to horizontal hold" | `UPPER_HORIZONTAL`: UPPER → `upper_for_lower` (UPPER_90), HELD | — |
 | `LowerMin` / `LowerMax` | `LOWER_MIN` / `LOWER_MAX` | — |
 | `LowerFolded`: "M11 directly from MAX contact to HIP parallel hold" | `LOWER_FOLDED`: LOWER → `lower_folded`, HELD; UPPER → HIP-MIN clearance pose where it differs from UPPER_90 | D3 (rear fold) |
-| `HipMin` / `HipMax` | `HIP_MIN` / `HIP_MAX` (per-side UPPER pose: HIP → q0, UPPER → MAX pose, then probe, where the poses differ) | — |
+| `HipMin` / `HipMax` | `HIP_MIN` / `HIP_MAX` (per-side UPPER pose: HIP → q0, UPPER → MAX pose, then probe, where the poses differ) | D8 |
 | `Diagnostics`: "endpoint and affine q0 diagnostics from all fine contacts" | `DIAGNOSTICS` (`deriveFullLegJointDiagnostics`, port of `derive_joint_evidence` L2094) | — |
 | `ReturnHip` → `ReturnLowerHeld` → `ReturnUpper` → `RestoreParking` | `RETURN_HIP` → `RETURN_LOWER_HELD` → `RETURN_UPPER` → `RESTORE_PARKING`, same order | — |
 | "Final verified global torque OFF" (L3058, and on every failure path L2585/L4243) | `CLEANUP` / `TORQUE_OFF`: SAFE_OFF of all 12, each confirmed by an independent readback, retried every tick until verified; on success also rest ≤ 16 ticks of q0 | — |
@@ -74,8 +77,130 @@ acceleration go with every GoalPosition write (`WritePosEx`, the V25 envelope). 
 checks the order on every bus against a servo model that drives to a **stale** GoalPosition at
 torque-on.
 
+## Contact search — `measure_lf_contact_side_efficient` (L3236), all 24 endpoints
+
+One generic `ContactProbeEngine` runs this for every one of LF/RF/RH/LH × HIP/UPPER/LOWER ×
+MIN/MAX. The executor owns exactly one, and the engine names no leg or joint (both audit-pinned).
+The MAX side starts where the MIN side's released contact left the joint, as in
+`measure_lf_joint_pair_efficient` (L3198), except front-leg HIP MAX (D8, below).
+
+### Ported from V25
+
+| V25 (matdog.rs) | Now (`ContactProbeEngine`) | Port |
+|---|---|---|
+| **Baseline**: `acquire_moving_current_baseline_forward` (L3294). ONE 64-tick move from the present position, guard-checked. A sample counts while the position changed or speed > 0. It ends at ≤ 10 ticks with ≥ 6 samples. `MOTION_TIMEOUT` is 12 s; a deadline with ≥ 6 samples proceeds un-arrived, < 6 samples is an error. Stats are median and MAD (L1733) | `BASELINE_PENDING/MONITORING`: the same move, rules, deadline and statistics | ported; sample store capped at 32 |
+| **Coarse contact scout**: `approach_with_scout(64, None)` (L3962). `next = target + 64` from the baseline end; `passed_guard(next)` (L4926) is an error. Settle window 900 ms, arrival at ≤ 10, tracking limit 68, detector with the **static** bounds (L800) | pass 0: the same steps, never clamped at the entry. The step past the guard is never issued (`NO_CONTACT_BEFORE_GUARD`). Steps short of the entry are labelled `COARSE_TRANSIT`, the rest `COARSE_SCOUT`; this is only a label (one detector, one pass). V25 has no separate transit | ported |
+| **Coarse reference**: the scout tick is logged "discarded" and is not metrology | `scout_tick` / `ContactEvidence.coarse_tick`: reference only | ported |
+| `EarlyStall` → `stop_pressure`, error; tracking failure without a scout → error | `EARLY_STALL_OUTSIDE_CORRIDOR`, `TRACKING_FAILED` → SAFE_OFF | ported; the error path differs (below) |
+| **Release**: `stop_pressure` (L4249) after every accepted approach, `set_motor_goal_verified` | `RELEASE_PENDING` → `RELEASE_VERIFYING`: GoalPosition := the contact, read back | ported |
+| **Backoff**: `backoff_and_verify` (L4211). Contact − 96, `crossed_home`. `move_motor_to` in the LF session is arrived only through the **StableTargetGate** (L887, used at L4290): ≤ 12 ticks, \|speed\| ≤ 4, 4 consecutive observations, ≥ 400 ms, reset by any non-qualifying one. Then the current must be ≤ median + max(4·MAD, 5) | `BACKOFF`: the same target and home check. The deadman's in-band sample is not arrival: `SearchSettleGate` must hold (same band, speed, count, window and reset). Only then are the current recovery and the next fine pass allowed | ported; the deadline differs (below) |
+| **Fine pass 1 / fine pass 2**: `approach_with_scout(8, Some(scout))` twice, each from its own backoff | pass 1 and pass 2 | ported |
+| **Adaptive fine scout**: `adaptive_contact_acceptance_bounds(Some(scout))` (L814) extends the corridor home-ward to scout − 32, never toward the guard | `searchAdaptiveAcceptanceEntryDepth()`, both fine passes | ported (V41 LF HIP MAX case replayed) |
+| **Lag rule**: `fine_contact_reproduces_coarse_depth` (L852), lag ≤ 8 = `FINE_STEP_TICKS`, else a friction/chamfer plateau bypass → next step | `searchFineContactReproducesScout()`, against the scout on both fine passes | ported (V23 values and the M11 chamfer replayed) |
+| **Plateau handling**: `confirm_kinematic_plateau` (L4164). 3 new samples in the adaptive bounds, target ahead, speed ≤ 10, within 32 of the scout, span ≤ 3 | `observeKinematicPlateau()`, only when a scout exists | ported |
+| **Repeatability**: `repeatability_spread(first, second)` (L4875) ≤ 16 | \|fine 1 − fine 2\| ≤ 16 after the fine-2 release | ported |
+| Metrology: `contact_result_tick()` (L2213) is the midpoint of the fine passes | diagnostics: midpoint(fine_tick_1, fine_tick_2); the envelope uses fine_tick_2; the scout never enters either | ported |
+| `HybridContactDetector::observe` (L1838) | `ContactSearchDetector::observe`, rule for rule | ported |
+| `TELEMETRY_TIMEOUT` (L73) is 2 s for every new observation | `kSearchTelemetryTimeoutMs` 2000 (search stages) and the backoff deadman's telemetry age 2000 | ported |
+| `TORQUE_LIMIT` 500, `GOAL_SPEED` 160, `ACCELERATION` 8 | the constants table above | ported |
+| the full-leg state machine | the Phases table above | ported |
+
+Implementation differences inside the search (the algorithm is unchanged):
+- every V25 error return (early stall, tracking failed, travel guard, repeatability, current not
+  recovered, …) ends in SAFE_OFF_REQUIRED, the caller's verified torque-off, instead of V25's
+  GoalPosition := present followed by an error;
+- the contact detector consumes samples at V25's 20 ms bus-poll cadence whatever the Controller tick
+  rate; the backoff settle gate counts every sample, and its 400 ms bound applies unchanged;
+- the backoff deadline is 12 s + travel at 80 ticks/s = 13.2 s for 96 ticks. V25's is
+  max(12 s, travel + 5 s) = 12 s. A settle that takes more than 12 s ends 1.2 s later here,
+  still `MOTION_TIMEOUT`;
+- at most 32 moving-current baseline samples are kept (V25: an unbounded `Vec`);
+- a release readback mismatch is `GOAL_READBACK_MISMATCH` at once, never a retry;
+- LOW, intentional (D9): V25 re-read the servo's configured temperature limit (EEPROM 0x0D) with
+  every observation. Here the persistent-profile preflight verifies it (0x0D = 70 among the 20
+  profile registers). The present temperature is still checked on every sample against 70 °C.
+  The hot loop does not read EEPROM.
+
+### Current-installation deliberate differences
+
+These come from the current mechanism and calibration contract, not from the search algorithm:
+- **Fresh measured q0.** The authoritative q0 is the current-boot, manually positioned capture,
+  promoted into `JointTransformTable`, never the historical LF V25 raw q0. Historical LF raw q0 or
+  contact numbers are never targets. Every raw target is `q0_tick + direction · q`:
+  - `resolveUrdfQToRaw`, and `resolveCalibrationSearchCorridor` (`home_tick = q0`; contact and URDF
+    limits = q0 + direction · q; entry/guard = URDF limit ∓/± 64);
+  - the plan poses and the rear park (`resolveFullLegPlan`);
+  - the INITIAL_RECOVERY targets.
+
+  There is no modulo or wrap: an out-of-range raw target is refused. `test_recentred_installation_translation`
+  proves this for two installations whose q0 differ by a different offset per joint: every
+  identical URDF command, all 24 corridors (home, contact, URDF limits, entry, guard, depth
+  geometry invariant), every prerequisite pose and the park all move by exactly Δq0.
+- **Servos physically recentred near raw 2048, PositionOffset = 0.** The mounting puts q=0 near
+  2048 but not at it, so 2048 is a servo/provisioning fact only. It serves as the profile sanity
+  value and the ±80-tick q0 plausibility window at promotion. It is never q0, a target or a
+  search origin; the audit refuses it in every calibration target unit. PositionOffset is only
+  ever read (audit-pinned).
+- All 12 INITIAL_RECOVERY joints actively commanded (D1).
+- GoalPosition prime at present before TorqueEnable (D2).
+- Geometry-required side-specific HIP prerequisite poses (D8, below).
+- Rear LOWER folded pose −455 ticks (D3).
+- 35° rear park (D4).
+- Held-joint speed abort (D5).
+- Temperature-limit register verified by preflight, not per sample (D9, LOW).
+
+### Reach of the coarse scout (risk R2) — a V25 property, decided on the fresh q0
+
+V25 steps the scout on a 64-tick grid from the baseline end and never issues a target past the
+guard; there is no clamp. A stop is scouted only if a grid target that still fits before the guard
+lies more than the 10-tick band beyond it:
+
+- baseline end depth B ≈ start depth + 54…58 (the first 20 ms sample within 10 ticks of the
+  64-tick baseline target, moving 3–4 ticks per sample);
+- deepest legal scout target T = B + 64·⌊(guard − B)/64⌋;
+- reach = T − 11;
+- margin = reach − stop depth.
+
+The port does not narrow this relative to V25: the corridor depths, grid origin, arrival band,
+bounded-lag continuation and strict guard are V25's. The #34/#35 search (8-tick steps to the guard)
+reached further on some endpoints. The margin is **not** a fixed number: the stop is fixed in raw
+ticks, while the corridor and the grid move with q0.
+
+For LF UPPER MIN (guard depth 661, 9 grid steps), reach ≈ start depth + 619…623. The stop was found
+by hand on 2026-09-29 at about raw 1470; at that boot's q0 2086 that is depth 616 (corridor: entry
+1553, contact 1493, URDF 1489, guard 1425). With a fresh q0 its depth is q0 − 1470. The margin is
+therefore positive at q0 ≈ 2086 and negative near 2100 (the CR2-C value).
+
+**Decision rule:** after the fresh Q0 PROMOTE and before any Full Calibration GO, a read-only LF
+UPPER MIN reach report is computed from the actual promoted q0. It is refined with the rest
+position after INITIAL RECOVERY. If the predicted margin is < 0, the run stops before Full
+Calibration. Nothing is widened (coarse step 64, guard 64, grid and corridor unchanged). A miss on
+hardware ends in `UPPER_MIN_PROBE_FAILED / NO_CONTACT_BEFORE_GUARD` at 0/6 with SAFE_OFF.
+`test_scout_reach_is_the_v25_coarse_grid` pins the rule.
+
 ## `stop_pressure` (L4249)
 
-After each accepted two-pass contact: GoalPosition := the pass-2 contact, so the joint rests ON
-the stop without pressing (`ContactProbePhase::RELEASE_PENDING`). The next phase then moves the
-joint away from there.
+After **each** accepted approach (the coarse scout, fine 1, fine 2): GoalPosition := that contact,
+verified by readback (`RELEASE_PENDING` → `RELEASE_VERIFYING`), so the joint rests ON the stop
+without pressing. After the scout and fine 1 the backoff follows; after fine 2 the probe is
+COMPLETE and the next phase moves the joint away from there.
+
+## HIP clearance pose (D8) — a geometry deviation, not a search change
+
+V25's LF **hardware** run used `lf_hip_sequence_profile` (L465): LF UPPER held at `UPPER_90` for
+**both** HIP sides, with no UPPER change between HIP MIN and HIP MAX. V25's generic profile
+(`prerequisites_for` → `hip_upper_clearance_delta`, L363) uses LF 90/85, RF 85/90, rear 90/90; the
+executor uses the latter. Geometry V5 decides between them.
+
+With UPPER 90° on both sides (same tool, scene and URDF;
+`~/MATDOG/evidence/full_cal_24contact_geometry/v25_upper90_both_hip_sides_{lf,rf}.*`), the folded
+lower leg hits `base_link` before the URDF limit: `PATH_OBSTRUCTION_BEFORE_URDF_LIMIT` in LF
+`HIP_MIN_TO_MAX_SEARCH` and in RF `HIP_MIN_SEARCH`. The side-specific poses are all `CLEAR_TO_END`
+(§4 of the dev log).
+
+What changes: on LF/RF the HIP returns to q0 after HIP MIN, the UPPER moves to the HIP-MAX pose,
+and the HIP MAX search starts at q0 instead of at the HIP MIN contact. So its baseline start,
+travel and raw scout-grid phase differ from historical LF V25. The contact-search algorithm,
+corridor and request are identical. The model is consistent with V25's LF HIP MAX contact sitting
+exactly on the corridor entry (R1): at UPPER 90° it predicts a body contact before the HIP stop.
+That is a hypothesis for hardware review, not a measured fact.

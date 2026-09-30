@@ -8,7 +8,8 @@
 //     goal - the "stall 4-5 ticks short of any goal" that fooled the old probe;
 //   - hard stops (optionally beyond the modelled contact), friction plateaus
 //     that hold until the target error exceeds a breakaway, or for a time;
-//   - current: idle / moving / pressing (grows with target error while blocked).
+//   - current: idle / moving / pressing (grows with target error while blocked,
+//     up to a torque-limit saturation).
 #ifndef MATDOG_TESTS_KINEMATIC_SERVO_SIM_H
 #define MATDOG_TESTS_KINEMATIC_SERVO_SIM_H
 
@@ -42,6 +43,12 @@ struct SimJoint {
   uint32_t plateau_stuck_since = 0;
   bool plateau_released = false;
   int current_idle = 4, current_moving = 30, press_gain = 6;
+  // Pressing current saturates where the RAM TorqueLimit caps the drive
+  // (synthetic figure). A coarse contact scout leaves its target up to one
+  // 64-tick step past a stop; the LF V25 hardware scouts at TorqueLimit 500
+  // never reached the 200-raw hard-current abort, so the model's cap stays
+  // below it. -1 = no cap (a jam that keeps drawing more current).
+  int press_current_max = 150;
   int current_override = -1;  // >= 0 forces the reported current
   int speed_override = -1;    // >= 0 forces the reported speed register
   int temperature = 35;
@@ -62,6 +69,12 @@ struct SimJoint {
   // temporary slowdown, not a stop.
   bool slow_zone = false;
   double slow_lo = 0, slow_hi = 0, slow_speed_tps = 0;
+  // Encoder dither while pressing a stop (synthetic): on every other 20 ms
+  // slot the reported position reads this many ticks back off the stop, the
+  // speed register still 0. It defeats the contact detector's per-sample
+  // progress rule while the joint stays kinematically still - the case the
+  // LF V25 kinematic-plateau path (confirm_kinematic_plateau) exists for.
+  int stop_dither_ticks = 0;
 
   // --- outputs ---
   double velocity = 0;
@@ -120,7 +133,10 @@ struct SimJoint {
   int current() const {
     if (current_override >= 0) return current_override;
     if (!torque) return 0;
-    if (pressing) return current_idle + press_gain * std::abs(goal - position());
+    if (pressing) {
+      const int drawn = current_idle + press_gain * std::abs(goal - position());
+      return (press_current_max >= 0 && drawn > press_current_max) ? press_current_max : drawn;
+    }
     return velocity > 0.5 ? current_moving : current_idle;
   }
 
@@ -134,6 +150,10 @@ struct SimJoint {
     s.read_ok = true;
     s.sampled_at_ms = now_ms;
     s.present_position = position();
+    if (stop_dither_ticks > 0 && pressing && (now_ms / 20) % 2 == 1) {
+      const bool on_low = has_stop_low && pos <= stop_low + 0.5;
+      s.present_position += on_low ? stop_dither_ticks : -stop_dither_ticks;
+    }
     s.torque_enable = torque ? 1 : 0;
     const bool noisy = speed_noise_every > 0 && (now_ms / 20) % speed_noise_every == 0;
     s.present_speed = speed_override >= 0

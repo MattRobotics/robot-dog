@@ -149,11 +149,11 @@ actuator::JointTransform promotedTransform(const JointIdentity& id, uint16_t q0)
 // Controller::begin()'s Full-Leg backoff deadman, figure for figure.
 MotionDeadmanConfig controllerBackoff() {
   MotionDeadmanConfig c{};
-  c.max_telemetry_age_ms = 3000;
+  c.max_telemetry_age_ms = kSearchTelemetryTimeoutMs;  // Controller::begin()
   c.motion_timeout_ms = 12000;
   c.stall_window_ms = 2000;
   c.stall_progress_ticks = 2;
-  c.arrival_tolerance_ticks = kSearchStaticToleranceTicks + 2;
+  c.arrival_tolerance_ticks = kSearchBackoffSettleToleranceTicks;
   c.nominal_travel_ticks_per_s = kSearchMinExpectedTicksPerSecond;
   return c;
 }
@@ -258,6 +258,12 @@ struct Rig {
   int held_violations = 0;
   int bystander_torque_violations = 0;
   int start_pos[256] = {0};
+  // Per probe phase, the (pass, stage) of every search write on the probed
+  // bus, consecutive repeats folded: the V25 stage order of that endpoint.
+  std::vector<std::pair<int, ContactSearchStage>> probe_trace[32];
+  // Each endpoint's probe verdict as the probe itself reported it:
+  // {scout, fine 1, fine 2}, 0 = not completed.
+  uint16_t probe_result[3][2][3] = {};
 
   explicit Rig(Leg l, const StopSpec& stops = StopSpec(), int deadband = 4) : leg(l) {
     arbiter.reset(AuthorityClearReason::BOOT);
@@ -374,7 +380,9 @@ struct Rig {
     if (!actuator::sequenceProbeEndpoint(phase, &pj, &ps)) return;
     if (full.status().step != FullLegStep::PROBE) return;
     const ContactProbePhase pp = full.probeStatus().phase;
-    if (pp != ContactProbePhase::STEP_PENDING && pp != ContactProbePhase::STEP_MONITORING &&
+    if (pp != ContactProbePhase::BASELINE_PENDING && pp != ContactProbePhase::BASELINE_MONITORING &&
+        pp != ContactProbePhase::STEP_PENDING && pp != ContactProbePhase::STEP_MONITORING &&
+        pp != ContactProbePhase::RELEASE_PENDING && pp != ContactProbePhase::RELEASE_VERIFYING &&
         pp != ContactProbePhase::BACKOFF_PENDING && pp != ContactProbePhase::BACKOFF_MONITORING) {
       return;
     }
@@ -416,7 +424,23 @@ struct Rig {
     const uint8_t n = full.telemetryRequest(buses, kFullLegMaxTelemetry);
     FullLegTelemetryFrame frame{};
     for (uint8_t i = 0; i < n; ++i) frame.add(buses[i], backend.joint[buses[i]].sample(t));
+    const size_t writes_before = backend.writes.size();
     full.update(ctx(), t, frame, safe_off_frame);
+    if (full.status().step == FullLegStep::PROBE) {
+      const uint8_t ph = static_cast<uint8_t>(full.status().phase);
+      for (size_t i = writes_before; i < backend.writes.size() && ph < 32; ++i) {
+        if (backend.writes[i].bus != full.probeRequest().bus_id) continue;
+        const std::pair<int, ContactSearchStage> e{full.probeStatus().pass, full.probeStatus().stage};
+        if (probe_trace[ph].empty() || probe_trace[ph].back() != e) probe_trace[ph].push_back(e);
+      }
+    }
+    if (full.probeStatus().phase == ContactProbePhase::COMPLETE) {
+      const ContactProbeRequest& pr = full.probeRequest();
+      uint16_t* r = probe_result[static_cast<uint8_t>(pr.endpoint_joint)][static_cast<uint8_t>(pr.endpoint_side)];
+      r[0] = full.probeStatus().scout_tick;
+      r[1] = full.probeStatus().pass1_contact_tick;
+      r[2] = full.probeStatus().pass2_contact_tick;
+    }
 
     const uint32_t changes = full.status().phase_changes;
     if (changes != seen_changes) {
@@ -599,6 +623,21 @@ void checkRecoveredAll(Rig& rig) {
   }
 }
 
+// V25 measure_lf_contact_side_efficient(), for every endpoint of the leg: the
+// one generic ContactProbeEngine ran baseline, coarse scout (its free-space
+// part labelled transit), release, backoff, fine 1, release, backoff, fine 2,
+// release - nothing else, in that order.
+bool isV25SearchTrace(const std::vector<std::pair<int, ContactSearchStage>>& got) {
+  using S = ContactSearchStage;
+  std::vector<std::pair<int, S>> full = {
+      {0, S::BASELINE}, {0, S::COARSE_TRANSIT}, {0, S::COARSE_SCOUT}, {0, S::RELEASE},
+      {0, S::BACKOFF},  {1, S::FINE_SEARCH},    {1, S::RELEASE},      {1, S::BACKOFF},
+      {2, S::FINE_SEARCH}, {2, S::RELEASE}};
+  if (got == full) return true;
+  full.erase(full.begin() + 1);
+  return got == full;
+}
+
 void checkComplete(Rig& rig) {
   const FullLegCalibrationStatus& s = rig.full.status();
   CHECK_EQ((int)s.step, (int)FullLegStep::COMPLETE);
@@ -615,7 +654,15 @@ void checkComplete(Rig& rig) {
                                    CalibrationPhase::HIP_MIN, CalibrationPhase::HIP_MAX}) {
     CHECK(rig.held_checks[static_cast<uint8_t>(p)] > 0);
   }
-  // Six contacts, each at its physical stop, two repeatable passes.
+  // Six contacts, each at its physical stop: the coarse scout (reference
+  // evidence) and two repeatable fine passes (metrology).
+  for (const CalibrationPhase p : {CalibrationPhase::UPPER_MIN, CalibrationPhase::UPPER_MAX,
+                                   CalibrationPhase::LOWER_MIN, CalibrationPhase::LOWER_MAX,
+                                   CalibrationPhase::HIP_MIN, CalibrationPhase::HIP_MAX}) {
+    const bool v25 = isV25SearchTrace(rig.probe_trace[static_cast<uint8_t>(p)]);
+    if (!v25) std::printf("    non-V25 search trace in %s\n", toString(p));
+    CHECK(v25);
+  }
   for (uint8_t k = 0; k < kJointKindCount; ++k) {
     for (uint8_t side = 0; side < kContactSideCount; ++side) {
       const ContactEvidence& e = rig.full.contact(static_cast<JointKind>(k), static_cast<ContactSide>(side));
@@ -625,8 +672,15 @@ void checkComplete(Rig& rig) {
       CHECK((int)e.key.joint == (int)k);
       CHECK((int)e.key.side == (int)side);
       const int stop = rig.stopTick(k, side);
-      CHECK(std::abs((int)e.coarse_tick - stop) <= 2);
+      // Recorded exactly as the one generic probe measured it: the scout as
+      // coarse_tick (reference), the fine passes as fine_tick_1/2.
+      CHECK_EQ(e.coarse_tick, rig.probe_result[k][side][0]);
+      CHECK_EQ(e.fine_tick_1, rig.probe_result[k][side][1]);
+      CHECK_EQ(e.fine_tick_2, rig.probe_result[k][side][2]);
+      CHECK(std::abs((int)e.coarse_tick - stop) <= 2);  // the scout
       CHECK(std::abs((int)e.fine_tick_1 - stop) <= 2);
+      CHECK(std::abs((int)e.fine_tick_2 - stop) <= 2);
+      CHECK_EQ(e.repeatability_ticks, std::abs((int)e.fine_tick_1 - (int)e.fine_tick_2));
       CHECK(actuator::searchCorridorAccepts(rig.req().corridor[k][side], e.coarse_tick));
       const FullLegJointDiagnostics& d = rig.full.diagnostics(static_cast<JointKind>(k));
       CHECK(d.evaluated && d.accepted && d.ordered);
@@ -670,6 +724,49 @@ void test_v25_lf_hardware_contacts_replayed_exactly() {
   const CalibrationSearchCorridor& c = rig.req().corridor[kHip][kMax];
   CHECK_EQ(actuator::searchDepth(c, c.entry_tick), 448);
   CHECK_EQ(actuator::searchDepth(c, rig.full.contact(JointKind::HIP, ContactSide::MAX_SIDE).coarse_tick), 448);
+}
+
+// [T3,T4,T10] The evidence fields are the probe's own three measurements, each
+// in its place - checked where they differ: the scout meets a transient
+// obstruction 20 ticks short, fine 2 finds the stop 5 ticks deeper than fine 1.
+void test_evidence_maps_scout_and_fine_passes() {
+  g_case = "evidence: coarse_tick = scout, fine_tick_1/2 = the fine passes, diagnostics fine-only";
+  Rig rig(Leg::LF);
+  const CalibrationSearchCorridor c = rig.req().corridor[kUpper][kMin];
+  const int stop0 = rig.stopTick(kUpper, kMin);
+  const int shallow = stop0 - c.probe_sign * 20;
+  auto armed = std::make_shared<int>(0);
+  rig.run([&, armed](Rig& r) {
+    if (r.full.status().phase != CalibrationPhase::UPPER_MIN || r.full.status().step != FullLegStep::PROBE) return;
+    const ContactProbeStatus& st = r.full.probeStatus();
+    simk::SimJoint& j = r.sim(kUpper);
+    if (*armed == 0 && st.pass == 0 && st.phase == ContactProbePhase::STEP_MONITORING) {
+      *armed = 1;
+      j.plateau = true;
+      j.plateau_tick = shallow;
+      j.plateau_breakaway = 1000;
+    } else if (*armed == 1 && st.scout_valid && st.phase == ContactProbePhase::BACKOFF_MONITORING) {
+      *armed = 2;
+      j.plateau = false;
+    } else if (*armed == 2 && st.pass == 2) {
+      *armed = 3;
+      if (c.probe_sign < 0) j.stop_low -= 5; else j.stop_high += 5;
+    }
+  });
+  CHECK_EQ(*armed, 3);
+  CHECK_EQ((int)rig.full.status().step, (int)FullLegStep::COMPLETE);
+  const ContactEvidence& e = rig.full.contact(JointKind::UPPER, ContactSide::MIN_SIDE);
+  CHECK_EQ(e.coarse_tick, rig.probe_result[kUpper][kMin][0]);
+  CHECK_EQ(e.fine_tick_1, rig.probe_result[kUpper][kMin][1]);
+  CHECK_EQ(e.fine_tick_2, rig.probe_result[kUpper][kMin][2]);
+  CHECK(std::abs((int)e.coarse_tick - shallow) <= 2);
+  CHECK(std::abs((int)e.fine_tick_1 - stop0) <= 2);
+  CHECK(std::abs((int)e.fine_tick_2 - (stop0 + c.probe_sign * 5)) <= 2);
+  CHECK_EQ(e.repeatability_ticks, std::abs((int)e.fine_tick_1 - (int)e.fine_tick_2));
+  CHECK(e.witness.accepted());
+  const FullLegJointDiagnostics& d = rig.full.diagnostics(JointKind::UPPER);
+  CHECK_EQ(d.min_contact_tick, ((int)e.fine_tick_1 + (int)e.fine_tick_2) / 2);
+  checkSafeEnd(rig);
 }
 
 void test_stop_one_tick_before_the_corridor_entry_fails_closed() {
@@ -1249,8 +1346,8 @@ void test_diagnostics_math_is_v25() {
   r.joint[kHip].q0_tick = 2048;
   ContactEvidence lo{}, hi{};
   lo.has_measurement = hi.has_measurement = true;
-  lo.coarse_tick = lo.fine_tick_1 = 2048 - 487;  // V25 LF HIP MIN
-  hi.coarse_tick = hi.fine_tick_1 = 2048 + 448;  // V25 LF HIP MAX
+  lo.coarse_tick = lo.fine_tick_1 = lo.fine_tick_2 = 2048 - 487;  // V25 LF HIP MIN
+  hi.coarse_tick = hi.fine_tick_1 = hi.fine_tick_2 = 2048 + 448;  // V25 LF HIP MAX
   const FullLegJointDiagnostics d = deriveFullLegJointDiagnostics(r, JointKind::HIP, lo, hi);
   CHECK(d.evaluated && d.ordered && d.accepted);
   CHECK_EQ(d.expected_span_ticks, 1024);
@@ -1263,8 +1360,25 @@ void test_diagnostics_math_is_v25() {
   // A missing side is not evaluated.
   ContactEvidence none{};
   CHECK(!deriveFullLegJointDiagnostics(r, JointKind::HIP, lo, none).evaluated);
+  // [T10] matdog_test.rs coarse_scout_is_persisted_but_cannot_change_fine_metrology_or_q0:
+  // only the two FINE passes enter the contact (their midpoint, V25
+  // contact_result_tick); the scout, however far off, changes nothing.
+  {
+    ContactEvidence lo2 = lo, hi2 = hi;
+    lo2.coarse_tick = 2048 - 460;
+    hi2.coarse_tick = 2048 + 400;
+    const FullLegJointDiagnostics d2 = deriveFullLegJointDiagnostics(r, JointKind::HIP, lo2, hi2);
+    CHECK_EQ(d2.min_contact_tick, d.min_contact_tick);
+    CHECK_EQ(d2.max_contact_tick, d.max_contact_tick);
+    CHECK_EQ(d2.scale_permille, d.scale_permille);
+    CHECK_EQ(d2.affine_zero_tick, d.affine_zero_tick);
+    ContactEvidence hi3 = hi;
+    hi3.fine_tick_1 = 2048 + 446;
+    hi3.fine_tick_2 = 2048 + 451;
+    CHECK_EQ(deriveFullLegJointDiagnostics(r, JointKind::HIP, lo, hi3).max_contact_tick, 2048 + 448);
+  }
   // Scale out of band.
-  hi.coarse_tick = hi.fine_tick_1 = 2048 + 300;
+  hi.coarse_tick = hi.fine_tick_1 = hi.fine_tick_2 = 2048 + 300;
   CHECK(!deriveFullLegJointDiagnostics(r, JointKind::HIP, lo, hi).accepted);
 }
 
@@ -1284,6 +1398,7 @@ void test_names() {
 int main() {
   test_every_leg_completes_the_full_v25_sequence();
   test_v25_lf_hardware_contacts_replayed_exactly();
+  test_evidence_maps_scout_and_fine_passes();
   test_stop_one_tick_before_the_corridor_entry_fails_closed();
   test_realistic_servo_behaviour_still_completes();
   test_recovery_only_run_commands_all_twelve_joints();

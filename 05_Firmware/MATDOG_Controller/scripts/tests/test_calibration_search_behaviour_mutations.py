@@ -10,6 +10,17 @@ sketch is copied to a temp directory, one mutation is applied, and the full
 scripts/tests/run_host_tests.sh must FAIL there. An unmutated copy must pass
 first, so a broken environment cannot masquerade as "every mutation caught".
 
+The LF V25 coarse contact scout (restored 2026-09-30) adds one mutation per
+dependency: no scout, a scout clamped at the corridor entry, a scout not
+stored, a scout promoted to metrology, no backoff after it, fine passes
+without the adaptive corridor / against fine pass 1 / with a wider lag, the
+kinematic plateau removed, opened to the scout or loosened, the baseline
+move removed or loosened, each per-sample readback dropped in the new
+stages, the evidence mapped wrongly, and one endpoint kind run differently.
+The V25 backoff StableTargetGate and TELEMETRY_TIMEOUT (2 s) have their own
+mutations (no gate, a shorter window, fewer samples, a looser speed or band,
+no reset, torque ignored while settling, the inherited 3 s timeout).
+
 The 24-contact Full Calibration sequence adds its own ORCHESTRATION
 mutations (FullLegCalibrationExecutor / the sequence plan / the policy's
 sequence door / the 24-contact finalizer): a skipped recovery, a limp held
@@ -41,6 +52,7 @@ EXEC_CPP = "src/calibration/FullLegCalibrationExecutor.cpp"
 SEQ_CPP = "src/actuator/CalibrationSequencePlan.cpp"
 FIN_CPP = "src/calibration/FullLegCalibrationFinalizer.cpp"
 FIN_H = "src/calibration/FullLegCalibrationFinalizer.h"
+ENV_CPP = "src/actuator/OperationalEnvelope.cpp"
 
 # (name, file, exact anchor (must occur exactly once), replacement)
 MUTATIONS = [
@@ -70,19 +82,18 @@ MUTATIONS = [
      "const bool low_velocity = speed_magnitude <= kSearchMaxVelocityRaw;"),
     ("guard check removed (next step past the guard issued)", PROBE_CPP,
      "if (next_depth > guard_depth) {", "if (next_depth > guard_depth + 100000) {"),
-    ("pass-2 friction plateau bypass removed", PROBE_CPP,
-     "if (lag > static_cast<int32_t>(kSearchFineScoutLagToleranceTicks)) {",
-     "if (lag > 100000) {"),
+    ("fine-pass friction plateau bypass removed", PROBE_CPP,
+     "if (!searchFineContactReproducesScout(request_.corridor, position, status_.scout_tick)) {",
+     "if (false) {"),
     ("repeatability check disabled", PROBE_CPP,
      "static_cast<int32_t>(request_.repeatability_tolerance_ticks)) {",
      "static_cast<int32_t>(4096)) {"),
-    ("pass 1 alone completes (no backoff, no pass 2)", PROBE_CPP,
-     "    status_.pass1_contact_tick = position;\n"
-     "    status_.phase = ContactProbePhase::BACKOFF_PENDING;\n",
-     "    status_.pass1_contact_tick = position;\n"
+    ("fine pass 1 alone completes (no backoff, no fine pass 2)", PROBE_CPP,
+     "  if (status_.pass == 1) {\n    status_.pass1_contact_tick = position;\n  } else {",
+     "  if (status_.pass == 1) {\n    status_.pass1_contact_tick = position;\n"
      "    status_.pass2_contact_tick = position;\n"
      "    finish(ContactProbePhase::COMPLETE, ContactProbeFailure::NONE,\n"
-     "           actuator::WriteDecision::ACCEPT);\n"),
+     "           actuator::WriteDecision::ACCEPT);\n    return;\n  } else {"),
     ("backoff current-recovery check removed", PROBE_CPP,
      "if (current < 0 || current > threshold) {",
      "if (current < 0 || current > threshold + 100000) {"),
@@ -91,7 +102,9 @@ MUTATIONS = [
      "      failSafeOff(ContactProbeFailure::UNEXPECTED_STALL_DURING_BACKOFF);\n"
      "      return;\n",
      "    case actuator::MotionDeadmanVerdict::STALLED:\n"
-     "      beginPass(2, static_cast<uint16_t>(sample.present_position));\n"
+     "      beginPass(static_cast<uint8_t>(status_.pass + 1),\n"
+     "                static_cast<uint16_t>(sample.present_position));\n"
+     "      if (!active()) return;\n"
      "      status_.phase = ContactProbePhase::STEP_PENDING;\n"
      "      return;\n"),
     ("calibration-search corridor granted to every operation", POLICY_CPP,
@@ -104,6 +117,152 @@ MUTATIONS = [
      "        (command.operation == ActuatorOperation::CALIBRATION_CONTACT_PROBE ||\n",
      "        (command.operation == ActuatorOperation::CALIBRATION_CONTACT_PROBE ||\n"
      "         command.operation == ActuatorOperation::POSITION_COMMAND ||\n"),
+
+    # --- the LF V25 coarse contact scout (2026-09-30) ----------------------
+    ("no coarse scout: 8-tick steps from the baseline end", PROBE_CPP,
+     "    step_ticks_ = kSearchCoarseStepTicks;\n"
+     "    next_depth = target_depth + kSearchCoarseStepTicks;\n",
+     "    step_ticks_ = kSearchFineStepTicks;\n"
+     "    next_depth = target_depth + kSearchFineStepTicks;\n"),
+    ("coarse scout clamped at the corridor entry (the #34/#35 transit)", PROBE_CPP,
+     "    next_depth = target_depth + kSearchCoarseStepTicks;\n",
+     "    next_depth = target_depth + kSearchCoarseStepTicks;\n"
+     "    if (target_depth < depth(request_.corridor.entry_tick) &&\n"
+     "        next_depth > depth(request_.corridor.entry_tick)) {\n"
+     "      next_depth = depth(request_.corridor.entry_tick);\n    }\n"),
+    ("coarse scout accepted in the adaptive (fine) corridor", PROBE_CPP,
+     "  int32_t acceptance_entry = depth(request_.corridor.entry_tick);\n  if (pass > 0) {",
+     "  int32_t acceptance_entry = depth(request_.corridor.entry_tick) - kSearchAdaptiveScoutTicks;\n"
+     "  if (pass > 0) {"),
+    ("scout tick not stored as reference evidence", PROBE_CPP,
+     "    status_.scout_tick = position;\n", ""),
+    ("scout promoted to metrology (repeatability scout vs fine 2)", PROBE_CPP,
+     "  if (absDiff(status_.pass1_contact_tick, status_.pass2_contact_tick) <=",
+     "  if (absDiff(status_.scout_tick, status_.pass2_contact_tick) <="),
+    ("witness deviation measured against the scout", PROBE_CPP,
+     "      static_cast<uint16_t>(absDiff(status_.pass1_contact_tick, status_.pass2_contact_tick));",
+     "      static_cast<uint16_t>(absDiff(status_.scout_tick, status_.pass2_contact_tick));"),
+    ("scout release (stop_pressure) skipped", PROBE_CPP,
+     "    status_.scout_valid = true;\n    beginRelease(position);\n",
+     "    status_.scout_valid = true;\n    contact_tick_ = position;\n"
+     "    status_.phase = ContactProbePhase::BACKOFF_PENDING;\n"),
+    ("release written but never read back", PROBE_CPP,
+     "  status_.stage = ContactSearchStage::RELEASE;\n"
+     "  status_.phase = ContactProbePhase::RELEASE_VERIFYING;\n",
+     "  status_.stage = ContactSearchStage::RELEASE;\n"
+     "  status_.phase = status_.pass < 2 ? ContactProbePhase::BACKOFF_PENDING\n"
+     "                                   : ContactProbePhase::RELEASE_VERIFYING;\n"),
+    ("no backoff after the scout (fine pass 1 starts on the stop)", PROBE_CPP,
+     "  if (status_.pass < 2) {\n    status_.phase = ContactProbePhase::BACKOFF_PENDING;\n    return;\n  }",
+     "  if (status_.pass == 0) {\n    beginPass(1, contact_tick_);\n    if (!active()) return;\n"
+     "    status_.phase = ContactProbePhase::STEP_PENDING;\n    return;\n  }\n"
+     "  if (status_.pass < 2) {\n    status_.phase = ContactProbePhase::BACKOFF_PENDING;\n    return;\n  }"),
+    ("fine passes without the scout-adaptive corridor", PROBE_CPP,
+     "    acceptance_entry = searchAdaptiveAcceptanceEntryDepth(request_.corridor, status_.scout_tick);",
+     "    (void)searchAdaptiveAcceptanceEntryDepth(request_.corridor, status_.scout_tick);"),
+    ("adaptive corridor extended toward the guard", PROBE_CPP,
+     "  return adaptive < entry ? adaptive : entry;", "  (void)entry;\n  return adaptive;"),
+    ("ADAPTIVE_FINE_SCOUT_TICKS 32 -> 0", PROBE_H,
+     "kSearchAdaptiveScoutTicks = 32;", "kSearchAdaptiveScoutTicks = 0;"),
+    ("fine passes judged against fine pass 1 (the #34/#35 rule)", PROBE_CPP,
+     "if (!searchFineContactReproducesScout(request_.corridor, position, status_.scout_tick)) {",
+     "if (status_.pass == 2 &&\n"
+     "      !searchFineContactReproducesScout(request_.corridor, position, status_.pass1_contact_tick)) {"),
+    ("FINE_CONTACT_SCOUT_LAG_TOLERANCE_TICKS 8 -> 16", PROBE_H,
+     "kSearchFineScoutLagToleranceTicks = 8;", "kSearchFineScoutLagToleranceTicks = 16;"),
+    ("scout lag measured the wrong way round", PROBE_CPP,
+     "  const int32_t lag = actuator::searchDepth(corridor, scout) - actuator::searchDepth(corridor, candidate);",
+     "  const int32_t lag = actuator::searchDepth(corridor, candidate) - actuator::searchDepth(corridor, scout);"),
+    ("kinematic-plateau path removed", PROBE_CPP,
+     "    if (status_.pass == 0) {\n      failSafeOff(ContactProbeFailure::TRACKING_FAILED);",
+     "    if (true) {\n      failSafeOff(ContactProbeFailure::TRACKING_FAILED);"),
+    ("kinematic plateau opened to the coarse scout", PROBE_CPP,
+     "    if (status_.pass == 0) {\n      failSafeOff(ContactProbeFailure::TRACKING_FAILED);\n      return;\n    }\n",
+     ""),
+    ("kinematic plateau: scout-distance rule removed", PROBE_CPP,
+     "  const bool near_scout =\n"
+     "      absDiff(position, status_.scout_tick) <= static_cast<int32_t>(kSearchAdaptiveScoutTicks);",
+     "  const bool near_scout = true;"),
+    ("kinematic plateau: span 3 -> 30 ticks", PROBE_H,
+     "kSearchKinematicPlateauSpanTicks = 3;", "kSearchKinematicPlateauSpanTicks = 30;"),
+    ("kinematic plateau: 1 sample instead of 3", PROBE_H,
+     "kSearchKinematicPlateauSamples = 3;", "kSearchKinematicPlateauSamples = 1;"),
+    ("no baseline move (baseline travel 64 -> 0)", PROBE_H,
+     "kSearchBaselineTravelTicks = 64;", "kSearchBaselineTravelTicks = 0;"),
+    ("baseline counts idle samples as moving", PROBE_CPP,
+     "          (last_cadence_position_ >= 0 && position != last_cadence_position_) || speed > 0;",
+     "          speed >= 0;"),
+    ("baseline deadline never expires", PROBE_CPP,
+     "  if (now_ms - baseline_started_ms_ >= kSearchBaselineTimeoutMs) {", "  if (false) {"),
+    ("baseline minimum samples 6 -> 0", PROBE_H,
+     "kSearchBaselineMinSamples = 6;", "kSearchBaselineMinSamples = 0;"),
+    ("baseline move skips the per-sample readback", PROBE_CPP,
+     "  if (usableSafeSample(now_ms, telemetry_available, telemetry)) {",
+     "  if (telemetry_available && sampleUsable(telemetry)) {"),
+    ("release verification skips the per-sample readback", PROBE_CPP,
+     "  if (!usableSafeSample(now_ms, telemetry_available, telemetry)) return;\n  if (status_.pass < 2) {",
+     "  (void)now_ms;\n  if (!(telemetry_available && sampleUsable(telemetry))) return;\n"
+     "  if (status_.pass < 2) {"),
+    ("search steps ignore the hard current", PROBE_CPP,
+     "  if (magnitude(telemetry.present_current) >= kSearchHardCurrentAbortRaw) {\n"
+     "    failSafeOff(ContactProbeFailure::HARD_CURRENT_ABORT);",
+     "  if (false) {\n    failSafeOff(ContactProbeFailure::HARD_CURRENT_ABORT);"),
+    ("search steps ignore the GoalPosition readback", PROBE_CPP,
+     "  if (telemetry.goal_position != static_cast<int32_t>(status_.target_tick)) {\n"
+     "    failSafeOff(ContactProbeFailure::GOAL_READBACK_MISMATCH);",
+     "  if (false) {\n    failSafeOff(ContactProbeFailure::GOAL_READBACK_MISMATCH);"),
+    ("search steps ignore the TorqueLimit readback", PROBE_CPP,
+     "  if (telemetry.torque_limit != static_cast<int32_t>(request_.expected_torque_limit)) {\n"
+     "    failSafeOff(ContactProbeFailure::TORQUE_LIMIT_CHANGED);",
+     "  if (false) {\n    failSafeOff(ContactProbeFailure::TORQUE_LIMIT_CHANGED);"),
+    ("telemetry loss never goes stale", PROBE_CPP,
+     "    if (now_ms - last_good_ms_ >= kSearchTelemetryTimeoutMs) {\n"
+     "      failSafeOff(ContactProbeFailure::STALE_TELEMETRY);",
+     "    if (false) {\n      failSafeOff(ContactProbeFailure::STALE_TELEMETRY);"),
+    ("HIP endpoints skip the coarse scout (not one generic search)", PROBE_CPP,
+     "  if (status_.pass == 0) {\n    // The V25 coarse contact scout",
+     "  if (status_.pass == 0 && request_.endpoint_joint != JointKind::HIP) {\n"
+     "    // The V25 coarse contact scout"),
+    ("executor records fine pass 1 as the scout", EXEC_CPP,
+     "  e.coarse_tick = probe_.status().scout_tick;",
+     "  e.coarse_tick = probe_.status().pass1_contact_tick;"),
+    ("executor records fine pass 2 twice (the #34/#35 mapping)", EXEC_CPP,
+     "  e.fine_tick_1 = probe_.status().pass1_contact_tick;",
+     "  e.fine_tick_1 = probe_.status().pass2_contact_tick;"),
+    ("diagnostics read the coarse scout", EXEC_CPP,
+     "  d.min_contact_tick = midpoint(min_side.fine_tick_1, min_side.fine_tick_2);",
+     "  d.min_contact_tick = midpoint(min_side.coarse_tick, min_side.fine_tick_1);"),
+    ("contact envelope bounded by the coarse scout", ENV_CPP,
+     "  const uint16_t lo = minTick(request.min_side_evidence.fine_tick_2,\n"
+     "                              request.max_side_evidence.fine_tick_2);",
+     "  const uint16_t lo = minTick(request.min_side_evidence.coarse_tick,\n"
+     "                              request.max_side_evidence.coarse_tick);"),
+
+    # --- V25 backoff StableTargetGate and TELEMETRY_TIMEOUT (2026-09-30) -----
+    ("backoff arrived on the first in-band sample (no V25 settle gate)", PROBE_CPP,
+     "      if (!settle_.observe(static_cast<uint16_t>(sample.present_position),\n"
+     "                           magnitude(sample.present_speed), status_.target_tick, now_ms)) {\n"
+     "        return;\n      }\n",
+     "      (void)settle_;\n"),
+    ("backoff settle window 400 -> 0 ms", PROBE_H,
+     "kSearchBackoffSettleWindowMs = 400;", "kSearchBackoffSettleWindowMs = 0;"),
+    ("backoff settle needs 1 sample instead of 4", PROBE_H,
+     "kSearchBackoffSettledSamples = 4;", "kSearchBackoffSettledSamples = 1;"),
+    ("backoff settle speed limit 4 -> 1000 raw", PROBE_H,
+     "kSearchBackoffSettleMaxSpeedRaw = 4;", "kSearchBackoffSettleMaxSpeedRaw = 1000;"),
+    ("backoff settle band 12 -> 40 ticks", PROBE_H,
+     "kSearchBackoffSettleToleranceTicks = 12;", "kSearchBackoffSettleToleranceTicks = 40;"),
+    ("settle gate keeps counting across a non-qualifying sample", PROBE_CPP,
+     "  if (!qualifies) {\n    reset();\n    return false;\n  }",
+     "  if (!qualifies) {\n    return false;\n  }"),
+    ("leaving the arrival band does not restart the settle gate", PROBE_CPP,
+     "      if (usable) settle_.reset();  // outside the band: V25 restarts the gate\n", ""),
+    ("backoff ignores TorqueEnable while settling in the band", PROBE_CPP,
+     "    if (!sampleSafe(telemetry)) return;\n  } else if (telemetry_available) {",
+     "    if (telemetry.torque_enable != 0 && !sampleSafe(telemetry)) return;\n"
+     "  } else if (telemetry_available) {"),
+    ("search telemetry timeout 2 s -> 3 s (the inherited value)", PROBE_H,
+     "kSearchTelemetryTimeoutMs = 2000;", "kSearchTelemetryTimeoutMs = 3000;"),
 
     # --- the 24-contact Full Calibration orchestration ---------------------
     ("INITIAL_RECOVERY skips joints already near q0", EXEC_CPP,
