@@ -142,8 +142,12 @@ Implementation differences inside the search (the algorithm is otherwise V25's):
 - a release readback mismatch is `GOAL_READBACK_MISMATCH` at once, never a retry;
 - LOW, intentional (D9): V25 re-read the servo's configured temperature limit (EEPROM 0x0D) with
   every observation. Here the persistent-profile preflight verifies it (0x0D = 70 among the 20
-  profile registers). The present temperature is still checked on every sample against 70 °C.
-  The hot loop does not read EEPROM.
+  profile registers). The hot loop does not read EEPROM.
+- Runtime PresentTemperature over-limit **confirmation — ported from V25 `port.rs`** (2026-09-30,
+  after a single-sample false abort on hardware). A sample > 70 °C is re-read directly twice,
+  50 ms apart, on the same servo. ≥ 2 of 3 over the limit aborts; exactly 1 is a transient and
+  the run continues; a failed confirmation read aborts. The first reading is the normal per-tick
+  observation (V25: a 500 ms direct read); the confirmation is V25's (dev log §8b).
 
 ### Current-installation deliberate differences
 

@@ -41,6 +41,7 @@
 #include "../../src/actuator/CalibrationSequencePlanData.h"
 #include "../../src/calibration/FullLegCalibrationExecutor.h"
 #include "../../src/calibration/FullLegCalibrationPlan.h"
+#include "../../src/calibration/ThermalConfirmation.h"
 #include "kinematic_servo_sim.h"
 
 using namespace matdog;
@@ -226,6 +227,23 @@ class SeqBackend : public simk::SimBackend {
   uint8_t limit_reverts_bus = 0;
 };
 
+// Controller::ServoThermalReadPort on the model: a DIRECT PresentTemperature
+// read returns the joint's true temperature (never a glitched bulk sample).
+struct SimThermalPort : ThermalReadPort {
+  explicit SimThermalPort(simk::SimBackend* b) : backend(b) {}
+  bool readPresentTemperatureDirect(uint8_t bus_id, int32_t* celsius) override {
+    ++direct_reads[bus_id];
+    if (fail_direct[bus_id] || backend->joint[bus_id].read_fails) return false;
+    *celsius = backend->joint[bus_id].temperature;
+    return true;
+  }
+  void delayMs(uint32_t ms) override { waited_ms += ms; }
+  simk::SimBackend* backend;
+  int direct_reads[256] = {0};
+  bool fail_direct[256] = {false};
+  uint32_t waited_ms = 0;
+};
+
 struct Rig;
 using Hook = std::function<void(Rig&)>;
 
@@ -261,6 +279,12 @@ struct Rig {
   // Per probe phase, the (pass, stage) of every search write on the probed
   // bus, consecutive repeats folded: the V25 stage order of that endpoint.
   std::vector<std::pair<int, ContactSearchStage>> probe_trace[32];
+  // A one-off bulk-telemetry temperature anomaly per bus: the next `count`
+  // bulk samples read `value` while the servo is really at its temperature.
+  struct BulkGlitch { int value = 0; int count = 0; };
+  BulkGlitch bulk_temperature_glitch[256];
+  SimThermalPort thermal_port{&backend};
+  std::vector<ThermalConfirmation> thermal_log;
   // Each endpoint's probe verdict as the probe itself reported it:
   // {scout, fine 1, fine 2}, 0 = not completed.
   uint16_t probe_result[3][2][3] = {};
@@ -425,7 +449,23 @@ struct Rig {
     uint8_t buses[kFullLegMaxTelemetry] = {0};
     const uint8_t n = full.telemetryRequest(buses, kFullLegMaxTelemetry);
     FullLegTelemetryFrame frame{};
-    for (uint8_t i = 0; i < n; ++i) frame.add(buses[i], backend.joint[buses[i]].sample(t));
+    for (uint8_t i = 0; i < n; ++i) {
+      actuator::TelemetrySample sample = backend.joint[buses[i]].sample(t);
+      BulkGlitch& g = bulk_temperature_glitch[buses[i]];
+      if (g.count > 0 && sample.read_ok) {
+        sample.present_temperature = g.value;
+        --g.count;
+      }
+      // Controller::updateFullLegCalibration(): the LF V25 over-limit
+      // confirmation on every sample, before the executor sees it.
+      if (sample.read_ok) {
+        const ThermalConfirmation th =
+            confirmPresentTemperature(&thermal_port, buses[i], sample.present_temperature);
+        sample.present_temperature = th.published_c;
+        if (th.decision != ThermalDecision::NORMAL) thermal_log.push_back(th);
+      }
+      frame.add(buses[i], sample);
+    }
     const size_t writes_before = backend.writes.size();
     full.update(ctx(), t, frame, safe_off_frame);
     if (full.status().step == FullLegStep::PROBE) {
@@ -799,6 +839,80 @@ void test_partial_scout_step_all_24_endpoints() {
   }
   std::printf("    partial scout step used on %d of 24 endpoints\n", partial_used);
   CHECK(partial_used > 0);
+}
+
+// The LF V25 runtime PresentTemperature confirmation, through the real
+// Controller-equivalent path: one bulk sample > 70 C with the servo really at
+// 32 C is a transient (the run continues); a real overheat, or an over-limit
+// sample that cannot be confirmed, still aborts to SAFE_OFF.
+void test_thermal_confirmation_in_the_sequence() {
+  auto parking_move = [](Rig& r) {
+    return r.full.status().phase == CalibrationPhase::PARKING &&
+           r.full.status().step == FullLegStep::MOVE_MONITOR;
+  };
+  {
+    g_case = "2026-09-30 M42: one > 70 C sample while parking, 32 C direct -> transient, 6/6";
+    Rig rig(Leg::LF);
+    const uint8_t park = rig.req().park.bus_id;
+    CHECK_EQ(park, 42);
+    rig.run(once(parking_move, [park](Rig& r) { r.bulk_temperature_glitch[park] = {255, 1}; }));
+    checkComplete(rig);
+    CHECK_EQ(rig.thermal_log.size(), 1u);
+    if (!rig.thermal_log.empty()) {
+      const ThermalConfirmation& th = rig.thermal_log.front();
+      CHECK(th.decision == ThermalDecision::TRANSIENT);
+      CHECK_EQ(th.bus_id, park);
+      CHECK_EQ(th.samples[0], 255);
+      CHECK_EQ(th.published_c, 35);
+    }
+    CHECK_EQ(rig.thermal_port.direct_reads[park], 2);
+    CHECK_EQ(rig.thermal_port.waited_ms, 2 * kThermalConfirmationDelayMs);
+  }
+  {
+    g_case = "a one-sample transient on the PROBED joint mid-search -> transient, 6/6";
+    Rig rig(Leg::RF);
+    rig.run(once(probing(CalibrationPhase::UPPER_MIN, 4),
+                 [](Rig& r) { r.bulk_temperature_glitch[r.bus(kUpper)] = {90, 1}; }));
+    checkComplete(rig);
+    CHECK_EQ(rig.thermal_log.size(), 1u);
+  }
+  {
+    g_case = "a real overheat of the park joint (bulk AND direct 75 C) -> CONFIRMED, abort";
+    Rig rig(Leg::LF);
+    const uint8_t park = rig.req().park.bus_id;
+    rig.run(once(parking_move, [park](Rig& r) { r.backend.joint[park].temperature = 75; }));
+    CHECK_EQ((int)rig.full.status().step, (int)FullLegStep::FAILED);
+    CHECK_EQ((int)rig.full.status().failure, (int)FullLegFailure::OVER_TEMPERATURE);
+    CHECK_EQ((int)rig.full.status().failed_phase, (int)CalibrationPhase::PARKING);
+    CHECK(!rig.thermal_log.empty() && rig.thermal_log.front().decision == ThermalDecision::CONFIRMED);
+    rig.backend.joint[park].temperature = 35;
+    checkSafeEnd(rig);
+  }
+  {
+    g_case = "an over-limit sample whose confirmation read fails -> abort (fail closed)";
+    Rig rig(Leg::LF);
+    const uint8_t park = rig.req().park.bus_id;
+    rig.run(once(parking_move, [park](Rig& r) {
+      r.bulk_temperature_glitch[park] = {255, 1};
+      r.thermal_port.fail_direct[park] = true;
+    }));
+    CHECK_EQ((int)rig.full.status().failure, (int)FullLegFailure::OVER_TEMPERATURE);
+    CHECK(!rig.thermal_log.empty() &&
+          rig.thermal_log.front().decision == ThermalDecision::CONFIRMATION_READ_FAILED);
+    rig.thermal_port.fail_direct[park] = false;
+    checkSafeEnd(rig);
+  }
+  {
+    g_case = "no over-limit sample: not one confirmation read in a whole 6/6 run";
+    Rig rig(Leg::RH);
+    rig.run();
+    checkComplete(rig);
+    CHECK(rig.thermal_log.empty());
+    int reads = 0;
+    for (int b = 0; b < 256; ++b) reads += rig.thermal_port.direct_reads[b];
+    CHECK_EQ(reads, 0);
+    CHECK_EQ(rig.thermal_port.waited_ms, 0u);
+  }
 }
 
 void test_stop_one_tick_before_the_corridor_entry_fails_closed() {
@@ -1432,6 +1546,7 @@ int main() {
   test_v25_lf_hardware_contacts_replayed_exactly();
   test_evidence_maps_scout_and_fine_passes();
   test_partial_scout_step_all_24_endpoints();
+  test_thermal_confirmation_in_the_sequence();
   test_stop_one_tick_before_the_corridor_entry_fails_closed();
   test_realistic_servo_behaviour_still_completes();
   test_recovery_only_run_commands_all_twelve_joints();

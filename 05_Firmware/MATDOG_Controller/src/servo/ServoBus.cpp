@@ -287,6 +287,20 @@ bool ServoBus::readRuntimeState(int id, RuntimeState* out) {
   return true;
 }
 
+bool ServoBus::readPresentTemperatureDirect(int id, int* celsius_out) {
+  if (id < 0 || id > 253 || celsius_out == nullptr) return false;
+  // An operational safety read, like readRuntimeState(): operational timeout.
+  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+  const int celsius = st_.readByte(static_cast<uint8_t>(id), SMS_STS_PRESENT_TEMPERATURE);
+  if (celsius < 0) {
+    last_detected_ = core::DetectedState::NO_RESPONSE;
+    return false;
+  }
+  last_detected_ = core::DetectedState::ONLINE;
+  *celsius_out = celsius;
+  return true;
+}
+
 bool ServoBus::readPositionOffset(int id, int16_t* out) {
   if (id < 0 || id > 253 || out == nullptr) return false;
 

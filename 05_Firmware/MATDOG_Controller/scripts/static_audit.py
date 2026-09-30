@@ -1656,6 +1656,66 @@ def check_calibration_search_boundaries(files):
                  f"search and its auxiliary park may request the V25 envelope")
 
 
+def check_thermal_confirmation(files):
+    """LF V25 runtime PresentTemperature over-limit confirmation (NormaCore
+    st3215 port.rs), ported 2026-09-30 after a single-sample false thermal
+    abort on hardware (M42, one > 70 C sample, 32 C a second later):
+      - the oracle constants: limit 70 C, 3 readings, 50 ms before each
+        confirmation read, >= 2 of 3 over the limit confirms;
+      - two FRESH DIRECT reads of the SAME servo, each after the wait; a read
+        that fails is fail-closed (the over-limit trigger stays published);
+      - at or below the limit nothing is read;
+      - the Controller applies it to EVERY Full-Leg sample before the frame
+        reaches the executor, and the direct read uses the operational
+        timeout. Only temperature is confirmed - no other check is touched.
+    The persistent MaxTemperature register is a different thing (preflight)."""
+    by_name = {path.name: (path, code) for path, code in files}
+    normalize = lambda text: re.sub(r"\s+", " ", text)
+    for name in ("ThermalConfirmation.h", "ThermalConfirmation.cpp", "Controller.cpp", "ServoBus.cpp"):
+        if name not in by_name:
+            fail(f"{name} not found - cannot audit the thermal confirmation")
+            return
+    path, code = by_name["ThermalConfirmation.h"]
+    body = normalize(code)
+    for pinned in ("constexpr int32_t kThermalLimitC = 70;",
+                   "constexpr uint8_t kThermalConfirmationReads = 3;",
+                   "constexpr uint32_t kThermalConfirmationDelayMs = 50;",
+                   "constexpr uint8_t kThermalConfirmedOverLimit = 2;"):
+        if body.count(pinned) != 1:
+            fail(f"{path}: the LF V25 thermal confirmation constant drifted: expected {pinned!r}")
+    path, code = by_name["ThermalConfirmation.cpp"]
+    body = normalize(re.sub(r"//[^\n]*", "", code))
+    for token, why in (
+            ("if (observed_c <= kThermalLimitC) return out;", "no confirmation read at or below the limit"),
+            ("for (uint8_t i = 1; i < kThermalConfirmationReads; ++i) {", "exactly two confirmation reads"),
+            ("port->delayMs(kThermalConfirmationDelayMs); if (!port->readPresentTemperatureDirect(bus_id, "
+             "&celsius) || celsius < 0) {", "50 ms, then a fresh direct read of the SAME servo"),
+            ("out.decision = ThermalDecision::CONFIRMATION_READ_FAILED; return out;",
+             "a failed confirmation read fails closed"),
+            ("if (over_limit >= kThermalConfirmedOverLimit) {", "V25: >= 2 of 3 over the limit confirms")):
+        if token not in body:
+            fail(f"{path}: the LF V25 thermal confirmation lost {token!r} ({why})")
+    path, code = by_name["Controller.cpp"]
+    m = re.search(r"void Controller::updateFullLegCalibration\(uint32_t now_ms\) \{(.*?)\n\}", code, re.DOTALL)
+    if not m:
+        fail(f"{path}: updateFullLegCalibration() not found to audit the thermal confirmation")
+    else:
+        body = normalize(m.group(1))
+        for token in ("calibration::confirmPresentTemperature( &thermal_read_port_, buses[i], "
+                      "sample.present_temperature);",
+                      "sample.present_temperature = thermal.published_c;"):
+            if token not in body:
+                fail(f"{path}: every Full-Leg sample must pass the LF V25 thermal confirmation "
+                     f"before the executor sees it (lost {token!r})")
+    path, code = by_name["ServoBus.cpp"]
+    m = re.search(r"bool ServoBus::readPresentTemperatureDirect\([^)]*\)\s*\{(.*?)\n\}", code, re.DOTALL)
+    if not m:
+        fail(f"{path}: readPresentTemperatureDirect() not found")
+    elif "kOperationalTimeoutMs" not in m.group(1) or "SMS_STS_PRESENT_TEMPERATURE" not in m.group(1):
+        fail(f"{path}: readPresentTemperatureDirect() must be one direct PresentTemperature read "
+             f"under the operational timeout")
+
+
 def check_full_leg_calibration_wiring(files):
     """Four-leg Full Calibration: command, Controller and finalizer wiring.
 
@@ -5609,6 +5669,7 @@ def main():
     check_full_leg_calibration_wiring(files)
     check_full_calibration_sequence(files, SKETCH_DIR)
     check_calibration_search_boundaries(files)
+    check_thermal_confirmation(files)
     check_service_readiness_is_host_linkable(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)
     check_ota_partition_verifier_fail_closed(SKETCH_DIR)

@@ -236,10 +236,12 @@ refuses any move not in the phase table, re-deriving the tick itself.
     old grid gap found, the scout still reference only, fine passes unchanged (8-tick grid,
     phase-dependent in the last 18 ticks), no stop = NO_CONTACT_BEFORE_GUARD, MIN/MAX, and every
     per-sample fault during the partial step;
+  - `test_thermal_confirmation` (145 checks): the LF V25 runtime PresentTemperature
+    confirmation (§8b);
   - `test_cr3_q0_fresh_promotion` (1,459 checks): fresh q0 supersedes CR2-C, and the recentred
     installation — two installations, different per-joint offsets, 12/12 URDF→raw commands,
     24/24 corridors and every pose and park translated by exactly Δq0;
-  - `test_full_leg_calibration_executor` (17,134 checks): the full V25 sequence on
+  - `test_full_leg_calibration_executor` (18,963 checks): the full V25 sequence on
     LF/RF/RH/LH with the V25 search trace of all 24 endpoints and the evidence mapping, the
     recovery-only run and ~30 adversarial cases, plus all 24 endpoints with stops at guard − 18
     (22 of 24 reached only through the partial step);
@@ -248,9 +250,10 @@ refuses any move not in the phase table, re-deriving the tick itself.
     Full Calibration; only 24/24 sets `all_contact_calibrated=1`;
 - `static_audit.py` PASS, including the Safe Actuator suite (orchestration, TorqueLimit,
   plan-data and coarse-scout mutations), DALY 52/52, LED 98/98 and the runner suite (24);
-- `test_calibration_search_behaviour_mutations.py`: **83/83** behaviour mutations caught (18
+- `test_calibration_search_behaviour_mutations.py`: **89/89** behaviour mutations caught (18
   staged search + 35 coarse scout + 9 backoff StableTargetGate / telemetry timeout + 4 final
-  partial scout step + 17 orchestration); every one must fail the host tests.
+  partial scout step + 6 thermal confirmation + 17 orchestration); every one must fail the host
+  tests.
 
 ## 8. LED charging presentation (separate change, same build)
 
@@ -269,6 +272,73 @@ protection, MOS state and every non-LED gate. The audit pins the helper's exact 
 mutation suite catches reverting to the any-word test, widening the mask and ignoring a word.
 Expected live: 6 fixed green + the 7th breathing at SOC 55 %; 11 fixed + the last breathing at a
 reported 100 % (never FULL from SOC).
+
+## 8b. Hardware finding: single-sample thermal abort → LF V25 thermal confirmation (2026-09-30)
+
+**What happened.** The first TRUE LF run, on build `4241a39eab60` with fresh q0 and verified INITIAL
+RECOVERY 12/12, ended at 7.1 s in PARKING with `OVER_TEMPERATURE`, before any contact search. M42
+(LH UPPER, the rear park) was moving 2072 → 2470. One PresentTemperature sample of M42 exceeded
+70 °C; about a second later all 12 leg servos read 31–34 °C (M42: 32 °C). The run failed closed:
+FULL LEG ABORT, SESSION ABORT, SAFE_OFF 13/13 verified, export 0/24. That aborted run is evidence
+only.
+
+**Why.** The port compared each raw sample against 70 °C and aborted on the first one over it. The
+LF V25 hardware stack did not.
+
+**The oracle, audited** (`LF_V25_Hardware_Oracle/source/software/drivers/st3215/src/port.rs`):
+- constants: `MATDOG_EXPECTED_TEMPERATURE_LIMIT_C = 70`, `MATDOG_THERMAL_CONFIRMATION_READS = 3`,
+  `MATDOG_THERMAL_CONFIRMATION_DELAY = 50 ms` (L36–41);
+- `apply_matdog_direct_temperature` (L491): a PresentTemperature reading above the limit is followed
+  by two more `read_motor_temperature_direct` reads of the **same motor** (L422: a 1-byte
+  PresentTemperature read), **each preceded by a 50 ms sleep**;
+- `classify_matdog_direct_temperature_samples` (L57): of the three values, ≥ 2 over the limit is
+  `Confirmed` (torque forced off, the highest over-limit value published), exactly 1 is
+  `Transient` (the last normal value published, `MATDOG_THERMAL_DIRECT_TRANSIENT` logged), and 0 is
+  `Normal`;
+- a failed confirmation read returns an error, and `scan_motors` stops the bus worker (L659–666). No
+  further observation is published, so the calibration dies on telemetry loss: fail closed.
+
+Two different things, not to be confused:
+- **A. runtime PresentTemperature transient confirmation** — the bug, now ported;
+- **B. persistent MaxTemperature configuration (EEPROM 0x0D = 70)** — verified by the
+  servo-profile preflight (D9), unchanged.
+
+**The port** (`calibration/ThermalConfirmation.*`, applied by `Controller::updateFullLegCalibration`
+to every Full-Leg sample before the executor sees it):
+- a sample > 70 °C triggers two fresh `ServoBus::readPresentTemperatureDirect` reads of the same
+  servo (operational timeout), each after 50 ms;
+- ≥ 2 of 3 over 70 °C gives CONFIRMED: the monitors see the highest value and abort, as before;
+- exactly 1 gives TRANSIENT: the monitors see the last normal value and the run continues;
+- a confirmation read that does not answer gives CONFIRMATION_READ_FAILED: the over-limit trigger
+  stays published and the run aborts. That is the original behaviour, and stricter than V25's
+  2-s telemetry timeout;
+- every non-normal decision prints `CALIBRATION_THERMAL_CONFIRMATION bus= decision= samples= published=`.
+
+The one difference from V25: V25 took its first reading from a direct read every 500 ms (its bulk
+temperature byte was always overwritten). Here the first reading is the normal per-tick
+observation, whose acquisition is unchanged by the operator's instruction. The confirmation reads,
+the timing and the rule are V25's.
+
+**Unchanged:** every other fail-closed check — communication, servo status, TorqueEnable,
+TorqueLimit, GoalPosition, hard current, telemetry age, held joints, guards, authority, permit — has
+no confirmation or debounce. The contact search, q0, geometry, D10, backoff, poses and TorqueLimit
+are also unchanged.
+
+**Tests:**
+- `test_thermal_confirmation`, through the real classification with a scripted direct-read port:
+  - the oracle constants;
+  - ≤ 70 °C reads nothing;
+  - >70 / normal / normal → TRANSIENT; >70 / >70 / normal, >70 / normal / >70 and >70 / >70 /
+    >70 → CONFIRMED;
+  - the same servo, fresh direct reads, a 50 ms wait before each;
+  - exactly two reads;
+  - read failures and a missing port fail closed;
+  - today's M42 (255, then 32, 32) → TRANSIENT.
+- The executor suite, through the Controller-equivalent path: today's M42 transient during PARKING
+  completes 6/6, a probed-joint transient mid-search completes 6/6, a real overheat and an
+  unconfirmable sample abort to SAFE_OFF, and a normal run makes no confirmation read.
+- Audit pins, 4 audit mutations and 6 behaviour mutations: reads removed, 1 of 3, another servo, a
+  cached value, no wait, a failed read no longer fail-closed.
 
 ## 9. Next
 

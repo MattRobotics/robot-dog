@@ -78,9 +78,15 @@ prints the six `CALIBRATION_FULL_LEG_SEARCH_CORRIDOR joint=… side=…` lines a
 `CALIBRATION_SEQUENCE …` line per phase/step and one `CALIBRATION_SEARCH …` line per search step.
 
 A held joint that loses torque, has its GoalPosition or TorqueLimit changed, drifts more than 10
-ticks, moves faster than 40 raw on two samples, reports a status fault, 200 current or more than
-70 °C, or goes 3 s without telemetry ends the run at once in a verified SAFE_OFF of all 12
-joints. So does any bystander that gains torque or moves more than 16 ticks.
+ticks, moves faster than 40 raw on two samples, reports a status fault or 200 current, or goes 3 s
+without telemetry ends the run at once in a verified SAFE_OFF of all 12 joints.
+
+A PresentTemperature above 70 °C is confirmed first, as LF V25 did. Two direct reads of the same
+servo, 50 ms apart, follow:
+- ≥ 2 of the 3 readings over 70 °C: the run ends in SAFE_OFF;
+- a single one: a transient, logged as `CALIBRATION_THERMAL_CONFIRMATION … decision=TRANSIENT`,
+  and the run continues;
+- a confirmation read that fails: SAFE_OFF. So does any bystander that gains torque or moves more than 16 ticks.
 
 End records:
 `CALIBRATION_FULL_LEG_CONTACTS leg=<L> expected=6 measured=6 accepted=6 diagnostics_accepted=YES`,

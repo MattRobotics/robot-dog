@@ -217,6 +217,13 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_motion_deadman.cpp" \
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp"
 
+# The LF V25 runtime PresentTemperature over-limit confirmation (port.rs),
+# driven through the real classification with a scripted direct-read port.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_thermal_confirmation" \
+  "$SCRIPT_DIR/test_thermal_confirmation.cpp" \
+  "$SKETCH_DIR/src/calibration/ThermalConfirmation.cpp"
+
 # The OTA suite links the REAL OTA-B gate and the REAL arbiter, so the
 # authorization path it exercises is the shipped one, not a stub.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -319,6 +326,7 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_full_leg_calibration_executor" \
   "$SCRIPT_DIR/test_full_leg_calibration_executor.cpp" \
   "$SKETCH_DIR/src/calibration/FullLegCalibrationExecutor.cpp" \
+  "$SKETCH_DIR/src/calibration/ThermalConfirmation.cpp" \
   "$SKETCH_DIR/src/calibration/FullLegCalibrationPlan.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationPopulationEvidence.cpp" \
   "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \
@@ -448,6 +456,7 @@ done
 "$OUT/test_cr3_q0_fresh_promotion"
 "$OUT/test_calibration_motion_permit"
 "$OUT/test_motion_deadman"
+"$OUT/test_thermal_confirmation"
 "$OUT/test_ota_policy"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_population_evidence"

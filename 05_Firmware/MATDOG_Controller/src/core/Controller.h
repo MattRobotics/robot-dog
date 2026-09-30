@@ -14,6 +14,7 @@
 #include "../calibration/FirstMotionExecutor.h"
 #include "../calibration/FullLegCalibrationExecutor.h"
 #include "../calibration/FullLegCalibrationFinalizer.h"
+#include "../calibration/ThermalConfirmation.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/HttpTransport.h"
 #include "../network/WifiManager.h"
@@ -80,6 +81,23 @@ class Controller {
   void printFullLegSequenceEvent();
 
   servo::ServoBus servo_bus_;
+  // The LF V25 runtime PresentTemperature over-limit confirmation's bus port:
+  // fresh direct reads through servo_bus_ and the oracle's 50 ms wait.
+  class ServoThermalReadPort : public calibration::ThermalReadPort {
+   public:
+    explicit ServoThermalReadPort(servo::ServoBus* bus) : bus_(bus) {}
+    bool readPresentTemperatureDirect(uint8_t bus_id, int32_t* celsius) override {
+      int value = -1;
+      if (!bus_->readPresentTemperatureDirect(bus_id, &value)) return false;
+      *celsius = value;
+      return true;
+    }
+    void delayMs(uint32_t ms) override { delay(ms); }
+
+   private:
+    servo::ServoBus* bus_;
+  };
+  ServoThermalReadPort thermal_read_port_{&servo_bus_};
   servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-start
   servo::ServoPreflight servo_preflight_;  // H0 leg verification; read-only, never auto-started
   imu::Bno085Imu imu_;

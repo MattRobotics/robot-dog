@@ -66,6 +66,16 @@ MIN/MAX only, 2 of a leg's 6 contacts. It is superseded and is **not** Full Cali
   −3…+1 at q0 2090) fell. The guard, step size, corridor and fine passes are unchanged. Reach is now
   guard − 18 (URDF + 46) for every q0; the LF UPPER MIN margin is +21. Tested on all 24 endpoints
   (22 of 24 need it at guard − 18).
+- **Runtime PresentTemperature over-limit confirmation, ported from LF V25 `port.rs`** (hardware
+  finding 2026-09-30). The first TRUE LF run aborted in PARKING on ONE M42 sample > 70 °C; M42
+  read 32 °C a second later.
+  - Now a sample > 70 °C is re-read directly twice on the same servo, each read after 50 ms.
+  - ≥ 2 of 3 over the limit aborts as before; exactly 1 is a transient (logged, the last normal
+    value used) and the run continues; a failed confirmation read aborts (fail closed).
+  - `calibration/ThermalConfirmation.*`, `ServoBus::readPresentTemperatureDirect()`, applied by
+    the Controller to every Full-Leg sample; `CALIBRATION_THERMAL_CONFIRMATION …` log line.
+  - Only temperature is confirmed; every other fail-closed check is unchanged. The EEPROM
+    MaxTemperature (0x0D = 70) stays a preflight check.
 - **Search telemetry timeout 2 s** (V25 `TELEMETRY_TIMEOUT`; closes review M1): was the inherited
   3 s, for the search stages and the backoff deadman.
 - **Recentred installation, proven**: every calibration raw target is the fresh promoted q0 +

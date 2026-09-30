@@ -437,6 +437,9 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     tests).
   - Each backoff is arrived only through V25's StableTargetGate (≤ 12 ticks, |speed| ≤ 4, 4
     samples, ≥ 400 ms); the search telemetry timeout is V25's 2 s.
+  - Runtime PresentTemperature > 70 °C is confirmed as in V25 `port.rs` (2 direct reads of the same
+    servo, 50 ms apart, ≥ 2 of 3 aborts, a failed read aborts). This follows the 2026-09-30
+    single-sample false abort on hardware; no other check is debounced.
   - Risk R2 closed by D10: V25's coarse-grid reach depended on the fresh q0; one final bounded
     partial coarse step to the existing guard (never beyond, not V25) makes the reach guard − 18
     for every q0. The read-only LF UPPER MIN reach report from the promoted q0 still gates the GO;

@@ -265,6 +265,12 @@ class ServoBus {
   };
   bool readRuntimeState(int id, RuntimeState* out);
 
+  // ONE fresh, direct PresentTemperature read (register 63, 1 byte) - the LF
+  // V25 read_motor_temperature_direct() the runtime over-limit confirmation
+  // needs (calibration/ThermalConfirmation.h). Read-only; false and *out
+  // untouched if the servo does not answer.
+  bool readPresentTemperatureDirect(int id, int* celsius_out);
+
   // -------------------------------------------------------------------------
   // H0 preflight reads — READ-ONLY, no write path exists for any of them
   // -------------------------------------------------------------------------

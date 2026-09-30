@@ -123,6 +123,12 @@ def run_search_checks(files):
     return list(audit.failures)
 
 
+def run_thermal_checks(files):
+    audit.failures.clear()
+    audit.check_thermal_confirmation(files)
+    return list(audit.failures)
+
+
 def run_full_leg_wiring_checks(files):
     audit.failures.clear()
     audit.check_full_leg_calibration_wiring(files)
@@ -236,6 +242,7 @@ def main():
     expect_pass("baseline four-leg Full Calibration wiring",
                 run_full_leg_wiring_checks(BASE))
     expect_pass("unmutated tree: calibration search boundaries", run_search_checks(BASE))
+    expect_pass("unmutated tree: LF V25 thermal confirmation", run_thermal_checks(BASE))
     expect_pass("baseline CR3 actuator infrastructure fail-closed",
                 run_actuator_infrastructure_checks(BASE))
     expect_pass("baseline current-boot q0 promotion", run_q0_promotion_checks(BASE))
@@ -765,6 +772,27 @@ def main():
          r"if \(next_depth > guard_depth && target_depth < guard_depth\) \{",
          "if (next_depth > guard_depth) {",
          "never repeated", runner=run_search_checks)
+
+    # --- LF V25 runtime PresentTemperature confirmation (2026-09-30) ---------
+    case("thermal majority weakened to 1 of 3", "ThermalConfirmation.h",
+         r"constexpr uint8_t kThermalConfirmedOverLimit = 2;",
+         "constexpr uint8_t kThermalConfirmedOverLimit = 1;",
+         "thermal confirmation constant drifted", runner=run_thermal_checks)
+
+    case("thermal confirmation wait removed", "ThermalConfirmation.cpp",
+         r"port->delayMs\(kThermalConfirmationDelayMs\);",
+         "",
+         "50 ms, then a fresh direct read", runner=run_thermal_checks)
+
+    case("thermal confirmation reads another servo", "ThermalConfirmation.cpp",
+         r"port->readPresentTemperatureDirect\(bus_id, &celsius\)",
+         "port->readPresentTemperatureDirect(static_cast<uint8_t>(bus_id + 1), &celsius)",
+         "the SAME servo", runner=run_thermal_checks)
+
+    case("Controller skips the thermal confirmation", "Controller.cpp",
+         r"sample\.present_temperature = thermal\.published_c;",
+         "(void)thermal;",
+         "thermal confirmation before the executor", runner=run_thermal_checks)
 
     case("CommandRouter derives its own search corridor", ROUTER_CPP,
          r"void CommandRouter::printServoRead\(int id\) \{",

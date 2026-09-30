@@ -22,7 +22,10 @@ mutations (no gate, a shorter window, fewer samples, a looser speed or band,
 no reset, torque ignored while settling, the inherited 3 s timeout). The
 final bounded partial coarse-scout step (a current-installation deviation) has
 mutations for its removal, a target past the guard, a repeat at the guard and
-its extension to the fine passes.
+its extension to the fine passes. The LF V25 runtime PresentTemperature
+confirmation has mutations for removed confirmation reads, a 1-of-3 majority,
+another servo's reading, a cached value, no 50 ms wait, and a failed read that
+no longer fails closed.
 
 The 24-contact Full Calibration sequence adds its own ORCHESTRATION
 mutations (FullLegCalibrationExecutor / the sequence plan / the policy's
@@ -56,6 +59,7 @@ SEQ_CPP = "src/actuator/CalibrationSequencePlan.cpp"
 FIN_CPP = "src/calibration/FullLegCalibrationFinalizer.cpp"
 FIN_H = "src/calibration/FullLegCalibrationFinalizer.h"
 ENV_CPP = "src/actuator/OperationalEnvelope.cpp"
+THERMAL_CPP = "src/calibration/ThermalConfirmation.cpp"
 
 # (name, file, exact anchor (must occur exactly once), replacement)
 MUTATIONS = [
@@ -280,6 +284,28 @@ MUTATIONS = [
      "  } else {\n    step_ticks_ = kSearchFineStepTicks;\n    next_depth = target_depth + kSearchFineStepTicks;\n",
      "  } else {\n    step_ticks_ = kSearchFineStepTicks;\n    next_depth = target_depth + kSearchFineStepTicks;\n"
      "    if (next_depth > guard_depth && target_depth < guard_depth) next_depth = guard_depth;\n"),
+
+    # --- LF V25 runtime PresentTemperature confirmation (2026-09-30) ---------
+    ("thermal: the two confirmation reads removed", THERMAL_CPP,
+     "  for (uint8_t i = 1; i < kThermalConfirmationReads; ++i) {",
+     "  for (uint8_t i = 1; i < 1; ++i) {"),
+    ("thermal: >= 2 of 3 weakened to 1 of 3", THERMAL_CPP,
+     "  if (over_limit >= kThermalConfirmedOverLimit) {", "  if (over_limit >= 1) {"),
+    ("thermal: confirmation reads another servo", THERMAL_CPP,
+     "    if (!port->readPresentTemperatureDirect(bus_id, &celsius) || celsius < 0) {",
+     "    if (!port->readPresentTemperatureDirect(static_cast<uint8_t>(bus_id + 1), &celsius) ||\n"
+     "        celsius < 0) {"),
+    ("thermal: cached trigger value instead of a fresh direct read", THERMAL_CPP,
+     "    if (!port->readPresentTemperatureDirect(bus_id, &celsius) || celsius < 0) {",
+     "    celsius = observed_c;\n    if (celsius < 0) {"),
+    ("thermal: the 50 ms wait before each confirmation removed", THERMAL_CPP,
+     "    port->delayMs(kThermalConfirmationDelayMs);\n", ""),
+    ("thermal: a failed confirmation read no longer fails closed", THERMAL_CPP,
+     "    if (!port->readPresentTemperatureDirect(bus_id, &celsius) || celsius < 0) {\n"
+     "      out.decision = ThermalDecision::CONFIRMATION_READ_FAILED;\n",
+     "    if (!port->readPresentTemperatureDirect(bus_id, &celsius) || celsius < 0) {\n"
+     "      out.decision = ThermalDecision::CONFIRMATION_READ_FAILED;\n"
+     "      out.published_c = kThermalLimitC;\n"),
 
     # --- the 24-contact Full Calibration orchestration ---------------------
     ("INITIAL_RECOVERY skips joints already near q0", EXEC_CPP,

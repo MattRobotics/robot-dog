@@ -494,6 +494,20 @@ void Controller::updateFullLegCalibration(uint32_t now_ms) {
       sample.goal_position = t.goal_position;
       sample.torque_limit = t.torque_limit;
       sample.servo_status = t.status;
+      // LF V25 runtime over-limit confirmation (port.rs): a reading > 70 C is
+      // re-read twice, directly, 50 ms apart; only >= 2 of 3 over the limit
+      // reaches the monitors as over-limit (abort). Nothing else is filtered.
+      const calibration::ThermalConfirmation thermal = calibration::confirmPresentTemperature(
+          &thermal_read_port_, buses[i], sample.present_temperature);
+      sample.present_temperature = thermal.published_c;
+      if (thermal.decision != calibration::ThermalDecision::NORMAL) {
+        Serial.printf("CALIBRATION_THERMAL_CONFIRMATION bus=%u decision=%s samples=%ld,%ld,%ld "
+                      "count=%u published=%ld limit=%ld\n",
+                      (unsigned)thermal.bus_id, calibration::toString(thermal.decision),
+                      (long)thermal.samples[0], (long)thermal.samples[1], (long)thermal.samples[2],
+                      (unsigned)thermal.sample_count, (long)thermal.published_c,
+                      (long)calibration::kThermalLimitC);
+      }
     }
     frame.add(buses[i], sample);
   }
