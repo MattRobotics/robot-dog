@@ -6,7 +6,7 @@ generalized to four legs) to the oracle:
 `source/software/drivers/st3215/src/auto_calibrate/matdog.rs` (line numbers below). The contact
 search is mapped stage by stage in **§ Contact search** below; it supersedes the search section of
 [`2026-09-29_FULL_CALIBRATION_V25_ORACLE_TRACEABILITY.md`](2026-09-29_FULL_CALIBRATION_V25_ORACLE_TRACEABILITY.md)
-(which described the no-scout PR #34 search). Deviations D1–D9 are explained in
+(which described the no-scout PR #34 search). Deviations D1–D10 are explained in
 [`2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md`](2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md) §3;
 D6 (no coarse scout) is **closed**. Where this log says "ported", the V25 rule is reproduced; every
 place where the port differs, even slightly, is listed under the table it belongs to. "Exact" is
@@ -89,7 +89,7 @@ The MAX side starts where the MIN side's released contact left the joint, as in
 | V25 (matdog.rs) | Now (`ContactProbeEngine`) | Port |
 |---|---|---|
 | **Baseline**: `acquire_moving_current_baseline_forward` (L3294). ONE 64-tick move from the present position, guard-checked. A sample counts while the position changed or speed > 0. It ends at ≤ 10 ticks with ≥ 6 samples. `MOTION_TIMEOUT` is 12 s; a deadline with ≥ 6 samples proceeds un-arrived, < 6 samples is an error. Stats are median and MAD (L1733) | `BASELINE_PENDING/MONITORING`: the same move, rules, deadline and statistics | ported; sample store capped at 32 |
-| **Coarse contact scout**: `approach_with_scout(64, None)` (L3962). `next = target + 64` from the baseline end; `passed_guard(next)` (L4926) is an error. Settle window 900 ms, arrival at ≤ 10, tracking limit 68, detector with the **static** bounds (L800) | pass 0: the same steps, never clamped at the entry. The step past the guard is never issued (`NO_CONTACT_BEFORE_GUARD`). Steps short of the entry are labelled `COARSE_TRANSIT`, the rest `COARSE_SCOUT`; this is only a label (one detector, one pass). V25 has no separate transit | ported |
+| **Coarse contact scout**: `approach_with_scout(64, None)` (L3962). `next = target + 64` from the baseline end; `passed_guard(next)` (L4926) is an error. Settle window 900 ms, arrival at ≤ 10, tracking limit 68, detector with the **static** bounds (L800) | pass 0: the same steps, never clamped at the entry. The step past the guard is never issued (`NO_CONTACT_BEFORE_GUARD`). Steps short of the entry are labelled `COARSE_TRANSIT`, the rest `COARSE_SCOUT`; this is only a label (one detector, one pass). V25 has no separate transit | ported, **plus the final partial step to the guard (D10, below)** |
 | **Coarse reference**: the scout tick is logged "discarded" and is not metrology | `scout_tick` / `ContactEvidence.coarse_tick`: reference only | ported |
 | `EarlyStall` → `stop_pressure`, error; tracking failure without a scout → error | `EARLY_STALL_OUTSIDE_CORRIDOR`, `TRACKING_FAILED` → SAFE_OFF | ported; the error path differs (below) |
 | **Release**: `stop_pressure` (L4249) after every accepted approach, `set_motor_goal_verified` | `RELEASE_PENDING` → `RELEASE_VERIFYING`: GoalPosition := the contact, read back | ported |
@@ -105,7 +105,31 @@ The MAX side starts where the MIN side's released contact left the joint, as in
 | `TORQUE_LIMIT` 500, `GOAL_SPEED` 160, `ACCELERATION` 8 | the constants table above | ported |
 | the full-leg state machine | the Phases table above | ported |
 
-Implementation differences inside the search (the algorithm is unchanged):
+**D10 — final bounded partial coarse-scout step (deliberate current-installation deviation, NOT
+V25).**
+- *What V25 does:* V25 ends the scout when the next 64-tick step would pass the guard. That leaves a
+  grid-phase-dependent gap between the last full target (minus the 11-tick detection margin) and
+  the guard.
+- *Evidence:* on 2026-09-30 the measured LF UPPER MIN hard stop (raw 1468, depth 622 at the fresh q0
+  2090) fell in that gap. The V25-grid margin was −3…+1.
+- *Now:* when the next 64-tick step would pass the guard and no coarse contact has been confirmed,
+  ONE final partial step targets the existing guard itself. It is never beyond the guard, is 0 < Δ <
+  64 ticks, and is never repeated. Once the target is the guard, the next step is refused with
+  `NO_CONTACT_BEFORE_GUARD`.
+- *Same rules as any coarse step:* the same detector, readback, current and safety rules, and the
+  tracking limit of V25's `probe_tracking_error_limit(Δ)`. A contact it finds is the coarse scout
+  reference like any other.
+- *Unchanged:* q0, the Geometry contact, the URDF limits, the guard (URDF + 64), the 64-tick step,
+  speed 160 / acceleration 8, TorqueLimit 500, the fine 8-tick passes, backoff 96, the
+  StableTargetGate, repeatability and the operational limits.
+- *Safety argument:* the step is never larger than a V25 coarse step and is clamped to the already
+  reviewed guard. It removes the grid-phase blind spot without enlarging the corridor.
+- *Resulting reach, whatever the grid phase:* the coarse scout finds any stop down to guard − 11. The
+  whole endpoint is found down to guard − 18 (URDF + 46), limited by the unchanged 8-tick fine
+  grid, which needs a fine target 11…18 ticks past the stop before the guard. A stop in the last 10
+  ticks before the guard has no kinematic contact signature and fails closed.
+
+Implementation differences inside the search (the algorithm is otherwise V25's):
 - every V25 error return (early stall, tracking failed, travel guard, repeatability, current not
   recovered, …) ends in SAFE_OFF_REQUIRED, the caller's verified torque-off, instead of V25's
   GoalPosition := present followed by an error;
@@ -149,7 +173,7 @@ These come from the current mechanism and calibration contract, not from the sea
 - Held-joint speed abort (D5).
 - Temperature-limit register verified by preflight, not per sample (D9, LOW).
 
-### Reach of the coarse scout (risk R2) — a V25 property, decided on the fresh q0
+### Reach of the coarse scout (risk R2) — closed by D10 on measured evidence
 
 V25 steps the scout on a 64-tick grid from the baseline end and never issues a target past the
 guard; there is no clamp. A stop is scouted only if a grid target that still fits before the guard
@@ -161,22 +185,25 @@ lies more than the 10-tick band beyond it:
 - reach = T − 11;
 - margin = reach − stop depth.
 
-The port does not narrow this relative to V25: the corridor depths, grid origin, arrival band,
-bounded-lag continuation and strict guard are V25's. The #34/#35 search (8-tick steps to the guard)
-reached further on some endpoints. The margin is **not** a fixed number: the stop is fixed in raw
-ticks, while the corridor and the grid move with q0.
+V25's reach depended on the grid phase, because the stop is fixed in raw ticks while the corridor
+and the grid move with q0. The port reproduced this without narrowing it. D10 removes the phase
+dependence: the coarse reach is now guard − 11 and the endpoint reach guard − 18 (URDF + 46) for
+every q0.
 
 For LF UPPER MIN (guard depth 661, 9 grid steps), reach ≈ start depth + 619…623. The stop was found
 by hand on 2026-09-29 at about raw 1470; at that boot's q0 2086 that is depth 616 (corridor: entry
 1553, contact 1493, URDF 1489, guard 1425). With a fresh q0 its depth is q0 − 1470. The margin is
 therefore positive at q0 ≈ 2086 and negative near 2100 (the CR2-C value).
 
-**Decision rule:** after the fresh Q0 PROMOTE and before any Full Calibration GO, a read-only LF
-UPPER MIN reach report is computed from the actual promoted q0. It is refined with the rest
-position after INITIAL RECOVERY. If the predicted margin is < 0, the run stops before Full
-Calibration. Nothing is widened (coarse step 64, guard 64, grid and corridor unchanged). A miss on
-hardware ends in `UPPER_MIN_PROBE_FAILED / NO_CONTACT_BEFORE_GUARD` at 0/6 with SAFE_OFF.
-`test_scout_reach_is_the_v25_coarse_grid` pins the rule.
+Measured 2026-09-30 (read-only, torque off, 10 samples, spread 0): the LF UPPER MIN hard stop is
+at **raw 1468**. At the fresh q0 2090 that is depth 622 (URDF + 25). The V25 grid alone gave a
+margin of −3…+1, so the run was stopped before any motion. With D10 the endpoint reach is depth 643,
+a margin of **+21**, independent of the grid phase.
+
+**Decision rule (kept):** after every fresh Q0 PROMOTE and before any Full Calibration GO, a read-only
+LF UPPER MIN reach report is computed from the promoted q0 with the production resolver. If the
+margin is < 0, the run stops before Full Calibration. Nothing is widened. `test_final_partial_scout_step`
+and `test_partial_scout_step_all_24_endpoints` pin the step, its bounds and its reach.
 
 ## `stop_pressure` (L4249)
 

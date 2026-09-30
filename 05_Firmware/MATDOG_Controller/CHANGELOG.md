@@ -59,6 +59,13 @@ MIN/MAX only, 2 of a leg's 6 contacts. It is superseded and is **not** Full Cali
   ticks, |speed| ≤ 4, 4 consecutive samples and ≥ 400 ms (`SearchSettleGate`, reset by any bad
   sample). Only then are the current recovery and the next fine pass allowed. TorqueEnable and
   the whole readback are checked on every backoff sample.
+- **Final bounded partial coarse-scout step (deliberate current-installation deviation, NOT V25).**
+  When the next 64-tick scout step would pass the existing guard, ONE final partial step (< 64
+  ticks) targets the guard itself; it is never beyond and never repeated. It removes V25's
+  grid-phase blind gap before the guard, where the measured LF UPPER MIN stop (raw 1468, margin
+  −3…+1 at q0 2090) fell. The guard, step size, corridor and fine passes are unchanged. Reach is now
+  guard − 18 (URDF + 46) for every q0; the LF UPPER MIN margin is +21. Tested on all 24 endpoints
+  (22 of 24 need it at guard − 18).
 - **Search telemetry timeout 2 s** (V25 `TELEMETRY_TIMEOUT`; closes review M1): was the inherited
   3 s, for the search stages and the backoff deadman.
 - **Recentred installation, proven**: every calibration raw target is the fresh promoted q0 +

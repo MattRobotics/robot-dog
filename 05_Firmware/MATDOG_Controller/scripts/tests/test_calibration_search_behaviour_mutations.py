@@ -19,7 +19,10 @@ move removed or loosened, each per-sample readback dropped in the new
 stages, the evidence mapped wrongly, and one endpoint kind run differently.
 The V25 backoff StableTargetGate and TELEMETRY_TIMEOUT (2 s) have their own
 mutations (no gate, a shorter window, fewer samples, a looser speed or band,
-no reset, torque ignored while settling, the inherited 3 s timeout).
+no reset, torque ignored while settling, the inherited 3 s timeout). The
+final bounded partial coarse-scout step (a current-installation deviation) has
+mutations for its removal, a target past the guard, a repeat at the guard and
+its extension to the fine passes.
 
 The 24-contact Full Calibration sequence adds its own ORCHESTRATION
 mutations (FullLegCalibrationExecutor / the sequence plan / the policy's
@@ -263,6 +266,20 @@ MUTATIONS = [
      "  } else if (telemetry_available) {"),
     ("search telemetry timeout 2 s -> 3 s (the inherited value)", PROBE_H,
      "kSearchTelemetryTimeoutMs = 2000;", "kSearchTelemetryTimeoutMs = 3000;"),
+
+    # --- the final bounded partial coarse-scout step (2026-09-30) ------------
+    ("final partial scout step removed (the V25 grid gap back)", PROBE_CPP,
+     "    if (next_depth > guard_depth && target_depth < guard_depth) {",
+     "    if (false && next_depth > guard_depth && target_depth < guard_depth) {"),
+    ("final partial scout step one tick beyond the guard", PROBE_CPP,
+     "      next_depth = guard_depth;\n", "      next_depth = guard_depth + 1;\n"),
+    ("final partial scout step repeated at the guard", PROBE_CPP,
+     "    if (next_depth > guard_depth && target_depth < guard_depth) {",
+     "    if (next_depth > guard_depth) {"),
+    ("final partial step taken by the fine passes too", PROBE_CPP,
+     "  } else {\n    step_ticks_ = kSearchFineStepTicks;\n    next_depth = target_depth + kSearchFineStepTicks;\n",
+     "  } else {\n    step_ticks_ = kSearchFineStepTicks;\n    next_depth = target_depth + kSearchFineStepTicks;\n"
+     "    if (next_depth > guard_depth && target_depth < guard_depth) next_depth = guard_depth;\n"),
 
     # --- the 24-contact Full Calibration orchestration ---------------------
     ("INITIAL_RECOVERY skips joints already near q0", EXEC_CPP,

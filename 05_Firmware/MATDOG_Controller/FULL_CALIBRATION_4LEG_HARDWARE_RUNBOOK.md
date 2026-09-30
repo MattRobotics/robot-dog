@@ -69,9 +69,10 @@ The sequence:
 
 Both fine passes use the scout: they accept down to scout − 32, and step past a plateau more
 than 8 ticks short of it. The scout is reference evidence only; the fine passes are the
-measurement. Contact is kinematic; current only aborts. A stop deeper than the scout's last
-64-tick target before the guard, minus 11, is not scouted (V25 property, risk R2):
-`NO_CONTACT_BEFORE_GUARD`, SAFE_OFF. Stop there and keep the evidence. On `ARMED` the firmware
+measurement. Contact is kinematic; current only aborts. When the next 64-tick scout step would
+pass the guard, one final partial step targets the guard itself (deviation D10, never beyond it).
+Every stop down to guard − 18 (URDF + 46) is therefore found whatever q0's grid phase. A deeper stop
+fails closed: `NO_CONTACT_BEFORE_GUARD`, SAFE_OFF. Stop there and keep the evidence. On `ARMED` the firmware
 prints the six `CALIBRATION_FULL_LEG_SEARCH_CORRIDOR joint=… side=…` lines and the
 `CALIBRATION_FULL_LEG_PREREQUISITE pose=…` lines for this q0. It also prints one
 `CALIBRATION_SEQUENCE …` line per phase/step and one `CALIBRATION_SEARCH …` line per search step.
@@ -123,9 +124,9 @@ Expect `envelope_accepted=0`, `parameters_approved=0`. That is correct.
    **R2 reach report (read-only, before any GO).** From the promoted LF UPPER q0, compute with the
    production resolver:
    - the LF UPPER MIN corridor (canonical contact, URDF limit, entry, guard);
-   - the coarse-scout start depth, the deepest legal coarse-scout target and the reach (= that
-     target − 11);
-   - the depth of the hand-found stop (raw ≈ 1470, 2026-09-29) and the predicted margin.
+   - the coarse-scout start depth, the deepest legal coarse target (the guard, via D10) and the
+     endpoint reach (guard − 18);
+   - the depth of the measured stop (raw 1468, 2026-09-30) and the predicted margin.
 
    If the margin is < 0, **stop before Full Calibration** and keep the evidence; nothing is
    widened. Recompute it after step 4 with the measured rest position of LF UPPER (bus 12).

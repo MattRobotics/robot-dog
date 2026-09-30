@@ -104,6 +104,7 @@ Deviations, each with its reason:
 | D6 | coarse contact scout, fine passes accept down to scout − 32 | **CLOSED (corrective commit on 873a121).** Was: no coarse scout, pass 1 a fine pass, pass 2 judged against pass 1 (inherited from PR #34). Now the V25 sequence: baseline → coarse scout (64) → release → backoff (StableTargetGate) → fine 1 → backoff → fine 2, both fine passes judged against the scout (§3b). The remaining implementation differences are listed in the traceability log | — |
 | D7 | one LF-only state machine, station-mediated RAM writes | one generic executor behind `SafeActuatorPolicy`; each move is policy-authorized against the phase table and **re-derived by the policy** | architecture |
 | D8 | LF hardware run (`lf_hip_sequence_profile`): UPPER 90° for **both** HIP sides | V25's generic `hip_upper_clearance_delta`: LF 90/85, RF 85/90, rear 90/90 (HIP → q0, UPPER → the MAX pose between the sides) | Geometry V5: at UPPER 90° on both sides the folded lower leg hits `base_link` before the URDF limit (LF HIP MIN→MAX, RF HIP MIN: `PATH_OBSTRUCTION_BEFORE_URDF_LIMIT`); the per-side poses are `CLEAR_TO_END` (traceability, § HIP clearance pose). A mechanical-installation/geometry deviation, not a search change: on LF/RF the HIP MAX search starts at q0 instead of the HIP MIN contact, so its raw scout-grid phase differs from historical LF V25 |
+| D10 | the scout ends when the next 64-tick step would pass the guard (grid-phase blind gap before it) | **ONE final bounded partial coarse step targets the existing guard** (0 < Δ < 64, never beyond, never repeated); same detector and safety rules; guard, step size, corridor, fine passes unchanged | measured 2026-09-30: the real LF UPPER MIN stop (raw 1468, URDF + 25 at q0 2090) lay in V25's gap (margin −3…+1). NOT V25 behaviour: a current-installation robustness adaptation; phase-independent reach now guard − 18 |
 | D9 | the configured temperature limit (EEPROM 0x0D) re-read with every observation | verified by the persistent-profile preflight (0x0D = 70); the present temperature is checked on every sample against 70 °C | LOW, intentional: no EEPROM reads in the hot calibration loop |
 
 **Risk R1 (hardware, flagged — not changed without evidence).** V25's LF HIP MAX contact was
@@ -116,11 +117,12 @@ and decide a corridor change from the measured stop, not before. (Geometry V5 su
 448 was a lower-leg/body contact at UPPER 90°; the plan probes LF HIP MAX at UPPER 85°, so the
 real HIP stop may lie deeper. That is a hypothesis to check on hardware, not evidence.)
 
-**Risk R2 (hardware, V25 property — flagged, not changed).** The V25 coarse scout steps on a
-64-tick grid from the baseline end and never issues a target past the guard, so its reach is
-reach = (deepest legal grid target) − 11. The port reproduces this without narrowing it. The
-margin to a stop depends on the **fresh q0**: the stop is fixed in raw ticks while the corridor
-and the grid move with q0.
+**Risk R2 (hardware) — closed by D10 on measured evidence.** V25's scout reach was the deepest
+legal 64-tick grid target − 11, so it depended on the fresh q0 (the stop is fixed in raw ticks while
+the corridor and grid move with q0). On 2026-09-30 the measured LF UPPER MIN stop (raw 1468) at the
+fresh q0 2090 had a V25-grid margin of −3…+1, and the run was stopped before any motion. With D10
+the endpoint reach is guard − 18 for every q0, a margin of +21 for that stop. The original analysis
+is kept below for the record.
 
 The known LF UPPER MIN stop (found by hand 2026-09-29, raw ≈ 1470, depth 616 at that boot's q0
 2086) lies at depth q0 − 1470 against a reach of about start depth + 619…623. The margin is
@@ -221,7 +223,7 @@ refuses any move not in the phase table, re-deriving the tick itself.
 ## 7. Offline evidence (this branch)
 
 - host suites: `run_host_tests.sh` exit 0, 0 warnings, failures = 0, including:
-  - `test_contact_probe_engine` (23,799 checks), the V25 search case by case, [T1]–[T15]: the
+  - `test_contact_probe_engine` (33,419 checks), the V25 search case by case, [T1]–[T15]: the
     scout in every search, distinct from transit, stored as reference, never metrology,
     followed by the backoff, 8-tick fine passes judged against it, the plateau bypass, fine
     pass 2 independent and scout-referenced, fine-only repeatability, no scout = no endpoint,
@@ -229,21 +231,26 @@ refuses any move not in the phase table, re-deriving the tick itself.
     functions against V25's own test values. [H1] covers the V25 backoff StableTargetGate rule by
     rule: in the band while moving, one good sample, 4 samples inside 400 ms, oscillation and
     speed resets, current recovery judged only once settled, no fine pass before settling, and
-    fail closed on timeout;
+    fail closed on timeout. [P1]–[P11] cover the final partial scout step (D10): full steps stay
+    64, one partial step < 64 to the guard and never repeated, never past the guard, stops in the
+    old grid gap found, the scout still reference only, fine passes unchanged (8-tick grid,
+    phase-dependent in the last 18 ticks), no stop = NO_CONTACT_BEFORE_GUARD, MIN/MAX, and every
+    per-sample fault during the partial step;
   - `test_cr3_q0_fresh_promotion` (1,459 checks): fresh q0 supersedes CR2-C, and the recentred
     installation — two installations, different per-joint offsets, 12/12 URDF→raw commands,
     24/24 corridors and every pose and park translated by exactly Δq0;
-  - `test_full_leg_calibration_executor` (14,814 checks): the full V25 sequence on
+  - `test_full_leg_calibration_executor` (17,134 checks): the full V25 sequence on
     LF/RF/RH/LH with the V25 search trace of all 24 endpoints and the evidence mapping, the
-    recovery-only run and ~30 adversarial cases;
+    recovery-only run and ~30 adversarial cases, plus all 24 endpoints with stops at guard − 18
+    (22 of 24 reached only through the partial step);
   - `test_full_leg_calibration_plan` (the 24-profile matrix + phase table);
   - `test_full_leg_calibration_finalizer`: 2/6 and 5/6 fail; 6/6 passes; 23/24 and 8/24 are not
     Full Calibration; only 24/24 sets `all_contact_calibrated=1`;
 - `static_audit.py` PASS, including the Safe Actuator suite (orchestration, TorqueLimit,
   plan-data and coarse-scout mutations), DALY 52/52, LED 98/98 and the runner suite (24);
-- `test_calibration_search_behaviour_mutations.py`: **79/79** behaviour mutations caught (18
-  staged search + 35 coarse scout + 9 backoff StableTargetGate / telemetry timeout + 17
-  orchestration); every one must fail the host tests.
+- `test_calibration_search_behaviour_mutations.py`: **83/83** behaviour mutations caught (18
+  staged search + 35 coarse scout + 9 backoff StableTargetGate / telemetry timeout + 4 final
+  partial scout step + 17 orchestration); every one must fail the host tests.
 
 ## 8. LED charging presentation (separate change, same build)
 

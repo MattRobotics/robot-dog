@@ -46,6 +46,11 @@
 //                   | be an EARLY_STALL, never contact); from the entry on,
 //                   | COARSE_SCOUT. V25 has no separate transit move: the
 //                   | scout pass IS the travel, so none is added here.
+//                   | DEVIATION (bounded, current installation): when the
+//                   | next 64-tick step would pass the guard, ONE final
+//                   | partial step targets the guard itself (< 64 ticks,
+//                   | never beyond, never repeated) - V25 stopped there,
+//                   | leaving a grid-phase-dependent gap before the guard
 //   RELEASE         | stop_pressure(): GoalPosition := the accepted position,
 //                   | verified by readback, after EVERY accepted approach
 //   BACKOFF         | backoff_and_verify(scout): 96 ticks back; arrival is V25's
@@ -89,6 +94,9 @@
 // abort and the guard bound that pressure.
 //
 // Differences from V25 (the traceability log lists them with reasons):
+//   - the final partial coarse-scout step to the guard (above): a stop down
+//     to guard - 11 is scouted whatever the grid phase; the guard, the step
+//     size and the corridor are unchanged;
 //   - every V25 error return (early stall, tracking failed, travel guard,
 //     repeatability, ...) is SAFE_OFF_REQUIRED here: the caller's verified
 //     torque-off instead of V25's GoalPosition := present then an error;
@@ -262,6 +270,9 @@ struct ContactProbeStatus {
   uint16_t step_count = 0;            // step writes this attempt (scout + both fine passes)
   uint16_t plateau_bypass_count = 0;  // fine candidates stepped past (V25 scout-lag rule)
   uint16_t kinematic_plateau_count = 0;  // V25 confirm_kinematic_plateau() entries
+  // The final partial coarse-scout step to the guard (deviation, see the file
+  // comment): its size in ticks, 0 = not taken.
+  uint16_t scout_partial_step_ticks = 0;
   uint16_t last_candidate_tick = 0;   // last confirmed candidate (detector or kinematic)
   int32_t last_position = -1;         // last good telemetry sample
   int32_t last_speed = -1;            // raw magnitude

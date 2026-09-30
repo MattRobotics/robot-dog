@@ -264,6 +264,8 @@ struct Rig {
   // Each endpoint's probe verdict as the probe itself reported it:
   // {scout, fine 1, fine 2}, 0 = not completed.
   uint16_t probe_result[3][2][3] = {};
+  // The final partial coarse-scout step each endpoint took (0 = none).
+  uint16_t probe_partial[3][2] = {};
 
   explicit Rig(Leg l, const StopSpec& stops = StopSpec(), int deadband = 4) : leg(l) {
     arbiter.reset(AuthorityClearReason::BOOT);
@@ -440,6 +442,8 @@ struct Rig {
       r[0] = full.probeStatus().scout_tick;
       r[1] = full.probeStatus().pass1_contact_tick;
       r[2] = full.probeStatus().pass2_contact_tick;
+      probe_partial[static_cast<uint8_t>(pr.endpoint_joint)][static_cast<uint8_t>(pr.endpoint_side)] =
+          full.probeStatus().scout_partial_step_ticks;
     }
 
     const uint32_t changes = full.status().phase_changes;
@@ -767,6 +771,34 @@ void test_evidence_maps_scout_and_fine_passes() {
   const FullLegJointDiagnostics& d = rig.full.diagnostics(JointKind::UPPER);
   CHECK_EQ(d.min_contact_tick, ((int)e.fine_tick_1 + (int)e.fine_tick_2) / 2);
   checkSafeEnd(rig);
+}
+
+// The final partial coarse-scout step, all 24 endpoints, both directions: a
+// stop at guard - 18 (URDF + 46, the phase-independent reach) is found on
+// every endpoint of every leg. Wherever the 64-tick grid would have ended short
+// of it, the one partial step to the guard is what reaches it.
+void test_partial_scout_step_all_24_endpoints() {
+  int partial_used = 0;
+  for (const Leg leg : kAllLegs) {
+    g_case = "partial scout step: stops at guard - 18 on all 6 endpoints, every leg";
+    StopSpec s;
+    for (auto& joint : s.beyond_limit) for (int& b : joint) b = 64 - 18;
+    Rig rig(leg, s);
+    rig.run();
+    checkComplete(rig);
+    for (uint8_t k = 0; k < kJointKindCount; ++k) {
+      for (uint8_t side = 0; side < kContactSideCount; ++side) {
+        const uint16_t partial = rig.probe_partial[k][side];
+        CHECK(partial < 64);
+        partial_used += partial > 0;
+        const CalibrationSearchCorridor& c = rig.req().corridor[k][side];
+        const ContactEvidence& e = rig.full.contact(static_cast<JointKind>(k), static_cast<ContactSide>(side));
+        CHECK_EQ(actuator::searchDepth(c, c.guard_tick) - actuator::searchDepth(c, e.coarse_tick), 18);
+      }
+    }
+  }
+  std::printf("    partial scout step used on %d of 24 endpoints\n", partial_used);
+  CHECK(partial_used > 0);
 }
 
 void test_stop_one_tick_before_the_corridor_entry_fails_closed() {
@@ -1399,6 +1431,7 @@ int main() {
   test_every_leg_completes_the_full_v25_sequence();
   test_v25_lf_hardware_contacts_replayed_exactly();
   test_evidence_maps_scout_and_fine_passes();
+  test_partial_scout_step_all_24_endpoints();
   test_stop_one_tick_before_the_corridor_entry_fails_closed();
   test_realistic_servo_behaviour_still_completes();
   test_recovery_only_run_commands_all_twelve_joints();

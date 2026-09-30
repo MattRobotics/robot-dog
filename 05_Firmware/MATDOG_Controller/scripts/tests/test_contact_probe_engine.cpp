@@ -85,13 +85,11 @@ constexpr ContactSide kSides[2] = {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}
 // LF_UPPER's real MIN stop, found by hand on 2026-09-29: ~23 ticks past the
 // modelled contact.
 constexpr int kHardwareStopBeyondContact = 23;
-// A stop the V25 coarse scout can reach from THIS rig's start (q0): the LF
-// UPPER MIN hardware offset on MIN; on MAX the canonical contact (from q0 the
-// MAX-side coarse grid ends at depth 1399, so +23 = 1410 lies beyond the
-// scout's reach - see test_scout_reach_is_the_v25_coarse_grid).
-int reachableBeyond(ContactSide side) {
-  return side == ContactSide::MIN_SIDE ? kHardwareStopBeyondContact : 0;
-}
+// The LF UPPER MIN hardware offset, on both sides. With the final partial
+// coarse-scout step every stop down to guard - 18 is found whatever the grid
+// phase (from q0 the MAX-side 64-tick grid ends at depth 1399, so +23 = 1410
+// is reached by the partial step - see test_final_partial_scout_step).
+int reachableBeyond(ContactSide) { return kHardwareStopBeyondContact; }
 
 JointIdentity upperOf(const UpperCase& u) {
   JointIdentity id{};
@@ -508,11 +506,15 @@ void checkStepDiscipline(ProbeRig& rig) {
           if (sg.stage == S::COARSE_TRANSIT) CHECK(d < entry_d);
           if (sg.stage == S::COARSE_SCOUT) CHECK(d >= entry_d);
           // 64-tick target steps; the first one from where the baseline left
-          // the joint (inside its 10-tick settle band).
+          // the joint (inside its 10-tick settle band); at most one final
+          // partial step, which targets the guard itself and is the last.
           if (rig.log[i - 1].stage == S::BASELINE) {
             CHECK(delta >= 64 - 10 && delta <= 64 + 10);
-          } else {
-            CHECK_EQ(delta, 64);
+          } else if (delta != 64) {
+            CHECK(d == rig.depth(rig.corridor.guard_tick));
+            CHECK(delta > 0 && delta < 64);
+            CHECK(i + 1 == rig.log.size() || rig.log[i + 1].stage == S::RELEASE);
+            CHECK_EQ(st.scout_partial_step_ticks, delta);
           }
           break;
         case S::RELEASE: {
@@ -1075,8 +1077,11 @@ void test_no_stop_fails_closed_at_the_guard() {
       CHECK_EQ((int)st.failure, (int)ContactProbeFailure::NO_CONTACT_BEFORE_GUARD);
       CHECK_EQ(st.last_candidate_tick, 0);
       CHECK(!st.scout_valid);
-      CHECK(rig.depth(st.target_tick) <= guard_d);
-      CHECK(rig.depth(st.target_tick) > guard_d - 64);  // one more coarse step would pass it
+      CHECK_EQ(rig.depth(st.target_tick), guard_d);  // the final partial step, then refused
+      CHECK(st.scout_partial_step_ticks > 0 && st.scout_partial_step_ticks < 64);
+      int at_guard = 0;
+      for (const WriteLog& w : rig.log) at_guard += rig.depth(w.tick) == guard_d;
+      CHECK_EQ(at_guard, 1);  // never repeated
       const simk::SimJoint& j = rig.joint();
       const int deepest = rig.corridor.probe_sign < 0 ? (int)j.lo_seen : (int)j.hi_seen;
       CHECK(rig.depth(deepest) <= guard_d);
@@ -1085,41 +1090,194 @@ void test_no_stop_fails_closed_at_the_guard() {
   }
 }
 
-// V25 passed_guard() on the COARSE grid: the scout detects a stop only if one
-// of its 64-tick targets that still fits before the guard lies more than the
-// 10-tick settle band beyond it. A stop deeper than that is never scouted and
-// fails closed - exactly V25's reach, pinned here so it is never mistaken for
-// a regression (see the traceability log, risk R2).
-void test_scout_reach_is_the_v25_coarse_grid() {
+// --- the final bounded partial coarse-scout step (current-installation
+// deviation, 2026-09-30) --------------------------------------------------------
+//
+// V25 ended the scout when the next 64-tick step would pass the guard, so a
+// stop deeper than (last full target - 11) was never scouted: a grid-phase
+// blind gap before the guard (LF UPPER MIN's measured stop fell in it). Now
+// ONE final partial step targets the guard itself. Detection still needs the
+// target more than 10 ticks past the stop, and the fine passes (8-tick grid,
+// unchanged) a fine target 11..18 past it, so every stop down to guard - 18 is
+// found whatever the phase; the last 10 ticks before the guard stay silent
+// and fail closed.
+
+struct Grid {
+  int last_full = -100000;  // deepest full 64-tick coarse target
+  int partial = 0;          // the partial step's size, 0 = none
+  int partial_target = -100000;
+  int guard_writes = 0;
+};
+
+Grid scoutGrid(const ProbeRig& rig) {
+  Grid g;
+  const int guard_d = rig.depth(rig.corridor.guard_tick);
+  int prev = rig.start_position;
+  for (const WriteLog& w : rig.log) {
+    const int d = rig.depth(w.tick);
+    if (w.pass == 0 && (w.stage == S::COARSE_TRANSIT || w.stage == S::COARSE_SCOUT)) {
+      const int delta = d - rig.depth(prev);
+      if (delta == 64 || prev == rig.start_position) {
+        g.last_full = std::max(g.last_full, d);
+      } else {
+        g.partial = delta;
+        g.partial_target = d;
+      }
+    }
+    if (d == guard_d && w.stage != S::RELEASE) ++g.guard_writes;
+    if (w.stage != S::RELEASE) prev = w.tick;
+  }
+  return g;
+}
+
+void test_final_partial_scout_step() {
   for (const UpperCase& u : kUppers) {
     for (ContactSide side : kSides) {
-      for (int beyond_guard : {-5, -20, -35, -50, -65}) {
-        g_case = "[T12] stop near the guard: COMPLETE iff a coarse target fits past it";
+      // The grid of this rig, learned from a free run (no stop at all).
+      ProbeRig free_rig(u, side);
+      runProbe(free_rig);
+      const int guard_d = free_rig.depth(free_rig.corridor.guard_tick);
+      const Grid fg = scoutGrid(free_rig);
+      {
+        g_case = "[P1-P4,P8,P9] no stop: full 64-tick steps, ONE partial step to the guard, then refused";
+        const ContactProbeStatus& st = free_rig.probe.status();
+        CHECK_EQ((int)st.failure, (int)ContactProbeFailure::NO_CONTACT_BEFORE_GUARD);
+        CHECK(fg.partial > 0 && fg.partial < 64);
+        CHECK_EQ(fg.partial_target, guard_d);
+        CHECK_EQ(fg.last_full + fg.partial, guard_d);
+        CHECK(fg.last_full + 64 > guard_d);  // V25 would have stopped here
+        CHECK_EQ(fg.guard_writes, 1);         // never repeated
+        CHECK_EQ(st.scout_partial_step_ticks, fg.partial);
+        checkWriteBounds(free_rig);
+        // Every coarse step but the first (from the baseline end) and the
+        // partial one is exactly 64 ticks.
+        int prev = -1, full = 0;
+        for (const WriteLog& w : free_rig.log) {
+          if (w.pass != 0 || (w.stage != S::COARSE_TRANSIT && w.stage != S::COARSE_SCOUT)) {
+            prev = w.tick;
+            continue;
+          }
+          const int delta = free_rig.depth(w.tick) - free_rig.depth(prev);
+          if (free_rig.depth(w.tick) != guard_d && free_rig.log[0].tick != prev) {
+            CHECK_EQ(delta, 64);
+            ++full;
+          }
+          prev = w.tick;
+        }
+        CHECK(full > 0);
+      }
+      // Stops in the V25 blind gap (deeper than last_full - 11), down to the
+      // phase-independent reach guard - 18.
+      for (int stop_d : {fg.last_full - 11 + 1, (fg.last_full - 11 + guard_d - 18) / 2, guard_d - 18}) {
+        g_case = "[P5-P7,P10] a stop in the old grid gap is scouted by the partial step; fine passes unchanged";
+        if (stop_d <= fg.last_full - 11) continue;
         ProbeRig rig(u, side);
-        rig.placeStop(rig.depth(rig.corridor.guard_tick) + beyond_guard -
-                      rig.depth(rig.corridor.contact_tick));
+        rig.placeStop(stop_d - rig.depth(rig.corridor.contact_tick));
         runProbe(rig);
         const ContactProbeStatus& st = rig.probe.status();
-        const int guard_d = rig.depth(rig.corridor.guard_tick);
-        const int stop_d = rig.depth(rig.stopTick());
-        int deepest_scout = -100000;
-        for (const WriteLog& w : rig.log) {
-          if (w.pass == 0 && (w.stage == S::COARSE_SCOUT || w.stage == S::COARSE_TRANSIT)) {
-            deepest_scout = std::max(deepest_scout, rig.depth(w.tick));
-          }
-        }
-        checkWriteBounds(rig);
-        if (st.phase == ContactProbePhase::COMPLETE) {
-          CHECK(deepest_scout - stop_d > 10);
-          CHECK(std::abs(st.scout_tick - rig.stopTick()) <= 1);
-        } else {
-          CHECK_EQ((int)st.failure, (int)ContactProbeFailure::NO_CONTACT_BEFORE_GUARD);
-          CHECK(deepest_scout - stop_d <= 10);     // no target ever ran past the stop
-          CHECK(deepest_scout + 64 > guard_d);     // the next one would pass the guard
-          CHECK(!st.scout_valid);
-        }
-        if (beyond_guard == -5) CHECK(st.phase != ContactProbePhase::COMPLETE);  // any grid phase
+        CHECK_EQ((int)st.phase, (int)ContactProbePhase::COMPLETE);
+        CHECK(st.scout_valid);
+        CHECK(std::abs(rig.depth(st.scout_tick) - stop_d) <= 1);           // scout = reference
+        CHECK(std::abs(rig.depth(st.pass1_contact_tick) - stop_d) <= 1);   // fine metrology
+        CHECK(std::abs(rig.depth(st.pass2_contact_tick) - stop_d) <= 1);
+        CHECK(st.scout_partial_step_ticks > 0 && st.scout_partial_step_ticks < 64);
+        CHECK_EQ(rig.probe.witness().max_deviation_ticks,
+                 std::abs(st.pass1_contact_tick - st.pass2_contact_tick));
+        const Grid g = scoutGrid(rig);
+        CHECK_EQ(g.partial_target, guard_d);
+        checkStepDiscipline(rig);
+        for (const WriteLog& w : rig.log) CHECK(rig.depth(w.tick) <= guard_d);
       }
+      {
+        g_case = "[P8] a stop in the last 10 ticks before the guard: no contact signature -> fails closed";
+        ProbeRig rig(u, side);
+        rig.placeStop(guard_d - 5 - rig.depth(rig.corridor.contact_tick));
+        runProbe(rig);
+        const ContactProbeStatus& st = rig.probe.status();
+        CHECK_EQ((int)st.failure, (int)ContactProbeFailure::NO_CONTACT_BEFORE_GUARD);
+        CHECK(!st.scout_valid);
+        CHECK_EQ(rig.depth(st.target_tick), guard_d);
+        CHECK_EQ(scoutGrid(rig).guard_writes, 1);
+        checkWriteBounds(rig);
+      }
+    }
+  }
+  // [P7] The fine passes are unchanged: 8-tick steps only, no partial step of
+  // their own. A stop 11..17 ticks short of the guard is scouted (coarse reach
+  // guard - 11) but a fine pass finds it only if its own 8-tick grid lands a
+  // target 11..18 past it before the guard - otherwise it fails closed there.
+  // (In this model the fine grid's phase is fixed - backoff 96 = 12 fine steps,
+  // 4-tick settle - so that target is always stop + 12 and only 11 ticks short
+  // misses; on hardware the offset can be anywhere in 11..18.)
+  int fine_misses = 0, fine_hits = 0;
+  for (const UpperCase& u : kUppers) {
+    for (ContactSide side : kSides) {
+      for (int short_of_guard = 11; short_of_guard <= 17; ++short_of_guard) {
+        g_case = "[P7] fine passes keep the 8-tick grid near the guard (no fine partial step)";
+        ProbeRig rig(u, side);
+        const int guard_d = rig.depth(rig.corridor.guard_tick);
+        const int stop_d = guard_d - short_of_guard;
+        rig.placeStop(stop_d - rig.depth(rig.corridor.contact_tick));
+        runProbe(rig);
+        const ContactProbeStatus& st = rig.probe.status();
+        CHECK(st.scout_valid);  // the partial coarse step reaches it
+        int prev = -1;
+        int last_fine = -100000;
+        for (const WriteLog& w : rig.log) {
+          if (w.stage == S::FINE_SEARCH && prev >= 0 && rig.log.front().tick != prev) {
+            const int delta = rig.depth(w.tick) - rig.depth(prev);
+            if (delta != 8) CHECK(delta >= 8 - 12 && delta <= 8 + 12 && rig.depth(prev) < stop_d - 60);
+          }
+          if (w.stage == S::FINE_SEARCH) last_fine = std::max(last_fine, rig.depth(w.tick));
+          if (w.stage != S::RELEASE) prev = w.tick;
+          CHECK(rig.depth(w.tick) <= guard_d);
+        }
+        if (st.phase == ContactProbePhase::COMPLETE) {
+          ++fine_hits;
+          CHECK(std::abs(rig.depth(st.pass1_contact_tick) - stop_d) <= 1);
+        } else {
+          ++fine_misses;
+          CHECK_EQ((int)st.failure, (int)ContactProbeFailure::NO_CONTACT_BEFORE_GUARD);
+          CHECK(st.pass >= 1);                    // missed by a FINE pass, not the scout
+          CHECK(last_fine - stop_d <= 10);        // no fine target ran past it by > 10
+          CHECK(last_fine + 8 > guard_d);         // the next 8-tick fine step would pass the guard
+        }
+      }
+    }
+  }
+  std::printf("    near-guard stops: fine grid found %d, missed (fail closed) %d\n", fine_hits, fine_misses);
+  CHECK(fine_misses > 0);  // the band really is fine-grid dependent
+  CHECK(fine_hits > 0);
+
+  // [P11] every per-sample violation during the partial step fails closed there.
+  struct Fault {
+    ContactProbeFailure expect;
+    std::function<void(bool*, TelemetrySample*)> apply;
+  };
+  const Fault faults[] = {
+      {ContactProbeFailure::HARD_CURRENT_ABORT, [](bool*, TelemetrySample* s) { s->present_current = 250; }},
+      {ContactProbeFailure::GOAL_READBACK_MISMATCH, [](bool*, TelemetrySample* s) { s->goal_position += 30; }},
+      {ContactProbeFailure::TORQUE_LIMIT_CHANGED, [](bool*, TelemetrySample* s) { s->torque_limit = 1000; }},
+      {ContactProbeFailure::STALE_TELEMETRY, [](bool* a, TelemetrySample*) { *a = false; }},
+  };
+  for (ContactSide side : kSides) {
+    for (const Fault& f : faults) {
+      g_case = "[P11] telemetry / current / GoalPosition / TorqueLimit faults during the partial step";
+      ProbeRig rig(kUppers[1], side);
+      rig.placeStop(rig.depth(rig.corridor.guard_tick) - 18 - rig.depth(rig.corridor.contact_tick));
+      bool armed = false;
+      runProbe(rig, 10, 180000, [&](ProbeRig& r, uint32_t, bool* available, TelemetrySample* s) {
+        const ContactProbeStatus& st = r.probe.status();
+        if (!armed && st.pass == 0 && st.phase == ContactProbePhase::STEP_MONITORING &&
+            st.target_tick == r.corridor.guard_tick) {
+          armed = true;
+        }
+        if (armed) f.apply(available, s);
+      });
+      CHECK(armed);
+      CHECK_EQ((int)rig.probe.status().failure, (int)f.expect);
+      CHECK_EQ(rig.probe.status().target_tick, rig.corridor.guard_tick);
+      CHECK(!rig.probe.status().scout_valid);
     }
   }
 }
@@ -1908,7 +2066,7 @@ int main() {
   test_kinematic_plateau_needs_the_scout();
   test_missing_scout_makes_the_endpoint_unacceptable();
   test_no_stop_fails_closed_at_the_guard();
-  test_scout_reach_is_the_v25_coarse_grid();
+  test_final_partial_scout_step();
   test_settling_shortfall_is_never_contact();
   test_brief_stop_and_yielding_friction_are_not_contact();
   test_early_friction_never_becomes_contact();

@@ -478,10 +478,21 @@ void ContactProbeEngine::stepWrite(const ContactProbeContext& context, uint32_t 
   ContactSearchStage stage = ContactSearchStage::FINE_SEARCH;
   if (status_.pass == 0) {
     // The V25 coarse contact scout: 64-tick steps from the baseline end,
-    // never clamped - the scout pass is the travel. A step still short of
-    // the corridor entry is free-space transit (only EARLY_STALL there).
+    // never clamped at the entry - the scout pass is the travel. A step still
+    // short of the corridor entry is free-space transit (only EARLY_STALL).
     step_ticks_ = kSearchCoarseStepTicks;
     next_depth = target_depth + kSearchCoarseStepTicks;
+    // DELIBERATE BOUNDED DEVIATION from V25 (current installation, measured
+    // 2026-09-30): V25 ended the scout when the next 64-tick step would pass
+    // the guard, leaving a grid-phase-dependent gap before it (LF UPPER MIN's
+    // real stop fell in it). Here ONE final partial coarse step targets the
+    // existing guard itself: never beyond it, never more than 64 ticks, never
+    // repeated (once the target is the guard, the next step is refused).
+    if (next_depth > guard_depth && target_depth < guard_depth) {
+      next_depth = guard_depth;
+      step_ticks_ = static_cast<uint16_t>(guard_depth - target_depth);
+      status_.scout_partial_step_ticks = step_ticks_;
+    }
     stage = next_depth < depth(request_.corridor.entry_tick) ? ContactSearchStage::COARSE_TRANSIT
                                                              : ContactSearchStage::COARSE_SCOUT;
   } else {

@@ -755,6 +755,17 @@ def main():
          "c.home_tick = 2048;",
          "raw servo centre", runner=run_search_checks)
 
+    # --- the final bounded partial coarse-scout step (2026-09-30) -------------
+    case("partial scout step beyond the guard", "ContactProbeEngine.cpp",
+         r"next_depth = guard_depth;",
+         "next_depth = guard_depth + 8;",
+         "beyond the guard", runner=run_search_checks)
+
+    case("partial scout step repeated at the guard", "ContactProbeEngine.cpp",
+         r"if \(next_depth > guard_depth && target_depth < guard_depth\) \{",
+         "if (next_depth > guard_depth) {",
+         "never repeated", runner=run_search_checks)
+
     case("CommandRouter derives its own search corridor", ROUTER_CPP,
          r"void CommandRouter::printServoRead\(int id\) \{",
          "void CommandRouter::printServoRead(int id) {\n  actuator::CalibrationSearchCorridor c{};\n"

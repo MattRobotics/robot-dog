@@ -437,9 +437,10 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     tests).
   - Each backoff is arrived only through V25's StableTargetGate (≤ 12 ticks, |speed| ≤ 4, 4
     samples, ≥ 400 ms); the search telemetry timeout is V25's 2 s.
-  - Known V25 property, risk R2: the coarse scout's reach near the guard depends on its 64-tick
-    grid phase and so on the fresh q0; a deeper stop fails closed (`NO_CONTACT_BEFORE_GUARD`). A
-    read-only LF UPPER MIN reach report from the promoted q0 gates the GO; margin < 0 = stop.
+  - Risk R2 closed by D10: V25's coarse-grid reach depended on the fresh q0; one final bounded
+    partial coarse step to the existing guard (never beyond, not V25) makes the reach guard − 18
+    for every q0. The read-only LF UPPER MIN reach report from the promoted q0 still gates the GO;
+    margin < 0 = stop.
   - Known hardware risk R1: V25's LF HIP MAX contact sat exactly on the corridor entry (see the
     development log). If it recurs: stop, keep the evidence, decide from the measured stop.
   **Next after a hardware Full Calibration PASS: Calibration Persistence V1** (versioned,

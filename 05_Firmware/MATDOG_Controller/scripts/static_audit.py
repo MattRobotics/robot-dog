@@ -1414,6 +1414,10 @@ def check_calibration_search_boundaries(files):
         current-recovery check and the next fine pass; the search times out
         after V25's TELEMETRY_TIMEOUT (2 s) without telemetry;
       - no calibration target unit names the raw servo centre 2048;
+      - current-installation deviation (2026-09-30, measured LF UPPER MIN stop):
+        when the next 64-tick coarse step would pass the guard, ONE final
+        partial step targets the existing guard itself - never beyond it,
+        never repeated; the guard, step size and corridor are unchanged;
       - the engine is generic: it names no leg and no joint, and the 24-contact
         executor owns exactly one of it; the executor records the scout as
         coarse_tick and the fine passes as fine_tick_1/2, and the diagnostics
@@ -1559,6 +1563,10 @@ def check_calibration_search_boundaries(files):
                         "magnitude(sample.present_speed), status_.target_tick, now_ms)) { return; }",
                         "the backoff is arrived only through the V25 StableTargetGate"),
                        ("if (usable) settle_.reset();", "leaving the band restarts the settle gate"),
+                       ("if (next_depth > guard_depth && target_depth < guard_depth) { next_depth = "
+                        "guard_depth; step_ticks_ = static_cast<uint16_t>(guard_depth - target_depth); "
+                        "status_.scout_partial_step_ticks = step_ticks_; }",
+                        "ONE final partial coarse-scout step exactly at the guard, never repeated"),
                        ("settle_.reset(); status_.phase = ContactProbePhase::BACKOFF_MONITORING;",
                         "every backoff starts its settle gate afresh"),
                        ("if (!sampleSafe(telemetry)) return; } else if (telemetry_available) { "
@@ -1570,6 +1578,10 @@ def check_calibration_search_boundaries(files):
     if body.count("kSearchTelemetryTimeoutMs") < 3 or "kSearchMaxTelemetryAgeMs" in body:
         fail(f"{path}: the search stale / communication timers must be V25 TELEMETRY_TIMEOUT "
              f"(kSearchTelemetryTimeoutMs)")
+    # The partial coarse-scout step may reach the guard, never pass it.
+    if re.search(r"guard_depth\s*\+", re.sub(r"//[^\n]*", "", code)):
+        fail(f"{path}: a search target is derived beyond the guard (guard_depth + ...) - the final "
+             f"partial coarse-scout step is clamped to the existing guard")
     # V25 has no transit clamp: the scout's steps are never cut at the entry.
     if "next_depth = entry_depth" in body:
         fail(f"{path}: the coarse scout is clamped to the corridor entry again (V25 steps 64 "
