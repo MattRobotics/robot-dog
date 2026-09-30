@@ -113,6 +113,14 @@ struct ContactProbeRequest {
   actuator::CalibrationSearchCorridor corridor{};
   // The reviewed repeatability band - never defaulted (see ContactWitness).
   uint16_t repeatability_tolerance_ticks = 0;
+  // The 24-contact sequence energizes the joint itself (V25 prepare_motor():
+  // GoalPosition := present, RAM TorqueLimit, TorqueEnable - each verified)
+  // BEFORE the probe starts, and the MAX side starts where the MIN side's
+  // contact left the joint, still torque-on. True skips TORQUE_ENABLE_PENDING.
+  bool start_torque_verified = false;
+  // The RAM TorqueLimit every sample must read back (V25 checked it on every
+  // observation). Never defaulted: 0 is a start() refusal.
+  uint16_t expected_torque_limit = 0;
 };
 
 enum class ContactProbePhase : uint8_t {
@@ -128,6 +136,10 @@ enum class ContactProbePhase : uint8_t {
   SAFE_OFF_REQUIRED     = 8,  // torque was VERIFIED applied and the attempt did
                               // not reach a clean COMPLETE — caller MUST
                               // invoke the real, independent SAFE_OFF now
+  // Both contacts accepted; GoalPosition := the pass-2 contact position is
+  // written next (V25 stop_pressure()), so the joint rests ON the stop without
+  // pressing into it, then COMPLETE. Not terminal.
+  RELEASE_PENDING       = 9,
 };
 
 enum class ContactSearchStage : uint8_t {
@@ -159,6 +171,10 @@ enum class ContactProbeFailure : uint8_t {
   UNEXPECTED_STALL_DURING_BACKOFF = 18,
   MOTION_TIMEOUT                  = 19,
   OPERATOR_ABORT                  = 20,
+  // The rest of V25's per-observation readback (see TelemetrySample).
+  TORQUE_LIMIT_CHANGED            = 21,  // RAM TorqueLimit no longer the calibration value
+  SERVO_STATUS_FAULT              = 22,  // the servo's own error flags are set
+  GOAL_READBACK_MISMATCH          = 23,  // GoalPosition is not what this probe commanded
 };
 
 struct ContactProbeConfig {
@@ -276,6 +292,7 @@ class ContactProbeEngine {
   void stepBackoffWrite(const ContactProbeContext& context, uint32_t now_ms);
   void stepBackoffMonitor(uint32_t now_ms, bool telemetry_available,
                          const actuator::TelemetrySample& telemetry);
+  void stepRelease(const ContactProbeContext& context);
   // Records a usable sample. False if it cannot be used at all.
   bool acceptSample(uint32_t now_ms, const actuator::TelemetrySample& telemetry);
   // Hard-current / thermal / torque checks on an accepted sample. False

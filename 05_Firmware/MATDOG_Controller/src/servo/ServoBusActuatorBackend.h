@@ -44,6 +44,11 @@ class ServoBusActuatorBackend final : public actuator::ActuatorBackend {
     return translate(bus_->writeGoalPosition(bus_id, target_tick, goal_profile));
   }
 
+  actuator::BackendWriteOutcome writeCalibrationTorqueLimit(uint8_t bus_id) override {
+    if (bus_ == nullptr) return actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
+    return translate(bus_->writeReviewedRamTorqueLimit(bus_id));
+  }
+
  private:
   // ServoBus's transport-level verdict and the actuator layer's
   // transport-independent one are deliberately the same three states under

@@ -213,6 +213,7 @@ struct ProbeRig {
     r.endpoint_side = side;
     r.corridor = corridor;
     r.repeatability_tolerance_ticks = 16;
+    r.expected_torque_limit = 500;
     return r;
   }
 
@@ -373,7 +374,20 @@ void checkStepDiscipline(ProbeRig& rig) {
   int prev = rig.u.q0;
   bool seen_backoff = false;
   bool seen_fine = false;
-  for (size_t i = 0; i < rig.log.size(); ++i) {
+  // A COMPLETE probe's LAST write is the V25 stop_pressure() release:
+  // GoalPosition := the accepted pass-2 contact, never deeper than the last
+  // step. It is checked on its own, then excluded from the step discipline.
+  size_t steps = rig.log.size();
+  if (st.phase == ContactProbePhase::COMPLETE) {
+    CHECK(steps >= 2);
+    const WriteLog& release = rig.log.back();
+    CHECK_EQ(release.tick, st.pass2_contact_tick);
+    CHECK_EQ(st.target_tick, st.pass2_contact_tick);
+    CHECK(rig.depth(release.tick) <= rig.depth(rig.log[steps - 2].tick));
+    CHECK(release.profile == MotionProfile::CALIBRATION_SEARCH);
+    --steps;
+  }
+  for (size_t i = 0; i < steps; ++i) {
     const WriteLog& w = rig.log[i];
     CHECK(w.profile == MotionProfile::CALIBRATION_SEARCH);
     CHECK(actuator::searchCorridorAdmits(rig.corridor, w.tick));
@@ -665,6 +679,87 @@ void test_safety_aborts() {
   }
 }
 
+// --- 8b. the rest of V25's per-observation readback ------------------------------
+
+void test_v25_register_readback_aborts() {
+  {
+    g_case = "RAM TorqueLimit no longer 500: TORQUE_LIMIT_CHANGED";
+    ProbeRig rig(kUppers[0], ContactSide::MIN_SIDE);
+    rig.placeStop(0);
+    runProbe(rig, 10, 180000, [&](ProbeRig& r, uint32_t, bool*, TelemetrySample*) {
+      if (r.probe.status().step_count >= 3) r.joint().torque_limit = 1000;
+    });
+    expectFailure(rig, ContactProbeFailure::TORQUE_LIMIT_CHANGED);
+  }
+  {
+    g_case = "servo status byte set: SERVO_STATUS_FAULT";
+    ProbeRig rig(kUppers[1], ContactSide::MAX_SIDE);
+    rig.placeStop(0);
+    runProbe(rig, 10, 180000, [&](ProbeRig& r, uint32_t, bool*, TelemetrySample*) {
+      if (r.probe.status().step_count >= 3) r.joint().status = 0x20;
+    });
+    expectFailure(rig, ContactProbeFailure::SERVO_STATUS_FAULT);
+  }
+  {
+    g_case = "GoalPosition not what the probe commanded: GOAL_READBACK_MISMATCH";
+    ProbeRig rig(kUppers[2], ContactSide::MIN_SIDE);
+    rig.placeStop(0);
+    runProbe(rig, 10, 180000, [&](ProbeRig& r, uint32_t, bool*, TelemetrySample* s) {
+      if (r.probe.status().step_count >= 3) s->goal_position = s->goal_position + 30;
+    });
+    expectFailure(rig, ContactProbeFailure::GOAL_READBACK_MISMATCH);
+  }
+  {
+    g_case = "a sample missing the readback registers is not usable";
+    ProbeRig rig(kUppers[3], ContactSide::MAX_SIDE);
+    rig.placeStop(0);
+    uint32_t cut = 0, failed_after = 0;
+    runProbe(rig, 10, 180000, [&](ProbeRig& r, uint32_t t, bool*, TelemetrySample* s) {
+      if (r.probe.status().step_count >= 2) {
+        if (cut == 0) cut = t;
+        s->torque_limit = -1;  // register not read
+        failed_after = t - cut;
+      }
+    });
+    CHECK_EQ((int)rig.probe.status().phase, (int)ContactProbePhase::SAFE_OFF_REQUIRED);
+    CHECK(failed_after >= 2990);  // treated as no sample, never as a good one
+  }
+  {
+    g_case = "expected TorqueLimit 0 is a refusal";
+    ProbeRig rig(kUppers[0], ContactSide::MIN_SIDE);
+    ContactProbeRequest r = rig.request();
+    r.expected_torque_limit = 0;
+    CHECK(!rig.probe.start(r, rig.ctx(), 1000));
+    CHECK_EQ((int)rig.probe.status().failure, (int)ContactProbeFailure::REJECT_PRECONDITIONS);
+  }
+}
+
+void test_start_torque_verified_and_release() {
+  g_case = "sequence start: no TorqueEnable of its own; ends released ON the stop";
+  ProbeRig rig(kUppers[1], ContactSide::MIN_SIDE);
+  rig.placeStop(kHardwareStopBeyondContact);
+  rig.joint().torque = true;  // the sequence energized it (prime, limit, torque)
+  rig.joint().goal = rig.joint().position();
+  ContactProbeRequest r = rig.request();
+  r.start_torque_verified = true;
+  CHECK(rig.probe.start(r, rig.ctx(), 1000));
+  CHECK_EQ((int)rig.probe.status().phase, (int)ContactProbePhase::STEP_PENDING);
+  uint32_t t = 1000;
+  while (rig.probe.active() && t < 200000) {
+    t += 10;
+    rig.backend.advance(t, 10);
+    rig.probe.update(rig.ctx(), t, true, rig.joint().sample(t));
+  }
+  CHECK_EQ((int)rig.probe.status().phase, (int)ContactProbePhase::COMPLETE);
+  CHECK_EQ(rig.backend.torque_writes[rig.u.bus], 0);
+  // V25 stop_pressure(): the last write parks GoalPosition on the pass-2
+  // contact, so the joint rests on the stop without pressing into it.
+  CHECK(!rig.backend.writes.empty());
+  CHECK_EQ(rig.backend.writes.back().tick, rig.probe.status().pass2_contact_tick);
+  CHECK(rig.joint().torque);
+  CHECK(std::abs(rig.joint().goal - rig.joint().position()) <= 4);
+}
+
 // --- 9. cadence: a brief stop can never confirm at a fast tick rate -----------
 
 void test_cadence_keeps_v25_timing_at_any_tick_rate() {
@@ -861,6 +956,8 @@ int main() {
   test_non_repeatable_contact_fails();
   test_limitation_plateau_holding_full_fine_error_on_both_passes();
   test_safety_aborts();
+  test_v25_register_readback_aborts();
+  test_start_torque_verified_and_release();
   test_cadence_keeps_v25_timing_at_any_tick_rate();
   test_abort_and_refusals();
   test_to_string_total();

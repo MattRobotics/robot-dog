@@ -43,7 +43,16 @@ struct SimJoint {
   bool plateau_released = false;
   int current_idle = 4, current_moving = 30, press_gain = 6;
   int current_override = -1;  // >= 0 forces the reported current
+  int speed_override = -1;    // >= 0 forces the reported speed register
   int temperature = 35;
+  // RAM registers the LF V25 calibrator read back on every observation.
+  // torque_limit defaults to the calibration value 500 so the single-joint
+  // probe rigs (which never write it) keep their meaning; the 24-contact
+  // sequence rigs start it at the EEPROM default 1000 and let the executor's
+  // own TorqueLimit write lower it.
+  int torque_limit = 500;
+  int status = 0;             // servo error flags (register 65)
+  bool read_fails = false;    // the servo stops answering (telemetry reads fail)
   // Speed-register noise on a TIME basis (keyed to 20 ms slots, so it cannot
   // alias with the engine's 20 ms consumption cadence): every
   // `speed_noise_every`-th slot reads `speed_noise_raw` above the true speed.
@@ -117,14 +126,24 @@ struct SimJoint {
 
   matdog::actuator::TelemetrySample sample(uint32_t now_ms) const {
     matdog::actuator::TelemetrySample s{};
+    if (read_fails) {
+      s.read_ok = false;
+      s.sampled_at_ms = now_ms;
+      return s;
+    }
     s.read_ok = true;
     s.sampled_at_ms = now_ms;
     s.present_position = position();
     s.torque_enable = torque ? 1 : 0;
     const bool noisy = speed_noise_every > 0 && (now_ms / 20) % speed_noise_every == 0;
-    s.present_speed = static_cast<int32_t>(std::lround(velocity)) + (noisy ? speed_noise_raw : 0);
+    s.present_speed = speed_override >= 0
+                          ? speed_override
+                          : static_cast<int32_t>(std::lround(velocity)) + (noisy ? speed_noise_raw : 0);
     s.present_current = current();
     s.present_temperature = temperature;
+    s.goal_position = goal;
+    s.torque_limit = torque_limit;
+    s.servo_status = status;
     return s;
   }
 };
@@ -142,7 +161,16 @@ class SimBackend : public matdog::actuator::ActuatorBackend {
     ++torque_writes[bus_id];
     SimJoint& j = joint[bus_id];
     j.torque = true;
-    j.goal = j.position();  // TorqueEnable holds the current pose
+    // A real ST3215 drives to whatever its GoalPosition register already
+    // holds when torque comes on (the hazard V25's prepare_motor() prime
+    // exists for). The single-joint probe rigs keep the older convenience of
+    // holding the present pose; the sequence rigs model the real servo.
+    if (torque_enable_holds_pose) j.goal = j.position();
+    return matdog::actuator::BackendWriteOutcome::VERIFIED_APPLIED;
+  }
+  matdog::actuator::BackendWriteOutcome writeCalibrationTorqueLimit(uint8_t bus_id) override {
+    ++torque_limit_writes[bus_id];
+    joint[bus_id].torque_limit = 500;  // ServoBus::kReviewedRamTorqueLimit
     return matdog::actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
   matdog::actuator::BackendWriteOutcome writeGoalPosition(
@@ -164,6 +192,8 @@ class SimBackend : public matdog::actuator::ActuatorBackend {
 
   SimJoint joint[256];
   int torque_writes[256] = {0};
+  int torque_limit_writes[256] = {0};
+  bool torque_enable_holds_pose = true;
   std::vector<GoalWrite> writes;
 };
 

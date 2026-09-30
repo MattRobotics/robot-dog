@@ -26,10 +26,13 @@ uint16_t medianOf(const uint16_t* values, uint8_t count) {
   return sorted[count / 2];
 }
 
+// A sample is usable only with V25's whole per-observation readback: an
+// unread GoalPosition / TorqueLimit / status byte is not "fine", it is unknown.
 bool sampleUsable(const actuator::TelemetrySample& s) {
   return s.read_ok && s.present_position >= 0 && s.present_position < 4096 &&
          s.torque_enable >= 0 && s.present_speed >= 0 && s.present_current >= 0 &&
-         s.present_temperature >= 0;
+         s.present_temperature >= 0 && s.goal_position >= 0 && s.torque_limit >= 0 &&
+         s.servo_status >= 0;
 }
 
 CalibrationExecutionContext toExecutionContext(const ContactProbeContext& context) {
@@ -145,7 +148,7 @@ bool ContactProbeEngine::start(const ContactProbeRequest& request,
   if (policy_ == nullptr || runtime_ == nullptr || engine_ == nullptr || geometry_ == nullptr ||
       expected_provenance_ == nullptr || !request.joint.valid() ||
       !request.joint.unitKnown() || request.repeatability_tolerance_ticks == 0 ||
-      !corridorUsable(request.corridor)) {
+      request.expected_torque_limit == 0 || !corridorUsable(request.corridor)) {
     status_ = ContactProbeStatus{};
     status_.phase = ContactProbePhase::FAILED_NO_MOTION;
     status_.failure = ContactProbeFailure::REJECT_PRECONDITIONS;
@@ -154,7 +157,8 @@ bool ContactProbeEngine::start(const ContactProbeRequest& request,
 
   request_ = request;
   status_ = ContactProbeStatus{};
-  status_.phase = ContactProbePhase::TORQUE_ENABLE_PENDING;
+  status_.phase = request.start_torque_verified ? ContactProbePhase::STEP_PENDING
+                                                : ContactProbePhase::TORQUE_ENABLE_PENDING;
   status_.pass = 1;
   has_good_sample_ = false;
   last_good_ms_ = now_ms;
@@ -201,6 +205,9 @@ void ContactProbeEngine::update(const ContactProbeContext& context, uint32_t now
     case ContactProbePhase::BACKOFF_MONITORING:
       stepBackoffMonitor(now_ms, telemetry_available, telemetry);
       return;
+    case ContactProbePhase::RELEASE_PENDING:
+      stepRelease(context);
+      return;
     case ContactProbePhase::IDLE:
     case ContactProbePhase::COMPLETE:
     case ContactProbePhase::FAILED_NO_MOTION:
@@ -219,6 +226,7 @@ void ContactProbeEngine::abort() {
     case ContactProbePhase::STEP_MONITORING:
     case ContactProbePhase::BACKOFF_PENDING:
     case ContactProbePhase::BACKOFF_MONITORING:
+    case ContactProbePhase::RELEASE_PENDING:
       failSafeOff(ContactProbeFailure::OPERATOR_ABORT);
       return;
     case ContactProbePhase::IDLE:
@@ -375,6 +383,18 @@ bool ContactProbeEngine::sampleSafe(const actuator::TelemetrySample& telemetry) 
     failSafeOff(ContactProbeFailure::TORQUE_UNEXPECTEDLY_OFF);
     return false;
   }
+  if (telemetry.servo_status != 0) {
+    failSafeOff(ContactProbeFailure::SERVO_STATUS_FAULT);
+    return false;
+  }
+  if (telemetry.torque_limit != static_cast<int32_t>(request_.expected_torque_limit)) {
+    failSafeOff(ContactProbeFailure::TORQUE_LIMIT_CHANGED);
+    return false;
+  }
+  if (telemetry.goal_position != static_cast<int32_t>(status_.target_tick)) {
+    failSafeOff(ContactProbeFailure::GOAL_READBACK_MISMATCH);
+    return false;
+  }
   if (magnitude(telemetry.present_current) >= kSearchHardCurrentAbortRaw) {
     failSafeOff(ContactProbeFailure::HARD_CURRENT_ABORT);
     return false;
@@ -487,11 +507,21 @@ void ContactProbeEngine::onCandidate(uint16_t position) {
   status_.pass2_contact_tick = position;
   if (absDiff(status_.pass1_contact_tick, position) <=
       static_cast<int32_t>(request_.repeatability_tolerance_ticks)) {
-    finish(ContactProbePhase::COMPLETE, ContactProbeFailure::NONE,
-          actuator::WriteDecision::ACCEPT);
+    // Accepted. Release the contact pressure before reporting COMPLETE.
+    status_.phase = ContactProbePhase::RELEASE_PENDING;
   } else {
     failSafeOff(ContactProbeFailure::REPEATABILITY_FAILED);
   }
+}
+
+// V25 stop_pressure(): GoalPosition := the position the joint stopped at, so
+// the leg rests on the stop instead of pressing up to a fine step into it.
+// The pass-2 contact lies inside the endpoint's own search corridor, so this
+// is an ordinary, policy-bounded search step.
+void ContactProbeEngine::stepRelease(const ContactProbeContext& context) {
+  if (!issueTarget(context, status_.pass2_contact_tick, nullptr)) return;
+  status_.target_tick = status_.pass2_contact_tick;
+  finish(ContactProbePhase::COMPLETE, ContactProbeFailure::NONE, actuator::WriteDecision::ACCEPT);
 }
 
 void ContactProbeEngine::stepBackoffWrite(const ContactProbeContext& context, uint32_t now_ms) {
@@ -519,6 +549,18 @@ void ContactProbeEngine::stepBackoffMonitor(uint32_t now_ms, bool telemetry_avai
     }
     if (telemetry.present_temperature > kSearchTemperatureLimitC) {
       failSafeOff(ContactProbeFailure::OVER_TEMPERATURE);
+      return;
+    }
+    if (telemetry.servo_status != 0) {
+      failSafeOff(ContactProbeFailure::SERVO_STATUS_FAULT);
+      return;
+    }
+    if (telemetry.torque_limit != static_cast<int32_t>(request_.expected_torque_limit)) {
+      failSafeOff(ContactProbeFailure::TORQUE_LIMIT_CHANGED);
+      return;
+    }
+    if (telemetry.goal_position != static_cast<int32_t>(status_.target_tick)) {
+      failSafeOff(ContactProbeFailure::GOAL_READBACK_MISMATCH);
       return;
     }
   } else if (telemetry_available) {
@@ -581,6 +623,7 @@ const char* toString(ContactProbePhase phase) {
     case ContactProbePhase::COMPLETE:              return "COMPLETE";
     case ContactProbePhase::FAILED_NO_MOTION:      return "FAILED_NO_MOTION";
     case ContactProbePhase::SAFE_OFF_REQUIRED:     return "SAFE_OFF_REQUIRED";
+    case ContactProbePhase::RELEASE_PENDING:       return "RELEASE_PENDING";
   }
   return "UNKNOWN";
 }
@@ -609,6 +652,9 @@ const char* toString(ContactProbeFailure failure) {
       return "UNEXPECTED_STALL_DURING_BACKOFF";
     case ContactProbeFailure::MOTION_TIMEOUT:                  return "MOTION_TIMEOUT";
     case ContactProbeFailure::OPERATOR_ABORT:                  return "OPERATOR_ABORT";
+    case ContactProbeFailure::TORQUE_LIMIT_CHANGED:            return "TORQUE_LIMIT_CHANGED";
+    case ContactProbeFailure::SERVO_STATUS_FAULT:              return "SERVO_STATUS_FAULT";
+    case ContactProbeFailure::GOAL_READBACK_MISMATCH:          return "GOAL_READBACK_MISMATCH";
   }
   return "UNKNOWN";
 }

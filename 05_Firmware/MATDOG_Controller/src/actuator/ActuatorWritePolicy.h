@@ -7,6 +7,7 @@
 #include "../core/ActuatorAuthority.h"
 #include "../core/OperatingMode.h"
 #include "CalibrationGeometryProfile.h"
+#include "CalibrationSequencePlan.h"
 
 // The Safe Actuator Layer's decision core.
 //
@@ -96,9 +97,22 @@ enum class ActuatorOperation : uint8_t {
   // in the calibration path consults it.
   DIRECTION_VERIFY           = 4,  // a micro excursion from the captured q0 tick
   CALIBRATION_AUXILIARY_MOVE = 5,  // park/unpark a plan's auxiliary joint
+  // The 24-contact Full Calibration sequence (LF V25 generalized). Its
+  // authorization object is the geometry-validated CalibrationSequencePlan,
+  // a DIFFERENT object from the V5 endpoint record the two classes above
+  // answer to - which is the only reason these exist:
+  //   SEQUENCE_MOVE  a joint of the calibrated leg (or its rear park joint, or
+  //                  any leg joint during INITIAL_RECOVERY) to exactly one of
+  //                  the plan's targets for the CURRENT phase, or the V25
+  //                  prepare_motor() GoalPosition prime at the present position
+  //   TORQUE_LIMIT   RAM TorqueLimit := the one compiled V25 value (500),
+  //                  before that joint's TorqueEnable. It can only LOWER the
+  //                  output ceiling, and the command carries no value.
+  CALIBRATION_SEQUENCE_MOVE  = 6,
+  CALIBRATION_TORQUE_LIMIT   = 7,
 };
 
-constexpr uint8_t kActuatorOperationCount = 6;
+constexpr uint8_t kActuatorOperationCount = 8;
 
 bool isKnownOperation(ActuatorOperation operation);
 
@@ -119,6 +133,8 @@ bool operationUsesAcceptedLimits(ActuatorOperation operation);
 bool operationUsesBootstrapEnvelope(ActuatorOperation operation);
 // The plan-bound calibration moves: a V5 endpoint record authorises them.
 bool operationUsesEndpointPlan(ActuatorOperation operation);
+// The Full Calibration sequence moves: the CalibrationSequencePlan authorises them.
+bool operationUsesSequencePlan(ActuatorOperation operation);
 
 // Owner -> operation eligibility.
 //
@@ -284,6 +300,16 @@ struct CalibrationBootstrapContext {
   calibration::Leg parked_leg = calibration::Leg::LF;
   calibration::JointKind parked_joint = calibration::JointKind::HIP;
   calibration::ContactSide parked_side = calibration::ContactSide::MIN_SIDE;
+
+  // The 24-contact Full Calibration sequence in flight, reported by its
+  // executor every tick (the same trust shape as auxiliary_parked above).
+  // sequence_prerequisites_verified means: every joint the current phase
+  // requires held is torque-on at its plan target and verified settled by
+  // telemetry. A sequence probe is refused without it.
+  bool sequence_active = false;
+  calibration::Leg sequence_leg = calibration::Leg::LF;
+  calibration::CalibrationPhase sequence_phase = calibration::CalibrationPhase::PREFLIGHT;
+  bool sequence_prerequisites_verified = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -330,9 +356,16 @@ enum class WriteDecision : uint8_t {
   // or a search target outside the endpoint's search corridor (past the
   // URDF-limit+64 guard, or past the opposite URDF limit).
   REJECT_CALIBRATION_SEARCH = 30,
-  // A motion profile other than BOUNDED_DEFAULT on anything but the two
+  // A motion profile other than BOUNDED_DEFAULT on anything but the
   // calibration moves, or an unknown profile value.
   REJECT_MOTION_PROFILE = 31,
+  // --- 24-contact Full Calibration sequence --------------------------------
+  REJECT_NO_SEQUENCE_PLAN        = 32,  // no plan bound, wrong model, or leg not validated
+  REJECT_SEQUENCE_NOT_ACTIVE     = 33,  // no sequence in flight, or for another leg
+  REJECT_SEQUENCE_PHASE          = 34,  // the command names a phase other than the live one
+  REJECT_SEQUENCE_TARGET         = 35,  // not a plan target of this phase / not a participant
+  REJECT_SEQUENCE_PRIME          = 36,  // prime not at a joint the phase energizes, or far from q0
+  REJECT_SEQUENCE_PREREQUISITES  = 37,  // a sequence probe before its holds are verified
 };
 
 // How fast a GoalPosition is driven. BOUNDED_DEFAULT is the conservative
@@ -392,9 +425,17 @@ struct ActuatorCommand {
   // Anywhere else it is REJECT_CALIBRATION_SEARCH.
   bool calibration_search = false;
 
-  // See MotionProfile. Anything but BOUNDED_DEFAULT outside the two
+  // See MotionProfile. Anything but BOUNDED_DEFAULT outside the
   // calibration moves is REJECT_MOTION_PROFILE.
   MotionProfile motion_profile = MotionProfile::BOUNDED_DEFAULT;
+
+  // CALIBRATION_SEQUENCE_MOVE only: which kind of move, and the sequence
+  // phase the caller believes is live (must equal the bootstrap context's).
+  // PRIME_AT_PRESENT carries a raw target_tick (the present position);
+  // TO_PLAN_TARGET carries target_urad (a plan target), resolved to a tick
+  // by the checked resolver. Anywhere else sequence_move must be NONE.
+  SequenceMoveKind sequence_move = SequenceMoveKind::NONE;
+  calibration::CalibrationPhase sequence_phase = calibration::CalibrationPhase::PREFLIGHT;
 };
 
 // What a planned write knows about the world it was planned in. Every field is
@@ -489,6 +530,11 @@ class SafeActuatorPolicy {
   void bindGeometry(const CalibrationGeometryProfile* profile,
                     const GeometryProvenance* expected_provenance);
 
+  // Binds the 24-contact Full Calibration sequence plan. Usable only while it
+  // was computed on the bound geometry's model (sequencePlanMatchesGeometry);
+  // nullptr, or a plan for another model, refuses every sequence operation.
+  void bindSequencePlan(const CalibrationSequencePlan* plan);
+
   void setBootstrapContext(const CalibrationBootstrapContext& context);
   const CalibrationBootstrapContext& bootstrapContext() const { return bootstrap_; }
 
@@ -514,11 +560,17 @@ class SafeActuatorPolicy {
 
   WriteDecision evaluateBootstrapEnvelope(const ActuatorCommand& command) const;
   WriteDecision evaluateEndpointPlan(const ActuatorCommand& command) const;
+  WriteDecision evaluateSequenceProbe(const ActuatorCommand& command) const;
+  WriteDecision evaluateSequenceOperation(const ActuatorCommand& command) const;
+  // The live leg's plan, or nullptr when no validated plan for the current
+  // model covers the sequence in flight.
+  const SequenceLegPlan* liveSequenceLeg() const;
   WriteDecision geometryPreconditions() const;
 
   const core::ActuatorAuthorityArbiter* arbiter_ = nullptr;
   const CalibrationGeometryProfile* geometry_ = nullptr;
   const GeometryProvenance* expected_provenance_ = nullptr;
+  const CalibrationSequencePlan* sequence_plan_ = nullptr;
   CalibrationBootstrapContext bootstrap_{};
   JointTransformTable transforms_{};
   ActuatorLimitTable limits_{};

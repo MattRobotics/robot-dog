@@ -132,7 +132,13 @@ class FakeActuatorBackend : public actuator::ActuatorBackend {
     last_profile = profile;
     return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
+  actuator::BackendWriteOutcome writeCalibrationTorqueLimit(uint8_t) override {
+    ++calls;
+    ++torque_limit_calls;
+    return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
+  }
   int calls = 0;
+  int torque_limit_calls = 0;
   uint16_t last_target_tick = 0;
   actuator::MotionProfile last_profile = actuator::MotionProfile::BOUNDED_DEFAULT;
 };

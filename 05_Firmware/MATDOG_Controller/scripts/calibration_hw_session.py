@@ -40,6 +40,7 @@ import argparse
 import datetime
 import errno
 import hashlib
+import json
 import os
 import re
 import select
@@ -54,17 +55,25 @@ INSTALLED = [11, 12, 13, 21, 22, 23, 31, 32, 33, 41, 42, 43, 51]
 CR2C = {11: 2087, 12: 2100, 13: 1996, 21: 1985, 22: 2092, 23: 2030,
         31: 2034, 32: 2042, 33: 2081, 41: 2073, 42: 2089, 43: 2035}
 HALF_TOOTH_TICKS = 82
-LEG_MATRIX = {  # primary bus, auxiliary, aux bus - Geometry V5 parking matrix
-    "LF": (12, "LH_UPPER", 42),
-    "RF": (22, "RH_UPPER", 32),
-    "RH": (32, "NONE", 0),
-    "LH": (42, "NONE", 0),
+# hip, upper, lower bus; rear park (Geometry V5's UPPER MAX auxiliary) and its bus.
+LEG_MATRIX = {
+    "LF": (13, 12, 11, "LH_UPPER", 42),
+    "RF": (23, 22, 21, "RH_UPPER", 32),
+    "RH": (33, 32, 31, "NONE", 0),
+    "LH": (43, 42, 41, "NONE", 0),
 }
+# The six contacts of a leg, in the LF V25 measurement order.
+CONTACT_ORDER = [("UPPER", "MIN"), ("UPPER", "MAX"), ("LOWER", "MIN"), ("LOWER", "MAX"),
+                 ("HIP", "MIN"), ("HIP", "MAX")]
 # LF_UPPER's true MIN stop was found by hand ~23 ticks past the canonical
-# contact (2026-09-29). A LF MIN contact far from that is stopped for review
-# before any other leg runs.
+# contact (2026-09-29). A LF UPPER MIN contact far from that is stopped for
+# review before any other leg runs.
 LF_MIN_EXPECTED_BEYOND = (7, 39)
-LEG_WATCHDOG_S = 420.0
+# One whole 24-contact leg: recovery of 12 joints, 6 two-pass searches, the
+# prerequisite and return moves, cleanup. Generous; the firmware bounds every
+# move itself - this only catches a hung run.
+LEG_WATCHDOG_S = 1800.0
+RECOVERY_WATCHDOG_S = 300.0
 POLL_S = 2.0
 SILENCE_S = 10.0
 
@@ -310,8 +319,25 @@ class Session:
                      r"ACTUATOR_PROVENANCE limits_admitted=0 transforms_admitted=12 geometry_bound=YES")
         self.log.say("PASS  Q0 promoted 12/12, transforms_admitted=12")
 
-    def run_leg(self, leg, lf_crosscheck=True):
-        bus, aux, aux_bus = LEG_MATRIX[leg]
+    # -- servo positions (read-only, evidence only) --------------------------
+
+    def read_positions(self, label):
+        """@SERVO READ of every leg joint - read-only, refused by the firmware
+        itself while an executor is active. Evidence, never a decision."""
+        out = {}
+        for bus in sorted(CR2C):
+            m = self.request(f"@SERVO READ {bus}",
+                             rf"SERVO_READ id={bus} position=(-?\d+) speed=(-?\d+) load=(-?\d+) "
+                             r"voltage=(-?\d+) temp=(-?\d+) torque=(-?\d+) current=(-?\d+)",
+                             fail_patterns=(r"SERVO_READ=BLOCKED", rf"SERVO_READ id={bus} result=\S+"))
+            out[bus] = (int(m.group(1)), int(m.group(6)))
+        self.log.say(f"      {label}: " + " ".join(f"{b}:{p}{'*' if t else ''}"
+                                                  for b, (p, t) in sorted(out.items())))
+        return out
+
+    # -- one leg's session + permit ---------------------------------------------
+
+    def open_leg_session(self, leg):
         self.authority_none()
         self.request(f"@CALIBRATION SESSION START {leg} CONFIRM_CURRENT_Q0",
                      rf"CALIBRATION_SESSION=ACTIVE leg={leg} session=\d+ authority_generation=\d+",
@@ -325,43 +351,116 @@ class Session:
                      fail_patterns=(r"CALIBRATION_MOTION_PERMIT=REFUSED",))
         self.log.say(f"PASS  {leg} session ACTIVE, permit ACTIVE")
 
+    def leg_session_ready(self, leg):
+        """True when a live <leg> session with an active permit already exists
+        (the state `--phase recover` leaves for the operator's GO)."""
+        mark = self.mark()
+        self.link.send("@CALIBRATION STATUS")
+        m = self.wait_for(r"CALIBRATION_SESSION state=(\S+) origin=(\S+) leg=(\S+) .*", mark, 5.0)
+        p = self.wait_for(r"CALIBRATION_MOTION_PERMIT_STATE active=(YES|NO) "
+                          r"operator_authorized=(YES|NO) token_valid=(YES|NO)", mark, 5.0)
+        return (m.group(1) == "ACTIVE" and m.group(2) == "LIVE_SESSION" and m.group(3) == leg and
+                p.group(1, 2, 3) == ("YES", "YES", "YES"))
+
+    # -- INITIAL RECOVERY: all twelve actively to q0, verified -------------------
+
+    def initial_recovery(self, leg, q0=None):
+        mark = self.mark()
+        self.link.send(f"@CALIBRATION INITIAL RECOVERY {leg} CONFIRM_Q0_RECOVERY")
+        self.wait_for(rf"CALIBRATION_INITIAL_RECOVERY=ARMED session_leg={leg} joints=12 "
+                      r"torque_limit=500 phase=PREFLIGHT", mark, 5.0,
+                      (r"CALIBRATION_INITIAL_RECOVERY=REFUSED",))
+        rx = re.compile(r"CALIBRATION_INITIAL_RECOVERY_TARGET bus=(\d+) leg=\w+ joint=\w+ unit=\S+ q0=(\d+)")
+        targets = {}
+        deadline = self.clock() + 3.0
+        while len(targets) < 12 and self.clock() < deadline:
+            for text in self.lines_since(mark):
+                m = rx.fullmatch(text)
+                if m:
+                    targets[int(m.group(1))] = int(m.group(2))
+            self.sleep(0.05)
+        if sorted(targets) != sorted(CR2C):
+            self.link.send("@CALIBRATION FULL LEG ABORT")
+            raise SessionFailure(f"INITIAL RECOVERY targets for buses {sorted(targets)}, expected 12")
+        for bus, tick in targets.items():
+            if abs(tick - CR2C[bus]) >= HALF_TOOTH_TICKS or (q0 is not None and q0.get(bus) != tick):
+                self.link.send("@CALIBRATION FULL LEG ABORT")
+                raise SessionFailure(f"INITIAL RECOVERY target bus {bus} q0={tick} is not the promoted q0")
+        self.log.say(f"RUN   INITIAL RECOVERY: 12 joints -> promoted q0, one at a time")
+        result = self._monitor(
+            re.compile(r"CALIBRATION_INITIAL_RECOVERY_RESULT verdict=(\S+) recovered=(\d+)/(\d+) "
+                       r"failure=(\S+) failed_phase=(\S+) last_decision=(\S+)"),
+            mark, f"{leg} INITIAL RECOVERY", RECOVERY_WATCHDOG_S)
+        verdict, recovered, total, failure = result.group(1, 2, 3, 4)
+        self.log.say(f"RESULT INITIAL RECOVERY verdict={verdict} recovered={recovered}/{total} "
+                     f"failure={failure}")
+        if verdict != "PASS" or recovered != "12" or total != "12" or failure != "NONE":
+            raise SessionFailure(f"INITIAL RECOVERY {result.group(0)}")
+        self.log.say("PASS  INITIAL RECOVERY 12/12: every leg joint actively at its promoted q0, "
+                     "settled, SAFE_OFF verified")
+
+    # -- one TRUE Full-Leg run: six contacts -------------------------------------
+
+    def run_full_leg(self, leg, lf_crosscheck=True):
+        hip, upper, lower, park, park_bus = LEG_MATRIX[leg]
         mark = self.mark()
         self.link.send(f"@CALIBRATION FULL LEG {leg} CONFIRM_FULL_CALIBRATION")
-        armed = self.wait_for(r"CALIBRATION_FULL_LEG=ARMED leg=(\S+) joint=UPPER bus=(\d+) "
-                              r"phase=UPPER_MIN_PROBE auxiliary=(\S+) aux_bus=(\d+)", mark, 5.0,
+        armed = self.wait_for(r"CALIBRATION_FULL_LEG=ARMED leg=(\S+) contacts_expected=(\d+) "
+                              r"hip_bus=(\d+) upper_bus=(\d+) lower_bus=(\d+) park=(\S+) "
+                              r"park_bus=(\d+) phase=PREFLIGHT", mark, 5.0,
                               (r"CALIBRATION_FULL_LEG=REFUSED",))
-        if (armed.group(1), int(armed.group(2)), armed.group(3), int(armed.group(4))) != \
-                (leg, bus, aux, aux_bus):
+        got = (armed.group(1), int(armed.group(2)), int(armed.group(3)), int(armed.group(4)),
+               int(armed.group(5)), armed.group(6), int(armed.group(7)))
+        if got != (leg, 6, hip, upper, lower, park, park_bus):
             self.link.send("@CALIBRATION FULL LEG ABORT")
-            raise SessionFailure(f"{leg} ARMED {armed.group(0)} does not match the parking matrix")
-        corridors = {}
-        crx = re.compile(r"CALIBRATION_FULL_LEG_SEARCH_CORRIDOR side=(MIN|MAX) probe_sign=(-?1) "
-                         r"q0=(\d+) contact=(\d+) urdf_limit=(\d+) entry=(\d+) guard=(\d+) "
-                         r"opposite_limit=(\d+) guard_beyond_contact=(-?\d+)")
+            raise SessionFailure(f"{leg} ARMED {armed.group(0)} does not match the 24-contact plan")
+        crx = re.compile(r"CALIBRATION_FULL_LEG_SEARCH_CORRIDOR joint=(UPPER|LOWER|HIP) side=(MIN|MAX) "
+                         r"probe_sign=(-?1) q0=(\d+) contact=(\d+) urdf_limit=(\d+) entry=(\d+) "
+                         r"guard=(\d+) opposite_limit=(\d+) guard_beyond_contact=(-?\d+)")
+        prx = re.compile(r"CALIBRATION_FULL_LEG_PREREQUISITE pose=(\S+) urad=(-?\d+) tick=(\d+)")
+        corridors, poses = {}, {}
         deadline = self.clock() + 3.0
-        while len(corridors) < 2 and self.clock() < deadline:
+        want_poses = 5 if park != "NONE" else 4
+        while (len(corridors) < 6 or len(poses) < want_poses) and self.clock() < deadline:
             for text in self.lines_since(mark):
                 m = crx.fullmatch(text)
                 if m:
-                    corridors[m.group(1)] = m
+                    corridors[(m.group(1), m.group(2))] = m
+                m = prx.fullmatch(text)
+                if m:
+                    poses[m.group(1)] = (int(m.group(2)), int(m.group(3)))
             self.sleep(0.05)
-        if len(corridors) != 2:
+        if len(corridors) != 6 or len(poses) != want_poses:
             self.link.send("@CALIBRATION FULL LEG ABORT")
-            raise SessionFailure(f"{leg}: search corridors not reported on ARMED")
-        for side in ("MIN", "MAX"):
-            c = corridors[side]
-            self.log.say(f"      {leg} {side}: q0={c.group(3)} contact={c.group(4)} "
-                         f"urdf_limit={c.group(5)} entry={c.group(6)} guard={c.group(7)} "
-                         f"(guard {c.group(9)} ticks past contact)")
-        self.log.say(f"RUN   {leg} full leg ARMED (bus {bus}, auxiliary {aux})")
+            raise SessionFailure(f"{leg}: {len(corridors)}/6 corridors, {len(poses)}/{want_poses} "
+                                 f"prerequisite poses reported on ARMED")
+        for key in CONTACT_ORDER:
+            c = corridors[key]
+            self.log.say(f"      {leg} {key[0]:5s} {key[1]}: q0={c.group(4)} contact={c.group(5)} "
+                         f"urdf_limit={c.group(6)} entry={c.group(7)} guard={c.group(8)}")
+        for name, (urad, tick) in sorted(poses.items()):
+            self.log.say(f"      {leg} prerequisite {name}: {urad} urad = tick {tick}")
+        self.log.say(f"RUN   {leg} TRUE Full Calibration ARMED: 6 contacts, park {park}")
 
-        verdict, failure = self._monitor(leg, mark)
-        self.log.say(f"RESULT {leg} verdict={verdict} failure={failure}")
-        if verdict != "HARDWARE_CONTACT_CALIBRATED" or failure != "NONE":
-            raise SessionFailure(f"{leg} verdict={verdict} failure={failure}")
+        self._monitor(re.compile(rf"CALIBRATION_FULL_LEG_CONTACTS leg={leg} expected=6 measured=(\d+) "
+                                 r"accepted=(\d+) diagnostics_accepted=(YES|NO)"),
+                      mark, f"{leg} FULL LEG", LEG_WATCHDOG_S, stop_on_match=False)
+        result = self._monitor(re.compile(rf"CALIBRATION_FULL_LEG_RESULT leg={leg} verdict=(\S+) "
+                                          r"failure=(\S+)"),
+                               mark, f"{leg} FULL LEG", LEG_WATCHDOG_S)
+        contacts = self.wait_for(rf"CALIBRATION_FULL_LEG_CONTACTS leg={leg} expected=6 measured=(\d+) "
+                                 r"accepted=(\d+) diagnostics_accepted=(YES|NO)", mark, 1.0)
+        verdict, failure = result.group(1), result.group(2)
+        self.log.say(f"RESULT {leg} verdict={verdict} failure={failure} contacts "
+                     f"{contacts.group(2)}/6 (measured {contacts.group(1)}, diagnostics "
+                     f"{contacts.group(3)})")
+        if verdict != "HARDWARE_CONTACT_CALIBRATED" or failure != "NONE" or \
+                contacts.group(1, 2, 3) != ("6", "6", "YES"):
+            raise SessionFailure(f"{leg} verdict={verdict} failure={failure} "
+                                 f"contacts={contacts.group(2)}/6")
 
         # Cleanup, exactly as the runbook requires before the next leg.
-        self.safe_off([bus] + ([aux_bus] if aux_bus else []))
+        self.safe_off_all()
         self.authority_none()
         mark = self.mark()
         self.link.send("@CALIBRATION STATUS")
@@ -369,30 +468,44 @@ class Session:
         mark = self.mark()
         self.link.send("@CALIBRATION FULL LEG STATUS")
         self.wait_for(rf"CALIBRATION_FULL_LEG_RECORD leg={leg} present=YES attempts=\d+ "
-                      r"verdict=HARDWARE_CONTACT_CALIBRATED contact_calibrated=YES "
-                      r"envelope_accepted=NO failure=NONE", mark, 5.0)
-        mins = self.wait_for(r"CALIBRATION_FULL_LEG_UPPER_MIN measured=YES fine_tick=(\d+) "
-                             r"witness_accepted=YES", mark, 5.0)
-        maxs = self.wait_for(r"CALIBRATION_FULL_LEG_UPPER_MAX measured=YES fine_tick=(\d+) "
-                             r"witness_accepted=YES", mark, 5.0)
-        for side, m in (("MIN", mins), ("MAX", maxs)):
-            c = corridors[side]
-            sign, contact = int(c.group(2)), int(c.group(4))
-            beyond = (int(m.group(1)) - contact) * sign
-            self.log.say(f"      {leg} {side} contact tick {m.group(1)} = canonical {beyond:+d}")
-            if leg == "LF" and side == "MIN" and lf_crosscheck and \
+                      r"verdict=HARDWARE_CONTACT_CALIBRATED contacts_accepted=6/6 "
+                      r"contact_calibrated=YES envelope_accepted=NO failure=NONE", mark, 5.0)
+        rx = re.compile(r"CALIBRATION_FULL_LEG_CONTACT joint=(UPPER|LOWER|HIP) side=(MIN|MAX) "
+                        r"measured=YES pass1=(\d+) pass2=(\d+) witness_accepted=YES")
+        seen = {}
+        deadline = self.clock() + 3.0
+        while len(seen) < 6 and self.clock() < deadline:
+            for text in self.lines_since(mark):
+                m = rx.fullmatch(text)
+                if m:
+                    seen[(m.group(1), m.group(2))] = (int(m.group(3)), int(m.group(4)))
+            self.sleep(0.05)
+        if sorted(seen) != sorted(CONTACT_ORDER):
+            raise SessionFailure(f"{leg}: status shows {len(seen)}/6 accepted contacts")
+        for key in CONTACT_ORDER:
+            c = corridors[key]
+            sign, contact = int(c.group(3)), int(c.group(5))
+            p1, p2 = seen[key]
+            beyond = (p2 - contact) * sign
+            self.log.say(f"      {leg} {key[0]:5s} {key[1]} contact pass1={p1} pass2={p2} "
+                         f"= canonical {beyond:+d}")
+            if leg == "LF" and key == ("UPPER", "MIN") and lf_crosscheck and \
                     not (LF_MIN_EXPECTED_BEYOND[0] <= beyond <= LF_MIN_EXPECTED_BEYOND[1]):
                 raise SessionFailure(
-                    f"LF MIN contact is canonical {beyond:+d}, but the stop was found by hand at "
-                    f"about +23: stopping for operator review before any other leg "
+                    f"LF UPPER MIN contact is canonical {beyond:+d}, but the stop was found by hand "
+                    f"at about +23: stopping for operator review before any other leg "
                     f"(--no-lf-min-crosscheck to accept)")
-        self.log.say(f"PASS  {leg} HARDWARE_CONTACT_CALIBRATED; cleanup verified")
+        self.log.say(f"PASS  {leg} 6/6 HARDWARE_CONTACT_CALIBRATED; cleanup verified")
 
-    def _monitor(self, leg, mark):
-        """Polls FULL LEG STATUS; returns only on the exact terminal record."""
-        terminal = re.compile(rf"CALIBRATION_FULL_LEG_RESULT leg={leg} verdict=(\S+) failure=(\S+)")
-        event = re.compile(r"CALIBRATION_SEARCH exec=(\S+) side=(MIN|MAX) pass=(\d) stage=(\S+) "
-                           r"probe=(\S+) target=(\d+) pos=(-?\d+) beyond_contact=(-?\d+) .*")
+    def _monitor(self, terminal, mark, label, watchdog_s, stop_on_match=True):
+        """Polls FULL LEG STATUS (the only command sent while a run is in
+        flight); returns the first line after `mark` that fully matches
+        `terminal`. With stop_on_match=False it only waits for it."""
+        event = re.compile(r"CALIBRATION_SEARCH exec=(\S+) joint=(\S+) side=(MIN|MAX) pass=(\d) "
+                           r"stage=(\S+) probe=(\S+) target=(\d+) pos=(-?\d+) beyond_contact=(-?\d+) .*")
+        seq = re.compile(r"CALIBRATION_SEQUENCE leg=\S+ phase=(\S+) step=(\S+) joint=\S+ bus=(\d+) "
+                         r"target=(\d+) held=(\d+) contacts=(\d+)/6 recovered=(\d+) prerequisites=\S+ "
+                         r"failure=(\S+)")
         final = re.compile(r"CALIBRATION_FULL_LEG_PROBE_FINAL .*")
         start = self.clock()
         last_poll = -POLL_S
@@ -401,6 +514,7 @@ class Session:
         aborted_at = None
         session_aborted = False
         last_state = None
+        last_phase = None
         while True:
             with self.link.cond:
                 new = [t for _, t in self.link.lines[seen:]]
@@ -411,26 +525,33 @@ class Session:
             for text in new:
                 m = terminal.fullmatch(text)
                 if m:
-                    return m.group(1), m.group(2)
+                    return m
+                q = seq.fullmatch(text)
+                if q and q.group(1) != last_phase:
+                    last_phase = q.group(1)
+                    self.log.say(f"      {self.clock() - start:6.1f}s phase {q.group(1)} "
+                                 f"contacts={q.group(6)}/6 recovered={q.group(7)} "
+                                 f"failure={q.group(8)}")
                 e = event.fullmatch(text)
                 if e:
-                    state = (e.group(1), e.group(2), e.group(3), e.group(4), e.group(5))
+                    state = e.group(1, 2, 3, 4, 5, 6)
                     if state != last_state:
                         last_state = state
                         self.log.say(f"      {self.clock() - start:6.1f}s {e.group(1)} {e.group(2)} "
-                                     f"pass {e.group(3)} {e.group(4)} {e.group(5)} target={e.group(6)} "
-                                     f"pos={e.group(7)} beyond_contact={e.group(8)}")
+                                     f"{e.group(3)} pass {e.group(4)} {e.group(5)} {e.group(6)} "
+                                     f"target={e.group(7)} pos={e.group(8)} "
+                                     f"beyond_contact={e.group(9)}")
                 if final.fullmatch(text):
                     self.log.say("      " + text)
             if lost:
-                raise SessionFailure(f"{leg}: USB link lost during an energized run - "
+                raise SessionFailure(f"{label}: USB link lost during an energized run - "
                                      f"use the physical disconnect; nothing can be sent")
             t = self.clock()
             if t - last_poll >= POLL_S:
                 self.link.send("@CALIBRATION FULL LEG STATUS")
                 last_poll = t
-            if aborted_at is None and (t - start > LEG_WATCHDOG_S or t - last_rx > SILENCE_S):
-                self.log.say(f"!!    {leg}: watchdog (elapsed {t - start:.0f}s, silence "
+            if aborted_at is None and (t - start > watchdog_s or t - last_rx > SILENCE_S):
+                self.log.say(f"!!    {label}: watchdog (elapsed {t - start:.0f}s, silence "
                              f"{t - last_rx:.0f}s) -> FULL LEG ABORT")
                 self.link.send("@CALIBRATION FULL LEG ABORT")
                 aborted_at = t
@@ -438,37 +559,52 @@ class Session:
                 self.link.send("@CALIBRATION SESSION ABORT")
                 session_aborted = True
             if aborted_at is not None and t - aborted_at > 60.0:
-                raise SessionFailure(f"{leg}: no terminal record 60 s after ABORT")
+                raise SessionFailure(f"{label}: no terminal record 60 s after ABORT")
             with self.link.cond:
                 if len(self.link.lines) == seen and not self.link.lost:
                     self.link.cond.wait(timeout=0.05)
 
-    def export(self, expected_legs):
+    def export(self):
         mark = self.mark()
         self.link.send("@CALIBRATION EVIDENCE EXPORT")
         end = self.wait_for(r"CALIBRATION_EVIDENCE_EXPORT=END legs_present=(\d+) "
                             r"legs_contact_calibrated=(\d+) legs_envelope_accepted=(\d+) "
-                            r"all_contact_calibrated=(\d)", mark, 20.0,
+                            r"total_contacts_expected=24 total_contacts_accepted=(\d+) "
+                            r"all_contact_calibrated=(\d)", mark, 30.0,
                             (r"CALIBRATION_EVIDENCE_EXPORT=REFUSED",))
         lines = self.lines_since(mark)
         return end, lines
 
     def verify_export(self, legs, end, lines):
+        """Every leg run must be a complete 6/6 record; the four-leg result
+        (all_contact_calibrated=1) is claimed only at 4 legs x 6 = 24/24."""
         n = len(legs)
-        want = (str(n), str(n), "0", "1" if n == 4 else end.group(4))
-        if (end.group(1), end.group(2), end.group(3), end.group(4)) != want:
+        want = (str(n), str(n), "0", str(6 * n), "1" if n == 4 else "0")
+        if end.group(1, 2, 3, 4, 5) != want:
             raise SessionFailure(f"export summary {end.group(0)} != legs_present={n} "
-                                 f"legs_contact_calibrated={n} legs_envelope_accepted=0"
-                                 + (" all_contact_calibrated=1" if n == 4 else ""))
-        rx = re.compile(r"CALIBRATION_EVIDENCE_LEG leg=(\S+) present=1 attempts=\d+ session=\d+ "
-                        r"geometry=\S+ verdict=HARDWARE_CONTACT_CALIBRATED contact_calibrated=1 "
-                        r"envelope_accepted=0 failure=NONE executor_failure=NONE "
-                        r"session_completed=1 permit_revoked=1 authority_released=1 "
-                        r"parameters_approved=0")
-        ok = {m.group(1) for m in (rx.fullmatch(t) for t in lines) if m}
-        missing = [leg for leg in legs if leg not in ok]
+                                 f"legs_contact_calibrated={n} legs_envelope_accepted=0 "
+                                 f"total_contacts_accepted={6 * n} all_contact_calibrated={want[4]}")
+        leg_rx = re.compile(r"CALIBRATION_EVIDENCE_LEG leg=(\S+) present=1 attempts=\d+ session=\d+ "
+                            r"geometry=\S+ verdict=HARDWARE_CONTACT_CALIBRATED contacts_expected=6 "
+                            r"contacts_measured=6 contacts_accepted=6 diagnostics_accepted=1 "
+                            r"contact_calibrated=1 envelope_accepted=0")
+        close_rx = re.compile(r"CALIBRATION_EVIDENCE_LEG_CLOSE leg=(\S+) failure=NONE "
+                              r"executor_failure=NONE failed_phase=- session_completed=1 "
+                              r"permit_revoked=1 authority_released=1 parameters_approved=0")
+        contact_rx = re.compile(r"CALIBRATION_EVIDENCE_CONTACT leg=(\S+) joint=(UPPER|LOWER|HIP) "
+                                r"side=(MIN|MAX) recorded=1 measured=1 .* witness_accepted=1")
+        legs_ok = {m.group(1) for m in (leg_rx.fullmatch(t) for t in lines) if m}
+        close_ok = {m.group(1) for m in (close_rx.fullmatch(t) for t in lines) if m}
+        contacts = {}
+        for t in lines:
+            m = contact_rx.fullmatch(t)
+            if m:
+                contacts.setdefault(m.group(1), set()).add((m.group(2), m.group(3)))
+        missing = [leg for leg in legs if leg not in legs_ok or leg not in close_ok or
+                   contacts.get(leg, set()) != set(CONTACT_ORDER)]
         if missing:
-            raise SessionFailure(f"export has no complete HARDWARE_CONTACT_CALIBRATED record for {missing}")
+            raise SessionFailure(f"export has no complete 6/6 HARDWARE_CONTACT_CALIBRATED record "
+                                 f"for {missing}")
         self.log.say(f"PASS  evidence export: {end.group(0)}")
 
     def emergency_stop(self):
@@ -563,29 +699,63 @@ def wait_for_port(port, log, timeout=30.0, flashed=False):
 
 # --------------------------------------------------------------------------
 
+PHASES = ("prepare", "q0", "recover", "legs", "all")
+
+
 def run(args, link_factory=SerialLink):
+    """Phases, each opening the board WITHOUT a reset (state survives between
+    invocations), each stopping at its first failed check:
+
+      prepare  build manifest (CLEAN, ROBOT_POWERED, ingest 0, HEAD), optional
+               application-only flash, signature, MAINTENANCE, SAFE_OFF 13/13,
+               health READY, authority NONE. No motion.
+      q0       --confirm-q0-pose: the operator placed all four legs at q=0.
+               Fresh Q0 CAPTURE (12/12, |delta vs CR2-C| < 82), Q0 PROMOTE.
+      recover  <first leg> session + permit, then @CALIBRATION INITIAL RECOVERY:
+               all 12 leg joints actively to their promoted q0, verified.
+               Leaves the session and permit live: the ready state for GO.
+      legs     --confirm-operator-go: for each leg, a TRUE 6-contact Full
+               Calibration (the first leg reuses the ready session), each later
+               leg preceded by its own session, permit and verified INITIAL
+               RECOVERY; then SAFE_OFF 13/13 and the evidence export
+               (all_contact_calibrated=1 only at 24/24).
+      all      prepare + q0 + recover + legs (both confirmations required).
+
+    Any failure: FULL LEG ABORT + SESSION ABORT, SAFE_OFF all 13, a read-only
+    evidence export, then stop - no further leg, no retry."""
     sketch_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     legs = [leg.strip().upper() for leg in args.legs.split(",") if leg.strip()]
     for leg in legs:
         if leg not in LEG_MATRIX:
             raise SystemExit(f"unknown leg {leg}")
-    if not args.no_flash and not re.fullmatch(r"[0-9a-f]{64}", args.backup_sha256 or ""):
+    if not legs or len(set(legs)) != len(legs):
+        raise SystemExit("--legs must name each leg at most once")
+    phase = args.phase
+    if phase not in PHASES:
+        raise SystemExit(f"--phase must be one of {PHASES}")
+    flashing = phase in ("prepare", "all") and not args.no_flash
+    if flashing and not re.fullmatch(r"[0-9a-f]{64}", args.backup_sha256 or ""):
         raise SystemExit("--backup-sha256 <64 hex> is required to flash: the operator-authorized "
                          "SHA256 of the --backup full-flash image (flash_app_only.sh checks it)")
-    if not args.confirm_q0_pose:
+    if phase in ("q0", "all") and not args.confirm_q0_pose:
         raise SystemExit("--confirm-q0-pose is required: Q0 CAPTURE asserts all four legs are "
                          "physically at the manual q=0 calibration pose")
+    if phase in ("legs", "all") and not args.confirm_operator_go:
+        raise SystemExit("--confirm-operator-go is required: the operator is physically present, "
+                         "the robot is supported, the charger disconnected, the envelope clear "
+                         "and the physical disconnect reachable")
     os.makedirs(args.evidence_dir, exist_ok=True)
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    log = Log(os.path.join(args.evidence_dir, f"hw_session_{stamp}.log"), echo=not args.quiet)
+    log = Log(os.path.join(args.evidence_dir, f"hw_session_{phase}_{stamp}.log"), echo=not args.quiet)
+    q0_path = os.path.join(args.evidence_dir, "q0_promoted.json")
 
     # Before the link exists nothing is energized: a failure here only stops.
     try:
-        build_id, manifest = verify_build(sketch_dir, log) if not args.skip_build_check \
+        build_id, _ = verify_build(sketch_dir, log) if not args.skip_build_check \
             else (args.build_id, {})
-        if not args.no_flash:
+        if flashing:
             flash(sketch_dir, args.backup, args.backup_sha256, log)
-        wait_for_port(args.port, log, flashed=not args.no_flash)
+        wait_for_port(args.port, log, flashed=flashing)
         link = link_factory(args.port, log)
         link.open()
     except (SessionFailure, OSError, subprocess.CalledProcessError) as e:
@@ -600,19 +770,46 @@ def run(args, link_factory=SerialLink):
             if args.imu_stream_off else None
         session.verify_signature(build_id)
         session.verify_maintenance()
-        session.safe_off_all()
-        session.wait_health_ready()
-        session.authority_none()
-        session.q0_capture()
-        session.q0_promote()
-        for leg in legs:
-            session.run_leg(leg, lf_crosscheck=not args.no_lf_min_crosscheck)
-        session.safe_off_all()
-        session.authority_none()
-        end, lines = session.export(legs)
-        session.verify_export(legs, end, lines)
-        log.say(f"DONE  {len(legs)}/{len(legs)} legs HARDWARE_CONTACT_CALIBRATED "
-                f"(RAM only - export saved in {args.evidence_dir})")
+        q0 = None
+        if phase in ("prepare", "q0", "all"):
+            session.safe_off_all()
+            session.wait_health_ready()
+            session.authority_none()
+        if phase in ("q0", "all"):
+            session.read_positions("raw positions before Q0 CAPTURE")
+            q0 = session.q0_capture()
+            session.q0_promote()
+            with open(q0_path, "w") as f:
+                json.dump({str(b): t for b, t in sorted(q0.items())}, f, indent=1)
+        if q0 is None and os.path.exists(q0_path):
+            with open(q0_path) as f:
+                q0 = {int(b): t for b, t in json.load(f).items()}
+        if phase in ("recover", "all"):
+            session.open_leg_session(legs[0])
+            session.read_positions("raw positions before INITIAL RECOVERY")
+            session.initial_recovery(legs[0], q0)
+            session.read_positions("raw positions after INITIAL RECOVERY")
+            session.log.say(f"READY {legs[0]} session + permit live; every leg joint verified at q0. "
+                            f"Next: --phase legs --confirm-operator-go (operator GO).")
+        if phase in ("legs", "all"):
+            for i, leg in enumerate(legs):
+                if i == 0 and session.leg_session_ready(leg):
+                    session.log.say(f"      {leg}: using the ready session + permit")
+                else:
+                    session.open_leg_session(leg)
+                    session.initial_recovery(leg, q0)
+                session.run_full_leg(leg, lf_crosscheck=not args.no_lf_min_crosscheck)
+                session.read_positions(f"raw positions after {leg}")
+            session.safe_off_all()
+            session.authority_none()
+            end, lines = session.export()
+            with open(os.path.join(args.evidence_dir, f"evidence_export_{stamp}.txt"), "w") as f:
+                f.write("\n".join(lines) + "\n")
+            session.verify_export(legs, end, lines)
+            total = 6 * len(legs)
+            log.say(f"DONE  {len(legs)} leg(s) x 6 = {total} contacts HARDWARE_CONTACT_CALIBRATED"
+                    + (" - TRUE FULL CALIBRATION 24/24" if total == 24 else "")
+                    + f" (RAM only - export saved in {args.evidence_dir})")
         return 0
     except SessionFailure as e:
         log.say(f"FAIL  {e}")
@@ -620,7 +817,10 @@ def run(args, link_factory=SerialLink):
             log.say("      de-escalating: FULL LEG ABORT, SESSION ABORT, SAFE_OFF all 13")
             session.emergency_stop()
             try:
-                end, lines = session.export(legs)
+                end, lines = session.export()
+                with open(os.path.join(args.evidence_dir, f"evidence_export_{stamp}_after_failure.txt"),
+                          "w") as f:
+                    f.write("\n".join(lines) + "\n")
                 log.say(f"      evidence export after failure: {end.group(0)}")
             except Exception as ex:
                 log.say(f"      evidence export unavailable: {ex}")
@@ -639,7 +839,9 @@ def main(argv=None):
                    help="authorized SHA256 of --backup (required unless --no-flash)")
     p.add_argument("--port", default=DEFAULT_PORT)
     p.add_argument("--legs", default="LF,RF,RH,LH")
+    p.add_argument("--phase", default="all", choices=PHASES)
     p.add_argument("--confirm-q0-pose", action="store_true")
+    p.add_argument("--confirm-operator-go", action="store_true")
     p.add_argument("--no-flash", action="store_true", help="the board already runs this build")
     p.add_argument("--no-lf-min-crosscheck", action="store_true")
     p.add_argument("--imu-stream-off", action="store_true", default=True)

@@ -17,19 +17,26 @@
 // Closes the evidence lifecycle of ONE Full Leg run, and holds the RAM record
 // of every leg run in this power-up.
 //
-// The executor proves two UPPER contacts and leaves the servos SAFE_OFF. That
-// is a measurement, not a calibration: nothing has yet been recorded in the
-// session, turned into an envelope, offered to the actuator policy, or
-// released. finalizeFullLeg() does that, once, in one fixed order:
+// FULL CALIBRATION HAS ONE DEFINITION: 4 legs x 3 joints x MIN/MAX = 24
+// mechanical contact witnesses. A leg is HARDWARE_CONTACT_CALIBRATED only with
+// all SIX of its contacts - UPPER, LOWER and HIP, each MIN and MAX - accepted.
+// Two (the old UPPER-only definition) or five are a FAILED leg, never a
+// partial success, and the four-leg result needs 24/24.
+//
+// The executor proves six contacts and leaves every servo SAFE_OFF. That is a
+// measurement, not a calibration: finalizeFullLeg() closes it, once, in one
+// fixed order:
 //
 //   1  the run is terminal; a FAILED run only cleans up
 //   2  the live session is the one the run started under (leg AND session id)
-//   3  recordContact(MIN) and recordContact(MAX), each exactly once
-//   4  UPPER / HIP / LOWER envelopes are built
-//   5  limits: admitted ONLY under approved parameters (see below)
-//   6  noteExecutionPhase(TORQUE_OFF), then completeSession()
-//   7  permit + operator authorization revoked
-//   8  post-conditions verified: session terminal, authority NONE, permit off
+//   3  6/6 contacts measured, each for this leg's exact (joint, side), and the
+//      executor's V25 diagnostics accepted
+//   4  recordContact() for all six, each exactly once
+//   5  UPPER / LOWER / HIP envelopes, each from its own two contacts
+//   6  limits: admitted ONLY under approved parameters (see below)
+//   7  noteExecutionPhase(TORQUE_OFF), then completeSession()
+//   8  permit + operator authorization revoked
+//   9  post-conditions verified: session terminal, authority NONE, permit off
 //
 // A refusal at any step ends the session as FAILED, revokes the permit, and
 // records why. Nothing after the refusing step runs.
@@ -37,40 +44,36 @@
 // TWO LEVELS, NEVER CONFLATED
 // ---------------------------
 //   HARDWARE_CONTACT_CALIBRATED
-//       Both UPPER contacts were witnessed, recorded exactly once, the UPPER
-//       envelope derived from them is READY, the servos are SAFE_OFF and the
-//       session completed cleanly. This is what a hardware run can honestly
-//       claim TODAY.
+//       All six contacts witnessed and recorded exactly once, diagnostics
+//       accepted, the three contact envelopes READY, every servo SAFE_OFF,
+//       the session completed cleanly.
 //   FINAL_OPERATIONAL_ENVELOPE_ACCEPTED
-//       Additionally, UPPER / HIP / LOWER envelopes were built from APPROVED
-//       parameters and all three JointLimits were admitted and read back.
+//       Additionally, the three envelopes were built with APPROVED parameters
+//       and all three JointLimits were admitted and read back.
 //
-// The second level needs a reviewed stand/gait workspace and margin. The
-// repository has none (MATDOG_JOINT_CALIBRATION.yaml records
-// first_stand_limit_rad as null for all twelve joints); the numbers below are
-// placeholders and productionEnvelopeParameters() marks them unapproved. An
-// unapproved run builds and REPORTS its envelopes but never offers them to
-// SafeActuatorPolicy - a placeholder must not become a POSITION_COMMAND bound.
-// Approving parameters is a deliberate, reviewed source change to
-// kFullLegOperationalParametersApproved, which static_audit.py pins to false.
+// The second level needs a reviewed stand/gait margin. The repository has
+// none; the margin below is a placeholder and productionEnvelopeParameters()
+// marks it unapproved. An unapproved run builds and REPORTS its envelopes but
+// never offers them to SafeActuatorPolicy. Approving is a deliberate, reviewed
+// source change to kFullLegOperationalParametersApproved, which
+// static_audit.py pins to false.
 //
-// Pure: no Arduino, no ServoBus, no time. The Controller owns the collaborators
-// and calls this exactly once per terminal executor.
+// Pure: no Arduino, no ServoBus, no time.
 
 namespace matdog {
 namespace calibration {
 
-// Placeholders, in the sense above. Reused unchanged from the LF precedent.
 constexpr bool kFullLegOperationalParametersApproved = false;
-constexpr uint16_t kFullLegPlaceholderUpperMarginTicks = 8;
-constexpr actuator::MicroRad kFullLegPlaceholderHipLowerMarginUrad = 50000;
+// Placeholder inset applied to both confirmed contact ticks of every joint.
+constexpr uint16_t kFullLegPlaceholderContactMarginTicks = 8;
+// The acceptance arithmetic of the 24-contact definition.
+constexpr uint8_t kFullLegContactsExpected = kFullLegContactCount;  // 6 per leg
+constexpr uint8_t kFullCalibrationContactsExpected =
+    static_cast<uint8_t>(kLegCount * kFullLegContactsExpected);   // 24
 
 struct FullLegEnvelopeParameters {
   bool approved = false;
-  // Symmetric inset applied to both confirmed UPPER contact ticks.
-  uint16_t upper_margin_ticks = 0;
-  // Symmetric inset applied to the full URDF domain of HIP and LOWER.
-  actuator::MicroRad hip_lower_margin_urad = 0;
+  uint16_t contact_margin_ticks = 0;
 };
 
 FullLegEnvelopeParameters productionEnvelopeParameters();
@@ -98,30 +101,31 @@ enum class FullLegFinalizeFailure : uint8_t {
   SESSION_NOT_ACTIVE = 4,         // the session ended (or never was ACTIVE) under the run
   SESSION_MISMATCH = 5,           // a different leg or session id than the run started under
   CONTACT_EVIDENCE_MALFORMED = 6, // wrong leg / joint / side, or no measurement
-  MIN_CONTACT_REJECTED = 7,
-  MAX_CONTACT_REJECTED = 8,
-  UPPER_ENVELOPE_NOT_READY = 9,
-  HIP_ENVELOPE_NOT_READY = 10,    // approved parameters only
-  LOWER_ENVELOPE_NOT_READY = 11,  // approved parameters only
-  LIMIT_ADMISSION_REJECTED = 12,
-  LIMIT_VERIFY_FAILED = 13,
-  PHASE_REPORT_REJECTED = 14,
-  SESSION_COMPLETE_REJECTED = 15,
-  CLEANUP_SESSION_NOT_TERMINAL = 16,
-  CLEANUP_AUTHORITY_HELD = 17,
-  CLEANUP_PERMIT_ACTIVE = 18,
+  CONTACTS_INCOMPLETE = 7,        // fewer than 6/6 contacts: never a leg success
+  DIAGNOSTICS_REJECTED = 8,
+  CONTACT_REJECTED = 9,           // the session refused to record a contact
+  ENVELOPE_NOT_READY = 10,
+  LIMIT_ADMISSION_REJECTED = 11,
+  LIMIT_VERIFY_FAILED = 12,
+  PHASE_REPORT_REJECTED = 13,
+  SESSION_COMPLETE_REJECTED = 14,
+  CLEANUP_SESSION_NOT_TERMINAL = 15,
+  CLEANUP_AUTHORITY_HELD = 16,
+  CLEANUP_PERMIT_ACTIVE = 17,
 };
 
 // What the finalizer needs to know about a finished run. Snapshotted by the
 // Controller from the executor at the moment it turns terminal.
 struct FullLegRunOutcome {
   bool terminal = false;
-  bool complete = false;  // executor phase == COMPLETE (both sides witnessed, SAFE_OFF verified)
-  FullLegCalibrationFailure failure = FullLegCalibrationFailure::NONE;
-  ContactEvidence min_contact{};
-  ContactEvidence max_contact{};
-  // The geometry the run STARTED under and the session it ran in. The
-  // envelope builder refuses evidence whose geometry is no longer current.
+  bool complete = false;  // executor COMPLETE: 6/6, diagnostics, verified rest
+  FullLegFailure failure = FullLegFailure::NONE;
+  CalibrationPhase failed_phase = CalibrationPhase::PREFLIGHT;
+  uint8_t contacts_measured = 0;
+  ContactEvidence contacts[kJointKindCount][kContactSideCount];
+  FullLegJointDiagnostics diagnostics[kJointKindCount];
+  bool diagnostics_accepted = false;
+  // The geometry the run STARTED under and the session it ran in.
   actuator::GeometryProvenanceTag geometry_at_start = actuator::kNoGeometryProvenance;
   uint32_t session_id_at_start = 0;
 };
@@ -141,6 +145,11 @@ struct FullLegJointRecord {
   actuator::GeometryProvenanceTag q0_geometry = actuator::kNoGeometryProvenance;
   uint16_t q0_tick = 0;
 
+  // [side]: MIN, MAX.
+  ContactEvidence contact[kContactSideCount];
+  bool contact_recorded[kContactSideCount] = {false, false};
+  FullLegJointDiagnostics diagnostics{};
+
   actuator::EnvelopeBuildStatus envelope_status = actuator::EnvelopeBuildStatus::NOT_EVALUATED;
   actuator::OperationalEnvelope envelope{};
 
@@ -158,20 +167,19 @@ struct FullLegRecord {
   // Indexed by static_cast<uint8_t>(JointKind): HIP, UPPER, LOWER.
   FullLegJointRecord joints[kJointKindCount];
 
-  bool auxiliary_required = false;
-  Leg auxiliary_leg = Leg::LF;
-  JointKind auxiliary_joint = JointKind::UPPER;
-  uint8_t auxiliary_bus_id = 0;
-  actuator::MicroRad auxiliary_park_target_urad = 0;
+  bool has_rear_park = false;
+  Leg park_leg = Leg::LF;
+  JointKind park_joint = JointKind::UPPER;
+  uint8_t park_bus_id = 0;
+  actuator::MicroRad park_target_urad = 0;
 
-  bool min_recorded = false;
-  bool max_recorded = false;
-  ContactEvidence min_contact{};
-  ContactEvidence max_contact{};
+  uint8_t contacts_expected = kFullLegContactsExpected;
+  uint8_t contacts_measured = 0;  // probes that completed
+  uint8_t contacts_accepted = 0;  // recorded in the session - 6 or the leg failed
+  bool diagnostics_accepted = false;
 
   bool parameters_approved = false;
-  uint16_t upper_margin_ticks = 0;
-  actuator::MicroRad hip_lower_margin_urad = 0;
+  uint16_t contact_margin_ticks = 0;
 
   bool session_completed = false;
   bool permit_revoked = false;
@@ -181,7 +189,8 @@ struct FullLegRecord {
   bool operational_envelope_accepted = false;
   FullLegVerdict verdict = FullLegVerdict::NOT_RUN;
   FullLegFinalizeFailure failure = FullLegFinalizeFailure::NONE;
-  FullLegCalibrationFailure executor_failure = FullLegCalibrationFailure::NONE;
+  FullLegFailure executor_failure = FullLegFailure::NONE;
+  CalibrationPhase executor_failed_phase = CalibrationPhase::PREFLIGHT;
 
   const FullLegJointRecord& joint(JointKind kind) const {
     return joints[static_cast<uint8_t>(kind)];
@@ -200,7 +209,7 @@ struct FullLegFinalizeContext {
   FullLegEnvelopeParameters parameters{};
 };
 
-// Runs steps 1-8 above. `*record` is rebuilt from scratch (attempts is
+// Runs steps 1-9 above. `*record` is rebuilt from scratch (attempts is
 // carried over by FullLegEvidenceStore, not here) and always describes what
 // happened, on success and on every refusal. Returns NONE only for the two
 // success verdicts. Never touches the servos: SAFE_OFF was the executor's.
@@ -211,12 +220,6 @@ FullLegFinalizeFailure finalizeFullLeg(const FullLegFinalizeContext& context,
 // ---------------------------------------------------------------------------
 // The run in flight
 // ---------------------------------------------------------------------------
-//
-// What the command handler hands to the Controller when it starts a run, so the
-// Controller can finalize it when the executor turns terminal - including a run
-// the operator aborted or whose session was lost. `armed` is set only by a
-// start() that the executor accepted, and cleared only by finalization: while
-// it is set, no other leg may start a session.
 struct FullLegRunState {
   bool armed = false;
   FullLegPlan plan{};
@@ -236,33 +239,27 @@ struct FullLegRunState {
 // ---------------------------------------------------------------------------
 // The RAM record of every leg run in this power-up
 // ---------------------------------------------------------------------------
-//
-// Four slots, one per leg, no persistence: reset() is the only way to clear
-// it and a reboot starts empty. A leg run again replaces its own slot (the
-// newest attempt is the record; attempts counts them) and never touches
-// another leg's, so one leg's failure cannot falsify another's result.
 class FullLegEvidenceStore {
  public:
   void reset();
-
-  // Stores the record for `record.leg`, incrementing that leg's attempt count.
   void put(const FullLegRecord& record);
-
   const FullLegRecord* find(Leg leg) const;
 
   uint8_t legsPresent() const;
   uint8_t legsContactCalibrated() const;
   uint8_t legsEnvelopeAccepted() const;
-  // All four legs finished HARDWARE_CONTACT_CALIBRATED or better.
-  bool allLegsContactCalibrated() const { return legsContactCalibrated() == kLegCount; }
+  // Contacts accepted across all four legs; the definition's total is 24.
+  uint8_t totalContactsAccepted() const;
+  // All four legs HARDWARE_CONTACT_CALIBRATED or better AND 24/24 contacts.
+  bool allLegsContactCalibrated() const {
+    return legsContactCalibrated() == kLegCount &&
+           totalContactsAccepted() == kFullCalibrationContactsExpected;
+  }
 
  private:
   FullLegRecord records_[kLegCount];
 };
 
-// Emits the record as deterministic single-line key=value text, one call per
-// line, in a fixed leg and joint order. `sink` receives a NUL-terminated line
-// without a trailing newline. The same store always yields the same lines.
 typedef void (*FullLegExportSink)(void* user, const char* line);
 
 void exportFullLegEvidence(const FullLegEvidenceStore& store,

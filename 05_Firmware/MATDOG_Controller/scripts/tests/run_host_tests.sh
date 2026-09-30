@@ -96,6 +96,7 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_actuator_write_policy" \
   "$SCRIPT_DIR/test_actuator_write_policy.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
@@ -110,6 +111,7 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_calibration_geometry" \
   "$SCRIPT_DIR/test_calibration_geometry.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
@@ -159,6 +161,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
@@ -177,6 +180,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationPopulationEvidence.cpp" \
   "$SKETCH_DIR/src/calibration/FullLegCalibrationPlan.cpp" \
@@ -235,6 +239,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_actuator_runtime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
@@ -252,6 +257,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
@@ -268,6 +274,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
@@ -285,6 +292,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
@@ -302,20 +310,25 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
 
-# CR3 continuation: the Full Leg Calibration sequencer. Links the REAL
-# policy, runtime, CalibrationExecutionEngine, ContactProbeEngine, envelope
-# builder, arbiter and checked target resolver against a fake backend and
-# synthetic telemetry - no fabricated physical measurement anywhere here.
+# The 24-contact Full Calibration sequence, end to end on all four legs: the
+# REAL policy (Geometry V5 + the geometry-validated sequence plan), runtime,
+# CalibrationExecutionEngine, ContactProbeEngine, arbiter, checked resolvers
+# and the REAL plan resolver against a twelve-joint kinematic servo model -
+# no fabricated physical measurement anywhere here.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -o "$OUT/test_full_leg_calibration_executor" \
   "$SCRIPT_DIR/test_full_leg_calibration_executor.cpp" \
   "$SKETCH_DIR/src/calibration/FullLegCalibrationExecutor.cpp" \
+  "$SKETCH_DIR/src/calibration/FullLegCalibrationPlan.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationPopulationEvidence.cpp" \
+  "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \
   "$SKETCH_DIR/src/calibration/ContactProbeEngine.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
   "$SKETCH_DIR/src/actuator/OperationalEnvelope.cpp" \
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
@@ -334,6 +347,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
@@ -358,6 +372,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \

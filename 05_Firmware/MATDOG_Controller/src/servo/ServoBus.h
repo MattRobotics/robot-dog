@@ -199,6 +199,47 @@ class ServoBus {
   ServoWriteVerifyResult writeGoalPosition(int id, uint16_t target_tick,
                                            GoalMotionProfile profile);
 
+  // The reviewed RAM TorqueLimit (LF V25 hardware oracle, matdog.rs
+  // TORQUE_LIMIT = 500, "still only half of the ST3215 command range"). The
+  // actuator layer writes it, and reads it back, before a TorqueEnable - V25's
+  // prepare_motor() order. RAM register 48 only: the EEPROM Max Torque
+  // (register 16) is never touched, so a power cycle restores the unit's own
+  // value. It can only LOWER the output ceiling relative to the EEPROM
+  // default; the value is a compile-time constant and this primitive accepts
+  // no argument that could raise it. Verified by an independent readback of
+  // the register itself, like every other write.
+  static constexpr uint16_t kReviewedRamTorqueLimit = 500;
+  ServoWriteVerifyResult writeReviewedRamTorqueLimit(int id);
+
+  // Read-only control + feedback snapshot: the two contiguous RAM blocks the
+  // LF V25 oracle validated on EVERY observation (matdog.rs
+  // ensure_observation_safe / validate_lf_active_readback), in two bus
+  // transactions instead of readRuntimeState()'s eight:
+  //   40..49  TorqueEnable, GoalPosition, TorqueLimit
+  //   56..70  present position/speed/load/voltage/temperature, servo status
+  //           (register 65: the servo's own error flags), present current
+  // Speed/load/current are returned raw (direction bit included); callers
+  // take the magnitude. Returns false, and leaves every field -1, if either
+  // block does not answer within kOperationalTimeoutMs.
+  //
+  // Register 65 is the ST3215 "servo status" byte (voltage / sensor /
+  // temperature / current / angle / overload error flags) - the value V25
+  // required to be 0 on every sample. SMS_STS.h does not name it.
+  static constexpr int kServoStatusRegister = 65;
+  struct ControlFeedbackSnapshot {
+    int torque_enable = -1;
+    int goal_position = -1;
+    int torque_limit = -1;
+    int present_position = -1;
+    int present_speed = -1;
+    int present_load = -1;
+    int present_voltage = -1;
+    int present_temperature = -1;
+    int status = -1;
+    int present_current = -1;
+  };
+  bool readControlFeedback(int id, ControlFeedbackSnapshot* out);
+
   // Read-only runtime snapshot (present position/speed/load/voltage/temp).
   // Returns false if the servo does not answer within the bounded timeout.
   // Uses kOperationalTimeoutMs, NOT the diagnostic timeout (Session 2.3

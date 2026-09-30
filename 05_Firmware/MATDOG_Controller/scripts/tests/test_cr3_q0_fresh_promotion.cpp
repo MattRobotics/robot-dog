@@ -15,6 +15,7 @@
 
 #include "../../src/actuator/CalibrationGeometryProfileData.h"
 #include "../../src/actuator/CalibrationQ0EvidencePreparation.h"
+#include "../../src/actuator/CalibrationSequencePlanData.h"
 #include "../../src/actuator/CalibrationTargetResolver.h"
 #include "../../src/calibration/CalibrationQ0CaptureSession.h"
 #include "../../src/calibration/FullLegCalibrationPlan.h"
@@ -51,6 +52,8 @@ static const char* g_case = "";
   } while (0)
 
 namespace {
+
+const CalibrationSequencePlan& kSeqPlan = sequence_plan_data::kPlan;
 
 CalibrationGeometryProfile boundProfile() {
   CalibrationGeometryProfile p;
@@ -437,50 +440,77 @@ void test_full_leg_plan_consumes_the_new_q0() {
   const Leg legs[4] = {Leg::LF, Leg::RF, Leg::RH, Leg::LH};
   for (Leg leg : legs) {
     FullLegPlan none{};
-    CHECK(resolveFullLegPlan(p, geometry_data::kProvenance, empty, leg, &none) ==
+    CHECK(resolveFullLegPlan(p, geometry_data::kProvenance, empty, &kSeqPlan, leg, &none) ==
           FullLegPlanStatus::REJECT_NO_TRANSFORM);
 
     FullLegPlan a{}, b{}, c{};
-    CHECK(resolveFullLegPlan(p, geometry_data::kProvenance, t_first, leg, &a) ==
+    CHECK(resolveFullLegPlan(p, geometry_data::kProvenance, t_first, &kSeqPlan, leg, &a) ==
           FullLegPlanStatus::OK);
-    CHECK(resolveFullLegPlan(p, geometry_data::kProvenance, t_second, leg, &b) ==
+    CHECK(resolveFullLegPlan(p, geometry_data::kProvenance, t_second, &kSeqPlan, leg, &b) ==
           FullLegPlanStatus::OK);
-    CHECK(resolveFullLegPlan(p, geometry_data::kProvenance, t_frozen, leg, &c) ==
+    CHECK(resolveFullLegPlan(p, geometry_data::kProvenance, t_frozen, &kSeqPlan, leg, &c) ==
           FullLegPlanStatus::OK);
 
-    // The URDF-side request does not depend on q0; the RAW target it resolves to
-    // does, and must move by exactly the change of q0 of the UPPER joint.
-    const JointTransform* ta = t_first.find(a.upper.identity, tag);
-    const JointTransform* tb = t_second.find(b.upper.identity, tag);
-    const JointTransform* tc = t_frozen.find(c.upper.identity, tag);
-    CHECK(ta != nullptr && tb != nullptr && tc != nullptr);
-    if (ta == nullptr || tb == nullptr || tc == nullptr) continue;
+    // The URDF-side request does not depend on q0; the RAW targets it resolves
+    // to do, and every one must move by exactly the change of q0 of its joint.
+    for (int k = 0; k < (int)kJointKindCount; ++k) {
+      const JointTransform* ta = t_first.find(a.request.joint[k].identity, tag);
+      const JointTransform* tb = t_second.find(b.request.joint[k].identity, tag);
+      const JointTransform* tc = t_frozen.find(c.request.joint[k].identity, tag);
+      CHECK(ta != nullptr && tb != nullptr && tc != nullptr);
+      if (ta == nullptr || tb == nullptr || tc == nullptr) continue;
+      CHECK_EQ((long)a.request.joint[k].q0_tick, (long)ta->q0_tick);
+      CHECK_EQ((long)b.request.joint[k].q0_tick, (long)tb->q0_tick);
 
-    // Every raw point of both search corridors (canonical contact, entry,
-    // guard) moves by exactly the change of q0 - the plan is never silently
-    // on the frozen values.
-    const int32_t d_ab = (int32_t)tb->q0_tick - (int32_t)ta->q0_tick;
-    const int32_t d_ac = (int32_t)ta->q0_tick - (int32_t)tc->q0_tick;
-    for (int side = 0; side < 2; ++side) {
-      const actuator::CalibrationSearchCorridor& ca = side ? a.request.max_search : a.request.min_search;
-      const actuator::CalibrationSearchCorridor& cb = side ? b.request.max_search : b.request.min_search;
-      const actuator::CalibrationSearchCorridor& cc = side ? c.request.max_search : c.request.min_search;
-      CHECK_EQ((long)cb.contact_tick - (long)ca.contact_tick, (long)d_ab);
-      CHECK_EQ((long)ca.contact_tick - (long)cc.contact_tick, (long)d_ac);
-      CHECK_EQ((long)cb.guard_tick - (long)ca.guard_tick, (long)d_ab);
-      CHECK_EQ((long)cb.entry_tick - (long)ca.entry_tick, (long)d_ab);
-      CHECK_EQ(ca.home_tick, ta->q0_tick);
-      CHECK(ca.contact_tick != cc.contact_tick);
+      // Every raw point of all six search corridors (canonical contact, entry,
+      // guard) moves by exactly the change of q0 - the plan is never silently
+      // on the frozen values.
+      const int32_t d_ab = (int32_t)tb->q0_tick - (int32_t)ta->q0_tick;
+      const int32_t d_ac = (int32_t)ta->q0_tick - (int32_t)tc->q0_tick;
+      for (int side = 0; side < 2; ++side) {
+        const actuator::CalibrationSearchCorridor& ca = a.request.corridor[k][side];
+        const actuator::CalibrationSearchCorridor& cb = b.request.corridor[k][side];
+        const actuator::CalibrationSearchCorridor& cc = c.request.corridor[k][side];
+        CHECK_EQ((long)cb.contact_tick - (long)ca.contact_tick, (long)d_ab);
+        CHECK_EQ((long)ca.contact_tick - (long)cc.contact_tick, (long)d_ac);
+        CHECK_EQ((long)cb.guard_tick - (long)ca.guard_tick, (long)d_ab);
+        CHECK_EQ((long)cb.entry_tick - (long)ca.entry_tick, (long)d_ab);
+        CHECK_EQ(ca.home_tick, ta->q0_tick);
+        CHECK(ca.contact_tick != cc.contact_tick);
+      }
+    }
+    // The prerequisite poses of the UPPER/LOWER move with their joint's q0 too.
+    {
+      const JointTransform* ua = t_first.find(a.upper.identity, tag);
+      const JointTransform* ub = t_second.find(b.upper.identity, tag);
+      const JointTransform* la = t_first.find(a.lower.identity, tag);
+      const JointTransform* lb = t_second.find(b.lower.identity, tag);
+      CHECK(ua && ub && la && lb);
+      if (ua && ub && la && lb) {
+        const long du = (long)ub->q0_tick - (long)ua->q0_tick;
+        const long dl = (long)lb->q0_tick - (long)la->q0_tick;
+        CHECK_EQ((long)b.request.upper_for_lower_tick - (long)a.request.upper_for_lower_tick, du);
+        CHECK_EQ((long)b.request.upper_for_hip_min_tick - (long)a.request.upper_for_hip_min_tick, du);
+        CHECK_EQ((long)b.request.upper_for_hip_max_tick - (long)a.request.upper_for_hip_max_tick, du);
+        CHECK_EQ((long)b.request.lower_folded_tick - (long)a.request.lower_folded_tick, dl);
+      }
     }
 
-    if (a.request.auxiliary_required) {
-      const JointTransform* aux = t_first.find(a.request.auxiliary_joint, tag);
+    if (a.request.has_rear_park) {
+      const JointTransform* aux = t_first.find(a.request.park.identity, tag);
       CHECK(aux != nullptr);
       if (aux != nullptr) {
-        // The parked auxiliary is also resolved against the fresh q0.
-        const JointTransform* aux_frozen = t_frozen.find(a.request.auxiliary_joint, tag);
+        // The parked rear UPPER is also resolved against the fresh q0.
+        const JointTransform* aux_frozen = t_frozen.find(a.request.park.identity, tag);
         CHECK(aux_frozen != nullptr && aux->q0_tick != aux_frozen->q0_tick);
+        CHECK_EQ((long)a.request.park.q0_tick, (long)aux->q0_tick);
       }
+    }
+    // All twelve leg joints, each at its fresh q0.
+    CHECK_EQ((long)a.request.population_count, 12L);
+    for (uint8_t i = 0; i < a.request.population_count; ++i) {
+      const JointTransform* t = t_first.find(a.request.population[i].identity, tag);
+      CHECK(t != nullptr && t->q0_tick == a.request.population[i].q0_tick);
     }
   }
 }

@@ -166,10 +166,21 @@ TargetResolveStatus resolveCalibrationSearchCorridor(const CalibrationGeometryPr
   CalibrationSearchCorridor c{};
   c.probe_sign = static_cast<int8_t>(direction * (min_side ? -1 : 1));
   c.home_tick = transform.q0_tick;
+  // The canonical contact is a REFERENCE, never a commanded target: sixteen of
+  // the twenty-four V5 contacts (every HIP and LOWER endpoint) lie just
+  // outside the URDF domain, so it is converted without the URDF-domain check
+  // and then required to lie inside [entry, guard] below. Every commanded
+  // search target stays bounded by the URDF-derived opposite limit and guard.
+  {
+    const int64_t signed_ticks = roundDivSigned(
+        static_cast<int64_t>(endpoint->contact) * kTicksPerRevolution, kMicroRadPerRevolution);
+    const int64_t raw = static_cast<int64_t>(transform.q0_tick) +
+                        static_cast<int64_t>(direction) * signed_ticks;
+    if (raw < 0 || raw >= kTicksPerRevolution) return TargetResolveStatus::REJECT_RAW_DOMAIN;
+    c.contact_tick = static_cast<uint16_t>(raw);
+  }
   TargetResolveStatus s =
-      resolveUrdfQToRaw(profile, expected_provenance, transform, endpoint->contact, &c.contact_tick);
-  if (s != TargetResolveStatus::OK) return s;
-  s = resolveUrdfQToRaw(profile, expected_provenance, transform,
+      resolveUrdfQToRaw(profile, expected_provenance, transform,
                         min_side ? joint->urdf_lower : joint->urdf_upper, &c.urdf_limit_tick);
   if (s != TargetResolveStatus::OK) return s;
   s = resolveUrdfQToRaw(profile, expected_provenance, transform,

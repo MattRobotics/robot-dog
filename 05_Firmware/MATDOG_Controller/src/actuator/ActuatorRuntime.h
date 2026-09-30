@@ -64,6 +64,10 @@ enum class BackendCallKind : uint8_t {
   NONE                = 0,  // no raw tick target exists yet — see the file comment above
   ENABLE_TORQUE       = 1,
   WRITE_GOAL_POSITION = 2,
+  // The LF V25 RAM TorqueLimit, a fixed LOWERING value (ServoBus::
+  // kReviewedRamTorqueLimit). Carries no target and no value: the command
+  // cannot choose one.
+  WRITE_CALIBRATION_TORQUE_LIMIT = 3,
 };
 
 BackendCallKind backendCallFor(ActuatorOperation operation);
@@ -99,6 +103,10 @@ class ActuatorBackend {
   // policy-checked MotionProfile of the command (see REJECT_MOTION_PROFILE).
   virtual BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick,
                                                 MotionProfile profile) = 0;
+
+  // RAM TorqueLimit := the one compiled calibration value (LF V25
+  // TORQUE_LIMIT = 500), verified by readback. No argument selects a value.
+  virtual BackendWriteOutcome writeCalibrationTorqueLimit(uint8_t bus_id) = 0;
 };
 
 enum class ExecuteResult : uint8_t {

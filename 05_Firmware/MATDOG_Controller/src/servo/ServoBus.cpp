@@ -202,6 +202,63 @@ ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick,
   return classifyServoWriteVerify(goal_readback, static_cast<int32_t>(target_tick));
 }
 
+ServoWriteVerifyResult ServoBus::writeReviewedRamTorqueLimit(int id) {
+  if (id < 0 || id > 253) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
+
+  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+  // RAM register 48 (SRAM, read/write); never the EEPROM Max Torque.
+  st_.writeWord(static_cast<uint8_t>(id), SMS_STS_TORQUE_LIMIT_L, kReviewedRamTorqueLimit);
+
+  // Independent readback is the sole verdict - see ServoWriteVerifyResult.
+  const int torque_limit_readback =
+      st_.readWord(static_cast<uint8_t>(id), SMS_STS_TORQUE_LIMIT_L);
+  last_detected_ = (torque_limit_readback < 0) ? core::DetectedState::NO_RESPONSE
+                                               : core::DetectedState::ONLINE;
+  return classifyServoWriteVerify(torque_limit_readback,
+                                  static_cast<int32_t>(kReviewedRamTorqueLimit));
+}
+
+bool ServoBus::readControlFeedback(int id, ControlFeedbackSnapshot* out) {
+  if (id < 0 || id > 253 || out == nullptr) return false;
+  *out = ControlFeedbackSnapshot{};
+
+  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+
+  // Block 1: SMS_STS_TORQUE_ENABLE (40) .. SMS_STS_TORQUE_LIMIT_H (49).
+  uint8_t control[SMS_STS_TORQUE_LIMIT_H - SMS_STS_TORQUE_ENABLE + 1] = {0};
+  if (st_.Read(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE, control, sizeof(control)) !=
+      static_cast<int>(sizeof(control))) {
+    last_detected_ = core::DetectedState::NO_RESPONSE;
+    return false;
+  }
+  // Block 2: SMS_STS_PRESENT_POSITION_L (56) .. SMS_STS_PRESENT_CURRENT_H (70).
+  uint8_t feedback[SMS_STS_PRESENT_CURRENT_H - SMS_STS_PRESENT_POSITION_L + 1] = {0};
+  if (st_.Read(static_cast<uint8_t>(id), SMS_STS_PRESENT_POSITION_L, feedback,
+               sizeof(feedback)) != static_cast<int>(sizeof(feedback))) {
+    last_detected_ = core::DetectedState::NO_RESPONSE;
+    return false;
+  }
+  last_detected_ = core::DetectedState::ONLINE;
+
+  // SMS_STS is little-endian (End = 0): low byte first.
+  auto le16 = [](const uint8_t* block, int offset) {
+    return static_cast<int>(block[offset]) | (static_cast<int>(block[offset + 1]) << 8);
+  };
+  const int c0 = SMS_STS_TORQUE_ENABLE;
+  const int f0 = SMS_STS_PRESENT_POSITION_L;
+  out->torque_enable = control[SMS_STS_TORQUE_ENABLE - c0];
+  out->goal_position = le16(control, SMS_STS_GOAL_POSITION_L - c0);
+  out->torque_limit = le16(control, SMS_STS_TORQUE_LIMIT_L - c0);
+  out->present_position = le16(feedback, SMS_STS_PRESENT_POSITION_L - f0);
+  out->present_speed = le16(feedback, SMS_STS_PRESENT_SPEED_L - f0);
+  out->present_load = le16(feedback, SMS_STS_PRESENT_LOAD_L - f0);
+  out->present_voltage = feedback[SMS_STS_PRESENT_VOLTAGE - f0];
+  out->present_temperature = feedback[SMS_STS_PRESENT_TEMPERATURE - f0];
+  out->status = feedback[kServoStatusRegister - f0];
+  out->present_current = le16(feedback, SMS_STS_PRESENT_CURRENT_L - f0);
+  return true;
+}
+
 bool ServoBus::readRuntimeState(int id, RuntimeState* out) {
   if (id < 0 || id > 253 || out == nullptr) return false;
 

@@ -7,9 +7,10 @@ namespace calibration {
 
 namespace {
 
-// Fixed order for every loop and every export line.
-const JointKind kJointOrder[] = {JointKind::UPPER, JointKind::HIP, JointKind::LOWER};
+// Fixed order for every loop and every export line: the V25 measurement order.
+const JointKind kJointOrder[] = {JointKind::UPPER, JointKind::LOWER, JointKind::HIP};
 constexpr uint8_t kJointOrderCount = 3;
+const ContactSide kSideOrder[] = {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE};
 
 const FullLegJointRef& planJoint(const FullLegPlan& plan, JointKind kind) {
   switch (kind) {
@@ -26,40 +27,48 @@ bool contextComplete(const FullLegFinalizeContext& c) {
          c.arbiter != nullptr;
 }
 
-bool contactMatches(const ContactEvidence& evidence, Leg leg, ContactSide side) {
-  return evidence.has_measurement && evidence.key.leg == leg &&
-         evidence.key.joint == JointKind::UPPER && evidence.key.side == side;
+bool contactMatches(const ContactEvidence& evidence, Leg leg, JointKind joint, ContactSide side) {
+  return evidence.has_measurement && evidence.key.leg == leg && evidence.key.joint == joint &&
+         evidence.key.side == side;
 }
 
 // The session cause is coarse metadata for @CALIBRATION STATUS. The record's
 // executor_failure and failure fields are the precise account.
-CalibrationFailure sessionCauseFor(FullLegFinalizeFailure failure,
-                                   FullLegCalibrationFailure executor_failure) {
+CalibrationFailure sessionCauseFor(FullLegFinalizeFailure failure, FullLegFailure executor_failure) {
   switch (failure) {
     case FullLegFinalizeFailure::EXECUTOR_FAILED:
       switch (executor_failure) {
-        case FullLegCalibrationFailure::UPPER_MIN_PROBE_FAILED:
-        case FullLegCalibrationFailure::UPPER_MAX_PROBE_FAILED:
-          return CalibrationFailure::CONTACT_WITNESS_REJECTED;
-        case FullLegCalibrationFailure::AUX_MOVE_STALE_TELEMETRY:
-        case FullLegCalibrationFailure::AUX_MOVE_COMMUNICATION_LOST:
+        case FullLegFailure::HARD_CURRENT_ABORT:
+          return CalibrationFailure::HARD_CURRENT_ABORT;
+        case FullLegFailure::STALE_TELEMETRY:
           return CalibrationFailure::TELEMETRY_STALE;
-        case FullLegCalibrationFailure::AUX_MOVE_TIMEOUT:
+        case FullLegFailure::MOVE_TIMEOUT:
           return CalibrationFailure::MOTION_TIMEOUT;
-        case FullLegCalibrationFailure::AUX_MOVE_STALLED:
-          return CalibrationFailure::EARLY_STALL;
-        case FullLegCalibrationFailure::OPERATOR_ABORT:
+        case FullLegFailure::HELD_JOINT_DRIFT:
+        case FullLegFailure::HELD_JOINT_SPEED:
+        case FullLegFailure::PASSIVE_JOINT_MOVED:
+        case FullLegFailure::BYSTANDER_MOVED:
+          return CalibrationFailure::STATIC_JOINT_MOVED;
+        case FullLegFailure::UPPER_MIN_PROBE_FAILED:
+        case FullLegFailure::UPPER_MAX_PROBE_FAILED:
+        case FullLegFailure::LOWER_MIN_PROBE_FAILED:
+        case FullLegFailure::LOWER_MAX_PROBE_FAILED:
+        case FullLegFailure::HIP_MIN_PROBE_FAILED:
+        case FullLegFailure::HIP_MAX_PROBE_FAILED:
+          return CalibrationFailure::CONTACT_WITNESS_REJECTED;
+        case FullLegFailure::DIAGNOSTICS_REJECTED:
+          return CalibrationFailure::AFFINE_GATE_REJECTED;
+        case FullLegFailure::OPERATOR_ABORT:
           return CalibrationFailure::OPERATOR_ABORT;
         default:
           return CalibrationFailure::AUTHORITY_LOST;
       }
     case FullLegFinalizeFailure::CONTACT_EVIDENCE_MALFORMED:
-    case FullLegFinalizeFailure::MIN_CONTACT_REJECTED:
-    case FullLegFinalizeFailure::MAX_CONTACT_REJECTED:
+    case FullLegFinalizeFailure::CONTACTS_INCOMPLETE:
+    case FullLegFinalizeFailure::CONTACT_REJECTED:
       return CalibrationFailure::CONTACT_WITNESS_REJECTED;
-    case FullLegFinalizeFailure::UPPER_ENVELOPE_NOT_READY:
-    case FullLegFinalizeFailure::HIP_ENVELOPE_NOT_READY:
-    case FullLegFinalizeFailure::LOWER_ENVELOPE_NOT_READY:
+    case FullLegFinalizeFailure::DIAGNOSTICS_REJECTED:
+    case FullLegFinalizeFailure::ENVELOPE_NOT_READY:
     case FullLegFinalizeFailure::LIMIT_ADMISSION_REJECTED:
     case FullLegFinalizeFailure::LIMIT_VERIFY_FAILED:
       return CalibrationFailure::AFFINE_GATE_REJECTED;
@@ -75,24 +84,29 @@ void fillStatic(const FullLegFinalizeContext& context, const FullLegPlan& plan,
   record->session_id = outcome.session_id_at_start;
   record->geometry = outcome.geometry_at_start;
   record->executor_failure = outcome.failure;
-  record->auxiliary_required = plan.request.auxiliary_required;
-  if (plan.request.auxiliary_required) {
-    record->auxiliary_leg = plan.request.auxiliary_joint.leg;
-    record->auxiliary_joint = plan.request.auxiliary_joint.joint;
-    record->auxiliary_bus_id = plan.request.auxiliary_bus_id;
-    record->auxiliary_park_target_urad = plan.request.auxiliary_park_target_urad;
+  record->executor_failed_phase = outcome.failed_phase;
+  record->has_rear_park = plan.request.has_rear_park;
+  if (plan.request.has_rear_park) {
+    record->park_leg = plan.request.park.identity.leg;
+    record->park_joint = plan.request.park.identity.joint;
+    record->park_bus_id = plan.request.park.bus_id;
+    record->park_target_urad = plan.request.park_target_urad;
   }
   record->parameters_approved = context.parameters.approved;
-  record->upper_margin_ticks = context.parameters.upper_margin_ticks;
-  record->hip_lower_margin_urad = context.parameters.hip_lower_margin_urad;
-  record->min_contact = outcome.min_contact;
-  record->max_contact = outcome.max_contact;
+  record->contact_margin_ticks = context.parameters.contact_margin_ticks;
+  record->contacts_expected = kFullLegContactsExpected;
+  record->contacts_measured = outcome.contacts_measured;
+  record->diagnostics_accepted = outcome.diagnostics_accepted;
 
   for (uint8_t i = 0; i < kJointOrderCount; ++i) {
     const JointKind kind = kJointOrder[i];
+    const uint8_t k = static_cast<uint8_t>(kind);
     FullLegJointRecord& joint = record->joint(kind);
     joint.identity = planJoint(plan, kind).identity;
     joint.bus_id = planJoint(plan, kind).bus_id;
+    joint.contact[0] = outcome.contacts[k][0];
+    joint.contact[1] = outcome.contacts[k][1];
+    joint.diagnostics = outcome.diagnostics[k];
     if (context.policy != nullptr) {
       const actuator::JointTransform* transform =
           context.policy->transforms().find(joint.identity, context.policy->currentGeometryTag());
@@ -107,7 +121,7 @@ void fillStatic(const FullLegFinalizeContext& context, const FullLegPlan& plan,
   }
 }
 
-// Steps 3-6. Returns the first refusal, or NONE with the session COMPLETED.
+// Steps 3-7. Returns the first refusal, or NONE with the session COMPLETED.
 FullLegFinalizeFailure runLifecycle(const FullLegFinalizeContext& context, const FullLegPlan& plan,
                                     const FullLegRunOutcome& outcome, FullLegRecord* record) {
   CalibrationManager& manager = *context.manager;
@@ -122,62 +136,59 @@ FullLegFinalizeFailure runLifecycle(const FullLegFinalizeContext& context, const
   }
   if (session.state != SessionState::ACTIVE) return FullLegFinalizeFailure::SESSION_NOT_ACTIVE;
 
-  // --- 3. the two contacts, each recorded exactly once ---------------------
-  if (!contactMatches(outcome.min_contact, plan.leg, ContactSide::MIN_SIDE) ||
-      !contactMatches(outcome.max_contact, plan.leg, ContactSide::MAX_SIDE)) {
-    return FullLegFinalizeFailure::CONTACT_EVIDENCE_MALFORMED;
+  // --- 3. six contacts, each for this leg's exact (joint, side) ------------
+  uint8_t measured = 0;
+  for (uint8_t i = 0; i < kJointOrderCount; ++i) {
+    for (const ContactSide side : kSideOrder) {
+      const JointKind kind = kJointOrder[i];
+      const ContactEvidence& e =
+          outcome.contacts[static_cast<uint8_t>(kind)][static_cast<uint8_t>(side)];
+      if (!e.has_measurement) continue;
+      if (!contactMatches(e, plan.leg, kind, side)) {
+        return FullLegFinalizeFailure::CONTACT_EVIDENCE_MALFORMED;
+      }
+      ++measured;
+    }
   }
-  if (!manager.recordContact(outcome.min_contact)) return FullLegFinalizeFailure::MIN_CONTACT_REJECTED;
-  record->min_recorded = true;
-  if (!manager.recordContact(outcome.max_contact)) return FullLegFinalizeFailure::MAX_CONTACT_REJECTED;
-  record->max_recorded = true;
+  if (measured != kFullLegContactsExpected || outcome.contacts_measured != kFullLegContactsExpected) {
+    return FullLegFinalizeFailure::CONTACTS_INCOMPLETE;
+  }
+  if (!outcome.diagnostics_accepted) return FullLegFinalizeFailure::DIAGNOSTICS_REJECTED;
+  for (uint8_t i = 0; i < kJointOrderCount; ++i) {
+    if (!outcome.diagnostics[static_cast<uint8_t>(kJointOrder[i])].accepted) {
+      return FullLegFinalizeFailure::DIAGNOSTICS_REJECTED;
+    }
+  }
 
-  // --- 4. envelopes --------------------------------------------------------
-  const actuator::GeometryProvenanceTag current = policy.currentGeometryTag();
-  FullLegJointRecord& upper = record->joint(JointKind::UPPER);
-  {
+  // --- 4. record all six, each exactly once --------------------------------
+  for (uint8_t i = 0; i < kJointOrderCount; ++i) {
+    FullLegJointRecord& joint = record->joint(kJointOrder[i]);
+    for (uint8_t s = 0; s < kContactSideCount; ++s) {
+      if (!manager.recordContact(joint.contact[s])) return FullLegFinalizeFailure::CONTACT_REJECTED;
+      joint.contact_recorded[s] = true;
+      ++record->contacts_accepted;
+    }
+  }
+
+  // --- 5. envelopes, each from its own two contacts --------------------------
+  for (uint8_t i = 0; i < kJointOrderCount; ++i) {
+    FullLegJointRecord& joint = record->joint(kJointOrder[i]);
     actuator::ContactDerivedEnvelopeRequest request{};
-    request.joint = upper.identity;
-    request.min_side_evidence = outcome.min_contact;
-    request.max_side_evidence = outcome.max_contact;
+    request.joint = joint.identity;
+    request.min_side_evidence = joint.contact[0];
+    request.max_side_evidence = joint.contact[1];
     request.min_side_geometry = outcome.geometry_at_start;
     request.max_side_geometry = outcome.geometry_at_start;
-    request.safety_margin_ticks = context.parameters.upper_margin_ticks;
-    upper.envelope_status = actuator::buildContactDerivedEnvelope(
-        *context.geometry, *context.expected_provenance, request, &upper.envelope);
-  }
-
-  FullLegFinalizeFailure envelope_failure = FullLegFinalizeFailure::NONE;
-  if (upper.envelope_status != actuator::EnvelopeBuildStatus::READY) {
-    envelope_failure = FullLegFinalizeFailure::UPPER_ENVELOPE_NOT_READY;
-  }
-  for (uint8_t i = 1; i < kJointOrderCount; ++i) {  // HIP, LOWER
-    const JointKind kind = kJointOrder[i];
-    FullLegJointRecord& joint = record->joint(kind);
-    const actuator::JointTransform* transform = policy.transforms().find(joint.identity, current);
-    const actuator::GeometryJointRecord* geometry_joint = context.geometry->findJoint(joint.identity);
-    if (transform == nullptr) {
-      joint.envelope_status = actuator::EnvelopeBuildStatus::REJECT_NO_TRANSFORM;
-    } else if (geometry_joint == nullptr) {
-      joint.envelope_status = actuator::EnvelopeBuildStatus::REJECT_UNKNOWN_JOINT;
-    } else {
-      actuator::GeometryDerivedEnvelopeRequest request{};
-      request.joint = joint.identity;
-      request.required_min_urad = geometry_joint->urdf_lower;
-      request.required_max_urad = geometry_joint->urdf_upper;
-      request.safety_margin_urad = context.parameters.hip_lower_margin_urad;
-      joint.envelope_status = actuator::buildGeometryDerivedEnvelope(
-          *context.geometry, *context.expected_provenance, *transform, request, &joint.envelope);
-    }
-    if (context.parameters.approved && joint.envelope_status != actuator::EnvelopeBuildStatus::READY &&
-        envelope_failure == FullLegFinalizeFailure::NONE) {
-      envelope_failure = (kind == JointKind::HIP) ? FullLegFinalizeFailure::HIP_ENVELOPE_NOT_READY
-                                                  : FullLegFinalizeFailure::LOWER_ENVELOPE_NOT_READY;
+    request.safety_margin_ticks = context.parameters.contact_margin_ticks;
+    joint.envelope_status = actuator::buildContactDerivedEnvelope(
+        *context.geometry, *context.expected_provenance, request, &joint.envelope);
+    if (joint.envelope_status != actuator::EnvelopeBuildStatus::READY) {
+      return FullLegFinalizeFailure::ENVELOPE_NOT_READY;
     }
   }
-  if (envelope_failure != FullLegFinalizeFailure::NONE) return envelope_failure;
 
-  // --- 5. limits -----------------------------------------------------------
+  // --- 6. limits -------------------------------------------------------------
+  const actuator::GeometryProvenanceTag current = policy.currentGeometryTag();
   if (!context.parameters.approved) {
     // A placeholder envelope is reported, never offered to the policy.
     for (uint8_t i = 0; i < kJointOrderCount; ++i) {
@@ -224,8 +235,11 @@ FullLegFinalizeFailure runLifecycle(const FullLegFinalizeContext& context, const
     }
   }
 
-  // --- 6. session close ----------------------------------------------------
-  if (!manager.noteExecutionPhase(CalibrationPhase::TORQUE_OFF)) {
+  // --- 7. session close --------------------------------------------------------
+  // The executor reported every phase live; TORQUE_OFF is its last one, and a
+  // repeat of it is legal only if it has not been reported yet.
+  if (manager.status().last_reported_phase != CalibrationPhase::TORQUE_OFF &&
+      !manager.noteExecutionPhase(CalibrationPhase::TORQUE_OFF)) {
     return FullLegFinalizeFailure::PHASE_REPORT_REJECTED;
   }
   if (!manager.completeSession()) return FullLegFinalizeFailure::SESSION_COMPLETE_REJECTED;
@@ -237,8 +251,7 @@ FullLegFinalizeFailure runLifecycle(const FullLegFinalizeContext& context, const
 FullLegEnvelopeParameters productionEnvelopeParameters() {
   FullLegEnvelopeParameters parameters{};
   parameters.approved = kFullLegOperationalParametersApproved;
-  parameters.upper_margin_ticks = kFullLegPlaceholderUpperMarginTicks;
-  parameters.hip_lower_margin_urad = kFullLegPlaceholderHipLowerMarginUrad;
+  parameters.contact_margin_ticks = kFullLegPlaceholderContactMarginTicks;
   return parameters;
 }
 
@@ -246,13 +259,19 @@ FullLegRunOutcome outcomeFromExecutor(const FullLegCalibrationExecutor& executor
                                       actuator::GeometryProvenanceTag geometry_at_start,
                                       uint32_t session_id_at_start) {
   FullLegRunOutcome outcome{};
-  const FullLegCalibrationPhase phase = executor.status().phase;
-  outcome.terminal = phase == FullLegCalibrationPhase::COMPLETE ||
-                     phase == FullLegCalibrationPhase::FAILED;
-  outcome.complete = phase == FullLegCalibrationPhase::COMPLETE;
+  const FullLegStep step = executor.status().step;
+  outcome.terminal = step == FullLegStep::COMPLETE || step == FullLegStep::FAILED;
+  outcome.complete = step == FullLegStep::COMPLETE;
   outcome.failure = executor.status().failure;
-  outcome.min_contact = executor.minSideEvidence();
-  outcome.max_contact = executor.maxSideEvidence();
+  outcome.failed_phase = executor.status().failed_phase;
+  outcome.contacts_measured = executor.status().contacts_accepted;
+  for (uint8_t k = 0; k < kJointKindCount; ++k) {
+    for (uint8_t s = 0; s < kContactSideCount; ++s) {
+      outcome.contacts[k][s] = executor.contact(static_cast<JointKind>(k), static_cast<ContactSide>(s));
+    }
+    outcome.diagnostics[k] = executor.diagnostics(static_cast<JointKind>(k));
+  }
+  outcome.diagnostics_accepted = executor.diagnosticsAccepted();
   outcome.geometry_at_start = geometry_at_start;
   outcome.session_id_at_start = session_id_at_start;
   return outcome;
@@ -265,9 +284,7 @@ FullLegFinalizeFailure finalizeFullLeg(const FullLegFinalizeContext& context,
   *record = FullLegRecord{};
   record->leg = plan.leg;
 
-  // Not terminal: the executor is still moving hardware. Touch nothing; the
-  // caller has a bug, and a permit revoked here would only trade that bug for
-  // a mid-motion dynamic-prerequisite loss.
+  // Not terminal: the executor is still moving hardware. Touch nothing.
   if (!outcome.terminal) {
     record->failure = FullLegFinalizeFailure::RUN_NOT_TERMINAL;
     return record->failure;
@@ -285,7 +302,7 @@ FullLegFinalizeFailure finalizeFullLeg(const FullLegFinalizeContext& context,
                       session.leg == plan.leg && session.origin == CalibrationOrigin::LIVE_SESSION;
     if (failure != FullLegFinalizeFailure::NONE && session_is_ours && context.manager->sessionLive()) {
       if (failure == FullLegFinalizeFailure::EXECUTOR_FAILED &&
-          outcome.failure == FullLegCalibrationFailure::OPERATOR_ABORT) {
+          outcome.failure == FullLegFailure::OPERATOR_ABORT) {
         context.manager->abortSession();
       } else {
         context.manager->failSession(sessionCauseFor(failure, outcome.failure));
@@ -293,11 +310,11 @@ FullLegFinalizeFailure finalizeFullLeg(const FullLegFinalizeContext& context,
     }
   }
 
-  // --- 7. permit and operator authorization go on every path ---------------
+  // --- 8. permit and operator authorization go on every path -----------------
   if (context.permit != nullptr) context.permit->revoke(CalibrationPermitRevokeReason::EXPLICIT);
   if (context.authorization != nullptr) context.authorization->revoke();
 
-  // --- 8. post-conditions --------------------------------------------------
+  // --- 9. post-conditions ------------------------------------------------------
   if (context.manager != nullptr) {
     record->session_completed = session_is_ours && context.manager->status().state == SessionState::COMPLETED;
   }
@@ -318,8 +335,12 @@ FullLegFinalizeFailure finalizeFullLeg(const FullLegFinalizeContext& context,
   }
 
   record->failure = failure;
-  if (failure != FullLegFinalizeFailure::NONE) {
+  // 6/6 recorded contacts or nothing: a failed finalization reports none accepted.
+  if (failure != FullLegFinalizeFailure::NONE || record->contacts_accepted != kFullLegContactsExpected) {
     record->verdict = FullLegVerdict::FAILED;
+    record->contacts_accepted = 0;
+    if (failure == FullLegFinalizeFailure::NONE) failure = FullLegFinalizeFailure::CONTACTS_INCOMPLETE;
+    record->failure = failure;
     return failure;
   }
 
@@ -364,7 +385,12 @@ uint8_t FullLegEvidenceStore::legsPresent() const {
 
 uint8_t FullLegEvidenceStore::legsContactCalibrated() const {
   uint8_t n = 0;
-  for (uint8_t i = 0; i < kLegCount; ++i) n += records_[i].hardware_contact_calibrated ? 1 : 0;
+  for (uint8_t i = 0; i < kLegCount; ++i) {
+    n += (records_[i].hardware_contact_calibrated &&
+          records_[i].contacts_accepted == kFullLegContactsExpected)
+             ? 1
+             : 0;
+  }
   return n;
 }
 
@@ -374,13 +400,25 @@ uint8_t FullLegEvidenceStore::legsEnvelopeAccepted() const {
   return n;
 }
 
+uint8_t FullLegEvidenceStore::totalContactsAccepted() const {
+  uint8_t n = 0;
+  for (uint8_t i = 0; i < kLegCount; ++i) {
+    if (records_[i].present && records_[i].hardware_contact_calibrated) {
+      n = static_cast<uint8_t>(n + records_[i].contacts_accepted);
+    }
+  }
+  return n;
+}
+
 // ---------------------------------------------------------------------------
 // Export
 // ---------------------------------------------------------------------------
 
 namespace {
 
-constexpr size_t kLineBytes = 384;
+// Every line below stays well under this with the LONGEST enum names
+// (host-tested); snprintf would otherwise truncate a line silently.
+constexpr size_t kLineBytes = 512;
 
 void tagHex(actuator::GeometryProvenanceTag tag, char* out, size_t out_size) {
   snprintf(out, out_size, "%08lx%08lx", static_cast<unsigned long>(tag >> 32),
@@ -404,10 +442,12 @@ void exportFullLegEvidence(const FullLegEvidenceStore& store,
 
   tagHex(current_geometry, hex, sizeof hex);
   snprintf(line, sizeof line,
-           "CALIBRATION_EVIDENCE_EXPORT=BEGIN format=1 geometry=%s parameters_approved=%u "
-           "upper_margin_ticks=%u hip_lower_margin_urad=%ld",
-           hex, parameters.approved ? 1u : 0u, static_cast<unsigned>(parameters.upper_margin_ticks),
-           static_cast<long>(parameters.hip_lower_margin_urad));
+           "CALIBRATION_EVIDENCE_EXPORT=BEGIN format=2 geometry=%s parameters_approved=%u "
+           "contact_margin_ticks=%u contacts_per_leg=%u total_contacts_expected=%u",
+           hex, parameters.approved ? 1u : 0u,
+           static_cast<unsigned>(parameters.contact_margin_ticks),
+           static_cast<unsigned>(kFullLegContactsExpected),
+           static_cast<unsigned>(kFullCalibrationContactsExpected));
   sink(user, line);
 
   const Leg legs[] = {Leg::LF, Leg::RF, Leg::RH, Leg::LH};
@@ -416,8 +456,10 @@ void exportFullLegEvidence(const FullLegEvidenceStore& store,
     const FullLegRecord* record = store.find(leg);
     if (record == nullptr) {
       snprintf(line, sizeof line,
-               "CALIBRATION_EVIDENCE_LEG leg=%s present=0 attempts=0 verdict=%s", toString(leg),
-               toString(FullLegVerdict::NOT_RUN));
+               "CALIBRATION_EVIDENCE_LEG leg=%s present=0 attempts=0 verdict=%s "
+               "contacts_expected=%u contacts_accepted=0",
+               toString(leg), toString(FullLegVerdict::NOT_RUN),
+               static_cast<unsigned>(kFullLegContactsExpected));
       sink(user, line);
       continue;
     }
@@ -425,26 +467,36 @@ void exportFullLegEvidence(const FullLegEvidenceStore& store,
     tagHex(record->geometry, hex, sizeof hex);
     snprintf(line, sizeof line,
              "CALIBRATION_EVIDENCE_LEG leg=%s present=1 attempts=%u session=%lu geometry=%s "
-             "verdict=%s contact_calibrated=%u envelope_accepted=%u failure=%s executor_failure=%s "
-             "session_completed=%u permit_revoked=%u authority_released=%u parameters_approved=%u",
+             "verdict=%s contacts_expected=%u contacts_measured=%u contacts_accepted=%u "
+             "diagnostics_accepted=%u contact_calibrated=%u envelope_accepted=%u",
              toString(leg), static_cast<unsigned>(record->attempts),
              static_cast<unsigned long>(record->session_id), hex, toString(record->verdict),
+             static_cast<unsigned>(record->contacts_expected),
+             static_cast<unsigned>(record->contacts_measured),
+             static_cast<unsigned>(record->contacts_accepted),
+             record->diagnostics_accepted ? 1u : 0u,
              record->hardware_contact_calibrated ? 1u : 0u,
-             record->operational_envelope_accepted ? 1u : 0u, toString(record->failure),
-             toString(record->executor_failure), record->session_completed ? 1u : 0u,
-             record->permit_revoked ? 1u : 0u, record->authority_released ? 1u : 0u,
-             record->parameters_approved ? 1u : 0u);
+             record->operational_envelope_accepted ? 1u : 0u);
+    sink(user, line);
+    snprintf(line, sizeof line,
+             "CALIBRATION_EVIDENCE_LEG_CLOSE leg=%s failure=%s executor_failure=%s failed_phase=%s "
+             "session_completed=%u permit_revoked=%u authority_released=%u parameters_approved=%u",
+             toString(leg), toString(record->failure), toString(record->executor_failure),
+             record->executor_failure == FullLegFailure::NONE ? "-"
+                                                              : toString(record->executor_failed_phase),
+             record->session_completed ? 1u : 0u, record->permit_revoked ? 1u : 0u,
+             record->authority_released ? 1u : 0u, record->parameters_approved ? 1u : 0u);
     sink(user, line);
 
-    if (record->auxiliary_required) {
+    if (record->has_rear_park) {
       snprintf(line, sizeof line,
-               "CALIBRATION_EVIDENCE_AUX leg=%s required=1 aux_leg=%s aux_joint=%s aux_bus=%u "
+               "CALIBRATION_EVIDENCE_PARK leg=%s required=1 park_leg=%s park_joint=%s park_bus=%u "
                "park_target_urad=%ld",
-               toString(leg), toString(record->auxiliary_leg), toString(record->auxiliary_joint),
-               static_cast<unsigned>(record->auxiliary_bus_id),
-               static_cast<long>(record->auxiliary_park_target_urad));
+               toString(leg), toString(record->park_leg), toString(record->park_joint),
+               static_cast<unsigned>(record->park_bus_id),
+               static_cast<long>(record->park_target_urad));
     } else {
-      snprintf(line, sizeof line, "CALIBRATION_EVIDENCE_AUX leg=%s required=0", toString(leg));
+      snprintf(line, sizeof line, "CALIBRATION_EVIDENCE_PARK leg=%s required=0", toString(leg));
     }
     sink(user, line);
 
@@ -462,19 +514,34 @@ void exportFullLegEvidence(const FullLegEvidenceStore& store,
       sink(user, line);
     }
 
-    for (uint8_t si = 0; si < 2; ++si) {
-      const bool is_min = si == 0;
-      const ContactEvidence& c = is_min ? record->min_contact : record->max_contact;
-      const bool recorded = is_min ? record->min_recorded : record->max_recorded;
+    for (uint8_t ji = 0; ji < kJointOrderCount; ++ji) {
+      const JointKind kind = kJointOrder[ji];
+      const FullLegJointRecord& joint = record->joint(kind);
+      for (uint8_t si = 0; si < kContactSideCount; ++si) {
+        const ContactEvidence& c = joint.contact[si];
+        snprintf(line, sizeof line,
+                 "CALIBRATION_EVIDENCE_CONTACT leg=%s joint=%s side=%s recorded=%u measured=%u "
+                 "detection=%s state=%s origin=%s pass1_tick=%u pass2_tick=%u "
+                 "repeatability_ticks=%u witness_accepted=%u",
+                 toString(leg), toString(kind), si == 0 ? "MIN" : "MAX",
+                 joint.contact_recorded[si] ? 1u : 0u, c.has_measurement ? 1u : 0u,
+                 toString(c.detection), toString(c.state), toString(c.origin),
+                 static_cast<unsigned>(c.coarse_tick), static_cast<unsigned>(c.fine_tick_1),
+                 static_cast<unsigned>(c.repeatability_ticks), c.witness.accepted() ? 1u : 0u);
+        sink(user, line);
+      }
+      const FullLegJointDiagnostics& d = joint.diagnostics;
       snprintf(line, sizeof line,
-               "CALIBRATION_EVIDENCE_CONTACT leg=%s joint=UPPER side=%s recorded=%u measured=%u "
-               "detection=%s state=%s origin=%s coarse_tick=%u fine_tick_1=%u fine_tick_2=%u "
-               "repeatability_ticks=%u witness_accepted=%u",
-               toString(leg), is_min ? "MIN" : "MAX", recorded ? 1u : 0u,
-               c.has_measurement ? 1u : 0u, toString(c.detection), toString(c.state),
-               toString(c.origin), static_cast<unsigned>(c.coarse_tick),
-               static_cast<unsigned>(c.fine_tick_1), static_cast<unsigned>(c.fine_tick_2),
-               static_cast<unsigned>(c.repeatability_ticks), c.witness.accepted() ? 1u : 0u);
+               "CALIBRATION_EVIDENCE_DIAG leg=%s joint=%s evaluated=%u min_contact=%u max_contact=%u "
+               "ordered=%u span=%u/%u scale_permille=%u affine_q0=%u q0_shift=%u "
+               "fixed_disagreement=%u accepted=%u",
+               toString(leg), toString(kind), d.evaluated ? 1u : 0u,
+               static_cast<unsigned>(d.min_contact_tick), static_cast<unsigned>(d.max_contact_tick),
+               d.ordered ? 1u : 0u, static_cast<unsigned>(d.measured_span_ticks),
+               static_cast<unsigned>(d.expected_span_ticks), static_cast<unsigned>(d.scale_permille),
+               static_cast<unsigned>(d.affine_zero_tick),
+               static_cast<unsigned>(d.affine_shift_from_q0_ticks),
+               static_cast<unsigned>(d.fixed_endpoint_disagreement_ticks), d.accepted ? 1u : 0u);
       sink(user, line);
     }
 
@@ -501,10 +568,13 @@ void exportFullLegEvidence(const FullLegEvidenceStore& store,
 
   snprintf(line, sizeof line,
            "CALIBRATION_EVIDENCE_EXPORT=END legs_present=%u legs_contact_calibrated=%u "
-           "legs_envelope_accepted=%u all_contact_calibrated=%u",
+           "legs_envelope_accepted=%u total_contacts_expected=%u total_contacts_accepted=%u "
+           "all_contact_calibrated=%u",
            static_cast<unsigned>(store.legsPresent()),
            static_cast<unsigned>(store.legsContactCalibrated()),
            static_cast<unsigned>(store.legsEnvelopeAccepted()),
+           static_cast<unsigned>(kFullCalibrationContactsExpected),
+           static_cast<unsigned>(store.totalContactsAccepted()),
            store.allLegsContactCalibrated() ? 1u : 0u);
   sink(user, line);
 }
@@ -539,11 +609,10 @@ const char* toString(FullLegFinalizeFailure failure) {
     case FullLegFinalizeFailure::SESSION_NOT_ACTIVE:           return "SESSION_NOT_ACTIVE";
     case FullLegFinalizeFailure::SESSION_MISMATCH:             return "SESSION_MISMATCH";
     case FullLegFinalizeFailure::CONTACT_EVIDENCE_MALFORMED:   return "CONTACT_EVIDENCE_MALFORMED";
-    case FullLegFinalizeFailure::MIN_CONTACT_REJECTED:         return "MIN_CONTACT_REJECTED";
-    case FullLegFinalizeFailure::MAX_CONTACT_REJECTED:         return "MAX_CONTACT_REJECTED";
-    case FullLegFinalizeFailure::UPPER_ENVELOPE_NOT_READY:     return "UPPER_ENVELOPE_NOT_READY";
-    case FullLegFinalizeFailure::HIP_ENVELOPE_NOT_READY:       return "HIP_ENVELOPE_NOT_READY";
-    case FullLegFinalizeFailure::LOWER_ENVELOPE_NOT_READY:     return "LOWER_ENVELOPE_NOT_READY";
+    case FullLegFinalizeFailure::CONTACTS_INCOMPLETE:          return "CONTACTS_INCOMPLETE";
+    case FullLegFinalizeFailure::DIAGNOSTICS_REJECTED:         return "DIAGNOSTICS_REJECTED";
+    case FullLegFinalizeFailure::CONTACT_REJECTED:             return "CONTACT_REJECTED";
+    case FullLegFinalizeFailure::ENVELOPE_NOT_READY:           return "ENVELOPE_NOT_READY";
     case FullLegFinalizeFailure::LIMIT_ADMISSION_REJECTED:     return "LIMIT_ADMISSION_REJECTED";
     case FullLegFinalizeFailure::LIMIT_VERIFY_FAILED:          return "LIMIT_VERIFY_FAILED";
     case FullLegFinalizeFailure::PHASE_REPORT_REJECTED:        return "PHASE_REPORT_REJECTED";

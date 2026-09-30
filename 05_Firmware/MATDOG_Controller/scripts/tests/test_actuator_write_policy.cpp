@@ -993,7 +993,7 @@ static void test_safe_off_is_not_expressible_through_this_layer() {
   // safety de-escalation on authority, mode, limits or a transaction. The
   // ungated path stays ServoBus::safeOff(), which static_audit.py keeps free of
   // any reference to authority or to this layer.
-  CHECK_EQ(kActuatorOperationCount, 6);
+  CHECK_EQ(kActuatorOperationCount, 8);
 
   int command_operations = 0;
   for (uint8_t raw = 0; raw < kActuatorOperationCount; ++raw) {
@@ -1007,7 +1007,7 @@ static void test_safe_off_is_not_expressible_through_this_layer() {
     CHECK(std::strstr(name, "TORQUE_OFF") == nullptr);
     CHECK(std::strstr(name, "DISABLE") == nullptr);
   }
-  CHECK_EQ(command_operations, 5);
+  CHECK_EQ(command_operations, 7);
 
   // TORQUE_ENABLE means APPLY torque and carries no target that could encode
   // "off": the operations that carry a target are the position-class ones.
@@ -1016,6 +1016,10 @@ static void test_safe_off_is_not_expressible_through_this_layer() {
   CHECK(operationNeedsTarget(ActuatorOperation::CALIBRATION_CONTACT_PROBE));
   CHECK(operationNeedsTarget(ActuatorOperation::DIRECTION_VERIFY));
   CHECK(operationNeedsTarget(ActuatorOperation::CALIBRATION_AUXILIARY_MOVE));
+  CHECK(operationNeedsTarget(ActuatorOperation::CALIBRATION_SEQUENCE_MOVE));
+  // The RAM TorqueLimit write carries no value at all: the backend writes the
+  // one compiled calibration limit, so it cannot encode "off" either.
+  CHECK(!operationNeedsTarget(ActuatorOperation::CALIBRATION_TORQUE_LIMIT));
   CHECK(!operationNeedsTarget(ActuatorOperation::NONE));
 
   // The three authorisation routes are mutually exclusive: no operation can
@@ -1102,13 +1106,13 @@ static void test_tostring_is_total() {
   }
   CHECK(std::strcmp(toString(static_cast<ActuatorOperation>(99)), "UNKNOWN") == 0);
 
-  for (uint8_t raw = 0; raw <= (uint8_t)WriteDecision::REJECT_MOTION_PROFILE;
+  for (uint8_t raw = 0; raw <= (uint8_t)WriteDecision::REJECT_SEQUENCE_PREREQUISITES;
        ++raw) {
     CHECK(std::strcmp(toString(static_cast<WriteDecision>(raw)), "UNKNOWN") != 0);
   }
   CHECK(std::strcmp(toString(static_cast<WriteDecision>(99)), "UNKNOWN") == 0);
   CHECK(std::strcmp(toString(static_cast<WriteDecision>(
-                        (uint8_t)WriteDecision::REJECT_MOTION_PROFILE + 1)),
+                        (uint8_t)WriteDecision::REJECT_SEQUENCE_PREREQUISITES + 1)),
                     "UNKNOWN") == 0);
 
   for (uint8_t raw = 0; raw <= (uint8_t)TransactionState::ABORTED; ++raw) {

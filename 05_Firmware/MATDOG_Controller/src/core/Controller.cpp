@@ -84,6 +84,10 @@ void Controller::begin() {
   actuator_backend_.begin(&servo_bus_);
   actuator_policy_.begin(&authority_);
   actuator_policy_.bindGeometry(&geometry_profile_, &actuator::geometry_data::kProvenance);
+  // The geometry-validated 24-contact Full Calibration sequence plan
+  // (CalibrationSequencePlan.h). Usable only while it matches the bound
+  // model; binding it authorises nothing without a live session + permit.
+  actuator_policy_.bindSequencePlan(&actuator::sequence_plan_data::kPlan);
   actuator_runtime_.begin(&actuator_policy_, &actuator_backend_);
   calibration_execution_.begin(&actuator_policy_, &actuator_runtime_, &geometry_profile_,
                                &actuator::geometry_data::kProvenance);
@@ -116,25 +120,22 @@ void Controller::begin() {
     first_motion_.begin(&actuator_policy_, &actuator_runtime_, &geometry_profile_,
                         &actuator::geometry_data::kProvenance, first_motion_config);
 
-    // Full Leg Calibration, 2026-09-29 staged endpoint search (LF V25
-    // oracle): the probe's steps are monitored inside ContactProbeEngine by
-    // V25's own settle window and contact detector. The two remaining long moves - the 96-tick backoff and
-    // the auxiliary park - run at the V25 calibration speed (160) with V25's
-    // figures: a travel-aware budget at its conservative
+    // 24-contact Full Calibration (LF V25 generalized): the probe's steps are
+    // monitored inside ContactProbeEngine by V25's own settle window and
+    // contact detector, and every prerequisite / recovery / return move by
+    // the executor's own V25 StableTargetGate. The one remaining deadman-
+    // monitored move is the 96-tick backoff, at the V25 calibration speed
+    // (160) with V25's figures: a travel-aware budget at its conservative
     // MIN_EXPECTED_MOTION_TICKS_PER_SECOND (80) on top of the same 12 s, and
-    // arrival within STATIC_TOLERANCE + 2 = 12 ticks (backoff) /
-    // STATIC_TOLERANCE = 10 ticks (park): a position-controlled ST3215
-    // settles a few ticks short of its goal (observed 4-5 on LF_UPPER), which
-    // the 4-tick DIRECTION_VERIFY tolerance above would misread as a stall.
-    actuator::MotionDeadmanConfig full_leg_move = deadman;
-    full_leg_move.nominal_travel_ticks_per_s = calibration::kSearchMinExpectedTicksPerSecond;
-    actuator::MotionDeadmanConfig full_leg_backoff = full_leg_move;
+    // arrival within STATIC_TOLERANCE + 2 = 12 ticks - a position-controlled
+    // ST3215 settles a few ticks short of its goal (observed 4-5 on
+    // LF_UPPER), which the 4-tick DIRECTION_VERIFY tolerance above would
+    // misread as a stall.
+    actuator::MotionDeadmanConfig full_leg_backoff = deadman;
+    full_leg_backoff.nominal_travel_ticks_per_s = calibration::kSearchMinExpectedTicksPerSecond;
     full_leg_backoff.arrival_tolerance_ticks = calibration::kSearchStaticToleranceTicks + 2;
-    actuator::MotionDeadmanConfig full_leg_park = full_leg_move;
-    full_leg_park.arrival_tolerance_ticks = calibration::kSearchStaticToleranceTicks;
     calibration::FullLegCalibrationConfig full_leg_config{};
     full_leg_config.probe_backoff_deadman = full_leg_backoff;
-    full_leg_config.aux_move_deadman = full_leg_park;
     full_leg_calibration_.begin(&actuator_policy_, &actuator_runtime_, &calibration_execution_,
                                &geometry_profile_, &actuator::geometry_data::kProvenance,
                                full_leg_config);
@@ -349,19 +350,20 @@ void Controller::updateCalibrationMotionPermit() {
   // operation without an active permit BEFORE this budget is ever
   // consulted, so threading it through unconditionally cannot widen access.
   ctx.direction_verify_tick_budget = motion_authorization_.direction_verify_tick_budget;
-  // Mirrors full_leg_calibration_.auxiliaryParked() exactly: true for the
-  // ONE tick window (the MAX-side probe) where the compiled <leg>_UPPER:MAX
-  // plan requires the named auxiliary already parked — false before and
-  // after, and always false for a leg whose MAX endpoint needs no auxiliary
-  // (a NOT_NEEDED plan must be validated with nothing parked). The endpoint
-  // named is the one the running request probes, read from the executor
-  // itself. See SafeActuatorPolicy::evaluateEndpointPlan() for how these four
-  // fields are consumed; unconditionally threading them through cannot widen
-  // access for the same reason the tick budget above cannot.
-  ctx.auxiliary_parked = full_leg_calibration_.auxiliaryParked();
-  ctx.parked_leg = full_leg_calibration_.endpointLeg();
-  ctx.parked_joint = full_leg_calibration_.endpointJoint();
-  ctx.parked_side = calibration::ContactSide::MAX_SIDE;
+  // The 24-contact Full Calibration sequence in flight, read from its
+  // executor: which leg, which V25 phase, and whether that phase's held
+  // prerequisites are verified. SafeActuatorPolicy authorises every sequence
+  // move and sequence probe against exactly these facts and its own copy of
+  // the geometry-validated sequence plan (evaluateSequenceOperation /
+  // evaluateSequenceProbe). Threading them through unconditionally cannot
+  // widen access: every CALIBRATION-owned write already needs a live session
+  // and an active permit before any of them is consulted. The V5 auxiliary
+  // window is never open: no production path parks outside the sequence.
+  ctx.auxiliary_parked = false;
+  ctx.sequence_active = full_leg_calibration_.sequenceActive();
+  ctx.sequence_leg = full_leg_calibration_.leg();
+  ctx.sequence_phase = full_leg_calibration_.sequencePhase();
+  ctx.sequence_prerequisites_verified = full_leg_calibration_.prerequisitesVerified();
   actuator_policy_.setBootstrapContext(ctx);
 }
 
@@ -443,35 +445,23 @@ void Controller::updateFirstMotion(uint32_t now_ms) {
   }
 }
 
-// CR3 continuation. Same contract as updateFirstMotion(), generalized to two
-// buses: full_leg_calibration_ never touches ServoBus itself (no reference
-// to it exists — see FullLegCalibrationExecutor.h), so this is the one place
-// its decisions turn into real bus transactions, including the two
-// independent, ungated ServoBus::safeOff() calls its two SAFE_OFF-servicing
-// phases wait on.
+// The 24-contact Full Calibration sequence. full_leg_calibration_ never
+// touches ServoBus itself (no reference to it exists - see
+// FullLegCalibrationExecutor.h), so this is the one place its decisions turn
+// into real bus transactions:
+//   1  calibration telemetry for every bus the executor names (the joint it
+//      moves/probes, EVERY held joint, one round-robin bystander);
+//   2  update(): at most one policy-gated backend write;
+//   3  the phase it is now in, reported to the session in V25 order (a
+//      refusal fails the run - the order is the oracle's, not a suggestion);
+//   4  the independent, ungated ServoBus::safeOff() for every bus it names,
+//      POST-update, so a failure this very tick is made safe this very tick;
+//      each result is handed to the NEXT update() and never reused after it.
 void Controller::updateFullLegCalibration(uint32_t now_ms) {
-  if (!full_leg_calibration_.active()) return;
-
-  // Read BEFORE this tick's update() call: whether the executor was already
-  // waiting on one or both SAFE_OFF confirmations coming into this tick, and
-  // therefore whether a cached VERIFIED_OFF from a PRIOR tick is still valid
-  // evidence to hand it as this call's primary/auxiliary_safe_off_verified
-  // input. A phase that was not yet waiting cannot have valid evidence, so
-  // its cached result is cleared first - the same "never reuse a past
-  // VERIFIED_OFF for a new requirement" rule updateFirstMotion() applies.
-  const bool was_primary_pending = full_leg_calibration_.primarySafeOffPending();
-  const bool was_auxiliary_pending = full_leg_calibration_.auxiliarySafeOffPending();
-  if (!was_primary_pending) {
-    full_leg_primary_safe_off_result_ = servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
+  if (!full_leg_calibration_.active()) {
+    full_leg_safe_off_frame_ = calibration::FullLegSafeOffFrame{};
+    return;
   }
-  if (!was_auxiliary_pending) {
-    full_leg_auxiliary_safe_off_result_ = servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
-  }
-  const bool primary_verified =
-      was_primary_pending && full_leg_primary_safe_off_result_ == servo::SafeOffResult::VERIFIED_OFF;
-  const bool auxiliary_verified =
-      was_auxiliary_pending &&
-      full_leg_auxiliary_safe_off_result_ == servo::SafeOffResult::VERIFIED_OFF;
 
   calibration::FullLegCalibrationContext context{};
   context.session_active = calibration_.sessionLive();
@@ -483,57 +473,88 @@ void Controller::updateFullLegCalibration(uint32_t now_ms) {
   context.authority_generation = authority_.generation();
   context.authority_inhibited = authority_.inhibited();
 
-  // Telemetry is read from whichever bus the CURRENT (pre-update) phase is
-  // actually monitoring - the auxiliary while it is being parked, the
-  // primary (probed) joint at every other point, including both
-  // ContactProbeEngine phases and both SAFE_OFF-servicing waits (harmless
-  // there: the executor ignores the sample outside a monitoring phase,
-  // exactly like FirstMotionExecutor does).
-  const bool aux_phase =
-      full_leg_calibration_.status().phase == calibration::FullLegCalibrationPhase::AUX_MOVE_PENDING ||
-      full_leg_calibration_.status().phase ==
-          calibration::FullLegCalibrationPhase::AUX_MOVE_MONITORING;
-  const uint8_t telemetry_bus_id = aux_phase ? full_leg_calibration_.auxiliaryBusId()
-                                             : full_leg_calibration_.primaryBusId();
-  servo::ServoBus::RuntimeState state{};
-  const bool read_ok = servo_bus_.readRuntimeState(telemetry_bus_id, &state);
-  actuator::TelemetrySample sample{};
-  sample.read_ok = read_ok;
-  sample.sampled_at_ms = now_ms;
-  if (read_ok) {
-    sample.present_position = state.present_position;
-    sample.torque_enable = state.torque_enable;
-    sample.present_speed = state.present_speed;
-    sample.present_current = state.present_current;
-    sample.present_temperature = state.present_temperature;
+  // 1 - telemetry (two block reads per bus: the V25 per-observation readback).
+  uint8_t buses[calibration::kFullLegMaxTelemetry] = {0};
+  const uint8_t n = full_leg_calibration_.telemetryRequest(buses, calibration::kFullLegMaxTelemetry);
+  calibration::FullLegTelemetryFrame frame{};
+  for (uint8_t i = 0; i < n; ++i) {
+    servo::ServoBus::ControlFeedbackSnapshot t{};
+    actuator::TelemetrySample sample{};
+    sample.read_ok = servo_bus_.readControlFeedback(buses[i], &t);
+    sample.sampled_at_ms = now_ms;
+    if (sample.read_ok) {
+      sample.present_position = t.present_position;
+      sample.torque_enable = t.torque_enable;
+      sample.present_speed = t.present_speed;
+      sample.present_current = t.present_current;
+      sample.present_temperature = t.present_temperature;
+      sample.goal_position = t.goal_position;
+      sample.torque_limit = t.torque_limit;
+      sample.servo_status = t.status;
+    }
+    frame.add(buses[i], sample);
   }
 
-  // At most one state-machine advance / backend write per tick. If this call
-  // reaches a SAFE_OFF-servicing phase (including transitioning into one
-  // just now), do NOT return: the independent SAFE_OFF forcing below runs in
-  // this SAME Controller tick, exactly like updateFirstMotion().
-  full_leg_calibration_.update(context, now_ms, /*telemetry_available=*/true, sample,
-                               primary_verified, auxiliary_verified);
+  // 2 - at most one backend write.
+  full_leg_calibration_.update(context, now_ms, frame, full_leg_safe_off_frame_);
+
+  // 3 - the V25 phase order, recorded by the session itself. A recovery-only
+  // run is not a leg calibration: it reports no phase (so the leg run that
+  // follows in the same session starts its report at PREFLIGHT), and is
+  // closed by printInitialRecoveryResult() instead of a finalization.
+  if (full_leg_calibration_.request().recovery_only) {
+    recovery_result_pending_ = true;
+  } else {
+    if (full_leg_run_.session_id_at_start != full_leg_reported_session_) {
+      full_leg_reported_session_ = full_leg_run_.session_id_at_start;
+      full_leg_phase_changes_seen_ = 0;
+    }
+    if (full_leg_calibration_.status().phase_changes != full_leg_phase_changes_seen_) {
+      full_leg_phase_changes_seen_ = full_leg_calibration_.status().phase_changes;
+      if (!calibration_.noteExecutionPhase(full_leg_calibration_.status().phase)) {
+        full_leg_calibration_.phaseReportRejected();
+      }
+    }
+  }
+  printFullLegSequenceEvent();
   printFullLegSearchEvent();
 
-  // SAFE_OFF is deliberately outside policy/session/authority/permit: forced
-  // every tick either phase is pending (POST-update, so a transition into a
-  // SAFE_OFF phase this very tick is still serviced this very tick), retried
-  // until VERIFIED_OFF.
-  if (full_leg_calibration_.primarySafeOffPending()) {
-    full_leg_primary_safe_off_result_ =
-        servo_bus_.safeOff(full_leg_calibration_.primaryBusId());
+  // 4 - SAFE_OFF, outside policy/session/authority/permit, retried every tick
+  // until each bus reads back VERIFIED_OFF.
+  uint8_t off[calibration::kFullLegPopulation] = {0};
+  const uint8_t m = full_leg_calibration_.safeOffRequest(off, calibration::kFullLegPopulation);
+  full_leg_safe_off_frame_ = calibration::FullLegSafeOffFrame{};
+  for (uint8_t i = 0; i < m; ++i) {
+    full_leg_safe_off_frame_.add(off[i],
+                                 servo_bus_.safeOff(off[i]) == servo::SafeOffResult::VERIFIED_OFF);
   }
-  if (full_leg_calibration_.auxiliarySafeOffPending()) {
-    full_leg_auxiliary_safe_off_result_ =
-        servo_bus_.safeOff(full_leg_calibration_.auxiliaryBusId());
-  }
+}
+
+// One evidence line per sequence transition (phase / step / joint / held set
+// / contacts), so a hardware run shows every V25 stage. Print only.
+void Controller::printFullLegSequenceEvent() {
+  const calibration::FullLegCalibrationStatus& s = full_leg_calibration_.status();
+  const uint32_t key = (static_cast<uint32_t>(s.phase) << 24) | (static_cast<uint32_t>(s.step) << 16) |
+                       (static_cast<uint32_t>(s.op_bus) << 8) |
+                       (static_cast<uint32_t>(s.held_count) << 4) | s.contacts_accepted;
+  if (key == sequence_event_key_ && s.phase_changes == sequence_event_changes_) return;
+  sequence_event_key_ = key;
+  sequence_event_changes_ = s.phase_changes;
+  Serial.printf("CALIBRATION_SEQUENCE leg=%s phase=%s step=%s joint=%s bus=%u target=%u held=%u "
+                "contacts=%u/%u recovered=%u prerequisites=%s failure=%s\n",
+                calibration::toString(full_leg_calibration_.leg()), calibration::toString(s.phase),
+                calibration::toString(s.step), calibration::toString(s.op_joint),
+                (unsigned)s.op_bus, (unsigned)s.op_target_tick, (unsigned)s.held_count,
+                (unsigned)s.contacts_accepted, (unsigned)calibration::kFullLegContactCount,
+                (unsigned)s.recovered_joints,
+                full_leg_calibration_.prerequisitesVerified() ? "VERIFIED" : "NO",
+                calibration::toString(s.failure));
 }
 
 // One unsolicited evidence line per search step / probe state change, so a
 // hardware run shows every stage (transit, fine search, contact, backoff,
-// second pass) with its geometry and telemetry, not only the verdict. Print
-// only; reads status, never state it could change.
+// second pass, release) with its geometry and telemetry, not only the
+// verdict. Print only; reads status, never state it could change.
 void Controller::printFullLegSearchEvent() {
   const calibration::ContactProbeStatus& p = full_leg_calibration_.probeStatus();
   const uint8_t exec_phase = static_cast<uint8_t>(full_leg_calibration_.status().phase);
@@ -548,16 +569,18 @@ void Controller::printFullLegSearchEvent() {
   search_event_exec_phase_ = exec_phase;
   search_event_pass_ = p.pass;
   search_event_bypass_ = p.plateau_bypass_count;
+  if (p.phase == calibration::ContactProbePhase::IDLE) return;
 
   const calibration::ContactProbeRequest& r = full_leg_calibration_.probeRequest();
   const actuator::CalibrationSearchCorridor& c = r.corridor;
   const long beyond_contact = c.valid() ? static_cast<long>(actuator::searchDepth(c, p.target_tick) -
                                                             actuator::searchDepth(c, c.contact_tick))
                                         : 0L;
-  Serial.printf("CALIBRATION_SEARCH exec=%s side=%s pass=%u stage=%s probe=%s target=%u "
+  Serial.printf("CALIBRATION_SEARCH exec=%s joint=%s side=%s pass=%u stage=%s probe=%s target=%u "
                 "pos=%ld beyond_contact=%ld contact=%u entry=%u guard=%u speed=%ld current=%ld "
                 "baseline=%u/%u steps=%u bypass=%u p1=%u p2=%u failure=%s\n",
                 calibration::toString(full_leg_calibration_.status().phase),
+                calibration::toString(r.endpoint_joint),
                 r.endpoint_side == calibration::ContactSide::MIN_SIDE ? "MIN" : "MAX",
                 (unsigned)p.pass, calibration::toString(p.stage), calibration::toString(p.phase),
                 (unsigned)p.target_tick, (long)p.last_position, beyond_contact,
@@ -578,10 +601,26 @@ void Controller::printFullLegSearchEvent() {
 // already re-checks, so cleanup between legs is finished before the next
 // command line is processed.
 void Controller::updateFullLegFinalization() {
+  if (recovery_result_pending_ && !full_leg_calibration_.active() &&
+      full_leg_calibration_.request().recovery_only) {
+    // The terminal line of @CALIBRATION INITIAL RECOVERY, printed once. PASS
+    // only when the executor COMPLETEd: all twelve actively recovered, each
+    // SAFE_OFF verified, all twelve verified at q0 torque-off.
+    recovery_result_pending_ = false;
+    const calibration::FullLegCalibrationStatus& s = full_leg_calibration_.status();
+    const bool pass = s.step == calibration::FullLegStep::COMPLETE;
+    Serial.printf("CALIBRATION_INITIAL_RECOVERY_RESULT verdict=%s recovered=%u/%u failure=%s "
+                  "failed_phase=%s last_decision=%s\n",
+                  pass ? "PASS" : "FAILED", (unsigned)s.recovered_joints,
+                  (unsigned)full_leg_calibration_.request().population_count,
+                  calibration::toString(s.failure),
+                  s.failure == calibration::FullLegFailure::NONE ? "-"
+                                                                 : calibration::toString(s.failed_phase),
+                  actuator::toString(s.last_policy_decision));
+  }
   if (!full_leg_run_.armed) return;
-  const calibration::FullLegCalibrationPhase phase = full_leg_calibration_.status().phase;
-  if (phase != calibration::FullLegCalibrationPhase::COMPLETE &&
-      phase != calibration::FullLegCalibrationPhase::FAILED) {
+  const calibration::FullLegStep step = full_leg_calibration_.status().step;
+  if (step != calibration::FullLegStep::COMPLETE && step != calibration::FullLegStep::FAILED) {
     return;
   }
 
@@ -605,22 +644,27 @@ void Controller::updateFullLegFinalization() {
   full_leg_run_.clear();
 
   // Printed BEFORE the terminal RESULT record so a host that stops reading at
-  // RESULT still has the probe-level cause of any UPPER_*_PROBE_FAILED.
+  // RESULT still has the probe-level cause of any *_PROBE_FAILED.
   const calibration::ContactProbeStatus& probe = full_leg_calibration_.probeStatus();
-  const actuator::CalibrationSearchCorridor& corridor = full_leg_calibration_.probeRequest().corridor;
-  Serial.printf("CALIBRATION_FULL_LEG_PROBE_FINAL leg=%s side=%s executor_failure=%s "
-                "probe_phase=%s probe_failure=%s pass=%u stage=%s target=%u pos=%ld "
-                "contact=%u guard=%u p1=%u p2=%u bypass=%u steps=%u\n",
-                calibration::toString(record.leg),
-                full_leg_calibration_.probeRequest().endpoint_side ==
-                        calibration::ContactSide::MIN_SIDE ? "MIN" : "MAX",
+  const calibration::ContactProbeRequest& pr = full_leg_calibration_.probeRequest();
+  Serial.printf("CALIBRATION_FULL_LEG_PROBE_FINAL leg=%s joint=%s side=%s executor_failure=%s "
+                "failed_phase=%s probe_phase=%s probe_failure=%s pass=%u stage=%s target=%u "
+                "pos=%ld contact=%u guard=%u p1=%u p2=%u bypass=%u steps=%u\n",
+                calibration::toString(record.leg), calibration::toString(pr.endpoint_joint),
+                pr.endpoint_side == calibration::ContactSide::MIN_SIDE ? "MIN" : "MAX",
                 calibration::toString(full_leg_calibration_.status().failure),
+                calibration::toString(full_leg_calibration_.status().failed_phase),
                 calibration::toString(probe.phase), calibration::toString(probe.failure),
                 (unsigned)probe.pass, calibration::toString(probe.stage),
                 (unsigned)probe.target_tick, (long)probe.last_position,
-                (unsigned)corridor.contact_tick, (unsigned)corridor.guard_tick,
+                (unsigned)pr.corridor.contact_tick, (unsigned)pr.corridor.guard_tick,
                 (unsigned)probe.pass1_contact_tick, (unsigned)probe.pass2_contact_tick,
                 (unsigned)probe.plateau_bypass_count, (unsigned)probe.step_count);
+  Serial.printf("CALIBRATION_FULL_LEG_CONTACTS leg=%s expected=%u measured=%u accepted=%u "
+                "diagnostics_accepted=%s\n",
+                calibration::toString(record.leg), (unsigned)record.contacts_expected,
+                (unsigned)record.contacts_measured, (unsigned)record.contacts_accepted,
+                record.diagnostics_accepted ? "YES" : "NO");
   Serial.printf("CALIBRATION_FULL_LEG_RESULT leg=%s verdict=%s failure=%s\n",
                 calibration::toString(record.leg), calibration::toString(record.verdict),
                 calibration::toString(failure));

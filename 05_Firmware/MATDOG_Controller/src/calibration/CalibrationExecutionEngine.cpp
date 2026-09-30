@@ -11,6 +11,8 @@ actuator::ActuatorOperation operationForIntent(CalibrationIntent intent) {
       return actuator::ActuatorOperation::CALIBRATION_AUXILIARY_MOVE;
     case CalibrationIntent::DIRECTION_VERIFY:
       return actuator::ActuatorOperation::DIRECTION_VERIFY;
+    case CalibrationIntent::SEQUENCE_MOVE:
+      return actuator::ActuatorOperation::CALIBRATION_SEQUENCE_MOVE;
     // Categorically non-executing — see the file comment. Neither of these,
     // nor an unrecognised value, ever maps to something execute() can send.
     case CalibrationIntent::NONE:
@@ -99,17 +101,32 @@ CalibrationExecutionResult CalibrationExecutionEngine::execute(
   command.target_urad = request.target_urad;
   command.calibration_search = request.calibration_search;
   command.motion_profile = request.motion_profile;
+  command.sequence_move = request.sequence_move;
+  command.sequence_phase = request.sequence_phase;
 
-  // A search step belongs to CONTACT_PROBE alone; the policy refuses it
-  // anywhere else too, this just fails closed one layer earlier.
+  // A search step belongs to CONTACT_PROBE alone, a sequence move kind to
+  // SEQUENCE_MOVE alone; the policy refuses both anywhere else too, this just
+  // fails closed one layer earlier.
   if (request.calibration_search &&
       operation != actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE) {
     result.outcome = CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION;
     return result;
   }
+  if ((request.sequence_move != actuator::SequenceMoveKind::NONE) !=
+      (operation == actuator::ActuatorOperation::CALIBRATION_SEQUENCE_MOVE)) {
+    result.outcome = CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION;
+    return result;
+  }
 
   actuator::TargetResolveStatus resolve = actuator::TargetResolveStatus::REJECT_TRANSFORM;
-  if (operation == actuator::ActuatorOperation::DIRECTION_VERIFY) {
+  if (operation == actuator::ActuatorOperation::CALIBRATION_SEQUENCE_MOVE &&
+      request.sequence_move == actuator::SequenceMoveKind::PRIME_AT_PRESENT) {
+    // Already a raw tick (the present position); the policy bounds it to
+    // the joint's q0 neighbourhood.
+    command.target_tick = request.prime_tick;
+    resolve = request.prime_tick < 4096u ? actuator::TargetResolveStatus::OK
+                                         : actuator::TargetResolveStatus::REJECT_RAW_DOMAIN;
+  } else if (operation == actuator::ActuatorOperation::DIRECTION_VERIFY) {
     resolve = actuator::resolveDeltaFromQ0(
         *geometry_, *expected_provenance_, *transform,
         request.direction_verify_delta_ticks, &command.target_tick);
@@ -165,6 +182,7 @@ const char* toString(CalibrationIntent intent) {
     case CalibrationIntent::DIRECTION_VERIFY: return "DIRECTION_VERIFY";
     case CalibrationIntent::RESTORE:          return "RESTORE";
     case CalibrationIntent::ABORT:            return "ABORT";
+    case CalibrationIntent::SEQUENCE_MOVE:    return "SEQUENCE_MOVE";
   }
   return "UNKNOWN";
 }

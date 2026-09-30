@@ -140,6 +140,7 @@ Exit code 0 = PASS, 1 = FAIL.
 """
 import os
 import pathlib
+import json
 import re
 import subprocess
 import sys
@@ -373,16 +374,64 @@ def check_goal_position_register_boundary(files, sketch_dir):
 
 
 def check_servo_id_write(files):
-    # Any writeByte/writeWord call at all is suspicious in V0.1 — the module
-    # is read-only plus the single EnableTorque(id, 0) safety write, which
-    # goes through the library's own EnableTorque(), not a raw register write.
-    pattern = re.compile(r"\bwriteByte\(|\bwriteWord\(")
+    """No raw register write may exist in ServoBus EXCEPT the one reviewed RAM
+    TorqueLimit write of the 24-contact Full Calibration sequence (LF V25
+    prepare_motor(): TorqueLimit 500 before TorqueEnable). That one write:
+      - is the only writeWord() call, and no writeByte() call exists at all;
+      - lives inside ServoBus::writeReviewedRamTorqueLimit(int id);
+      - targets SMS_STS_TORQUE_LIMIT_L (RAM 48) - never EEPROM Max Torque, an
+        ID, an offset, a lock or any other register;
+      - writes the compile-time kReviewedRamTorqueLimit, pinned to exactly 500
+        and equal to the executor's kFullLegCalibrationTorqueLimit;
+      - is verified by an independent readWord() of the same register
+        through classifyServoWriteVerify()."""
     for path, code in files:
         if "ServoBus.cpp" not in str(path):
             continue
-        if pattern.search(code):
-            fail(f"{path}: raw writeByte/writeWord call found — V0.1 ServoBus must stay read-only "
-                 f"plus EnableTorque(id, 0) only")
+        if re.search(r"\bwriteByte\(", code):
+            fail(f"{path}: raw writeByte() call found - ServoBus has no reviewed byte write")
+        words = [m.start() for m in re.finditer(r"\bwriteWord\(", code)]
+        if len(words) != 1:
+            fail(f"{path}: exactly one raw writeWord() (the reviewed RAM TorqueLimit) may "
+                 f"exist in ServoBus, found {len(words)}")
+            continue
+        body = re.search(r"ServoWriteVerifyResult ServoBus::writeReviewedRamTorqueLimit\(int id\)"
+                         r"\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not body or not (body.start() <= words[0] <= body.end()):
+            fail(f"{path}: the one writeWord() is not inside "
+                 f"ServoBus::writeReviewedRamTorqueLimit(int id)")
+            continue
+        text = re.sub(r"\s+", " ", body.group(1))
+        for required in ("st_.writeWord(static_cast<uint8_t>(id), SMS_STS_TORQUE_LIMIT_L, "
+                         "kReviewedRamTorqueLimit);",
+                         "st_.readWord(static_cast<uint8_t>(id), SMS_STS_TORQUE_LIMIT_L);",
+                         "classifyServoWriteVerify(torque_limit_readback, "
+                         "static_cast<int32_t>(kReviewedRamTorqueLimit));",
+                         "if (id < 0 || id > 253) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;"):
+            if required not in text:
+                fail(f"{path}: writeReviewedRamTorqueLimit() lost {required!r}")
+        if re.search(r"\bst_\.Error\b", text):
+            fail(f"{path}: writeReviewedRamTorqueLimit() must decide by readback only")
+    by_name = {p.name: c for p, c in files}
+    header = re.sub(r"\s+", " ", by_name.get("ServoBus.h", ""))
+    if header.count("static constexpr uint16_t kReviewedRamTorqueLimit = 500;") != 1:
+        fail("ServoBus.h: kReviewedRamTorqueLimit must be exactly 500 (LF V25 TORQUE_LIMIT)")
+    if "ServoWriteVerifyResult writeReviewedRamTorqueLimit(int id);" not in header:
+        fail("ServoBus.h: writeReviewedRamTorqueLimit(int id) must take no value argument")
+    plan_h = re.sub(r"\s+", " ", by_name.get("FullLegCalibrationPlan.h", ""))
+    if plan_h.count("constexpr uint16_t kFullLegCalibrationTorqueLimit = 500;") != 1:
+        fail("FullLegCalibrationPlan.h: kFullLegCalibrationTorqueLimit must equal "
+             "ServoBus::kReviewedRamTorqueLimit (500)")
+    for path, code in files:
+        if "tests" in path.parts:
+            continue
+        if "SMS_STS_TORQUE_LIMIT" in code and path.name != "ServoBus.cpp":
+            fail(f"{path}: names SMS_STS_TORQUE_LIMIT - only ServoBus's reviewed write and "
+                 f"its readback may touch the TorqueLimit register")
+        if re.search(r"SMS_STS_MAX_TORQUE|SMS_STS_ID\b|unLockEprom|LockEprom", code) and \
+                path.name not in ("SMS_STS.h", "SMS_STS.cpp"):
+            if re.search(r"(writeWord|writeByte|genWrite)\s*\([^;]*(SMS_STS_MAX_TORQUE|SMS_STS_ID)", code):
+                fail(f"{path}: an EEPROM torque/ID write is expressible here")
 
 
 # The complete DALY transmit vocabulary. Each entry is re-verified below
@@ -1063,12 +1112,27 @@ def check_calibration_execution_engine_boundaries(files):
         if path.name not in ("CalibrationExecutionEngine.h", "CalibrationExecutionEngine.cpp"):
             continue
         for token in ("#include <Arduino.h>", "Serial.", "millis(", "ServoBus",
-                      "CalibrationPhase", "safeOff", "EnableTorque"):
+                      "safeOff", "EnableTorque"):
             if token in code:
                 fail(f"{path}: contains {token!r} - the Calibration Execution boundary must "
-                     f"stay host-linkable, must never reference the historical LF V25 18-phase "
-                     f"sequence as its architecture (V3 handoff Sec 15.11), and must never name "
-                     f"a torque-removal primitive (SAFE_OFF stays outside this layer)")
+                     f"stay host-linkable and must never name a torque-removal primitive "
+                     f"(SAFE_OFF stays outside this layer)")
+        # V3 Sec 15.11 as amended 2026-09-30: the V25 phase is the executor's;
+        # this layer may only DECLARE the pass-through label and FORWARD it.
+        flat = re.sub(r"\s+", " ", code)
+        allowed = {"CalibrationExecutionEngine.h":
+                       ["CalibrationPhase sequence_phase = CalibrationPhase::PREFLIGHT;"],
+                   "CalibrationExecutionEngine.cpp": []}[path.name]
+        for a in allowed:
+            flat = flat.replace(a, "", 1)
+        if "CalibrationPhase" in flat:
+            fail(f"{path}: names CalibrationPhase beyond the one pass-through declaration - "
+                 f"the execution engine must never sequence or branch on V25 phases")
+        if path.name == "CalibrationExecutionEngine.cpp":
+            uses = re.findall(r"sequence_phase", code)
+            if re.sub(r"\s+", " ", code).count("command.sequence_phase = request.sequence_phase;") != 1 \
+                    or len(uses) != 2:
+                fail(f"{path}: sequence_phase may only be forwarded, exactly once, into the command")
 
     # Same guarantee I4 enforces for ActuatorRuntime, applied to this class
     # directly: #include hides a transitive ActuatorRuntime reference from a
@@ -1383,8 +1447,12 @@ def check_calibration_search_boundaries(files):
              "if (command.motion_profile != MotionProfile::BOUNDED_DEFAULT && "
              "!(command.motion_profile == MotionProfile::CALIBRATION_SEARCH && "
              "(command.operation == ActuatorOperation::CALIBRATION_CONTACT_PROBE || "
-             "command.operation == ActuatorOperation::CALIBRATION_AUXILIARY_MOVE))) { return "
-             "WriteDecision::REJECT_MOTION_PROFILE; }")
+             "command.operation == ActuatorOperation::CALIBRATION_AUXILIARY_MOVE || "
+             "command.operation == ActuatorOperation::CALIBRATION_SEQUENCE_MOVE))) { return "
+             "WriteDecision::REJECT_MOTION_PROFILE; }",
+             "if (command.sequence_move != SequenceMoveKind::NONE && "
+             "command.operation != ActuatorOperation::CALIBRATION_SEQUENCE_MOVE) { return "
+             "WriteDecision::REJECT_SEQUENCE_TARGET; }")
     if not evaluate:
         fail(f"{path}: SafeActuatorPolicy::evaluate() not found")
     else:
@@ -1516,10 +1584,12 @@ def check_full_leg_calibration_wiring(files):
         return
     handle = normalize(handle_match.group(1))
 
-    if handle.count("matchLegCommand(") != 2:
-        fail(f"{router_path}: handleLine() must call matchLegCommand() exactly twice "
-             f"(SESSION START, FULL LEG); found {handle.count('matchLegCommand(')}")
-    for prefix in ("@CALIBRATION FULL LEG ", "@CALIBRATION SESSION START "):
+    if handle.count("matchLegCommand(") != 3:
+        fail(f"{router_path}: handleLine() must call matchLegCommand() exactly three times "
+             f"(SESSION START, INITIAL RECOVERY, FULL LEG); found "
+             f"{handle.count('matchLegCommand(')}")
+    for prefix in ("@CALIBRATION FULL LEG ", "@CALIBRATION SESSION START ",
+                   "@CALIBRATION INITIAL RECOVERY "):
         if handle.count(f'"{prefix}"') != 1:
             fail(f"{router_path}: the {prefix.strip()!r} prefix must appear exactly once "
                  f"in handleLine()")
@@ -1537,8 +1607,9 @@ def check_full_leg_calibration_wiring(files):
 
     session = branch('matchLegCommand(upper, "@CALIBRATION SESSION START "')
     full = branch('matchLegCommand(upper, "@CALIBRATION FULL LEG "')
-    if not session or not full:
-        fail(f"{router_path}: SESSION START / FULL LEG four-leg branches not found")
+    recovery = branch('matchLegCommand(upper, "@CALIBRATION INITIAL RECOVERY "')
+    if not session or not full or not recovery:
+        fail(f"{router_path}: SESSION START / INITIAL RECOVERY / FULL LEG branches not found")
         return
 
     # ---- SESSION START: cleanup gates between legs ------------------------
@@ -1555,34 +1626,72 @@ def check_full_leg_calibration_wiring(files):
         if token not in session:
             fail(f"{router_path}: SESSION START branch missing between-leg gate {token!r}")
 
-    # ---- FULL LEG ----------------------------------------------------------
-    for token in ("modules_.calibration->status().state != calibration::SessionState::ACTIVE",
-                  "modules_.calibration->status().leg != command_leg",
-                  "modules_.motion_permit->active()",
-                  "modules_.motion_authorization->operator_authorized",
-                  "modules_.motion_authorization->token.valid()",
-                  "modules_.first_motion->active() || modules_.full_leg_calibration->active()",
-                  "modules_.full_leg_run->armed",
-                  "calibration::resolveFullLegPlan(",
-                  "actuator::geometry_data::kProvenance",
-                  "modules_.actuator_policy->transforms(), command_leg, &plan",
-                  "plan_status != calibration::FullLegPlanStatus::OK",
-                  "context.session_active = modules_.calibration->sessionLive()",
-                  "context.motion_permit_active = modules_.motion_permit->active()",
-                  "context.authority = modules_.authority->current()",
-                  "context.authority_generation = modules_.authority->generation()",
-                  "context.authority_inhibited = modules_.authority->inhibited()",
-                  "modules_.full_leg_calibration->start(plan.request, context, millis())",
-                  "modules_.full_leg_run->arm(plan,"):
-        if token not in full:
-            fail(f"{router_path}: FULL LEG branch missing pinned token {token!r}")
+    # ---- FULL LEG and INITIAL RECOVERY: the same gates, the same resolver ----
+    shared = ("modules_.calibration->status().state != calibration::SessionState::ACTIVE",
+              "modules_.calibration->status().leg != command_leg",
+              "modules_.motion_permit->active()",
+              "modules_.motion_authorization->operator_authorized",
+              "modules_.motion_authorization->token.valid()",
+              "modules_.first_motion->active() || modules_.full_leg_calibration->active()",
+              "modules_.full_leg_run->armed",
+              "calibration::resolveFullLegPlan(",
+              "actuator::geometry_data::kProvenance",
+              "modules_.actuator_policy->transforms(), &actuator::sequence_plan_data::kPlan, "
+              "command_leg, &plan",
+              "plan_status != calibration::FullLegPlanStatus::OK",
+              "context.session_active = modules_.calibration->sessionLive()",
+              "context.motion_permit_active = modules_.motion_permit->active()",
+              "context.authority = modules_.authority->current()",
+              "context.authority_generation = modules_.authority->generation()",
+              "context.authority_inhibited = modules_.authority->inhibited()",
+              "modules_.full_leg_calibration->start(plan.request, context, millis())")
+    # Each refusal gate pinned as its WHOLE condition followed by a refusal and
+    # a return: a token that merely appears somewhere in the branch (the
+    # permit is also read into the context below) proves nothing.
+    gates = ("if (modules_.calibration->status().state != calibration::SessionState::ACTIVE || "
+             "modules_.calibration->status().leg != command_leg) {",
+             "if (!modules_.motion_permit->active() || "
+             "!modules_.motion_authorization->operator_authorized || "
+             "!modules_.motion_authorization->token.valid()) {",
+             "if (modules_.first_motion->active() || modules_.full_leg_calibration->active()) {",
+             "if (modules_.full_leg_run->armed) {",
+             "if (plan_status != calibration::FullLegPlanStatus::OK) {")
+    for name, text, refused in (("FULL LEG", full, "CALIBRATION_FULL_LEG=REFUSED"),
+                                ("INITIAL RECOVERY", recovery, "CALIBRATION_INITIAL_RECOVERY=REFUSED")):
+        for token in shared:
+            if token not in text:
+                fail(f"{router_path}: {name} branch missing pinned token {token!r}")
+        for gate in gates:
+            at = text.find(gate)
+            tail = text[at + len(gate):at + len(gate) + 200] if at >= 0 else ""
+            if at < 0 or not re.match(rf'\s*Serial\.println\("{refused}"\);.*?return;', tail):
+                fail(f"{router_path}: {name} branch missing pinned token {gate!r} "
+                     f"(the whole gate, refusing and returning)")
+    if "modules_.full_leg_run->arm(plan," not in full:
+        fail(f"{router_path}: FULL LEG branch missing pinned token 'modules_.full_leg_run->arm(plan,'")
+    if "recovery_only" in full:
+        fail(f"{router_path}: FULL LEG may not touch recovery_only - a Full Leg run always "
+             f"runs all six contacts")
+    # The recovery run is a recovery run and nothing else: flagged before start,
+    # never armed as a leg run, never finalized into the evidence store.
+    set_at = recovery.find("plan.request.recovery_only = true;")
+    rstart_at = recovery.find("modules_.full_leg_calibration->start(")
+    if set_at < 0 or rstart_at < 0 or set_at > rstart_at:
+        fail(f"{router_path}: INITIAL RECOVERY must set plan.request.recovery_only = true "
+             f"before start()")
+    if "full_leg_run->arm(" in recovery or "full_leg_evidence" in recovery:
+        fail(f"{router_path}: INITIAL RECOVERY may never arm or record a leg run")
+    if re.findall(r"((?:request|plan)\.[\w.]+)\s*=(?!=)", recovery) != ["plan.request.recovery_only"]:
+        fail(f"{router_path}: INITIAL RECOVERY may assign exactly one plan field "
+             f"(recovery_only = true); the rest comes whole from resolveFullLegPlan()")
     start_at = full.find("modules_.full_leg_calibration->start(")
     arm_at = full.find("modules_.full_leg_run->arm(")
     if start_at < 0 or arm_at < 0 or arm_at < start_at:
         fail(f"{router_path}: FULL LEG must arm the run record only AFTER the executor "
              f"accepted start()")
 
-    for name, text in (("SESSION START", session), ("FULL LEG", full)):
+    for name, text in (("SESSION START", session), ("FULL LEG", full),
+                       ("INITIAL RECOVERY", recovery)):
         for token in parsers:
             if token in text:
                 fail(f"{router_path}: {name} branch contains runtime parser {token!r}")
@@ -1606,9 +1715,10 @@ def check_full_leg_calibration_wiring(files):
         fail(f"{router_path}: SESSION START may not start an executor")
 
     starts = sum(code.count("modules_.full_leg_calibration->start(") for _, code in files)
-    if starts != 1:
-        fail(f"exactly one production full_leg_calibration->start() call is allowed; "
-             f"found {starts}")
+    if starts != 2 or full.count("modules_.full_leg_calibration->start(") != 1 or \
+            recovery.count("modules_.full_leg_calibration->start(") != 1:
+        fail(f"exactly two production full_leg_calibration->start() calls are allowed, one in "
+             f"FULL LEG and one in INITIAL RECOVERY; found {starts}")
 
     # ---- the plan resolver: canonical -> identity -> Geometry V5 ----------
     for token in ("legServoAt(", "semanticIdentityFromCanonical(", "findJoint(",
@@ -1628,15 +1738,24 @@ def check_full_leg_calibration_wiring(files):
         fail(f"{controller_path}: updateCalibrationMotionPermit() not found")
     else:
         body = permit_fn.group(1)
-        for token in ("ctx.parked_leg = full_leg_calibration_.endpointLeg()",
-                      "ctx.parked_joint = full_leg_calibration_.endpointJoint()",
-                      "ctx.parked_side = calibration::ContactSide::MAX_SIDE",
-                      "ctx.auxiliary_parked = full_leg_calibration_.auxiliaryParked()"):
+        # The sequence facts come from the executor, every tick; the V5
+        # auxiliary window is never open in production (no path parks outside
+        # the sequence plan).
+        for token in ("ctx.auxiliary_parked = false;",
+                      "ctx.sequence_active = full_leg_calibration_.sequenceActive();",
+                      "ctx.sequence_leg = full_leg_calibration_.leg();",
+                      "ctx.sequence_phase = full_leg_calibration_.sequencePhase();",
+                      "ctx.sequence_prerequisites_verified = "
+                      "full_leg_calibration_.prerequisitesVerified();"):
             if not contains_ws(body, token):
-                fail(f"{controller_path}: parked-endpoint context lost {token!r}")
-        if re.search(r"parked_leg\s*=\s*calibration::Leg::", body):
-            fail(f"{controller_path}: parked_leg is hard-coded; it must follow the "
-                 f"running request's endpoint")
+                fail(f"{controller_path}: sequence bootstrap context lost {token!r}")
+        for field in ("auxiliary_parked", "parked_leg", "parked_joint", "parked_side",
+                      "sequence_active", "sequence_leg", "sequence_phase",
+                      "sequence_prerequisites_verified"):
+            if len(re.findall(rf"ctx\.{field}\s*=", body)) > 1:
+                fail(f"{controller_path}: ctx.{field} is assigned more than once")
+        if re.search(r"ctx\.(parked_leg|parked_joint|parked_side)\s*=", body):
+            fail(f"{controller_path}: no production path may open the V5 auxiliary window")
 
     step_fn = re.search(r"void Controller::updateFullLegCalibration\(uint32_t now_ms\)\s*\{(.*?)\n\}",
                         controller, re.DOTALL)
@@ -1644,16 +1763,35 @@ def check_full_leg_calibration_wiring(files):
         fail(f"{controller_path}: updateFullLegCalibration() not found")
     else:
         body = normalize(step_fn.group(1))
-        safe_offs = re.findall(r"safeOff\(\s*([\w.]+\(\))\s*\)", body)
-        if safe_offs != ["full_leg_calibration_.primaryBusId()",
-                         "full_leg_calibration_.auxiliaryBusId()"]:
-            fail(f"{controller_path}: updateFullLegCalibration() must call safeOff() "
-                 f"exactly for primaryBusId() then auxiliaryBusId(), got {safe_offs}")
-        for token in ("if (full_leg_calibration_.primarySafeOffPending()) {",
-                      "if (full_leg_calibration_.auxiliarySafeOffPending()) {"):
-            if token not in body:
-                fail(f"{controller_path}: SAFE_OFF servicing lost its pending guard "
-                     f"{token!r}; an unneeded auxiliary must never be sent SAFE_OFF")
+        order = ("full_leg_calibration_.telemetryRequest(buses, calibration::kFullLegMaxTelemetry)",
+                 "servo_bus_.readControlFeedback(buses[i], &t)",
+                 "full_leg_calibration_.update(context, now_ms, frame, full_leg_safe_off_frame_);",
+                 "calibration_.noteExecutionPhase(full_leg_calibration_.status().phase)",
+                 "full_leg_calibration_.phaseReportRejected();",
+                 "full_leg_calibration_.safeOffRequest(off, calibration::kFullLegPopulation)",
+                 "full_leg_safe_off_frame_ = calibration::FullLegSafeOffFrame{}; "
+                 "for (uint8_t i = 0; i < m; ++i) {",
+                 "full_leg_safe_off_frame_.add(off[i], servo_bus_.safeOff(off[i]) == "
+                 "servo::SafeOffResult::VERIFIED_OFF);")
+        last = -1
+        for token in order:
+            at = body.find(token)
+            if at < 0:
+                fail(f"{controller_path}: updateFullLegCalibration() lost {token!r}")
+                break
+            if at < last:
+                fail(f"{controller_path}: updateFullLegCalibration() out of order at {token!r}: "
+                     f"telemetry -> one update -> phase report -> SAFE_OFF of exactly the "
+                     f"requested buses")
+            last = at
+        safe_offs = re.findall(r"safeOff\(\s*([^()]*)\)", body)
+        if safe_offs != ["off[i]"]:
+            fail(f"{controller_path}: updateFullLegCalibration() must call safeOff() only for "
+                 f"the buses safeOffRequest() names, got {safe_offs}")
+        # A recovery-only run reports no phase (the leg run after it must start
+        # its report at PREFLIGHT) - and ONLY a recovery-only run.
+        if body.count("if (full_leg_calibration_.request().recovery_only) {") != 1:
+            fail(f"{controller_path}: the phase report may be skipped only for a recovery-only run")
 
     final_fn = re.search(r"void Controller::updateFullLegFinalization\(\)\s*\{(.*?)\n\}",
                          controller, re.DOTALL)
@@ -1662,8 +1800,8 @@ def check_full_leg_calibration_wiring(files):
     else:
         body = normalize(final_fn.group(1))
         for token in ("if (!full_leg_run_.armed) return;",
-                      "FullLegCalibrationPhase::COMPLETE",
-                      "FullLegCalibrationPhase::FAILED",
+                      "calibration::FullLegStep::COMPLETE",
+                      "calibration::FullLegStep::FAILED",
                       "context.manager = &calibration_",
                       "context.policy = &actuator_policy_",
                       "context.geometry = &geometry_profile_",
@@ -1703,13 +1841,11 @@ def check_full_leg_calibration_wiring(files):
         fail(f"{controller_path}: Controller::begin() not found")
     else:
         body = normalize(begin_fn.group(1))
-        for token in ("full_leg_move.nominal_travel_ticks_per_s = "
+        for token in ("full_leg_backoff.nominal_travel_ticks_per_s = "
                       "calibration::kSearchMinExpectedTicksPerSecond;",
                       "full_leg_backoff.arrival_tolerance_ticks = "
                       "calibration::kSearchStaticToleranceTicks + 2;",
-                      "full_leg_park.arrival_tolerance_ticks = calibration::kSearchStaticToleranceTicks;",
-                      "full_leg_config.probe_backoff_deadman = full_leg_backoff;",
-                      "full_leg_config.aux_move_deadman = full_leg_park;"):
+                      "full_leg_config.probe_backoff_deadman = full_leg_backoff;"):
             if body.count(token) != 1:
                 fail(f"{controller_path}: the Full-Leg long-move deadman lost {token!r} "
                      f"(V25 travel-aware floor / settle tolerance)")
@@ -1731,8 +1867,33 @@ def check_full_leg_calibration_wiring(files):
             if token in code:
                 fail(f"{path}: the finalizer contains {token!r}; it is a pure decision "
                      f"unit that never touches the bus")
-    order = ("manager.recordContact(outcome.min_contact)",
-             "manager.recordContact(outcome.max_contact)",
+    # THE definition: 6 per leg, 24 in all; a leg below 6/6 is FAILED with 0
+    # accepted; the four-leg verdict needs 24/24.
+    for path, code, pinned in (
+            (fin_h_path, fin_h, "constexpr uint8_t kFullLegContactsExpected = kFullLegContactCount;"),
+            (fin_h_path, fin_h, "constexpr uint8_t kFullCalibrationContactsExpected = "
+                                "static_cast<uint8_t>(kLegCount * kFullLegContactsExpected);"),
+            (fin_h_path, fin_h, "return legsContactCalibrated() == kLegCount && "
+                                "totalContactsAccepted() == kFullCalibrationContactsExpected;"),
+            (fin_c_path, fin_c, "if (measured != kFullLegContactsExpected || "
+                                "outcome.contacts_measured != kFullLegContactsExpected) { return "
+                                "FullLegFinalizeFailure::CONTACTS_INCOMPLETE; }"),
+            (fin_c_path, fin_c, "if (failure != FullLegFinalizeFailure::NONE || "
+                                "record->contacts_accepted != kFullLegContactsExpected) { "
+                                "record->verdict = FullLegVerdict::FAILED; record->contacts_accepted = 0;"),
+            (fin_c_path, fin_c, "n += (records_[i].hardware_contact_calibrated && "
+                                "records_[i].contacts_accepted == kFullLegContactsExpected) ? 1 : 0;")):
+        if pinned not in normalize(code):
+            fail(f"{path}: the 24-contact definition lost {pinned!r}")
+    exec_h = normalize(by_name["FullLegCalibrationExecutor.h"][1])
+    if exec_h.count("constexpr uint8_t kFullLegContactCount = 6;") != 1:
+        fail("FullLegCalibrationExecutor.h: a leg is exactly 6 contacts (3 joints x MIN/MAX)")
+    if normalize(fin_c).count("manager.recordContact(joint.contact[s])") != 1 or \
+            "for (uint8_t i = 0; i < kJointOrderCount; ++i) { FullLegJointRecord& joint = " \
+            "record->joint(kJointOrder[i]); for (uint8_t s = 0; s < kContactSideCount; ++s) { if " \
+            "(!manager.recordContact(joint.contact[s]))" not in normalize(fin_c):
+        fail(f"{fin_c_path}: all six contacts (3 joints x MIN/MAX) must be recorded, each once")
+    order = ("manager.recordContact(joint.contact[s])",
              "actuator::buildContactDerivedEnvelope(",
              "policy.validateOperationalLimit(",
              "policy.admitOperationalLimit(",
@@ -1765,6 +1926,176 @@ def check_full_leg_calibration_wiring(files):
         if "admitOperationalLimit(" in code and path.name not in allowed:
             fail(f"{path}: admitOperationalLimit() may only be called from the "
                  f"policy units and FullLegCalibrationFinalizer.cpp")
+
+
+SEQUENCE_ARTIFACT_DIR = "09_Logs/Validation_Reports/Full_Calibration_Sequence_Geometry_2026-09-30"
+SEQUENCE_ARTIFACTS = ("lf", "rf", "rh", "lh")
+V25_PHASE_ORDER = ("PREFLIGHT", "INITIAL_RECOVERY", "PARKING", "UPPER_MIN", "UPPER_MAX",
+                   "UPPER_HORIZONTAL", "LOWER_MIN", "LOWER_MAX", "LOWER_FOLDED", "HIP_MIN",
+                   "HIP_MAX", "DIAGNOSTICS", "RETURN_HIP", "RETURN_LOWER_HELD", "RETURN_UPPER",
+                   "RESTORE_PARKING", "CLEANUP", "TORQUE_OFF")
+
+
+def check_full_calibration_sequence(files, sketch_dir):
+    """TRUE Full Calibration = 24 contacts: the LF V25 full-leg state machine
+    generalized to all four legs (FullLegCalibrationExecutor), pinned so it
+    can never quietly become a partial calibration again:
+      - the V25 constants the executor ported, each exactly its V25 value;
+      - nextPhase() walks exactly the V25 order, one phase per step;
+      - COMPLETE needs 6/6 contacts AND accepted diagnostics (a recovery-only
+        run needs all twelve joints recovered and no contact);
+      - INITIAL_RECOVERY commands EVERY joint (no "already at q0" shortcut)
+        and never moves a joint farther than the 64-tick prime reach;
+      - every probe's held set is exactly V25's prerequisites_for();
+      - CalibrationSequencePlanData.h is byte-identical to the exporter's
+        output from the committed geometry artifacts, all four collision-free
+        on the SHA-pinned URDF and meshes."""
+    by_name = {path.name: (path, code) for path, code in files}
+    normalize = lambda text: re.sub(r"\s+", " ", text)
+    for name in ("FullLegCalibrationExecutor.h", "FullLegCalibrationExecutor.cpp",
+                 "CalibrationSequencePlan.cpp", "CalibrationSequencePlanData.h"):
+        if name not in by_name:
+            fail(f"{name}: 24-contact sequence unit not found")
+            return
+    h_path, h = by_name["FullLegCalibrationExecutor.h"]
+    c_path, c = by_name["FullLegCalibrationExecutor.cpp"]
+    hn, cn = normalize(h), normalize(c)
+    v25 = {"kSequenceStaticToleranceTicks": ("uint16_t", 10),
+           "kSequenceSettleMaxSpeedRaw": ("uint16_t", 4),
+           "kSequenceSettledSamples": ("uint8_t", 4),
+           "kSequenceSettleWindowMs": ("uint32_t", 400),
+           "kSequencePassiveCorridorTicks": ("uint16_t", 32),
+           "kSequenceBystanderDriftTicks": ("uint16_t", 16),
+           "kSequenceRestToleranceTicks": ("uint16_t", 16),
+           "kSequenceMotionTimeoutMs": ("uint32_t", 12000),
+           "kSequenceMaxTelemetryAgeMs": ("uint32_t", 3000),
+           "kSequenceMinTicksPerSecond": ("uint16_t", 80),
+           "kAffineScaleMinPermille": ("uint16_t", 850),
+           "kAffineScaleMaxPermille": ("uint16_t", 1150),
+           "kModelZeroMaxShiftTicks": ("uint16_t", 96),
+           "kSequenceHeldSpeedAbortRaw": ("uint16_t", 40),
+           "kSequenceHeldSpeedAbortSamples": ("uint8_t", 2),
+           "kFullLegContactCount": ("uint8_t", 6)}
+    for name, (ctype, value) in v25.items():
+        if hn.count(f"constexpr {ctype} {name} = {value};") != 1:
+            fail(f"{h_path}: {name} must be exactly {value}")
+
+    next_fn = re.search(r"void FullLegCalibrationExecutor::nextPhase\(uint32_t now_ms\)\s*\{(.*?)\n\}",
+                        c, re.DOTALL)
+    if not next_fn:
+        fail(f"{c_path}: nextPhase() not found")
+    else:
+        body = next_fn.group(1)
+        pairs = re.findall(r"case CalibrationPhase::(\w+):\s*enterPhase\(CalibrationPhase::(\w+)", body)
+        chain = [a for a, _ in pairs]
+        expected = list(V25_PHASE_ORDER[:-1])
+        expected.remove("INITIAL_RECOVERY")  # its successor is conditional (recovery-only run)
+        if chain != expected or any(V25_PHASE_ORDER.index(b) != V25_PHASE_ORDER.index(a) + 1
+                                    for a, b in pairs):
+            fail(f"{c_path}: nextPhase() must advance exactly one V25 phase at a time in the "
+                 f"V25 order, got {pairs}")
+        if "request_.recovery_only ? CalibrationPhase::TORQUE_OFF : CalibrationPhase::PARKING" \
+                not in normalize(body):
+            fail(f"{c_path}: INITIAL_RECOVERY may only continue to PARKING, or end a "
+                 f"recovery-only run at TORQUE_OFF")
+        for pinned in ("status_.contacts_accepted == kFullLegContactCount && diagnostics_accepted_",
+                       "status_.recovered_joints == request_.population_count && "
+                       "status_.contacts_accepted == 0",
+                       "(status_.failure == FullLegFailure::NONE && done) ? FullLegStep::COMPLETE"):
+            if pinned not in normalize(body):
+                fail(f"{c_path}: nextPhase() lost the COMPLETE rule {pinned!r}")
+
+    inspect = re.search(r"case R_INSPECT: \{(.*?)\n    \}", c, re.DOTALL)
+    if not inspect:
+        fail(f"{c_path}: INITIAL_RECOVERY inspect step not found")
+    else:
+        body = normalize(inspect.group(1))
+        if "++recover_index_" in body:
+            fail(f"{c_path}: INITIAL_RECOVERY may not skip a joint - every one of the twelve "
+                 f"is actively commanded to q0 (operator requirement 2026-09-30)")
+        for pinned in ("if (distance > static_cast<int32_t>(actuator::kSequencePrimeMaxDistanceTicks)) "
+                       "{ fail(FullLegFailure::INITIAL_RECOVERY_OUT_OF_RANGE);",
+                       "if (s->torque_enable != 0) { fail(FullLegFailure::PREFLIGHT_TORQUE_ON);",
+                       "if (!writePrime(ctx, j, op_prime_tick_)) return;"):
+            if pinned not in body:
+                fail(f"{c_path}: INITIAL_RECOVERY inspect lost {pinned!r}")
+
+    probe = re.search(r"void FullLegCalibrationExecutor::stepProbe\(.*?\n\}", c, re.DOTALL)
+    held = normalize(probe.group(0)) if probe else ""
+    for pinned in ("case JointKind::UPPER: want[kSlotHip] = true; want_tick[kSlotHip] = "
+                   "request_.joint[kSlotHip].q0_tick; want[kSlotLower] = true; want_tick[kSlotLower] "
+                   "= request_.joint[kSlotLower].q0_tick; break;",
+                   "case JointKind::LOWER: want[kSlotHip] = true; want_tick[kSlotHip] = "
+                   "request_.joint[kSlotHip].q0_tick; want[kSlotUpper] = true; want_tick[kSlotUpper] "
+                   "= request_.upper_for_lower_tick; break;",
+                   "want_tick[kSlotUpper] = side == ContactSide::MIN_SIDE ? "
+                   "request_.upper_for_hip_min_tick : request_.upper_for_hip_max_tick; "
+                   "want[kSlotLower] = true; want_tick[kSlotLower] = request_.lower_folded_tick;",
+                   "bool want[kSlotCount] = {false, false, false, request_.has_rear_park};",
+                   "fail(FullLegFailure::HELD_SET_MISMATCH);",
+                   "pr.start_torque_verified = true;",
+                   "pr.expected_torque_limit = request_.torque_limit;"):
+        if pinned not in held:
+            fail(f"{c_path}: stepProbe() lost the V25 held-set rule {pinned!r}")
+    monitor = re.search(r"bool FullLegCalibrationExecutor::monitorHeld\(.*?\n\}", c, re.DOTALL)
+    mon = normalize(monitor.group(0)) if monitor else ""
+    for pinned in ("fail(FullLegFailure::STALE_TELEMETRY);", "fail(FullLegFailure::HELD_JOINT_READBACK);",
+                   "fail(FullLegFailure::HELD_JOINT_DRIFT);", "fail(FullLegFailure::HELD_JOINT_SPEED);",
+                   "sample->torque_limit != static_cast<int32_t>(request_.torque_limit)",
+                   "sample->goal_position != static_cast<int32_t>(st.target_tick)",
+                   "sample->torque_enable != 1"):
+        if pinned not in mon:
+            fail(f"{c_path}: monitorHeld() lost {pinned!r}")
+
+    # ---- evidence lines are never truncated: the device capture buffer is the
+    # exporter's own line size (the finalizer suite pins the worst case < 480).
+    fin_c = by_name.get("FullLegCalibrationFinalizer.cpp", (None, ""))[1]
+    router = by_name.get("CommandRouter.cpp", (None, ""))[1]
+    if normalize(fin_c).count("constexpr size_t kLineBytes = 512;") != 1 or \
+            not re.search(r"struct ExportLineCapture \{[^}]*char line\[512\]", router, re.DOTALL):
+        fail("the evidence export line buffers must both be 512 bytes (finalizer kLineBytes and "
+             "CommandRouter ExportLineCapture) so no evidence line is ever truncated")
+
+    # ---- the geometry-validated plan data: re-derived, never hand-patched ----
+    repo_root = sketch_dir.parents[1]
+    tool = repo_root / "06_Software/Matdog_Core/calibration/matdog_full_calibration_sequence_geometry_v5.py"
+    header_path, header = by_name["CalibrationSequencePlanData.h"]
+    artifacts = [repo_root / SEQUENCE_ARTIFACT_DIR /
+                 f"{leg}_full_calibration_sequence_geometry_validate.json" for leg in SEQUENCE_ARTIFACTS]
+    missing = [str(a) for a in artifacts if not a.exists()]
+    if not tool.exists() or missing:
+        fail(f"sequence geometry tool/artifacts missing: tool={tool.exists()} missing={missing}")
+        return
+    for a in artifacts:
+        try:
+            report = json.loads(a.read_text())
+        except (OSError, ValueError) as exc:
+            fail(f"{a}: unreadable ({exc})")
+            continue
+        if report.get("all_sequences_collision_free") is not True or \
+                report.get("urdf_sha256") != "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59":
+            fail(f"{a}: not a collision-free validation on the pinned Geometry V5 URDF")
+        for plan in report.get("plans", []):
+            for seg in plan.get("segments", []):
+                if seg.get("verdict") != "CLEAR_TO_END" or seg.get("base_static") != "CLEAR":
+                    fail(f"{a}: segment {seg.get('segment')} is not CLEAR_TO_END from a clear start")
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "CalibrationSequencePlanData.h"
+        result = subprocess.run([sys.executable, str(tool), "--export-header", str(out),
+                                 "--artifacts", ",".join(str(a) for a in artifacts)],
+                                capture_output=True, text=True)
+        if result.returncode != 0 or not out.exists():
+            fail(f"{tool}: --export-header failed (stdout={result.stdout!r} stderr={result.stderr!r})")
+            return
+        # Compared as audited (comment-stripped), so an edit anywhere in the
+        # table - value, flag, row, hash - is caught, whatever its comments say.
+        if re.sub(r"\s+", " ", strip_comments(out.read_text())).strip() != \
+                re.sub(r"\s+", " ", header).strip():
+            fail(f"{header_path}: CalibrationSequencePlanData.h is not the exporter's output from "
+                 f"{SEQUENCE_ARTIFACT_DIR} - regenerate it with the tool, never hand-edit it")
+    if len(re.findall(r"\{calibration::Leg::(LF|RF|RH|LH), true,", header)) != 4:
+        fail(f"{header_path}: all four legs must be geometry_validated in the committed plan")
 
 
 def check_service_readiness_is_host_linkable(files):
@@ -5136,6 +5467,7 @@ def main():
     check_actuator_infrastructure_wired_fail_closed(files)
     check_first_motion_command_wiring(files)
     check_full_leg_calibration_wiring(files)
+    check_full_calibration_sequence(files, SKETCH_DIR)
     check_calibration_search_boundaries(files)
     check_service_readiness_is_host_linkable(files)
     check_app_only_script_never_targets_other_partitions(SKETCH_DIR)

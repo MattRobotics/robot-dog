@@ -1,0 +1,405 @@
+{
+ "schema": "matdog.full_calibration_sequence_geometry.v1",
+ "generated": "2026-09-30T11:32:16",
+ "urdf": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+ "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+ "mesh_manifest_sha256": "60fff604eae0857c7c61f115bbe3922949ababdd827fab61c74e1673336c39e1",
+ "tool_sha256": "2992f3deaf2610f5481d44f796e30c346d39311bfc5f58c12d9927ebf0588688",
+ "constants": {
+  "tick_rad": 0.0015339807878856412,
+  "guard_overshoot_ticks": 64,
+  "v25_upper_90_deg": 90.0,
+  "v25_upper_85_deg": 84.990234375,
+  "v25_lower_folded_deg": -87.01171875000001,
+  "lower_folded_ticks": {
+   "lf": -990,
+   "rf": -990,
+   "rh": -455,
+   "lh": -455
+  },
+  "v5_rear_upper_park_deg": 34.99999999999912,
+  "step_deg": 0.5,
+  "clearance_step_deg": 2.0,
+  "bisection_resolution_rad": 0.0001
+ },
+ "plans": [
+  {
+   "leg": "LF",
+   "upper_for_lower_rad": 1.5707963267948966,
+   "upper_for_lower_deg": 90.0,
+   "upper_for_hip_min_rad": 1.5707963267948966,
+   "upper_for_hip_min_deg": 90.0,
+   "upper_for_hip_max_rad": 1.483359421885415,
+   "upper_for_hip_max_deg": 84.990234375,
+   "lower_folded_rad": -1.5186409800067848,
+   "lower_folded_deg": -87.01171875000001,
+   "rear_park_joint": "lh_upper_leg_joint",
+   "rear_park_rad": 0.610865238198,
+   "rear_park_deg": 34.99999999999912,
+   "segments": [
+    {
+     "segment": "PARKING",
+     "joint": "lh_upper_leg_joint",
+     "start_deg": 0.0,
+     "end_deg": 34.99999999999912,
+     "held": {},
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": 0.610865238198
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.013787832260131826,
+      "pair": [
+       "base_link",
+       "lh_upper_leg_link"
+      ],
+      "at_rad": 0.0
+     }
+    },
+    {
+     "segment": "UPPER_MIN_SEARCH",
+     "joint": "lf_upper_leg_joint",
+     "start_deg": 0.0,
+     "end_deg": -58.12499999999868,
+     "held": {
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": -1.014472627721681
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.0085,
+      "pair": [
+       "base_link",
+       "lf_lower_leg_link"
+      ],
+      "at_rad": -0.4396048053460617
+     }
+    },
+    {
+     "segment": "UPPER_MIN_TO_MAX_SEARCH",
+     "joint": "lf_upper_leg_joint",
+     "start_deg": -58.12499999999868,
+     "end_deg": 128.12499999999693,
+     "held": {
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": 2.2362031041176813
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.0085,
+      "pair": [
+       "base_link",
+       "lf_lower_leg_link"
+      ],
+      "at_rad": -0.42658446345286005
+     }
+    },
+    {
+     "segment": "UPPER_HORIZONTAL",
+     "joint": "lf_upper_leg_joint",
+     "start_deg": 122.49999999999694,
+     "end_deg": 90.0,
+     "held": {
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": 1.5707963267948966
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.0085,
+      "pair": [
+       "base_link",
+       "lf_lower_leg_link"
+      ],
+      "at_rad": 2.138028333693
+     }
+    },
+    {
+     "segment": "LOWER_MIN_SEARCH",
+     "joint": "lf_lower_leg_joint",
+     "start_deg": 0.0,
+     "end_deg": -97.62500000001242,
+     "held": {
+      "lf_upper_leg_joint": 90.0,
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": -1.703877682259681
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.0003400703736121946,
+      "pair": [
+       "lf_upper_leg_link",
+       "lf_foot_link"
+      ],
+      "at_rad": -1.7038776822596813
+     }
+    },
+    {
+     "segment": "LOWER_MIN_TO_MAX_SEARCH",
+     "joint": "lf_lower_leg_joint",
+     "start_deg": -97.62500000001242,
+     "end_deg": 43.12500000000724,
+     "held": {
+      "lf_upper_leg_joint": 90.0,
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": 0.752673239922681
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.0003045318243427228,
+      "pair": [
+       "lf_foot_link",
+       "lh_lower_leg_link"
+      ],
+      "at_rad": 0.6142760048701534
+     }
+    },
+    {
+     "segment": "LOWER_FOLDED",
+     "joint": "lf_lower_leg_joint",
+     "start_deg": 37.50000000000724,
+     "end_deg": -87.01171875000001,
+     "held": {
+      "lf_upper_leg_joint": 90.0,
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": -1.5186409800067848
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.000823690842533295,
+      "pair": [
+       "lf_foot_link",
+       "lh_lower_leg_link"
+      ],
+      "at_rad": 0.6200041925217336
+     }
+    },
+    {
+     "segment": "HIP_MIN_SEARCH",
+     "joint": "lf_hip_joint",
+     "start_deg": 0.0,
+     "end_deg": -50.624999999974314,
+     "held": {
+      "lf_upper_leg_joint": 90.0,
+      "lf_lower_leg_joint": -87.012,
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": -0.883572933821681
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 3.224316716949927e-05,
+      "pair": [
+       "base_link",
+       "lf_foot_link"
+      ],
+      "at_rad": -0.7476386363106531
+     }
+    },
+    {
+     "segment": "HIP_MIN_RETURN_TO_ZERO",
+     "joint": "lf_hip_joint",
+     "start_deg": -44.999999999974314,
+     "end_deg": 0.0,
+     "held": {
+      "lf_upper_leg_joint": 90.0,
+      "lf_lower_leg_joint": -87.012,
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": 0.0
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 7.497151518050352e-05,
+      "pair": [
+       "base_link",
+       "lf_foot_link"
+      ],
+      "at_rad": -0.7512504171623478
+     }
+    },
+    {
+     "segment": "UPPER_TO_HIP_MAX_CLEARANCE",
+     "joint": "lf_upper_leg_joint",
+     "start_deg": 90.0,
+     "end_deg": 84.990234375,
+     "held": {
+      "lf_upper_leg_joint": 90.0,
+      "lf_lower_leg_joint": -87.012,
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": 1.483359421885415
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.0006165924474794346,
+      "pair": [
+       "lf_hip_link",
+       "lf_lower_leg_link"
+      ],
+      "at_rad": 1.512505056855242
+     }
+    },
+    {
+     "segment": "HIP_MAX_SEARCH",
+     "joint": "lf_hip_joint",
+     "start_deg": 0.0,
+     "end_deg": 50.624999999974314,
+     "held": {
+      "lf_upper_leg_joint": 84.99,
+      "lf_lower_leg_joint": -87.012,
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": 0.883572933821681
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.0002662554204595699,
+      "pair": [
+       "base_link",
+       "lf_lower_leg_link"
+      ],
+      "at_rad": 0.8156057850661671
+     }
+    },
+    {
+     "segment": "RETURN_HIP",
+     "joint": "lf_hip_joint",
+     "start_deg": 44.999999999974314,
+     "end_deg": 0.0,
+     "held": {
+      "lf_upper_leg_joint": 84.99,
+      "lf_lower_leg_joint": -87.012,
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": 0.0
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.00039652834465662284,
+      "pair": [
+       "base_link",
+       "lf_upper_leg_link"
+      ],
+      "at_rad": 0.7512504171623478
+     }
+    },
+    {
+     "segment": "RETURN_LOWER",
+     "joint": "lf_lower_leg_joint",
+     "start_deg": -87.01171875000001,
+     "end_deg": 0.0,
+     "held": {
+      "lf_upper_leg_joint": 84.99,
+      "lf_lower_leg_joint": -87.012,
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": 0.0
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.0002450049875333815,
+      "pair": [
+       "lf_hip_link",
+       "lf_lower_leg_link"
+      ],
+      "at_rad": -0.6557767868211115
+     }
+    },
+    {
+     "segment": "RETURN_UPPER",
+     "joint": "lf_upper_leg_joint",
+     "start_deg": 84.990234375,
+     "end_deg": 0.0,
+     "held": {
+      "lf_upper_leg_joint": 84.99,
+      "lh_upper_leg_joint": 35.0
+     },
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": 0.0
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.0085,
+      "pair": [
+       "base_link",
+       "lf_lower_leg_link"
+      ],
+      "at_rad": 1.483359421885415
+     }
+    },
+    {
+     "segment": "RESTORE_PARKING",
+     "joint": "lh_upper_leg_joint",
+     "start_deg": 34.99999999999912,
+     "end_deg": 0.0,
+     "held": {},
+     "base_static": "CLEAR",
+     "sweep": {
+      "status": "COLLISION_FREE",
+      "end_rad": 0.0
+     },
+     "verdict": "CLEAR_TO_END",
+     "clearance": {
+      "min_clearance_m": 0.013787832260131826,
+      "pair": [
+       "base_link",
+       "lh_upper_leg_link"
+      ],
+      "at_rad": 0.610865238198
+     }
+    }
+   ],
+   "sequence_collision_free": true,
+   "v25_deviations": []
+  }
+ ],
+ "all_sequences_collision_free": true,
+ "evaluations": 2756,
+ "runtime_s": 724.5
+}

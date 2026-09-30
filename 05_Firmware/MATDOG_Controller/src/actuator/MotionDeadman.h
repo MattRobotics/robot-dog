@@ -48,6 +48,15 @@ struct TelemetrySample {
   int32_t present_speed = -1;
   int32_t present_current = -1;
   int32_t present_temperature = -1;
+  // The rest of the LF V25 per-observation readback (matdog.rs
+  // validate_lf_active_readback / ensure_observation_safe), -1 = not read:
+  // the GoalPosition register, the RAM TorqueLimit register and the servo's
+  // own status/error byte (register 65). Filled by the calibration
+  // telemetry read (ServoBus::readControlFeedback); the 24-contact
+  // sequence treats an unread value as an unusable sample.
+  int32_t goal_position = -1;
+  int32_t torque_limit = -1;
+  int32_t servo_status = -1;
 };
 
 // Ordered so a caller can treat CONTINUE/ARRIVED as "keep going" and
