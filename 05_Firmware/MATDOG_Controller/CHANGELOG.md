@@ -1,5 +1,63 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — TRUE 24-contact Full Calibration (LF V25 full-leg state machine × 4 legs) — 2026-09-30
+
+**OFFLINE-VALIDATED; never run on hardware.** Scope correction: **TRUE FULL CALIBRATION = 4 legs ×
+3 joints × MIN/MAX = 24 contacts.** The "Full Leg" below (2026-09-29, PR #34) measured UPPER
+MIN/MAX only, 2 of a leg's 6 contacts. It is superseded and is **not** Full Calibration. See
+`09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md` and the V25 mapping
+`…/2026-09-30_FULL_CALIBRATION_24_CONTACT_V25_TRACEABILITY.md`.
+
+- **`FullLegCalibrationExecutor` (rewritten)**: the LF V25 `run_lf_state_machine` for every leg.
+  PREFLIGHT → INITIAL_RECOVERY → PARKING → UPPER MIN/MAX → UPPER_HORIZONTAL → LOWER MIN/MAX →
+  LOWER_FOLDED → HIP MIN/MAX → DIAGNOSTICS → RETURN_HIP/LOWER/UPPER → RESTORE_PARKING →
+  CLEANUP/TORQUE_OFF. One phase per update, reported to the session in V25 order. COMPLETE only
+  with 6/6 contacts + accepted V25 affine diagnostics + verified rest.
+- **INITIAL RECOVERY**: every one of the 12 leg joints actively commanded to its promoted q0,
+  one at a time (prime at present → RAM TorqueLimit 500 → torque on → move → V25 StableTargetGate
+  → SAFE_OFF), then all verified at q0. It never moves a joint more than 64 ticks.
+  `@CALIBRATION INITIAL RECOVERY <LEG> CONFIRM_Q0_RECOVERY` runs it alone (recovery-only: no
+  probe, no evidence record; session + permit stay live).
+- **Held prerequisites (V25 `prerequisites_for`)**: UPPER probe HIP/LOWER@q0; LOWER probe
+  HIP@q0 + UPPER@90°; HIP probe UPPER@side clearance (LF 90/85, RF 85/90, rear 90/90) + LOWER
+  folded; front legs keep the rear UPPER parked. A probe starts only with exactly that held set.
+  Every held joint and one round-robin bystander are checked every tick (torque, GoalPosition,
+  TorqueLimit, drift, speed, status, current, temperature, telemetry age). Any violation fails
+  closed to a verified SAFE_OFF of all 12.
+- **`CalibrationSequencePlan` (new)**: the second authorization object. Poses per leg, generated
+  by `matdog_full_calibration_sequence_geometry_v5.py` from four collision-free validation
+  artifacts (every segment of every leg's sequence on the SHA-pinned URDF/meshes). Rear LOWER fold
+  −455 ticks (V25 −990 gives 0.04 mm body clearance on the rear legs). `SafeActuatorPolicy`: new
+  `CALIBRATION_SEQUENCE_MOVE` (phase table, tick re-derived) and `CALIBRATION_TORQUE_LIMIT`
+  operations; sequence probes go through their own door (`evaluateSequenceProbe`: phase ==
+  endpoint, prerequisites verified, corridor). `isExecutable()` unchanged.
+- **RAM TorqueLimit 500 (V25 `prepare_motor`)**: `ServoBus::writeReviewedRamTorqueLimit()`, the
+  one raw register write (RAM 48, readback-verified, no argument). Never restored (V25).
+  `ServoBus::readControlFeedback()` reads TorqueEnable/Goal/TorqueLimit + feedback + status in
+  two block reads.
+- **ContactProbeEngine**: `start_torque_verified`, the V25 `stop_pressure` release, and
+  `TORQUE_LIMIT_CHANGED` / `SERVO_STATUS_FAULT` / `GOAL_READBACK_MISMATCH`.
+- **Finalizer / evidence**: 6 contacts recorded per leg; UPPER/LOWER/HIP envelopes;
+  `contacts_expected=6` and `contacts_accepted` (0 unless 6); four-leg result only at 24/24.
+  Export `format=2`: `LEG` + `LEG_CLOSE`, six `CONTACT`, three `DIAG`, and the `END` line with
+  `total_contacts_expected=24 total_contacts_accepted=…`. Lines are never truncated (512-byte
+  buffers, worst case host-tested).
+- **Runner** `scripts/calibration_hw_session.py`: phases `prepare / q0 / recover / legs / all`.
+  `legs` needs `--confirm-operator-go`. It requires 6/6 per leg and the 24/24 export; anchored
+  whole-line records only.
+- **Gates**: host suites (executor end-to-end on four legs + ~30 adversarial cases, 24-profile
+  plan matrix, 24-contact finalizer), static audit (incl. plan-data re-derivation), Safe
+  Actuator / LED / DALY mutation suites, and behavioural orchestration mutations.
+
+### LED — DALY informational alarm bit is not a charging fault (presentation only)
+
+- Live 2026-09-30: an attended KEY-OFF charge (SOC 55 %, MOS on) showed `CHARGING_FAULT` for
+  `alarms=0000 0000 0000 0010`. The DALY app names that bit "GPS or soft switch turn off MOS".
+- `status::dalyAlarmBlocksChargingPresentation()`: word 3 bit **0x0010 alone** no longer shows
+  `CHARGING_FAULT`. Words 0–2 ≠ 0 or any other word-3 bit still do.
+- Unchanged: raw alarm words (`@BMS STATUS`), `DalyBms` `alarms_clear` (the KEY/MOS write gate),
+  DALY protection, MOS, every non-LED gate. Audit-pinned; LED mutation suite extended.
+
 ## Unreleased — staged calibration endpoint search (LF V25 oracle) — 2026-09-29
 
 **OFFLINE-VALIDATED, FLASH-READY; HARDWARE VALIDATION PENDING. Never run on hardware.**

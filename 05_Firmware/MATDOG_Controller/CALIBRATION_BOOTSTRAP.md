@@ -166,6 +166,8 @@ path obstructed                            6
 | 22 | `lh_lower:min` | DIAGNOSTIC | **1-DOF** | −92.074° | −92.0° |
 | 23 | `lh_lower:max` | DIAGNOSTIC | NOT_NEEDED | +38.180° | +37.5° |
 
+> **SUPERSEDED 2026-09-30 — TRUE FULL CALIBRATION = 24 CONTACTS.** 4 legs × 3 joints × MIN/MAX. A leg is `HARDWARE_CONTACT_CALIBRATED` only with 6/6, the robot only with 24/24. The V5 classification below describes V5's own q=0 evaluation context. It does not describe the calibration's scope. The 16 HIP/LOWER contacts are reached through the LF V25 full-leg sequence (held prerequisite poses), authorized by the geometry-validated `CalibrationSequencePlan`, never by weakening `isExecutable()`. See [`2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md`](../../09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md).
+
 **The eight executable endpoints are exactly the eight upper-leg ones.** For every hip and
 every lower leg the mechanism contacts *beyond* the declared URDF limit — by 1.0° at the hips
 and 0.07° at the lower legs. Those sixteen endpoints are evidence about where the mechanism
@@ -702,7 +704,8 @@ Only after it passes, in order, each its own authorised session:
 7. the Safe Actuator runtime adapter;
 8. **C4-C current-installation stand revalidation** — see below;
 9. **then** the 8 upper-leg contacts, the only ones required for final calibration and the only
-   ones reachable without beyond-URDF motion (§8.3);
+   ones reachable without beyond-URDF motion (§8.3); **superseded 2026-09-30: all 24 contacts,
+   see the SUPERSEDED note beside the endpoint table**;
 10. full current safe limits.
 
 ### The next stand is a REVALIDATION, not a first stand

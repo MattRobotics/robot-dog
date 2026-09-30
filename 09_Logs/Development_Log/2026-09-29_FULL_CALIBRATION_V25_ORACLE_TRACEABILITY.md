@@ -1,5 +1,10 @@
 # Full Calibration staged search — LF V25 hardware-oracle traceability (2026-09-29)
 
+> **2026-09-30:** the staged search mapped here is unchanged and now drives all six endpoints of
+> every leg. The UPPER-only sequence this document describes around it is **superseded**: TRUE
+> Full Calibration = 24 contacts. The full-leg mapping is in
+> [`2026-09-30_FULL_CALIBRATION_24_CONTACT_V25_TRACEABILITY.md`](2026-09-30_FULL_CALIBRATION_24_CONTACT_V25_TRACEABILITY.md).
+
 Status: **OFFLINE-VALIDATED, HARDWARE VALIDATION PENDING.** This maps every contact-search
 mechanic of the new staged endpoint search (`ContactProbeEngine` and friends, branch
 `fix/calibration-hw-session-20260929`) onto the only MATDOG calibrator ever validated on hardware:
