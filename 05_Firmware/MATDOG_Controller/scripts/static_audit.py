@@ -2056,9 +2056,36 @@ def check_led_status_boundaries(files):
                      'led_inputs.battery_charging = strcmp(battery.state_name, "CHARGING") == 0'):
         if required not in ctl:
             fail(f"{ctl_path}: missing reviewed cached telemetry input: {required}")
-    alarm = re.search(r"led_inputs\.battery_alarm\s*=([^;]+);", ctl)
-    if not alarm or any(f"battery.alarms[{i}] != 0" not in alarm.group(1) for i in range(4)):
-        fail(f"{ctl_path}: charging fault must consume all four cached alarm words")
+    # The charging fault consumes all four cached alarm words through ONE pure,
+    # host-tested helper whose only exception is DALY word 3 bit 0x0010 (the
+    # informational KEY-OFF charging bit) - presentation only.
+    alarms = re.findall(r"led_inputs\.battery_alarm\s*=([^;]+);", ctl)
+    if alarms != [" status::dalyAlarmBlocksChargingPresentation(battery.alarms)"]:
+        fail(f"{ctl_path}: charging fault must be exactly "
+             f"status::dalyAlarmBlocksChargingPresentation(battery.alarms), got {alarms}")
+    policy_c = by_name.get("LedStatusPolicy.cpp", (None, ""))[1]
+    helper = re.search(r"bool dalyAlarmBlocksChargingPresentation\(const uint16_t alarms\[4\]\)\s*"
+                       r"\{(.*?)\n\}", policy_c, re.DOTALL)
+    expected = ("if (alarms == nullptr) return true; return alarms[0] != 0 || alarms[1] != 0 || "
+                "alarms[2] != 0 || (alarms[3] & static_cast<uint16_t>(~kDalyLedInformationalAlarm3Bits)) != 0;")
+    if not helper or re.sub(r"\s+", " ", helper.group(1)).strip() != expected:
+        fail("LedStatusPolicy.cpp: dalyAlarmBlocksChargingPresentation() must be exactly "
+             "words 0-2 != 0 OR word 3 with any bit other than kDalyLedInformationalAlarm3Bits")
+    if len(re.findall(r"constexpr uint16_t kDalyLedInformationalAlarm3Bits = 0x0010;", policy_h)) != 1:
+        fail("LedStatusPolicy.h: the LED-only informational DALY bit must be exactly 0x0010")
+    for path, code in production:
+        if path.name in ("LedStatusPolicy.h", "LedStatusPolicy.cpp"):
+            continue
+        if "kDalyLedInformationalAlarm3Bits" in code:
+            fail(f"{path}: the LED-only DALY informational mask may not leave LED presentation")
+        if "dalyAlarmBlocksChargingPresentation" in code and path.name != "Controller.cpp":
+            fail(f"{path}: the LED alarm classifier may only feed the LED inputs")
+    bms_path, bms = by_name.get("DalyBms.cpp", (None, ""))
+    if not re.search(r"in\.alarms_clear\s*=\s*sample_\.alarms\[0\]\s*==\s*0\s*&&\s*sample_\.alarms\[1\]"
+                     r"\s*==\s*0\s*&&\s*sample_\.alarms\[2\]\s*==\s*0\s*&&\s*sample_\.alarms\[3\]"
+                     r"\s*==\s*0\s*;", bms):
+        fail(f"{bms_path}: the DALY KEY/MOS write gate must still require ALL FOUR raw alarm "
+             f"words zero - the LED presentation mask never weakens a non-LED gate")
 
     protocol = by_name.get("DalyProtocol.h", (None, ""))[1]
     if not re.search(r"kDalyTelemetryFreshnessMs\s*=\s*5000\s*;", protocol) or not re.search(

@@ -433,6 +433,31 @@ static void test_telemetry_parser_unchanged() {
   CHECK_EQ(s.alarms[2], 0x0000);
   CHECK_EQ(s.alarms[3], 0x8000);
 
+  // The live 2026-09-30 attended KEY-OFF charge: the raw alarm words are
+  // decoded and exposed exactly as received - 0x0010 in word 3 included. The
+  // LED-only informational mask (LedStatusPolicy) never reaches this layer.
+  {
+    uint8_t live[129];
+    buildTelemetryResponse(live);
+    putBe16(live, 3 + 2 * 42, 550);  // 55.0 %
+    putBe16(live, 3 + 2 * 47, 1);    // CHARGING
+    putBe16(live, 3 + 2 * 53, 1);    // charge MOS ON
+    putBe16(live, 3 + 2 * 54, 1);    // discharge MOS ON
+    putBe16(live, 3 + 2 * 58, 0x0000);
+    putBe16(live, 3 + 2 * 59, 0x0000);
+    putBe16(live, 3 + 2 * 60, 0x0000);
+    putBe16(live, 3 + 2 * 61, 0x0010);
+    appendCrc(live, 129);
+    DalySample c;
+    CHECK_EQ(parseDalyTelemetry(live, sizeof(live), 5, &c), DalyCommResult::OK);
+    CHECK(std::strcmp(c.state_name, "CHARGING") == 0);
+    CHECK_EQ(c.alarms[0], 0x0000);
+    CHECK_EQ(c.alarms[1], 0x0000);
+    CHECK_EQ(c.alarms[2], 0x0000);
+    CHECK_EQ(c.alarms[3], 0x0010);
+    CHECK(c.charge_mos_on && c.discharge_mos_on);
+  }
+
   // Oversized cell count is clamped to the 32-cell table, as before.
   putBe16(rx, 3 + 2 * 49, 40);
   appendCrc(rx, 129);

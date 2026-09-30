@@ -779,8 +779,10 @@ void Controller::update(uint32_t now_ms) {
     led_inputs.telemetry_age_ms = led_now_ms - battery.sampled_at_ms;
     led_inputs.soc_percent = battery.soc_percent;
     led_inputs.battery_charging = strcmp(battery.state_name, "CHARGING") == 0;
-    led_inputs.battery_alarm = battery.alarms[0] != 0 || battery.alarms[1] != 0 ||
-                               battery.alarms[2] != 0 || battery.alarms[3] != 0;
+    // Presentation only: the one informational KEY-OFF charging bit (word 3,
+    // 0x0010) does not show as CHARGING_FAULT; every other bit does. The raw
+    // words are untouched - @BMS STATUS still prints all four.
+    led_inputs.battery_alarm = status::dalyAlarmBlocksChargingPresentation(battery.alarms);
     // No reviewed charge-completion policy exists yet: the reserved
     // charge_complete_verified input stays false, including at 100% SOC.
     led_status_.update(led_now_ms, led_inputs);
