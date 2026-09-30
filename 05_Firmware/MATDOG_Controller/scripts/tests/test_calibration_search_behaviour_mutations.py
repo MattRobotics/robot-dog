@@ -27,6 +27,12 @@ confirmation has mutations for removed confirmation reads, a 1-of-3 majority,
 another servo's reading, a cached value, no 50 ms wait, and a failed read that
 no longer fails closed.
 
+The LF V25 ActivelyHeld supervision (the retired post-V25 held-joint speed
+abort) has mutations for a speed abort reintroduced (at 40 or at the settle
+bound 4), a looser drift, each held readback and safety check dropped, the
+StableTargetGate / INITIAL_RECOVERY settle losing its speed criterion or
+bound, and the held-role evidence / bounded transient diagnostic regressing.
+
 The 24-contact Full Calibration sequence adds its own ORCHESTRATION
 mutations (FullLegCalibrationExecutor / the sequence plan / the policy's
 sequence door / the 24-contact finalizer): a skipped recovery, a limp held
@@ -55,6 +61,7 @@ PROBE_H = "src/calibration/ContactProbeEngine.h"
 RESOLVER_H = "src/actuator/CalibrationTargetResolver.h"
 POLICY_CPP = "src/actuator/ActuatorWritePolicy.cpp"
 EXEC_CPP = "src/calibration/FullLegCalibrationExecutor.cpp"
+EXEC_H = "src/calibration/FullLegCalibrationExecutor.h"
 SEQ_CPP = "src/actuator/CalibrationSequencePlan.cpp"
 FIN_CPP = "src/calibration/FullLegCalibrationFinalizer.cpp"
 FIN_H = "src/calibration/FullLegCalibrationFinalizer.h"
@@ -327,7 +334,8 @@ MUTATIONS = [
      "      if (hip_poses_differ) {\n        // V25 per-side clearance",
      "      if (hip_poses_differ && false) {\n        // V25 per-side clearance"),
     ("held-joint drift ignored", EXEC_CPP,
-     "      fail(FullLegFailure::HELD_JOINT_DRIFT);\n      return false;",
+     "      failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_DRIFT);\n"
+     "      return false;",
      "      (void)0;"),
     ("held-joint TorqueLimit readback ignored", EXEC_CPP,
      "        sample->torque_limit != static_cast<int32_t>(request_.torque_limit) ||\n"
@@ -335,8 +343,64 @@ MUTATIONS = [
      "        sample->goal_position != static_cast<int32_t>(st.target_tick)) {"),
     ("held-joint telemetry loss never fails", EXEC_CPP,
      "      if (now_ms - st.last_good_ms >= kSequenceMaxTelemetryAgeMs) {\n"
-     "        fail(FullLegFailure::STALE_TELEMETRY);",
-     "      if (false) {\n        fail(FullLegFailure::STALE_TELEMETRY);"),
+     "        failHeldRole(observeHeld(s, nullptr, now_ms, t), FullLegFailure::STALE_TELEMETRY);",
+     "      if (false) {\n"
+     "        failHeldRole(observeHeld(s, nullptr, now_ms, t), FullLegFailure::STALE_TELEMETRY);"),
+    # LF V25 ActivelyHeld supervision (2026-09-30 correction): an already-held
+    # joint is never aborted on its speed alone; speed stays the settling gate.
+    ("held-joint speed abort reintroduced (the retired post-V25 D5 rule)", EXEC_CPP,
+     "    st.speed_transient = fast;",
+     "    if (fast) {\n"
+     "      failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_DRIFT);\n"
+     "      return false;\n    }\n    st.speed_transient = fast;"),
+    ("held-joint speed abort at the V25 settle bound (|speed| > 4)", EXEC_CPP,
+     "    st.last_good_ms = now_ms;\n    st.has_last_sample = true;",
+     "    st.last_good_ms = now_ms;\n"
+     "    if (magnitude(sample->present_speed) > static_cast<int32_t>(kSequenceSettleMaxSpeedRaw)) {\n"
+     "      fail(FullLegFailure::HELD_JOINT_DRIFT);\n      return false;\n    }\n"
+     "    st.has_last_sample = true;"),
+    ("held-joint drift tolerance 11 instead of 10", EXEC_CPP,
+     "        static_cast<int32_t>(kSequenceStaticToleranceTicks)) {\n"
+     "      failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_DRIFT);",
+     "        static_cast<int32_t>(kSequenceStaticToleranceTicks) + 1) {\n"
+     "      failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_DRIFT);"),
+    ("held-joint TorqueEnable readback ignored", EXEC_CPP,
+     "    if (sample->torque_enable != 1 ||\n"
+     "        sample->torque_limit != static_cast<int32_t>(request_.torque_limit) ||",
+     "    if (sample->torque_limit != static_cast<int32_t>(request_.torque_limit) ||"),
+    ("held-joint GoalPosition readback ignored", EXEC_CPP,
+     "        sample->goal_position != static_cast<int32_t>(st.target_tick)) {\n"
+     "      failHeldRole(",
+     "        false) {\n      failHeldRole("),
+    ("held-joint status / current / temperature skipped", EXEC_CPP,
+     "    if (safety != FullLegFailure::NONE) {",
+     "    if (false) {"),
+    ("StableTargetGate promotes a moving joint to held (speed criterion removed)", EXEC_CPP,
+     "      absDiff(s->present_position, p.target_tick) <= static_cast<int32_t>(kSequenceStaticToleranceTicks) &&\n"
+     "      magnitude(s->present_speed) <= static_cast<int32_t>(kSequenceSettleMaxSpeedRaw);",
+     "      absDiff(s->present_position, p.target_tick) <= static_cast<int32_t>(kSequenceStaticToleranceTicks);"),
+    ("INITIAL_RECOVERY settles a moving joint (speed criterion removed)", EXEC_CPP,
+     "          absDiff(s->present_position, j.q0_tick) <= static_cast<int32_t>(kSequenceStaticToleranceTicks) &&\n"
+     "          magnitude(s->present_speed) <= static_cast<int32_t>(kSequenceSettleMaxSpeedRaw);",
+     "          absDiff(s->present_position, j.q0_tick) <= static_cast<int32_t>(kSequenceStaticToleranceTicks);"),
+    ("settle speed bound 5 instead of the V25 4", EXEC_H,
+     "constexpr uint16_t kSequenceSettleMaxSpeedRaw = 4;",
+     "constexpr uint16_t kSequenceSettleMaxSpeedRaw = 5;"),
+    ("held-role failure evidence not latched", EXEC_CPP,
+     "    held_role_failure_ = observation;",
+     "    (void)observation;"),
+    ("held-role failure evidence observed after the failure (TORQUE_OFF, probe gone)", EXEC_CPP,
+     "      failHeldRole(observeHeld(s, sample, now_ms, t), safety);",
+     "      fail(safety);\n      failHeldRole(observeHeld(s, sample, now_ms, t), safety);"),
+    ("held speed transient not recorded", EXEC_CPP,
+     "        held_transients_tick_[held_transients_tick_count_++] = observeHeld(s, sample, now_ms, t);\n",
+     ""),
+    ("held speed transient recorded every sample, not per rising edge", EXEC_CPP,
+     "    if (fast && !st.speed_transient) {",
+     "    if (fast) {"),
+    ("held speed transient records unbounded", EXEC_CPP,
+     "      if (held_transients_recorded_ < kHeldSpeedTransientEventCap &&",
+     "      if (true &&"),
     ("bystander drift ignored", EXEC_CPP,
      "  } else if (absDiff(sample->present_position, ps.entry_tick) >",
      "  } else if (false && absDiff(sample->present_position, ps.entry_tick) >"),

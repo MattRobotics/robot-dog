@@ -79,6 +79,11 @@ class Controller {
   void printFullLegSearchEvent();
   // Evidence line per sequence phase / step / joint transition.
   void printFullLegSequenceEvent();
+  // Held-joint evidence: the held-role failure (once) and the diagnostic
+  // speed transients (bounded by the executor). Print only.
+  void printFullLegHeldEvents();
+  void printFullLegHeldObservation(const char* tag,
+                                   const calibration::FullLegHeldObservation& o);
 
   servo::ServoBus servo_bus_;
   // The LF V25 runtime PresentTemperature over-limit confirmation's bus port:
@@ -208,6 +213,7 @@ class Controller {
   uint16_t search_event_bypass_ = 0;
   uint32_t sequence_event_key_ = 0;
   uint32_t sequence_event_changes_ = 0;
+  bool held_role_failure_printed_ = false;
   // A recovery-only run (@CALIBRATION INITIAL RECOVERY) is in flight or has
   // just ended and its RESULT line is still to be printed.
   bool recovery_result_pending_ = false;

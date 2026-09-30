@@ -2173,8 +2173,6 @@ def check_full_calibration_sequence(files, sketch_dir):
            "kAffineScaleMinPermille": ("uint16_t", 850),
            "kAffineScaleMaxPermille": ("uint16_t", 1150),
            "kModelZeroMaxShiftTicks": ("uint16_t", 96),
-           "kSequenceHeldSpeedAbortRaw": ("uint16_t", 40),
-           "kSequenceHeldSpeedAbortSamples": ("uint8_t", 2),
            "kFullLegContactCount": ("uint8_t", 6)}
     for name, (ctype, value) in v25.items():
         if hn.count(f"constexpr {ctype} {name} = {value};") != 1:
@@ -2237,15 +2235,50 @@ def check_full_calibration_sequence(files, sketch_dir):
                    "pr.expected_torque_limit = request_.torque_limit;"):
         if pinned not in held:
             fail(f"{c_path}: stepProbe() lost the V25 held-set rule {pinned!r}")
+    # LF V25 validate_lf_role_observation(ActivelyHeld): an already-held joint
+    # fails on stale telemetry, status / hard current / temperature, readback
+    # (TorqueEnable, TorqueLimit, GoalPosition) and drift > 10 - never on its
+    # speed alone (the post-V25 D5 speed abort false-aborted LF UPPER MAX on
+    # 2026-09-30 with the hold intact and is retired). Speed stays a SETTLING
+    # criterion: the StableTargetGate (stepMove) and INITIAL_RECOVERY settle.
     monitor = re.search(r"bool FullLegCalibrationExecutor::monitorHeld\(.*?\n\}", c, re.DOTALL)
     mon = normalize(monitor.group(0)) if monitor else ""
-    for pinned in ("fail(FullLegFailure::STALE_TELEMETRY);", "fail(FullLegFailure::HELD_JOINT_READBACK);",
-                   "fail(FullLegFailure::HELD_JOINT_DRIFT);", "fail(FullLegFailure::HELD_JOINT_SPEED);",
+    for pinned in ("failHeldRole(observeHeld(s, nullptr, now_ms, t), FullLegFailure::STALE_TELEMETRY);",
+                   "const FullLegFailure safety = commonSafetyFailure(*sample); if (safety != "
+                   "FullLegFailure::NONE) { failHeldRole(observeHeld(s, sample, now_ms, t), safety); "
+                   "return false; }",
+                   "failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_READBACK);",
+                   "if (absDiff(sample->present_position, st.target_tick) > "
+                   "static_cast<int32_t>(kSequenceStaticToleranceTicks)) { "
+                   "failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_DRIFT);",
                    "sample->torque_limit != static_cast<int32_t>(request_.torque_limit)",
                    "sample->goal_position != static_cast<int32_t>(st.target_tick)",
                    "sample->torque_enable != 1"):
         if pinned not in mon:
             fail(f"{c_path}: monitorHeld() lost {pinned!r}")
+    diag_at = mon.find("const bool fast = magnitude(sample->present_speed) > "
+                       "static_cast<int32_t>(kHeldSpeedTransientReportRaw);")
+    drift_at = mon.find("FullLegFailure::HELD_JOINT_DRIFT);")
+    speed_uses = mon.count("present_speed")
+    if diag_at < 0 or drift_at < 0 or drift_at > diag_at or speed_uses != 1 or \
+            re.search(r"\bfail\w*\(|return false", mon[diag_at:]):
+        fail(f"{c_path}: monitorHeld() may read a held joint's speed only for the diagnostic "
+             f"transient after every V25 held-role check, and never fail or return on it "
+             f"(V25 ActivelyHeld has no speed abort; LF_HELD_MAX_SPEED_RAW is a settling gate)")
+    if "HELD_JOINT_SPEED" in h + c:
+        fail(f"{c_path}: the retired post-V25 HELD_JOINT_SPEED abort is back")
+    if hn.count("constexpr uint16_t kHeldSpeedTransientReportRaw = 40;") != 1 or \
+            hn.count("constexpr uint8_t kHeldSpeedTransientEventCap = 32;") != 1:
+        fail(f"{h_path}: the held speed-transient diagnostic must stay bounded "
+             f"(kHeldSpeedTransientReportRaw = 40, kHeldSpeedTransientEventCap = 32)")
+    settle_gate = ("magnitude(s->present_speed) <= static_cast<int32_t>(kSequenceSettleMaxSpeedRaw);")
+    move_fn = re.search(r"void FullLegCalibrationExecutor::stepMove\(.*?\n\}", c, re.DOTALL)
+    recover_fn = re.search(r"case R_MOVE: \{(.*?)\n    \}", c, re.DOTALL)
+    if not move_fn or settle_gate not in normalize(move_fn.group(0)) or \
+            not recover_fn or settle_gate not in normalize(recover_fn.group(1)):
+        fail(f"{c_path}: the V25 StableTargetGate speed criterion (|speed| <= "
+             f"LF_HELD_MAX_SPEED_RAW) must gate both the promotion to held (stepMove) and the "
+             f"INITIAL_RECOVERY settle")
 
     # ---- evidence lines are never truncated: the device capture buffer is the
     # exporter's own line size (the finalizer suite pins the worst case < 480).

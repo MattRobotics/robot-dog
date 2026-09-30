@@ -8,7 +8,8 @@ search is mapped stage by stage in **§ Contact search** below; it supersedes th
 [`2026-09-29_FULL_CALIBRATION_V25_ORACLE_TRACEABILITY.md`](2026-09-29_FULL_CALIBRATION_V25_ORACLE_TRACEABILITY.md)
 (which described the no-scout PR #34 search). Deviations D1–D10 are explained in
 [`2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md`](2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md) §3;
-D6 (no coarse scout) is **closed**. Where this log says "ported", the V25 rule is reproduced; every
+D6 (no coarse scout) is **closed**; D5 (a post-V25 held-joint speed abort) is **retired**
+(§ Held-role supervision). Where this log says "ported", the V25 rule is reproduced; every
 place where the port differs, even slightly, is listed under the table it belongs to. "Exact" is
 not claimed anywhere.
 
@@ -53,18 +54,43 @@ station-mediated architecture or an LF-only table.
 | `PROBE_HOME_TOLERANCE_TICKS` (L53) | 16 | `kSequenceRestToleranceTicks` | final rest |
 | `PROBE_PASSIVE_RESTORE_DRIFT_TICKS` (L57) | 32 | `kSequencePassiveCorridorTicks` | limp participants |
 | `NON_PARTICIPATING_MAX_DRIFT_TICKS` (L117) | 16 | `kSequenceBystanderDriftTicks` | bystanders |
-| `LF_HELD_MAX_SPEED_RAW` (L116) | 4 | `kSequenceSettleMaxSpeedRaw` | settle gate |
+| `LF_HELD_MAX_SPEED_RAW` (L116) | 4 | `kSequenceSettleMaxSpeedRaw` | StableTargetGate (promotion to held) and INITIAL_RECOVERY settle; **not** the supervision of an already-held joint (as V25) |
 | `LF_TRANSITION_SETTLED_SAMPLES` / `_WINDOW` (L114–115) | 4 / 400 ms | `kSequenceSettledSamples` / `kSequenceSettleWindowMs` | StableTargetGate (L887) |
 | `MOTION_TIMEOUT` / `MAX_TELEMETRY_AGE` (L74–75) | 12 s / 3 s | `kSequenceMotionTimeoutMs` / `kSequenceMaxTelemetryAgeMs` | + travel at 80 ticks/s |
 | `UPPER_90_DELTA` / `UPPER_85_DELTA` (L96–97) | 1024 / 967 | sequence plan poses (URDF q), resolved per q0 and direction | geometry-validated |
 | `LOWER_FOLDED_DELTA` (L98) | −990 | front −990, rear −455 | D3 |
 | `AFFINE_SCALE_MIN/MAX_PERMILLE` (L107–108) | 850 / 1150 | `kAffineScaleMin/MaxPermille` | |
 | `MODEL_ZERO_MAX_SHIFT_FROM_DIGITAL_HOME_TICKS` (L113) | 96 | `kModelZeroMaxShiftTicks` (shift from the promoted q0) | |
-| — | — | `kSequenceHeldSpeedAbortRaw = 40` × 2 samples | D5 |
+| — | — | `kHeldSpeedTransientReportRaw = 40`, `kHeldSpeedTransientEventCap = 32` | diagnostic only (`CALIBRATION_HELD_SPEED_TRANSIENT`), never an abort; replaces the retired D5 abort |
 
 All of the above are pinned to exactly these values by `static_audit.py`
 (`check_full_calibration_sequence`, `check_calibration_search_boundaries`,
 `check_servo_id_write`).
+
+## Held-role supervision — `validate_lf_role_observation` (L1378), `LfMotorRole::ActivelyHeld`
+
+| V25 | Now (`FullLegCalibrationExecutor::monitorHeld`, every held joint, every tick) |
+|---|---|
+| telemetry age > `MAX_TELEMETRY_AGE` | no usable sample for ≥ 3 s → `STALE_TELEMETRY` |
+| `has_driver_error` / `status != 0` | `SERVO_STATUS_FAULT` |
+| `current >= HARD_CURRENT_ABORT_RAW` | `HARD_CURRENT_ABORT` |
+| `validate_matdog_temperature` | `OVER_TEMPERATURE`, after the V25 over-limit confirmation (dev log §8b) |
+| `validate_lf_active_readback`: torque enabled, `TORQUE_LIMIT`, `goal_position == target_tick` | `HELD_JOINT_READBACK` |
+| `circular_distance(position, target) > STATIC_TOLERANCE_TICKS` (10) | `HELD_JOINT_DRIFT` (`|present − target| > 10`; the installation never wraps) |
+| — (no speed check on an `ActivelyHeld` joint) | none. A held joint above 40 raw inside its hold is only logged: `CALIBRATION_HELD_SPEED_TRANSIENT`, rising edge, ≤ 32 per run |
+
+`LF_HELD_MAX_SPEED_RAW = 4` is V25's settling criterion, and the port uses it the same way:
+- `StableTargetGate::observe_at` (L887): within tolerance **and** |speed| ≤ 4 for 4 samples over
+  ≥ 400 ms. This is `stepMove`'s settle, before `Op::HOLD` promotes the joint to held, and the
+  contact search's backoff gate;
+- `lf_initial_recovery_needed` (L914): recovery quiescence. The port recovers every joint (D1),
+  and each recovery settles through the same |speed| ≤ 4 gate.
+
+The retired D5 was an additional post-V25 rule: an already-held joint failed at |speed| > 40 raw
+on two consecutive samples. On 2026-09-30 it aborted LF UPPER MAX 66 ms into a coarse step while
+every held joint was inside its 10-tick hold (dev log §8c). A held-role failure now prints
+`CALIBRATION_HELD_ROLE_FAILURE`, which names the motor and carries its full readback and the
+active probe's state.
 
 ## `prepare_motor` (L3875) — the energize order
 
@@ -174,7 +200,7 @@ These come from the current mechanism and calibration contract, not from the sea
 - Geometry-required side-specific HIP prerequisite poses (D8, below).
 - Rear LOWER folded pose −455 ticks (D3).
 - 35° rear park (D4).
-- Held-joint speed abort (D5).
+- (D5, a post-V25 held-joint speed abort, is retired: § Held-role supervision.)
 - Temperature-limit register verified by preflight, not per sample (D9, LOW).
 
 ### Reach of the coarse scout (risk R2) — closed by D10 on measured evidence

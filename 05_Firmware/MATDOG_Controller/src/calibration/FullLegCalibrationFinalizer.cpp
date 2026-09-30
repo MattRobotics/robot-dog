@@ -45,7 +45,6 @@ CalibrationFailure sessionCauseFor(FullLegFinalizeFailure failure, FullLegFailur
         case FullLegFailure::MOVE_TIMEOUT:
           return CalibrationFailure::MOTION_TIMEOUT;
         case FullLegFailure::HELD_JOINT_DRIFT:
-        case FullLegFailure::HELD_JOINT_SPEED:
         case FullLegFailure::PASSIVE_JOINT_MOVED:
         case FullLegFailure::BYSTANDER_MOVED:
           return CalibrationFailure::STATIC_JOINT_MOVED;

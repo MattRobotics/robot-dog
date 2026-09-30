@@ -213,6 +213,10 @@ bool FullLegCalibrationExecutor::start(const FullLegCalibrationRequest& request,
   }
   diagnostics_accepted_ = false;
   prerequisites_verified_ = false;
+  held_role_failure_ = FullLegHeldObservation{};
+  held_transients_tick_count_ = 0;
+  held_transient_total_ = 0;
+  held_transients_recorded_ = 0;
   for (uint8_t s = 0; s < kSlotCount; ++s) slot_[s] = SlotState{};
   for (uint8_t i = 0; i < kFullLegPopulation; ++i) population_[i] = PopulationState{};
   recover_index_ = 0;
@@ -487,22 +491,29 @@ bool FullLegCalibrationExecutor::sampleUsable(const actuator::TelemetrySample* s
          s->servo_status >= 0;
 }
 
-bool FullLegCalibrationExecutor::commonSafety(const actuator::TelemetrySample& s) {
-  if (s.servo_status != 0) {
-    fail(FullLegFailure::SERVO_STATUS_FAULT);
-    return false;
-  }
+FullLegFailure FullLegCalibrationExecutor::commonSafetyFailure(const actuator::TelemetrySample& s) const {
+  if (s.servo_status != 0) return FullLegFailure::SERVO_STATUS_FAULT;
   if (magnitude(s.present_current) >= kSearchHardCurrentAbortRaw) {
-    fail(FullLegFailure::HARD_CURRENT_ABORT);
-    return false;
+    return FullLegFailure::HARD_CURRENT_ABORT;
   }
-  if (s.present_temperature > kSearchTemperatureLimitC) {
-    fail(FullLegFailure::OVER_TEMPERATURE);
-    return false;
-  }
-  return true;
+  if (s.present_temperature > kSearchTemperatureLimitC) return FullLegFailure::OVER_TEMPERATURE;
+  return FullLegFailure::NONE;
 }
 
+bool FullLegCalibrationExecutor::commonSafety(const actuator::TelemetrySample& s) {
+  const FullLegFailure failure = commonSafetyFailure(s);
+  if (failure == FullLegFailure::NONE) return true;
+  fail(failure);
+  return false;
+}
+
+// LF V25 validate_lf_role_observation(), LfMotorRole::ActivelyHeld: fresh
+// telemetry, healthy status, no hard current, temperature, active readback
+// (TorqueEnable, TorqueLimit, GoalPosition == held target), and position
+// within STATIC_TOLERANCE_TICKS of the held target. Nothing else: speed is a
+// settling criterion (the StableTargetGate that promoted the joint to held),
+// not a held-role abort. A held joint's speed above
+// kHeldSpeedTransientReportRaw is only recorded as evidence.
 bool FullLegCalibrationExecutor::monitorHeld(uint32_t now_ms, const FullLegTelemetryFrame& t) {
   uint8_t held = 0;
   for (uint8_t s = 0; s < kSlotCount; ++s) {
@@ -513,35 +524,100 @@ bool FullLegCalibrationExecutor::monitorHeld(uint32_t now_ms, const FullLegTelem
     const actuator::TelemetrySample* sample = t.find(j.bus_id);
     if (!sampleUsable(sample)) {
       if (now_ms - st.last_good_ms >= kSequenceMaxTelemetryAgeMs) {
-        fail(FullLegFailure::STALE_TELEMETRY);
+        failHeldRole(observeHeld(s, nullptr, now_ms, t), FullLegFailure::STALE_TELEMETRY);
         return false;
       }
       continue;
     }
     st.last_good_ms = now_ms;
-    if (!commonSafety(*sample)) return false;
+    st.has_last_sample = true;
+    st.last_sample = *sample;
+    const FullLegFailure safety = commonSafetyFailure(*sample);
+    if (safety != FullLegFailure::NONE) {
+      failHeldRole(observeHeld(s, sample, now_ms, t), safety);
+      return false;
+    }
     if (sample->torque_enable != 1 ||
         sample->torque_limit != static_cast<int32_t>(request_.torque_limit) ||
         sample->goal_position != static_cast<int32_t>(st.target_tick)) {
-      fail(FullLegFailure::HELD_JOINT_READBACK);
+      failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_READBACK);
       return false;
     }
     if (absDiff(sample->present_position, st.target_tick) >
         static_cast<int32_t>(kSequenceStaticToleranceTicks)) {
-      fail(FullLegFailure::HELD_JOINT_DRIFT);
+      failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_DRIFT);
       return false;
     }
-    if (magnitude(sample->present_speed) > static_cast<int32_t>(kSequenceHeldSpeedAbortRaw)) {
-      if (++st.fast_samples >= kSequenceHeldSpeedAbortSamples) {
-        fail(FullLegFailure::HELD_JOINT_SPEED);
-        return false;
+    // Diagnostic only: never fails the run.
+    const bool fast =
+        magnitude(sample->present_speed) > static_cast<int32_t>(kHeldSpeedTransientReportRaw);
+    if (fast && !st.speed_transient) {
+      if (held_transient_total_ < 0xFFFF) ++held_transient_total_;
+      if (held_transients_recorded_ < kHeldSpeedTransientEventCap &&
+          held_transients_tick_count_ < kHeldTransientSlots) {
+        held_transients_tick_[held_transients_tick_count_++] = observeHeld(s, sample, now_ms, t);
+        ++held_transients_recorded_;
       }
-    } else {
-      st.fast_samples = 0;
     }
+    st.speed_transient = fast;
   }
   status_.held_count = held;
   return true;
+}
+
+FullLegHeldObservation FullLegCalibrationExecutor::observeHeld(
+    uint8_t slot, const actuator::TelemetrySample* sample, uint32_t now_ms,
+    const FullLegTelemetryFrame& t) const {
+  const SlotState& st = slot_[slot];
+  const FullLegJoint& j = slotJoint(slot);
+  FullLegHeldObservation o{};
+  o.valid = true;
+  o.phase = status_.phase;
+  o.bus_id = j.bus_id;
+  o.identity = j.identity;
+  o.target_tick = st.target_tick;
+  o.sample_usable = sample != nullptr;
+  const actuator::TelemetrySample* v = sample != nullptr ? sample
+                                       : (st.has_last_sample ? &st.last_sample : nullptr);
+  o.has_sample = v != nullptr;
+  o.sample_age_ms = sample != nullptr ? 0 : now_ms - st.last_good_ms;
+  if (v != nullptr) {
+    o.present_position = v->present_position;
+    o.position_error = absDiff(v->present_position, st.target_tick);
+    o.present_speed = magnitude(v->present_speed);
+    o.goal_position = v->goal_position;
+    o.torque_enable = v->torque_enable;
+    o.torque_limit = v->torque_limit;
+    o.present_current = magnitude(v->present_current);
+    o.present_temperature = v->present_temperature;
+    o.servo_status = v->servo_status;
+  }
+  if (program_index_ < program_count_) {
+    const ProgramStep& p = program_[program_index_];
+    if (p.op == Op::PROBE && probe_.active()) {
+      o.active_is_probe = true;
+      o.active_bus = probe_.request().bus_id;
+      o.active_joint = probe_.request().endpoint_joint;
+      o.active_side = probe_.request().endpoint_side;
+      o.active_target_tick = probe_.status().target_tick;
+    } else if (p.op == Op::ENERGIZE || p.op == Op::MOVE) {
+      o.active_bus = slotJoint(p.slot).bus_id;
+      o.active_joint = slotJoint(p.slot).identity.joint;
+      o.active_target_tick = p.target_tick;
+    }
+    const actuator::TelemetrySample* a = o.active_bus != 0 ? t.find(o.active_bus) : nullptr;
+    if (sampleUsable(a)) o.active_position = a->present_position;
+  }
+  return o;
+}
+
+void FullLegCalibrationExecutor::failHeldRole(FullLegHeldObservation observation,
+                                              FullLegFailure failure) {
+  if (!held_role_failure_.valid) {
+    observation.failure = failure;
+    held_role_failure_ = observation;
+  }
+  fail(failure);
 }
 
 bool FullLegCalibrationExecutor::monitorBystander(uint32_t now_ms, const FullLegTelemetryFrame& t) {
@@ -1215,6 +1291,7 @@ void FullLegCalibrationExecutor::update(const FullLegCalibrationContext& context
                                         const FullLegSafeOffFrame& safe_off) {
   if (!active()) return;
   now_ms_ = now_ms;
+  held_transients_tick_count_ = 0;
 
   // Every tick, before any op: dynamic prerequisites, then every held joint,
   // then one bystander. Any failure here sends the run to its SAFE_OFF.
@@ -1247,7 +1324,8 @@ void FullLegCalibrationExecutor::update(const FullLegCalibrationContext& context
         return;
       }
       st.held = true;
-      st.fast_samples = 0;
+      st.speed_transient = false;
+      st.has_last_sample = false;
       st.last_good_ms = now_ms;
       advanceProgram(now_ms);
       return;
@@ -1313,7 +1391,6 @@ const char* toString(FullLegFailure failure) {
     case FullLegFailure::MOVE_TIMEOUT:                  return "MOVE_TIMEOUT";
     case FullLegFailure::MOVE_READBACK:                 return "MOVE_READBACK";
     case FullLegFailure::HELD_JOINT_DRIFT:              return "HELD_JOINT_DRIFT";
-    case FullLegFailure::HELD_JOINT_SPEED:              return "HELD_JOINT_SPEED";
     case FullLegFailure::HELD_JOINT_READBACK:           return "HELD_JOINT_READBACK";
     case FullLegFailure::HELD_SET_MISMATCH:             return "HELD_SET_MISMATCH";
     case FullLegFailure::PASSIVE_JOINT_MOVED:           return "PASSIVE_JOINT_MOVED";

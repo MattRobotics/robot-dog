@@ -22,8 +22,17 @@ MIN/MAX only, 2 of a leg's 6 contacts. It is superseded and is **not** Full Cali
   HIP@q0 + UPPER@90°; HIP probe UPPER@side clearance (LF 90/85, RF 85/90, rear 90/90) + LOWER
   folded; front legs keep the rear UPPER parked. A probe starts only with exactly that held set.
   Every held joint and one round-robin bystander are checked every tick (torque, GoalPosition,
-  TorqueLimit, drift, speed, status, current, temperature, telemetry age). Any violation fails
+  TorqueLimit, drift, status, current, temperature, telemetry age). Any violation fails
   closed to a verified SAFE_OFF of all 12.
+- **Held-role supervision = LF V25 `ActivelyHeld` (hardware correction, 2026-09-30)**: the
+  post-V25 held-joint speed abort (`HELD_JOINT_SPEED`, |speed| > 40 raw × 2 samples) is removed,
+  and nothing replaces it. On hardware it aborted LF UPPER MAX while every held joint was inside its
+  10-tick hold. An already-held joint fails on telemetry, status, hard current, confirmed
+  temperature, TorqueEnable/TorqueLimit/GoalPosition readback and drift > 10, exactly as
+  `validate_lf_role_observation`. `LF_HELD_MAX_SPEED_RAW = 4` stays the StableTargetGate before a
+  joint is held and the INITIAL_RECOVERY settle. New evidence naming the exact motor:
+  `CALIBRATION_HELD_ROLE_FAILURE` (once per failure) and, diagnostic only,
+  `CALIBRATION_HELD_SPEED_TRANSIENT` (rising edge, ≤ 32 per run).
 - **`CalibrationSequencePlan` (new)**: the second authorization object. Poses per leg, generated
   by `matdog_full_calibration_sequence_geometry_v5.py` from four collision-free validation
   artifacts (every segment of every leg's sequence on the SHA-pinned URDF/meshes). Rear LOWER fold

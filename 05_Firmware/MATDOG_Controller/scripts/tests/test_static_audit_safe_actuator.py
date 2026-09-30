@@ -1112,6 +1112,44 @@ def main():
          r"sample->goal_position != static_cast<int32_t>\(st\.target_tick\)",
          "sample->goal_position != static_cast<int32_t>(st.target_tick)",
          "monitorHeld() lost", runner=run_sequence_checks)
+    # V25 ActivelyHeld supervision: no speed abort on an already-held joint;
+    # speed stays the settling gate (StableTargetGate / INITIAL_RECOVERY).
+    case("a held joint aborts on its speed again", "FullLegCalibrationExecutor.cpp",
+         r"    st\.speed_transient = fast;",
+         "    if (fast) return false;\n    st.speed_transient = fast;",
+         "may read a held joint's speed only", runner=run_sequence_checks)
+    case("a held joint fails on speed before the V25 checks", "FullLegCalibrationExecutor.cpp",
+         r"    st\.last_good_ms = now_ms;\n    st\.has_last_sample = true;",
+         "    st.last_good_ms = now_ms;\n    if (magnitude(sample->present_speed) > 40) "
+         "{ failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_DRIFT); "
+         "return false; }\n    st.has_last_sample = true;",
+         "may read a held joint's speed only", runner=run_sequence_checks)
+    case("the retired HELD_JOINT_SPEED failure reappears", "FullLegCalibrationExecutor.h",
+         r"  HELD_JOINT_DRIFT,\n",
+         "  HELD_JOINT_DRIFT,\n  HELD_JOINT_SPEED,\n",
+         "retired post-V25 HELD_JOINT_SPEED", runner=run_sequence_checks)
+    case("held joints stop checking drift", "FullLegCalibrationExecutor.cpp",
+         r"if \(absDiff\(sample->present_position, st\.target_tick\) >",
+         "if (false && absDiff(sample->present_position, st.target_tick) >",
+         "monitorHeld() lost", runner=run_sequence_checks)
+    case("held joints skip status / current / temperature", "FullLegCalibrationExecutor.cpp",
+         r"    if \(safety != FullLegFailure::NONE\) \{",
+         "    if (false) {",
+         "monitorHeld() lost", runner=run_sequence_checks)
+    case("the StableTargetGate loses its speed criterion", "FullLegCalibrationExecutor.cpp",
+         r"absDiff\(s->present_position, p\.target_tick\) <= static_cast<int32_t>\(kSequenceStaticToleranceTicks\) &&"
+         r"\s*magnitude\(s->present_speed\) <= static_cast<int32_t>\(kSequenceSettleMaxSpeedRaw\);",
+         "absDiff(s->present_position, p.target_tick) <= static_cast<int32_t>(kSequenceStaticToleranceTicks);",
+         "StableTargetGate speed criterion", runner=run_sequence_checks)
+    case("the INITIAL_RECOVERY settle loses its speed criterion", "FullLegCalibrationExecutor.cpp",
+         r"absDiff\(s->present_position, j\.q0_tick\) <= static_cast<int32_t>\(kSequenceStaticToleranceTicks\) &&"
+         r"\s*magnitude\(s->present_speed\) <= static_cast<int32_t>\(kSequenceSettleMaxSpeedRaw\);",
+         "absDiff(s->present_position, j.q0_tick) <= static_cast<int32_t>(kSequenceStaticToleranceTicks);",
+         "StableTargetGate speed criterion", runner=run_sequence_checks)
+    case("the held speed-transient diagnostic becomes unbounded", "FullLegCalibrationExecutor.h",
+         r"constexpr uint8_t kHeldSpeedTransientEventCap = 32;",
+         "constexpr uint8_t kHeldSpeedTransientEventCap = 255;",
+         "must stay bounded", runner=run_sequence_checks)
     case("the validated plan data is hand-edited", "CalibrationSequencePlanData.h",
          r"-697961\}",
          "-1518641}",

@@ -535,6 +535,7 @@ void Controller::updateFullLegCalibration(uint32_t now_ms) {
   }
   printFullLegSequenceEvent();
   printFullLegSearchEvent();
+  printFullLegHeldEvents();
 
   // 4 - SAFE_OFF, outside policy/session/authority/permit, retried every tick
   // until each bus reads back VERIFIED_OFF.
@@ -611,6 +612,46 @@ void Controller::printFullLegSearchEvent() {
                 p.scout_valid ? (unsigned)p.scout_tick : 0u,
                 (unsigned)p.pass1_contact_tick, (unsigned)p.pass2_contact_tick,
                 calibration::toString(p.failure));
+}
+
+// Held-joint evidence, identifying the exact motor. The held-role failure is
+// printed once, on the tick it ended the run; a speed transient of a held
+// joint that stayed inside its hold is DIAGNOSTIC ONLY (the executor never
+// aborts on speed alone) and bounded by the executor. Print only.
+void Controller::printFullLegHeldEvents() {
+  const calibration::FullLegHeldObservation& f = full_leg_calibration_.heldRoleFailure();
+  if (!f.valid) {
+    held_role_failure_printed_ = false;  // a new run
+  } else if (!held_role_failure_printed_) {
+    held_role_failure_printed_ = true;
+    printFullLegHeldObservation("CALIBRATION_HELD_ROLE_FAILURE", f);
+  }
+  for (uint8_t i = 0; i < full_leg_calibration_.heldSpeedTransientsThisTick(); ++i) {
+    printFullLegHeldObservation("CALIBRATION_HELD_SPEED_TRANSIENT",
+                                full_leg_calibration_.heldSpeedTransient(i));
+  }
+}
+
+void Controller::printFullLegHeldObservation(const char* tag,
+                                             const calibration::FullLegHeldObservation& o) {
+  Serial.printf("%s run_leg=%s phase=%s failure=%s bus=%u leg=%s joint=%s held_target=%u pos=%ld "
+                "error=%ld speed=%ld goal=%ld torque=%ld torque_limit=%ld current=%ld temp=%ld "
+                "status=%ld sample=%s age_ms=%lu active=%s active_bus=%u active_joint=%s "
+                "active_side=%s active_target=%u active_pos=%ld transients=%u\n",
+                tag, calibration::toString(full_leg_calibration_.leg()),
+                calibration::toString(o.phase), calibration::toString(o.failure),
+                (unsigned)o.bus_id, calibration::toString(o.identity.leg),
+                calibration::toString(o.identity.joint), (unsigned)o.target_tick,
+                (long)o.present_position, (long)o.position_error, (long)o.present_speed,
+                (long)o.goal_position, (long)o.torque_enable, (long)o.torque_limit,
+                (long)o.present_current, (long)o.present_temperature, (long)o.servo_status,
+                o.sample_usable ? "FRESH" : (o.has_sample ? "LAST_GOOD" : "NONE"),
+                (unsigned long)o.sample_age_ms,
+                o.active_is_probe ? "PROBE" : (o.active_bus != 0 ? "MOVE" : "NONE"),
+                (unsigned)o.active_bus, calibration::toString(o.active_joint),
+                o.active_side == calibration::ContactSide::MIN_SIDE ? "MIN" : "MAX",
+                (unsigned)o.active_target_tick, (long)o.active_position,
+                (unsigned)full_leg_calibration_.heldSpeedTransientTotal());
 }
 
 // Closes the evidence lifecycle of the armed Full Leg run, exactly once, on

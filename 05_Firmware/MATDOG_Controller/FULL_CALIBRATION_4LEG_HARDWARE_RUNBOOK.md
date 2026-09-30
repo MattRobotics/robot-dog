@@ -78,8 +78,11 @@ prints the six `CALIBRATION_FULL_LEG_SEARCH_CORRIDOR joint=… side=…` lines a
 `CALIBRATION_SEQUENCE …` line per phase/step and one `CALIBRATION_SEARCH …` line per search step.
 
 A held joint that loses torque, has its GoalPosition or TorqueLimit changed, drifts more than 10
-ticks, moves faster than 40 raw on two samples, reports a status fault or 200 current, or goes 3 s
-without telemetry ends the run at once in a verified SAFE_OFF of all 12 joints.
+ticks, reports a status fault or 200 current, or goes 3 s without telemetry ends the run at once in
+a verified SAFE_OFF of all 12 joints. The failure prints `CALIBRATION_HELD_ROLE_FAILURE`, naming
+the motor (bus, joint, held target, position, error, speed, readback, current, temperature) and
+the active probe. A held joint's speed alone never ends the run (LF V25 `ActivelyHeld`). A spike
+above 40 raw inside the hold is logged as `CALIBRATION_HELD_SPEED_TRANSIENT`, diagnostic only.
 
 A PresentTemperature above 70 °C is confirmed first, as LF V25 did. Two direct reads of the same
 servo, 50 ms apart, follow:

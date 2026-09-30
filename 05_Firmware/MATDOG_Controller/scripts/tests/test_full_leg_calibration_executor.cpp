@@ -290,6 +290,12 @@ struct Rig {
   uint16_t probe_result[3][2][3] = {};
   // The final partial coarse-scout step each endpoint took (0 = none).
   uint16_t probe_partial[3][2] = {};
+  // Held-joint evidence the executor recorded (CALIBRATION_HELD_SPEED_TRANSIENT).
+  std::vector<FullLegHeldObservation> transients;
+  // Per bus: consecutive samples handed to the executor with |speed| > 40,
+  // and the longest such run (the retired D5 condition, as the monitor saw it).
+  int fast_run[256] = {0};
+  int max_fast_run[256] = {0};
 
   explicit Rig(Leg l, const StopSpec& stops = StopSpec(), int deadband = 4) : leg(l) {
     arbiter.reset(AuthorityClearReason::BOOT);
@@ -465,9 +471,16 @@ struct Rig {
         if (th.decision != ThermalDecision::NORMAL) thermal_log.push_back(th);
       }
       frame.add(buses[i], sample);
+      const bool fast = sample.read_ok && sample.present_speed >= 0 &&
+                        (sample.present_speed & 0x7FFF) > 40;
+      fast_run[buses[i]] = fast ? fast_run[buses[i]] + 1 : 0;
+      max_fast_run[buses[i]] = std::max(max_fast_run[buses[i]], fast_run[buses[i]]);
     }
     const size_t writes_before = backend.writes.size();
     full.update(ctx(), t, frame, safe_off_frame);
+    for (uint8_t i = 0; i < full.heldSpeedTransientsThisTick(); ++i) {
+      transients.push_back(full.heldSpeedTransient(i));
+    }
     if (full.status().step == FullLegStep::PROBE) {
       const uint8_t ph = static_cast<uint8_t>(full.status().phase);
       for (size_t i = writes_before; i < backend.writes.size() && ph < 32; ++i) {
@@ -1054,6 +1067,43 @@ void test_recovery_move_that_never_settles_times_out() {
 
 // --- held prerequisites ---------------------------------------------------------
 
+// The CALIBRATION_HELD_ROLE_FAILURE record names the exact motor.
+void checkHeldRoleFailure(Rig& rig, uint8_t bus, uint8_t slot, int held_target,
+                          FullLegFailure expect, CalibrationPhase phase) {
+  const FullLegHeldObservation& f = rig.full.heldRoleFailure();
+  CHECK(f.valid);
+  CHECK_EQ((int)f.failure, (int)expect);
+  CHECK_EQ((int)f.phase, (int)phase);
+  CHECK_EQ(f.bus_id, bus);
+  const FullLegJoint& j = slot == 3 ? rig.req().park : rig.req().joint[slot];
+  CHECK_EQ((int)f.identity.leg, (int)j.identity.leg);
+  CHECK_EQ((int)f.identity.joint, (int)j.identity.joint);
+  CHECK_EQ(f.target_tick, held_target);
+  CHECK(f.has_sample);
+  if (expect == FullLegFailure::STALE_TELEMETRY) {
+    CHECK(!f.sample_usable);  // the last good sample, and how old it is
+    CHECK(f.sample_age_ms >= kSequenceMaxTelemetryAgeMs);
+  } else {
+    CHECK(f.sample_usable);
+    CHECK_EQ(f.sample_age_ms, 0u);
+  }
+  CHECK_EQ(f.position_error, std::abs(f.present_position - held_target));
+  CHECK(f.present_speed >= 0 && f.goal_position >= 0 && f.torque_enable >= 0 &&
+        f.torque_limit >= 0 && f.present_current >= 0 && f.present_temperature >= 0 &&
+        f.servo_status >= 0);
+  // ...and what the run was driving at that moment: the probe.
+  JointKind pj = JointKind::UPPER;
+  ContactSide ps = ContactSide::MIN_SIDE;
+  CHECK(actuator::sequenceProbeEndpoint(phase, &pj, &ps));
+  CHECK(f.active_is_probe);
+  CHECK_EQ(f.active_bus, rig.bus(static_cast<uint8_t>(pj)));
+  CHECK_EQ((int)f.active_joint, (int)pj);
+  CHECK_EQ((int)f.active_side, (int)ps);
+  CHECK(f.active_target_tick != 0);
+  CHECK(f.active_position >= 0);
+}
+
+
 struct HeldCase {
   const char* name;
   Leg leg;
@@ -1070,8 +1120,6 @@ void test_held_joint_violations_fail_closed() {
        [](simk::SimJoint& j) { j.pos += 25; }, FullLegFailure::HELD_JOINT_DRIFT, 2},
       {"held LOWER loses torque during HIP MIN", Leg::RH, CalibrationPhase::HIP_MIN, kLower,
        [](simk::SimJoint& j) { j.torque = false; }, FullLegFailure::HELD_JOINT_READBACK, 4},
-      {"held HIP excessive speed during UPPER MIN", Leg::RF, CalibrationPhase::UPPER_MIN, kHip,
-       [](simk::SimJoint& j) { j.speed_override = 60; }, FullLegFailure::HELD_JOINT_SPEED, 0},
       {"held UPPER telemetry lost during LOWER MAX", Leg::LH, CalibrationPhase::LOWER_MAX, kUpper,
        [](simk::SimJoint& j) { j.read_fails = true; }, FullLegFailure::STALE_TELEMETRY, 3},
       {"held LOWER GoalPosition rewritten during HIP MAX", Leg::LF, CalibrationPhase::HIP_MAX, kLower,
@@ -1093,16 +1141,261 @@ void test_held_joint_violations_fail_closed() {
     g_case = hc.name;
     Rig rig(hc.leg);
     const uint8_t b = hc.held_slot == 3 ? rig.req().park.bus_id : rig.bus(hc.held_slot);
-    rig.run(once(probing(hc.phase), [&](Rig& r) { hc.act(r.backend.joint[b]); }));
+    int held_target = -1;
+    rig.run(once(probing(hc.phase), [&](Rig& r) {
+      held_target = r.backend.joint[b].goal;
+      hc.act(r.backend.joint[b]);
+    }));
     CHECK_EQ((int)rig.full.status().step, (int)FullLegStep::FAILED);
     CHECK_EQ((int)rig.full.status().failure, (int)hc.expect);
     CHECK_EQ((int)rig.full.status().failed_phase, (int)hc.phase);
     CHECK_EQ(rig.full.status().contacts_accepted, hc.contacts);
+    checkHeldRoleFailure(rig, b, hc.held_slot, held_target, hc.expect, hc.phase);
+    if (hc.expect == FullLegFailure::OVER_TEMPERATURE) {
+      // The V25 confirmation CONFIRMED it (>= 2 of 3 direct reads) first.
+      bool confirmed = false;
+      for (const ThermalConfirmation& th : rig.thermal_log) {
+        confirmed = confirmed || (th.bus_id == b && th.decision == ThermalDecision::CONFIRMED);
+      }
+      CHECK(confirmed);
+    }
     // The held joint is watched - no telemetry-loss case aside, the failure
     // came within a few ticks, not after the probe finished.
     CHECK(rig.full.contact(rig.full.probeRequest().endpoint_joint,
                            rig.full.probeRequest().endpoint_side).has_measurement == false);
     for (const JointOracle& o : kOracle) rig.backend.joint[o.bus].read_fails = false;
+    checkSafeEnd(rig);
+  }
+}
+
+// --- held-role supervision: LF V25 ActivelyHeld, never a speed abort -------------
+//
+// V25 validate_lf_role_observation(LfMotorRole::ActivelyHeld): fresh
+// telemetry, status, hard current, temperature, TorqueEnable / TorqueLimit /
+// GoalPosition readback, position within STATIC_TOLERANCE_TICKS (10) of the
+// held target. LF_HELD_MAX_SPEED_RAW (4) is used by the StableTargetGate that
+// PROMOTES a moved joint to held and by INITIAL_RECOVERY's settle - not by the
+// supervision of an already-held joint.
+//   MOVING / SETTLING TO BECOME HELD: speed matters.
+//   ALREADY HELD DURING ANOTHER JOINT'S PROBE: position / readback / safety
+//   matter; instantaneous speed alone does not abort.
+
+// 2026-09-30 hardware, LF UPPER MAX: ~66 ms into a coarse step, the probed
+// UPPER accelerating, a held joint (LF HIP, LF LOWER or the LH UPPER park)
+// reported |speed| > 40 on two consecutive samples while its position stayed
+// inside the 10-tick hold; the retired post-V25 D5 rule aborted the run. Here:
+// the held joint's speed register reads 60 for the whole rest of the probe,
+// position / torque / goal / limit / current / temperature all valid. No
+// abort - the leg completes 6/6 - and the transient is one diagnostic record.
+void test_held_speed_transient_is_not_an_abort() {
+  for (const Leg leg : {Leg::LF, Leg::RF, Leg::RH, Leg::LH}) {
+    for (const uint8_t slot : {kHip, kLower, (uint8_t)3}) {
+      Rig rig(leg);
+      if (slot == 3 && !rig.req().has_rear_park) continue;
+      g_case = slot == kHip ? "held HIP |speed| 60 during UPPER MAX: not an abort"
+               : slot == kLower ? "held LOWER |speed| 60 during UPPER MAX: not an abort"
+                                : "held rear park |speed| 60 during UPPER MAX: not an abort";
+      const uint8_t b = slot == 3 ? rig.req().park.bus_id : rig.bus(slot);
+      int held_target = -1;
+      bool armed = false, cleared = false;
+      rig.run([&](Rig& r) {
+        if (!armed && probing(CalibrationPhase::UPPER_MAX, 3)(r)) {
+          armed = true;
+          held_target = r.backend.joint[b].goal;
+          r.backend.joint[b].speed_override = 60;
+        } else if (armed && !cleared && r.full.status().phase != CalibrationPhase::UPPER_MAX) {
+          cleared = true;  // before this joint is moved again (a settle needs <= 4)
+          r.backend.joint[b].speed_override = -1;
+        }
+      });
+      CHECK(armed && cleared);
+      checkComplete(rig);
+      CHECK(!rig.full.heldRoleFailure().valid);
+      CHECK(rig.max_fast_run[b] >= 2);  // the monitor saw consecutive samples > 40
+      int records = 0;
+      for (const FullLegHeldObservation& o : rig.transients) {
+        if (o.bus_id != b) continue;
+        ++records;
+        CHECK(o.valid);
+        CHECK_EQ((int)o.failure, (int)FullLegFailure::NONE);
+        CHECK_EQ((int)o.phase, (int)CalibrationPhase::UPPER_MAX);
+        const FullLegJoint& j = slot == 3 ? rig.req().park : rig.req().joint[slot];
+        CHECK_EQ((int)o.identity.leg, (int)j.identity.leg);
+        CHECK_EQ((int)o.identity.joint, (int)j.identity.joint);
+        CHECK_EQ(o.target_tick, held_target);
+        CHECK(o.position_error <= (int)kSequenceStaticToleranceTicks);
+        CHECK_EQ(o.present_speed, 60);
+        CHECK_EQ(o.goal_position, held_target);
+        CHECK_EQ(o.torque_enable, 1);
+        CHECK_EQ(o.torque_limit, rig.req().torque_limit);
+        CHECK(o.sample_usable);
+        CHECK(o.active_is_probe);
+        CHECK_EQ(o.active_bus, rig.bus(kUpper));
+        CHECK_EQ((int)o.active_joint, (int)JointKind::UPPER);
+        CHECK_EQ((int)o.active_side, (int)ContactSide::MAX_SIDE);
+      }
+      CHECK_EQ(records, 1);  // one rising edge, one record - not one per sample
+      CHECK_EQ(rig.full.heldSpeedTransientTotal(), 1);
+      checkSafeEnd(rig);
+    }
+  }
+}
+
+// The transient diagnostic is bounded: a held joint whose speed register
+// flickers above 40 every other 20 ms slot for a whole probe produces many
+// rising edges, all counted, at most kHeldSpeedTransientEventCap recorded -
+// and still no abort.
+void test_held_speed_transient_records_are_bounded() {
+  g_case = "flickering held-joint speed: bounded records, no abort";
+  Rig rig(Leg::RH);
+  const uint8_t b = rig.bus(kHip);
+  bool armed = false, cleared = false;
+  rig.run([&](Rig& r) {
+    if (!armed && probing(CalibrationPhase::UPPER_MAX, 1)(r)) {
+      armed = true;
+      r.backend.joint[b].speed_noise_every = 2;
+      r.backend.joint[b].speed_noise_raw = 60;
+    } else if (armed && !cleared && r.full.status().phase != CalibrationPhase::UPPER_MAX) {
+      cleared = true;
+      r.backend.joint[b].speed_noise_every = 0;
+    }
+  });
+  checkComplete(rig);
+  CHECK(!rig.full.heldRoleFailure().valid);
+  CHECK(rig.full.heldSpeedTransientTotal() > kHeldSpeedTransientEventCap);
+  CHECK_EQ(rig.transients.size(), (size_t)kHeldSpeedTransientEventCap);
+  for (const FullLegHeldObservation& o : rig.transients) CHECK_EQ(o.bus_id, b);
+  checkSafeEnd(rig);
+}
+
+// The physical hold invariant is the position: exactly 10 ticks off the held
+// target is inside the hold, 11 fails closed, on every leg and every held
+// joint of UPPER MAX.
+void test_held_position_drift_boundary() {
+  for (const Leg leg : {Leg::LF, Leg::RF, Leg::RH, Leg::LH}) {
+    for (const uint8_t slot : {kHip, kLower, (uint8_t)3}) {
+      for (const int off : {10, -10, 11, -11}) {
+        Rig rig(leg);
+        if (slot == 3 && !rig.req().has_rear_park) continue;
+        g_case = std::abs(off) == 10 ? "held joint exactly 10 ticks off its target: inside the hold"
+                                     : "held joint 11 ticks off its target: HELD_JOINT_DRIFT";
+        const uint8_t b = slot == 3 ? rig.req().park.bus_id : rig.bus(slot);
+        int held_target = -1;
+        rig.run(once(probing(CalibrationPhase::UPPER_MAX), [&](Rig& r) {
+          held_target = r.backend.joint[b].goal;
+          r.backend.joint[b].pos = held_target + off;
+        }));
+        if (std::abs(off) == 10) {
+          checkComplete(rig);
+          CHECK(!rig.full.heldRoleFailure().valid);
+        } else {
+          CHECK_EQ((int)rig.full.status().failure, (int)FullLegFailure::HELD_JOINT_DRIFT);
+          CHECK_EQ((int)rig.full.status().failed_phase, (int)CalibrationPhase::UPPER_MAX);
+          checkHeldRoleFailure(rig, b, slot, held_target, FullLegFailure::HELD_JOINT_DRIFT,
+                               CalibrationPhase::UPPER_MAX);
+          CHECK_EQ(rig.full.heldRoleFailure().position_error, 11);
+        }
+        checkSafeEnd(rig);
+      }
+    }
+  }
+}
+
+// V25 StableTargetGate: a moved joint is promoted to held only once it is
+// within 10 ticks AND |speed| <= LF_HELD_MAX_SPEED_RAW (4) for 4 samples over
+// >= 400 ms. A joint at its target whose speed reads 5 is never promoted (the
+// move times out, nothing is probed); 4 is promoted.
+void test_speed_gates_the_promotion_to_held() {
+  for (const Leg leg : {Leg::LF, Leg::RF, Leg::RH, Leg::LH}) {
+    for (const int speed : {5, 4}) {
+      g_case = speed == 5 ? "UPPER MIN prerequisite HIP at target, speed 5: never held"
+                          : "UPPER MIN prerequisite HIP at target, speed 4: held";
+      Rig rig(leg);
+      const uint8_t b = rig.bus(kHip);
+      bool armed = false, cleared = false;
+      rig.run([&](Rig& r) {
+        const bool moving_hip = r.full.status().phase == CalibrationPhase::UPPER_MIN &&
+                                r.full.status().step == FullLegStep::MOVE_MONITOR &&
+                                r.full.status().op_bus == b;
+        if (!armed && moving_hip) {
+          armed = true;
+          r.backend.joint[b].speed_override = speed;
+        } else if (armed && !cleared && !moving_hip) {
+          cleared = true;
+          r.backend.joint[b].speed_override = -1;
+        }
+      });
+      CHECK(armed);
+      if (speed == 5) {
+        CHECK_EQ((int)rig.full.status().failure, (int)FullLegFailure::MOVE_TIMEOUT);
+        CHECK_EQ((int)rig.full.status().failed_phase, (int)CalibrationPhase::UPPER_MIN);
+        CHECK(rig.probe_trace[static_cast<uint8_t>(CalibrationPhase::UPPER_MIN)].empty());
+        CHECK_EQ(rig.held_checks[static_cast<uint8_t>(CalibrationPhase::UPPER_MIN)], 0);
+        CHECK(!rig.full.heldRoleFailure().valid);  // it never became a held joint
+      } else {
+        checkComplete(rig);
+      }
+      checkSafeEnd(rig);
+    }
+  }
+  for (const int speed : {5, 4}) {
+    g_case = speed == 5 ? "PARKING rear park at target, speed 5: never held"
+                        : "PARKING rear park at target, speed 4: held";
+    Rig rig(Leg::LF);
+    const uint8_t b = rig.req().park.bus_id;
+    bool armed = false, cleared = false;
+    rig.run([&](Rig& r) {
+      const bool moving = r.full.status().phase == CalibrationPhase::PARKING &&
+                          r.full.status().step == FullLegStep::MOVE_MONITOR;
+      if (!armed && moving) {
+        armed = true;
+        r.backend.joint[b].speed_override = speed;
+      } else if (armed && !cleared && !moving) {
+        cleared = true;
+        r.backend.joint[b].speed_override = -1;
+      }
+    });
+    CHECK(armed);
+    if (speed == 5) {
+      CHECK_EQ((int)rig.full.status().failure, (int)FullLegFailure::MOVE_TIMEOUT);
+      CHECK_EQ((int)rig.full.status().failed_phase, (int)CalibrationPhase::PARKING);
+      CHECK_EQ(rig.full.status().contacts_accepted, 0);
+    } else {
+      checkComplete(rig);
+    }
+    checkSafeEnd(rig);
+  }
+}
+
+// INITIAL_RECOVERY quiescence: a recovered joint at q0 whose speed reads 5 is
+// never settled (MOVE_TIMEOUT, not all twelve recovered); 4 settles.
+void test_speed_gates_the_recovery_settle() {
+  for (const int speed : {5, 4}) {
+    g_case = speed == 5 ? "INITIAL_RECOVERY joint at q0, speed 5: never settled"
+                        : "INITIAL_RECOVERY joint at q0, speed 4: settled";
+    Rig rig(Leg::LH);
+    const uint8_t b = rig.req().population[0].bus_id;
+    bool armed = false, cleared = false;
+    rig.run([&](Rig& r) {
+      const bool first = r.full.status().phase == CalibrationPhase::INITIAL_RECOVERY &&
+                         r.full.status().step == FullLegStep::MOVE_MONITOR &&
+                         r.full.status().recovered_joints == 0;
+      if (!armed && first) {
+        armed = true;
+        r.backend.joint[b].speed_override = speed;
+      } else if (armed && !cleared && !first) {
+        cleared = true;
+        r.backend.joint[b].speed_override = -1;
+      }
+    });
+    CHECK(armed);
+    if (speed == 5) {
+      CHECK_EQ((int)rig.full.status().failure, (int)FullLegFailure::MOVE_TIMEOUT);
+      CHECK_EQ((int)rig.full.status().failed_phase, (int)CalibrationPhase::INITIAL_RECOVERY);
+      CHECK_EQ(rig.full.status().recovered_joints, 0);
+    } else {
+      checkComplete(rig);
+    }
     checkSafeEnd(rig);
   }
 }
@@ -1555,6 +1848,11 @@ int main() {
   test_recovery_that_does_not_stay_at_q0_fails();
   test_recovery_move_that_never_settles_times_out();
   test_held_joint_violations_fail_closed();
+  test_held_speed_transient_is_not_an_abort();
+  test_held_speed_transient_records_are_bounded();
+  test_held_position_drift_boundary();
+  test_speed_gates_the_promotion_to_held();
+  test_speed_gates_the_recovery_settle();
   test_probe_failures_stop_the_sequence_at_the_right_count();
   test_transition_and_parking_failures();
   test_bystanders_and_passive_participants();

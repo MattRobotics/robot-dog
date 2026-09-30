@@ -102,11 +102,22 @@ constexpr uint16_t kAffineScaleMinPermille = 850;          // AFFINE_SCALE_MIN_P
 constexpr uint16_t kAffineScaleMaxPermille = 1150;         // AFFINE_SCALE_MAX_PERMILLE
 constexpr uint16_t kModelZeroMaxShiftTicks = 96;           // MODEL_ZERO_MAX_SHIFT_FROM_DIGITAL_HOME_TICKS
 constexpr uint16_t kModelZeroEndpointConsistencyTicks = 24;  // diagnostic only, as in V25
-// Operator requirement 2026-09-30 (not in V25, which checked held drift only):
-// a held joint moving this fast on two consecutive samples fails the run
-// before it can drift 10 ticks.
-constexpr uint16_t kSequenceHeldSpeedAbortRaw = 40;
-constexpr uint8_t kSequenceHeldSpeedAbortSamples = 2;
+// Speed is a SETTLING criterion only, exactly as in V25: LF_HELD_MAX_SPEED_RAW
+// (kSequenceSettleMaxSpeedRaw) gates the StableTargetGate that promotes a
+// moved joint to held, and INITIAL_RECOVERY's settle. An ALREADY-held joint
+// is supervised as V25 validate_lf_role_observation(ActivelyHeld): fresh
+// telemetry, status, hard current, temperature, TorqueEnable / TorqueLimit /
+// GoalPosition readback, and position within kSequenceStaticToleranceTicks of
+// its held target. Its instantaneous speed alone never aborts the run.
+//
+// DIAGNOSTIC ONLY, never an abort: an already-held joint reporting a speed
+// above this is logged (CALIBRATION_HELD_SPEED_TRANSIENT), once per rising
+// edge per joint and at most kHeldSpeedTransientEventCap times per run. The
+// figure is the retired post-V25 D5 abort level, so the transient that
+// false-aborted LF UPPER MAX on 2026-09-30 (held position within 10 ticks) is
+// now visible as evidence instead.
+constexpr uint16_t kHeldSpeedTransientReportRaw = 40;
+constexpr uint8_t kHeldSpeedTransientEventCap = 32;
 
 constexpr uint8_t kFullLegContactCount = 6;                // 3 joints x MIN/MAX
 constexpr uint8_t kFullLegPopulation = kLegServoSlotCount;   // every leg joint of the robot
@@ -144,7 +155,6 @@ enum class FullLegFailure : uint8_t {
   MOVE_TIMEOUT,
   MOVE_READBACK,                  // moving joint: torque off / limit / goal / status
   HELD_JOINT_DRIFT,
-  HELD_JOINT_SPEED,
   HELD_JOINT_READBACK,            // held joint: torque off / limit / goal changed
   HELD_SET_MISMATCH,              // a probe's required held set is not exactly what is held
   PASSIVE_JOINT_MOVED,            // a limp participant left its corridor or got torque
@@ -268,6 +278,38 @@ FullLegJointDiagnostics deriveFullLegJointDiagnostics(const FullLegCalibrationRe
                                                       const ContactEvidence& min_side,
                                                       const ContactEvidence& max_side);
 
+// One held joint as the run observed it: the record of a held-role failure,
+// or of a diagnostic speed transient. Evidence only - no decision reads it.
+struct FullLegHeldObservation {
+  bool valid = false;
+  FullLegFailure failure = FullLegFailure::NONE;  // NONE: a speed transient (not a failure)
+  CalibrationPhase phase = CalibrationPhase::PREFLIGHT;
+  uint8_t bus_id = 0;
+  JointIdentity identity{};
+  uint16_t target_tick = 0;      // the held target
+  // false: no usable sample this tick (read failed / stale); the values below
+  // are then the joint's last usable sample, sample_age_ms old.
+  bool sample_usable = false;
+  bool has_sample = false;       // false: no usable sample since it was held
+  uint32_t sample_age_ms = 0;
+  int32_t present_position = -1;
+  int32_t position_error = 0;    // |present - target|
+  int32_t present_speed = -1;    // magnitude, raw
+  int32_t goal_position = -1;
+  int32_t torque_enable = -1;
+  int32_t torque_limit = -1;
+  int32_t present_current = -1;  // magnitude, raw
+  int32_t present_temperature = -1;
+  int32_t servo_status = -1;
+  // The joint the run was driving at that moment (the probe, or a move).
+  uint8_t active_bus = 0;
+  JointKind active_joint = JointKind::HIP;
+  bool active_is_probe = false;
+  ContactSide active_side = ContactSide::MIN_SIDE;
+  uint16_t active_target_tick = 0;
+  int32_t active_position = -1;
+};
+
 struct FullLegCalibrationStatus {
   CalibrationPhase phase = CalibrationPhase::PREFLIGHT;
   FullLegStep step = FullLegStep::IDLE;
@@ -333,6 +375,18 @@ class FullLegCalibrationExecutor {
   // The bus the owned probe is (or was last) driving.
   uint8_t probeBusId() const { return probe_.request().bus_id; }
 
+  // Held-joint evidence (print only). The held-role failure that ended the
+  // run, if one did (valid == false otherwise)...
+  const FullLegHeldObservation& heldRoleFailure() const { return held_role_failure_; }
+  // ...and the diagnostic speed transients the LAST update() recorded (0..4;
+  // none once kHeldSpeedTransientEventCap were recorded this run).
+  uint8_t heldSpeedTransientsThisTick() const { return held_transients_tick_count_; }
+  const FullLegHeldObservation& heldSpeedTransient(uint8_t i) const {
+    return held_transients_tick_[i < kHeldTransientSlots ? i : 0];
+  }
+  // Every transient rising edge this run, including those past the cap.
+  uint16_t heldSpeedTransientTotal() const { return held_transient_total_; }
+
  private:
   // One primitive of a phase program.
   enum class Op : uint8_t {
@@ -354,6 +408,7 @@ class FullLegCalibrationExecutor {
   };
   static constexpr uint8_t kSlotCount = 4;
   static constexpr uint8_t kSlotPark = 3;
+  static constexpr uint8_t kHeldTransientSlots = kSlotCount;
   static constexpr uint8_t kMaxProgram = 12;
 
   struct SlotState {
@@ -362,7 +417,11 @@ class FullLegCalibrationExecutor {
     uint16_t target_tick = 0;
     bool has_good = false;
     uint32_t last_good_ms = 0;
-    uint8_t fast_samples = 0;
+    // Evidence only: the last usable sample while held, and whether the
+    // joint is inside a speed transient (for the rising-edge diagnostic).
+    bool has_last_sample = false;
+    actuator::TelemetrySample last_sample{};
+    bool speed_transient = false;
   };
   struct PopulationState {
     bool has_good = false;
@@ -386,8 +445,15 @@ class FullLegCalibrationExecutor {
   bool continuationOk(const FullLegCalibrationContext& context) const;
   const FullLegJoint& slotJoint(uint8_t slot) const;
   bool sampleUsable(const actuator::TelemetrySample* s) const;
+  // Status / hard current / temperature, as V25 checks them on every role.
+  FullLegFailure commonSafetyFailure(const actuator::TelemetrySample& s) const;
   bool commonSafety(const actuator::TelemetrySample& s);
   bool monitorHeld(uint32_t now_ms, const FullLegTelemetryFrame& telemetry);
+  FullLegHeldObservation observeHeld(uint8_t slot, const actuator::TelemetrySample* sample,
+                                     uint32_t now_ms, const FullLegTelemetryFrame& telemetry) const;
+  // Latches the held-role record (observed BEFORE fail() moves the run to
+  // TORQUE_OFF and aborts the probe), then fails the run with `failure`.
+  void failHeldRole(FullLegHeldObservation observation, FullLegFailure failure);
   bool monitorBystander(uint32_t now_ms, const FullLegTelemetryFrame& telemetry);
   bool isParticipantBus(uint8_t bus, uint8_t* slot) const;
   void recomputePrerequisites();
@@ -426,6 +492,11 @@ class FullLegCalibrationExecutor {
   FullLegJointDiagnostics diagnostics_[kJointKindCount];
   bool diagnostics_accepted_ = false;
   bool prerequisites_verified_ = false;
+  FullLegHeldObservation held_role_failure_{};
+  FullLegHeldObservation held_transients_tick_[kHeldTransientSlots];
+  uint8_t held_transients_tick_count_ = 0;
+  uint16_t held_transient_total_ = 0;
+  uint8_t held_transients_recorded_ = 0;
 
   SlotState slot_[kSlotCount];
   PopulationState population_[kFullLegPopulation];
