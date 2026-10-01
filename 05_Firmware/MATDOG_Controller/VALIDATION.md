@@ -23,6 +23,22 @@ checkboxes are not current project status and are intentionally not rewritten.
 | Exact validated firmware source | `5b371da5482f9b0bd2df1c37ed361250ea54ae8f` |
 | Validated application SHA256 | `6e6d92f898dbe95000b53dbb252c7eb5d3deaa9a4b161e2b1934436a76b29364` |
 
+### Latest hardware session — 2026-10-01
+
+| Item | Result |
+|---|---|
+| Validated firmware source | `dfcecb670d0565d2db1a8152b6cd7ad230bdb87d`; BUILD_ID `dfcecb670d05` |
+| Hardware profile | `ROBOT_POWERED`, OTA ingest disabled |
+| TRUE Full Calibration | **24/24 hardware PASS**, LF/RF/RH/LH 6/6 each |
+| Fine-pass repeatability | <= 4 ticks for every endpoint |
+| Final SAFE_OFF | 13/13 verified |
+| Persistence | RAM-only; boot restoration not implemented |
+| Operational envelopes | Unapproved (`envelope_accepted=0`) |
+
+Evidence: [hardware-validation report](../../09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md). The merged PR #35 contains the hardware-validated source; the later merge
+commit itself was not flashed. This is a development-firmware validation, not a change to the
+frozen V0.1 release identity.
+
 ### VALIDATED
 
 - `USB_ONLY` boot on the real ESP32-S3, native USB CDC and live BNO085 acquisition;
@@ -75,11 +91,9 @@ in the note after this table) — the DALY KEY write flash
 | Application SHA256 | `e9283ced5801d87d5fe44f95411ead2de6d6f6dad2101c88b210c31cd0e645b6` (per § EVIDENCE PROVENANCE below) |
 | Flash path | `MATDOG_FLASH_PROFILE=ROBOT_POWERED scripts/flash_app_only.sh`, `app0 @ 0x010000` |
 
-Later flashes: `88062e1` (LED V2 hardware validation, 2026-09-26) and then `315d4ade6ff0` (CR2-C
-read-only q0 capture, 2026-09-27) — the last build recorded as running on the robot. **The
-current `main` (four-leg Full Calibration, current-boot q0 promotion) is not flashed**; the
-hardware Full Calibration session starts from a clean-merged-`main` `ROBOT_POWERED` build whose manifest is
-kept with the evidence.
+Later development flashes: `88062e1` (LED V2, 2026-09-26), `315d4ade6ff0`
+(read-only q0 capture, 2026-09-27), and `dfcecb670d05` (24-contact hardware calibration,
+2026-10-01). The 2026-10-01 build is the latest hardware-validated development firmware.
 
 ### OPEN
 
@@ -104,22 +118,15 @@ kept with the evidence.
 ### Next
 
 ```text
-Full Calibration HW Validation      (LF -> RF -> RH -> LH, one attended ROBOT_POWERED session)
-  -> Calibration Persistence V1     (NEXT AFTER hardware Full Calibration PASS)
-  -> Operational Envelopes / JointLimits
-  -> Stand / Gait hardware
+CURRENT    Calibration Persistence V1           TO_DESIGN
+OPEN       Telemetry integrity                  Before hardware gait
+OPEN       LOWER MAX margin and q0 review       Before operational approval
+THEN       Operational Envelopes / JointLimits   BLOCKED pending approval
+THEN       Stand / Gait hardware                 BLOCKED
 ```
 
-The four-leg Full Calibration is **IMPLEMENTED / OFFLINE TESTED** on `main` (host suite, static
-audit, Safe Actuator / DALY / LED mutation suites, and both `USB_ONLY` and `ROBOT_POWERED`
-builds PASS) but has **never run on hardware**; nothing in this file claims it is hardware
-validated. The best outcome a hardware run can honestly claim is `HARDWARE_CONTACT_CALIBRATED`;
-`FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` is unavailable until a stand/gait workspace is approved, so
-0/12 final JointLimits are admitted on purpose. Calibration results are RAM-only until
-Calibration Persistence V1 exists. Procedure and stop conditions:
-[`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md); the
-sequence and its dependencies are owned by
-[`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md).
+The Full Calibration contact hardware gate is complete. The measurements are RAM-only and no
+approved operational limits exist. Stand or gait hardware motion is not authorized.
 
 Charging hardware qualification beyond the one attended manual session (autonomous dock/contact,
 reverse-polarity protection, unattended charge acceptance/termination, future Jetson charging) is
@@ -137,11 +144,8 @@ The allocation authority is
 [`MATDOG_SERVO_ALLOCATION.yaml`](../../06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml),
 while the root [`README.md`](../../README.md) owns the current physical-population snapshot.
 
-The hardware Full Calibration requires its own separate, attended authorization. It permits the
-runbook's read-only q0 capture and RAM promotion, and the session-scoped, permit-gated calibration
-motion of the four legs; `SAFE_OFF` stays reachable throughout. It forbids servo EEPROM/`PositionOffset`
-and ID writes, NVS writes, BNO085 DCD writes and DALY writes. Passing earlier single-device bench
-campaigns, or the read-only CR2-C capture, does not constitute passing this gate.
+The completed 2026-10-01 hardware session was attended and separately authorized. Any new
+calibration or motion experiment requires fresh operator authorization and its own safety gates.
 
 ## Session 1 — 2026-09-15, USB-only bench state
 

@@ -27,23 +27,19 @@ MATDOG Controller
 └── status/          LedRing — WS2812B ring, boots OFF, non-blocking effects
 ```
 
-**TRUE Full Calibration = 4 legs × 3 joints × MIN/MAX = 24 contacts (2026-09-30).** The
-24-contact implementation, the LF V25 full-leg state machine generalized to LF/RF/RH/LH with
-INITIAL RECOVERY and held prerequisites, is offline-validated and has never run on the robot. See
-[`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md) and
-[`2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md`](../../09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md).
-The UPPER-only run described below as "Full Calibration" was 8 contacts and is superseded.
+## Current hardware status — 2026-10-01
 
-**Current state (2026-09-29).** `ROBOT_POWERED` no-motion operation is hardware-validated. The
-Safe Actuator layer and the four-leg Full Calibration (LF, RF, RH, LH) are merged on `main`,
-**IMPLEMENTED / OFFLINE TESTED and never run on the robot** — see [Calibration on
-`main`](#calibration-on-main-2026-09-29). No stand, gait, IK, closed-loop stabilization, ROS
-2/MoveIt 2 or autonomous behaviour is implemented here — see `VALIDATION.md` for the precise
-scope. The historical scope statements in the sections below are kept as written. A **Wi-Fi station runtime** (W1) and the
-**OTA-A update core** (state machine, inactive-slot writer, first-boot rollback validation)
-are implemented and offline-tested but **not yet hardware-tested**, and OTA ships **no
-transport and no authentication**. See [Wi-Fi runtime](#wi-fi-runtime-w1) and
-[OTA-A](#ota-a-update-core) for exactly what that does and does not mean.
+**TRUE Full Calibration: HARDWARE-VALIDATED 24/24.** The LF V25-derived full-leg sequence was
+run on the real robot: LF/RF/RH/LH each reached `HARDWARE_CONTACT_CALIBRATED` 6/6 on the first
+attempt. Firmware `dfcecb670d0565d2db1a8152b6cd7ad230bdb87d` (`ROBOT_POWERED`) ended SAFE_OFF 13/13 verified.
+
+The 12 fresh q0 values and 24 contacts were exported and archived ([hardware-validation report](../../09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md)).
+Calibration is RAM-only; the export is not an implemented boot restore. No operational envelope
+is approved, and stand/gait hardware motion remains blocked. The frozen Controller V0.1 release
+is distinct from the later development firmware validated in this session.
+
+The [2026-09-29 calibration overview](#calibration-on-main-2026-09-29) below is retained as a
+historical software-only snapshot, not the current project status.
 
 ## Official baseline
 
@@ -575,10 +571,12 @@ events are fired at a live one and must not touch it.
 
 ## Calibration on `main` (2026-09-29)
 
+> **HISTORICAL / SUPERSEDED status snapshot.** Current 24/24 hardware result is above.
+
 **Status: IMPLEMENTED / OFFLINE TESTED. The four-leg Full Calibration has NOT been run on
 hardware.** The sections *Calibration foundation* and *Safe Actuator Layer* below are the
 historical record of how the foundation was built; where they say "no write path" or "runtime
-adapter TO_IMPLEMENT", this block is the current state.
+adapter TO_IMPLEMENT", those statements are historical, not current status.
 
 - **Write path.** A bounded production `ServoBusActuatorBackend` exists and is reachable only
   through the Safe Actuator layer: `ActuatorAuthority` lease, a live calibration session, a fresh
@@ -893,7 +891,7 @@ cleared explicitly, or by the next boot.
 
 **Status (historical, 2026-09-25): policy core implemented, compiled, offline-tested. Runtime adapter TO_IMPLEMENT.
 NO write path added.** *(Current: see [Calibration on `main`](#calibration-on-main-2026-09-29) —
-a bounded production backend now exists, calibration-only and hardware TO_TEST.)*
+bounded calibration was hardware-validated on 2026-10-01; operational motion remains blocked.)*
 
 `src/actuator/ActuatorWritePolicy.*` is the boundary every future actuator write must pass
 through. It is a **decision**, not a transport: there is no bus handle in it, so an `ACCEPT`

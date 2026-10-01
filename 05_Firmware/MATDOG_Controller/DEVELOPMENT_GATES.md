@@ -1,7 +1,7 @@
 # MATDOG Controller — Development Gates
 
 **Canonical owner of the technical pass/fail authorization criteria for each Controller
-development gate.** Last updated 2026-09-27.
+development gate.** Last updated 2026-10-01.
 
 This file answers *what must be true before this stage may begin, what it may and may not do, and
 what proves it passed*. It is not a narrative roadmap and not an evidence log:
