@@ -12,7 +12,10 @@ BackendCallKind backendCallFor(ActuatorOperation operation) {
     case ActuatorOperation::CALIBRATION_CONTACT_PROBE:
     case ActuatorOperation::DIRECTION_VERIFY:
     case ActuatorOperation::CALIBRATION_AUXILIARY_MOVE:
+    case ActuatorOperation::CALIBRATION_SEQUENCE_MOVE:
       return BackendCallKind::WRITE_GOAL_POSITION;
+    case ActuatorOperation::CALIBRATION_TORQUE_LIMIT:
+      return BackendCallKind::WRITE_CALIBRATION_TORQUE_LIMIT;
     case ActuatorOperation::NONE:
       return BackendCallKind::NONE;
   }
@@ -39,7 +42,10 @@ ExecuteResult ActuatorRuntime::execute(ActuatorTransaction* transaction, uint8_t
       outcome = backend_->enableTorque(bus_id);
       break;
     case BackendCallKind::WRITE_GOAL_POSITION:
-      outcome = backend_->writeGoalPosition(bus_id, cmd.target_tick);
+      outcome = backend_->writeGoalPosition(bus_id, cmd.target_tick, cmd.motion_profile);
+      break;
+    case BackendCallKind::WRITE_CALIBRATION_TORQUE_LIMIT:
+      outcome = backend_->writeCalibrationTorqueLimit(bus_id);
       break;
     case BackendCallKind::NONE:
       return ExecuteResult::NO_RAW_TARGET;
@@ -80,6 +86,8 @@ const char* toString(BackendCallKind kind) {
     case BackendCallKind::NONE:                return "NONE";
     case BackendCallKind::ENABLE_TORQUE:       return "ENABLE_TORQUE";
     case BackendCallKind::WRITE_GOAL_POSITION: return "WRITE_GOAL_POSITION";
+    case BackendCallKind::WRITE_CALIBRATION_TORQUE_LIMIT:
+      return "WRITE_CALIBRATION_TORQUE_LIMIT";
   }
   return "UNKNOWN";
 }

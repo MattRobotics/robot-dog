@@ -6,6 +6,7 @@
 #include "../actuator/ActuatorRuntime.h"
 #include "../actuator/ActuatorWritePolicy.h"
 #include "../actuator/CalibrationGeometryProfileData.h"
+#include "../actuator/CalibrationSequencePlanData.h"
 #include "../calibration/CalibrationExecutionEngine.h"
 #include "../calibration/CalibrationManager.h"
 #include "../calibration/CalibrationMotionPermit.h"
@@ -13,6 +14,7 @@
 #include "../calibration/FirstMotionExecutor.h"
 #include "../calibration/FullLegCalibrationExecutor.h"
 #include "../calibration/FullLegCalibrationFinalizer.h"
+#include "../calibration/ThermalConfirmation.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/HttpTransport.h"
 #include "../network/WifiManager.h"
@@ -60,11 +62,11 @@ class Controller {
   // authority or permit state. See the CR3 development log for why this is
   // the one place SAFE_OFF is actually invoked from this activation path.
   void updateFirstMotion(uint32_t now_ms);
-  // Same per-tick contract as updateFirstMotion(), generalized to the two
-  // SAFE_OFF-servicing phases (primary bus, then primary+auxiliary bus)
-  // FullLegCalibrationExecutor reports - see its own file comment for why
-  // SAFE_OFF for BOTH joints is forced independently of policy/session,
-  // authority or permit, every tick, until each one VERIFIED_OFF.
+  // The 24-contact Full Calibration sequence, every tick: calibration
+  // telemetry for every bus the executor names, at most one backend write,
+  // the V25 phase reported to the session, then the independent SAFE_OFF of
+  // every bus the executor names - forced outside policy/session/authority/
+  // permit, every tick, until each reads back VERIFIED_OFF.
   void updateFullLegCalibration(uint32_t now_ms);
   // Every tick, after updateFullLegCalibration(): once the armed run's
   // executor is terminal (COMPLETE or FAILED - including a run the operator
@@ -73,8 +75,34 @@ class Controller {
   // never touches a servo: SAFE_OFF was the executor's, verified before the
   // executor turned terminal.
   void updateFullLegFinalization();
+  // Evidence line per search step / probe transition (see its definition).
+  void printFullLegSearchEvent();
+  // Evidence line per sequence phase / step / joint transition.
+  void printFullLegSequenceEvent();
+  // Held-joint evidence: the held-role failure (once) and the diagnostic
+  // speed transients (bounded by the executor). Print only.
+  void printFullLegHeldEvents();
+  void printFullLegHeldObservation(const char* tag,
+                                   const calibration::FullLegHeldObservation& o);
 
   servo::ServoBus servo_bus_;
+  // The LF V25 runtime PresentTemperature over-limit confirmation's bus port:
+  // fresh direct reads through servo_bus_ and the oracle's 50 ms wait.
+  class ServoThermalReadPort : public calibration::ThermalReadPort {
+   public:
+    explicit ServoThermalReadPort(servo::ServoBus* bus) : bus_(bus) {}
+    bool readPresentTemperatureDirect(uint8_t bus_id, int32_t* celsius) override {
+      int value = -1;
+      if (!bus_->readPresentTemperatureDirect(bus_id, &value)) return false;
+      *celsius = value;
+      return true;
+    }
+    void delayMs(uint32_t ms) override { delay(ms); }
+
+   private:
+    servo::ServoBus* bus_;
+  };
+  ServoThermalReadPort thermal_read_port_{&servo_bus_};
   servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-start
   servo::ServoPreflight servo_preflight_;  // H0 leg verification; read-only, never auto-started
   imu::Bno085Imu imu_;
@@ -155,27 +183,40 @@ class Controller {
   // attempt, never by anything else, so a past VERIFIED_OFF can never be
   // mistaken for proof about a NEW attempt.
   servo::SafeOffResult first_motion_safe_off_result_ = servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
-  // CR3 continuation: the UPPER two-endpoint contact sequence (MIN, then
-  // MAX, with the Geometry V5 auxiliary parked first where the MAX endpoint
-  // names one) that a Full Leg Calibration needs, for any of the four legs —
-  // see FullLegCalibrationExecutor.h. Real backend, real policy,
-  // real geometry, same reachability argument as first_motion_ above: only
+  // The 24-contact Full Calibration of one leg (UPPER, LOWER, HIP x MIN/MAX),
+  // the LF V25 hardware-oracle state machine generalized to all four legs -
+  // see FullLegCalibrationExecutor.h. Real backend, real policy, real
+  // geometry, same reachability argument as first_motion_ above: only
   // @CALIBRATION FULL LEG <LF|RF|RH|LH> CONFIRM_FULL_CALIBRATION can start it, and it
   // still requires the SAME live session (Objective A) and fresh permit
-  // (Objective B) as every other motion path.
+  // (Objective B) as every other motion path, plus the geometry-validated
+  // sequence plan for every move and probe it makes.
   calibration::FullLegCalibrationExecutor full_leg_calibration_;
   // The run in flight (armed by the FULL LEG command once the executor
   // accepted it) and the RAM-only record of every leg run in this power-up.
   // Neither is persisted: a reboot starts with an empty store.
   calibration::FullLegRunState full_leg_run_;
   calibration::FullLegEvidenceStore full_leg_evidence_;
-  // Same convention as first_motion_safe_off_result_ above, one per bus this
-  // path may energize. Both reset to UNVERIFIED_NO_RESPONSE at the start of
-  // every fresh full_leg_calibration_ attempt.
-  servo::SafeOffResult full_leg_primary_safe_off_result_ =
-      servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
-  servo::SafeOffResult full_leg_auxiliary_safe_off_result_ =
-      servo::SafeOffResult::UNVERIFIED_NO_RESPONSE;
+  // The SAFE_OFF results of the buses the executor named at the END of the
+  // previous tick, handed to exactly the next update() and then replaced -
+  // a past VERIFIED_OFF is never reused for a new requirement. Cleared
+  // whenever no run is active.
+  calibration::FullLegSafeOffFrame full_leg_safe_off_frame_{};
+  // Which executor phase change was last reported to calibration_, per run.
+  uint32_t full_leg_reported_session_ = 0;
+  uint32_t full_leg_phase_changes_seen_ = 0;
+  // Last state printFullLegSearchEvent() / printFullLegSequenceEvent() reported.
+  uint16_t search_event_steps_ = 0;
+  uint8_t search_event_probe_phase_ = 0;
+  uint8_t search_event_exec_phase_ = 0;
+  uint8_t search_event_pass_ = 0;
+  uint16_t search_event_bypass_ = 0;
+  uint32_t sequence_event_key_ = 0;
+  uint32_t sequence_event_changes_ = 0;
+  bool held_role_failure_printed_ = false;
+  // A recovery-only run (@CALIBRATION INITIAL RECOVERY) is in flight or has
+  // just ended and its RESULT line is still to be printed.
+  bool recovery_result_pending_ = false;
   // The transport-neutral telemetry layer (I6) — see ControllerService.h.
   // Bound to the same module pointers CommandRouter already holds; adds no
   // module ownership of its own.

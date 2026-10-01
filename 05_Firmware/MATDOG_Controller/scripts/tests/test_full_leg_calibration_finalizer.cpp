@@ -1,18 +1,15 @@
-// Offline tests for the Full Leg evidence lifecycle
-// (src/calibration/FullLegCalibrationFinalizer.*) and the operational-limit
-// gate it uses (SafeActuatorPolicy::validate/admitOperationalLimit).
+// Offline tests for the Full Leg evidence lifecycle and the 24-contact
+// definition (src/calibration/FullLegCalibrationFinalizer.*), against the REAL
+// CalibrationManager, arbiter, motion permit, SafeActuatorPolicy tables,
+// Geometry V5 profile, sequence plan and plan resolver.
 //
-// The real CalibrationManager, ActuatorAuthorityArbiter, CalibrationMotionPermit,
-// SafeActuatorPolicy tables, Geometry V5 profile and envelope builders are
-// linked; only the executor's OUTCOME is synthesized (FullLegRunOutcome), so
-// this suite proves what happens AFTER two contacts were measured. It measured
-// nothing itself: every tick below is a Geometry V5 contact angle pushed
-// through the checked URDF-q -> raw resolver.
+// FULL CALIBRATION = 4 legs x 3 joints x MIN/MAX = 24 contact witnesses.
+// Proven here, not asserted in prose:
+//   - 2/6 (the old UPPER-only scope) and 5/6 are a FAILED leg, 0 accepted;
+//   - only 6/6 recorded contacts make a leg HARDWARE_CONTACT_CALIBRATED;
+//   - 23/24 is not Full Calibration; only 24/24 gives all_contact_calibrated.
 //
-// NO HARDWARE VALIDATION.
-//
-// Same conventions as the other suites: no framework, a CHECK macro and a
-// pass/fail tally. Run via scripts/tests/run_host_tests.sh.
+// NO HARDWARE VALIDATION. Every contact tick here is synthetic.
 
 #include <cstdio>
 #include <cstdlib>
@@ -22,7 +19,7 @@
 #include <vector>
 
 #include "../../src/actuator/CalibrationGeometryProfileData.h"
-#include "../../src/actuator/CalibrationTargetResolver.h"
+#include "../../src/actuator/CalibrationSequencePlanData.h"
 #include "../../src/calibration/FullLegCalibrationFinalizer.h"
 
 using namespace matdog;
@@ -73,6 +70,8 @@ namespace {
 
 constexpr CalibrationOrigin kLive = CalibrationOrigin::LIVE_SESSION;
 constexpr uint16_t kWitnessBand = 16;
+constexpr JointKind kJoints[3] = {JointKind::UPPER, JointKind::LOWER, JointKind::HIP};
+constexpr Leg kAllLegs[4] = {Leg::LF, Leg::RF, Leg::RH, Leg::LH};
 
 struct JointOracle {
   Leg leg;
@@ -91,28 +90,6 @@ constexpr JointOracle kOracle[12] = {
     {Leg::RH, JointKind::HIP, 33, "NEW06", 2081},   {Leg::LH, JointKind::LOWER, 41, "M41", 2073},
     {Leg::LH, JointKind::UPPER, 42, "M42", 2089},   {Leg::LH, JointKind::HIP, 43, "M43", 2035},
 };
-
-constexpr Leg kAllLegs[4] = {Leg::LF, Leg::RF, Leg::RH, Leg::LH};
-
-struct ParkingOracle {
-  Leg leg;
-  bool aux_required;
-  Leg aux_leg;
-  uint8_t aux_bus;
-};
-constexpr ParkingOracle kParking[4] = {
-    {Leg::LF, true, Leg::LH, 42},
-    {Leg::RF, true, Leg::RH, 32},
-    {Leg::RH, false, Leg::RH, 0},
-    {Leg::LH, false, Leg::LH, 0},
-};
-
-const ParkingOracle& parkingFor(Leg leg) {
-  for (const ParkingOracle& p : kParking) {
-    if (p.leg == leg) return p;
-  }
-  return kParking[0];
-}
 
 const JointOracle& oracleFor(Leg leg, JointKind joint) {
   for (const JointOracle& o : kOracle) {
@@ -148,19 +125,19 @@ actuator::JointTransform promotedTransform(const JointOracle& o) {
   return t;
 }
 
-ContactEvidence contactAt(Leg leg, ContactSide side, uint16_t tick) {
+ContactEvidence contactAt(Leg leg, JointKind joint, ContactSide side, uint16_t tick) {
   ContactEvidence e{};
   e.key.leg = leg;
-  e.key.joint = JointKind::UPPER;
+  e.key.joint = joint;
   e.key.side = side;
   e.state = EvidenceState::PROMOTED;
   e.origin = kLive;
   e.detection = ContactState::CONTACT_CONFIRMED;
-  e.witness = makeContactWitness(0, 0, kWitnessBand);
+  e.witness = makeContactWitness(0, 2, kWitnessBand);
   e.coarse_tick = tick;
   e.fine_tick_1 = tick;
   e.fine_tick_2 = tick;
-  e.repeatability_ticks = 0;
+  e.repeatability_ticks = 2;
   e.has_measurement = true;
   return e;
 }
@@ -189,6 +166,7 @@ struct Rig {
     profile = boundProfile();
     policy.begin(&arbiter);
     policy.bindGeometry(&profile, &actuator::geometry_data::kProvenance);
+    policy.bindSequencePlan(&actuator::sequence_plan_data::kPlan);
     for (const JointOracle& o : kOracle) CHECK(policy.transforms().admit(promotedTransform(o)));
 
     context.manager = &manager;
@@ -202,8 +180,9 @@ struct Rig {
     context.parameters.approved = approved;
   }
 
-  // SESSION START <leg> + PERMIT GRANT, exactly the state a run starts under.
-  bool startLeg(Leg leg) {
+  // SESSION START <leg> + PERMIT GRANT, then the executor's live V25 phase
+  // reports up to TORQUE_OFF - exactly the state a finished run leaves.
+  bool startLeg(Leg leg, bool report_phases = true) {
     if (manager.startSession(leg, OperatingMode::MAINTENANCE, kLive) != SessionResult::STARTED) {
       return false;
     }
@@ -228,39 +207,60 @@ struct Rig {
     if (permit.grant(facts, &token) != CalibrationPermitStatus::ACTIVE) return false;
     authorization.operator_authorized = true;
     authorization.token = token;
+    if (report_phases) {
+      for (uint8_t p = 0; p <= static_cast<uint8_t>(CalibrationPhase::TORQUE_OFF); ++p) {
+        if (!manager.noteExecutionPhase(static_cast<CalibrationPhase>(p))) return false;
+      }
+    }
     return true;
   }
 
   FullLegPlan planFor(Leg leg) {
     FullLegPlan plan{};
     CHECK(resolveFullLegPlan(profile, actuator::geometry_data::kProvenance, policy.transforms(),
-                             leg, &plan) == FullLegPlanStatus::OK);
+                             &actuator::sequence_plan_data::kPlan, leg, &plan) ==
+          FullLegPlanStatus::OK);
     return plan;
   }
 
-  uint16_t tickOf(Leg leg, ContactSide side) {
-    const actuator::GeometryEndpointRecord* endpoint =
-        profile.findEndpoint(leg, JointKind::UPPER, side);
-    const actuator::JointTransform* transform = policy.transforms().find(
-        identityOf(oracleFor(leg, JointKind::UPPER)), policy.currentGeometryTag());
-    uint16_t tick = 0;
-    CHECK(endpoint != nullptr && transform != nullptr);
-    if (endpoint == nullptr || transform == nullptr) return 0;
-    CHECK(actuator::resolveUrdfQToRaw(profile, actuator::geometry_data::kProvenance, *transform,
-                                      endpoint->contact, &tick) ==
-          actuator::TargetResolveStatus::OK);
-    return tick;
-  }
-
-  FullLegRunOutcome goodOutcome(Leg leg) {
+  // A complete, accepted 6/6 outcome at the canonical contacts of the plan.
+  FullLegRunOutcome goodOutcome(const FullLegPlan& plan) {
     FullLegRunOutcome outcome{};
     outcome.terminal = true;
     outcome.complete = true;
-    outcome.failure = FullLegCalibrationFailure::NONE;
-    outcome.min_contact = contactAt(leg, ContactSide::MIN_SIDE, tickOf(leg, ContactSide::MIN_SIDE));
-    outcome.max_contact = contactAt(leg, ContactSide::MAX_SIDE, tickOf(leg, ContactSide::MAX_SIDE));
+    outcome.failure = FullLegFailure::NONE;
+    for (const JointKind joint : kJoints) {
+      const uint8_t k = static_cast<uint8_t>(joint);
+      for (uint8_t s = 0; s < kContactSideCount; ++s) {
+        outcome.contacts[k][s] = contactAt(plan.leg, joint, static_cast<ContactSide>(s),
+                                           plan.request.corridor[k][s].contact_tick);
+      }
+      outcome.diagnostics[k] = deriveFullLegJointDiagnostics(plan.request, joint, outcome.contacts[k][0],
+                                                             outcome.contacts[k][1]);
+      CHECK(outcome.diagnostics[k].accepted);
+    }
+    outcome.contacts_measured = 6;
+    outcome.diagnostics_accepted = true;
     outcome.geometry_at_start = policy.currentGeometryTag();
     outcome.session_id_at_start = manager.status().session_id;
+    return outcome;
+  }
+
+  // The executor stopped after `measured` contacts in V25 order
+  // (UPPER MIN, UPPER MAX, LOWER MIN, LOWER MAX, HIP MIN, HIP MAX).
+  FullLegRunOutcome partialOutcome(const FullLegPlan& plan, uint8_t measured, FullLegFailure why) {
+    FullLegRunOutcome outcome = goodOutcome(plan);
+    outcome.complete = false;
+    outcome.failure = why;
+    outcome.diagnostics_accepted = false;
+    uint8_t n = 0;
+    for (const JointKind joint : kJoints) {
+      for (uint8_t s = 0; s < kContactSideCount; ++s) {
+        if (n++ >= measured) outcome.contacts[static_cast<uint8_t>(joint)][s] = ContactEvidence{};
+      }
+      outcome.diagnostics[static_cast<uint8_t>(joint)] = FullLegJointDiagnostics{};
+    }
+    outcome.contacts_measured = measured;
     return outcome;
   }
 
@@ -273,6 +273,17 @@ struct Rig {
     CHECK(!authorization.token.valid());
   }
 };
+
+void expectFailedLeg(const FullLegRecord& record) {
+  CHECK(record.verdict == FullLegVerdict::FAILED);
+  CHECK(!record.hardware_contact_calibrated);
+  CHECK(!record.operational_envelope_accepted);
+  CHECK_EQ(record.contacts_accepted, 0);
+  CHECK_EQ(record.contacts_expected, 6);
+  for (const JointKind joint : kJoints) {
+    CHECK(record.joint(joint).limit != FullLegLimitAdmission::ADMITTED);
+  }
+}
 
 struct Lines {
   std::vector<std::string> v;
@@ -289,15 +300,18 @@ bool has(const Lines& lines, const std::string& needle) {
 
 // ---------------------------------------------------------------------------
 
-void test_production_parameters_are_placeholders_and_unapproved() {
-  g_case = "production parameters";
+void test_the_definition_is_24_contacts() {
+  g_case = "24-contact definition";
+  CHECK_EQ(kFullLegContactsExpected, 6);
+  CHECK_EQ(kFullLegContactCount, 6);
+  CHECK_EQ(kFullCalibrationContactsExpected, 24);
+  CHECK_EQ(kLegCount, 4);
+  CHECK_EQ(kJointKindCount, 3);
+  CHECK_EQ(kContactSideCount, 2);
   const FullLegEnvelopeParameters p = productionEnvelopeParameters();
   CHECK(!p.approved);
   CHECK(!kFullLegOperationalParametersApproved);
-  CHECK_EQ(p.upper_margin_ticks, 8);
-  CHECK_EQ(p.hip_lower_margin_urad, 50000);
-  CHECK_EQ(kFullLegPlaceholderUpperMarginTicks, 8);
-  CHECK_EQ(kFullLegPlaceholderHipLowerMarginUrad, 50000);
+  CHECK_EQ(p.contact_margin_ticks, 8);
 }
 
 void test_policy_operational_limit_gate() {
@@ -375,638 +389,466 @@ void test_policy_operational_limit_gate() {
   CHECK(rig.policy.limits().find(id, current ^ 0x1) == nullptr);
 }
 
-void test_unapproved_lifecycle_for_every_leg() {
-  g_case = "unapproved lifecycle, 4 legs";
-  for (Leg leg : kAllLegs) {
+void test_six_of_six_is_a_calibrated_leg_for_every_leg() {
+  for (const Leg leg : kAllLegs) {
+    g_case = "6/6 -> HARDWARE_CONTACT_CALIBRATED";
     Rig rig;
     CHECK(rig.startLeg(leg));
     const FullLegPlan plan = rig.planFor(leg);
-    const FullLegRunOutcome outcome = rig.goodOutcome(leg);
-    const uint32_t session_id = rig.manager.status().session_id;
-
     FullLegRecord record{};
-    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::NONE);
-
-    // The two contacts landed in the session exactly once each.
-    CHECK_EQ(rig.manager.status().contacts_recorded, 2);
-    CHECK(record.min_recorded);
-    CHECK(record.max_recorded);
-    CHECK(rig.manager.status().state == SessionState::COMPLETED);
-    CHECK(record.session_completed);
-
-    // Cleanup.
-    rig.expectCleanBetweenLegs();
-    CHECK(record.permit_revoked);
-    CHECK(record.authority_released);
-
-    // Level 1 only: contact calibrated, envelope NOT accepted, no limit stored.
-    CHECK(record.hardware_contact_calibrated);
-    CHECK(!record.operational_envelope_accepted);
+    CHECK(finalizeFullLeg(rig.context, plan, rig.goodOutcome(plan), &record) == FullLegFinalizeFailure::NONE);
     CHECK(record.verdict == FullLegVerdict::HARDWARE_CONTACT_CALIBRATED);
-    CHECK(record.failure == FullLegFinalizeFailure::NONE);
-    CHECK(!record.parameters_approved);
-    for (JointKind kind : {JointKind::UPPER, JointKind::HIP, JointKind::LOWER}) {
-      const JointIdentity id = identityOf(oracleFor(leg, kind));
-      CHECK(rig.policy.limits().find(id, rig.policy.currentGeometryTag()) == nullptr);
-      CHECK(record.joint(kind).limit == FullLegLimitAdmission::NOT_ADMITTED_UNAPPROVED_PARAMETERS);
+    CHECK(record.hardware_contact_calibrated);
+    CHECK(!record.operational_envelope_accepted);  // placeholder margin, unapproved
+    CHECK_EQ(record.contacts_expected, 6);
+    CHECK_EQ(record.contacts_measured, 6);
+    CHECK_EQ(record.contacts_accepted, 6);
+    CHECK_EQ(rig.manager.status().contacts_recorded, 6);  // each exactly once
+    CHECK(record.session_completed && record.permit_revoked && record.authority_released);
+    CHECK(rig.manager.status().state == SessionState::COMPLETED);
+    for (const JointKind joint : kJoints) {
+      const FullLegJointRecord& j = record.joint(joint);
+      CHECK(j.contact_recorded[0] && j.contact_recorded[1]);
+      CHECK(j.envelope_status == actuator::EnvelopeBuildStatus::READY);
+      CHECK(j.envelope.source == actuator::EnvelopeSource::MEASURED_CONTACT);
+      CHECK(j.limit == FullLegLimitAdmission::NOT_ADMITTED_UNAPPROVED_PARAMETERS);
+      CHECK(j.diagnostics.accepted);
+      CHECK(j.q0_present && j.q0_tick == oracleFor(leg, joint).q0);
+      // The envelope is the two sides' second fine passes inset by the
+      // placeholder margin; the coarse scout never bounds it.
+      const uint16_t a = j.contact[0].fine_tick_2, b = j.contact[1].fine_tick_2;
+      CHECK_EQ(j.envelope.min_tick, (a < b ? a : b) + 8);
+      CHECK_EQ(j.envelope.max_tick, (a < b ? b : a) - 8);
+      // Unapproved: nothing offered to the policy.
+      CHECK(rig.policy.limits().find(j.identity, rig.policy.currentGeometryTag()) == nullptr);
     }
-
-    // Identity, bus, q0 and provenance in the record.
-    CHECK(record.leg == leg);
-    CHECK_EQ(record.session_id, session_id);
-    CHECK(record.geometry == rig.policy.currentGeometryTag());
-    for (JointKind kind : {JointKind::UPPER, JointKind::HIP, JointKind::LOWER}) {
-      const JointOracle& o = oracleFor(leg, kind);
-      const FullLegJointRecord& j = record.joint(kind);
-      CHECK_EQ(j.bus_id, o.bus);
-      CHECK(std::strcmp(j.identity.physical_unit, o.unit) == 0);
-      CHECK(j.q0_present);
-      CHECK_EQ(j.q0_tick, o.q0);
-      CHECK(j.q0_state == EvidenceState::PROMOTED);
-      CHECK(j.q0_origin == kLive);
-      CHECK(j.q0_geometry == rig.policy.currentGeometryTag());
-    }
-
-    // UPPER envelope: READY, derived from the two contacts, inset by 8 ticks.
-    const FullLegJointRecord& upper = record.joint(JointKind::UPPER);
-    CHECK(upper.envelope_status == actuator::EnvelopeBuildStatus::READY);
-    CHECK(upper.envelope.source == actuator::EnvelopeSource::MEASURED_CONTACT);
-    const uint16_t a = outcome.min_contact.fine_tick_1;
-    const uint16_t b = outcome.max_contact.fine_tick_1;
-    const uint16_t lo = a < b ? a : b;
-    const uint16_t hi = a < b ? b : a;
-    CHECK_EQ(upper.envelope.min_tick, lo + 8);
-    CHECK_EQ(upper.envelope.max_tick, hi - 8);
-    CHECK(upper.envelope.geometry == rig.policy.currentGeometryTag());
-
-    // Parking metadata straight from the plan.
-    const ParkingOracle& park = parkingFor(leg);
-    CHECK(record.auxiliary_required == park.aux_required);
-    if (park.aux_required) {
-      CHECK(record.auxiliary_leg == park.aux_leg);
-      CHECK(record.auxiliary_joint == JointKind::UPPER);
-      CHECK_EQ(record.auxiliary_bus_id, park.aux_bus);
-      CHECK_EQ(record.auxiliary_park_target_urad, 610865);
-    } else {
-      CHECK_EQ(record.auxiliary_bus_id, 0);
-    }
+    CHECK(record.has_rear_park == (leg == Leg::LF || leg == Leg::RF));
+    rig.expectCleanBetweenLegs();
   }
 }
 
-void test_approved_lifecycle_admits_current_limits_for_every_leg() {
-  g_case = "approved lifecycle, 4 legs";
-  for (Leg leg : kAllLegs) {
-    Rig rig(/*approved=*/true);
+void test_approved_parameters_admit_all_three_limits() {
+  for (const Leg leg : kAllLegs) {
+    g_case = "approved: FINAL_OPERATIONAL_ENVELOPE_ACCEPTED";
+    Rig rig(true);
     CHECK(rig.startLeg(leg));
     const FullLegPlan plan = rig.planFor(leg);
-    const FullLegRunOutcome outcome = rig.goodOutcome(leg);
-
     FullLegRecord record{};
-    const FullLegFinalizeFailure failure = finalizeFullLeg(rig.context, plan, outcome, &record);
-    if (failure != FullLegFinalizeFailure::NONE) {
-      std::printf("  approved run leg=%s failure=%s\n", toString(leg), toString(failure));
-      for (JointKind kind : {JointKind::UPPER, JointKind::HIP, JointKind::LOWER}) {
-        std::printf("    %s envelope=%s limit=%s\n", toString(kind),
-                    actuator::toString(record.joint(kind).envelope_status),
-                    toString(record.joint(kind).limit));
-      }
-    }
-    CHECK(failure == FullLegFinalizeFailure::NONE);
+    CHECK(finalizeFullLeg(rig.context, plan, rig.goodOutcome(plan), &record) == FullLegFinalizeFailure::NONE);
     CHECK(record.verdict == FullLegVerdict::FINAL_OPERATIONAL_ENVELOPE_ACCEPTED);
-    CHECK(record.hardware_contact_calibrated);
-    CHECK(record.operational_envelope_accepted);
-    CHECK(record.parameters_approved);
-    rig.expectCleanBetweenLegs();
-
-    for (JointKind kind : {JointKind::UPPER, JointKind::HIP, JointKind::LOWER}) {
-      const JointIdentity id = identityOf(oracleFor(leg, kind));
-      const FullLegJointRecord& j = record.joint(kind);
-      CHECK(j.envelope_status == actuator::EnvelopeBuildStatus::READY);
+    for (const JointKind joint : kJoints) {
+      const FullLegJointRecord& j = record.joint(joint);
       CHECK(j.limit == FullLegLimitAdmission::ADMITTED);
-      const actuator::JointLimit* found =
-          rig.policy.limits().find(id, rig.policy.currentGeometryTag());
-      CHECK(found != nullptr);
-      if (found == nullptr) continue;
-      CHECK(found->present);
-      CHECK(found->state == EvidenceState::PROMOTED);
-      CHECK(found->origin == kLive);
-      CHECK(found->geometry == rig.policy.currentGeometryTag());
-      CHECK_EQ(found->min_tick, j.envelope.min_tick);
-      CHECK_EQ(found->max_tick, j.envelope.max_tick);
-      CHECK(found->min_tick <= found->max_tick);
-      // Not readable under a foreign tag.
-      CHECK(rig.policy.limits().find(id, rig.policy.currentGeometryTag() ^ 0x1) == nullptr);
+      const actuator::JointLimit* l = rig.policy.limits().find(j.identity, rig.policy.currentGeometryTag());
+      CHECK(l != nullptr && l->min_tick == j.envelope.min_tick && l->max_tick == j.envelope.max_tick);
     }
-    // HIP and LOWER come from the URDF domain, not from contacts.
-    CHECK(record.joint(JointKind::HIP).envelope.source ==
-          actuator::EnvelopeSource::DERIVED_FROM_GEOMETRY);
-    CHECK(record.joint(JointKind::LOWER).envelope.source ==
-          actuator::EnvelopeSource::DERIVED_FROM_GEOMETRY);
   }
 }
 
-void test_run_not_terminal_touches_nothing() {
-  g_case = "run not terminal";
-  Rig rig;
-  CHECK(rig.startLeg(Leg::LF));
-  const FullLegPlan plan = rig.planFor(Leg::LF);
-  FullLegRunOutcome outcome = rig.goodOutcome(Leg::LF);
-  outcome.terminal = false;
-  outcome.complete = false;
-
-  FullLegRecord record{};
-  CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) ==
-        FullLegFinalizeFailure::RUN_NOT_TERMINAL);
-  CHECK(record.failure == FullLegFinalizeFailure::RUN_NOT_TERMINAL);
-  CHECK(!record.present);  // never committed by the store
-  CHECK(record.verdict == FullLegVerdict::NOT_RUN);
-
-  // Mid-run: session, permit and authority are exactly as they were.
-  CHECK(rig.manager.status().state == SessionState::ACTIVE);
-  CHECK_EQ(rig.manager.status().contacts_recorded, 0);
-  CHECK(rig.permit.active());
-  CHECK(rig.authorization.operator_authorized);
-  CHECK(rig.arbiter.current() == ActuatorAuthority::CALIBRATION);
-
-  FullLegEvidenceStore store;
-  store.put(record);
-  CHECK_EQ(store.legsPresent(), 0);
-}
-
-void test_executor_failure_cleans_up_without_evidence() {
-  g_case = "executor failure";
-  {
-    Rig rig;
-    CHECK(rig.startLeg(Leg::RF));
-    const FullLegPlan plan = rig.planFor(Leg::RF);
-    FullLegRunOutcome outcome{};
-    outcome.terminal = true;
-    outcome.complete = false;
-    outcome.failure = FullLegCalibrationFailure::AUX_MOVE_TIMEOUT;
-    outcome.geometry_at_start = rig.policy.currentGeometryTag();
-    outcome.session_id_at_start = rig.manager.status().session_id;
-
-    FullLegRecord record{};
-    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) ==
-          FullLegFinalizeFailure::EXECUTOR_FAILED);
-    CHECK(record.verdict == FullLegVerdict::FAILED);
-    CHECK(record.executor_failure == FullLegCalibrationFailure::AUX_MOVE_TIMEOUT);
-    CHECK(!record.hardware_contact_calibrated);
-    CHECK(!record.operational_envelope_accepted);
-    CHECK(!record.min_recorded && !record.max_recorded);
-    CHECK_EQ(rig.manager.status().contacts_recorded, 0);
-    CHECK(rig.manager.status().state == SessionState::FAILED);
-    rig.expectCleanBetweenLegs();
-    CHECK(record.permit_revoked && record.authority_released);
-    CHECK(!record.session_completed);
-    CHECK(record.joint(JointKind::UPPER).limit == FullLegLimitAdmission::NOT_EVALUATED);
-  }
-  {
-    // An operator abort ends the session ABORTED, not FAILED.
-    Rig rig;
-    CHECK(rig.startLeg(Leg::LH));
-    const FullLegPlan plan = rig.planFor(Leg::LH);
-    FullLegRunOutcome outcome{};
-    outcome.terminal = true;
-    outcome.failure = FullLegCalibrationFailure::OPERATOR_ABORT;
-    outcome.geometry_at_start = rig.policy.currentGeometryTag();
-    outcome.session_id_at_start = rig.manager.status().session_id;
-    FullLegRecord record{};
-    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) ==
-          FullLegFinalizeFailure::EXECUTOR_FAILED);
-    CHECK(rig.manager.status().state == SessionState::ABORTED);
-    rig.expectCleanBetweenLegs();
-  }
-  {
-    // A complete-looking record with a failed executor phase never passes.
-    Rig rig;
-    CHECK(rig.startLeg(Leg::RH));
-    const FullLegPlan plan = rig.planFor(Leg::RH);
-    FullLegRunOutcome outcome = rig.goodOutcome(Leg::RH);
-    outcome.complete = false;
-    outcome.failure = FullLegCalibrationFailure::UPPER_MAX_PROBE_FAILED;
-    FullLegRecord record{};
-    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) ==
-          FullLegFinalizeFailure::EXECUTOR_FAILED);
-    CHECK_EQ(rig.manager.status().contacts_recorded, 0);
-    CHECK(record.verdict == FullLegVerdict::FAILED);
-  }
-}
-
-void test_session_mismatch_never_touches_a_foreign_session() {
-  g_case = "session mismatch";
-  {
-    // The live session is RF's; the finished run was LF's.
-    Rig rig;
-    CHECK(rig.startLeg(Leg::RF));
-    const FullLegPlan lf_plan = rig.planFor(Leg::LF);
-    FullLegRunOutcome outcome = rig.goodOutcome(Leg::LF);
-    FullLegRecord record{};
-    CHECK(finalizeFullLeg(rig.context, lf_plan, outcome, &record) ==
-          FullLegFinalizeFailure::SESSION_MISMATCH);
-    CHECK(record.verdict == FullLegVerdict::FAILED);
-    CHECK_EQ(rig.manager.status().contacts_recorded, 0);
-    // The foreign session is neither completed, failed nor aborted.
-    CHECK(rig.manager.status().state == SessionState::ACTIVE);
-    CHECK(rig.arbiter.current() == ActuatorAuthority::CALIBRATION);
-    // The permit still goes: nothing may keep moving on a run that ended.
-    CHECK(!rig.permit.active());
-    CHECK(!rig.authorization.operator_authorized);
-    CHECK(record.permit_revoked);
-    CHECK(!record.authority_released);
-    CHECK(!record.session_completed);
-    // Ownership of the foreign session stays with its owner.
-    rig.manager.abortSession();
-  }
-  {
-    // Same leg, different session id (a newer session replaced the run's).
-    Rig rig;
-    CHECK(rig.startLeg(Leg::LF));
-    const FullLegPlan plan = rig.planFor(Leg::LF);
-    FullLegRunOutcome outcome = rig.goodOutcome(Leg::LF);
-    outcome.session_id_at_start += 1;
-    FullLegRecord record{};
-    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) ==
-          FullLegFinalizeFailure::SESSION_MISMATCH);
-    CHECK(rig.manager.status().state == SessionState::ACTIVE);
-    CHECK_EQ(rig.manager.status().contacts_recorded, 0);
-    rig.manager.abortSession();
-  }
-  {
-    // The run's own session ended under it (operator SESSION ABORT mid-run).
-    Rig rig;
-    CHECK(rig.startLeg(Leg::LH));
-    const FullLegPlan plan = rig.planFor(Leg::LH);
-    const FullLegRunOutcome outcome = rig.goodOutcome(Leg::LH);
-    rig.manager.abortSession();
-    FullLegRecord record{};
-    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) ==
-          FullLegFinalizeFailure::SESSION_NOT_ACTIVE);
-    CHECK(record.verdict == FullLegVerdict::FAILED);
-    CHECK_EQ(rig.manager.status().contacts_recorded, 0);
-    CHECK(rig.manager.status().state == SessionState::ABORTED);
-    rig.expectCleanBetweenLegs();
-    CHECK(record.permit_revoked && record.authority_released);
-  }
-}
-
-void test_contact_evidence_refusals() {
-  g_case = "contact evidence refusals";
+void test_partial_legs_are_failed_legs() {
   struct Case {
-    const char* label;
-    void (*mutate)(FullLegRunOutcome&);
-    FullLegFinalizeFailure expected;
-    int contacts_recorded;
-    bool min_recorded;
-    bool max_recorded;
+    const char* name;
+    uint8_t measured;
+    FullLegFailure why;
   };
+  // 2/6 is exactly the superseded UPPER-only "Full Leg" of PR #34.
   const Case cases[] = {
-      {"min wrong side",
-       [](FullLegRunOutcome& o) { o.min_contact.key.side = ContactSide::MAX_SIDE; },
-       FullLegFinalizeFailure::CONTACT_EVIDENCE_MALFORMED, 0, false, false},
-      {"max wrong leg",
-       [](FullLegRunOutcome& o) {
-         o.max_contact.key.leg =
-             static_cast<Leg>((static_cast<uint8_t>(o.max_contact.key.leg) + 1) % kLegCount);
-       },
-       FullLegFinalizeFailure::CONTACT_EVIDENCE_MALFORMED, 0, false, false},
-      {"min wrong joint",
-       [](FullLegRunOutcome& o) { o.min_contact.key.joint = JointKind::HIP; },
-       FullLegFinalizeFailure::CONTACT_EVIDENCE_MALFORMED, 0, false, false},
-      {"max not measured",
-       [](FullLegRunOutcome& o) { o.max_contact.has_measurement = false; },
-       FullLegFinalizeFailure::CONTACT_EVIDENCE_MALFORMED, 0, false, false},
-      {"min not confirmed",
-       [](FullLegRunOutcome& o) { o.min_contact.detection = ContactState::CONTACT_SUSPECTED; },
-       FullLegFinalizeFailure::MIN_CONTACT_REJECTED, 0, false, false},
-      {"min witness rejected",
-       [](FullLegRunOutcome& o) {
-         o.min_contact.witness = makeContactWitness(0, kWitnessBand + 1, kWitnessBand);
-       },
-       FullLegFinalizeFailure::MIN_CONTACT_REJECTED, 0, false, false},
-      {"min replay origin",
-       [](FullLegRunOutcome& o) { o.min_contact.origin = CalibrationOrigin::HISTORICAL_REPLAY; },
-       FullLegFinalizeFailure::MIN_CONTACT_REJECTED, 0, false, false},
-      {"max not confirmed",
-       [](FullLegRunOutcome& o) { o.max_contact.detection = ContactState::EARLY_STALL; },
-       FullLegFinalizeFailure::MAX_CONTACT_REJECTED, 1, true, false},
-      {"max witness rejected",
-       [](FullLegRunOutcome& o) {
-         o.max_contact.witness = makeContactWitness(0, kWitnessBand + 1, kWitnessBand);
-       },
-       FullLegFinalizeFailure::MAX_CONTACT_REJECTED, 1, true, false},
+      {"0/6 -> FAILED", 0, FullLegFailure::UPPER_MIN_PROBE_FAILED},
+      {"1/6 -> FAILED", 1, FullLegFailure::UPPER_MAX_PROBE_FAILED},
+      {"2/6 (UPPER only) -> FAILED", 2, FullLegFailure::LOWER_MIN_PROBE_FAILED},
+      {"3/6 -> FAILED", 3, FullLegFailure::LOWER_MAX_PROBE_FAILED},
+      {"4/6 -> FAILED", 4, FullLegFailure::HIP_MIN_PROBE_FAILED},
+      {"5/6 -> FAILED", 5, FullLegFailure::HIP_MAX_PROBE_FAILED},
   };
-
-  for (Leg leg : kAllLegs) {
-    for (const Case& c : cases) {
-      g_case = c.label;
+  for (const Case& c : cases) {
+    for (const Leg leg : kAllLegs) {
+      g_case = c.name;
       Rig rig;
       CHECK(rig.startLeg(leg));
       const FullLegPlan plan = rig.planFor(leg);
-      FullLegRunOutcome outcome = rig.goodOutcome(leg);
-      c.mutate(outcome);
       FullLegRecord record{};
-      CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == c.expected);
-      CHECK_EQ(rig.manager.status().contacts_recorded, c.contacts_recorded);
-      CHECK(record.min_recorded == c.min_recorded);
-      CHECK(record.max_recorded == c.max_recorded);
-      CHECK(record.verdict == FullLegVerdict::FAILED);
-      CHECK(!record.hardware_contact_calibrated);
-      CHECK(!record.operational_envelope_accepted);
+      CHECK(finalizeFullLeg(rig.context, plan, rig.partialOutcome(plan, c.measured, c.why), &record) ==
+            FullLegFinalizeFailure::EXECUTOR_FAILED);
+      expectFailedLeg(record);
+      CHECK_EQ(record.contacts_measured, c.measured);
+      CHECK(record.executor_failure == c.why);
+      CHECK_EQ(rig.manager.status().contacts_recorded, 0);  // nothing recorded from a failed run
       CHECK(rig.manager.status().state == SessionState::FAILED);
-      CHECK(!record.session_completed);
       rig.expectCleanBetweenLegs();
-      CHECK(record.permit_revoked && record.authority_released);
-      for (JointKind kind : {JointKind::UPPER, JointKind::HIP, JointKind::LOWER}) {
-        CHECK(rig.policy.limits().find(identityOf(oracleFor(leg, kind)),
-                                       rig.policy.currentGeometryTag()) == nullptr);
-      }
     }
   }
 }
 
-void test_envelope_refusals_leave_no_limit_and_no_pass() {
-  g_case = "envelope refusals";
-  {
-    // Contacts measured under a geometry that is no longer current.
-    Rig rig(/*approved=*/true);
-    CHECK(rig.startLeg(Leg::LF));
-    const FullLegPlan plan = rig.planFor(Leg::LF);
-    FullLegRunOutcome outcome = rig.goodOutcome(Leg::LF);
-    outcome.geometry_at_start = rig.policy.currentGeometryTag() ^ 0x1;
+void test_an_outcome_claiming_success_with_fewer_than_six_is_refused() {
+  for (uint8_t measured = 0; measured < 6; ++measured) {
+    g_case = "complete=true but < 6 contacts: CONTACTS_INCOMPLETE";
+    Rig rig;
+    CHECK(rig.startLeg(Leg::RF));
+    const FullLegPlan plan = rig.planFor(Leg::RF);
+    FullLegRunOutcome outcome = rig.partialOutcome(plan, measured, FullLegFailure::NONE);
+    outcome.complete = true;  // a lying (or buggy) executor snapshot
+    outcome.diagnostics_accepted = true;
     FullLegRecord record{};
-    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) ==
-          FullLegFinalizeFailure::UPPER_ENVELOPE_NOT_READY);
-    CHECK(record.joint(JointKind::UPPER).envelope_status ==
-          actuator::EnvelopeBuildStatus::REJECT_CONTACT_GEOMETRY_MISMATCH);
-    // Recorded before the envelope was attempted; still not a pass.
-    CHECK_EQ(rig.manager.status().contacts_recorded, 2);
-    CHECK(record.verdict == FullLegVerdict::FAILED);
-    CHECK(!record.hardware_contact_calibrated);
-    CHECK(rig.manager.status().state == SessionState::FAILED);
-    rig.expectCleanBetweenLegs();
-    for (JointKind kind : {JointKind::UPPER, JointKind::HIP, JointKind::LOWER}) {
-      CHECK(rig.policy.limits().find(identityOf(oracleFor(Leg::LF, kind)),
-                                     rig.policy.currentGeometryTag()) == nullptr);
-    }
+    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::CONTACTS_INCOMPLETE);
+    expectFailedLeg(record);
+    CHECK_EQ(rig.manager.status().contacts_recorded, 0);
   }
   {
-    // Contacts closer together than twice the margin: the envelope collapses.
+    g_case = "six measured but the count says five";
+    Rig rig;
+    CHECK(rig.startLeg(Leg::LH));
+    const FullLegPlan plan = rig.planFor(Leg::LH);
+    FullLegRunOutcome outcome = rig.goodOutcome(plan);
+    outcome.contacts_measured = 5;
+    FullLegRecord record{};
+    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::CONTACTS_INCOMPLETE);
+    expectFailedLeg(record);
+  }
+}
+
+void test_contact_and_diagnostic_refusals() {
+  {
+    g_case = "a contact filed under the wrong joint";
+    Rig rig;
+    CHECK(rig.startLeg(Leg::LF));
+    const FullLegPlan plan = rig.planFor(Leg::LF);
+    FullLegRunOutcome outcome = rig.goodOutcome(plan);
+    outcome.contacts[static_cast<uint8_t>(JointKind::HIP)][1].key.joint = JointKind::LOWER;
+    FullLegRecord record{};
+    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) ==
+          FullLegFinalizeFailure::CONTACT_EVIDENCE_MALFORMED);
+    expectFailedLeg(record);
+  }
+  {
+    g_case = "a contact of another leg";
     Rig rig;
     CHECK(rig.startLeg(Leg::RH));
     const FullLegPlan plan = rig.planFor(Leg::RH);
-    FullLegRunOutcome outcome = rig.goodOutcome(Leg::RH);
-    outcome.min_contact.fine_tick_1 = 2000;
-    outcome.max_contact.fine_tick_1 = 2010;
+    FullLegRunOutcome outcome = rig.goodOutcome(plan);
+    outcome.contacts[static_cast<uint8_t>(JointKind::LOWER)][0].key.leg = Leg::LH;
     FullLegRecord record{};
     CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) ==
-          FullLegFinalizeFailure::UPPER_ENVELOPE_NOT_READY);
-    CHECK(record.joint(JointKind::UPPER).envelope_status ==
-          actuator::EnvelopeBuildStatus::REJECT_CONTACT_ORDER_INVALID);
-    CHECK(record.verdict == FullLegVerdict::FAILED);
-    CHECK(rig.manager.status().state == SessionState::FAILED);
-    rig.expectCleanBetweenLegs();
+          FullLegFinalizeFailure::CONTACT_EVIDENCE_MALFORMED);
+    expectFailedLeg(record);
   }
   {
-    // Approved parameters but HIP has lost its transform: nothing is admitted,
-    // not even the UPPER limit that could have been.
-    Rig rig(/*approved=*/true);
-    CHECK(rig.startLeg(Leg::RF));
-    const FullLegPlan plan = rig.planFor(Leg::RF);
-    const FullLegRunOutcome outcome = rig.goodOutcome(Leg::RF);
-    actuator::JointTransformTable trimmed;
-    for (const JointOracle& o : kOracle) {
-      if (o.leg == Leg::RF && o.joint == JointKind::HIP) continue;
-      CHECK(trimmed.admit(promotedTransform(o)));
-    }
-    rig.policy.transforms() = trimmed;
-    FullLegRecord record{};
-    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) ==
-          FullLegFinalizeFailure::HIP_ENVELOPE_NOT_READY);
-    CHECK(record.joint(JointKind::HIP).envelope_status ==
-          actuator::EnvelopeBuildStatus::REJECT_NO_TRANSFORM);
-    CHECK(record.verdict == FullLegVerdict::FAILED);
-    CHECK(!record.operational_envelope_accepted);
-    for (JointKind kind : {JointKind::UPPER, JointKind::HIP, JointKind::LOWER}) {
-      CHECK(rig.policy.limits().find(identityOf(oracleFor(Leg::RF, kind)),
-                                     rig.policy.currentGeometryTag()) == nullptr);
-    }
-    rig.expectCleanBetweenLegs();
-  }
-  {
-    // Unapproved parameters: HIP/LOWER refusal is REPORTED but is not a run
-    // failure - level 1 does not depend on placeholder envelopes.
+    g_case = "one joint's diagnostics rejected";
     Rig rig;
     CHECK(rig.startLeg(Leg::RF));
     const FullLegPlan plan = rig.planFor(Leg::RF);
-    const FullLegRunOutcome outcome = rig.goodOutcome(Leg::RF);
-    actuator::JointTransformTable trimmed;
-    for (const JointOracle& o : kOracle) {
-      if (o.leg == Leg::RF && o.joint == JointKind::HIP) continue;
-      CHECK(trimmed.admit(promotedTransform(o)));
-    }
-    rig.policy.transforms() = trimmed;
+    FullLegRunOutcome outcome = rig.goodOutcome(plan);
+    outcome.diagnostics[static_cast<uint8_t>(JointKind::LOWER)].accepted = false;
     FullLegRecord record{};
-    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::NONE);
-    CHECK(record.joint(JointKind::HIP).envelope_status ==
-          actuator::EnvelopeBuildStatus::REJECT_NO_TRANSFORM);
-    CHECK(record.verdict == FullLegVerdict::HARDWARE_CONTACT_CALIBRATED);
-    CHECK(!record.operational_envelope_accepted);
+    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::DIAGNOSTICS_REJECTED);
+    expectFailedLeg(record);
+    CHECK_EQ(rig.manager.status().contacts_recorded, 0);
+  }
+  {
+    g_case = "the session refuses the sixth contact";
+    Rig rig;
+    CHECK(rig.startLeg(Leg::LH));
+    const FullLegPlan plan = rig.planFor(Leg::LH);
+    FullLegRunOutcome outcome = rig.goodOutcome(plan);
+    // The HIP MAX witness is not accepted: recordContact() refuses it, after
+    // five were recorded. The leg is FAILED with 0 accepted, not 5.
+    outcome.contacts[static_cast<uint8_t>(JointKind::HIP)][1].witness = makeContactWitness(0, 40, kWitnessBand);
+    FullLegRecord record{};
+    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::CONTACT_REJECTED);
+    expectFailedLeg(record);
+  }
+  {
+    g_case = "an envelope that cannot be built";
+    Rig rig;
+    CHECK(rig.startLeg(Leg::LF));
+    const FullLegPlan plan = rig.planFor(Leg::LF);
+    FullLegRunOutcome outcome = rig.goodOutcome(plan);
+    outcome.geometry_at_start = outcome.geometry_at_start ^ 0x1;  // captured under another model
+    FullLegRecord record{};
+    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::ENVELOPE_NOT_READY);
+    expectFailedLeg(record);
   }
 }
 
-void test_context_incomplete_still_revokes_the_permit() {
-  g_case = "context incomplete";
-  Rig rig;
-  CHECK(rig.startLeg(Leg::LF));
-  const FullLegPlan plan = rig.planFor(Leg::LF);
-  const FullLegRunOutcome outcome = rig.goodOutcome(Leg::LF);
+void test_session_and_context_refusals() {
+  {
+    g_case = "not terminal: touches nothing";
+    Rig rig;
+    CHECK(rig.startLeg(Leg::LF));
+    const FullLegPlan plan = rig.planFor(Leg::LF);
+    FullLegRunOutcome outcome = rig.goodOutcome(plan);
+    outcome.terminal = false;
+    FullLegRecord record{};
+    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::RUN_NOT_TERMINAL);
+    CHECK(rig.manager.sessionLive());
+    CHECK(rig.permit.active());
+  }
+  {
+    g_case = "a different session than the run started under";
+    Rig rig;
+    CHECK(rig.startLeg(Leg::RF));
+    const FullLegPlan plan = rig.planFor(Leg::RF);
+    FullLegRunOutcome outcome = rig.goodOutcome(plan);
+    outcome.session_id_at_start += 1;
+    FullLegRecord record{};
+    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::SESSION_MISMATCH);
+    expectFailedLeg(record);
+    CHECK(!rig.permit.active());
+  }
+  {
+    g_case = "the session was opened for another leg";
+    Rig rig;
+    CHECK(rig.startLeg(Leg::RH));
+    const FullLegPlan plan = rig.planFor(Leg::LH);
+    FullLegRecord record{};
+    CHECK(finalizeFullLeg(rig.context, plan, rig.goodOutcome(plan), &record) ==
+          FullLegFinalizeFailure::SESSION_MISMATCH);
+    expectFailedLeg(record);
+    CHECK(rig.manager.sessionLive());  // never touches a foreign session
+    CHECK(!rig.permit.active());       // ...but the permit always goes
+  }
+  {
+    g_case = "context incomplete still revokes the permit";
+    Rig rig;
+    CHECK(rig.startLeg(Leg::LF));
+    const FullLegPlan plan = rig.planFor(Leg::LF);
+    FullLegFinalizeContext partial = rig.context;
+    partial.policy = nullptr;
+    FullLegRecord record{};
+    CHECK(finalizeFullLeg(partial, plan, rig.goodOutcome(plan), &record) ==
+          FullLegFinalizeFailure::CONTEXT_INCOMPLETE);
+    expectFailedLeg(record);
+    CHECK(!rig.permit.active());
+  }
+  {
+    g_case = "operator abort ends the session ABORTED";
+    Rig rig;
+    CHECK(rig.startLeg(Leg::LH));
+    const FullLegPlan plan = rig.planFor(Leg::LH);
+    FullLegRecord record{};
+    CHECK(finalizeFullLeg(rig.context, plan,
+                          rig.partialOutcome(plan, 3, FullLegFailure::OPERATOR_ABORT), &record) ==
+          FullLegFinalizeFailure::EXECUTOR_FAILED);
+    expectFailedLeg(record);
+    CHECK(rig.manager.status().state == SessionState::ABORTED);
+  }
+}
 
-  FullLegFinalizeContext broken = rig.context;
-  broken.manager = nullptr;
+// --- the four-leg result ----------------------------------------------------------
+
+void finalizeInto(Rig& rig, FullLegEvidenceStore& store, Leg leg, uint8_t measured) {
+  CHECK(rig.startLeg(leg));
+  const FullLegPlan plan = rig.planFor(leg);
   FullLegRecord record{};
-  CHECK(finalizeFullLeg(broken, plan, outcome, &record) ==
-        FullLegFinalizeFailure::CONTEXT_INCOMPLETE);
-  CHECK(record.verdict == FullLegVerdict::FAILED);
-  CHECK(!rig.permit.active());
-  CHECK(!rig.authorization.operator_authorized);
-  CHECK(!record.authority_released);
-
-  CHECK(finalizeFullLeg(rig.context, plan, outcome, nullptr) ==
-        FullLegFinalizeFailure::CONTEXT_INCOMPLETE);
-  rig.manager.abortSession();
-}
-
-void test_four_legs_sequential_in_one_boot_session() {
-  g_case = "four legs sequential";
-  Rig rig;
-  FullLegEvidenceStore store;
-  store.reset();
-  uint32_t last_session_id = 0;
-
-  for (Leg leg : kAllLegs) {
-    CHECK(rig.startLeg(leg));
-    CHECK(rig.manager.status().leg == leg);
-    CHECK(rig.manager.status().session_id > last_session_id);
-    last_session_id = rig.manager.status().session_id;
-
-    const FullLegPlan plan = rig.planFor(leg);
-    const FullLegRunOutcome outcome = rig.goodOutcome(leg);
-    FullLegRecord record{};
-    CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::NONE);
-    store.put(record);
-    rig.expectCleanBetweenLegs();
-    CHECK(record.verdict == FullLegVerdict::HARDWARE_CONTACT_CALIBRATED);
-  }
-
-  CHECK_EQ(store.legsPresent(), 4);
-  CHECK_EQ(store.legsContactCalibrated(), 4);
-  CHECK_EQ(store.legsEnvelopeAccepted(), 0);
-  CHECK(store.allLegsContactCalibrated());
-  CHECK_EQ(rig.manager.status().sessions_completed, 4);
-  CHECK_EQ(rig.manager.status().sessions_failed, 0);
-  for (Leg leg : kAllLegs) {
-    const FullLegRecord* r = store.find(leg);
-    CHECK(r != nullptr);
-    if (r == nullptr) continue;
-    CHECK(r->leg == leg);
-    CHECK_EQ(r->attempts, 1);
-    CHECK(r->hardware_contact_calibrated);
-  }
-}
-
-void test_one_leg_failing_does_not_falsify_the_others() {
-  g_case = "isolated failure";
-  Rig rig;
-  FullLegEvidenceStore store;
-
-  for (Leg leg : kAllLegs) {
-    CHECK(rig.startLeg(leg));
-    const FullLegPlan plan = rig.planFor(leg);
-    FullLegRunOutcome outcome = rig.goodOutcome(leg);
-    if (leg == Leg::RF) outcome.max_contact.detection = ContactState::EARLY_STALL;
-    FullLegRecord record{};
-    const FullLegFinalizeFailure failure = finalizeFullLeg(rig.context, plan, outcome, &record);
-    CHECK((failure == FullLegFinalizeFailure::NONE) == (leg != Leg::RF));
-    store.put(record);
-    rig.expectCleanBetweenLegs();
-  }
-
-  CHECK_EQ(store.legsPresent(), 4);
-  CHECK_EQ(store.legsContactCalibrated(), 3);
-  CHECK(!store.allLegsContactCalibrated());
-  CHECK(store.find(Leg::LF)->verdict == FullLegVerdict::HARDWARE_CONTACT_CALIBRATED);
-  CHECK(store.find(Leg::RF)->verdict == FullLegVerdict::FAILED);
-  CHECK(store.find(Leg::RF)->failure == FullLegFinalizeFailure::MAX_CONTACT_REJECTED);
-  CHECK(store.find(Leg::RH)->verdict == FullLegVerdict::HARDWARE_CONTACT_CALIBRATED);
-  CHECK(store.find(Leg::LH)->verdict == FullLegVerdict::HARDWARE_CONTACT_CALIBRATED);
-
-  // The failed leg can be rerun: it replaces only its own slot.
-  CHECK(rig.startLeg(Leg::RF));
-  const FullLegPlan plan = rig.planFor(Leg::RF);
-  const FullLegRunOutcome outcome = rig.goodOutcome(Leg::RF);
-  FullLegRecord record{};
-  CHECK(finalizeFullLeg(rig.context, plan, outcome, &record) == FullLegFinalizeFailure::NONE);
+  finalizeFullLeg(rig.context, plan,
+                  measured == 6 ? rig.goodOutcome(plan)
+                                : rig.partialOutcome(plan, measured, FullLegFailure::HIP_MAX_PROBE_FAILED),
+                  &record);
   store.put(record);
-  CHECK_EQ(store.find(Leg::RF)->attempts, 2);
-  CHECK(store.find(Leg::RF)->verdict == FullLegVerdict::HARDWARE_CONTACT_CALIBRATED);
-  CHECK_EQ(store.find(Leg::LF)->attempts, 1);
-  CHECK(store.allLegsContactCalibrated());
+  rig.expectCleanBetweenLegs();
 }
 
-void test_store_reset_and_bounds() {
+void test_only_24_of_24_is_full_calibration() {
+  {
+    g_case = "4 x 6/6 in one boot = 24/24";
+    Rig rig;
+    FullLegEvidenceStore store;
+    for (const Leg leg : kAllLegs) {
+      CHECK(!store.allLegsContactCalibrated());
+      finalizeInto(rig, store, leg, 6);
+    }
+    CHECK_EQ(store.legsPresent(), 4);
+    CHECK_EQ(store.legsContactCalibrated(), 4);
+    CHECK_EQ(store.totalContactsAccepted(), 24);
+    CHECK(store.allLegsContactCalibrated());
+    CHECK_EQ(store.legsEnvelopeAccepted(), 0);  // never claimed without approved parameters
+  }
+  {
+    g_case = "three legs 6/6, one leg 5/6: 18/24, not Full Calibration";
+    Rig rig;
+    FullLegEvidenceStore store;
+    finalizeInto(rig, store, Leg::LF, 6);
+    finalizeInto(rig, store, Leg::RF, 6);
+    finalizeInto(rig, store, Leg::RH, 6);
+    finalizeInto(rig, store, Leg::LH, 5);
+    CHECK_EQ(store.legsPresent(), 4);
+    CHECK_EQ(store.legsContactCalibrated(), 3);
+    CHECK_EQ(store.totalContactsAccepted(), 18);
+    CHECK(!store.allLegsContactCalibrated());
+    CHECK(store.find(Leg::LH)->verdict == FullLegVerdict::FAILED);
+    // The failed leg does not falsify the others.
+    CHECK(store.find(Leg::RH)->verdict == FullLegVerdict::HARDWARE_CONTACT_CALIBRATED);
+  }
+  {
+    g_case = "23/24 (a forged 5-contact 'calibrated' record) is not Full Calibration";
+    Rig rig;
+    FullLegEvidenceStore store;
+    finalizeInto(rig, store, Leg::LF, 6);
+    finalizeInto(rig, store, Leg::RF, 6);
+    finalizeInto(rig, store, Leg::RH, 6);
+    finalizeInto(rig, store, Leg::LH, 6);
+    FullLegRecord forged = *store.find(Leg::LH);
+    forged.contacts_accepted = 5;  // still flagged calibrated
+    store.put(forged);
+    CHECK_EQ(store.totalContactsAccepted(), 23);
+    CHECK_EQ(store.legsContactCalibrated(), 3);
+    CHECK(!store.allLegsContactCalibrated());
+  }
+  {
+    g_case = "the old UPPER-only total (4 x 2 = 8) is not Full Calibration";
+    Rig rig;
+    FullLegEvidenceStore store;
+    for (const Leg leg : kAllLegs) finalizeInto(rig, store, leg, 2);
+    CHECK_EQ(store.legsContactCalibrated(), 0);
+    CHECK_EQ(store.totalContactsAccepted(), 0);
+    CHECK(!store.allLegsContactCalibrated());
+  }
+  {
+    g_case = "a failed retry replaces the leg's record; a later 6/6 restores it";
+    Rig rig;
+    FullLegEvidenceStore store;
+    finalizeInto(rig, store, Leg::LF, 4);
+    CHECK_EQ(store.find(Leg::LF)->attempts, 1);
+    CHECK_EQ(store.legsContactCalibrated(), 0);
+    finalizeInto(rig, store, Leg::LF, 6);
+    CHECK_EQ(store.find(Leg::LF)->attempts, 2);
+    CHECK_EQ(store.legsContactCalibrated(), 1);
+    CHECK_EQ(store.totalContactsAccepted(), 6);
+  }
+}
+
+void test_store_bounds() {
   g_case = "store";
   FullLegEvidenceStore store;
   CHECK_EQ(store.legsPresent(), 0);
-  CHECK(store.find(Leg::LF) == nullptr);
   CHECK(store.find(static_cast<Leg>(9)) == nullptr);
-
   FullLegRecord record{};
   record.leg = static_cast<Leg>(9);
   record.present = true;
-  store.put(record);  // unknown leg: ignored
+  store.put(record);
   CHECK_EQ(store.legsPresent(), 0);
-
   record.leg = Leg::RH;
+  record.present = false;
+  store.put(record);  // an absent record is not a run
+  CHECK_EQ(store.legsPresent(), 0);
+  record.present = true;
   store.put(record);
   CHECK_EQ(store.legsPresent(), 1);
-  CHECK(store.find(Leg::RH) != nullptr);
+  CHECK_EQ(store.totalContactsAccepted(), 0);
   store.reset();
   CHECK_EQ(store.legsPresent(), 0);
-  CHECK(store.find(Leg::RH) == nullptr);
 }
 
-void test_export_is_deterministic_and_complete() {
+void test_export_is_deterministic_and_carries_the_definition() {
   g_case = "export";
   Rig rig;
   FullLegEvidenceStore store;
   const actuator::GeometryProvenanceTag tag = rig.policy.currentGeometryTag();
-
-  // Empty store: header, four NOT_RUN legs, footer.
   {
     Lines lines;
     exportFullLegEvidence(store, tag, rig.context.parameters, &collect, &lines);
     CHECK_EQ(lines.v.size(), 6);
-    CHECK(has(lines, "CALIBRATION_EVIDENCE_EXPORT=BEGIN format=1"));
-    CHECK(has(lines, "CALIBRATION_EVIDENCE_LEG leg=LF present=0 attempts=0 verdict=NOT_RUN"));
-    CHECK(has(lines, "CALIBRATION_EVIDENCE_LEG leg=LH present=0 attempts=0 verdict=NOT_RUN"));
-    CHECK(has(lines, "legs_present=0 legs_contact_calibrated=0 legs_envelope_accepted=0 "
-                     "all_contact_calibrated=0"));
+    CHECK(has(lines, "CALIBRATION_EVIDENCE_EXPORT=BEGIN format=2"));
+    CHECK(has(lines, "contacts_per_leg=6 total_contacts_expected=24"));
+    CHECK(has(lines, "CALIBRATION_EVIDENCE_LEG leg=LF present=0 attempts=0 verdict=NOT_RUN "
+                     "contacts_expected=6 contacts_accepted=0"));
+    CHECK(has(lines, "total_contacts_expected=24 total_contacts_accepted=0 all_contact_calibrated=0"));
   }
+  finalizeInto(rig, store, Leg::LF, 6);
+  finalizeInto(rig, store, Leg::RF, 6);
+  finalizeInto(rig, store, Leg::RH, 2);
+  finalizeInto(rig, store, Leg::LH, 6);
 
-  for (Leg leg : kAllLegs) {
-    CHECK(rig.startLeg(leg));
-    const FullLegPlan plan = rig.planFor(leg);
-    FullLegRunOutcome outcome = rig.goodOutcome(leg);
-    if (leg == Leg::RH) outcome.min_contact.detection = ContactState::CONTACT_SUSPECTED;
-    FullLegRecord record{};
-    finalizeFullLeg(rig.context, plan, outcome, &record);
-    store.put(record);
-  }
-
-  Lines first;
-  Lines second;
+  Lines first, second;
   exportFullLegEvidence(store, tag, rig.context.parameters, &collect, &first);
   exportFullLegEvidence(store, tag, rig.context.parameters, &collect, &second);
   CHECK(first.v == second.v);
-  // 1 header + 4 legs x (LEG + AUX + 3 Q0 + 2 CONTACT + 3 ENVELOPE + 3 LIMIT) + 1 footer.
-  CHECK_EQ(first.v.size(), 1 + 4 * 13 + 1);
-  for (const std::string& line : first.v) CHECK(line.size() < 383);
-
-  CHECK(has(first, "CALIBRATION_EVIDENCE_EXPORT=BEGIN format=1 geometry="));
-  CHECK(has(first, "parameters_approved=0 upper_margin_ticks=8 hip_lower_margin_urad=50000"));
+  // 1 + 4 x (LEG + LEG_CLOSE + PARK + 3 Q0 + 6 CONTACT + 3 DIAG + 3 ENVELOPE + 3 LIMIT) + 1.
+  CHECK_EQ(first.v.size(), 1 + 4 * 21 + 1);
+  for (const std::string& line : first.v) CHECK(line.size() < 400);
   CHECK(has(first, "CALIBRATION_EVIDENCE_LEG leg=LF present=1 attempts=1"));
-  CHECK(has(first, "verdict=HARDWARE_CONTACT_CALIBRATED contact_calibrated=1 envelope_accepted=0"));
-  CHECK(has(first, "leg=RH present=1 attempts=1"));
-  CHECK(has(first, "verdict=FAILED contact_calibrated=0 envelope_accepted=0 "
-                   "failure=MIN_CONTACT_REJECTED"));
-  CHECK(has(first, "CALIBRATION_EVIDENCE_AUX leg=LF required=1 aux_leg=LH aux_joint=UPPER aux_bus=42 "
-                   "park_target_urad=610865"));
-  CHECK(has(first, "CALIBRATION_EVIDENCE_AUX leg=RF required=1 aux_leg=RH aux_joint=UPPER aux_bus=32"));
-  CHECK(has(first, "CALIBRATION_EVIDENCE_AUX leg=RH required=0"));
-  CHECK(has(first, "CALIBRATION_EVIDENCE_AUX leg=LH required=0"));
-  CHECK(has(first, "CALIBRATION_EVIDENCE_Q0 leg=LF joint=UPPER unit=ELR01 bus=12 present=1 q0_tick=2100"));
-  CHECK(has(first, "CALIBRATION_EVIDENCE_Q0 leg=LH joint=LOWER unit=M41 bus=41 present=1 q0_tick=2073"));
-  CHECK(has(first, "CALIBRATION_EVIDENCE_CONTACT leg=LF joint=UPPER side=MIN recorded=1"));
-  CHECK(has(first, "CALIBRATION_EVIDENCE_CONTACT leg=LF joint=UPPER side=MAX recorded=1"));
-  CHECK(has(first, "CALIBRATION_EVIDENCE_LIMIT leg=LF joint=UPPER "
-                   "admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS"));
-  CHECK(has(first, "placeholder=1"));
-  CHECK(has(first, "legs_present=4 legs_contact_calibrated=3 legs_envelope_accepted=0 "
-                   "all_contact_calibrated=0"));
-
-  // A null sink is a no-op, not a crash.
-  exportFullLegEvidence(store, tag, rig.context.parameters, nullptr, nullptr);
-
-  // Leg order in the export is fixed: LF, RF, RH, LH.
-  size_t lf = 0, rf = 0, rh = 0, lh = 0;
-  for (size_t i = 0; i < first.v.size(); ++i) {
-    if (first.v[i].rfind("CALIBRATION_EVIDENCE_LEG leg=LF", 0) == 0) lf = i;
-    if (first.v[i].rfind("CALIBRATION_EVIDENCE_LEG leg=RF", 0) == 0) rf = i;
-    if (first.v[i].rfind("CALIBRATION_EVIDENCE_LEG leg=RH", 0) == 0) rh = i;
-    if (first.v[i].rfind("CALIBRATION_EVIDENCE_LEG leg=LH", 0) == 0) lh = i;
+  CHECK(has(first, "verdict=HARDWARE_CONTACT_CALIBRATED contacts_expected=6 contacts_measured=6 "
+                   "contacts_accepted=6"));
+  CHECK(has(first, "verdict=FAILED contacts_expected=6 contacts_measured=2 contacts_accepted=0"));
+  CHECK(has(first, "CALIBRATION_EVIDENCE_LEG_CLOSE leg=RH failure=EXECUTOR_FAILED "
+                   "executor_failure=HIP_MAX_PROBE_FAILED failed_phase=PREFLIGHT session_completed=0 "
+                   "permit_revoked=1 authority_released=1 parameters_approved=0"));
+  CHECK(has(first, "CALIBRATION_EVIDENCE_LEG_CLOSE leg=LF failure=NONE executor_failure=NONE "
+                   "failed_phase=- session_completed=1 permit_revoked=1 authority_released=1 "
+                   "parameters_approved=0"));
+  CHECK(has(first, "CALIBRATION_EVIDENCE_PARK leg=LF required=1 park_leg=LH park_joint=UPPER "
+                   "park_bus=42 park_target_urad=610865"));
+  CHECK(has(first, "CALIBRATION_EVIDENCE_PARK leg=RF required=1 park_leg=RH park_joint=UPPER park_bus=32"));
+  CHECK(has(first, "CALIBRATION_EVIDENCE_PARK leg=RH required=0"));
+  CHECK(has(first, "CALIBRATION_EVIDENCE_Q0 leg=LF joint=HIP unit=M22 bus=13 present=1 q0_tick=1996"));
+  for (const char* j : {"UPPER", "LOWER", "HIP"}) {
+    for (const char* s : {"MIN", "MAX"}) {
+      CHECK(has(first, std::string("CALIBRATION_EVIDENCE_CONTACT leg=LH joint=") + j + " side=" + s +
+                           " recorded=1 measured=1"));
+    }
+    CHECK(has(first, std::string("CALIBRATION_EVIDENCE_DIAG leg=LF joint=") + j + " evaluated=1"));
+    CHECK(has(first, std::string("CALIBRATION_EVIDENCE_LIMIT leg=LF joint=") + j +
+                         " admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS"));
   }
-  CHECK(lf < rf && rf < rh && rh < lh);
+  CHECK(has(first, "CALIBRATION_EVIDENCE_CONTACT leg=RH joint=HIP side=MAX recorded=0 measured=0"));
+  CHECK(has(first, "legs_present=4 legs_contact_calibrated=3 legs_envelope_accepted=0 "
+                   "total_contacts_expected=24 total_contacts_accepted=18 all_contact_calibrated=0"));
+  exportFullLegEvidence(store, tag, rig.context.parameters, nullptr, nullptr);  // no crash
+
+  // The final line of a 24/24 store.
+  Rig all;
+  FullLegEvidenceStore full;
+  for (const Leg leg : kAllLegs) finalizeInto(all, full, leg, 6);
+  Lines done;
+  exportFullLegEvidence(full, tag, all.context.parameters, &collect, &done);
+  CHECK(done.v.back() ==
+        "CALIBRATION_EVIDENCE_EXPORT=END legs_present=4 legs_contact_calibrated=4 "
+        "legs_envelope_accepted=0 total_contacts_expected=24 total_contacts_accepted=24 "
+        "all_contact_calibrated=1");
+}
+
+// The longest value of every field at once: no line may reach the buffer
+// (a silently truncated evidence line would drop its last fields).
+void test_export_never_truncates() {
+  g_case = "export worst-case line length";
+  FullLegEvidenceStore store;
+  for (const Leg leg : kAllLegs) {
+    FullLegRecord r{};
+    r.leg = leg;
+    r.present = true;
+    r.session_id = 4294967295u;
+    r.geometry = 0xFFFFFFFFFFFFFFFFULL;
+    r.verdict = FullLegVerdict::FINAL_OPERATIONAL_ENVELOPE_ACCEPTED;
+    r.failure = FullLegFinalizeFailure::CLEANUP_SESSION_NOT_TERMINAL;
+    r.executor_failure = FullLegFailure::INITIAL_RECOVERY_OUT_OF_RANGE;
+    r.executor_failed_phase = CalibrationPhase::RETURN_LOWER_HELD;
+    r.has_rear_park = true;
+    r.park_target_urad = -2147483647;
+    for (const JointKind joint : kJoints) {
+      FullLegJointRecord& j = r.joint(joint);
+      setPhysicalUnit(&j.identity, "WWWWWWWW");
+      j.bus_id = 255;
+      j.q0_tick = 65535;
+      j.q0_state = EvidenceState::PROMOTED;
+      j.q0_origin = CalibrationOrigin::HISTORICAL_REPLAY;
+      for (ContactEvidence& c : j.contact) {
+        c.detection = ContactState::CONTACT_CONFIRMED;
+        c.coarse_tick = c.fine_tick_1 = c.fine_tick_2 = c.repeatability_ticks = 65535;
+      }
+      j.diagnostics.min_contact_tick = j.diagnostics.max_contact_tick = 65535;
+      j.envelope_status = actuator::EnvelopeBuildStatus::REJECT_CONTACT_GEOMETRY_MISMATCH;
+      j.envelope.source = actuator::EnvelopeSource::DERIVED_FROM_GEOMETRY;
+      j.limit = FullLegLimitAdmission::NOT_ADMITTED_UNAPPROVED_PARAMETERS;
+    }
+    for (int a = 0; a < 70; ++a) store.put(r);  // attempts > 2 digits
+  }
+  Lines lines;
+  FullLegEnvelopeParameters p{};
+  p.contact_margin_ticks = 65535;
+  exportFullLegEvidence(store, 0xFFFFFFFFFFFFFFFFULL, p, &collect, &lines);
+  size_t longest = 0;
+  for (const std::string& line : lines.v) longest = line.size() > longest ? line.size() : longest;
+  CHECK(longest < 480);  // the buffer is 512
+  CHECK(has(lines, "parameters_approved=0"));  // the LEG_CLOSE tail survives
 }
 
 void test_outcome_from_executor() {
@@ -1017,51 +859,46 @@ void test_outcome_from_executor() {
   CHECK(!idle.complete);
   CHECK(idle.geometry_at_start == 7);
   CHECK_EQ(idle.session_id_at_start, 3);
-
   FullLegCalibrationRequest request{};
   FullLegCalibrationContext ctx{};
   CHECK(!executor.start(request, ctx, 0));
   FullLegRunOutcome failed = outcomeFromExecutor(executor, 7, 3);
   CHECK(failed.terminal);
   CHECK(!failed.complete);
-  CHECK(failed.failure == FullLegCalibrationFailure::REJECT_PRECONDITIONS);
+  CHECK(failed.failure == FullLegFailure::REJECT_PRECONDITIONS);
+  CHECK_EQ(failed.contacts_measured, 0);
 }
 
-void test_enum_strings_are_distinct_and_named() {
+void test_enum_strings() {
   g_case = "toString";
   CHECK_STR(toString(FullLegVerdict::HARDWARE_CONTACT_CALIBRATED), "HARDWARE_CONTACT_CALIBRATED");
   CHECK_STR(toString(FullLegVerdict::FINAL_OPERATIONAL_ENVELOPE_ACCEPTED),
             "FINAL_OPERATIONAL_ENVELOPE_ACCEPTED");
-  CHECK_STR(toString(FullLegVerdict::NOT_RUN), "NOT_RUN");
-  CHECK_STR(toString(FullLegVerdict::FAILED), "FAILED");
-  CHECK_STR(toString(FullLegLimitAdmission::ADMITTED), "ADMITTED");
-  CHECK_STR(toString(FullLegFinalizeFailure::NONE), "NONE");
-  CHECK_STR(toString(actuator::LimitAdmission::REJECT_NO_TRANSFORM), "REJECT_NO_TRANSFORM");
-  for (uint8_t i = 0; i <= 18; ++i) {
+  CHECK_STR(toString(FullLegFinalizeFailure::CONTACTS_INCOMPLETE), "CONTACTS_INCOMPLETE");
+  for (uint8_t i = 0; i <= static_cast<uint8_t>(FullLegFinalizeFailure::CLEANUP_PERMIT_ACTIVE); ++i) {
     CHECK(std::strcmp(toString(static_cast<FullLegFinalizeFailure>(i)), "UNKNOWN") != 0);
   }
+  CHECK_STR(toString(static_cast<FullLegFinalizeFailure>(200)), "UNKNOWN");
 }
 
 }  // namespace
 
 int main() {
-  test_production_parameters_are_placeholders_and_unapproved();
+  test_the_definition_is_24_contacts();
   test_policy_operational_limit_gate();
-  test_unapproved_lifecycle_for_every_leg();
-  test_approved_lifecycle_admits_current_limits_for_every_leg();
-  test_run_not_terminal_touches_nothing();
-  test_executor_failure_cleans_up_without_evidence();
-  test_session_mismatch_never_touches_a_foreign_session();
-  test_contact_evidence_refusals();
-  test_envelope_refusals_leave_no_limit_and_no_pass();
-  test_context_incomplete_still_revokes_the_permit();
-  test_four_legs_sequential_in_one_boot_session();
-  test_one_leg_failing_does_not_falsify_the_others();
-  test_store_reset_and_bounds();
-  test_export_is_deterministic_and_complete();
+  test_six_of_six_is_a_calibrated_leg_for_every_leg();
+  test_approved_parameters_admit_all_three_limits();
+  test_partial_legs_are_failed_legs();
+  test_an_outcome_claiming_success_with_fewer_than_six_is_refused();
+  test_contact_and_diagnostic_refusals();
+  test_session_and_context_refusals();
+  test_only_24_of_24_is_full_calibration();
+  test_store_bounds();
+  test_export_is_deterministic_and_carries_the_definition();
+  test_export_never_truncates();
   test_outcome_from_executor();
-  test_enum_strings_are_distinct_and_named();
+  test_enum_strings();
 
-  std::printf("full_leg_calibration_finalizer: %d checks, %d failures\n", g_checks, g_failures);
+  std::printf("test_full_leg_calibration_finalizer: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;
 }

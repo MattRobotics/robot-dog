@@ -296,8 +296,9 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   robot.
 - **ENTRY** — G3 formal PASS (including the census repeat); G3.1 PASS; Authority model PASS;
   powered bus health proven.
-- **ALLOWED** — H1 census semantics, q0 evidence capture, current `motorDirection` resolved from
-  the bound URDF / Geometry V5 contract, characterization, then staged calibration motion
+- **ALLOWED** — H1 census semantics, q0 evidence capture, the current-installation
+  `encoder_direction` record (amended 2026-10-01; never the URDF `motorDirection`) resolved from
+  the bound profile, characterization, then staged calibration motion
   **each with its own session authorization**. `DIRECTION_VERIFY` is optional diagnostic work,
   not a calibration prerequisite.
 - **FORBIDDEN** — merging the archived calibrator tree
@@ -307,17 +308,25 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
 - **PASS CRITERIA** — formal H1 satisfied for all 12 leg servos (ID 51 is not in Full-Leg H1); the
   evidence lifecycle `MEASURED → CANDIDATE → ACCEPTED → PROMOTED` is preserved.
 - **NEXT** — motion may be considered, behind the Safe Actuator Layer.
-- **GEOMETRY** — the current Geometry Compiler V5 canonical bundle is the only source of
-  prerequisite, parking and contact-corridor data. The pre-reset calibration block's
-  `rear_parking_pose` / `front_leg_dependencies` and the 30/50/85/90 poses are **SUPERSEDED**;
-  the current plans park at 35.000 / 64.1667 / 93.3333 degrees. Of the 24 endpoints only the
-  **8 upper-leg** ones are `EXECUTABLE_URDF_DOMAIN`; the 16 hip and lower-leg endpoints contact
-  beyond the declared URDF limit and are diagnostic evidence, never motion targets, whatever
-  their clearance verdict. Full operational calibration therefore does **not** mean 24 contact
-  motions: the eight upper contacts are the current physical contact-calibration set, while
-  hip/lower require conservative current operational envelopes without beyond-URDF probing.
-  See [`CALIBRATION_BOOTSTRAP.md`](CALIBRATION_BOOTSTRAP.md) and
-  [`CALIBRATION_READINESS.md`](CALIBRATION_READINESS.md).
+- **DEFINITION (2026-09-30, the only one)** — **TRUE FULL CALIBRATION = 4 legs × 3 joints
+  (HIP, UPPER, LOWER) × MIN/MAX = 24 physical contact witnesses.** A leg is
+  `HARDWARE_CONTACT_CALIBRATED` only with 6/6; the robot is fully calibrated only at 24/24
+  (`all_contact_calibrated=1`). 2/6 (UPPER only), 5/6, or 8 UPPER contacts in total are a FAILED
+  leg / not Full Calibration. Machine-enforced by the finalizer, pinned by `static_audit.py` and
+  host-tested. Every run starts with an active INITIAL RECOVERY of all 12 leg joints to the
+  promoted q0, and every probe runs with the other same-leg joints HELD at the LF V25
+  prerequisite poses.
+- **GEOMETRY** — Geometry Compiler V5 is the source of the canonical contacts, the URDF domain
+  and the front legs' rear-UPPER park (35.000°). V5 evaluates every endpoint from q=0 with all
+  other joints at q=0; in **that** context only the 8 UPPER endpoints are
+  `EXECUTABLE_URDF_DOMAIN`. That describes V5's evaluation context, not the calibration's scope
+  (the error PR #34 was built on). The 24-contact sequence is authorized by a second object, the
+  geometry-validated `CalibrationSequencePlan`. Every segment of every leg's V25 sequence is
+  collision-checked on the SHA-pinned URDF/meshes, and the committed data is re-derived by the
+  audit
+  ([`09_Logs/Validation_Reports/Full_Calibration_Sequence_Geometry_2026-09-30/`](../../09_Logs/Validation_Reports/Full_Calibration_Sequence_Geometry_2026-09-30/)).
+  `isExecutable()` is not weakened. See
+  [`2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md`](../../09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md).
 - **STATUS** — **BLOCKED** by `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION`. Last formal H1 was
   6/12 and is **not** superseded by a Controller census.
   - **Offline foundation: IMPLEMENTED / COMPILED / OFFLINE TESTED.** `src/calibration/` holds a
@@ -369,9 +378,13 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     motion" true without a special-cased guard. It owns no session state, no persistence and no
     geometry profile of its own — full record and adversarial test list in
     [`../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md`](../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md).
-  - **CR0 direction contract CLOSED (2026-09-27)** — normal calibration does not measure
-    `motorDirection`. Commit `9aae03d` made the current URDF / Geometry V5 profile the single
-    production authority and kept `DIRECTION_VERIFY` diagnostic-only; the older
+  - **CR0 direction contract AMENDED (2026-10-01)** — the encoder direction is the
+    current-installation `encoder_direction` record (`MATDOG_SERVO_ALLOCATION.yaml`, per-joint
+    source + evidence, generated into the profile, audited 12/12); the URDF `motorDirection` is
+    spec metadata (it was wrong for every HIP/LOWER; the TRUE LF run hit LF LOWER's wrong-side
+    end-stop under it). *Superseded text:* **CR0 direction contract CLOSED (2026-09-27)** — normal
+    calibration does not measure `motorDirection`. Commit `9aae03d` made the current URDF /
+    Geometry V5 profile the single production authority and kept `DIRECTION_VERIFY` diagnostic-only; the older
     `MEASURED_CANDIDATE`/`ACCEPTED` direction vocabulary is legacy/oracle-domain state, not a
     production readiness prerequisite. **Still TO_DESIGN** — the persistence/promotion boundary
     (whether accepted calibration is written by `PROVISIONING` or by a separate transaction).
@@ -404,14 +417,45 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     [`../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/`](../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/).
     **Next: CR3 acceptance/persistence/promotion policy; no motion authorization changes.**
 
-- **Four-leg Full Calibration (2026-09-29): IMPLEMENTED / OFFLINE-VALIDATED, hardware TO_TEST.**
-  One build runs LF → RF → RH → LH, each as its own session + fresh permit, through the same
-  `FullLegCalibrationExecutor`/`ContactProbeEngine`/`CalibrationManager`/`SafeActuatorPolicy`.
-  The end state a hardware run can honestly claim is `HARDWARE_CONTACT_CALIBRATED`;
-  `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` stays unreachable until an approved stand/gait
-  workspace turns `kFullLegOperationalParametersApproved` on (audit-pinned `false`). Procedure:
+- **TRUE 24-contact Full Calibration — HARDWARE-VALIDATED 24/24 (2026-10-01, firmware
+  `dfcecb670d05`, `all_contact_calibrated=1`).** Still not authorized: operational envelopes
+  (`parameters_approved=0`), calibration persistence (RAM-only), stand and gait. Open before gait:
+  telemetry integrity (23 implausible single temperature readings), the LOWER MAX margin decision
+  (RF +6 ticks), and a reviewed zero-refinement procedure. Report:
+  [`../../09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/`](../../09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md).
+  *Original entry (2026-09-30):* IMPLEMENTED / OFFLINE-VALIDATED, hardware NOT RUN. The LF V25 full-leg state machine (PREFLIGHT → INITIAL_RECOVERY → PARKING → UPPER
+  MIN/MAX → UPPER_HORIZONTAL → LOWER MIN/MAX → LOWER_FOLDED → HIP MIN/MAX → DIAGNOSTICS → RETURN
+  → RESTORE → verified SAFE_OFF), generalized to LF, RF, RH and LH (`FullLegCalibrationExecutor`).
+  Each leg runs in its own session + fresh permit, preceded by a verified
+  `@CALIBRATION INITIAL RECOVERY` of all 12 joints. The end state a hardware run can honestly
+  claim is `HARDWARE_CONTACT_CALIBRATED` (per leg, 6/6); `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED`
+  stays unreachable until an approved stand/gait workspace turns
+  `kFullLegOperationalParametersApproved` on (audit-pinned `false`). Procedure:
   [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md).
-  `@CALIBRATION Q0 PROMOTE` promotes the **current-boot** capture (not the frozen CR2-C package).
+  V25 mapping:
+  [`2026-09-30_FULL_CALIBRATION_24_CONTACT_V25_TRACEABILITY.md`](../../09_Logs/Development_Log/2026-09-30_FULL_CALIBRATION_24_CONTACT_V25_TRACEABILITY.md).
+  - Supersedes PR #34's UPPER-only "Full Leg" (2 contacts per leg, 8 in all), which is **not**
+    Full Calibration and stays unmerged. Its staged endpoint search had no coarse contact
+    scout (PR #35 D6); the corrective commit restores the V25 search exactly: baseline →
+    64-tick coarse scout → release → backoff 96 → fine 1 (8) → backoff → fine 2 (8), both fine
+    passes judged against the scout (adaptive corridor, lag bypass, kinematic plateau),
+    repeatability fine-to-fine ≤ 16. It drives all 24 endpoints.
+  - Gates: host tests, static audit (incl. the runner suite and the plan-data re-derivation),
+    the Safe Actuator/DALY/LED audit mutation suites, and
+    `scripts/tests/test_calibration_search_behaviour_mutations.py` (staged-search,
+    coarse-scout and orchestration mutations, explicit run: every mutation must fail the host
+    tests).
+  - Each backoff is arrived only through V25's StableTargetGate (≤ 12 ticks, |speed| ≤ 4, 4
+    samples, ≥ 400 ms); the search telemetry timeout is V25's 2 s.
+  - Runtime PresentTemperature > 70 °C is confirmed as in V25 `port.rs` (2 direct reads of the same
+    servo, 50 ms apart, ≥ 2 of 3 aborts, a failed read aborts). This follows the 2026-09-30
+    single-sample false abort on hardware; no other check is debounced.
+  - Risk R2 closed by D10: V25's coarse-grid reach depended on the fresh q0; one final bounded
+    partial coarse step to the existing guard (never beyond, not V25) makes the reach guard − 18
+    for every q0. The read-only LF UPPER MIN reach report from the promoted q0 still gates the GO;
+    margin < 0 = stop.
+  - Known hardware risk R1: V25's LF HIP MAX contact sat exactly on the corridor entry (see the
+    development log). If it recurs: stop, keep the evidence, decide from the measured stop.
   **Next after a hardware Full Calibration PASS: Calibration Persistence V1** (versioned,
   atomic, fail-closed at boot, no ST3215 EEPROM writes) — TO_DESIGN, not started; see
   [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md).

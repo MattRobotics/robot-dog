@@ -45,6 +45,8 @@ struct LedStatusInputs {
   uint32_t telemetry_age_ms = UINT32_MAX;
   float soc_percent = 0;
   bool battery_charging = false;
+  // A DALY alarm that BLOCKS the charging presentation - produced by
+  // dalyAlarmBlocksChargingPresentation() below, never by "any word != 0".
   bool battery_alarm = false;
   // Reserved for a future reviewed power policy. No production producer.
   // SOC (even 100%) can never set this fact.
@@ -80,6 +82,20 @@ struct LedStatusSnapshot {
   bool battery_warning = false;
   bool battery_critical = false;
 };
+
+// DALY 0xD2 alarm word 3, bit 0x0010. Observed on every attended charge with
+// KEY OFF (live 2026-09-30: state=CHARGING, alarms=0000 0000 0000 0010, charge
+// and discharge MOS ON); the DALY app names it "GPS or soft switch turn off
+// MOS". It is INFORMATIONAL FOR LED PRESENTATION ONLY: this one bit, in this
+// one word, never raises CHARGING_FAULT. Every other bit of every word still
+// does. The raw alarm words, @BMS STATUS, DalyBms::alarms_clear, the KEY/MOS
+// write gates and the BMS's own protection are NOT affected by this mask.
+constexpr uint16_t kDalyLedInformationalAlarm3Bits = 0x0010;
+
+// True when the four raw 0xD2 alarm words hold anything that must show as a
+// charging fault: alarms[0..2] != 0, or alarms[3] with any bit other than
+// kDalyLedInformationalAlarm3Bits.
+bool dalyAlarmBlocksChargingPresentation(const uint16_t alarms[4]);
 
 LedPresentationState selectLedState(const LedStatusInputs& inputs);
 LedEffect ledEffectFor(LedPresentationState state, uint32_t now_ms, uint8_t max_brightness);

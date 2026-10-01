@@ -10,8 +10,11 @@ This repository is the single active engineering repository for the robot.
 >   **17 remain canonically allocated** — IDs 52–55 are intentionally absent today.
 > - **MATDOG Controller V0.1 is the official firmware baseline**, and `ROBOT_POWERED` no-motion
 >   operation is **VALIDATED** (G3/G3.1, 2026-09-17/18).
-> - **The four-leg Full Calibration (LF, RF, RH, LH) is implemented and offline-tested on `main`,
->   but it has never run on the robot.** That hardware session is the immediate gate.
+> - **TRUE Full Calibration = 4 legs × 3 joints × MIN/MAX = 24 contacts.** The 24-contact
+>   implementation (the LF V25 full-leg state machine for all four legs) is offline-validated on
+>   its PR branch and has never run on the robot. The UPPER-only "Full Calibration" on `main`
+>   (2 contacts per leg) was a scope error and is superseded. The hardware session is the
+>   immediate gate.
 > - Gait exists only as an offline engine on a separate, unmerged feature branch. No stand or
 >   gait hardware motion is authorized.
 > - Joint calibration is not accepted. No stale calibration authorizes motion.
@@ -78,7 +81,9 @@ Every current-facing document uses these meanings:
   domain/manager (**OFFLINE TESTED**; the calibration path is not yet exercised on hardware).
 - Four-leg Full Calibration on `main`: fresh read-only q0 capture and current-q0 promotion, the
   Full Leg sequence for LF, RF, RH and LH, contact-evidence lifecycle and deterministic evidence
-  export — see *Calibration on `main`* below.
+  export — see *Calibration on `main`* below. **Scope superseded 2026-09-30:** `main` measures
+  UPPER only (8 contacts); TRUE Full Calibration is 24 contacts
+  ([development log](09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md)).
 
 ### DECIDED
 
@@ -192,8 +197,9 @@ OPEN       autonomous dock/charging              OPEN — no dock hardware evide
                                                  attended manual charging session
 
 COMPLETE   read-only q0 capture on the robot     VALIDATED (CR2-C, 2026-09-27; 12/12, spread 0)
-COMPLETE   four-leg Full Calibration software    IMPLEMENTED / OFFLINE TESTED on main (2026-09-29)
-NEXT       Full 4-leg calibration on hardware    TO_TEST — LF -> RF -> RH -> LH, one attended session
+SUPERSEDED UPPER-only four-leg calibration on main  2026-09-29 - 8 contacts, NOT Full Calibration
+COMPLETE   TRUE 24-contact Full Calibration sw   IMPLEMENTED / OFFLINE-VALIDATED (2026-09-30, PR branch)
+NEXT       Full 4-leg calibration on hardware    TO_TEST — LF -> RF -> RH -> LH, 6/6 each = 24/24
 THEN       Calibration Persistence V1            NEXT AFTER hardware Full Calibration PASS
 THEN       Operational envelopes / JointLimits   BLOCKED until calibration is hardware accepted
 THEN       Stand / gait hardware                 BLOCKED
@@ -217,7 +223,9 @@ presence: BNO085 acquisition runs at 50.1 Hz with the port closed (G3.1). No com
   table and replaces the previous q0. The frozen CR2-C values remain a comparison reference and
   are never promoted.
 - **Full Leg Calibration** is generalized to LF, RF, RH and LH: UPPER MIN contact, an optional
-  auxiliary park, UPPER MAX contact, `SAFE_OFF`, then the evidence lifecycle. Parking: LF parks
+  auxiliary park, UPPER MAX contact, `SAFE_OFF`, then the evidence lifecycle. **(Superseded
+  2026-09-30: that is 2 of a leg's 6 contacts. TRUE Full Calibration runs all six — UPPER, LOWER,
+  HIP × MIN/MAX — per leg, 24 in all.)** Parking: LF parks
   `LH_UPPER` (bus 42), RF parks `RH_UPPER` (bus 32), RH and LH need none. Contact evidence is
   exported deterministically.
 - **Offline gates PASS:** host suite, static audit, Safe Actuator/DALY/LED mutation suites,

@@ -75,11 +75,11 @@ JointIdentity joint(Leg leg, JointKind kind, const char* unit) {
   return id;
 }
 
-// LF_HIP: unit "M22", bus 13, urdf_motor_direction=+1, urdf range
-// +/-785398 urad (verified against CalibrationGeometryProfileData.h).
+// LF_HIP: unit "M22", bus 13, encoder_direction=-1 (current-installation
+// witness 2026-10-01), urdf range +/-785398 urad (CalibrationGeometryProfileData.h).
 JointIdentity lfHip() { return joint(Leg::LF, JointKind::HIP, "M22"); }
-// LH_HIP: unit "M43", bus 43, urdf_motor_direction=-1 - used to prove the
-// min/max-tick ordering logic does not assume a positive direction.
+// LH_HIP: unit "M43", bus 43, encoder_direction=+1 (slot evidence). LF_HIP and
+// LH_HIP together prove the min/max-tick ordering never assumes a sign.
 JointIdentity lhHip() { return joint(Leg::LH, JointKind::HIP, "M43"); }
 // LF_UPPER: the same executable endpoint used throughout the CR3 test suite.
 JointIdentity lfUpper() { return joint(Leg::LF, JointKind::UPPER, "ELR01"); }
@@ -140,6 +140,7 @@ ContactEvidence contactEvidence(Leg leg, JointKind kind, uint16_t fine_tick,
                                  witness_accepted ? 16 : 2);
   e.coarse_tick = static_cast<uint16_t>(fine_tick - 10);
   e.fine_tick_1 = fine_tick;
+  e.fine_tick_2 = fine_tick;
   e.has_measurement = true;
   return e;
 }
@@ -165,29 +166,33 @@ ContactDerivedEnvelopeRequest upperRequest(uint16_t min_side_tick = 1400,
 void test_geometry_derived_happy_path_positive_direction() {
   g_case = "geometry-derived happy path, direction +1";
   CalibrationGeometryProfile profile = boundProfile();
-  const JointTransform transform = promotedTransform(lfHip());
+  CHECK_EQ(jointDirection(profile, lhHip()), 1);
+  const JointTransform transform = promotedTransform(lhHip());
+  GeometryDerivedEnvelopeRequest req = hipRequest();
+  req.joint = lhHip();
   OperationalEnvelope env{};
 
   const EnvelopeBuildStatus status = buildGeometryDerivedEnvelope(
-      profile, geometry_data::kProvenance, transform, hipRequest(), &env);
+      profile, geometry_data::kProvenance, transform, req, &env);
 
   CHECK_EQ((int)status, (int)EnvelopeBuildStatus::READY);
   CHECK(env.present);
   CHECK_EQ((int)env.source, (int)EnvelopeSource::DERIVED_FROM_GEOMETRY);
-  CHECK_EQ(env.min_tick, resolvedTick(lfHip(), -350000));
-  CHECK_EQ(env.max_tick, resolvedTick(lfHip(), 350000));
+  CHECK_EQ(env.min_tick, resolvedTick(lhHip(), -350000));
+  CHECK_EQ(env.max_tick, resolvedTick(lhHip(), 350000));
   CHECK(env.ordered());
   CHECK_EQ(env.geometry, geometryProvenanceTag(geometry_data::kProvenance));
 }
 
 void test_geometry_derived_happy_path_negative_direction() {
-  // LH_HIP has urdf_motor_direction=-1: the numerically smaller URDF angle
+  // LF_HIP has encoder_direction=-1: the numerically smaller URDF angle
   // must NOT be assumed to resolve to the numerically smaller raw tick.
   g_case = "geometry-derived happy path, direction -1";
   CalibrationGeometryProfile profile = boundProfile();
-  const JointTransform transform = promotedTransform(lhHip());
+  CHECK_EQ(jointDirection(profile, lfHip()), -1);
+  const JointTransform transform = promotedTransform(lfHip());
   GeometryDerivedEnvelopeRequest req = hipRequest();
-  req.joint = lhHip();
+  req.joint = lfHip();
   OperationalEnvelope env{};
 
   const EnvelopeBuildStatus status =
@@ -196,8 +201,8 @@ void test_geometry_derived_happy_path_negative_direction() {
   CHECK_EQ((int)status, (int)EnvelopeBuildStatus::READY);
   CHECK(env.present);
   CHECK(env.ordered());
-  const uint16_t a = resolvedTick(lhHip(), -350000);
-  const uint16_t b = resolvedTick(lhHip(), 350000);
+  const uint16_t a = resolvedTick(lfHip(), -350000);
+  const uint16_t b = resolvedTick(lfHip(), 350000);
   CHECK_EQ(env.min_tick, a < b ? a : b);
   CHECK_EQ(env.max_tick, a < b ? b : a);
   // direction=-1 means the negative URDF angle resolves to the LARGER tick.
@@ -309,8 +314,10 @@ void test_geometry_derived_zero_margin_is_the_workspace_itself() {
       profile, geometry_data::kProvenance, transform, hipRequest(-400000, 400000, /*margin=*/0),
       &env);
   CHECK_EQ((int)status, (int)EnvelopeBuildStatus::READY);
-  CHECK_EQ(env.min_tick, resolvedTick(lfHip(), -400000));
-  CHECK_EQ(env.max_tick, resolvedTick(lfHip(), 400000));
+  const uint16_t a = resolvedTick(lfHip(), -400000);
+  const uint16_t b = resolvedTick(lfHip(), 400000);
+  CHECK_EQ(env.min_tick, a < b ? a : b);
+  CHECK_EQ(env.max_tick, a < b ? b : a);
 }
 
 // ---------------------------------------------------------------------------

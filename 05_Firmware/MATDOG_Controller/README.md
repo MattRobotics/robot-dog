@@ -27,6 +27,13 @@ MATDOG Controller
 └── status/          LedRing — WS2812B ring, boots OFF, non-blocking effects
 ```
 
+**TRUE Full Calibration = 4 legs × 3 joints × MIN/MAX = 24 contacts (2026-09-30).** The
+24-contact implementation, the LF V25 full-leg state machine generalized to LF/RF/RH/LH with
+INITIAL RECOVERY and held prerequisites, is offline-validated and has never run on the robot. See
+[`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md) and
+[`2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md`](../../09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md).
+The UPPER-only run described below as "Full Calibration" was 8 contacts and is superseded.
+
 **Current state (2026-09-29).** `ROBOT_POWERED` no-motion operation is hardware-validated. The
 Safe Actuator layer and the four-leg Full Calibration (LF, RF, RH, LH) are merged on `main`,
 **IMPLEMENTED / OFFLINE TESTED and never run on the robot** — see [Calibration on

@@ -4,10 +4,15 @@
 // from the canonical Geometry Compiler V5 bundle
 //   2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4
 //
-// Every value below is COPIED from that bundle and converted to integer
-// micro-radians. No geometry is computed here and none is computed on the
-// device: the Controller verifies provenance and executes prevalidated
+// Every geometric value below is COPIED from that bundle and converted to
+// integer micro-radians. No geometry is computed here and none is computed on
+// the device: the Controller verifies provenance and executes prevalidated
 // plan primitives only. Regenerate with the exporter; never patch a value.
+//
+// encoder_direction is NOT from the URDF: it is the current-installation
+// encoder polarity of 06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml
+// (hashed into kProvenance). The URDF custom motorDirection is spec metadata,
+// shown in the comments for traceability only.
 //
 // max rounding error introduced by the micro-radian conversion: 4.695e-07 rad
 //   (the compiler's own bisection resolution is 1.0e-4 rad)
@@ -32,35 +37,35 @@ constexpr GeometryProvenance kProvenance = {
     "de205209f6015734f43af7f49146ecf60f89a74d6ce1276ce134c189a89c9f7e",
     "67c58430e78241af1a636cdcc22092ff855371713fc7f26bc56412f7c7181139",
     "e5cb2a4c33082c59c6f5d381f90fcc19680cc899e326d13c9c9129932bde5d08",
-    "574dfd6e4cf88034655eea6b5f3505da06a4b2fc9cb198ac34cdd0398315b234",
+    "d9c66134357acbc95c13aae81180f50843cef5cef2613a2ede7927691884e769",
 };
 
 constexpr uint8_t kJointCount = 12;
 constexpr GeometryJointRecord kJoints[kJointCount] = {
-    // lf_hip_joint  unit M22  bus 13
-    {{calibration::Leg::LF, calibration::JointKind::HIP, "M22"}, 13, 1, -785398, 785398, 789216, 2048, 0},
-    // lf_lower_leg_joint  unit M33  bus 11
-    {{calibration::Leg::LF, calibration::JointKind::LOWER, "M33"}, 11, 1, -1605703, 654498, 666293, 2049, 1},
-    // lf_upper_leg_joint  unit ELR01  bus 12
-    {{calibration::Leg::LF, calibration::JointKind::UPPER, "ELR01"}, 12, 1, -916298, 2138028, 909821, 2048, 0},
-    // lh_hip_joint  unit M43  bus 43
-    {{calibration::Leg::LH, calibration::JointKind::HIP, "M43"}, 43, -1, -785398, 785398, 788057, 2049, 1},
-    // lh_lower_leg_joint  unit M41  bus 41
-    {{calibration::Leg::LH, calibration::JointKind::LOWER, "M41"}, 41, 1, -1605703, 654498, 666293, 2049, 1},
-    // lh_upper_leg_joint  unit M42  bus 42
-    {{calibration::Leg::LH, calibration::JointKind::UPPER, "M42"}, 42, 1, -916298, 2138028, 909821, 2048, 0},
-    // rf_hip_joint  unit NEW01  bus 23
-    {{calibration::Leg::RF, calibration::JointKind::HIP, "NEW01"}, 23, 1, -785398, 785398, 789216, 2047, -1},
-    // rf_lower_leg_joint  unit NEW03  bus 21
-    {{calibration::Leg::RF, calibration::JointKind::LOWER, "NEW03"}, 21, -1, -1605703, 654498, 666293, 2048, 0},
-    // rf_upper_leg_joint  unit ELR03  bus 22
-    {{calibration::Leg::RF, calibration::JointKind::UPPER, "ELR03"}, 22, -1, -916298, 2138028, 909821, 2049, 1},
-    // rh_hip_joint  unit NEW06  bus 33
-    {{calibration::Leg::RH, calibration::JointKind::HIP, "NEW06"}, 33, -1, -785398, 785398, 788057, 2047, -1},
-    // rh_lower_leg_joint  unit NEW05  bus 31
-    {{calibration::Leg::RH, calibration::JointKind::LOWER, "NEW05"}, 31, -1, -1605703, 654498, 666293, 2049, 1},
-    // rh_upper_leg_joint  unit ELR02  bus 32
-    {{calibration::Leg::RH, calibration::JointKind::UPPER, "ELR02"}, 32, -1, -916298, 2138028, 909821, 2049, 1},
+    // lf_hip_joint  unit M22  bus 13  encoder_direction -1 (CURRENT_HARDWARE_WITNESS; URDF spec motorDirection +1 DISAGREES, not used)
+    {{calibration::Leg::LF, calibration::JointKind::HIP, "M22"}, 13, -1, EncoderDirectionSource::CURRENT_HARDWARE_WITNESS, -785398, 785398, 789216, 2048, 0},
+    // lf_lower_leg_joint  unit M33  bus 11  encoder_direction -1 (CURRENT_HARDWARE_WITNESS; URDF spec motorDirection +1 DISAGREES, not used)
+    {{calibration::Leg::LF, calibration::JointKind::LOWER, "M33"}, 11, -1, EncoderDirectionSource::CURRENT_HARDWARE_WITNESS, -1605703, 654498, 666293, 2049, 1},
+    // lf_upper_leg_joint  unit ELR01  bus 12  encoder_direction +1 (CURRENT_HARDWARE_WITNESS; URDF spec motorDirection +1, not used)
+    {{calibration::Leg::LF, calibration::JointKind::UPPER, "ELR01"}, 12, 1, EncoderDirectionSource::CURRENT_HARDWARE_WITNESS, -916298, 2138028, 909821, 2048, 0},
+    // lh_hip_joint  unit M43  bus 43  encoder_direction +1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection -1 DISAGREES, not used)
+    {{calibration::Leg::LH, calibration::JointKind::HIP, "M43"}, 43, 1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -785398, 785398, 788057, 2049, 1},
+    // lh_lower_leg_joint  unit M41  bus 41  encoder_direction -1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection +1 DISAGREES, not used)
+    {{calibration::Leg::LH, calibration::JointKind::LOWER, "M41"}, 41, -1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -1605703, 654498, 666293, 2049, 1},
+    // lh_upper_leg_joint  unit M42  bus 42  encoder_direction +1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection +1, not used)
+    {{calibration::Leg::LH, calibration::JointKind::UPPER, "M42"}, 42, 1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -916298, 2138028, 909821, 2048, 0},
+    // rf_hip_joint  unit NEW01  bus 23  encoder_direction -1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection +1 DISAGREES, not used)
+    {{calibration::Leg::RF, calibration::JointKind::HIP, "NEW01"}, 23, -1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -785398, 785398, 789216, 2047, -1},
+    // rf_lower_leg_joint  unit NEW03  bus 21  encoder_direction +1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection -1 DISAGREES, not used)
+    {{calibration::Leg::RF, calibration::JointKind::LOWER, "NEW03"}, 21, 1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -1605703, 654498, 666293, 2048, 0},
+    // rf_upper_leg_joint  unit ELR03  bus 22  encoder_direction -1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection -1, not used)
+    {{calibration::Leg::RF, calibration::JointKind::UPPER, "ELR03"}, 22, -1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -916298, 2138028, 909821, 2049, 1},
+    // rh_hip_joint  unit NEW06  bus 33  encoder_direction +1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection -1 DISAGREES, not used)
+    {{calibration::Leg::RH, calibration::JointKind::HIP, "NEW06"}, 33, 1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -785398, 785398, 788057, 2047, -1},
+    // rh_lower_leg_joint  unit NEW05  bus 31  encoder_direction +1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection -1 DISAGREES, not used)
+    {{calibration::Leg::RH, calibration::JointKind::LOWER, "NEW05"}, 31, 1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -1605703, 654498, 666293, 2049, 1},
+    // rh_upper_leg_joint  unit ELR02  bus 32  encoder_direction -1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection -1, not used)
+    {{calibration::Leg::RH, calibration::JointKind::UPPER, "ELR02"}, 32, -1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -916298, 2138028, 909821, 2049, 1},
 };
 
 constexpr uint8_t kEndpointCount = 24;

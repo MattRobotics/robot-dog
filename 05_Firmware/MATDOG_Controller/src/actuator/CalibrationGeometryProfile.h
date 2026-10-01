@@ -157,28 +157,38 @@ GeometryProvenanceTag geometryProvenanceTag(const GeometryProvenance& provenance
 // Records
 // ---------------------------------------------------------------------------
 
+// Where a joint's current-installation encoder_direction comes from.
+enum class EncoderDirectionSource : uint8_t {
+  CURRENT_HARDWARE_WITNESS = 1,   // observed on THIS installation after 2026-08-27
+  HISTORICAL_SLOT_UNCHANGED = 2,  // the slot's PASS_DIRECTION_TEST, slot mechanics unchanged
+};
+const char* toString(EncoderDirectionSource source);
+
 struct GeometryJointRecord {
   calibration::JointIdentity identity;  // leg, kind, PHYSICAL UNIT - never a bus id alone
   uint8_t bus_id;                       // transport metadata; cross-checked against URDF motorId
-  // THE JOINT'S DIRECTION. Hardware-contract data, not a recalibration datum.
+  // THE JOINT'S ENCODER DIRECTION: raw = q0 + encoder_direction * ticks(q).
   //
-  // The canonical URDF carries the per-joint motorDirection and those
-  // directions were validated on real hardware. The 2026-08-27 reprovisioning
-  // changed the physical units, the PositionOffset baseline and the raw q0
-  // installation. It did NOT change the servo model, the mounting
-  // orientation, the joint mechanical architecture, the URDF joint axes or
-  // motorDirection - so direction did not become unknown.
+  // CURRENT-INSTALLATION encoder polarity, generated from the encoder_direction
+  // record of MATDOG_SERVO_ALLOCATION.yaml (hashed into the provenance tag), NOT
+  // from the URDF. The URDF custom motorDirection is design/spec metadata: it
+  // was promoted to hardware polarity on 2026-09-27 (CR0) without ever having
+  // been measured on this installation, and it was wrong for LF HIP and LF LOWER
+  // (2026-10-01: the TRUE LF run's "LOWER MIN" drove the shank into its MAX
+  // end-stop). It never reaches this field.
   //
-  //   q0              CURRENT INSTALLATION CALIBRATION DATA - measured
-  //   motorDirection  CURRENT URDF / HARDWARE CONTRACT DATA - read, not measured
+  //   q0                 CURRENT INSTALLATION CALIBRATION DATA - measured each boot
+  //   encoder_direction  CURRENT INSTALLATION POLARITY - a hardware witness, or the
+  //                      slot's hardware-backed sign carried over an unchanged slot
   //
-  // Replacing a servo with the same type in the same mounting needs a new q0
-  // capture; it does NOT need direction re-verification. Direction is only
-  // reconsidered when the servo's physical orientation, the transmission
-  // topology, the servo type / encoder convention, the URDF joint axis or
-  // motorDirection change - or when contradictory hardware evidence appears.
-  // Every one of those changes the URDF, and therefore the provenance tag.
-  int8_t urdf_motor_direction;
+  // A same-type servo swapped into the same slot mechanics keeps the slot's sign
+  // (2026-10-01: M33, M22 and ELR01 reproduced their LF slots' 2026-07 signs). The
+  // sign is reconsidered when the mounting orientation, the transmission, the
+  // servo type / encoder convention or the URDF joint axis change, or when
+  // contradictory hardware evidence appears - and the record change moves the
+  // provenance tag, so every transform bound to the old sign goes stale.
+  int8_t encoder_direction;
+  EncoderDirectionSource encoder_direction_source;
   MicroRad urdf_lower;
   MicroRad urdf_upper;
   // The SYMMETRIC proven-clear half-span around q=0 for this joint alone, all
@@ -274,15 +284,16 @@ class CalibrationGeometryProfile {
 //             URDF q=0 pose. It is NOT 2048 - the provisioned raw centre is a
 //             servo-level fact and a sanity prior, nothing more. This is the
 //             ONLY half that a reprovisioning invalidates.
-//   direction NOT carried here at all. It is contract data read from the
-//             bound profile's GeometryJointRecord::urdf_motor_direction, and
-//             it is already hardware-validated. Storing a measured copy would
-//             create a second source of truth that could silently disagree
-//             with the URDF the geometry plan was compiled against.
+//   direction NOT carried here at all. It is the current-installation
+//             encoder polarity read from the bound profile's
+//             GeometryJointRecord::encoder_direction (MATDOG_SERVO_ALLOCATION.yaml,
+//             in the provenance tag). Storing a copy here would create a second
+//             source of truth that could silently disagree with the record the
+//             profile was generated from.
 //
 // The two are therefore invalidated by DIFFERENT events, which is the point:
 // a same-type servo replacement in the same mounting invalidates q0 and leaves
-// direction untouched, while a URDF change moves the provenance tag and makes
+// direction untouched, while an encoder_direction / URDF change moves the provenance tag and makes
 // the whole transform stale.
 //
 // Until q0 exists with operational provenance, every angle-targeted

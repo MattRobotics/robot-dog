@@ -117,10 +117,51 @@ def run_first_motion_command_checks(files):
     return list(audit.failures)
 
 
+def run_search_checks(files):
+    audit.failures.clear()
+    audit.check_calibration_search_boundaries(files)
+    return list(audit.failures)
+
+
+def run_thermal_checks(files):
+    audit.failures.clear()
+    audit.check_thermal_confirmation(files)
+    return list(audit.failures)
+
+
 def run_full_leg_wiring_checks(files):
     audit.failures.clear()
     audit.check_full_leg_calibration_wiring(files)
     return list(audit.failures)
+
+
+def run_sequence_checks(files):
+    audit.failures.clear()
+    audit.check_full_calibration_sequence(files, SKETCH_DIR)
+    return list(audit.failures)
+
+
+def run_servo_write_checks(files):
+    audit.failures.clear()
+    audit.check_servo_id_write(files)
+    return list(audit.failures)
+
+
+def run_engine_checks(files):
+    audit.failures.clear()
+    audit.check_calibration_execution_engine_boundaries(files)
+    return list(audit.failures)
+
+
+# The FULL LEG handler's own plan declaration (INITIAL RECOVERY has one too,
+# above it): anchored on the FULL LEG-only refusal just before it.
+FULL_PLAN = (r'(Serial\.println\("CALIBRATION_FULL_LEG=REFUSED"\);\s*'
+             r'Serial\.println\("REASON=PREVIOUS_LEG_RUN_NOT_FINALIZED"\);\s*return;\s*\}\s*)'
+             r'calibration::FullLegPlan plan\{\};')
+FULL_START = (r'if \(!modules_\.full_leg_calibration->start\(plan\.request, context, millis\(\)\)\) \{'
+              r'(\s*Serial\.println\("CALIBRATION_FULL_LEG=REFUSED"\);)')
+RECOVERY_START = (r'if \(!modules_\.full_leg_calibration->start\(plan\.request, context, millis\(\)\)\) \{'
+                  r'(\s*Serial\.println\("CALIBRATION_INITIAL_RECOVERY=REFUSED"\);)')
 
 
 def run_q0_promotion_checks(files):
@@ -177,6 +218,7 @@ PROFILE_H = "CalibrationGeometryProfile.h"
 PROFILE_CPP = "CalibrationGeometryProfile.cpp"
 PROFILE_DATA_H = "CalibrationGeometryProfileData.h"
 BUS_CPP = "ServoBus.cpp"
+BUS_H = "ServoBus.h"
 SERVO_PROFILE_CPP = "ServoProfile.cpp"
 SERVO_PROFILE_DATA_H = "ServoProfileData.h"
 PREFLIGHT_CPP = "ServoPreflight.cpp"
@@ -199,9 +241,14 @@ def main():
                 run_first_motion_command_checks(BASE))
     expect_pass("baseline four-leg Full Calibration wiring",
                 run_full_leg_wiring_checks(BASE))
+    expect_pass("unmutated tree: calibration search boundaries", run_search_checks(BASE))
+    expect_pass("unmutated tree: LF V25 thermal confirmation", run_thermal_checks(BASE))
     expect_pass("baseline CR3 actuator infrastructure fail-closed",
                 run_actuator_infrastructure_checks(BASE))
     expect_pass("baseline current-boot q0 promotion", run_q0_promotion_checks(BASE))
+    expect_pass("baseline 24-contact sequence", run_sequence_checks(BASE))
+    expect_pass("baseline reviewed servo raw write", run_servo_write_checks(BASE))
+    expect_pass("baseline execution engine boundary", run_engine_checks(BASE))
 
     # --- purity of the decision core --------------------------------------
     case("policy gains Arduino", POLICY_H,
@@ -263,12 +310,12 @@ def main():
          "",
          "CALIBRATION_CONTACT_PROBE")
     case("the operation count drifts upward", POLICY_H,
-         r"kActuatorOperationCount = 6;",
-         "kActuatorOperationCount = 7;",
+         r"kActuatorOperationCount = 8;",
+         "kActuatorOperationCount = 9;",
          "kActuatorOperationCount")
     case("the operation count drifts downward", POLICY_H,
-         r"kActuatorOperationCount = 6;",
-         "kActuatorOperationCount = 5;",
+         r"kActuatorOperationCount = 8;",
+         "kActuatorOperationCount = 7;",
          "kActuatorOperationCount")
 
     # --- limit provenance --------------------------------------------------
@@ -461,10 +508,27 @@ def main():
          r"  uint16_t q0_tick = 0;",
          "  uint16_t q0_tick = 0;\n  int8_t direction = 0;",
          "second source of truth", runner=run_direction_checks)
-    case("the direction resolver stops reading the URDF", PROFILE_CPP,
-         r"  const int8_t direction = record->urdf_motor_direction;",
+    case("the direction resolver stops reading the encoder_direction", PROFILE_CPP,
+         r"  const int8_t direction = record->encoder_direction;",
          "  const int8_t direction = 1;",
-         "urdf_motor_direction", runner=run_direction_checks)
+         "jointDirection() must read", runner=run_direction_checks)
+    case("the direction resolver falls back to a URDF field", PROFILE_CPP,
+         r"  const int8_t direction = record->encoder_direction;",
+         "  const int8_t direction = record->encoder_direction ? record->encoder_direction "
+         ": urdf_spec_direction(record);",
+         "jointDirection() must read", runner=run_direction_checks)
+    case("the record carries urdf_motor_direction again", PROFILE_H,
+         r"  int8_t encoder_direction;",
+         "  int8_t urdf_motor_direction;\n  int8_t encoder_direction;",
+         "carries urdf_motor_direction again", runner=run_direction_checks)
+    case("the generated profile reverts LF LOWER to the URDF +1", "CalibrationGeometryProfileData.h",
+         r'"M33"\}, 11, -1, ',
+         '"M33"}, 11, 1, ',
+         "are not exactly the 12 records", runner=run_direction_checks)
+    case("the generated profile mislabels a direction source", "CalibrationGeometryProfileData.h",
+         r'"NEW01"\}, 23, -1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED',
+         '"NEW01"}, 23, -1, EncoderDirectionSource::CURRENT_HARDWARE_WITNESS',
+         "are not exactly the 12 records", runner=run_direction_checks)
     case("the direction resolver bypasses the bound profile", PROFILE_CPP,
          r"  const GeometryJointRecord\* record = profile\.findJoint\(joint\);",
          "  const GeometryJointRecord* record = &geometry_data_kJoints[0];",
@@ -539,6 +603,248 @@ def main():
          "status().leg != command_leg",
          runner=run_first_motion_command_checks)
 
+    # --- staged calibration endpoint search (2026-09-29, LF V25 oracle) ------
+    case("search guard widened 64 -> 128", "CalibrationTargetResolver.h",
+         r"constexpr uint16_t kCalibrationSearchGuardOvershootTicks = 64;",
+         "constexpr uint16_t kCalibrationSearchGuardOvershootTicks = 128;",
+         "GUARD_OVERSHOOT_TICKS", runner=run_search_checks)
+
+    case("fine step widened 8 -> 16", "ContactProbeEngine.h",
+         r"constexpr uint16_t kSearchFineStepTicks = 8;",
+         "constexpr uint16_t kSearchFineStepTicks = 16;",
+         "kSearchFineStepTicks must be exactly", runner=run_search_checks)
+
+    case("hard-current abort raised 200 -> 400", "ContactProbeEngine.h",
+         r"constexpr int32_t kSearchHardCurrentAbortRaw = 200;",
+         "constexpr int32_t kSearchHardCurrentAbortRaw = 400;",
+         "kSearchHardCurrentAbortRaw must be exactly", runner=run_search_checks)
+
+    case("persistence weakened 3 -> 1 sample", "ContactProbeEngine.h",
+         r"constexpr uint8_t kSearchPersistenceSamples = 3;",
+         "constexpr uint8_t kSearchPersistenceSamples = 1;",
+         "kSearchPersistenceSamples must be exactly", runner=run_search_checks)
+
+    case("policy stops refusing the search flag on non-probe operations", POLICY_CPP,
+         r"if \(command\.calibration_search &&\s*command\.operation != "
+         r"ActuatorOperation::CALIBRATION_CONTACT_PROBE\)",
+         "if (false)",
+         "calibration-only gate", runner=run_search_checks)
+
+    case("policy lets POSITION_COMMAND use the V25 speed profile", POLICY_CPP,
+         r"command\.operation == ActuatorOperation::CALIBRATION_SEQUENCE_MOVE\)\)\)",
+         "command.operation == ActuatorOperation::CALIBRATION_SEQUENCE_MOVE || "
+         "command.operation == ActuatorOperation::POSITION_COMMAND)))",
+         "calibration-only gate", runner=run_search_checks)
+
+    case("policy no longer bounds a search step by the corridor", POLICY_CPP,
+         r"!searchCorridorAdmits\(corridor, command\.target_tick\)",
+         "false",
+         "search-corridor bound", runner=run_search_checks)
+
+    case("engine stops refusing a search step on other intents", "CalibrationExecutionEngine.cpp",
+         r"if \(request\.calibration_search &&\s*operation != "
+         r"actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE\) \{",
+         "if (false) {",
+         "refuse a search step", runner=run_search_checks)
+
+    case("probe issues the step past the guard", "ContactProbeEngine.cpp",
+         r"if \(next_depth > guard_depth\) \{",
+         "if (next_depth > guard_depth + 64) {",
+         "the step past the guard is never issued", runner=run_search_checks)
+
+    case("probe accepts a stall outside the corridor as contact", "ContactProbeEngine.cpp",
+         r"return inside_acceptance \? ContactDetectorState::CONTACT_CONFIRMED\s*"
+         r": ContactDetectorState::EARLY_STALL;",
+         "return ContactDetectorState::CONTACT_CONFIRMED;",
+         "a stall outside the corridor is never contact", runner=run_search_checks)
+
+    case("probe drops the V25 sample cadence", "ContactProbeEngine.cpp",
+         r"if \(has_cadence_sample_ && now_ms - last_cadence_ms_ < kSearchSampleIntervalMs\) return;",
+         "",
+         "V25 sample cadence", runner=run_search_checks)
+
+    # --- the LF V25 coarse contact scout (2026-09-30, PR #35 D6 closed) -------
+    case("coarse scout clamped to the corridor entry again", "ContactProbeEngine.cpp",
+         r"next_depth = target_depth \+ kSearchCoarseStepTicks;",
+         "next_depth = target_depth + kSearchCoarseStepTicks;\n"
+         "    const int32_t entry_depth = depth(request_.corridor.entry_tick);\n"
+         "    if (next_depth > entry_depth) next_depth = entry_depth;",
+         "clamped to the corridor entry", runner=run_search_checks)
+
+    case("fine pass allowed without a scout", "ContactProbeEngine.cpp",
+         r"if \(!status_\.scout_valid\) \{\s*failSafeOff\(ContactProbeFailure::SCOUT_MISSING\);",
+         "if (false) {\n      failSafeOff(ContactProbeFailure::SCOUT_MISSING);",
+         "no fine pass without a scout", runner=run_search_checks)
+
+    case("fine passes judged against fine pass 1 instead of the scout", "ContactProbeEngine.cpp",
+         r"if \(!searchFineContactReproducesScout\(request_\.corridor, position, status_\.scout_tick\)\) \{",
+         "if (!searchFineContactReproducesScout(request_.corridor, position, status_.pass1_contact_tick)) {",
+         "fine_contact_reproduces_coarse_depth", runner=run_search_checks)
+
+    case("adaptive corridor no longer bounded by the static entry", "ContactProbeEngine.cpp",
+         r"return adaptive < entry \? adaptive : entry;",
+         "return adaptive;",
+         "extends HOME-ward only", runner=run_search_checks)
+
+    case("scout-lag tolerance doubled", "ContactProbeEngine.cpp",
+         r"<=\s*static_cast<int32_t>\(kSearchFineScoutLagToleranceTicks\);",
+         "<= 2 * static_cast<int32_t>(kSearchFineScoutLagToleranceTicks);",
+         "one fine step", runner=run_search_checks)
+
+    case("kinematic plateau opened to the coarse scout", "ContactProbeEngine.cpp",
+         r"if \(status_\.pass == 0\) \{\s*failSafeOff\(ContactProbeFailure::TRACKING_FAILED\);\s*return;\s*\}",
+         "",
+         "exists only for passes with a scout", runner=run_search_checks)
+
+    case("backoff always from fine pass 1", "ContactProbeEngine.cpp",
+         r"depth\(contact_tick_\) - kSearchBackoffTicks;",
+         "depth(status_.pass1_contact_tick) - kSearchBackoffTicks;",
+         "V25 backoff", runner=run_search_checks)
+
+    case("the contact search branches on a leg", "ContactProbeEngine.cpp",
+         r"void ContactProbeEngine::onCandidate\(uint16_t position\) \{",
+         "void ContactProbeEngine::onCandidate(uint16_t position) {\n"
+         "  if (request_.endpoint_leg == Leg::LF) return;",
+         "names a leg or joint", runner=run_search_checks)
+
+    case("a second contact probe engine in the executor", "FullLegCalibrationExecutor.h",
+         r"ContactProbeEngine probe_;",
+         "ContactProbeEngine probe_;\n  ContactProbeEngine hip_probe_;",
+         "exactly one ContactProbeEngine", runner=run_search_checks)
+
+    case("executor records fine pass 1 as the scout", "FullLegCalibrationExecutor.cpp",
+         r"e\.coarse_tick = probe_\.status\(\)\.scout_tick;",
+         "e.coarse_tick = probe_.status().pass1_contact_tick;",
+         "the scout is recorded as coarse_tick", runner=run_search_checks)
+
+    case("executor accepts a contact without a scout", "FullLegCalibrationExecutor.cpp",
+         r" \|\| !probe_\.status\(\)\.scout_valid\) \{",
+         ") {",
+         "no evidence without a scout", runner=run_search_checks)
+
+    case("diagnostics read the coarse scout", "FullLegCalibrationExecutor.cpp",
+         r"midpoint\(min_side\.fine_tick_1, min_side\.fine_tick_2\)",
+         "midpoint(min_side.coarse_tick, min_side.fine_tick_1)",
+         "the fine passes only", runner=run_search_checks)
+
+    case("envelope bounded by the coarse scout", "OperationalEnvelope.cpp",
+         r"minTick\(request\.min_side_evidence\.fine_tick_2,\s*request\.max_side_evidence\.fine_tick_2\)",
+         "minTick(request.min_side_evidence.coarse_tick, request.max_side_evidence.coarse_tick)",
+         "second fine passes", runner=run_search_checks)
+
+    case("baseline deadline stretched 12 s -> 30 s", "ContactProbeEngine.h",
+         r"constexpr uint32_t kSearchBaselineTimeoutMs = 12000;",
+         "constexpr uint32_t kSearchBaselineTimeoutMs = 30000;",
+         "kSearchBaselineTimeoutMs must be exactly", runner=run_search_checks)
+
+    case("kinematic-plateau span widened 3 -> 8", "ContactProbeEngine.h",
+         r"constexpr uint16_t kSearchKinematicPlateauSpanTicks = 3;",
+         "constexpr uint16_t kSearchKinematicPlateauSpanTicks = 8;",
+         "kSearchKinematicPlateauSpanTicks must be exactly", runner=run_search_checks)
+
+    # --- V25 backoff StableTargetGate, TELEMETRY_TIMEOUT, recentred q0 ---------
+    case("backoff settle window 400 -> 0 ms", "ContactProbeEngine.h",
+         r"constexpr uint32_t kSearchBackoffSettleWindowMs = 400;",
+         "constexpr uint32_t kSearchBackoffSettleWindowMs = 0;",
+         "kSearchBackoffSettleWindowMs must be exactly", runner=run_search_checks)
+
+    case("backoff settle speed limit 4 -> 40 raw", "ContactProbeEngine.h",
+         r"constexpr int32_t kSearchBackoffSettleMaxSpeedRaw = 4;",
+         "constexpr int32_t kSearchBackoffSettleMaxSpeedRaw = 40;",
+         "kSearchBackoffSettleMaxSpeedRaw must be exactly", runner=run_search_checks)
+
+    case("search telemetry timeout back to 3 s", "ContactProbeEngine.h",
+         r"constexpr uint32_t kSearchTelemetryTimeoutMs = 2000;",
+         "constexpr uint32_t kSearchTelemetryTimeoutMs = 3000;",
+         "kSearchTelemetryTimeoutMs must be exactly", runner=run_search_checks)
+
+    case("backoff arrived on the first in-band sample (no settle gate)", "ContactProbeEngine.cpp",
+         r"if \(!settle_\.observe\(static_cast<uint16_t>\(sample\.present_position\),\s*"
+         r"magnitude\(sample\.present_speed\), status_\.target_tick, now_ms\)\) \{\s*return;\s*\}",
+         "(void)settle_;",
+         "through the V25 StableTargetGate", runner=run_search_checks)
+
+    case("settle gate keeps counting across a bad sample", "ContactProbeEngine.cpp",
+         r"if \(!qualifies\) \{\s*reset\(\);\s*return false;\s*\}",
+         "if (!qualifies) {\n    return false;\n  }",
+         "band, speed, reset", runner=run_search_checks)
+
+    case("backoff deadman telemetry age back to 3 s", "Controller.cpp",
+         r"full_leg_backoff\.max_telemetry_age_ms = calibration::kSearchTelemetryTimeoutMs;",
+         "full_leg_backoff.max_telemetry_age_ms = 3000;",
+         "V25 figures", runner=run_search_checks)
+
+    case("corridor home taken from the raw servo centre", "CalibrationTargetResolver.cpp",
+         r"c\.home_tick = transform\.q0_tick;",
+         "c.home_tick = 2048;",
+         "raw servo centre", runner=run_search_checks)
+
+    # --- the final bounded partial coarse-scout step (2026-09-30) -------------
+    case("partial scout step beyond the guard", "ContactProbeEngine.cpp",
+         r"next_depth = guard_depth;",
+         "next_depth = guard_depth + 8;",
+         "beyond the guard", runner=run_search_checks)
+
+    case("partial scout step repeated at the guard", "ContactProbeEngine.cpp",
+         r"if \(next_depth > guard_depth && target_depth < guard_depth\) \{",
+         "if (next_depth > guard_depth) {",
+         "never repeated", runner=run_search_checks)
+
+    # --- LF V25 runtime PresentTemperature confirmation (2026-09-30) ---------
+    case("thermal majority weakened to 1 of 3", "ThermalConfirmation.h",
+         r"constexpr uint8_t kThermalConfirmedOverLimit = 2;",
+         "constexpr uint8_t kThermalConfirmedOverLimit = 1;",
+         "thermal confirmation constant drifted", runner=run_thermal_checks)
+
+    case("thermal confirmation wait removed", "ThermalConfirmation.cpp",
+         r"port->delayMs\(kThermalConfirmationDelayMs\);",
+         "",
+         "50 ms, then a fresh direct read", runner=run_thermal_checks)
+
+    case("thermal confirmation reads another servo", "ThermalConfirmation.cpp",
+         r"port->readPresentTemperatureDirect\(bus_id, &celsius\)",
+         "port->readPresentTemperatureDirect(static_cast<uint8_t>(bus_id + 1), &celsius)",
+         "the SAME servo", runner=run_thermal_checks)
+
+    case("Controller skips the thermal confirmation", "Controller.cpp",
+         r"sample\.present_temperature = thermal\.published_c;",
+         "(void)thermal;",
+         "thermal confirmation before the executor", runner=run_thermal_checks)
+
+    case("CommandRouter derives its own search corridor", ROUTER_CPP,
+         r"void CommandRouter::printServoRead\(int id\) \{",
+         "void CommandRouter::printServoRead(int id) {\n  actuator::CalibrationSearchCorridor c{};\n"
+         "  (void)actuator::resolveCalibrationSearchCorridor(*modules_.geometry_profile, "
+         "actuator::geometry_data::kProvenance, actuator::JointTransform{}, calibration::Leg::LF, "
+         "calibration::JointKind::UPPER, calibration::ContactSide::MIN_SIDE, &c);",
+         "only the reviewed", runner=run_search_checks)
+
+    case("FirstMotionExecutor requests the V25 speed profile", "FirstMotionExecutor.cpp",
+         r"cmd\.operation = actuator::ActuatorOperation::TORQUE_ENABLE;",
+         "cmd.operation = actuator::ActuatorOperation::TORQUE_ENABLE;\n"
+         "  cmd.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;",
+         "only the calibration", runner=run_search_checks)
+
+    case("ServoBus search envelope raised 160 -> 400", BUS_H,
+         r"static constexpr uint16_t kSearchEnvelopeSpeed = 160;",
+         "static constexpr uint16_t kSearchEnvelopeSpeed = 400;",
+         "GoalPosition speed envelope", runner=run_motion_surface_checks)
+
+    case("ServoBus bounded speed raised 40 -> 80", BUS_H,
+         r"static constexpr uint16_t kBoundedWriteSpeed = 40;",
+         "static constexpr uint16_t kBoundedWriteSpeed = 80;",
+         "GoalPosition speed envelope", runner=run_motion_surface_checks)
+
+    case("Full-Leg backoff deadman falls back to the DIRECTION_VERIFY budget", CONTROLLER_CPP,
+         r"full_leg_config\.probe_backoff_deadman = full_leg_backoff;",
+         "full_leg_config.probe_backoff_deadman = deadman;",
+         "long-move deadman", runner=run_full_leg_wiring_checks)
+
+    case("Full-Leg long moves lose the travel-aware floor", CONTROLLER_CPP,
+         r"full_leg_backoff\.nominal_travel_ticks_per_s = calibration::kSearchMinExpectedTicksPerSecond;",
+         "",
+         "long-move deadman", runner=run_full_leg_wiring_checks)
+
     # --- four-leg Full Calibration: command surface ------------------------
     case("leg matcher gains a fifth token", ROUTER_CPP,
          r'\{"LH", calibration::Leg::LH\},',
@@ -589,47 +895,47 @@ def main():
          runner=run_full_leg_wiring_checks)
 
     case("full leg hard-codes a bus id", ROUTER_CPP,
-         r"calibration::FullLegPlan plan\{\};",
-         "calibration::FullLegPlan plan{};\n    plan.request.probe_bus_id = 12;",
+         FULL_PLAN,
+         r"\1calibration::FullLegPlan plan{};\n    plan.request.probe_bus_id = 12;",
          "assigns into the plan/request",
          runner=run_full_leg_wiring_checks)
 
     case("full leg restores the LF backoff residue", ROUTER_CPP,
-         r"calibration::FullLegPlan plan\{\};",
-         "calibration::FullLegPlan plan{};\n    const int32_t kBackoff = -700000;",
+         FULL_PLAN,
+         r"\1calibration::FullLegPlan plan{};\n    const int32_t kBackoff = -700000;",
          "hard-codes a per-leg bus/backoff",
          runner=run_full_leg_wiring_checks)
 
     case("full leg names a leg literal", ROUTER_CPP,
-         r"calibration::FullLegPlan plan\{\};",
-         "calibration::FullLegPlan plan{};\n    const calibration::Leg fixed = calibration::Leg::LF;",
+         FULL_PLAN,
+         r"\1calibration::FullLegPlan plan{};\n    const calibration::Leg fixed = calibration::Leg::LF;",
          "names a leg literal",
          runner=run_full_leg_wiring_checks)
 
     case("full leg gains a runtime parser", ROUTER_CPP,
-         r"calibration::FullLegPlan plan\{\};",
-         'calibration::FullLegPlan plan{};\n    int parsed = 0; sscanf(upper.c_str(), "%d", &parsed);',
+         FULL_PLAN,
+         r'\1calibration::FullLegPlan plan{};\n    int parsed = 0; sscanf(upper.c_str(), "%d", &parsed);',
          "runtime parser",
          runner=run_full_leg_wiring_checks)
 
     case("full leg writes to the bus from the handler", ROUTER_CPP,
-         r"calibration::FullLegPlan plan\{\};",
-         "calibration::FullLegPlan plan{};\n    modules_.servo_bus->safeOff(12);",
+         FULL_PLAN,
+         r"\1calibration::FullLegPlan plan{};\n    modules_.servo_bus->safeOff(12);",
          "write/transaction primitive",
          runner=run_full_leg_wiring_checks)
 
     case("full leg arms the run before the executor accepts", ROUTER_CPP,
-         r"if \(!modules_\.full_leg_calibration->start\(plan\.request, context, millis\(\)\)\) \{",
+         FULL_START,
          "modules_.full_leg_run->arm(plan, 0, 0);\n"
-         "    if (!modules_.full_leg_calibration->start(plan.request, context, millis())) {",
+         r"    if (!modules_.full_leg_calibration->start(plan.request, context, millis())) {\1",
          "arm the run record only AFTER",
          runner=run_full_leg_wiring_checks)
 
     case("second full leg start call appears", ROUTER_CPP,
-         r"if \(!modules_\.full_leg_calibration->start\(plan\.request, context, millis\(\)\)\) \{",
+         FULL_START,
          "modules_.full_leg_calibration->start(plan.request, context, millis());\n"
-         "    if (!modules_.full_leg_calibration->start(plan.request, context, millis())) {",
-         "exactly one production full_leg_calibration->start()",
+         r"    if (!modules_.full_leg_calibration->start(plan.request, context, millis())) {\1",
+         "exactly two production full_leg_calibration->start()",
          runner=run_full_leg_wiring_checks)
 
     case("full leg stops resolving the plan", ROUTER_CPP,
@@ -646,10 +952,28 @@ def main():
          runner=run_full_leg_wiring_checks)
 
     # --- four-leg Full Calibration: Controller -----------------------------
-    case("parked endpoint leg is hard-coded again", CONTROLLER_CPP,
-         r"ctx\.parked_leg = full_leg_calibration_\.endpointLeg\(\);",
-         "ctx.parked_leg = calibration::Leg::LF;",
-         "parked-endpoint context lost",
+    case("the V5 auxiliary window is opened in production", CONTROLLER_CPP,
+         r"ctx\.auxiliary_parked = false;",
+         "ctx.auxiliary_parked = true;",
+         "sequence bootstrap context lost",
+         runner=run_full_leg_wiring_checks)
+
+    case("the sequence phase is not the executor's", CONTROLLER_CPP,
+         r"ctx\.sequence_phase = full_leg_calibration_\.sequencePhase\(\);",
+         "ctx.sequence_phase = calibration::CalibrationPhase::HIP_MAX;",
+         "sequence bootstrap context lost",
+         runner=run_full_leg_wiring_checks)
+
+    case("held prerequisites always reported verified", CONTROLLER_CPP,
+         r"ctx\.sequence_prerequisites_verified = full_leg_calibration_\.prerequisitesVerified\(\);",
+         "ctx.sequence_prerequisites_verified = true;",
+         "sequence bootstrap context lost",
+         runner=run_full_leg_wiring_checks)
+
+    case("a parked leg is hard-coded again", CONTROLLER_CPP,
+         r"ctx\.auxiliary_parked = false;",
+         "ctx.auxiliary_parked = false;\n  ctx.parked_leg = calibration::Leg::LF;",
+         "no production path may open the V5 auxiliary window",
          runner=run_full_leg_wiring_checks)
 
     case("finalization is never called", CONTROLLER_CPP,
@@ -684,15 +1008,21 @@ def main():
          runner=run_full_leg_wiring_checks)
 
     case("final SAFE_OFF targets a fixed bus", CONTROLLER_CPP,
-         r"servo_bus_\.safeOff\(full_leg_calibration_\.auxiliaryBusId\(\)\);",
-         "servo_bus_.safeOff(0);",
-         "must call safeOff() exactly",
+         r"servo_bus_\.safeOff\(off\[i\]\)",
+         "servo_bus_.safeOff(12)",
+         "must call safeOff() only for",
          runner=run_full_leg_wiring_checks)
 
-    case("auxiliary SAFE_OFF loses its pending guard", CONTROLLER_CPP,
-         r"if \(full_leg_calibration_\.auxiliarySafeOffPending\(\)\) \{",
-         "if (true) {",
-         "pending guard",
+    case("SAFE_OFF ignores the executor's request", CONTROLLER_CPP,
+         r"const uint8_t m = full_leg_calibration_\.safeOffRequest\(off, calibration::kFullLegPopulation\);",
+         "const uint8_t m = 0;",
+         "safeOffRequest",
+         runner=run_full_leg_wiring_checks)
+
+    case("a Full Leg run skips its phase report", CONTROLLER_CPP,
+         r"if \(!calibration_\.noteExecutionPhase\(full_leg_calibration_\.status\(\)\.phase\)\) \{",
+         "if (false) {",
+         "noteExecutionPhase",
          runner=run_full_leg_wiring_checks)
 
     # --- four-leg Full Calibration: finalizer ------------------------------
@@ -715,10 +1045,168 @@ def main():
          runner=run_full_leg_wiring_checks)
 
     case("finalizer skips the contact recording", FINALIZER_CPP,
-         r"manager\.recordContact\(outcome\.max_contact\)",
-         "manager.recordContactSkipped(outcome.max_contact)",
-         "lost 'manager.recordContact(outcome.max_contact)'",
+         r"manager\.recordContact\(joint\.contact\[s\]\)",
+         "manager.recordContactSkipped(joint.contact[s])",
+         "manager.recordContact(joint.contact[s])",
          runner=run_full_leg_wiring_checks)
+
+    # --- TRUE FULL CALIBRATION = 24 CONTACTS: the definition -----------------
+    case("a leg accepted with 5/6 contacts", FINALIZER_CPP,
+         r"if \(measured != kFullLegContactsExpected \|\|",
+         "if (measured < kFullLegContactsExpected - 1 ||",
+         "24-contact definition", runner=run_full_leg_wiring_checks)
+    case("a failed leg keeps its partial count", FINALIZER_CPP,
+         r"record->verdict = FullLegVerdict::FAILED;\s*record->contacts_accepted = 0;",
+         "record->verdict = FullLegVerdict::FAILED;",
+         "24-contact definition", runner=run_full_leg_wiring_checks)
+    case("the four-leg verdict ignores the contact total", FINALIZER_H,
+         r"totalContactsAccepted\(\) == kFullCalibrationContactsExpected;",
+         "totalContactsAccepted() >= 8;",
+         "24-contact definition", runner=run_full_leg_wiring_checks)
+    case("the UPPER-only definition returns", FINALIZER_H,
+         r"constexpr uint8_t kFullLegContactsExpected = kFullLegContactCount;",
+         "constexpr uint8_t kFullLegContactsExpected = 2;",
+         "24-contact definition", runner=run_full_leg_wiring_checks)
+
+    # --- INITIAL RECOVERY: its own command, never a leg run ------------------
+    case("recovery command arms a leg run", ROUTER_CPP,
+         RECOVERY_START,
+         "modules_.full_leg_run->arm(plan, 0, 0);\n"
+         r"    if (!modules_.full_leg_calibration->start(plan.request, context, millis())) {\1",
+         "may never arm or record a leg run", runner=run_full_leg_wiring_checks)
+    case("recovery command forgets recovery_only", ROUTER_CPP,
+         r"plan\.request\.recovery_only = true;",
+         "",
+         "recovery_only = true before start()", runner=run_full_leg_wiring_checks)
+    case("FULL LEG runs recovery only", ROUTER_CPP,
+         FULL_START,
+         "plan.request.recovery_only = true;\n"
+         r"    if (!modules_.full_leg_calibration->start(plan.request, context, millis())) {\1",
+         "FULL LEG may not touch recovery_only", runner=run_full_leg_wiring_checks)
+    case("recovery command drops the permit gate", ROUTER_CPP,
+         r"if \(!modules_\.motion_permit->active\(\) \|\|(\s*!modules_\.motion_authorization->operator_authorized \|\|\s*"
+         r"!modules_\.motion_authorization->token\.valid\(\)\) \{\s*"
+         r'Serial\.println\("CALIBRATION_INITIAL_RECOVERY=REFUSED"\);)',
+         r"if (false ||\1",
+         "INITIAL RECOVERY branch missing pinned token", runner=run_full_leg_wiring_checks)
+    case("a recovery-only run is phase-reported", CONTROLLER_CPP,
+         r"if \(full_leg_calibration_\.request\(\)\.recovery_only\) \{",
+         "if (false) {",
+         "recovery-only run", runner=run_full_leg_wiring_checks)
+
+    # --- the V25 sequence itself ----------------------------------------------
+    case("a V25 held-drift tolerance widens", "FullLegCalibrationExecutor.h",
+         r"constexpr uint16_t kSequenceStaticToleranceTicks = 10;",
+         "constexpr uint16_t kSequenceStaticToleranceTicks = 20;",
+         "kSequenceStaticToleranceTicks must be exactly 10", runner=run_sequence_checks)
+    case("a leg becomes 5 contacts", "FullLegCalibrationExecutor.h",
+         r"constexpr uint8_t kFullLegContactCount = 6;",
+         "constexpr uint8_t kFullLegContactCount = 5;",
+         "kFullLegContactCount must be exactly 6", runner=run_sequence_checks)
+    case("the sequence skips LOWER_MAX", "FullLegCalibrationExecutor.cpp",
+         r"case CalibrationPhase::LOWER_MIN:\s*enterPhase\(CalibrationPhase::LOWER_MAX, now_ms\); return;",
+         "case CalibrationPhase::LOWER_MIN:         enterPhase(CalibrationPhase::LOWER_FOLDED, now_ms); return;",
+         "one V25 phase at a time", runner=run_sequence_checks)
+    case("the sequence ends after the UPPER", "FullLegCalibrationExecutor.cpp",
+         r"case CalibrationPhase::UPPER_HORIZONTAL:\s*enterPhase\(CalibrationPhase::LOWER_MIN, now_ms\); return;",
+         "case CalibrationPhase::UPPER_HORIZONTAL:  enterPhase(CalibrationPhase::CLEANUP, now_ms); return;",
+         "one V25 phase at a time", runner=run_sequence_checks)
+    case("COMPLETE without diagnostics", "FullLegCalibrationExecutor.cpp",
+         r"status_\.contacts_accepted == kFullLegContactCount && diagnostics_accepted_",
+         "status_.contacts_accepted == kFullLegContactCount",
+         "COMPLETE rule", runner=run_sequence_checks)
+    case("INITIAL_RECOVERY skips a joint already near q0", "FullLegCalibrationExecutor.cpp",
+         r"if \(distance > static_cast<int32_t>\(actuator::kSequencePrimeMaxDistanceTicks\)\) \{",
+         "if (distance <= 10) { ++recover_index_; return; }\n"
+         "      if (distance > static_cast<int32_t>(actuator::kSequencePrimeMaxDistanceTicks)) {",
+         "INITIAL_RECOVERY may not skip a joint", runner=run_sequence_checks)
+    case("UPPER probe drops the held LOWER", "FullLegCalibrationExecutor.cpp",
+         r"want\[kSlotLower\] = true; want_tick\[kSlotLower\] = request_\.joint\[kSlotLower\]\.q0_tick;",
+         "want_tick[kSlotLower] = request_.joint[kSlotLower].q0_tick;",
+         "held-set rule", runner=run_sequence_checks)
+    case("held joints stop checking the TorqueLimit", "FullLegCalibrationExecutor.cpp",
+         r"sample->torque_limit != static_cast<int32_t>\(request_\.torque_limit\) \|\|\s*"
+         r"sample->goal_position != static_cast<int32_t>\(st\.target_tick\)",
+         "sample->goal_position != static_cast<int32_t>(st.target_tick)",
+         "monitorHeld() lost", runner=run_sequence_checks)
+    # V25 ActivelyHeld supervision: no speed abort on an already-held joint;
+    # speed stays the settling gate (StableTargetGate / INITIAL_RECOVERY).
+    case("a held joint aborts on its speed again", "FullLegCalibrationExecutor.cpp",
+         r"    st\.speed_transient = fast;",
+         "    if (fast) return false;\n    st.speed_transient = fast;",
+         "may read a held joint's speed only", runner=run_sequence_checks)
+    case("a held joint fails on speed before the V25 checks", "FullLegCalibrationExecutor.cpp",
+         r"    st\.last_good_ms = now_ms;\n    st\.has_last_sample = true;",
+         "    st.last_good_ms = now_ms;\n    if (magnitude(sample->present_speed) > 40) "
+         "{ failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_DRIFT); "
+         "return false; }\n    st.has_last_sample = true;",
+         "may read a held joint's speed only", runner=run_sequence_checks)
+    case("the retired HELD_JOINT_SPEED failure reappears", "FullLegCalibrationExecutor.h",
+         r"  HELD_JOINT_DRIFT,\n",
+         "  HELD_JOINT_DRIFT,\n  HELD_JOINT_SPEED,\n",
+         "retired post-V25 HELD_JOINT_SPEED", runner=run_sequence_checks)
+    case("held joints stop checking drift", "FullLegCalibrationExecutor.cpp",
+         r"if \(absDiff\(sample->present_position, st\.target_tick\) >",
+         "if (false && absDiff(sample->present_position, st.target_tick) >",
+         "monitorHeld() lost", runner=run_sequence_checks)
+    case("held joints skip status / current / temperature", "FullLegCalibrationExecutor.cpp",
+         r"    if \(safety != FullLegFailure::NONE\) \{",
+         "    if (false) {",
+         "monitorHeld() lost", runner=run_sequence_checks)
+    case("the StableTargetGate loses its speed criterion", "FullLegCalibrationExecutor.cpp",
+         r"absDiff\(s->present_position, p\.target_tick\) <= static_cast<int32_t>\(kSequenceStaticToleranceTicks\) &&"
+         r"\s*magnitude\(s->present_speed\) <= static_cast<int32_t>\(kSequenceSettleMaxSpeedRaw\);",
+         "absDiff(s->present_position, p.target_tick) <= static_cast<int32_t>(kSequenceStaticToleranceTicks);",
+         "StableTargetGate speed criterion", runner=run_sequence_checks)
+    case("the INITIAL_RECOVERY settle loses its speed criterion", "FullLegCalibrationExecutor.cpp",
+         r"absDiff\(s->present_position, j\.q0_tick\) <= static_cast<int32_t>\(kSequenceStaticToleranceTicks\) &&"
+         r"\s*magnitude\(s->present_speed\) <= static_cast<int32_t>\(kSequenceSettleMaxSpeedRaw\);",
+         "absDiff(s->present_position, j.q0_tick) <= static_cast<int32_t>(kSequenceStaticToleranceTicks);",
+         "StableTargetGate speed criterion", runner=run_sequence_checks)
+    case("the held speed-transient diagnostic becomes unbounded", "FullLegCalibrationExecutor.h",
+         r"constexpr uint8_t kHeldSpeedTransientEventCap = 32;",
+         "constexpr uint8_t kHeldSpeedTransientEventCap = 255;",
+         "must stay bounded", runner=run_sequence_checks)
+    case("the validated plan data is hand-edited", "CalibrationSequencePlanData.h",
+         r"-697961\}",
+         "-1518641}",
+         "exporter's output", runner=run_sequence_checks)
+    case("a leg's geometry validation is flipped", "CalibrationSequencePlanData.h",
+         r"\{calibration::Leg::RH, true,",
+         "{calibration::Leg::RH, false,",
+         "exporter's output", runner=run_sequence_checks)
+
+    # --- the one reviewed raw register write -----------------------------------
+    case("the RAM TorqueLimit rises to 1000", BUS_H,
+         r"static constexpr uint16_t kReviewedRamTorqueLimit = 500;",
+         "static constexpr uint16_t kReviewedRamTorqueLimit = 1000;",
+         "kReviewedRamTorqueLimit must be exactly 500", runner=run_servo_write_checks)
+    case("the TorqueLimit write targets another register", BUS_CPP,
+         r"st_\.writeWord\(static_cast<uint8_t>\(id\), SMS_STS_TORQUE_LIMIT_L, kReviewedRamTorqueLimit\);",
+         "st_.writeWord(static_cast<uint8_t>(id), SMS_STS_MAX_TORQUE_LIMIT_L, kReviewedRamTorqueLimit);",
+         "writeReviewedRamTorqueLimit() lost", runner=run_servo_write_checks)
+    case("a second raw register write appears", BUS_CPP,
+         r"bool ServoBus::readRuntimeState\(int id, RuntimeState\* out\) \{",
+         "void ServoBus::rogue(int id) { st_.writeWord((uint8_t)id, 31, 0); }\n"
+         "bool ServoBus::readRuntimeState(int id, RuntimeState* out) {",
+         "exactly one raw writeWord()", runner=run_servo_write_checks)
+    case("a raw byte write appears", BUS_CPP,
+         r"bool ServoBus::readRuntimeState\(int id, RuntimeState\* out\) \{",
+         "void ServoBus::rogue(int id) { st_.writeByte((uint8_t)id, 5, 1); }\n"
+         "bool ServoBus::readRuntimeState(int id, RuntimeState* out) {",
+         "writeByte", runner=run_servo_write_checks)
+    case("the TorqueLimit verdict stops reading back", BUS_CPP,
+         r"st_\.readWord\(static_cast<uint8_t>\(id\), SMS_STS_TORQUE_LIMIT_L\);",
+         "0;",
+         "writeReviewedRamTorqueLimit() lost", runner=run_servo_write_checks)
+
+    # --- the engine carries the phase label, never branches on it ----------------
+    case("the execution engine branches on a V25 phase", "CalibrationExecutionEngine.cpp",
+         r"command\.sequence_phase = request\.sequence_phase;",
+         "command.sequence_phase = request.sequence_phase;\n"
+         "  if (request.sequence_phase == CalibrationPhase::HIP_MAX) return result;",
+         "CalibrationPhase", runner=run_engine_checks)
+
 
     case("finalizer admits limits before the envelopes", FINALIZER_CPP,
          r"const actuator::GeometryProvenanceTag current = policy\.currentGeometryTag\(\);",
@@ -784,9 +1272,9 @@ def main():
          runner=run_q0_promotion_checks)
 
     case("production code consumes the frozen CR2-C package", PLAN_CPP,
-         r"FullLegPlanStatus deriveBackoffUrad\(",
+         r"FullLegPlanStatus resolveFullLegPlan\(",
          "void bad() { actuator::prepareCurrentQ0Evidence(profile, prov, true); }\n"
-         "FullLegPlanStatus deriveBackoffUrad(",
+         "FullLegPlanStatus resolveFullLegPlan(",
          "historical regression oracle",
          runner=run_q0_promotion_checks)
 

@@ -16,7 +16,7 @@ manual placement at nominal URDF q=0     operator, no motion
         ↓
 read-only q0 capture, torque OFF         TO_IMPLEMENT
         ↓
-current motorDirection from URDF/V5       REUSED / CONTRACT DATA
+current encoder_direction (installation)  RECORD + EVIDENCE (amended 2026-10-01)
         ↓
 raw encoder ↔ URDF q transform            TO_IMPLEMENT
         ↓
@@ -165,6 +165,8 @@ path obstructed                            6
 | 21 | `lh_upper:max` | **EXECUTABLE** | NOT_NEEDED | +121.875° | +122.5° |
 | 22 | `lh_lower:min` | DIAGNOSTIC | **1-DOF** | −92.074° | −92.0° |
 | 23 | `lh_lower:max` | DIAGNOSTIC | NOT_NEEDED | +38.180° | +37.5° |
+
+> **SUPERSEDED 2026-09-30 — TRUE FULL CALIBRATION = 24 CONTACTS.** 4 legs × 3 joints × MIN/MAX. A leg is `HARDWARE_CONTACT_CALIBRATED` only with 6/6, the robot only with 24/24. The V5 classification below describes V5's own q=0 evaluation context. It does not describe the calibration's scope. The 16 HIP/LOWER contacts are reached through the LF V25 full-leg sequence (held prerequisite poses), authorized by the geometry-validated `CalibrationSequencePlan`, never by weakening `isExecutable()`. See [`2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md`](../../09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md).
 
 **The eight executable endpoints are exactly the eight upper-leg ones.** For every hip and
 every lower leg the mechanism contacts *beyond* the declared URDF limit — by 1.0° at the hips
@@ -452,6 +454,16 @@ and the reset document both prohibit exactly that.
 
 ## 11. DIRECTION — CONTRACT DATA, NOT A RECALIBRATION DATUM
 
+> **AMENDED 2026-10-01 — the premise below was false.** The URDF custom `motorDirection` was
+> **not** the hardware-validated sign. The hardware-validated signs are the slot
+> `PASS_DIRECTION_TEST` records of 2026-07-02/05 (`09_Logs/Calibration_Sessions/`). They
+> disagree with the URDF field on all eight HIP/LOWER joints, and the TRUE LF run hit LF LOWER's
+> wrong-side end-stop under the URDF value. The slot reasoning below still holds (same type, same
+> mounting ⇒ same sign), but its source is now the current-installation `encoder_direction`
+> record in `MATDOG_SERVO_ALLOCATION.yaml`, with per-joint evidence. That record is generated into
+> `GeometryJointRecord::encoder_direction` and moves the provenance tag when it changes. The URDF
+> `motorDirection` is spec metadata only. See [`CALIBRATION_READINESS.md`](CALIBRATION_READINESS.md) §2.
+
 > **CORRECTED 2026-09-22.** This section previously treated current direction as
 > calibration work to be measured. That was wrong, and the code has been corrected on
 > `feat/h0-current-leg-preflight-v1`.
@@ -490,7 +502,7 @@ changes the URDF, and therefore the geometry provenance tag, and therefore inval
 affected transforms automatically.
 
 `JointTransform` carries **no** `direction` field. It is resolved by
-`jointDirection(profile, joint)` from the bound profile's `urdf_motor_direction`: one source of
+`jointDirection(profile, joint)` from the bound profile's `encoder_direction` (amended): one source of
 truth, one invalidation path. A copy stored as evidence could silently disagree with the URDF the
 geometry plan was compiled against.
 
@@ -702,7 +714,8 @@ Only after it passes, in order, each its own authorised session:
 7. the Safe Actuator runtime adapter;
 8. **C4-C current-installation stand revalidation** — see below;
 9. **then** the 8 upper-leg contacts, the only ones required for final calibration and the only
-   ones reachable without beyond-URDF motion (§8.3);
+   ones reachable without beyond-URDF motion (§8.3); **superseded 2026-09-30: all 24 contacts,
+   see the SUPERSEDED note beside the endpoint table**;
 10. full current safe limits.
 
 ### The next stand is a REVALIDATION, not a first stand

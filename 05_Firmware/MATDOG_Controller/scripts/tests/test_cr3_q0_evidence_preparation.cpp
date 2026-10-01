@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstring>
 
 #include "../../src/actuator/CalibrationGeometryProfileData.h"
 #include "../../src/actuator/CalibrationQ0EvidencePreparation.h"
@@ -36,8 +37,25 @@ static void test_snapshot_is_exact_cr2c_package() {
     check(q0_evidence_data::kRecords[i].bus_id == buses[i], "snapshot bus id");
     check(q0_evidence_data::kRecords[i].q0_tick == q0[i], "snapshot q0 tick");
   }
-  check(sameProvenance(q0_evidence_data::kSourceGeometry, geometry_data::kProvenance),
-        "frozen source geometry matches current CR3 geometry");
+  // 2026-10-01: the current geometry provenance moved (the allocation record now
+  // carries the current-installation encoder_direction; LF HIP/LF LOWER were
+  // wrong under the URDF motorDirection). CR2-C was captured under the old
+  // direction contract, so it must NOT be rebound to the new one.
+  check(!sameProvenance(q0_evidence_data::kSourceGeometry, geometry_data::kProvenance),
+        "frozen CR2-C source geometry is the superseded direction contract");
+  for (uint8_t f = 0; f < 5; ++f) {
+    const char* a[] = {q0_evidence_data::kSourceGeometry.urdf_sha256,
+                       q0_evidence_data::kSourceGeometry.mesh_manifest_sha256,
+                       q0_evidence_data::kSourceGeometry.endpoint_semantic_sha256,
+                       q0_evidence_data::kSourceGeometry.parking_semantic_sha256,
+                       q0_evidence_data::kSourceGeometry.safety_policy_semantic_sha256};
+    const char* b[] = {geometry_data::kProvenance.urdf_sha256,
+                       geometry_data::kProvenance.mesh_manifest_sha256,
+                       geometry_data::kProvenance.endpoint_semantic_sha256,
+                       geometry_data::kProvenance.parking_semantic_sha256,
+                       geometry_data::kProvenance.safety_policy_semantic_sha256};
+    check(std::strcmp(a[f], b[f]) == 0, "only the allocation (encoder polarity) hash moved");
+  }
 }
 
 static void test_no_implicit_promotion_after_boot() {
@@ -78,10 +96,22 @@ static void test_capture_package_prerequisites_fail_closed() {
 }
 
 static void test_current_package_repasses_real_gates() {
-  const auto p = profile();
+  // On the CURRENT geometry the frozen package is refused (it was captured under
+  // the superseded direction contract)...
+  const auto stale = prepareCurrentQ0Evidence(profile(), geometry_data::kProvenance, true);
+  check(stale.status == Q0EvidencePreparationStatus::REJECT_SOURCE_GEOMETRY,
+        "CR2-C is not rebound to the current encoder-direction contract");
+  check(stale.transform_count == 0, "no transform from superseded evidence");
+
+  // ...while under its own frozen source geometry it still re-passes every real
+  // gate (the gates themselves are unchanged).
+  CalibrationGeometryProfile p;
+  p.bind(&q0_evidence_data::kSourceGeometry,
+         geometry_data::kJoints, geometry_data::kJointCount,
+         geometry_data::kEndpoints, geometry_data::kEndpointCount);
   const auto result =
-      prepareCurrentQ0Evidence(p, geometry_data::kProvenance, true);
-  check(result.ready(), "current CR2-C package prepares 12 transforms");
+      prepareCurrentQ0Evidence(p, q0_evidence_data::kSourceGeometry, true);
+  check(result.ready(), "CR2-C package prepares 12 transforms under its own geometry");
   check(result.transform_count == 12, "all 12 transforms produced");
 
   for (uint8_t i = 0; i < result.transform_count; ++i) {

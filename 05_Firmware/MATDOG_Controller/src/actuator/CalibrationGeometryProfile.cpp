@@ -150,13 +150,22 @@ bool transformMayBeAppliedTo(const JointTransform& transform,
   return calibration::identityPermitsEvidenceReuse(transform.identity, current);
 }
 
+const char* toString(EncoderDirectionSource source) {
+  switch (source) {
+    case EncoderDirectionSource::CURRENT_HARDWARE_WITNESS:  return "CURRENT_HARDWARE_WITNESS";
+    case EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED: return "HISTORICAL_SLOT_UNCHANGED";
+  }
+  return "UNKNOWN";
+}
+
 int8_t jointDirection(const CalibrationGeometryProfile& profile,
                       const calibration::JointIdentity& joint) {
   const GeometryJointRecord* record = profile.findJoint(joint);
   if (record == nullptr) return 0;  // unknown joint is not a direction
-  const int8_t direction = record->urdf_motor_direction;
-  // The URDF gate already requires exactly one motorDirection in {-1, +1} per
-  // actuated joint, but a corrupted table must not produce a third sign.
+  // The current-installation encoder polarity - never the URDF motorDirection.
+  const int8_t direction = record->encoder_direction;
+  // The exporter already requires exactly one encoder_direction in {-1, +1}
+  // per leg joint, but a corrupted table must not produce a third sign.
   return (direction == 1 || direction == -1) ? direction : 0;
 }
 

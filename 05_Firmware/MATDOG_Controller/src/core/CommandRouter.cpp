@@ -7,6 +7,7 @@
 
 #include "../servo/ServoProfileData.h"
 #include "../actuator/CalibrationGeometryProfileData.h"
+#include "../actuator/CalibrationSequencePlanData.h"
 #include "../actuator/CalibrationQ0EvidencePreparation.h"
 #include "../calibration/CalibrationSessionOrchestrator.h"
 #include "../calibration/CalibrationMotionPermit.h"
@@ -60,7 +61,9 @@ struct ExportLineCapture {
   uint16_t want = 0;
   uint16_t seen = 0;
   bool got = false;
-  char line[400] = {0};
+  // As large as the exporter's own line buffer (FullLegCalibrationFinalizer.cpp
+  // kLineBytes = 512): an evidence line is never truncated here either.
+  char line[512] = {0};
 };
 
 void captureExportLine(void* user, const char* line) {
@@ -720,12 +723,90 @@ void CommandRouter::handleLine(String line) {
     Serial.println("CALIBRATION_SESSION_ABORT=OK");
     Serial.println("CALIBRATION_SESSION_ABORT_NOTE permit=REVOKED authority=RELEASED");
 
+  } else if (matchLegCommand(upper, "@CALIBRATION INITIAL RECOVERY ", " CONFIRM_Q0_RECOVERY",
+                             &command_leg)) {
+    // The controller-verified q0 baseline required after a fresh q0 promotion
+    // and before any leg is calibrated: EVERY leg joint of the robot actively
+    // commanded to its promoted q0, one at a time (prime at present, RAM
+    // TorqueLimit, TorqueEnable, move, V25 settle gate, SAFE_OFF), then all
+    // twelve verified at q0 torque-off. The SAME executor, policy phase table
+    // and SAFE_OFF path as the INITIAL_RECOVERY phase of every Full Leg run;
+    // no probe, no contact, no evidence record. Same live-session and
+    // fresh-permit gates as @CALIBRATION FULL LEG; the session and permit
+    // stay live for the leg run that follows.
+    const char* leg_name = calibration::toString(command_leg);
+    if (modules_.calibration->status().state != calibration::SessionState::ACTIVE ||
+        modules_.calibration->status().leg != command_leg) {
+      Serial.println("CALIBRATION_INITIAL_RECOVERY=REFUSED");
+      Serial.printf("REASON=NO_ACTIVE_%s_CALIBRATION_SESSION\n", leg_name);
+      return;
+    }
+    if (!modules_.motion_permit->active() ||
+        !modules_.motion_authorization->operator_authorized ||
+        !modules_.motion_authorization->token.valid()) {
+      Serial.println("CALIBRATION_INITIAL_RECOVERY=REFUSED");
+      Serial.println("REASON=NO_CURRENT_MOTION_PERMIT");
+      return;
+    }
+    if (modules_.first_motion->active() || modules_.full_leg_calibration->active()) {
+      Serial.println("CALIBRATION_INITIAL_RECOVERY=REFUSED");
+      Serial.println("REASON=MOTION_EXECUTOR_ALREADY_ACTIVE");
+      return;
+    }
+    if (modules_.full_leg_run->armed) {
+      Serial.println("CALIBRATION_INITIAL_RECOVERY=REFUSED");
+      Serial.println("REASON=PREVIOUS_LEG_RUN_NOT_FINALIZED");
+      return;
+    }
+    calibration::FullLegPlan plan{};
+    const calibration::FullLegPlanStatus plan_status = calibration::resolveFullLegPlan(
+        *modules_.geometry_profile, actuator::geometry_data::kProvenance,
+        modules_.actuator_policy->transforms(), &actuator::sequence_plan_data::kPlan, command_leg,
+        &plan);
+    if (plan_status != calibration::FullLegPlanStatus::OK) {
+      Serial.println("CALIBRATION_INITIAL_RECOVERY=REFUSED");
+      Serial.printf("REASON=FULL_LEG_PLAN_%s\n", calibration::toString(plan_status));
+      return;
+    }
+    plan.request.recovery_only = true;
+
+    calibration::FullLegCalibrationContext context{};
+    context.session_active = modules_.calibration->sessionLive();
+    context.origin = modules_.calibration->status().origin;
+    context.lease = modules_.calibration->authorityLease();
+    context.mode = modules_.operating_mode->mode();
+    context.motion_permit_active = modules_.motion_permit->active();
+    context.authority = modules_.authority->current();
+    context.authority_generation = modules_.authority->generation();
+    context.authority_inhibited = modules_.authority->inhibited();
+    if (!modules_.full_leg_calibration->start(plan.request, context, millis())) {
+      Serial.println("CALIBRATION_INITIAL_RECOVERY=REFUSED");
+      Serial.println("REASON=FULL_LEG_EXECUTOR_START_REFUSED");
+      return;
+    }
+    // Deliberately NOT armed as a leg run: nothing is finalized, nothing is
+    // recorded in the evidence store, the session is not completed.
+    Serial.printf("CALIBRATION_INITIAL_RECOVERY=ARMED session_leg=%s joints=%u torque_limit=%u "
+                  "phase=PREFLIGHT\n",
+                  leg_name, (unsigned)plan.request.population_count,
+                  (unsigned)plan.request.torque_limit);
+    for (uint8_t i = 0; i < plan.request.population_count; ++i) {
+      const calibration::FullLegJoint& j = plan.request.population[i];
+      Serial.printf("CALIBRATION_INITIAL_RECOVERY_TARGET bus=%u leg=%s joint=%s unit=%s q0=%u\n",
+                    (unsigned)j.bus_id, calibration::toString(j.identity.leg),
+                    calibration::toString(j.identity.joint), j.identity.physical_unit,
+                    (unsigned)j.q0_tick);
+    }
+    Serial.println("CALIBRATION_INITIAL_RECOVERY_NOTE no_write_in_command_handler; "
+                   "poll with @CALIBRATION FULL LEG STATUS; "
+                   "terminal line CALIBRATION_INITIAL_RECOVERY_RESULT");
+
   } else if (matchLegCommand(upper, "@CALIBRATION FULL LEG ", " CONFIRM_FULL_CALIBRATION",
                              &command_leg)) {
-    // The UPPER two-endpoint contact sequence (MIN, then MAX with the
-    // Geometry V5 auxiliary parked first where the MAX endpoint names one)
-    // for the leg the LIVE SESSION was opened for - see
-    // FullLegCalibrationExecutor.h. Exactly the same live-session and
+    // The 24-contact Full Calibration of the leg the LIVE SESSION was opened
+    // for: all SIX contacts (UPPER, LOWER, HIP x MIN/MAX) in the LF V25
+    // state-machine order, with initial q0 recovery, held prerequisites and
+    // the reviewed return - see FullLegCalibrationExecutor.h. Exactly the same live-session and
     // fresh-permit gates as @CALIBRATION MOTION DIRECTION_VERIFY, reused
     // rather than re-derived; mutually exclusive with it (both would
     // otherwise contend for the same bus).
@@ -755,15 +836,16 @@ void CommandRouter::handleLine(String line) {
     }
 
     // Everything the run needs comes from ONE resolver: canonical allocation
-    // -> JointIdentity + bus id, cross-checked against Geometry V5 (identity
-    // AND bus id); MIN/MAX endpoints, the auxiliary decision and its park
-    // target from the Geometry V5 endpoint records; the re-approach point
-    // from the generic, geometrically verified backoff rule. No leg, bus id,
-    // contact or backoff number is typed in this handler.
+    // -> JointIdentity + bus id for all 12 leg joints (cross-checked against
+    // Geometry V5), the six search corridors for this installation's q0, and
+    // the geometry-validated sequence plan's prerequisite poses and park
+    // joint. No leg, bus id, contact, corridor or pose number is typed in
+    // this handler.
     calibration::FullLegPlan plan{};
     const calibration::FullLegPlanStatus plan_status = calibration::resolveFullLegPlan(
         *modules_.geometry_profile, actuator::geometry_data::kProvenance,
-        modules_.actuator_policy->transforms(), command_leg, &plan);
+        modules_.actuator_policy->transforms(), &actuator::sequence_plan_data::kPlan, command_leg,
+        &plan);
     if (plan_status != calibration::FullLegPlanStatus::OK) {
       Serial.println("CALIBRATION_FULL_LEG=REFUSED");
       Serial.printf("REASON=FULL_LEG_PLAN_%s\n", calibration::toString(plan_status));
@@ -790,17 +872,52 @@ void CommandRouter::handleLine(String line) {
     modules_.full_leg_run->arm(plan, modules_.actuator_policy->currentGeometryTag(),
                                modules_.calibration->status().session_id);
 
-    if (plan.request.auxiliary_required) {
-      Serial.printf("CALIBRATION_FULL_LEG=ARMED leg=%s joint=UPPER bus=%u "
-                    "phase=UPPER_MIN_PROBE auxiliary=%s_%s aux_bus=%u\n",
-                    leg_name, (unsigned)plan.request.probe_bus_id,
-                    calibration::toString(plan.request.auxiliary_joint.leg),
-                    calibration::toString(plan.request.auxiliary_joint.joint),
-                    (unsigned)plan.request.auxiliary_bus_id);
+    const calibration::FullLegCalibrationRequest& r = plan.request;
+    if (r.has_rear_park) {
+      Serial.printf("CALIBRATION_FULL_LEG=ARMED leg=%s contacts_expected=%u hip_bus=%u upper_bus=%u "
+                    "lower_bus=%u park=%s_%s park_bus=%u phase=PREFLIGHT\n",
+                    leg_name, (unsigned)calibration::kFullLegContactCount,
+                    (unsigned)plan.hip.bus_id, (unsigned)plan.upper.bus_id,
+                    (unsigned)plan.lower.bus_id, calibration::toString(r.park.identity.leg),
+                    calibration::toString(r.park.identity.joint), (unsigned)r.park.bus_id);
     } else {
-      Serial.printf("CALIBRATION_FULL_LEG=ARMED leg=%s joint=UPPER bus=%u "
-                    "phase=UPPER_MIN_PROBE auxiliary=NONE aux_bus=0\n",
-                    leg_name, (unsigned)plan.request.probe_bus_id);
+      Serial.printf("CALIBRATION_FULL_LEG=ARMED leg=%s contacts_expected=%u hip_bus=%u upper_bus=%u "
+                    "lower_bus=%u park=NONE park_bus=0 phase=PREFLIGHT\n",
+                    leg_name, (unsigned)calibration::kFullLegContactCount,
+                    (unsigned)plan.hip.bus_id, (unsigned)plan.upper.bus_id,
+                    (unsigned)plan.lower.bus_id);
+    }
+    // The run's own geometry evidence, printed before anything moves: the six
+    // calibration search corridors for this q0 and every prerequisite pose.
+    const calibration::JointKind order[] = {calibration::JointKind::UPPER,
+                                            calibration::JointKind::LOWER,
+                                            calibration::JointKind::HIP};
+    for (const calibration::JointKind kind : order) {
+      for (uint8_t side = 0; side < calibration::kContactSideCount; ++side) {
+        const actuator::CalibrationSearchCorridor& c =
+            r.corridor[static_cast<uint8_t>(kind)][side];
+        Serial.printf("CALIBRATION_FULL_LEG_SEARCH_CORRIDOR joint=%s side=%s probe_sign=%d q0=%u "
+                      "contact=%u urdf_limit=%u entry=%u guard=%u opposite_limit=%u "
+                      "guard_beyond_contact=%ld\n",
+                      calibration::toString(kind), side == 0 ? "MIN" : "MAX", (int)c.probe_sign,
+                      (unsigned)c.home_tick, (unsigned)c.contact_tick, (unsigned)c.urdf_limit_tick,
+                      (unsigned)c.entry_tick, (unsigned)c.guard_tick,
+                      (unsigned)c.opposite_limit_tick,
+                      (long)(actuator::searchDepth(c, c.guard_tick) -
+                             actuator::searchDepth(c, c.contact_tick)));
+      }
+    }
+    Serial.printf("CALIBRATION_FULL_LEG_PREREQUISITE pose=UPPER_FOR_LOWER urad=%ld tick=%u\n",
+                  (long)r.upper_for_lower_urad, (unsigned)r.upper_for_lower_tick);
+    Serial.printf("CALIBRATION_FULL_LEG_PREREQUISITE pose=UPPER_FOR_HIP_MIN urad=%ld tick=%u\n",
+                  (long)r.upper_for_hip_min_urad, (unsigned)r.upper_for_hip_min_tick);
+    Serial.printf("CALIBRATION_FULL_LEG_PREREQUISITE pose=UPPER_FOR_HIP_MAX urad=%ld tick=%u\n",
+                  (long)r.upper_for_hip_max_urad, (unsigned)r.upper_for_hip_max_tick);
+    Serial.printf("CALIBRATION_FULL_LEG_PREREQUISITE pose=LOWER_FOLDED urad=%ld tick=%u\n",
+                  (long)r.lower_folded_urad, (unsigned)r.lower_folded_tick);
+    if (r.has_rear_park) {
+      Serial.printf("CALIBRATION_FULL_LEG_PREREQUISITE pose=REAR_PARK urad=%ld tick=%u\n",
+                    (long)r.park_target_urad, (unsigned)r.park_target_tick);
     }
     Serial.println("CALIBRATION_FULL_LEG_NOTE no_write_in_command_handler; "
                    "next_Controller_tick_revalidates_all_dynamic_prerequisites; "
@@ -1033,10 +1150,11 @@ void CommandRouter::printHelp() {
   Serial.println("  @CALIBRATION MOTION ABORT");
   Serial.println("  @CALIBRATION MOTION PERMIT REVOKE");
   Serial.println("  @CALIBRATION SESSION ABORT");
+  Serial.println("  @CALIBRATION INITIAL RECOVERY <LF|RF|RH|LH> CONFIRM_Q0_RECOVERY");
   Serial.println("  @CALIBRATION FULL LEG <LF|RF|RH|LH> CONFIRM_FULL_CALIBRATION");
-  Serial.println("                           (the session's leg: UPPER MIN+MAX contact; the Geometry");
-  Serial.println("                           V5 auxiliary is parked for MAX only where the endpoint");
-  Serial.println("                           names one; many-second sequence)");
+  Serial.println("                           (the session's leg: all SIX contacts, UPPER/LOWER/HIP x");
+  Serial.println("                           MIN/MAX, LF V25 order: q0 recovery, park, held");
+  Serial.println("                           prerequisites, return, SAFE_OFF; minutes-long sequence)");
   Serial.println("  @CALIBRATION FULL LEG STATUS   (poll while the sequence runs)");
   Serial.println("  @CALIBRATION FULL LEG ABORT");
   Serial.println("  @CALIBRATION EVIDENCE EXPORT   (read-only; RAM record of every leg run this boot)");
@@ -1163,6 +1281,12 @@ void CommandRouter::printCalibrationStatus() {
                 calibration::toString(c.leg), calibration::toString(c.last_result));
   Serial.printf("CALIBRATION_AUTHORITY held=%s generation=%lu\n",
                 c.holds_authority ? "YES" : "NO", (unsigned long)c.lease_generation);
+  // Read-only view of the RAM-only motion permit (granted by @CALIBRATION
+  // MOTION PERMIT GRANT, re-checked every tick, revoked by any fact change).
+  Serial.printf("CALIBRATION_MOTION_PERMIT_STATE active=%s operator_authorized=%s token_valid=%s\n",
+                modules_.motion_permit->active() ? "YES" : "NO",
+                modules_.motion_authorization->operator_authorized ? "YES" : "NO",
+                modules_.motion_authorization->token.valid() ? "YES" : "NO");
   Serial.printf("CALIBRATION_POPULATION verdict=%s observed=%u/%u mask=0x%03x\n",
                 calibration::toString(c.population_verdict),
                 (unsigned)calibration::observedLegSlotCount(c.population),
@@ -1257,33 +1381,51 @@ void CommandRouter::printActuatorStatus() {
 }
 
 void CommandRouter::printFullLegCalibrationStatus() {
-  const calibration::FullLegCalibrationStatus& s = modules_.full_leg_calibration->status();
-  Serial.printf("CALIBRATION_FULL_LEG phase=%s failure=%s last_decision=%s\n",
-                calibration::toString(s.phase), calibration::toString(s.failure),
+  const calibration::FullLegCalibrationExecutor& ex = *modules_.full_leg_calibration;
+  const calibration::FullLegCalibrationStatus& s = ex.status();
+  Serial.printf("CALIBRATION_FULL_LEG phase=%s step=%s failure=%s failed_phase=%s last_decision=%s\n",
+                calibration::toString(s.phase), calibration::toString(s.step),
+                calibration::toString(s.failure),
+                s.failure == calibration::FullLegFailure::NONE ? "-" : calibration::toString(s.failed_phase),
                 actuator::toString(s.last_policy_decision));
-  Serial.printf("CALIBRATION_FULL_LEG_RUN armed=%s executor_active=%s endpoint=%s_%s\n",
-                modules_.full_leg_run->armed ? "YES" : "NO",
-                modules_.full_leg_calibration->active() ? "YES" : "NO",
-                calibration::toString(modules_.full_leg_calibration->endpointLeg()),
-                calibration::toString(modules_.full_leg_calibration->endpointJoint()));
-  Serial.printf("CALIBRATION_FULL_LEG_BUS primary=%u auxiliary=%u auxiliary_required=%s\n",
-                (unsigned)modules_.full_leg_calibration->primaryBusId(),
-                (unsigned)modules_.full_leg_calibration->auxiliaryBusId(),
-                modules_.full_leg_calibration->auxiliaryRequired() ? "YES" : "NO");
-  Serial.printf("CALIBRATION_FULL_LEG_SAFE_OFF primary_pending=%s auxiliary_pending=%s "
-                "auxiliary_parked=%s\n",
-                modules_.full_leg_calibration->primarySafeOffPending() ? "YES" : "NO",
-                modules_.full_leg_calibration->auxiliarySafeOffPending() ? "YES" : "NO",
-                modules_.full_leg_calibration->auxiliaryParked() ? "YES" : "NO");
-
-  const calibration::ContactEvidence& min_evidence = modules_.full_leg_calibration->minSideEvidence();
-  const calibration::ContactEvidence& max_evidence = modules_.full_leg_calibration->maxSideEvidence();
-  Serial.printf("CALIBRATION_FULL_LEG_UPPER_MIN measured=%s fine_tick=%u witness_accepted=%s\n",
-                min_evidence.has_measurement ? "YES" : "NO", (unsigned)min_evidence.fine_tick_1,
-                min_evidence.witness.accepted() ? "YES" : "NO");
-  Serial.printf("CALIBRATION_FULL_LEG_UPPER_MAX measured=%s fine_tick=%u witness_accepted=%s\n",
-                max_evidence.has_measurement ? "YES" : "NO", (unsigned)max_evidence.fine_tick_1,
-                max_evidence.witness.accepted() ? "YES" : "NO");
+  Serial.printf("CALIBRATION_FULL_LEG_RUN mode=%s armed=%s executor_active=%s leg=%s contacts=%u/%u "
+                "held=%u recovered=%u prerequisites=%s\n",
+                ex.request().recovery_only ? "INITIAL_RECOVERY_ONLY" : "FULL_LEG",
+                modules_.full_leg_run->armed ? "YES" : "NO", ex.active() ? "YES" : "NO",
+                calibration::toString(ex.leg()), (unsigned)s.contacts_accepted,
+                (unsigned)calibration::kFullLegContactCount, (unsigned)s.held_count,
+                (unsigned)s.recovered_joints, ex.prerequisitesVerified() ? "VERIFIED" : "NO");
+  Serial.printf("CALIBRATION_FULL_LEG_OP joint=%s bus=%u target=%u\n",
+                calibration::toString(s.op_joint), (unsigned)s.op_bus, (unsigned)s.op_target_tick);
+  // The owned contact probe's own verdict for the endpoint that ran last.
+  const calibration::ContactProbeStatus& probe = ex.probeStatus();
+  const calibration::ContactProbeRequest& pr = ex.probeRequest();
+  Serial.printf("CALIBRATION_FULL_LEG_PROBE joint=%s side=%s phase=%s failure=%s pass=%u stage=%s "
+                "target=%u pos=%ld speed=%ld current=%ld steps=%u bypass=%u scout=%u p1=%u p2=%u\n",
+                calibration::toString(pr.endpoint_joint),
+                pr.endpoint_side == calibration::ContactSide::MIN_SIDE ? "MIN" : "MAX",
+                calibration::toString(probe.phase), calibration::toString(probe.failure),
+                (unsigned)probe.pass, calibration::toString(probe.stage),
+                (unsigned)probe.target_tick, (long)probe.last_position, (long)probe.last_speed,
+                (long)probe.last_current, (unsigned)probe.step_count,
+                (unsigned)probe.plateau_bypass_count,
+                probe.scout_valid ? (unsigned)probe.scout_tick : 0u,
+                (unsigned)probe.pass1_contact_tick, (unsigned)probe.pass2_contact_tick);
+  const calibration::JointKind order[] = {calibration::JointKind::UPPER,
+                                          calibration::JointKind::LOWER,
+                                          calibration::JointKind::HIP};
+  for (const calibration::JointKind kind : order) {
+    for (uint8_t side = 0; side < calibration::kContactSideCount; ++side) {
+      const calibration::ContactEvidence& e =
+          ex.contact(kind, static_cast<calibration::ContactSide>(side));
+      Serial.printf("CALIBRATION_FULL_LEG_CONTACT joint=%s side=%s measured=%s scout=%u fine1=%u "
+                    "fine2=%u witness_accepted=%s\n",
+                    calibration::toString(kind), side == 0 ? "MIN" : "MAX",
+                    e.has_measurement ? "YES" : "NO", (unsigned)e.coarse_tick,
+                    (unsigned)e.fine_tick_1, (unsigned)e.fine_tick_2,
+                    e.witness.accepted() ? "YES" : "NO");
+    }
+  }
 
   // The verdict of a finished run is the finalizer's, kept in the RAM store:
   // the envelopes, limit admission, session completion and cleanup are all
@@ -1294,25 +1436,30 @@ void CommandRouter::printFullLegCalibrationStatus() {
     const calibration::Leg leg = static_cast<calibration::Leg>(i);
     const calibration::FullLegRecord* record = store.find(leg);
     if (record == nullptr || !record->present) {
-      Serial.printf("CALIBRATION_FULL_LEG_RECORD leg=%s present=NO verdict=NOT_RUN\n",
-                    calibration::toString(leg));
+      Serial.printf("CALIBRATION_FULL_LEG_RECORD leg=%s present=NO verdict=NOT_RUN "
+                    "contacts_accepted=0/%u\n",
+                    calibration::toString(leg), (unsigned)calibration::kFullLegContactsExpected);
       continue;
     }
     Serial.printf("CALIBRATION_FULL_LEG_RECORD leg=%s present=YES attempts=%u verdict=%s "
-                  "contact_calibrated=%s envelope_accepted=%s failure=%s\n",
+                  "contacts_accepted=%u/%u contact_calibrated=%s envelope_accepted=%s failure=%s\n",
                   calibration::toString(leg), (unsigned)record->attempts,
-                  calibration::toString(record->verdict),
+                  calibration::toString(record->verdict), (unsigned)record->contacts_accepted,
+                  (unsigned)record->contacts_expected,
                   record->hardware_contact_calibrated ? "YES" : "NO",
                   record->operational_envelope_accepted ? "YES" : "NO",
                   calibration::toString(record->failure));
   }
   Serial.printf("CALIBRATION_FULL_LEG_SUMMARY legs_present=%u legs_contact_calibrated=%u "
-                "legs_envelope_accepted=%u\n",
+                "legs_envelope_accepted=%u total_contacts_accepted=%u/%u\n",
                 (unsigned)store.legsPresent(), (unsigned)store.legsContactCalibrated(),
-                (unsigned)store.legsEnvelopeAccepted());
-  Serial.println("CALIBRATION_FULL_LEG_NOTE HARDWARE_CONTACT_CALIBRATED = both UPPER contacts "
-                 "recorded + SAFE_OFF + session completed; FINAL_OPERATIONAL_ENVELOPE_ACCEPTED "
-                 "additionally needs APPROVED envelope parameters (none exist in this build)");
+                (unsigned)store.legsEnvelopeAccepted(), (unsigned)store.totalContactsAccepted(),
+                (unsigned)calibration::kFullCalibrationContactsExpected);
+  Serial.println("CALIBRATION_FULL_LEG_NOTE FULL CALIBRATION = 4 legs x 3 joints x MIN/MAX = 24 "
+                 "contacts; HARDWARE_CONTACT_CALIBRATED = all 6 of a leg's contacts (UPPER, LOWER, "
+                 "HIP x MIN/MAX) recorded + diagnostics + verified SAFE_OFF + session completed; "
+                 "FINAL_OPERATIONAL_ENVELOPE_ACCEPTED additionally needs APPROVED envelope "
+                 "parameters (none exist in this build)");
 }
 
 // Starts a paced export; pumpFullLegEvidenceExport() prints it.
@@ -1732,11 +1879,13 @@ void CommandRouter::printServoSafeOff(int id) {
   // is same-tick effective for exactly the reason @CALIBRATION MOTION ABORT
   // documents.
   const uint8_t safe_off_id = static_cast<uint8_t>(id);
+  // The 24-contact sequence may energize ANY leg joint (INITIAL_RECOVERY) and
+  // holds several at once, so while it runs every manual SAFE_OFF is treated
+  // as an intervention: the permit goes, and the run fails closed into its
+  // own verified SAFE_OFF of every leg joint.
   const bool owns_bus =
       (modules_.first_motion->active() && modules_.first_motion->busId() == safe_off_id) ||
-      (modules_.full_leg_calibration->active() &&
-       (modules_.full_leg_calibration->primaryBusId() == safe_off_id ||
-        modules_.full_leg_calibration->auxiliaryBusId() == safe_off_id));
+      modules_.full_leg_calibration->active();
   if (owns_bus) {
     modules_.motion_permit->revoke(calibration::CalibrationPermitRevokeReason::EXPLICIT);
     modules_.motion_authorization->revoke();

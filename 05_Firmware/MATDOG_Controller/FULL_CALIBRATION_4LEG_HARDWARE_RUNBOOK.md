@@ -1,89 +1,124 @@
-# Full Calibration — four-leg hardware runbook (LF → RF → RH → LH, one build, one session)
+# TRUE Full Calibration — 24 contacts, four legs (LF → RF → RH → LH) — hardware runbook
 
-Date: 2026-09-29
-Status: PROCEDURE — OFFLINE-VALIDATED, NEVER RUN ON HARDWARE
-Firmware: ONE `ROBOT_POWERED` build from clean merged `main` (manifest `SOURCE_STATE=CLEAN`).
+Date: 2026-09-30 (replaces the 2026-09-29 UPPER-only procedure)
+Status: PROCEDURE — **HARDWARE-VALIDATED 2026-10-01: TRUE FULL CALIBRATION 24/24** (firmware `dfcecb670d05`, `all_contact_calibrated=1`; report:
+`09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md`). The result is RAM-only (no persistence yet)
+and no operational envelope is approved.
+Firmware: ONE `ROBOT_POWERED` build, OTA ingest 0, manifest `SOURCE_STATE=CLEAN`, from the PR's
+final commit (branch `fix/full-calibration-24-contact-v25-generalized-v1`).
+
+**TRUE FULL CALIBRATION = 4 legs × 3 joints (HIP, UPPER, LOWER) × MIN/MAX = 24 contacts.** A leg
+passes only at 6/6; the robot only at 24/24 (`all_contact_calibrated=1`). There is no other
+definition, and a 2/6 (UPPER-only) or 5/6 leg is a FAILED leg.
 
 This document is a procedure, not an authorization. Building, flashing, energizing the servo
 rail, every `@CALIBRATION` command below and every servo motion need the operator's explicit
-go-ahead for that session. Nothing here writes EEPROM/NVS, `PositionOffset`, servo IDs or DALY
-configuration; everything the run produces lives in RAM and is lost at reset — **export the
-evidence before any power cycle.**
+go-ahead for that session. Nothing here writes EEPROM/NVS, `PositionOffset`, servo IDs,
+`CalibrationOfs` or DALY configuration. TorqueLimit 500 is a RAM value restored by the next power
+cycle. Everything the run produces lives in RAM and is lost at reset — **export the evidence
+before any power cycle.**
 
-## What one build does
+## Commands (each exact)
 
-| Command (each exact, four-token) | Effect |
+| Command | Effect |
 |---|---|
-| `@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE` | read-only, Torque-OFF 12/12 q0 capture of the current installation (nine samples per joint) |
-| `@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION` | promotes **the twelve candidates of that capture** into the RAM transform table; replaces the previous q0 of every joint; no bus traffic |
-| `@CALIBRATION SESSION START <LF\|RF\|RH\|LH> CONFIRM_CURRENT_Q0` | live session for that leg; refused unless the transform table holds exactly the current capture's q0 |
-| `@CALIBRATION MOTION PERMIT GRANT 16 CONFIRM_FIRST_MOTION` | fresh RAM permit for the live session (same command for every leg) |
-| `@CALIBRATION FULL LEG <LF\|RF\|RH\|LH> CONFIRM_FULL_CALIBRATION` | UPPER MIN contact, (aux park), UPPER MAX contact, SAFE_OFF; then the evidence lifecycle |
-| `@CALIBRATION FULL LEG STATUS` / `ABORT` | poll / abort the running sequence |
-| `@CALIBRATION EVIDENCE EXPORT` | deterministic key=value dump of the RAM record of all four legs |
-| `@CALIBRATION MOTION DIRECTION_VERIFY LF_UPPER +16 CONFIRM_FIRST_MOTION` | the first bounded diagnostic; **LF session only, once** |
+| `@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE` | read-only torque-OFF q0 capture, 12/12, nine samples per joint |
+| `@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION` | promotes that capture into the RAM transform table (replaces any previous q0) |
+| `@CALIBRATION SESSION START <LEG> CONFIRM_CURRENT_Q0` | live session for that leg |
+| `@CALIBRATION MOTION PERMIT GRANT 16 CONFIRM_FIRST_MOTION` | fresh RAM permit for the live session |
+| `@CALIBRATION INITIAL RECOVERY <LEG> CONFIRM_Q0_RECOVERY` | **motion**: every one of the 12 leg joints, one at a time, actively to its promoted q0 (prime at present → RAM TorqueLimit 500 → torque on → move → V25 settle gate → SAFE_OFF), then all 12 verified at q0 torque-off; ends `CALIBRATION_INITIAL_RECOVERY_RESULT verdict=PASS recovered=12/12 …`; session + permit stay live |
+| `@CALIBRATION FULL LEG <LEG> CONFIRM_FULL_CALIBRATION` | **motion**: the TRUE Full-Leg run, 6 contacts (below) |
+| `@CALIBRATION FULL LEG STATUS` / `ABORT` | poll / abort the running sequence (always allowed) |
+| `@CALIBRATION STATUS` | includes `CALIBRATION_MOTION_PERMIT_STATE active=… operator_authorized=… token_valid=…` |
+| `@CALIBRATION EVIDENCE EXPORT` | deterministic dump of the RAM record of all four legs |
 
-The leg is the only free token. Bus ids, joint identities, MIN/MAX endpoints, the auxiliary
-decision and its park target are derived by the firmware: canonical allocation → `JointIdentity`
-→ cross-checked against Geometry V5 (`bus_id`), endpoints from `findEndpoint(leg, UPPER, side)`.
+The leg is the only free token. Bus ids, identities, corridors, prerequisite poses and the park
+are derived by the firmware: canonical allocation → Geometry V5 → current promoted q0 →
+geometry-validated sequence plan.
 
-### Parking matrix (derived from the Geometry V5 MAX endpoint; pinned by host test)
+## What one Full-Leg run does
 
-| Leg | UPPER bus | MAX side needs | Parked auxiliary |
-|---|---|---|---|
-| LF | 12 | auxiliary | `LH_UPPER` (bus 42) → park 35.0° (610865 µrad), clear 1278983 µrad |
-| RF | 22 | auxiliary | `RH_UPPER` (bus 32) → park 35.0° |
-| RH | 32 | NOT_NEEDED | none |
-| LH | 42 | NOT_NEEDED | none |
+```
+PREFLIGHT → INITIAL_RECOVERY (all 12 → q0, verified) → PARKING (front legs: rear UPPER → 35°, held)
+→ UPPER_MIN → UPPER_MAX            (HIP@q0, LOWER@q0 held)
+→ UPPER_HORIZONTAL (UPPER → 90°, held)
+→ LOWER_MIN → LOWER_MAX            (HIP@q0, UPPER@90° held)
+→ LOWER_FOLDED (LOWER → fold, held; UPPER → HIP-MIN clearance pose where it differs)
+→ HIP_MIN → HIP_MAX                (UPPER@clearance pose of that side, LOWER@fold held)
+→ DIAGNOSTICS (ordering, affine scale 850–1150‰, q0 shift ≤ 96)
+→ RETURN_HIP → RETURN_LOWER_HELD → RETURN_UPPER → RESTORE_PARKING → CLEANUP (verified SAFE_OFF of all 12) → TORQUE_OFF
+```
 
-UPPER MIN needs no auxiliary on any leg. SAFE_OFF after a leg covers the primary, plus the
-auxiliary only where one was used (never a `safeOff(0)`).
+| Leg | HIP / UPPER / LOWER bus | Park | UPPER for LOWER | UPPER for HIP MIN / MAX | LOWER fold |
+|---|---|---|---|---|---|
+| LF | 13 / 12 / 11 | LH_UPPER (42) → 35° | 90° | 90° / 84.99° | −87.01° |
+| RF | 23 / 22 / 21 | RH_UPPER (32) → 35° | 90° | 84.99° / 90° | −87.01° |
+| RH | 33 / 32 / 31 | none | 90° | 90° / 90° | −39.99° |
+| LH | 43 / 42 / 41 | none | 90° | 90° / 90° | −39.99° |
 
-### Two levels of "calibrated" — never conflated
+Every endpoint is searched with the LF V25 contact search (`measure_lf_contact_side_efficient`).
+The sequence:
+1. a 64-tick moving-current baseline;
+2. the **coarse contact scout** in 64-tick steps through the corridor [URDF limit − 64, guard =
+   URDF limit + 64]. Its steps short of the entry are free-space transit
+   (`stage=COARSE_TRANSIT`); the rest are `stage=COARSE_SCOUT`;
+3. release on the scout, backoff 96, fine pass 1 (8-tick steps), release, backoff 96, fine
+   pass 2, release; repeatability |fine 1 − fine 2| ≤ 16.
 
-- **`HARDWARE_CONTACT_CALIBRATED`** — both UPPER contacts witnessed and recorded once each in the
-  session, UPPER envelope READY, servos SAFE_OFF, session COMPLETED, permit revoked, authority NONE.
-  **This is what a hardware run ends at today, and it is a PASS for this evening.**
-- **`FINAL_OPERATIONAL_ENVELOPE_ACCEPTED`** — additionally UPPER/HIP/LOWER envelopes from
-  *approved* parameters and all three JointLimits admitted and read back. It needs a reviewed
-  stand/gait workspace and margin. None exists (`first_stand_limit_rad` is null for all twelve
-  joints), so `kFullLegOperationalParametersApproved` is `false` (audit-pinned), placeholder
-  envelopes (UPPER 8 ticks, HIP/LOWER 50000 µrad) are **reported but never admitted** to the
-  actuator policy. **Expect `envelope_accepted=0`, `parameters_approved=0`, every `admission=
-  NOT_ADMITTED_UNAPPROVED_PARAMETERS`, and 0 of 12 JointLimits admitted. That is correct, not a
-  failure.** Do not treat a missing FINAL level as a reason to retry.
+   Each backoff counts as arrived only through V25's StableTargetGate: ≤ 12 ticks, |speed| ≤ 4,
+   4 consecutive samples, ≥ 400 ms. Only then are the current-recovery check and the next pass
+   allowed. Without new telemetry the search stops after 2 s (V25 `TELEMETRY_TIMEOUT`).
 
-## Preconditions (before power on)
+Both fine passes use the scout: they accept down to scout − 32, and step past a plateau more
+than 8 ticks short of it. The scout is reference evidence only; the fine passes are the
+measurement. Contact is kinematic; current only aborts. When the next 64-tick scout step would
+pass the guard, one final partial step targets the guard itself (deviation D10, never beyond it).
+Every stop down to guard − 18 (URDF + 46) is therefore found whatever q0's grid phase. A deeper stop
+fails closed: `NO_CONTACT_BEFORE_GUARD`, SAFE_OFF. Stop there and keep the evidence. On `ARMED` the firmware
+prints the six `CALIBRATION_FULL_LEG_SEARCH_CORRIDOR joint=… side=…` lines and the
+`CALIBRATION_FULL_LEG_PREREQUISITE pose=…` lines for this q0. It also prints one
+`CALIBRATION_SEQUENCE …` line per phase/step and one `CALIBRATION_SEARCH …` line per search step.
 
-- Clean-merged-`main` `ROBOT_POWERED` binary, its manifest kept with the evening's evidence.
-- Robot supported so every leg can sweep its full UPPER range and both rear UPPER joints can
-  park without touching the ground or the frame; rail power switch within reach.
-- Legs at the same nominal q0 pose used for CR2-C (`CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md`); the
-  fresh capture of this session, not CR2-C, becomes the promoted q0.
-- Serial log captured to a file for the whole session.
+A held joint that loses torque, has its GoalPosition or TorqueLimit changed, drifts more than 10
+ticks, reports a status fault or 200 current, or goes 3 s without telemetry ends the run at once in
+a verified SAFE_OFF of all 12 joints. The failure prints `CALIBRATION_HELD_ROLE_FAILURE`, naming
+the motor (bus, joint, held target, position, error, speed, readback, current, temperature) and
+the active probe. A held joint's speed alone never ends the run (LF V25 `ActivelyHeld`). A spike
+above 40 raw inside the hold is logged as `CALIBRATION_HELD_SPEED_TRANSIENT`, diagnostic only.
 
-## Sequence
+A PresentTemperature above 70 °C is confirmed first, as LF V25 did. Two direct reads of the same
+servo, 50 ms apart, follow:
+- ≥ 2 of the 3 readings over 70 °C: the run ends in SAFE_OFF;
+- a single one: a transient, logged as `CALIBRATION_THERMAL_CONFIRMATION … decision=TRANSIENT`,
+  and the run continues;
+- a confirmation read that fails: SAFE_OFF. So does any bystander that gains torque or moves more than 16 ticks.
 
-### 0. Flash and identity
+End records:
+`CALIBRATION_FULL_LEG_CONTACTS leg=<L> expected=6 measured=6 accepted=6 diagnostics_accepted=YES`,
+then `CALIBRATION_FULL_LEG_RESULT leg=<L> verdict=HARDWARE_CONTACT_CALIBRATED failure=NONE`.
+**Only that exact RESULT line, with 6/6 on the CONTACTS line, is a leg PASS.**
 
-1. Application-only flash of the exact manifest binary, verified digest (as in the LED V2 / CR2-C
-   sessions). No EEPROM/NVS/bootloader change.
-2. `@SYSTEM SOURCE_SIGNATURE` → the source SHA equals the merged `main` SHA in the manifest,
-   `HARDWARE_PROFILE=ROBOT_POWERED`, no `-dirty`.
-3. `@MODE MAINTENANCE`; `@MODE STATUS` → `MODE=MAINTENANCE`.
-4. `@SERVO SAFE_OFF <id>` for **all 13 installed servos** — 11 12 13 21 22 23 31 32 33 41 42 43
-   51 — each `SERVO_SAFE_OFF id=<id> result=VERIFIED_OFF`.
+`HARDWARE_CONTACT_CALIBRATED` is the honest end state: 6 contacts recorded, envelopes built,
+servos SAFE_OFF, session COMPLETED. `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` needs an approved
+stand/gait workspace that does not exist (`kFullLegOperationalParametersApproved = false`).
+Expect `envelope_accepted=0`, `parameters_approved=0`. That is correct.
 
-### 1. Fresh q0, 12/12, then promotion of THAT capture
+## Preconditions
 
-The q0 the four legs are calibrated with is the one captured **in this boot**. The frozen CR2-C
-values (2026-09-27) are a **comparison/reference only**: nothing in the production firmware reads
-them any more, and promotion never falls back to them.
+- Charger **disconnected**; robot mechanically supported, every leg free to sweep its full
+  UPPER, LOWER and HIP ranges and both rear UPPERs free to park; physical disconnect within reach;
+  nobody inside a leg's motion envelope.
+- The clean build and its manifest; serial log captured for the whole session (the runner does).
 
-1. `@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE`; wait for the unsolicited `CALIBRATION_Q0
-   state=COMPLETE … candidates=12/12` and `CALIBRATION_Q0_POPULATION … observed=12/12`; no other
-   servo command while it runs.
-2. Compare every fresh q0 with CR2-C (reference, not an input):
+## Sequence (`scripts/calibration_hw_session.py`, one phase per invocation, no board reset)
+
+1. `--phase prepare` — manifest (CLEAN, ROBOT_POWERED, ingest 0, SOURCE_COMMIT == HEAD, SHA256),
+   application-only flash (`--backup … --backup-sha256 …`, or `--no-flash`), signature ==
+   BUILD_ID, `MODE=MAINTENANCE`, SAFE_OFF 13/13 (11 12 13 21 22 23 31 32 33 41 42 43 51), health
+   READY, authority NONE. **No motion.**
+2. The operator places all four legs at the nominal q=0 calibration pose.
+3. `--phase q0 --confirm-q0-pose` — raw positions printed; `Q0 CAPTURE` 9/9 passes, 12/12
+   candidates, population PASS; every q0 against CR2-C (reference only):
 
    | leg | LOWER | UPPER | HIP |
    |---|---|---|---|
@@ -92,80 +127,62 @@ them any more, and promotion never falls back to them.
    | RH | 31 = 2034 | 32 = 2042 | 33 = 2081 |
    | LH | 41 = 2073 | 42 = 2089 | 43 = 2035 |
 
-   The repository has **no approved q0-repeatability threshold**
-   (`CR3_Q0_ACCEPTANCE_PROMOTION_PLAN.md`); the operator judges each difference against a
-   re-alignment they can account for. Hard stop for any |Δ| ≥ 82 ticks — the half-tooth
-   ceiling (81.92): beyond it the difference is a different spline tooth, not noise.
-3. `@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION` →
-   `CALIBRATION_Q0_PROMOTE=OK admitted=12/12 source=CURRENT_BOOT_CAPTURE capture_session=<n>`.
-   The promoted `q0_tick` of every joint is the fresh capture's tick (the numbers compared in
-   step 2), acceptance is the unchanged CR3 rule (≥ 9 samples, spread ≤ 16, |tick − 2048| ≤ 80,
-   identity/bus/Geometry V5 bound) and any single bad candidate refuses all twelve
-   (`REASON=REJECT_CANDIDATE|REJECT_PROMOTION|REJECT_RECORD_DUPLICATE`, `FAILED_RECORD_INDEX`).
-   Refusals: `REASON=NOT_IN_MAINTENANCE_MODE`, `REJECT_FRESH_CAPTURE_NOT_COMPLETE` (no finished
-   12/12 capture in this boot), `REJECT_CAPTURE_POPULATION_NOT_PASS`; `BUSY` with
-   `CAPTURE_STILL_ACTIVE` or `CALIBRATION_SESSION_OR_MOTION_ACTIVE`.
-4. Re-capturing and promoting again is allowed between legs' sessions: the new promotion
-   **replaces** the previous q0 of the same twelve joints (RAM only; nothing is appended and
-   nothing is written to a servo). A completed capture that has not been promoted, or that was
-   superseded by a newer promotion, makes `SESSION START` refuse with
-   `REASON=CURRENT_BOOT_Q0_NOT_PROMOTED hint=@CALIBRATION_Q0_PROMOTE`. All four legs of one
-   evening run on ONE capture and ONE promotion.
+   **Hard stop at any |Δ| ≥ 82** (half a spline tooth). Then `Q0 PROMOTE` → `admitted=12/12
+   source=CURRENT_BOOT_CAPTURE`, `transforms_admitted=12 geometry_bound=YES`. The promoted
+   **fresh** q0 is authoritative from here on; CR2-C is only this plausibility reference, and 2048
+   is never a q0.
 
-### 2. Per-leg cycle (LF, then RF, then RH, then LH — never concurrently)
+   **R2 reach report (read-only, before any GO).** From the promoted LF UPPER q0, compute with the
+   production resolver:
+   - the LF UPPER MIN corridor (canonical contact, URDF limit, entry, guard);
+   - the coarse-scout start depth, the deepest legal coarse target (the guard, via D10) and the
+     endpoint reach (guard − 18);
+   - the depth of the measured stop (raw 1468, 2026-09-30) and the predicted margin.
 
-For `<L>` in this order:
+   If the margin is < 0, **stop before Full Calibration** and keep the evidence; nothing is
+   widened. Recompute it after step 4 with the measured rest position of LF UPPER (bus 12).
 
-1. `@CALIBRATION SESSION START <L> CONFIRM_CURRENT_Q0` →
-   `CALIBRATION_SESSION=ACTIVE leg=<L> …`. It is refused while the previous leg's run is not
-   finalized, a session is live, a permit is active or authority is not NONE.
-2. `@CALIBRATION MOTION PERMIT GRANT 16 CONFIRM_FIRST_MOTION` → `CALIBRATION_MOTION_PERMIT=ACTIVE`.
-3. **LF only, once:** `@CALIBRATION MOTION DIRECTION_VERIFY LF_UPPER +16 CONFIRM_FIRST_MOTION`
-   (bus 12, +16 ticks). Wait for its own SAFE_OFF, then `@SERVO SAFE_OFF 12` →
-   `VERIFIED_OFF`. The command refuses in any other leg's session
-   (`REASON=ACTIVE_SESSION_IS_NOT_LF`). Nothing revokes the permit when it finishes; if step 4
-   nevertheless answers `NO_CURRENT_MOTION_PERMIT`, send the PERMIT GRANT again (it refuses with
-   `PERMIT_ALREADY_ACTIVE_REVOKE_FIRST` while one is still active — that is fine).
-4. `@CALIBRATION FULL LEG <L> CONFIRM_FULL_CALIBRATION` →
-   `CALIBRATION_FULL_LEG=ARMED leg=<L> joint=UPPER bus=<12|22|32|42> … auxiliary=<LH_UPPER|
-   RH_UPPER|NONE> aux_bus=<42|32|0>` — check the printed bus/aux against the matrix above.
-5. Poll `@CALIBRATION FULL LEG STATUS` until the run ends (many seconds). Then
-   `CALIBRATION_FULL_LEG_RESULT leg=<L> verdict=HARDWARE_CONTACT_CALIBRATED failure=NONE` prints
-   on its own. `FULL LEG ABORT` / `SESSION ABORT` are always allowed.
-6. Confirm the cleanup before the next leg:
-   - `@SERVO SAFE_OFF <primary>` (and `<aux>` for LF/RF) → `VERIFIED_OFF`;
-   - `@AUTHORITY STATUS` → owner NONE; `@CALIBRATION STATUS` → session COMPLETED (terminal);
-   - `@CALIBRATION FULL LEG STATUS` → `CALIBRATION_FULL_LEG_RECORD leg=<L> … verdict=
-     HARDWARE_CONTACT_CALIBRATED contact_calibrated=YES envelope_accepted=NO failure=NONE`.
+   **Encoder-direction table (read-only, before INITIAL RECOVERY).** Using the production
+   resolver from the promoted q0, print all 12 joints: the current-installation
+   `encoder_direction`, its source, the raw sense of −q (MIN side) and +q (MAX side), and every
+   corridor. The URDF `motorDirection` is never used. LF LOWER must read **MIN → RAW INCREASING**
+   (contact ≈ q0 + 1047) and **MAX → RAW DECREASING** (≈ q0 − 434). LF HIP +q (foot outward)
+   must read **RAW DECREASING**. If either differs, or any joint lacks a record, **stop**. During
+   LF LOWER MIN the shank must visibly move **forward**, toward the long ~92° excursion. If it
+   starts backward toward the short ~35° stop, abort at once.
+4. `--phase recover` — LF `SESSION START` + `PERMIT GRANT`, then `INITIAL RECOVERY LF`: the 12
+   targets must equal the promoted q0, and the run must end `verdict=PASS recovered=12/12`. Raw
+   positions printed before and after. **Stops here:** LF session + permit live, every joint
+   torque-off at q0, no Full-Leg motion yet.
+5. **The operator's GO** (physically present, robot supported, charger disconnected, envelope
+   clear, disconnect reachable).
+6. `--phase legs --confirm-operator-go` — LF runs in the ready session. After each leg the
+   cleanup is verified: SAFE_OFF 13/13, authority NONE, session COMPLETED,
+   `CALIBRATION_FULL_LEG_RECORD leg=<L> … contacts_accepted=6/6 contact_calibrated=YES …`, six
+   accepted contacts; the LF UPPER MIN contact must be +7…+39 past the canonical contact (the
+   stop found by hand on 2026-09-29). RF, RH, LH each get a new session, permit and a verified
+   INITIAL RECOVERY, then their Full-Leg run. Finally SAFE_OFF 13/13, authority NONE,
+   `EVIDENCE EXPORT` saved and verified:
+   `CALIBRATION_EVIDENCE_EXPORT=END legs_present=4 legs_contact_calibrated=4
+   legs_envelope_accepted=0 total_contacts_expected=24 total_contacts_accepted=24
+   all_contact_calibrated=1`, and for every leg `…_LEG … contacts_accepted=6 …`,
+   `…_LEG_CLOSE … failure=NONE … session_completed=1 permit_revoked=1 authority_released=1 …`
+   and six `…_CONTACT … recorded=1 measured=1 … witness_accepted=1`.
 
-A failed leg does not falsify the others: its record keeps `verdict=FAILED` with the reason, the
-session is terminal, permit and authority are released, and the next leg (or a retry of the
-same leg with a new `SESSION START` + `PERMIT GRANT`, `attempts` increments) is allowed once the
-operator has judged the failure.
+`--phase all` runs 1–6 in one invocation (both confirmations required).
 
-### 3. Close
+## Immediate stop
 
-1. `@SERVO SAFE_OFF <id>` for all 13 servos → 13/13 `VERIFIED_OFF`.
-2. `@CALIBRATION EVIDENCE EXPORT` (refused while a run is in flight). It prints, paced so the
-   USB CDC ring never drops a line: one `CALIBRATION_EVIDENCE_EXPORT=BEGIN … parameters_approved=0`,
-   then per leg `…_LEG`, `…_AUX`, three `…_Q0`, two `…_CONTACT`, three `…_ENVELOPE` and three
-   `…_LIMIT` lines, then `CALIBRATION_EVIDENCE_EXPORT=END legs_present=4
-   legs_contact_calibrated=4 legs_envelope_accepted=0 all_contact_calibrated=1`.
-3. Save the log with the export and the manifest. Only then power down.
+The runner does this itself on the first failed check: `FULL LEG ABORT`, `SESSION ABORT`,
+SAFE_OFF all 13, a read-only evidence export, no further leg, no retry. Stop conditions:
+- any q0 |Δ| ≥ 82 or a population/promotion not 12/12;
+- an `ARMED` plan (buses, park, 6 corridors, poses) that disagrees with the table above;
+- INITIAL RECOVERY not `PASS 12/12`, or targets that are not the promoted q0;
+- any leg not exactly 6/6 `HARDWARE_CONTACT_CALIBRATED`, or its cleanup not verified;
+- any SAFE_OFF not `VERIFIED_OFF`, a lost link (use the physical disconnect), a hung run
+  (watchdog);
+- anything physical that looks wrong: stop by hand, first.
 
-Four-leg acceptance = `END` line above, all four `…_LEG` lines `verdict=HARDWARE_CONTACT_CALIBRATED
-session_completed=1 permit_revoked=1 authority_released=1`, and 13/13 `VERIFIED_OFF`.
-
-## Immediate stop (send `@CALIBRATION FULL LEG ABORT`, `@CALIBRATION SESSION ABORT`, then
-## `@SERVO SAFE_OFF` on every servo)
-
-- q0 mismatch versus CR2-C the operator cannot account for, or any |Δ| ≥ 82 ticks; population ≠ 12/12;
-  `Q0 PROMOTE` not `admitted=12/12 source=CURRENT_BOOT_CAPTURE`;
-- identity or Geometry V5 mismatch (`REASON=FULL_LEG_PLAN_…`, `CANONICAL_IDENTITY_MISMATCH`);
-- any SAFE_OFF not `VERIFIED_OFF`;
-- permit/session mismatch (`NO_ACTIVE_<LEG>_CALIBRATION_SESSION`, `SESSION_LEG_MISMATCH`);
-- contact failure, stale telemetry, comms loss or deadman trip (`verdict=FAILED`);
-- envelope build failure (`UPPER_ENVELOPE_NOT_READY`) or any admission failure;
-- cleanup not clean: `authority_released=0` / `permit_revoked=0` / `session_completed=0`.
-
-Do not continue to the next leg after a stop without an explicit decision.
+Known risk R1: V25's LF HIP MAX contact sat exactly on the corridor entry. A slightly shallower
+stop fails `HIP_MAX_PROBE_FAILED` / `EARLY_STALL_OUTSIDE_CORRIDOR` after 5/6. Report it with the
+evidence; no software change before the measured stop is reviewed.

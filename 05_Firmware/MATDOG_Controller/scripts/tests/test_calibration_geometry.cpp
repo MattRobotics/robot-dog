@@ -20,6 +20,8 @@
 
 #include "../../src/actuator/ActuatorWritePolicy.h"
 #include "../../src/actuator/CalibrationGeometryProfileData.h"
+#include "../../src/actuator/CalibrationSequencePlanData.h"
+#include "../../src/actuator/CalibrationTargetResolver.h"
 
 using namespace matdog;
 using namespace matdog::actuator;
@@ -322,7 +324,7 @@ static void test_joints_are_keyed_by_current_physical_unit() {
       CHECK_EQ(got->bus_id, want.bus_id);
       // The URDF's motorId and the allocation's bus id agree for all twelve -
       // the exporter refuses to emit a table where they do not.
-      CHECK(got->urdf_motor_direction == 1 || got->urdf_motor_direction == -1);
+      CHECK(got->encoder_direction == 1 || got->encoder_direction == -1);
       // PositionOffset is 0 on every unit, so the provisioned raw centre is
       // within one tick of 2048. A PRIOR about mounting, never a q0.
       CHECK(got->provisioned_center_raw >= 2047 && got->provisioned_center_raw <= 2049);
@@ -866,7 +868,7 @@ static void test_the_profile_carries_no_lf_v25_numeric_evidence() {
     CHECK(j.provisioned_center_raw != 2074);
     // The URDF motorDirection is specification data the profile carries for
     // comparison. It is never a transform's direction: those start at 0.
-    CHECK(j.urdf_motor_direction == 1 || j.urdf_motor_direction == -1);
+    CHECK(j.encoder_direction == 1 || j.encoder_direction == -1);
   }
   JointTransform fresh{};
   CHECK_EQ(fresh.q0_tick, 0);
@@ -917,7 +919,7 @@ static void test_a_same_type_replacement_invalidates_q0_and_keeps_direction() {
     const GeometryJointRecord& j = geometry_data::kJoints[i];
     const int8_t d = jointDirection(profile, j.identity);
     if (d == 1 || d == -1) ++resolved;
-    CHECK_EQ(d, j.urdf_motor_direction);
+    CHECK_EQ(d, j.encoder_direction);
   }
   CHECK_EQ(resolved, geometry_data::kJointCount);
 
@@ -1039,6 +1041,288 @@ static void test_calibration_authority_never_substitutes_for_motion_permit() {
   CHECK_DECISION(h.plan(c), WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT);
 }
 
+
+// ---------------------------------------------------------------------------
+// The 24-contact Full Calibration sequence: the second authorization object
+// ---------------------------------------------------------------------------
+
+using matdog::calibration::CalibrationPhase;
+
+static JointIdentity lfHip() { return identity(Leg::LF, JointKind::HIP, "M22"); }
+static JointIdentity rhHip() { return identity(Leg::RH, JointKind::HIP, "NEW06"); }
+static JointIdentity rhUpper2() { return identity(Leg::RH, JointKind::UPPER, "ELR02"); }
+
+struct SequenceHarness : Harness {
+  explicit SequenceHarness(bool bind_plan = true) {
+    if (bind_plan) policy.bindSequencePlan(&sequence_plan_data::kPlan);
+    for (const JointIdentity& j : {lfUpper(), lfLower(), lfHip(), lhUpper(), rhHip(), rhUpper2()}) {
+      policy.transforms().admit(acceptedTransform(j, 2048));
+    }
+  }
+  void sequence(Leg leg, CalibrationPhase phase, bool prerequisites = false, bool active = true) {
+    CalibrationBootstrapContext ctx = liveSession(lease.generation);
+    ctx.sequence_active = active;
+    ctx.sequence_leg = leg;
+    ctx.sequence_phase = phase;
+    ctx.sequence_prerequisites_verified = prerequisites;
+    policy.setBootstrapContext(ctx);
+  }
+};
+
+static ActuatorCommand seqMove(JointIdentity j, CalibrationPhase phase, SequenceMoveKind kind,
+                               MicroRad urad, uint16_t tick) {
+  ActuatorCommand c{};
+  c.operation = ActuatorOperation::CALIBRATION_SEQUENCE_MOVE;
+  c.joint = j;
+  c.sequence_move = kind;
+  c.sequence_phase = phase;
+  c.target_urad = urad;
+  c.target_tick = tick;
+  c.motion_profile = MotionProfile::CALIBRATION_SEARCH;
+  return c;
+}
+static ActuatorCommand seqLimit(JointIdentity j) {
+  ActuatorCommand c{};
+  c.operation = ActuatorOperation::CALIBRATION_TORQUE_LIMIT;
+  c.joint = j;
+  return c;
+}
+static ActuatorCommand torqueOn(JointIdentity j) {
+  ActuatorCommand c{};
+  c.operation = ActuatorOperation::TORQUE_ENABLE;
+  c.joint = j;
+  return c;
+}
+static ActuatorCommand seqProbe(JointIdentity j, Leg leg, JointKind kind, ContactSide side, uint16_t tick) {
+  ActuatorCommand c{};
+  c.operation = ActuatorOperation::CALIBRATION_CONTACT_PROBE;
+  c.joint = j;
+  c.endpoint_leg = leg;
+  c.endpoint_joint = kind;
+  c.endpoint_side = side;
+  c.target_tick = tick;
+  c.calibration_search = true;
+  c.motion_profile = MotionProfile::CALIBRATION_SEARCH;
+  return c;
+}
+
+static void test_sequence_operations_need_a_live_validated_sequence() {
+  g_case = "sequence: live, plan-bound, same model";
+  {
+    SequenceHarness h;
+    h.sequence(Leg::LF, CalibrationPhase::INITIAL_RECOVERY, false, /*active=*/false);
+    CHECK_DECISION(h.plan(seqMove(lfHip(), CalibrationPhase::INITIAL_RECOVERY,
+                                  SequenceMoveKind::TO_PLAN_TARGET, 0, 2048)),
+                   WriteDecision::REJECT_SEQUENCE_NOT_ACTIVE);
+    CHECK_DECISION(h.plan(seqLimit(lfHip())), WriteDecision::REJECT_SEQUENCE_NOT_ACTIVE);
+  }
+  {
+    SequenceHarness h(/*bind_plan=*/false);
+    h.sequence(Leg::LF, CalibrationPhase::INITIAL_RECOVERY);
+    CHECK_DECISION(h.plan(seqMove(lfHip(), CalibrationPhase::INITIAL_RECOVERY,
+                                  SequenceMoveKind::TO_PLAN_TARGET, 0, 2048)),
+                   WriteDecision::REJECT_NO_SEQUENCE_PLAN);
+  }
+  {
+    SequenceHarness h;
+    CalibrationSequencePlan other = sequence_plan_data::kPlan;
+    other.mesh_manifest_sha256 = "1111111111111111111111111111111111111111111111111111111111111111";
+    h.policy.bindSequencePlan(&other);
+    h.sequence(Leg::LF, CalibrationPhase::INITIAL_RECOVERY);
+    CHECK_DECISION(h.plan(seqLimit(lfHip())), WriteDecision::REJECT_NO_SEQUENCE_PLAN);
+    CalibrationSequencePlan unvalidated = sequence_plan_data::kPlan;
+    unvalidated.legs[static_cast<uint8_t>(Leg::LF)].geometry_validated = false;
+    h.policy.bindSequencePlan(&unvalidated);
+    CHECK_DECISION(h.plan(seqLimit(lfHip())), WriteDecision::REJECT_NO_SEQUENCE_PLAN);
+  }
+  {
+    // Without a live motion permit nothing CALIBRATION-owned passes, sequence or not.
+    SequenceHarness h;
+    CalibrationBootstrapContext ctx = liveSession(h.lease.generation);
+    ctx.motion_permit_active = false;
+    ctx.sequence_active = true;
+    ctx.sequence_phase = CalibrationPhase::INITIAL_RECOVERY;
+    h.policy.setBootstrapContext(ctx);
+    CHECK_DECISION(h.plan(seqLimit(lfHip())), WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT);
+  }
+}
+
+static void test_initial_recovery_is_q0_only_for_every_leg_joint() {
+  g_case = "sequence: INITIAL_RECOVERY";
+  SequenceHarness h;
+  h.sequence(Leg::LF, CalibrationPhase::INITIAL_RECOVERY);
+  // Any leg joint of the robot - even another leg's - may be primed near q0,
+  // limited, energized and returned to q=0 exactly.
+  for (const JointIdentity& j : {lfHip(), lfUpper(), rhHip()}) {
+    CHECK_DECISION(h.plan(seqMove(j, CalibrationPhase::INITIAL_RECOVERY,
+                                  SequenceMoveKind::PRIME_AT_PRESENT, 0, 2048 + 64)),
+                   WriteDecision::ACCEPT);
+    CHECK_DECISION(h.plan(seqMove(j, CalibrationPhase::INITIAL_RECOVERY,
+                                  SequenceMoveKind::PRIME_AT_PRESENT, 0, 2048 - 64)),
+                   WriteDecision::ACCEPT);
+    CHECK_DECISION(h.plan(seqMove(j, CalibrationPhase::INITIAL_RECOVERY,
+                                  SequenceMoveKind::PRIME_AT_PRESENT, 0, 2048 + 65)),
+                   WriteDecision::REJECT_SEQUENCE_PRIME);
+    CHECK_DECISION(h.plan(seqLimit(j)), WriteDecision::ACCEPT);
+    CHECK_DECISION(h.plan(torqueOn(j)), WriteDecision::ACCEPT);
+    CHECK_DECISION(h.plan(seqMove(j, CalibrationPhase::INITIAL_RECOVERY,
+                                  SequenceMoveKind::TO_PLAN_TARGET, 0, 2048)),
+                   WriteDecision::ACCEPT);
+    // The tick is re-derived, never trusted.
+    CHECK_DECISION(h.plan(seqMove(j, CalibrationPhase::INITIAL_RECOVERY,
+                                  SequenceMoveKind::TO_PLAN_TARGET, 0, 2049)),
+                   WriteDecision::REJECT_SEQUENCE_TARGET);
+    // Anywhere but q=0 is not a recovery.
+    CHECK_DECISION(h.plan(seqMove(j, CalibrationPhase::INITIAL_RECOVERY,
+                                  SequenceMoveKind::TO_PLAN_TARGET, 100000, 2048 + 65)),
+                   WriteDecision::REJECT_SEQUENCE_TARGET);
+  }
+  // A move kind of NONE, or one written in the name of another phase.
+  CHECK_DECISION(h.plan(seqMove(lfHip(), CalibrationPhase::INITIAL_RECOVERY, SequenceMoveKind::NONE, 0, 2048)),
+                 WriteDecision::REJECT_SEQUENCE_TARGET);
+  CHECK_DECISION(h.plan(seqMove(lfHip(), CalibrationPhase::UPPER_MIN, SequenceMoveKind::TO_PLAN_TARGET, 0, 2048)),
+                 WriteDecision::REJECT_SEQUENCE_PHASE);
+  // No transform: fail closed.
+  const JointIdentity lh_hip = identity(Leg::LH, JointKind::HIP, "M43");
+  CHECK(h.plan(seqMove(lh_hip, CalibrationPhase::INITIAL_RECOVERY, SequenceMoveKind::TO_PLAN_TARGET, 0, 2048)) !=
+        WriteDecision::ACCEPT);
+}
+
+static void test_each_phase_moves_only_its_own_joints_to_its_own_poses() {
+  g_case = "sequence: per-phase targets";
+  const SequenceLegPlan& lf = sequence_plan_data::kPlan.legs[static_cast<uint8_t>(Leg::LF)];
+  SequenceHarness h;
+  // UPPER_HORIZONTAL: the leg's UPPER to the V25 UPPER_90 pose, nothing else.
+  h.sequence(Leg::LF, CalibrationPhase::UPPER_HORIZONTAL);
+  CHECK_DECISION(h.plan(seqMove(lfUpper(), CalibrationPhase::UPPER_HORIZONTAL,
+                                SequenceMoveKind::TO_PLAN_TARGET, lf.upper_for_lower, 2048 + 1024)),
+                 WriteDecision::ACCEPT);
+  CHECK_DECISION(h.plan(seqMove(lfUpper(), CalibrationPhase::UPPER_HORIZONTAL,
+                                SequenceMoveKind::TO_PLAN_TARGET, lf.upper_for_lower, 2048 + 1023)),
+                 WriteDecision::REJECT_SEQUENCE_TARGET);
+  CHECK_DECISION(h.plan(seqMove(lfLower(), CalibrationPhase::UPPER_HORIZONTAL,
+                                SequenceMoveKind::TO_PLAN_TARGET, 0, 2048)),
+                 WriteDecision::REJECT_SEQUENCE_TARGET);
+  CHECK_DECISION(h.plan(seqMove(rhHip(), CalibrationPhase::UPPER_HORIZONTAL,
+                                SequenceMoveKind::TO_PLAN_TARGET, 0, 2048)),
+                 WriteDecision::REJECT_SEQUENCE_TARGET);  // not a participant
+  // Energizing is over: no prime, no TorqueLimit, no TorqueEnable here.
+  CHECK_DECISION(h.plan(seqMove(lfLower(), CalibrationPhase::UPPER_HORIZONTAL,
+                                SequenceMoveKind::PRIME_AT_PRESENT, 0, 2048)),
+                 WriteDecision::REJECT_SEQUENCE_PRIME);
+  CHECK_DECISION(h.plan(seqLimit(lfLower())), WriteDecision::REJECT_SEQUENCE_PRIME);
+  CHECK_DECISION(h.plan(torqueOn(rhHip())), WriteDecision::REJECT_SEQUENCE_PRIME);
+  // A plan pose outside the URDF domain is refused before the table.
+  CHECK_DECISION(h.plan(seqMove(lfUpper(), CalibrationPhase::UPPER_HORIZONTAL,
+                                SequenceMoveKind::TO_PLAN_TARGET, 3000000, 4000)),
+                 WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS);
+
+  // PARKING / RESTORE_PARKING: the rear UPPER of the front leg only.
+  h.sequence(Leg::LF, CalibrationPhase::PARKING);
+  CHECK_DECISION(h.plan(seqMove(lhUpper(), CalibrationPhase::PARKING, SequenceMoveKind::TO_PLAN_TARGET,
+                                lf.park_target, 2048 + 398)),
+                 WriteDecision::ACCEPT);
+  CHECK_DECISION(h.plan(seqMove(lfUpper(), CalibrationPhase::PARKING, SequenceMoveKind::TO_PLAN_TARGET,
+                                lf.park_target, 2048 + 398)),
+                 WriteDecision::REJECT_SEQUENCE_TARGET);
+  CHECK_DECISION(h.plan(seqLimit(lhUpper())), WriteDecision::ACCEPT);
+  CHECK_DECISION(h.plan(seqLimit(lfUpper())), WriteDecision::REJECT_SEQUENCE_PRIME);
+  h.sequence(Leg::LF, CalibrationPhase::RESTORE_PARKING);
+  CHECK_DECISION(h.plan(seqMove(lhUpper(), CalibrationPhase::RESTORE_PARKING,
+                                SequenceMoveKind::TO_PLAN_TARGET, 0, 2048)),
+                 WriteDecision::ACCEPT);
+
+  // HIP_MAX: LF's per-side clearance poses differ, so HIP -> 0 and UPPER ->
+  // the MAX pose are allowed; for RH they do not, and nothing moves there.
+  h.sequence(Leg::LF, CalibrationPhase::HIP_MAX);
+  CHECK_DECISION(h.plan(seqMove(lfHip(), CalibrationPhase::HIP_MAX, SequenceMoveKind::TO_PLAN_TARGET, 0, 2048)),
+                 WriteDecision::ACCEPT);
+  CHECK_DECISION(h.plan(seqMove(lfUpper(), CalibrationPhase::HIP_MAX, SequenceMoveKind::TO_PLAN_TARGET,
+                                lf.upper_for_hip_max, 2048 + 967)),
+                 WriteDecision::ACCEPT);
+  h.sequence(Leg::RH, CalibrationPhase::HIP_MAX);
+  CHECK_DECISION(h.plan(seqMove(rhHip(), CalibrationPhase::HIP_MAX, SequenceMoveKind::TO_PLAN_TARGET, 0, 2048)),
+                 WriteDecision::REJECT_SEQUENCE_TARGET);
+}
+
+static void test_sequence_probe_is_its_own_door() {
+  g_case = "sequence: probe";
+  SequenceHarness h;
+  CalibrationGeometryProfile profile = boundProfile();
+  CalibrationSearchCorridor c{};
+  CHECK(resolveCalibrationSearchCorridor(profile, geometry_data::kProvenance, acceptedTransform(lfHip(), 2048),
+                                         Leg::LF, JointKind::HIP, ContactSide::MIN_SIDE, &c) ==
+        TargetResolveStatus::OK);
+  const uint16_t inside = c.entry_tick;
+  const uint16_t past_guard = static_cast<uint16_t>(c.guard_tick + c.probe_sign);
+
+  // Outside a sequence, the V5 door refuses every HIP endpoint (DIAGNOSTIC).
+  CHECK(h.plan(seqProbe(lfHip(), Leg::LF, JointKind::HIP, ContactSide::MIN_SIDE, inside)) != WriteDecision::ACCEPT);
+
+  // Inside the sequence, only in HIP_MIN, only with the held set verified.
+  h.sequence(Leg::LF, CalibrationPhase::HIP_MIN, /*prerequisites=*/false);
+  CHECK_DECISION(h.plan(seqProbe(lfHip(), Leg::LF, JointKind::HIP, ContactSide::MIN_SIDE, inside)),
+                 WriteDecision::REJECT_SEQUENCE_PREREQUISITES);
+  h.sequence(Leg::LF, CalibrationPhase::HIP_MIN, true);
+  CHECK_DECISION(h.plan(seqProbe(lfHip(), Leg::LF, JointKind::HIP, ContactSide::MIN_SIDE, inside)),
+                 WriteDecision::ACCEPT);
+  CHECK_DECISION(h.plan(seqProbe(lfHip(), Leg::LF, JointKind::HIP, ContactSide::MIN_SIDE, c.guard_tick)),
+                 WriteDecision::ACCEPT);
+  CHECK_DECISION(h.plan(seqProbe(lfHip(), Leg::LF, JointKind::HIP, ContactSide::MIN_SIDE, past_guard)),
+                 WriteDecision::REJECT_CALIBRATION_SEARCH);
+  ActuatorCommand plain = seqProbe(lfHip(), Leg::LF, JointKind::HIP, ContactSide::MIN_SIDE, inside);
+  plain.calibration_search = false;
+  plain.motion_profile = MotionProfile::BOUNDED_DEFAULT;
+  CHECK_DECISION(h.plan(plain), WriteDecision::REJECT_CALIBRATION_SEARCH);
+  // The other side, another joint, another leg: not this phase's endpoint.
+  CHECK_DECISION(h.plan(seqProbe(lfHip(), Leg::LF, JointKind::HIP, ContactSide::MAX_SIDE, inside)),
+                 WriteDecision::REJECT_SEQUENCE_PHASE);
+  CHECK_DECISION(h.plan(seqProbe(lfUpper(), Leg::LF, JointKind::UPPER, ContactSide::MIN_SIDE, 2048 - 600)),
+                 WriteDecision::REJECT_SEQUENCE_PHASE);
+  CHECK_DECISION(h.plan(seqProbe(rhHip(), Leg::RH, JointKind::HIP, ContactSide::MIN_SIDE, inside)),
+                 WriteDecision::REJECT_SEQUENCE_NOT_ACTIVE);
+  // The joint must be the endpoint's own joint.
+  CHECK_DECISION(h.plan(seqProbe(lfLower(), Leg::LF, JointKind::HIP, ContactSide::MIN_SIDE, inside)),
+                 WriteDecision::REJECT_NO_ENDPOINT_PLAN);
+  // A non-probe phase admits no probe at all.
+  h.sequence(Leg::LF, CalibrationPhase::LOWER_FOLDED, true);
+  CHECK_DECISION(h.plan(seqProbe(lfHip(), Leg::LF, JointKind::HIP, ContactSide::MIN_SIDE, inside)),
+                 WriteDecision::REJECT_SEQUENCE_PHASE);
+  // Nothing else probes or parks while a sequence is live.
+  h.sequence(Leg::LF, CalibrationPhase::UPPER_MAX, true);
+  CHECK_DECISION(h.plan(auxiliary(lhUpper(), Leg::LF, JointKind::UPPER, ContactSide::MAX_SIDE, 610865)),
+                 WriteDecision::REJECT_SEQUENCE_TARGET);
+  CalibrationBootstrapContext dv = liveSession(h.lease.generation);
+  dv.direction_verify_tick_budget = 16;
+  dv.sequence_active = true;
+  dv.sequence_leg = Leg::LF;
+  dv.sequence_phase = CalibrationPhase::UPPER_MAX;
+  h.policy.setBootstrapContext(dv);
+  CHECK_DECISION(h.plan(directionVerify(lfUpper(), 16)), WriteDecision::REJECT_SEQUENCE_TARGET);
+}
+
+static void test_sequence_fields_cannot_leak_into_other_operations() {
+  g_case = "sequence: no leakage";
+  SequenceHarness h;
+  h.sequence(Leg::LF, CalibrationPhase::INITIAL_RECOVERY);
+  ActuatorCommand pos{};
+  pos.operation = ActuatorOperation::POSITION_COMMAND;
+  pos.joint = lfHip();
+  pos.target_tick = 2048;
+  pos.sequence_move = SequenceMoveKind::TO_PLAN_TARGET;
+  CHECK_DECISION(h.plan(pos), WriteDecision::REJECT_SEQUENCE_TARGET);
+  pos.sequence_move = SequenceMoveKind::NONE;
+  pos.motion_profile = MotionProfile::CALIBRATION_SEARCH;
+  CHECK_DECISION(h.plan(pos), WriteDecision::REJECT_MOTION_PROFILE);
+  ActuatorCommand lim = seqLimit(lfHip());
+  lim.sequence_move = SequenceMoveKind::PRIME_AT_PRESENT;
+  CHECK_DECISION(h.plan(lim), WriteDecision::REJECT_SEQUENCE_TARGET);
+  ActuatorCommand search = seqMove(lfHip(), CalibrationPhase::INITIAL_RECOVERY,
+                                   SequenceMoveKind::TO_PLAN_TARGET, 0, 2048);
+  search.calibration_search = true;  // the search flag belongs to the probe alone
+  CHECK_DECISION(h.plan(search), WriteDecision::REJECT_CALIBRATION_SEARCH);
+}
+
 int main() {
   std::printf("MATDOG calibration bootstrap geometry offline tests\n");
 
@@ -1070,6 +1354,12 @@ int main() {
   test_direction_verify_is_optional_and_never_required();
   test_plan_bound_moves_fail_closed_without_a_transform();
   test_reset_drops_the_session_and_the_transforms();
+
+  test_sequence_operations_need_a_live_validated_sequence();
+  test_initial_recovery_is_q0_only_for_every_leg_joint();
+  test_each_phase_moves_only_its_own_joints_to_its_own_poses();
+  test_sequence_probe_is_its_own_door();
+  test_sequence_fields_cannot_leak_into_other_operations();
 
   test_position_command_is_not_weakened_by_any_of_this();
   test_the_profile_carries_no_lf_v25_numeric_evidence();

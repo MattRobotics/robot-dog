@@ -1,5 +1,7 @@
 #include "ActuatorWritePolicy.h"
 
+#include "CalibrationTargetResolver.h"
+
 namespace matdog {
 namespace actuator {
 
@@ -26,8 +28,10 @@ bool operationNeedsTarget(ActuatorOperation operation) {
     case ActuatorOperation::CALIBRATION_CONTACT_PROBE:
     case ActuatorOperation::DIRECTION_VERIFY:
     case ActuatorOperation::CALIBRATION_AUXILIARY_MOVE:
+    case ActuatorOperation::CALIBRATION_SEQUENCE_MOVE:
       return true;
     case ActuatorOperation::TORQUE_ENABLE:
+    case ActuatorOperation::CALIBRATION_TORQUE_LIMIT:
     case ActuatorOperation::NONE:
       return false;
   }
@@ -48,6 +52,11 @@ bool operationUsesBootstrapEnvelope(ActuatorOperation operation) {
 bool operationUsesEndpointPlan(ActuatorOperation operation) {
   return operation == ActuatorOperation::CALIBRATION_CONTACT_PROBE ||
          operation == ActuatorOperation::CALIBRATION_AUXILIARY_MOVE;
+}
+
+bool operationUsesSequencePlan(ActuatorOperation operation) {
+  return operation == ActuatorOperation::CALIBRATION_SEQUENCE_MOVE ||
+         operation == ActuatorOperation::CALIBRATION_TORQUE_LIMIT;
 }
 
 bool operationPermittedForOwner(core::ActuatorAuthority owner, ActuatorOperation operation) {
@@ -211,6 +220,20 @@ void SafeActuatorPolicy::bindGeometry(const CalibrationGeometryProfile* profile,
   expected_provenance_ = expected_provenance;
 }
 
+void SafeActuatorPolicy::bindSequencePlan(const CalibrationSequencePlan* plan) {
+  sequence_plan_ = plan;
+}
+
+const SequenceLegPlan* SafeActuatorPolicy::liveSequenceLeg() const {
+  if (!bootstrap_.sequence_active) return nullptr;
+  if (sequence_plan_ == nullptr || expected_provenance_ == nullptr) return nullptr;
+  // A plan computed on another robot model is not evidence about this one.
+  if (!sequencePlanMatchesGeometry(*sequence_plan_, *expected_provenance_)) return nullptr;
+  const SequenceLegPlan* leg = findSequenceLeg(*sequence_plan_, bootstrap_.sequence_leg);
+  if (leg == nullptr || !leg->geometry_validated) return nullptr;
+  return leg;
+}
+
 void SafeActuatorPolicy::setBootstrapContext(const CalibrationBootstrapContext& context) {
   bootstrap_ = context;
 }
@@ -318,7 +341,18 @@ WriteDecision SafeActuatorPolicy::evaluateEndpointPlan(const ActuatorCommand& co
                               command.endpoint_side);
   if (endpoint == nullptr) return WriteDecision::REJECT_NO_ENDPOINT_PLAN;
 
-  // THE door, and the only one. Sixteen of the twenty-four canonical endpoints
+  // The 24-contact Full Calibration sequence answers to its own, geometry-
+  // validated authorization object (CalibrationSequencePlan.h), never to the
+  // V5 q=0-context door below. While a sequence is live nothing else may
+  // probe or park: the auxiliary class has no place in it.
+  if (bootstrap_.sequence_active) {
+    if (command.operation != ActuatorOperation::CALIBRATION_CONTACT_PROBE) {
+      return WriteDecision::REJECT_SEQUENCE_TARGET;
+    }
+    return evaluateSequenceProbe(command);
+  }
+
+  // THE door, and the only one outside the sequence. Sixteen of the twenty-four canonical endpoints
   // are DIAGNOSTIC - the mechanism contacts just beyond the declared URDF limit
   // - and eight of those still pass the 3 mm clearance policy. A clean
   // clearance on a diagnostic endpoint is not a permission to go there.
@@ -375,6 +409,32 @@ WriteDecision SafeActuatorPolicy::evaluateEndpointPlan(const ActuatorCommand& co
     return WriteDecision::REJECT_UNEXPECTED_PARKING;
   }
 
+  const JointTransform* transform = transforms_.find(command.joint, currentGeometryTag());
+
+  // A step of the staged endpoint search (2026-09-29): a raw tick bounded by
+  // the endpoint's calibration search corridor - never past URDF limit + 64
+  // on the probe side, never past the other side's URDF limit - re-derived
+  // here from the policy's own geometry and transform, never taken from the
+  // caller. The canonical contact and the URDF domain themselves are not
+  // widened for anything else.
+  if (command.calibration_search) {
+    if (transform == nullptr) {
+      return transforms_.findAny(command.joint) != nullptr
+                 ? WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH
+                 : WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
+    }
+    CalibrationSearchCorridor corridor{};
+    if (expected_provenance_ == nullptr ||
+        resolveCalibrationSearchCorridor(*geometry_, *expected_provenance_, *transform,
+                                         command.endpoint_leg, command.endpoint_joint,
+                                         command.endpoint_side, &corridor) !=
+            TargetResolveStatus::OK ||
+        !searchCorridorAdmits(corridor, command.target_tick)) {
+      return WriteDecision::REJECT_CALIBRATION_SEARCH;
+    }
+    return WriteDecision::ACCEPT;
+  }
+
   if (command.target_urad < moving->urdf_lower || command.target_urad > moving->urdf_upper) {
     return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
   }
@@ -386,12 +446,135 @@ WriteDecision SafeActuatorPolicy::evaluateEndpointPlan(const ActuatorCommand& co
     return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
   }
 
-  if (transforms_.find(command.joint, currentGeometryTag()) == nullptr) {
+  if (transform == nullptr) {
     return transforms_.findAny(command.joint) != nullptr
                ? WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH
                : WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
   }
   return WriteDecision::ACCEPT;
+}
+
+// One search step of the 24-contact sequence. Everything the V5 door checks
+// that is NOT specific to its q=0 context is checked here too: the endpoint
+// exists (the caller already found it), the probe moves the endpoint's own
+// joint, and the step lies inside the endpoint's calibration search corridor,
+// re-derived from the policy's own geometry and promoted transform. What the
+// sequence plan adds: the live phase must be exactly this endpoint's
+// measurement phase, the leg the sequence runs, and the phase's held
+// prerequisites verified.
+WriteDecision SafeActuatorPolicy::evaluateSequenceProbe(const ActuatorCommand& command) const {
+  const SequenceLegPlan* leg_plan = liveSequenceLeg();
+  if (leg_plan == nullptr) return WriteDecision::REJECT_NO_SEQUENCE_PLAN;
+  if (command.endpoint_leg != bootstrap_.sequence_leg) {
+    return WriteDecision::REJECT_SEQUENCE_NOT_ACTIVE;
+  }
+  calibration::JointKind phase_joint = calibration::JointKind::UPPER;
+  calibration::ContactSide phase_side = calibration::ContactSide::MIN_SIDE;
+  if (!sequenceProbeEndpoint(bootstrap_.sequence_phase, &phase_joint, &phase_side) ||
+      phase_joint != command.endpoint_joint || phase_side != command.endpoint_side) {
+    return WriteDecision::REJECT_SEQUENCE_PHASE;
+  }
+  const GeometryJointRecord* moving = geometry_->findJoint(command.joint);
+  if (moving == nullptr) return WriteDecision::REJECT_UNKNOWN_GEOMETRY_JOINT;
+  if (moving->identity.leg != command.endpoint_leg ||
+      moving->identity.joint != command.endpoint_joint) {
+    return WriteDecision::REJECT_NO_ENDPOINT_PLAN;
+  }
+  if (!bootstrap_.sequence_prerequisites_verified) {
+    return WriteDecision::REJECT_SEQUENCE_PREREQUISITES;
+  }
+  // A sequence probe is a staged search step and nothing else.
+  if (!command.calibration_search) return WriteDecision::REJECT_CALIBRATION_SEARCH;
+
+  const JointTransform* transform = transforms_.find(command.joint, currentGeometryTag());
+  if (transform == nullptr) {
+    return transforms_.findAny(command.joint) != nullptr
+               ? WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH
+               : WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
+  }
+  CalibrationSearchCorridor corridor{};
+  if (resolveCalibrationSearchCorridor(*geometry_, *expected_provenance_, *transform,
+                                       command.endpoint_leg, command.endpoint_joint,
+                                       command.endpoint_side, &corridor) !=
+          TargetResolveStatus::OK ||
+      !searchCorridorAdmits(corridor, command.target_tick)) {
+    return WriteDecision::REJECT_CALIBRATION_SEARCH;
+  }
+  return WriteDecision::ACCEPT;
+}
+
+// CALIBRATION_SEQUENCE_MOVE and CALIBRATION_TORQUE_LIMIT. See
+// CalibrationSequencePlan.h for the one phase table both this and the
+// executor read; nothing here trusts the caller's own view of it beyond
+// requiring that it agrees with the bootstrap context.
+WriteDecision SafeActuatorPolicy::evaluateSequenceOperation(const ActuatorCommand& command) const {
+  if (!bootstrap_.sequence_active) return WriteDecision::REJECT_SEQUENCE_NOT_ACTIVE;
+  const SequenceLegPlan* leg_plan = liveSequenceLeg();
+  if (leg_plan == nullptr) return WriteDecision::REJECT_NO_SEQUENCE_PLAN;
+
+  const GeometryJointRecord* moving = geometry_->findJoint(command.joint);
+  if (moving == nullptr) return WriteDecision::REJECT_UNKNOWN_GEOMETRY_JOINT;
+  const calibration::CalibrationPhase phase = bootstrap_.sequence_phase;
+  // Outside INITIAL_RECOVERY only the calibrated leg and its rear park joint
+  // take part; every other joint stays torque-off and untouched.
+  if (phase != calibration::CalibrationPhase::INITIAL_RECOVERY &&
+      !sequenceParticipant(*leg_plan, moving->identity)) {
+    return WriteDecision::REJECT_SEQUENCE_TARGET;
+  }
+  const JointTransform* transform = transforms_.find(command.joint, currentGeometryTag());
+  if (transform == nullptr) {
+    return transforms_.findAny(command.joint) != nullptr
+               ? WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH
+               : WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
+  }
+
+  if (command.operation == ActuatorOperation::CALIBRATION_TORQUE_LIMIT) {
+    if (command.sequence_move != SequenceMoveKind::NONE) {
+      return WriteDecision::REJECT_SEQUENCE_TARGET;
+    }
+    return sequenceEnergizeAllowed(*leg_plan, phase, moving->identity)
+               ? WriteDecision::ACCEPT
+               : WriteDecision::REJECT_SEQUENCE_PRIME;
+  }
+
+  // --- CALIBRATION_SEQUENCE_MOVE --------------------------------------------
+  if (command.sequence_phase != phase) return WriteDecision::REJECT_SEQUENCE_PHASE;
+  switch (command.sequence_move) {
+    case SequenceMoveKind::PRIME_AT_PRESENT: {
+      // The V25 prepare_motor() GoalPosition := present, torque still OFF.
+      // Only where the phase first energizes that joint, and only near q0.
+      if (!sequenceEnergizeAllowed(*leg_plan, phase, moving->identity)) {
+        return WriteDecision::REJECT_SEQUENCE_PRIME;
+      }
+      if (command.target_tick >= 4096) return WriteDecision::REJECT_SEQUENCE_PRIME;
+      int32_t distance = static_cast<int32_t>(command.target_tick) -
+                         static_cast<int32_t>(transform->q0_tick);
+      if (distance < 0) distance = -distance;
+      if (distance > static_cast<int32_t>(kSequencePrimeMaxDistanceTicks)) {
+        return WriteDecision::REJECT_SEQUENCE_PRIME;
+      }
+      return WriteDecision::ACCEPT;
+    }
+    case SequenceMoveKind::TO_PLAN_TARGET: {
+      if (command.target_urad < moving->urdf_lower || command.target_urad > moving->urdf_upper) {
+        return WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS;
+      }
+      if (!sequencePlanTargetAllowed(*leg_plan, phase, moving->identity, command.target_urad)) {
+        return WriteDecision::REJECT_SEQUENCE_TARGET;
+      }
+      // The tick itself is re-derived here, never taken from the caller.
+      uint16_t expected_tick = 0;
+      if (resolveUrdfQToRaw(*geometry_, *expected_provenance_, *transform, command.target_urad,
+                            &expected_tick) != TargetResolveStatus::OK ||
+          expected_tick != command.target_tick) {
+        return WriteDecision::REJECT_SEQUENCE_TARGET;
+      }
+      return WriteDecision::ACCEPT;
+    }
+    case SequenceMoveKind::NONE:
+      return WriteDecision::REJECT_SEQUENCE_TARGET;
+  }
+  return WriteDecision::REJECT_SEQUENCE_TARGET;
 }
 
 WriteDecision SafeActuatorPolicy::evaluate(const ActuatorCommand& command,
@@ -402,6 +585,27 @@ WriteDecision SafeActuatorPolicy::evaluate(const ActuatorCommand& command,
   if (arbiter_ == nullptr) return WriteDecision::REJECT_NO_ARBITER;
 
   if (!isCommandOperation(command.operation)) return WriteDecision::REJECT_UNKNOWN_OPERATION;
+
+  // The calibration search corridor and the calibration speed profile exist
+  // for the calibration moves alone. Checked before anything else can accept,
+  // so no route - accepted limits, bootstrap envelope, a future stand/gait
+  // POSITION_COMMAND - can ever carry either.
+  if (command.calibration_search &&
+      command.operation != ActuatorOperation::CALIBRATION_CONTACT_PROBE) {
+    return WriteDecision::REJECT_CALIBRATION_SEARCH;
+  }
+  if (command.motion_profile != MotionProfile::BOUNDED_DEFAULT &&
+      !(command.motion_profile == MotionProfile::CALIBRATION_SEARCH &&
+        (command.operation == ActuatorOperation::CALIBRATION_CONTACT_PROBE ||
+         command.operation == ActuatorOperation::CALIBRATION_AUXILIARY_MOVE ||
+         command.operation == ActuatorOperation::CALIBRATION_SEQUENCE_MOVE))) {
+    return WriteDecision::REJECT_MOTION_PROFILE;
+  }
+  // A sequence move kind belongs to CALIBRATION_SEQUENCE_MOVE alone.
+  if (command.sequence_move != SequenceMoveKind::NONE &&
+      command.operation != ActuatorOperation::CALIBRATION_SEQUENCE_MOVE) {
+    return WriteDecision::REJECT_SEQUENCE_TARGET;
+  }
 
   // A bus id is an address, not an identity (CalibrationDomain.h): after the
   // 2026-08-27 reassembly, the slot alone no longer says which servo answers.
@@ -465,12 +669,32 @@ WriteDecision SafeActuatorPolicy::evaluate(const ActuatorCommand& command,
   }
 
   if (operationUsesBootstrapEnvelope(command.operation) ||
-      operationUsesEndpointPlan(command.operation)) {
+      operationUsesEndpointPlan(command.operation) ||
+      operationUsesSequencePlan(command.operation)) {
     const WriteDecision preconditions = geometryPreconditions();
     if (preconditions != WriteDecision::ACCEPT) return preconditions;
+    if (operationUsesSequencePlan(command.operation)) return evaluateSequenceOperation(command);
+    // The optional direction diagnostic has no place inside a sequence.
+    if (bootstrap_.sequence_active && operationUsesBootstrapEnvelope(command.operation)) {
+      return WriteDecision::REJECT_SEQUENCE_TARGET;
+    }
     return operationUsesBootstrapEnvelope(command.operation)
                ? evaluateBootstrapEnvelope(command)
                : evaluateEndpointPlan(command);
+  }
+
+  // While a sequence is live, torque may be applied only to a joint the live
+  // phase energizes - never to a bystander (V25: every non-participating
+  // joint stays torque-off and is monitored for drift).
+  if (command.operation == ActuatorOperation::TORQUE_ENABLE && bootstrap_.sequence_active) {
+    const SequenceLegPlan* leg_plan = liveSequenceLeg();
+    if (leg_plan == nullptr) return WriteDecision::REJECT_NO_SEQUENCE_PLAN;
+    if (geometry_ == nullptr) return WriteDecision::REJECT_NO_GEOMETRY_PROFILE;
+    const GeometryJointRecord* moving = geometry_->findJoint(command.joint);
+    if (moving == nullptr) return WriteDecision::REJECT_UNKNOWN_GEOMETRY_JOINT;
+    if (!sequenceEnergizeAllowed(*leg_plan, bootstrap_.sequence_phase, moving->identity)) {
+      return WriteDecision::REJECT_SEQUENCE_PRIME;
+    }
   }
 
   return WriteDecision::ACCEPT;
@@ -595,6 +819,8 @@ const char* toString(ActuatorOperation operation) {
     case ActuatorOperation::CALIBRATION_CONTACT_PROBE: return "CALIBRATION_CONTACT_PROBE";
     case ActuatorOperation::DIRECTION_VERIFY:           return "DIRECTION_VERIFY";
     case ActuatorOperation::CALIBRATION_AUXILIARY_MOVE: return "CALIBRATION_AUXILIARY_MOVE";
+    case ActuatorOperation::CALIBRATION_SEQUENCE_MOVE:  return "CALIBRATION_SEQUENCE_MOVE";
+    case ActuatorOperation::CALIBRATION_TORQUE_LIMIT:   return "CALIBRATION_TORQUE_LIMIT";
   }
   return "UNKNOWN";
 }
@@ -638,6 +864,24 @@ const char* toString(WriteDecision decision) {
       return "REJECT_EVIDENCE_GEOMETRY_MISMATCH";
     case WriteDecision::REJECT_NO_CALIBRATION_MOTION_PERMIT:
       return "REJECT_NO_CALIBRATION_MOTION_PERMIT";
+    case WriteDecision::REJECT_CALIBRATION_SEARCH:
+      return "REJECT_CALIBRATION_SEARCH";
+    case WriteDecision::REJECT_MOTION_PROFILE:
+      return "REJECT_MOTION_PROFILE";
+    case WriteDecision::REJECT_NO_SEQUENCE_PLAN:       return "REJECT_NO_SEQUENCE_PLAN";
+    case WriteDecision::REJECT_SEQUENCE_NOT_ACTIVE:    return "REJECT_SEQUENCE_NOT_ACTIVE";
+    case WriteDecision::REJECT_SEQUENCE_PHASE:         return "REJECT_SEQUENCE_PHASE";
+    case WriteDecision::REJECT_SEQUENCE_TARGET:        return "REJECT_SEQUENCE_TARGET";
+    case WriteDecision::REJECT_SEQUENCE_PRIME:         return "REJECT_SEQUENCE_PRIME";
+    case WriteDecision::REJECT_SEQUENCE_PREREQUISITES: return "REJECT_SEQUENCE_PREREQUISITES";
+  }
+  return "UNKNOWN";
+}
+
+const char* toString(MotionProfile profile) {
+  switch (profile) {
+    case MotionProfile::BOUNDED_DEFAULT:    return "BOUNDED_DEFAULT";
+    case MotionProfile::CALIBRATION_SEARCH: return "CALIBRATION_SEARCH";
   }
   return "UNKNOWN";
 }

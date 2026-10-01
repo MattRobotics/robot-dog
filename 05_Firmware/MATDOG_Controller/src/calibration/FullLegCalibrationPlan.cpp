@@ -8,18 +8,35 @@ namespace calibration {
 
 namespace {
 
-// Half of a signed micro-radian value, rounded toward zero. The result is
-// never farther from q=0 than the input, so the rule cannot overshoot the
-// contact by rounding.
-actuator::MicroRad halfTowardZero(actuator::MicroRad value) { return value / 2; }
-
-int64_t absTicksBetween(uint16_t a, uint16_t b) {
-  const int64_t d = static_cast<int64_t>(a) - static_cast<int64_t>(b);
-  return d < 0 ? -d : d;
-}
-
 bool sameJoint(const JointIdentity& a, const JointIdentity& b) {
   return a.leg == b.leg && a.joint == b.joint;
+}
+
+// Resolves one joint the run touches: canonical identity/bus (cross-checked
+// against Geometry V5) and its current promoted q0.
+FullLegPlanStatus resolveRunJoint(const actuator::CalibrationGeometryProfile& profile,
+                                  const actuator::JointTransformTable& transforms, Leg leg,
+                                  JointKind kind, FullLegJointRef* ref, FullLegJoint* out) {
+  const FullLegPlanStatus s = resolveLegJoint(profile, leg, kind, ref);
+  if (s != FullLegPlanStatus::OK) return s;
+  const actuator::JointTransform* t = transforms.find(ref->identity, profile.provenanceTag());
+  if (t == nullptr || !t->present) return FullLegPlanStatus::REJECT_NO_TRANSFORM;
+  out->identity = ref->identity;
+  out->bus_id = ref->bus_id;
+  out->q0_tick = t->q0_tick;
+  return FullLegPlanStatus::OK;
+}
+
+FullLegPlanStatus resolveTick(const actuator::CalibrationGeometryProfile& profile,
+                              const actuator::GeometryProvenance& provenance,
+                              const actuator::JointTransformTable& transforms,
+                              const JointIdentity& joint, actuator::MicroRad q, uint16_t* tick) {
+  const actuator::JointTransform* t = transforms.find(joint, profile.provenanceTag());
+  if (t == nullptr || !t->present) return FullLegPlanStatus::REJECT_NO_TRANSFORM;
+  return actuator::resolveUrdfQToRaw(profile, provenance, *t, q, tick) ==
+                 actuator::TargetResolveStatus::OK
+             ? FullLegPlanStatus::OK
+             : FullLegPlanStatus::REJECT_TARGET_RESOLUTION;
 }
 
 }  // namespace
@@ -58,56 +75,11 @@ FullLegPlanStatus resolveLegJoint(const actuator::CalibrationGeometryProfile& pr
   return FullLegPlanStatus::OK;
 }
 
-FullLegPlanStatus deriveBackoffUrad(const actuator::CalibrationGeometryProfile& profile,
-                                    const actuator::GeometryProvenance& expected_provenance,
-                                    const actuator::JointTransform& transform,
-                                    const actuator::GeometryEndpointRecord& endpoint,
-                                    uint16_t repeatability_tolerance_ticks,
-                                    actuator::MicroRad* backoff_urad_out) {
-  if (backoff_urad_out == nullptr) return FullLegPlanStatus::REJECT_NULL_OUTPUT;
-  *backoff_urad_out = 0;
-
-  const actuator::MicroRad contact = endpoint.contact;
-  const actuator::MicroRad clear = endpoint.clear;
-  const actuator::MicroRad backoff = halfTowardZero(contact);
-
-  // Same side as the contact and strictly between q=0 and it.
-  const bool positive = endpoint.side == ContactSide::MAX_SIDE;
-  if (positive) {
-    if (!(contact > 0 && backoff > 0 && backoff < contact)) return FullLegPlanStatus::REJECT_BACKOFF;
-    // Inside the region the geometry compiler proved clear on this side.
-    if (!(clear > 0 && backoff <= clear)) return FullLegPlanStatus::REJECT_BACKOFF;
-  } else {
-    if (!(contact < 0 && backoff < 0 && backoff > contact)) return FullLegPlanStatus::REJECT_BACKOFF;
-    if (!(clear < 0 && backoff >= clear)) return FullLegPlanStatus::REJECT_BACKOFF;
-  }
-
-  // Both points must survive the one checked URDF-q -> raw conversion.
-  uint16_t contact_raw = 0;
-  uint16_t backoff_raw = 0;
-  if (actuator::resolveUrdfQToRaw(profile, expected_provenance, transform, contact,
-                                  &contact_raw) != actuator::TargetResolveStatus::OK ||
-      actuator::resolveUrdfQToRaw(profile, expected_provenance, transform, backoff,
-                                  &backoff_raw) != actuator::TargetResolveStatus::OK) {
-    return FullLegPlanStatus::REJECT_TARGET_RESOLUTION;
-  }
-
-  // A re-approach shorter than a few repeatability tolerances proves nothing.
-  const int64_t minimum_travel = static_cast<int64_t>(repeatability_tolerance_ticks) *
-                                 static_cast<int64_t>(kFullLegMinReapproachToleranceMultiple);
-  if (repeatability_tolerance_ticks == 0 ||
-      absTicksBetween(contact_raw, backoff_raw) < minimum_travel) {
-    return FullLegPlanStatus::REJECT_BACKOFF;
-  }
-
-  *backoff_urad_out = backoff;
-  return FullLegPlanStatus::OK;
-}
-
 FullLegPlanStatus resolveFullLegPlan(const actuator::CalibrationGeometryProfile& profile,
                                      const actuator::GeometryProvenance& expected_provenance,
-                                     const actuator::JointTransformTable& transforms, Leg leg,
-                                     FullLegPlan* out) {
+                                     const actuator::JointTransformTable& transforms,
+                                     const actuator::CalibrationSequencePlan* sequence_plan,
+                                     Leg leg, FullLegPlan* out) {
   if (out == nullptr) return FullLegPlanStatus::REJECT_NULL_OUTPUT;
   *out = FullLegPlan{};
   if (!isKnownLeg(leg)) return FullLegPlanStatus::REJECT_UNKNOWN_LEG;
@@ -115,87 +87,113 @@ FullLegPlanStatus resolveFullLegPlan(const actuator::CalibrationGeometryProfile&
       profile.provenanceTag() == actuator::kNoGeometryProvenance) {
     return FullLegPlanStatus::REJECT_GEOMETRY_UNBOUND;
   }
+  if (sequence_plan == nullptr ||
+      !actuator::sequencePlanMatchesGeometry(*sequence_plan, expected_provenance)) {
+    return FullLegPlanStatus::REJECT_NO_SEQUENCE_PLAN;
+  }
+  const actuator::SequenceLegPlan* leg_plan = actuator::findSequenceLeg(*sequence_plan, leg);
+  if (leg_plan == nullptr) return FullLegPlanStatus::REJECT_NO_SEQUENCE_PLAN;
+  if (!leg_plan->geometry_validated) return FullLegPlanStatus::REJECT_SEQUENCE_NOT_VALIDATED;
 
   FullLegPlan plan{};
   plan.leg = leg;
+  FullLegCalibrationRequest& r = plan.request;
+  r.leg = leg;
+  r.repeatability_tolerance_ticks = kFullLegRepeatabilityToleranceTicks;
+  r.torque_limit = kFullLegCalibrationTorqueLimit;
 
-  FullLegPlanStatus s = resolveLegJoint(profile, leg, JointKind::UPPER, &plan.upper);
-  if (s != FullLegPlanStatus::OK) return s;
-  s = resolveLegJoint(profile, leg, JointKind::HIP, &plan.hip);
-  if (s != FullLegPlanStatus::OK) return s;
-  s = resolveLegJoint(profile, leg, JointKind::LOWER, &plan.lower);
+  FullLegJointRef* refs[kJointKindCount] = {&plan.hip, &plan.upper, &plan.lower};
+  for (uint8_t k = 0; k < kJointKindCount; ++k) {
+    const JointKind kind = static_cast<JointKind>(k);
+    FullLegPlanStatus s = resolveRunJoint(profile, transforms, leg, kind, refs[k], &r.joint[k]);
+    if (s != FullLegPlanStatus::OK) return s;
+    const actuator::GeometryJointRecord* record = profile.findJoint(r.joint[k].identity);
+    const int8_t direction = actuator::jointDirection(profile, r.joint[k].identity);
+    if (record == nullptr) return FullLegPlanStatus::REJECT_GEOMETRY_JOINT;
+    if (direction != 1 && direction != -1) return FullLegPlanStatus::REJECT_NO_DIRECTION;
+    r.direction[k] = direction;
+    r.urdf_lower[k] = record->urdf_lower;
+    r.urdf_upper[k] = record->urdf_upper;
+
+    const actuator::JointTransform* t = transforms.find(r.joint[k].identity, profile.provenanceTag());
+    for (uint8_t side = 0; side < kContactSideCount; ++side) {
+      const ContactSide cs = static_cast<ContactSide>(side);
+      if (profile.findEndpoint(leg, kind, cs) == nullptr) {
+        return FullLegPlanStatus::REJECT_ENDPOINT_MISSING;
+      }
+      const actuator::TargetResolveStatus cr = actuator::resolveCalibrationSearchCorridor(
+          profile, expected_provenance, *t, leg, kind, cs, &r.corridor[k][side]);
+      if (cr == actuator::TargetResolveStatus::REJECT_SEARCH_CORRIDOR) {
+        return FullLegPlanStatus::REJECT_SEARCH_CORRIDOR;
+      }
+      if (cr != actuator::TargetResolveStatus::OK) return FullLegPlanStatus::REJECT_TARGET_RESOLUTION;
+    }
+  }
+
+  // The prerequisite poses, as URDF q (the command) and resolved ticks (what
+  // a held joint's GoalPosition must read back).
+  const JointIdentity& upper = r.joint[static_cast<uint8_t>(JointKind::UPPER)].identity;
+  const JointIdentity& lower = r.joint[static_cast<uint8_t>(JointKind::LOWER)].identity;
+  r.upper_for_lower_urad = leg_plan->upper_for_lower;
+  r.upper_for_hip_min_urad = leg_plan->upper_for_hip_min;
+  r.upper_for_hip_max_urad = leg_plan->upper_for_hip_max;
+  r.lower_folded_urad = leg_plan->lower_folded;
+  FullLegPlanStatus s = resolveTick(profile, expected_provenance, transforms, upper,
+                                    r.upper_for_lower_urad, &r.upper_for_lower_tick);
+  if (s == FullLegPlanStatus::OK) {
+    s = resolveTick(profile, expected_provenance, transforms, upper, r.upper_for_hip_min_urad,
+                    &r.upper_for_hip_min_tick);
+  }
+  if (s == FullLegPlanStatus::OK) {
+    s = resolveTick(profile, expected_provenance, transforms, upper, r.upper_for_hip_max_urad,
+                    &r.upper_for_hip_max_tick);
+  }
+  if (s == FullLegPlanStatus::OK) {
+    s = resolveTick(profile, expected_provenance, transforms, lower, r.lower_folded_urad,
+                    &r.lower_folded_tick);
+  }
   if (s != FullLegPlanStatus::OK) return s;
 
-  const actuator::GeometryEndpointRecord* min_endpoint =
-      profile.findEndpoint(leg, JointKind::UPPER, ContactSide::MIN_SIDE);
-  const actuator::GeometryEndpointRecord* max_endpoint =
+  // A front leg parks its rear neighbour's UPPER for the whole sequence. The
+  // plan's park joint and pose must be exactly the auxiliary and parked pose
+  // Geometry V5 itself found for this leg's UPPER MAX path obstruction.
+  const actuator::GeometryEndpointRecord* upper_max =
       profile.findEndpoint(leg, JointKind::UPPER, ContactSide::MAX_SIDE);
-  if (min_endpoint == nullptr || max_endpoint == nullptr) {
-    return FullLegPlanStatus::REJECT_ENDPOINT_MISSING;
-  }
-  if (!actuator::isExecutable(*min_endpoint) || !actuator::isExecutable(*max_endpoint)) {
-    return FullLegPlanStatus::REJECT_ENDPOINT_NOT_EXECUTABLE;
-  }
-  // The executor parks an auxiliary for the MAX side only. A MIN side that
-  // needed one would be silently mis-run, so it is a refusal here.
-  if (min_endpoint->has_auxiliary ||
-      min_endpoint->parking != actuator::ParkingOutcome::NOT_NEEDED) {
-    return FullLegPlanStatus::REJECT_MIN_NEEDS_AUXILIARY;
-  }
-  // The compiler's outcome and the auxiliary record must tell one story.
-  const bool max_needs_auxiliary =
-      max_endpoint->parking == actuator::ParkingOutcome::FEASIBLE_1DOF_PLAN_FOUND;
-  if (max_needs_auxiliary != max_endpoint->has_auxiliary) {
-    return FullLegPlanStatus::REJECT_MAX_PLAN_INCONSISTENT;
-  }
-
-  const actuator::GeometryProvenanceTag tag = profile.provenanceTag();
-  const actuator::JointTransform* upper_transform = transforms.find(plan.upper.identity, tag);
-  if (upper_transform == nullptr || !upper_transform->present) {
-    return FullLegPlanStatus::REJECT_NO_TRANSFORM;
-  }
-
-  FullLegCalibrationRequest request{};
-  request.probe_joint = plan.upper.identity;
-  request.probe_bus_id = plan.upper.bus_id;
-  request.endpoint_leg = leg;
-  request.endpoint_joint = JointKind::UPPER;
-  request.min_repeatability_tolerance_ticks = kFullLegRepeatabilityToleranceTicks;
-  request.max_repeatability_tolerance_ticks = kFullLegRepeatabilityToleranceTicks;
-  request.min_approach_urad = min_endpoint->contact;
-  request.max_approach_urad = max_endpoint->contact;
-
-  s = deriveBackoffUrad(profile, expected_provenance, *upper_transform, *min_endpoint,
-                        kFullLegRepeatabilityToleranceTicks, &request.min_backoff_urad);
-  if (s != FullLegPlanStatus::OK) return s;
-  s = deriveBackoffUrad(profile, expected_provenance, *upper_transform, *max_endpoint,
-                        kFullLegRepeatabilityToleranceTicks, &request.max_backoff_urad);
-  if (s != FullLegPlanStatus::OK) return s;
-
-  request.auxiliary_required = max_needs_auxiliary;
-  if (max_needs_auxiliary) {
-    FullLegJointRef aux{};
-    s = resolveLegJoint(profile, max_endpoint->auxiliary_leg, max_endpoint->auxiliary_joint, &aux);
-    if (s != FullLegPlanStatus::OK) return FullLegPlanStatus::REJECT_AUXILIARY_IDENTITY;
-    if (sameJoint(aux.identity, plan.upper.identity) || aux.bus_id == plan.upper.bus_id) {
-      return FullLegPlanStatus::REJECT_AUXILIARY_IDENTITY;
+  const bool v5_parks = upper_max != nullptr && upper_max->has_auxiliary;
+  if (leg_plan->has_rear_park != v5_parks) return FullLegPlanStatus::REJECT_PARK_INCONSISTENT;
+  if (leg_plan->has_rear_park) {
+    if (leg_plan->park_leg != upper_max->auxiliary_leg ||
+        leg_plan->park_joint != upper_max->auxiliary_joint ||
+        leg_plan->park_target != upper_max->auxiliary_target || leg_plan->park_leg == leg) {
+      return FullLegPlanStatus::REJECT_PARK_INCONSISTENT;
     }
-    const actuator::JointTransform* aux_transform = transforms.find(aux.identity, tag);
-    if (aux_transform == nullptr || !aux_transform->present) {
-      return FullLegPlanStatus::REJECT_NO_TRANSFORM;
+    s = resolveRunJoint(profile, transforms, leg_plan->park_leg, leg_plan->park_joint, &plan.park,
+                        &r.park);
+    if (s != FullLegPlanStatus::OK) return s;
+    r.has_rear_park = true;
+    r.park_target_urad = leg_plan->park_target;
+    s = resolveTick(profile, expected_provenance, transforms, r.park.identity, r.park_target_urad,
+                    &r.park_target_tick);
+    if (s != FullLegPlanStatus::OK) return s;
+    for (uint8_t k = 0; k < kJointKindCount; ++k) {
+      if (sameJoint(r.park.identity, r.joint[k].identity) || r.park.bus_id == r.joint[k].bus_id) {
+        return FullLegPlanStatus::REJECT_PARK_INCONSISTENT;
+      }
     }
-    uint16_t aux_raw = 0;
-    if (actuator::resolveUrdfQToRaw(profile, expected_provenance, *aux_transform,
-                                    max_endpoint->auxiliary_target,
-                                    &aux_raw) != actuator::TargetResolveStatus::OK) {
-      return FullLegPlanStatus::REJECT_TARGET_RESOLUTION;
-    }
-    request.auxiliary_joint = aux.identity;
-    request.auxiliary_bus_id = aux.bus_id;
-    request.auxiliary_park_target_urad = max_endpoint->auxiliary_target;
   }
 
-  plan.request = request;
+  // Every leg joint of the robot: INITIAL_RECOVERY and bystander monitoring.
+  r.population_count = 0;
+  for (uint8_t l = 0; l < kLegCount; ++l) {
+    for (uint8_t k = 0; k < kJointKindCount; ++k) {
+      FullLegJointRef ref{};
+      s = resolveRunJoint(profile, transforms, static_cast<Leg>(l), static_cast<JointKind>(k), &ref,
+                          &r.population[r.population_count]);
+      if (s != FullLegPlanStatus::OK) return s;
+      ++r.population_count;
+    }
+  }
+
   *out = plan;
   return FullLegPlanStatus::OK;
 }
@@ -209,12 +207,12 @@ const char* toString(FullLegPlanStatus status) {
     case FullLegPlanStatus::REJECT_CANONICAL_IDENTITY: return "REJECT_CANONICAL_IDENTITY";
     case FullLegPlanStatus::REJECT_GEOMETRY_JOINT: return "REJECT_GEOMETRY_JOINT";
     case FullLegPlanStatus::REJECT_ENDPOINT_MISSING: return "REJECT_ENDPOINT_MISSING";
-    case FullLegPlanStatus::REJECT_ENDPOINT_NOT_EXECUTABLE: return "REJECT_ENDPOINT_NOT_EXECUTABLE";
-    case FullLegPlanStatus::REJECT_MIN_NEEDS_AUXILIARY: return "REJECT_MIN_NEEDS_AUXILIARY";
-    case FullLegPlanStatus::REJECT_MAX_PLAN_INCONSISTENT: return "REJECT_MAX_PLAN_INCONSISTENT";
-    case FullLegPlanStatus::REJECT_AUXILIARY_IDENTITY: return "REJECT_AUXILIARY_IDENTITY";
+    case FullLegPlanStatus::REJECT_NO_SEQUENCE_PLAN: return "REJECT_NO_SEQUENCE_PLAN";
+    case FullLegPlanStatus::REJECT_SEQUENCE_NOT_VALIDATED: return "REJECT_SEQUENCE_NOT_VALIDATED";
+    case FullLegPlanStatus::REJECT_PARK_INCONSISTENT: return "REJECT_PARK_INCONSISTENT";
     case FullLegPlanStatus::REJECT_NO_TRANSFORM: return "REJECT_NO_TRANSFORM";
-    case FullLegPlanStatus::REJECT_BACKOFF: return "REJECT_BACKOFF";
+    case FullLegPlanStatus::REJECT_NO_DIRECTION: return "REJECT_NO_DIRECTION";
+    case FullLegPlanStatus::REJECT_SEARCH_CORRIDOR: return "REJECT_SEARCH_CORRIDOR";
     case FullLegPlanStatus::REJECT_TARGET_RESOLUTION: return "REJECT_TARGET_RESOLUTION";
   }
   return "UNKNOWN";

@@ -89,6 +89,12 @@ LedFrame socBarFrame(uint8_t completed, uint8_t max_brightness) {
   return frame;
 }
 
+bool dalyAlarmBlocksChargingPresentation(const uint16_t alarms[4]) {
+  if (alarms == nullptr) return true;  // no words: nothing proves the charge is clean
+  return alarms[0] != 0 || alarms[1] != 0 || alarms[2] != 0 ||
+         (alarms[3] & static_cast<uint16_t>(~kDalyLedInformationalAlarm3Bits)) != 0;
+}
+
 LedPresentationState selectLedState(const LedStatusInputs& in) {
   return factsFor(in).presentation;
 }

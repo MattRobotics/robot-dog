@@ -66,6 +66,14 @@ enum class SafeOffResult : uint8_t {
 
 const char* toString(SafeOffResult result);
 
+// Which of the two reviewed WritePosEx speed/acceleration pairs a GoalPosition
+// uses - see ServoBus::kBoundedWrite* / kSearchEnvelope*. No other value is
+// ever written.
+enum class GoalMotionProfile : uint8_t {
+  BOUNDED = 0,
+  SEARCH_ENVELOPE = 1,
+};
+
 // Lean operational transport around the hardware-proven ST3215 / SCServo
 // path (05_Firmware/ST3215_Bench_Tools/Bench_QC_V6_1/matdog_servo_commissioning.ino,
 // SHA256 74656fb9187fd2024f8251276b49676d8be9c6455f542c49500cfb30d25630cd).
@@ -181,7 +189,56 @@ class ServoBus {
   // present_position, which lags behind a write by the joint's travel time).
   static constexpr uint16_t kBoundedWriteSpeed = 40;
   static constexpr uint8_t kBoundedWriteAcceleration = 10;
-  ServoWriteVerifyResult writeGoalPosition(int id, uint16_t target_tick);
+  // The LF V25 hardware-proven endpoint-search envelope (matdog.rs
+  // GOAL_SPEED=160, ACCELERATION=8, adopted there after supervised LF
+  // hardware passes). Only reachable as GoalMotionProfile::SEARCH_ENVELOPE;
+  // SafeActuatorPolicy grants that to its two endpoint-search moves alone
+  // (REJECT_MOTION_PROFILE everywhere else).
+  static constexpr uint16_t kSearchEnvelopeSpeed = 160;
+  static constexpr uint8_t kSearchEnvelopeAcceleration = 8;
+  ServoWriteVerifyResult writeGoalPosition(int id, uint16_t target_tick,
+                                           GoalMotionProfile profile);
+
+  // The reviewed RAM TorqueLimit (LF V25 hardware oracle, matdog.rs
+  // TORQUE_LIMIT = 500, "still only half of the ST3215 command range"). The
+  // actuator layer writes it, and reads it back, before a TorqueEnable - V25's
+  // prepare_motor() order. RAM register 48 only: the EEPROM Max Torque
+  // (register 16) is never touched, so a power cycle restores the unit's own
+  // value. It can only LOWER the output ceiling relative to the EEPROM
+  // default; the value is a compile-time constant and this primitive accepts
+  // no argument that could raise it. Verified by an independent readback of
+  // the register itself, like every other write.
+  static constexpr uint16_t kReviewedRamTorqueLimit = 500;
+  ServoWriteVerifyResult writeReviewedRamTorqueLimit(int id);
+
+  // Read-only control + feedback snapshot: the two contiguous RAM blocks the
+  // LF V25 oracle validated on EVERY observation (matdog.rs
+  // ensure_observation_safe / validate_lf_active_readback), in two bus
+  // transactions instead of readRuntimeState()'s eight:
+  //   40..49  TorqueEnable, GoalPosition, TorqueLimit
+  //   56..70  present position/speed/load/voltage/temperature, servo status
+  //           (register 65: the servo's own error flags), present current
+  // Speed/load/current are returned raw (direction bit included); callers
+  // take the magnitude. Returns false, and leaves every field -1, if either
+  // block does not answer within kOperationalTimeoutMs.
+  //
+  // Register 65 is the ST3215 "servo status" byte (voltage / sensor /
+  // temperature / current / angle / overload error flags) - the value V25
+  // required to be 0 on every sample. SMS_STS.h does not name it.
+  static constexpr int kServoStatusRegister = 65;
+  struct ControlFeedbackSnapshot {
+    int torque_enable = -1;
+    int goal_position = -1;
+    int torque_limit = -1;
+    int present_position = -1;
+    int present_speed = -1;
+    int present_load = -1;
+    int present_voltage = -1;
+    int present_temperature = -1;
+    int status = -1;
+    int present_current = -1;
+  };
+  bool readControlFeedback(int id, ControlFeedbackSnapshot* out);
 
   // Read-only runtime snapshot (present position/speed/load/voltage/temp).
   // Returns false if the servo does not answer within the bounded timeout.
@@ -207,6 +264,12 @@ class ServoBus {
     int present_current = -1;
   };
   bool readRuntimeState(int id, RuntimeState* out);
+
+  // ONE fresh, direct PresentTemperature read (register 63, 1 byte) - the LF
+  // V25 read_motor_temperature_direct() the runtime over-limit confirmation
+  // needs (calibration/ThermalConfirmation.h). Read-only; false and *out
+  // untouched if the servo does not answer.
+  bool readPresentTemperatureDirect(int id, int* celsius_out);
 
   // -------------------------------------------------------------------------
   // H0 preflight reads — READ-ONLY, no write path exists for any of them

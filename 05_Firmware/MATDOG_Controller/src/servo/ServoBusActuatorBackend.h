@@ -27,9 +27,26 @@ class ServoBusActuatorBackend final : public actuator::ActuatorBackend {
     return translate(bus_->enableTorqueOn(bus_id));
   }
 
-  actuator::BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick) override {
+  actuator::BackendWriteOutcome writeGoalPosition(uint8_t bus_id, uint16_t target_tick,
+                                                  actuator::MotionProfile profile) override {
     if (bus_ == nullptr) return actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
-    return translate(bus_->writeGoalPosition(bus_id, target_tick));
+    GoalMotionProfile goal_profile = GoalMotionProfile::BOUNDED;
+    switch (profile) {
+      case actuator::MotionProfile::BOUNDED_DEFAULT:
+        goal_profile = GoalMotionProfile::BOUNDED;
+        break;
+      case actuator::MotionProfile::CALIBRATION_SEARCH:
+        goal_profile = GoalMotionProfile::SEARCH_ENVELOPE;
+        break;
+      default:
+        return actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;  // write nothing
+    }
+    return translate(bus_->writeGoalPosition(bus_id, target_tick, goal_profile));
+  }
+
+  actuator::BackendWriteOutcome writeCalibrationTorqueLimit(uint8_t bus_id) override {
+    if (bus_ == nullptr) return actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
+    return translate(bus_->writeReviewedRamTorqueLimit(bus_id));
   }
 
  private:

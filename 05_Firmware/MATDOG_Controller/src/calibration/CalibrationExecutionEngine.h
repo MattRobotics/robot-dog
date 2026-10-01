@@ -10,15 +10,17 @@
 
 // The Calibration Execution boundary — I5, V3 handoff §13/§15.11.
 //
-// BINDING CONTRACT (V3 §15.11): LF V25's 18-phase hardware-execution
-// sequence (calibration::CalibrationPhase, CalibrationDomain.h) is an
-// IMMUTABLE HISTORICAL ORACLE. It is used for regression replay in
-// scripts/tests/test_calibration_domain.cpp and nowhere else. It is NOT
-// this architecture, it is NOT imported here, and nothing below references
-// CalibrationPhase. A future engine may reference it as a
-// behavioural-comparison oracle; it must never become the execution
-// architecture itself. See DEVELOPMENT_GATES.md's calibration gate for the
-// prior (now corrected) documentation that conflated the two.
+// BINDING CONTRACT (V3 §15.11), AS AMENDED 2026-09-30: V3 made LF V25's
+// 18-phase sequence (calibration::CalibrationPhase, CalibrationDomain.h) a
+// historical oracle only. The operator's 2026-09-30 scope correction (TRUE
+// Full Calibration = 24 contacts) superseded that: the V25 full-leg state
+// machine, generalized to all four legs, IS the production sequence now -
+// owned by FullLegCalibrationExecutor, not by this class. This engine still
+// sequences nothing and decides nothing per phase: it carries the
+// executor's current phase as an opaque label (sequence_phase) to the
+// policy, which checks it against its own bootstrap copy. static_audit.py
+// pins that the label is only ever declared and forwarded here, never
+// compared or switched on.
 //
 // Deliberately generic and intent-based instead: CalibrationIntent names
 // what the operator/session wants, not which of eighteen historical steps
@@ -92,6 +94,10 @@ enum class CalibrationIntent : uint8_t {
   DIRECTION_VERIFY = 3,  // -> ActuatorOperation::DIRECTION_VERIFY (optional diagnostic)
   RESTORE          = 4,  // intent only — never reaches the backend, by construction
   ABORT            = 5,  // lifecycle only — never reaches the backend, by construction
+  // -> ActuatorOperation::CALIBRATION_SEQUENCE_MOVE: a 24-contact Full
+  // Calibration sequence move (plan target of the live phase) or the V25
+  // GoalPosition prime at the present position. See CalibrationSequencePlan.h.
+  SEQUENCE_MOVE    = 6,
 };
 
 // The operation an intent maps to, or NONE for the two non-executing
@@ -139,6 +145,25 @@ struct CalibrationExecutionRequest {
   // CONTACT_PROBE / AUXILIARY_MOVE: requested URDF-frame target. The policy
   // still checks the endpoint, parking and contact-side safety constraints.
   actuator::MicroRad target_urad = 0;
+
+  // CONTACT_PROBE only: a raw-tick step of the staged endpoint search. The
+  // policy bounds `search_target_tick` by the endpoint's calibration search
+  // corridor (actuator::resolveCalibrationSearchCorridor); target_urad is not
+  // used. Any other intent carrying it is refused before the policy.
+  bool calibration_search = false;
+  uint16_t search_target_tick = 0;
+
+  // The GoalPosition speed envelope (actuator::MotionProfile). The policy
+  // refuses CALIBRATION_SEARCH outside the calibration moves.
+  actuator::MotionProfile motion_profile = actuator::MotionProfile::BOUNDED_DEFAULT;
+
+  // SEQUENCE_MOVE only. TO_PLAN_TARGET uses target_urad (resolved here by the
+  // checked resolver, re-derived again by the policy); PRIME_AT_PRESENT uses
+  // prime_tick, the joint's present position. Any other intent carrying a
+  // sequence move kind is refused before the policy.
+  actuator::SequenceMoveKind sequence_move = actuator::SequenceMoveKind::NONE;
+  CalibrationPhase sequence_phase = CalibrationPhase::PREFLIGHT;
+  uint16_t prime_tick = 0;
 };
 
 enum class CalibrationExecutionOutcome : uint8_t {

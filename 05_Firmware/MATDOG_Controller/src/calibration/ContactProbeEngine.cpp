@@ -3,6 +3,165 @@
 namespace matdog {
 namespace calibration {
 
+namespace {
+
+int32_t absDiff(int32_t a, int32_t b) { return a > b ? a - b : b - a; }
+
+// ST3215 speed/current registers carry direction in bit 15; the magnitude is
+// what V25's speed_magnitude() compared. -1 (not read) stays -1.
+int32_t magnitude(int32_t raw) { return raw < 0 ? -1 : (raw & 0x7FFF); }
+
+// V25 median(): sorted[len / 2].
+uint16_t medianOf(const uint16_t* values, uint8_t count) {
+  uint16_t sorted[kSearchBaselineMaxSamples] = {0};
+  for (uint8_t i = 0; i < count; ++i) {
+    uint16_t v = values[i];
+    uint8_t j = i;
+    while (j > 0 && sorted[j - 1] > v) {
+      sorted[j] = sorted[j - 1];
+      --j;
+    }
+    sorted[j] = v;
+  }
+  return sorted[count / 2];
+}
+
+// A sample is usable only with V25's whole per-observation readback: an
+// unread GoalPosition / TorqueLimit / status byte is not "fine", it is unknown.
+bool sampleUsable(const actuator::TelemetrySample& s) {
+  return s.read_ok && s.present_position >= 0 && s.present_position < 4096 &&
+         s.torque_enable >= 0 && s.present_speed >= 0 && s.present_current >= 0 &&
+         s.present_temperature >= 0 && s.goal_position >= 0 && s.torque_limit >= 0 &&
+         s.servo_status >= 0;
+}
+
+CalibrationExecutionContext toExecutionContext(const ContactProbeContext& context) {
+  CalibrationExecutionContext ctx{};
+  ctx.session_active = context.session_active;
+  ctx.origin = context.origin;
+  ctx.lease = context.lease;
+  ctx.mode = context.mode;
+  return ctx;
+}
+
+bool corridorUsable(const actuator::CalibrationSearchCorridor& c) {
+  if (!c.valid() || c.guard_tick >= 4096 || c.entry_tick >= 4096) return false;
+  const int32_t entry = actuator::searchDepth(c, c.entry_tick);
+  const int32_t contact = actuator::searchDepth(c, c.contact_tick);
+  const int32_t guard = actuator::searchDepth(c, c.guard_tick);
+  return entry > 0 && entry <= contact && contact <= guard;
+}
+
+}  // namespace
+
+uint16_t searchBaselineThreshold(uint16_t median_current, uint16_t mad_current) {
+  uint32_t margin = static_cast<uint32_t>(mad_current) * 4u;
+  if (margin < 5u) margin = 5u;
+  const uint32_t threshold = static_cast<uint32_t>(median_current) + margin;
+  return threshold > 0xFFFFu ? 0xFFFFu : static_cast<uint16_t>(threshold);
+}
+
+int32_t searchScoutLagTicks(const actuator::CalibrationSearchCorridor& corridor,
+                            uint16_t candidate, uint16_t scout) {
+  const int32_t lag = actuator::searchDepth(corridor, scout) - actuator::searchDepth(corridor, candidate);
+  return lag > 0 ? lag : 0;
+}
+
+bool searchFineContactReproducesScout(const actuator::CalibrationSearchCorridor& corridor,
+                                      uint16_t candidate, uint16_t scout) {
+  return searchScoutLagTicks(corridor, candidate, scout) <=
+         static_cast<int32_t>(kSearchFineScoutLagToleranceTicks);
+}
+
+int32_t searchAdaptiveAcceptanceEntryDepth(const actuator::CalibrationSearchCorridor& corridor,
+                                           uint16_t scout) {
+  const int32_t entry = actuator::searchDepth(corridor, corridor.entry_tick);
+  const int32_t adaptive = actuator::searchDepth(corridor, scout) - kSearchAdaptiveScoutTicks;
+  return adaptive < entry ? adaptive : entry;
+}
+
+bool SearchSettleGate::observe(uint16_t position, int32_t speed_magnitude, uint16_t target,
+                               uint32_t now_ms) {
+  const bool qualifies =
+      absDiff(position, target) <= static_cast<int32_t>(kSearchBackoffSettleToleranceTicks) &&
+      speed_magnitude >= 0 && speed_magnitude <= kSearchBackoffSettleMaxSpeedRaw;
+  if (!qualifies) {
+    reset();
+    return false;
+  }
+  if (consecutive_ < 255) ++consecutive_;
+  if (!has_first_) {
+    has_first_ = true;
+    first_ms_ = now_ms;
+  }
+  return consecutive_ >= kSearchBackoffSettledSamples &&
+         now_ms - first_ms_ >= kSearchBackoffSettleWindowMs;
+}
+
+// --- ContactSearchDetector (V25 HybridContactDetector::observe) -------------
+
+void ContactSearchDetector::begin(const actuator::CalibrationSearchCorridor& corridor,
+                                  uint16_t start_position, int32_t acceptance_entry_depth) {
+  corridor_ = corridor;
+  start_position_ = start_position;
+  previous_position_ = start_position;
+  acceptance_entry_depth_ = acceptance_entry_depth;
+  active_target_ = -1;
+  target_samples_seen_ = 0;
+  confirming_samples_ = 0;
+}
+
+ContactDetectorState ContactSearchDetector::observe(uint16_t position, int32_t speed_magnitude,
+                                                    uint16_t commanded_target) {
+  // A new target restarts the start-up count and the persistence run.
+  if (active_target_ != static_cast<int32_t>(commanded_target)) {
+    active_target_ = commanded_target;
+    target_samples_seen_ = 0;
+    previous_position_ = position;
+    confirming_samples_ = 0;
+    return ContactDetectorState::FREE_MOTION;
+  }
+  if (target_samples_seen_ < 255) ++target_samples_seen_;
+
+  const int32_t depth_now = actuator::searchDepth(corridor_, position);
+  const int32_t travel = depth_now - actuator::searchDepth(corridor_, start_position_);
+  const int32_t progress = depth_now - actuator::searchDepth(corridor_, previous_position_);
+  previous_position_ = position;
+
+  // An unread speed (-1) can never count as "low": fail closed toward FREE.
+  const bool low_velocity = speed_magnitude >= 0 && speed_magnitude <= kSearchMaxVelocityRaw;
+  const bool low_progress = progress <= static_cast<int32_t>(kSearchMaxProgressTicks);
+  const bool enough_travel = travel >= static_cast<int32_t>(kSearchMinContactTravelTicks);
+  const int32_t goal_error = absDiff(position, commanded_target);
+  const bool inside_acceptance =
+      depth_now >= acceptance_entry_depth_ &&
+      depth_now <= actuator::searchDepth(corridor_, corridor_.guard_tick);
+  const int32_t settle_tolerance = inside_acceptance ? kSearchStaticToleranceTicks
+                                                     : kSearchOutsideCorridorSettleToleranceTicks;
+  const bool target_ahead = actuator::searchDepth(corridor_, commanded_target) > depth_now;
+
+  if (goal_error <= settle_tolerance) {
+    confirming_samples_ = 0;
+    return ContactDetectorState::FREE_MOTION;
+  }
+  if (target_samples_seen_ <= kSearchTargetStartupSamples) {
+    confirming_samples_ = 0;
+    return ContactDetectorState::FREE_MOTION;
+  }
+  if (enough_travel && low_progress && low_velocity && target_ahead) {
+    if (confirming_samples_ < 255) ++confirming_samples_;
+    if (confirming_samples_ >= kSearchPersistenceSamples) {
+      return inside_acceptance ? ContactDetectorState::CONTACT_CONFIRMED
+                               : ContactDetectorState::EARLY_STALL;
+    }
+    return ContactDetectorState::CONTACT_SUSPECTED;
+  }
+  confirming_samples_ = 0;
+  return ContactDetectorState::FREE_MOTION;
+}
+
+// --- ContactProbeEngine -----------------------------------------------------
+
 void ContactProbeEngine::begin(actuator::SafeActuatorPolicy* policy,
                                actuator::ActuatorRuntime* runtime,
                                CalibrationExecutionEngine* engine,
@@ -21,13 +180,12 @@ void ContactProbeEngine::begin(actuator::SafeActuatorPolicy* policy,
 bool ContactProbeEngine::start(const ContactProbeRequest& request,
                                const ContactProbeContext& context, uint32_t now_ms) {
   (void)context;
-  (void)now_ms;
-
   if (active()) return false;
 
   if (policy_ == nullptr || runtime_ == nullptr || engine_ == nullptr || geometry_ == nullptr ||
       expected_provenance_ == nullptr || !request.joint.valid() ||
-      !request.joint.unitKnown() || request.repeatability_tolerance_ticks == 0) {
+      !request.joint.unitKnown() || request.repeatability_tolerance_ticks == 0 ||
+      request.expected_torque_limit == 0 || !corridorUsable(request.corridor)) {
     status_ = ContactProbeStatus{};
     status_.phase = ContactProbePhase::FAILED_NO_MOTION;
     status_.failure = ContactProbeFailure::REJECT_PRECONDITIONS;
@@ -36,29 +194,67 @@ bool ContactProbeEngine::start(const ContactProbeRequest& request,
 
   request_ = request;
   status_ = ContactProbeStatus{};
-  status_.phase = ContactProbePhase::TORQUE_ENABLE_PENDING;
-  status_.pass = 1;
+  status_.phase = request.start_torque_verified ? ContactProbePhase::BASELINE_PENDING
+                                                : ContactProbePhase::TORQUE_ENABLE_PENDING;
+  status_.pass = 0;
+  has_good_sample_ = false;
+  last_good_ms_ = now_ms;
+  started_ms_ = now_ms;
+  has_cadence_sample_ = false;
+  last_cadence_ms_ = 0;
+  last_cadence_position_ = -1;
+  step_written_ms_ = now_ms;
+  step_ticks_ = 0;
+  acceptance_entry_depth_ = 0;
+  baseline_started_ms_ = now_ms;
+  contact_tick_ = 0;
+  plateau_active_ = false;
+  plateau_samples_ = 0;
   return true;
 }
 
 void ContactProbeEngine::update(const ContactProbeContext& context, uint32_t now_ms,
                                 bool telemetry_available,
                                 const actuator::TelemetrySample& telemetry) {
+  if (!active()) return;
+
+  // Every usable sample is recorded whatever the phase, so a pass always
+  // starts from where the joint really is.
+  if (telemetry_available && sampleUsable(telemetry)) {
+    has_good_sample_ = true;
+    last_good_ms_ = now_ms;
+    status_.last_position = telemetry.present_position;
+    status_.last_speed = magnitude(telemetry.present_speed);
+    status_.last_current = magnitude(telemetry.present_current);
+  }
+
   switch (status_.phase) {
     case ContactProbePhase::TORQUE_ENABLE_PENDING:
-      stepTorqueEnable(context, now_ms);
+      stepTorqueEnable(context);
       return;
-    case ContactProbePhase::APPROACH_PENDING:
-      stepApproachPending(context, now_ms);
+    case ContactProbePhase::BASELINE_PENDING:
+      stepBaselineWrite(context, now_ms);
       return;
-    case ContactProbePhase::APPROACH_MONITORING:
-      stepApproachMonitoring(now_ms, telemetry_available, telemetry);
+    case ContactProbePhase::BASELINE_MONITORING:
+      stepBaselineMonitor(now_ms, telemetry_available, telemetry);
+      return;
+    case ContactProbePhase::STEP_PENDING:
+      stepWrite(context, now_ms);
+      return;
+    case ContactProbePhase::STEP_MONITORING:
+      stepMonitor(now_ms, telemetry_available, telemetry);
       return;
     case ContactProbePhase::BACKOFF_PENDING:
-      stepBackoffPending(context, now_ms);
+      stepBackoffWrite(context, now_ms);
       return;
     case ContactProbePhase::BACKOFF_MONITORING:
-      stepBackoffMonitoring(now_ms, telemetry_available, telemetry);
+      stepBackoffMonitor(now_ms, telemetry_available, telemetry);
+      return;
+    case ContactProbePhase::RELEASE_PENDING:
+      stepRelease(context);
+      return;
+    case ContactProbePhase::RELEASE_VERIFYING:
+      stepReleaseVerify(now_ms, telemetry_available, telemetry);
       return;
     case ContactProbePhase::IDLE:
     case ContactProbePhase::COMPLETE:
@@ -74,12 +270,15 @@ void ContactProbeEngine::abort() {
       finish(ContactProbePhase::FAILED_NO_MOTION, ContactProbeFailure::OPERATOR_ABORT,
             status_.last_policy_decision);
       return;
-    case ContactProbePhase::APPROACH_PENDING:
-    case ContactProbePhase::APPROACH_MONITORING:
+    case ContactProbePhase::BASELINE_PENDING:
+    case ContactProbePhase::BASELINE_MONITORING:
+    case ContactProbePhase::STEP_PENDING:
+    case ContactProbePhase::STEP_MONITORING:
     case ContactProbePhase::BACKOFF_PENDING:
     case ContactProbePhase::BACKOFF_MONITORING:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::OPERATOR_ABORT,
-            status_.last_policy_decision);
+    case ContactProbePhase::RELEASE_PENDING:
+    case ContactProbePhase::RELEASE_VERIFYING:
+      failSafeOff(ContactProbeFailure::OPERATOR_ABORT);
       return;
     case ContactProbePhase::IDLE:
     case ContactProbePhase::COMPLETE:
@@ -96,17 +295,46 @@ void ContactProbeEngine::finish(ContactProbePhase phase, ContactProbeFailure fai
   status_.last_policy_decision = decision;
 }
 
-bool ContactProbeEngine::resolveTarget(actuator::MicroRad target_urad,
-                                       uint16_t* raw_tick_out) const {
-  const actuator::JointTransform* transform =
-      policy_->transforms().find(request_.joint, policy_->currentGeometryTag());
-  if (transform == nullptr) return false;
-  return actuator::resolveUrdfQToRaw(*geometry_, *expected_provenance_, *transform, target_urad,
-                                     raw_tick_out) == actuator::TargetResolveStatus::OK;
+uint16_t ContactProbeEngine::tickAtDepth(int32_t d) const {
+  const int32_t tick = static_cast<int32_t>(request_.corridor.home_tick) +
+                       static_cast<int32_t>(request_.corridor.probe_sign) * d;
+  // 4096 is never a valid GoalPosition: the engine and policy refuse it.
+  return (tick < 0 || tick >= 4096) ? static_cast<uint16_t>(4096) : static_cast<uint16_t>(tick);
 }
 
-void ContactProbeEngine::stepTorqueEnable(const ContactProbeContext& context, uint32_t now_ms) {
-  (void)now_ms;
+bool ContactProbeEngine::issueTarget(const ContactProbeContext& context, uint16_t target_tick,
+                                     actuator::ExecuteResult* result_out) {
+  CalibrationExecutionRequest req{};
+  req.intent = CalibrationIntent::CONTACT_PROBE;
+  req.joint = request_.joint;
+  req.endpoint_leg = request_.endpoint_leg;
+  req.endpoint_joint = request_.endpoint_joint;
+  req.endpoint_side = request_.endpoint_side;
+  req.calibration_search = true;
+  req.search_target_tick = target_tick;
+  req.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;
+
+  const CalibrationExecutionResult result =
+      engine_->execute(req, toExecutionContext(context), request_.bus_id);
+  status_.last_policy_decision = result.policy_decision;
+  if (result_out != nullptr) *result_out = result.execute_result;
+  if (result.outcome != CalibrationExecutionOutcome::ROUTED_TO_POLICY) {
+    failSafeOff(ContactProbeFailure::COMMAND_REJECTED);
+    return false;
+  }
+  switch (result.execute_result) {
+    case actuator::ExecuteResult::WRITTEN:
+      return true;
+    case actuator::ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF:
+      failSafeOff(ContactProbeFailure::COMMAND_UNCERTAIN);
+      return false;
+    default:
+      failSafeOff(ContactProbeFailure::COMMAND_REJECTED);
+      return false;
+  }
+}
+
+void ContactProbeEngine::stepTorqueEnable(const ContactProbeContext& context) {
   actuator::ActuatorCommand cmd{};
   cmd.operation = actuator::ActuatorOperation::TORQUE_ENABLE;
   cmd.joint = request_.joint;
@@ -127,7 +355,7 @@ void ContactProbeEngine::stepTorqueEnable(const ContactProbeContext& context, ui
   status_.last_policy_decision = commit_decision;
   switch (result) {
     case actuator::ExecuteResult::WRITTEN:
-      status_.phase = ContactProbePhase::APPROACH_PENDING;
+      status_.phase = ContactProbePhase::BASELINE_PENDING;
       return;
     case actuator::ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF:
       finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::TORQUE_ENABLE_UNCERTAIN,
@@ -143,241 +371,497 @@ void ContactProbeEngine::stepTorqueEnable(const ContactProbeContext& context, ui
   }
 }
 
-namespace {
-CalibrationExecutionContext toExecutionContext(const ContactProbeContext& context) {
-  CalibrationExecutionContext ctx{};
-  ctx.session_active = context.session_active;
-  ctx.origin = context.origin;
-  ctx.lease = context.lease;
-  ctx.mode = context.mode;
-  return ctx;
-}
-}  // namespace
-
-void ContactProbeEngine::stepApproachPending(const ContactProbeContext& context,
-                                             uint32_t now_ms) {
-  // Reached only after TorqueEnable was VERIFIED applied - every exit below
-  // is therefore SAFE_OFF_REQUIRED, never FAILED_NO_MOTION.
-  uint16_t target_tick = 0;
-  if (!resolveTarget(request_.approach_target_urad, &target_tick)) {
-    finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::REJECT_TARGET_RESOLUTION,
-          actuator::WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM);
-    return;
-  }
-
-  CalibrationExecutionRequest req{};
-  req.intent = CalibrationIntent::CONTACT_PROBE;
-  req.joint = request_.joint;
-  req.endpoint_leg = request_.endpoint_leg;
-  req.endpoint_joint = request_.endpoint_joint;
-  req.endpoint_side = request_.endpoint_side;
-  req.target_urad = request_.approach_target_urad;
-
-  const CalibrationExecutionResult result =
-      engine_->execute(req, toExecutionContext(context), request_.bus_id);
-  status_.last_policy_decision = result.policy_decision;
-
-  if (result.outcome != CalibrationExecutionOutcome::ROUTED_TO_POLICY) {
-    finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::COMMAND_REJECTED,
-          result.policy_decision);
-    return;
-  }
-  switch (result.execute_result) {
-    case actuator::ExecuteResult::WRITTEN:
-      deadman_.begin(config_.approach_deadman, target_tick, now_ms);
-      status_.phase = ContactProbePhase::APPROACH_MONITORING;
-      return;
-    case actuator::ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::COMMAND_UNCERTAIN,
-            result.policy_decision);
-      return;
-    default:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::COMMAND_REJECTED,
-            result.policy_decision);
-      return;
-  }
-}
-
-void ContactProbeEngine::stepApproachMonitoring(uint32_t now_ms, bool telemetry_available,
-                                                const actuator::TelemetrySample& telemetry) {
-  const actuator::MotionDeadmanVerdict verdict =
-      telemetry_available ? deadman_.evaluate(telemetry, now_ms) : deadman_.poll(now_ms);
-  switch (verdict) {
-    case actuator::MotionDeadmanVerdict::CONTINUE:
-      return;
-
-    case actuator::MotionDeadmanVerdict::STALLED: {
-      // THE contact signal - see the file comment for why a sustained stall,
-      // not a threshold on an uncharacterized current/load register, is
-      // what this engine treats as possible contact.
-      const uint16_t stalled_at = static_cast<uint16_t>(deadman_.lastProgressPosition());
-      if (status_.pass == 1) {
-        status_.coarse_tick = stalled_at;
-        status_.pass = 2;
-        status_.phase = ContactProbePhase::BACKOFF_PENDING;
-        return;
-      }
-      status_.fine_tick_1 = stalled_at;
-      const int32_t delta =
-          static_cast<int32_t>(status_.fine_tick_1) - static_cast<int32_t>(status_.coarse_tick);
-      const int32_t magnitude = delta < 0 ? -delta : delta;
-      if (magnitude <= static_cast<int32_t>(request_.repeatability_tolerance_ticks)) {
-        finish(ContactProbePhase::COMPLETE, ContactProbeFailure::NONE,
-              actuator::WriteDecision::ACCEPT);
-      } else {
-        finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::REPEATABILITY_FAILED,
-              status_.last_policy_decision);
-      }
+void ContactProbeEngine::beginPass(uint8_t pass, uint16_t start_position) {
+  status_.pass = pass;
+  status_.target_tick = start_position;
+  plateau_active_ = false;
+  plateau_samples_ = 0;
+  // V25 adaptive_contact_acceptance_bounds(): the coarse scout searches the
+  // static corridor [entry, guard]; both fine passes may accept a contact up
+  // to 32 ticks HOME-ward of the scout - never farther toward the guard.
+  int32_t acceptance_entry = depth(request_.corridor.entry_tick);
+  if (pass > 0) {
+    // V25 approach_with_scout(FINE_STEP_TICKS, Some(scout)): no fine pass
+    // exists without an accepted coarse scout.
+    if (!status_.scout_valid) {
+      failSafeOff(ContactProbeFailure::SCOUT_MISSING);
       return;
     }
+    acceptance_entry = searchAdaptiveAcceptanceEntryDepth(request_.corridor, status_.scout_tick);
+  }
+  acceptance_entry_depth_ = acceptance_entry;
+  detector_.begin(request_.corridor, start_position, acceptance_entry);
+}
 
-    case actuator::MotionDeadmanVerdict::ARRIVED:
-      // Reached the commanded boundary with no stall ever observed - not
-      // contact evidence on either pass; fabricating one is exactly what
-      // this engine must not do.
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::NO_CONTACT_DETECTED,
-            status_.last_policy_decision);
+// Torque is VERIFIED applied from here on: every failure is SAFE_OFF_REQUIRED.
+//
+// V25 acquire_moving_current_baseline_forward(): ONE 64-tick move from where
+// the joint IS (not from its goal), never past the guard.
+void ContactProbeEngine::stepBaselineWrite(const ContactProbeContext& context, uint32_t now_ms) {
+  if (!has_good_sample_) {
+    if (now_ms - started_ms_ >= kSearchTelemetryTimeoutMs) {
+      failSafeOff(ContactProbeFailure::STALE_TELEMETRY);
+    }
+    return;
+  }
+  const uint16_t start = static_cast<uint16_t>(status_.last_position);
+  const int32_t target_depth = depth(start) + kSearchBaselineTravelTicks;
+  if (target_depth > depth(request_.corridor.guard_tick)) {
+    failSafeOff(ContactProbeFailure::BASELINE_PASSES_GUARD);
+    return;
+  }
+  const uint16_t target = tickAtDepth(target_depth);
+  if (!issueTarget(context, target, nullptr)) return;
+  status_.target_tick = target;
+  status_.stage = ContactSearchStage::BASELINE;
+  status_.baseline_samples = 0;
+  baseline_started_ms_ = now_ms;
+  has_cadence_sample_ = false;
+  last_cadence_position_ = start;
+  status_.phase = ContactProbePhase::BASELINE_MONITORING;
+}
+
+void ContactProbeEngine::stepBaselineMonitor(uint32_t now_ms, bool telemetry_available,
+                                             const actuator::TelemetrySample& telemetry) {
+  if (usableSafeSample(now_ms, telemetry_available, telemetry)) {
+    if (!has_cadence_sample_ || now_ms - last_cadence_ms_ >= kSearchSampleIntervalMs) {
+      const uint16_t position = static_cast<uint16_t>(telemetry.present_position);
+      const int32_t speed = magnitude(telemetry.present_speed);
+      // V25: a sample is a MOVING sample when the position changed since the
+      // previous one or the speed register is non-zero.
+      const bool moving =
+          (last_cadence_position_ >= 0 && position != last_cadence_position_) || speed > 0;
+      if (moving && status_.baseline_samples < kSearchBaselineMaxSamples) {
+        baseline_[status_.baseline_samples++] =
+            static_cast<uint16_t>(magnitude(telemetry.present_current));
+      }
+      has_cadence_sample_ = true;
+      last_cadence_ms_ = now_ms;
+      last_cadence_position_ = position;
+      if (absDiff(position, status_.target_tick) <= kSearchStaticToleranceTicks &&
+          status_.baseline_samples >= kSearchBaselineMinSamples) {
+        finishBaseline(position);
+        return;
+      }
+    }
+  } else if (!active()) {
+    return;
+  }
+  // V25 MOTION_TIMEOUT ends the loop: enough moving samples still make a
+  // baseline (V25 did not require arrival); too few fail closed.
+  if (now_ms - baseline_started_ms_ >= kSearchBaselineTimeoutMs) {
+    if (status_.baseline_samples < kSearchBaselineMinSamples) {
+      failSafeOff(ContactProbeFailure::INSUFFICIENT_BASELINE);
       return;
-    case actuator::MotionDeadmanVerdict::STALE_TELEMETRY:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::STALE_TELEMETRY,
-            status_.last_policy_decision);
-      return;
-    case actuator::MotionDeadmanVerdict::COMMUNICATION_LOST:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::COMMUNICATION_LOST,
-            status_.last_policy_decision);
-      return;
-    case actuator::MotionDeadmanVerdict::TORQUE_UNEXPECTEDLY_OFF:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::TORQUE_UNEXPECTEDLY_OFF,
-            status_.last_policy_decision);
-      return;
-    case actuator::MotionDeadmanVerdict::TIMED_OUT:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::MOTION_TIMEOUT,
-            status_.last_policy_decision);
-      return;
+    }
+    finishBaseline(static_cast<uint16_t>(status_.last_position));
   }
 }
 
-void ContactProbeEngine::stepBackoffPending(const ContactProbeContext& context,
-                                            uint32_t now_ms) {
-  uint16_t target_tick = 0;
-  if (!resolveTarget(request_.backoff_target_urad, &target_tick)) {
-    finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::REJECT_TARGET_RESOLUTION,
-          actuator::WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM);
+// V25 BaselineStats::from_samples(): median and MAD of the moving current.
+void ContactProbeEngine::finishBaseline(uint16_t position) {
+  const uint16_t median = medianOf(baseline_, status_.baseline_samples);
+  uint16_t deviations[kSearchBaselineMaxSamples] = {0};
+  for (uint8_t i = 0; i < status_.baseline_samples; ++i) {
+    deviations[i] = static_cast<uint16_t>(absDiff(baseline_[i], median));
+  }
+  status_.baseline_median_current = median;
+  status_.baseline_mad_current = medianOf(deviations, status_.baseline_samples);
+  beginPass(0, position);  // the coarse scout, from where the baseline ended
+  status_.phase = ContactProbePhase::STEP_PENDING;
+}
+
+void ContactProbeEngine::stepWrite(const ContactProbeContext& context, uint32_t now_ms) {
+  const int32_t target_depth = depth(status_.target_tick);
+  const int32_t guard_depth = depth(request_.corridor.guard_tick);
+  int32_t next_depth = 0;
+  ContactSearchStage stage = ContactSearchStage::FINE_SEARCH;
+  if (status_.pass == 0) {
+    // The V25 coarse contact scout: 64-tick steps from the baseline end,
+    // never clamped at the entry - the scout pass is the travel. A step still
+    // short of the corridor entry is free-space transit (only EARLY_STALL).
+    step_ticks_ = kSearchCoarseStepTicks;
+    next_depth = target_depth + kSearchCoarseStepTicks;
+    // DELIBERATE BOUNDED DEVIATION from V25 (current installation, measured
+    // 2026-09-30): V25 ended the scout when the next 64-tick step would pass
+    // the guard, leaving a grid-phase-dependent gap before it (LF UPPER MIN's
+    // real stop fell in it). Here ONE final partial coarse step targets the
+    // existing guard itself: never beyond it, never more than 64 ticks, never
+    // repeated (once the target is the guard, the next step is refused).
+    if (next_depth > guard_depth && target_depth < guard_depth) {
+      next_depth = guard_depth;
+      step_ticks_ = static_cast<uint16_t>(guard_depth - target_depth);
+      status_.scout_partial_step_ticks = step_ticks_;
+    }
+    stage = next_depth < depth(request_.corridor.entry_tick) ? ContactSearchStage::COARSE_TRANSIT
+                                                             : ContactSearchStage::COARSE_SCOUT;
+  } else {
+    step_ticks_ = kSearchFineStepTicks;
+    next_depth = target_depth + kSearchFineStepTicks;
+  }
+  // V25 passed_guard(): the step that would pass the guard is never issued.
+  if (next_depth > guard_depth) {
+    failSafeOff(ContactProbeFailure::NO_CONTACT_BEFORE_GUARD);
     return;
   }
 
-  CalibrationExecutionRequest req{};
-  req.intent = CalibrationIntent::CONTACT_PROBE;
-  req.joint = request_.joint;
-  req.endpoint_leg = request_.endpoint_leg;
-  req.endpoint_joint = request_.endpoint_joint;
-  req.endpoint_side = request_.endpoint_side;
-  req.target_urad = request_.backoff_target_urad;
+  const uint16_t next = tickAtDepth(next_depth);
+  if (!issueTarget(context, next, nullptr)) return;
+  status_.target_tick = next;
+  status_.stage = stage;
+  if (status_.step_count < 0xFFFF) ++status_.step_count;
+  step_written_ms_ = now_ms;
+  status_.phase = ContactProbePhase::STEP_MONITORING;
+}
 
-  const CalibrationExecutionResult result =
-      engine_->execute(req, toExecutionContext(context), request_.bus_id);
-  status_.last_policy_decision = result.policy_decision;
+bool ContactProbeEngine::sampleSafe(const actuator::TelemetrySample& telemetry) {
+  if (telemetry.torque_enable == 0) {
+    failSafeOff(ContactProbeFailure::TORQUE_UNEXPECTEDLY_OFF);
+    return false;
+  }
+  if (telemetry.servo_status != 0) {
+    failSafeOff(ContactProbeFailure::SERVO_STATUS_FAULT);
+    return false;
+  }
+  if (telemetry.torque_limit != static_cast<int32_t>(request_.expected_torque_limit)) {
+    failSafeOff(ContactProbeFailure::TORQUE_LIMIT_CHANGED);
+    return false;
+  }
+  if (telemetry.goal_position != static_cast<int32_t>(status_.target_tick)) {
+    failSafeOff(ContactProbeFailure::GOAL_READBACK_MISMATCH);
+    return false;
+  }
+  if (magnitude(telemetry.present_current) >= kSearchHardCurrentAbortRaw) {
+    failSafeOff(ContactProbeFailure::HARD_CURRENT_ABORT);
+    return false;
+  }
+  if (telemetry.present_temperature > kSearchTemperatureLimitC) {
+    failSafeOff(ContactProbeFailure::OVER_TEMPERATURE);
+    return false;
+  }
+  return true;
+}
 
-  if (result.outcome != CalibrationExecutionOutcome::ROUTED_TO_POLICY) {
-    finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::COMMAND_REJECTED,
-          result.policy_decision);
+bool ContactProbeEngine::usableSafeSample(uint32_t now_ms, bool telemetry_available,
+                                          const actuator::TelemetrySample& telemetry) {
+  if (!telemetry_available) {
+    if (now_ms - last_good_ms_ >= kSearchTelemetryTimeoutMs) {
+      failSafeOff(ContactProbeFailure::STALE_TELEMETRY);
+    }
+    return false;
+  }
+  if (!sampleUsable(telemetry)) {
+    if (now_ms - last_good_ms_ >= kSearchTelemetryTimeoutMs) {
+      failSafeOff(ContactProbeFailure::COMMUNICATION_LOST);
+    }
+    return false;
+  }
+  return sampleSafe(telemetry);
+}
+
+void ContactProbeEngine::stepMonitor(uint32_t now_ms, bool telemetry_available,
+                                     const actuator::TelemetrySample& telemetry) {
+  if (!usableSafeSample(now_ms, telemetry_available, telemetry)) return;
+  // V25 consumed one observation per 20 ms bus poll; its sample-count rules
+  // mean what they meant there only at that cadence.
+  if (has_cadence_sample_ && now_ms - last_cadence_ms_ < kSearchSampleIntervalMs) return;
+  has_cadence_sample_ = true;
+  last_cadence_ms_ = now_ms;
+
+  const uint16_t position = static_cast<uint16_t>(telemetry.present_position);
+  const int32_t speed = magnitude(telemetry.present_speed);
+  last_cadence_position_ = position;
+  if (plateau_active_) {
+    observeKinematicPlateau(position, speed);
     return;
   }
-  switch (result.execute_result) {
-    case actuator::ExecuteResult::WRITTEN:
-      deadman_.begin(config_.backoff_deadman, target_tick, now_ms);
-      status_.phase = ContactProbePhase::BACKOFF_MONITORING;
+
+  const int32_t goal_error = absDiff(position, status_.target_tick);
+  if (goal_error <= kSearchStaticToleranceTicks) {
+    status_.phase = ContactProbePhase::STEP_PENDING;  // reached: take the next step
+    return;
+  }
+
+  switch (detector_.observe(position, speed, status_.target_tick)) {
+    case ContactDetectorState::CONTACT_CONFIRMED:
+      onCandidate(position);
       return;
-    case actuator::ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::COMMAND_UNCERTAIN,
-            result.policy_decision);
+    case ContactDetectorState::EARLY_STALL:
+      failSafeOff(ContactProbeFailure::EARLY_STALL_OUTSIDE_CORRIDOR);
       return;
-    default:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::COMMAND_REJECTED,
-            result.policy_decision);
+    case ContactDetectorState::FREE_MOTION:
+    case ContactDetectorState::CONTACT_SUSPECTED:
+      break;
+  }
+
+  if (now_ms - step_written_ms_ >= kSearchSettleWindowMs) {
+    // V25 probe_tracking_error_limit(): max(step + 4, 16).
+    uint16_t tracking_limit = static_cast<uint16_t>(step_ticks_ + 4);
+    if (tracking_limit < kSearchTrackingErrorFloorTicks) {
+      tracking_limit = kSearchTrackingErrorFloorTicks;
+    }
+    if (goal_error <= tracking_limit) {
+      status_.phase = ContactProbePhase::STEP_PENDING;  // bounded lag: continue
       return;
+    }
+    // V25: only an approach that HAS a coarse scout may confirm a kinematic
+    // plateau; the scout itself fails closed here.
+    if (status_.pass == 0) {
+      failSafeOff(ContactProbeFailure::TRACKING_FAILED);
+      return;
+    }
+    plateau_active_ = true;
+    plateau_samples_ = 0;
+    if (status_.kinematic_plateau_count < 0xFFFF) ++status_.kinematic_plateau_count;
   }
 }
 
-void ContactProbeEngine::stepBackoffMonitoring(uint32_t now_ms, bool telemetry_available,
-                                               const actuator::TelemetrySample& telemetry) {
+// V25 confirm_kinematic_plateau(): KINEMATIC_PLATEAU_SAMPLES further samples,
+// each inside the adaptive corridor with the target still ahead, |speed| <= 10
+// and within ADAPTIVE_FINE_SCOUT_TICKS of the scout; a span <= 3 ticks makes
+// the last one a contact candidate (then the scout-lag rule). Anything else
+// is a tracking failure.
+void ContactProbeEngine::observeKinematicPlateau(uint16_t position, int32_t speed) {
+  const int32_t d = depth(position);
+  const bool inside =
+      d >= acceptance_entry_depth_ && d <= depth(request_.corridor.guard_tick);
+  const bool target_ahead = depth(status_.target_tick) > d;
+  const bool low_velocity = speed >= 0 && speed <= kSearchMaxVelocityRaw;
+  const bool near_scout =
+      absDiff(position, status_.scout_tick) <= static_cast<int32_t>(kSearchAdaptiveScoutTicks);
+  if (!inside || !target_ahead || !low_velocity || !near_scout) {
+    plateau_active_ = false;
+    failSafeOff(ContactProbeFailure::TRACKING_FAILED);
+    return;
+  }
+  if (plateau_samples_ == 0) {
+    plateau_min_depth_ = d;
+    plateau_max_depth_ = d;
+  } else {
+    if (d < plateau_min_depth_) plateau_min_depth_ = d;
+    if (d > plateau_max_depth_) plateau_max_depth_ = d;
+  }
+  ++plateau_samples_;
+  if (plateau_samples_ < kSearchKinematicPlateauSamples) return;
+  plateau_active_ = false;
+  if (plateau_max_depth_ - plateau_min_depth_ > static_cast<int32_t>(kSearchKinematicPlateauSpanTicks)) {
+    failSafeOff(ContactProbeFailure::TRACKING_FAILED);
+    return;
+  }
+  onCandidate(position);
+}
+
+void ContactProbeEngine::onCandidate(uint16_t position) {
+  status_.last_candidate_tick = position;
+  if (status_.pass == 0) {
+    // The coarse contact scout: stored as REFERENCE evidence, never promoted
+    // to metrology. Released, then backed off from (V25
+    // backoff_and_verify(coarse_scout_tick)).
+    status_.scout_tick = position;
+    status_.scout_valid = true;
+    beginRelease(position);
+    return;
+  }
+
+  // V25 fine_contact_reproduces_coarse_depth(): a fine candidate more than
+  // one fine step HOME-ward of the scout is a friction/chamfer plateau,
+  // stepped past; the guard still bounds how far that can go.
+  if (!searchFineContactReproducesScout(request_.corridor, position, status_.scout_tick)) {
+    if (status_.plateau_bypass_count < 0xFFFF) ++status_.plateau_bypass_count;
+    status_.phase = ContactProbePhase::STEP_PENDING;
+    return;
+  }
+  if (status_.pass == 1) {
+    status_.pass1_contact_tick = position;
+  } else {
+    status_.pass2_contact_tick = position;
+  }
+  beginRelease(position);
+}
+
+void ContactProbeEngine::beginRelease(uint16_t contact_tick) {
+  contact_tick_ = contact_tick;
+  status_.phase = ContactProbePhase::RELEASE_PENDING;
+}
+
+// V25 stop_pressure(): GoalPosition := the position the joint stopped at, so
+// the leg rests on the stop instead of pressing up to a step into it. The
+// contact lies inside the endpoint's own search corridor, so this is an
+// ordinary, policy-bounded search target.
+void ContactProbeEngine::stepRelease(const ContactProbeContext& context) {
+  if (!issueTarget(context, contact_tick_, nullptr)) return;
+  status_.target_tick = contact_tick_;
+  status_.stage = ContactSearchStage::RELEASE;
+  status_.phase = ContactProbePhase::RELEASE_VERIFYING;
+}
+
+// V25 set_motor_goal_verified(): the release is read back (sampleSafe checks
+// GoalPosition against it) before anything else moves the joint.
+void ContactProbeEngine::stepReleaseVerify(uint32_t now_ms, bool telemetry_available,
+                                           const actuator::TelemetrySample& telemetry) {
+  if (!usableSafeSample(now_ms, telemetry_available, telemetry)) return;
+  if (status_.pass < 2) {
+    status_.phase = ContactProbePhase::BACKOFF_PENDING;
+    return;
+  }
+  // V25 repeatability_spread(first_tick, second_tick): the fine passes only.
+  if (absDiff(status_.pass1_contact_tick, status_.pass2_contact_tick) <=
+      static_cast<int32_t>(request_.repeatability_tolerance_ticks)) {
+    finish(ContactProbePhase::COMPLETE, ContactProbeFailure::NONE, actuator::WriteDecision::ACCEPT);
+  } else {
+    failSafeOff(ContactProbeFailure::REPEATABILITY_FAILED);
+  }
+}
+
+void ContactProbeEngine::stepBackoffWrite(const ContactProbeContext& context, uint32_t now_ms) {
+  // V25 backoff_and_verify(contact): from the contact just released - the
+  // coarse scout, then fine pass 1.
+  const int32_t backoff_depth = depth(contact_tick_) - kSearchBackoffTicks;
+  if (backoff_depth < 0) {  // V25 crossed_home()
+    failSafeOff(ContactProbeFailure::BACKOFF_CROSSES_HOME);
+    return;
+  }
+  const uint16_t target = tickAtDepth(backoff_depth);
+  if (!issueTarget(context, target, nullptr)) return;
+  status_.target_tick = target;
+  status_.stage = ContactSearchStage::BACKOFF;
+  deadman_.begin(config_.backoff_deadman, target, now_ms);
+  settle_.reset();
+  status_.phase = ContactProbePhase::BACKOFF_MONITORING;
+}
+
+void ContactProbeEngine::stepBackoffMonitor(uint32_t now_ms, bool telemetry_available,
+                                            const actuator::TelemetrySample& telemetry) {
+  actuator::TelemetrySample sample = telemetry;
+  const bool usable = telemetry_available && sampleUsable(telemetry);
+  if (usable) {
+    // The whole V25 per-observation readback, torque included: inside the
+    // arrival band the deadman no longer looks at TorqueEnable, and the
+    // settle gate keeps the joint there for >= 400 ms.
+    if (!sampleSafe(telemetry)) return;
+  } else if (telemetry_available) {
+    sample.read_ok = false;  // a partial read is not a position
+  }
+
   const actuator::MotionDeadmanVerdict verdict =
-      telemetry_available ? deadman_.evaluate(telemetry, now_ms) : deadman_.poll(now_ms);
+      telemetry_available ? deadman_.evaluate(sample, now_ms) : deadman_.poll(now_ms);
   switch (verdict) {
     case actuator::MotionDeadmanVerdict::CONTINUE:
+      if (usable) settle_.reset();  // outside the band: V25 restarts the gate
       return;
-    case actuator::MotionDeadmanVerdict::ARRIVED:
-      status_.phase = ContactProbePhase::APPROACH_PENDING;
+    case actuator::MotionDeadmanVerdict::ARRIVED: {
+      // V25 move_motor_to() in the LF session: in the band is not arrived -
+      // the StableTargetGate must hold (<= 12 ticks, |speed| <= 4, 4
+      // consecutive samples, >= 400 ms) before anything else happens.
+      if (!settle_.observe(static_cast<uint16_t>(sample.present_position),
+                           magnitude(sample.present_speed), status_.target_tick, now_ms)) {
+        return;
+      }
+      // V25 backoff_and_verify(): the contact pressure must have released.
+      const uint16_t threshold = searchBaselineThreshold(status_.baseline_median_current,
+                                                         status_.baseline_mad_current);
+      const int32_t current = magnitude(sample.present_current);
+      if (current < 0 || current > threshold) {
+        failSafeOff(ContactProbeFailure::CURRENT_NOT_RECOVERED);
+        return;
+      }
+      // The next approach - fine pass 1 after the scout, fine pass 2 after
+      // fine pass 1 - starts from the backoff pose.
+      beginPass(static_cast<uint8_t>(status_.pass + 1),
+                static_cast<uint16_t>(sample.present_position));
+      if (!active()) return;  // refused: no scout
+      status_.phase = ContactProbePhase::STEP_PENDING;
       return;
+    }
     case actuator::MotionDeadmanVerdict::STALLED:
-      // Unexpected during backoff: this corridor was already proven clear
-      // on the way in, so a stall here is a genuine anomaly, not evidence.
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED,
-            ContactProbeFailure::UNEXPECTED_STALL_DURING_BACKOFF, status_.last_policy_decision);
+      failSafeOff(ContactProbeFailure::UNEXPECTED_STALL_DURING_BACKOFF);
       return;
     case actuator::MotionDeadmanVerdict::STALE_TELEMETRY:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::STALE_TELEMETRY,
-            status_.last_policy_decision);
+      failSafeOff(ContactProbeFailure::STALE_TELEMETRY);
       return;
     case actuator::MotionDeadmanVerdict::COMMUNICATION_LOST:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::COMMUNICATION_LOST,
-            status_.last_policy_decision);
+      failSafeOff(ContactProbeFailure::COMMUNICATION_LOST);
       return;
     case actuator::MotionDeadmanVerdict::TORQUE_UNEXPECTEDLY_OFF:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::TORQUE_UNEXPECTEDLY_OFF,
-            status_.last_policy_decision);
+      failSafeOff(ContactProbeFailure::TORQUE_UNEXPECTEDLY_OFF);
       return;
     case actuator::MotionDeadmanVerdict::TIMED_OUT:
-      finish(ContactProbePhase::SAFE_OFF_REQUIRED, ContactProbeFailure::MOTION_TIMEOUT,
-            status_.last_policy_decision);
+      failSafeOff(ContactProbeFailure::MOTION_TIMEOUT);
       return;
   }
 }
 
 ContactWitness ContactProbeEngine::witness() const {
-  if (status_.phase != ContactProbePhase::COMPLETE) return ContactWitness{};
-  const uint16_t deviation = status_.coarse_tick > status_.fine_tick_1
-                                 ? status_.coarse_tick - status_.fine_tick_1
-                                 : status_.fine_tick_1 - status_.coarse_tick;
-  // Only one independent repeat exists in this two-pass design (see the file
-  // comment) - the single deviation is reported as both bounds rather than
-  // fabricating a second, unmeasured one.
+  if (status_.phase != ContactProbePhase::COMPLETE || !status_.scout_valid) return ContactWitness{};
+  // V25 repeatability_spread(first_tick, second_tick): the two FINE passes,
+  // never the coarse scout. The single deviation is reported as both bounds
+  // rather than fabricating a third, unmeasured one.
+  const uint16_t deviation =
+      static_cast<uint16_t>(absDiff(status_.pass1_contact_tick, status_.pass2_contact_tick));
   return makeContactWitness(deviation, deviation, request_.repeatability_tolerance_ticks);
 }
 
 const char* toString(ContactProbePhase phase) {
   switch (phase) {
     case ContactProbePhase::IDLE:                  return "IDLE";
-    case ContactProbePhase::TORQUE_ENABLE_PENDING:  return "TORQUE_ENABLE_PENDING";
-    case ContactProbePhase::APPROACH_PENDING:       return "APPROACH_PENDING";
-    case ContactProbePhase::APPROACH_MONITORING:    return "APPROACH_MONITORING";
-    case ContactProbePhase::BACKOFF_PENDING:        return "BACKOFF_PENDING";
-    case ContactProbePhase::BACKOFF_MONITORING:     return "BACKOFF_MONITORING";
-    case ContactProbePhase::COMPLETE:               return "COMPLETE";
-    case ContactProbePhase::FAILED_NO_MOTION:       return "FAILED_NO_MOTION";
-    case ContactProbePhase::SAFE_OFF_REQUIRED:      return "SAFE_OFF_REQUIRED";
+    case ContactProbePhase::TORQUE_ENABLE_PENDING: return "TORQUE_ENABLE_PENDING";
+    case ContactProbePhase::STEP_PENDING:          return "STEP_PENDING";
+    case ContactProbePhase::STEP_MONITORING:       return "STEP_MONITORING";
+    case ContactProbePhase::BACKOFF_PENDING:       return "BACKOFF_PENDING";
+    case ContactProbePhase::BACKOFF_MONITORING:    return "BACKOFF_MONITORING";
+    case ContactProbePhase::COMPLETE:              return "COMPLETE";
+    case ContactProbePhase::FAILED_NO_MOTION:      return "FAILED_NO_MOTION";
+    case ContactProbePhase::SAFE_OFF_REQUIRED:     return "SAFE_OFF_REQUIRED";
+    case ContactProbePhase::RELEASE_PENDING:       return "RELEASE_PENDING";
+    case ContactProbePhase::BASELINE_PENDING:      return "BASELINE_PENDING";
+    case ContactProbePhase::BASELINE_MONITORING:   return "BASELINE_MONITORING";
+    case ContactProbePhase::RELEASE_VERIFYING:     return "RELEASE_VERIFYING";
   }
   return "UNKNOWN";
 }
 
 const char* toString(ContactProbeFailure failure) {
   switch (failure) {
-    case ContactProbeFailure::NONE:                     return "NONE";
-    case ContactProbeFailure::REJECT_PRECONDITIONS:     return "REJECT_PRECONDITIONS";
-    case ContactProbeFailure::TORQUE_ENABLE_REJECTED:   return "TORQUE_ENABLE_REJECTED";
-    case ContactProbeFailure::TORQUE_ENABLE_UNCERTAIN:  return "TORQUE_ENABLE_UNCERTAIN";
-    case ContactProbeFailure::REJECT_TARGET_RESOLUTION: return "REJECT_TARGET_RESOLUTION";
-    case ContactProbeFailure::COMMAND_REJECTED:         return "COMMAND_REJECTED";
-    case ContactProbeFailure::COMMAND_UNCERTAIN:        return "COMMAND_UNCERTAIN";
-    case ContactProbeFailure::NO_CONTACT_DETECTED:      return "NO_CONTACT_DETECTED";
-    case ContactProbeFailure::REPEATABILITY_FAILED:     return "REPEATABILITY_FAILED";
-    case ContactProbeFailure::STALE_TELEMETRY:          return "STALE_TELEMETRY";
-    case ContactProbeFailure::COMMUNICATION_LOST:       return "COMMUNICATION_LOST";
-    case ContactProbeFailure::TORQUE_UNEXPECTEDLY_OFF:  return "TORQUE_UNEXPECTEDLY_OFF";
+    case ContactProbeFailure::NONE:                            return "NONE";
+    case ContactProbeFailure::REJECT_PRECONDITIONS:            return "REJECT_PRECONDITIONS";
+    case ContactProbeFailure::TORQUE_ENABLE_REJECTED:          return "TORQUE_ENABLE_REJECTED";
+    case ContactProbeFailure::TORQUE_ENABLE_UNCERTAIN:         return "TORQUE_ENABLE_UNCERTAIN";
+    case ContactProbeFailure::COMMAND_REJECTED:                return "COMMAND_REJECTED";
+    case ContactProbeFailure::COMMAND_UNCERTAIN:               return "COMMAND_UNCERTAIN";
+    case ContactProbeFailure::NO_CONTACT_BEFORE_GUARD:         return "NO_CONTACT_BEFORE_GUARD";
+    case ContactProbeFailure::EARLY_STALL_OUTSIDE_CORRIDOR:    return "EARLY_STALL_OUTSIDE_CORRIDOR";
+    case ContactProbeFailure::TRACKING_FAILED:                 return "TRACKING_FAILED";
+    case ContactProbeFailure::REPEATABILITY_FAILED:            return "REPEATABILITY_FAILED";
+    case ContactProbeFailure::HARD_CURRENT_ABORT:              return "HARD_CURRENT_ABORT";
+    case ContactProbeFailure::OVER_TEMPERATURE:                return "OVER_TEMPERATURE";
+    case ContactProbeFailure::STALE_TELEMETRY:                 return "STALE_TELEMETRY";
+    case ContactProbeFailure::COMMUNICATION_LOST:              return "COMMUNICATION_LOST";
+    case ContactProbeFailure::TORQUE_UNEXPECTEDLY_OFF:         return "TORQUE_UNEXPECTEDLY_OFF";
+    case ContactProbeFailure::INSUFFICIENT_BASELINE:           return "INSUFFICIENT_BASELINE";
+    case ContactProbeFailure::BACKOFF_CROSSES_HOME:            return "BACKOFF_CROSSES_HOME";
+    case ContactProbeFailure::CURRENT_NOT_RECOVERED:           return "CURRENT_NOT_RECOVERED";
     case ContactProbeFailure::UNEXPECTED_STALL_DURING_BACKOFF:
       return "UNEXPECTED_STALL_DURING_BACKOFF";
-    case ContactProbeFailure::MOTION_TIMEOUT:            return "MOTION_TIMEOUT";
-    case ContactProbeFailure::OPERATOR_ABORT:            return "OPERATOR_ABORT";
+    case ContactProbeFailure::MOTION_TIMEOUT:                  return "MOTION_TIMEOUT";
+    case ContactProbeFailure::OPERATOR_ABORT:                  return "OPERATOR_ABORT";
+    case ContactProbeFailure::TORQUE_LIMIT_CHANGED:            return "TORQUE_LIMIT_CHANGED";
+    case ContactProbeFailure::SERVO_STATUS_FAULT:              return "SERVO_STATUS_FAULT";
+    case ContactProbeFailure::GOAL_READBACK_MISMATCH:          return "GOAL_READBACK_MISMATCH";
+    case ContactProbeFailure::BASELINE_PASSES_GUARD:           return "BASELINE_PASSES_GUARD";
+    case ContactProbeFailure::SCOUT_MISSING:                   return "SCOUT_MISSING";
+  }
+  return "UNKNOWN";
+}
+
+const char* toString(ContactSearchStage stage) {
+  switch (stage) {
+    case ContactSearchStage::NONE:           return "NONE";
+    case ContactSearchStage::COARSE_TRANSIT: return "COARSE_TRANSIT";
+    case ContactSearchStage::FINE_SEARCH:    return "FINE_SEARCH";
+    case ContactSearchStage::BACKOFF:        return "BACKOFF";
+    case ContactSearchStage::BASELINE:       return "BASELINE";
+    case ContactSearchStage::COARSE_SCOUT:   return "COARSE_SCOUT";
+    case ContactSearchStage::RELEASE:        return "RELEASE";
   }
   return "UNKNOWN";
 }

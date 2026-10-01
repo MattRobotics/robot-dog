@@ -414,6 +414,119 @@ void testChargingAndTrueFullSeparation() {
   CHECK_EQ(selectLedState(in), LedPresentationState::READY);
 }
 
+// DALY alarm word 3 bit 0x0010 (KEY-OFF attended charging, "GPS or soft
+// switch turn off MOS") is informational for LED presentation ONLY. Exactly
+// that one bit of that one word; everything else still blocks.
+LedStatusInputs chargingWith(uint16_t a0, uint16_t a1, uint16_t a2, uint16_t a3, float soc = 55.0f) {
+  auto in = ready(soc);
+  in.battery_charging = true;
+  const uint16_t words[4] = {a0, a1, a2, a3};
+  in.battery_alarm = dalyAlarmBlocksChargingPresentation(words);
+  return in;
+}
+
+void testDalyInformationalAlarmBitIsNarrow() {
+  g_case = "DALY 0x0010 LED exception: the helper";
+  CHECK_EQ(kDalyLedInformationalAlarm3Bits, 0x0010);
+  {
+    const uint16_t none[4] = {0, 0, 0, 0};
+    const uint16_t info[4] = {0, 0, 0, 0x0010};
+    CHECK(!dalyAlarmBlocksChargingPresentation(none));
+    CHECK(!dalyAlarmBlocksChargingPresentation(info));
+    CHECK(dalyAlarmBlocksChargingPresentation(nullptr));
+  }
+  // Every single bit of every word blocks, except word 3 bit 4 alone.
+  for (int word = 0; word < 4; ++word) {
+    for (int bit = 0; bit < 16; ++bit) {
+      uint16_t w[4] = {0, 0, 0, 0};
+      w[word] = static_cast<uint16_t>(1u << bit);
+      CHECK_EQ(dalyAlarmBlocksChargingPresentation(w), !(word == 3 && bit == 4));
+      // ...and together with the informational bit it still blocks.
+      uint16_t both[4] = {w[0], w[1], w[2], static_cast<uint16_t>(w[3] | 0x0010)};
+      CHECK_EQ(dalyAlarmBlocksChargingPresentation(both), !(word == 3 && bit == 4));
+    }
+  }
+  // The operator's listed cases, literally.
+  const struct {
+    uint16_t a[4];
+    bool blocks;
+  } listed[] = {
+      {{0x0000, 0x0000, 0x0000, 0x0010}, false},
+      {{0x0000, 0x0000, 0x0000, 0x0000}, false},
+      {{0x0001, 0x0000, 0x0000, 0x0010}, true},
+      {{0x0000, 0x0000, 0x0000, 0x0011}, true},
+      {{0x0000, 0x0000, 0x0000, 0x0030}, true},
+      {{0x0000, 0x0001, 0x0000, 0x0010}, true},
+      {{0x0000, 0x0000, 0x0001, 0x0010}, true},
+      {{0x0000, 0x0000, 0x0000, 0xFFEF}, true},
+      {{0x0000, 0x0000, 0x0000, 0x8000}, true},
+  };
+  for (const auto& c : listed) CHECK_EQ(dalyAlarmBlocksChargingPresentation(c.a), c.blocks);
+
+  g_case = "DALY 0x0010 LED exception: live 2026-09-30 charge, SOC 55";
+  {
+    auto in = chargingWith(0, 0, 0, 0x0010);
+    LedStatusPolicy policy;
+    const LedFrame f = policy.update(in, 0, 60);
+    CHECK_EQ(policy.state(), LedPresentationState::CHARGING);
+    CHECK(policy.snapshot().charging);
+    CHECK(!policy.snapshot().charging_fault);
+    CHECK(policy.snapshot().soc_valid);
+    CHECK_EQ(policy.snapshot().soc_segments, 6);
+    checkBar(f, 6, 6, 6);                          // 6 fixed, the 7th breathing
+    checkBar(policy.update(in, 1500, 60), 6, 6, 20);
+  }
+  g_case = "DALY 0x0010 LED exception: every other alarm is still a charging fault";
+  for (const auto& in : {chargingWith(0, 0, 0, 0), chargingWith(0, 0, 0, 0x0010)}) {
+    CHECK_EQ(selectLedState(in), LedPresentationState::CHARGING);
+  }
+  for (const auto& in : {chargingWith(0, 0, 0, 0x0011), chargingWith(0x0001, 0, 0, 0x0010),
+                         chargingWith(0, 0x0100, 0, 0), chargingWith(0, 0, 0x8000, 0),
+                         chargingWith(0, 0, 0, 0x0030), chargingWith(0x0004, 0, 0, 0)}) {
+    LedStatusPolicy policy;
+    checkUniform(policy.update(in, 0, 60), 255, 0, 0, 6);
+    CHECK_EQ(policy.state(), LedPresentationState::CHARGING_FAULT);
+    CHECK(policy.snapshot().charging_fault);
+  }
+  g_case = "DALY 0x0010 LED exception: priority and freshness unchanged";
+  {
+    auto in = chargingWith(0, 0, 0, 0x0010);
+    in.system_health = SystemHealth::FAULT;
+    CHECK_EQ(selectLedState(in), LedPresentationState::FAULT);
+    in = chargingWith(0, 0, 0, 0x0010);
+    in.firmware_update_in_progress = true;
+    CHECK_EQ(selectLedState(in), LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS);
+    in = chargingWith(0, 0, 0, 0x0010);
+    in.calibration_in_progress = true;
+    CHECK_EQ(selectLedState(in), LedPresentationState::CALIBRATION_IN_PROGRESS);
+    in = chargingWith(0, 0, 0, 0x0010);
+    in.battery_critical = true;
+    CHECK_EQ(selectLedState(in), LedPresentationState::BATTERY_CRITICAL);
+    // Stale telemetry: not charging at all, as before.
+    in = chargingWith(0, 0, 0, 0x0010);
+    in.telemetry_age_ms = kDalyTelemetryFreshnessMs + 1;
+    CHECK_EQ(selectLedState(in), LedPresentationState::READY);
+    in = chargingWith(0, 0, 0, 0x0011);
+    in.daly_comm_ok = false;
+    CHECK_EQ(selectLedState(in), LedPresentationState::READY);
+    // Not charging: the bit changes nothing either.
+    in = chargingWith(0, 0, 0, 0x0010);
+    in.battery_charging = false;
+    CHECK_EQ(selectLedState(in), LedPresentationState::READY);
+    // 100 percent, charging, informational bit: 11 fixed + the last breathing.
+    in = chargingWith(0, 0, 0, 0x0010, 100.0f);
+    LedStatusPolicy policy;
+    checkBar(policy.update(in, 0, 60), 12, 11, 6);
+    CHECK_EQ(policy.state(), LedPresentationState::CHARGING);
+    CHECK(!policy.snapshot().charge_complete_verified);
+  }
+  g_case = "DALY 0x0010 LED exception: quantization unchanged";
+  CHECK_EQ(socCompletedSegments(55.0f), 6);
+  CHECK_EQ(socCompletedSegments(58.33f), 6);
+  CHECK_EQ(socCompletedSegments(58.34f), 7);
+  CHECK_EQ(socCompletedSegments(100.0f), 12);
+}
+
 void testNamesAndInitialState() {
   g_case = "names and initial state";
   const char* names[] = {"READY", "CHARGING", "CHARGE_COMPLETE_VERIFIED", "BOOTING",
@@ -442,6 +555,7 @@ int main() {
   testQuantizationBoundariesAndPhysicalFrames();
   testCachedFreshnessAndIndeterminate();
   testChargingAndTrueFullSeparation();
+  testDalyInformationalAlarmBitIsNarrow();
   testNamesAndInitialState();
   std::printf("test_led_status_policy: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;

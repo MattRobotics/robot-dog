@@ -1,5 +1,291 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — TRUE 24-contact Full Calibration (LF V25 full-leg state machine × 4 legs) — 2026-09-30
+
+**HARDWARE-VALIDATED 2026-10-01: TRUE FULL CALIBRATION 24/24.**
+- Firmware `dfcecb670d0565d2db1a8152b6cd7ad230bdb87d`, BUILD_ID `dfcecb670d05`, app SHA256
+  `5fe625cd…11c503da`.
+- All four legs `HARDWARE_CONTACT_CALIBRATED` 6/6 on their first attempt; SAFE_OFF 13/13 verified.
+- Fine-pass repeatability ≤ 4 ticks on all 24 contacts.
+- Logged events: 23 transient (unconfirmed) temperature readings and 39 diagnostic held-speed
+  transients; no held-role failure.
+- Thin LOWER MAX scout margins: RF +6 and LH +13 ticks, from a systematic 3–6° LOWER MAX deficit
+  against the URDF.
+- Envelopes are not approved and the result is RAM-only (no persistence).
+- Report and evidence hashes: `09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/`.
+
+Scope correction: **TRUE FULL CALIBRATION = 4 legs ×
+3 joints × MIN/MAX = 24 contacts.** The "Full Leg" below (2026-09-29, PR #34) measured UPPER
+MIN/MAX only, 2 of a leg's 6 contacts. It is superseded and is **not** Full Calibration. See
+`09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md` and the V25 mapping
+`…/2026-09-30_FULL_CALIBRATION_24_CONTACT_V25_TRACEABILITY.md`.
+
+- **`FullLegCalibrationExecutor` (rewritten)**: the LF V25 `run_lf_state_machine` for every leg.
+  PREFLIGHT → INITIAL_RECOVERY → PARKING → UPPER MIN/MAX → UPPER_HORIZONTAL → LOWER MIN/MAX →
+  LOWER_FOLDED → HIP MIN/MAX → DIAGNOSTICS → RETURN_HIP/LOWER/UPPER → RESTORE_PARKING →
+  CLEANUP/TORQUE_OFF. One phase per update, reported to the session in V25 order. COMPLETE only
+  with 6/6 contacts + accepted V25 affine diagnostics + verified rest.
+- **INITIAL RECOVERY**: every one of the 12 leg joints actively commanded to its promoted q0,
+  one at a time (prime at present → RAM TorqueLimit 500 → torque on → move → V25 StableTargetGate
+  → SAFE_OFF), then all verified at q0. It never moves a joint more than 64 ticks.
+  `@CALIBRATION INITIAL RECOVERY <LEG> CONFIRM_Q0_RECOVERY` runs it alone (recovery-only: no
+  probe, no evidence record; session + permit stay live).
+- **Held prerequisites (V25 `prerequisites_for`)**: UPPER probe HIP/LOWER@q0; LOWER probe
+  HIP@q0 + UPPER@90°; HIP probe UPPER@side clearance (LF 90/85, RF 85/90, rear 90/90) + LOWER
+  folded; front legs keep the rear UPPER parked. A probe starts only with exactly that held set.
+  Every held joint and one round-robin bystander are checked every tick (torque, GoalPosition,
+  TorqueLimit, drift, status, current, temperature, telemetry age). Any violation fails
+  closed to a verified SAFE_OFF of all 12.
+- **Encoder direction = current-installation record, not the URDF (hardware correction,
+  2026-10-01)**: the TRUE LF run resolved LF LOWER with the URDF custom `motorDirection` (+1),
+  promoted to encoder polarity by CR0. "LOWER MIN" ran RAW DECREASING and drove the shank
+  backward into the short-side (MAX) end-stop. The run failed closed with
+  `EARLY_STALL_OUTSIDE_CORRIDOR`. A read-only witness then showed LF HIP inverted too.
+  - Each leg joint's `encoder_direction` now lives in `MATDOG_SERVO_ALLOCATION.yaml`, with its
+    source and evidence:
+    - LF HIP/UPPER/LOWER: `CURRENT_HARDWARE_WITNESS`;
+    - RF/RH/LH: `HISTORICAL_SLOT_UNCHANGED`, the slot's 2026-07 `PASS_DIRECTION_TEST`, since axes,
+      servo type and mechanics are unchanged.
+  - The exporter generates it into `GeometryJointRecord::encoder_direction`, with a
+    `EncoderDirectionSource` per joint, and refuses a joint without a record. It never falls back
+    to the URDF.
+  - The record is in the profile provenance, so the frozen CR2-C package is refused on the new
+    contract; fresh capture is the path.
+  - The matrix differs from the URDF on all eight HIP/LOWER joints.
+  - CR0, source precedence, bootstrap §11 and the audit are amended. The URDF and Geometry V5
+    are not changed and not rerun.
+- **Held-role supervision = LF V25 `ActivelyHeld` (hardware correction, 2026-09-30)**: the
+  post-V25 held-joint speed abort (`HELD_JOINT_SPEED`, |speed| > 40 raw × 2 samples) is removed,
+  and nothing replaces it. On hardware it aborted LF UPPER MAX while every held joint was inside its
+  10-tick hold. An already-held joint fails on telemetry, status, hard current, confirmed
+  temperature, TorqueEnable/TorqueLimit/GoalPosition readback and drift > 10, exactly as
+  `validate_lf_role_observation`. `LF_HELD_MAX_SPEED_RAW = 4` stays the StableTargetGate before a
+  joint is held and the INITIAL_RECOVERY settle. New evidence naming the exact motor:
+  `CALIBRATION_HELD_ROLE_FAILURE` (once per failure) and, diagnostic only,
+  `CALIBRATION_HELD_SPEED_TRANSIENT` (rising edge, ≤ 32 per run).
+- **`CalibrationSequencePlan` (new)**: the second authorization object. Poses per leg, generated
+  by `matdog_full_calibration_sequence_geometry_v5.py` from four collision-free validation
+  artifacts (every segment of every leg's sequence on the SHA-pinned URDF/meshes). Rear LOWER fold
+  −455 ticks (V25 −990 gives 0.04 mm body clearance on the rear legs). `SafeActuatorPolicy`: new
+  `CALIBRATION_SEQUENCE_MOVE` (phase table, tick re-derived) and `CALIBRATION_TORQUE_LIMIT`
+  operations; sequence probes go through their own door (`evaluateSequenceProbe`: phase ==
+  endpoint, prerequisites verified, corridor). `isExecutable()` unchanged.
+- **RAM TorqueLimit 500 (V25 `prepare_motor`)**: `ServoBus::writeReviewedRamTorqueLimit()`, the
+  one raw register write (RAM 48, readback-verified, no argument). Never restored (V25).
+  `ServoBus::readControlFeedback()` reads TorqueEnable/Goal/TorqueLimit + feedback + status in
+  two block reads.
+- **ContactProbeEngine**: `start_torque_verified`, the V25 `stop_pressure` release, and
+  `TORQUE_LIMIT_CHANGED` / `SERVO_STATUS_FAULT` / `GOAL_READBACK_MISMATCH`.
+- **ContactProbeEngine — the LF V25 coarse contact scout restored (corrective commit; closes PR
+  #35 D6 "no coarse scout, inherited from #34")**: every one of the 24 searches is now V25
+  `measure_lf_contact_side_efficient` stage for stage:
+  - BASELINE: one 64-tick moving-current move from the present pose (≥ 6 samples, 12 s).
+  - COARSE scout: 64-tick steps from the baseline end, never clamped at the entry; the static
+    corridor applies; pre-corridor steps are free-space transit, where a stall is EARLY_STALL.
+  - RELEASE (GoalPosition := the scout, read back), then BACKOFF 96.
+  - FINE 1 (8), RELEASE, BACKOFF 96, FINE 2 (8), RELEASE; repeatability |fine 1 − fine 2| ≤ 16.
+
+  Both fine passes are judged against the scout: the adaptive corridor (scout − 32), the
+  one-fine-step lag bypass (friction/chamfer plateau) and the V25 kinematic-plateau
+  confirmation. Evidence is `coarse_tick` = scout (reference only), `fine_tick_1/2` = the fine
+  passes. Diagnostics use the midpoint of the fine passes and the envelope the second fine pass;
+  the scout enters neither. New: `SCOUT_MISSING`, `BASELINE_PASSES_GUARD`; phases
+  `BASELINE_*`, `RELEASE_VERIFYING`; stages `BASELINE`, `COARSE_SCOUT`, `RELEASE`. Serial:
+  `CALIBRATION_SEARCH … kplateau= scout=`, `CALIBRATION_FULL_LEG_CONTACT … scout= fine1= fine2=`,
+  export `scout_tick= fine1_tick= fine2_tick=`. Known V25 property, risk R2: the scout's reach
+  near the guard depends on its 64-tick grid phase and hence on the fresh q0 (development log §3).
+- **Backoff = V25 StableTargetGate** (closes review H1): a backoff is arrived only after ≤ 12
+  ticks, |speed| ≤ 4, 4 consecutive samples and ≥ 400 ms (`SearchSettleGate`, reset by any bad
+  sample). Only then are the current recovery and the next fine pass allowed. TorqueEnable and
+  the whole readback are checked on every backoff sample.
+- **Final bounded partial coarse-scout step (deliberate current-installation deviation, NOT V25).**
+  When the next 64-tick scout step would pass the existing guard, ONE final partial step (< 64
+  ticks) targets the guard itself; it is never beyond and never repeated. It removes V25's
+  grid-phase blind gap before the guard, where the measured LF UPPER MIN stop (raw 1468, margin
+  −3…+1 at q0 2090) fell. The guard, step size, corridor and fine passes are unchanged. Reach is now
+  guard − 18 (URDF + 46) for every q0; the LF UPPER MIN margin is +21. Tested on all 24 endpoints
+  (22 of 24 need it at guard − 18).
+- **Runtime PresentTemperature over-limit confirmation, ported from LF V25 `port.rs`** (hardware
+  finding 2026-09-30). The first TRUE LF run aborted in PARKING on ONE M42 sample > 70 °C; M42
+  read 32 °C a second later.
+  - Now a sample > 70 °C is re-read directly twice on the same servo, each read after 50 ms.
+  - ≥ 2 of 3 over the limit aborts as before; exactly 1 is a transient (logged, the last normal
+    value used) and the run continues; a failed confirmation read aborts (fail closed).
+  - `calibration/ThermalConfirmation.*`, `ServoBus::readPresentTemperatureDirect()`, applied by
+    the Controller to every Full-Leg sample; `CALIBRATION_THERMAL_CONFIRMATION …` log line.
+  - Only temperature is confirmed; every other fail-closed check is unchanged. The EEPROM
+    MaxTemperature (0x0D = 70) stays a preflight check.
+- **Search telemetry timeout 2 s** (V25 `TELEMETRY_TIMEOUT`; closes review M1): was the inherited
+  3 s, for the search stages and the backoff deadman.
+- **Recentred installation, proven**: every calibration raw target is the fresh promoted q0 +
+  direction · q. For two installations with different per-joint mounting offsets, identical URDF
+  commands, all 24 corridors, every prerequisite pose and the park move by exactly Δq0
+  (`test_recentred_installation_translation`). The audit refuses the raw centre 2048 in every
+  calibration target unit.
+- **Finalizer / evidence**: 6 contacts recorded per leg; UPPER/LOWER/HIP envelopes;
+  `contacts_expected=6` and `contacts_accepted` (0 unless 6); four-leg result only at 24/24.
+  Export `format=2`: `LEG` + `LEG_CLOSE`, six `CONTACT`, three `DIAG`, and the `END` line with
+  `total_contacts_expected=24 total_contacts_accepted=…`. Lines are never truncated (512-byte
+  buffers, worst case host-tested).
+- **Runner** `scripts/calibration_hw_session.py`: phases `prepare / q0 / recover / legs / all`.
+  `legs` needs `--confirm-operator-go`. It requires 6/6 per leg and the 24/24 export; anchored
+  whole-line records only.
+- **Gates**: host suites (executor end-to-end on four legs + ~30 adversarial cases, the V25
+  search trace of all 24 endpoints, 24-profile plan matrix, 24-contact finalizer), static audit
+  (incl. plan-data re-derivation and the coarse-scout pins), Safe Actuator / LED / DALY mutation
+  suites, and behaviour mutations (staged search, coarse scout, orchestration).
+
+### LED — DALY informational alarm bit is not a charging fault (presentation only)
+
+- Live 2026-09-30: an attended KEY-OFF charge (SOC 55 %, MOS on) showed `CHARGING_FAULT` for
+  `alarms=0000 0000 0000 0010`. The DALY app names that bit "GPS or soft switch turn off MOS".
+- `status::dalyAlarmBlocksChargingPresentation()`: word 3 bit **0x0010 alone** no longer shows
+  `CHARGING_FAULT`. Words 0–2 ≠ 0 or any other word-3 bit still do.
+- Unchanged: raw alarm words (`@BMS STATUS`), `DalyBms` `alarms_clear` (the KEY/MOS write gate),
+  DALY protection, MOS, every non-LED gate. Audit-pinned; LED mutation suite extended.
+
+## Unreleased — staged calibration endpoint search (LF V25 oracle) — 2026-09-29
+
+**OFFLINE-VALIDATED, FLASH-READY; HARDWARE VALIDATION PENDING. Never run on hardware.**
+Supersedes the contact+16 / URDF-clamp probe (`e5c0a3c`, `67cd3cb`, entry below). The clamped
+run (1489) arrived 4 ticks short, like every earlier target. The operator then found the real
+LF_UPPER MIN stop by hand, torque off: **~23 ticks past the Geometry V5 contact / URDF limit**.
+No single target at or near the model contact can witness that stop, and "no progress 4–5 ticks
+short" is servo settling, not contact. The search is now a port of the only
+hardware-validated calibrator's *behaviour*, LF V25 (`matdog.rs`), made generic over
+LF/RF/RH/LH; see
+`09_Logs/Development_Log/2026-09-29_FULL_CALIBRATION_V25_ORACLE_TRACEABILITY.md`.
+
+- **Search corridor** (`actuator::resolveCalibrationSearchCorridor`): entry = URDF limit − 64,
+  guard = URDF limit + 64 along the probe direction (V25 `GUARD_OVERSHOOT_TICKS`,
+  `contact_acceptance_bounds`). Geometry V5 contacts and the URDF domain are unchanged. The
+  corridor is a calibration-search bound only.
+- **SafeActuatorPolicy**: `REJECT_CALIBRATION_SEARCH` covers a search flag on any operation other
+  than `CALIBRATION_CONTACT_PROBE`, and a search target outside [opposite URDF limit, guard].
+  `REJECT_MOTION_PROFILE` covers `MotionProfile::CALIBRATION_SEARCH` on any operation other than
+  CONTACT_PROBE / AUXILIARY_MOVE (never `POSITION_COMMAND`, stand, gait, first motion). Both are
+  checked before any route can accept. The legacy µrad path (`REJECT_TARGET_OUTSIDE_URDF_LIMITS`,
+  contact check) is unchanged for everything else.
+- **Speed profile**: `ServoBus::writeGoalPosition(id, tick, GoalMotionProfile)`:
+  BOUNDED 40/10 (unchanged default) or SEARCH_ENVELOPE 160/8 (V25 `GOAL_SPEED`/`ACCELERATION`),
+  plumbed through `ActuatorRuntime` → `ActuatorBackend`. An unknown profile is never written.
+- **ContactProbeEngine** (rewritten): COARSE_TRANSIT (64-tick steps, clamped at the entry) →
+  FINE_SEARCH (8-tick target steps) → contact #1 → BACKOFF 96 (current must recover to the
+  transit baseline, median + max(4·MAD, 5)) → FINE_SEARCH pass 2 → contact #2 within 16 of #1.
+  A pass-2 candidate > 8 ticks short of #1 is a friction plateau and is stepped past; pass 2
+  accepts up to 32 ticks HOME-ward of #1. `ContactSearchDetector` ports V25's
+  `HybridContactDetector` rule for rule: 4 startup samples, 24 ticks travel, progress ≤ 2,
+  |speed| ≤ 10, goal error > 10 inside / > 16 outside, target ahead, 3 samples. Stalls outside
+  the corridor are `EARLY_STALL_OUTSIDE_CORRIDOR`. Current is never part of contact admission.
+  Other V25 figures: 20 ms consumption cadence, 900 ms settle window, tracking limit
+  max(step + 4, 16), hard current ≥ 200 raw, temperature > 70 °C. A step past the guard is never
+  issued: `NO_CONTACT_BEFORE_GUARD`. Every failure after TorqueEnable is SAFE_OFF_REQUIRED.
+- **Full Leg executor/plan**: per-side `CalibrationSearchCorridor`s replace approach/backoff µrad
+  and overtravel (`REJECT_SEARCH_CORRIDOR`). Evidence ticks = pass 1 / pass 2 contacts. The
+  auxiliary park runs at 160/8 with the travel-aware deadman at V25's 80 ticks/s, arrival 10.
+  The backoff arrival is 12. The parking matrix, SAFE_OFF paths, finalizer and
+  HARDWARE_CONTACT_CALIBRATED semantics are unchanged.
+- **Observability**: ARMED prints `CALIBRATION_FULL_LEG_SEARCH_CORRIDOR side=… entry=… guard=…`.
+  Every step/state change prints `CALIBRATION_SEARCH …` (stage, target, pos, beyond_contact,
+  speed, current, baseline, p1/p2, bypass). `PROBE_FINAL` and STATUS carry the same fields.
+- **Removed**: `kContactProbeMaxOvertravelTicks`, `resolveContactProbeApproachToRaw`,
+  `REJECT_PROBE_OVERTRAVEL`, and the contact+16 / URDF-clamped single target. No compatibility
+  path is left.
+- **Not ported from V25 (documented in the traceability file)**: RAM TorqueLimit 500; the coarse
+  contact scout; `confirm_kinematic_plateau`; per-sample goal/status readback; holding
+  HIP/LOWER at q0; drift monitoring of the other joints; the 400 ms stable-target gate.
+- **Runner**: `scripts/calibration_hw_session.py` is a one-shot, fail-closed session:
+  build/manifest check → app-only flash → no-reset serial → signature/MAINTENANCE → SAFE_OFF
+  13/13 → Q0 CAPTURE (half-tooth 82 stop vs CR2-C) → PROMOTE 12 → LF, RF, RH, LH → SAFE_OFF 13/13
+  → EVIDENCE EXPORT check. Terminal detection is exact
+  `CALIBRATION_FULL_LEG_RESULT leg=<LEG> verdict=… failure=…` only. Tests:
+  `test_calibration_hw_session.py`.
+- Tests:
+  - `test_contact_probe_engine` (10 148 checks) on a kinematic ST3215 model
+    (`kinematic_servo_sim.h`);
+  - `test_full_leg_calibration_executor` (4 288);
+  - plan/engine/q0-promotion/runtime/first-motion/policy suites updated;
+  - `check_calibration_search_boundaries` plus 17 static mutation cases;
+  - `test_calibration_search_behaviour_mutations.py`: source mutations, each of which must make
+    the host tests fail.
+
+## Unreleased — URDF-clamped contact-probe overtravel (hardware finding #2) — 2026-09-29
+
+**SUPERSEDED by the staged endpoint search above; the mechanism below was removed.** Flashed as
+`67cd3cb` and run once on LF. The clamped target (1489) arrived 4 short (1493), and the real
+stop proved to be ~23 ticks past the contact, beyond any single URDF-bounded target.
+
+*Original entry:* **OPERATOR-APPROVED, OFFLINE-VALIDATED; hardware re-test pending.** With the motion budget fixed
+(`b646631`), LF's MIN first approach reached its stop and stalled at tick 1500, but the stop sits
+4–5 ticks short of the Geometry V5 contact (target 1495). Pass 2 ended within the 4-tick arrival
+tolerance (1499), so it read as arrival: `NO_CONTACT_DETECTED`. The operator confirmed the leg
+pressed on the intended stop both times.
+
+- `actuator::kContactProbeMaxOvertravelTicks = 16` and
+  `resolveContactProbeApproachToRaw()`: the only way to command past a contact. It resolves the
+  canonical contact through the URDF-checked resolver, then moves by min(16, room to the URDF
+  joint limit) raw ticks in the side's approach direction. The room is the furthest tick that
+  still converts back inside the URDF domain (`resolveRawToUrdfQ`). It never crosses the URDF
+  limit and never wraps; asking for more than 16 returns `REJECT_OVERTRAVEL`. 16 is a ceiling,
+  not a travel amount. For every UPPER joint today the room is **4 ticks (MIN)** and
+  **6 ticks (MAX)**, independent of q0.
+- The ceiling field flows plan → executor → probe → engine → policy (default 0). Both approach
+  passes use the clamped point for the command and for arrival; the backoff never does. The plan
+  sets `kFullLegApproachOvertravelTicks = 16` (ceiling), statically bounded by the maximum, and
+  records per side `contact_tick`, `target_tick`, `urdf_limit_tick` and
+  `applied_overtravel_ticks`.
+- `SafeActuatorPolicy`: `REJECT_PROBE_OVERTRAVEL` for any non-CONTACT_PROBE command carrying the
+  ceiling, checked before any route can accept (including the future stand/gait
+  `POSITION_COMMAND`). For CONTACT_PROBE the anchor must be exactly the canonical contact. The
+  commanded tick must independently convert back inside the URDF domain
+  (`REJECT_TARGET_OUTSIDE_URDF_LIMITS`) and equal the policy's own clamped re-derivation. The
+  execution engine also refuses the ceiling on other intents.
+- Unchanged: Geometry V5 contacts (still the evidence reference), URDF limits, backoff, arrival
+  tolerance, stall window/progress, repeatability 16, aux parking, envelopes/JointLimits.
+- ARMED prints `CALIBRATION_FULL_LEG_PROBE_BOUND side=MIN|MAX contact_tick=… target_tick=…
+  urdf_limit_tick=… applied_overtravel_ticks=… ceiling_ticks=16 …`.
+- Revision history: `e5c0a3c` first let the allowance reach contact+16 past the URDF limit. It was
+  flashed but never ran a motion. On the operator's decision it was revised to clamp at the URDF
+  limit before any hardware use.
+- Tests: policy/engine cases (four UPPER joints, MIN and MAX, applied 4/6 from a hand-computed
+  oracle; the clamp is tight; the unclamped contact+16 is refused; >16 is refused at every layer;
+  16 is only a ceiling; CONTACT_PROBE only; the backoff cannot carry it); kinematic cases (a stop
+  4 ticks short without the allowance reproduces `NO_CONTACT_DETECTED`; stops 4–5 ticks short
+  stall on both passes of both sides on all four legs, target-to-stop 8–9 MIN / 10–11 MAX; with
+  no stop the run fails at the clamped point and never goes further); plan pins; an audit rule
+  and ten mutation cases.
+
+## Unreleased — Full-Leg motion budget fix (hardware finding) — 2026-09-29
+
+**PARTLY SUPERSEDED.** The travel-aware deadman stays, and the backoff and auxiliary park use it at
+V25's 80 ticks/s. The probe's steps are now monitored by the staged search, and
+`PROBE_FINAL` has new fields (entry above). Verified on hardware: the MIN first approach reached
+the stop instead of timing out (`b646631` run).
+
+*Original entry:* **HARDWARE-DISCOVERED DEFECT, FIXED OFFLINE; hardware re-test pending.** Both LF Full-Leg
+attempts of the 2026-09-29 session (`14881cd`) ended `UPPER_MIN_PROBE_FAILED`: every monitored
+Full-Leg move had the fixed 12 s deadman budget, but `ServoBus::writeGoalPosition()` commands the
+bounded 40 ticks/s (~3.5 deg/s), so no move could exceed ~480 ticks (~42 deg). The Geometry V5
+UPPER contacts need ~590 ticks (MIN first approach) and up to ~1980 (MAX first approach); the
+probe hit `MOTION_TIMEOUT` before reaching the stop. The offline suites teleported the synthetic
+servo, so travel time was never modelled.
+
+- `MotionDeadmanConfig::nominal_travel_ticks_per_s` (default 0 = unchanged fixed budget). When
+  set, the first in-range sample fixes the start and the budget becomes `motion_timeout_ms` plus
+  the nominal travel time at that rate; fixed once, so a late sample can only shorten it. Stall,
+  telemetry-age, torque and communication checks are unchanged; so are the write speed, travel,
+  contact targets and repeatability tolerance.
+- `Controller::begin()` sets it to `servo::ServoBus::kBoundedWriteSpeed` for the three Full-Leg
+  deadman configs only; the 16-tick DIRECTION_VERIFY keeps the fixed 12 s. Pinned by
+  `check_full_leg_calibration_wiring` plus four mutation cases.
+- Observability: `FullLegCalibrationExecutor::probeStatus()`; `@CALIBRATION FULL LEG STATUS`
+  prints `CALIBRATION_FULL_LEG_PROBE …`, and the terminal output prints
+  `CALIBRATION_FULL_LEG_PROBE_FINAL …` just before `CALIBRATION_FULL_LEG_RESULT`, so a probe
+  failure's cause (e.g. `MOTION_TIMEOUT` vs `NO_CONTACT_DETECTED`) is visible on hardware.
+- Tests: six `test_motion_deadman` cases; a kinematic 40 ticks/s executor rig that reproduces
+  the hardware signature bit for bit with the old budget (probe `MOTION_TIMEOUT`, pass 1, two
+  writes) and completes all four legs at the physical stops with the new one.
+
 ## Unreleased — current-boot q0 promotion — 2026-09-29
 
 **IMPLEMENTED / OFFLINE-VALIDATED. Never run on hardware.** `@CALIBRATION Q0 PROMOTE

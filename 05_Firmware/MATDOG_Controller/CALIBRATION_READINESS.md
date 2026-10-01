@@ -25,31 +25,53 @@ Compiler V5 profile are current sources. LF V25 remains a historical hardware an
 oracle only. Historical q0, historical physical-unit assignments and historical direction values
 must never be promoted into current-installation calibration evidence.
 
-## 2. Direction is current hardware-contract data
+## 2. Encoder direction is current-installation data (CR0 amended 2026-10-01)
 
-For the current mechanical architecture, `motorDirection` is part of the current URDF / Geometry
-Compiler V5 contract, not a datum that normal recalibration measures.
+**Amended 2026-10-01.** CR0 (2026-09-27) made the URDF custom `motorDirection` the production
+direction. That was a source-semantics error. The field was never measured on the current
+installation, and the repository's own servo contract keeps the hardware encoder-to-q sign
+separate from it, recording eight conflicts: every HIP and every LOWER. On hardware the TRUE LF
+Full Calibration then resolved LF LOWER with it. "LOWER MIN" ran RAW DECREASING and drove the
+shank backward into the short-side (MAX) end-stop. A read-only witness then showed LF HIP was
+also inverted.
 
 The production rule is:
 
 ```text
-q0              = current-installation calibration data; capture and promote
-motorDirection  = current URDF / hardware-contract data; resolve from bound geometry
+q0                = current-installation calibration data; capture and promote every boot
+encoder_direction = current-installation record (MATDOG_SERVO_ALLOCATION.yaml); generated into the bound profile
+URDF motorDirection = design/spec metadata, never encoder polarity
 ```
 
-`JointTransform` therefore carries q0 but no stored direction copy. The current direction is
-resolved through the bound `CalibrationGeometryProfile`, and a geometry-provenance change makes
-previous transforms non-current.
+- `raw = q0 + encoder_direction * ticks(q)`.
+- Each leg joint's `encoder_direction` carries its source and its evidence:
+  - `CURRENT_HARDWARE_WITNESS` — observed on this installation after 2026-08-27 (LF HIP, UPPER
+    and LOWER);
+  - `HISTORICAL_SLOT_UNCHANGED` — the joint slot's 2026-07 `PASS_DIRECTION_TEST`. It is carried
+    because nothing sign-defining in the slot changed: the URDF joint axis and origin, the servo
+    type (ST3215-C018, MATDOG_C018_V1), and the bracket and linkage design. The LF witnesses
+    reproduced their slots' signs on re-slotted and new units.
+- The exporter refuses a leg joint without a valid record. It never falls back to the URDF, and
+  the static audit checks the twelve generated values against the record.
+- Changing the record moves the profile provenance (`allocation_sha256`), so every transform bound
+  to the old sign goes stale. The frozen CR2-C q0 package is bound to the superseded contract and
+  is refused (`REJECT_SOURCE_GEOMETRY`); the fresh capture is the production path.
 
-`DIRECTION_VERIFY` remains an optional maintenance/development diagnostic. Its default budget is
-zero. It is not a prerequisite for calibration acceptance, contact calibration, first stand, or
-normal motion authorization.
+`JointTransform` carries q0 but no stored direction copy. The direction is resolved through the
+bound `CalibrationGeometryProfile` (`GeometryJointRecord::encoder_direction`).
 
-A mechanical/topology change that invalidates the URDF contract requires updating and
-re-validating the URDF/geometry source; it does not justify silently copying a historical
-direction.
+`DIRECTION_VERIFY` remains an optional maintenance/development diagnostic with a default budget
+of zero. A sign is established from a current hardware witness, or from unchanged slot evidence
+as above, before Full Calibration. It is never established from the URDF, and never by symmetry
+or a historical value alone.
+
+A change to a slot's mounting orientation, transmission, servo type or encoder convention, or
+its URDF joint axis, invalidates that slot's carried sign. It needs a new current-installation
+witness.
 
 ## 3. Full operational calibration does not mean 24 contact motions
+
+> **SUPERSEDED 2026-09-30 — TRUE FULL CALIBRATION = 24 CONTACTS.** 4 legs × 3 joints × MIN/MAX. A leg is `HARDWARE_CONTACT_CALIBRATED` only with 6/6, the robot only with 24/24. The V5 classification below describes V5's own q=0 evaluation context. It does not describe the calibration's scope. The 16 HIP/LOWER contacts are reached through the LF V25 full-leg sequence (held prerequisite poses), authorized by the geometry-validated `CalibrationSequencePlan`, never by weakening `isExecutable()`. See [`2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md`](../../09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md).
 
 Geometry Compiler V5 currently classifies the 24 leg endpoints as:
 
@@ -159,8 +181,8 @@ should be closed first.
 
 CR0 is complete when repository truth is internally consistent on these three points:
 
-1. normal calibration does not require measuring `motorDirection`; `DIRECTION_VERIFY` is
-   diagnostic-only;
+1. the encoder direction comes from the current-installation record, never the URDF
+   `motorDirection` (amended 2026-10-01); `DIRECTION_VERIFY` is diagnostic-only;
 2. Full Calibration does not require commanding the 16 hip/lower diagnostic contacts beyond the
    URDF domain;
 3. future calibration motion authorization is explicitly distinct from final
@@ -177,7 +199,8 @@ authorization.
 **IMPLEMENTED on `feat/calibration-readiness-v1`.**
 
 Repository contracts now agree that:
-- production `motorDirection` comes from current URDF / Geometry V5;
+- production encoder direction comes from the current-installation `encoder_direction` record
+  (amended 2026-10-01: the URDF `motorDirection` is spec metadata only);
 - Full Calibration does not require the 16 beyond-URDF hip/lower contacts;
 - controlled calibration motion will need a session-scoped permit distinct from final
   `hardware_motion_authorized`.

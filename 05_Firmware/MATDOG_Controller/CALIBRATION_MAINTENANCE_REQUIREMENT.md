@@ -90,6 +90,8 @@ NOT_REQUIRED_BEFORE_FIRST_STAND  !=  REMOVED_FROM_CALIBRATION
 The decision in [`CALIBRATION_BOOTSTRAP.md`](CALIBRATION_BOOTSTRAP.md) §8 to defer some contact
 probes past the first stand is a **scheduling** decision only:
 
+> **SUPERSEDED 2026-09-30 — TRUE FULL CALIBRATION = 24 CONTACTS.** 4 legs × 3 joints × MIN/MAX. A leg is `HARDWARE_CONTACT_CALIBRATED` only with 6/6, the robot only with 24/24. The V5 classification below describes V5's own q=0 evaluation context. It does not describe the calibration's scope. The 16 HIP/LOWER contacts are reached through the LF V25 full-leg sequence (held prerequisite poses), authorized by the geometry-validated `CalibrationSequencePlan`, never by weakening `isExecutable()`. See [`2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md`](../../09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md).
+
 - the **8 upper-leg contacts** remain part of final calibration;
 - the **16 hip / lower-leg contacts** remain a maintenance and model-validation capability, to be
   enabled only when a dedicated geometry-safe plan exists for beyond-URDF travel.

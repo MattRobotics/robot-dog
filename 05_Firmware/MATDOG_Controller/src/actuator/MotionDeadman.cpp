@@ -8,6 +8,10 @@ void MotionDeadmanMonitor::begin(const MotionDeadmanConfig& config, uint16_t tar
   config_ = config;
   target_tick_ = target_tick;
   started_at_ms_ = started_at_ms;
+  // Until a travel-aware budget is fixed (see fixTravelBudget()) the fixed
+  // motion_timeout_ms alone is enforced - the shorter of the two.
+  motion_budget_ms_ = config.motion_timeout_ms;
+  travel_budget_fixed_ = false;
   // The staleness/stall clocks start from motion start, not from "forever
   // ago": a monitor that has not yet received its first sample must not
   // immediately report STALE_TELEMETRY/STALLED before the caller has had any
@@ -23,7 +27,7 @@ MotionDeadmanVerdict MotionDeadmanMonitor::evaluateAgainstClockOnly(uint32_t now
 
   // Timeout outranks everything: an exhausted budget is exhausted regardless
   // of how healthy telemetry looked a moment ago.
-  if (now_ms - started_at_ms_ >= config_.motion_timeout_ms) {
+  if (now_ms - started_at_ms_ >= motion_budget_ms_) {
     return MotionDeadmanVerdict::TIMED_OUT;
   }
   if (now_ms - last_good_sample_ms_ >= config_.max_telemetry_age_ms) {
@@ -40,11 +44,27 @@ MotionDeadmanVerdict MotionDeadmanMonitor::poll(uint32_t now_ms) const {
   return evaluateAgainstClockOnly(now_ms);
 }
 
+void MotionDeadmanMonitor::fixTravelBudget(int32_t present_position) {
+  if (travel_budget_fixed_ || config_.nominal_travel_ticks_per_s == 0) return;
+  // A read that "succeeded" can still carry a failed register read (-1) or
+  // garbage: only a position inside the unsigned no-wrap tick domain may
+  // define the travel. Anything else leaves the shorter fixed budget alone.
+  if (present_position < 0 || present_position > 4095) return;
+  const int32_t delta = present_position - static_cast<int32_t>(target_tick_);
+  const uint32_t travel_ticks = static_cast<uint32_t>(delta < 0 ? -delta : delta);
+  const uint32_t rate = config_.nominal_travel_ticks_per_s;
+  const uint32_t travel_ms = (travel_ticks * 1000u + rate - 1u) / rate;  // ceil
+  motion_budget_ms_ = config_.motion_timeout_ms + travel_ms;
+  travel_budget_fixed_ = true;
+}
+
 MotionDeadmanVerdict MotionDeadmanMonitor::evaluate(const TelemetrySample& sample,
                                                     uint32_t now_ms) {
   if (!began_) return MotionDeadmanVerdict::STALE_TELEMETRY;
 
-  if (now_ms - started_at_ms_ >= config_.motion_timeout_ms) {
+  if (sample.read_ok) fixTravelBudget(sample.present_position);
+
+  if (now_ms - started_at_ms_ >= motion_budget_ms_) {
     return MotionDeadmanVerdict::TIMED_OUT;
   }
 

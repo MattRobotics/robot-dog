@@ -19,6 +19,7 @@
 // pass/fail tally. Run via scripts/tests/run_host_tests.sh.
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <initializer_list>
 
@@ -124,11 +125,22 @@ class FakeActuatorBackend : public actuator::ActuatorBackend {
     ++calls;
     return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
-  actuator::BackendWriteOutcome writeGoalPosition(uint8_t, uint16_t) override {
+  actuator::BackendWriteOutcome writeGoalPosition(uint8_t, uint16_t target_tick,
+                                                  actuator::MotionProfile profile) override {
     ++calls;
+    last_target_tick = target_tick;
+    last_profile = profile;
+    return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
+  }
+  actuator::BackendWriteOutcome writeCalibrationTorqueLimit(uint8_t) override {
+    ++calls;
+    ++torque_limit_calls;
     return actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   }
   int calls = 0;
+  int torque_limit_calls = 0;
+  uint16_t last_target_tick = 0;
+  actuator::MotionProfile last_profile = actuator::MotionProfile::BOUNDED_DEFAULT;
 };
 
 // One fully-wired rig: real arbiter, real policy, real runtime, real
@@ -515,7 +527,253 @@ void test_to_string_fails_closed_on_corrupted_value() {
 
 }  // namespace
 
+// ---------------------------------------------------------------------------
+// Staged endpoint search (2026-09-29): a CONTACT_PROBE step is a raw tick
+// bounded by the endpoint's calibration search corridor (URDF limit + 64 on
+// the probe side, the other URDF limit behind), re-derived by the policy. The
+// V25 calibration speed profile exists only for the calibration moves. The
+// contact+16 / URDF-clamp allowance this replaces is gone.
+// ---------------------------------------------------------------------------
+
+struct UpperCase {
+  Leg leg;
+  const char* unit;
+  uint8_t bus;
+  uint16_t q0;  // the 2026-09-29 22:05 current-boot capture
+};
+constexpr UpperCase kUppers[4] = {{Leg::LF, "ELR01", 12, 2086},
+                                  {Leg::RF, "ELR03", 22, 2108},
+                                  {Leg::RH, "ELR02", 32, 2042},
+                                  {Leg::LH, "M42", 42, 2072}};
+
+void armProbeRig(Rig& rig, const UpperCase& u, ContactSide side, AuthorityLease* lease_out) {
+  CHECK(rig.policy.transforms().admit(
+      promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0)));
+  const AuthorityLease lease =
+      grant(rig.arbiter, ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE);
+  const actuator::GeometryEndpointRecord* ep =
+      rig.profile.findEndpoint(u.leg, JointKind::UPPER, side);
+  CHECK(ep != nullptr);
+  actuator::CalibrationBootstrapContext bootstrap{};
+  bootstrap.session_active = true;
+  bootstrap.origin = CalibrationOrigin::LIVE_SESSION;
+  bootstrap.motion_permit_active = true;
+  bootstrap.motion_permit_generation = 1;
+  bootstrap.motion_permit_session_id = 1;
+  bootstrap.motion_permit_authority_generation = lease.generation;
+  bootstrap.auxiliary_parked =
+      ep != nullptr && ep->parking == actuator::ParkingOutcome::FEASIBLE_1DOF_PLAN_FOUND;
+  bootstrap.parked_leg = u.leg;
+  bootstrap.parked_joint = JointKind::UPPER;
+  bootstrap.parked_side = side;
+  rig.policy.setBootstrapContext(bootstrap);
+  *lease_out = lease;
+}
+
+actuator::CalibrationSearchCorridor corridorOf(const Rig& rig, const UpperCase& u, ContactSide side) {
+  actuator::CalibrationSearchCorridor c{};
+  CHECK(actuator::resolveCalibrationSearchCorridor(
+            rig.profile, actuator::geometry_data::kProvenance,
+            promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0), u.leg, JointKind::UPPER,
+            side, &c) == actuator::TargetResolveStatus::OK);
+  return c;
+}
+
+CalibrationExecutionRequest searchStep(const UpperCase& u, ContactSide side, uint16_t tick) {
+  CalibrationExecutionRequest req =
+      contactProbe(joint(u.leg, JointKind::UPPER, u.unit), u.leg, JointKind::UPPER, side);
+  req.calibration_search = true;
+  req.search_target_tick = tick;
+  req.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;
+  return req;
+}
+
+void test_corridor_is_v25_guard_and_entry_every_leg_both_sides() {
+  g_case = "corridor: guard = URDF limit + 64, entry = URDF limit - 64, contact inside";
+  for (const UpperCase& u : kUppers) {
+    for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
+      Rig rig;
+      const actuator::CalibrationSearchCorridor c = corridorOf(rig, u, side);
+      const actuator::GeometryJointRecord* j = rig.profile.findJoint(joint(u.leg, JointKind::UPPER, u.unit));
+      uint16_t limit = 0;
+      CHECK(actuator::resolveUrdfQToRaw(rig.profile, actuator::geometry_data::kProvenance,
+                                        promotedTransform(joint(u.leg, JointKind::UPPER, u.unit), u.q0),
+                                        side == ContactSide::MIN_SIDE ? j->urdf_lower : j->urdf_upper,
+                                        &limit) == actuator::TargetResolveStatus::OK);
+      CHECK_EQ(c.urdf_limit_tick, limit);
+      CHECK_EQ(c.guard_tick, limit + c.probe_sign * 64);
+      CHECK_EQ(c.entry_tick, limit - c.probe_sign * 64);
+      CHECK_EQ(c.home_tick, u.q0);
+      // Guard-to-contact room covers the hand-found LF MIN stop (~23 past contact).
+      CHECK(actuator::searchDepth(c, c.guard_tick) - actuator::searchDepth(c, c.contact_tick) >= 64);
+      // The raw direction follows the joint's URDF direction and the side.
+      const int dir = u.leg == Leg::RF || u.leg == Leg::RH ? -1 : 1;
+      CHECK_EQ(c.probe_sign, dir * (side == ContactSide::MIN_SIDE ? -1 : 1));
+    }
+  }
+  {
+    Rig rig;  // a q0 that pushes the MAX guard past raw 4095 is refused, never wrapped
+    actuator::CalibrationSearchCorridor c{};
+    CHECK(actuator::resolveCalibrationSearchCorridor(
+              rig.profile, actuator::geometry_data::kProvenance,
+              promotedTransform(joint(Leg::LF, JointKind::UPPER, "ELR01"), 2700), Leg::LF,
+              JointKind::UPPER, ContactSide::MAX_SIDE, &c) != actuator::TargetResolveStatus::OK);
+    CHECK(!c.valid());
+  }
+  {
+    Rig rig;  // the corridor belongs to the probed joint itself
+    actuator::CalibrationSearchCorridor c{};
+    CHECK(actuator::resolveCalibrationSearchCorridor(
+              rig.profile, actuator::geometry_data::kProvenance,
+              promotedTransform(joint(Leg::LF, JointKind::UPPER, "ELR01"), 2086), Leg::RF,
+              JointKind::UPPER, ContactSide::MIN_SIDE, &c) == actuator::TargetResolveStatus::REJECT_JOINT);
+  }
+}
+
+void test_search_step_bounded_by_the_corridor_every_leg_both_sides() {
+  g_case = "search step: guard and opposite URDF limit admitted, one tick past either refused";
+  for (const UpperCase& u : kUppers) {
+    for (ContactSide side : {ContactSide::MIN_SIDE, ContactSide::MAX_SIDE}) {
+      const actuator::CalibrationSearchCorridor c = [&] { Rig r; return corridorOf(r, u, side); }();
+      const int s = c.probe_sign;
+      struct { int tick; bool ok; } cases[] = {{c.guard_tick, true},
+                                               {c.guard_tick + s, false},
+                                               {c.contact_tick, true},
+                                               {c.entry_tick, true},
+                                               {c.opposite_limit_tick, true},
+                                               {c.opposite_limit_tick - s, false}};
+      for (const auto& k : cases) {
+        Rig rig;
+        AuthorityLease lease{};
+        armProbeRig(rig, u, side, &lease);
+        const CalibrationExecutionResult r = rig.engine.execute(
+            searchStep(u, side, static_cast<uint16_t>(k.tick)),
+            liveContext(lease, OperatingMode::MAINTENANCE), u.bus);
+        CHECK_EQ((int)r.outcome, (int)CalibrationExecutionOutcome::ROUTED_TO_POLICY);
+        CHECK_EQ((int)r.policy_decision,
+                 (int)(k.ok ? WriteDecision::ACCEPT : WriteDecision::REJECT_CALIBRATION_SEARCH));
+        CHECK_EQ(rig.backend.calls, k.ok ? 1 : 0);
+        if (k.ok) {
+          CHECK_EQ(rig.backend.last_target_tick, k.tick);
+          CHECK((int)rig.backend.last_profile == (int)actuator::MotionProfile::CALIBRATION_SEARCH);
+        }
+      }
+      // The non-search CONTACT_PROBE rule is unchanged: never past the contact.
+      Rig rig;
+      AuthorityLease lease{};
+      armProbeRig(rig, u, side, &lease);
+      CalibrationExecutionRequest legacy =
+          contactProbe(joint(u.leg, JointKind::UPPER, u.unit), u.leg, JointKind::UPPER, side);
+      const actuator::MicroRad contact = rig.profile.findEndpoint(u.leg, JointKind::UPPER, side)->contact;
+      legacy.target_urad = contact + (side == ContactSide::MIN_SIDE ? -1 : 1);
+      CHECK_EQ((int)rig.engine.execute(legacy, liveContext(lease, OperatingMode::MAINTENANCE), u.bus)
+                   .policy_decision,
+               (int)WriteDecision::REJECT_TARGET_OUTSIDE_URDF_LIMITS);
+    }
+  }
+}
+
+void test_search_and_calibration_profile_are_calibration_only() {
+  g_case = "calibration search / speed profile: refused for every non-calibration command";
+  const UpperCase& u = kUppers[0];
+  const JointIdentity id = joint(u.leg, JointKind::UPPER, u.unit);
+  Rig rig;
+  AuthorityLease lease{};
+  armProbeRig(rig, u, ContactSide::MAX_SIDE, &lease);
+  CHECK(rig.policy.transforms().admit(promotedTransform(joint(Leg::LH, JointKind::UPPER, "M42"), 2072)));
+
+  // Engine: a search step on another intent fails closed before the policy.
+  CalibrationExecutionRequest dv{};
+  dv.intent = CalibrationIntent::DIRECTION_VERIFY;
+  dv.joint = id;
+  dv.direction_verify_delta_ticks = 16;
+  dv.calibration_search = true;
+  CHECK_EQ((int)rig.engine.execute(dv, liveContext(lease, OperatingMode::MAINTENANCE), u.bus).outcome,
+           (int)CalibrationExecutionOutcome::REJECT_TARGET_RESOLUTION);
+  CHECK_EQ(rig.backend.calls, 0);
+
+  // Policy, directly: the search flag on anything but CONTACT_PROBE...
+  for (actuator::ActuatorOperation op :
+       {actuator::ActuatorOperation::TORQUE_ENABLE, actuator::ActuatorOperation::POSITION_COMMAND,
+        actuator::ActuatorOperation::DIRECTION_VERIFY,
+        actuator::ActuatorOperation::CALIBRATION_AUXILIARY_MOVE}) {
+    actuator::ActuatorCommand cmd{};
+    cmd.operation = op;
+    cmd.joint = id;
+    cmd.target_tick = 2048;
+    cmd.calibration_search = true;
+    actuator::ActuatorTransaction txn{};
+    CHECK_EQ((int)rig.policy.plan(cmd, lease, OperatingMode::MAINTENANCE, &txn),
+             (int)WriteDecision::REJECT_CALIBRATION_SEARCH);
+  }
+  // ...and the calibration speed profile on anything but the two calibration moves.
+  for (actuator::ActuatorOperation op :
+       {actuator::ActuatorOperation::TORQUE_ENABLE, actuator::ActuatorOperation::POSITION_COMMAND,
+        actuator::ActuatorOperation::DIRECTION_VERIFY}) {
+    actuator::ActuatorCommand cmd{};
+    cmd.operation = op;
+    cmd.joint = id;
+    cmd.target_tick = 2048;
+    cmd.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;
+    actuator::ActuatorTransaction txn{};
+    CHECK_EQ((int)rig.policy.plan(cmd, lease, OperatingMode::MAINTENANCE, &txn),
+             (int)WriteDecision::REJECT_MOTION_PROFILE);
+  }
+  {  // a corrupted profile value is refused even for CONTACT_PROBE
+    actuator::ActuatorCommand cmd{};
+    cmd.operation = actuator::ActuatorOperation::CALIBRATION_CONTACT_PROBE;
+    cmd.joint = id;
+    cmd.endpoint_leg = u.leg;
+    cmd.endpoint_joint = JointKind::UPPER;
+    cmd.endpoint_side = ContactSide::MAX_SIDE;
+    cmd.calibration_search = true;
+    cmd.target_tick = corridorOf(rig, u, ContactSide::MAX_SIDE).contact_tick;
+    cmd.motion_profile = static_cast<actuator::MotionProfile>(7);
+    actuator::ActuatorTransaction txn{};
+    CHECK_EQ((int)rig.policy.plan(cmd, lease, OperatingMode::MAINTENANCE, &txn),
+             (int)WriteDecision::REJECT_MOTION_PROFILE);
+  }
+  {  // stand/gait: MOTION owner, POSITION_COMMAND - neither flag, ever
+    Rig motion_rig;
+    CHECK(motion_rig.policy.transforms().admit(promotedTransform(id, u.q0)));
+    const AuthorityLease motion =
+        grant(motion_rig.arbiter, ActuatorAuthority::MOTION, OperatingMode::RUN);
+    actuator::ActuatorCommand cmd{};
+    cmd.operation = actuator::ActuatorOperation::POSITION_COMMAND;
+    cmd.joint = id;
+    cmd.target_tick = 2048;
+    cmd.calibration_search = true;
+    actuator::ActuatorTransaction txn{};
+    CHECK_EQ((int)motion_rig.policy.plan(cmd, motion, OperatingMode::RUN, &txn),
+             (int)WriteDecision::REJECT_CALIBRATION_SEARCH);
+    cmd.calibration_search = false;
+    cmd.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;
+    CHECK_EQ((int)motion_rig.policy.plan(cmd, motion, OperatingMode::RUN, &txn),
+             (int)WriteDecision::REJECT_MOTION_PROFILE);
+  }
+  {  // the auxiliary park may use the calibration profile, at its exact pose only
+    CalibrationExecutionRequest aux{};
+    aux.intent = CalibrationIntent::AUXILIARY_MOVE;
+    aux.joint = joint(Leg::LH, JointKind::UPPER, "M42");
+    aux.endpoint_leg = Leg::LF;
+    aux.endpoint_joint = JointKind::UPPER;
+    aux.endpoint_side = ContactSide::MAX_SIDE;
+    aux.target_urad = 610865;
+    aux.motion_profile = actuator::MotionProfile::CALIBRATION_SEARCH;
+    const CalibrationExecutionResult r =
+        rig.engine.execute(aux, liveContext(lease, OperatingMode::MAINTENANCE), 42);
+    CHECK_EQ((int)r.policy_decision, (int)WriteDecision::ACCEPT);
+    CHECK((int)rig.backend.last_profile == (int)actuator::MotionProfile::CALIBRATION_SEARCH);
+  }
+  CHECK(std::strcmp(actuator::toString(actuator::MotionProfile::CALIBRATION_SEARCH),
+                    "CALIBRATION_SEARCH") == 0);
+  CHECK(std::strcmp(actuator::toString(static_cast<actuator::MotionProfile>(7)), "UNKNOWN") == 0);
+}
+
 int main() {
+  test_corridor_is_v25_guard_and_entry_every_leg_both_sides();
+  test_search_step_bounded_by_the_corridor_every_leg_both_sides();
+  test_search_and_calibration_profile_are_calibration_only();
   test_authority_loss_produces_zero_restore_motion();
   test_stale_authority_generation_rejected();
   test_diagnostic_endpoint_cannot_become_executable();

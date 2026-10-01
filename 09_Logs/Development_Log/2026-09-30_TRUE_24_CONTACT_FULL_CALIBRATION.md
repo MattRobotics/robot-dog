@@ -1,0 +1,568 @@
+# TRUE Full Calibration = 24 contacts — LF V25 full-leg state machine generalized (2026-09-30)
+
+Branch `fix/full-calibration-24-contact-v25-generalized-v1` (from `84bafcc`). Supersedes the
+UPPER-only "Full Leg" of PR #34 (`fix/calibration-hw-session-20260929`), which stays in the
+history unchanged and is **not** Full Calibration.
+
+Status: **HARDWARE-VALIDATED 2026-10-01 — TRUE FULL CALIBRATION 24/24** (§8e; firmware
+`dfcecb670d05`). *Original status (2026-09-30):* implemented / offline-validated, hardware not run. Every hardware step needs the operator's explicit go-ahead for that session.
+
+## 1. The scope error (what was wrong, and why it happened)
+
+PR #34 shipped a "four-leg Full Calibration" that measured **two contacts per leg (UPPER MIN/MAX),
+eight in all**, and called a leg `HARDWARE_CONTACT_CALIBRATED` on those two. That is not Full
+Calibration.
+
+**The one definition, from now on:**
+
+```
+TRUE FULL CALIBRATION = 4 legs x 3 joints (HIP, UPPER, LOWER) x 2 endpoints (MIN, MAX)
+                      = 24 physical contact witnesses
+a leg is HARDWARE_CONTACT_CALIBRATED only with 6/6; the robot only with 24/24.
+```
+
+Where the error came from. The Geometry Compiler V5 profile evaluates every endpoint from `q=0`
+with **all other joints at `q=0`**. In that context the 16 HIP/LOWER contacts lie just outside
+the URDF limits and are classified `DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS`, and only the 8 UPPER
+endpoints are `EXECUTABLE_URDF_DOMAIN`. `DEVELOPMENT_GATES.md` and `CALIBRATION_READINESS.md §3` then
+concluded "*Full operational calibration does **not** mean 24 contact motions: the eight upper
+contacts are the current physical contact-calibration set*". That conclusion confused **a
+property of V5's q=0 evaluation context** with **the calibration's scope**.
+
+The only calibrator ever validated on hardware, LF V25 (`matdog.rs run_lf_state_machine`,
+58/58 steps, **6/6 LF contacts**), never probed a HIP or LOWER from the V5 q=0 context. It held the
+leg's other joints at reviewed prerequisite poses: UPPER horizontal while the LOWER is probed,
+UPPER raised and LOWER folded while the HIP is probed. It moved between those poses in a fixed
+order. The DIAGNOSTIC label never applied to that sequence. The correction keeps V5 as the
+source of the canonical contact and the URDF domain, and adds a **second, geometry-validated
+authorization object** for exactly the V25 sequence (§4).
+
+Superseded statements, now corrected in place: `DEVELOPMENT_GATES.md` (Calibration gate,
+GEOMETRY bullet), `CALIBRATION_READINESS.md §3`, `CALIBRATION_BOOTSTRAP.md` (the "8 upper
+endpoints only" passages), `CALIBRATION_MAINTENANCE_REQUIREMENT.md`, `ROADMAP.md` (persistence
+record: 24 contacts, not 8).
+
+## 2. What the firmware does now (one leg)
+
+`FullLegCalibrationExecutor` is the V25 state machine, generalized. Every target is resolved from
+the current promoted q0, the transform direction, the Geometry V5 URDF domain and the validated
+sequence plan (`FullLegCalibrationPlan.cpp`). Nothing is leg-specific.
+
+| # | Phase | Moves | Held (torque on, GoalPosition = pose, ≤10 ticks) |
+|---|---|---|---|
+| 1 | PREFLIGHT | — | all 12 leg joints torque-OFF, fresh telemetry |
+| 2 | INITIAL_RECOVERY | every leg joint of the robot → promoted q0, one at a time, then SAFE_OFF | — |
+| 3 | PARKING | front legs: rear UPPER → 35° (Geometry V5's own UPPER MAX auxiliary) | park |
+| 4 | UPPER_MIN | HIP → q0, LOWER → q0, then the staged search | park, HIP@q0, LOWER@q0 |
+| 5 | UPPER_MAX | search from the MIN contact | park, HIP@q0, LOWER@q0 |
+| 6 | UPPER_HORIZONTAL | UPPER → +90° (V25 UPPER_90) | park, HIP, LOWER |
+| 7 | LOWER_MIN | search | park, HIP@q0, UPPER@90° |
+| 8 | LOWER_MAX | search from the MIN contact | park, HIP@q0, UPPER@90° |
+| 9 | LOWER_FOLDED | LOWER → folded; UPPER → HIP-MIN clearance pose where it differs | park, UPPER, LOWER |
+| 10 | HIP_MIN | search | park, UPPER@clearance(MIN), LOWER@folded |
+| 11 | HIP_MAX | where the per-side clearance differs (LF, RF): HIP → q0, UPPER → MAX pose; then search | park, UPPER@clearance(MAX), LOWER@folded |
+| 12 | DIAGNOSTICS | V25 derive_joint_evidence: ordering, affine scale 850–1150‰, q0 shift ≤ 96 | |
+| 13–16 | RETURN_HIP → RETURN_LOWER_HELD → RETURN_UPPER → RESTORE_PARKING | back to q0 in V25 order | |
+| 17–18 | CLEANUP → TORQUE_OFF | verified SAFE_OFF of all 12, leg at rest ≤ 16 ticks of q0 | |
+
+COMPLETE only with **6/6 contacts + accepted diagnostics + verified rest**. A safety failure goes
+straight to the verified SAFE_OFF of every leg joint. A diagnostics rejection first returns the
+leg through the reviewed RETURN phases, then ends FAILED.
+
+`@CALIBRATION INITIAL RECOVERY <LEG> CONFIRM_Q0_RECOVERY` runs phases 1–2 alone, then the verified
+SAFE_OFF (recovery-only run). It gives the controller-verified q0 baseline the operator requires
+after a fresh q0 promotion, before any leg moves. It uses the same session and permit, and the
+leg run that follows starts from PREFLIGHT.
+
+## 3. Gap analysis against LF V25, and every deliberate deviation
+
+Full item-by-item mapping:
+[`2026-09-30_FULL_CALIBRATION_24_CONTACT_V25_TRACEABILITY.md`](2026-09-30_FULL_CALIBRATION_24_CONTACT_V25_TRACEABILITY.md).
+
+Ported unchanged: phase order; held sets (`prerequisites_for`); `hip_upper_clearance_delta`
+(LF 90/85, RF 85/90, rear 90/90); UPPER_90 (1024 ticks), UPPER_85 (967); the V25 StableTargetGate
+(≤10 ticks, |speed| ≤ 4, 4 samples, ≥ 400 ms) that promotes a moved joint to held; the V25
+ActivelyHeld supervision of every held joint (`validate_lf_role_observation`: fresh telemetry,
+status, hard current, temperature, TorqueEnable/TorqueLimit/GoalPosition readback, drift ≤ 10 —
+no speed abort, §8c); passive corridor ±32;
+non-participant drift ≤ 16; rest ≤ 16; 12 s motion timeout + travel at 80 ticks/s; telemetry ≤ 3 s;
+TorqueLimit 500 before TorqueEnable; the V25 contact search stage for stage (moving-current
+baseline, **coarse contact scout** at 64, release, backoff 96 arrived through V25's
+StableTargetGate, fine 1 and fine 2 at 8 judged against the scout — adaptive corridor scout − 32,
+one-fine-step lag bypass, kinematic plateau —, telemetry timeout 2 s,
+repeatability fine-to-fine ≤ 16; guard/entry ±64, travel ≥ 24, settle 900 ms, current only as
+abort); `stop_pressure` after every accepted approach; affine diagnostics from the fine passes;
+return order; verified global torque-off on every exit; TorqueLimit never restored (RAM, until
+power cycle).
+
+Deviations, each with its reason:
+
+| # | V25 | Now | Reason |
+|---|---|---|---|
+| D1 | `normalize_all_matdog_joints_to_q0` skipped a joint already within 10 ticks of home | **every one of the 12 is actively commanded to q0**, prime → limit → torque → move → settle → SAFE_OFF | operator requirement 2026-09-30: a capture next to the pose is not a controller-verified baseline |
+| D2 | recovery wrote GoalPosition = HOME with torque OFF, then enabled torque (the servo drives itself home at the torque-on instant) | GoalPosition := **present** (torque off), TorqueLimit, torque on (no motion), then a reviewed move to q0 | no torque-on instant ever has a goal away from the present position; the stale-goal hazard is structurally absent |
+| D3 | rear LOWER fold `LOWER_FOLDED_DELTA = −990` (−87.01°) (V25 never ran a rear leg) | rear legs **−455 ticks (−39.99°)**; front legs keep −990 | nominal CAD: at −87° the folded RH/LH lower leg passes the body at **0.04 mm** during the HIP sweep, inside mesh/assembly tolerance, so a false contact is plausible. At −455 the worst interior clearance is **2.02 mm** (§4) |
+| D4 | rear UPPER parked at `UPPER_30_DELTA` (30°) | **35.000°** | the current Geometry V5 compiler's own parking plan for LF/RF UPPER MAX; the pre-reset 30° is superseded |
+| D5 | — | **RETIRED 2026-09-30 (§8c); not an active deviation.** It was an additional post-V25 safety rule: an already-held joint failed at \|speed\| > 40 raw on two consecutive samples. Held-role supervision is now V25's `ActivelyHeld` validation. V25's `LF_HELD_MAX_SPEED_RAW = 4` is kept where V25 uses it: the StableTargetGate that promotes a joint to held, and the INITIAL_RECOVERY settle | hardware: it false-aborted LF UPPER MAX while the held joint stayed inside its 10-tick hold |
+| D6 | coarse contact scout, fine passes accept down to scout − 32 | **CLOSED (corrective commit on 873a121).** Was: no coarse scout, pass 1 a fine pass, pass 2 judged against pass 1 (inherited from PR #34). Now the V25 sequence: baseline → coarse scout (64) → release → backoff (StableTargetGate) → fine 1 → backoff → fine 2, both fine passes judged against the scout (§3b). The remaining implementation differences are listed in the traceability log | — |
+| D7 | one LF-only state machine, station-mediated RAM writes | one generic executor behind `SafeActuatorPolicy`; each move is policy-authorized against the phase table and **re-derived by the policy** | architecture |
+| D8 | LF hardware run (`lf_hip_sequence_profile`): UPPER 90° for **both** HIP sides | V25's generic `hip_upper_clearance_delta`: LF 90/85, RF 85/90, rear 90/90 (HIP → q0, UPPER → the MAX pose between the sides) | Geometry V5: at UPPER 90° on both sides the folded lower leg hits `base_link` before the URDF limit (LF HIP MIN→MAX, RF HIP MIN: `PATH_OBSTRUCTION_BEFORE_URDF_LIMIT`); the per-side poses are `CLEAR_TO_END` (traceability, § HIP clearance pose). A mechanical-installation/geometry deviation, not a search change: on LF/RF the HIP MAX search starts at q0 instead of the HIP MIN contact, so its raw scout-grid phase differs from historical LF V25 |
+| D10 | the scout ends when the next 64-tick step would pass the guard (grid-phase blind gap before it) | **ONE final bounded partial coarse step targets the existing guard** (0 < Δ < 64, never beyond, never repeated); same detector and safety rules; guard, step size, corridor, fine passes unchanged | measured 2026-09-30: the real LF UPPER MIN stop (raw 1468, URDF + 25 at q0 2090) lay in V25's gap (margin −3…+1). NOT V25 behaviour: a current-installation robustness adaptation; phase-independent reach now guard − 18 |
+| D9 | the configured temperature limit (EEPROM 0x0D) re-read with every observation | verified by the persistent-profile preflight (0x0D = 70); the present temperature is checked on every sample against 70 °C | LOW, intentional: no EEPROM reads in the hot calibration loop |
+
+**Risk R1 (hardware, flagged — not changed without evidence).** V25's LF HIP MAX contact was
++39.375° = **448 ticks, exactly the corridor entry** (URDF 512 − 64). V25 accepted it with zero
+margin. On this installation a contact a tick or two shallower (q0 placement, assembly) fails
+`HIP_MAX_PROBE_FAILED / EARLY_STALL_OUTSIDE_CORRIDOR` after 5/6 contacts. RF HIP MIN mirrors it.
+This is pinned by the executor suite (`V25 LF hardware contact set replayed` passes at 448;
+`one tick before the entry` fails closed). If it happens on hardware: stop, keep the evidence,
+and decide a corridor change from the measured stop, not before. (Geometry V5 suggests V25's
+448 was a lower-leg/body contact at UPPER 90°; the plan probes LF HIP MAX at UPPER 85°, so the
+real HIP stop may lie deeper. That is a hypothesis to check on hardware, not evidence.)
+
+**Risk R2 (hardware) — closed by D10 on measured evidence.** V25's scout reach was the deepest
+legal 64-tick grid target − 11, so it depended on the fresh q0 (the stop is fixed in raw ticks while
+the corridor and grid move with q0). On 2026-09-30 the measured LF UPPER MIN stop (raw 1468) at the
+fresh q0 2090 had a V25-grid margin of −3…+1, and the run was stopped before any motion. With D10
+the endpoint reach is guard − 18 for every q0, a margin of +21 for that stop. The original analysis
+is kept below for the record.
+
+The known LF UPPER MIN stop (found by hand 2026-09-29, raw ≈ 1470, depth 616 at that boot's q0
+2086) lies at depth q0 − 1470 against a reach of about start depth + 619…623. The margin is
+positive near q0 2086 and negative near 2100 (CR2-C).
+
+Rule: after the fresh Q0 PROMOTE, compute a read-only reach report from the promoted q0 and refine
+it after INITIAL RECOVERY. If the margin is < 0, stop before Full Calibration. Nothing is widened.
+A miss on hardware is `UPPER_MIN_PROBE_FAILED / NO_CONTACT_BEFORE_GUARD` at 0/6 and SAFE_OFF
+(traceability, § Reach).
+
+**Installation fact.** The current ST3215s were recentred near their raw mid-range (~2048) before
+mounting, PositionOffset = 0, and q=0 lies near 2048 but not at it. 2048 is a servo/provisioning
+fact only, never q0, a target or a search origin. Every calibration target is the fresh promoted
+q0 + direction · q (proven for two installations and all 24 corridors by
+`test_recentred_installation_translation`). Historical LF V25 raw numbers are never targets.
+
+### 3b. The coarse contact scout (D6 closed, 2026-09-30)
+
+Every one of the 24 endpoint searches now runs V25 `measure_lf_contact_side_efficient` stage for
+stage in the one generic `ContactProbeEngine`. The steps: a 64-tick moving-current baseline from
+the present pose, then the coarse contact scout. The scout steps 64 ticks from the baseline end
+through the static corridor, never clamped. Its pre-corridor steps are free-space transit, where
+a stall is only ever an EARLY_STALL. The scout tick is stored (`ContactEvidence.coarse_tick`) as
+reference evidence and never used as metrology. Then GoalPosition := the scout (verified) and
+backoff 96. The backoff counts as arrived only through V25's StableTargetGate: ≤ 12 ticks,
+|speed| ≤ 4, 4 consecutive samples, ≥ 400 ms, reset by any bad sample. Only then are the current
+recovery and the next pass allowed. Then fine pass 1 (8), GoalPosition := fine 1, backoff 96 (same
+gate), fine pass 2 (8), GoalPosition := fine 2, and repeatability |fine 1 − fine 2| ≤ 16. The
+search fails after V25's TELEMETRY_TIMEOUT (2 s, was 3 s) without telemetry. Both fine passes
+use the scout as V25 did: the corridor is extended HOME-ward to scout − 32
+(`ADAPTIVE_FINE_SCOUT_TICKS`). A candidate lagging the scout by more than one fine step
+(`FINE_CONTACT_SCOUT_LAG_TOLERANCE_TICKS = 8`) is a friction/chamfer plateau and is stepped past.
+After a settle window with a large error, the V25 kinematic-plateau confirmation applies. The
+diagnostics use the midpoint of the two fine passes and the envelope uses the second fine pass;
+the scout never enters either. No fine pass runs without an accepted scout
+(`SCOUT_MISSING`), and the executor records no evidence without one. The exact
+mapping, the remaining narrowings and the reach property R2 are in the traceability log.
+
+Unchanged: TorqueLimit 500; speed 160 / acceleration 8; guard/entry ±64; backoff 96; fine step 8;
+hard-current abort 200; telemetry, GoalPosition and TorqueLimit readback on every sample (now
+also in the baseline and the release verification); SAFE_OFF fail-closed; every phase, held set,
+geometry pose, the park and the rear fold. The scout's 64-tick step can leave the target up to
+one coarse step past a stop (V25 behaviour), bounded by TorqueLimit 500, the 200-raw abort and
+the guard.
+
+## 4. Geometry validation of all 24 searches
+
+`06_Software/Matdog_Core/calibration/matdog_full_calibration_sequence_geometry_v5.py` evaluates
+every segment of every leg's sequence on the SHA-pinned URDF (`3890a3f0…`) and collision meshes
+(manifest `60fff604…`), using the same V5 scene/kernel. The segments are parking, both probe
+corridors up to the guard, every prerequisite transition, return and restore. Each is swept at
+0.5° and bisected to 1e-4 rad. Any collision other than the probed joint's own modelled stop
+fails the leg. The start pose of each segment must also be collision-free.
+
+Result (artifacts: `09_Logs/Validation_Reports/Full_Calibration_Sequence_Geometry_2026-09-30/`):
+
+| Leg | Segments | Verdict | Held poses (UPPER for LOWER / HIP MIN / HIP MAX, LOWER fold) | Park |
+|---|---|---|---|---|
+| LF | 15 | all CLEAR_TO_END | 90° / 90° / 84.99° / −87.01° | LH UPPER 35° |
+| RF | 16 | all CLEAR_TO_END | 90° / 84.99° / 90° / −87.01° | RH UPPER 35° |
+| RH | 11 | all CLEAR_TO_END | 90° / 90° / 90° / −39.99° | — |
+| LH | 11 | all CLEAR_TO_END | 90° / 90° / 90° / −39.99° | — |
+
+`CalibrationSequencePlanData.h` is generated from those four artifacts by the tool
+(`--export-header`). `static_audit.py` re-exports it and requires the committed header to match
+exactly, and every segment to be `CLEAR_TO_END` from a clear start.
+
+Evidence of the rear-fold decision (2-D scan UPPER 80–110° × fold −87…−30°, both HIP sides):
+at UPPER 90°, fold −87.01° gives an interior minimum of 0.04–0.14 mm (base ↔ lower leg at
+|hip| 21–31°); fold −40° gives 2.02–2.24 mm, limited by the upper leg approaching the body just
+before the modelled stop. The front legs keep V25's fold. A front fold of −40° brings the lower
+leg within 0.014 mm of the body at −21° on the MIN side, and V25 proved −87° on hardware.
+
+Correction made during validation: the first report's `base_static` field evaluated a transition
+segment's moving joint at q=0 instead of at the segment's start. That flagged a HIT for a pose
+the sequence never visits (UPPER 0° with LOWER folded). The tool now checks the real start pose
+with the segment's own stop excluded, and a HIT fails the leg. The re-run is the committed evidence.
+
+## 5. TorqueLimit 500 (V25 `prepare_motor`)
+
+Ported. `ServoBus::writeReviewedRamTorqueLimit(id)` writes RAM register 48 (`SMS_STS_TORQUE_LIMIT_L`)
+= the compile-time `kReviewedRamTorqueLimit = 500` and returns the verdict of an **independent
+readback**. It is the only raw register write in ServoBus (audit-pinned). The EEPROM Max Torque is
+never written, and nothing restores the value (V25 semantics). It returns at the next power cycle.
+The executor writes it before every TorqueEnable, verifies torque/limit/goal on the next sample,
+and checks the TorqueLimit readback on **every** sample of every held and probed joint.
+
+## 6. Machine-enforced invariants (fail closed)
+
+Every tick, before any write: session/permit/authority/mode continuation. Then every held joint
+(V25 `ActivelyHeld`) must be torque on, GoalPosition equal to its pose, TorqueLimit 500, drift ≤ 10,
+status 0, current < 200, temperature ≤ 70 °C (confirmed, §8b), and telemetry fresher than 3 s. Its
+speed alone never aborts: speed is the settling criterion that promotes a joint to held
+(StableTargetGate, |speed| ≤ 4) and settles INITIAL_RECOVERY (§8c).
+One round-robin bystander is checked per tick: torque off, within 16 of where recovery left it
+(limp participants: within 32 of q0). A probe starts only when the held set is **exactly** V25's
+set at the plan ticks. The policy refuses a probe unless the executor reports it verified, and
+refuses any move not in the phase table, re-deriving the tick itself.
+
+## 7. Offline evidence (this branch)
+
+- host suites: `run_host_tests.sh` exit 0, 0 warnings, failures = 0, including:
+  - `test_contact_probe_engine` (33,419 checks), the V25 search case by case, [T1]–[T15]: the
+    scout in every search, distinct from transit, stored as reference, never metrology,
+    followed by the backoff, 8-tick fine passes judged against it, the plateau bypass, fine
+    pass 2 independent and scout-referenced, fine-only repeatability, no scout = no endpoint,
+    the guard, early friction, every per-sample violation in every stage, and the V25 rule
+    functions against V25's own test values. [H1] covers the V25 backoff StableTargetGate rule by
+    rule: in the band while moving, one good sample, 4 samples inside 400 ms, oscillation and
+    speed resets, current recovery judged only once settled, no fine pass before settling, and
+    fail closed on timeout. [P1]–[P11] cover the final partial scout step (D10): full steps stay
+    64, one partial step < 64 to the guard and never repeated, never past the guard, stops in the
+    old grid gap found, the scout still reference only, fine passes unchanged (8-tick grid,
+    phase-dependent in the last 18 ticks), no stop = NO_CONTACT_BEFORE_GUARD, MIN/MAX, and every
+    per-sample fault during the partial step;
+  - `test_thermal_confirmation` (145 checks): the LF V25 runtime PresentTemperature
+    confirmation (§8b);
+  - `test_cr3_q0_fresh_promotion` (1,459 checks): fresh q0 supersedes CR2-C, and the recentred
+    installation — two installations, different per-joint offsets, 12/12 URDF→raw commands,
+    24/24 corridors and every pose and park translated by exactly Δq0;
+  - `test_full_leg_calibration_executor` (56,392 checks): the full V25 sequence on
+    LF/RF/RH/LH with the V25 search trace of all 24 endpoints and the evidence mapping, the
+    recovery-only run and ~30 adversarial cases, plus all 24 endpoints with stops at guard − 18
+    (22 of 24 reached only through the partial step), and the V25 held-role supervision (§8c);
+  - `test_full_leg_calibration_plan` (the 24-profile matrix + phase table);
+  - `test_full_leg_calibration_finalizer`: 2/6 and 5/6 fail; 6/6 passes; 23/24 and 8/24 are not
+    Full Calibration; only 24/24 sets `all_contact_calibrated=1`;
+- `static_audit.py` PASS, including the Safe Actuator suite (orchestration, TorqueLimit,
+  plan-data and coarse-scout mutations), DALY 52/52, LED 98/98 and the runner suite (24);
+- `test_calibration_search_behaviour_mutations.py`: **103/103** behaviour mutations caught (18
+  staged search + 35 coarse scout + 9 backoff StableTargetGate / telemetry timeout + 4 final
+  partial scout step + 6 thermal confirmation + 14 held-role supervision + 17 orchestration);
+  every one must fail the host tests.
+
+## 8. LED charging presentation (separate change, same build)
+
+Live 2026-09-30, attended charge with KEY OFF, fresh DALY telemetry: `state=CHARGING`,
+SOC 55.0 %, charge + discharge MOS ON, `alarms=0000 0000 0000 0010`. The LED showed
+`CHARGING_FAULT` because the Controller treated any non-zero alarm word as a charging fault. The
+DALY app names word 3 bit 0x0010 "GPS or soft switch turn off MOS". It appears on every
+KEY-OFF charge.
+
+Change, **presentation only**: `status::dalyAlarmBlocksChargingPresentation()` treats exactly
+word 3 bit 0x0010 as non-blocking. Words 0–2 ≠ 0, or any other bit of word 3, still show
+`CHARGING_FAULT`. Unchanged: the raw alarm words (`@BMS STATUS` still prints `0000 0000 0000
+0010`), `DalyBms` `alarms_clear` (the KEY/MOS write gate still needs all four words zero), DALY
+protection, MOS state and every non-LED gate. The audit pins the helper's exact expression, the
+0x0010 constant, its confinement to LED presentation and the unchanged DALY gate. The LED
+mutation suite catches reverting to the any-word test, widening the mask and ignoring a word.
+Expected live: 6 fixed green + the 7th breathing at SOC 55 %; 11 fixed + the last breathing at a
+reported 100 % (never FULL from SOC).
+
+## 8b. Hardware finding: single-sample thermal abort → LF V25 thermal confirmation (2026-09-30)
+
+**What happened.** The first TRUE LF run, on build `4241a39eab60` with fresh q0 and verified INITIAL
+RECOVERY 12/12, ended at 7.1 s in PARKING with `OVER_TEMPERATURE`, before any contact search. M42
+(LH UPPER, the rear park) was moving 2072 → 2470. One PresentTemperature sample of M42 exceeded
+70 °C; about a second later all 12 leg servos read 31–34 °C (M42: 32 °C). The run failed closed:
+FULL LEG ABORT, SESSION ABORT, SAFE_OFF 13/13 verified, export 0/24. That aborted run is evidence
+only.
+
+**Why.** The port compared each raw sample against 70 °C and aborted on the first one over it. The
+LF V25 hardware stack did not.
+
+**The oracle, audited** (`LF_V25_Hardware_Oracle/source/software/drivers/st3215/src/port.rs`):
+- constants: `MATDOG_EXPECTED_TEMPERATURE_LIMIT_C = 70`, `MATDOG_THERMAL_CONFIRMATION_READS = 3`,
+  `MATDOG_THERMAL_CONFIRMATION_DELAY = 50 ms` (L36–41);
+- `apply_matdog_direct_temperature` (L491): a PresentTemperature reading above the limit is followed
+  by two more `read_motor_temperature_direct` reads of the **same motor** (L422: a 1-byte
+  PresentTemperature read), **each preceded by a 50 ms sleep**;
+- `classify_matdog_direct_temperature_samples` (L57): of the three values, ≥ 2 over the limit is
+  `Confirmed` (torque forced off, the highest over-limit value published), exactly 1 is
+  `Transient` (the last normal value published, `MATDOG_THERMAL_DIRECT_TRANSIENT` logged), and 0 is
+  `Normal`;
+- a failed confirmation read returns an error, and `scan_motors` stops the bus worker (L659–666). No
+  further observation is published, so the calibration dies on telemetry loss: fail closed.
+
+Two different things, not to be confused:
+- **A. runtime PresentTemperature transient confirmation** — the bug, now ported;
+- **B. persistent MaxTemperature configuration (EEPROM 0x0D = 70)** — verified by the
+  servo-profile preflight (D9), unchanged.
+
+**The port** (`calibration/ThermalConfirmation.*`, applied by `Controller::updateFullLegCalibration`
+to every Full-Leg sample before the executor sees it):
+- a sample > 70 °C triggers two fresh `ServoBus::readPresentTemperatureDirect` reads of the same
+  servo (operational timeout), each after 50 ms;
+- ≥ 2 of 3 over 70 °C gives CONFIRMED: the monitors see the highest value and abort, as before;
+- exactly 1 gives TRANSIENT: the monitors see the last normal value and the run continues;
+- a confirmation read that does not answer gives CONFIRMATION_READ_FAILED: the over-limit trigger
+  stays published and the run aborts. That is the original behaviour, and stricter than V25's
+  2-s telemetry timeout;
+- every non-normal decision prints `CALIBRATION_THERMAL_CONFIRMATION bus= decision= samples= published=`.
+
+The one difference from V25: V25 took its first reading from a direct read every 500 ms (its bulk
+temperature byte was always overwritten). Here the first reading is the normal per-tick
+observation, whose acquisition is unchanged by the operator's instruction. The confirmation reads,
+the timing and the rule are V25's.
+
+**Unchanged:** every other fail-closed check — communication, servo status, TorqueEnable,
+TorqueLimit, GoalPosition, hard current, telemetry age, held joints, guards, authority, permit — has
+no confirmation or debounce. The contact search, q0, geometry, D10, backoff, poses and TorqueLimit
+are also unchanged.
+
+**Tests:**
+- `test_thermal_confirmation`, through the real classification with a scripted direct-read port:
+  - the oracle constants;
+  - ≤ 70 °C reads nothing;
+  - >70 / normal / normal → TRANSIENT; >70 / >70 / normal, >70 / normal / >70 and >70 / >70 /
+    >70 → CONFIRMED;
+  - the same servo, fresh direct reads, a 50 ms wait before each;
+  - exactly two reads;
+  - read failures and a missing port fail closed;
+  - today's M42 (255, then 32, 32) → TRANSIENT.
+- The executor suite, through the Controller-equivalent path: today's M42 transient during PARKING
+  completes 6/6, a probed-joint transient mid-search completes 6/6, a real overheat and an
+  unconfirmable sample abort to SAFE_OFF, and a normal run makes no confirmation read.
+- Audit pins, 4 audit mutations and 6 behaviour mutations: reads removed, 1 of 3, another servo, a
+  cached value, no wait, a failed read no longer fail-closed.
+
+## 8c. Hardware finding: held-joint speed false abort → LF V25 ActivelyHeld supervision (2026-09-30)
+
+**What happened.** The TRUE LF rerun (build `beac4348ffec`) started from a fresh q0 (LF UPPER 2090,
+matching both careful placements), a reach margin of +21 and INITIAL RECOVERY 12/12. It passed
+PARKING. The thermal confirmation classified a one-sample 81 °C reading of the moving bus 12 as a
+TRANSIENT (samples 81, 34, 35), and the run continued. LF UPPER MIN was measured (scout 1450,
+fine 1454/1457). During UPPER MAX coarse transit, 21 steps in, at raw 2787, 66 ms after a step had
+started (the probed UPPER accelerating), the run ended with `HELD_JOINT_SPEED`. The held set was LF
+HIP (M13), LF LOWER (M11) and the LH UPPER park (M42). No held joint had drifted more than 10 ticks:
+drift is checked first and did not fire. The run failed closed: FULL LEG ABORT, SESSION ABORT,
+SAFE_OFF 13/13, export 0/24. That run, including its UPPER MIN measurement, is evidence only. The
+failure line did not name the motor.
+
+**Why.** D5 was an additional post-V25 safety rule, not LF V25 behaviour: an already-held joint
+failed at |speed| > 40 raw on two consecutive samples. The hardware showed it false-aborts while the
+V25 positional hold invariant is satisfied.
+
+**The oracle, re-read** (`matdog.rs`):
+- `LF_HELD_MAX_SPEED_RAW = 4` (L116) **does** exist. It is used by `StableTargetGate::observe_at`
+  (L887–908: within tolerance **and** |speed| ≤ 4, 4 samples, ≥ 400 ms) to settle a move before the
+  joint is promoted to held, and by `lf_initial_recovery_needed` (L914) for recovery quiescence.
+- `validate_lf_role_observation` (L1378), `LfMotorRole::ActivelyHeld` (L1411) validates:
+  - telemetry age;
+  - `has_driver_error` / status;
+  - hard current and temperature;
+  - `validate_lf_active_readback` (torque enabled, TorqueLimit, GoalPosition == held target);
+  - circular drift ≤ `STATIC_TOLERANCE_TICKS` (10).
+
+  There is **no speed check** on an already-held joint.
+
+**The correction** (`FullLegCalibrationExecutor::monitorHeld`):
+- The D5 abort (`HELD_JOINT_SPEED`, `kSequenceHeldSpeedAbortRaw/Samples`) is removed and nothing
+  replaces it: no other threshold, no more samples, no debounce.
+- Every other held-role check is unchanged and still fails at once: stale telemetry / read failure,
+  status fault, hard current, confirmed over-temperature, TorqueEnable off, TorqueLimit ≠ 500,
+  GoalPosition ≠ held target, drift > 10.
+- Speed stays exactly where V25 uses it: the StableTargetGate before a joint is held (`stepMove`),
+  and the INITIAL_RECOVERY settle (|speed| ≤ 4, 4 samples, ≥ 400 ms).
+  - MOVING / SETTLING TO BECOME HELD: speed matters.
+  - ALREADY HELD DURING ANOTHER JOINT'S PROBE: position, readback and safety state matter. Speed
+    alone does not abort.
+- Evidence naming the exact motor, printed only on these events, not every cycle:
+  - `CALIBRATION_HELD_ROLE_FAILURE`, once, on the tick a held-role check ends the run. It carries
+    the bus, leg/joint, held target, present position and error, speed, GoalPosition, TorqueEnable,
+    TorqueLimit, current, temperature, status, whether the sample was fresh or the last good one
+    (and its age), the active probe's bus/joint/side/target/position, and the phase. It is
+    observed before the failure moves the run to TORQUE_OFF.
+  - `CALIBRATION_HELD_SPEED_TRANSIENT`, diagnostic only and never an abort, for a held joint above
+    40 raw while inside its hold: once per rising edge per joint, at most 32 records per run, with
+    all transients counted.
+
+**Tests** (`test_full_leg_calibration_executor`):
+- The hardware regression, on all four legs and every held joint of UPPER MAX (HIP, LOWER, rear
+  park): the held joint's speed reads 60 for the rest of the probe, with ≥ 2 consecutive samples
+  > 40 reaching the monitor, the position inside the hold and every readback valid. The leg
+  completes 6/6, with one diagnostic record carrying the correct identity and probe context.
+- Flicker bounded at 32 records, no abort.
+- Drift boundary on all four legs and every held joint: ±10 is inside the hold; ±11 gives
+  `HELD_JOINT_DRIFT` with the evidence record, error 11.
+- The adversarial table (torque off, GoalPosition, TorqueLimit, hard current, status, confirmed
+  over-temperature, stale telemetry) now also checks the evidence record, and that the
+  over-temperature was CONFIRMED by the V25 confirmation first.
+- Speed 5 on a joint at its target is never promoted to held: MOVE_TIMEOUT, nothing probed, on all
+  four legs, and in PARKING for the park. Speed 4 is promoted.
+- An INITIAL_RECOVERY joint with speed 5 never settles; with speed 4 it does.
+
+**Gates:**
+- 14 behaviour mutations: speed abort reintroduced at 40 or at the settle bound 4, drift 11,
+  TorqueEnable / GoalPosition / safety dropped, the StableTargetGate or recovery settle without
+  speed, bound 5, evidence not latched or observed after the failure, transient not recorded, per
+  sample, or unbounded.
+- 8 audit mutations. The audit refuses any held-role speed use other than the post-check
+  diagnostic, any reintroduced `HELD_JOINT_SPEED`, and a settle gate without the speed criterion.
+
+**Unchanged:** thermal confirmation, q0, geometry, corridors, D10, coarse scout, fine passes,
+backoff, StableTargetGate, TorqueLimit, prerequisite poses, repeatability, LEDs, runner.
+
+## 8d. Hardware finding: LF LOWER wrong-side end-stop → current-installation encoder direction (2026-10-01)
+
+**What happened.** The TRUE LF run on build `418c4c2e6562` (fresh q0, reach +33, INITIAL RECOVERY
+12/12) measured UPPER MIN (fine 1463/1465) and UPPER MAX (fine 3476/3478). It also held through
+three `CALIBRATION_HELD_SPEED_TRANSIENT` records on M11 and three TRANSIENT temperature glitches on
+bus 12. Then, at 48.7 s, LOWER MIN failed closed with `EARLY_STALL_OUTSIDE_CORRIDOR` at raw 1690:
+first contact at 1728, then 38 ticks of give. The operator saw the shank move **backward** and
+strike the real **short-side** mechanical end-stop. From q0 2088 that is −398 ticks = 35.0°, the
+URDF MAX magnitude (+37.5°), not MIN's 92°. The run was SAFE_OFF 13/13 with export 0/24; it is
+evidence only.
+
+**Root cause: a source-semantics error in CR0 (2026-09-27).** It is error class A, wrong source
+data. There is no exporter, `JointTransform` or URDF-axis bug.
+- The firmware resolved `raw = q0 + direction·q` with `direction` = the URDF custom
+  `<motorDirection>`, copied by the Geometry V5 exporter.
+- CR0 had made that field the only direction authority, and stated it had been "validated on real
+  hardware". It had not.
+- The repository's servo contract keeps the hardware encoder-to-q sign separate from that field,
+  and records eight conflicts.
+- The hardware signs exist as slot `PASS_DIRECTION_TEST` records (2026-07-02/05,
+  `09_Logs/Calibration_Sessions/`). They differ from the URDF field on all four HIPs and all four
+  LOWERs.
+- Nobody measured a direction after the 2026-08-27 remount.
+
+**Current-installation evidence:**
+- **LF LOWER = −1**, from the operator's witness plus the raw stop above.
+- **LF HIP = −1**, from a read-only hand witness with torque off: URDF +q (foot outward) moved
+  bus 13 from 1992 to 1713 (−279 ticks, 10+10 reads, spread 0).
+- **LF UPPER = +1**: the measured MIN/MAX contacts lie at −53.9°/+122.9°, the asymmetric URDF
+  range, which only fits +1.
+
+**Static slot audit (no further witness needed).** For the nine other joints the slot's 2026-07
+sign is carried, because nothing that defines it changed:
+- the URDF joint axis and origin RPY are byte-identical to 2026-07-01 (12/12);
+- every unit is the same ST3215-C018 with the MATDOG_C018_V1 profile, and the provisioning
+  recorded identical preserve-only registers on all 17;
+- the rebuild remounted units into the same bracket and linkage design;
+- the sign follows the **slot, not the unit**. M33 read +1 as RH HIP in July and reads −1 in the
+  LF LOWER slot, which kept its historical −1 under M11. M22 (formerly RF UPPER) and the new
+  ELR01 also reproduced their LF slots' signs.
+
+No slot shows a change to its orientation, transmission, axis or encoder convention, and no
+current evidence contradicts the carried sign.
+
+| leg | joint | unit | bus | encoder_direction | URDF spec | source | evidence |
+|---|---|---|---|---|---|---|---|
+| LF | HIP | M22 | 13 | −1 | +1 | CURRENT_HARDWARE_WITNESS | 2026-10-01 hand witness 1992→1713 for +q |
+| LF | UPPER | ELR01 | 12 | +1 | +1 | CURRENT_HARDWARE_WITNESS | 2026-10-01 MIN/MAX contacts −53.9°/+122.9° |
+| LF | LOWER | M33 | 11 | −1 | +1 | CURRENT_HARDWARE_WITNESS | 2026-10-01 wrong-side stop at 35.0° (+1 drove MIN backward) |
+| RF | HIP | NEW01 | 23 | −1 | +1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_154026_m23_rf_hip_negative_probe` |
+| RF | UPPER | ELR03 | 22 | −1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_154229_m22_rf_upper_positive_probe` |
+| RF | LOWER | NEW03 | 21 | +1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_154451_m21_rf_lower_negative_probe` |
+| RH | HIP | NEW06 | 33 | +1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_155142_m33_rh_hip_positive_probe` |
+| RH | UPPER | ELR02 | 32 | −1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_155257_m32_rh_upper_positive_probe` |
+| RH | LOWER | NEW05 | 31 | +1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_155450_m31_rh_lower_positive_probe` |
+| LH | HIP | M43 | 43 | +1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_155839_m43_lh_hip_positive_probe` |
+| LH | UPPER | M42 | 42 | +1 | +1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_160015_m42_lh_upper_positive_probe` |
+| LH | LOWER | M41 | 41 | −1 | +1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_160206_m41_lh_lower_positive_probe` |
+
+The residual risk is that a slot's mounting was physically changed without a record. It is not
+detected for the symmetric HIPs. The asymmetric UPPER/LOWER fail closed at the short stop, as
+LF LOWER did.
+
+**Why it mattered beyond LOWER.** LF HIP is symmetric (±45°), so a wrong sign is not caught by
+magnitude:
+- HIP MIN would have swept the physical MAX side and passed the V25 diagnostics with MIN and MAX
+  swapped;
+- on LF it would also have swept UPPER@90° into the side Geometry V5 found obstructed by
+  `base_link` (D8).
+
+**The correction (authority model, not a geometry change):**
+- `MATDOG_SERVO_ALLOCATION.yaml` gives each leg unit `encoder_direction`,
+  `encoder_direction_source` and `encoder_direction_evidence`. This is the current-installation
+  record, already hashed into the profile provenance (`allocation_sha256`).
+- The exporter generates `GeometryJointRecord::encoder_direction` plus
+  `EncoderDirectionSource`. A leg joint without a valid record fails the export, with no URDF
+  fallback. The generated comments show the URDF spec value and whether it DISAGREES.
+- `jointDirection()` reads `encoder_direction`; `JointTransform` still carries no direction.
+- The URDF, the meshes and Geometry V5 are **unchanged and not rerun**. Geometry is in q-space;
+  only the raw↔q polarity moved.
+- The provenance moved (allocation hash). The frozen CR2-C package is therefore refused on the
+  new contract (`REJECT_SOURCE_GEOMETRY`, by design: old measurements are never rebound). Fresh
+  capture remains the production path.
+- CR0 (`CALIBRATION_READINESS.md` §2), `CALIBRATION_SOURCE_PRECEDENCE.md`,
+  `CALIBRATION_BOOTSTRAP.md` §11 and `DEVELOPMENT_GATES.md` are amended.
+
+**Proof from today's q0** (production resolver; `encoder_direction_table_offline_q0_0622.txt`):
+- LF LOWER MIN (−92.00°) is RAW INCREASING: contact 3136, entry 3071, URDF 3135, guard 3199.
+- LF LOWER MAX (+37.50°) is RAW DECREASING: contact 1654, entry 1725, URDF 1661, guard 1597.
+- LF HIP +q is RAW DECREASING: MAX contact 1477 < q0 1992.
+- All 24 corridors resolve inside the raw range with no wrap. The UPPERs are unchanged.
+
+**Gates:**
+- `test_full_leg_calibration_plan`, with an independent literal oracle of the new matrix. It
+  replays today's failure: the old +1 mapping runs MIN raw-decreasing through 1690 and is
+  rejected; the new mapping sends MIN forward and MAX to the short side. It also checks LF HIP,
+  and all four legs from today's q0 (no wrap, sides as witnessed).
+- The executor, CR2-C and fresh-q0 suites are updated. The CR2-C contrast now goes through the
+  fresh path.
+- Audit: `check_direction_is_contractual` checks the twelve generated values against the record,
+  rejects any URDF-derived resolver or a `urdf_motor_direction` field, and pins the new CR0
+  invariants.
+- 5 audit mutations and 4 behaviour mutations: LF LOWER and LF HIP reverted to the URDF value, a
+  slot sign flipped, and a resolver that ignores the record.
+
+## 8e. Hardware result: TRUE FULL CALIBRATION 24/24 (2026-10-01 18:08:41 → 18:17:12)
+
+- **Firmware:** `dfcecb670d05` (commit `dfcecb6`, CLEAN, ROBOT_POWERED, app SHA256
+  `5fe625cd…11c503da`).
+- **Before the run:**
+  - fresh q0 12/12;
+  - encoder-direction table from the current-installation record (LF LOWER MIN raw increasing,
+    MAX raw decreasing);
+  - R2 margin +33;
+  - INITIAL RECOVERY 12/12.
+- **Run:** LF → RF → RH → LH, each `HARDWARE_CONTACT_CALIBRATED` 6/6 on the first attempt, each
+  with its own session, permit and recovery.
+  - Export: `legs_contact_calibrated=4 total_contacts_accepted=24 all_contact_calibrated=1`.
+  - SAFE_OFF 13/13 verified.
+- **All 24 endpoints** lie on the sides the encoder-direction table predicted, including all eight
+  HIP/LOWER joints whose URDF `motorDirection` disagrees.
+- **Measurement:**
+  - repeatability ≤ 4 ticks;
+  - HIP and UPPER within about ±2.4° of URDF/V5, LOWER MIN within 1.2° of the CAD;
+  - **LOWER MAX systematically 3.0–5.7° short** of the URDF, as V25 also measured;
+  - thin LOWER MAX scout margins: RF +6 and LH +13 ticks;
+  - returns within 6 ticks of q0.
+- **Events:** 23 transient temperature readings and 39 held-speed diagnostics (all `speed=50`).
+- **Full metrology, V25 comparison and evidence hashes:**
+  [`../Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md`](../Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md).
+- **Not done:** no envelope approved, no persistence (RAM-only), no stand or gait authorization.
+
+## 9. Next
+
+*Done 2026-10-01 (§8e).* Remaining: Calibration Persistence V1; the telemetry-integrity
+follow-up; the LOWER MAX corridor-margin decision; a reviewed zero-refinement procedure;
+operational-envelope approval. The original sequence below is kept for reference.
+
+Hardware, in order, each step on the operator's go-ahead: clean build → application-only flash
+→ SAFE_OFF 13/13 → operator places the legs at q=0 → fresh Q0 CAPTURE/PROMOTE (a reboot
+invalidates q0) → R2 reach report → encoder-direction table (LF LOWER MIN RAW INCREASING, MAX RAW
+DECREASING, else stop) → INITIAL RECOVERY 12/12 → LF session + permit → **stop for the
+operator's GO** → LF 6/6 from the beginning (no aborted-run measurement is reused) → RF → RH → LH →
+export (24/24). Procedure: `05_Firmware/MATDOG_Controller/FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`.

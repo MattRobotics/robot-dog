@@ -9,8 +9,27 @@ total_units: 17
 profile: MATDOG_C018_V1
 
 # WARNING: this table maps PHYSICAL UNIT -> JOINT -> BUS ID.
-# It says nothing about joint calibration. All calibration is RESET as of 2026-08-27;
+# It says nothing about joint ZERO or LIMITS. All calibration is RESET as of 2026-08-27;
 # see 09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md
+#
+# encoder_direction (12 leg joints only) - CURRENT-INSTALLATION encoder polarity,
+# the ONLY authority for raw <-> URDF q:  raw = q0 + encoder_direction * ticks(q).
+# Added 2026-10-01 after the TRUE LF Full Calibration drove LF LOWER into its
+# short-side end-stop: the URDF custom <motorDirection> (+1) had been promoted
+# (CR0, 2026-09-27) to hardware encoder polarity, which it never was. The URDF
+# value stays design/spec metadata and must not drive hardware calibration.
+#   encoder_direction_source:
+#     CURRENT_HARDWARE_WITNESS   observed on THIS installation after 2026-08-27
+#     HISTORICAL_SLOT_UNCHANGED  the joint SLOT's PASS_DIRECTION_TEST (2026-07-02/05),
+#                                carried because every sign-defining property of the
+#                                slot is unchanged: URDF joint axis/origin identical since
+#                                2026-07-01, same ST3215-C018 MATDOG_C018_V1 servo type,
+#                                same bracket/linkage design (the 2026-08-27 rebuild
+#                                remounted units in the same slots' mechanics). Today's
+#                                LF witnesses reproduced all three LF slot signs on
+#                                re-slotted/new units (M22, ELR01, M33), so the sign
+#                                follows the SLOT, not the unit.
+# Full audit: 09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md §8d.
 
 units:
   - unit: M22
@@ -24,6 +43,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V5
     session: M22__20260827_134852Z
+    encoder_direction: -1
+    encoder_direction_source: CURRENT_HARDWARE_WITNESS
+    encoder_direction_evidence: "2026-10-01 read-only hand witness, torque off: URDF +q (foot outward) moved bus 13 raw 1992 -> 1713 (-279, 10+10 reads, spread 0)"
   - unit: ELR01
     joint: LF_UPPER
     bus_id: 12
@@ -35,6 +57,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V6
     session: ELR01__20260827_140449Z
+    encoder_direction: 1
+    encoder_direction_source: CURRENT_HARDWARE_WITNESS
+    encoder_direction_evidence: "2026-10-01 TRUE LF run: UPPER MIN/MAX contacts 1465/3478 at q0 2078 = -53.9/+122.9 deg, the asymmetric URDF range only under +1"
   - unit: M33
     joint: LF_LOWER
     bus_id: 11
@@ -46,6 +71,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V6
     session: M33__20260827_140704Z
+    encoder_direction: -1
+    encoder_direction_source: CURRENT_HARDWARE_WITNESS
+    encoder_direction_evidence: "2026-10-01 operator witness: under +1 'LOWER MIN' drove the shank BACKWARD into the short-side end-stop, raw ~1690 = 35.0 deg from q0 2088 (URDF MAX +37.5)"
   - unit: NEW01
     joint: RF_HIP
     bus_id: 23
@@ -57,6 +85,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V4
     session: NEW01__20260827_122920Z
+    encoder_direction: -1
+    encoder_direction_source: HISTORICAL_SLOT_UNCHANGED
+    encoder_direction_evidence: "09_Logs/Calibration_Sessions/2026-07-05_154026_m23_rf_hip_negative_probe.result.yaml"
   - unit: ELR03
     joint: RF_UPPER
     bus_id: 22
@@ -68,6 +99,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V5
     session: ELR03__20260827_130419Z
+    encoder_direction: -1
+    encoder_direction_source: HISTORICAL_SLOT_UNCHANGED
+    encoder_direction_evidence: "09_Logs/Calibration_Sessions/2026-07-05_154229_m22_rf_upper_positive_probe.result.yaml"
   - unit: NEW03
     joint: RF_LOWER
     bus_id: 21
@@ -79,6 +113,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V5
     session: NEW03__20260827_131754Z
+    encoder_direction: 1
+    encoder_direction_source: HISTORICAL_SLOT_UNCHANGED
+    encoder_direction_evidence: "09_Logs/Calibration_Sessions/2026-07-05_154451_m21_rf_lower_negative_probe.result.yaml"
   - unit: NEW06
     joint: RH_HIP
     bus_id: 33
@@ -90,6 +127,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V5
     session: NEW06__20260827_132535Z
+    encoder_direction: 1
+    encoder_direction_source: HISTORICAL_SLOT_UNCHANGED
+    encoder_direction_evidence: "09_Logs/Calibration_Sessions/2026-07-05_155142_m33_rh_hip_positive_probe.result.yaml"
   - unit: ELR02
     joint: RH_UPPER
     bus_id: 32
@@ -101,6 +141,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V5
     session: ELR02__20260827_132834Z
+    encoder_direction: -1
+    encoder_direction_source: HISTORICAL_SLOT_UNCHANGED
+    encoder_direction_evidence: "09_Logs/Calibration_Sessions/2026-07-05_155257_m32_rh_upper_positive_probe.result.yaml"
   - unit: NEW05
     joint: RH_LOWER
     bus_id: 31
@@ -112,6 +155,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V5
     session: NEW05__20260827_133055Z
+    encoder_direction: 1
+    encoder_direction_source: HISTORICAL_SLOT_UNCHANGED
+    encoder_direction_evidence: "09_Logs/Calibration_Sessions/2026-07-05_155450_m31_rh_lower_positive_probe.result.yaml"
   - unit: M43
     joint: LH_HIP
     bus_id: 43
@@ -123,6 +169,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V5
     session: M43__20260827_133313Z
+    encoder_direction: 1
+    encoder_direction_source: HISTORICAL_SLOT_UNCHANGED
+    encoder_direction_evidence: "09_Logs/Calibration_Sessions/2026-07-05_155839_m43_lh_hip_positive_probe.result.yaml"
   - unit: M42
     joint: LH_UPPER
     bus_id: 42
@@ -134,6 +183,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V5
     session: M42__20260827_133526Z
+    encoder_direction: 1
+    encoder_direction_source: HISTORICAL_SLOT_UNCHANGED
+    encoder_direction_evidence: "09_Logs/Calibration_Sessions/2026-07-05_160015_m42_lh_upper_positive_probe.result.yaml"
   - unit: M41
     joint: LH_LOWER
     bus_id: 41
@@ -145,6 +197,9 @@ units:
     cold_verify: PASS
     provisioner_firmware: V5
     session: M41__20260827_133737Z
+    encoder_direction: -1
+    encoder_direction_source: HISTORICAL_SLOT_UNCHANGED
+    encoder_direction_evidence: "09_Logs/Calibration_Sessions/2026-07-05_160206_m41_lh_lower_positive_probe.result.yaml"
   - unit: M31
     joint: NECK_ROTATION
     bus_id: 51

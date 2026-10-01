@@ -121,6 +121,96 @@ TargetResolveStatus resolveDeltaFromQ0(const CalibrationGeometryProfile& profile
   return TargetResolveStatus::OK;
 }
 
+int32_t searchDepth(const CalibrationSearchCorridor& corridor, uint16_t tick) {
+  return (static_cast<int32_t>(tick) - static_cast<int32_t>(corridor.home_tick)) *
+         static_cast<int32_t>(corridor.probe_sign);
+}
+
+bool searchCorridorAdmits(const CalibrationSearchCorridor& corridor, uint16_t tick) {
+  if (!corridor.valid() || tick >= kTicksPerRevolution) return false;
+  const int32_t depth = searchDepth(corridor, tick);
+  return depth >= searchDepth(corridor, corridor.opposite_limit_tick) &&
+         depth <= searchDepth(corridor, corridor.guard_tick);
+}
+
+bool searchCorridorAccepts(const CalibrationSearchCorridor& corridor, uint16_t tick) {
+  if (!corridor.valid() || tick >= kTicksPerRevolution) return false;
+  const int32_t depth = searchDepth(corridor, tick);
+  return depth >= searchDepth(corridor, corridor.entry_tick) &&
+         depth <= searchDepth(corridor, corridor.guard_tick);
+}
+
+TargetResolveStatus resolveCalibrationSearchCorridor(const CalibrationGeometryProfile& profile,
+                                                     const GeometryProvenance& expected_provenance,
+                                                     const JointTransform& transform,
+                                                     calibration::Leg endpoint_leg,
+                                                     calibration::JointKind endpoint_joint,
+                                                     calibration::ContactSide side,
+                                                     CalibrationSearchCorridor* out) {
+  if (out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
+  *out = CalibrationSearchCorridor{};
+
+  const GeometryJointRecord* joint = nullptr;
+  int8_t direction = 0;
+  const TargetResolveStatus common =
+      commonChecks(profile, expected_provenance, transform, &joint, &direction);
+  if (common != TargetResolveStatus::OK) return common;
+  // The corridor belongs to the probed joint itself.
+  if (transform.identity.leg != endpoint_leg || transform.identity.joint != endpoint_joint) {
+    return TargetResolveStatus::REJECT_JOINT;
+  }
+  const GeometryEndpointRecord* endpoint = profile.findEndpoint(endpoint_leg, endpoint_joint, side);
+  if (endpoint == nullptr) return TargetResolveStatus::REJECT_SEARCH_CORRIDOR;
+
+  const bool min_side = side == calibration::ContactSide::MIN_SIDE;
+  CalibrationSearchCorridor c{};
+  c.probe_sign = static_cast<int8_t>(direction * (min_side ? -1 : 1));
+  c.home_tick = transform.q0_tick;
+  // The canonical contact is a REFERENCE, never a commanded target: sixteen of
+  // the twenty-four V5 contacts (every HIP and LOWER endpoint) lie just
+  // outside the URDF domain, so it is converted without the URDF-domain check
+  // and then required to lie inside [entry, guard] below. Every commanded
+  // search target stays bounded by the URDF-derived opposite limit and guard.
+  {
+    const int64_t signed_ticks = roundDivSigned(
+        static_cast<int64_t>(endpoint->contact) * kTicksPerRevolution, kMicroRadPerRevolution);
+    const int64_t raw = static_cast<int64_t>(transform.q0_tick) +
+                        static_cast<int64_t>(direction) * signed_ticks;
+    if (raw < 0 || raw >= kTicksPerRevolution) return TargetResolveStatus::REJECT_RAW_DOMAIN;
+    c.contact_tick = static_cast<uint16_t>(raw);
+  }
+  TargetResolveStatus s =
+      resolveUrdfQToRaw(profile, expected_provenance, transform,
+                        min_side ? joint->urdf_lower : joint->urdf_upper, &c.urdf_limit_tick);
+  if (s != TargetResolveStatus::OK) return s;
+  s = resolveUrdfQToRaw(profile, expected_provenance, transform,
+                        min_side ? joint->urdf_upper : joint->urdf_lower, &c.opposite_limit_tick);
+  if (s != TargetResolveStatus::OK) return s;
+
+  const int64_t entry = static_cast<int64_t>(c.urdf_limit_tick) -
+                        static_cast<int64_t>(c.probe_sign) * kCalibrationSearchAcceptanceInnerTicks;
+  const int64_t guard = static_cast<int64_t>(c.urdf_limit_tick) +
+                        static_cast<int64_t>(c.probe_sign) * kCalibrationSearchGuardOvershootTicks;
+  if (entry < 0 || entry >= kTicksPerRevolution || guard < 0 || guard >= kTicksPerRevolution) {
+    return TargetResolveStatus::REJECT_RAW_DOMAIN;
+  }
+  c.entry_tick = static_cast<uint16_t>(entry);
+  c.guard_tick = static_cast<uint16_t>(guard);
+
+  // home < entry <= contact <= guard along the probe axis; the other side's
+  // limit behind home. Anything else is a geometry/q0 combination this search
+  // was never designed for, and is refused rather than improvised around.
+  const int32_t entry_depth = searchDepth(c, c.entry_tick);
+  const int32_t contact_depth = searchDepth(c, c.contact_tick);
+  const int32_t guard_depth = searchDepth(c, c.guard_tick);
+  if (!(entry_depth > 0 && entry_depth <= contact_depth && contact_depth <= guard_depth &&
+        searchDepth(c, c.opposite_limit_tick) < 0)) {
+    return TargetResolveStatus::REJECT_SEARCH_CORRIDOR;
+  }
+  *out = c;
+  return TargetResolveStatus::OK;
+}
+
 const char* toString(TargetResolveStatus status) {
   switch (status) {
     case TargetResolveStatus::OK: return "OK";
@@ -131,6 +221,7 @@ const char* toString(TargetResolveStatus status) {
     case TargetResolveStatus::REJECT_DIRECTION: return "REJECT_DIRECTION";
     case TargetResolveStatus::REJECT_URDF_LIMIT: return "REJECT_URDF_LIMIT";
     case TargetResolveStatus::REJECT_RAW_DOMAIN: return "REJECT_RAW_DOMAIN";
+    case TargetResolveStatus::REJECT_SEARCH_CORRIDOR: return "REJECT_SEARCH_CORRIDOR";
   }
   return "UNKNOWN";
 }
