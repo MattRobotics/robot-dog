@@ -1,7 +1,7 @@
 # MATDOG Roadmap
 
 **Canonical owner of the MATDOG development sequence, its dependencies, and where the project
-currently stands.** Last updated 2026-09-29.
+currently stands.** Last updated 2026-10-01.
 
 This file answers *where are we, what is next, and why a stage cannot be skipped*. It does not
 duplicate other owners:
@@ -69,20 +69,16 @@ OPEN       manual charging common-port behaviour  VERIFIED electrically (2026-09
 OPEN       autonomous dock/charging qualification OPEN — no dock hardware evidence beyond one
                                                   attended manual charging session
 
-COMPLETE   LED Status Manager V2 (focused hw)     VALIDATED (2026-09-26; live charging animations TO_TEST)
-COMPLETE   read-only q0 capture on the robot      VALIDATED (CR2-C, 2026-09-27; 12/12, spread 0)
-COMPLETE   Safe Actuator / authority / Geometry V5 calibration path   IMPLEMENTED / OFFLINE TESTED
-SUPERSEDED four-leg "Full Calibration" on main       2026-09-29: UPPER-only (2 contacts/leg, 8 in all) -
-                                                  NOT Full Calibration (scope error, 2026-09-30)
-COMPLETE   TRUE 24-contact Full Calibration sw    IMPLEMENTED / OFFLINE-VALIDATED (2026-09-30, PR branch
-                                                  fix/full-calibration-24-contact-v25-generalized-v1):
-                                                  LF V25 full-leg state machine x 4 legs, 6 contacts/leg,
-                                                  INITIAL RECOVERY, held prerequisites, geometry-validated plan
-
-CURRENT    Full Calibration HW validation         TO_TEST — LF -> RF -> RH -> LH, 6/6 each, 24/24
-NEXT       Calibration Persistence V1             NEXT AFTER hardware Full Calibration PASS
-THEN       Operational Envelopes / JointLimits    BLOCKED — no approved stand/gait workspace yet
-THEN       Stand / Gait hardware                  BLOCKED
+COMPLETE   LED Status Manager V2                VALIDATED (2026-09-26)
+COMPLETE   read-only q0 capture                 VALIDATED (2026-09-27)
+SUPERSEDED UPPER-only 8-contact milestone       Historical scope error
+COMPLETE   TRUE Full Calibration SW            INTEGRATED on main (PR #35)
+COMPLETE   Full Calibration hardware            24/24 PASS (2026-10-01)
+CURRENT    Calibration Persistence V1           TO_DESIGN
+OPEN       Telemetry integrity                  Prior to hardware gait
+OPEN       LOWER MAX / q0 review                Before operational approval
+THEN       Operational Envelopes / JointLimits   BLOCKED pending approval
+THEN       Stand / Gait hardware                 BLOCKED
 ```
 
 The gait engine is developed offline on the separate feature branch `feat/gait-engine-offline-v1`;
@@ -96,8 +92,8 @@ live, 13/13 expected servos with 4 absent by design in two identical censuses, `
 `torque=0` on all 13. G3.1 closed a regression found after the first powered session — the
 Controller loop starved while no USB CDC host held the port open (0.68 Hz); with the native HWCDC
 fix it runs at 50.1 Hz with the port closed. That validation covers the firmware of that date.
-Bounded calibration motion has since been **IMPLEMENTED / OFFLINE TESTED** on `main` (see the gate
-sequence below) but has **never run on hardware**; no stand or gait motion exists.
+Bounded calibration motion passed the dedicated 24-contact hardware session on
+2026-10-01. No stand or gait motion is authorized.
 
 G2 through G3.1 were developed on branch `feat/controller-robot-powered-v02` and merged to `main`
 by the G3/G3.1 closeout pull request.
@@ -105,21 +101,20 @@ by the G3/G3.1 closeout pull request.
 ### The gate sequence from here
 
 ```text
-Full Calibration HW Validation
-  -> Calibration Persistence V1
+Calibration Persistence V1
   -> Operational Envelopes / JointLimits
   -> Stand / Gait hardware
 ```
 
 | Gate | State | What it means |
 |---|---|---|
-| **Full Calibration HW Validation** | **CURRENT / TO_TEST** | TRUE Full Calibration = 4 legs × 3 joints × MIN/MAX = **24 contacts**; PASS = 24/24, every leg 6/6. One attended `ROBOT_POWERED` session runs LF → RF → RH → LH on the real robot ([runbook](../../05_Firmware/MATDOG_Controller/FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md)). Honest best outcome: `HARDWARE_CONTACT_CALIBRATED`. Results stay in RAM. |
-| **Calibration Persistence V1** | **NEXT AFTER hardware Full Calibration PASS** — TO_DESIGN, **not implemented** | See the requirements below. Nothing is persisted today. |
-| **Operational Envelopes / JointLimits** | **BLOCKED** | Needs an approved stand/gait workspace and margins. Until then `kFullLegOperationalParametersApproved=false` (audit-pinned) and 0/12 final JointLimits are admitted — a deliberate boundary, not a failure. `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` is unreachable. |
-| **Stand / Gait hardware** | **BLOCKED** | Needs the three gates above, plus IK and poses. The gait engine on `feat/gait-engine-offline-v1` is offline only. |
+| **Full Calibration HW Validation** | **COMPLETE / HARDWARE-VALIDATED** | LF/RF/RH/LH 6/6 each, 24/24 PASS on 2026-10-01, firmware `dfcecb6`. RAM-only. |
+| **Calibration Persistence V1** | **CURRENT / TO_DESIGN** | Versioned, integrity-checked, transactional storage and fail-closed boot recovery; not implemented. |
+| **Operational Envelopes / JointLimits** | **BLOCKED** | Approved workspace and margins are absent; 0/12 operational limits admitted. |
+| **Stand / Gait hardware** | **BLOCKED** | Requires persistence, approved limits and independent motion-safety validation. |
 
-**Calibration Persistence V1 must provide** (documentation of the requirement only — do **not**
-start it before the hardware Full Calibration PASS):
+**Calibration Persistence V1 must provide** (requirements only; the contact hardware gate passed on 2026-10-01, but this
+implementation still requires a separate reviewed development cycle):
 
 1. the last accepted calibration persisted across a reboot;
 2. a versioned record;
@@ -176,11 +171,11 @@ Each row's *Blocks* column states what it gates. Arrows are hard dependencies, n
 | # | Stage | Status | Reality in this repository |
 |---|---|---|---|
 | 4 | **G4 — Diagnostics / Maintenance** | **PARTIAL** — foundation IMPLEMENTED (MAINTENANCE mode and the diagnostics below exist; the formal G4 pass is not declared). DALY KEY read/write and the physical power-off are all live-verified; no hardware blocker remains for this stage. | Already exist: `@STATUS` module availability, `@SERVO SCAN`, `@SERVO READ`, `@SERVO CENSUS` (structured population classification), `@SERVO SAFE_OFF` with independent readback, `@IMU`/`@BMS`/`@LED` status, `@SERVO PREFLIGHT` (H0 read-only 12-leg-joint model/offset/profile verification, **IMPLEMENTED / OFFLINE TESTED**, 444 checks, **HARDWARE TO_TEST** — not flashed, see [`H0_LEG_PREFLIGHT_RUNBOOK.md`](../../05_Firmware/MATDOG_Controller/H0_LEG_PREFLIGHT_RUNBOOK.md)), the **LED Status Manager** (I2, single presentation owner over `LedRing` with deterministic priority arbitration, **IMPLEMENTED / OFFLINE TESTED**, 198 checks, **HARDWARE TO_TEST**, battery/charging states deferred pending a reviewed threshold policy — see [`09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md`](../../09_Logs/Development_Log/2026-09-25_I2_LED_STATUS_MANAGER.md)), and `@SYSTEM SOURCE_SIGNATURE` (I3, read-only build/source identity, no new hardware read). Do **not** exist: `SYSTEM_SELF_TEST`, `PROFILE_AUDIT`, consolidated servo health summary. **Update (2026-09-26/29):** the LED Status Manager V2 passed a focused hardware validation on 2026-09-26 (source `88062e1`; live charging animations remain TO_TEST) and the read-only q0 capture ran on the robot on 2026-09-27 (CR2-C). |
-| 5 | **OperatingMode / ActuatorAuthority** | **IMPLEMENTED / OFFLINE TESTED** | `src/core/ActuatorAuthority.*` is the single central arbiter (`NONE`/`DIAGNOSTICS`/`CALIBRATION`/`QC`/`PROVISIONING`/`MOTION`, at most one owner at a time), pure and host-linkable, one instance owned by `Controller`, `NONE` at boot, leases carrying a generation against stale releases. Orthogonal to `OperatingMode` and enforced as such. `SAFE_OFF` is outside arbitration structurally. Read-only servo diagnostics deliberately take no lock. **No new write path was added** — the only actuator write is still `EnableTorque(id, 0)`, and nothing can acquire an owner yet. 751 offline checks. **HARDWARE TO_TEST.** |
+| 5 | **OperatingMode / ActuatorAuthority** | **IMPLEMENTED; calibration path HARDWARE-VALIDATED** | Authority and the Safe Actuator layer participated in the 2026-10-01 bounded calibration run. Service/QC and stand/gait write paths require separate validation. |
 | 6 | **Service / Provisioning / QC** | **FUTURE** | Frozen bench tools (Bench QC V6.1, Source Signature Survey V1, Provisioner V6) remain **FROZEN** oracles; nothing is integrated into the Controller. Blocked by stage 5. |
-| 7 | **Full Leg Calibration integration** | **IMPLEMENTED / OFFLINE-VALIDATED (TRUE 24-contact, 2026-09-30, PR branch) — hardware TO_TEST** | **2026-09-30 scope correction:** TRUE Full Calibration = 24 contacts (4 legs × 3 joints × MIN/MAX); the UPPER-only run below was not Full Calibration and is superseded by the LF V25 full-leg state machine generalized to four legs ([development log](../../09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md)). **State as of 2026-09-29 (superseded scope):** the four-leg Full Calibration is merged. Fresh read-only q0 capture 12/12; `@CALIBRATION Q0 PROMOTE` promotes that same current-boot capture into the RAM transform table (replacing the previous q0; the frozen CR2-C q0 is a comparison reference only); Full Leg Calibration for LF, RF, RH and LH with UPPER MIN/MAX contacts, parking LF→`LH_UPPER` (bus 42) and RF→`RH_UPPER` (bus 32), none for RH/LH; contact-evidence lifecycle and deterministic evidence export. Host, static-audit, mutation and both build gates PASS. **Not run on hardware. All results are RAM-only** — persistence is the gate after the hardware PASS. Levels: `HARDWARE_CONTACT_CALIBRATED` is the next hardware acceptance level; `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` is not available until a stand/gait workspace is approved. See [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](../../05_Firmware/MATDOG_Controller/FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md). **Earlier record (2026-09-24, superseded where it says no write path / execution engine TO_IMPLEMENT):** `src/calibration/` holds a pure host-linkable domain model recovered from the LF V25 archive plus a `CalibrationManager` over the real `ActuatorAuthority` (branch `feat/controller-calibration-manager-v1`). LF V25 replayed offline: 58 steps, 6 LF contacts of 24, matched. **No write path was added** and hardware motion is compile-time blocked. The Geometry Compiler V5 canonical bundle is **REUSED** (all 18 gated inputs, 9 compiler sources and 8 artifacts re-verified bit-for-bit) and exported to a compact on-device profile: 24 endpoints of which **8 executable / 16 diagnostic**, the **6** 1-DOF parking plans, and a per-joint bootstrap envelope. The execution engine is **TO_IMPLEMENT**. Audit and source precedence: [`CALIBRATION_SOURCE_PRECEDENCE.md`](../../05_Firmware/MATDOG_Controller/CALIBRATION_SOURCE_PRECEDENCE.md). Note: `matdog/full-leg-calibrator-v1` no longer exists as a branch; it was archived 2026-09-18 under the annotated tag `archive/2026-08-29/full-leg-calibrator-v1-h0` -> `15f3fb8f378e6cadf6bc479bfcaca2947741c9fd` (local and on `origin`), with its worktree-only hardware evidence in `~/MATDOG/archive/full-leg-calibrator-v1/`. No oracle material was lost. |
-| 8 | **Formal recalibration of the installed robot** | **CURRENT — hardware session TO_TEST** | The software is ready (stage 7); the real four-leg session has not been run. Blocker until it passes: `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION`, `hardware_motion_authorized: false`. Last formal Full-Leg H1 result was 6/12 and has not been superseded. A Controller census finding 13 servos proves bus visibility, **not** calibration H1. The offline foundation (stage 7) models this gate and enforces it: historical population evidence, however complete, can never produce a current PASS. Blocks all motion. |
-| 8a | **Calibration Persistence V1** | **NEXT AFTER hardware Full Calibration PASS** — TO_DESIGN | Keeps the last accepted calibration across a reboot: versioned record, geometry provenance, servo identities/mapping, 12 q0, all 24 contacts/evidence, atomic validated commit, previous valid generation retained until the new one is verified, **no ST3215 EEPROM `PositionOffset`/ID writes**, and a fail-closed rejection at boot on any mismatch. Full list in *The gate sequence from here*. **Not implemented.** Blocked by stage 8. |
+| 7 | **Full Leg Calibration integration** | **COMPLETE / HARDWARE-VALIDATED** | TRUE 24-contact calibration passed on 2026-10-01 (firmware `dfcecb6`); PR #35 merged. [Evidence](../../09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md). Earlier UPPER-only scope is superseded. |
+| 8 | **Formal recalibration of the installed robot** | **COMPLETE for physical contact acquisition; RAM-only** | Four legs x 6/6 contacts accepted. Not persisted across reboot and does not authorize operational motion. |
+| 8a | **Calibration Persistence V1** | **CURRENT / TO_DESIGN** | 12 q0, 24 contacts and witnesses, version, servo/geometry provenance, atomic commit, previous generation, fail-closed boot verification. Not implemented. |
 | 8b | **Operational Envelopes / JointLimits** | **BLOCKED** | Needs an approved stand/gait workspace and margins; blocked by 8a. Until then 0/12 final JointLimits are admitted on purpose. Blocks stages 17 and 20 on hardware. |
 
 ### Phase 3 — Host transport, network, Web UI, OTA
@@ -197,8 +192,8 @@ Each row's *Blocks* column states what it gates. Arrows are hard dependencies, n
 
 | # | Stage | Status | Reality in this repository |
 |---|---|---|---|
-| 14 | **Safe Actuator Layer** | **IMPLEMENTED / OFFLINE TESTED — hardware TO_TEST** | **Current state (2026-09-29):** a bounded production `ServoBusActuatorBackend` exists and is composed fail-closed for the calibration path only (session + fresh permit + authority + Geometry V5 targets, deadman, uncertain-write handling); it has never driven the real robot. No stand/pose/gait primitive exists. **Earlier record (2026-09-25, superseded where it says no production `ActuatorBackend` exists):** The only legal path from joint-level commands to `ServoBus` writes. `src/actuator/ActuatorWritePolicy.*` holds the decision core: plan/commit transactions bound to the real `ActuatorAuthority` lease and generation, fail-closed on authority loss, replay and reset, with limits admitted on provenance only (branch `feat/controller-safe-actuator-layer-v1`). **I4 (2026-09-25):** `src/actuator/ActuatorRuntime.*` adds the runtime adapter — an abstract `ActuatorBackend` interface plus a thin bridge that calls `commit()` and issues at most one backend call, only on `ACCEPT`. **No production `ActuatorBackend` exists** — `ServoBus` still exposes exactly one write, `safeOff()` — so the adapter is exercised only offline against a fake backend, is unreferenced by `Controller`/`CommandRouter`, and is fully dead-code-eliminated from both compiled profiles (byte-identical flash size with and without it). The three geometry-authorised operations (`CALIBRATION_CONTACT_PROBE`/`DIRECTION_VERIFY`/`CALIBRATION_AUXILIARY_MOVE`) have no raw-tick target yet and always refuse at the adapter (`NO_RAW_TARGET`) — that conversion belongs to the future Calibration Execution Engine (I5). No motion primitive is reachable. `POSITION_COMMAND` is unchanged. **I4/I5 Controller wiring (2026-09-25, objective change):** `Controller` now owns real `SafeActuatorPolicy`/`ActuatorRuntime`/`CalibrationExecutionEngine` instances as fail-closed status infrastructure only — `nullptr` backend, no geometry/limit/transform ever admitted from `Controller`, no command path reaches `plan`/`commit`/`execute`/`abort` (audit-enforced, mutation-verified). New read-only `@ACTUATOR STATUS`. Audit and design: [`SAFE_ACTUATOR_LAYER.md`](../../05_Firmware/MATDOG_Controller/SAFE_ACTUATOR_LAYER.md), [`CALIBRATION_BOOTSTRAP.md`](../../05_Firmware/MATDOG_Controller/CALIBRATION_BOOTSTRAP.md), [`09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md`](../../09_Logs/Development_Log/2026-09-25_I4_ACTUATOR_RUNTIME.md), [`09_Logs/Development_Log/2026-09-25_I4_I5_CONTROLLER_WIRING.md`](../../09_Logs/Development_Log/2026-09-25_I4_I5_CONTROLLER_WIRING.md). |
-| 15 | **First bounded joint motion** | **BLOCKED** on hardware | The calibration first-motion path (`FirstMotionExecutor`, contact probing) is **IMPLEMENTED / OFFLINE TESTED** and is exercised on the robot for the first time by the stage 8 session. Blockers for anything beyond calibration motion: stages 8, 8a, 8b. |
+| 14 | **Safe Actuator Layer** | **CALIBRATION PATH HARDWARE-VALIDATED** | Bounded production backend exercised during the 24/24 session. This does not validate general-purpose motion. |
+| 15 | **First bounded joint motion** | **CALIBRATION SCOPE COMPLETE; operational motion BLOCKED** | Dedicated calibration motion passed on hardware; general motion still requires persistence, approved limits and separate tests. |
 | 16 | **Joint Test UI (UI-4)** | **BLOCKED** | Blockers: stages 11, 14, 15. |
 | 17 | **Controlled poses** | **BLOCKED** | Blocker: stage 15. |
 | 18 | **Operational IK** | **FUTURE** | Geometry/kinematics assets exist in `06_Software/Matdog_Core/`; no operational IK runs on the Controller. |
@@ -271,10 +266,10 @@ authoritative Controller state, never from frontend assumptions.
 |---|---|---|
 | ~~Hardware `B-`/`P-` bypass~~ — **RESOLVED 2026-09-24**: TECNOIOT `VIN-` now returns to `P-`; post-rewire power gate A–E passed live | *(historical)* KEY OFF as a power-off; the OFF / `MANUAL_CHARGE_KEY_OFF` / SERVICE_ISOLATED states | operator rewire + validation, both done — see [`MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md) §§ 10–11 |
 | Autonomous dock/contact hardware and charger-topology qualification beyond one attended manual session (reverse-polarity protection not yet evidenced; a connected charger backfeeds `B+`/`P-` independent of KEY state) | autonomous docking/charging; unattended charge acceptance/termination | a separate charging-hardware gate once dock hardware exists — see [`MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md) §8 |
-| `CALIBRATION_RESET_PENDING_FULL_RECALIBRATION` | all motion (15, 17, 20, 23) | the hardware Full Calibration PASS (stage 8), then persistence (8a) |
-| Full 4-leg calibration has never run on hardware | Calibration Persistence V1 (8a), JointLimits (8b), stand/gait hardware | the attended LF → RF → RH → LH session |
+| Hardware calibration is RAM-only and cannot be restored after reboot | Stand/gait and operational motion | Calibration Persistence V1 plus approved operational limits and separate motion tests |
+| Telemetry integrity and LOWER MAX scout margin remain open | Hardware gait readiness and repeat-calibration robustness | Bounded, reviewed, evidence-based investigations without weakening protections |
 | No approved stand/gait workspace and margins (`kFullLegOperationalParametersApproved=false`) | Operational Envelopes / JointLimits (8b) → `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` | an approved workspace, after 8a |
-| `ActuatorAuthority` and the Safe Actuator write path (bounded `ServoBusActuatorBackend`, calibration only) are implemented / offline-tested but **not hardware-tested** | write-capable service, QC, calibration, motion | the stage 8 hardware session for the calibration path; further gates for anything else |
+| Safe Actuator is hardware-validated only for bounded calibration | Service/QC and operational motion | Dedicated tests and approval for each additional write-capable workflow |
 | Wi-Fi runtime (station-mode) is implemented / offline-tested but **not hardware-tested** — no MATDOG build has associated with an access point | hardware-validated Web UI and OTA runtime | stage 10 hardware test |
 
 ---

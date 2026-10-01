@@ -16,14 +16,14 @@ ESP32-S3 tools that have run on real hardware and are archived byte-for-byte:
 These are **bench** tools: they run on a bench rig with a single servo attached, never on the
 assembled robot under power for motion.
 
-**MATDOG Controller V0.1 integration runtime is implemented.**
+**Controller V0.1 is the frozen release baseline.** The current development Controller
+passed TRUE Full Calibration 24/24 on real hardware on 2026-10-01 (build `dfcecb670d05`).
 [`MATDOG_Controller/`](MATDOG_Controller/) is the first unified operational ESP32-S3 firmware:
 one deployable image with modular ServoBus / BNO085 / DALY BMS / LED ring / USB diagnostics,
 adapted from the hardware-proven bench and bring-up sources above rather than rewritten from
 scratch. USB-only bench validation (boot, BNO085 live acquisition, existing viewer compatibility,
 expected-offline classification for DALY/ST3215/LED) is recorded in
-[`MATDOG_Controller/VALIDATION.md`](MATDOG_Controller/VALIDATION.md). **Motion, gait and
-operational IK remain not implemented** — V0.1 is an integration and platform milestone, not a
+[`MATDOG_Controller/VALIDATION.md`](MATDOG_Controller/VALIDATION.md). **Operational stand/gait motion and operational IK remain unimplemented** — V0.1 is an integration and platform milestone, not a
 motion controller.
 
 The official tagged baseline and exact validated source are recorded in the
@@ -55,7 +55,7 @@ baseline. Future integrated capabilities include:
 
 - diagnostics, maintenance and service modes
 - servo QC and provisioning
-- full-leg calibration
+- calibration persistence and approved operational envelopes
 - Wi-Fi / OTA and host transport
 - deterministic servo motion / operational IK / gait execution
 - closed-loop BNO085 stabilization
@@ -67,8 +67,7 @@ The Full Leg Calibrator V1 tree is preserved as an implementation and evidence o
 annotated tag `archive/2026-08-29/full-leg-calibrator-v1-h0` ->
 `15f3fb8f378e6cadf6bc479bfcaca2947741c9fd`; the former branch `matdog/full-leg-calibrator-v1` was
 archived 2026-09-18 and no longer exists. It is not the final runtime architecture and must not be
-merged wholesale; selected calibration, safety and evidence logic may be migrated into the
-permanent Controller in a later phase.
+merged wholesale; the current Controller already reuses reviewed V25 calibration patterns.
 
 The frozen ST3215 tools remain immutable qualification evidence. Equivalent service capabilities
 may later be integrated into the Controller without rewriting or replacing those frozen sources.
@@ -84,8 +83,8 @@ Anything added here must follow the freeze policy in
 every artifact, provenance, complete command surface, toolchain/FQBN, test result, hardware
 validation scope, and an explicit statement of what is **not** validated.
 
-**Deterministic servo motion, gait execution and operational IK are decided to live on the
-ESP32-S3 but are not yet written.** IMU acquisition, read-only power telemetry and a USB
+**Operational stand/gait execution and operational IK are planned for the ESP32-S3,
+but are not yet hardware-authorized.** Bounded calibration motion passed its own hardware gate. IMU acquisition, read-only power telemetry and a USB
 diagnostic/health surface **are** written, as of `MATDOG_Controller` V0.1 — see
 [`MATDOG_Controller/VALIDATION.md`](MATDOG_Controller/VALIDATION.md) for exactly what has been
 exercised on real hardware versus what remains software-only. `MATDOG_Controller` is distinct
