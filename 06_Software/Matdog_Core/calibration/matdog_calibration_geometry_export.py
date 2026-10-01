@@ -116,10 +116,12 @@ def load_urdf_joints() -> dict[str, dict]:
             raise ExportError(f"{name}: URDF revolute joint without hardware metadata")
         out[name] = {
             "motor_id": motor_id,
-            # SPECIFICATION data. This is the sign the URDF model expects, NOT a
-            # measured witness for the current installation. Direction evidence
-            # is current calibration work; this value is only what that work
-            # will be compared against.
+            # SPECIFICATION metadata only. The URDF custom motorDirection is NOT
+            # the installation's encoder polarity and never reaches the firmware
+            # direction (2026-10-01: it was wrong for LF HIP and LF LOWER on the
+            # current installation). The encoder_direction of the current-
+            # installation record (load_allocation) is the only authority; this
+            # value is only printed beside it for traceability.
             "motor_direction": motor_dir,
             "lower_rad": float(limit.get("lower")),
             "upper_rad": float(limit.get("upper")),
@@ -129,8 +131,12 @@ def load_urdf_joints() -> dict[str, dict]:
     return out
 
 
+ENCODER_DIRECTION_SOURCES = ("CURRENT_HARDWARE_WITNESS", "HISTORICAL_SLOT_UNCHANGED")
+
+
 def load_allocation() -> dict[str, dict]:
-    """physical unit -> joint -> bus id, from the 2026-08-27 campaign."""
+    """physical unit -> joint -> bus id, from the 2026-08-27 campaign, plus the
+    current-installation encoder_direction of each leg joint (2026-10-01)."""
     text = ALLOCATION.read_text(encoding="utf-8")
     blocks = re.findall(
         r"- unit: (\S+)\n\s+joint: (\S+)\n\s+bus_id: (\d+)\n(.*?)(?=\n  - unit:|\Z)",
@@ -140,12 +146,18 @@ def load_allocation() -> dict[str, dict]:
         offset = re.search(r"position_offset: (-?\d+)", rest)
         center = re.search(r"center_physical_raw: (\d+)", rest)
         error = re.search(r"center_error_ticks: (-?\d+)", rest)
+        direction = re.search(r"^\s+encoder_direction: (-?\d+)\s*$", rest, re.M)
+        source = re.search(r"^\s+encoder_direction_source: (\S+)\s*$", rest, re.M)
+        evidence = re.search(r'^\s+encoder_direction_evidence: "([^"]+)"\s*$', rest, re.M)
         out[joint] = {
             "unit": unit,
             "bus_id": int(bus_id),
             "position_offset": int(offset.group(1)) if offset else None,
             "center_physical_raw": int(center.group(1)) if center else None,
             "center_error_ticks": int(error.group(1)) if error else None,
+            "encoder_direction": int(direction.group(1)) if direction else None,
+            "encoder_direction_source": source.group(1) if source else None,
+            "encoder_direction_evidence": evidence.group(1) if evidence else None,
         }
     if len(out) != 17:
         raise ExportError(f"expected 17 allocated units, found {len(out)}")
@@ -204,6 +216,16 @@ def build_records():
                 f"{entry['bus_id']} for unit {entry['unit']}")
         if entry["position_offset"] != 0:
             raise ExportError(f"{allocation_key}: PositionOffset is not 0")
+        # The ONLY direction authority: never fall back to the URDF spec value.
+        if entry["encoder_direction"] not in (-1, 1):
+            raise ExportError(f"{allocation_key} ({entry['unit']}): no current-installation "
+                              f"encoder_direction in {{-1, +1}} - the URDF motorDirection is "
+                              f"spec metadata and is never used as encoder polarity")
+        if entry["encoder_direction_source"] not in ENCODER_DIRECTION_SOURCES:
+            raise ExportError(f"{allocation_key}: encoder_direction_source must be one of "
+                              f"{ENCODER_DIRECTION_SOURCES}")
+        if not entry["encoder_direction_evidence"]:
+            raise ExportError(f"{allocation_key}: encoder_direction without evidence")
 
     policy_by_endpoint = {row["endpoint_id"]: row for row in policy["endpoint_policy_results"]}
     parking_by_endpoint = {plan["endpoint_id"]: plan for plan in parking["plans"]}
@@ -302,7 +324,9 @@ def build_records():
             "kind": kind,
             "unit": entry["unit"],
             "bus_id": entry["bus_id"],
-            "urdf_motor_direction": urdf["motor_direction"],
+            "encoder_direction": entry["encoder_direction"],
+            "encoder_direction_source": entry["encoder_direction_source"],
+            "urdf_spec_motor_direction": urdf["motor_direction"],
             "urdf_lower_urad": to_urad(urdf["lower_rad"]),
             "urdf_upper_urad": to_urad(urdf["upper_rad"]),
             "clear_half_span_urad": to_urad(half_span_rad),
@@ -337,10 +361,15 @@ def render(provenance, joints, endpoints) -> str:
     add("// from the canonical Geometry Compiler V5 bundle")
     add(f"//   {provenance['bundle_id']}")
     add("//")
-    add("// Every value below is COPIED from that bundle and converted to integer")
-    add("// micro-radians. No geometry is computed here and none is computed on the")
-    add("// device: the Controller verifies provenance and executes prevalidated")
+    add("// Every geometric value below is COPIED from that bundle and converted to")
+    add("// integer micro-radians. No geometry is computed here and none is computed on")
+    add("// the device: the Controller verifies provenance and executes prevalidated")
     add("// plan primitives only. Regenerate with the exporter; never patch a value.")
+    add("//")
+    add("// encoder_direction is NOT from the URDF: it is the current-installation")
+    add("// encoder polarity of 06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml")
+    add("// (hashed into kProvenance). The URDF custom motorDirection is spec metadata,")
+    add("// shown in the comments for traceability only.")
     add("//")
     add(f"// max rounding error introduced by the micro-radian conversion: "
         f"{provenance['max_rounding_error_rad']:.3e} rad")
@@ -372,11 +401,16 @@ def render(provenance, joints, endpoints) -> str:
     add(f"constexpr uint8_t kJointCount = {len(joints)};")
     add("constexpr GeometryJointRecord kJoints[kJointCount] = {")
     for j in joints:
-        add(f"    // {j['joint_name']}  unit {j['unit']}  bus {j['bus_id']}")
+        spec = j["urdf_spec_motor_direction"]
+        add(f"    // {j['joint_name']}  unit {j['unit']}  bus {j['bus_id']}  "
+            f"encoder_direction {j['encoder_direction']:+d} "
+            f"({j['encoder_direction_source']}; URDF spec motorDirection {spec:+d}"
+            f"{'' if spec == j['encoder_direction'] else ' DISAGREES'}, not used)")
         add("    {" +
             f"{{{enum('calibration::Leg', j['leg'])}, "
             f"{enum('calibration::JointKind', j['kind'])}, \"{j['unit']}\"}}, "
-            f"{j['bus_id']}, {j['urdf_motor_direction']}, "
+            f"{j['bus_id']}, {j['encoder_direction']}, "
+            f"{enum('EncoderDirectionSource', j['encoder_direction_source'])}, "
             f"{j['urdf_lower_urad']}, {j['urdf_upper_urad']}, "
             f"{j['clear_half_span_urad']}, "
             f"{j['provisioned_center_raw']}, {j['provisioned_center_error_ticks']}" +

@@ -422,10 +422,116 @@ V25 positional hold invariant is satisfied.
 **Unchanged:** thermal confirmation, q0, geometry, corridors, D10, coarse scout, fine passes,
 backoff, StableTargetGate, TorqueLimit, prerequisite poses, repeatability, LEDs, runner.
 
+## 8d. Hardware finding: LF LOWER wrong-side end-stop → current-installation encoder direction (2026-10-01)
+
+**What happened.** The TRUE LF run on build `418c4c2e6562` (fresh q0, reach +33, INITIAL RECOVERY
+12/12) measured UPPER MIN (fine 1463/1465) and UPPER MAX (fine 3476/3478). It also held through
+three `CALIBRATION_HELD_SPEED_TRANSIENT` records on M11 and three TRANSIENT temperature glitches on
+bus 12. Then, at 48.7 s, LOWER MIN failed closed with `EARLY_STALL_OUTSIDE_CORRIDOR` at raw 1690:
+first contact at 1728, then 38 ticks of give. The operator saw the shank move **backward** and
+strike the real **short-side** mechanical end-stop. From q0 2088 that is −398 ticks = 35.0°, the
+URDF MAX magnitude (+37.5°), not MIN's 92°. The run was SAFE_OFF 13/13 with export 0/24; it is
+evidence only.
+
+**Root cause: a source-semantics error in CR0 (2026-09-27).** It is error class A, wrong source
+data. There is no exporter, `JointTransform` or URDF-axis bug.
+- The firmware resolved `raw = q0 + direction·q` with `direction` = the URDF custom
+  `<motorDirection>`, copied by the Geometry V5 exporter.
+- CR0 had made that field the only direction authority, and stated it had been "validated on real
+  hardware". It had not.
+- The repository's servo contract keeps the hardware encoder-to-q sign separate from that field,
+  and records eight conflicts.
+- The hardware signs exist as slot `PASS_DIRECTION_TEST` records (2026-07-02/05,
+  `09_Logs/Calibration_Sessions/`). They differ from the URDF field on all four HIPs and all four
+  LOWERs.
+- Nobody measured a direction after the 2026-08-27 remount.
+
+**Current-installation evidence:**
+- **LF LOWER = −1**, from the operator's witness plus the raw stop above.
+- **LF HIP = −1**, from a read-only hand witness with torque off: URDF +q (foot outward) moved
+  bus 13 from 1992 to 1713 (−279 ticks, 10+10 reads, spread 0).
+- **LF UPPER = +1**: the measured MIN/MAX contacts lie at −53.9°/+122.9°, the asymmetric URDF
+  range, which only fits +1.
+
+**Static slot audit (no further witness needed).** For the nine other joints the slot's 2026-07
+sign is carried, because nothing that defines it changed:
+- the URDF joint axis and origin RPY are byte-identical to 2026-07-01 (12/12);
+- every unit is the same ST3215-C018 with the MATDOG_C018_V1 profile, and the provisioning
+  recorded identical preserve-only registers on all 17;
+- the rebuild remounted units into the same bracket and linkage design;
+- the sign follows the **slot, not the unit**. M33 read +1 as RH HIP in July and reads −1 in the
+  LF LOWER slot, which kept its historical −1 under M11. M22 (formerly RF UPPER) and the new
+  ELR01 also reproduced their LF slots' signs.
+
+No slot shows a change to its orientation, transmission, axis or encoder convention, and no
+current evidence contradicts the carried sign.
+
+| leg | joint | unit | bus | encoder_direction | URDF spec | source | evidence |
+|---|---|---|---|---|---|---|---|
+| LF | HIP | M22 | 13 | −1 | +1 | CURRENT_HARDWARE_WITNESS | 2026-10-01 hand witness 1992→1713 for +q |
+| LF | UPPER | ELR01 | 12 | +1 | +1 | CURRENT_HARDWARE_WITNESS | 2026-10-01 MIN/MAX contacts −53.9°/+122.9° |
+| LF | LOWER | M33 | 11 | −1 | +1 | CURRENT_HARDWARE_WITNESS | 2026-10-01 wrong-side stop at 35.0° (+1 drove MIN backward) |
+| RF | HIP | NEW01 | 23 | −1 | +1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_154026_m23_rf_hip_negative_probe` |
+| RF | UPPER | ELR03 | 22 | −1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_154229_m22_rf_upper_positive_probe` |
+| RF | LOWER | NEW03 | 21 | +1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_154451_m21_rf_lower_negative_probe` |
+| RH | HIP | NEW06 | 33 | +1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_155142_m33_rh_hip_positive_probe` |
+| RH | UPPER | ELR02 | 32 | −1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_155257_m32_rh_upper_positive_probe` |
+| RH | LOWER | NEW05 | 31 | +1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_155450_m31_rh_lower_positive_probe` |
+| LH | HIP | M43 | 43 | +1 | −1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_155839_m43_lh_hip_positive_probe` |
+| LH | UPPER | M42 | 42 | +1 | +1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_160015_m42_lh_upper_positive_probe` |
+| LH | LOWER | M41 | 41 | −1 | +1 | HISTORICAL_SLOT_UNCHANGED | `2026-07-05_160206_m41_lh_lower_positive_probe` |
+
+The residual risk is that a slot's mounting was physically changed without a record. It is not
+detected for the symmetric HIPs. The asymmetric UPPER/LOWER fail closed at the short stop, as
+LF LOWER did.
+
+**Why it mattered beyond LOWER.** LF HIP is symmetric (±45°), so a wrong sign is not caught by
+magnitude:
+- HIP MIN would have swept the physical MAX side and passed the V25 diagnostics with MIN and MAX
+  swapped;
+- on LF it would also have swept UPPER@90° into the side Geometry V5 found obstructed by
+  `base_link` (D8).
+
+**The correction (authority model, not a geometry change):**
+- `MATDOG_SERVO_ALLOCATION.yaml` gives each leg unit `encoder_direction`,
+  `encoder_direction_source` and `encoder_direction_evidence`. This is the current-installation
+  record, already hashed into the profile provenance (`allocation_sha256`).
+- The exporter generates `GeometryJointRecord::encoder_direction` plus
+  `EncoderDirectionSource`. A leg joint without a valid record fails the export, with no URDF
+  fallback. The generated comments show the URDF spec value and whether it DISAGREES.
+- `jointDirection()` reads `encoder_direction`; `JointTransform` still carries no direction.
+- The URDF, the meshes and Geometry V5 are **unchanged and not rerun**. Geometry is in q-space;
+  only the raw↔q polarity moved.
+- The provenance moved (allocation hash). The frozen CR2-C package is therefore refused on the
+  new contract (`REJECT_SOURCE_GEOMETRY`, by design: old measurements are never rebound). Fresh
+  capture remains the production path.
+- CR0 (`CALIBRATION_READINESS.md` §2), `CALIBRATION_SOURCE_PRECEDENCE.md`,
+  `CALIBRATION_BOOTSTRAP.md` §11 and `DEVELOPMENT_GATES.md` are amended.
+
+**Proof from today's q0** (production resolver; `encoder_direction_table_offline_q0_0622.txt`):
+- LF LOWER MIN (−92.00°) is RAW INCREASING: contact 3136, entry 3071, URDF 3135, guard 3199.
+- LF LOWER MAX (+37.50°) is RAW DECREASING: contact 1654, entry 1725, URDF 1661, guard 1597.
+- LF HIP +q is RAW DECREASING: MAX contact 1477 < q0 1992.
+- All 24 corridors resolve inside the raw range with no wrap. The UPPERs are unchanged.
+
+**Gates:**
+- `test_full_leg_calibration_plan`, with an independent literal oracle of the new matrix. It
+  replays today's failure: the old +1 mapping runs MIN raw-decreasing through 1690 and is
+  rejected; the new mapping sends MIN forward and MAX to the short side. It also checks LF HIP,
+  and all four legs from today's q0 (no wrap, sides as witnessed).
+- The executor, CR2-C and fresh-q0 suites are updated. The CR2-C contrast now goes through the
+  fresh path.
+- Audit: `check_direction_is_contractual` checks the twelve generated values against the record,
+  rejects any URDF-derived resolver or a `urdf_motor_direction` field, and pins the new CR0
+  invariants.
+- 5 audit mutations and 4 behaviour mutations: LF LOWER and LF HIP reverted to the URDF value, a
+  slot sign flipped, and a resolver that ignores the record.
+
 ## 9. Next
 
 Hardware, in order, each step on the operator's go-ahead: clean build → application-only flash
 → SAFE_OFF 13/13 → operator places the legs at q=0 → fresh Q0 CAPTURE/PROMOTE (a reboot
-invalidates q0) → R2 reach report → INITIAL RECOVERY 12/12 → LF session + permit → **stop for the
+invalidates q0) → R2 reach report → encoder-direction table (LF LOWER MIN RAW INCREASING, MAX RAW
+DECREASING, else stop) → INITIAL RECOVERY 12/12 → LF session + permit → **stop for the
 operator's GO** → LF 6/6 from the beginning (no aborted-run measurement is reused) → RF → RH → LH →
 export (24/24). Procedure: `05_Firmware/MATDOG_Controller/FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`.

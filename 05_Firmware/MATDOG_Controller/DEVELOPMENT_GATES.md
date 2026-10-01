@@ -296,8 +296,9 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   robot.
 - **ENTRY** — G3 formal PASS (including the census repeat); G3.1 PASS; Authority model PASS;
   powered bus health proven.
-- **ALLOWED** — H1 census semantics, q0 evidence capture, current `motorDirection` resolved from
-  the bound URDF / Geometry V5 contract, characterization, then staged calibration motion
+- **ALLOWED** — H1 census semantics, q0 evidence capture, the current-installation
+  `encoder_direction` record (amended 2026-10-01; never the URDF `motorDirection`) resolved from
+  the bound profile, characterization, then staged calibration motion
   **each with its own session authorization**. `DIRECTION_VERIFY` is optional diagnostic work,
   not a calibration prerequisite.
 - **FORBIDDEN** — merging the archived calibrator tree
@@ -377,9 +378,13 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     motion" true without a special-cased guard. It owns no session state, no persistence and no
     geometry profile of its own — full record and adversarial test list in
     [`../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md`](../../09_Logs/Development_Log/2026-09-25_I5_CALIBRATION_EXECUTION_ENGINE.md).
-  - **CR0 direction contract CLOSED (2026-09-27)** — normal calibration does not measure
-    `motorDirection`. Commit `9aae03d` made the current URDF / Geometry V5 profile the single
-    production authority and kept `DIRECTION_VERIFY` diagnostic-only; the older
+  - **CR0 direction contract AMENDED (2026-10-01)** — the encoder direction is the
+    current-installation `encoder_direction` record (`MATDOG_SERVO_ALLOCATION.yaml`, per-joint
+    source + evidence, generated into the profile, audited 12/12); the URDF `motorDirection` is
+    spec metadata (it was wrong for every HIP/LOWER; the TRUE LF run hit LF LOWER's wrong-side
+    end-stop under it). *Superseded text:* **CR0 direction contract CLOSED (2026-09-27)** — normal
+    calibration does not measure `motorDirection`. Commit `9aae03d` made the current URDF /
+    Geometry V5 profile the single production authority and kept `DIRECTION_VERIFY` diagnostic-only; the older
     `MEASURED_CANDIDATE`/`ACCEPTED` direction vocabulary is legacy/oracle-domain state, not a
     production readiness prerequisite. **Still TO_DESIGN** — the persistence/promotion boundary
     (whether accepted calibration is written by `PROVISIONING` or by a separate transaction).

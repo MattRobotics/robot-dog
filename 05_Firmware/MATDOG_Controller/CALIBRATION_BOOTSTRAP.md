@@ -16,7 +16,7 @@ manual placement at nominal URDF q=0     operator, no motion
         ↓
 read-only q0 capture, torque OFF         TO_IMPLEMENT
         ↓
-current motorDirection from URDF/V5       REUSED / CONTRACT DATA
+current encoder_direction (installation)  RECORD + EVIDENCE (amended 2026-10-01)
         ↓
 raw encoder ↔ URDF q transform            TO_IMPLEMENT
         ↓
@@ -454,6 +454,16 @@ and the reset document both prohibit exactly that.
 
 ## 11. DIRECTION — CONTRACT DATA, NOT A RECALIBRATION DATUM
 
+> **AMENDED 2026-10-01 — the premise below was false.** The URDF custom `motorDirection` was
+> **not** the hardware-validated sign. The hardware-validated signs are the slot
+> `PASS_DIRECTION_TEST` records of 2026-07-02/05 (`09_Logs/Calibration_Sessions/`). They
+> disagree with the URDF field on all eight HIP/LOWER joints, and the TRUE LF run hit LF LOWER's
+> wrong-side end-stop under the URDF value. The slot reasoning below still holds (same type, same
+> mounting ⇒ same sign), but its source is now the current-installation `encoder_direction`
+> record in `MATDOG_SERVO_ALLOCATION.yaml`, with per-joint evidence. That record is generated into
+> `GeometryJointRecord::encoder_direction` and moves the provenance tag when it changes. The URDF
+> `motorDirection` is spec metadata only. See [`CALIBRATION_READINESS.md`](CALIBRATION_READINESS.md) §2.
+
 > **CORRECTED 2026-09-22.** This section previously treated current direction as
 > calibration work to be measured. That was wrong, and the code has been corrected on
 > `feat/h0-current-leg-preflight-v1`.
@@ -492,7 +502,7 @@ changes the URDF, and therefore the geometry provenance tag, and therefore inval
 affected transforms automatically.
 
 `JointTransform` carries **no** `direction` field. It is resolved by
-`jointDirection(profile, joint)` from the bound profile's `urdf_motor_direction`: one source of
+`jointDirection(profile, joint)` from the bound profile's `encoder_direction` (amended): one source of
 truth, one invalidation path. A copy stored as evidence could silently disagree with the URDF the
 geometry plan was compiled against.
 

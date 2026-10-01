@@ -4,7 +4,7 @@
 //
 // THE 24-PROFILE MATRIX: 4 legs x {UPPER, LOWER, HIP} x {MIN, MAX}. Every
 // profile is checked against oracles that are deliberately LITERAL - they
-// restate config/MATDOG_SERVO_ALLOCATION.yaml, the URDF directions and
+// restate config/MATDOG_SERVO_ALLOCATION.yaml (incl. encoder_direction) and
 // limits, the compiled Geometry V5 contacts and the validated sequence poses,
 // and recompute every raw tick independently - so a wrong dynamic lookup or a
 // silently regenerated table cannot pass by being wrong in the same way as the
@@ -71,17 +71,21 @@ struct JointOracle {
   JointKind joint;
   uint8_t bus;
   const char* unit;
-  int8_t direction;  // URDF motorDirection
+  int8_t direction;  // CURRENT-INSTALLATION encoder_direction (never the URDF motorDirection)
   uint16_t q0;       // a DIFFERENT synthetic q0 per joint
+  int8_t urdf_spec;  // the URDF custom motorDirection - spec metadata, NOT used
 };
-// config/MATDOG_SERVO_ALLOCATION.yaml; directions from the URDF.
+// config/MATDOG_SERVO_ALLOCATION.yaml: units, buses and the current-installation
+// encoder_direction (2026-10-01). LF: hardware witnesses; RF/RH/LH: the slots'
+// 2026-07 PASS_DIRECTION_TEST, slot mechanics unchanged. The URDF spec value
+// disagrees on all eight HIP/LOWER joints.
 constexpr JointOracle kOracle[12] = {
-    {Leg::LF, JointKind::LOWER, 11, "M33", 1, 2011},   {Leg::LF, JointKind::UPPER, 12, "ELR01", 1, 2023},
-    {Leg::LF, JointKind::HIP, 13, "M22", 1, 2037},     {Leg::RF, JointKind::LOWER, 21, "NEW03", -1, 2041},
-    {Leg::RF, JointKind::UPPER, 22, "ELR03", -1, 2053}, {Leg::RF, JointKind::HIP, 23, "NEW01", 1, 2067},
-    {Leg::RH, JointKind::LOWER, 31, "NEW05", -1, 2071}, {Leg::RH, JointKind::UPPER, 32, "ELR02", -1, 2083},
-    {Leg::RH, JointKind::HIP, 33, "NEW06", -1, 2097},   {Leg::LH, JointKind::LOWER, 41, "M41", 1, 2101},
-    {Leg::LH, JointKind::UPPER, 42, "M42", 1, 2113},   {Leg::LH, JointKind::HIP, 43, "M43", -1, 2127},
+    {Leg::LF, JointKind::LOWER, 11, "M33", -1, 2011, 1},   {Leg::LF, JointKind::UPPER, 12, "ELR01", 1, 2023, 1},
+    {Leg::LF, JointKind::HIP, 13, "M22", -1, 2037, 1},     {Leg::RF, JointKind::LOWER, 21, "NEW03", 1, 2041, -1},
+    {Leg::RF, JointKind::UPPER, 22, "ELR03", -1, 2053, -1}, {Leg::RF, JointKind::HIP, 23, "NEW01", -1, 2067, 1},
+    {Leg::RH, JointKind::LOWER, 31, "NEW05", 1, 2071, -1}, {Leg::RH, JointKind::UPPER, 32, "ELR02", -1, 2083, -1},
+    {Leg::RH, JointKind::HIP, 33, "NEW06", 1, 2097, -1},   {Leg::LH, JointKind::LOWER, 41, "M41", -1, 2101, 1},
+    {Leg::LH, JointKind::UPPER, 42, "M42", 1, 2113, 1},   {Leg::LH, JointKind::HIP, 43, "M43", 1, 2127, -1},
 };
 
 // URDF limits (micro-radians), identical for the four legs.
@@ -676,6 +680,116 @@ void test_refused_plan_leaves_no_partial_request() {
   CHECK_EQ(plan.request.torque_limit, 0);
 }
 
+// --- current-installation encoder polarity (2026-10-01) --------------------------
+//
+// The TRUE LF run resolved LF LOWER with the URDF custom motorDirection (+1):
+// "LOWER MIN" (q -> -92 deg) became RAW DECREASING and drove the shank BACKWARD
+// into the short-side (MAX, +37.5 deg) end-stop at raw ~1690 (q0 2088). The
+// authority is now the current-installation encoder_direction record.
+
+// Today's fresh q0 (2026-10-01 06:22 capture).
+constexpr uint16_t kTodayQ0[12] = {2088, 2078, 1992, 1995, 2108, 2030, 2034, 2061, 2081, 2073, 2082, 2026};
+uint16_t todayQ0(uint8_t bus) {
+  const uint8_t buses[12] = {11, 12, 13, 21, 22, 23, 31, 32, 33, 41, 42, 43};
+  for (uint8_t i = 0; i < 12; ++i) {
+    if (buses[i] == bus) return kTodayQ0[i];
+  }
+  return 0;
+}
+void primeToday(actuator::JointTransformTable& table) {
+  table.clear();
+  for (const JointOracle& o : kOracle) {
+    CHECK(table.admit(promotedTransform(identityOf(o), todayQ0(o.bus))));
+  }
+}
+
+void test_current_installation_encoder_direction() {
+  g_case = "encoder_direction is the current-installation record, not the URDF";
+  CalibrationGeometryProfile profile = boundProfile();
+  int disagree = 0;
+  for (const JointOracle& o : kOracle) {
+    const actuator::GeometryJointRecord* r = profile.findJoint(identityOf(o));
+    CHECK(r != nullptr);
+    if (r == nullptr) continue;
+    CHECK_EQ(r->encoder_direction, o.direction);
+    CHECK_EQ(actuator::jointDirection(profile, identityOf(o)), o.direction);
+    const bool lf = o.leg == Leg::LF;
+    CHECK(r->encoder_direction_source ==
+          (lf ? actuator::EncoderDirectionSource::CURRENT_HARDWARE_WITNESS
+              : actuator::EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED));
+    if (o.direction != o.urdf_spec) {
+      ++disagree;
+      CHECK(o.joint != JointKind::UPPER);  // exactly the HIPs and LOWERs
+    }
+  }
+  CHECK_EQ(disagree, 8);
+
+  g_case = "today's LF LOWER failure: the old +1 mapping is refused, -1 resolves MIN forward";
+  actuator::JointTransformTable table;
+  primeToday(table);
+  FullLegPlan plan{};
+  CHECK_EQ((int)planOf(profile, table, Leg::LF, &plan), (int)FullLegPlanStatus::OK);
+  const uint8_t kL = static_cast<uint8_t>(JointKind::LOWER);
+  const CalibrationSearchCorridor& lmin = plan.request.corridor[kL][0];
+  const CalibrationSearchCorridor& lmax = plan.request.corridor[kL][1];
+  CHECK_EQ(lmin.home_tick, 2088);
+  // MIN (-92 deg, the long excursion): RAW INCREASING, ~q0 + 1047.
+  CHECK_EQ(lmin.probe_sign, 1);
+  CHECK(lmin.contact_tick > 2088 && lmin.urdf_limit_tick > 2088 && lmin.guard_tick > lmin.contact_tick);
+  CHECK_EQ(lmin.urdf_limit_tick, 2088 + ticksOf(-kUrdfLower[kL]));  // 2088 + 1046
+  CHECK(lmin.contact_tick >= 3120 && lmin.contact_tick <= 3140);
+  // MAX (+37.5 deg, the short side): RAW DECREASING, ~q0 - 427.
+  CHECK_EQ(lmax.probe_sign, -1);
+  CHECK(lmax.contact_tick < 2088 && lmax.urdf_limit_tick < 2088 && lmax.guard_tick < lmax.contact_tick);
+  CHECK_EQ(lmax.urdf_limit_tick, 2088 - ticksOf(kUrdfUpper[kL]));
+  CHECK(lmax.contact_tick >= 1645 && lmax.contact_tick <= 1670);
+  // The physical stop the failed run hit (raw ~1690, first touch ~1728) is on
+  // the MAX side: behind q0 for the MIN search, ahead of it for MAX.
+  CHECK(actuator::searchDepth(lmin, 1690) < 0 && actuator::searchDepth(lmin, 1728) < 0);
+  CHECK(actuator::searchDepth(lmax, 1690) > 0);
+  CHECK_EQ(std::abs(1690 - 2088), 398);  // 35.0 deg: the MAX magnitude, not MIN's 92
+
+  // The OLD mapping (URDF motorDirection +1) reproduces the failure: its MIN
+  // search runs RAW DECREASING straight through 1690. The production profile
+  // must never resolve that.
+  Copy old;
+  old.joint(Leg::LF, JointKind::LOWER)->encoder_direction = 1;
+  old.bind();
+  FullLegPlan old_plan{};
+  CHECK_EQ((int)planOf(old.profile, table, Leg::LF, &old_plan), (int)FullLegPlanStatus::OK);
+  const CalibrationSearchCorridor& omin = old_plan.request.corridor[kL][0];
+  CHECK_EQ(omin.probe_sign, -1);
+  CHECK(actuator::searchDepth(omin, 1690) > 0);  // the wrong-side stop lay on its path
+  CHECK(omin.probe_sign != lmin.probe_sign && omin.contact_tick != lmin.contact_tick);
+
+  g_case = "LF HIP: URDF +q (foot outward) is RAW DECREASING, as witnessed 1992 -> 1713";
+  const uint8_t kH = static_cast<uint8_t>(JointKind::HIP);
+  CHECK_EQ(plan.request.corridor[kH][1].probe_sign, -1);  // MAX = +q
+  CHECK(plan.request.corridor[kH][1].contact_tick < 1992);
+  CHECK_EQ(plan.request.corridor[kH][0].probe_sign, 1);   // MIN = -q
+  CHECK(plan.request.corridor[kH][0].contact_tick > 1992);
+  CHECK(actuator::searchDepth(plan.request.corridor[kH][1], 1713) > 0);  // the witness pose
+
+  g_case = "every leg resolves from today's q0: no wrap, corridors on the witnessed sides";
+  for (const Leg leg : kAllLegs) {
+    FullLegPlan lp{};
+    CHECK_EQ((int)planOf(profile, table, leg, &lp), (int)FullLegPlanStatus::OK);
+    for (uint8_t k = 0; k < kJointKindCount; ++k) {
+      const JointOracle& o = oracleFor(leg, static_cast<JointKind>(k));
+      for (int side = 0; side < 2; ++side) {
+        const CalibrationSearchCorridor& c = lp.request.corridor[k][side];
+        CHECK_EQ(c.home_tick, todayQ0(o.bus));
+        CHECK_EQ(c.probe_sign, o.direction * (side == 0 ? -1 : 1));
+        CHECK_EQ(c.contact_tick, rawOf(JointOracle{o.leg, o.joint, o.bus, o.unit, o.direction,
+                                                   todayQ0(o.bus), o.urdf_spec},
+                                       contactOf(leg, static_cast<JointKind>(k), side)));
+        CHECK(c.guard_tick > 0 && c.guard_tick < 4095);  // inside the raw range, no modulo
+        CHECK(actuator::searchDepth(c, c.guard_tick) > actuator::searchDepth(c, c.contact_tick));
+      }
+    }
+  }
+}
+
 void test_status_names_are_unique_and_stable() {
   g_case = "status names";
   const int n = static_cast<int>(FullLegPlanStatus::REJECT_TARGET_RESOLUTION) + 1;
@@ -698,6 +812,7 @@ int main() {
   test_plan_refusals();
   test_plan_requires_all_twelve_current_transforms();
   test_refused_plan_leaves_no_partial_request();
+  test_current_installation_encoder_direction();
   test_status_names_are_unique_and_stable();
 
   std::printf("test_full_leg_calibration_plan: %d checks, %d failures\n", g_checks, g_failures);

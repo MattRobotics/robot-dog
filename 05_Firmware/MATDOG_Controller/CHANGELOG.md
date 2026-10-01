@@ -24,6 +24,24 @@ MIN/MAX only, 2 of a leg's 6 contacts. It is superseded and is **not** Full Cali
   Every held joint and one round-robin bystander are checked every tick (torque, GoalPosition,
   TorqueLimit, drift, status, current, temperature, telemetry age). Any violation fails
   closed to a verified SAFE_OFF of all 12.
+- **Encoder direction = current-installation record, not the URDF (hardware correction,
+  2026-10-01)**: the TRUE LF run resolved LF LOWER with the URDF custom `motorDirection` (+1),
+  promoted to encoder polarity by CR0. "LOWER MIN" ran RAW DECREASING and drove the shank
+  backward into the short-side (MAX) end-stop. The run failed closed with
+  `EARLY_STALL_OUTSIDE_CORRIDOR`. A read-only witness then showed LF HIP inverted too.
+  - Each leg joint's `encoder_direction` now lives in `MATDOG_SERVO_ALLOCATION.yaml`, with its
+    source and evidence:
+    - LF HIP/UPPER/LOWER: `CURRENT_HARDWARE_WITNESS`;
+    - RF/RH/LH: `HISTORICAL_SLOT_UNCHANGED`, the slot's 2026-07 `PASS_DIRECTION_TEST`, since axes,
+      servo type and mechanics are unchanged.
+  - The exporter generates it into `GeometryJointRecord::encoder_direction`, with a
+    `EncoderDirectionSource` per joint, and refuses a joint without a record. It never falls back
+    to the URDF.
+  - The record is in the profile provenance, so the frozen CR2-C package is refused on the new
+    contract; fresh capture is the path.
+  - The matrix differs from the URDF on all eight HIP/LOWER joints.
+  - CR0, source precedence, bootstrap §11 and the audit are amended. The URDF and Geometry V5
+    are not changed and not rerun.
 - **Held-role supervision = LF V25 `ActivelyHeld` (hardware correction, 2026-09-30)**: the
   post-V25 held-joint speed abort (`HELD_JOINT_SPEED`, |speed| > 40 raw × 2 samples) is removed,
   and nothing replaces it. On hardware it aborted LF UPPER MAX while every held joint was inside its

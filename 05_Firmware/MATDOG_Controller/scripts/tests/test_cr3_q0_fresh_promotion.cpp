@@ -192,6 +192,45 @@ void test_capture_view_lifecycle() {
   CHECK(!s.freshCapture().complete);
 }
 
+// The CR2-C contrast oracle on the CURRENT geometry. Since 2026-10-01 the frozen
+// package itself is bound to the superseded direction contract (the allocation
+// record now carries the current-installation encoder_direction) and is refused
+// by prepareCurrentQ0Evidence(); its raw q0 values remain a valid CONTRAST: a
+// second, different installation of the same robot. They are promoted here
+// through the same fresh path the Controller uses.
+Q0EvidencePreparation cr2cContrast(const CalibrationGeometryProfile& p) {
+  static Q0BootstrapCandidate c[12];
+  for (uint8_t i = 0; i < 12; ++i) {
+    const q0_evidence_data::Q0CandidateRecord& r = q0_evidence_data::kRecords[i];
+    Q0BootstrapCandidate x{};
+    x.status = Q0BootstrapStatus::CANDIDATE;
+    x.geometry = geometryProvenanceTag(geometry_data::kProvenance);
+    x.bus_id = r.bus_id;
+    x.capture_session_id = 77;
+    x.sample_count = q0_evidence_data::kSampleCount;
+    x.stability_spread_ticks = q0_evidence_data::kStabilitySpreadTicks;
+    x.evidence.measured = true;
+    x.evidence.estimator = calibration::Q0Estimator::MANUAL_ZERO_POSE;
+    x.evidence.state = calibration::EvidenceState::CANDIDATE;
+    x.evidence.origin = calibration::CalibrationOrigin::LIVE_SESSION;
+    x.evidence.identity.leg = r.leg;
+    x.evidence.identity.joint = r.joint;
+    calibration::setPhysicalUnit(&x.evidence.identity, r.physical_unit);
+    x.evidence.tick = r.q0_tick;
+    const int center = calibration::kServoRawCenter;  // a servo-level prior, never a q0
+    const int d = r.q0_tick > center ? r.q0_tick - center : center - r.q0_tick;
+    x.evidence.shift_from_digital_home_ticks = static_cast<uint16_t>(d);
+    c[i] = x;
+  }
+  FreshQ0Capture capture{};
+  capture.complete = true;
+  capture.population_pass = true;
+  capture.capture_session_id = 77;
+  capture.candidates = c;
+  capture.candidate_count = 12;
+  return prepareFreshQ0Evidence(p, geometry_data::kProvenance, capture, true);
+}
+
 void test_fresh_capture_is_promoted_not_frozen() {
   g_case = "fresh candidates, not frozen CR2-C";
   const CalibrationGeometryProfile p = boundProfile();
@@ -205,7 +244,7 @@ void test_fresh_capture_is_promoted_not_frozen() {
   CHECK(fresh.failed_record_index == 0xFF);
 
   const Q0EvidencePreparation frozen =
-      prepareCurrentQ0Evidence(p, geometry_data::kProvenance, true);
+      cr2cContrast(p);
   CHECK(frozen.ready());
 
   for (uint8_t i = 0; i < 12; ++i) {
@@ -428,7 +467,7 @@ void test_full_leg_plan_consumes_the_new_q0() {
   const Q0EvidencePreparation p2 =
       prepareFreshQ0Evidence(p, geometry_data::kProvenance, second.freshCapture(), true);
   const Q0EvidencePreparation frozen =
-      prepareCurrentQ0Evidence(p, geometry_data::kProvenance, true);
+      cr2cContrast(p);
   CHECK(p1.ready() && p2.ready() && frozen.ready());
 
   JointTransformTable empty;
@@ -564,7 +603,7 @@ void test_recentred_installation_translation() {
       prepareFreshQ0Evidence(p, geometry_data::kProvenance, ca.freshCapture(), true);
   const Q0EvidencePreparation pb =
       prepareFreshQ0Evidence(p, geometry_data::kProvenance, cb.freshCapture(), true);
-  const Q0EvidencePreparation frozen = prepareCurrentQ0Evidence(p, geometry_data::kProvenance, true);
+  const Q0EvidencePreparation frozen = cr2cContrast(p);
   CHECK(pa.ready() && pb.ready() && frozen.ready());
   JointTransformTable ta, tb;
   CHECK(admitAll(&ta, pa));

@@ -27,6 +27,10 @@ confirmation has mutations for removed confirmation reads, a 1-of-3 majority,
 another servo's reading, a cached value, no 50 ms wait, and a failed read that
 no longer fails closed.
 
+The current-installation encoder polarity has mutations reverting LF LOWER and
+LF HIP to the URDF value, flipping a slot-evidence sign, and a resolver that
+ignores the record.
+
 The LF V25 ActivelyHeld supervision (the retired post-V25 held-joint speed
 abort) has mutations for a speed abort reintroduced (at 40 or at the settle
 bound 4), a looser drift, each held readback and safety check dropped, the
@@ -62,6 +66,8 @@ RESOLVER_H = "src/actuator/CalibrationTargetResolver.h"
 POLICY_CPP = "src/actuator/ActuatorWritePolicy.cpp"
 EXEC_CPP = "src/calibration/FullLegCalibrationExecutor.cpp"
 EXEC_H = "src/calibration/FullLegCalibrationExecutor.h"
+GEOM_DATA = "src/actuator/CalibrationGeometryProfileData.h"
+GEOM_CPP = "src/actuator/CalibrationGeometryProfile.cpp"
 SEQ_CPP = "src/actuator/CalibrationSequencePlan.cpp"
 FIN_CPP = "src/calibration/FullLegCalibrationFinalizer.cpp"
 FIN_H = "src/calibration/FullLegCalibrationFinalizer.h"
@@ -401,6 +407,17 @@ MUTATIONS = [
     ("held speed transient records unbounded", EXEC_CPP,
      "      if (held_transients_recorded_ < kHeldSpeedTransientEventCap &&",
      "      if (true &&"),
+    # Current-installation encoder polarity (2026-10-01): the URDF custom
+    # motorDirection drove LF LOWER into its wrong-side end-stop.
+    ("LF LOWER encoder_direction reverted to the URDF +1 (today's wrong-side stop)", GEOM_DATA,
+     '"M33"}, 11, -1, ', '"M33"}, 11, 1, '),
+    ("LF HIP encoder_direction reverted to the URDF +1", GEOM_DATA,
+     '"M22"}, 13, -1, ', '"M22"}, 13, 1, '),
+    ("a slot-evidence direction flipped (RH HIP NEW06)", GEOM_DATA,
+     '"NEW06"}, 33, 1, ', '"NEW06"}, 33, -1, '),
+    ("jointDirection ignores the record (always +1)", GEOM_CPP,
+     "  const int8_t direction = record->encoder_direction;",
+     "  const int8_t direction = 1;"),
     ("bystander drift ignored", EXEC_CPP,
      "  } else if (absDiff(sample->present_position, ps.entry_tick) >",
      "  } else if (false && absDiff(sample->present_position, ps.entry_tick) >"),

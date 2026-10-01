@@ -324,7 +324,7 @@ static void test_joints_are_keyed_by_current_physical_unit() {
       CHECK_EQ(got->bus_id, want.bus_id);
       // The URDF's motorId and the allocation's bus id agree for all twelve -
       // the exporter refuses to emit a table where they do not.
-      CHECK(got->urdf_motor_direction == 1 || got->urdf_motor_direction == -1);
+      CHECK(got->encoder_direction == 1 || got->encoder_direction == -1);
       // PositionOffset is 0 on every unit, so the provisioned raw centre is
       // within one tick of 2048. A PRIOR about mounting, never a q0.
       CHECK(got->provisioned_center_raw >= 2047 && got->provisioned_center_raw <= 2049);
@@ -868,7 +868,7 @@ static void test_the_profile_carries_no_lf_v25_numeric_evidence() {
     CHECK(j.provisioned_center_raw != 2074);
     // The URDF motorDirection is specification data the profile carries for
     // comparison. It is never a transform's direction: those start at 0.
-    CHECK(j.urdf_motor_direction == 1 || j.urdf_motor_direction == -1);
+    CHECK(j.encoder_direction == 1 || j.encoder_direction == -1);
   }
   JointTransform fresh{};
   CHECK_EQ(fresh.q0_tick, 0);
@@ -919,7 +919,7 @@ static void test_a_same_type_replacement_invalidates_q0_and_keeps_direction() {
     const GeometryJointRecord& j = geometry_data::kJoints[i];
     const int8_t d = jointDirection(profile, j.identity);
     if (d == 1 || d == -1) ++resolved;
-    CHECK_EQ(d, j.urdf_motor_direction);
+    CHECK_EQ(d, j.encoder_direction);
   }
   CHECK_EQ(resolved, geometry_data::kJointCount);
 

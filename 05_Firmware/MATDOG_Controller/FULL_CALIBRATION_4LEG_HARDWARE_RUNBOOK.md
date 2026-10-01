@@ -139,6 +139,15 @@ Expect `envelope_accepted=0`, `parameters_approved=0`. That is correct.
 
    If the margin is < 0, **stop before Full Calibration** and keep the evidence; nothing is
    widened. Recompute it after step 4 with the measured rest position of LF UPPER (bus 12).
+
+   **Encoder-direction table (read-only, before INITIAL RECOVERY).** Using the production
+   resolver from the promoted q0, print all 12 joints: the current-installation
+   `encoder_direction`, its source, the raw sense of −q (MIN side) and +q (MAX side), and every
+   corridor. The URDF `motorDirection` is never used. LF LOWER must read **MIN → RAW INCREASING**
+   (contact ≈ q0 + 1047) and **MAX → RAW DECREASING** (≈ q0 − 434). LF HIP +q (foot outward)
+   must read **RAW DECREASING**. If either differs, or any joint lacks a record, **stop**. During
+   LF LOWER MIN the shank must visibly move **forward**, toward the long ~92° excursion. If it
+   starts backward toward the short ~35° stop, abort at once.
 4. `--phase recover` — LF `SESSION START` + `PERMIT GRANT`, then `INITIAL RECOVERY LF`: the 12
    targets must equal the promoted q0, and the run must end `verdict=PASS recovered=12/12`. Raw
    positions printed before and after. **Stops here:** LF session + permit live, every joint

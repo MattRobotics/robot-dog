@@ -508,10 +508,27 @@ def main():
          r"  uint16_t q0_tick = 0;",
          "  uint16_t q0_tick = 0;\n  int8_t direction = 0;",
          "second source of truth", runner=run_direction_checks)
-    case("the direction resolver stops reading the URDF", PROFILE_CPP,
-         r"  const int8_t direction = record->urdf_motor_direction;",
+    case("the direction resolver stops reading the encoder_direction", PROFILE_CPP,
+         r"  const int8_t direction = record->encoder_direction;",
          "  const int8_t direction = 1;",
-         "urdf_motor_direction", runner=run_direction_checks)
+         "jointDirection() must read", runner=run_direction_checks)
+    case("the direction resolver falls back to a URDF field", PROFILE_CPP,
+         r"  const int8_t direction = record->encoder_direction;",
+         "  const int8_t direction = record->encoder_direction ? record->encoder_direction "
+         ": urdf_spec_direction(record);",
+         "jointDirection() must read", runner=run_direction_checks)
+    case("the record carries urdf_motor_direction again", PROFILE_H,
+         r"  int8_t encoder_direction;",
+         "  int8_t urdf_motor_direction;\n  int8_t encoder_direction;",
+         "carries urdf_motor_direction again", runner=run_direction_checks)
+    case("the generated profile reverts LF LOWER to the URDF +1", "CalibrationGeometryProfileData.h",
+         r'"M33"\}, 11, -1, ',
+         '"M33"}, 11, 1, ',
+         "are not exactly the 12 records", runner=run_direction_checks)
+    case("the generated profile mislabels a direction source", "CalibrationGeometryProfileData.h",
+         r'"NEW01"\}, 23, -1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED',
+         '"NEW01"}, 23, -1, EncoderDirectionSource::CURRENT_HARDWARE_WITNESS',
+         "are not exactly the 12 records", runner=run_direction_checks)
     case("the direction resolver bypasses the bound profile", PROFILE_CPP,
          r"  const GeometryJointRecord\* record = profile\.findJoint\(joint\);",
          "  const GeometryJointRecord* record = &geometry_data_kJoints[0];",

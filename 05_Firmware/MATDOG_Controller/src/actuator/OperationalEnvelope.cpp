@@ -61,7 +61,7 @@ EnvelopeBuildStatus buildGeometryDerivedEnvelope(
     return EnvelopeBuildStatus::REJECT_TARGET_RESOLUTION;
   }
 
-  // Direction (urdf_motor_direction) can be -1, so the numerically smaller
+  // Direction (encoder_direction) can be -1, so the numerically smaller
   // URDF angle does not always resolve to the numerically smaller raw tick -
   // take min/max of the two resolved ticks rather than assuming an order.
   out->identity = request.joint;

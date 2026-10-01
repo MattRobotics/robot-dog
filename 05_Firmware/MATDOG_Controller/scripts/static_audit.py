@@ -4364,7 +4364,8 @@ def check_calibration_readiness_contract(sketch_dir):
     from silently returning while all existing actuator fail-closed checks
     continue to enforce zero production write reachability:
 
-      1. motorDirection is current URDF/Geometry V5 contract data;
+      1. encoder direction is the current-installation record, NOT the URDF
+         motorDirection (amended 2026-10-01 after the LF LOWER wrong-side stop);
       2. Full Calibration does not require the 16 beyond-URDF hip/lower
          diagnostic contacts to become executable;
       3. future calibration-motion permission is distinct from final
@@ -4392,8 +4393,10 @@ def check_calibration_readiness_contract(sketch_dir):
          "same-session q0 orchestration passed offline/build validation but remains hardware-unvalidated"),
         ("@CALIBRATION Q0 CAPTURE <samples 3..32> <stability_ticks 0..2047> CONFIRM_Q0_POSE",
          "the read-only q0 capture command must remain explicit and pose-confirmed"),
-        ("motorDirection  = current URDF / hardware-contract data",
-         "production direction must remain bound to the current URDF/geometry contract"),
+        ("encoder_direction = current-installation record (MATDOG_SERVO_ALLOCATION.yaml)",
+         "production raw<->q direction must come from the current-installation record"),
+        ("URDF motorDirection = design/spec metadata, never encoder polarity",
+         "the URDF custom motorDirection must never drive hardware calibration again"),
         ("8  upper-leg endpoints  EXECUTABLE_URDF_DOMAIN",
          "the executable V5 endpoint population must remain explicit"),
         ("16 hip/lower endpoints  DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS",
@@ -4434,11 +4437,12 @@ def check_calibration_readiness_contract(sketch_dir):
     for stale in (
         "current direction verification            TO_IMPLEMENT",
         "current q0/direction",
+        "current motorDirection from URDF/V5       REUSED / CONTRACT DATA",
     ):
         if stale in bootstrap:
             fail(f"{required_docs['CALIBRATION_BOOTSTRAP.md']}: stale CR0 direction prerequisite {stale!r}")
     for required in (
-        "current motorDirection from URDF/V5       REUSED / CONTRACT DATA",
+        "current encoder_direction (installation)  RECORD + EVIDENCE (amended 2026-10-01)",
         "8 upper endpoints are `REQUIRED_FOR_FINAL_CALIBRATION`",
         "a 12-joint direction campaign",
     ):
@@ -4459,23 +4463,30 @@ def check_calibration_readiness_contract(sketch_dir):
                  f"statement {required!r}")
 
 def check_direction_is_contractual(files, sketch_dir):
-    """Joint direction is hardware-contract data, not a recalibration datum.
+    """Joint encoder direction is CURRENT-INSTALLATION polarity, never the URDF.
 
-    The canonical URDF carries per-joint motorDirection and those directions
-    were validated on real hardware. The 2026-08-27 reprovisioning changed the
-    physical units, the PositionOffset baseline and the raw q0 installation -
-    it did NOT change the servo model, the mounting orientation, the joint
-    mechanical architecture, the URDF axes or motorDirection.
+    2026-10-01 correction of CR0 (2026-09-27): CR0 promoted the URDF custom
+    motorDirection to hardware encoder polarity. It never was one - the repo's
+    own servo contract keeps the hardware encoder-to-q sign separate from it,
+    with eight recorded conflicts (all HIPs and LOWERs) - and the TRUE LF run
+    drove LF LOWER into its short-side end-stop under it. The authority is the
+    encoder_direction record of MATDOG_SERVO_ALLOCATION.yaml (hashed into the
+    profile provenance), generated into GeometryJointRecord::encoder_direction.
 
-        q0              CURRENT INSTALLATION CALIBRATION DATA - measured
-        motorDirection  CURRENT URDF / HARDWARE CONTRACT DATA - read
+        q0                 CURRENT INSTALLATION CALIBRATION DATA - measured
+        encoder_direction  CURRENT INSTALLATION POLARITY - witnessed / slot evidence
+        URDF motorDirection  design/spec metadata - never encoder polarity
 
     So:
 
       1. JointTransform carries NO direction field - one source of truth;
-      2. jointDirection() resolves it from the bound profile's URDF record;
-      3. usableProvenance() does not require a measured direction;
-      4. the optional DIRECTION_VERIFY diagnostic budget is consulted ONLY by
+      2. jointDirection() resolves it from the bound profile's
+         encoder_direction, never a URDF field;
+      3. every leg joint of the allocation carries encoder_direction in {-1,+1}
+         with a recognised source and evidence, and the generated profile
+         carries exactly those twelve values;
+      4. usableProvenance() does not require a measured direction;
+      5. the optional DIRECTION_VERIFY diagnostic budget is consulted ONLY by
          the diagnostic path - never by calibration acceptance.
     """
     by_name = {path.name: (path, code) for path, code in files}
@@ -4492,10 +4503,12 @@ def check_direction_is_contractual(files, sketch_dir):
     if not body:
         fail(f"{path}: struct JointTransform not found")
     elif re.search(r"^\s*int8_t\s+direction\s*=", body.group(1), re.M):
-        fail(f"{path}: JointTransform carries a `direction` field - direction is "
-             f"hardware-contract data read from the URDF, not measured evidence. Storing a "
-             f"copy creates a second source of truth that can silently disagree with the "
-             f"URDF the geometry plan was compiled against")
+        fail(f"{path}: JointTransform carries a `direction` field - the encoder direction "
+             f"lives in the bound profile (current-installation record). Storing a copy "
+             f"creates a second source of truth that can silently disagree with it")
+    if re.search(r"int8_t\s+urdf_motor_direction", code):
+        fail(f"{path}: GeometryJointRecord carries urdf_motor_direction again - the URDF "
+             f"custom motorDirection is spec metadata and must never be encoder polarity")
 
     # --- (2) it is resolved from the profile -------------------------------
     path, code = profile_cpp
@@ -4505,9 +4518,10 @@ def check_direction_is_contractual(files, sketch_dir):
              f"bound profile, which is what ties it to the URDF provenance")
     else:
         text = resolver.group(0)
-        if "urdf_motor_direction" not in text:
-            fail(f"{path}: jointDirection() does not read urdf_motor_direction - the URDF "
-                 f"is the only authority for a joint's direction")
+        if "record->encoder_direction" not in text or "urdf" in text.lower():
+            fail(f"{path}: jointDirection() must read the profile's current-installation "
+                 f"encoder_direction and nothing URDF-derived - the URDF motorDirection is "
+                 f"spec metadata, never encoder polarity (2026-10-01)")
         if "findJoint" not in text:
             fail(f"{path}: jointDirection() does not go through the bound profile - a "
                  f"direction read outside the profile escapes the geometry provenance tag, "
@@ -4516,7 +4530,43 @@ def check_direction_is_contractual(files, sketch_dir):
             fail(f"{path}: jointDirection() cannot return 0 - an unknown joint or an "
                  f"unbound profile must fail closed rather than guess a sign")
 
-    # --- (3) provenance does not demand a measured direction ---------------
+    # --- (3) the record and the generated profile agree, joint by joint ---
+    yaml_path = sketch_dir.parents[1] / "06_Software" / "Matdog_Core" / "config" / \
+        "MATDOG_SERVO_ALLOCATION.yaml"
+    data_entry = by_name.get("CalibrationGeometryProfileData.h")
+    data_path = data_entry[0] if data_entry else sketch_dir / "src" / "actuator" / \
+        "CalibrationGeometryProfileData.h"
+    if not yaml_path.exists() or data_entry is None:
+        fail(f"{yaml_path} / {data_path}: encoder-direction authority or profile missing")
+    else:
+        yaml_text = yaml_path.read_text(encoding="utf-8")
+        record = {}
+        for unit, joint, bus, rest in re.findall(
+                r"- unit: (\S+)\n\s+joint: (\S+)\n\s+bus_id: (\d+)\n(.*?)(?=\n  - unit:|\Z)",
+                yaml_text, re.S):
+            if not re.match(r"^(LF|RF|RH|LH)_(HIP|UPPER|LOWER)$", joint):
+                continue
+            d = re.search(r"^\s+encoder_direction: (-?\d+)\s*$", rest, re.M)
+            src = re.search(r"^\s+encoder_direction_source: (\S+)\s*$", rest, re.M)
+            ev = re.search(r'^\s+encoder_direction_evidence: "([^"]+)"\s*$', rest, re.M)
+            if not d or int(d.group(1)) not in (-1, 1) or not src or src.group(1) not in (
+                    "CURRENT_HARDWARE_WITNESS", "HISTORICAL_SLOT_UNCHANGED") or not ev:
+                fail(f"{yaml_path}: {joint} ({unit}) has no valid current-installation "
+                     f"encoder_direction / source / evidence")
+                continue
+            record[(int(bus), unit)] = (int(d.group(1)), src.group(1))
+        generated = {
+            (int(bus), unit): (int(d), src)
+            for unit, bus, d, src in re.findall(
+                r'"(\w+)"\}, (\d+), (-?1), EncoderDirectionSource::(\w+),',
+                data_entry[1])
+        }
+        if len(record) != 12 or record != generated:
+            fail(f"{data_path}: the generated encoder directions {sorted(generated.items())} "
+                 f"are not exactly the 12 records of {yaml_path.name} "
+                 f"{sorted(record.items())} - regenerate with the exporter")
+
+    # --- (4) provenance does not demand a measured direction ---------------
     provenance = re.search(r"bool JointTransform::usableProvenance\(\) const\s*\{(.*?)\n\}",
                            code, re.DOTALL)
     if provenance and "direction" in provenance.group(1):
@@ -4524,7 +4574,7 @@ def check_direction_is_contractual(files, sketch_dir):
              f"same-type servo replacement in the same mounting invalidates q0 only, and "
              f"must not be blocked waiting for a direction measurement")
 
-    # --- (4) the diagnostic budget never gates calibration -----------------
+    # --- (5) the diagnostic budget never gates calibration -----------------
     path, code = policy_cpp
     for m in re.finditer(r"(\w+)\s*\([^)]*\)\s*(?:const\s*)?\{", code):
         pass  # function boundaries are not reliable here; scope by name instead

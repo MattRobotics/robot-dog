@@ -8,6 +8,10 @@ document; see §9.
 **Amended:** 2026-09-27 — CR0 reconciles the direction contract with commit `9aae03d` and
 [`CALIBRATION_READINESS.md`](CALIBRATION_READINESS.md): production direction is current
 URDF/Geometry V5 contract data; direction measurement is not a calibration prerequisite.
+**Amended:** 2026-10-01 — that direction rule is **superseded**. The encoder direction is the
+current-installation `encoder_direction` record (`MATDOG_SERVO_ALLOCATION.yaml`); the URDF
+`motorDirection` is design/spec metadata and never encoder polarity. See
+[`CALIBRATION_READINESS.md`](CALIBRATION_READINESS.md) §2.
 
 This document records the C0 evidence audit that preceded the native calibration
 foundation. It exists so the next person does not have to re-derive which of several
@@ -123,6 +127,9 @@ LF V25's `direction` is a compile-time `JointSpec` constant, not measured eviden
 that exists in that archive is the **contact witness**. Commit `9aae03d` subsequently closed the
 current production question: `motorDirection` is resolved from the current bound URDF / Geometry
 V5 profile and is hardware-contract data, while q0 remains current-installation calibration data.
+*(Superseded 2026-10-01: the encoder direction is the current-installation `encoder_direction`
+record. The URDF field disagreed with the hardware on all eight HIP/LOWER joints; the 2026-07
+`PASS_DIRECTION_TEST` records in `09_Logs/Calibration_Sessions/` ARE hardware direction witnesses.)*
 `DIRECTION_VERIFY` is optional diagnostic-only. The legacy `MEASURED_CANDIDATE`/`ACCEPTED`
 direction vocabulary remains in the recovered domain for oracle/diagnostic representation; it is
 **not** a TO_IMPLEMENT prerequisite for current calibration acceptance.

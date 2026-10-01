@@ -67,6 +67,19 @@ All of the above are pinned to exactly these values by `static_audit.py`
 (`check_full_calibration_sequence`, `check_calibration_search_boundaries`,
 `check_servo_id_write`).
 
+## Joint direction — `JointSpec::direction` (L187–319)
+
+V25 resolved `tick = HOME_TICK + direction · q_delta` with a per-joint `direction` constant. Its LF
+values were the hardware-measured ones, and they equal the 2026-07 slot `PASS_DIRECTION_TEST`
+records. The port resolves `raw = q0 + encoder_direction · ticks(q)`. **`encoder_direction` is the
+current-installation record** (`MATDOG_SERVO_ALLOCATION.yaml`, dev log §8d), never the URDF custom
+`motorDirection`.
+
+On 2026-10-01 the URDF value drove LF LOWER "MIN" into its MAX end-stop. The current matrix equals
+the V25/2026-07 hardware signs on every joint. That is not because V25 was copied: LF is witnessed
+on the current installation, and RF/RH/LH carry their unchanged slots' signs. It differs from the
+URDF field on all eight HIP/LOWER joints.
+
 ## Held-role supervision — `validate_lf_role_observation` (L1378), `LfMotorRole::ActivelyHeld`
 
 | V25 | Now (`FullLegCalibrationExecutor::monitorHeld`, every held joint, every tick) |
