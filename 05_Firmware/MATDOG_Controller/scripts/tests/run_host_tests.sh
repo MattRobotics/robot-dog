@@ -388,6 +388,46 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# Calibration Persistence V1 (P2): record codec/validation, A/B store with fault
+# injection, and the NVS adapter against a host stand-in of <nvs.h>. The record
+# validator re-derives joint diagnostics through the production
+# deriveFullLegJointDiagnostics, so the executor chain is linked as above.
+CALREC_SRCS=(
+  "$SKETCH_DIR/src/calibration/CalibrationRecord.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationRecordStore.cpp"
+  "$SKETCH_DIR/src/calibration/FullLegCalibrationFinalizer.cpp"
+  "$SKETCH_DIR/src/calibration/FullLegCalibrationPlan.cpp"
+  "$SKETCH_DIR/src/calibration/FullLegCalibrationExecutor.cpp"
+  "$SKETCH_DIR/src/calibration/ContactProbeEngine.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationManager.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationMotionPermit.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationPopulationEvidence.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
+  "$SKETCH_DIR/src/actuator/OperationalEnvelope.cpp"
+  "$SKETCH_DIR/src/actuator/MotionDeadman.cpp"
+  "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp"
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp"
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp"
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp"
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp"
+  "$SKETCH_DIR/src/servo/ServoPopulation.cpp"
+  "$SKETCH_DIR/src/core/SystemState.cpp"
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp"
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+)
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_record" \
+  "$SCRIPT_DIR/test_calibration_record.cpp" "${CALREC_SRCS[@]}"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_record_store" \
+  "$SCRIPT_DIR/test_calibration_record_store.cpp" "${CALREC_SRCS[@]}"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -I"$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_calibration_record_nvs_backend" \
+  "$SCRIPT_DIR/test_calibration_record_nvs_backend.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationRecordNvsBackend.cpp" "${CALREC_SRCS[@]}"
+
 # The HostLink readiness classifier suite links the REAL pure classifier -
 # no module pointer, no hardware call - I6 (2026-09-25 objective change).
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -470,6 +510,9 @@ done
 "$OUT/test_full_leg_calibration_executor"
 "$OUT/test_full_leg_calibration_plan"
 "$OUT/test_full_leg_calibration_finalizer"
+"$OUT/test_calibration_record"
+"$OUT/test_calibration_record_store"
+"$OUT/test_calibration_record_nvs_backend"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"
 "$OUT/test_led_ring_manager_USB_ONLY"
