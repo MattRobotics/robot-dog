@@ -1,0 +1,41 @@
+source_commit=dfcecb670d0565d2db1a8152b6cd7ad230bdb87d
+ENCODER_DIRECTION_TABLE (current-installation record; URDF motorDirection NOT used)
+leg joint  unit   bus  q0    enc_dir  source                     -q(MIN side)    +q(MAX side)
+LF  HIP    M22     13  1975  -1       CURRENT_HARDWARE_WITNESS   RAW INCREASING  RAW DECREASING
+LF  UPPER  ELR01   12  2078  +1       CURRENT_HARDWARE_WITNESS   RAW DECREASING  RAW INCREASING
+LF  LOWER  M33     11  2104  -1       CURRENT_HARDWARE_WITNESS   RAW INCREASING  RAW DECREASING
+RF  HIP    NEW01   23  2030  -1       HISTORICAL_SLOT_UNCHANGED  RAW INCREASING  RAW DECREASING
+RF  UPPER  ELR03   22  2108  -1       HISTORICAL_SLOT_UNCHANGED  RAW INCREASING  RAW DECREASING
+RF  LOWER  NEW03   21  1995  +1       HISTORICAL_SLOT_UNCHANGED  RAW DECREASING  RAW INCREASING
+RH  HIP    NEW06   33  2081  +1       HISTORICAL_SLOT_UNCHANGED  RAW DECREASING  RAW INCREASING
+RH  UPPER  ELR02   32  2061  -1       HISTORICAL_SLOT_UNCHANGED  RAW INCREASING  RAW DECREASING
+RH  LOWER  NEW05   31  2034  +1       HISTORICAL_SLOT_UNCHANGED  RAW DECREASING  RAW INCREASING
+LH  HIP    M43     43  2026  +1       HISTORICAL_SLOT_UNCHANGED  RAW DECREASING  RAW INCREASING
+LH  UPPER  M42     42  2098  +1       HISTORICAL_SLOT_UNCHANGED  RAW DECREASING  RAW INCREASING
+LH  LOWER  M41     41  2073  -1       HISTORICAL_SLOT_UNCHANGED  RAW INCREASING  RAW DECREASING
+
+CORRIDORS (production resolveFullLegPlan)
+LF  HIP    MIN q_limit=-0.7854 rad ( -45.00 deg) probe=RAW INCREASING q0=1975 contact=2499 entry=2423 urdf_limit=2487 guard=2551
+LF  HIP    MAX q_limit=+0.7854 rad ( +45.00 deg) probe=RAW DECREASING q0=1975 contact=1460 entry=1527 urdf_limit=1463 guard=1399
+LF  UPPER  MIN q_limit=-0.9163 rad ( -52.50 deg) probe=RAW DECREASING q0=2078 contact=1485 entry=1545 urdf_limit=1481 guard=1417
+LF  UPPER  MAX q_limit=+2.1380 rad (+122.50 deg) probe=RAW INCREASING q0=2078 contact=3465 entry=3408 urdf_limit=3472 guard=3536
+LF  LOWER  MIN q_limit=-1.6057 rad ( -92.00 deg) probe=RAW INCREASING q0=2104 contact=3152 entry=3087 urdf_limit=3151 guard=3215
+LF  LOWER  MAX q_limit=+0.6545 rad ( +37.50 deg) probe=RAW DECREASING q0=2104 contact=1670 entry=1741 urdf_limit=1677 guard=1613
+RF  HIP    MIN q_limit=-0.7854 rad ( -45.00 deg) probe=RAW INCREASING q0=2030 contact=2545 entry=2478 urdf_limit=2542 guard=2606
+RF  HIP    MAX q_limit=+0.7854 rad ( +45.00 deg) probe=RAW DECREASING q0=2030 contact=1506 entry=1582 urdf_limit=1518 guard=1454
+RF  UPPER  MIN q_limit=-0.9163 rad ( -52.50 deg) probe=RAW INCREASING q0=2108 contact=2701 entry=2641 urdf_limit=2705 guard=2769
+RF  UPPER  MAX q_limit=+2.1380 rad (+122.50 deg) probe=RAW DECREASING q0=2108 contact= 721 entry= 778 urdf_limit= 714 guard= 650
+RF  LOWER  MIN q_limit=-1.6057 rad ( -92.00 deg) probe=RAW DECREASING q0=1995 contact= 947 entry=1012 urdf_limit= 948 guard= 884
+RF  LOWER  MAX q_limit=+0.6545 rad ( +37.50 deg) probe=RAW INCREASING q0=1995 contact=2429 entry=2358 urdf_limit=2422 guard=2486
+RH  HIP    MIN q_limit=-0.7854 rad ( -45.00 deg) probe=RAW DECREASING q0=2081 contact=1567 entry=1633 urdf_limit=1569 guard=1505
+RH  HIP    MAX q_limit=+0.7854 rad ( +45.00 deg) probe=RAW INCREASING q0=2081 contact=2605 entry=2529 urdf_limit=2593 guard=2657
+RH  UPPER  MIN q_limit=-0.9163 rad ( -52.50 deg) probe=RAW INCREASING q0=2061 contact=2654 entry=2594 urdf_limit=2658 guard=2722
+RH  UPPER  MAX q_limit=+2.1380 rad (+122.50 deg) probe=RAW DECREASING q0=2061 contact= 674 entry= 731 urdf_limit= 667 guard= 603
+RH  LOWER  MIN q_limit=-1.6057 rad ( -92.00 deg) probe=RAW DECREASING q0=2034 contact= 986 entry=1051 urdf_limit= 987 guard= 923
+RH  LOWER  MAX q_limit=+0.6545 rad ( +37.50 deg) probe=RAW INCREASING q0=2034 contact=2468 entry=2397 urdf_limit=2461 guard=2525
+LH  HIP    MIN q_limit=-0.7854 rad ( -45.00 deg) probe=RAW DECREASING q0=2026 contact=1502 entry=1578 urdf_limit=1514 guard=1450
+LH  HIP    MAX q_limit=+0.7854 rad ( +45.00 deg) probe=RAW INCREASING q0=2026 contact=2540 entry=2474 urdf_limit=2538 guard=2602
+LH  UPPER  MIN q_limit=-0.9163 rad ( -52.50 deg) probe=RAW DECREASING q0=2098 contact=1505 entry=1565 urdf_limit=1501 guard=1437
+LH  UPPER  MAX q_limit=+2.1380 rad (+122.50 deg) probe=RAW INCREASING q0=2098 contact=3485 entry=3428 urdf_limit=3492 guard=3556
+LH  LOWER  MIN q_limit=-1.6057 rad ( -92.00 deg) probe=RAW INCREASING q0=2073 contact=3121 entry=3056 urdf_limit=3120 guard=3184
+LH  LOWER  MAX q_limit=+0.6545 rad ( +37.50 deg) probe=RAW DECREASING q0=2073 contact=1639 entry=1710 urdf_limit=1646 guard=1582

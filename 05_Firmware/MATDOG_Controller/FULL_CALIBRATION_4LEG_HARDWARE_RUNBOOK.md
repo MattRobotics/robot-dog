@@ -1,7 +1,9 @@
 # TRUE Full Calibration — 24 contacts, four legs (LF → RF → RH → LH) — hardware runbook
 
 Date: 2026-09-30 (replaces the 2026-09-29 UPPER-only procedure)
-Status: PROCEDURE — OFFLINE-VALIDATED; the 24-contact sequence has NEVER RUN ON HARDWARE
+Status: PROCEDURE — **HARDWARE-VALIDATED 2026-10-01: TRUE FULL CALIBRATION 24/24** (firmware `dfcecb670d05`, `all_contact_calibrated=1`; report:
+`09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md`). The result is RAM-only (no persistence yet)
+and no operational envelope is approved.
 Firmware: ONE `ROBOT_POWERED` build, OTA ingest 0, manifest `SOURCE_STATE=CLEAN`, from the PR's
 final commit (branch `fix/full-calibration-24-contact-v25-generalized-v1`).
 

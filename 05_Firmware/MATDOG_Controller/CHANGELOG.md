@@ -2,7 +2,19 @@
 
 ## Unreleased — TRUE 24-contact Full Calibration (LF V25 full-leg state machine × 4 legs) — 2026-09-30
 
-**OFFLINE-VALIDATED; never run on hardware.** Scope correction: **TRUE FULL CALIBRATION = 4 legs ×
+**HARDWARE-VALIDATED 2026-10-01: TRUE FULL CALIBRATION 24/24.**
+- Firmware `dfcecb670d0565d2db1a8152b6cd7ad230bdb87d`, BUILD_ID `dfcecb670d05`, app SHA256
+  `5fe625cd…11c503da`.
+- All four legs `HARDWARE_CONTACT_CALIBRATED` 6/6 on their first attempt; SAFE_OFF 13/13 verified.
+- Fine-pass repeatability ≤ 4 ticks on all 24 contacts.
+- Logged events: 23 transient (unconfirmed) temperature readings and 39 diagnostic held-speed
+  transients; no held-role failure.
+- Thin LOWER MAX scout margins: RF +6 and LH +13 ticks, from a systematic 3–6° LOWER MAX deficit
+  against the URDF.
+- Envelopes are not approved and the result is RAM-only (no persistence).
+- Report and evidence hashes: `09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/`.
+
+Scope correction: **TRUE FULL CALIBRATION = 4 legs ×
 3 joints × MIN/MAX = 24 contacts.** The "Full Leg" below (2026-09-29, PR #34) measured UPPER
 MIN/MAX only, 2 of a leg's 6 contacts. It is superseded and is **not** Full Calibration. See
 `09_Logs/Development_Log/2026-09-30_TRUE_24_CONTACT_FULL_CALIBRATION.md` and the V25 mapping

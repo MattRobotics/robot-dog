@@ -4,8 +4,8 @@ Branch `fix/full-calibration-24-contact-v25-generalized-v1` (from `84bafcc`). Su
 UPPER-only "Full Leg" of PR #34 (`fix/calibration-hw-session-20260929`), which stays in the
 history unchanged and is **not** Full Calibration.
 
-Status: **IMPLEMENTED / OFFLINE-VALIDATED. Hardware: NOT RUN** (the 24-contact sequence has never
-moved a servo). Every hardware step needs the operator's explicit go-ahead for that session.
+Status: **HARDWARE-VALIDATED 2026-10-01 — TRUE FULL CALIBRATION 24/24** (§8e; firmware
+`dfcecb670d05`). *Original status (2026-09-30):* implemented / offline-validated, hardware not run. Every hardware step needs the operator's explicit go-ahead for that session.
 
 ## 1. The scope error (what was wrong, and why it happened)
 
@@ -527,7 +527,38 @@ magnitude:
 - 5 audit mutations and 4 behaviour mutations: LF LOWER and LF HIP reverted to the URDF value, a
   slot sign flipped, and a resolver that ignores the record.
 
+## 8e. Hardware result: TRUE FULL CALIBRATION 24/24 (2026-10-01 18:08:41 → 18:17:12)
+
+- **Firmware:** `dfcecb670d05` (commit `dfcecb6`, CLEAN, ROBOT_POWERED, app SHA256
+  `5fe625cd…11c503da`).
+- **Before the run:**
+  - fresh q0 12/12;
+  - encoder-direction table from the current-installation record (LF LOWER MIN raw increasing,
+    MAX raw decreasing);
+  - R2 margin +33;
+  - INITIAL RECOVERY 12/12.
+- **Run:** LF → RF → RH → LH, each `HARDWARE_CONTACT_CALIBRATED` 6/6 on the first attempt, each
+  with its own session, permit and recovery.
+  - Export: `legs_contact_calibrated=4 total_contacts_accepted=24 all_contact_calibrated=1`.
+  - SAFE_OFF 13/13 verified.
+- **All 24 endpoints** lie on the sides the encoder-direction table predicted, including all eight
+  HIP/LOWER joints whose URDF `motorDirection` disagrees.
+- **Measurement:**
+  - repeatability ≤ 4 ticks;
+  - HIP and UPPER within about ±2.4° of URDF/V5, LOWER MIN within 1.2° of the CAD;
+  - **LOWER MAX systematically 3.0–5.7° short** of the URDF, as V25 also measured;
+  - thin LOWER MAX scout margins: RF +6 and LH +13 ticks;
+  - returns within 6 ticks of q0.
+- **Events:** 23 transient temperature readings and 39 held-speed diagnostics (all `speed=50`).
+- **Full metrology, V25 comparison and evidence hashes:**
+  [`../Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md`](../Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md).
+- **Not done:** no envelope approved, no persistence (RAM-only), no stand or gait authorization.
+
 ## 9. Next
+
+*Done 2026-10-01 (§8e).* Remaining: Calibration Persistence V1; the telemetry-integrity
+follow-up; the LOWER MAX corridor-margin decision; a reviewed zero-refinement procedure;
+operational-envelope approval. The original sequence below is kept for reference.
 
 Hardware, in order, each step on the operator's go-ahead: clean build → application-only flash
 → SAFE_OFF 13/13 → operator places the legs at q=0 → fresh Q0 CAPTURE/PROMOTE (a reboot

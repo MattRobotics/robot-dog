@@ -1,0 +1,90 @@
+AUTHORITY_MODE operating_mode=MAINTENANCE motion_allowed=NO service_allowed=YES
+AUTHORITY_LAST_CLEAR BOOT
+AUTHORITY_COUNTERS grants=4 already_owned=0 releases=4 rejections=0 stale=0 force_clears=0 inhibits=0
+AUTHORITY_NOTE SAFE_OFF is outside arbitration and always reachable
+CALIBRATION_EVIDENCE_EXPORT=BEGIN format=2 geometry=3713f4ddc43b204e parameters_approved=0 contact_margin_ticks=8 contacts_per_leg=6 total_contacts_expected=24
+CALIBRATION_EVIDENCE_LEG leg=LF present=1 attempts=1 session=1 geometry=3713f4ddc43b204e verdict=HARDWARE_CONTACT_CALIBRATED contacts_expected=6 contacts_measured=6 contacts_accepted=6 diagnostics_accepted=1 contact_calibrated=1 envelope_accepted=0
+CALIBRATION_EVIDENCE_LEG_CLOSE leg=LF failure=NONE executor_failure=NONE failed_phase=- session_completed=1 permit_revoked=1 authority_released=1 parameters_approved=0
+CALIBRATION_EVIDENCE_PARK leg=LF required=1 park_leg=LH park_joint=UPPER park_bus=42 park_target_urad=610865
+CALIBRATION_EVIDENCE_Q0 leg=LF joint=UPPER unit=ELR01 bus=12 present=1 q0_tick=2078 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_Q0 leg=LF joint=LOWER unit=M33 bus=11 present=1 q0_tick=2104 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_Q0 leg=LF joint=HIP unit=M22 bus=13 present=1 q0_tick=1975 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_CONTACT leg=LF joint=UPPER side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=1460 fine1_tick=1463 fine2_tick=1459 repeatability_ticks=4 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=LF joint=UPPER side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=3479 fine1_tick=3476 fine2_tick=3478 repeatability_ticks=2 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=LF joint=UPPER evaluated=1 min_contact=1461 max_contact=3477 ordered=1 span=2016/1991 scale_permille=1013 affine_q0=2065 q0_shift=13 fixed_disagreement=25 accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=LF joint=LOWER side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=3152 fine1_tick=3149 fine2_tick=3149 repeatability_ticks=0 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=LF joint=LOWER side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=1706 fine1_tick=1712 fine2_tick=1712 repeatability_ticks=0 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=LF joint=LOWER evaluated=1 min_contact=3149 max_contact=1712 ordered=1 span=1437/1474 scale_permille=975 affine_q0=2128 q0_shift=24 fixed_disagreement=37 accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=LF joint=HIP side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=2511 fine1_tick=2506 fine2_tick=2503 repeatability_ticks=3 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=LF joint=HIP side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=1489 fine1_tick=1476 fine2_tick=1472 repeatability_ticks=4 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=LF joint=HIP evaluated=1 min_contact=2504 max_contact=1474 ordered=1 span=1030/1024 scale_permille=1006 affine_q0=1989 q0_shift=14 fixed_disagreement=6 accepted=1
+CALIBRATION_EVIDENCE_ENVELOPE leg=LF joint=UPPER source=MEASURED_CONTACT status=READY present=1 min_tick=1467 max_tick=3470 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=LF joint=UPPER admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_ENVELOPE leg=LF joint=LOWER source=MEASURED_CONTACT status=READY present=1 min_tick=1720 max_tick=3141 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=LF joint=LOWER admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_ENVELOPE leg=LF joint=HIP source=MEASURED_CONTACT status=READY present=1 min_tick=1480 max_tick=2495 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=LF joint=HIP admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_LEG leg=RF present=1 attempts=1 session=2 geometry=3713f4ddc43b204e verdict=HARDWARE_CONTACT_CALIBRATED contacts_expected=6 contacts_measured=6 contacts_accepted=6 diagnostics_accepted=1 contact_calibrated=1 envelope_accepted=0
+CALIBRATION_EVIDENCE_LEG_CLOSE leg=RF failure=NONE executor_failure=NONE failed_phase=- session_completed=1 permit_revoked=1 authority_released=1 parameters_approved=0
+CALIBRATION_EVIDENCE_PARK leg=RF required=1 park_leg=RH park_joint=UPPER park_bus=32 park_target_urad=610865
+CALIBRATION_EVIDENCE_Q0 leg=RF joint=UPPER unit=ELR03 bus=22 present=1 q0_tick=2108 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_Q0 leg=RF joint=LOWER unit=NEW03 bus=21 present=1 q0_tick=1995 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_Q0 leg=RF joint=HIP unit=NEW01 bus=23 present=1 q0_tick=2030 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_CONTACT leg=RF joint=UPPER side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=2726 fine1_tick=2730 fine2_tick=2726 repeatability_ticks=4 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=RF joint=UPPER side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=717 fine1_tick=721 fine2_tick=722 repeatability_ticks=1 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=RF joint=UPPER evaluated=1 min_contact=2728 max_contact=721 ordered=1 span=2007/1991 scale_permille=1008 affine_q0=2126 q0_shift=18 fixed_disagreement=16 accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=RF joint=LOWER side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=936 fine1_tick=938 fine2_tick=937 repeatability_ticks=1 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=RF joint=LOWER side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=2364 fine1_tick=2359 fine2_tick=2356 repeatability_ticks=3 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=RF joint=LOWER evaluated=1 min_contact=937 max_contact=2357 ordered=1 span=1420/1474 scale_permille=963 affine_q0=1946 q0_shift=49 fixed_disagreement=54 accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=RF joint=HIP side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=2551 fine1_tick=2545 fine2_tick=2543 repeatability_ticks=2 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=RF joint=HIP side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=1492 fine1_tick=1498 fine2_tick=1497 repeatability_ticks=1 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=RF joint=HIP evaluated=1 min_contact=2544 max_contact=1497 ordered=1 span=1047/1024 scale_permille=1022 affine_q0=2020 q0_shift=10 fixed_disagreement=23 accepted=1
+CALIBRATION_EVIDENCE_ENVELOPE leg=RF joint=UPPER source=MEASURED_CONTACT status=READY present=1 min_tick=730 max_tick=2718 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=RF joint=UPPER admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_ENVELOPE leg=RF joint=LOWER source=MEASURED_CONTACT status=READY present=1 min_tick=945 max_tick=2348 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=RF joint=LOWER admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_ENVELOPE leg=RF joint=HIP source=MEASURED_CONTACT status=READY present=1 min_tick=1505 max_tick=2535 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=RF joint=HIP admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_LEG leg=RH present=1 attempts=1 session=3 geometry=3713f4ddc43b204e verdict=HARDWARE_CONTACT_CALIBRATED contacts_expected=6 contacts_measured=6 contacts_accepted=6 diagnostics_accepted=1 contact_calibrated=1 envelope_accepted=0
+CALIBRATION_EVIDENCE_LEG_CLOSE leg=RH failure=NONE executor_failure=NONE failed_phase=- session_completed=1 permit_revoked=1 authority_released=1 parameters_approved=0
+CALIBRATION_EVIDENCE_PARK leg=RH required=0
+CALIBRATION_EVIDENCE_Q0 leg=RH joint=UPPER unit=ELR02 bus=32 present=1 q0_tick=2061 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_Q0 leg=RH joint=LOWER unit=NEW05 bus=31 present=1 q0_tick=2034 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_Q0 leg=RH joint=HIP unit=NEW06 bus=33 present=1 q0_tick=2081 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_CONTACT leg=RH joint=UPPER side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=2672 fine1_tick=2668 fine2_tick=2670 repeatability_ticks=2 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=RH joint=UPPER side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=655 fine1_tick=659 fine2_tick=659 repeatability_ticks=0 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=RH joint=UPPER evaluated=1 min_contact=2669 max_contact=659 ordered=1 span=2010/1991 scale_permille=1010 affine_q0=2066 q0_shift=5 fixed_disagreement=19 accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=RH joint=LOWER side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=987 fine1_tick=992 fine2_tick=991 repeatability_ticks=1 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=RH joint=LOWER side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=2429 fine1_tick=2424 fine2_tick=2421 repeatability_ticks=3 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=RH joint=LOWER evaluated=1 min_contact=991 max_contact=2422 ordered=1 span=1431/1474 scale_permille=971 affine_q0=2007 q0_shift=27 fixed_disagreement=43 accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=RH joint=HIP side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=1557 fine1_tick=1563 fine2_tick=1565 repeatability_ticks=2 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=RH joint=HIP side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=2603 fine1_tick=2595 fine2_tick=2595 repeatability_ticks=0 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=RH joint=HIP evaluated=1 min_contact=1564 max_contact=2595 ordered=1 span=1031/1024 scale_permille=1007 affine_q0=2080 q0_shift=1 fixed_disagreement=7 accepted=1
+CALIBRATION_EVIDENCE_ENVELOPE leg=RH joint=UPPER source=MEASURED_CONTACT status=READY present=1 min_tick=667 max_tick=2662 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=RH joint=UPPER admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_ENVELOPE leg=RH joint=LOWER source=MEASURED_CONTACT status=READY present=1 min_tick=999 max_tick=2413 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=RH joint=LOWER admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_ENVELOPE leg=RH joint=HIP source=MEASURED_CONTACT status=READY present=1 min_tick=1573 max_tick=2587 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=RH joint=HIP admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_LEG leg=LH present=1 attempts=1 session=4 geometry=3713f4ddc43b204e verdict=HARDWARE_CONTACT_CALIBRATED contacts_expected=6 contacts_measured=6 contacts_accepted=6 diagnostics_accepted=1 contact_calibrated=1 envelope_accepted=0
+CALIBRATION_EVIDENCE_LEG_CLOSE leg=LH failure=NONE executor_failure=NONE failed_phase=- session_completed=1 permit_revoked=1 authority_released=1 parameters_approved=0
+CALIBRATION_EVIDENCE_PARK leg=LH required=0
+CALIBRATION_EVIDENCE_Q0 leg=LH joint=UPPER unit=M42 bus=42 present=1 q0_tick=2098 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_Q0 leg=LH joint=LOWER unit=M41 bus=41 present=1 q0_tick=2073 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_Q0 leg=LH joint=HIP unit=M43 bus=43 present=1 q0_tick=2026 state=PROMOTED origin=LIVE_SESSION geometry=3713f4ddc43b204e
+CALIBRATION_EVIDENCE_CONTACT leg=LH joint=UPPER side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=1482 fine1_tick=1486 fine2_tick=1488 repeatability_ticks=2 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=LH joint=UPPER side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=3489 fine1_tick=3484 fine2_tick=3485 repeatability_ticks=1 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=LH joint=UPPER evaluated=1 min_contact=1487 max_contact=3484 ordered=1 span=1997/1991 scale_permille=1003 affine_q0=2086 q0_shift=12 fixed_disagreement=6 accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=LH joint=LOWER side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=3133 fine1_tick=3133 fine2_tick=3133 repeatability_ticks=0 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=LH joint=LOWER side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=1697 fine1_tick=1702 fine2_tick=1705 repeatability_ticks=3 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=LH joint=LOWER evaluated=1 min_contact=3133 max_contact=1703 ordered=1 span=1430/1474 scale_permille=970 affine_q0=2117 q0_shift=44 fixed_disagreement=44 accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=LH joint=HIP side=MIN recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=1494 fine1_tick=1502 fine2_tick=1502 repeatability_ticks=0 witness_accepted=1
+CALIBRATION_EVIDENCE_CONTACT leg=LH joint=HIP side=MAX recorded=1 measured=1 detection=CONTACT_CONFIRMED state=PROMOTED origin=LIVE_SESSION scout_tick=2546 fine1_tick=2541 fine2_tick=2543 repeatability_ticks=2 witness_accepted=1
+CALIBRATION_EVIDENCE_DIAG leg=LH joint=HIP evaluated=1 min_contact=1502 max_contact=2542 ordered=1 span=1040/1024 scale_permille=1016 affine_q0=2022 q0_shift=4 fixed_disagreement=16 accepted=1
+CALIBRATION_EVIDENCE_ENVELOPE leg=LH joint=UPPER source=MEASURED_CONTACT status=READY present=1 min_tick=1496 max_tick=3477 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=LH joint=UPPER admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_ENVELOPE leg=LH joint=LOWER source=MEASURED_CONTACT status=READY present=1 min_tick=1713 max_tick=3125 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=LH joint=LOWER admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_ENVELOPE leg=LH joint=HIP source=MEASURED_CONTACT status=READY present=1 min_tick=1510 max_tick=2535 placeholder=1
+CALIBRATION_EVIDENCE_LIMIT leg=LH joint=HIP admission=NOT_ADMITTED_UNAPPROVED_PARAMETERS policy=-
+CALIBRATION_EVIDENCE_EXPORT=END legs_present=4 legs_contact_calibrated=4 legs_envelope_accepted=0 total_contacts_expected=24 total_contacts_accepted=24 all_contact_calibrated=1

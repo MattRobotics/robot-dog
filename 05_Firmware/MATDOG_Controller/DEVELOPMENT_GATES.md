@@ -417,8 +417,13 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     [`../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/`](../../09_Logs/Validation_Reports/Calibration_Q0_CR2C_2026-09-27/).
     **Next: CR3 acceptance/persistence/promotion policy; no motion authorization changes.**
 
-- **TRUE 24-contact Full Calibration (2026-09-30): IMPLEMENTED / OFFLINE-VALIDATED, hardware
-  NOT RUN.** The LF V25 full-leg state machine (PREFLIGHT → INITIAL_RECOVERY → PARKING → UPPER
+- **TRUE 24-contact Full Calibration — HARDWARE-VALIDATED 24/24 (2026-10-01, firmware
+  `dfcecb670d05`, `all_contact_calibrated=1`).** Still not authorized: operational envelopes
+  (`parameters_approved=0`), calibration persistence (RAM-only), stand and gait. Open before gait:
+  telemetry integrity (23 implausible single temperature readings), the LOWER MAX margin decision
+  (RF +6 ticks), and a reviewed zero-refinement procedure. Report:
+  [`../../09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/`](../../09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md).
+  *Original entry (2026-09-30):* IMPLEMENTED / OFFLINE-VALIDATED, hardware NOT RUN. The LF V25 full-leg state machine (PREFLIGHT → INITIAL_RECOVERY → PARKING → UPPER
   MIN/MAX → UPPER_HORIZONTAL → LOWER MIN/MAX → LOWER_FOLDED → HIP MIN/MAX → DIAGNOSTICS → RETURN
   → RESTORE → verified SAFE_OFF), generalized to LF, RF, RH and LH (`FullLegCalibrationExecutor`).
   Each leg runs in its own session + fresh permit, preceded by a verified
