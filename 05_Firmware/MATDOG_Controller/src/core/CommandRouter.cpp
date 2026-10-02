@@ -79,7 +79,13 @@ void captureExportLine(void* user, const char* line) {
 
 void CommandRouter::begin(const Modules& modules) {
   modules_ = modules;
+  resetLine();
+}
+
+void CommandRouter::resetLine() {
+  memset(line_buf_, 0, sizeof(line_buf_));
   line_len_ = 0;
+  line_error_ = LineError::NONE;
 }
 
 bool CommandRouter::q0CaptureOwnsServoDiagnostics() const {
@@ -104,17 +110,27 @@ void CommandRouter::update(uint32_t now_ms) {
     if (c == '\r') continue;
 
     if (c == '\n') {
-      line_buf_[line_len_] = '\0';
-      if (line_len_ > 0) {
+      if (line_error_ != LineError::NONE) {
+        Serial.println(line_error_ == LineError::OVERFLOW ? "ERROR=COMMAND_LINE_OVERFLOW"
+                                                        : "ERROR=COMMAND_LINE_NUL");
+      } else if (line_len_ > 0) {
+        line_buf_[line_len_] = '\0';
         handleLine(String(line_buf_));
       }
-      line_len_ = 0;
+      resetLine();
       continue;
     }
 
-    if (line_len_ < kLineBufSize - 1) {
-      line_buf_[line_len_++] = c;
+    if (line_error_ != LineError::NONE) continue;
+    if (c == '\0') {
+      line_error_ = LineError::NUL;
+      continue;
     }
+    if (line_len_ == kLineBufSize - 1) {
+      line_error_ = LineError::OVERFLOW;
+      continue;
+    }
+    line_buf_[line_len_++] = c;
   }
 
   if (bms_stream_enabled_ && (now_ms - last_bms_stream_ms_ >= 2000)) {

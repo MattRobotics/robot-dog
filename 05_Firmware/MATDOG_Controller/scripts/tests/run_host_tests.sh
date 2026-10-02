@@ -459,7 +459,7 @@ CALREC_SRCS=(
   "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
   "${CALREC_SRCS[@]}"
 
-# P3a.1: both REAL CommandRouter translation units, including USB framing,
+# P3a.1/P3a.2: both REAL CommandRouter translation units, including USB framing,
 # dispatch and explicit Q0 promotion. Platform transports / unrelated device
 # service methods are fakes; the calibration and persistence code stays real.
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -469,6 +469,7 @@ CALREC_SRCS=(
   -o "$OUT/test_command_router_persistence" \
   "$SCRIPT_DIR/test_command_router_persistence.cpp" \
   "$SCRIPT_DIR/router_fake_hardware.cpp" \
+  "$SCRIPT_DIR/router_nvs_stub.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationRecordNvsBackend.cpp" \
   "$SKETCH_DIR/src/core/CommandRouter.cpp" \
   "$SKETCH_DIR/src/core/CommandRouterPersistence.cpp" \
@@ -580,6 +581,7 @@ done
 "$OUT/test_calibration_persistence_service"
 "$OUT/test_calibration_save_gate"
 "$OUT/test_command_router_persistence"
+python3 "$SCRIPT_DIR/test_command_router_framing_mutations.py"
 "$OUT/test_calibration_record_nvs_backend"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"

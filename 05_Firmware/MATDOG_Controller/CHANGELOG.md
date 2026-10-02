@@ -1,5 +1,21 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — P3a.2 USB command framing hardening (offline, no hardware) — 2026-10-02
+
+- CommandRouter latches overflow or NUL for the entire USB line and discards it
+  through LF, across `update()` calls. No prefix is dispatched. LF and `begin()`
+  clear the buffer, length and error; subsequent lines are received normally.
+- The buffer stays 96 bytes: 95 payload bytes are accepted, the 96th invalidates
+  the line. CR remains ignored, preserving LF/CRLF behavior and command grammar.
+  Invalid lines report `ERROR=COMMAND_LINE_OVERFLOW` or `ERROR=COMMAND_LINE_NUL`
+  at LF; the first error is retained.
+- Real-router raw-byte regressions cover both findings for SAVE, ACK and
+  RECONCILE ADOPT, including fragmented input, recovery and `begin()` reset.
+  An integrated real NVS adapter test observes `nvs_set_blob`/`nvs_commit`:
+  rejected lines make zero calls and leave marker, slots and calibration unchanged.
+  Temporary-source mutation tests independently restore each defect and must
+  detect writes through both storage paths. Existing P2.4.1/P3a.1 tests remain.
+
 ## Unreleased — P3a.1 corrective persistence integration (offline, no hardware) — 2026-10-02
 
 - SAVE now requires a RAM attestation of the exact current `capture_session_id`,

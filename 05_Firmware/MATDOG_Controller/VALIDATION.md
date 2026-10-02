@@ -10,6 +10,80 @@ terminology.
 This document will be updated in place as hardware sessions progress; it is not
 rewritten per session.
 
+## P3a.2 USB framing hardening — offline verification, 2026-10-02
+
+Initial branch: `feat/calibration-persistence-record-store-v1`; initial HEAD:
+`e82cdab9c58c3dadd512b993901303c9bc46fa39`. The worktree was clean before this task.
+Production changes are limited to `src/core/CommandRouter.{h,cpp}`.
+
+### Framing and reproductions
+
+The unchanged 96-byte buffer accepts at most 95 payload bytes. LF dispatches a
+valid nonempty line; CR is ignored, including when CRLF is split across updates.
+The 96th payload byte or any NUL latches an error. The whole line is refused,
+including the already collected prefix, and all subsequent bytes are discarded
+through LF. The first error is reported once at LF; buffer, length and error are
+then reset. `begin()` performs the same reset. Empty lines remain ignored.
+Other control bytes retain their existing parser behavior; no token normalization,
+confirmation grammar or SAVE/ACK semantics changed.
+
+Both original findings are reproduced for eligible SAVE with full confirmation,
+ACK 2 and RECONCILE ADOPT 1 with CONFIRM_DISCARD: padding to 95 bytes followed by
+EXTRA, and a valid command followed by NUL and EXTRA. Whole and fragmented input
+are refused without command dispatch, storage writes, marker/slot changes or
+calibration changes. The same valid mutating command succeeds after recovery.
+
+The real-router test feeds transport bytes with explicit lengths. Its matrix covers
+all fifteen requested cases: within/exact/over limit, long lines, fragmentation,
+internal/first/multiple NULs, NUL with overflow, LF recovery, immediate valid next
+line, multiple lines in one update, `begin()` reset and CRLF. It runs both with
+memory storage and with the real CalibrationPersistenceService, record store and
+CalibrationRecordNvsBackend linked to simulated platform APIs. Malformed lines
+cause zero `nvs_set_blob`, `nvs_commit` or read-write namespace opens. Positive
+controls require three set/commit calls for SAVE and one for ACK or ADOPT, proving
+the integrated backend is exercised. The simulator contains no command parser.
+
+### Results and boundaries
+
+- Complete host suite: **44 executables, PASS**, run by `static_audit.py`.
+- Actual CommandRouter: **15,044 checks, zero failures**, including the previous
+  P3a.1 tests. Persistence service, SAVE gate and P2.4.1 regressions pass unchanged.
+- Negative controls: restoring silent overflow truncation or NUL acceptance in
+  separate temporary copies of the real router makes the same regressions fail.
+  Each must observe unintended memory-storage writes and actual `nvs_set_blob`
+  calls; compilation errors or diagnostic-only failures do not count. Both pass
+  this detection requirement without failing the pre-existing P3a.1 cases.
+- Static audit: **PASS**, 203 source files scanned. Layout suite: **57 tests, PASS**.
+- Both clean builds pass with ESP32 core **3.3.11**, pinned 16 MiB/custom partition
+  FQBN, PSRAM OPI and explicit **MATDOG_OTA_INGEST_ENABLED=0**. Verification build
+  ID: `e82cdab-p3a2-offline`, from the corrected pre-commit working tree. All build
+  outputs stay under `/tmp/matdog-p3a2-build-3cvl2sh6`; exported firmware and
+  repository manifests were not overwritten.
+
+| Profile | Sketch flash report | Application .bin | Global RAM | RAM left for locals |
+|---|---:|---:|---:|---:|
+| USB_ONLY | 1,120,319 B | 1,120,464 B | 73,884 B | 253,796 B |
+| ROBOT_POWERED | 1,123,455 B | 1,123,600 B | 73,884 B | 253,796 B |
+
+Both generated tables pass `matdog_layout.py check-build`, retaining layout
+`MATDOG_16M_2x5M_NVS_V1` and partition-table SHA256
+`8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7`.
+Each app slot remains 5,242,880 B; both images occupy 21.4%. Each ELF contains
+14 verified defined symbols for router begin/update/reset/dispatch/PERSIST,
+SAVE/ACK/RECONCILE, SAVE gate, Q0 attestation and NVS backend begin/writeMarker.
+
+No changes to marker/A/B protocol, layout, flashing/manifest, OTA, calibrator,
+geometry, Q0/transform, motion/gait/stabilization, servo allocation/limits or
+movement authorization. RESTORE/P3b remain unimplemented. No device access,
+flash, erase, reset, OTA or gait-worktree modification occurred. One corrective
+local commit is created; no push, PR or merge.
+
+Residual limits: simulated NVS does not prove physical durability or power-cut
+recovery, and offline framing tests do not exercise the live USB driver. Clean
+builds retain existing local-credential comment warnings and SCServo warnings
+(including ReadMode array bounds); none originates in the framing changes.
+These verification artifacts do not authorize a device migration or flash.
+
 ## P3a.1 corrective integration — offline verification, 2026-10-02
 
 Initial branch: `feat/calibration-persistence-record-store-v1`; initial HEAD:

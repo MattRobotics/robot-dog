@@ -156,6 +156,7 @@ class CommandRouter {
   bool bound() const { return modules_.system_state != nullptr; }
 
  private:
+  void resetLine();
   void handleLine(String line);
   bool q0CaptureOwnsServoDiagnostics() const;
   // True while either motion executor (the DIRECTION_VERIFY first-motion
@@ -267,8 +268,12 @@ class CommandRouter {
   uint16_t evidence_export_next_ = 0;
 
   static constexpr size_t kLineBufSize = 96;
+  // LF ends a line; CR is ignored for compatibility. The first framing error
+  // discards the whole line, across update() calls, until the next LF.
+  enum class LineError : uint8_t { NONE, OVERFLOW, NUL };
   char line_buf_[kLineBufSize] = {0};
   size_t line_len_ = 0;
+  LineError line_error_ = LineError::NONE;
 };
 
 }  // namespace core
