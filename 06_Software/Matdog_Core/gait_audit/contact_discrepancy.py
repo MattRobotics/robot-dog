@@ -91,6 +91,31 @@ def frames_of(case):
     return case['frames']
 
 
+def stance_pitch_runs(model, case):
+    """Per-leg stance runs of foot pitch (deg) from saved frames; each run is one continuous contact."""
+    runs = {l: [] for l in LEGS}; cur = {l: None for l in LEGS}
+    for f in case['frames']:
+        tf = model.fk(f['q'], np.array(f['body']))
+        for i, l in enumerate(LEGS):
+            if f['leg_phase'][i][1]:
+                if cur[l] is None:
+                    cur[l] = []; runs[l].append(cur[l])
+                cur[l].append(pitch_deg(tf[l + '_foot_link'])[0])
+            else:
+                cur[l] = None
+    return runs
+
+
+def pitch_interval_min_delta_um(foot, runs):
+    """Worst mesh-minus-analytic height over every pitch a stance run sweeps through (exact mesh function)."""
+    worst = np.inf
+    for rs in runs.values():
+        for run in rs:
+            grid = np.append(np.arange(min(run), max(run), 0.002), max(run))
+            worst = min(worst, float(foot.delta(grid).min()) * UM)
+    return worst
+
+
 def analyze(model, foot):
     tfs = {}
     out = dict(steady=[], lifecycle=[])
