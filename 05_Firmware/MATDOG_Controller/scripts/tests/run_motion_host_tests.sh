@@ -65,3 +65,9 @@ python3 "$REPO_DIR/06_Software/Matdog_Core/pose_audit/pose_export.py" --check
   -o "$OUT/test_gait" "$SCRIPT_DIR/test_gait.cpp" \
   "$SKETCH_DIR"/src/motion/*.cpp
 "$OUT/test_gait"
+
+# G4.1 declared contact modes (pure schedule function; no geometry).
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -fno-exceptions -fno-rtti \
+  -o "$OUT/test_contact_mode" "$SCRIPT_DIR/test_contact_mode.cpp" \
+  "$SKETCH_DIR"/src/motion/*.cpp
+"$OUT/test_contact_mode"
