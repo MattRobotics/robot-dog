@@ -24,7 +24,7 @@ PY = sys.executable
 CXX = os.environ.get('CXX', 'g++')
 BASELINE = 'c4befbe90b3121d60ba1b9ba09dc1082364c8d88'
 SUMMARY = re.compile(r'(GAIT_HOST|STATIC_AUDIT|REVALIDATE_SAVED|ARTIFACT_MANIFEST|Ran \d+ tests|^OK|PASS|passed|"status")', re.I)
-REPORT_TOOLING = ('validate.py', 'artifact_manifest.py')
+REPORT_TOOLING = ('validate.py', 'artifact_manifest.py', 'build_report.py')
 
 
 def sha_bytes(data):
