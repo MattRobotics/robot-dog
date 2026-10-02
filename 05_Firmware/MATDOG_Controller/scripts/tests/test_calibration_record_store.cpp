@@ -3,11 +3,12 @@
 // fake storage with fault injection per mutation. No flash, no NVS, no hardware.
 //
 // What is proven here: the SAVE protocol order (PENDING marker, record to the
-// inactive slot, full read-back, COMPLETED marker, marker read-back), that no
-// failure at any step produces a false confirmation, that every post-PENDING
-// failure blocks the instance (P2.1), that a "rebooted" instance never serves
-// an unconfirmed record and never overwrites the confirmed one, and that the
-// explicit reconciliation contract leads back to a usable state.
+// inactive slot, full read-back, AWAITING_ACK marker, marker read-back), the
+// separate durable acknowledgment (P2.4.1), that no failure at any step produces
+// a false acknowledgment, that every post-PENDING failure blocks the instance
+// (P2.1), that a "rebooted" instance never serves an unacknowledged record and
+// never overwrites the acknowledged one, and that the explicit reconciliation
+// contract leads back to a usable state.
 //
 // A power cut is modelled as: the faulting mutation is lost / partly written /
 // fully written, the storage then goes "dead" (every call fails) until
@@ -100,7 +101,7 @@ class FakeStorage : public CalibrationRecordStorage {
   bool fail_marker_read = false;
   bool oversize_marker = false;
   // Slot reads fail once a slot write was attempted; marker reads fail once the
-  // n-th marker write was attempted (1 = PENDING, 2 = COMPLETED). 0 = never.
+  // n-th marker write was attempted (1 = PENDING, 2 = AWAITING_ACK, 3 = ACK). 0 = never.
   bool fail_slot_read_after_slot_write = false;
   int fail_marker_read_from_marker_write = 0;
 
@@ -181,12 +182,12 @@ class FakeStorage : public CalibrationRecordStorage {
     data[slot] = b;
   }
 
-  void putMarker(SaveMarkerState state, uint32_t completed, uint32_t begun) {
+  void putMarker(SaveMarkerState state, uint32_t acknowledged, uint32_t begun) {
     uint8_t b[kSaveMarkerV1Bytes];
     size_t n = 0;
     SaveMarker m;
     m.state = state;
-    m.completed_generation = completed;
+    m.acknowledged_generation = acknowledged;
     m.begun_generation = begun;
     encodeSaveMarker(m, b, sizeof(b), &n);
     marker_present = true;
@@ -247,12 +248,13 @@ class FakeStorage : public CalibrationRecordStorage {
 
 CalibrationRecord record() { return goldenRecord(0); }
 
-// Storage with n confirmed generations written by the store itself.
+// Storage with n generations written by the store itself AND acknowledged.
 void seed(FakeStorage* fs, int n) {
   CalibrationRecordStore store(fs);
   for (int i = 0; i < n; ++i) {
     const SaveResult r = store.save(record(), boundProfile());
     CHECK(r.status == SaveStatus::OK);
+    CHECK(store.acknowledge(r.generation, boundProfile()).status == AckStatus::OK);
   }
   fs->log.clear();
   fs->reads = 0;
@@ -296,7 +298,8 @@ void test_empty_storage_is_first_install() {
   CHECK(r.marker.state == MarkerObservation::ABSENT);
   CHECK_EQ(fs.slot_writes + fs.marker_writes, 0);  // load never writes
 
-  // The first marker is a PENDING{completed 0, begun 1}; final state COMPLETED{1,1}.
+  // The first marker is a PENDING{acknowledged 0, begun 1}; the SAVE ends at
+  // AWAITING_ACK{0, 1} - no previous generation is invented.
   const SaveResult s = store.save(record(), boundProfile());
   CHECK(s.status == SaveStatus::OK);
   CHECK(s.phase == SavePhase::DONE);
@@ -304,9 +307,19 @@ void test_empty_storage_is_first_install() {
   CHECK_EQ(s.generation, 1);
   SaveMarker m;
   CHECK(fs.decodedMarker(&m));
-  CHECK(m.state == SaveMarkerState::COMPLETED);
-  CHECK_EQ(m.completed_generation, 1);
+  CHECK(m.state == SaveMarkerState::AWAITING_ACK);
+  CHECK_EQ(m.acknowledged_generation, 0);
   CHECK_EQ(m.begun_generation, 1);
+  // Verified on flash is not calibration data: nothing is served until the ACK.
+  CHECK(store.load(boundProfile(), &loaded).status == LoadStatus::ACKNOWLEDGMENT_REQUIRED);
+  CHECK(classOf(fs) == PersistenceClass::AWAITING_ACK);
+  const AckResult ack = store.acknowledge(1, boundProfile());
+  CHECK(ack.status == AckStatus::OK);
+  CHECK(fs.decodedMarker(&m));
+  CHECK(m.state == SaveMarkerState::IDLE);
+  CHECK_EQ(m.acknowledged_generation, 1);
+  CHECK_EQ(m.begun_generation, 1);
+  expectSelected(store, 1, CalibrationSlot::A, false);
 }
 
 void test_protocol_order() {
@@ -315,10 +328,17 @@ void test_protocol_order() {
   CalibrationRecordStore store(&fs);
   const SaveResult s = store.save(record(), boundProfile());
   CHECK(s.status == SaveStatus::OK);
-  // scan (rA rB rM), PENDING + verify, slot + full read-back, COMPLETED + verify
+  // scan (rA rB rM), PENDING + verify, slot + full read-back, AWAITING_ACK + verify
   const std::vector<std::string> expected = {"rA", "rB", "rM", "wM", "rM", "wA", "rA", "wM", "rM"};
   CHECK(fs.log == expected);
   CHECK_EQ(fs.mutations, 3);
+  // ACK: rescan, then one marker write and its read-back. No record is written.
+  fs.log.clear();
+  CHECK(store.acknowledge(s.generation, boundProfile()).status == AckStatus::OK);
+  const std::vector<std::string> expected_ack = {"rA", "rB", "rM", "wM", "rM"};
+  CHECK(fs.log == expected_ack);
+  CHECK_EQ(fs.mutations, 4);
+  CHECK_EQ(fs.slot_writes, 1);  // still only the SAVE's record write
 }
 
 void test_alternation_and_generations() {
@@ -332,6 +352,7 @@ void test_alternation_and_generations() {
   CHECK(r.slot == CalibrationSlot::A);
   CHECK(!r.previous_record_intact);
   CHECK(!fs.present[1]);
+  CHECK(store.acknowledge(1, profile).status == AckStatus::OK);
   expectSelected(store, 1, CalibrationSlot::A, false);
 
   const std::vector<uint8_t> a_after_first = fs.data[0];
@@ -341,11 +362,18 @@ void test_alternation_and_generations() {
   CHECK_EQ(r.generation, 2);
   CHECK(r.previous_record_intact);
   CHECK_EQ(r.previous_generation, 1);
-  CHECK(fs.data[0] == a_after_first);  // the confirmed slot was not touched
+  CHECK(fs.data[0] == a_after_first);  // the acknowledged slot was not touched
+  // Until it is acknowledged the new generation is neither served nor does it release A.
+  CalibrationRecord loaded0;
+  CHECK(store.load(profile, &loaded0).status == LoadStatus::ACKNOWLEDGMENT_REQUIRED);
+  CHECK(store.save(record(), profile).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+  CHECK(fs.data[0] == a_after_first);
+  CHECK(store.acknowledge(2, profile).status == AckStatus::OK);
   expectSelected(store, 2, CalibrationSlot::B, false);
 
   const std::vector<uint8_t> b_after_second = fs.data[1];
   r = store.save(record(), profile);
+  CHECK(store.acknowledge(3, profile).status == AckStatus::OK);
   CHECK(r.slot == CalibrationSlot::A);
   CHECK_EQ(r.generation, 3);
   CHECK(fs.data[1] == b_after_second);
@@ -355,6 +383,7 @@ void test_alternation_and_generations() {
     CHECK(r.status == SaveStatus::OK);
     CHECK_EQ(r.generation, i);
     CHECK_EQ(static_cast<int>(r.slot), (i - 1) % 2);
+    CHECK(store.acknowledge(i, profile).status == AckStatus::OK);
   }
   expectSelected(store, 30, CalibrationSlot::B, false);
 
@@ -362,6 +391,7 @@ void test_alternation_and_generations() {
   r = store.save(goldenRecord(999), profile);
   CHECK(r.status == SaveStatus::OK);
   CHECK_EQ(r.generation, 31);
+  CHECK(store.acknowledge(31, profile).status == AckStatus::OK);
 
   CalibrationRecord loaded;
   CHECK(store.load(profile, &loaded).status == LoadStatus::OK);
@@ -400,12 +430,12 @@ void test_invalid_record_does_not_touch_storage() {
   CHECK(store.load(boundProfile(), nullptr).status == LoadStatus::BAD_ARGUMENT);
 }
 
-// ---- named failure scenarios (state seeded: gen 1 confirmed in slot A) -----
+// ---- named failure scenarios (state seeded: gen 1 acknowledged in slot A) -----
 
-// Common post-conditions of a failed SAVE started from a confirmed gen 1.
-void expectConfirmedUntouched(FakeStorage& fs, const std::vector<uint8_t>& slot_a_before) {
+// Common post-conditions of a failed SAVE started from a acknowledged gen 1.
+void expectAcknowledgedUntouched(FakeStorage& fs, const std::vector<uint8_t>& slot_a_before) {
   CHECK(fs.present[0]);
-  CHECK(fs.data[0] == slot_a_before);  // the confirmed record's bytes never changed
+  CHECK(fs.data[0] == slot_a_before);  // the acknowledged record's bytes never changed
 }
 
 void test_failure_before_pending_write() {
@@ -427,7 +457,7 @@ void test_failure_before_pending_write() {
     CHECK(store.writeState() == WriteState::OPEN);
     SaveMarker after;
     CHECK(fs.decodedMarker(&after) && after == before);
-    expectConfirmedUntouched(fs, a);
+    expectAcknowledgedUntouched(fs, a);
     expectSelected(store, 1, CalibrationSlot::A, false);
     // ...and succeeds, without any reconciliation: nothing was published.
     fs.arm(0, Fault::NONE);
@@ -458,13 +488,13 @@ void test_pending_published_record_not_written() {
   CHECK(r.status == SaveStatus::WRITE_FAILED);
   CHECK(r.phase == SavePhase::RECORD_WRITE);
   CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
-  CHECK_EQ(r.generation, 0);  // no confirmed generation reported
+  CHECK_EQ(r.generation, 0);  // no acknowledged generation reported
   SaveMarker m;
   CHECK(fs.decodedMarker(&m));
   CHECK(m.state == SaveMarkerState::PENDING);
-  CHECK_EQ(m.completed_generation, 1);
+  CHECK_EQ(m.acknowledged_generation, 1);
   CHECK_EQ(m.begun_generation, 2);
-  expectConfirmedUntouched(fs, a);
+  expectAcknowledgedUntouched(fs, a);
 
   // Same instance: refused, nothing read, nothing written.
   fs.arm(0, Fault::NONE);
@@ -479,13 +509,13 @@ void test_pending_published_record_not_written() {
   const LoadResult l = rebooted.load(boundProfile(), &out);
   CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
   CHECK(l.assessment.cls == PersistenceClass::PENDING_RECORD_ABSENT);
-  CHECK(l.assessment.confirmed_record_intact);  // gen 1 is still there, but not served
+  CHECK(l.assessment.acknowledged_record_intact);  // gen 1 is still there, but not served
   CHECK(l.assessment.reconciliation_required);
   const SaveResult s = rebooted.save(record(), boundProfile());
   CHECK(s.status == SaveStatus::RECONCILIATION_REQUIRED);
   CHECK(s.persistence == PersistenceClass::PENDING_RECORD_ABSENT);
   CHECK_EQ(fs.mutations, muts);
-  expectConfirmedUntouched(fs, a);
+  expectAcknowledgedUntouched(fs, a);
 }
 
 void test_record_partially_written() {
@@ -499,7 +529,7 @@ void test_record_partially_written() {
   CHECK(r.status == SaveStatus::WRITE_FAILED);
   CHECK(r.phase == SavePhase::RECORD_WRITE);
   CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
-  expectConfirmedUntouched(fs, a);
+  expectAcknowledgedUntouched(fs, a);
   CHECK_EQ(fs.data[1].size(), kCalibrationRecordV1EncodedBytes / 2);
 
   fs.arm(0, Fault::NONE);
@@ -532,7 +562,7 @@ void test_record_written_but_commit_failed() {
   CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);  // NOT promoted
   CHECK(!l.assessment.record_available);
   CHECK(rebooted.save(record(), boundProfile()).status == SaveStatus::RECONCILIATION_REQUIRED);
-  expectConfirmedUntouched(fs, a);
+  expectAcknowledgedUntouched(fs, a);
 }
 
 void test_record_readback_failed() {
@@ -545,7 +575,7 @@ void test_record_readback_failed() {
   CHECK(r.status == SaveStatus::READBACK_FAILED);
   CHECK(r.phase == SavePhase::RECORD_VERIFY);
   CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
-  CHECK_EQ(fs.marker_writes, 1);  // the COMPLETED marker was never written
+  CHECK_EQ(fs.marker_writes, 1);  // the AWAITING_ACK marker was never written
   SaveMarker m;
   CHECK(fs.decodedMarker(&m) && m.state == SaveMarkerState::PENDING);
 
@@ -568,7 +598,7 @@ void test_record_readback_mismatch() {
 }
 
 void test_completed_marker_partially_written() {
-  g_case = "COMPLETED marker partially written";
+  g_case = "AWAITING_ACK marker partially written";
   FakeStorage fs;
   seed(&fs, 1);
   CalibrationRecordStore store(&fs);
@@ -576,7 +606,7 @@ void test_completed_marker_partially_written() {
   fs.arm(3, Fault::TORN);
   const SaveResult r = store.save(record(), boundProfile());
   CHECK(r.status == SaveStatus::MARKER_WRITE_FAILED);
-  CHECK(r.phase == SavePhase::MARKER_COMPLETED_WRITE);
+  CHECK(r.phase == SavePhase::MARKER_AWAITING_ACK_WRITE);
   CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
   CHECK_EQ(r.generation, 0);
   fs.arm(0, Fault::NONE);
@@ -586,13 +616,14 @@ void test_completed_marker_partially_written() {
   CHECK(l.assessment.cls == PersistenceClass::MARKER_CORRUPT);
   CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
   CHECK(rebooted.save(record(), boundProfile()).status == SaveStatus::RECONCILIATION_REQUIRED);
-  expectConfirmedUntouched(fs, a);
+  expectAcknowledgedUntouched(fs, a);
 }
 
-void test_completed_published_but_error_returned() {
-  g_case = "COMPLETED published, error returned";
+void test_awaiting_published_but_error_returned() {
+  g_case = "AWAITING_ACK published, error returned";
   FakeStorage fs;
   seed(&fs, 1);
+  const std::vector<uint8_t> a = fs.data[0];
   CalibrationRecordStore store(&fs);
   fs.arm(3, Fault::AFTER_DATA);
   const SaveResult r = store.save(record(), boundProfile());
@@ -600,11 +631,19 @@ void test_completed_published_but_error_returned() {
   CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
   CHECK_EQ(r.generation, 0);
   CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
-  // The truth is on disk and a reboot reads it: generation 2 was in fact confirmed
-  // (record fully read back, COMPLETED marker intact), so it is served, once.
-  fs.arm(0, Fault::NONE);
+  // The record and the marker are intact on disk, but the caller never got SAVE=OK:
+  // a reboot reads "verified, awaiting ACK". Generation 2 is NOT served, NOT promoted,
+  // and generation 1 stays protected.
+  fs.reboot();
   CalibrationRecordStore rebooted(&fs);
-  expectSelected(rebooted, 2, CalibrationSlot::B, false);
+  CalibrationRecord out;
+  const LoadResult l = rebooted.load(boundProfile(), &out);
+  CHECK(l.status == LoadStatus::ACKNOWLEDGMENT_REQUIRED);
+  CHECK(l.assessment.cls == PersistenceClass::AWAITING_ACK);
+  CHECK(!l.assessment.record_available);
+  CHECK(rebooted.save(record(), boundProfile()).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+  CHECK_EQ(fs.mutations, 0);
+  expectAcknowledgedUntouched(fs, a);
 }
 
 void test_marker_readback_failed() {
@@ -622,20 +661,20 @@ void test_marker_readback_failed() {
     fs.reboot();
     CHECK(classOf(fs) == PersistenceClass::PENDING_RECORD_ABSENT);
   }
-  {  // COMPLETED verify read fails: marker is in fact fine on disk, instance still blocked
+  {  // AWAITING_ACK verify read fails: marker is in fact fine on disk, instance still blocked
     FakeStorage fs;
     seed(&fs, 1);
     CalibrationRecordStore store(&fs);
     fs.fail_marker_read_from_marker_write = 2;
     const SaveResult r = store.save(record(), boundProfile());
     CHECK(r.status == SaveStatus::MARKER_VERIFY_FAILED);
-    CHECK(r.phase == SavePhase::MARKER_COMPLETED_VERIFY);
+    CHECK(r.phase == SavePhase::MARKER_AWAITING_ACK_VERIFY);
     CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
     CHECK_EQ(r.generation, 0);
     fs.reboot();
-    CHECK(classOf(fs) == PersistenceClass::CONSISTENT);
+    CHECK(classOf(fs) == PersistenceClass::AWAITING_ACK);  // verified on disk, never acknowledged
   }
-  {  // COMPLETED written with a silent flipped byte: verify catches it
+  {  // AWAITING_ACK written with a silent flipped byte: verify catches it
     FakeStorage fs;
     seed(&fs, 1);
     CalibrationRecordStore store(&fs);
@@ -666,8 +705,8 @@ void test_fault_matrix() {
       g_case = label.c_str();
 
       CHECK(r.status != SaveStatus::OK);        // a fault is never reported as success
-      CHECK_EQ(r.generation, 0);                // ...and never carries a confirmed generation
-      CHECK(fs.data[0] == a);                   // the confirmed record's bytes are untouched
+      CHECK_EQ(r.generation, 0);                // ...and never carries a acknowledged generation
+      CHECK(fs.data[0] == a);                   // the acknowledged record's bytes are untouched
       const int muts_at_failure = fs.mutations;
       CHECK(muts_at_failure <= at);             // nothing was attempted after the fault
 
@@ -688,21 +727,23 @@ void test_fault_matrix() {
       const LoadResult l = rebooted.load(boundProfile(), &out);
       CHECK(fs.data[0] == a);
       if (l.status == LoadStatus::OK) {
-        // Served only if CONSISTENT with the marker's own COMPLETED generation.
+        // Served only if CONSISTENT with the marker's own acknowledged generation, and
+        // that can only be the generation 1 acknowledged before the faulty SAVE.
         SaveMarker m;
         CHECK(fs.decodedMarker(&m));
-        CHECK(m.state == SaveMarkerState::COMPLETED);
-        CHECK_EQ(m.completed_generation, l.generation);
-        CHECK(l.generation == 1 || l.generation == 2);
+        CHECK(m.state == SaveMarkerState::IDLE);
+        CHECK_EQ(m.acknowledged_generation, l.generation);
+        CHECK_EQ(l.generation, 1);
         CHECK(out.generation == l.generation);
         CHECK(l.assessment.cls == PersistenceClass::CONSISTENT);
       } else {
-        CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+        const bool awaiting = l.status == LoadStatus::ACKNOWLEDGMENT_REQUIRED;
+        CHECK(awaiting || l.status == LoadStatus::RECONCILIATION_REQUIRED);
         CHECK(l.assessment.reconciliation_required);
-        CHECK(!l.assessment.save_allowed);
+        CHECK(!l.assessment.save_allowed && !l.assessment.record_available);
         const int before = fs.mutations;
         const SaveResult s = rebooted.save(record(), boundProfile());
-        CHECK(s.status == SaveStatus::RECONCILIATION_REQUIRED);
+        CHECK(s.status == (awaiting ? SaveStatus::ACKNOWLEDGMENT_REQUIRED : SaveStatus::RECONCILIATION_REQUIRED));
         CHECK_EQ(fs.mutations, before);
         CHECK(fs.data[0] == a);
       }
@@ -728,13 +769,13 @@ void test_fault_matrix_first_install() {
       CalibrationRecordStore rebooted(&fs);
       CalibrationRecord out;
       const LoadResult l = rebooted.load(boundProfile(), &out);
-      if (l.status == LoadStatus::OK) {
-        // Only a fully written + confirmed record can ever be served.
-        CHECK_EQ(l.generation, 1);
-        SaveMarker m;
-        CHECK(fs.decodedMarker(&m) && m.state == SaveMarkerState::COMPLETED);
-      } else {
-        CHECK(!l.assessment.record_available);
+      // A SAVE that was never acknowledged cannot be served, whatever it reached.
+      CHECK(l.status != LoadStatus::OK);
+      CHECK(!l.assessment.record_available);
+      CHECK(l.status == LoadStatus::NOT_FOUND || l.status == LoadStatus::ACKNOWLEDGMENT_REQUIRED ||
+            l.status == LoadStatus::RECONCILIATION_REQUIRED);
+      if (at == 3 && (f == Fault::AFTER_DATA || f == Fault::POWER_AFTER)) {
+        CHECK(l.assessment.cls == PersistenceClass::AWAITING_ACK);  // first SAVE, verified, unacknowledged
       }
       g_case = "fault matrix, first install";
     }
@@ -768,8 +809,8 @@ void test_two_consecutive_errors() {
   CHECK(fs.present[0]);
 }
 
-void test_error_then_error_cannot_erase_confirmed() {
-  g_case = "retries cannot erase the confirmed record";
+void test_error_then_error_cannot_erase_acknowledged() {
+  g_case = "retries cannot erase the acknowledged record";
   // A long sequence of failing boots/saves never changes slot A.
   FakeStorage fs;
   seed(&fs, 1);
@@ -807,11 +848,11 @@ void test_load_serves_only_consistent() {
   {  // marker attests 3, only 2 survives: NOT healthy
     FakeStorage fs;
     fs.putSlot(1, goldenRecord(2));
-    fs.putMarker(SaveMarkerState::COMPLETED, 3, 3);
+    fs.putMarker(SaveMarkerState::IDLE, 3, 3);
     CalibrationRecordStore store(&fs);
     const LoadResult l = store.load(profile, &out);
     CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
-    CHECK(l.assessment.cls == PersistenceClass::CONFIRMED_GENERATION_LOST);
+    CHECK(l.assessment.cls == PersistenceClass::ACKNOWLEDGED_GENERATION_LOST);
     CHECK(l.assessment.older_record_survives);
     CHECK(!l.assessment.record_available);
     CHECK(store.save(record(), profile).status == SaveStatus::RECONCILIATION_REQUIRED);
@@ -821,17 +862,17 @@ void test_load_serves_only_consistent() {
     FakeStorage fs;
     fs.putSlot(0, goldenRecord(3));
     fs.data[0][600] ^= 1;
-    fs.putMarker(SaveMarkerState::COMPLETED, 3, 3);
+    fs.putMarker(SaveMarkerState::IDLE, 3, 3);
     CalibrationRecordStore store(&fs);
     const LoadResult l = store.load(profile, &out);
-    CHECK(l.assessment.cls == PersistenceClass::CONFIRMED_GENERATION_LOST);
+    CHECK(l.assessment.cls == PersistenceClass::ACKNOWLEDGED_GENERATION_LOST);
     CHECK(!l.assessment.older_record_survives);
   }
-  {  // record above the confirmed generation, marker COMPLETED
+  {  // record above the acknowledged generation, marker IDLE
     FakeStorage fs;
     fs.putSlot(0, goldenRecord(1));
     fs.putSlot(1, goldenRecord(2));
-    fs.putMarker(SaveMarkerState::COMPLETED, 1, 1);
+    fs.putMarker(SaveMarkerState::IDLE, 1, 1);
     CalibrationRecordStore store(&fs);
     const LoadResult l = store.load(profile, &out);
     CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
@@ -842,21 +883,21 @@ void test_load_serves_only_consistent() {
     FakeStorage fs;
     fs.putSlot(0, goldenRecord(2));
     fs.putSlot(1, goldenRecord(2));
-    fs.putMarker(SaveMarkerState::COMPLETED, 2, 2);
+    fs.putMarker(SaveMarkerState::IDLE, 2, 2);
     CalibrationRecordStore store(&fs);
     CHECK(store.load(profile, &out).assessment.cls == PersistenceClass::RECORD_GENERATION_CONFLICT);
   }
-  {  // both records corrupt, marker COMPLETED
+  {  // both records corrupt, marker IDLE
     FakeStorage fs;
     fs.putSlot(0, goldenRecord(1));
     fs.putSlot(1, goldenRecord(2));
     fs.data[0][500] ^= 1;
     fs.data[1][500] ^= 1;
-    fs.putMarker(SaveMarkerState::COMPLETED, 2, 2);
+    fs.putMarker(SaveMarkerState::IDLE, 2, 2);
     CalibrationRecordStore store(&fs);
     const LoadResult l = store.load(profile, &out);
     CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
-    CHECK(l.assessment.cls == PersistenceClass::CONFIRMED_GENERATION_LOST);
+    CHECK(l.assessment.cls == PersistenceClass::ACKNOWLEDGED_GENERATION_LOST);
   }
   {  // corrupt marker, valid records
     FakeStorage fs;
@@ -871,7 +912,7 @@ void test_load_serves_only_consistent() {
   {  // foreign marker schema: this build neither reads nor replaces it
     FakeStorage fs;
     seed(&fs, 2);
-    fs.marker_data[4] = 2;  // schema 2 ...
+    fs.marker_data[4] = 3;  // a schema this build does not know ...
     const uint32_t crc = calibrationCrc32(fs.marker_data.data(), fs.marker_data.size() - 4);
     for (int i = 0; i < 4; ++i) fs.marker_data[fs.marker_data.size() - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
     CalibrationRecordStore store(&fs);
@@ -881,7 +922,7 @@ void test_load_serves_only_consistent() {
     CHECK(store.save(record(), profile).status == SaveStatus::RECONCILIATION_REQUIRED);
     CHECK_EQ(fs.mutations, 0);
   }
-  {  // confirmed record foreign (another schema), intact
+  {  // acknowledged record foreign (another schema), intact
     FakeStorage fs;
     seed(&fs, 1);
     fs.data[0][4] = 2;
@@ -892,13 +933,13 @@ void test_load_serves_only_consistent() {
     CHECK(l.status == LoadStatus::INCOMPATIBLE);
     CHECK(l.assessment.cls == PersistenceClass::RECORD_INCOMPATIBLE);
   }
-  {  // marker COMPLETED{0,1}: nothing confirmed; no calibration, saving allowed
+  {  // marker IDLE{0,1}: nothing acknowledged; no calibration, saving allowed
     FakeStorage fs;
-    fs.putMarker(SaveMarkerState::COMPLETED, 0, 1);
+    fs.putMarker(SaveMarkerState::IDLE, 0, 1);
     CalibrationRecordStore store(&fs);
     const LoadResult l = store.load(profile, &out);
     CHECK(l.status == LoadStatus::NOT_FOUND);
-    CHECK(l.assessment.cls == PersistenceClass::NOTHING_CONFIRMED);
+    CHECK(l.assessment.cls == PersistenceClass::NOTHING_ACKNOWLEDGED);
     const SaveResult s = store.save(record(), profile);
     CHECK(s.status == SaveStatus::OK);
     CHECK_EQ(s.generation, 2);  // never reuses a begun generation
@@ -931,7 +972,7 @@ void test_storage_errors_fail_closed() {
     CalibrationRecordStore store(&fs);
     const LoadResult l = store.load(profile, &out);
     CHECK(l.report[0].state == SlotState::CORRUPT);
-    CHECK(l.assessment.cls == PersistenceClass::CONFIRMED_GENERATION_LOST);
+    CHECK(l.assessment.cls == PersistenceClass::ACKNOWLEDGED_GENERATION_LOST);
   }
   {
     FakeStorage fs;
@@ -951,27 +992,28 @@ void test_generation_monotonic_over_leftovers() {
   CalibrationRecord bad = goldenRecord(7);
   bad.joint[3].diagnostics.scale_permille += 1;
   fs.putSlot(1, bad);
-  fs.putMarker(SaveMarkerState::COMPLETED, 1, 7);  // "7 was discarded"
+  fs.putMarker(SaveMarkerState::IDLE, 1, 7);  // "7 was discarded"
   CalibrationRecordStore store(&fs);
   expectSelected(store, 1, CalibrationSlot::A, true);
   const SaveResult s = store.save(record(), profile);
   CHECK(s.status == SaveStatus::OK);
   CHECK_EQ(s.generation, 8);
   CHECK(s.slot == CalibrationSlot::B);
+  CHECK(store.acknowledge(8, profile).status == AckStatus::OK);
   expectSelected(store, 8, CalibrationSlot::B, false);
 }
 
 void test_both_slots_unusable_first_save_recovers_nothing() {
-  g_case = "nothing confirmed, leftovers";
+  g_case = "nothing acknowledged, leftovers";
   const auto profile = boundProfile();
   FakeStorage fs;
-  fs.putSlot(0, goldenRecord(4));  // valid but never confirmed ...
-  fs.putMarker(SaveMarkerState::COMPLETED, 0, 4);  // ... explicitly declared not confirmed
+  fs.putSlot(0, goldenRecord(4));  // valid but never acknowledged ...
+  fs.putMarker(SaveMarkerState::IDLE, 0, 4);  // ... explicitly declared not acknowledged
   CalibrationRecordStore store(&fs);
   CalibrationRecord out;
   const LoadResult l = store.load(profile, &out);
   CHECK(l.status == LoadStatus::NOT_FOUND);
-  CHECK(l.assessment.cls == PersistenceClass::NOTHING_CONFIRMED);
+  CHECK(l.assessment.cls == PersistenceClass::NOTHING_ACKNOWLEDGED);
   const SaveResult s = store.save(record(), profile);
   CHECK(s.status == SaveStatus::OK);
   CHECK_EQ(s.generation, 5);
@@ -981,7 +1023,7 @@ void test_both_slots_unusable_first_save_recovers_nothing() {
 // ---- explicit reconciliation, end to end ----------------------------------
 
 void applyPlan(FakeStorage* fs, const SaveMarker& m) {
-  fs->putMarker(m.state, m.completed_generation, m.begun_generation);
+  fs->putMarker(m.state, m.acknowledged_generation, m.begun_generation);
 }
 
 PersistenceInputs inputsOf(FakeStorage& fs) {
@@ -1016,7 +1058,7 @@ void test_reconciliation_end_to_end() {
     CHECK(s.status == SaveStatus::OK);
     CHECK_EQ(s.generation, 3);
   }
-  {  // same, operator prefers the previous confirmed one
+  {  // same, operator prefers the previous acknowledged one
     FakeStorage fs;
     seed(&fs, 1);
     CalibrationRecordStore store(&fs);
@@ -1034,19 +1076,20 @@ void test_reconciliation_end_to_end() {
     CHECK_EQ(s.generation, 3);  // 2 is never reused
     CHECK(s.slot == CalibrationSlot::B);
   }
-  {  // confirmed generation lost: declare nothing confirmed, then a fresh SAVE
+  {  // acknowledged generation lost: declare nothing acknowledged, then a fresh SAVE
     FakeStorage fs;
     fs.putSlot(1, goldenRecord(2));
-    fs.putMarker(SaveMarkerState::COMPLETED, 3, 3);
+    fs.putMarker(SaveMarkerState::IDLE, 3, 3);
     PersistenceInputs in = inputsOf(fs);
     SaveMarker m;
-    CHECK(planReconciliation(in, ReconciliationAction::DECLARE_NOTHING_CONFIRMED, 0, &m) == ReconciliationStatus::OK);
+    CHECK(planReconciliation(in, ReconciliationAction::DECLARE_NOTHING_ACKNOWLEDGED, 0, &m) == ReconciliationStatus::OK);
     applyPlan(&fs, m);
     CalibrationRecordStore after(&fs);
     CHECK(after.load(profile, &out).status == LoadStatus::NOT_FOUND);
     const SaveResult s = after.save(record(), profile);
     CHECK(s.status == SaveStatus::OK);
     CHECK_EQ(s.generation, 4);
+    CHECK(after.acknowledge(4, profile).status == AckStatus::OK);  // the old leftover (gen 2) does not block it
     expectSelected(after, 4, CalibrationSlot::A, false);
   }
 }
@@ -1071,6 +1114,7 @@ void test_roundtrip_content_equality() {
   CalibrationRecordStore store(&fs);
   CalibrationRecord rec = goldenRecord(0);
   CHECK(store.save(rec, boundProfile()).status == SaveStatus::OK);
+  CHECK(store.acknowledge(1, boundProfile()).status == AckStatus::OK);
   CalibrationRecord loaded;
   CHECK(store.load(boundProfile(), &loaded).status == LoadStatus::OK);
   rec.generation = 1;
@@ -1085,7 +1129,7 @@ void test_generation_exhausted() {
   g_case = "generation exhausted";
   FakeStorage fs;
   fs.putSlot(0, goldenRecord(0xFFFFFFFFu));
-  fs.putMarker(SaveMarkerState::COMPLETED, 0xFFFFFFFFu, 0xFFFFFFFFu);
+  fs.putMarker(SaveMarkerState::IDLE, 0xFFFFFFFFu, 0xFFFFFFFFu);
   CalibrationRecordStore store(&fs);
   const SaveResult s = store.save(record(), boundProfile());
   CHECK(s.status == SaveStatus::GENERATION_EXHAUSTED);
@@ -1096,8 +1140,436 @@ void test_to_strings() {
   g_case = "toString";
   CHECK(std::strcmp(toString(SaveStatus::MARKER_VERIFY_FAILED), "MARKER_VERIFY_FAILED") == 0);
   CHECK(std::strcmp(toString(LoadStatus::RECONCILIATION_REQUIRED), "RECONCILIATION_REQUIRED") == 0);
-  CHECK(std::strcmp(toString(SavePhase::MARKER_COMPLETED_VERIFY), "MARKER_COMPLETED_VERIFY") == 0);
+  CHECK(std::strcmp(toString(SavePhase::MARKER_AWAITING_ACK_VERIFY), "MARKER_AWAITING_ACK_VERIFY") == 0);
   CHECK(std::strcmp(toString(SaveStatus::BLOCKED_UNCERTAIN_WRITE), "BLOCKED_UNCERTAIN_WRITE") == 0);
+  CHECK(std::strcmp(toString(SaveStatus::ACKNOWLEDGMENT_REQUIRED), "ACKNOWLEDGMENT_REQUIRED") == 0);
+  CHECK(std::strcmp(toString(LoadStatus::ACKNOWLEDGMENT_REQUIRED), "ACKNOWLEDGMENT_REQUIRED") == 0);
+  CHECK(std::strcmp(toString(AckStatus::ALREADY_ACKNOWLEDGED), "ALREADY_ACKNOWLEDGED") == 0);
+  CHECK(std::strcmp(toString(AckStatus::MARKER_VERIFY_FAILED), "MARKER_VERIFY_FAILED") == 0);
+}
+
+// ---- P2.4.1: durable acknowledgment ----------------------------------------
+
+AckStatus ackOf(FakeStorage& fs, uint32_t g) {
+  CalibrationRecordStore s(&fs);
+  return s.acknowledge(g, boundProfile()).status;
+}
+
+void test_acknowledge_contract() {
+  g_case = "acknowledge contract";
+  const auto profile = boundProfile();
+  {  // nothing stored / nothing awaiting
+    FakeStorage fs;
+    CalibrationRecordStore store(&fs);
+    CHECK(store.acknowledge(1, profile).status == AckStatus::NOT_AWAITING);
+    CHECK(store.acknowledge(0, profile).status == AckStatus::BAD_ARGUMENT);
+    CalibrationRecordStore null_store(nullptr);
+    CHECK(null_store.acknowledge(1, profile).status == AckStatus::BAD_ARGUMENT);
+    CHECK_EQ(fs.mutations, 0);
+  }
+  {  // acknowledged state: idempotent for the acknowledged generation only
+    FakeStorage fs;
+    seed(&fs, 2);
+    CHECK(ackOf(fs, 2) == AckStatus::ALREADY_ACKNOWLEDGED);
+    CHECK(ackOf(fs, 1) == AckStatus::NOT_AWAITING);
+    CHECK(ackOf(fs, 3) == AckStatus::NOT_AWAITING);
+    CHECK_EQ(fs.mutations, 0);
+  }
+  {  // awaiting generation 2: only 2, exactly once
+    FakeStorage fs;
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    CHECK(store.save(record(), profile).status == SaveStatus::OK);
+    fs.mutations = 0;
+    const std::vector<uint8_t> a = fs.data[0], b = fs.data[1];
+    CHECK(store.acknowledge(1, profile).status == AckStatus::GENERATION_MISMATCH);  // a neighbour
+    CHECK(store.acknowledge(3, profile).status == AckStatus::GENERATION_MISMATCH);  // a future one
+    CHECK(store.acknowledge(0, profile).status == AckStatus::BAD_ARGUMENT);
+    CHECK_EQ(fs.mutations, 0);
+    CHECK(store.writeState() == WriteState::OPEN);  // refusals are not uncertain writes
+    CHECK(classOf(fs) == PersistenceClass::AWAITING_ACK);
+    const AckResult ok = store.acknowledge(2, profile);
+    CHECK(ok.status == AckStatus::OK);
+    CHECK(ok.persistence == PersistenceClass::AWAITING_ACK);
+    CHECK_EQ(fs.mutations, 1);
+    CHECK(fs.data[0] == a && fs.data[1] == b);  // an ACK writes the marker only
+    CHECK(classOf(fs) == PersistenceClass::CONSISTENT);
+    CHECK(store.acknowledge(2, profile).status == AckStatus::ALREADY_ACKNOWLEDGED);  // duplicate
+    CHECK(store.acknowledge(1, profile).status == AckStatus::NOT_AWAITING);          // stale
+    CHECK_EQ(fs.mutations, 1);
+    expectSelected(store, 2, CalibrationSlot::B, false);
+  }
+  {  // ACK of an incomplete record: the SAVE never reached its verified marker
+    FakeStorage fs;
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    fs.arm(3, Fault::POWER_BEFORE);  // record on flash, marker still PENDING
+    store.save(record(), profile);
+    fs.reboot();
+    CHECK(classOf(fs) == PersistenceClass::PENDING_RECORD_PRESENT);
+    CHECK(ackOf(fs, 2) == AckStatus::RECORD_NOT_VALID);
+    CHECK(ackOf(fs, 1) == AckStatus::GENERATION_MISMATCH);
+    CHECK_EQ(fs.mutations, 0);
+    CHECK(classOf(fs) == PersistenceClass::PENDING_RECORD_PRESENT);
+  }
+  {  // verified generation whose record is damaged afterwards / incompatible / gone
+    for (int kind = 0; kind < 3; ++kind) {
+      FakeStorage fs;
+      seed(&fs, 1);
+      CalibrationRecordStore store(&fs);
+      CHECK(store.save(record(), profile).status == SaveStatus::OK);
+      fs.mutations = 0;
+      if (kind == 0) fs.data[1][600] ^= 1;
+      if (kind == 1) {
+        fs.data[1][4] = 2;
+        const uint32_t crc = calibrationCrc32(fs.data[1].data(), fs.data[1].size() - 4);
+        for (int i = 0; i < 4; ++i) fs.data[1][fs.data[1].size() - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
+      }
+      if (kind == 2) fs.present[1] = false;
+      CHECK(store.acknowledge(2, profile).status == AckStatus::RECORD_NOT_VALID);
+      CHECK_EQ(fs.mutations, 0);
+      CHECK(classOf(fs) != PersistenceClass::CONSISTENT);
+    }
+  }
+  {  // acknowledged generation lost while another awaits: reconciliation, not ACK
+    FakeStorage fs;
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    CHECK(store.save(record(), profile).status == SaveStatus::OK);
+    fs.mutations = 0;
+    fs.present[0] = false;
+    const AckResult r = store.acknowledge(2, profile);
+    CHECK(r.status == AckStatus::RECONCILIATION_REQUIRED);
+    CHECK(r.persistence == PersistenceClass::ACKNOWLEDGED_GENERATION_LOST);
+    CHECK_EQ(fs.mutations, 0);
+  }
+  {  // marker missing / corrupt
+    for (int kind = 0; kind < 2; ++kind) {
+      FakeStorage fs;
+      seed(&fs, 1);
+      CalibrationRecordStore store(&fs);
+      CHECK(store.save(record(), profile).status == SaveStatus::OK);
+      fs.mutations = 0;
+      if (kind == 0) fs.marker_present = false; else fs.marker_data[13] ^= 1;
+      CHECK(store.acknowledge(2, profile).status == AckStatus::RECONCILIATION_REQUIRED);
+      CHECK_EQ(fs.mutations, 0);
+    }
+  }
+  {  // unreadable storage
+    FakeStorage fs;
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    CHECK(store.save(record(), profile).status == SaveStatus::OK);
+    fs.mutations = 0;
+    fs.fail_read[1] = true;
+    CHECK(store.acknowledge(2, profile).status == AckStatus::STORAGE_UNUSABLE);
+    CHECK_EQ(fs.mutations, 0);
+    CHECK(store.writeState() == WriteState::OPEN);
+  }
+}
+
+// Fault on the ACK marker write itself. The protected slot is never touched, the
+// outcome is conservative, and a reboot reads the real state.
+void test_ack_write_faults() {
+  g_case = "ack write faults";
+  const auto profile = boundProfile();
+  for (Fault f : kAllFaults) {
+    FakeStorage fs;
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    CHECK(store.save(record(), profile).status == SaveStatus::OK);
+    const std::vector<uint8_t> a = fs.data[0], b = fs.data[1];
+    fs.reboot();  // counters back to zero; same store instance
+    fs.arm(1, f);
+    const AckResult r = store.acknowledge(2, profile);
+    const std::string label = std::string("ack fault=") + faultName(f);
+    g_case = label.c_str();
+    CHECK(r.status != AckStatus::OK);  // a fault is never reported as an acknowledgment
+    CHECK(r.status == (f == Fault::SILENT_CORRUPTION ? AckStatus::MARKER_VERIFY_FAILED
+                                                     : AckStatus::MARKER_WRITE_FAILED));
+    CHECK(fs.data[0] == a && fs.data[1] == b);
+    CHECK_EQ(fs.slot_writes, 0);
+    // Conservative: unless storage certified it did nothing, this instance writes no more.
+    CHECK_EQ(store.writeState() == WriteState::OPEN, f == Fault::NOT_MODIFIED);
+    if (f != Fault::NOT_MODIFIED) {
+      CHECK(store.save(record(), profile).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+    }
+
+    fs.reboot();
+    CalibrationRecordStore rebooted(&fs);
+    CalibrationRecord out;
+    const LoadResult l = rebooted.load(profile, &out);
+    switch (l.assessment.cls) {
+      case PersistenceClass::AWAITING_ACK: {  // the ACK did not land: still awaiting, still protected
+        CHECK(l.status == LoadStatus::ACKNOWLEDGMENT_REQUIRED);
+        CHECK(rebooted.save(record(), profile).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+        CHECK_EQ(fs.mutations, 0);
+        CHECK(rebooted.acknowledge(2, profile).status == AckStatus::OK);  // and can be repeated
+        CHECK(classOf(fs) == PersistenceClass::CONSISTENT);
+        break;
+      }
+      case PersistenceClass::CONSISTENT: {  // the ACK landed, the reply was lost
+        CHECK(l.status == LoadStatus::OK);
+        CHECK_EQ(l.generation, 2);
+        CHECK(rebooted.acknowledge(2, profile).status == AckStatus::ALREADY_ACKNOWLEDGED);
+        CHECK_EQ(fs.mutations, 0);
+        break;
+      }
+      case PersistenceClass::MARKER_CORRUPT: {  // torn marker: nothing is guessed
+        CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+        CHECK(rebooted.save(record(), profile).status == SaveStatus::RECONCILIATION_REQUIRED);
+        CHECK(rebooted.acknowledge(2, profile).status == AckStatus::RECONCILIATION_REQUIRED);
+        CHECK_EQ(fs.mutations, 0);
+        break;
+      }
+      default:
+        CHECK(false);  // no other state is reachable from a faulty ACK
+    }
+    CHECK(fs.data[0] == a && fs.data[1] == b);
+    g_case = "ack write faults";
+  }
+  // The exact stories.
+  {
+    FakeStorage fs;  // ACK persisted, reply lost (commit error after the data landed)
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    CHECK(store.save(record(), profile).status == SaveStatus::OK);
+    const std::vector<uint8_t> a = fs.data[0], b = fs.data[1];
+    fs.reboot();
+    fs.arm(1, Fault::AFTER_DATA);
+    CHECK(store.acknowledge(2, profile).status == AckStatus::MARKER_WRITE_FAILED);
+    fs.reboot();
+    CHECK(classOf(fs) == PersistenceClass::CONSISTENT);  // really acknowledged
+    CalibrationRecordStore rebooted(&fs);
+    CHECK(rebooted.acknowledge(2, profile).status == AckStatus::ALREADY_ACKNOWLEDGED);
+    // Only now is slot A reusable: the next SAVE writes it, and only it.
+    const SaveResult n = rebooted.save(record(), profile);
+    CHECK(n.status == SaveStatus::OK && n.slot == CalibrationSlot::A && n.generation == 3);
+    CHECK(fs.data[1] == b);
+    CHECK(fs.data[0] != a);
+  }
+  {
+    FakeStorage fs;  // ACK marker verify read fails: the marker is in fact fine on disk
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    CHECK(store.save(record(), profile).status == SaveStatus::OK);
+    fs.reboot();
+    fs.fail_marker_read_from_marker_write = 1;
+    CHECK(store.acknowledge(2, profile).status == AckStatus::MARKER_VERIFY_FAILED);
+    CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+    fs.reboot();
+    CHECK(classOf(fs) == PersistenceClass::CONSISTENT);  // the marker had landed after all
+  }
+}
+
+// P2.4.1 regression for the review finding: A/1 acknowledged; B/2 written and
+// verified; the marker is published but the caller never gets SAVE=OK; reboot; a
+// new SAVE; a power cut in its write. A/1 must stay byte-for-byte intact.
+void test_review_finding_regression() {
+  g_case = "review finding";
+  const auto profile = boundProfile();
+  enum Variant { WRITE_FAILED_AFTER_DATA, WRITE_FAILED_POWER_AFTER, VERIFY_FAILED, OK_NEVER_ACKED, ACK_NEVER_SENT_N_BOOTS };
+  for (int v = 0; v <= ACK_NEVER_SENT_N_BOOTS; ++v) {
+    FakeStorage fs;
+    seed(&fs, 1);
+    const std::vector<uint8_t> a = fs.data[0];
+    {
+      CalibrationRecordStore store(&fs);
+      switch (v) {
+        case WRITE_FAILED_AFTER_DATA:
+          fs.arm(3, Fault::AFTER_DATA);
+          CHECK(store.save(record(), profile).status == SaveStatus::MARKER_WRITE_FAILED);
+          break;
+        case WRITE_FAILED_POWER_AFTER:
+          fs.arm(3, Fault::POWER_AFTER);
+          CHECK(store.save(record(), profile).status == SaveStatus::MARKER_WRITE_FAILED);
+          break;
+        case VERIFY_FAILED:
+          fs.fail_marker_read_from_marker_write = 2;
+          CHECK(store.save(record(), profile).status == SaveStatus::MARKER_VERIFY_FAILED);
+          break;
+        default:
+          CHECK(store.save(record(), profile).status == SaveStatus::OK);  // reply delivered, ACK not sent
+          break;
+      }
+    }
+    const int boots = v == ACK_NEVER_SENT_N_BOOTS ? 6 : 1;
+    for (int boot = 0; boot < boots; ++boot) {
+      fs.reboot();
+      CalibrationRecordStore rebooted(&fs);
+      CalibrationRecord out;
+      const LoadResult l = rebooted.load(profile, &out);
+      CHECK(l.status == LoadStatus::ACKNOWLEDGMENT_REQUIRED);  // B/2 is NOT confirmed
+      CHECK(l.assessment.cls == PersistenceClass::AWAITING_ACK);
+      CHECK(!l.assessment.record_available);
+      // A new SAVE with a power cut in "its" write: it must never get to write.
+      fs.arm(1, Fault::POWER_TORN);
+      const SaveResult s = rebooted.save(record(), profile);
+      CHECK(s.status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+      CHECK_EQ(fs.mutations, 0);
+      CHECK_EQ(fs.slot_writes, 0);
+      CHECK(fs.data[0] == a);
+      fs.arm(2, Fault::POWER_TORN);  // and with the cut at the record write instead
+      CHECK(rebooted.save(record(), profile).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+      CHECK_EQ(fs.mutations, 0);
+      CHECK(fs.data[0] == a);
+    }
+    // The generation was never lost either: the caller can still acknowledge it.
+    fs.reboot();
+    CHECK(ackOf(fs, 2) == AckStatus::OK);
+    CHECK(fs.data[0] == a);  // even now A is untouched until a later SAVE reuses it
+    CalibrationRecordStore after(&fs);
+    expectSelected(after, 2, CalibrationSlot::B, false);
+  }
+}
+
+void test_first_save_states_are_distinguishable() {
+  g_case = "first SAVE states";
+  const auto profile = boundProfile();
+  struct Row { int at; Fault f; PersistenceClass expect; };
+  const Row rows[] = {
+      {1, Fault::POWER_BEFORE, PersistenceClass::NEVER_INITIALIZED_OR_ERASED},  // nothing happened
+      {1, Fault::POWER_AFTER, PersistenceClass::PENDING_RECORD_ABSENT},         // PENDING marker only
+      {2, Fault::POWER_BEFORE, PersistenceClass::PENDING_RECORD_ABSENT},
+      {2, Fault::POWER_TORN, PersistenceClass::PENDING_RECORD_ABSENT},          // torn record = no record
+      {2, Fault::POWER_AFTER, PersistenceClass::PENDING_RECORD_PRESENT},        // record, marker still PENDING
+      {3, Fault::POWER_BEFORE, PersistenceClass::PENDING_RECORD_PRESENT},
+      {3, Fault::POWER_TORN, PersistenceClass::MARKER_CORRUPT},
+      {3, Fault::POWER_AFTER, PersistenceClass::AWAITING_ACK},                  // verified, never acknowledged
+  };
+  for (const Row& row : rows) {
+    FakeStorage fs;
+    CalibrationRecordStore store(&fs);
+    fs.arm(row.at, row.f);
+    CHECK(store.save(record(), profile).status != SaveStatus::OK);
+    fs.reboot();
+    const PersistenceClass c = classOf(fs);
+    CHECK(c == row.expect);
+    CalibrationRecordStore rebooted(&fs);
+    CalibrationRecord out;
+    const LoadResult l = rebooted.load(profile, &out);
+    CHECK(!l.assessment.record_available);  // no calibration data is declared available
+    CHECK(l.status != LoadStatus::OK);
+    if (c == PersistenceClass::AWAITING_ACK) {
+      CHECK(l.assessment.acknowledged_generation == 0 && !l.assessment.acknowledged_record_intact);
+      CHECK(rebooted.save(record(), profile).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+      CHECK(rebooted.acknowledge(1, profile).status == AckStatus::OK);
+      expectSelected(rebooted, 1, CalibrationSlot::A, false);
+    } else if (c != PersistenceClass::NEVER_INITIALIZED_OR_ERASED) {
+      CHECK(!l.assessment.save_allowed);
+    }
+  }
+}
+
+void test_acknowledged_generation_lost_with_awaiting() {
+  g_case = "acknowledged lost, one awaiting";
+  const auto profile = boundProfile();
+  for (int kind = 0; kind < 2; ++kind) {
+    FakeStorage fs;
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    CHECK(store.save(record(), profile).status == SaveStatus::OK);  // B/2 verified, awaiting
+    const std::vector<uint8_t> b = fs.data[1];
+    if (kind == 0) fs.data[0][500] ^= 1; else fs.present[0] = false;  // A/1 damaged / gone
+    fs.mutations = 0;
+    CalibrationRecordStore rebooted(&fs);
+    CalibrationRecord out;
+    const LoadResult l = rebooted.load(profile, &out);
+    CHECK(l.assessment.cls == PersistenceClass::ACKNOWLEDGED_GENERATION_LOST);  // reported, not hidden
+    CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);  // no silent fallback to B/2
+    CHECK(!l.assessment.record_available);
+    CHECK(rebooted.save(record(), profile).status == SaveStatus::RECONCILIATION_REQUIRED);
+    CHECK(rebooted.acknowledge(2, profile).status == AckStatus::RECONCILIATION_REQUIRED);
+    CHECK_EQ(fs.mutations, 0);
+    CHECK(fs.data[1] == b);
+  }
+}
+
+void test_reconciliation_of_awaiting() {
+  g_case = "reconciliation of awaiting";
+  const auto profile = boundProfile();
+  auto awaitingStorage = [&](FakeStorage* fs) {
+    seed(fs, 1);
+    CalibrationRecordStore store(fs);
+    CHECK(store.save(record(), profile).status == SaveStatus::OK);
+  };
+  {  // ADOPT the verified generation: an operator acknowledgment
+    FakeStorage fs;
+    awaitingStorage(&fs);
+    SaveMarker m;
+    CHECK(planReconciliation(inputsOf(fs), ReconciliationAction::ADOPT_VALID_RECORD, 2, &m) == ReconciliationStatus::OK);
+    applyPlan(&fs, m);
+    CalibrationRecordStore after(&fs);
+    expectSelected(after, 2, CalibrationSlot::B, false);
+    const SaveResult s = after.save(record(), profile);
+    CHECK(s.status == SaveStatus::OK && s.slot == CalibrationSlot::A && s.generation == 3);
+  }
+  {  // ADOPT the previous one: the verified generation is discarded, A stays byte-identical
+    FakeStorage fs;
+    awaitingStorage(&fs);
+    const std::vector<uint8_t> a = fs.data[0];
+    SaveMarker m;
+    CHECK(planReconciliation(inputsOf(fs), ReconciliationAction::ADOPT_VALID_RECORD, 1, &m) == ReconciliationStatus::OK);
+    applyPlan(&fs, m);
+    CalibrationRecordStore after(&fs);
+    expectSelected(after, 1, CalibrationSlot::A, false);
+    fs.reboot();
+    fs.arm(2, Fault::POWER_TORN);  // the next SAVE is cut in its record write
+    after.save(record(), profile);
+    CHECK(fs.data[0] == a);
+    fs.reboot();
+    CHECK(classOf(fs) == PersistenceClass::PENDING_RECORD_ABSENT);
+    CHECK(fs.data[0] == a);
+  }
+  {  // a damaged / foreign verified record is never adoptable
+    for (int kind = 0; kind < 2; ++kind) {
+      FakeStorage fs;
+      awaitingStorage(&fs);
+      if (kind == 0) {
+        fs.data[1][600] ^= 1;
+      } else {
+        fs.data[1][4] = 2;
+        const uint32_t crc = calibrationCrc32(fs.data[1].data(), fs.data[1].size() - 4);
+        for (int i = 0; i < 4; ++i) fs.data[1][fs.data[1].size() - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
+      }
+      SaveMarker m;
+      CHECK(planReconciliation(inputsOf(fs), ReconciliationAction::ADOPT_VALID_RECORD, 2, &m) == ReconciliationStatus::GENERATION_NOT_VALID);
+      CHECK(planReconciliation(inputsOf(fs), ReconciliationAction::ADOPT_VALID_RECORD, 1, &m) == ReconciliationStatus::OK);
+    }
+  }
+  {  // DECLARE nothing: fresh calibration required, the leftovers are never reused
+    FakeStorage fs;
+    awaitingStorage(&fs);
+    SaveMarker m;
+    CHECK(planReconciliation(inputsOf(fs), ReconciliationAction::DECLARE_NOTHING_ACKNOWLEDGED, 0, &m) == ReconciliationStatus::OK);
+    applyPlan(&fs, m);
+    CalibrationRecordStore after(&fs);
+    CalibrationRecord out;
+    CHECK(after.load(profile, &out).status == LoadStatus::NOT_FOUND);
+    const SaveResult s = after.save(record(), profile);
+    CHECK(s.status == SaveStatus::OK && s.generation == 3);
+  }
+}
+
+void test_two_consecutive_errors_awaiting() {
+  g_case = "two consecutive errors, awaiting";
+  const auto profile = boundProfile();
+  FakeStorage fs;
+  seed(&fs, 1);
+  const std::vector<uint8_t> a = fs.data[0];
+  CalibrationRecordStore store(&fs);
+  fs.arm(3, Fault::AFTER_DATA);
+  CHECK(store.save(record(), profile).status == SaveStatus::MARKER_WRITE_FAILED);  // error 1
+  fs.arm(0, Fault::NONE);
+  CHECK(store.save(record(), profile).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);  // error 2
+  for (int i = 0; i < 4; ++i) {
+    fs.reboot();
+    CalibrationRecordStore again(&fs);
+    CHECK(again.save(record(), profile).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+    CHECK(again.save(record(), profile).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+    CHECK_EQ(fs.mutations, 0);
+    CHECK(fs.data[0] == a);
+  }
 }
 
 }  // namespace
@@ -1114,12 +1586,12 @@ int main() {
   test_record_readback_failed();
   test_record_readback_mismatch();
   test_completed_marker_partially_written();
-  test_completed_published_but_error_returned();
+  test_awaiting_published_but_error_returned();
   test_marker_readback_failed();
   test_fault_matrix();
   test_fault_matrix_first_install();
   test_two_consecutive_errors();
-  test_error_then_error_cannot_erase_confirmed();
+  test_error_then_error_cannot_erase_acknowledged();
   test_load_serves_only_consistent();
   test_storage_errors_fail_closed();
   test_generation_monotonic_over_leftovers();
@@ -1128,6 +1600,13 @@ int main() {
   test_load_does_not_unlock();
   test_roundtrip_content_equality();
   test_generation_exhausted();
+  test_acknowledge_contract();
+  test_ack_write_faults();
+  test_review_finding_regression();
+  test_first_save_states_are_distinguishable();
+  test_acknowledged_generation_lost_with_awaiting();
+  test_reconciliation_of_awaiting();
+  test_two_consecutive_errors_awaiting();
   test_to_strings();
   std::printf("calibration record store: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;

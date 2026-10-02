@@ -7,11 +7,13 @@ const char* toString(PersistenceClass cls) {
   switch (cls) {
     case PersistenceClass::IO_ERROR:                    return "IO_ERROR";
     case PersistenceClass::NEVER_INITIALIZED_OR_ERASED: return "NEVER_INITIALIZED_OR_ERASED";
-    case PersistenceClass::NOTHING_CONFIRMED:           return "NOTHING_CONFIRMED";
+    case PersistenceClass::NOTHING_ACKNOWLEDGED:           return "NOTHING_ACKNOWLEDGED";
     case PersistenceClass::CONSISTENT:                  return "CONSISTENT";
     case PersistenceClass::PENDING_RECORD_ABSENT:       return "PENDING_RECORD_ABSENT";
     case PersistenceClass::PENDING_RECORD_PRESENT:      return "PENDING_RECORD_PRESENT";
-    case PersistenceClass::CONFIRMED_GENERATION_LOST:   return "CONFIRMED_GENERATION_LOST";
+    case PersistenceClass::AWAITING_ACK:                return "AWAITING_ACK";
+    case PersistenceClass::AWAITING_ACK_RECORD_LOST:    return "AWAITING_ACK_RECORD_LOST";
+    case PersistenceClass::ACKNOWLEDGED_GENERATION_LOST:   return "ACKNOWLEDGED_GENERATION_LOST";
     case PersistenceClass::RECORD_AHEAD_OF_MARKER:      return "RECORD_AHEAD_OF_MARKER";
     case PersistenceClass::RECORD_GENERATION_CONFLICT:  return "RECORD_GENERATION_CONFLICT";
     case PersistenceClass::MARKER_MISSING:              return "MARKER_MISSING";
@@ -25,7 +27,21 @@ const char* toString(PersistenceClass cls) {
 const char* toString(ReconciliationAction action) {
   switch (action) {
     case ReconciliationAction::ADOPT_VALID_RECORD:        return "ADOPT_VALID_RECORD";
-    case ReconciliationAction::DECLARE_NOTHING_CONFIRMED: return "DECLARE_NOTHING_CONFIRMED";
+    case ReconciliationAction::DECLARE_NOTHING_ACKNOWLEDGED: return "DECLARE_NOTHING_ACKNOWLEDGED";
+  }
+  return "UNKNOWN";
+}
+
+const char* toString(AckPlanStatus status) {
+  switch (status) {
+    case AckPlanStatus::OK:                      return "OK";
+    case AckPlanStatus::ALREADY_ACKNOWLEDGED:    return "ALREADY_ACKNOWLEDGED";
+    case AckPlanStatus::BAD_ARGUMENT:            return "BAD_ARGUMENT";
+    case AckPlanStatus::STORAGE_UNUSABLE:        return "STORAGE_UNUSABLE";
+    case AckPlanStatus::NOT_AWAITING:            return "NOT_AWAITING";
+    case AckPlanStatus::GENERATION_MISMATCH:     return "GENERATION_MISMATCH";
+    case AckPlanStatus::RECORD_NOT_VALID:        return "RECORD_NOT_VALID";
+    case AckPlanStatus::RECONCILIATION_REQUIRED: return "RECONCILIATION_REQUIRED";
   }
   return "UNKNOWN";
 }
@@ -47,7 +63,9 @@ bool needsReconciliation(PersistenceClass cls) {
   switch (cls) {
     case PersistenceClass::PENDING_RECORD_ABSENT:
     case PersistenceClass::PENDING_RECORD_PRESENT:
-    case PersistenceClass::CONFIRMED_GENERATION_LOST:
+    case PersistenceClass::AWAITING_ACK:
+    case PersistenceClass::AWAITING_ACK_RECORD_LOST:
+    case PersistenceClass::ACKNOWLEDGED_GENERATION_LOST:
     case PersistenceClass::RECORD_AHEAD_OF_MARKER:
     case PersistenceClass::RECORD_GENERATION_CONFLICT:
     case PersistenceClass::MARKER_MISSING:
@@ -59,7 +77,7 @@ bool needsReconciliation(PersistenceClass cls) {
     case PersistenceClass::IO_ERROR:
     case PersistenceClass::MARKER_INCOMPATIBLE:
     case PersistenceClass::NEVER_INITIALIZED_OR_ERASED:
-    case PersistenceClass::NOTHING_CONFIRMED:
+    case PersistenceClass::NOTHING_ACKNOWLEDGED:
     case PersistenceClass::CONSISTENT:
       return false;
   }
@@ -81,9 +99,10 @@ int validSlotAt(const PersistenceInputs& in, uint32_t generation) {
 void finish(PersistenceAssessment* a, const PersistenceInputs& in) {
   a->reconciliation_required = needsReconciliation(a->cls);
   a->save_allowed = a->cls == PersistenceClass::NEVER_INITIALIZED_OR_ERASED ||
-                    a->cls == PersistenceClass::NOTHING_CONFIRMED ||
+                    a->cls == PersistenceClass::NOTHING_ACKNOWLEDGED ||
                     a->cls == PersistenceClass::CONSISTENT;
   a->record_available = a->cls == PersistenceClass::CONSISTENT;
+  a->ack_allowed = a->cls == PersistenceClass::AWAITING_ACK;
   a->allowed_actions = 0;
   if (a->reconciliation_required) {
     a->allowed_actions |= kReconcileDeclareBit;
@@ -136,36 +155,39 @@ PersistenceAssessment classifyPersistence(const PersistenceInputs& in) {
   }
 
   const SaveMarker& m = in.marker.marker;
-  const uint32_t C = m.completed_generation;
+  const uint32_t A = m.acknowledged_generation;
   const uint32_t B = m.begun_generation;
   const bool pending = m.state == SaveMarkerState::PENDING;
-  a.confirmed_generation = C;
+  const bool awaiting = m.state == SaveMarkerState::AWAITING_ACK;
+  const bool in_flight = pending || awaiting;  // a generation above A is expected: B
+  a.acknowledged_generation = A;
   a.pending_generation = pending ? B : 0;
+  a.awaiting_generation = awaiting ? B : 0;
 
-  const int confirmed_idx = C > 0 ? validSlotAt(in, C) : -1;
-  a.confirmed_record_intact = confirmed_idx >= 0;
-  if (confirmed_idx >= 0) a.confirmed_slot = static_cast<CalibrationSlot>(confirmed_idx);
+  const int acknowledged_idx = A > 0 ? validSlotAt(in, A) : -1;
+  a.acknowledged_record_intact = acknowledged_idx >= 0;
+  if (acknowledged_idx >= 0) a.acknowledged_slot = static_cast<CalibrationSlot>(acknowledged_idx);
 
   // Two valid records with one generation only matter when that generation is
   // one the marker speaks about; elsewhere (older, discarded) they are leftovers.
   const uint32_t dup = in.slot[0].generation_hint;
   if (in.slot[0].state == SlotState::VALID && in.slot[1].state == SlotState::VALID &&
-      dup == in.slot[1].generation_hint && ((C > 0 && dup == C) || (pending && dup == B))) {
+      dup == in.slot[1].generation_hint && ((A > 0 && dup == A) || (in_flight && dup == B))) {
     a.cls = PersistenceClass::RECORD_GENERATION_CONFLICT;
     finish(&a, in);
     return a;
   }
 
-  // A generation above the confirmed one is acceptable only as: the pending one,
-  // or (marker COMPLETED) one explicitly discarded by an earlier reconciliation,
-  // which leaves begun_generation >= it.
-  auto acceptableAboveConfirmed = [&](uint32_t g) {
-    return pending ? g == B : g <= B;
-  };
+  // A generation above the acknowledged one is acceptable only if the marker has
+  // already begun it: the in-flight one (== B) or one explicitly discarded by an
+  // earlier reconciliation (< B; generations are never reused, so it cannot be
+  // mistaken for the in-flight one). Anything above begun_generation is a record
+  // the marker knows nothing about.
+  auto acceptableAboveAcknowledged = [&](uint32_t g) { return g <= B; };
 
   for (int i = 0; i < kCalibrationSlotCount; ++i) {
-    if (in.slot[i].state == SlotState::VALID && in.slot[i].generation_hint > C &&
-        !acceptableAboveConfirmed(in.slot[i].generation_hint)) {
+    if (in.slot[i].state == SlotState::VALID && in.slot[i].generation_hint > A &&
+        !acceptableAboveAcknowledged(in.slot[i].generation_hint)) {
       a.cls = PersistenceClass::RECORD_AHEAD_OF_MARKER;
       finish(&a, in);
       return a;
@@ -174,22 +196,24 @@ PersistenceAssessment classifyPersistence(const PersistenceInputs& in) {
   for (int i = 0; i < kCalibrationSlotCount; ++i) {
     if (in.slot[i].state != SlotState::INCOMPATIBLE) continue;
     const uint32_t g = in.slot[i].generation_hint;
-    const bool above = g > C && !(pending ? false : g <= B);
-    const bool is_confirmed_gen = C > 0 && g == C && confirmed_idx < 0;
-    if (above || is_confirmed_gen) {
+    const bool above = g > A && (in_flight || g > B);
+    const bool is_acknowledged_gen = A > 0 && g == A && acknowledged_idx < 0;
+    if (above || is_acknowledged_gen) {
       a.cls = PersistenceClass::RECORD_INCOMPATIBLE;
       finish(&a, in);
       return a;
     }
   }
 
-  if (C > 0 && !a.confirmed_record_intact) {
+  // Priority over every in-flight state: a lost acknowledged generation is never
+  // hidden behind a newer, unacknowledged one.
+  if (A > 0 && !a.acknowledged_record_intact) {
     for (int i = 0; i < kCalibrationSlotCount; ++i) {
-      if (in.slot[i].state == SlotState::VALID && in.slot[i].generation_hint < C) {
+      if (in.slot[i].state == SlotState::VALID && in.slot[i].generation_hint < A) {
         a.older_record_survives = true;
       }
     }
-    a.cls = PersistenceClass::CONFIRMED_GENERATION_LOST;
+    a.cls = PersistenceClass::ACKNOWLEDGED_GENERATION_LOST;
     finish(&a, in);
     return a;
   }
@@ -197,8 +221,11 @@ PersistenceAssessment classifyPersistence(const PersistenceInputs& in) {
   if (pending) {
     a.cls = validSlotAt(in, B) >= 0 ? PersistenceClass::PENDING_RECORD_PRESENT
                                     : PersistenceClass::PENDING_RECORD_ABSENT;
+  } else if (awaiting) {
+    a.cls = validSlotAt(in, B) >= 0 ? PersistenceClass::AWAITING_ACK
+                                    : PersistenceClass::AWAITING_ACK_RECORD_LOST;
   } else {
-    a.cls = C == 0 ? PersistenceClass::NOTHING_CONFIRMED : PersistenceClass::CONSISTENT;
+    a.cls = A == 0 ? PersistenceClass::NOTHING_ACKNOWLEDGED : PersistenceClass::CONSISTENT;
   }
   finish(&a, in);
   return a;
@@ -217,7 +244,7 @@ ReconciliationStatus planReconciliation(const PersistenceInputs& in, Reconciliat
   }
 
   SaveMarker m;
-  m.state = SaveMarkerState::COMPLETED;
+  m.state = SaveMarkerState::IDLE;
   switch (action) {
     case ReconciliationAction::ADOPT_VALID_RECORD:
       if ((a.allowed_actions & kReconcileAdoptBit) == 0) return ReconciliationStatus::ACTION_NOT_ALLOWED;
@@ -227,12 +254,12 @@ ReconciliationStatus planReconciliation(const PersistenceInputs& in, Reconciliat
           in.slot[0].generation_hint == generation && in.slot[1].generation_hint == generation) {
         return ReconciliationStatus::GENERATION_NOT_VALID;
       }
-      m.completed_generation = generation;
+      m.acknowledged_generation = generation;
       if (generation > begun) begun = generation;
       break;
-    case ReconciliationAction::DECLARE_NOTHING_CONFIRMED:
+    case ReconciliationAction::DECLARE_NOTHING_ACKNOWLEDGED:
       if ((a.allowed_actions & kReconcileDeclareBit) == 0) return ReconciliationStatus::ACTION_NOT_ALLOWED;
-      m.completed_generation = 0;
+      m.acknowledged_generation = 0;
       if (begun == 0) begun = 1;
       break;
     default:
@@ -242,6 +269,55 @@ ReconciliationStatus planReconciliation(const PersistenceInputs& in, Reconciliat
   if (validateSaveMarker(m) != SaveMarkerStatus::OK) return ReconciliationStatus::BAD_ARGUMENT;
   *out = m;
   return ReconciliationStatus::OK;
+}
+
+AckPlanStatus planAcknowledgment(const PersistenceInputs& in, uint32_t generation,
+                                 SaveMarker* out) {
+  if (out == nullptr || generation == 0) return AckPlanStatus::BAD_ARGUMENT;
+  const PersistenceAssessment a = classifyPersistence(in);
+  switch (a.cls) {
+    case PersistenceClass::IO_ERROR:
+      return AckPlanStatus::STORAGE_UNUSABLE;
+    case PersistenceClass::AWAITING_ACK: {
+      if (generation != a.awaiting_generation) return AckPlanStatus::GENERATION_MISMATCH;
+      SaveMarker m;
+      m.state = SaveMarkerState::IDLE;
+      m.acknowledged_generation = generation;
+      m.begun_generation = generation;
+      if (validateSaveMarker(m) != SaveMarkerStatus::OK) return AckPlanStatus::BAD_ARGUMENT;
+      *out = m;
+      return AckPlanStatus::OK;
+    }
+    case PersistenceClass::AWAITING_ACK_RECORD_LOST:
+      return generation == a.awaiting_generation ? AckPlanStatus::RECORD_NOT_VALID
+                                                 : AckPlanStatus::GENERATION_MISMATCH;
+    case PersistenceClass::PENDING_RECORD_PRESENT:
+    case PersistenceClass::PENDING_RECORD_ABSENT:
+      // The SAVE never reached its verified marker: that record is incomplete.
+      return generation == a.pending_generation ? AckPlanStatus::RECORD_NOT_VALID
+                                               : AckPlanStatus::GENERATION_MISMATCH;
+    case PersistenceClass::CONSISTENT:
+      return generation == a.acknowledged_generation ? AckPlanStatus::ALREADY_ACKNOWLEDGED
+                                                     : AckPlanStatus::NOT_AWAITING;
+    case PersistenceClass::NEVER_INITIALIZED_OR_ERASED:
+    case PersistenceClass::NOTHING_ACKNOWLEDGED:
+      return AckPlanStatus::NOT_AWAITING;
+    case PersistenceClass::RECORD_INCOMPATIBLE:
+      for (int i = 0; i < kCalibrationSlotCount; ++i) {
+        if (in.slot[i].state == SlotState::INCOMPATIBLE && in.slot[i].generation_hint == generation) {
+          return AckPlanStatus::RECORD_NOT_VALID;
+        }
+      }
+      return AckPlanStatus::RECONCILIATION_REQUIRED;
+    case PersistenceClass::ACKNOWLEDGED_GENERATION_LOST:
+    case PersistenceClass::RECORD_AHEAD_OF_MARKER:
+    case PersistenceClass::RECORD_GENERATION_CONFLICT:
+    case PersistenceClass::MARKER_MISSING:
+    case PersistenceClass::MARKER_CORRUPT:
+    case PersistenceClass::MARKER_INCOMPATIBLE:
+      return AckPlanStatus::RECONCILIATION_REQUIRED;
+  }
+  return AckPlanStatus::RECONCILIATION_REQUIRED;
 }
 
 }  // namespace calibration

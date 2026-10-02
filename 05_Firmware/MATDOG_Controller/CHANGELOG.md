@@ -1,5 +1,47 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — P2.4.1 Durable acknowledgment and generation protection (offline, no hardware) — 2026-10-02
+
+Fixes the blocker found by the independent review of P2.3/P2.4: "verified on flash" was treated as
+"confirmed", so a SAVE that published its last marker but never delivered `SAVE=OK` made the next
+boot serve that generation as confirmed; a later failed SAVE could then overwrite the generation
+the caller had actually acknowledged. Persistence layer only; still **not integrated** into the
+Controller (no command, no boot hook).
+
+- **Marker schema 2** (same 28 bytes, same key `M`): `acknowledged_generation` (last generation the
+  CALLER acknowledged; its slot is protected), `begun_generation`, state `IDLE` (nothing in flight),
+  `PENDING` (SAVE in flight / interrupted), `AWAITING_ACK` (record written and read back, caller has
+  not acknowledged). Schema 1 (never installed) and unknown schemas are MARKER_INCOMPATIBLE: this
+  build neither interprets nor overwrites them.
+- **SAVE** keeps acknowledged G, registers G+1 PENDING, writes + reads back the free slot, registers
+  `AWAITING_ACK`, returns `SAVE=OK generation=G+1`. `SaveStatus::OK` now means "verified, awaiting
+  ACK"; the record is not served and the previous slot is NOT reusable. No new SAVE is accepted
+  while a generation awaits its ACK (`ACKNOWLEDGMENT_REQUIRED`, zero mutations).
+- **ACK** (`CalibrationRecordStore::acknowledge(g, profile)`, pure; planned by
+  `planAcknowledgment`): rescans, requires class AWAITING_ACK and `g` == the awaiting generation,
+  writes and reads back `IDLE(g, g)`. Only then does G+1 replace G. Duplicate ACK of the
+  acknowledged generation is idempotent (`ALREADY_ACKNOWLEDGED`, no write); other generations,
+  incomplete/incompatible records, lost acknowledged generation or damaged marker are refused with
+  no mutation. An uncertain ACK write blocks later SAVEs of that instance; the ACK itself can be
+  repeated. P3a will wire the command; none exists here.
+- **Reboot:** `AWAITING_ACK` (and `AWAITING_ACK_RECORD_LOST`) are never auto-promoted;
+  ACK persisted but reply lost -> CONSISTENT; torn ACK marker -> MARKER_CORRUPT (reconciliation).
+  A lost acknowledged generation has priority over any in-flight state (no silent fallback).
+  ADOPT of the awaiting generation is an explicit operator ACK; ADOPT of the acknowledged one
+  discards the verified one; neither promotes corrupt/foreign records. A discarded older attempt
+  surviving in the other slot no longer blocks the next ACK.
+- **First SAVE** on an empty partition enters `AWAITING_ACK(0, 1)`; every interruption is
+  distinguishable by marker + record; nothing is declared available before the ACK.
+- **RAM:** store 5312 B, backend 16 B (unchanged); `LoadResult` 64 -> 68 B and `AckResult` 12 B are
+  transient. No heap. Record V1 (1088 B) and A/B layout untouched.
+- **Tests:** regression for the review finding (marker commit/set error, read-back error, power
+  loss after publication, OK without ACK, N reboots, new SAVE cut at every write) at both the
+  fake-storage and the NVS-stub level, with byte-for-byte checks of the acknowledged slot; ACK fault
+  matrix; first-SAVE matrix; lost acknowledged generation; reconciliation; two consecutive errors.
+  Mutation tests (gate removed, auto-ack) make the regressions fail. The stub still does NOT prove
+  physical flash durability, NVS page recovery or SPI power-loss behaviour.
+- P2.3 layout, manifest, flashing and OTA untouched. Nothing flashed, erased or run on the robot.
+
 ## Unreleased — P2.4 Dedicated NVS and persistent SAVE recovery (offline, no hardware) — 2026-10-02
 
 Persistence layer only. **Not integrated** into the Controller: no command, no boot hook, nothing

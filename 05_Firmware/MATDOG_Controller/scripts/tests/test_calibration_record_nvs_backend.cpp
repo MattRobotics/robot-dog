@@ -219,12 +219,22 @@ LoadResult doLoad(Rig* r) {
   return r->store.load(profile, &tmp);
 }
 
-// A: gen 1, B: gen 2, marker COMPLETED(2,2). The next SAVE targets slot A.
+AckResult doAck(Rig* r, uint32_t generation) { return r->store.acknowledge(generation, profile); }
+
+// SAVE then the caller's explicit ACK of the generation it returned.
+SaveResult doSaveAck(Rig* r) {
+  const SaveResult s = doSave(r);
+  CHECK(s.status == SaveStatus::OK);
+  if (s.status == SaveStatus::OK) CHECK(doAck(r, s.generation).status == AckStatus::OK);
+  return s;
+}
+
+// A: gen 1, B: gen 2, both acknowledged, marker IDLE(2,2). The next SAVE targets slot A.
 void seed(Rig* r) {
   resetAll();
   boot(r);
-  CHECK(doSave(r).status == SaveStatus::OK);
-  CHECK(doSave(r).status == SaveStatus::OK);
+  doSaveAck(r);
+  doSaveAck(r);
   g.mut = 0;
   g.sets = 0;
   g.calls.clear();
@@ -514,13 +524,21 @@ void test_first_install_and_total_loss() {
   const SaveResult s1 = doSave(&r);
   CHECK(s1.status == SaveStatus::OK && s1.generation == 1 && s1.slot == CalibrationSlot::A);
   SaveMarker m;
-  CHECK(decodeFlashMarker(&m) && m.state == SaveMarkerState::COMPLETED &&
-        m.completed_generation == 1 && m.begun_generation == 1);
+  // SAVE=OK is "verified, awaiting ACK": nothing is acknowledged, nothing is served.
+  CHECK(decodeFlashMarker(&m) && m.state == SaveMarkerState::AWAITING_ACK &&
+        m.acknowledged_generation == 0 && m.begun_generation == 1);
   CHECK(g.flash[kNs]["A"].size() == kCalibrationRecordV1EncodedBytes);
   CHECK(g.flash[kNs]["M"].size() == kSaveMarkerV1Bytes);
   l = doLoad(&r);
+  CHECK(l.status == LoadStatus::ACKNOWLEDGMENT_REQUIRED && !l.assessment.record_available);
+  CHECK(l.assessment.cls == PersistenceClass::AWAITING_ACK);
+  CHECK(doSave(&r).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+  CHECK(doAck(&r, 1).status == AckStatus::OK);
+  CHECK(decodeFlashMarker(&m) && m.state == SaveMarkerState::IDLE &&
+        m.acknowledged_generation == 1 && m.begun_generation == 1);
+  l = doLoad(&r);
   CHECK(l.status == LoadStatus::OK && l.generation == 1);
-  const SaveResult s2 = doSave(&r);
+  const SaveResult s2 = doSaveAck(&r);
   CHECK(s2.status == SaveStatus::OK && s2.generation == 2 && s2.slot == CalibrationSlot::B);
 
   // Whole partition erased out of band: indistinguishable from a first install,
@@ -553,7 +571,7 @@ void test_first_install_and_total_loss() {
   boot(&lost2);
   l = doLoad(&lost2);
   CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
-  CHECK(l.assessment.cls == PersistenceClass::CONFIRMED_GENERATION_LOST);
+  CHECK(l.assessment.cls == PersistenceClass::ACKNOWLEDGED_GENERATION_LOST);
   CHECK(!l.assessment.older_record_survives);
 }
 
@@ -564,8 +582,8 @@ void test_marker_and_record_incompatibilities() {
   // Confirmed generation lost, the previous one is valid: NOT healthy.
   seedFresh();
   SaveMarker m;
-  m.state = SaveMarkerState::COMPLETED;
-  m.completed_generation = 3;
+  m.state = SaveMarkerState::IDLE;
+  m.acknowledged_generation = 3;
   m.begun_generation = 3;
   uint8_t buf[kSaveMarkerV1Bytes];
   size_t n = 0;
@@ -576,7 +594,7 @@ void test_marker_and_record_incompatibilities() {
     boot(&b);
     const LoadResult l = doLoad(&b);
     CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
-    CHECK(l.assessment.cls == PersistenceClass::CONFIRMED_GENERATION_LOST);
+    CHECK(l.assessment.cls == PersistenceClass::ACKNOWLEDGED_GENERATION_LOST);
     CHECK(l.assessment.older_record_survives && !l.assessment.record_available);
     CHECK(!l.assessment.save_allowed);
     const Flash before = g.flash;
@@ -586,7 +604,7 @@ void test_marker_and_record_incompatibilities() {
 
   // A record newer than anything the marker attested.
   seedFresh();
-  m.completed_generation = 1;
+  m.acknowledged_generation = 1;
   m.begun_generation = 1;
   CHECK(encodeSaveMarker(m, buf, sizeof(buf), &n) == SaveMarkerStatus::OK);
   g.flash[kNs]["M"].assign(buf, buf + n);
@@ -602,7 +620,7 @@ void test_marker_and_record_incompatibilities() {
   // Marker written by another schema: this build neither interprets nor replaces it.
   seedFresh();
   std::vector<uint8_t> foreign = blobOf("M");
-  patchSchemaAndRecrc(&foreign, 2);
+  patchSchemaAndRecrc(&foreign, 3);
   g.flash[kNs]["M"] = foreign;
   {
     Rig b;
@@ -647,7 +665,9 @@ void test_marker_and_record_incompatibilities() {
 // SAVE under injected errors and power cuts at every mutating step
 // ---------------------------------------------------------------------------
 // A third SAVE (target slot A) performs exactly six mutating calls:
-//   1 set M(PENDING)  2 commit  3 set A  4 commit  5 set M(COMPLETED)  6 commit
+//   1 set M(PENDING)  2 commit  3 set A  4 commit  5 set M(AWAITING_ACK)  6 commit
+// and ends with the generation "verified, awaiting ACK". The caller's ACK is a
+// separate operation of two more mutating calls: 1 set M(IDLE)  2 commit.
 
 struct Expect {
   PersistenceClass cls;
@@ -670,9 +690,9 @@ Expect expected(int event, Pub pub) {
     case 5:
       if (pub == Pub::NOTHING) return {PersistenceClass::PENDING_RECORD_PRESENT, 0};
       if (pub == Pub::PARTIAL) return {PersistenceClass::MARKER_CORRUPT, 0};
-      return {PersistenceClass::CONSISTENT, 3};
+      return {PersistenceClass::AWAITING_ACK, 0};
     default:
-      return {PersistenceClass::CONSISTENT, 3};
+      return {PersistenceClass::AWAITING_ACK, 0};
   }
 }
 
@@ -721,8 +741,10 @@ void sweepOne(int event, Pub pub, bool power_cut) {
     // Same flash, same verdict in the same instance.
     const LoadResult same = doLoad(&r);
     CHECK(same.assessment.cls == ex.cls);
-    CHECK(same.status == (ex.cls == PersistenceClass::CONSISTENT ? LoadStatus::OK
-                                                                  : LoadStatus::RECONCILIATION_REQUIRED));
+    CHECK(same.status == (ex.cls == PersistenceClass::CONSISTENT
+                              ? LoadStatus::OK
+                              : ex.cls == PersistenceClass::AWAITING_ACK ? LoadStatus::ACKNOWLEDGMENT_REQUIRED
+                                                                         : LoadStatus::RECONCILIATION_REQUIRED));
     CHECK(r.store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);  // load does not unlock
   }
 
@@ -738,8 +760,23 @@ void sweepOne(int event, Pub pub, bool power_cut) {
     // What is served is exactly what the marker attests.
     SaveMarker m;
     CHECK(decodeFlashMarker(&m));
-    CHECK(m.state == SaveMarkerState::COMPLETED && m.completed_generation == l.generation);
-    CHECK(l.slot == (ex.generation == 3 ? CalibrationSlot::A : CalibrationSlot::B));
+    CHECK(m.state == SaveMarkerState::IDLE && m.acknowledged_generation == l.generation);
+    CHECK(l.slot == CalibrationSlot::B);
+  } else if (ex.cls == PersistenceClass::AWAITING_ACK) {
+    // Generation 3 is verified on flash but was never acknowledged: not served, not
+    // promoted, generation 2 (slot B) protected. Only an explicit ACK resolves it.
+    CHECK(l.status == LoadStatus::ACKNOWLEDGMENT_REQUIRED);
+    CHECK(!l.assessment.record_available && !l.assessment.save_allowed && l.assessment.ack_allowed);
+    const Flash frozen = g.flash;
+    g.mut = 0;
+    CHECK(doSave(&after).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+    CHECK(doAck(&after, 2).status == AckStatus::GENERATION_MISMATCH);
+    CHECK(g.mut == 0 && g.flash == frozen);
+    CHECK(blobOf("B") == b2);
+    CHECK(doAck(&after, 3).status == AckStatus::OK);
+    const LoadResult ok3 = doLoad(&after);
+    CHECK(ok3.status == LoadStatus::OK && ok3.generation == 3 && ok3.slot == CalibrationSlot::A);
+    CHECK(blobOf("B") == b2);
   } else {
     CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
     CHECK(!l.assessment.record_available && !l.assessment.save_allowed);
@@ -767,6 +804,8 @@ void sweepOne(int event, Pub pub, bool power_cut) {
   CHECK(next.status == SaveStatus::OK);
   CHECK(next.generation > served);
   CHECK(next.slot == (served == 3 ? CalibrationSlot::B : CalibrationSlot::A));
+  CHECK(doLoad(&after).status == LoadStatus::ACKNOWLEDGMENT_REQUIRED);  // verified, not yet acknowledged
+  CHECK(doAck(&after, next.generation).status == AckStatus::OK);
   CHECK(doLoad(&after).generation == next.generation);
   (void)m2;
 }
@@ -795,7 +834,7 @@ void test_clean_save_step_order() {
   const SaveResult s = doSave(&r);
   CHECK(s.status == SaveStatus::OK && s.generation == 3 && s.slot == CalibrationSlot::A);
   CHECK(g.mut == 6);
-  // Mutations in order: PENDING marker, record, COMPLETED marker - each committed.
+  // Mutations in order: PENDING marker, record, AWAITING_ACK marker - each committed.
   std::vector<std::string> mutations;
   for (const std::string& c : g.calls) {
     if (c.rfind("set:", 0) == 0 || c == "commit") mutations.push_back(c);
@@ -803,8 +842,23 @@ void test_clean_save_step_order() {
   const std::vector<std::string> want = {"set:M", "commit", "set:A", "commit", "set:M", "commit"};
   CHECK(mutations == want);
   SaveMarker m;
-  CHECK(decodeFlashMarker(&m) && m.state == SaveMarkerState::COMPLETED &&
-        m.completed_generation == 3 && m.begun_generation == 3);
+  CHECK(decodeFlashMarker(&m) && m.state == SaveMarkerState::AWAITING_ACK &&
+        m.acknowledged_generation == 2 && m.begun_generation == 3);
+  // The ACK is its own two-mutation operation and writes the marker only.
+  const std::vector<uint8_t> a3 = blobOf("A"), b2 = blobOf("B");
+  g.calls.clear();
+  g.mut = 0;
+  CHECK(doAck(&r, 3).status == AckStatus::OK);
+  CHECK(g.mut == 2);
+  std::vector<std::string> ack_mutations;
+  for (const std::string& c : g.calls) {
+    if (c.rfind("set:", 0) == 0 || c == "commit") ack_mutations.push_back(c);
+  }
+  const std::vector<std::string> want_ack = {"set:M", "commit"};
+  CHECK(ack_mutations == want_ack);
+  CHECK(blobOf("A") == a3 && blobOf("B") == b2);
+  CHECK(decodeFlashMarker(&m) && m.state == SaveMarkerState::IDLE &&
+        m.acknowledged_generation == 3 && m.begun_generation == 3);
   CHECK(g.label_violations == 0);
 }
 
@@ -819,7 +873,7 @@ void test_readback_failures() {
   const Case cases[] = {
       {"M", 1, PersistenceClass::PENDING_RECORD_ABSENT, SaveStatus::MARKER_VERIFY_FAILED},   // PENDING read-back
       {"A", 2, PersistenceClass::PENDING_RECORD_PRESENT, SaveStatus::READBACK_FAILED},       // record read-back
-      {"M", 3, PersistenceClass::CONSISTENT, SaveStatus::MARKER_VERIFY_FAILED},              // COMPLETED read-back
+      {"M", 3, PersistenceClass::AWAITING_ACK, SaveStatus::MARKER_VERIFY_FAILED},            // AWAITING_ACK read-back
   };
   for (const Case& c : cases) {
     Rig seeded;
@@ -844,10 +898,13 @@ void test_readback_failures() {
     boot(&after);
     const LoadResult l = doLoad(&after);
     CHECK(l.assessment.cls == c.cls_after_reboot);
-    if (c.cls_after_reboot == PersistenceClass::CONSISTENT) {
-      // The COMPLETED marker WAS published although SAVE reported an error: after
-      // a reboot the verified-on-disk state is legitimately consistent.
-      CHECK(l.status == LoadStatus::OK && l.generation == 3);
+    if (c.cls_after_reboot == PersistenceClass::AWAITING_ACK) {
+      // The AWAITING_ACK marker WAS published although SAVE reported an error: the
+      // caller never got SAVE=OK, so a reboot must not treat generation 3 as
+      // confirmed, and generation 2 stays protected.
+      CHECK(l.status == LoadStatus::ACKNOWLEDGMENT_REQUIRED && !l.assessment.record_available);
+      CHECK(doSave(&after).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+      CHECK(blobOf("B") == b2);
     } else {
       CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
       CHECK(doSave(&after).status == SaveStatus::RECONCILIATION_REQUIRED);
@@ -883,9 +940,9 @@ void test_pending_block_survives_reboot_and_retries() {
   reboot();
   Rig fin;
   boot(&fin);
-  CHECK(reconcile(&fin, ReconciliationAction::DECLARE_NOTHING_CONFIRMED, 0));
+  CHECK(reconcile(&fin, ReconciliationAction::DECLARE_NOTHING_ACKNOWLEDGED, 0));
   const LoadResult l = doLoad(&fin);
-  CHECK(l.status == LoadStatus::NOT_FOUND && l.assessment.cls == PersistenceClass::NOTHING_CONFIRMED);
+  CHECK(l.status == LoadStatus::NOT_FOUND && l.assessment.cls == PersistenceClass::NOTHING_ACKNOWLEDGED);
   const SaveResult s = doSave(&fin);
   CHECK(s.status == SaveStatus::OK && s.generation == 4);
 }
@@ -947,6 +1004,315 @@ void test_open_failure_is_certain_and_retryable() {
   CHECK(res.status == SaveStatus::OK && res.generation == 3 && res.slot == CalibrationSlot::A);
 }
 
+// ---------------------------------------------------------------------------
+// P2.4.1: durable acknowledgment at the NVS-stub level
+// ---------------------------------------------------------------------------
+
+// A/1 acknowledged, nothing else. The next SAVE (generation 2) targets slot B.
+void seedOne(Rig* r) {
+  resetAll();
+  boot(r);
+  doSaveAck(r);
+  g.mut = 0;
+  g.sets = 0;
+  g.calls.clear();
+}
+
+// The review finding: A/1 acknowledged; B/2 written and verified; the last marker is
+// published but the caller never gets SAVE=OK (or never ACKs); reboot; a new SAVE
+// with a power cut in its write. A/1 must stay byte-for-byte intact, and B/2 must
+// not be promoted.
+void test_review_finding_regression() {
+  g_case = "review finding";
+  struct Variant {
+    const char* name;
+    int cut_at, err_at;
+    Pub pub;
+    const char* get_key;
+    int get_min_sets;
+    bool expect_ok;
+  };
+  const Variant variants[] = {
+      {"marker commit error after publication (MARKER_WRITE_FAILED)", 0, 6, Pub::NOTHING, nullptr, 0, false},
+      {"marker set error after publication (MARKER_WRITE_FAILED)", 0, 5, Pub::FULL, nullptr, 0, false},
+      {"marker read-back error (MARKER_VERIFY_FAILED)", 0, 0, Pub::NOTHING, "M", 3, false},
+      {"power loss after marker publication (commit)", 6, 0, Pub::NOTHING, nullptr, 0, false},
+      {"power loss after marker publication (set)", 5, 0, Pub::FULL, nullptr, 0, false},
+      {"SAVE=OK delivered, ACK never sent", 0, 0, Pub::NOTHING, nullptr, 0, true},
+  };
+  for (const Variant& v : variants) {
+    g_case = v.name;
+    Rig first;
+    seedOne(&first);
+    const std::vector<uint8_t> a1 = blobOf("A");
+    g.fault_pub = v.pub;
+    g.cut_at = v.cut_at;
+    g.err_at = v.err_at;
+    if (v.get_key != nullptr) {
+      g.get_error = 0x1234;
+      g.get_error_key = v.get_key;
+      g.get_error_min_sets = v.get_min_sets;
+    }
+    const SaveResult res = doSave(&first);
+    CHECK((res.status == SaveStatus::OK) == v.expect_ok);
+    CHECK(blobOf("A") == a1);
+    SaveMarker m;
+    CHECK(decodeFlashMarker(&m) && m.state == SaveMarkerState::AWAITING_ACK &&
+          m.acknowledged_generation == 1 && m.begun_generation == 2);
+    const std::vector<uint8_t> b2 = blobOf("B");
+    const std::vector<uint8_t> marker = blobOf("M");
+
+    for (int boots = 0; boots < 3; ++boots) {
+      reboot();
+      Rig after;
+      if (!boot(&after)) return;
+      const LoadResult l = doLoad(&after);
+      CHECK(l.status == LoadStatus::ACKNOWLEDGMENT_REQUIRED);  // B/2 is NOT confirmed
+      CHECK(l.assessment.cls == PersistenceClass::AWAITING_ACK && !l.assessment.record_available);
+      for (int cut : {1, 3, 5}) {  // a new SAVE, cut where its PENDING / record / marker write would be
+        reboot();
+        Rig again;
+        if (!boot(&again)) return;
+        g.fault_pub = Pub::PARTIAL;
+        g.cut_at = cut;
+        g.calls.clear();
+        CHECK(doSave(&again).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+        CHECK(g.mut == 0);
+        for (const std::string& c : g.calls) CHECK(c.rfind("set:", 0) != 0 && c != "commit");
+        CHECK(blobOf("A") == a1);  // the acknowledged generation, byte for byte
+        CHECK(blobOf("B") == b2);
+        CHECK(blobOf("M") == marker);
+      }
+    }
+    // The generation is not lost: the caller can still acknowledge it. Only then is
+    // slot A reusable; the next SAVE writes A, never B.
+    reboot();
+    Rig fin;
+    if (!boot(&fin)) return;
+    CHECK(blobOf("A") == a1);
+    CHECK(doAck(&fin, 2).status == AckStatus::OK);
+    CHECK(blobOf("A") == a1 && blobOf("B") == b2);  // the ACK writes the marker only
+    const LoadResult served = doLoad(&fin);
+    CHECK(served.status == LoadStatus::OK && served.generation == 2 && served.slot == CalibrationSlot::B);
+    const SaveResult next = doSave(&fin);
+    CHECK(next.status == SaveStatus::OK && next.generation == 3 && next.slot == CalibrationSlot::A);
+    CHECK(blobOf("B") == b2);
+  }
+}
+
+// Fault on the ACK itself (set M(IDLE), commit). The acknowledged slot is never
+// touched; the conservative outcome is never OK; a reboot reads the real state.
+void test_ack_fault_sweep() {
+  g_case = "ack fault sweep";
+  for (int event = 1; event <= 2; ++event) {
+    for (Pub pub : {Pub::NOTHING, Pub::PARTIAL, Pub::FULL}) {
+      if (event == 2 && pub != Pub::NOTHING) continue;
+      for (int power_cut = 0; power_cut < 2; ++power_cut) {
+        char tag[80];
+        std::snprintf(tag, sizeof(tag), "ack %s event %d pub %d", power_cut ? "cut" : "error", event,
+                      static_cast<int>(pub));
+        g_case = tag;
+        Rig seeded;
+        seed(&seeded);
+        Rig r;
+        boot(&r);
+        CHECK(doSave(&r).status == SaveStatus::OK);  // gen 3 -> slot A, awaiting
+        const std::vector<uint8_t> a3 = blobOf("A"), b2 = blobOf("B");
+        g.mut = 0;
+        g.fault_pub = pub;
+        if (power_cut) g.cut_at = event; else g.err_at = event;
+        const AckResult ack = doAck(&r, 3);
+        CHECK(ack.status == AckStatus::MARKER_WRITE_FAILED);  // never OK on a fault
+        CHECK(blobOf("A") == a3 && blobOf("B") == b2);
+        if (!power_cut) {
+          g.err_at = 0;
+          CHECK(doSave(&r).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);  // uncertain: no more writes
+        }
+
+        reboot();
+        Rig after;
+        if (!boot(&after)) return;
+        g.calls.clear();
+        const LoadResult l = doLoad(&after);
+        PersistenceClass expect = PersistenceClass::CONSISTENT;  // the ACK did land (reply lost)
+        if (event == 1 && pub == Pub::NOTHING) expect = PersistenceClass::AWAITING_ACK;
+        if (event == 1 && pub == Pub::PARTIAL) expect = PersistenceClass::MARKER_CORRUPT;
+        CHECK(l.assessment.cls == expect);
+        if (expect == PersistenceClass::AWAITING_ACK) {
+          CHECK(l.status == LoadStatus::ACKNOWLEDGMENT_REQUIRED);
+          reboot();
+          Rig retry;
+          if (!boot(&retry)) return;
+          CHECK(doSave(&retry).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+          CHECK(g.mut == 0 && blobOf("B") == b2);
+          CHECK(doAck(&retry, 3).status == AckStatus::OK);  // the ACK can simply be repeated
+          CHECK(doLoad(&retry).generation == 3);
+        } else if (expect == PersistenceClass::CONSISTENT) {
+          CHECK(l.status == LoadStatus::OK && l.generation == 3 && l.slot == CalibrationSlot::A);
+          const Flash frozen = g.flash;
+          g.mut = 0;
+          CHECK(doAck(&after, 3).status == AckStatus::ALREADY_ACKNOWLEDGED);
+          CHECK(g.mut == 0 && g.flash == frozen);
+          const SaveResult next = doSave(&after);  // only now is slot B reusable
+          CHECK(next.status == SaveStatus::OK && next.generation == 4 && next.slot == CalibrationSlot::B);
+          CHECK(blobOf("A") == a3);
+        } else {
+          CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+          const Flash frozen = g.flash;
+          g.mut = 0;
+          CHECK(doSave(&after).status == SaveStatus::RECONCILIATION_REQUIRED);
+          CHECK(doAck(&after, 3).status == AckStatus::RECONCILIATION_REQUIRED);
+          CHECK(g.mut == 0 && g.flash == frozen);
+          CHECK(reconcile(&after, ReconciliationAction::ADOPT_VALID_RECORD, 3));
+          CHECK(doLoad(&after).generation == 3);
+        }
+      }
+    }
+  }
+  {  // ACK marker read-back fails although the marker landed
+    g_case = "ack read-back failure";
+    Rig seeded;
+    seed(&seeded);
+    Rig r;
+    boot(&r);
+    CHECK(doSave(&r).status == SaveStatus::OK);
+    g.sets = 0;
+    g.get_error = 0x1234;
+    g.get_error_key = "M";
+    g.get_error_min_sets = 1;
+    CHECK(doAck(&r, 3).status == AckStatus::MARKER_VERIFY_FAILED);
+    CHECK(r.store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+    reboot();
+    Rig after;
+    boot(&after);
+    CHECK(doLoad(&after).assessment.cls == PersistenceClass::CONSISTENT);
+  }
+}
+
+// First SAVE on an empty partition: every interruption is distinguishable at boot,
+// and no calibration is declared available before an ACK.
+void test_first_save_interruptions() {
+  g_case = "first SAVE interruptions";
+  for (int event = 1; event <= 6; ++event) {
+    for (Pub pub : {Pub::NOTHING, Pub::PARTIAL, Pub::FULL}) {
+      if (event % 2 == 0 && pub != Pub::NOTHING) continue;
+      char tag[64];
+      std::snprintf(tag, sizeof(tag), "first SAVE cut %d pub %d", event, static_cast<int>(pub));
+      g_case = tag;
+      resetAll();
+      Rig r;
+      boot(&r);
+      g.fault_pub = pub;
+      g.cut_at = event;
+      CHECK(doSave(&r).status != SaveStatus::OK);
+      reboot();
+      Rig after;
+      if (!boot(&after)) return;
+      const LoadResult l = doLoad(&after);
+      PersistenceClass expect;
+      switch (event) {
+        case 1: expect = pub == Pub::NOTHING ? PersistenceClass::NEVER_INITIALIZED_OR_ERASED
+                         : pub == Pub::PARTIAL ? PersistenceClass::MARKER_CORRUPT
+                                               : PersistenceClass::PENDING_RECORD_ABSENT; break;
+        case 2: expect = PersistenceClass::PENDING_RECORD_ABSENT; break;
+        case 3: expect = pub == Pub::FULL ? PersistenceClass::PENDING_RECORD_PRESENT
+                                          : PersistenceClass::PENDING_RECORD_ABSENT; break;
+        case 4: expect = PersistenceClass::PENDING_RECORD_PRESENT; break;
+        case 5: expect = pub == Pub::NOTHING ? PersistenceClass::PENDING_RECORD_PRESENT
+                         : pub == Pub::PARTIAL ? PersistenceClass::MARKER_CORRUPT
+                                               : PersistenceClass::AWAITING_ACK; break;
+        default: expect = PersistenceClass::AWAITING_ACK; break;
+      }
+      CHECK(l.assessment.cls == expect);
+      CHECK(l.status != LoadStatus::OK && !l.assessment.record_available);
+      if (expect == PersistenceClass::AWAITING_ACK) {
+        CHECK(l.status == LoadStatus::ACKNOWLEDGMENT_REQUIRED);
+        CHECK(l.assessment.acknowledged_generation == 0);
+        CHECK(doSave(&after).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+        CHECK(doAck(&after, 1).status == AckStatus::OK);
+        CHECK(doLoad(&after).status == LoadStatus::OK);
+      } else if (expect == PersistenceClass::NEVER_INITIALIZED_OR_ERASED) {
+        CHECK(l.status == LoadStatus::NOT_FOUND);
+        CHECK(doSave(&after).status == SaveStatus::OK);
+      } else {
+        CHECK(!l.assessment.save_allowed);
+        CHECK(doSave(&after).status == SaveStatus::RECONCILIATION_REQUIRED);
+      }
+    }
+  }
+}
+
+void test_acknowledged_generation_lost_and_reconciliation() {
+  g_case = "acknowledged generation lost";
+  for (int kind = 0; kind < 2; ++kind) {  // 0: erased, 1: damaged
+    Rig seeded;
+    seed(&seeded);
+    Rig r;
+    boot(&r);
+    CHECK(doSave(&r).status == SaveStatus::OK);  // gen 3 awaiting in A; acknowledged is B/2
+    const std::vector<uint8_t> a3 = blobOf("A");
+    if (kind == 0) g.flash[kNs].erase("B"); else g.flash[kNs]["B"][700] ^= 0x01;
+    reboot();
+    Rig after;
+    boot(&after);
+    const LoadResult l = doLoad(&after);
+    CHECK(l.assessment.cls == PersistenceClass::ACKNOWLEDGED_GENERATION_LOST);  // reported, no silent fallback
+    CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED && !l.assessment.record_available);
+    const Flash frozen = g.flash;
+    g.mut = 0;
+    CHECK(doSave(&after).status == SaveStatus::RECONCILIATION_REQUIRED);
+    CHECK(doAck(&after, 3).status == AckStatus::RECONCILIATION_REQUIRED);
+    CHECK(g.mut == 0 && g.flash == frozen);
+    if (kind == 0) {
+      CHECK(reconcile(&after, ReconciliationAction::ADOPT_VALID_RECORD, 3));  // operator takes the verified one
+      CHECK(doLoad(&after).generation == 3 && blobOf("A") == a3);
+    } else {
+      CHECK(reconcile(&after, ReconciliationAction::DECLARE_NOTHING_ACKNOWLEDGED, 0));
+      CHECK(doLoad(&after).status == LoadStatus::NOT_FOUND);
+    }
+  }
+  {  // reconciling an AWAITING_ACK state: ADOPT the previous one discards the verified one
+    g_case = "reconcile awaiting";
+    Rig seeded;
+    seed(&seeded);
+    Rig r;
+    boot(&r);
+    CHECK(doSave(&r).status == SaveStatus::OK);
+    const std::vector<uint8_t> b2 = blobOf("B");
+    reboot();
+    Rig after;
+    boot(&after);
+    CHECK(reconcile(&after, ReconciliationAction::ADOPT_VALID_RECORD, 2));
+    const LoadResult l = doLoad(&after);
+    CHECK(l.status == LoadStatus::OK && l.generation == 2 && blobOf("B") == b2);
+    const SaveResult next = doSave(&after);
+    CHECK(next.status == SaveStatus::OK && next.generation == 4 && next.slot == CalibrationSlot::A);  // 3 never reused
+    CHECK(blobOf("B") == b2);
+  }
+}
+
+void test_two_consecutive_errors_keep_acknowledged_slot() {
+  g_case = "two consecutive errors";
+  Rig first;
+  seedOne(&first);
+  const std::vector<uint8_t> a1 = blobOf("A");
+  g.err_at = 6;
+  CHECK(doSave(&first).status == SaveStatus::MARKER_WRITE_FAILED);  // error 1: marker published, error returned
+  g.err_at = 0;
+  CHECK(doSave(&first).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);  // error 2, same instance
+  for (int i = 0; i < 3; ++i) {
+    reboot();
+    Rig again;
+    boot(&again);
+    g.cut_at = 1;
+    g.fault_pub = Pub::PARTIAL;
+    CHECK(doSave(&again).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);  // error 2, new instance
+    CHECK(doSave(&again).status == SaveStatus::ACKNOWLEDGMENT_REQUIRED);
+    CHECK(g.mut == 0);
+    CHECK(blobOf("A") == a1);
+  }
+}
+
 void test_boundaries_of_the_backend() {
   g_case = "backend boundaries";
   // Every partition-naming call in this whole binary named "matdog_nvs".
@@ -970,6 +1336,11 @@ int main() {
   test_readback_failures();
   test_pending_block_survives_reboot_and_retries();
   test_open_failure_is_certain_and_retryable();
+  test_review_finding_regression();
+  test_ack_fault_sweep();
+  test_first_save_interruptions();
+  test_acknowledged_generation_lost_and_reconciliation();
+  test_two_consecutive_errors_keep_acknowledged_slot();
   test_boundaries_of_the_backend();
   std::printf("test_calibration_record_nvs_backend: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;

@@ -25,6 +25,7 @@ const char* toString(LoadStatus status) {
     case LoadStatus::NOT_FOUND:               return "NOT_FOUND";
     case LoadStatus::IO_ERROR:                return "IO_ERROR";
     case LoadStatus::INCOMPATIBLE:            return "INCOMPATIBLE";
+    case LoadStatus::ACKNOWLEDGMENT_REQUIRED: return "ACKNOWLEDGMENT_REQUIRED";
     case LoadStatus::RECONCILIATION_REQUIRED: return "RECONCILIATION_REQUIRED";
     case LoadStatus::BAD_ARGUMENT:            return "BAD_ARGUMENT";
   }
@@ -38,6 +39,7 @@ const char* toString(SaveStatus status) {
     case SaveStatus::INVALID_RECORD:          return "INVALID_RECORD";
     case SaveStatus::STORAGE_UNUSABLE:        return "STORAGE_UNUSABLE";
     case SaveStatus::GENERATION_EXHAUSTED:    return "GENERATION_EXHAUSTED";
+    case SaveStatus::ACKNOWLEDGMENT_REQUIRED: return "ACKNOWLEDGMENT_REQUIRED";
     case SaveStatus::RECONCILIATION_REQUIRED: return "RECONCILIATION_REQUIRED";
     case SaveStatus::WRITE_FAILED:            return "WRITE_FAILED";
     case SaveStatus::NO_SPACE:                return "NO_SPACE";
@@ -60,9 +62,25 @@ const char* toString(SavePhase phase) {
     case SavePhase::MARKER_PENDING_VERIFY:   return "MARKER_PENDING_VERIFY";
     case SavePhase::RECORD_WRITE:            return "RECORD_WRITE";
     case SavePhase::RECORD_VERIFY:           return "RECORD_VERIFY";
-    case SavePhase::MARKER_COMPLETED_WRITE:  return "MARKER_COMPLETED_WRITE";
-    case SavePhase::MARKER_COMPLETED_VERIFY: return "MARKER_COMPLETED_VERIFY";
+    case SavePhase::MARKER_AWAITING_ACK_WRITE:  return "MARKER_AWAITING_ACK_WRITE";
+    case SavePhase::MARKER_AWAITING_ACK_VERIFY: return "MARKER_AWAITING_ACK_VERIFY";
     case SavePhase::DONE:                    return "DONE";
+  }
+  return "UNKNOWN";
+}
+
+const char* toString(AckStatus status) {
+  switch (status) {
+    case AckStatus::OK:                      return "OK";
+    case AckStatus::ALREADY_ACKNOWLEDGED:    return "ALREADY_ACKNOWLEDGED";
+    case AckStatus::BAD_ARGUMENT:            return "BAD_ARGUMENT";
+    case AckStatus::STORAGE_UNUSABLE:        return "STORAGE_UNUSABLE";
+    case AckStatus::NOT_AWAITING:            return "NOT_AWAITING";
+    case AckStatus::GENERATION_MISMATCH:     return "GENERATION_MISMATCH";
+    case AckStatus::RECORD_NOT_VALID:        return "RECORD_NOT_VALID";
+    case AckStatus::RECONCILIATION_REQUIRED: return "RECONCILIATION_REQUIRED";
+    case AckStatus::MARKER_WRITE_FAILED:     return "MARKER_WRITE_FAILED";
+    case AckStatus::MARKER_VERIFY_FAILED:    return "MARKER_VERIFY_FAILED";
   }
   return "UNKNOWN";
 }
@@ -152,7 +170,7 @@ void CalibrationRecordStore::scan(const actuator::CalibrationGeometryProfile& pr
   readMarkerReport(&out->load.marker, &out->io_error);
   if (out->load.marker.state == MarkerObservation::VALID) {
     const SaveMarker& m = out->load.marker.marker;
-    if (m.completed_generation > out->max_generation) out->max_generation = m.completed_generation;
+    if (m.acknowledged_generation > out->max_generation) out->max_generation = m.acknowledged_generation;
     if (m.begun_generation > out->max_generation) out->max_generation = m.begun_generation;
   }
 
@@ -176,18 +194,21 @@ LoadResult CalibrationRecordStore::load(const actuator::CalibrationGeometryProfi
   const PersistenceAssessment& a = result.assessment;
   switch (a.cls) {
     case PersistenceClass::CONSISTENT: {
-      const uint8_t pick = static_cast<uint8_t>(a.confirmed_slot);
+      const uint8_t pick = static_cast<uint8_t>(a.acknowledged_slot);
       const SlotState other = result.report[1 - pick].state;
       result.status = LoadStatus::OK;
-      result.slot = a.confirmed_slot;
+      result.slot = a.acknowledged_slot;
       result.generation = decoded_[pick].generation;
       result.degraded = other != SlotState::VALID && other != SlotState::ABSENT;
       *out = decoded_[pick];
       return result;
     }
     case PersistenceClass::NEVER_INITIALIZED_OR_ERASED:
-    case PersistenceClass::NOTHING_CONFIRMED:
+    case PersistenceClass::NOTHING_ACKNOWLEDGED:
       result.status = LoadStatus::NOT_FOUND;
+      return result;
+    case PersistenceClass::AWAITING_ACK:
+      result.status = LoadStatus::ACKNOWLEDGMENT_REQUIRED;  // verified, never acknowledged: not served
       return result;
     case PersistenceClass::IO_ERROR:
       result.status = LoadStatus::IO_ERROR;  // fail closed: never select on partial knowledge
@@ -270,7 +291,8 @@ SaveResult CalibrationRecordStore::save(const CalibrationRecord& record,
 
   result.phase = SavePhase::CLASSIFY;
   if (!a.save_allowed) {
-    result.status = SaveStatus::RECONCILIATION_REQUIRED;
+    result.status = a.cls == PersistenceClass::AWAITING_ACK ? SaveStatus::ACKNOWLEDGMENT_REQUIRED
+                                                            : SaveStatus::RECONCILIATION_REQUIRED;
     return result;
   }
   if (s.max_generation == 0xFFFFFFFFu) {
@@ -278,16 +300,16 @@ SaveResult CalibrationRecordStore::save(const CalibrationRecord& record,
     return result;
   }
   const uint32_t new_generation = s.max_generation + 1;
-  const uint32_t confirmed = a.confirmed_generation;
+  const uint32_t acknowledged = a.acknowledged_generation;
 
-  // Target: never the slot holding the confirmed record.
+  // Target: never the slot holding the acknowledged record.
   uint8_t target = 0;
   if (a.cls == PersistenceClass::CONSISTENT) {
-    target = 1 - static_cast<uint8_t>(a.confirmed_slot);
+    target = 1 - static_cast<uint8_t>(a.acknowledged_slot);
     result.previous_record_intact = true;
-    result.previous_generation = confirmed;
+    result.previous_generation = acknowledged;
   } else {
-    // Nothing confirmed to protect: take an absent slot, else a corrupt one, else
+    // Nothing acknowledged to protect: take an absent slot, else a corrupt one, else
     // a foreign one, else a leftover valid one; ties go to the lower generation.
     auto rank = [](SlotState st) {
       return st == SlotState::ABSENT ? 0 : st == SlotState::CORRUPT ? 1 : st == SlotState::INCOMPATIBLE ? 2 : 3;
@@ -315,7 +337,7 @@ SaveResult CalibrationRecordStore::save(const CalibrationRecord& record,
   // have left a PENDING marker behind.
   SaveMarker pending;
   pending.state = SaveMarkerState::PENDING;
-  pending.completed_generation = confirmed;
+  pending.acknowledged_generation = acknowledged;
   pending.begun_generation = new_generation;
   result.phase = SavePhase::MARKER_PENDING_WRITE;
   bool unmodified = false;
@@ -360,24 +382,72 @@ SaveResult CalibrationRecordStore::save(const CalibrationRecord& record,
     return result;
   }
 
-  // 5-6. Confirm: COMPLETED marker, read back.
-  SaveMarker done;
-  done.state = SaveMarkerState::COMPLETED;
-  done.completed_generation = new_generation;
-  done.begun_generation = new_generation;
-  result.phase = SavePhase::MARKER_COMPLETED_WRITE;
-  mst = writeAndVerifyMarker(done, &result.io, &unmodified);
+  // 5-6. Record that the generation is verified and awaits the caller's ACK. The
+  // acknowledged generation stays in the marker, and its slot stays protected:
+  // only acknowledge() moves the acknowledgment forward.
+  SaveMarker awaiting;
+  awaiting.state = SaveMarkerState::AWAITING_ACK;
+  awaiting.acknowledged_generation = acknowledged;
+  awaiting.begun_generation = new_generation;
+  result.phase = SavePhase::MARKER_AWAITING_ACK_WRITE;
+  mst = writeAndVerifyMarker(awaiting, &result.io, &unmodified);
   if (mst != SaveStatus::OK) {
     write_state_ = WriteState::BLOCKED_UNCERTAIN_WRITE;
-    if (mst == SaveStatus::MARKER_VERIFY_FAILED) result.phase = SavePhase::MARKER_COMPLETED_VERIFY;
+    if (mst == SaveStatus::MARKER_VERIFY_FAILED) result.phase = SavePhase::MARKER_AWAITING_ACK_VERIFY;
     result.status = mst;
     return result;
   }
 
-  // 7. Only now.
+  // 7. Only now: verified on flash, NOT acknowledged.
   result.phase = SavePhase::DONE;
   result.status = SaveStatus::OK;
   result.generation = new_generation;
+  return result;
+}
+
+AckResult CalibrationRecordStore::acknowledge(uint32_t generation,
+                                              const actuator::CalibrationGeometryProfile& profile) {
+  AckResult result;
+  if (storage_ == nullptr || generation == 0) return result;  // BAD_ARGUMENT
+  result.generation = generation;
+
+  // Always from what is on flash: a stale or replayed ACK cannot act on RAM state.
+  Scan s;
+  scan(profile, &s);
+  result.persistence = s.load.assessment.cls;
+  if (s.io_error || s.load.assessment.cls == PersistenceClass::IO_ERROR) {
+    result.status = AckStatus::STORAGE_UNUSABLE;
+    result.io = StorageIoStatus::IO_ERROR;
+    return result;
+  }
+
+  PersistenceInputs in;
+  for (uint8_t i = 0; i < kCalibrationSlotCount; ++i) in.slot[i] = s.load.report[i];
+  in.marker = s.load.marker;
+  SaveMarker ack;
+  switch (planAcknowledgment(in, generation, &ack)) {
+    case AckPlanStatus::OK:                      break;
+    case AckPlanStatus::ALREADY_ACKNOWLEDGED:    result.status = AckStatus::ALREADY_ACKNOWLEDGED; return result;
+    case AckPlanStatus::BAD_ARGUMENT:            return result;
+    case AckPlanStatus::STORAGE_UNUSABLE:        result.status = AckStatus::STORAGE_UNUSABLE; return result;
+    case AckPlanStatus::NOT_AWAITING:            result.status = AckStatus::NOT_AWAITING; return result;
+    case AckPlanStatus::GENERATION_MISMATCH:     result.status = AckStatus::GENERATION_MISMATCH; return result;
+    case AckPlanStatus::RECORD_NOT_VALID:        result.status = AckStatus::RECORD_NOT_VALID; return result;
+    case AckPlanStatus::RECONCILIATION_REQUIRED: result.status = AckStatus::RECONCILIATION_REQUIRED; return result;
+  }
+
+  bool unmodified = false;
+  const SaveStatus mst = writeAndVerifyMarker(ack, &result.io, &unmodified);
+  if (mst != SaveStatus::OK) {
+    // The ACK marker may or may not be on flash. Either way the protected slot was
+    // not touched; a reboot (or a repeated acknowledge()) reads the real state.
+    // Further SAVEs of this instance stay refused unless storage was untouched.
+    if (!unmodified) write_state_ = WriteState::BLOCKED_UNCERTAIN_WRITE;
+    result.status = mst == SaveStatus::MARKER_VERIFY_FAILED ? AckStatus::MARKER_VERIFY_FAILED
+                                                            : AckStatus::MARKER_WRITE_FAILED;
+    return result;
+  }
+  result.status = AckStatus::OK;
   return result;
 }
 

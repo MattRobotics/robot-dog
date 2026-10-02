@@ -11,7 +11,7 @@ constexpr size_t kOffMagic = 0;
 constexpr size_t kOffSchema = 4;
 constexpr size_t kOffFlags = 6;
 constexpr size_t kOffLength = 8;
-constexpr size_t kOffCompleted = 12;
+constexpr size_t kOffAcknowledged = 12;
 constexpr size_t kOffBegun = 16;
 constexpr size_t kOffState = 20;
 constexpr size_t kOffReserved = 21;  // 3 bytes
@@ -52,21 +52,23 @@ const char* toString(SaveMarkerStatus status) {
 
 const char* toString(SaveMarkerState state) {
   switch (state) {
-    case SaveMarkerState::COMPLETED: return "COMPLETED";
-    case SaveMarkerState::PENDING:   return "PENDING";
+    case SaveMarkerState::IDLE:         return "IDLE";
+    case SaveMarkerState::PENDING:      return "PENDING";
+    case SaveMarkerState::AWAITING_ACK: return "AWAITING_ACK";
   }
   return "UNKNOWN";
 }
 
 SaveMarkerStatus validateSaveMarker(const SaveMarker& m) {
   switch (m.state) {
-    case SaveMarkerState::COMPLETED:
-      if (m.begun_generation < m.completed_generation) return SaveMarkerStatus::INCOHERENT;
-      if (m.completed_generation == 0 && m.begun_generation == 0) return SaveMarkerStatus::INCOHERENT;
+    case SaveMarkerState::IDLE:
+      if (m.begun_generation < m.acknowledged_generation) return SaveMarkerStatus::INCOHERENT;
+      if (m.acknowledged_generation == 0 && m.begun_generation == 0) return SaveMarkerStatus::INCOHERENT;
       return SaveMarkerStatus::OK;
     case SaveMarkerState::PENDING:
-      return m.begun_generation > m.completed_generation ? SaveMarkerStatus::OK
-                                                         : SaveMarkerStatus::INCOHERENT;
+    case SaveMarkerState::AWAITING_ACK:
+      return m.begun_generation > m.acknowledged_generation ? SaveMarkerStatus::OK
+                                                            : SaveMarkerStatus::INCOHERENT;
   }
   return SaveMarkerStatus::MALFORMED;
 }
@@ -84,7 +86,7 @@ SaveMarkerStatus encodeSaveMarker(const SaveMarker& marker, uint8_t* out, size_t
   putU16(out, kOffSchema, kSaveMarkerSchemaV1);
   putU16(out, kOffFlags, 0);
   putU32(out, kOffLength, static_cast<uint32_t>(kSaveMarkerV1Bytes));
-  putU32(out, kOffCompleted, marker.completed_generation);
+  putU32(out, kOffAcknowledged, marker.acknowledged_generation);
   putU32(out, kOffBegun, marker.begun_generation);
   out[kOffState] = static_cast<uint8_t>(marker.state);
   putU32(out, kOffCrc, calibrationCrc32(out, kOffCrc));
@@ -108,13 +110,14 @@ SaveMarkerStatus decodeSaveMarker(const uint8_t* data, size_t length, SaveMarker
     if (data[kOffReserved + i] != 0) return SaveMarkerStatus::MALFORMED;
   }
   const uint8_t state = data[kOffState];
-  if (state != static_cast<uint8_t>(SaveMarkerState::COMPLETED) &&
-      state != static_cast<uint8_t>(SaveMarkerState::PENDING)) {
+  if (state != static_cast<uint8_t>(SaveMarkerState::IDLE) &&
+      state != static_cast<uint8_t>(SaveMarkerState::PENDING) &&
+      state != static_cast<uint8_t>(SaveMarkerState::AWAITING_ACK)) {
     return SaveMarkerStatus::MALFORMED;
   }
   SaveMarker m;
   m.state = static_cast<SaveMarkerState>(state);
-  m.completed_generation = getU32(data, kOffCompleted);
+  m.acknowledged_generation = getU32(data, kOffAcknowledged);
   m.begun_generation = getU32(data, kOffBegun);
   const SaveMarkerStatus v = validateSaveMarker(m);
   if (v != SaveMarkerStatus::OK) return v;
