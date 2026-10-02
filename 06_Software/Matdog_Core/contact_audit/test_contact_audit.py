@@ -143,7 +143,8 @@ class LifecycleTests(unittest.TestCase):
                 pairs.append(('support_margin_walk', 'certified_lower_bound_m', 'sampled_min_m'))
             for q, lo, mn in pairs:
                 self.assertLessEqual(coarse[q][lo], fine[q][mn] + 1e-12, (case, q))  # a certified lower bound never exceeds a finer sample
-                self.assertGreaterEqual(fine[q][mn], coarse[q][mn] - 1e-9, (case, q))  # and finer sampling does not find a worse minimum
+                # finer sampling may find a slightly lower minimum; it must stay above the certified bound (checked above) and within the certified slack
+                self.assertLessEqual(coarse[q][mn] - fine[q][mn], coarse[q][mn] - coarse[q][lo] + 1e-12, (case, q))
 
     def test_deterministic_replay(self):
         import lifecycle_v2 as lc

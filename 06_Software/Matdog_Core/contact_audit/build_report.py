@@ -268,7 +268,7 @@ $validation_table
 3. An approved actuator-limit source and the semantic-derivative comparison (still not done); timing, torque and thermal limits.
 4. A rigid-body dynamics and stabilisation study before any TROT claim; BNO085/state estimation integration.
 5. Lateral and yaw contact (axis tilt) validated under the contact contract.
-6. Completion and approval of the separate calibration workstream (q0, motorDirection, persistence), the stand authorisation (none exists) and the G3 REST_GROUND route (BODY_ONLY REST_GROUND to STAND remains unvalidated).
+6. Completion and approval of the separate calibration workstream (q0, joint-direction mapping, persistence), the stand authorisation (none exists) and the G3 REST_GROUND route (BODY_ONLY REST_GROUND to STAND remains unvalidated).
 7. An independent safety review; hardware commissioning needs explicit authorisation. Nothing in G4.1 authorises any physical motion.
 ''')
 
