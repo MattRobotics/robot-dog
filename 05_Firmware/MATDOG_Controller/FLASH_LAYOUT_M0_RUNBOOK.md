@@ -174,6 +174,11 @@ APP="$USB/MATDOG_Controller.ino.bin"
 TABLE="$USB/MATDOG_Controller.ino.partitions.bin"
 MANIFEST="$USB/matdog_build_manifest.txt"
 ESPTOOL="$HOME/.arduino15/packages/esp32/tools/esptool_py/5.3.1/esptool"
+M01_ROOT="$HOME/MATDOG/verification-artifacts/MATDOG_M0_1_HARDENING_ebb6078_20261002T162810Z"
+WRITE_PY="$M01_ROOT/venv/bin/python"
+M0_WRITER="$SCRIPTS/migration_m0_write.py"
+# L: verifica versione e hash dei sorgenti API, senza aprire porte.
+"$WRITE_PY" -I -c 'import sys; sys.path.insert(0, sys.argv[1]); import migration_m0_write as w; w.load_tool(); print("M0_WRITER_TOOL=PASS")' "$SCRIPTS"
 FQBN="$(PYTHONPATH="$SCRIPTS" python3 -c 'import matdog_layout; print(matdog_layout.PINNED_FQBN)')"
 ```
 
@@ -226,14 +231,24 @@ consente W, erase, OTA, primo boot del candidato o attuazione. M0 non la concede
 
 ### 5. B/R — Isolare e identificare fisicamente
 
-ESP32 alimentato **solo USB stabile**; robot sostenuto meccanicamente. Scollegare
-batteria, caricabatterie, alimentatore esterno, ramo servo e rail LED; evitare
-retorni da step-down o altri controller. Verificare con misura che i rail degli
-attuatori siano a 0 V e scarichi. Isolare i segnali UART servo GPIO17/18 e i
-segnali LED/DALY verso periferiche spente per evitare back-power dai GPIO; BNO085
-sulla 3V3 ESP32 può restare collegato. Documentare foto/schema e misure.
-Non affidarsi al profilo software, alla chiave DALY o a un comando SAFE_OFF come
-prova di isolamento. Nessun comando servo è parte di questo preflight.
+Utilizzare esclusivamente la **USB-C integrata nella scheda ESP32-S3**, con
+cavo stabile, per alimentazione e comunicazione M0. La porta USB esterna del
+robot collega GPIO19, GPIO20 e GND: **VBUS non è collegato**, quindi non alimenta
+la scheda e non sostituisce la USB-C in questo preflight. Collegare un solo host.
+
+Robot sostenuto meccanicamente; batteria e caricatore scollegati, nessun
+alimentatore esterno. **Isolare fisicamente il ramo TECNOIOT verso ESP32**, per
+escludere alimentazioni concorrenti e back-power. Scollegare i rami servo e LED;
+misurare e documentare **0 V** sui due rail, anche con la USB-C collegata.
+Isolare i segnali verso periferiche spente: UART servo **GPIO17/18**, DALY
+**GPIO15/16**, LED **GPIO47**. BNO085 sulla 3V3 ESP32 è ammesso soltanto senza
+una seconda alimentazione o ritorni. **BOOT ed EN devono restare accessibili**
+per le sole transizioni ROM autorizzate; durante W BOOT resta fisicamente basso.
+Documentare foto/schema e misure. Questo isolamento è coerente con
+[`04_Electronics/README.md`](../../04_Electronics/README.md) e
+[`MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
+**USB_ONLY non è una protezione elettrica**. Profilo software, chiave DALY e
+SAFE_OFF non provano l'isolamento; nessun comando servo fa parte del preflight.
 
 Un solo proprietario USB; chiudere monitor, viewer, servizi di calibrazione,
 upload automatici e altri processi seriali. Usare il by-id, non un ttyACM
@@ -391,11 +406,65 @@ Non eseguire `flash_app_only.sh`: continua a rifiutare il legacy; il suo wrapper
 usa reset ordinari e non governa questa transazione. `upload.sh` resta uno stub
 di rifiuto. Nessun preflight chiama W come effetto collaterale.
 
+### M0.1 — Contratto di ogni W (B oppure R/R2)
+
+Tutte le W sotto usano `migration_m0_write.py`, mai la CLI `write-flash`.
+Il pacchetto API 5.3.1 nel nuovo bundle M0.1 è attestato contro tutti i 26 moduli
+nel binario congelato M0; il writer verifica versione e hash dei sorgenti
+esptool/pyserial. Usa Python isolato (`-I`), non il pacchetto esptool di sistema.
+Non modificare né reinstallare nel bundle M0 originale. Ambiente riproducibile:
+sdist ufficiale e SHA in `scripts/migration_m0_esptool531.json`, dipendenze in
+`$M01_ROOT/requirements.lock.txt`, prova di equivalenza nel bundle M0.1.
+
+Dopo B, oppure dopo la distinta autorizzazione R/R2, predisporre il contesto:
+
+```bash
+WRITE_CONTEXT=(--backup "$A_IMAGE" --backup-repeat "$B_IMAGE" \
+  --backup-sha256 "$AUTHORIZED_BACKUP_SHA256" --port "$PORT" \
+  --mac 14:c1:9f:22:75:94 --binary "$APP" --manifest "$MANIFEST")
+```
+
+Il flag `--gate` registra il gate richiesto, **non concede autorizzazione**.
+I passi ordinari 13/14 richiedono B. Una R distinta può nominare la riparazione
+V1 con il medesimo candidato/tabella approvati: solo in quel caso usare
+`app0` oppure `table` con `--gate R`, stessi SHA/offset/manifest e verifiche
+indipendenti, app0 prima della tabella. Non è rollback byte-identico del legacy.
+Un seed otadata diverso dall'estratto del backup non è accettato: l'eventuale
+riparazione V1 con seed richiede il piano separato citato nella matrice, fuori
+dal writer M0.1; nessun bypass CLI o nuova W è implicitamente autorizzato.
+Ogni invocazione accetta una sola operazione e un solo artefatto/range fisso.
+Prima della porta controlla backup A/B, hash, manifest e byte esatti autorizzati.
+DTR/RTS sono inattivi prima dell'open; una sola connessione ROM `no-reset`,
+nessuno stub. Prima di W impone e verifica `ESPLoader.WRITE_FLASH_ATTEMPTS=1`
+e `esptool.loader.WRITE_BLOCK_ATTEMPTS=1` sui binding realmente utilizzati.
+Un secondo FLASH_BEGIN, blocco duplicato, reset/finish o comando non ammesso
+è rifiutato. Errore di protocollo o trasporto avvelena la sessione e propaga STOP;
+SerialException non raggiunge la riconnessione/reset della libreria.
+
+Nessuna compressione, encryption, diff/skip, erase-all o modifica degli header;
+attach ROM diretto senza fallback XMC/reset NOR della CLI. La configurazione
+volatile SPI/watchdog e la scansione delle risposte ROM non sono W in flash.
+Il SYNC produce più risposte a una sola richiesta; `command()` può leggere fino
+a 100 risposte per correlare un ACK, senza ritrasmettere FLASH_DATA. Anche il
+primo errore durante SYNC impone STOP, senza il ciclo di retry del sync.
+Il ROM scrive blocchi da 1024 byte con checksum esptool e padding FF invariati.
+Verifica MD5 obbligatoria, seguita dalle verifiche indipendenti del runbook.
+
+**STOP non certifica i byte scritti**: il settore potrebbe essere cancellato e
+un blocco parziale già programmato. Conservare log, restare in ROM, acquisire
+nuove letture indipendenti dello stato e riconciliarle prima di **qualsiasi W**,
+anche su un'altra invocazione. Rinnovare B o R/R2 per la decisione risultante.
+Non ritentare, non concatenare alla fase successiva, non avviare recovery da un
+handler d'errore. I blocchi 13, 14 e R1/R2 sono passi separati per l'operatore,
+non un file shell da lanciare integralmente.
+
 ### 13. W/R — Scrivere app0, poi verificare prima di proseguire
 
 ```bash
-"${ESP[@]}" write-flash --flash-mode keep --flash-freq keep --flash-size keep \
-  0x10000 "$APP" | tee "$SESSION/write-app0.log"
+"$WRITE_PY" -I "$M0_WRITER" app0 "${WRITE_CONTEXT[@]}" --gate B \
+  --offset 0x10000 --artifact "$APP" \
+  --sha256 f0f3df4e83708f04d4e7acb44ab35794028521a0abfe50fa95b219694c498c3e \
+  2>&1 | tee "$SESSION/write-app0.log"
 "${ESP[@]}" verify-flash 0x10000 "$APP" | tee "$SESSION/verify-app0.log"
 "${ESP[@]}" read-flash 0x10000 0x112000 "$SESSION/app0-readback.bin" \
   | tee "$SESSION/readback-app0.log"
@@ -412,8 +481,10 @@ non scrivere la tabella per cercare di correggere un'app non verificata.
 ### 14. W/R — Scrivere la tabella per ultima, poi verificare
 
 ```bash
-"${ESP[@]}" write-flash --flash-mode keep --flash-freq keep --flash-size keep \
-  0x8000 "$TABLE" | tee "$SESSION/write-table.log"
+"$WRITE_PY" -I "$M0_WRITER" table "${WRITE_CONTEXT[@]}" --gate B \
+  --offset 0x8000 --artifact "$TABLE" \
+  --sha256 8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7 \
+  2>&1 | tee "$SESSION/write-table.log"
 "${ESP[@]}" verify-flash 0x8000 "$TABLE" | tee "$SESSION/verify-table.log"
 "${ESP[@]}" read-flash 0x8000 0x1000 "$SESSION/table-readback.bin" \
   | tee "$SESSION/readback-table.log"
@@ -594,24 +665,60 @@ se la lettura ne dimostra l'alterazione, settore tabella legacy per ultimo.
 BOOT deve restare basso. Ogni riga W va trattata come passo distinto:
 
 ```bash
-"${ESP[@]}" write-flash --flash-mode keep --flash-freq keep --flash-size keep \
-  0x10000 "$SESSION/plan/legacy_app0.bin"
+"$WRITE_PY" -I "$M0_WRITER" r1-app0 "${WRITE_CONTEXT[@]}" --gate R \
+  --offset 0x10000 --artifact "$SESSION/plan/legacy_app0.bin" \
+  --sha256 "$(sha256sum "$SESSION/plan/legacy_app0.bin" | cut -d' ' -f1)" \
+  2>&1 | tee "$SESSION/write-r1-app0.log"
 "${ESP[@]}" verify-flash 0x10000 "$SESSION/plan/legacy_app0.bin"
 "${ESP[@]}" read-flash 0x10000 0x300000 "$SESSION/recovery-app0.bin"
 cmp "$SESSION/recovery-app0.bin" "$SESSION/plan/legacy_app0.bin"
 
 # SOLO se necessario e incluso nell'autorizzazione R:
-"${ESP[@]}" write-flash --flash-mode keep --flash-freq keep --flash-size keep \
-  0xE000 "$SESSION/plan/otadata.bin"
+"$WRITE_PY" -I "$M0_WRITER" r1-otadata "${WRITE_CONTEXT[@]}" --gate R \
+  --offset 0xE000 --artifact "$SESSION/plan/otadata.bin" \
+  --sha256 "$(sha256sum "$SESSION/plan/otadata.bin" | cut -d' ' -f1)" \
+  2>&1 | tee "$SESSION/write-r1-otadata.log"
 "${ESP[@]}" verify-flash 0xE000 "$SESSION/plan/otadata.bin"
 "${ESP[@]}" read-flash 0xE000 0x2000 "$SESSION/recovery-otadata.bin"
 cmp "$SESSION/recovery-otadata.bin" "$SESSION/plan/otadata.bin"
 
-"${ESP[@]}" write-flash --flash-mode keep --flash-freq keep --flash-size keep \
-  0x8000 "$SESSION/plan/partition_sector.bin"
+"$WRITE_PY" -I "$M0_WRITER" r1-table "${WRITE_CONTEXT[@]}" --gate R \
+  --offset 0x8000 --artifact "$SESSION/plan/partition_sector.bin" \
+  --sha256 "$(sha256sum "$SESSION/plan/partition_sector.bin" | cut -d' ' -f1)" \
+  2>&1 | tee "$SESSION/write-r1-table.log"
 "${ESP[@]}" verify-flash 0x8000 "$SESSION/plan/partition_sector.bin"
 "${ESP[@]}" read-flash 0x8000 0x1000 "$SESSION/recovery-table.bin"
 cmp "$SESSION/recovery-table.bin" "$SESSION/plan/partition_sector.bin"
+```
+
+Il writer ammette inoltre `r1-default-nvs` `[0x9000,0xE000)` e
+`r1-coredump` `[0xFF0000,0x1000000)` **solo con R nominativa** se le letture
+ne dimostrano l'alterazione: artefatto esatto dal backup A/B, SHA registrato,
+verify-flash e readback/cmp separati. Altre regioni richiedono R2; nessun range
+libero. Queste W sono recovery, mai parte delle due W ordinarie.
+
+Se necessario e incluso nella distinta R, **prima del settore tabella finale**:
+
+```bash
+# SOLO default NVS alterata e inclusa nella R nominativa:
+"$WRITE_PY" -I "$M0_WRITER" r1-default-nvs "${WRITE_CONTEXT[@]}" --gate R \
+  --offset 0x9000 --artifact "$SESSION/plan/default_nvs.bin" \
+  --sha256 "$(sha256sum "$SESSION/plan/default_nvs.bin" | cut -d' ' -f1)" \
+  2>&1 | tee "$SESSION/write-r1-default-nvs.log"
+"${ESP[@]}" verify-flash 0x9000 "$SESSION/plan/default_nvs.bin"
+"${ESP[@]}" read-flash 0x9000 0x5000 "$SESSION/recovery-default-nvs.bin"
+cmp "$SESSION/recovery-default-nvs.bin" "$SESSION/plan/default_nvs.bin"
+```
+
+```bash
+# SOLO coredump alterato e incluso nella R nominativa:
+"$WRITE_PY" -I "$M0_WRITER" r1-coredump "${WRITE_CONTEXT[@]}" --gate R \
+  --offset 0xFF0000 --artifact "$SESSION/plan/coredump.bin" \
+  --sha256 "$(sha256sum "$SESSION/plan/coredump.bin" | cut -d' ' -f1)" \
+  2>&1 | tee "$SESSION/write-r1-coredump.log"
+"${ESP[@]}" verify-flash 0xFF0000 "$SESSION/plan/coredump.bin"
+"${ESP[@]}" read-flash 0xFF0000 0x10000 "$SESSION/recovery-coredump.bin"
+cmp "$SESSION/recovery-coredump.bin" "$SESSION/plan/coredump.bin"
 ```
 
 I blocchi condizionati non sono uno script da eseguire in blocco. Nessun boot
@@ -639,7 +746,9 @@ autorizzazione e una giustificazione separate. Non usare `erase-flash`.
 ```bash
 test "$(stat -c%s "$A_IMAGE")" -eq 16777216
 test "$(sha256sum "$A_IMAGE" | cut -d' ' -f1)" = "$AUTHORIZED_BACKUP_SHA256"
-"${ESP[@]}" write-flash --flash-mode keep --flash-freq keep --flash-size keep 0x0 "$A_IMAGE"
+"$WRITE_PY" -I "$M0_WRITER" r2-full "${WRITE_CONTEXT[@]}" --gate R2 \
+  --offset 0x0 --artifact "$A_IMAGE" --sha256 "$AUTHORIZED_BACKUP_SHA256" \
+  2>&1 | tee "$SESSION/write-r2-full.log"
 "${ESP[@]}" verify-flash 0x0 "$A_IMAGE"
 "${ESP[@]}" read-flash 0x0 0x1000000 "$SESSION/recovery-full-a.bin"
 "${ESP[@]}" read-flash 0x0 0x1000000 "$SESSION/recovery-full-b.bin"
@@ -654,8 +763,12 @@ come R1. Il file qui è il backup device-specific, non un `.merged.bin` di build
 ## Checklist del preflight e autorizzazioni
 
 - [ ] A registrata, con sessione, MAC, R e transizioni ROM/legacy diagnostico previste.
-- [ ] Solo USB; batteria/caricatore/alimentatore/rail attuatori isolati; misura 0 V,
-      segnali verso periferiche spente isolati, robot sostenuto.
+- [ ] USB-C integrata per alimentazione/comunicazione; esterna GPIO19/20/GND senza VBUS.
+- [ ] Batteria/caricatore/alimentatore assenti; ramo TECNOIOT verso ESP32 isolato;
+      rail servo/LED misurati 0 V; GPIO17/18,15/16,47 isolati; BNO senza altra fonte;
+      BOOT/EN accessibili; robot sostenuto. USB_ONLY non prova isolamento.
+- [ ] Writer M0.1 e sorgenti API 5.3.1 verificati; contatori effettivi 1/1;
+      ogni W separata e nessun retry/reset/recovery automatico.
 - [ ] Porta by-id e chip/MAC/seriale/JEDEC/revision verificati; security nota e compatibile.
 - [ ] Nessun altro proprietario USB; ROM stabile, nessun reset implicito/stub.
 - [ ] Firmware/profilo e slot realmente in esecuzione registrati e riconciliati col dump.
@@ -688,6 +801,7 @@ Test sintetici eseguibili senza robot:
 
 ```bash
 python3 "$SCRIPTS/tests/test_migration_m0.py"
+MATDOG_M0_USB="$USB" "$WRITE_PY" -I "$SCRIPTS/tests/test_migration_m0_write.py"
 python3 "$SCRIPTS/tests/test_matdog_layout.py"
 python3 "$SCRIPTS/tests/test_build_manifest.py"
 python3 "$SCRIPTS/tests/test_backup_gate_logic.py"
@@ -701,6 +815,11 @@ I test M0 coprono legacy corretto, layout inatteso/corrotto, slot1/fallback,
 manifest/profilo/OTA/core configuration incompatibili, NVS/FFAT/app1 non vuoti,
 hash sbagliati, oversize/staging fuori dal legacy, otadata ambiguo/instabile,
 backup assente/non verificato/discordante e danni fuori regione nel readback.
+
+Per il correttivo e i test reali API con trasporto simulato vedere il
+[rapporto M0.1](../../09_Logs/Development_Log/2026-10-02_M0_1_MIGRATION_WRITE_HARDENING.md).
+Il criterio del passo 18 resta invariato: 64 KiB `matdog_nvs` interamente FF
+nel flusso USB_ONLY/LOAD/STATUS approvato; nessuna modifica al firmware NVS.
 
 Rischi residui: stato presente del chip sconosciuto; indipendenza delle letture
 non dimostrabile da due file soli; affidabilità elettrica/USB e accesso ROM da
