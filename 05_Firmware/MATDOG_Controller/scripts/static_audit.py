@@ -5861,7 +5861,8 @@ def check_usb_cdc_tx_never_blocks(files):
 def check_calibration_persistence_boundaries(files, sketch_dir):
     """P2.4: the calibration persistence layer lives on the dedicated
     `matdog_nvs` partition, initializes it explicitly by label, never erases,
-    and is not wired into the Controller.
+    and is integrated into the Controller only through the P3a surface
+    (see check_calibration_persistence_integration).
 
     Pins: no bare nvs_flash_init() and no erase/format/raw-partition-write call
     anywhere in firmware sources; only the NVS backend .cpp includes <nvs*.h>
@@ -5870,7 +5871,7 @@ def check_calibration_persistence_boundaries(files, sketch_dir):
     match scripts/matdog_layout.py; the persistence files do not include
     Controller / CommandRouter / JointTransformTable / ActuatorAuthority /
     CalibrationExecutor; nothing outside the persistence files includes the
-    store or the backend (integration is a later step).
+    store or the backend except the P3a integration surface.
     """
     scripts_dir = sketch_dir / "scripts"
     tests_dir = scripts_dir / "tests"
@@ -5896,7 +5897,8 @@ def check_calibration_persistence_boundaries(files, sketch_dir):
         "CalibrationRecord.h", "CalibrationRecord.cpp", "CalibrationRecordStore.h",
         "CalibrationRecordStore.cpp", "CalibrationSaveMarker.h", "CalibrationSaveMarker.cpp",
         "CalibrationPersistenceState.h", "CalibrationPersistenceState.cpp",
-        "CalibrationRecordNvsBackend.h", "CalibrationRecordNvsBackend.cpp")]
+        "CalibrationRecordNvsBackend.h", "CalibrationRecordNvsBackend.cpp",
+        "CalibrationPersistenceService.h", "CalibrationPersistenceService.cpp")]
     for path in persistence:
         if not path.exists():
             fail(f"{path}: missing - the calibration persistence layer is incomplete")
@@ -5954,16 +5956,92 @@ def check_calibration_persistence_boundaries(files, sketch_dir):
             fail(f"{cal / 'CalibrationRecordNvsBackend.h'}: partition label is not "
                  f"{matdog_layout.MATDOG_NVS_LABEL!r}")
 
-    # Not wired in yet: nothing outside the persistence files and the tests uses them.
+    # P3a integration surface: outside the persistence files only the Controller
+    # (owner), the router's persistence command file and the SAVE gate may
+    # include the persistence headers, and only the ones they need.
+    allowed_includers = {
+        sketch_dir / "src" / "core" / "Controller.h": {
+            "CalibrationPersistenceService.h", "CalibrationRecordNvsBackend.h"},
+        sketch_dir / "src" / "core" / "Controller.cpp": {
+            "CalibrationPersistenceService.h", "CalibrationRecordNvsBackend.h"},
+        sketch_dir / "src" / "core" / "CommandRouterPersistence.cpp": {
+            "CalibrationPersistenceService.h"},
+    }
     for path, code in firmware:
         if path in persistence_set:
             continue
+        allowed = allowed_includers.get(path, set())
         for inc in re.findall(r'#\s*include\s*"([^"]+)"', code):
             base = inc.rsplit("/", 1)[-1]
             if base in ("CalibrationRecordStore.h", "CalibrationRecordNvsBackend.h",
-                        "CalibrationSaveMarker.h", "CalibrationPersistenceState.h"):
-                fail(f"{path}: includes {inc} - the persistence layer is not integrated into "
-                     f"the Controller in P2.4")
+                        "CalibrationSaveMarker.h", "CalibrationPersistenceState.h",
+                        "CalibrationPersistenceService.h") and base not in allowed:
+                fail(f"{path}: includes {inc} - only the Controller and "
+                     f"CommandRouterPersistence.cpp integrate the persistence layer (P3a)")
+
+
+def check_calibration_persistence_integration(files, sketch_dir):
+    """P3a: the persistence integration is read/write-to-NVS only. It never
+    admits a JointTransform, never touches the servo bus or a servo EEPROM,
+    never grants a permit or starts a motion, runs before any actuator wiring
+    in Controller::begin(), and every persistent write command is behind its
+    gate."""
+    core = sketch_dir / "src" / "core"
+    cal = sketch_dir / "src" / "calibration"
+    by_path = {p: c for p, c in files}
+    integration = [cal / "CalibrationPersistenceService.h", cal / "CalibrationPersistenceService.cpp",
+                   cal / "CalibrationSaveGate.h", cal / "CalibrationSaveGate.cpp",
+                   core / "CommandRouterPersistence.cpp"]
+    for path in integration:
+        if path not in by_path:
+            fail(f"{path}: missing - the P3a persistence integration is incomplete")
+            return
+    forbidden = (
+        (r"\.admit\s*\(", "admits a JointTransform"),
+        (r"\bservo_bus\w*|\bServoBus\b", "touches the servo bus"),
+        (r"(?i)eeprom", "touches servo EEPROM"),
+        (r"(?i)\btorque\w*", "touches servo torque"),
+        (r"\.grant\s*\(|->grant\s*\(", "grants a motion permit"),
+        (r"\bsafeOff\s*\(", "issues bus traffic"),
+        (r"->start\s*\(|\.start\s*\(", "starts an executor / session"),
+        (r"\bpromote\w*\s*\(", "promotes Q0"),
+    )
+    for path in integration:
+        code = by_path[path]
+        for pattern, why in forbidden:
+            if re.search(pattern, code):
+                fail(f"{path}: {pattern} - the persistence integration {why} (P3a)")
+
+    controller = by_path.get(core / "Controller.cpp", "")
+    if re.search(r"\bpersistence_\.(save|acknowledge|reconcile)\s*\(", controller):
+        fail(f"{core / 'Controller.cpp'}: persistence save/acknowledge/reconcile are explicit "
+             f"commands only; the Controller never calls them on its own (P3a)")
+    begin = controller.find("void Controller::begin(")
+    pos_init = controller.find("persistence_backend_.begin(", begin)
+    pos_load = controller.find("persistence_.load(", begin)
+    if begin < 0 or pos_init < 0 or pos_load < 0 or pos_init > pos_load:
+        fail(f"{core / 'Controller.cpp'}: Controller::begin() must init the NVS backend and run "
+             f"the boot LOAD (P3a)")
+    else:
+        for later in ("actuator_backend_.begin(", "actuator_policy_.begin(", "service_.begin(",
+                      "command_router_.begin("):
+            pos = controller.find(later, begin)
+            if pos >= 0 and pos < pos_load:
+                fail(f"{core / 'Controller.cpp'}: persistence init+LOAD must precede {later} (P3a)")
+
+    router = by_path.get(core / "CommandRouterPersistence.cpp", "")
+    pos_gate = router.find("evaluateSaveGate(")
+    for call, guard in ((".save(", "evaluateSaveGate("), (".acknowledge(", "persistenceQuietViolation()"),
+                        (".reconcile(", "persistenceQuietViolation()")):
+        pos = router.find(call)
+        pos_guard = router.find(guard)
+        if pos < 0 or pos_guard < 0 or pos_guard > pos:
+            fail(f"{core / 'CommandRouterPersistence.cpp'}: {call}...) must be preceded by "
+                 f"{guard} (P3a)")
+    router_main = by_path.get(core / "CommandRouter.cpp", "")
+    if "persistence->" in router_main or "persistence_" in router_main:
+        fail(f"{core / 'CommandRouter.cpp'}: persistence calls belong in "
+             f"CommandRouterPersistence.cpp (P3a)")
 
 
 def main():
@@ -6036,6 +6114,7 @@ def main():
     check_backup_gate_provenance(SKETCH_DIR)
     check_flash_layout_safety(SKETCH_DIR)
     check_calibration_persistence_boundaries(files, SKETCH_DIR)
+    check_calibration_persistence_integration(files, SKETCH_DIR)
     check_unknown_detection_is_not_a_verdict(files)
     check_usb_cdc_tx_never_blocks(files)
 

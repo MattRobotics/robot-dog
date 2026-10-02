@@ -9,6 +9,8 @@
 #include "../actuator/CalibrationSequencePlanData.h"
 #include "../calibration/CalibrationExecutionEngine.h"
 #include "../calibration/CalibrationManager.h"
+#include "../calibration/CalibrationPersistenceService.h"
+#include "../calibration/CalibrationRecordNvsBackend.h"
 #include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/CalibrationQ0CaptureSession.h"
 #include "../calibration/FirstMotionExecutor.h"
@@ -197,6 +199,11 @@ class Controller {
   // Neither is persisted: a reboot starts with an empty store.
   calibration::FullLegRunState full_leg_run_;
   calibration::FullLegEvidenceStore full_leg_evidence_;
+  // Calibration Persistence V1 (P3a). The ~5.3 KiB store and the 1.4 KiB
+  // scratch record live inside this statically allocated Controller, never on
+  // a stack. The backend is declared first: the service holds a pointer to it.
+  calibration::CalibrationRecordNvsBackend persistence_backend_;
+  calibration::CalibrationPersistenceService persistence_{&persistence_backend_};
   // The SAFE_OFF results of the buses the executor named at the END of the
   // previous tick, handed to exactly the next update() and then replaced -
   // a past VERIFIED_OFF is never reused for a new requirement. Cleared

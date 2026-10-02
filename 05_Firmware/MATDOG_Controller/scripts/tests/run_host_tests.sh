@@ -403,6 +403,7 @@ CALREC_SRCS=(
   "$SKETCH_DIR/src/calibration/CalibrationRecordStore.cpp"
   "$SKETCH_DIR/src/calibration/CalibrationSaveMarker.cpp"
   "$SKETCH_DIR/src/calibration/CalibrationPersistenceState.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationPersistenceService.cpp"
   "$SKETCH_DIR/src/calibration/FullLegCalibrationFinalizer.cpp"
   "$SKETCH_DIR/src/calibration/FullLegCalibrationPlan.cpp"
   "$SKETCH_DIR/src/calibration/FullLegCalibrationExecutor.cpp"
@@ -441,6 +442,22 @@ CALREC_SRCS=(
   -o "$OUT/test_calibration_record_nvs_backend" \
   "$SCRIPT_DIR/test_calibration_record_nvs_backend.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationRecordNvsBackend.cpp" "${CALREC_SRCS[@]}"
+
+# Controller integration of the persistence (P3a): the service (boot LOAD
+# verdicts, SAVE/ACK/RECONCILE entry points) against a fake storage, and the
+# SAVE gate against the REAL Q0 capture session, promotion and transform table.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_persistence_service" \
+  "$SCRIPT_DIR/test_calibration_persistence_service.cpp" "${CALREC_SRCS[@]}"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_save_gate" \
+  "$SCRIPT_DIR/test_calibration_save_gate.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationSaveGate.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0EvidencePreparation.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Promotion.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
+  "${CALREC_SRCS[@]}"
 
 # The HostLink readiness classifier suite links the REAL pure classifier -
 # no module pointer, no hardware call - I6 (2026-09-25 objective change).
@@ -529,6 +546,8 @@ done
 "$OUT/test_calibration_save_marker"
 "$OUT/test_calibration_persistence_state"
 "$OUT/test_calibration_record_store"
+"$OUT/test_calibration_persistence_service"
+"$OUT/test_calibration_save_gate"
 "$OUT/test_calibration_record_nvs_backend"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"

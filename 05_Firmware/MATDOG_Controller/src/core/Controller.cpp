@@ -81,6 +81,20 @@ void Controller::begin() {
   geometry_profile_.bind(&actuator::geometry_data::kProvenance, actuator::geometry_data::kJoints,
                          actuator::geometry_data::kJointCount, actuator::geometry_data::kEndpoints,
                          actuator::geometry_data::kEndpointCount);
+  // Calibration Persistence V1 (P3a): init the NVS backend and run the
+  // read-only boot LOAD BEFORE anything that could authorise an actuator is
+  // wired. No servo bus traffic, no write, no format; the verdict only feeds
+  // @CALIBRATION PERSIST STATUS and the SAVE gate. "Available" is never a
+  // movement authorisation and nothing is restored into the motion path.
+  {
+    const calibration::NvsInitStatus nvs_status = persistence_backend_.begin();
+    persistence_.begin(nvs_status, persistence_backend_.lastEspError());
+    persistence_.load(geometry_profile_);
+    const calibration::PersistenceSnapshot& boot = persistence_.snapshot();
+    Serial.printf("CALIBRATION_PERSISTENCE_BOOT nvs=%s verdict=%s available=%u motion_authorized=0\n",
+                  calibration::toString(nvs_status), calibration::toString(boot.verdict),
+                  persistence_.calibrationAvailable() ? 1u : 0u);
+  }
   actuator_backend_.begin(&servo_bus_);
   actuator_policy_.begin(&authority_);
   actuator_policy_.bindGeometry(&geometry_profile_, &actuator::geometry_data::kProvenance);
@@ -196,6 +210,8 @@ void Controller::begin() {
       &http_transport_,
       &full_leg_run_,
       &full_leg_evidence_,
+      &persistence_,
+      &first_motion_safe_off_result_,
   };
   service_.begin(modules);
   // Never starts the listening socket here — see network/HttpTransport.h.

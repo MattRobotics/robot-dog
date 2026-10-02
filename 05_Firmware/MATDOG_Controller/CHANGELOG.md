@@ -1,5 +1,39 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — P3a Controller integration of Calibration Persistence V1 (offline, no hardware) — 2026-10-02
+
+Wires the P2–P2.4.1 persistence into the Controller. It adds diagnostics and two explicit,
+operator-driven persistent actions (SAVE, ACK) plus a controlled reconciliation. It restores
+nothing and authorizes no movement: every reply states `MOTION_AUTHORIZED=0` and STATUS prints
+`RESTORE=NOT_IMPLEMENTED`. **Do not load this firmware on a device that still has the legacy
+`app3M_fat9M_16MB` partition table**: there is no `matdog_nvs` partition, the boot LOAD reports
+`NVS_UNAVAILABLE` (PARTITION_MISSING) and SAVE/ACK/RECONCILE are refused. Nothing is formatted.
+
+- **Boot:** in `Controller::begin()`, right after `geometry_profile_.bind()` and before any
+  actuator/servo/service/command init: `persistence_backend_.begin()`, then a read-only LOAD.
+  No servo bus traffic. The result is kept for diagnostics only. `CalibrationPersistenceService`
+  (pure) owns the single `CalibrationRecordStore`; the Controller owns the service (no stack copy).
+- **`@CALIBRATION PERSIST STATUS`** (read-only): NVS state, marker, acknowledged/awaiting generation,
+  slots A/B, boot and last LOAD verdict, write block, error codes, whether a valid persistent
+  calibration is available (information, not an authorization).
+- **`@CALIBRATION PERSIST SAVE CHECK` / `SAVE CONFIRM_SAVE_FULL_CALIBRATION`**: `CalibrationSaveGate`
+  proves, in a fixed order, persistence ready, no write in doubt, saveable storage state,
+  maintenance, no live session / armed run / executor / Q0 capture / servo diagnostic, authority
+  NONE, permit revoked, no operator authorization, SAFE_OFF evidence, 24/24 Full Calibration,
+  closed leg runs, current geometry, complete and PROMOTED fresh Q0, record buildable/valid/accepted
+  and record q0 == promoted q0 per joint. A fact that cannot be proven refuses and is named.
+  Success reports the generation and `ACK_REQUIRED=1 SAVE_CONCLUDED=0`.
+- **`@CALIBRATION PERSIST ACK <generation>`**: store `acknowledge()`; OK / ALREADY_ACKNOWLEDGED /
+  WRONG_GENERATION / INVALID_RECORD / UNCERTAIN.
+- **`@CALIBRATION PERSIST RECONCILE ADOPT <generation> [CONFIRM_DISCARD]` /
+  `RECONCILE DECLARE_NOTHING [CONFIRM_DISCARD]`**: maintenance only, no actuator activity, fresh
+  LOAD, `planReconciliation`, marker written and read back, state re-classified. DECLARE is refused
+  while the acknowledged record is intact; anything that drops a valid generation needs
+  `CONFIRM_DISCARD`. No automatic deletion; slots are never erased.
+- An uncertain SAVE/ACK/RECONCILE outcome blocks further persistent writes until the next boot.
+- Tests: `test_calibration_persistence_service`, `test_calibration_save_gate`; static audit
+  `check_calibration_persistence_integration`.
+
 ## Unreleased — P2.4.1 Durable acknowledgment and generation protection (offline, no hardware) — 2026-10-02
 
 Fixes the blocker found by the independent review of P2.3/P2.4: "verified on flash" was treated as

@@ -296,6 +296,8 @@ void CommandRouter::handleLine(String line) {
       Serial.println("HINT=create src/config/WifiCredentials.local.h and rebuild");
     }
     printWifiStatus();
+  } else if (upper.startsWith("@CALIBRATION PERSIST")) {
+    handlePersistCommand(upper);
   } else if (upper == "@CALIBRATION Q0 STATUS") {
     printCalibrationQ0Status();
   } else if (upper == "@CALIBRATION Q0 ABORT") {
@@ -1133,6 +1135,12 @@ void CommandRouter::printHelp() {
   Serial.println("  @WEB SERVER START|STOP (MAINTENANCE mode only; never auto-started)");
   Serial.println("  @AUTHORITY STATUS      (read-only; no owner can be acquired yet)");
   Serial.println("  @CALIBRATION STATUS    (read-only; no session can move hardware)");
+  Serial.println("  @CALIBRATION PERSIST STATUS (read-only: NVS, marker, slots, last LOAD)");
+  Serial.println("  @CALIBRATION PERSIST SAVE CHECK (read-only dry run of the SAVE prerequisites)");
+  Serial.println("  @CALIBRATION PERSIST SAVE CONFIRM_SAVE_FULL_CALIBRATION (NVS only; ACK still required)");
+  Serial.println("  @CALIBRATION PERSIST ACK <generation> (acknowledges a verified SAVE; no motion)");
+  Serial.println("  @CALIBRATION PERSIST RECONCILE ADOPT <generation> [CONFIRM_DISCARD]");
+  Serial.println("  @CALIBRATION PERSIST RECONCILE DECLARE_NOTHING [CONFIRM_DISCARD]");
   Serial.println("  @CALIBRATION Q0 STATUS (cached CR2-B acquisition state; no bus transaction)");
   Serial.println("  @CALIBRATION Q0 ABORT  (stop future q0 reads; no actuator command)");
   Serial.println("  @CALIBRATION Q0 CAPTURE <samples> <stability_ticks> CONFIRM_Q0_POSE");
