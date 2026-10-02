@@ -95,6 +95,32 @@ def values():
     v['validation_table'] = table(['Gate', 'Result', 'Summary'], [[g['name'], 'PASS' if g['passed'] else 'FAIL', (g['summary'] or '').replace('|', '/')] for g in val['gates']])
     v['all_passed'] = 'ALL PASSED' if val['all_passed'] else 'NOT ALL PASSED'
     v['head_validated'] = val['git']['head_at_validation']; v['clean_before'] = val['git']['worktree_clean_before_validation']
+    import csv
+    pf = load('per_foot_discrepancy.json')['cases']
+    v['per_foot_table'] = table(['Case', 'Foot', 'Pitch range [deg]', 'Mesh minus analytic, stance [um]', 'Samples below -1 um (5 ms)'],
+                                [[c.replace('_', ' '), leg.upper(), f"{r['pitch_deg'][0]:.1f} .. {r['pitch_deg'][1]:.1f}", f"{r['mesh_minus_analytic_um_stance'][0]:+.3f} .. {r['mesh_minus_analytic_um_stance'][1]:+.2f}", r['samples_below_minus_1um']]
+                                 for c, rows in pf.items() for leg, r in rows.items()])
+    dwell, states = [], []
+    for case in CASES:
+        with (OUT / f'lifecycle_{case}_G2_NOMINAL.csv').open() as fh:
+            rows = list(csv.DictReader(fh))
+        dt = float(rows[1]['t']) - float(rows[0]['t'])
+        zs = [float(r['min_zc_swing']) if r['min_zc_swing'] not in ('', 'nan') else None for r in rows]
+        flag = [z is not None and 0 <= z <= 1e-6 for z in zs]
+        longest = run = 0
+        for f in flag:
+            run = run + 1 if f else 0
+            longest = max(longest, run)
+        dwell.append([case.replace('_', ' '), f"{sum(flag) * dt * 1e3:.0f} ms", f"{longest * dt * 1e3:.0f} ms"])
+        for st in ('GAIT_START', 'WALK', 'TROT', 'STOPPING', 'STAND'):
+            sel = [r for r in rows if r['state'] == st]
+            if not sel:
+                continue
+            f_ = lambda key: [float(r[key]) for r in sel if r[key] not in ('', 'nan', 'None')]
+            sup = f_('support')
+            states.append([case.replace('_', ' '), st, len(sel), f"{min(f_('jm')):.3f}", f"{min(f_('nonfoot')) * 1e3:.2f}", f"{min(f_('sep')) * 1e3:.2f}", f"{min(sup) * 1e3:.2f}" if sup else 'n/a'])
+    v['dwell_table'] = table(['Case', 'Time with a swing foot within 1 um of the ground (analytic)', 'Longest continuous interval'], dwell)
+    v['state_table'] = table(['Case', 'Lifecycle state', 'Samples', 'Min joint margin [rad]', 'Min non-foot ground [mm]', 'Min self-separation [mm]', 'Min declared-set support margin [mm]'], states)
     ev = load('lifecycle_WALK_357_G2_NOMINAL.json')['verification']['contact_events']
     v['events'] = ev['count']
     return v
@@ -199,6 +225,18 @@ $lifecycle_table
 Convergence confirmation (certified bound at 2 ms never exceeds, and fine sampling never finds a worse minimum than, the 0.5 ms sampled minimum):
 
 $conv_table
+
+Per-state minima (sampled, G2 nominal; the start state is the descent from the canonical 150 mm STAND, STOPPING includes the recentre):
+
+$state_table
+
+Time a swing foot spends within 1 um of the ground on the analytic surface (the interval the legacy band rule treated as undeclared contact; it is the planned approach, and it is longest in the zero-rate stop ending):
+
+$dwell_table
+
+Per-foot discrepancy over the lifecycle motions (all four feet share one collision geometry; they differ only in the pitch they pass through):
+
+$per_foot_table
 
 ### 7. Complete WALK lifecycle
 
