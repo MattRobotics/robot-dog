@@ -92,7 +92,7 @@ def main():
     digest, count = source_digest()
     results = {'all_passed': all(g['passed'] for g in gates), 'gates': gates,
                'git': {'head_at_validation': head, 'worktree_clean_before_validation': not dirty, 'baseline': BASELINE},
-               'scope': 'offline software gates only: host compiler, Python, git; no hardware, serial device, ServoBus, servo command, flashing, EEPROM or calibration was used',
+               'scope': 'offline software gates only: host compiler, Python, git; no hardware, serial device, actuator bus, servo command, flashing, persistent-memory write or calibration change was used',
                'source_digest': digest, 'source_digest_file_count': count,
                'provenance': {'generator_sha256': sha_bytes(Path(__file__).read_bytes())}}
     (OUT / 'validation_results.json').write_text(json.dumps(results, indent=2, allow_nan=False) + '\n')
