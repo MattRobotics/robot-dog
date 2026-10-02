@@ -10,13 +10,20 @@ sys.path.insert(0,str(ROOT/'06_Software/Matdog_Core/pose_audit'))
 from model import Model,LEGS
 OUT=ROOT/'09_Logs/Validation_Reports/G4_Gait_Envelope'
 COLORS=['#167b92','#3b94a8','#825fbb','#a280c5']
+SNAPSHOTS={0:(1.15,1.4,1.65,1.9),1:(1.05,1.3,1.55,1.8)}  # WALK: mid-swing of RH/RF/LH/LF; TROT: all-stance and each diagonal pair mid-swing
+def representative(entry):
+ # Only an explicitly recorded, audited representative may be rendered; a failed candidate is refused.
+ case=next(c for c in json.loads((OUT/entry['frames_source']).read_text())['cases'] if c['id']==entry['id'])
+ assert case['complete'] and case['classification']==['KINEMATICALLY_VALID'] and case['first_failure'] is None and entry['status'] in ('FULL_MESH_VALIDATED','FULL_MESH_SAMPLED_PASS_DENSITY_FRAGILE'),entry
+ return case
 def main():
- data=json.loads((OUT/'full_cases.json').read_text())['cases'];model=Model();(OUT/'views').mkdir(exist_ok=True)
- for kind,name in ((0,'walk'),(1,'trot')):
-  r=next(r for r in data if r['parameters']['type']==kind and r['parameters']['height_m']==.1 and r['parameters']['advance_x_m']==.01 and r['parameters']['lift_m']==.01)
-  frames=r['frames'];chosen=[min(frames,key=lambda f:abs(f['phase']-s)) for s in (1.125,1.375,1.625,1.875)]
+ reps=json.loads((OUT/'representatives.json').read_text())['representatives'];model=Model();(OUT/'views').mkdir(exist_ok=True)
+ for entry in reps:
+  kind=0 if entry['type']=='WALK' else 1;name=entry['name'];r=representative(entry);p=r['parameters']
+  frames=r['frames'];chosen=[min(frames,key=lambda f:abs(f['phase']-s)) for s in SNAPSHOTS[kind]]
+  caption=f"{p['height_m']*1000:.0f} mm body · {p['advance_x_m']*1000:+.0f} mm/cycle · {p['lift_m']*1000:.0f} mm lift · duty {p['duty']:g} · id{entry['id']}\n{entry['status']}"
   for axes,label in (((0,2),'side'),((0,1),'top')):
-   fig,axs=plt.subplots(2,2,figsize=(11,7),layout='constrained');fig.suptitle(f'MATDOG {name.upper()} — canonical collision meshes · {label} view\n100 mm body · 10 mm advance/cycle · 10 mm lift · OFFLINE MODEL',fontsize=13)
+   fig,axs=plt.subplots(2,2,figsize=(11,7),layout='constrained');fig.suptitle(f'MATDOG {name.upper()} — canonical collision meshes · {label} view\n{caption} · OFFLINE MODEL',fontsize=13)
    for ax,f in zip(axs.flat,chosen):
     tf=model.fk(f['q'],np.array(f['body']))
     for link,mesh in model.meshes.items():
