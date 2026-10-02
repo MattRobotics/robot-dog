@@ -1,6 +1,7 @@
 """Host-only bridge to the production gait core. Independent checks live in oracle.py."""
 import ctypes as C
 import hashlib
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -16,7 +17,11 @@ class Core:
   sources=[MOTION/(n+'.cpp') for n in ('Gait','Locomotion','MotionState','StartupAcquisition','TimedStand','StandTransition','BodyPose','FootContact','LegKinematics','LegInverseKinematics','StandTrajectory')]+[HERE/'bridge.cpp']
   digest=hashlib.sha256(b''.join(p.read_bytes() for p in sources+sorted(MOTION.glob('*.h')))).hexdigest()[:20]
   path=Path(tempfile.gettempdir())/('matdog-g4-'+digest+'.so')
-  if not path.exists():subprocess.run(['g++','-std=c++17','-O2','-Wall','-Wextra','-Werror','-fno-exceptions','-fno-rtti','-shared','-fPIC','-I',str(MOTION),*[str(p) for p in sources],'-o',str(path)],check=True)
+  if not path.exists():
+   # Build privately then rename atomically so concurrent workers never load a partial library.
+   part=path.with_suffix('.%d.tmp'%os.getpid())
+   subprocess.run(['g++','-std=c++17','-O2','-Wall','-Wextra','-Werror','-fno-exceptions','-fno-rtti','-shared','-fPIC','-I',str(MOTION),*[str(p) for p in sources],'-o',str(part)],check=True)
+   os.replace(part,path)
   self.lib=C.CDLL(str(path));self.ptr=C.POINTER(C.c_double)
   self.lib.g4_frame.argtypes=[self.ptr,*([C.c_double]*4),self.ptr,self.ptr];self.lib.g4_frame.restype=C.c_int
  def frame(self,p,s,period=1,previous=None,terminal=-1,rate=None,accel=0):
