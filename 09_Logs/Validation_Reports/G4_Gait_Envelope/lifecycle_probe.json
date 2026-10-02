@@ -1,0 +1,302 @@
+{
+  "scope": "5 ms ground/support-policy probe of the kinematic lifecycle; supplementary to lifecycle_audit.json (141-frame full mesh)",
+  "cases": [
+    {
+      "name": "WALK_100mm_id287",
+      "parameters": [
+        0.0,
+        0.1,
+        0.01,
+        0.8,
+        0.01,
+        0.0,
+        0.0,
+        0.004,
+        10000.0
+      ],
+      "samples": 1401,
+      "strict_pass": false,
+      "failing_error_instances": {
+        "GROUND_PENETRATION": 88,
+        "UNDECLARED_GROUND_CONTACT": 7
+      },
+      "failing_by_state": {
+        "GAIT_START": 48,
+        "STOPPING": 47
+      },
+      "worst_foot_mesh_z_um": -1.2617903296574182,
+      "start_prep_penetration_instances": 44,
+      "rear_pitch_range_deg": [
+        -51.515539866351276,
+        -35.212347671236394
+      ],
+      "first_failures": [
+        {
+          "time_s": 0.125,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.0117193435001115
+        },
+        {
+          "time_s": 0.125,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.0117193435001115
+        },
+        {
+          "time_s": 0.13,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.059776630493725
+        },
+        {
+          "time_s": 0.13,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.059776630493725
+        },
+        {
+          "time_s": 0.135,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.105360518598858
+        },
+        {
+          "time_s": 0.135,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.105360518598858
+        }
+      ]
+    },
+    {
+      "name": "WALK_80mm_id357",
+      "parameters": [
+        0.0,
+        0.08,
+        0.01,
+        0.8,
+        0.01,
+        0.0,
+        0.0,
+        0.004,
+        10000.0
+      ],
+      "samples": 1401,
+      "strict_pass": false,
+      "failing_error_instances": {
+        "GROUND_PENETRATION": 76,
+        "UNDECLARED_GROUND_CONTACT": 5
+      },
+      "failing_by_state": {
+        "GAIT_START": 41,
+        "STOPPING": 40
+      },
+      "worst_foot_mesh_z_um": -1.2601626961615542,
+      "start_prep_penetration_instances": 38,
+      "rear_pitch_range_deg": [
+        -51.515539866351276,
+        -33.6085364801744
+      ],
+      "first_failures": [
+        {
+          "time_s": 0.115,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.0450027875443664
+        },
+        {
+          "time_s": 0.115,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.0450027875443664
+        },
+        {
+          "time_s": 0.12,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.0971355559460592
+        },
+        {
+          "time_s": 0.12,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.0971355559443243
+        },
+        {
+          "time_s": 0.125,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.1450896706330371
+        },
+        {
+          "time_s": 0.125,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.1450896706313025
+        }
+      ]
+    },
+    {
+      "name": "TROT_100mm_id3105",
+      "parameters": [
+        1.0,
+        0.1,
+        0.005,
+        0.6,
+        0.045,
+        0.0,
+        0.0,
+        0.0,
+        10000.0
+      ],
+      "samples": 1401,
+      "strict_pass": false,
+      "failing_error_instances": {
+        "GROUND_PENETRATION": 130,
+        "UNDECLARED_GROUND_CONTACT": 85
+      },
+      "failing_by_state": {
+        "GAIT_START": 90,
+        "TROT": 1,
+        "STOPPING": 124
+      },
+      "worst_foot_mesh_z_um": -1.7037785859201626,
+      "start_prep_penetration_instances": 84,
+      "rear_pitch_range_deg": [
+        -56.21462003156064,
+        -32.97854089818674
+      ],
+      "first_failures": [
+        {
+          "time_s": 0.13,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.0169599457474088
+        },
+        {
+          "time_s": 0.13,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.0169599457474088
+        },
+        {
+          "time_s": 0.135,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.062972363102821
+        },
+        {
+          "time_s": 0.135,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.062972363102821
+        },
+        {
+          "time_s": 0.14,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.1066150086593007
+        },
+        {
+          "time_s": 0.14,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.1066150086593007
+        }
+      ]
+    },
+    {
+      "name": "TROT_80mm_id61",
+      "parameters": [
+        1.0,
+        0.08,
+        0.01,
+        0.8,
+        0.02,
+        0.0,
+        0.0,
+        0.0,
+        10000.0
+      ],
+      "samples": 1401,
+      "strict_pass": false,
+      "failing_error_instances": {
+        "GROUND_PENETRATION": 95,
+        "UNDECLARED_GROUND_CONTACT": 2
+      },
+      "failing_by_state": {
+        "GAIT_START": 56,
+        "STOPPING": 41
+      },
+      "worst_foot_mesh_z_um": -1.2613399029493335,
+      "start_prep_penetration_instances": 55,
+      "rear_pitch_range_deg": [
+        -51.515539866351276,
+        -35.35851117548368
+      ],
+      "first_failures": [
+        {
+          "time_s": 0.115,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.0140091651405712
+        },
+        {
+          "time_s": 0.115,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.0140091651405712
+        },
+        {
+          "time_s": 0.12,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.066385871055682
+        },
+        {
+          "time_s": 0.12,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.0663858710539473
+        },
+        {
+          "time_s": 0.125,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "rh_foot_link",
+          "mesh_min_z_um": -1.1156445173885614
+        },
+        {
+          "time_s": 0.125,
+          "state": "GAIT_START",
+          "error": "GROUND_PENETRATION",
+          "link": "lh_foot_link",
+          "mesh_min_z_um": -1.1156445173868268
+        }
+      ]
+    }
+  ]
+}
