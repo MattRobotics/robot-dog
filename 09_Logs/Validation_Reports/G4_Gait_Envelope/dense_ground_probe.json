@@ -1,0 +1,3009 @@
+{
+  "scope": "Ground-contact and support policy only, cases that passed the saved sampling; evidence of sampling-density sensitivity, not a validation",
+  "densities": [
+    80,
+    200,
+    400,
+    800,
+    1600
+  ],
+  "pass_counts_by_density": {
+    "80": {
+      "cases": 19,
+      "passing": 19
+    },
+    "200": {
+      "cases": 19,
+      "passing": 8
+    },
+    "400": {
+      "cases": 19,
+      "passing": 4
+    },
+    "800": {
+      "cases": 19,
+      "passing": 3
+    },
+    "1600": {
+      "cases": 19,
+      "passing": 2
+    }
+  },
+  "cases": [
+    {
+      "id": 18,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        }
+      },
+      "type": "WALK",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 222,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 2,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.0525,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.47,
+                "rf": 1.502,
+                "rh": 0.901,
+                "lh": -0.523
+              }
+            },
+            {
+              "phase": 1.5525,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.502,
+                "rf": 1.47,
+                "rh": -0.523,
+                "lh": 0.901
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 6,
+          "passes": false,
+          "undeclared_contact_frames": 6,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.05125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.463,
+                "rf": 1.502,
+                "rh": 0.359,
+                "lh": -0.528
+              }
+            },
+            {
+              "phase": 1.0525,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.47,
+                "rf": 1.502,
+                "rh": 0.901,
+                "lh": -0.523
+              }
+            },
+            {
+              "phase": 1.24875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.052,
+                "rf": 1.929,
+                "rh": 0.82,
+                "lh": -0.452
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 14,
+          "passes": false,
+          "undeclared_contact_frames": 14,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.050625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.46,
+                "rf": 1.502,
+                "rh": 0.284,
+                "lh": -0.53
+              }
+            },
+            {
+              "phase": 1.05125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.463,
+                "rf": 1.502,
+                "rh": 0.359,
+                "lh": -0.528
+              }
+            },
+            {
+              "phase": 1.051875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.466,
+                "rf": 1.502,
+                "rh": 0.547,
+                "lh": -0.525
+              }
+            }
+          ]
+        }
+      },
+      "type": "WALK",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 287,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 4,
+          "passes": false,
+          "undeclared_contact_frames": 4,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.05125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.929,
+                "rf": 3.052,
+                "rh": 0.896,
+                "lh": -0.452
+              }
+            },
+            {
+              "phase": 1.24875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.502,
+                "rf": 1.463,
+                "rh": 0.436,
+                "lh": -0.528
+              }
+            },
+            {
+              "phase": 1.55125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.052,
+                "rf": 1.929,
+                "rh": -0.452,
+                "lh": 0.896
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 10,
+          "passes": false,
+          "undeclared_contact_frames": 10,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.050625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.925,
+                "rf": 3.042,
+                "rh": 0.775,
+                "lh": -0.451
+              }
+            },
+            {
+              "phase": 1.05125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.929,
+                "rf": 3.052,
+                "rh": 0.896,
+                "lh": -0.452
+              }
+            },
+            {
+              "phase": 1.248125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.502,
+                "rf": 1.466,
+                "rh": 0.804,
+                "lh": -0.525
+              }
+            }
+          ]
+        }
+      },
+      "type": "WALK",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 416,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 2,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.250625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rf_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.205,
+                "rf": 0.979,
+                "rh": 2.094,
+                "lh": 2.306
+              }
+            },
+            {
+              "phase": 1.750625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lf_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.979,
+                "rf": 1.205,
+                "rh": 2.306,
+                "lh": 2.094
+              }
+            }
+          ]
+        }
+      },
+      "type": "WALK",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 426,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 2,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.0525,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.999,
+                "rf": 0.87,
+                "rh": 0.043,
+                "lh": -0.803
+              }
+            },
+            {
+              "phase": 1.5525,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.87,
+                "rf": 0.999,
+                "rh": -0.803,
+                "lh": 0.043
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 6,
+          "passes": false,
+          "undeclared_contact_frames": 6,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.05125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.991,
+                "rf": 0.873,
+                "rh": -0.484,
+                "lh": -0.803
+              }
+            },
+            {
+              "phase": 1.0525,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.999,
+                "rf": 0.87,
+                "rh": 0.043,
+                "lh": -0.803
+              }
+            },
+            {
+              "phase": 1.24875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.707,
+                "rf": 1.41,
+                "rh": 0.585,
+                "lh": 1.16
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 16,
+          "passes": false,
+          "undeclared_contact_frames": 16,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.050625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.987,
+                "rf": 0.874,
+                "rh": -0.552,
+                "lh": -0.802
+              }
+            },
+            {
+              "phase": 1.05125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.991,
+                "rf": 0.873,
+                "rh": -0.484,
+                "lh": -0.803
+              }
+            },
+            {
+              "phase": 1.051875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.995,
+                "rf": 0.871,
+                "rh": -0.303,
+                "lh": -0.803
+              }
+            }
+          ]
+        }
+      },
+      "type": "WALK",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 1040,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 2,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.671,
+                "rf": 2.363,
+                "rh": 2.165,
+                "lh": 0.841
+              }
+            },
+            {
+              "phase": 1.995,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.363,
+                "rf": 3.671,
+                "rh": 0.841,
+                "lh": 2.165
+              }
+            }
+          ]
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 4,
+          "passes": false,
+          "undeclared_contact_frames": 4,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.671,
+                "rf": 2.363,
+                "rh": 2.165,
+                "lh": 0.841
+              }
+            },
+            {
+              "phase": 1.4975,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.539,
+                "rf": 1.9,
+                "rh": 1.92,
+                "lh": 0.523
+              }
+            },
+            {
+              "phase": 1.995,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.363,
+                "rf": 3.671,
+                "rh": 0.841,
+                "lh": 2.165
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 8,
+          "passes": false,
+          "undeclared_contact_frames": 8,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.671,
+                "rf": 2.363,
+                "rh": 2.165,
+                "lh": 0.841
+              }
+            },
+            {
+              "phase": 1.49625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.604,
+                "rf": 2.047,
+                "rh": 2.04,
+                "lh": 0.597
+              }
+            },
+            {
+              "phase": 1.4975,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.539,
+                "rf": 1.9,
+                "rh": 1.92,
+                "lh": 0.523
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 16,
+          "passes": false,
+          "undeclared_contact_frames": 16,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.671,
+                "rf": 2.363,
+                "rh": 2.165,
+                "lh": 0.841
+              }
+            },
+            {
+              "phase": 1.495625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.637,
+                "rf": 2.18,
+                "rh": 2.102,
+                "lh": 0.694
+              }
+            },
+            {
+              "phase": 1.49625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.604,
+                "rf": 2.047,
+                "rh": 2.04,
+                "lh": 0.597
+              }
+            }
+          ]
+        }
+      },
+      "type": "TROT",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 1046,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 2,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.105,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.671,
+                "rf": 2.363,
+                "rh": 2.165,
+                "lh": 0.841
+              }
+            },
+            {
+              "phase": 1.605,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.363,
+                "rf": 3.671,
+                "rh": 0.841,
+                "lh": 2.165
+              }
+            }
+          ]
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 4,
+          "passes": false,
+          "undeclared_contact_frames": 4,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.1025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.539,
+                "rf": 1.9,
+                "rh": 1.92,
+                "lh": 0.523
+              }
+            },
+            {
+              "phase": 1.105,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.671,
+                "rf": 2.363,
+                "rh": 2.165,
+                "lh": 0.841
+              }
+            },
+            {
+              "phase": 1.6025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.9,
+                "rf": 3.539,
+                "rh": 0.523,
+                "lh": 1.92
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 8,
+          "passes": false,
+          "undeclared_contact_frames": 8,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.10125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.475,
+                "rf": 1.869,
+                "rh": 1.804,
+                "lh": 0.566
+              }
+            },
+            {
+              "phase": 1.1025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.539,
+                "rf": 1.9,
+                "rh": 1.92,
+                "lh": 0.523
+              }
+            },
+            {
+              "phase": 1.10375,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.604,
+                "rf": 2.047,
+                "rh": 2.04,
+                "lh": 0.597
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 16,
+          "passes": false,
+          "undeclared_contact_frames": 16,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.100625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.445,
+                "rf": 1.88,
+                "rh": 1.748,
+                "lh": 0.614
+              }
+            },
+            {
+              "phase": 1.10125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.475,
+                "rf": 1.869,
+                "rh": 1.804,
+                "lh": 0.566
+              }
+            },
+            {
+              "phase": 1.101875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.507,
+                "rf": 1.874,
+                "rh": 1.861,
+                "lh": 0.533
+              }
+            }
+          ]
+        }
+      },
+      "type": "TROT",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 1230,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 4,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 2,
+          "first_failures": [
+            {
+              "phase": 1.02,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.055,
+                "rf": 20.288,
+                "rh": -1.03,
+                "lh": 18.709
+              }
+            },
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.186,
+                "rf": 1.723,
+                "rh": 0.745,
+                "lh": -0.486
+              }
+            },
+            {
+              "phase": 1.52,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 20.288,
+                "rf": 1.055,
+                "rh": 18.709,
+                "lh": -1.03
+              }
+            }
+          ]
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 12,
+          "passes": false,
+          "undeclared_contact_frames": 6,
+          "penetration_frames": 6,
+          "first_failures": [
+            {
+              "phase": 1.0175,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.079,
+                "rf": 14.514,
+                "rh": -1.029,
+                "lh": 12.939
+              }
+            },
+            {
+              "phase": 1.02,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.055,
+                "rf": 20.288,
+                "rh": -1.03,
+                "lh": 18.709
+              }
+            },
+            {
+              "phase": 1.0225,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.049,
+                "rf": 27.561,
+                "rh": -1.002,
+                "lh": 25.992
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 26,
+          "passes": false,
+          "undeclared_contact_frames": 14,
+          "penetration_frames": 12,
+          "first_failures": [
+            {
+              "phase": 1.01625,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.098,
+                "rf": 12.145,
+                "rh": -1.018,
+                "lh": 10.578
+              }
+            },
+            {
+              "phase": 1.0175,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.079,
+                "rf": 14.514,
+                "rh": -1.029,
+                "lh": 12.939
+              }
+            },
+            {
+              "phase": 1.01875,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.064,
+                "rf": 17.222,
+                "rh": -1.033,
+                "lh": 15.643
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 54,
+          "passes": false,
+          "undeclared_contact_frames": 30,
+          "penetration_frames": 24,
+          "first_failures": [
+            {
+              "phase": 1.015625,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.11,
+                "rf": 11.083,
+                "rh": -1.01,
+                "lh": 9.52
+              }
+            },
+            {
+              "phase": 1.01625,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.098,
+                "rf": 12.145,
+                "rh": -1.018,
+                "lh": 10.578
+              }
+            },
+            {
+              "phase": 1.016875,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.088,
+                "rf": 13.288,
+                "rh": -1.025,
+                "lh": 11.716
+              }
+            }
+          ]
+        }
+      },
+      "type": "TROT",
+      "pitch_sweep_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "id": 1238,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 4,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 2,
+          "first_failures": [
+            {
+              "phase": 1.005,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.186,
+                "rf": 1.723,
+                "rh": 0.745,
+                "lh": -0.486
+              }
+            },
+            {
+              "phase": 1.48,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.055,
+                "rf": 20.288,
+                "rh": -1.03,
+                "lh": 18.709
+              }
+            },
+            {
+              "phase": 1.505,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.723,
+                "rf": 2.186,
+                "rh": -0.486,
+                "lh": 0.745
+              }
+            }
+          ]
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 12,
+          "passes": false,
+          "undeclared_contact_frames": 6,
+          "penetration_frames": 6,
+          "first_failures": [
+            {
+              "phase": 1.0025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.239,
+                "rf": 1.595,
+                "rh": 0.886,
+                "lh": -0.601
+              }
+            },
+            {
+              "phase": 1.005,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.186,
+                "rf": 1.723,
+                "rh": 0.745,
+                "lh": -0.486
+              }
+            },
+            {
+              "phase": 1.0075,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.145,
+                "rf": 2.32,
+                "rh": 0.633,
+                "lh": 0.108
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 26,
+          "passes": false,
+          "undeclared_contact_frames": 14,
+          "penetration_frames": 12,
+          "first_failures": [
+            {
+              "phase": 1.00125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.27,
+                "rf": 1.639,
+                "rh": 0.967,
+                "lh": -0.546
+              }
+            },
+            {
+              "phase": 1.0025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.239,
+                "rf": 1.595,
+                "rh": 0.886,
+                "lh": -0.601
+              }
+            },
+            {
+              "phase": 1.00375,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.211,
+                "rf": 1.613,
+                "rh": 0.812,
+                "lh": -0.59
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 54,
+          "passes": false,
+          "undeclared_contact_frames": 30,
+          "penetration_frames": 24,
+          "first_failures": [
+            {
+              "phase": 1.000625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.287,
+                "rf": 1.676,
+                "rh": 1.011,
+                "lh": -0.503
+              }
+            },
+            {
+              "phase": 1.00125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.27,
+                "rf": 1.639,
+                "rh": 0.967,
+                "lh": -0.546
+              }
+            },
+            {
+              "phase": 1.001875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.254,
+                "rf": 1.611,
+                "rh": 0.926,
+                "lh": -0.58
+              }
+            }
+          ]
+        }
+      },
+      "type": "TROT",
+      "pitch_sweep_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "id": 3012,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 4,
+          "passes": false,
+          "undeclared_contact_frames": 4,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.0525,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.355,
+                "rf": 2.134,
+                "rh": -0.027,
+                "lh": -0.029
+              }
+            },
+            {
+              "phase": 1.2475,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.371,
+                "rf": 2.507,
+                "rh": 0.533,
+                "lh": -0.515
+              }
+            },
+            {
+              "phase": 1.5525,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.134,
+                "rf": 2.355,
+                "rh": -0.029,
+                "lh": -0.027
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 8,
+          "passes": false,
+          "undeclared_contact_frames": 8,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.05125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.348,
+                "rf": 2.122,
+                "rh": -0.566,
+                "lh": -0.048
+              }
+            },
+            {
+              "phase": 1.0525,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.355,
+                "rf": 2.134,
+                "rh": -0.027,
+                "lh": -0.029
+              }
+            },
+            {
+              "phase": 1.2475,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.371,
+                "rf": 2.507,
+                "rh": 0.533,
+                "lh": -0.515
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 18,
+          "passes": false,
+          "undeclared_contact_frames": 18,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.050625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.344,
+                "rf": 2.116,
+                "rh": -0.64,
+                "lh": -0.057
+              }
+            },
+            {
+              "phase": 1.05125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.348,
+                "rf": 2.122,
+                "rh": -0.566,
+                "lh": -0.048
+              }
+            },
+            {
+              "phase": 1.051875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.352,
+                "rf": 2.128,
+                "rh": -0.38,
+                "lh": -0.038
+              }
+            }
+          ]
+        }
+      },
+      "type": "WALK",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 3032,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 2,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.2475,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.255,
+                "rf": 1.617,
+                "rh": -0.024,
+                "lh": -0.389
+              }
+            },
+            {
+              "phase": 1.7475,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.617,
+                "rf": 3.255,
+                "rh": -0.389,
+                "lh": -0.024
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 4,
+          "passes": false,
+          "undeclared_contact_frames": 4,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.2475,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.255,
+                "rf": 1.617,
+                "rh": -0.024,
+                "lh": -0.389
+              }
+            },
+            {
+              "phase": 1.24875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.282,
+                "rf": 1.616,
+                "rh": -0.539,
+                "lh": -0.382
+              }
+            },
+            {
+              "phase": 1.7475,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.617,
+                "rf": 3.255,
+                "rh": -0.389,
+                "lh": -0.024
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 10,
+          "passes": false,
+          "undeclared_contact_frames": 10,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.246875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.242,
+                "rf": 1.618,
+                "rh": 0.533,
+                "lh": -0.392
+              }
+            },
+            {
+              "phase": 1.2475,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.255,
+                "rf": 1.617,
+                "rh": -0.024,
+                "lh": -0.389
+              }
+            },
+            {
+              "phase": 1.248125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 3.269,
+                "rf": 1.617,
+                "rh": -0.365,
+                "lh": -0.385
+              }
+            }
+          ]
+        }
+      },
+      "type": "WALK",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 3053,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 2,
+          "passes": false,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 2,
+          "first_failures": [
+            {
+              "phase": 1.255,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.843,
+                "rf": 0.934,
+                "rh": -1.022,
+                "lh": 1.986
+              }
+            },
+            {
+              "phase": 1.755,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.934,
+                "rf": 0.843,
+                "rh": 1.986,
+                "lh": -1.022
+              }
+            }
+          ]
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 10,
+          "passes": false,
+          "undeclared_contact_frames": 4,
+          "penetration_frames": 6,
+          "first_failures": [
+            {
+              "phase": 1.0525,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.671,
+                "rf": 0.845,
+                "rh": 0.172,
+                "lh": -0.661
+              }
+            },
+            {
+              "phase": 1.2475,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.923,
+                "rf": 0.945,
+                "rh": -0.375,
+                "lh": 2.243
+              }
+            },
+            {
+              "phase": 1.2525,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.883,
+                "rf": 0.938,
+                "rh": -1.002,
+                "lh": 2.215
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 22,
+          "passes": false,
+          "undeclared_contact_frames": 10,
+          "penetration_frames": 12,
+          "first_failures": [
+            {
+              "phase": 1.05125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.677,
+                "rf": 0.842,
+                "rh": -0.348,
+                "lh": -0.651
+              }
+            },
+            {
+              "phase": 1.0525,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.671,
+                "rf": 0.845,
+                "rh": 0.172,
+                "lh": -0.661
+              }
+            },
+            {
+              "phase": 1.2475,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.923,
+                "rf": 0.945,
+                "rh": -0.375,
+                "lh": 2.243
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 48,
+          "passes": false,
+          "undeclared_contact_frames": 24,
+          "penetration_frames": 24,
+          "first_failures": [
+            {
+              "phase": 1.050625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.68,
+                "rf": 0.841,
+                "rh": -0.413,
+                "lh": -0.646
+              }
+            },
+            {
+              "phase": 1.05125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.677,
+                "rf": 0.842,
+                "rh": -0.348,
+                "lh": -0.651
+              }
+            },
+            {
+              "phase": 1.051875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.674,
+                "rf": 0.844,
+                "rh": -0.171,
+                "lh": -0.656
+              }
+            }
+          ]
+        }
+      },
+      "type": "WALK",
+      "pitch_sweep_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "id": 3069,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 4,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 2,
+          "first_failures": [
+            {
+              "phase": 1.03,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.977,
+                "rf": 2.837,
+                "rh": -1.033,
+                "lh": 0.651
+              }
+            },
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.641,
+                "rf": 2.143,
+                "rh": 0.606,
+                "lh": -0.518
+              }
+            },
+            {
+              "phase": 1.53,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.837,
+                "rf": 1.977,
+                "rh": 0.651,
+                "lh": -1.033
+              }
+            }
+          ]
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 14,
+          "passes": false,
+          "undeclared_contact_frames": 8,
+          "penetration_frames": 6,
+          "first_failures": [
+            {
+              "phase": 1.0275,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.101,
+                "rf": 2.904,
+                "rh": -1.015,
+                "lh": 0.565
+              }
+            },
+            {
+              "phase": 1.03,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.977,
+                "rf": 2.837,
+                "rh": -1.033,
+                "lh": 0.651
+              }
+            },
+            {
+              "phase": 1.0325,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.872,
+                "rf": 2.783,
+                "rh": -1.026,
+                "lh": 0.766
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 28,
+          "passes": false,
+          "undeclared_contact_frames": 14,
+          "penetration_frames": 14,
+          "first_failures": [
+            {
+              "phase": 1.0275,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.101,
+                "rf": 2.904,
+                "rh": -1.015,
+                "lh": 0.565
+              }
+            },
+            {
+              "phase": 1.02875,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.037,
+                "rf": 2.869,
+                "rh": -1.027,
+                "lh": 0.605
+              }
+            },
+            {
+              "phase": 1.03,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.977,
+                "rf": 2.837,
+                "rh": -1.033,
+                "lh": 0.651
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 58,
+          "passes": false,
+          "undeclared_contact_frames": 26,
+          "penetration_frames": 32,
+          "first_failures": [
+            {
+              "phase": 1.026875,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.135,
+                "rf": 2.923,
+                "rh": -1.006,
+                "lh": 0.548
+              }
+            },
+            {
+              "phase": 1.0275,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.101,
+                "rf": 2.904,
+                "rh": -1.015,
+                "lh": 0.565
+              }
+            },
+            {
+              "phase": 1.028125,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.068,
+                "rf": 2.886,
+                "rh": -1.021,
+                "lh": 0.584
+              }
+            }
+          ]
+        }
+      },
+      "type": "TROT",
+      "pitch_sweep_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "id": 3084,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 4,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 2,
+          "first_failures": [
+            {
+              "phase": 1.07,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.837,
+                "rf": 1.977,
+                "rh": 0.651,
+                "lh": -1.033
+              }
+            },
+            {
+              "phase": 1.105,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.641,
+                "rf": 2.143,
+                "rh": 0.606,
+                "lh": -0.518
+              }
+            },
+            {
+              "phase": 1.57,
+              "errors": [
+                "GROUND_PENETRATION:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.977,
+                "rf": 2.837,
+                "rh": -1.033,
+                "lh": 0.651
+              }
+            }
+          ]
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 14,
+          "passes": false,
+          "undeclared_contact_frames": 8,
+          "penetration_frames": 6,
+          "first_failures": [
+            {
+              "phase": 1.0675,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.783,
+                "rf": 1.872,
+                "rh": 0.766,
+                "lh": -1.026
+              }
+            },
+            {
+              "phase": 1.07,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.837,
+                "rf": 1.977,
+                "rh": 0.651,
+                "lh": -1.033
+              }
+            },
+            {
+              "phase": 1.0725,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.904,
+                "rf": 2.101,
+                "rh": 0.565,
+                "lh": -1.015
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 28,
+          "passes": false,
+          "undeclared_contact_frames": 14,
+          "penetration_frames": 14,
+          "first_failures": [
+            {
+              "phase": 1.06625,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.76,
+                "rf": 1.826,
+                "rh": 0.834,
+                "lh": -1.014
+              }
+            },
+            {
+              "phase": 1.0675,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.783,
+                "rf": 1.872,
+                "rh": 0.766,
+                "lh": -1.026
+              }
+            },
+            {
+              "phase": 1.06875,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.808,
+                "rf": 1.922,
+                "rh": 0.705,
+                "lh": -1.032
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 58,
+          "passes": false,
+          "undeclared_contact_frames": 26,
+          "penetration_frames": 32,
+          "first_failures": [
+            {
+              "phase": 1.065625,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.75,
+                "rf": 1.804,
+                "rh": 0.87,
+                "lh": -1.005
+              }
+            },
+            {
+              "phase": 1.06625,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.76,
+                "rf": 1.826,
+                "rh": 0.834,
+                "lh": -1.014
+              }
+            },
+            {
+              "phase": 1.066875,
+              "errors": [
+                "GROUND_PENETRATION:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.771,
+                "rf": 1.848,
+                "rh": 0.799,
+                "lh": -1.021
+              }
+            }
+          ]
+        }
+      },
+      "type": "TROT",
+      "pitch_sweep_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "id": 3092,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 2,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.192,
+                "rf": 1.651,
+                "rh": 0.305,
+                "lh": -0.417
+              }
+            },
+            {
+              "phase": 1.995,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.651,
+                "rf": 2.192,
+                "rh": -0.417,
+                "lh": 0.305
+              }
+            }
+          ]
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 8,
+          "passes": false,
+          "undeclared_contact_frames": 8,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.1025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.469,
+                "rf": 2.235,
+                "rh": -0.515,
+                "lh": 0.675
+              }
+            },
+            {
+              "phase": 1.4925,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.257,
+                "rf": 3.051,
+                "rh": 0.244,
+                "lh": 0.961
+              }
+            },
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.192,
+                "rf": 1.651,
+                "rh": 0.305,
+                "lh": -0.417
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 18,
+          "passes": false,
+          "undeclared_contact_frames": 18,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.10125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.502,
+                "rf": 2.164,
+                "rh": -0.562,
+                "lh": 0.642
+              }
+            },
+            {
+              "phase": 1.1025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.469,
+                "rf": 2.235,
+                "rh": -0.515,
+                "lh": 0.675
+              }
+            },
+            {
+              "phase": 1.10375,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.44,
+                "rf": 2.4,
+                "rh": -0.464,
+                "lh": 0.825
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 38,
+          "passes": false,
+          "undeclared_contact_frames": 38,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.100625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.519,
+                "rf": 2.146,
+                "rh": -0.584,
+                "lh": 0.652
+              }
+            },
+            {
+              "phase": 1.10125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.502,
+                "rf": 2.164,
+                "rh": -0.562,
+                "lh": 0.642
+              }
+            },
+            {
+              "phase": 1.101875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.485,
+                "rf": 2.196,
+                "rh": -0.539,
+                "lh": 0.647
+              }
+            }
+          ]
+        }
+      },
+      "type": "TROT",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 3105,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 2,
+          "passes": false,
+          "undeclared_contact_frames": 2,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.105,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.192,
+                "rf": 1.651,
+                "rh": 0.305,
+                "lh": -0.417
+              }
+            },
+            {
+              "phase": 1.605,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.651,
+                "rf": 2.192,
+                "rh": -0.417,
+                "lh": 0.305
+              }
+            }
+          ]
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 8,
+          "passes": false,
+          "undeclared_contact_frames": 8,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.1025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.135,
+                "rf": 1.127,
+                "rh": 0.382,
+                "lh": -0.913
+              }
+            },
+            {
+              "phase": 1.105,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.192,
+                "rf": 1.651,
+                "rh": 0.305,
+                "lh": -0.417
+              }
+            },
+            {
+              "phase": 1.1075,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.257,
+                "rf": 3.051,
+                "rh": 0.244,
+                "lh": 0.961
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 18,
+          "passes": false,
+          "undeclared_contact_frames": 18,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.10125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.109,
+                "rf": 1.064,
+                "rh": 0.427,
+                "lh": -0.959
+              }
+            },
+            {
+              "phase": 1.1025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.135,
+                "rf": 1.127,
+                "rh": 0.382,
+                "lh": -0.913
+              }
+            },
+            {
+              "phase": 1.10375,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.163,
+                "rf": 1.305,
+                "rh": 0.342,
+                "lh": -0.75
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 38,
+          "passes": false,
+          "undeclared_contact_frames": 38,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.100625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.097,
+                "rf": 1.059,
+                "rh": 0.451,
+                "lh": -0.956
+              }
+            },
+            {
+              "phase": 1.10125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.109,
+                "rf": 1.064,
+                "rh": 0.427,
+                "lh": -0.959
+              }
+            },
+            {
+              "phase": 1.101875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 2.122,
+                "rf": 1.084,
+                "rh": 0.404,
+                "lh": -0.947
+              }
+            }
+          ]
+        }
+      },
+      "type": "TROT",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 3116,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 4,
+          "passes": false,
+          "undeclared_contact_frames": 4,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.105,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.76,
+                "rf": 1.807,
+                "rh": -0.369,
+                "lh": 0.586
+              }
+            },
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.212,
+                "rf": 1.255,
+                "rh": 0.34,
+                "lh": -0.262
+              }
+            },
+            {
+              "phase": 1.605,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.807,
+                "rf": 0.76,
+                "rh": 0.586,
+                "lh": -0.369
+              }
+            }
+          ]
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 8,
+          "passes": false,
+          "undeclared_contact_frames": 8,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.1025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.78,
+                "rf": 1.269,
+                "rh": -0.294,
+                "lh": 0.095
+              }
+            },
+            {
+              "phase": 1.105,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.76,
+                "rf": 1.807,
+                "rh": -0.369,
+                "lh": 0.586
+              }
+            },
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.212,
+                "rf": 1.255,
+                "rh": 0.34,
+                "lh": -0.262
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 18,
+          "passes": false,
+          "undeclared_contact_frames": 18,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.10125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.792,
+                "rf": 1.196,
+                "rh": -0.255,
+                "lh": 0.048
+              }
+            },
+            {
+              "phase": 1.1025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.78,
+                "rf": 1.269,
+                "rh": -0.294,
+                "lh": 0.095
+              }
+            },
+            {
+              "phase": 1.10375,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.77,
+                "rf": 1.455,
+                "rh": -0.332,
+                "lh": 0.257
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 40,
+          "passes": false,
+          "undeclared_contact_frames": 40,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.100625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.798,
+                "rf": 1.185,
+                "rh": -0.234,
+                "lh": 0.05
+              }
+            },
+            {
+              "phase": 1.10125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.792,
+                "rf": 1.196,
+                "rh": -0.255,
+                "lh": 0.048
+              }
+            },
+            {
+              "phase": 1.101875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.786,
+                "rf": 1.222,
+                "rh": -0.275,
+                "lh": 0.061
+              }
+            }
+          ]
+        }
+      },
+      "type": "TROT",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 3125,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 4,
+          "passes": false,
+          "undeclared_contact_frames": 4,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.105,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.212,
+                "rf": 1.255,
+                "rh": 0.34,
+                "lh": -0.262
+              }
+            },
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.76,
+                "rf": 1.807,
+                "rh": -0.369,
+                "lh": 0.586
+              }
+            },
+            {
+              "phase": 1.605,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.255,
+                "rf": 1.212,
+                "rh": -0.262,
+                "lh": 0.34
+              }
+            }
+          ]
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 8,
+          "passes": false,
+          "undeclared_contact_frames": 8,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.1025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rf_foot_link",
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.242,
+                "rf": 0.711,
+                "rh": 0.432,
+                "lh": -0.739
+              }
+            },
+            {
+              "phase": 1.105,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.212,
+                "rf": 1.255,
+                "rh": 0.34,
+                "lh": -0.262
+              }
+            },
+            {
+              "phase": 1.495,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 0.76,
+                "rf": 1.807,
+                "rh": -0.369,
+                "lh": 0.586
+              }
+            }
+          ]
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 18,
+          "passes": false,
+          "undeclared_contact_frames": 18,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.10125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rf_foot_link",
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.258,
+                "rf": 0.636,
+                "rh": 0.479,
+                "lh": -0.78
+              }
+            },
+            {
+              "phase": 1.1025,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rf_foot_link",
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.242,
+                "rf": 0.711,
+                "rh": 0.432,
+                "lh": -0.739
+              }
+            },
+            {
+              "phase": 1.10375,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rf_foot_link",
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.226,
+                "rf": 0.899,
+                "rh": 0.385,
+                "lh": -0.584
+              }
+            }
+          ]
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 40,
+          "passes": false,
+          "undeclared_contact_frames": 40,
+          "penetration_frames": 0,
+          "first_failures": [
+            {
+              "phase": 1.100625,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rf_foot_link",
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.266,
+                "rf": 0.623,
+                "rh": 0.504,
+                "lh": -0.775
+              }
+            },
+            {
+              "phase": 1.10125,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rf_foot_link",
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.258,
+                "rf": 0.636,
+                "rh": 0.479,
+                "lh": -0.78
+              }
+            },
+            {
+              "phase": 1.101875,
+              "errors": [
+                "UNDECLARED_GROUND_CONTACT:rf_foot_link",
+                "UNDECLARED_GROUND_CONTACT:lh_foot_link"
+              ],
+              "foot_mesh_min_z_um": {
+                "lf": 1.25,
+                "rf": 0.662,
+                "rh": 0.455,
+                "lh": -0.771
+              }
+            }
+          ]
+        }
+      },
+      "type": "TROT",
+      "pitch_sweep_check": "OK"
+    },
+    {
+      "id": 4000,
+      "densities": {
+        "80": {
+          "frames": 81,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "200": {
+          "frames": 201,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "400": {
+          "frames": 401,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "800": {
+          "frames": 801,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        },
+        "1600": {
+          "frames": 1601,
+          "failing_frames": 0,
+          "passes": true,
+          "undeclared_contact_frames": 0,
+          "penetration_frames": 0,
+          "first_failures": []
+        }
+      },
+      "type": "WALK",
+      "pitch_sweep_check": "OK"
+    }
+  ]
+}
