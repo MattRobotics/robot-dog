@@ -401,6 +401,8 @@ trap 'rm -rf "$OUT"' EXIT
 CALREC_SRCS=(
   "$SKETCH_DIR/src/calibration/CalibrationRecord.cpp"
   "$SKETCH_DIR/src/calibration/CalibrationRecordStore.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationSaveMarker.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationPersistenceState.cpp"
   "$SKETCH_DIR/src/calibration/FullLegCalibrationFinalizer.cpp"
   "$SKETCH_DIR/src/calibration/FullLegCalibrationPlan.cpp"
   "$SKETCH_DIR/src/calibration/FullLegCalibrationExecutor.cpp"
@@ -425,6 +427,12 @@ CALREC_SRCS=(
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -o "$OUT/test_calibration_record" \
   "$SCRIPT_DIR/test_calibration_record.cpp" "${CALREC_SRCS[@]}"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_save_marker" \
+  "$SCRIPT_DIR/test_calibration_save_marker.cpp" "${CALREC_SRCS[@]}"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_persistence_state" \
+  "$SCRIPT_DIR/test_calibration_persistence_state.cpp" "${CALREC_SRCS[@]}"
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -o "$OUT/test_calibration_record_store" \
   "$SCRIPT_DIR/test_calibration_record_store.cpp" "${CALREC_SRCS[@]}"
@@ -518,6 +526,8 @@ done
 "$OUT/test_full_leg_calibration_plan"
 "$OUT/test_full_leg_calibration_finalizer"
 "$OUT/test_calibration_record"
+"$OUT/test_calibration_save_marker"
+"$OUT/test_calibration_persistence_state"
 "$OUT/test_calibration_record_store"
 "$OUT/test_calibration_record_nvs_backend"
 "$OUT/test_service_readiness"

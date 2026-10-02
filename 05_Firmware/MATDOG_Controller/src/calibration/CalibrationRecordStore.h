@@ -4,28 +4,40 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "CalibrationPersistenceState.h"
 #include "CalibrationRecord.h"
+#include "CalibrationSaveMarker.h"
 
 // CALIBRATION RECORD STORE - A/B slot selection, generations and the commit
 // protocol, over a minimal storage interface (P2: no Controller integration).
 //
 // Two slots, "A" and "B". A save always targets the slot that does NOT hold the
-// record currently selected as valid, so a failure at any point of the write
-// leaves the previous record untouched. The previous slot is never pre-erased
-// and there is no "current slot" key: the valid slot with the highest
-// generation IS the current record, decided from the data alone at every load.
+// confirmed record, so a failure at any point of the write leaves the previous
+// record untouched. The previous slot is never pre-erased and there is no
+// "current slot" key.
+//
+// SAVE MARKER (P2.4). A third value, stored apart from the slots, says which
+// generation was last CONFIRMED and whether a SAVE is in flight. SAVE is:
+//   1. validate the record and the store state;
+//   2. publish the new generation as PENDING in the marker, and verify it;
+//   3. write the record to the inactive slot;
+//   4. read it back and compare it whole;
+//   5. publish the marker as COMPLETED for that generation;
+//   6. read the marker back and verify it;
+//   7. only now SaveStatus::OK.
+// After step 2 the storage is no longer "as it was": any failure from then on
+// (including a storage that says it did not modify anything) blocks this
+// instance. A reboot classifies the result with classifyPersistence()
+// (CalibrationPersistenceState.h); it never repairs, promotes or erases.
+// load() serves a record ONLY in the CONSISTENT class; every other class says
+// why and what explicit reconciliation (not implemented here) it needs.
 //
 // WRITE-UNCERTAINTY BLOCK (session-local, RAM only). Once a write has been
 // attempted and its outcome is not certain to have left storage untouched or
 // fully verified, this store instance refuses every further save() with
-// BLOCKED_UNCERTAIN_WRITE. Reason: after such an error the slot just targeted may
-// already hold a complete, valid, higher-generation record; a naive retry would
-// then select that record as "current", target the OTHER slot - the one that
-// still holds the last record known to be good - and overwrite it. load() and
-// diagnostics stay available and never clear the block. Only a new instance
-// (a reboot) clears it; the next load then simply selects the valid record
-// with the highest generation, which may be the one whose save() reported an
-// error. Nothing about "what the operator confirmed" survives a reboot.
+// BLOCKED_UNCERTAIN_WRITE. load() and diagnostics stay available and never
+// clear the block. Only a new instance (a reboot) clears it - and then the
+// persistent marker, not RAM, keeps an unreconciled SAVE from being retried.
 //
 // Pure: no Arduino, no NVS. The real backend lives in
 // CalibrationRecordNvsBackend; host tests use a fault-injecting fake.
@@ -36,31 +48,25 @@
 namespace matdog {
 namespace calibration {
 
-enum class CalibrationSlot : uint8_t { A = 0, B = 1 };
-constexpr uint8_t kCalibrationSlotCount = 2;
-
 // Slot capacity: V1 record plus headroom, bounded and statically allocated.
 constexpr size_t kCalibrationSlotScratchBytes = 1536;
 
-inline CalibrationSlot otherSlot(CalibrationSlot s) {
-  return s == CalibrationSlot::A ? CalibrationSlot::B : CalibrationSlot::A;
-}
 const char* toString(CalibrationSlot slot);
 
 enum class StorageIoStatus : uint8_t {
   OK = 0,
-  ABSENT,              // nothing stored under this slot (read only)
+  ABSENT,              // nothing stored under this key (read only)
   IO_ERROR,            // storage failed (open, read, write, commit, bad handle...)
   NO_SPACE,            // storage reported it is full (write only); the backend cannot
                        // promise that nothing was published, so the store treats it
                        // as an uncertain write
   BUFFER_TOO_SMALL,    // stored blob larger than the scratch (read only)
-  NOT_MODIFIED,        // write only: failed BEFORE modifying any slot (e.g. the storage
-                       // could not be opened). Slots are untouched; retry is safe.
+  NOT_MODIFIED,        // write only: failed BEFORE modifying anything (e.g. the storage
+                       // could not be opened). Storage is untouched.
 };
 
-// What the store needs from storage. Never erases a whole partition and never
-// touches anything but the two calibration slots.
+// What the store needs from storage: the two record slots and the save marker.
+// Never erases a whole partition and never touches anything else.
 class CalibrationRecordStorage {
  public:
   virtual ~CalibrationRecordStorage() {}
@@ -71,73 +77,89 @@ class CalibrationRecordStorage {
   // result other than OK and NOT_MODIFIED means the slot may hold anything:
   // nothing, the old blob, a partial update, or the complete new blob.
   virtual StorageIoStatus write(CalibrationSlot slot, const uint8_t* data, size_t length) = 0;
+  // Same contract for the save marker, a value stored apart from the slots.
+  virtual StorageIoStatus readMarker(uint8_t* buffer, size_t capacity, size_t* length) = 0;
+  virtual StorageIoStatus writeMarker(const uint8_t* data, size_t length) = 0;
 };
 
-enum class SlotState : uint8_t {
-  UNREAD = 0,
-  ABSENT,
-  IO_ERROR,
-  CORRUPT,       // damaged or self-contradictory (see CalibrationRecordStatus)
-  INCOMPATIBLE,  // intact, other schema / geometry / installation
-  VALID,
-};
 const char* toString(SlotState state);
 
-struct SlotReport {
-  SlotState state = SlotState::UNREAD;
-  CalibrationRecordStatus detail = CalibrationRecordStatus::OK;
-  // Generation read from an envelope-intact blob (valid, incompatible or
-  // semantically corrupt): keeps generations monotonic. 0 when unknown.
-  uint32_t generation_hint = 0;
-};
-
 enum class LoadStatus : uint8_t {
-  OK = 0,           // a valid record was selected
-  NOT_FOUND,        // both slots absent: a clean "never saved"
-  IO_ERROR,         // storage failed on a slot: fail closed, nothing selected
-  INCOMPATIBLE,     // no valid record and at least one slot is intact-but-foreign
-  NO_VALID_RECORD,  // no valid record and at least one slot is corrupt
+  // The confirmed record was selected: PersistenceClass::CONSISTENT, the only
+  // class that serves a record.
+  OK = 0,
+  // No calibration is stored: NEVER_INITIALIZED_OR_ERASED (indistinguishable from
+  // a total loss) or NOTHING_CONFIRMED. A fresh Full Calibration is required.
+  NOT_FOUND,
+  IO_ERROR,         // storage failed on a slot or the marker: fail closed
+  INCOMPATIBLE,     // the confirmed record or the marker is intact but foreign
+  // Slots and marker disagree (interrupted SAVE, lost confirmed generation,
+  // missing/corrupt marker, record ahead of marker...). Nothing is served;
+  // `assessment` says which and what explicit reconciliation is allowed.
+  RECONCILIATION_REQUIRED,
   BAD_ARGUMENT,
 };
 const char* toString(LoadStatus status);
 
 struct LoadResult {
-  LoadStatus status = LoadStatus::NO_VALID_RECORD;
+  LoadStatus status = LoadStatus::RECONCILIATION_REQUIRED;
   CalibrationSlot slot = CalibrationSlot::A;  // meaningful when status == OK
   uint32_t generation = 0;                    // idem
-  // The selected record is older than a slot that exists but is unusable:
-  // the newest save was lost, the previous calibration was recovered.
+  // The selected record is fine but the other slot is damaged or foreign.
   bool degraded = false;
   SlotReport report[kCalibrationSlotCount];
+  MarkerReport marker;
+  PersistenceAssessment assessment;
 };
 
 enum class SaveStatus : uint8_t {
   OK = 0,
   BAD_ARGUMENT,
   INVALID_RECORD,       // refused by validation before touching storage
-  STORAGE_UNUSABLE,     // a slot could not be read: refusing to write blind
+  STORAGE_UNUSABLE,     // a slot or the marker could not be read: refusing to write blind
   GENERATION_EXHAUSTED,
-  WRITE_FAILED,         // storage error while writing
+  // The persistent state is not CONSISTENT/empty: an earlier SAVE was never
+  // reconciled, a confirmed generation is lost, the marker is missing... Nothing
+  // was written; see `persistence`. Explicit reconciliation is required.
+  RECONCILIATION_REQUIRED,
+  WRITE_FAILED,         // storage error while writing a record slot
   NO_SPACE,
-  READBACK_FAILED,      // could not read the new slot back
-  READBACK_MISMATCH,    // new slot differs from what was written
+  READBACK_FAILED,      // could not read the new record back
+  READBACK_MISMATCH,    // new record differs from what was written
+  MARKER_WRITE_FAILED,  // storage error while writing the marker (see `phase`)
+  MARKER_VERIFY_FAILED, // marker read-back failed or differs from what was written
   BLOCKED_UNCERTAIN_WRITE,  // refused: an earlier write left storage in an uncertain state
                             // (see WriteState); nothing was read or written
 };
 const char* toString(SaveStatus status);
 
+// Where a SAVE stopped (SaveResult::phase), in protocol order.
+enum class SavePhase : uint8_t {
+  NONE = 0,
+  VALIDATE,
+  SCAN,
+  CLASSIFY,
+  MARKER_PENDING_WRITE,
+  MARKER_PENDING_VERIFY,
+  RECORD_WRITE,
+  RECORD_VERIFY,
+  MARKER_COMPLETED_WRITE,
+  MARKER_COMPLETED_VERIFY,
+  DONE,
+};
+const char* toString(SavePhase phase);
+
 struct SaveResult {
   SaveStatus status = SaveStatus::BAD_ARGUMENT;
+  SavePhase phase = SavePhase::NONE;          // last phase entered
   CalibrationSlot slot = CalibrationSlot::A;  // slot targeted (valid on OK and on write failures)
-  uint32_t generation = 0;                    // generation written (valid on OK)
+  uint32_t generation = 0;                    // generation confirmed (valid on OK only)
   CalibrationRecordStatus validation = CalibrationRecordStatus::OK;  // INVALID_RECORD detail
   StorageIoStatus io = StorageIoStatus::OK;                          // storage detail
-  // The VALID record that was selected before this attempt (highest valid
-  // generation) was not the write target and this attempt did not touch it.
-  // It is NOT necessarily the last record the operator saw confirmed: after an
-  // earlier uncertain failure the selected record may be one whose save()
-  // reported an error. False when no valid record existed or no scan was done
-  // (BLOCKED_UNCERTAIN_WRITE, INVALID_RECORD, STORAGE_UNUSABLE...).
+  // Persistent state found before this attempt (valid once the scan was done).
+  PersistenceClass persistence = PersistenceClass::IO_ERROR;
+  // The CONFIRMED record was not the write target and this attempt did not touch
+  // it. False when no confirmed record existed or no scan was done.
   bool previous_record_intact = false;
   uint32_t previous_generation = 0;  // its generation, valid with previous_record_intact
 };
@@ -153,17 +175,17 @@ class CalibrationRecordStore {
  public:
   explicit CalibrationRecordStore(CalibrationRecordStorage* storage) : storage_(storage) {}
 
-  // Read both slots, decode, validate against `profile`, select the valid one
-  // with the highest generation. Never writes.
+  // Read both slots and the marker, classify them together and, only if the
+  // state is CONSISTENT, select the confirmed record. Never writes.
   LoadResult load(const actuator::CalibrationGeometryProfile& profile, CalibrationRecord* out);
 
-  // validate -> encode -> inactive slot -> write (backend commits) -> read back
-  // and compare. `record.generation` is ignored: the store assigns
-  // max(known generations) + 1. On any failure the previously selected record
-  // is untouched and the result says which slot/step failed. If the write phase
-  // ends in an uncertain outcome (anything but a clean success or a
-  // NOT_MODIFIED refusal) the failure is reported as is - never as success - and
-  // the instance moves to WriteState::BLOCKED_UNCERTAIN_WRITE.
+  // The SAVE protocol above. `record.generation` is ignored: the store assigns
+  // max(every generation seen on disk, marker.begun) + 1. On any failure the
+  // previously confirmed record is untouched and the result says which phase
+  // failed. SaveStatus::OK is returned only after the record AND the COMPLETED
+  // marker were read back and verified. Every outcome after the PENDING marker
+  // was published that is not a full success moves the instance to
+  // WriteState::BLOCKED_UNCERTAIN_WRITE.
   SaveResult save(const CalibrationRecord& record,
                   const actuator::CalibrationGeometryProfile& profile);
 
@@ -173,10 +195,16 @@ class CalibrationRecordStore {
  private:
   struct Scan {
     LoadResult load;
-    uint32_t max_generation = 0;
+    uint32_t max_generation = 0;  // highest generation seen on disk, slots and marker
     bool io_error = false;
   };
   void scan(const actuator::CalibrationGeometryProfile& profile, Scan* scan);
+  // Marker read + decode.
+  void readMarkerReport(MarkerReport* report, bool* io_error);
+  // Write `marker`, read it back, compare. OK only if verified. `*unmodified` is
+  // true only when the storage itself said the marker was left alone.
+  SaveStatus writeAndVerifyMarker(const SaveMarker& marker, StorageIoStatus* io,
+                                  bool* unmodified);
 
   CalibrationRecordStorage* storage_;
   WriteState write_state_ = WriteState::OPEN;

@@ -1,15 +1,22 @@
-// Offline tests for the A/B calibration record store
-// (src/calibration/CalibrationRecordStore.*) against a deterministic fake
-// storage with fault injection. No flash, no NVS, no hardware.
+// Offline tests for the A/B calibration record store and its SAVE-marker
+// protocol (src/calibration/CalibrationRecordStore.*) against a deterministic
+// fake storage with fault injection per mutation. No flash, no NVS, no hardware.
 //
-// What is proven here: slot alternation and generations, selection of the
-// newest VALID record, recovery of the previous record when the newest slot is
-// damaged or never completed, and fail-closed behaviour when nothing usable
-// remains - for an interruption before, during and after the write/commit.
+// What is proven here: the SAVE protocol order (PENDING marker, record to the
+// inactive slot, full read-back, COMPLETED marker, marker read-back), that no
+// failure at any step produces a false confirmation, that every post-PENDING
+// failure blocks the instance (P2.1), that a "rebooted" instance never serves
+// an unconfirmed record and never overwrites the confirmed one, and that the
+// explicit reconciliation contract leads back to a usable state.
+//
+// A power cut is modelled as: the faulting mutation is lost / partly written /
+// fully written, the storage then goes "dead" (every call fails) until
+// reboot() brings it back with exactly the bytes it held.
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #include "calibration_record_golden.h"
@@ -48,33 +55,86 @@ namespace {
 using golden::boundProfile;
 using golden::goldenRecord;
 
-enum class WriteFault {
+enum class Fault {
   NONE,
-  FAIL_BEFORE_WRITE,   // nothing reaches the slot, storage says NOT_MODIFIED (certain)
-  FAIL_NOTHING_WRITTEN,  // nothing reaches the slot, but storage only says IO_ERROR (uncertain)
-  TORN,                // half the bytes reach the slot, then IO error
-  FAIL_AFTER_DATA,     // all bytes reach the slot, commit reported as failed
-  NO_SPACE,            // refused, slot untouched
-  SILENT_CORRUPTION,   // reports OK but one byte is wrong
+  NOT_MODIFIED,       // storage certifies it did nothing
+  IO_NOTHING,         // nothing reaches storage, storage only says IO_ERROR (uncertain)
+  TORN,               // half the bytes reach storage, then IO error
+  AFTER_DATA,         // all bytes reach storage, error reported (commit failed)
+  NO_SPACE,           // refused, nothing written
+  SILENT_CORRUPTION,  // reports OK but one byte is wrong
+  POWER_BEFORE,       // power lost before the mutation: nothing written, storage dead
+  POWER_TORN,         // power lost mid-write: half written, storage dead
+  POWER_AFTER,        // power lost after the data landed, before the return: dead
 };
+
+const Fault kAllFaults[] = {Fault::NOT_MODIFIED, Fault::IO_NOTHING, Fault::TORN,
+                            Fault::AFTER_DATA,   Fault::NO_SPACE,   Fault::SILENT_CORRUPTION,
+                            Fault::POWER_BEFORE, Fault::POWER_TORN, Fault::POWER_AFTER};
+
+const char* faultName(Fault f) {
+  switch (f) {
+    case Fault::NONE: return "NONE";
+    case Fault::NOT_MODIFIED: return "NOT_MODIFIED";
+    case Fault::IO_NOTHING: return "IO_NOTHING";
+    case Fault::TORN: return "TORN";
+    case Fault::AFTER_DATA: return "AFTER_DATA";
+    case Fault::NO_SPACE: return "NO_SPACE";
+    case Fault::SILENT_CORRUPTION: return "SILENT_CORRUPTION";
+    case Fault::POWER_BEFORE: return "POWER_BEFORE";
+    case Fault::POWER_TORN: return "POWER_TORN";
+    case Fault::POWER_AFTER: return "POWER_AFTER";
+  }
+  return "?";
+}
 
 class FakeStorage : public CalibrationRecordStorage {
  public:
   bool present[2] = {false, false};
   std::vector<uint8_t> data[2];
+  bool marker_present = false;
+  std::vector<uint8_t> marker_data;
+
   bool fail_read[2] = {false, false};
   bool oversize[2] = {false, false};
-  WriteFault fault = WriteFault::NONE;
-  bool fail_read_after_write = false;
+  bool fail_marker_read = false;
+  bool oversize_marker = false;
+  // Slot reads fail once a slot write was attempted; marker reads fail once the
+  // n-th marker write was attempted (1 = PENDING, 2 = COMPLETED). 0 = never.
+  bool fail_slot_read_after_slot_write = false;
+  int fail_marker_read_from_marker_write = 0;
+
+  int fault_at = 0;  // 1-based index of the mutation (slot or marker write) that faults
+  Fault fault = Fault::NONE;
+  bool dead = false;
+
+  int mutations = 0;
+  int slot_writes = 0;
+  int marker_writes = 0;
   int reads = 0;
-  int writes = 0;
-  int last_write_slot = -1;
+  std::vector<std::string> log;  // "wM", "wA", "wB", "rM", "rA", "rB"
+
+  void arm(int at, Fault f) {
+    fault_at = at;
+    fault = f;
+  }
+  void reboot() {
+    dead = false;
+    fault_at = 0;
+    fault = Fault::NONE;
+    fail_slot_read_after_slot_write = false;
+    fail_marker_read_from_marker_write = 0;
+    slot_writes = marker_writes = mutations = 0;
+  }
 
   StorageIoStatus read(CalibrationSlot slot, uint8_t* buffer, size_t capacity, size_t* length) override {
     ++reads;
     const int i = static_cast<int>(slot);
+    log.push_back(i == 0 ? "rA" : "rB");
     *length = 0;
-    if (fail_read[i] || (fail_read_after_write && writes > 0)) return StorageIoStatus::IO_ERROR;
+    if (dead || fail_read[i] || (fail_slot_read_after_slot_write && slot_writes > 0)) {
+      return StorageIoStatus::IO_ERROR;
+    }
     if (oversize[i]) return StorageIoStatus::BUFFER_TOO_SMALL;
     if (!present[i]) return StorageIoStatus::ABSENT;
     if (data[i].size() > capacity) return StorageIoStatus::BUFFER_TOO_SMALL;
@@ -83,39 +143,36 @@ class FakeStorage : public CalibrationRecordStorage {
     return StorageIoStatus::OK;
   }
 
-  StorageIoStatus write(CalibrationSlot slot, const uint8_t* bytes, size_t length) override {
-    const int i = static_cast<int>(slot);
-    ++writes;
-    last_write_slot = i;
-    switch (fault) {
-      case WriteFault::NONE:
-        break;
-      case WriteFault::FAIL_BEFORE_WRITE:
-        return StorageIoStatus::NOT_MODIFIED;
-      case WriteFault::FAIL_NOTHING_WRITTEN:
-        return StorageIoStatus::IO_ERROR;
-      case WriteFault::TORN:
-        present[i] = true;
-        data[i].assign(bytes, bytes + length / 2);
-        return StorageIoStatus::IO_ERROR;
-      case WriteFault::FAIL_AFTER_DATA:
-        present[i] = true;
-        data[i].assign(bytes, bytes + length);
-        return StorageIoStatus::IO_ERROR;
-      case WriteFault::NO_SPACE:
-        return StorageIoStatus::NO_SPACE;
-      case WriteFault::SILENT_CORRUPTION:
-        present[i] = true;
-        data[i].assign(bytes, bytes + length);
-        data[i][100] ^= 0x10;
-        return StorageIoStatus::OK;
+  StorageIoStatus readMarker(uint8_t* buffer, size_t capacity, size_t* length) override {
+    ++reads;
+    log.push_back("rM");
+    *length = 0;
+    if (dead || fail_marker_read ||
+        (fail_marker_read_from_marker_write > 0 && marker_writes >= fail_marker_read_from_marker_write)) {
+      return StorageIoStatus::IO_ERROR;
     }
-    present[i] = true;
-    data[i].assign(bytes, bytes + length);
+    if (oversize_marker) return StorageIoStatus::BUFFER_TOO_SMALL;
+    if (!marker_present) return StorageIoStatus::ABSENT;
+    if (marker_data.size() > capacity) return StorageIoStatus::BUFFER_TOO_SMALL;
+    std::memcpy(buffer, marker_data.data(), marker_data.size());
+    *length = marker_data.size();
     return StorageIoStatus::OK;
   }
 
-  void put(int slot, const CalibrationRecord& r) {
+  StorageIoStatus write(CalibrationSlot slot, const uint8_t* bytes, size_t length) override {
+    const int i = static_cast<int>(slot);
+    ++slot_writes;
+    log.push_back(i == 0 ? "wA" : "wB");
+    return mutate(&present[i], &data[i], bytes, length, 100);
+  }
+
+  StorageIoStatus writeMarker(const uint8_t* bytes, size_t length) override {
+    ++marker_writes;
+    log.push_back("wM");
+    return mutate(&marker_present, &marker_data, bytes, length, 14);
+  }
+
+  void putSlot(int slot, const CalibrationRecord& r) {
     std::vector<uint8_t> b(kCalibrationRecordV1EncodedBytes);
     size_t n = 0;
     encodeCalibrationRecord(r, b.data(), b.size(), &n);
@@ -123,15 +180,91 @@ class FakeStorage : public CalibrationRecordStorage {
     present[slot] = true;
     data[slot] = b;
   }
+
+  void putMarker(SaveMarkerState state, uint32_t completed, uint32_t begun) {
+    uint8_t b[kSaveMarkerV1Bytes];
+    size_t n = 0;
+    SaveMarker m;
+    m.state = state;
+    m.completed_generation = completed;
+    m.begun_generation = begun;
+    encodeSaveMarker(m, b, sizeof(b), &n);
+    marker_present = true;
+    marker_data.assign(b, b + n);
+  }
+
+  bool decodedMarker(SaveMarker* m) const {
+    return marker_present && decodeSaveMarker(marker_data.data(), marker_data.size(), m) == SaveMarkerStatus::OK;
+  }
+
+ private:
+  StorageIoStatus mutate(bool* pres, std::vector<uint8_t>* d, const uint8_t* bytes, size_t length,
+                         size_t flip_at) {
+    ++mutations;
+    if (dead) return StorageIoStatus::IO_ERROR;
+    const Fault f = mutations == fault_at ? fault : Fault::NONE;
+    switch (f) {
+      case Fault::NONE:
+        break;
+      case Fault::NOT_MODIFIED:
+        return StorageIoStatus::NOT_MODIFIED;
+      case Fault::IO_NOTHING:
+        return StorageIoStatus::IO_ERROR;
+      case Fault::NO_SPACE:
+        return StorageIoStatus::NO_SPACE;
+      case Fault::TORN:
+        *pres = true;
+        d->assign(bytes, bytes + length / 2);
+        return StorageIoStatus::IO_ERROR;
+      case Fault::AFTER_DATA:
+        *pres = true;
+        d->assign(bytes, bytes + length);
+        return StorageIoStatus::IO_ERROR;
+      case Fault::SILENT_CORRUPTION:
+        *pres = true;
+        d->assign(bytes, bytes + length);
+        (*d)[flip_at] ^= 0x10;
+        return StorageIoStatus::OK;
+      case Fault::POWER_BEFORE:
+        dead = true;
+        return StorageIoStatus::IO_ERROR;
+      case Fault::POWER_TORN:
+        *pres = true;
+        d->assign(bytes, bytes + length / 2);
+        dead = true;
+        return StorageIoStatus::IO_ERROR;
+      case Fault::POWER_AFTER:
+        *pres = true;
+        d->assign(bytes, bytes + length);
+        dead = true;
+        return StorageIoStatus::IO_ERROR;
+    }
+    *pres = true;
+    d->assign(bytes, bytes + length);
+    return StorageIoStatus::OK;
+  }
 };
 
 CalibrationRecord record() { return goldenRecord(0); }
+
+// Storage with n confirmed generations written by the store itself.
+void seed(FakeStorage* fs, int n) {
+  CalibrationRecordStore store(fs);
+  for (int i = 0; i < n; ++i) {
+    const SaveResult r = store.save(record(), boundProfile());
+    CHECK(r.status == SaveStatus::OK);
+  }
+  fs->log.clear();
+  fs->reads = 0;
+  fs->slot_writes = fs->marker_writes = fs->mutations = 0;
+}
 
 void expectSelected(CalibrationRecordStore& store, uint32_t generation, CalibrationSlot slot, bool degraded) {
   const CalibrationRecord expect = goldenRecord(generation);
   CalibrationRecord loaded;
   const LoadResult r = store.load(boundProfile(), &loaded);
   CHECK(r.status == LoadStatus::OK);
+  CHECK(r.assessment.cls == PersistenceClass::CONSISTENT);
   if (r.status != LoadStatus::OK) return;
   CHECK_EQ(r.generation, generation);
   CHECK(r.slot == slot);
@@ -140,21 +273,55 @@ void expectSelected(CalibrationRecordStore& store, uint32_t generation, Calibrat
   CHECK_EQ(loaded.joint[7].q0_tick, expect.joint[7].q0_tick);
 }
 
+PersistenceClass classOf(FakeStorage& fs) {
+  CalibrationRecordStore s(&fs);
+  CalibrationRecord out;
+  return s.load(boundProfile(), &out).assessment.cls;
+}
+
 // ---------------------------------------------------------------------------
 
-void test_empty_storage() {
-  g_case = "empty storage";
+void test_empty_storage_is_first_install() {
+  g_case = "first install";
   FakeStorage fs;
   CalibrationRecordStore store(&fs);
   CalibrationRecord loaded;
   const LoadResult r = store.load(boundProfile(), &loaded);
   CHECK(r.status == LoadStatus::NOT_FOUND);
+  CHECK(r.assessment.cls == PersistenceClass::NEVER_INITIALIZED_OR_ERASED);
+  CHECK(!r.assessment.record_available);
+  CHECK(r.assessment.save_allowed);  // the first SAVE after a fresh Full Calibration
   CHECK(r.report[0].state == SlotState::ABSENT);
   CHECK(r.report[1].state == SlotState::ABSENT);
-  CHECK_EQ(fs.writes, 0);  // load never writes
+  CHECK(r.marker.state == MarkerObservation::ABSENT);
+  CHECK_EQ(fs.slot_writes + fs.marker_writes, 0);  // load never writes
+
+  // The first marker is a PENDING{completed 0, begun 1}; final state COMPLETED{1,1}.
+  const SaveResult s = store.save(record(), boundProfile());
+  CHECK(s.status == SaveStatus::OK);
+  CHECK(s.phase == SavePhase::DONE);
+  CHECK(s.persistence == PersistenceClass::NEVER_INITIALIZED_OR_ERASED);
+  CHECK_EQ(s.generation, 1);
+  SaveMarker m;
+  CHECK(fs.decodedMarker(&m));
+  CHECK(m.state == SaveMarkerState::COMPLETED);
+  CHECK_EQ(m.completed_generation, 1);
+  CHECK_EQ(m.begun_generation, 1);
 }
 
-void test_first_second_third_save_alternate() {
+void test_protocol_order() {
+  g_case = "protocol order";
+  FakeStorage fs;
+  CalibrationRecordStore store(&fs);
+  const SaveResult s = store.save(record(), boundProfile());
+  CHECK(s.status == SaveStatus::OK);
+  // scan (rA rB rM), PENDING + verify, slot + full read-back, COMPLETED + verify
+  const std::vector<std::string> expected = {"rA", "rB", "rM", "wM", "rM", "wA", "rA", "wM", "rM"};
+  CHECK(fs.log == expected);
+  CHECK_EQ(fs.mutations, 3);
+}
+
+void test_alternation_and_generations() {
   g_case = "A/B alternation";
   FakeStorage fs;
   CalibrationRecordStore store(&fs);
@@ -163,9 +330,7 @@ void test_first_second_third_save_alternate() {
   SaveResult r = store.save(record(), profile);
   CHECK(r.status == SaveStatus::OK);
   CHECK(r.slot == CalibrationSlot::A);
-  CHECK_EQ(r.generation, 1);
   CHECK(!r.previous_record_intact);
-  CHECK_EQ(fs.data[0].size(), kCalibrationRecordV1EncodedBytes);
   CHECK(!fs.present[1]);
   expectSelected(store, 1, CalibrationSlot::A, false);
 
@@ -176,16 +341,14 @@ void test_first_second_third_save_alternate() {
   CHECK_EQ(r.generation, 2);
   CHECK(r.previous_record_intact);
   CHECK_EQ(r.previous_generation, 1);
-  CHECK(fs.data[0] == a_after_first);  // the previous slot was not touched
+  CHECK(fs.data[0] == a_after_first);  // the confirmed slot was not touched
   expectSelected(store, 2, CalibrationSlot::B, false);
 
   const std::vector<uint8_t> b_after_second = fs.data[1];
   r = store.save(record(), profile);
-  CHECK(r.status == SaveStatus::OK);
   CHECK(r.slot == CalibrationSlot::A);
   CHECK_EQ(r.generation, 3);
   CHECK(fs.data[1] == b_after_second);
-  expectSelected(store, 3, CalibrationSlot::A, false);
 
   for (int i = 4; i <= 30; ++i) {
     r = store.save(record(), profile);
@@ -196,19 +359,17 @@ void test_first_second_third_save_alternate() {
   expectSelected(store, 30, CalibrationSlot::B, false);
 
   // The caller's generation is ignored: the store owns it.
-  CalibrationRecord forced = goldenRecord(999);
-  r = store.save(forced, profile);
+  r = store.save(goldenRecord(999), profile);
   CHECK(r.status == SaveStatus::OK);
   CHECK_EQ(r.generation, 31);
 
-  // What is stored is exactly the record: a load returns the saved content.
   CalibrationRecord loaded;
   CHECK(store.load(profile, &loaded).status == LoadStatus::OK);
   CHECK(std::memcmp(loaded.digest, goldenRecord(1).digest, sizeof(loaded.digest)) == 0);
   CHECK_EQ(loaded.parameters_approved, 0);
 }
 
-void test_save_refuses_invalid_without_touching_storage() {
+void test_invalid_record_does_not_touch_storage() {
   g_case = "invalid record";
   FakeStorage fs;
   CalibrationRecordStore store(&fs);
@@ -217,20 +378,20 @@ void test_save_refuses_invalid_without_touching_storage() {
   SaveResult r = store.save(bad, boundProfile());
   CHECK(r.status == SaveStatus::INVALID_RECORD);
   CHECK(r.validation == CalibrationRecordStatus::FORBIDDEN_AUTHORIZATION);
+  CHECK(r.phase == SavePhase::VALIDATE);
   CHECK_EQ(fs.reads, 0);
-  CHECK_EQ(fs.writes, 0);
+  CHECK_EQ(fs.mutations, 0);
+  CHECK(store.writeState() == WriteState::OPEN);  // a refusal before storage is not an uncertain write
 
   bad = record();
   bad.joint[0].bus_id = 14;
   r = store.save(bad, boundProfile());
-  CHECK(r.status == SaveStatus::INVALID_RECORD);
   CHECK(r.validation == CalibrationRecordStatus::IDENTITY_MISMATCH);
-  CHECK_EQ(fs.writes, 0);
+  CHECK_EQ(fs.mutations, 0);
 
   actuator::CalibrationGeometryProfile unbound;
-  r = store.save(record(), unbound);
-  CHECK(r.status == SaveStatus::INVALID_RECORD);
-  CHECK_EQ(fs.writes, 0);
+  CHECK(store.save(record(), unbound).status == SaveStatus::INVALID_RECORD);
+  CHECK_EQ(fs.mutations, 0);
 
   CalibrationRecordStore null_store(nullptr);
   CHECK(null_store.save(record(), boundProfile()).status == SaveStatus::BAD_ARGUMENT);
@@ -239,555 +400,735 @@ void test_save_refuses_invalid_without_touching_storage() {
   CHECK(store.load(boundProfile(), nullptr).status == LoadStatus::BAD_ARGUMENT);
 }
 
-// Seeds storage with generations 1 (slot A) and 2 (slot B) through the store itself.
-void seedTwo(FakeStorage* fs, CalibrationRecordStore* store) {
-  CHECK(store->save(record(), boundProfile()).status == SaveStatus::OK);
-  CHECK(store->save(record(), boundProfile()).status == SaveStatus::OK);
-  fs->writes = 0;
-  fs->reads = 0;
+// ---- named failure scenarios (state seeded: gen 1 confirmed in slot A) -----
+
+// Common post-conditions of a failed SAVE started from a confirmed gen 1.
+void expectConfirmedUntouched(FakeStorage& fs, const std::vector<uint8_t>& slot_a_before) {
+  CHECK(fs.present[0]);
+  CHECK(fs.data[0] == slot_a_before);  // the confirmed record's bytes never changed
 }
 
-void test_failure_before_write() {
-  g_case = "failure before write";
-  FakeStorage fs;
-  CalibrationRecordStore store(&fs);
-  seedTwo(&fs, &store);
-  const std::vector<uint8_t> a = fs.data[0], b = fs.data[1];
-
-  fs.fault = WriteFault::FAIL_BEFORE_WRITE;
-  const SaveResult r = store.save(record(), boundProfile());
-  CHECK(r.status == SaveStatus::WRITE_FAILED);
-  CHECK(r.io == StorageIoStatus::NOT_MODIFIED);
-  CHECK(r.slot == CalibrationSlot::A);  // target was the older slot
-  CHECK(r.previous_record_intact);
-  CHECK_EQ(r.previous_generation, 2);
-  CHECK(fs.data[0] == a && fs.data[1] == b);
-  CHECK(store.writeState() == WriteState::OPEN);  // certain: storage was not modified
-  fs.fault = WriteFault::NONE;
-  expectSelected(store, 2, CalibrationSlot::B, false);
-
-  // Retry on the SAME instance behaves as before: it succeeds into the older slot.
-  const SaveResult retry = store.save(record(), boundProfile());
-  CHECK(retry.status == SaveStatus::OK);
-  CHECK(retry.slot == CalibrationSlot::A);
-  CHECK_EQ(retry.generation, 3);
-  CHECK(fs.data[1] == b);
-  CHECK(store.writeState() == WriteState::OPEN);
-}
-
-void test_failure_during_write_torn() {
-  g_case = "failure during write (torn)";
-  FakeStorage fs;
-  CalibrationRecordStore store(&fs);
-  seedTwo(&fs, &store);
-  const std::vector<uint8_t> b = fs.data[1];
-
-  fs.fault = WriteFault::TORN;
-  const SaveResult r = store.save(record(), boundProfile());
-  CHECK(r.status == SaveStatus::WRITE_FAILED);
-  CHECK(r.previous_record_intact);
-  CHECK(fs.data[1] == b);  // the record being protected is byte-identical
-  fs.fault = WriteFault::NONE;
-
-  CalibrationRecord loaded;
-  const LoadResult l = store.load(boundProfile(), &loaded);
-  CHECK(l.status == LoadStatus::OK);
-  CHECK_EQ(l.generation, 2);
-  CHECK(l.slot == CalibrationSlot::B);
-  CHECK(l.degraded);  // the newest save was lost and reported as such
-  CHECK(l.report[0].state == SlotState::CORRUPT);
-
-  // The failed instance refuses to write again; the good slot stays untouched.
-  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
-  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
-  CHECK(fs.data[1] == b);
-
-  // After a reboot (new instance) the next save heals it: it overwrites the
-  // damaged slot, never the good one.
-  CalibrationRecordStore rebooted(&fs);
-  const SaveResult next = rebooted.save(record(), boundProfile());
-  CHECK(next.status == SaveStatus::OK);
-  CHECK(next.slot == CalibrationSlot::A);
-  CHECK_EQ(next.generation, 3);
-  CHECK(fs.data[1] == b);
-  expectSelected(rebooted, 3, CalibrationSlot::A, false);
-}
-
-void test_failure_during_commit() {
-  g_case = "failure during commit";
-  FakeStorage fs;
-  CalibrationRecordStore store(&fs);
-  seedTwo(&fs, &store);
-  const std::vector<uint8_t> b = fs.data[1];
-
-  // The commit is reported as failed although the bytes did land. The store
-  // reports failure; whatever state storage is in must still load safely.
-  fs.fault = WriteFault::FAIL_AFTER_DATA;
-  const SaveResult r = store.save(record(), boundProfile());
-  CHECK(r.status == SaveStatus::WRITE_FAILED);
-  CHECK(fs.data[1] == b);
-  fs.fault = WriteFault::NONE;
-  CalibrationRecord loaded;
-  const LoadResult l = store.load(boundProfile(), &loaded);
-  CHECK(l.status == LoadStatus::OK);
-  // Complete and CRC-valid: it is a legitimate generation 3 (the caller was
-  // told the save failed; after a reboot the next save yields generation 4).
-  CHECK_EQ(l.generation, 3);
-  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
-  CalibrationRecordStore rebooted(&fs);
-  const SaveResult retry = rebooted.save(record(), boundProfile());
-  CHECK(retry.status == SaveStatus::OK);
-  CHECK_EQ(retry.generation, 4);
-  CHECK(retry.slot == CalibrationSlot::B);
-}
-
-void test_no_space() {
-  g_case = "insufficient space";
-  FakeStorage fs;
-  CalibrationRecordStore store(&fs);
-  seedTwo(&fs, &store);
-  fs.fault = WriteFault::NO_SPACE;
-  const SaveResult r = store.save(record(), boundProfile());
-  CHECK(r.status == SaveStatus::NO_SPACE);
-  CHECK(r.io == StorageIoStatus::NO_SPACE);
-  CHECK(r.previous_record_intact);
-  // Backends cannot promise that NO_SPACE left the slot alone: treated as uncertain.
-  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
-  fs.fault = WriteFault::NONE;
-  expectSelected(store, 2, CalibrationSlot::B, false);
-  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
-}
-
-void test_readback_failures() {
-  g_case = "read-back";
-  {
+void test_failure_before_pending_write() {
+  g_case = "failure before PENDING";
+  for (Fault f : {Fault::NOT_MODIFIED}) {
     FakeStorage fs;
+    seed(&fs, 1);
     CalibrationRecordStore store(&fs);
-    seedTwo(&fs, &store);
-    fs.fault = WriteFault::SILENT_CORRUPTION;
+    const std::vector<uint8_t> a = fs.data[0];
+    SaveMarker before;
+    CHECK(fs.decodedMarker(&before));
+    fs.arm(1, f);
     const SaveResult r = store.save(record(), boundProfile());
-    CHECK(r.status == SaveStatus::READBACK_MISMATCH);
-    CHECK_EQ(r.generation, 0);  // no success is claimed
-    CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
-    fs.fault = WriteFault::NONE;
-    expectSelected(store, 2, CalibrationSlot::B, true);  // recovered, flagged
+    CHECK(r.status == SaveStatus::MARKER_WRITE_FAILED);
+    CHECK(r.phase == SavePhase::MARKER_PENDING_WRITE);
+    CHECK(r.io == StorageIoStatus::NOT_MODIFIED);
+    CHECK_EQ(fs.slot_writes, 0);  // the record write never started
+    // Storage certified it was untouched: nothing is uncertain, a retry is legitimate...
+    CHECK(store.writeState() == WriteState::OPEN);
+    SaveMarker after;
+    CHECK(fs.decodedMarker(&after) && after == before);
+    expectConfirmedUntouched(fs, a);
+    expectSelected(store, 1, CalibrationSlot::A, false);
+    // ...and succeeds, without any reconciliation: nothing was published.
+    fs.arm(0, Fault::NONE);
+    const SaveResult again = store.save(record(), boundProfile());
+    CHECK(again.status == SaveStatus::OK);
+    CHECK_EQ(again.generation, 2);
   }
-  {
+  {  // storage fails without certifying: uncertain, blocked
     FakeStorage fs;
+    seed(&fs, 1);
     CalibrationRecordStore store(&fs);
-    seedTwo(&fs, &store);
-    fs.fail_read_after_write = true;
+    fs.arm(1, Fault::IO_NOTHING);
+    CHECK(store.save(record(), boundProfile()).status == SaveStatus::MARKER_WRITE_FAILED);
+    CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+    fs.arm(0, Fault::NONE);
+    CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  }
+}
+
+void test_pending_published_record_not_written() {
+  g_case = "PENDING published, record not written";
+  FakeStorage fs;
+  seed(&fs, 1);
+  CalibrationRecordStore store(&fs);
+  const std::vector<uint8_t> a = fs.data[0];
+  fs.arm(2, Fault::NOT_MODIFIED);  // even a certified "nothing written" is uncertain now
+  const SaveResult r = store.save(record(), boundProfile());
+  CHECK(r.status == SaveStatus::WRITE_FAILED);
+  CHECK(r.phase == SavePhase::RECORD_WRITE);
+  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+  CHECK_EQ(r.generation, 0);  // no confirmed generation reported
+  SaveMarker m;
+  CHECK(fs.decodedMarker(&m));
+  CHECK(m.state == SaveMarkerState::PENDING);
+  CHECK_EQ(m.completed_generation, 1);
+  CHECK_EQ(m.begun_generation, 2);
+  expectConfirmedUntouched(fs, a);
+
+  // Same instance: refused, nothing read, nothing written.
+  fs.arm(0, Fault::NONE);
+  const int reads = fs.reads, muts = fs.mutations;
+  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CHECK_EQ(fs.reads, reads);
+  CHECK_EQ(fs.mutations, muts);
+
+  // New instance after reboot: PENDING with an absent record; not served, not overwritten.
+  CalibrationRecordStore rebooted(&fs);
+  CalibrationRecord out;
+  const LoadResult l = rebooted.load(boundProfile(), &out);
+  CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+  CHECK(l.assessment.cls == PersistenceClass::PENDING_RECORD_ABSENT);
+  CHECK(l.assessment.confirmed_record_intact);  // gen 1 is still there, but not served
+  CHECK(l.assessment.reconciliation_required);
+  const SaveResult s = rebooted.save(record(), boundProfile());
+  CHECK(s.status == SaveStatus::RECONCILIATION_REQUIRED);
+  CHECK(s.persistence == PersistenceClass::PENDING_RECORD_ABSENT);
+  CHECK_EQ(fs.mutations, muts);
+  expectConfirmedUntouched(fs, a);
+}
+
+void test_record_partially_written() {
+  g_case = "record partially written";
+  FakeStorage fs;
+  seed(&fs, 1);
+  CalibrationRecordStore store(&fs);
+  const std::vector<uint8_t> a = fs.data[0];
+  fs.arm(2, Fault::TORN);
+  const SaveResult r = store.save(record(), boundProfile());
+  CHECK(r.status == SaveStatus::WRITE_FAILED);
+  CHECK(r.phase == SavePhase::RECORD_WRITE);
+  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+  expectConfirmedUntouched(fs, a);
+  CHECK_EQ(fs.data[1].size(), kCalibrationRecordV1EncodedBytes / 2);
+
+  fs.arm(0, Fault::NONE);
+  CalibrationRecordStore rebooted(&fs);
+  CalibrationRecord out;
+  const LoadResult l = rebooted.load(boundProfile(), &out);
+  CHECK(l.assessment.cls == PersistenceClass::PENDING_RECORD_ABSENT);  // the torn blob is not a record
+  CHECK(l.report[1].state == SlotState::CORRUPT);
+  CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+}
+
+void test_record_written_but_commit_failed() {
+  g_case = "record written, commit failed";
+  FakeStorage fs;
+  seed(&fs, 1);
+  CalibrationRecordStore store(&fs);
+  const std::vector<uint8_t> a = fs.data[0];
+  fs.arm(2, Fault::AFTER_DATA);
+  const SaveResult r = store.save(record(), boundProfile());
+  CHECK(r.status == SaveStatus::WRITE_FAILED);
+  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+  // The new record is complete and valid on disk, but the marker still says PENDING.
+  SaveMarker m;
+  CHECK(fs.decodedMarker(&m) && m.state == SaveMarkerState::PENDING);
+  fs.arm(0, Fault::NONE);
+  CalibrationRecordStore rebooted(&fs);
+  CalibrationRecord out;
+  const LoadResult l = rebooted.load(boundProfile(), &out);
+  CHECK(l.assessment.cls == PersistenceClass::PENDING_RECORD_PRESENT);
+  CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);  // NOT promoted
+  CHECK(!l.assessment.record_available);
+  CHECK(rebooted.save(record(), boundProfile()).status == SaveStatus::RECONCILIATION_REQUIRED);
+  expectConfirmedUntouched(fs, a);
+}
+
+void test_record_readback_failed() {
+  g_case = "record read-back failed";
+  FakeStorage fs;
+  seed(&fs, 1);
+  CalibrationRecordStore store(&fs);
+  fs.fail_slot_read_after_slot_write = true;
+  const SaveResult r = store.save(record(), boundProfile());
+  CHECK(r.status == SaveStatus::READBACK_FAILED);
+  CHECK(r.phase == SavePhase::RECORD_VERIFY);
+  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+  CHECK_EQ(fs.marker_writes, 1);  // the COMPLETED marker was never written
+  SaveMarker m;
+  CHECK(fs.decodedMarker(&m) && m.state == SaveMarkerState::PENDING);
+
+  fs.reboot();
+  CHECK(classOf(fs) == PersistenceClass::PENDING_RECORD_PRESENT);
+}
+
+void test_record_readback_mismatch() {
+  g_case = "record read-back mismatch";
+  FakeStorage fs;
+  seed(&fs, 1);
+  CalibrationRecordStore store(&fs);
+  fs.arm(2, Fault::SILENT_CORRUPTION);
+  const SaveResult r = store.save(record(), boundProfile());
+  CHECK(r.status == SaveStatus::READBACK_MISMATCH);
+  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+  CHECK_EQ(fs.marker_writes, 1);
+  fs.reboot();
+  CHECK(classOf(fs) == PersistenceClass::PENDING_RECORD_ABSENT);  // the corrupt blob is no record
+}
+
+void test_completed_marker_partially_written() {
+  g_case = "COMPLETED marker partially written";
+  FakeStorage fs;
+  seed(&fs, 1);
+  CalibrationRecordStore store(&fs);
+  const std::vector<uint8_t> a = fs.data[0];
+  fs.arm(3, Fault::TORN);
+  const SaveResult r = store.save(record(), boundProfile());
+  CHECK(r.status == SaveStatus::MARKER_WRITE_FAILED);
+  CHECK(r.phase == SavePhase::MARKER_COMPLETED_WRITE);
+  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+  CHECK_EQ(r.generation, 0);
+  fs.arm(0, Fault::NONE);
+  CalibrationRecordStore rebooted(&fs);
+  CalibrationRecord out;
+  const LoadResult l = rebooted.load(boundProfile(), &out);
+  CHECK(l.assessment.cls == PersistenceClass::MARKER_CORRUPT);
+  CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+  CHECK(rebooted.save(record(), boundProfile()).status == SaveStatus::RECONCILIATION_REQUIRED);
+  expectConfirmedUntouched(fs, a);
+}
+
+void test_completed_published_but_error_returned() {
+  g_case = "COMPLETED published, error returned";
+  FakeStorage fs;
+  seed(&fs, 1);
+  CalibrationRecordStore store(&fs);
+  fs.arm(3, Fault::AFTER_DATA);
+  const SaveResult r = store.save(record(), boundProfile());
+  CHECK(r.status == SaveStatus::MARKER_WRITE_FAILED);  // the caller is NOT told it succeeded
+  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+  CHECK_EQ(r.generation, 0);
+  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  // The truth is on disk and a reboot reads it: generation 2 was in fact confirmed
+  // (record fully read back, COMPLETED marker intact), so it is served, once.
+  fs.arm(0, Fault::NONE);
+  CalibrationRecordStore rebooted(&fs);
+  expectSelected(rebooted, 2, CalibrationSlot::B, false);
+}
+
+void test_marker_readback_failed() {
+  g_case = "marker read-back failed";
+  {  // PENDING verify read fails
+    FakeStorage fs;
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    fs.fail_marker_read_from_marker_write = 1;
     const SaveResult r = store.save(record(), boundProfile());
-    CHECK(r.status == SaveStatus::READBACK_FAILED);
+    CHECK(r.status == SaveStatus::MARKER_VERIFY_FAILED);
+    CHECK(r.phase == SavePhase::MARKER_PENDING_VERIFY);
+    CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+    CHECK_EQ(fs.slot_writes, 0);  // the record was never written on an unverified PENDING
+    fs.reboot();
+    CHECK(classOf(fs) == PersistenceClass::PENDING_RECORD_ABSENT);
+  }
+  {  // COMPLETED verify read fails: marker is in fact fine on disk, instance still blocked
+    FakeStorage fs;
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    fs.fail_marker_read_from_marker_write = 2;
+    const SaveResult r = store.save(record(), boundProfile());
+    CHECK(r.status == SaveStatus::MARKER_VERIFY_FAILED);
+    CHECK(r.phase == SavePhase::MARKER_COMPLETED_VERIFY);
+    CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
     CHECK_EQ(r.generation, 0);
+    fs.reboot();
+    CHECK(classOf(fs) == PersistenceClass::CONSISTENT);
+  }
+  {  // COMPLETED written with a silent flipped byte: verify catches it
+    FakeStorage fs;
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    fs.arm(3, Fault::SILENT_CORRUPTION);
+    const SaveResult r = store.save(record(), boundProfile());
+    CHECK(r.status == SaveStatus::MARKER_VERIFY_FAILED);
     CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+    fs.reboot();
+    CHECK(classOf(fs) == PersistenceClass::MARKER_CORRUPT);
   }
 }
 
-void test_recovery_when_newest_slot_is_invalid() {
-  g_case = "recovery";
-  const auto profile = boundProfile();
-  {  // newest slot bit-flipped
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    seedTwo(&fs, &store);
-    fs.data[1][500] ^= 0x01;
-    expectSelected(store, 1, CalibrationSlot::A, true);
-    CalibrationRecord out;
-    const LoadResult l = store.load(profile, &out);
-    CHECK(l.report[1].state == SlotState::CORRUPT);
-    CHECK(l.report[1].detail == CalibrationRecordStatus::BAD_CRC);
-    CHECK(l.report[0].state == SlotState::VALID);
+// ---- every (mutation, fault) pair, then a reboot ---------------------------
+
+void test_fault_matrix() {
+  g_case = "fault matrix";
+  int combos = 0;
+  for (int at = 1; at <= 3; ++at) {
+    for (Fault f : kAllFaults) {
+      ++combos;
+      FakeStorage fs;
+      seed(&fs, 1);
+      const std::vector<uint8_t> a = fs.data[0];
+      CalibrationRecordStore store(&fs);
+      fs.arm(at, f);
+      const SaveResult r = store.save(record(), boundProfile());
+      const std::string label = std::string("at=") + std::to_string(at) + " fault=" + faultName(f);
+      g_case = label.c_str();
+
+      CHECK(r.status != SaveStatus::OK);        // a fault is never reported as success
+      CHECK_EQ(r.generation, 0);                // ...and never carries a confirmed generation
+      CHECK(fs.data[0] == a);                   // the confirmed record's bytes are untouched
+      const int muts_at_failure = fs.mutations;
+      CHECK(muts_at_failure <= at);             // nothing was attempted after the fault
+
+      const bool certain_untouched = at == 1 && f == Fault::NOT_MODIFIED;
+      CHECK_EQ(store.writeState() == WriteState::OPEN, certain_untouched);
+
+      if (!certain_untouched) {
+        const int reads = fs.reads;
+        CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+        CHECK_EQ(fs.reads, reads);
+        CHECK_EQ(fs.mutations, muts_at_failure);  // no automatic retry
+      }
+
+      // Reboot: a new instance on the very same bytes.
+      fs.reboot();
+      CalibrationRecordStore rebooted(&fs);
+      CalibrationRecord out;
+      const LoadResult l = rebooted.load(boundProfile(), &out);
+      CHECK(fs.data[0] == a);
+      if (l.status == LoadStatus::OK) {
+        // Served only if CONSISTENT with the marker's own COMPLETED generation.
+        SaveMarker m;
+        CHECK(fs.decodedMarker(&m));
+        CHECK(m.state == SaveMarkerState::COMPLETED);
+        CHECK_EQ(m.completed_generation, l.generation);
+        CHECK(l.generation == 1 || l.generation == 2);
+        CHECK(out.generation == l.generation);
+        CHECK(l.assessment.cls == PersistenceClass::CONSISTENT);
+      } else {
+        CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+        CHECK(l.assessment.reconciliation_required);
+        CHECK(!l.assessment.save_allowed);
+        const int before = fs.mutations;
+        const SaveResult s = rebooted.save(record(), boundProfile());
+        CHECK(s.status == SaveStatus::RECONCILIATION_REQUIRED);
+        CHECK_EQ(fs.mutations, before);
+        CHECK(fs.data[0] == a);
+      }
+      g_case = "fault matrix";
+    }
   }
-  {  // newest slot truncated
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    seedTwo(&fs, &store);
-    fs.data[1].resize(700);
-    expectSelected(store, 1, CalibrationSlot::A, true);
-  }
-  {  // newest slot semantically contradictory but CRC-valid
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    CHECK(store.save(record(), profile).status == SaveStatus::OK);
-    CalibrationRecord bad = goldenRecord(2);
-    bad.joint[3].diagnostics.scale_permille += 1;
-    fs.put(1, bad);
-    CalibrationRecord out;
-    const LoadResult l = store.load(profile, &out);
-    CHECK(l.status == LoadStatus::OK);
-    CHECK_EQ(l.generation, 1);
-    CHECK(l.degraded);
-    CHECK(l.report[1].state == SlotState::CORRUPT);
-    CHECK(l.report[1].detail == CalibrationRecordStatus::INCOHERENT);
-    // Its generation still counts: the next save is 3, never a reuse of 2.
-    const SaveResult s = store.save(record(), profile);
-    CHECK(s.status == SaveStatus::OK);
-    CHECK_EQ(s.generation, 3);
-    CHECK(s.slot == CalibrationSlot::B);
-  }
-  {  // newest slot foreign (another schema, intact)
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    CHECK(store.save(record(), profile).status == SaveStatus::OK);
-    fs.put(1, goldenRecord(2));
-    fs.data[1][4] = 2;  // schema 2
-    const uint32_t crc = calibrationCrc32(fs.data[1].data(), fs.data[1].size() - 4);
-    for (int i = 0; i < 4; ++i) fs.data[1][fs.data[1].size() - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
-    CalibrationRecord out;
-    const LoadResult l = store.load(profile, &out);
-    CHECK(l.status == LoadStatus::OK);
-    CHECK_EQ(l.generation, 1);
-    CHECK(l.degraded);
-    CHECK(l.report[1].state == SlotState::INCOMPATIBLE);
+  CHECK_EQ(combos, 27);
+}
+
+// Same, starting from an empty partition (first install).
+void test_fault_matrix_first_install() {
+  g_case = "fault matrix, first install";
+  for (int at = 1; at <= 3; ++at) {
+    for (Fault f : kAllFaults) {
+      FakeStorage fs;
+      CalibrationRecordStore store(&fs);
+      fs.arm(at, f);
+      const SaveResult r = store.save(record(), boundProfile());
+      const std::string label = std::string("first at=") + std::to_string(at) + " fault=" + faultName(f);
+      g_case = label.c_str();
+      CHECK(r.status != SaveStatus::OK);
+      fs.reboot();
+      CalibrationRecordStore rebooted(&fs);
+      CalibrationRecord out;
+      const LoadResult l = rebooted.load(boundProfile(), &out);
+      if (l.status == LoadStatus::OK) {
+        // Only a fully written + confirmed record can ever be served.
+        CHECK_EQ(l.generation, 1);
+        SaveMarker m;
+        CHECK(fs.decodedMarker(&m) && m.state == SaveMarkerState::COMPLETED);
+      } else {
+        CHECK(!l.assessment.record_available);
+      }
+      g_case = "fault matrix, first install";
+    }
   }
 }
 
-void test_generation_selection() {
-  g_case = "generation selection";
-  const auto profile = boundProfile();
+void test_two_consecutive_errors() {
+  g_case = "two consecutive errors";
+  FakeStorage fs;
+  seed(&fs, 1);
+  const std::vector<uint8_t> a = fs.data[0];
+  CalibrationRecordStore store(&fs);
+  fs.arm(2, Fault::IO_NOTHING);
+  CHECK(store.save(record(), boundProfile()).status == SaveStatus::WRITE_FAILED);
+  fs.arm(0, Fault::NONE);
+  const int muts = fs.mutations;
+  for (int i = 0; i < 3; ++i) {
+    CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  }
+  CHECK_EQ(fs.mutations, muts);
+
+  // After a reboot the persistent PENDING marker keeps refusing, repeatedly.
+  for (int i = 0; i < 3; ++i) {
+    fs.reboot();
+    CalibrationRecordStore again(&fs);
+    CHECK(again.save(record(), boundProfile()).status == SaveStatus::RECONCILIATION_REQUIRED);
+    CHECK(again.save(record(), boundProfile()).status == SaveStatus::RECONCILIATION_REQUIRED);
+  }
+  CHECK_EQ(fs.mutations, 0);  // reboot() reset the counter: no mutation since
+  CHECK(fs.data[0] == a);
+  CHECK(fs.present[0]);
+}
+
+void test_error_then_error_cannot_erase_confirmed() {
+  g_case = "retries cannot erase the confirmed record";
+  // A long sequence of failing boots/saves never changes slot A.
+  FakeStorage fs;
+  seed(&fs, 1);
+  const std::vector<uint8_t> a = fs.data[0];
   {
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    fs.put(0, goldenRecord(3));
-    fs.put(1, goldenRecord(10));
-    expectSelected(store, 10, CalibrationSlot::B, false);
+    CalibrationRecordStore s(&fs);
+    fs.arm(2, Fault::POWER_TORN);
+    s.save(record(), boundProfile());
   }
-  {
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    fs.put(0, goldenRecord(10));
-    fs.put(1, goldenRecord(3));
-    expectSelected(store, 10, CalibrationSlot::A, false);
-  }
-  {  // only one slot holds a record
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    fs.put(1, goldenRecord(4));
-    expectSelected(store, 4, CalibrationSlot::B, false);
-  }
-  {  // equal generations contradict the protocol: nothing is selected
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    fs.put(0, goldenRecord(5));
-    fs.put(1, goldenRecord(5));
-    CalibrationRecord out;
-    CHECK(store.load(profile, &out).status == LoadStatus::NO_VALID_RECORD);
-  }
-  {  // generation exhaustion refuses to wrap
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    fs.put(0, goldenRecord(0xFFFFFFFFu));
-    const SaveResult r = store.save(record(), profile);
-    CHECK(r.status == SaveStatus::GENERATION_EXHAUSTED);
-    CHECK_EQ(fs.writes, 0);
-  }
-  {  // a foreign intact record keeps generations monotonic and is not overwritten
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    fs.put(1, goldenRecord(9));
-    fs.data[1][4] = 2;
-    const uint32_t crc = calibrationCrc32(fs.data[1].data(), fs.data[1].size() - 4);
-    for (int i = 0; i < 4; ++i) fs.data[1][fs.data[1].size() - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
-    const std::vector<uint8_t> foreign = fs.data[1];
-    const SaveResult r = store.save(record(), profile);
-    CHECK(r.status == SaveStatus::OK);
-    CHECK_EQ(r.generation, 10);
-    CHECK(r.slot == CalibrationSlot::A);  // the absent slot, not the foreign one
-    CHECK(fs.data[1] == foreign);
+  for (int i = 0; i < 10; ++i) {
+    fs.reboot();
+    CalibrationRecordStore s(&fs);
+    CHECK(s.save(record(), boundProfile()).status == SaveStatus::RECONCILIATION_REQUIRED);
+    CHECK_EQ(fs.mutations, 0);
+    CHECK(fs.data[0] == a);
   }
 }
 
-void test_both_slots_unusable() {
-  g_case = "both slots unusable";
+// ---- states a reboot can find ---------------------------------------------
+
+void test_load_serves_only_consistent() {
+  g_case = "load serves only CONSISTENT";
   const auto profile = boundProfile();
   CalibrationRecord out;
-  {  // both corrupt
+  {  // records but no marker (layout from before the marker, or a lost marker)
     FakeStorage fs;
+    fs.putSlot(0, goldenRecord(1));
     CalibrationRecordStore store(&fs);
-    fs.put(0, goldenRecord(1));
-    fs.put(1, goldenRecord(2));
-    fs.data[0][300] ^= 1;
-    fs.data[1][300] ^= 1;
     const LoadResult l = store.load(profile, &out);
-    CHECK(l.status == LoadStatus::NO_VALID_RECORD);
-    CHECK(l.report[0].state == SlotState::CORRUPT && l.report[1].state == SlotState::CORRUPT);
+    CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+    CHECK(l.assessment.cls == PersistenceClass::MARKER_MISSING);
+    CHECK(store.save(record(), profile).status == SaveStatus::RECONCILIATION_REQUIRED);
+    CHECK_EQ(fs.mutations, 0);
   }
-  {  // one corrupt, one absent
+  {  // marker attests 3, only 2 survives: NOT healthy
     FakeStorage fs;
+    fs.putSlot(1, goldenRecord(2));
+    fs.putMarker(SaveMarkerState::COMPLETED, 3, 3);
     CalibrationRecordStore store(&fs);
-    fs.put(0, goldenRecord(1));
-    fs.data[0][300] ^= 1;
-    CHECK(store.load(profile, &out).status == LoadStatus::NO_VALID_RECORD);
-    // Saving into this state is allowed (nothing valid to protect) and heals it.
+    const LoadResult l = store.load(profile, &out);
+    CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+    CHECK(l.assessment.cls == PersistenceClass::CONFIRMED_GENERATION_LOST);
+    CHECK(l.assessment.older_record_survives);
+    CHECK(!l.assessment.record_available);
+    CHECK(store.save(record(), profile).status == SaveStatus::RECONCILIATION_REQUIRED);
+    CHECK_EQ(fs.mutations, 0);
+  }
+  {  // marker attests 3, nothing valid survives
+    FakeStorage fs;
+    fs.putSlot(0, goldenRecord(3));
+    fs.data[0][600] ^= 1;
+    fs.putMarker(SaveMarkerState::COMPLETED, 3, 3);
+    CalibrationRecordStore store(&fs);
+    const LoadResult l = store.load(profile, &out);
+    CHECK(l.assessment.cls == PersistenceClass::CONFIRMED_GENERATION_LOST);
+    CHECK(!l.assessment.older_record_survives);
+  }
+  {  // record above the confirmed generation, marker COMPLETED
+    FakeStorage fs;
+    fs.putSlot(0, goldenRecord(1));
+    fs.putSlot(1, goldenRecord(2));
+    fs.putMarker(SaveMarkerState::COMPLETED, 1, 1);
+    CalibrationRecordStore store(&fs);
+    const LoadResult l = store.load(profile, &out);
+    CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+    CHECK(l.assessment.cls == PersistenceClass::RECORD_AHEAD_OF_MARKER);
+    CHECK(store.save(record(), profile).status == SaveStatus::RECONCILIATION_REQUIRED);
+  }
+  {  // both records valid with the same generation
+    FakeStorage fs;
+    fs.putSlot(0, goldenRecord(2));
+    fs.putSlot(1, goldenRecord(2));
+    fs.putMarker(SaveMarkerState::COMPLETED, 2, 2);
+    CalibrationRecordStore store(&fs);
+    CHECK(store.load(profile, &out).assessment.cls == PersistenceClass::RECORD_GENERATION_CONFLICT);
+  }
+  {  // both records corrupt, marker COMPLETED
+    FakeStorage fs;
+    fs.putSlot(0, goldenRecord(1));
+    fs.putSlot(1, goldenRecord(2));
+    fs.data[0][500] ^= 1;
+    fs.data[1][500] ^= 1;
+    fs.putMarker(SaveMarkerState::COMPLETED, 2, 2);
+    CalibrationRecordStore store(&fs);
+    const LoadResult l = store.load(profile, &out);
+    CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+    CHECK(l.assessment.cls == PersistenceClass::CONFIRMED_GENERATION_LOST);
+  }
+  {  // corrupt marker, valid records
+    FakeStorage fs;
+    seed(&fs, 2);
+    fs.marker_data[13] ^= 0x01;
+    CalibrationRecordStore store(&fs);
+    const LoadResult l = store.load(profile, &out);
+    CHECK(l.status == LoadStatus::RECONCILIATION_REQUIRED);
+    CHECK(l.assessment.cls == PersistenceClass::MARKER_CORRUPT);
+    CHECK(l.marker.detail == SaveMarkerStatus::BAD_CRC);
+  }
+  {  // foreign marker schema: this build neither reads nor replaces it
+    FakeStorage fs;
+    seed(&fs, 2);
+    fs.marker_data[4] = 2;  // schema 2 ...
+    const uint32_t crc = calibrationCrc32(fs.marker_data.data(), fs.marker_data.size() - 4);
+    for (int i = 0; i < 4; ++i) fs.marker_data[fs.marker_data.size() - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
+    CalibrationRecordStore store(&fs);
+    const LoadResult l = store.load(profile, &out);
+    CHECK(l.status == LoadStatus::INCOMPATIBLE);
+    CHECK(l.assessment.cls == PersistenceClass::MARKER_INCOMPATIBLE);
+    CHECK(store.save(record(), profile).status == SaveStatus::RECONCILIATION_REQUIRED);
+    CHECK_EQ(fs.mutations, 0);
+  }
+  {  // confirmed record foreign (another schema), intact
+    FakeStorage fs;
+    seed(&fs, 1);
+    fs.data[0][4] = 2;
+    const uint32_t crc = calibrationCrc32(fs.data[0].data(), fs.data[0].size() - 4);
+    for (int i = 0; i < 4; ++i) fs.data[0][fs.data[0].size() - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
+    CalibrationRecordStore store(&fs);
+    const LoadResult l = store.load(profile, &out);
+    CHECK(l.status == LoadStatus::INCOMPATIBLE);
+    CHECK(l.assessment.cls == PersistenceClass::RECORD_INCOMPATIBLE);
+  }
+  {  // marker COMPLETED{0,1}: nothing confirmed; no calibration, saving allowed
+    FakeStorage fs;
+    fs.putMarker(SaveMarkerState::COMPLETED, 0, 1);
+    CalibrationRecordStore store(&fs);
+    const LoadResult l = store.load(profile, &out);
+    CHECK(l.status == LoadStatus::NOT_FOUND);
+    CHECK(l.assessment.cls == PersistenceClass::NOTHING_CONFIRMED);
     const SaveResult s = store.save(record(), profile);
     CHECK(s.status == SaveStatus::OK);
-    CHECK(s.slot == CalibrationSlot::B);  // the absent slot first
-    CHECK_EQ(s.generation, 1);            // hint was unknowable (CRC bad)
-  }
-  {  // both foreign: a different geometry (consistent tag) is INCOMPATIBLE, not corrupt
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    CalibrationRecord other = goldenRecord(1);
-    other.digest[0][0] ^= 1;
-    actuator::GeometryProvenance p = actuator::geometry_data::kProvenance;
-    static const char kDigits[] = "0123456789abcdef";
-    char* dst[6] = {p.urdf_sha256, p.mesh_manifest_sha256, p.endpoint_semantic_sha256,
-                    p.parking_semantic_sha256, p.safety_policy_semantic_sha256, p.allocation_sha256};
-    for (int k = 0; k < 6; ++k) {
-      for (int b = 0; b < 32; ++b) {
-        dst[k][2 * b] = kDigits[other.digest[k][b] >> 4];
-        dst[k][2 * b + 1] = kDigits[other.digest[k][b] & 15];
-      }
-      dst[k][64] = '\0';
-    }
-    other.geometry_tag = actuator::geometryProvenanceTag(p);
-    fs.put(0, other);
-    other.generation = 2;
-    fs.put(1, other);
-    const LoadResult l = store.load(profile, &out);
-    CHECK(l.status == LoadStatus::INCOMPATIBLE);
-    CHECK(l.report[0].state == SlotState::INCOMPATIBLE);
-    CHECK(l.report[0].detail == CalibrationRecordStatus::PROVENANCE_MISMATCH);
-  }
-  {  // an installation difference (bus id) is incompatible too
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    CalibrationRecord other = goldenRecord(1);
-    other.joint[0].bus_id = 14;
-    fs.put(0, other);
-    const LoadResult l = store.load(profile, &out);
-    CHECK(l.status == LoadStatus::INCOMPATIBLE);
-    CHECK(l.report[0].detail == CalibrationRecordStatus::IDENTITY_MISMATCH);
-  }
-  {  // a slot larger than any V1 record
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    fs.oversize[0] = true;
-    fs.oversize[1] = true;
-    const LoadResult l = store.load(profile, &out);
-    CHECK(l.status == LoadStatus::NO_VALID_RECORD);
-    CHECK(l.report[0].state == SlotState::CORRUPT);
-    CHECK(l.report[0].detail == CalibrationRecordStatus::BAD_LENGTH);
+    CHECK_EQ(s.generation, 2);  // never reuses a begun generation
   }
 }
 
 void test_storage_errors_fail_closed() {
-  g_case = "storage I/O errors";
+  g_case = "storage errors fail closed";
   const auto profile = boundProfile();
   CalibrationRecord out;
-  for (int bad = 0; bad < 2; ++bad) {
+  for (int which = 0; which < 3; ++which) {
     FakeStorage fs;
+    seed(&fs, 2);
+    if (which < 2) fs.fail_read[which] = true; else fs.fail_marker_read = true;
     CalibrationRecordStore store(&fs);
-    seedTwo(&fs, &store);
-    fs.fail_read[bad] = true;
     const LoadResult l = store.load(profile, &out);
-    // Never selects on partial knowledge, even if the other slot is fine.
     CHECK(l.status == LoadStatus::IO_ERROR);
-    CHECK(l.report[bad].state == SlotState::IO_ERROR);
+    CHECK(l.assessment.cls == PersistenceClass::IO_ERROR);
+    CHECK(!l.assessment.record_available);
+    fs.mutations = 0;
     const SaveResult s = store.save(record(), profile);
     CHECK(s.status == SaveStatus::STORAGE_UNUSABLE);
-    CHECK_EQ(fs.writes, 0);  // refuses to write blind
+    CHECK_EQ(fs.mutations, 0);
+    CHECK(store.writeState() == WriteState::OPEN);  // nothing was written, nothing is uncertain
+  }
+  {  // oversize blobs are damage, not I/O errors
+    FakeStorage fs;
+    seed(&fs, 1);
+    fs.oversize[0] = true;
+    CalibrationRecordStore store(&fs);
+    const LoadResult l = store.load(profile, &out);
+    CHECK(l.report[0].state == SlotState::CORRUPT);
+    CHECK(l.assessment.cls == PersistenceClass::CONFIRMED_GENERATION_LOST);
+  }
+  {
+    FakeStorage fs;
+    seed(&fs, 1);
+    fs.oversize_marker = true;
+    CalibrationRecordStore store(&fs);
+    CHECK(store.load(profile, &out).assessment.cls == PersistenceClass::MARKER_CORRUPT);
   }
 }
 
-void test_roundtrip_content_equality() {
-  g_case = "content equality";
-  FakeStorage fs;
-  CalibrationRecordStore store(&fs);
+void test_generation_monotonic_over_leftovers() {
+  g_case = "generations over leftovers";
   const auto profile = boundProfile();
-  CHECK(store.save(record(), profile).status == SaveStatus::OK);
-  CalibrationRecord loaded;
-  CHECK(store.load(profile, &loaded).status == LoadStatus::OK);
-  const CalibrationRecord expect = goldenRecord(1);
-  uint8_t a[kCalibrationRecordV1EncodedBytes], b[kCalibrationRecordV1EncodedBytes];
-  size_t na = 0, nb = 0;
-  CHECK(encodeCalibrationRecord(loaded, a, sizeof(a), &na) == CalibrationRecordStatus::OK);
-  CHECK(encodeCalibrationRecord(expect, b, sizeof(b), &nb) == CalibrationRecordStatus::OK);
-  CHECK_EQ(na, nb);
-  CHECK(std::memcmp(a, b, na) == 0);
-}
-
-// --- P2.1: write-uncertainty block -----------------------------------------
-
-// SAVE confirmed B/2; the next SAVE fails with an uncertain error but leaves a
-// complete valid A/3. Without the block a retry would select A/3, target B and
-// overwrite the last confirmed record.
-void seedConfirmedB2ThenUncertainA3(FakeStorage* fs, CalibrationRecordStore* store) {
-  seedTwo(fs, store);
-  fs->fault = WriteFault::FAIL_AFTER_DATA;
-  const SaveResult r = store->save(record(), boundProfile());
-  CHECK(r.status == SaveStatus::WRITE_FAILED);  // never turned into success
-  CHECK_EQ(r.generation, 0);
-  CHECK(r.slot == CalibrationSlot::A);
-  fs->fault = WriteFault::NONE;
-}
-
-void test_uncertain_error_blocks_retry() {
-  g_case = "uncertain error blocks retry";
   FakeStorage fs;
+  seed(&fs, 1);
+  // A corrupt-but-envelope-intact leftover with a high generation, plus a marker above it.
+  CalibrationRecord bad = goldenRecord(7);
+  bad.joint[3].diagnostics.scale_permille += 1;
+  fs.putSlot(1, bad);
+  fs.putMarker(SaveMarkerState::COMPLETED, 1, 7);  // "7 was discarded"
   CalibrationRecordStore store(&fs);
-  seedConfirmedB2ThenUncertainA3(&fs, &store);
-  const std::vector<uint8_t> b2 = fs.data[1];
-  const std::vector<uint8_t> a3 = fs.data[0];
-  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
-  CHECK(std::strcmp(toString(store.writeState()), "BLOCKED_UNCERTAIN_WRITE") == 0);
-
-  fs.reads = 0;
-  fs.writes = 0;
-  const SaveResult retry = store.save(record(), boundProfile());
-  CHECK(retry.status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
-  CHECK(std::strcmp(toString(retry.status), "BLOCKED_UNCERTAIN_WRITE") == 0);
-  CHECK_EQ(retry.generation, 0);
-  CHECK(!retry.previous_record_intact);  // nothing was scanned
-  CHECK_EQ(fs.writes, 0);
-  CHECK_EQ(fs.reads, 0);
-  CHECK(fs.data[1] == b2);  // the last confirmed record is byte-identical
-  CHECK(fs.data[0] == a3);
-
-  // Even a retry whose write would itself tear the slot never gets to write.
-  fs.fault = WriteFault::TORN;
-  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
-  CHECK_EQ(fs.writes, 0);
-  CHECK(fs.data[1] == b2);
-  fs.fault = WriteFault::NONE;
+  expectSelected(store, 1, CalibrationSlot::A, true);
+  const SaveResult s = store.save(record(), profile);
+  CHECK(s.status == SaveStatus::OK);
+  CHECK_EQ(s.generation, 8);
+  CHECK(s.slot == CalibrationSlot::B);
+  expectSelected(store, 8, CalibrationSlot::B, false);
 }
 
-void test_repeated_attempts_cannot_overwrite() {
-  g_case = "repeated attempts after uncertain error";
+void test_both_slots_unusable_first_save_recovers_nothing() {
+  g_case = "nothing confirmed, leftovers";
+  const auto profile = boundProfile();
   FakeStorage fs;
+  fs.putSlot(0, goldenRecord(4));  // valid but never confirmed ...
+  fs.putMarker(SaveMarkerState::COMPLETED, 0, 4);  // ... explicitly declared not confirmed
   CalibrationRecordStore store(&fs);
-  seedConfirmedB2ThenUncertainA3(&fs, &store);
-  const std::vector<uint8_t> b2 = fs.data[1];
-  for (int i = 0; i < 5; ++i) {
-    CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CalibrationRecord out;
+  const LoadResult l = store.load(profile, &out);
+  CHECK(l.status == LoadStatus::NOT_FOUND);
+  CHECK(l.assessment.cls == PersistenceClass::NOTHING_CONFIRMED);
+  const SaveResult s = store.save(record(), profile);
+  CHECK(s.status == SaveStatus::OK);
+  CHECK_EQ(s.generation, 5);
+  CHECK(s.slot == CalibrationSlot::B);  // never the leftover when an absent slot exists
+}
+
+// ---- explicit reconciliation, end to end ----------------------------------
+
+void applyPlan(FakeStorage* fs, const SaveMarker& m) {
+  fs->putMarker(m.state, m.completed_generation, m.begun_generation);
+}
+
+PersistenceInputs inputsOf(FakeStorage& fs) {
+  CalibrationRecordStore s(&fs);
+  CalibrationRecord out;
+  const LoadResult l = s.load(boundProfile(), &out);
+  PersistenceInputs in;
+  for (int i = 0; i < 2; ++i) in.slot[i] = l.report[i];
+  in.marker = l.marker;
+  return in;
+}
+
+void test_reconciliation_end_to_end() {
+  g_case = "reconciliation";
+  const auto profile = boundProfile();
+  CalibrationRecord out;
+  {  // interrupted SAVE whose record is complete: operator adopts it
+    FakeStorage fs;
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    fs.arm(3, Fault::POWER_BEFORE);
+    store.save(record(), profile);
+    fs.reboot();
+    PersistenceInputs in = inputsOf(fs);
+    CHECK(classifyPersistence(in).cls == PersistenceClass::PENDING_RECORD_PRESENT);
+    SaveMarker m;
+    CHECK(planReconciliation(in, ReconciliationAction::ADOPT_VALID_RECORD, 2, &m) == ReconciliationStatus::OK);
+    applyPlan(&fs, m);
+    CalibrationRecordStore after(&fs);
+    expectSelected(after, 2, CalibrationSlot::B, false);
+    const SaveResult s = after.save(record(), profile);
+    CHECK(s.status == SaveStatus::OK);
+    CHECK_EQ(s.generation, 3);
   }
-  CHECK_EQ(fs.writes, 1);  // only the original, failed attempt
-  CHECK(fs.data[1] == b2);
+  {  // same, operator prefers the previous confirmed one
+    FakeStorage fs;
+    seed(&fs, 1);
+    CalibrationRecordStore store(&fs);
+    fs.arm(3, Fault::POWER_BEFORE);
+    store.save(record(), profile);
+    fs.reboot();
+    PersistenceInputs in = inputsOf(fs);
+    SaveMarker m;
+    CHECK(planReconciliation(in, ReconciliationAction::ADOPT_VALID_RECORD, 1, &m) == ReconciliationStatus::OK);
+    applyPlan(&fs, m);
+    CalibrationRecordStore after(&fs);
+    expectSelected(after, 1, CalibrationSlot::A, false);  // gen 2 is a valid, discarded leftover
+    const SaveResult s = after.save(record(), profile);
+    CHECK(s.status == SaveStatus::OK);
+    CHECK_EQ(s.generation, 3);  // 2 is never reused
+    CHECK(s.slot == CalibrationSlot::B);
+  }
+  {  // confirmed generation lost: declare nothing confirmed, then a fresh SAVE
+    FakeStorage fs;
+    fs.putSlot(1, goldenRecord(2));
+    fs.putMarker(SaveMarkerState::COMPLETED, 3, 3);
+    PersistenceInputs in = inputsOf(fs);
+    SaveMarker m;
+    CHECK(planReconciliation(in, ReconciliationAction::DECLARE_NOTHING_CONFIRMED, 0, &m) == ReconciliationStatus::OK);
+    applyPlan(&fs, m);
+    CalibrationRecordStore after(&fs);
+    CHECK(after.load(profile, &out).status == LoadStatus::NOT_FOUND);
+    const SaveResult s = after.save(record(), profile);
+    CHECK(s.status == SaveStatus::OK);
+    CHECK_EQ(s.generation, 4);
+    expectSelected(after, 4, CalibrationSlot::A, false);
+  }
 }
 
 void test_load_does_not_unlock() {
   g_case = "load does not unlock";
   FakeStorage fs;
+  seed(&fs, 1);
   CalibrationRecordStore store(&fs);
-  seedConfirmedB2ThenUncertainA3(&fs, &store);
-  const std::vector<uint8_t> b2 = fs.data[1];
-
-  // LOAD stays available and reports what is in storage: the valid highest generation.
-  expectSelected(store, 3, CalibrationSlot::A, false);
+  fs.arm(2, Fault::IO_NOTHING);
+  store.save(record(), boundProfile());
+  fs.arm(0, Fault::NONE);
+  CalibrationRecord out;
+  for (int i = 0; i < 3; ++i) store.load(boundProfile(), &out);
   CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
   CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
-  expectSelected(store, 3, CalibrationSlot::A, false);
-  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
-  CHECK(fs.data[1] == b2);
 }
 
-void test_reboot_selects_highest_valid_record() {
-  g_case = "reboot after uncertain error";
-  FakeStorage fs;
-  {
-    CalibrationRecordStore store(&fs);
-    seedConfirmedB2ThenUncertainA3(&fs, &store);
-  }
-  // New instance = reboot. Nothing remembers which record the operator saw
-  // confirmed: the valid record with the highest generation is simply selected.
-  CalibrationRecordStore rebooted(&fs);
-  CHECK(rebooted.writeState() == WriteState::OPEN);
-  expectSelected(rebooted, 3, CalibrationSlot::A, false);
-  const SaveResult r = rebooted.save(record(), boundProfile());
-  CHECK(r.status == SaveStatus::OK);
-  CHECK(r.slot == CalibrationSlot::B);
-  CHECK_EQ(r.generation, 4);
-  CHECK(r.previous_record_intact);
-  CHECK_EQ(r.previous_generation, 3);  // the selected record, not "the last confirmed"
-}
-
-void test_every_uncertain_outcome_blocks() {
-  g_case = "uncertain outcomes block";
-  const WriteFault faults[] = {WriteFault::FAIL_NOTHING_WRITTEN, WriteFault::TORN,
-                               WriteFault::FAIL_AFTER_DATA, WriteFault::NO_SPACE,
-                               WriteFault::SILENT_CORRUPTION};
-  for (WriteFault f : faults) {
-    FakeStorage fs;
-    CalibrationRecordStore store(&fs);
-    seedTwo(&fs, &store);
-    const std::vector<uint8_t> b = fs.data[1];
-    fs.fault = f;
-    CHECK(store.save(record(), boundProfile()).status != SaveStatus::OK);
-    CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
-    fs.fault = WriteFault::NONE;
-    CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
-    CHECK(fs.data[1] == b);
-  }
-}
-
-void test_certain_errors_do_not_block() {
-  g_case = "certain errors do not block";
-  const auto profile = boundProfile();
+void test_roundtrip_content_equality() {
+  g_case = "round trip";
   FakeStorage fs;
   CalibrationRecordStore store(&fs);
-  seedTwo(&fs, &store);
-  const std::vector<uint8_t> a = fs.data[0], b = fs.data[1];
-
-  // Rejected before any storage access.
-  CalibrationRecord bad = record();
-  bad.parameters_approved = 1;
-  CHECK(store.save(bad, profile).status == SaveStatus::INVALID_RECORD);
-  CHECK(store.writeState() == WriteState::OPEN);
-
-  // Could not read a slot: refused before any write.
-  fs.fail_read[0] = true;
-  CHECK(store.save(record(), profile).status == SaveStatus::STORAGE_UNUSABLE);
-  CHECK(store.writeState() == WriteState::OPEN);
-  fs.fail_read[0] = false;
-
-  // Storage said it did not modify anything.
-  fs.fault = WriteFault::FAIL_BEFORE_WRITE;
-  CHECK(store.save(record(), profile).status == SaveStatus::WRITE_FAILED);
-  CHECK(store.writeState() == WriteState::OPEN);
-  CHECK(fs.data[0] == a && fs.data[1] == b);
-  fs.fault = WriteFault::NONE;
-
-  const SaveResult ok = store.save(record(), profile);
-  CHECK(ok.status == SaveStatus::OK);
-  CHECK_EQ(ok.generation, 3);
-  CHECK(fs.data[1] == b);
+  CalibrationRecord rec = goldenRecord(0);
+  CHECK(store.save(rec, boundProfile()).status == SaveStatus::OK);
+  CalibrationRecord loaded;
+  CHECK(store.load(boundProfile(), &loaded).status == LoadStatus::OK);
+  rec.generation = 1;
+  uint8_t a[1536], b[1536];
+  size_t na = 0, nb = 0;
+  CHECK(encodeCalibrationRecord(rec, a, sizeof(a), &na) == CalibrationRecordStatus::OK);
+  CHECK(encodeCalibrationRecord(loaded, b, sizeof(b), &nb) == CalibrationRecordStatus::OK);
+  CHECK(na == nb && std::memcmp(a, b, na) == 0);
 }
 
-void test_uncertain_failure_on_first_save_blocks() {
-  g_case = "uncertain failure on first save";
+void test_generation_exhausted() {
+  g_case = "generation exhausted";
   FakeStorage fs;
+  fs.putSlot(0, goldenRecord(0xFFFFFFFFu));
+  fs.putMarker(SaveMarkerState::COMPLETED, 0xFFFFFFFFu, 0xFFFFFFFFu);
   CalibrationRecordStore store(&fs);
-  fs.fault = WriteFault::FAIL_AFTER_DATA;  // A/1 lands, error reported
-  CHECK(store.save(record(), boundProfile()).status == SaveStatus::WRITE_FAILED);
-  fs.fault = WriteFault::NONE;
-  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
-  expectSelected(store, 1, CalibrationSlot::A, false);
+  const SaveResult s = store.save(record(), boundProfile());
+  CHECK(s.status == SaveStatus::GENERATION_EXHAUSTED);
+  CHECK_EQ(fs.mutations, 0);
+}
+
+void test_to_strings() {
+  g_case = "toString";
+  CHECK(std::strcmp(toString(SaveStatus::MARKER_VERIFY_FAILED), "MARKER_VERIFY_FAILED") == 0);
+  CHECK(std::strcmp(toString(LoadStatus::RECONCILIATION_REQUIRED), "RECONCILIATION_REQUIRED") == 0);
+  CHECK(std::strcmp(toString(SavePhase::MARKER_COMPLETED_VERIFY), "MARKER_COMPLETED_VERIFY") == 0);
+  CHECK(std::strcmp(toString(SaveStatus::BLOCKED_UNCERTAIN_WRITE), "BLOCKED_UNCERTAIN_WRITE") == 0);
 }
 
 }  // namespace
 
 int main() {
-  test_empty_storage();
-  test_first_second_third_save_alternate();
-  test_save_refuses_invalid_without_touching_storage();
-  test_failure_before_write();
-  test_failure_during_write_torn();
-  test_failure_during_commit();
-  test_no_space();
-  test_readback_failures();
-  test_recovery_when_newest_slot_is_invalid();
-  test_generation_selection();
-  test_both_slots_unusable();
+  test_empty_storage_is_first_install();
+  test_protocol_order();
+  test_alternation_and_generations();
+  test_invalid_record_does_not_touch_storage();
+  test_failure_before_pending_write();
+  test_pending_published_record_not_written();
+  test_record_partially_written();
+  test_record_written_but_commit_failed();
+  test_record_readback_failed();
+  test_record_readback_mismatch();
+  test_completed_marker_partially_written();
+  test_completed_published_but_error_returned();
+  test_marker_readback_failed();
+  test_fault_matrix();
+  test_fault_matrix_first_install();
+  test_two_consecutive_errors();
+  test_error_then_error_cannot_erase_confirmed();
+  test_load_serves_only_consistent();
   test_storage_errors_fail_closed();
-  test_roundtrip_content_equality();
-  test_uncertain_error_blocks_retry();
-  test_repeated_attempts_cannot_overwrite();
+  test_generation_monotonic_over_leftovers();
+  test_both_slots_unusable_first_save_recovers_nothing();
+  test_reconciliation_end_to_end();
   test_load_does_not_unlock();
-  test_reboot_selects_highest_valid_record();
-  test_every_uncertain_outcome_blocks();
-  test_certain_errors_do_not_block();
-  test_uncertain_failure_on_first_save_blocks();
-  std::printf("test_calibration_record_store: %d checks, %d failures\n", g_checks, g_failures);
+  test_roundtrip_content_equality();
+  test_generation_exhausted();
+  test_to_strings();
+  std::printf("calibration record store: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;
 }

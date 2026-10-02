@@ -5858,6 +5858,114 @@ def check_usb_cdc_tx_never_blocks(files):
                      f"transmit path and begins Serial before setup() (G3.1)")
 
 
+def check_calibration_persistence_boundaries(files, sketch_dir):
+    """P2.4: the calibration persistence layer lives on the dedicated
+    `matdog_nvs` partition, initializes it explicitly by label, never erases,
+    and is not wired into the Controller.
+
+    Pins: no bare nvs_flash_init() and no erase/format/raw-partition-write call
+    anywhere in firmware sources; only the NVS backend .cpp includes <nvs*.h>
+    or <esp_partition.h> among the calibration persistence files; every nvs
+    partition name is the pinned label, and the label/offset/size constants
+    match scripts/matdog_layout.py; the persistence files do not include
+    Controller / CommandRouter / JointTransformTable / ActuatorAuthority /
+    CalibrationExecutor; nothing outside the persistence files includes the
+    store or the backend (integration is a later step).
+    """
+    scripts_dir = sketch_dir / "scripts"
+    tests_dir = scripts_dir / "tests"
+    firmware = [(p, code) for p, code in files if tests_dir not in p.parents]
+
+    forbidden = (
+        (r"\bnvs_flash_init\s*\(", "nvs_flash_init() initializes the DEFAULT partition and may format it"),
+        (r"\bnvs_flash_erase\w*\s*\(", "NVS erase/format"),
+        (r"\bnvs_erase_\w+\s*\(", "NVS key/namespace erase"),
+        (r"\bnvs_flash_deinit\w*\s*\(", "NVS deinit"),
+        (r"\besp_partition_erase_range\s*\(", "raw partition erase"),
+        (r"\besp_partition_write\w*\s*\(", "raw partition write"),
+        (r"\bnvs_open\s*\(", "nvs_open() opens the DEFAULT partition"),
+        (r"\bnvs_flash_init_partition_ptr\s*\(", "init by pointer bypasses the label pin"),
+    )
+    for path, code in firmware:
+        for pattern, why in forbidden:
+            if re.search(pattern, code):
+                fail(f"{path}: {pattern} is forbidden - {why} (P2.4)")
+
+    cal = sketch_dir / "src" / "calibration"
+    persistence = [cal / n for n in (
+        "CalibrationRecord.h", "CalibrationRecord.cpp", "CalibrationRecordStore.h",
+        "CalibrationRecordStore.cpp", "CalibrationSaveMarker.h", "CalibrationSaveMarker.cpp",
+        "CalibrationPersistenceState.h", "CalibrationPersistenceState.cpp",
+        "CalibrationRecordNvsBackend.h", "CalibrationRecordNvsBackend.cpp")]
+    for path in persistence:
+        if not path.exists():
+            fail(f"{path}: missing - the calibration persistence layer is incomplete")
+            return
+    backend_cpp = cal / "CalibrationRecordNvsBackend.cpp"
+    persistence_set = set(persistence)
+
+    for path in persistence:
+        text = path.read_text(encoding="utf-8")
+        code = strip_comments(text)
+        if path != backend_cpp:
+            for inc in re.findall(r'#\s*include\s*[<"]([^>"]+)[>"]', code):
+                base = inc.rsplit("/", 1)[-1]
+                if base in ("nvs.h", "nvs_flash.h", "esp_partition.h", "Arduino.h", "Preferences.h"):
+                    fail(f"{path}: includes <{inc}> - only CalibrationRecordNvsBackend.cpp may "
+                         f"touch NVS/partition APIs; the rest must stay host-testable (P2.4)")
+        for inc in re.findall(r'#\s*include\s*"([^"]+)"', code):
+            base = inc.rsplit("/", 1)[-1]
+            # CalibrationRecord.cpp (P2) builds a record from the pure executor result
+            # types; that older, read-only dependency is the one allowed exception.
+            executor = "" if path.name.startswith("CalibrationRecord.") else "|FullLegCalibrationExecutor"
+            if re.match(r"(Controller|CommandRouter|JointTransformTable|ActuatorAuthority|"
+                        r"CalibrationExecutor|HostLink|SystemState" + executor + r")\.h$", base):
+                fail(f"{path}: includes {inc} - the persistence layer must not depend on the "
+                     f"Controller side (P2.4)")
+
+    # Every partition label handed to NVS is the pinned one, via the constant.
+    backend = strip_comments(backend_cpp.read_text(encoding="utf-8"))
+    for call in re.findall(r"\b(nvs_flash_init_partition|nvs_open_from_partition)\s*\(([^;]*?),", backend):
+        if call[1].strip() != "kMatdogNvsPartitionLabel":
+            fail(f"{backend_cpp}: {call[0]}({call[1].strip()}, ...) - the partition label must "
+                 f"be kMatdogNvsPartitionLabel")
+    for needed in ("nvs_flash_init_partition(", "nvs_open_from_partition(", "esp_partition_find_first("):
+        if needed not in backend:
+            fail(f"{backend_cpp}: {needed} missing - explicit by-label initialization lost")
+
+    header = strip_comments((cal / "CalibrationRecordNvsBackend.h").read_text(encoding="utf-8"))
+    sys.path.insert(0, str(scripts_dir))
+    try:
+        import matdog_layout
+    finally:
+        sys.path.pop(0)
+    mat = [e for e in matdog_layout.EXPECTED_PARTITIONS if e.label == matdog_layout.MATDOG_NVS_LABEL]
+    if len(mat) != 1:
+        fail("matdog_layout.py: no unique matdog_nvs partition to pin the backend against")
+    else:
+        for name, want in (("kMatdogNvsPartitionAddress", mat[0].offset),
+                           ("kMatdogNvsPartitionSize", mat[0].size)):
+            m = re.search(name + r"\s*=\s*(0[xX][0-9a-fA-F]+)u?", header)
+            if not m or int(m.group(1), 16) != want:
+                fail(f"{cal / 'CalibrationRecordNvsBackend.h'}: {name} != {want:#x} "
+                     f"(matdog_layout.py) - P2.3 layout drifted from the backend pin")
+        m = re.search(r'kMatdogNvsPartitionLabel\s*=\s*"([^"]+)"', header)
+        if not m or m.group(1) != matdog_layout.MATDOG_NVS_LABEL:
+            fail(f"{cal / 'CalibrationRecordNvsBackend.h'}: partition label is not "
+                 f"{matdog_layout.MATDOG_NVS_LABEL!r}")
+
+    # Not wired in yet: nothing outside the persistence files and the tests uses them.
+    for path, code in firmware:
+        if path in persistence_set:
+            continue
+        for inc in re.findall(r'#\s*include\s*"([^"]+)"', code):
+            base = inc.rsplit("/", 1)[-1]
+            if base in ("CalibrationRecordStore.h", "CalibrationRecordNvsBackend.h",
+                        "CalibrationSaveMarker.h", "CalibrationPersistenceState.h"):
+                fail(f"{path}: includes {inc} - the persistence layer is not integrated into "
+                     f"the Controller in P2.4")
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -5927,6 +6035,7 @@ def main():
     check_build_profile_provenance(SKETCH_DIR)
     check_backup_gate_provenance(SKETCH_DIR)
     check_flash_layout_safety(SKETCH_DIR)
+    check_calibration_persistence_boundaries(files, SKETCH_DIR)
     check_unknown_detection_is_not_a_verdict(files)
     check_usb_cdc_tx_never_blocks(files)
 

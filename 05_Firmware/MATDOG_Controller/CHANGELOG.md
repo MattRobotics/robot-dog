@@ -1,5 +1,37 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — P2.4 Dedicated NVS and persistent SAVE recovery (offline, no hardware) — 2026-10-02
+
+Persistence layer only. **Not integrated** into the Controller: no command, no boot hook, nothing
+reads a stored calibration into the motion path.
+
+- **Dedicated partition.** `CalibrationRecordNvsBackend` uses `matdog_nvs` (0xFE0000 / 0x10000) by
+  label: `esp_partition_find_first` (type/subtype/label, geometry pinned) ->
+  `nvs_flash_init_partition("matdog_nvs")` -> `nvs_open_from_partition`. `begin()` is explicit and
+  returns a `NvsInitStatus` (READY, PARTITION_MISSING, PARTITION_GEOMETRY_MISMATCH, NO_FREE_PAGES,
+  NEW_VERSION_FOUND, INIT_FAILED, OPEN_FAILED); until READY every read is IO_ERROR and every write
+  NOT_MODIFIED. Never `nvs_flash_init()`, never any erase/format, no retry, no repair.
+- **Save marker V1** (`CalibrationSaveMarker`): 28-byte explicit little-endian blob, magic `MDMK`,
+  schema 1, CRC-32, NVS key `M`. Fields: completed generation, begun generation, state
+  (COMPLETED/PENDING). Not a journal; the 1088-byte CalibrationRecord V1 is unchanged.
+- **SAVE protocol:** validate -> scan+classify -> PENDING marker (+read-back) -> write inactive slot
+  -> full read-back -> COMPLETED marker (+read-back) -> `SaveStatus::OK`. Any outcome after the
+  PENDING marker was published that is not full success blocks the instance (P2.1 block kept); the
+  PENDING marker keeps refusing SAVEs across reboots until an explicit reconciliation.
+- **Pure classifier** (`CalibrationPersistenceState`): 13 classes. Only CONSISTENT serves a record;
+  a record newer than the marker is never promoted; marker attests G but only G-1 survives ->
+  CONFIRMED_GENERATION_LOST (not healthy); erased partition == never initialized ->
+  NEVER_INITIALIZED_OR_ERASED (no calibration, no motion). `planReconciliation()` defines the
+  explicit recovery contract (ADOPT_VALID_RECORD / DECLARE_NOTHING_CONFIRMED); nothing executes it.
+- **RAM:** `sizeof(CalibrationRecordStore)` 5312 B (unchanged: no new buffer), backend 16 B,
+  transient `LoadResult` 28 -> 64 B (stack). No dynamic allocation.
+- **Tests:** host stub extended (`nvs_open_from_partition`, `nvs_flash_init_partition`,
+  `esp_partition_find_first`; default init, bare `nvs_open` and all erase calls are NOT declared so
+  they cannot be called), power-cut and error injection at every mutating step, reboot model.
+  Static audit pins the boundaries. The stub does NOT prove physical flash durability or NVS-internal
+  page recovery.
+- Layout P2.3, manifest, flashing and OTA untouched. Nothing flashed, erased or run on the robot.
+
 ## Unreleased — P2.3 Custom flash layout and flashing safety (offline, no hardware) — 2026-10-02
 
 - **Layout `MATDOG_16M_2x5M_NVS_V1`** (`partitions.csv`, `PartitionScheme=custom`): nvs 0x9000/0x5000,
