@@ -52,9 +52,17 @@ def build():
     prov = json.loads((OUT / 'geometry_provenance.json').read_text())
     recorded = {'03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf': prov['urdf_sha256']}
     canon = []
+    base = ROOT / '03_CAD/URDF/matt_robodog_rev00'
+    sums = {}
+    for line in (base / 'SHA256SUMS.txt').read_text().splitlines():
+        if line.strip():
+            digest, name = line.split(None, 1)
+            sums[str(Path('03_CAD/URDF/matt_robodog_rev00') / name.strip().lstrip('*'))] = digest
     for rel in CANONICAL:
         now = sha(ROOT / rel)
-        canon.append({'path': rel, 'current_sha256': now, 'g4_final_head_sha256': g4_blob_sha(rel), 'status': 'MATCH' if g4_blob_sha(rel) == now else 'CHANGED'})
+        # canonical geometry is checked against the URDF bundle's own SHA256SUMS (the STLs are not tracked blobs); code against the G4 head
+        rec_hash = sums.get(rel) or g4_blob_sha(rel)
+        canon.append({'path': rel, 'current_sha256': now, 'recorded_sha256': rec_hash, 'recorded_by': 'SHA256SUMS.txt' if rel in sums else 'G4 final head', 'status': 'MATCH' if rec_hash == now else 'CHANGED'})
     return {'scope': 'G4.1 offline contact reconciliation; no hardware artifact, serial log, or actuator command is indexed', 'excluded': ['artifact_manifest.json (self)'],
             'artifact_count': len(artifacts), 'artifacts': artifacts, 'generator_sha256': gen, 'g4_preservation': g4, 'canonical_source_checks': canon,
             'summary': {'changed_g4_evidence': [x['path'] for x in g4 if x['status'] != 'PRESERVED'], 'changed_canonical_sources': [x['path'] for x in canon if x['status'] != 'MATCH'],

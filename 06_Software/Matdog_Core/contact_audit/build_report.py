@@ -152,7 +152,7 @@ Five things were separated (`root_cause.json`):
 | Numerical error | float64 vs long double $err_ld um; float32 STL quantisation $err_f32 um: negligible |
 
 * The **visual** STL carries the same translation ($vis_dx, $vis_dz) um (difference from the collision STL under 0.01 um). Two independently exported meshes agree, so the offset is real CAD-to-foot_link registration and not an export artefact. The G2 YAML audit used the visual STL and rejected a *centroid* offset because the centroid depends on tessellation; the circle translation does not.
-* `delta(phi) = u.d + (non-negative tessellation term)`, with `u` the world-up vector in foot_link for foot pitch `phi` and `d` the translation. So the mesh sits $offset um below the analytic reference at the worst pitch and up to $tess_max um above it (tessellation inscribes a polygon in the translated circle).
+* `delta(phi) = u.d + (non-negative tessellation term)`, with `u` the world-up vector in foot_link for foot pitch `phi` and `d` the translation. So the mesh sits up to $offset um below the analytic reference at the worst pitch; with the tessellation term (up to $tess_max um, because tessellation inscribes a polygon in the translated circle) it sits up to $delta_max um above it.
 * All four feet have identical collision geometry in foot_link (max vertex difference 0 um: $feet_identical); the discrepancy of each foot is `delta` at that foot's pitch (G4: rear feet at -51 deg, delta = -1.2 um).
 * The geometric cause of the translation itself (why the CAD wheel axis is 5.8 um from the nominal point in the foot frame) cannot be determined from the repository; the URDF foot joint origin is specified to 0.1 mm. This is an **open question for the CAD owner**, not something the offline model can settle.
 
@@ -219,6 +219,8 @@ For TROT: $status_vocab_trot. The TROT support margin is diagnostic only (dynami
 * `CONTINUOUSLY_VERIFIED_ANALYTIC`: closed form, valid for all `t` (tread stance exactness, swing height >= 0, mesh-minus-reference bound over all pitches; scope: foot axis tilt 0).
 * `CONTINUOUSLY_VERIFIED_BOUNDED`: sampled value minus an interpolation-error bound (`A h^2 / 8` for C2 quantities, Lipschitz for separation) whose constant is **estimated** from the dense samples with a 1.5 safety factor. This is **not a formal proof**; it is confirmed by a 0.5 ms re-run (below).
 * `SAMPLED_ONLY`: derivative magnitudes and steps (the G4 oracle covers the analytic C2 joins).
+* `PASS_WITH_SAMPLED_ONLY_ITEMS` means no check failed and no check is unresolved, but the derivative item is only sampled (the lifecycle is not claimed fully continuous in that respect).
+* For the unchanged G2 reference, `tread_mesh_vs_reference` is verified **against the declared uncertainty** `U`, which by construction equals the measured offset (its exact content is the all-pitch bound -5.775 um); for the registered reference the same bound is >= 0, a statement with no allowance at all. The first is therefore a model-uncertainty statement, the second a geometric one.
 
 $lifecycle_table
 

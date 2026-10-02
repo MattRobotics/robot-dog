@@ -1,0 +1,275 @@
+{
+  "scope": "G4.1 offline contact reconciliation; no hardware artifact, serial log, or actuator command is indexed",
+  "excluded": [
+    "artifact_manifest.json (self)"
+  ],
+  "artifact_count": 27,
+  "artifacts": [
+    {
+      "path": "REPORT.md",
+      "sha256": "89f90e16f8b68f3f066f7a546fcf0cb994146386c31a1b0ee285f985c74a5bcf",
+      "bytes": 25968,
+      "producer": "build_report.py"
+    },
+    {
+      "path": "alternatives.json",
+      "sha256": "1d444bc8a746a97068f12698cc9b3bae44d36e4d2617b7802c69b75724fadc71",
+      "bytes": 6874,
+      "producer": "alternatives.py"
+    },
+    {
+      "path": "geometry_provenance.json",
+      "sha256": "0cbf88c78e8c5866fada9077146b82f3f78a174064145a63951f5de49e70a285",
+      "bytes": 14936,
+      "producer": "geometry_provenance.py"
+    },
+    {
+      "path": "lifecycle_TROT_309_G2_1_REGISTERED_CANDIDATE.csv",
+      "sha256": "bac84e55dcffeb2c56bc5a376b86a7c066fb0f219f4a5be758502631b9767a18",
+      "bytes": 734349,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_TROT_309_G2_1_REGISTERED_CANDIDATE.json",
+      "sha256": "9c6551c87ff0aa6e5d4cdce0daa52ae74a5ea774905827e0eb909ee534679d31",
+      "bytes": 4740,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_TROT_309_G2_NOMINAL.csv",
+      "sha256": "9a3a485864d8370ccde261fa5e60597cf7ded1c27d52d72cd4f71f0f229dac90",
+      "bytes": 730879,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_TROT_309_G2_NOMINAL.json",
+      "sha256": "24f2438dc39e3723d19dff55ddc607accd58b8130fb177313afa95afcb816100",
+      "bytes": 4748,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_TROT_309_G2_NOMINAL_fine.json",
+      "sha256": "1d749556f310fc3c3aa792c8398407c0f610b9d75c947cc51843b384a037d06e",
+      "bytes": 4758,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_TROT_61_G2_1_REGISTERED_CANDIDATE.csv",
+      "sha256": "077e800742a7fa8714fa5a30ba8117ba7efaf5d5306f5d20b4839f376eb3e873",
+      "bytes": 736413,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_TROT_61_G2_1_REGISTERED_CANDIDATE.json",
+      "sha256": "ecde746946513da9c8b2bf2b3c5160ac54ae843195c81c6fa3d88195dbb03e81",
+      "bytes": 4733,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_TROT_61_G2_NOMINAL.csv",
+      "sha256": "97b875551c540a7af6edba2602d08a46da5c02f4d4d8aa53d70b7d90fa4406f4",
+      "bytes": 732285,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_TROT_61_G2_NOMINAL.json",
+      "sha256": "973aa7f5ab71507b9dc59a61745c213f89a892672b4c2e1a378a345ea345774e",
+      "bytes": 4742,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_TROT_61_G2_NOMINAL_fine.json",
+      "sha256": "096a3bdcbf951779ecc9076967be8b88b98fed89fc0bee1ae98851e153a3d9db",
+      "bytes": 4754,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_WALK_287_G2_1_REGISTERED_CANDIDATE.csv",
+      "sha256": "7e6def3c23929d26e49a69ccda34a4ca2f7db730a11851e1ed27850f291814c6",
+      "bytes": 747797,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_WALK_287_G2_1_REGISTERED_CANDIDATE.json",
+      "sha256": "5613ac6b6e813b12086e64872ed51f847a1359033842eb17cb4d70936de8af7c",
+      "bytes": 4902,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_WALK_287_G2_NOMINAL.csv",
+      "sha256": "4ed74a74b5a2fd0ba219cd16011a2753a2372015c8c0df322da5018c70cccce4",
+      "bytes": 745036,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_WALK_287_G2_NOMINAL.json",
+      "sha256": "65adf3b34ad2aa448f4b999c46889d2f75e18df1f55818d050e7e1ba9a55da65",
+      "bytes": 4911,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_WALK_287_G2_NOMINAL_fine.json",
+      "sha256": "b82bb9bdf0f38b5bb7ab4743c92b54a312826985f6c764bdcd9a52ee8d0fe7b8",
+      "bytes": 4921,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_WALK_357_G2_1_REGISTERED_CANDIDATE.csv",
+      "sha256": "d2f396051d3c7d27353e7550aa74de176eacebbf2e7f0fe6b69eff2eaa037707",
+      "bytes": 751364,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_WALK_357_G2_1_REGISTERED_CANDIDATE.json",
+      "sha256": "d0330eafd2787255a5c1e357bb317e63d82da5f330cb436b3620d34a9f599a7c",
+      "bytes": 4905,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_WALK_357_G2_NOMINAL.csv",
+      "sha256": "df72b2b151bd10661f4d9e78bb5aafbff4cd4e9047df1ab81e6d04d1157d7cdc",
+      "bytes": 747006,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_WALK_357_G2_NOMINAL.json",
+      "sha256": "11946f3ef0e362b2c14a3d3163950f211fa26d320226426d6bee7fa922f5b709",
+      "bytes": 4916,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "lifecycle_WALK_357_G2_NOMINAL_fine.json",
+      "sha256": "2c0e847a2bc48a954f8ed1a9cd3a0f01136ebbf7f13105b8a9f955d5d26af4c9",
+      "bytes": 4919,
+      "producer": "lifecycle_v2.py"
+    },
+    {
+      "path": "oracle_results_g41.json",
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "bytes": 684,
+      "producer": "run_g4_oracle.py"
+    },
+    {
+      "path": "per_foot_discrepancy.json",
+      "sha256": "75e913426070ea5708e14daea6ed365f2c3090ed77527f550a9fcc52a542b29c",
+      "bytes": 6399,
+      "producer": null
+    },
+    {
+      "path": "root_cause.json",
+      "sha256": "b6bd746aaddbbf171f62d7131070a88d2e9c82a6d415fe83f08dc87b89be11ce",
+      "bytes": 32443,
+      "producer": "root_cause.py"
+    },
+    {
+      "path": "validation_results.json",
+      "sha256": "9ecd512d52e5580d43ef56d2badc3feb644d7870958191864d436283867d0340",
+      "bytes": 16383,
+      "producer": "validate.py"
+    }
+  ],
+  "generator_sha256": {
+    "alternatives.py": "a347f7282508451b7b73d12c2e5fe6bc93fa37bc514bd323ca0641d48d467e6f",
+    "build_report.py": "76ee144f2e6a6d57e6c5f789d25e6b7d4fe46911c91e49ac29a96cb61ab7e1c0",
+    "geometry_provenance.py": "4e149af6eb1bdc6f207574b52d4d5f33fc6e0bd187ced9389b43aeae9b029fe0",
+    "lifecycle_v2.py": "b4fef80d4750c3c00a4e236aa5b83a186f570bf785bcf3aa93008001c04b57e9",
+    "root_cause.py": "101302b329502fc6a872e668a382d37cf32a52c1d10ed4521af9757ecd9fbd87",
+    "run_g4_oracle.py": "053606388385eea9e731aaf3dfd92a565de16f9f5da4cf1d00411ab94887527d",
+    "validate.py": "fa516b5d8a4db08e5ed3e1942ac52777273d5e1927e6453fca4a953f29199915"
+  },
+  "g4_preservation": [
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/REPORT.md",
+      "g4_final_head_sha256": "ad69065ae9fc1d7e4956410e8ae4e918551359fad660339fff4bca9b55d6856d",
+      "current_sha256": "ad69065ae9fc1d7e4956410e8ae4e918551359fad660339fff4bca9b55d6856d",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/validation_results.json",
+      "g4_final_head_sha256": "a0af396692b96645b317dcf7e8e77371b50b0d33a52ea3250a2523810336a16e",
+      "current_sha256": "a0af396692b96645b317dcf7e8e77371b50b0d33a52ea3250a2523810336a16e",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/artifact_manifest.json",
+      "g4_final_head_sha256": "26d03efc56d1fed542549d48b63e040911a2f997c514bc0952c6d392125646a4",
+      "current_sha256": "26d03efc56d1fed542549d48b63e040911a2f997c514bc0952c6d392125646a4",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/full_cases.json",
+      "g4_final_head_sha256": "cdd1d29da08a726120bf962cfc527356bcade5a16fcccde34c44b7f69957ff3a",
+      "current_sha256": "cdd1d29da08a726120bf962cfc527356bcade5a16fcccde34c44b7f69957ff3a",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/representatives.json",
+      "g4_final_head_sha256": "229dc84815906eb4c2ddd953223892f20e4d886e7a1adff73d9ece62a3701608",
+      "current_sha256": "229dc84815906eb4c2ddd953223892f20e4d886e7a1adff73d9ece62a3701608",
+      "status": "PRESERVED"
+    }
+  ],
+  "canonical_source_checks": [
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+      "current_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "recorded_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "recorded_by": "SHA256SUMS.txt",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl",
+      "current_sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "recorded_sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "recorded_by": "SHA256SUMS.txt",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl",
+      "current_sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "recorded_sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "recorded_by": "SHA256SUMS.txt",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/lf_foot_link.stl",
+      "current_sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+      "recorded_sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+      "recorded_by": "SHA256SUMS.txt",
+      "status": "MATCH"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml",
+      "current_sha256": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
+      "recorded_sha256": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
+      "recorded_by": "G4 final head",
+      "status": "MATCH"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FootContactData.h",
+      "current_sha256": "fe6fe1fa593199d82cf829b2c5cd83f974dc0085e7e049024cd7209cf3dbe57c",
+      "recorded_sha256": "fe6fe1fa593199d82cf829b2c5cd83f974dc0085e7e049024cd7209cf3dbe57c",
+      "recorded_by": "G4 final head",
+      "status": "MATCH"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp",
+      "current_sha256": "a6c497c393641577988d9773f001a4280e875422bc22d7588bd2fb8979198823",
+      "recorded_sha256": "a6c497c393641577988d9773f001a4280e875422bc22d7588bd2fb8979198823",
+      "recorded_by": "G4 final head",
+      "status": "MATCH"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Gait.h",
+      "current_sha256": "e308c64acff060b8be78796c5db21078a4de5f2b3b9b38f26d186ed0e6173914",
+      "recorded_sha256": "e308c64acff060b8be78796c5db21078a4de5f2b3b9b38f26d186ed0e6173914",
+      "recorded_by": "G4 final head",
+      "status": "MATCH"
+    }
+  ],
+  "summary": {
+    "changed_g4_evidence": [],
+    "changed_canonical_sources": [],
+    "urdf_matches_provenance": true
+  }
+}

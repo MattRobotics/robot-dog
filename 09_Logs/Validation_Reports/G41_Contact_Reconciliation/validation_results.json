@@ -1,0 +1,225 @@
+{
+  "all_passed": true,
+  "gates": [
+    {
+      "name": "test_gait_build_strict_cpp17",
+      "command": "g++ -std=c++17 -Wall -Wextra -Werror -fno-exceptions -fno-rtti -O1 /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/tests/test_gait.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/ContactMode.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StandTransition.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/TimedStand.cpp -o /tmp/matdog-g41-validate-ei5ifykx/test_gait",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 4.3,
+      "summary": "",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output_lines": 0
+    },
+    {
+      "name": "test_gait_run",
+      "command": "/tmp/matdog-g41-validate-ei5ifykx/test_gait",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 0.1,
+      "summary": "GAIT_HOST = PASS: 148291 checks, 0 failures",
+      "output_sha256": "d489d547b123cb6f1ed3ffe7e80cca23959dd5b398ccb1bee1602ab9cb455c8d",
+      "output_lines": 1
+    },
+    {
+      "name": "test_contact_mode_build_strict_cpp17",
+      "command": "g++ -std=c++17 -Wall -Wextra -Werror -fno-exceptions -fno-rtti -O1 /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/tests/test_contact_mode.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/ContactMode.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StandTransition.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/TimedStand.cpp -o /tmp/matdog-g41-validate-ei5ifykx/test_contact_mode",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 4.0,
+      "summary": "",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output_lines": 0
+    },
+    {
+      "name": "test_contact_mode_run",
+      "command": "/tmp/matdog-g41-validate-ei5ifykx/test_contact_mode",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 0.0,
+      "summary": "CONTACT_MODE_HOST = PASS: 68 checks, 0 failures",
+      "output_sha256": "3ed6223c092c66c5ec6ca5f2d7505fb5a17e23c336cc742fd9bbe2b30b79bda1",
+      "output_lines": 1
+    },
+    {
+      "name": "g4_independent_oracle_current_source",
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/contact_audit/run_g4_oracle.py",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 14.3,
+      "summary": "\"status\": \"PASS\",",
+      "output_sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "output_lines": 21
+    },
+    {
+      "name": "g4_artifact_tests",
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/gait_audit/test_gait_audit.py",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 2.7,
+      "summary": "Ran 15 tests in 1.394s; OK",
+      "output_sha256": "19398dbc4247d818a12bd517a39f1a8212e11f74ff8c68bf9a69cedd47cd9a52",
+      "output_lines": 18
+    },
+    {
+      "name": "g4_artifact_manifest_check",
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/gait_audit/artifact_manifest.py --check",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 1.1,
+      "summary": "ARTIFACT_MANIFEST OK 57 artifacts; historical generator revisions: 4",
+      "output_sha256": "056faada5045d1a28b9dd56853f85df30ab808a1e0d95b4f2da40fb9b6ff6a34",
+      "output_lines": 1
+    },
+    {
+      "name": "g35_pose_audit_tests",
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/pose_audit/test_pose_audit.py",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 15.7,
+      "summary": "Ran 28 tests in 14.885s; OK",
+      "output_sha256": "ed8a8407bb505f640c73ecb345b03d6867fb96be3f058234e8ffa23cfcbed53e",
+      "output_lines": 31
+    },
+    {
+      "name": "g35_artifact_manifest_check",
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/pose_audit/artifact_manifest.py --check",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 1.0,
+      "summary": "ARTIFACT_MANIFEST OK 80 artifacts; historical generator revisions: 1",
+      "output_sha256": "a075c9fcd61aa3574c9db9d0e4422685c0339bdce0fa428e014fa170c510a30b",
+      "output_lines": 1
+    },
+    {
+      "name": "geometry_provenance_recheck",
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/contact_audit/geometry_provenance.py --check",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 1.7,
+      "summary": "}",
+      "output_sha256": "2eb670e65d589cc93ddc370ecc1d9a999ad3cb6feccaf5b1d3006c75735c07a4",
+      "output_lines": 8
+    },
+    {
+      "name": "g41_contact_tests",
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/contact_audit/test_contact_audit.py",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 12.8,
+      "summary": "Ran 14 tests in 12.069s; OK",
+      "output_sha256": "d49e9380f94be7925c7b09434eb63e6b63510414c760e565e8fb516c6e85e805",
+      "output_lines": 17
+    },
+    {
+      "name": "lifecycle_replay_bit_identical_2ms",
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/06_Software/Matdog_Core/contact_audit/replay_compare.py",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 140.5,
+      "summary": "REPLAY_COMPARE PASS",
+      "output_sha256": "5bf2872c3ba7d6b36d4c26ad3b27fa5326dc138c9f83c9dfe4d26b0e5f57b8ef",
+      "output_lines": 5
+    },
+    {
+      "name": "host_motion_runner_g1_g2_g3_g35_g4_g41",
+      "command": "bash /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/tests/run_motion_host_tests.sh",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 286.5,
+      "summary": "CONTACT_MODE_HOST = PASS: 68 checks, 0 failures",
+      "output_sha256": "00fa893da2afbb3f36cb8b795bb1594120e81b2fb4ea63267ae837d88cf93437",
+      "output_lines": 28
+    },
+    {
+      "name": "static_audit",
+      "command": "/tmp/matdog-g35-env/bin/python /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/static_audit.py",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 342.1,
+      "summary": "STATIC_AUDIT = PASS",
+      "output_sha256": "a41ee11c2414a6a74044823b81688780b81d43f30c8873387fc5baf7f0143b10",
+      "output_lines": 2
+    },
+    {
+      "name": "test_gait_asan_ubsan_build",
+      "command": "g++ -std=c++17 -Wall -Wextra -Werror -fno-exceptions -fno-rtti -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/tests/test_gait.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/ContactMode.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StandTransition.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/TimedStand.cpp -o /tmp/matdog-g41-validate-ei5ifykx/test_gait_san",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 9.0,
+      "summary": "",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output_lines": 0
+    },
+    {
+      "name": "test_gait_asan_ubsan_run",
+      "command": "/tmp/matdog-g41-validate-ei5ifykx/test_gait_san",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 0.5,
+      "summary": "GAIT_HOST = PASS: 148291 checks, 0 failures",
+      "output_sha256": "d489d547b123cb6f1ed3ffe7e80cca23959dd5b398ccb1bee1602ab9cb455c8d",
+      "output_lines": 1
+    },
+    {
+      "name": "test_contact_mode_asan_ubsan_build",
+      "command": "g++ -std=c++17 -Wall -Wextra -Werror -fno-exceptions -fno-rtti -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/scripts/tests/test_contact_mode.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/ContactMode.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StandTransition.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp /home/matteo-manicardi/MATDOG/worktrees/robot-dog-gait-engine/05_Firmware/MATDOG_Controller/src/motion/TimedStand.cpp -o /tmp/matdog-g41-validate-ei5ifykx/test_contact_mode_san",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 7.2,
+      "summary": "",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output_lines": 0
+    },
+    {
+      "name": "test_contact_mode_asan_ubsan_run",
+      "command": "/tmp/matdog-g41-validate-ei5ifykx/test_contact_mode_san",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 0.0,
+      "summary": "CONTACT_MODE_HOST = PASS: 68 checks, 0 failures",
+      "output_sha256": "3ed6223c092c66c5ec6ca5f2d7505fb5a17e23c336cc742fd9bbe2b30b79bda1",
+      "output_lines": 1
+    },
+    {
+      "name": "git_diff_check_worktree",
+      "command": "git diff --check",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 0.0,
+      "summary": "",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output_lines": 0
+    },
+    {
+      "name": "git_diff_check_vs_g4_head",
+      "command": "git -c core.whitespace=cr-at-eol diff --check 3ce85f92e2b5381b65e327dd371b2f164308f326..HEAD",
+      "returncode": 0,
+      "passed": true,
+      "seconds": 0.0,
+      "summary": "",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output_lines": 0
+    },
+    {
+      "name": "accepted_g1_g4_files_unchanged_vs_g4_head",
+      "command": "git diff --name-status 3ce85f92e2b5381b65e327dd371b2f164308f326..HEAD",
+      "returncode": 0,
+      "passed": true,
+      "summary": "only G4.1 additions, the host-runner line and the host-oracle include allowlist changed; G1/G2/G3/G3.5/G4 sources, geometry and evidence untouched",
+      "unexpected_changes": []
+    }
+  ],
+  "git": {
+    "head_at_validation": "e69531bdb815acc7307ed9fa3863249808bb7e39",
+    "worktree_clean_before_validation": true,
+    "g4_head": "3ce85f92e2b5381b65e327dd371b2f164308f326",
+    "baseline": "c4befbe90b3121d60ba1b9ba09dc1082364c8d88"
+  },
+  "scope": "offline software gates only: host compiler, Python, git; no hardware, serial device, actuator bus, servo command, flashing, persistent-memory write or calibration change was used",
+  "source_digest": "e5522c61039738cfc70fbc9096f947dc519b924f36b01b2122e6803d9380e153",
+  "source_digest_file_count": 89,
+  "provenance": {
+    "generator_sha256": "fa516b5d8a4db08e5ed3e1942ac52777273d5e1927e6453fca4a953f29199915"
+  }
+}
