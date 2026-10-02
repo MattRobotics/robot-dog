@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "OtaLayoutContract.h"
 #include "OtaPolicy.h"
 
 // The ESP-IDF half of OTA-A: the only translation unit in the firmware that
@@ -22,6 +23,7 @@ class OtaEspBackend : public OtaBackend {
   OtaPartitionInfo runningPartition() override;
   OtaPartitionInfo nextUpdatePartition() override;
   OtaImgState imageState(const OtaPartitionInfo& partition) override;
+  bool installedLayoutConforms() override;
 
   bool beginWrite(const OtaPartitionInfo& target, uint32_t image_size) override;
   bool write(const uint8_t* data, uint32_t len) override;
@@ -42,11 +44,19 @@ class OtaEspBackend : public OtaBackend {
   bool streamOpen() const { return stream_open_; }
   // Raw esp_err_t of the last failing call, for diagnostics.
   int32_t lastError() const { return last_error_; }
+  // Verdict of the last installedLayoutConforms() call, for diagnostics.
+  uint8_t lastLayoutVerdict() const { return last_layout_verdict_; }
+  // The layout identity compiled into this image. Holding the address is what
+  // keeps the marker string in the linked binary (the manifest verifier looks
+  // for it); the linker would otherwise discard an unreferenced constant.
+  const char* layoutMarker() const { return layout_marker_; }
 
  private:
   uint32_t handle_ = 0;
   bool stream_open_ = false;
   int32_t last_error_ = 0;
+  uint8_t last_layout_verdict_ = 0;
+  const char* layout_marker_ = kLayoutMarker;
   uint32_t max_open_us_ = 0;
   uint32_t max_write_us_ = 0;
   uint32_t max_end_us_ = 0;

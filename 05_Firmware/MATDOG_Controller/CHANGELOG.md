@@ -1,5 +1,24 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — P2.3 Custom flash layout and flashing safety (offline, no hardware) — 2026-10-02
+
+- **Layout `MATDOG_16M_2x5M_NVS_V1`** (`partitions.csv`, `PartitionScheme=custom`): nvs 0x9000/0x5000,
+  otadata 0xE000/0x2000, app0 0x10000/5 MiB, app1 0x510000/5 MiB, ffat 0xA10000/0x5D0000,
+  **matdog_nvs 0xFE0000/0x10000**, coredump 0xFF0000/0x10000. Default NVS precedes MATDOG NVS (the
+  Arduino core erases the first nvs-subtype partition on a bad default NVS).
+- `scripts/matdog_layout.py`: pinned contract, binary-table SHA-256, 5 MiB size gate (> 5,242,880 B
+  refused, >= 4 MiB growth warning), write/erase-range check, migration contract (data only).
+- **Manifest V2** adds `LAYOUT_ID`, `PARTITION_TABLE_SHA256` (of the table the build produced) and
+  `APP_PARTITION_SIZE`; V1 manifests are rejected. The layout id string is compiled into the
+  firmware and checked in the binary.
+- `flash_app_only.sh` additionally verifies the table installed on the device, the target offset/size
+  and the effective erase range before its single write. A device with the legacy table is refused
+  (no bypass; migration is a separate procedure). `upload.sh` is now a refusing stub.
+- OTA: `OtaPolicy::prepare()` refuses (`LAYOUT_NOT_CONFORMING`) when the running partition table is
+  not the compiled-in contract. Authenticated layout declaration in the OTA metadata is a separate
+  task (OTA metadata schema 2).
+- **Not migrated**: the device still runs the legacy table. Nothing was flashed, erased or reset.
+
 ## Unreleased — TRUE 24-contact Full Calibration (LF V25 full-leg state machine × 4 legs) — 2026-09-30
 
 **HARDWARE-VALIDATED 2026-10-01: TRUE FULL CALIBRATION 24/24.**

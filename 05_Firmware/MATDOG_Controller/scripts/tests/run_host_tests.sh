@@ -236,6 +236,12 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# The firmware-side MATDOG flash layout contract (pure, ESP-IDF-free).
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -o "$OUT/test_ota_layout_contract" \
+  "$SCRIPT_DIR/test_ota_layout_contract.cpp" \
+  "$SKETCH_DIR/src/update/OtaLayoutContract.cpp"
+
 # The Safe Actuator runtime adapter suite links the REAL adapter, the REAL
 # policy and the REAL arbiter, so the "no ACCEPT -> no backend call" and
 # "ACCEPT -> exactly one backend call" properties under test are the shipped
@@ -498,6 +504,7 @@ done
 "$OUT/test_motion_deadman"
 "$OUT/test_thermal_confirmation"
 "$OUT/test_ota_policy"
+"$OUT/test_ota_layout_contract"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_population_evidence"
 "$OUT/test_calibration_manager"

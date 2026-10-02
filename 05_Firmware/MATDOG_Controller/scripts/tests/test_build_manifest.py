@@ -33,6 +33,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from matdog_layout import (  # noqa: E402
+    EXPECTED_TABLE_SHA256,
+    LAYOUT_ID,
+    PINNED_FQBN,
+)
 from build_manifest import (  # noqa: E402
     DEFAULT_FLASH_OTA_INGEST,
     DEFAULT_FLASH_PROFILE,
@@ -54,11 +59,26 @@ SHA = "6e6d92f898dbe95000b53dbb252c7eb5d3deaa9a4b161e2b1934436a76b29364"
 
 # The real pinned FQBN used by scripts/build.sh and scripts/flash_app_only.sh.
 # Kept verbatim so these tests exercise the actual string, not a stand-in.
-CANONICAL_FQBN = (
-    "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,"
-    "CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,"
-    "DebugLevel=none,PSRAM=opi"
-)
+CANONICAL_FQBN = PINNED_FQBN
+assert "PartitionScheme=custom" in CANONICAL_FQBN
+LEGACY_FQBN = CANONICAL_FQBN.replace("PartitionScheme=custom",
+                                     "PartitionScheme=app3M_fat9M_16MB")
+APP_SLOT = 5242880
+MARKER_BINARY = b"firmware-bytes\x00MATDOG_LAYOUT_ID=" + LAYOUT_ID.encode() + b"\x00tail"
+
+
+def _real_table():
+    """The partition table the real toolchain produces from partitions.csv."""
+    import subprocess
+    d = Path(__file__).resolve().parent.parent.parent
+    gen = (Path.home() / ".arduino15/packages/esp32/hardware/esp32/3.3.11/tools/gen_esp32part.py")
+    out = Path(tempfile.mkdtemp()) / "partitions.bin"
+    subprocess.run([sys.executable, str(gen), "-q", str(d / "partitions.csv"), str(out)],
+                   check=True, capture_output=True)
+    return out
+
+
+REAL_TABLE = _real_table()
 
 
 def manifest(**overrides):
@@ -73,6 +93,9 @@ def manifest(**overrides):
         "APPLICATION_BINARY": "MATDOG_Controller.ino.bin",
         "APPLICATION_SIZE": "387164",
         "APPLICATION_SHA256": SHA,
+        "LAYOUT_ID": LAYOUT_ID,
+        "PARTITION_TABLE_SHA256": EXPECTED_TABLE_SHA256,
+        "APP_PARTITION_SIZE": str(APP_SLOT),
     }
     base.update(overrides)
     return base
@@ -80,7 +103,9 @@ def manifest(**overrides):
 
 def verify(m=None, *, head=HEAD, expected_fqbn=CANONICAL_FQBN, tree_state="CLEAN",
            binary_exists=True, binary_size=387164, binary_sha256=SHA,
-           requested_profile="USB_ONLY", requested_ota_ingest="0"):
+           requested_profile="USB_ONLY", requested_ota_ingest="0",
+           build_partition_table_sha256=EXPECTED_TABLE_SHA256,
+           binary_embeds_layout_id=True):
     return verify_manifest(
         manifest() if m is None else m,
         head_commit=head,
@@ -91,6 +116,8 @@ def verify(m=None, *, head=HEAD, expected_fqbn=CANONICAL_FQBN, tree_state="CLEAN
         binary_sha256=binary_sha256,
         requested_profile=requested_profile,
         requested_ota_ingest=requested_ota_ingest,
+        build_partition_table_sha256=build_partition_table_sha256,
+        binary_embeds_layout_id=binary_embeds_layout_id,
     )
 
 
@@ -286,7 +313,7 @@ class TestFqbnBinding(unittest.TestCase):
         # The realistic failure: one option drifts. A partition-scheme
         # change silently relocates the application partition.
         for wrong in (
-                CANONICAL_FQBN.replace("PartitionScheme=app3M_fat9M_16MB",
+                CANONICAL_FQBN.replace("PartitionScheme=custom",
                                        "PartitionScheme=default"),
                 CANONICAL_FQBN.replace("FlashSize=16M", "FlashSize=8M"),
                 CANONICAL_FQBN.replace("PSRAM=opi", "PSRAM=disabled"),
@@ -394,14 +421,17 @@ class TestManifestIntegrity(unittest.TestCase):
         v = verify_manifest(None, head_commit=HEAD, expected_fqbn=CANONICAL_FQBN,
                             tree_state="CLEAN", binary_exists=True,
                             binary_size=387164, binary_sha256=SHA,
-                            requested_profile="USB_ONLY", requested_ota_ingest="0")
+                            requested_profile="USB_ONLY", requested_ota_ingest="0",
+                            build_partition_table_sha256=EXPECTED_TABLE_SHA256,
+                            binary_embeds_layout_id=True)
         self.assertFalse(v.ok)
         self.assertEqual(v.reason, Refusal.MANIFEST_MISSING)
 
     def test_incomplete_manifest_refuses(self):
         for key in ("SOURCE_COMMIT", "HARDWARE_PROFILE", "OTA_INGEST_ENABLED",
                     "APPLICATION_SHA256", "APPLICATION_SIZE", "SOURCE_STATE", "BUILD_ID",
-                    "FQBN", "APPLICATION_BINARY", "MATDOG_MANIFEST_VERSION"):
+                    "FQBN", "APPLICATION_BINARY", "MATDOG_MANIFEST_VERSION",
+                    "LAYOUT_ID", "PARTITION_TABLE_SHA256", "APP_PARTITION_SIZE"):
             m = manifest()
             del m[key]
             v = verify(m)
@@ -409,7 +439,7 @@ class TestManifestIntegrity(unittest.TestCase):
             self.assertEqual(v.reason, Refusal.MANIFEST_INCOMPLETE, key)
 
     def test_unknown_manifest_version_refuses(self):
-        v = verify(manifest(MATDOG_MANIFEST_VERSION="2"))
+        v = verify(manifest(MATDOG_MANIFEST_VERSION="3"))
         self.assertFalse(v.ok)
         self.assertEqual(v.reason, Refusal.MANIFEST_VERSION_UNKNOWN)
 
@@ -434,19 +464,91 @@ class TestManifestIntegrity(unittest.TestCase):
             source_commit=HEAD, build_id="34afbc7808e2", source_state="CLEAN",
             profile="ROBOT_POWERED", ota_ingest_enabled="1", fqbn=CANONICAL_FQBN,
             application_binary="MATDOG_Controller.ino.bin",
-            application_size=387632, application_sha256=SHA)
+            application_size=387632, application_sha256=SHA,
+            layout_id=LAYOUT_ID, partition_table_sha256=EXPECTED_TABLE_SHA256,
+            app_partition_size=APP_SLOT)
         m = parse_manifest(text)
         self.assertEqual(m["HARDWARE_PROFILE"], "ROBOT_POWERED")
         self.assertEqual(m["OTA_INGEST_ENABLED"], "1")
         self.assertEqual(m["APPLICATION_SIZE"], "387632")
         self.assertEqual(m["SOURCE_COMMIT"], HEAD)
+        self.assertEqual(m["MATDOG_MANIFEST_VERSION"], "2")
+        self.assertEqual(m["LAYOUT_ID"], LAYOUT_ID)
+        self.assertEqual(m["PARTITION_TABLE_SHA256"], EXPECTED_TABLE_SHA256)
+        self.assertEqual(m["APP_PARTITION_SIZE"], str(APP_SLOT))
         # Every key the verifier requires must be produced by the writer —
         # otherwise a freshly built tree would refuse its own manifest.
         v = verify_manifest(m, head_commit=HEAD, expected_fqbn=CANONICAL_FQBN,
                             tree_state="CLEAN", binary_exists=True,
                             binary_size=387632, binary_sha256=SHA,
-                            requested_profile="ROBOT_POWERED", requested_ota_ingest="1")
+                            requested_profile="ROBOT_POWERED", requested_ota_ingest="1",
+                            build_partition_table_sha256=EXPECTED_TABLE_SHA256,
+                            binary_embeds_layout_id=True)
         self.assertTrue(v.ok, v.detail)
+
+
+class TestManifestV2Layout(unittest.TestCase):
+    """Manifest V2 binds the artifact to the flash layout. V1 manifests and
+    manifests without layout information must never reach a write."""
+
+    def test_v1_manifest_is_rejected(self):
+        m = manifest(MATDOG_MANIFEST_VERSION="1")
+        for k in ("LAYOUT_ID", "PARTITION_TABLE_SHA256", "APP_PARTITION_SIZE"):
+            del m[k]
+        v = verify(m)
+        self.assertFalse(v.ok)
+        self.assertEqual(v.reason, Refusal.MANIFEST_VERSION_UNKNOWN)
+
+    def test_v1_label_with_layout_keys_is_still_rejected(self):
+        v = verify(manifest(MATDOG_MANIFEST_VERSION="1"))
+        self.assertEqual(v.reason, Refusal.MANIFEST_VERSION_UNKNOWN)
+
+    def test_v2_without_layout_keys_is_incomplete(self):
+        for k in ("LAYOUT_ID", "PARTITION_TABLE_SHA256", "APP_PARTITION_SIZE"):
+            m = manifest()
+            del m[k]
+            self.assertEqual(verify(m).reason, Refusal.MANIFEST_INCOMPLETE, k)
+
+    def test_layout_id_mismatch(self):
+        v = verify(manifest(LAYOUT_ID="MATDOG_16M_3M_FAT9M_LEGACY"))
+        self.assertEqual(v.reason, Refusal.LAYOUT_ID_MISMATCH)
+
+    def test_manifest_table_hash_must_be_the_pinned_one(self):
+        v = verify(manifest(PARTITION_TABLE_SHA256="a" * 64))
+        self.assertEqual(v.reason, Refusal.PARTITION_TABLE_MISMATCH)
+
+    def test_built_table_must_match_manifest(self):
+        v = verify(build_partition_table_sha256="b" * 64)
+        self.assertEqual(v.reason, Refusal.PARTITION_TABLE_MISMATCH)
+
+    def test_missing_table_artifact_refuses(self):
+        v = verify(build_partition_table_sha256="")
+        self.assertEqual(v.reason, Refusal.PARTITION_TABLE_ARTIFACT_MISSING)
+
+    def test_app_partition_size_mismatch(self):
+        v = verify(manifest(APP_PARTITION_SIZE=str(3 * 1024 * 1024)))
+        self.assertEqual(v.reason, Refusal.APP_PARTITION_SIZE_MISMATCH)
+
+    def test_legacy_fqbn_refuses(self):
+        v = verify(manifest(FQBN=LEGACY_FQBN))
+        self.assertEqual(v.reason, Refusal.FQBN_MISMATCH)
+
+    def test_binary_over_the_slot_refuses(self):
+        size = APP_SLOT + 1
+        v = verify(manifest(APPLICATION_SIZE=str(size)), binary_size=size)
+        self.assertEqual(v.reason, Refusal.APPLICATION_TOO_LARGE)
+
+    def test_binary_exactly_the_slot_is_accepted(self):
+        v = verify(manifest(APPLICATION_SIZE=str(APP_SLOT)), binary_size=APP_SLOT)
+        self.assertTrue(v.ok, v.detail)
+
+    def test_binary_without_layout_marker_refuses(self):
+        v = verify(binary_embeds_layout_id=False)
+        self.assertEqual(v.reason, Refusal.LAYOUT_ID_NOT_IN_BINARY)
+
+    def test_layout_checked_before_tree_state(self):
+        v = verify(manifest(LAYOUT_ID="X"), tree_state="DIRTY")
+        self.assertEqual(v.reason, Refusal.LAYOUT_ID_MISMATCH)
 
 
 class TestCliEndToEnd(unittest.TestCase):
@@ -462,10 +564,13 @@ class TestCliEndToEnd(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             return fn(*args, **kwargs)
 
-    def _build(self, tmp, profile, content=b"firmware-bytes", fqbn=CANONICAL_FQBN,
-              ota_ingest="0"):
+    def _build(self, tmp, profile, content=MARKER_BINARY, fqbn=CANONICAL_FQBN,
+              ota_ingest="0", table=None):
         binary = Path(tmp) / "MATDOG_Controller.ino.bin"
         binary.write_bytes(content)
+        if table is None:
+            table = REAL_TABLE.read_bytes()
+        (Path(tmp) / "MATDOG_Controller.ino.partitions.bin").write_bytes(table)
         out = Path(tmp) / "matdog_build_manifest.txt"
         rc = self._quiet(main, ["write", "--output", str(out), "--binary", str(binary),
                                  "--source-commit", HEAD, "--build-id", "34afbc7808e2",
@@ -573,13 +678,22 @@ class TestCliEndToEnd(unittest.TestCase):
                 self._verify(binary, out, "USB_ONLY",
                              expected_fqbn="esp32:esp32:esp32s3:FlashSize=8M"), 1)
 
-    def test_artifact_built_with_wrong_fqbn_refuses_via_cli(self):
-        # End to end: a build genuinely recorded under a different FQBN,
-        # verified against the flasher's pinned one.
-        with tempfile.TemporaryDirectory() as tmp:
-            binary, out = self._build(tmp, "USB_ONLY",
-                                      fqbn="esp32:esp32:esp32s3:PartitionScheme=default")
-            self.assertEqual(self._verify(binary, out, "USB_ONLY"), 1)
+    def test_write_refuses_a_build_under_a_non_custom_partition_scheme(self):
+        # The write step is the choke point: a build under any other scheme
+        # never gets a manifest at all.
+        for fqbn in ("esp32:esp32:esp32s3:PartitionScheme=default", LEGACY_FQBN):
+            with tempfile.TemporaryDirectory() as tmp:
+                binary = Path(tmp) / "MATDOG_Controller.ino.bin"
+                binary.write_bytes(MARKER_BINARY)
+                (Path(tmp) / "MATDOG_Controller.ino.partitions.bin").write_bytes(
+                    REAL_TABLE.read_bytes())
+                out = Path(tmp) / "m.txt"
+                rc = self._quiet(main, ["write", "--output", str(out), "--binary", str(binary),
+                                        "--source-commit", HEAD, "--build-id", "x",
+                                        "--source-state", "CLEAN", "--profile", "USB_ONLY",
+                                        "--ota-ingest", "0", "--fqbn", fqbn])
+                self.assertEqual(rc, 1, fqbn)
+                self.assertFalse(out.exists(), fqbn)
 
     def test_both_profiles_end_to_end_with_canonical_fqbn(self):
         for profile in KNOWN_PROFILES:
@@ -598,9 +712,68 @@ class TestCliEndToEnd(unittest.TestCase):
             binary, out = self._build(tmp, "USB_ONLY")
             self.assertEqual(self._verify(binary, out, "USB_ONLY", tree="DIRTY"), 1)
 
+    def test_verify_refuses_when_table_artifact_is_replaced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            binary, out = self._build(tmp, "USB_ONLY")
+            table = Path(tmp) / "MATDOG_Controller.ino.partitions.bin"
+            table.write_bytes(table.read_bytes()[:-1] + b"\x00")
+            self.assertEqual(self._verify(binary, out, "USB_ONLY"), 1)
+
+    def test_verify_refuses_when_table_artifact_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            binary, out = self._build(tmp, "USB_ONLY")
+            (Path(tmp) / "MATDOG_Controller.ino.partitions.bin").unlink()
+            self.assertEqual(self._verify(binary, out, "USB_ONLY"), 1)
+
+    def test_verify_refuses_binary_without_layout_marker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            binary, out = self._build(tmp, "USB_ONLY")
+            data = b"no-marker-here"
+            binary.write_bytes(data)
+            self.assertEqual(self._verify(binary, out, "USB_ONLY"), 1)
+
+    def test_write_refuses_the_legacy_partition_table(self):
+        # Build a legacy-hash-shaped table is not possible offline; any table
+        # other than the pinned one must be refused at write time.
+        with tempfile.TemporaryDirectory() as tmp:
+            binary = Path(tmp) / "MATDOG_Controller.ino.bin"
+            binary.write_bytes(MARKER_BINARY)
+            (Path(tmp) / "MATDOG_Controller.ino.partitions.bin").write_bytes(b"\xff" * 3072)
+            out = Path(tmp) / "m.txt"
+            rc = self._quiet(main, ["write", "--output", str(out), "--binary", str(binary),
+                                    "--source-commit", HEAD, "--build-id", "x",
+                                    "--source-state", "CLEAN", "--profile", "USB_ONLY",
+                                    "--ota-ingest", "0", "--fqbn", CANONICAL_FQBN])
+            self.assertEqual(rc, 1)
+            self.assertFalse(out.exists())
+
+    def test_write_refuses_binary_without_marker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            binary = Path(tmp) / "MATDOG_Controller.ino.bin"
+            binary.write_bytes(b"plain")
+            (Path(tmp) / "MATDOG_Controller.ino.partitions.bin").write_bytes(
+                REAL_TABLE.read_bytes())
+            out = Path(tmp) / "m.txt"
+            rc = self._quiet(main, ["write", "--output", str(out), "--binary", str(binary),
+                                    "--source-commit", HEAD, "--build-id", "x",
+                                    "--source-state", "CLEAN", "--profile", "USB_ONLY",
+                                    "--ota-ingest", "0", "--fqbn", CANONICAL_FQBN])
+            self.assertEqual(rc, 1)
+
+    def test_write_refuses_without_table_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            binary = Path(tmp) / "MATDOG_Controller.ino.bin"
+            binary.write_bytes(MARKER_BINARY)
+            rc = self._quiet(main, ["write", "--output", str(Path(tmp) / "m.txt"),
+                                    "--binary", str(binary), "--source-commit", HEAD,
+                                    "--build-id", "x", "--source-state", "CLEAN",
+                                    "--profile", "USB_ONLY", "--ota-ingest", "0",
+                                    "--fqbn", CANONICAL_FQBN])
+            self.assertEqual(rc, 1)
+
     def test_recorded_sha256_matches_real_file_digest(self):
         with tempfile.TemporaryDirectory() as tmp:
-            binary, out = self._build(tmp, "USB_ONLY", content=b"deterministic")
+            binary, out = self._build(tmp, "USB_ONLY", content=MARKER_BINARY + b"deterministic")
             m, err = load_manifest(out)
             self.assertIsNone(err)
             self.assertEqual(m["APPLICATION_SHA256"], sha256_file(binary))

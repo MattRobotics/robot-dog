@@ -131,6 +131,8 @@ enum class OtaFault : uint8_t {
   IMAGE_REJECTED,             // ESP-IDF rejected the written image structure
   HASH_MISMATCH,              // our SHA-256 of the received bytes != declared
   BOOT_SWITCH_REJECTED,       // setting the boot partition failed
+  LAYOUT_NOT_CONFORMING,      // the installed partition table is not the compiled-in
+                              // MATDOG layout contract (see OtaLayoutContract.h)
 };
 
 // ---------------------------------------------------------------------------
@@ -191,6 +193,13 @@ class OtaBackend {
   virtual OtaPartitionInfo runningPartition() = 0;
   virtual OtaPartitionInfo nextUpdatePartition() = 0;
   virtual OtaImgState imageState(const OtaPartitionInfo& partition) = 0;
+
+  // True only if the partition table the device is actually running equals
+  // the layout contract compiled into THIS firmware (OtaLayoutContract.h).
+  // Layout identity therefore comes from the running firmware and the real
+  // table, never from anything the sender declares. Fail closed: a backend
+  // that cannot tell returns false.
+  virtual bool installedLayoutConforms() = 0;
 
   // esp_ota_begin equivalent. image_size is advisory for erase strategy; the
   // policy has already bounded it against the partition.

@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 # Compiles MATDOG Controller V0.1 with the pinned FQBN. Does not touch
-# hardware — no upload happens here (see scripts/upload.sh for that, and
-# note it still requires the backup/static-audit gates to have passed).
+# hardware — no upload happens here.
+#
+# FLASH LAYOUT (P2.3). PartitionScheme=custom makes the Arduino core use
+# the sketch-folder partitions.csv (layout MATDOG_16M_2x5M_NVS_V1: two 5 MiB
+# app slots, default NVS BEFORE matdog_nvs). The installed core is never
+# modified. The FQBN name alone does not prove the table, so after the compile
+# scripts/matdog_layout.py checks the binary table the build ACTUALLY produced
+# (exact SHA-256), the application size against the 5 MiB slot (> 5,242,880 B
+# is not an acceptable build; >= 4 MiB is a growth warning) and that the layout
+# id is compiled into the binary. upload.maximum_size is only passed so the
+# arduino-cli size report agrees; it is never relied on.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,7 +18,7 @@ SKETCH_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$SKETCH_DIR/../.." && pwd)"
 
 ARDUINO="${ARDUINO_CLI:-$HOME/.local/bin/arduino-cli}"
-FQBN='esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,DebugLevel=none,PSRAM=opi'
+FQBN='esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=custom,DebugLevel=none,PSRAM=opi'
 
 GIT_SHA="nogit"
 DIRTY_SUFFIX=""
@@ -106,8 +115,19 @@ echo "profile    : $PROFILE_NAME"
 echo "ota_ingest : $OTA_INGEST_NAME"
 echo
 
+BUILD_DIR="$SKETCH_DIR/build/esp32.esp32.esp32s3"
+APPLICATION_BINARY="$BUILD_DIR/MATDOG_Controller.ino.bin"
+PARTITION_ARTIFACT="$BUILD_DIR/MATDOG_Controller.ino.partitions.bin"
+MANIFEST="$BUILD_DIR/matdog_build_manifest.txt"
+
+# A previous build's table or manifest must never be mistaken for this one's.
+rm -f "$MANIFEST" "$PARTITION_ARTIFACT"
+
+python3 "$SCRIPT_DIR/matdog_layout.py" check-fqbn --fqbn "$FQBN" >/dev/null
+
 "$ARDUINO" compile \
   --fqbn "$FQBN" \
+  --build-property "upload.maximum_size=5242880" \
   --build-property "compiler.cpp.extra_flags=-DMATDOG_BUILD_ID=\"${BUILD_ID}\"${PROFILE_FLAG}${OTA_INGEST_FLAG}" \
   --warnings all \
   --export-binaries \
@@ -122,10 +142,6 @@ echo
 # against this file. The manifest lives inside the gitignored build output
 # directory, adjacent to the binary — it is a build artifact, never
 # committed.
-BUILD_DIR="$SKETCH_DIR/build/esp32.esp32.esp32s3"
-APPLICATION_BINARY="$BUILD_DIR/MATDOG_Controller.ino.bin"
-MANIFEST="$BUILD_DIR/matdog_build_manifest.txt"
-
 # Stale-manifest safety: if the compile produced no binary, make sure a
 # previous build's manifest cannot be left behind to be verified against.
 if [ ! -f "$APPLICATION_BINARY" ]; then
@@ -133,6 +149,18 @@ if [ ! -f "$APPLICATION_BINARY" ]; then
   echo "ERROR: expected application binary not found after compile: $APPLICATION_BINARY" >&2
   exit 1
 fi
+
+if [ ! -f "$PARTITION_ARTIFACT" ]; then
+  echo "ERROR: the build produced no binary partition table: $PARTITION_ARTIFACT" >&2
+  exit 1
+fi
+
+echo
+echo "== Flash layout gate =="
+python3 "$SCRIPT_DIR/matdog_layout.py" check-build \
+  --partitions "$PARTITION_ARTIFACT" \
+  --binary "$APPLICATION_BINARY" \
+  --fqbn "$FQBN"
 
 python3 "$SCRIPT_DIR/build_manifest.py" write \
   --output "$MANIFEST" \

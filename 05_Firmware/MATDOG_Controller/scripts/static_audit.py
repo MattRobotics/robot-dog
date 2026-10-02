@@ -5535,6 +5535,139 @@ def check_build_profile_provenance(sketch_dir):
              f"(stdout={result.stdout!r} stderr={result.stderr!r})")
 
 
+def check_flash_layout_safety(sketch_dir):
+    """P2.3: the MATDOG V1 flash layout and the controls that keep ordinary
+    maintenance from overwriting the persistent MATDOG NVS partition.
+
+    Offline only. Pins: partitions.csv == scripts/matdog_layout.py contract
+    (default NVS before matdog_nvs); one FQBN, with PartitionScheme=custom,
+    in build.sh / flash_app_only.sh / upload.sh; the layout gates run before
+    the manifest is written and before the single write-flash; upload.sh
+    performs no upload; no chip-erase anywhere; the OTA policy refuses a
+    non-conforming installed table before resolving a target.
+    """
+    scripts_dir = sketch_dir / "scripts"
+    layout_py = scripts_dir / "matdog_layout.py"
+    csv_path = sketch_dir / "partitions.csv"
+    build_sh = scripts_dir / "build.sh"
+    flash_sh = scripts_dir / "flash_app_only.sh"
+    upload_sh = scripts_dir / "upload.sh"
+    verifier = scripts_dir / "verify_application_partition.py"
+    tests = scripts_dir / "tests" / "test_matdog_layout.py"
+    for path in (layout_py, csv_path, build_sh, flash_sh, upload_sh, verifier, tests):
+        if not path.exists():
+            fail(f"{path}: missing - the MATDOG V1 flash-layout safety chain is incomplete")
+            return
+
+    # 1. partitions.csv is exactly the pinned contract, default NVS first.
+    sys.path.insert(0, str(scripts_dir))
+    try:
+        import matdog_layout
+    finally:
+        sys.path.pop(0)
+    rows = []
+    for line in csv_path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#")[0].strip()
+        if line:
+            rows.append([c.strip() for c in line.split(",")])
+    got = [(r[0], int(r[3], 0), int(r[4], 0)) for r in rows]
+    want = [(e.label, e.offset, e.size) for e in matdog_layout.EXPECTED_PARTITIONS]
+    if got != want:
+        fail(f"{csv_path}: partition table {got} != the pinned layout "
+             f"{matdog_layout.LAYOUT_ID} {want}")
+    nvs_labels = [r[0] for r in rows if r[1] == "data" and r[2] == "nvs"]
+    if nvs_labels != ["nvs", "matdog_nvs"]:
+        fail(f"{csv_path}: nvs-subtype partitions are {nvs_labels}; the default 'nvs' "
+             f"must precede 'matdog_nvs' (initArduino() erases the FIRST nvs partition)")
+
+    # 2. One FQBN everywhere, custom scheme.
+    for script in (build_sh, flash_sh, upload_sh):
+        m = re.search(r"^FQBN='([^']+)'", script.read_text(encoding="utf-8"), re.MULTILINE)
+        if not m or m.group(1) != matdog_layout.PINNED_FQBN:
+            fail(f"{script}: FQBN is not matdog_layout.PINNED_FQBN "
+                 f"(PartitionScheme=custom)")
+
+    # 3. build.sh: layout gate before the manifest, explicit size limit.
+    build_text = strip_shell_comments(build_sh.read_text(encoding="utf-8"))
+    gate = re.search(r'matdog_layout\.py"?\s+check-build', build_text)
+    manifest = re.search(r'build_manifest\.py"?\s+write', build_text)
+    if not gate or not manifest or gate.start() > manifest.start():
+        fail(f"{build_sh}: `matdog_layout.py check-build` (table hash, 5 MiB size gate, "
+             f"layout marker) must run before the manifest is written")
+    if "upload.maximum_size=5242880" not in build_text:
+        fail(f"{build_sh}: lost --build-property upload.maximum_size=5242880")
+    if not re.search(r"rm -f[^\n]*PARTITION_ARTIFACT", build_text):
+        fail(f"{build_sh}: does not remove the previous build's partition table artifact")
+
+    # 4. flash_app_only.sh: layout gates before the single write.
+    flash_text = strip_shell_comments(flash_sh.read_text(encoding="utf-8"))
+    write = re.search(r'"\$ESPTOOL"[^\n]*write-flash', flash_text)
+    for pattern, description in (
+            (r'matdog_layout\.py"?\s+check-write', "effective write/erase range check"),
+            (r'--expected-table-sha256\s+"\$VERIFIED_PARTITION_TABLE_SHA256"',
+             "installed-table == manifest table check"),
+            (r'\$MAX_PARTITION_SIZE"\s*=\s*"\$VERIFIED_APP_PARTITION_SIZE"',
+             "target size == manifest APP_PARTITION_SIZE check")):
+        m = re.search(pattern, flash_text)
+        if not m:
+            fail(f"{flash_sh}: lost the {description}")
+        elif write and m.start() > write.start():
+            fail(f"{flash_sh}: the {description} must come before write-flash")
+    block = flash_text[flash_text.find("check-write"):][:600]
+    if re.search(r"\|\|\s*(true|:|echo|warn)\b", block.split("WRITE_TARGET_LABEL")[0]):
+        fail(f"{flash_sh}: the write-range check swallows its failure")
+    if len([l for l in flash_text.splitlines()
+            if "write-flash" in l and not l.lstrip().startswith(("echo", "refuse"))
+            and "verify-flash" not in l]) != 1:
+        fail(f"{flash_sh}: expected exactly one write-flash invocation")
+
+    # 5. The installed-layout gate is in the verifier and has no bypass.
+    ver_text = verifier.read_text(encoding="utf-8")
+    if "check_table_bytes" not in ver_text or "--expected-table-sha256" not in ver_text:
+        fail(f"{verifier}: no longer checks the installed table against the pinned layout")
+    if re.search(r'add_argument\("--expected-table-sha256"[^)]*default=', ver_text):
+        fail(f"{verifier}: --expected-table-sha256 gained a default")
+    if re.search(r"(allow|ignore|skip|force|bypass)[-_]?(legacy|layout)", ver_text, re.I):
+        fail(f"{verifier}: a legacy/layout bypass appeared - migration is a separate procedure")
+
+    # 6. upload.sh performs no hardware operation.
+    upload_text = strip_shell_comments(upload_sh.read_text(encoding="utf-8"))
+    for token in ("arduino-cli", "$ARDUINO", "esptool", "ESPTOOL", "write-flash",
+                  "write_flash", "--port", "PORT="):
+        if token in upload_text:
+            fail(f"{upload_sh}: {token!r} - upload.sh is a refusing stub, it must not "
+                 f"perform any upload or hardware operation")
+    if not re.search(r"^exit 1\s*$", upload_text, re.MULTILINE):
+        fail(f"{upload_sh}: does not end by refusing (exit 1)")
+
+    # 7. No chip erase anywhere in the scripts.
+    for path in sorted(scripts_dir.glob("*.sh")) + sorted(scripts_dir.glob("*.py")):
+        if path.name in ("static_audit.py", "matdog_layout.py"):
+            continue
+        text = path.read_text(encoding="utf-8")
+        text = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))
+        if re.search(r"erase[-_]flash|erase[-_]region", text):
+            fail(f"{path}: references a flash erase command - none is allowed (P2.3)")
+
+    # 8. OTA: the installed layout is checked before any target is resolved.
+    policy = sketch_dir / "src" / "update" / "OtaPolicy.cpp"
+    if policy.exists():
+        text = strip_comments(policy.read_text(encoding="utf-8"))
+        prep = text.find("OtaPolicy::prepare(")
+        gate_pos = text.find("installedLayoutConforms()", prep)
+        target_pos = text.find("nextUpdatePartition()", prep)
+        if prep < 0 or gate_pos < 0:
+            fail(f"{policy}: prepare() no longer asks the backend whether the installed "
+                 f"layout conforms (LAYOUT_NOT_CONFORMING)")
+        elif target_pos >= 0 and gate_pos > target_pos:
+            fail(f"{policy}: the layout check must come before the OTA target is resolved")
+
+    result = subprocess.run([sys.executable, str(tests)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{tests}: flash layout offline tests FAILED "
+             f"(stdout={result.stdout[-2000:]!r} stderr={result.stderr[-2000:]!r})")
+
+
 def check_backup_gate_provenance(sketch_dir):
     """Recovery-backup hardening (2026-09-25): flash_app_only.sh's backup
     gate must PROVE a full-flash backup is authorized, never accept one by
@@ -5793,6 +5926,7 @@ def main():
     check_led_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
     check_backup_gate_provenance(SKETCH_DIR)
+    check_flash_layout_safety(SKETCH_DIR)
     check_unknown_detection_is_not_a_verdict(files)
     check_usb_cdc_tx_never_blocks(files)
 
