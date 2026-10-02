@@ -33,11 +33,17 @@ static const char* g_case = "";
 
 namespace {
 
+// What nvs_set_blob leaves behind when it returns set_error. In ESP-IDF a
+// failing set can fail before anything is published (e.g. NOT_ENOUGH_SPACE),
+// or after a partial/full publication (ESP_ERR_NVS_REMOVE_FAILED).
+enum class SetPublication { NOTHING, PARTIAL, FULL };
+
 struct StubNvs {
   std::map<std::string, std::map<std::string, std::vector<uint8_t>>> ns;
   std::vector<std::string> calls;
   esp_err_t open_error = ESP_OK;
   esp_err_t set_error = ESP_OK;
+  SetPublication set_publication = SetPublication::NOTHING;  // only when set_error != ESP_OK
   esp_err_t commit_error = ESP_OK;
   esp_err_t get_error = ESP_OK;
   std::string open_name;
@@ -78,8 +84,15 @@ esp_err_t nvs_get_blob(nvs_handle_t, const char* key, void* out, size_t* length)
 esp_err_t nvs_set_blob(nvs_handle_t, const char* key, const void* value, size_t length) {
   g.calls.push_back(std::string("set:") + key);
   if (g.open_mode != NVS_READWRITE) return -1;
-  if (g.set_error != ESP_OK) return g.set_error;
   const uint8_t* p = static_cast<const uint8_t*>(value);
+  if (g.set_error != ESP_OK) {
+    if (g.set_publication == SetPublication::PARTIAL) {
+      g.ns[g.open_name][key].assign(p, p + length / 2);
+    } else if (g.set_publication == SetPublication::FULL) {
+      g.ns[g.open_name][key].assign(p, p + length);
+    }
+    return g.set_error;
+  }
   g.ns[g.open_name][key].assign(p, p + length);
   g.dirty = true;
   return ESP_OK;
@@ -138,16 +151,23 @@ void test_error_mapping() {
   size_t n = 0;
   const uint8_t data[2] = {9, 9};
 
+  // Failing to open touches no slot: the only write error that is certain.
   g.open_error = ESP_ERR_NVS_NOT_INITIALIZED;
   CHECK(nvs.read(CalibrationSlot::A, buf, sizeof(buf), &n) == StorageIoStatus::IO_ERROR);
-  CHECK(nvs.write(CalibrationSlot::A, data, 2) == StorageIoStatus::IO_ERROR);
+  CHECK(nvs.write(CalibrationSlot::A, data, 2) == StorageIoStatus::NOT_MODIFIED);
+  g.open_error = ESP_ERR_NVS_NOT_ENOUGH_SPACE;
+  CHECK(nvs.write(CalibrationSlot::A, data, 2) == StorageIoStatus::NOT_MODIFIED);
   g.open_error = ESP_OK;
+  CHECK(g.ns.empty() || g.ns["matdog_calrec"].empty());
 
   g.set_error = ESP_ERR_NVS_NOT_ENOUGH_SPACE;
   CHECK(nvs.write(CalibrationSlot::A, data, 2) == StorageIoStatus::NO_SPACE);
   g.set_error = ESP_ERR_NVS_PAGE_FULL;
   CHECK(nvs.write(CalibrationSlot::A, data, 2) == StorageIoStatus::NO_SPACE);
   g.set_error = 0x1234;
+  CHECK(nvs.write(CalibrationSlot::A, data, 2) == StorageIoStatus::IO_ERROR);
+  // REMOVE_FAILED means "written, update finishes after re-init": an error, never OK.
+  g.set_error = ESP_ERR_NVS_REMOVE_FAILED;
   CHECK(nvs.write(CalibrationSlot::A, data, 2) == StorageIoStatus::IO_ERROR);
   g.set_error = ESP_OK;
 
@@ -163,8 +183,8 @@ void test_error_mapping() {
   CHECK(nvs.read(CalibrationSlot::A, buf, sizeof(buf), &n) == StorageIoStatus::IO_ERROR);
   g.get_error = ESP_OK;
 
-  CHECK(nvs.write(CalibrationSlot::A, nullptr, 2) == StorageIoStatus::IO_ERROR);
-  CHECK(nvs.write(CalibrationSlot::A, data, 0) == StorageIoStatus::IO_ERROR);
+  CHECK(nvs.write(CalibrationSlot::A, nullptr, 2) == StorageIoStatus::NOT_MODIFIED);
+  CHECK(nvs.write(CalibrationSlot::A, data, 0) == StorageIoStatus::NOT_MODIFIED);
 }
 
 void test_store_over_nvs_backend() {
@@ -198,12 +218,200 @@ void test_store_over_nvs_backend() {
   }
 }
 
+// --- P2.1: nvs_set_blob fault model ------------------------------------------
+// The stub does not prove physical durability; it only exercises what the
+// store does with every combination of "error returned" x "what was published".
+
+struct Seeded {
+  CalibrationRecordNvsBackend nvs;
+  CalibrationRecordStore store{&nvs};
+  std::vector<uint8_t> b2;  // the last confirmed record (generation 2, slot B)
+};
+
+void seed(Seeded* s) {
+  reset();
+  const auto profile = golden::boundProfile();
+  CHECK(s->store.save(golden::goldenRecord(0), profile).status == SaveStatus::OK);  // A/1
+  CHECK(s->store.save(golden::goldenRecord(0), profile).status == SaveStatus::OK);  // B/2
+  s->b2 = g.ns["matdog_calrec"]["B"];
+}
+
+// A reboot: new backend, new store, same flash content (the stub's map).
+LoadResult rebootAndLoad(CalibrationRecord* out) {
+  CalibrationRecordNvsBackend nvs;
+  CalibrationRecordStore store(&nvs);
+  return store.load(golden::boundProfile(), out);
+}
+
+void test_set_blob_fails_before_publication() {
+  g_case = "set_blob fails before publication";
+  const auto profile = golden::boundProfile();
+
+  const esp_err_t errors[] = {ESP_ERR_NVS_NOT_ENOUGH_SPACE, ESP_ERR_NVS_PAGE_FULL, 0x1234};
+  for (esp_err_t e : errors) {
+    Seeded s;
+    seed(&s);
+    g.set_error = e;
+    g.set_publication = SetPublication::NOTHING;
+    const SaveResult r = s.store.save(golden::goldenRecord(0), profile);
+    CHECK(r.status == SaveStatus::WRITE_FAILED || r.status == SaveStatus::NO_SPACE);
+    CHECK(r.generation == 0);
+    CHECK(g.ns["matdog_calrec"]["B"] == s.b2);
+    CHECK(g.ns["matdog_calrec"]["A"].size() == kCalibrationRecordV1EncodedBytes);  // old A/1
+    // The backend cannot tell this from a published failure: the block applies.
+    CHECK(s.store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+    g.set_error = ESP_OK;
+    g.calls.clear();
+    CHECK(s.store.save(golden::goldenRecord(0), profile).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+    CHECK(g.calls.empty());  // refused without touching NVS at all
+    CHECK(g.ns["matdog_calrec"]["B"] == s.b2);
+
+    CalibrationRecord out;
+    const LoadResult l = rebootAndLoad(&out);
+    CHECK(l.status == LoadStatus::OK && l.generation == 2 && l.slot == CalibrationSlot::B);
+  }
+}
+
+void test_set_blob_partial_publication() {
+  g_case = "set_blob partial publication";
+  Seeded s;
+  seed(&s);
+  const auto profile = golden::boundProfile();
+
+  g.set_error = ESP_ERR_NVS_REMOVE_FAILED;
+  g.set_publication = SetPublication::PARTIAL;
+  const SaveResult r = s.store.save(golden::goldenRecord(0), profile);
+  CHECK(r.status == SaveStatus::WRITE_FAILED);
+  CHECK(r.io == StorageIoStatus::IO_ERROR);
+  CHECK(r.previous_record_intact && r.previous_generation == 2);
+  CHECK(g.ns["matdog_calrec"]["A"].size() == kCalibrationRecordV1EncodedBytes / 2);
+  g.set_error = ESP_OK;
+
+  // Subsequent read: the torn slot is corrupt, B/2 is selected and flagged degraded.
+  CalibrationRecord loaded;
+  const LoadResult l = s.store.load(profile, &loaded);
+  CHECK(l.status == LoadStatus::OK && l.generation == 2 && l.slot == CalibrationSlot::B);
+  CHECK(l.degraded);
+  CHECK(l.report[0].state == SlotState::CORRUPT);
+
+  // Retry refused, previous record untouched.
+  CHECK(s.store.save(golden::goldenRecord(0), profile).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(s.store.save(golden::goldenRecord(0), profile).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(g.ns["matdog_calrec"]["B"] == s.b2);
+
+  // Recovery after a reboot: B/2 selected, and the next save heals slot A.
+  CalibrationRecordNvsBackend nvs2;
+  CalibrationRecordStore rebooted(&nvs2);
+  CHECK(rebooted.load(profile, &loaded).generation == 2);
+  const SaveResult healed = rebooted.save(golden::goldenRecord(0), profile);
+  CHECK(healed.status == SaveStatus::OK);
+  CHECK(healed.slot == CalibrationSlot::A && healed.generation == 3);
+  CHECK(g.ns["matdog_calrec"]["B"] == s.b2);
+}
+
+void test_set_blob_full_publication_with_error() {
+  g_case = "set_blob full publication with error";
+  Seeded s;
+  seed(&s);
+  const auto profile = golden::boundProfile();
+
+  g.set_error = ESP_ERR_NVS_REMOVE_FAILED;
+  g.set_publication = SetPublication::FULL;
+  const SaveResult r = s.store.save(golden::goldenRecord(0), profile);
+  CHECK(r.status == SaveStatus::WRITE_FAILED);  // the error is not retroactively turned into success
+  CHECK(r.generation == 0);
+  g.set_error = ESP_OK;
+  CHECK(g.ns["matdog_calrec"]["A"].size() == kCalibrationRecordV1EncodedBytes);
+
+  // The new record IS in flash and valid, although SAVE reported an error.
+  CalibrationRecord loaded;
+  const LoadResult l = s.store.load(profile, &loaded);
+  CHECK(l.status == LoadStatus::OK && l.generation == 3 && l.slot == CalibrationSlot::A);
+  CHECK(!l.degraded);
+
+  // The only guard between a retry and the last confirmed B/2.
+  CHECK(s.store.save(golden::goldenRecord(0), profile).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(s.store.save(golden::goldenRecord(0), profile).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(g.ns["matdog_calrec"]["B"] == s.b2);
+  CHECK(s.store.load(profile, &loaded).generation == 3);  // load does not unlock
+  CHECK(s.store.save(golden::goldenRecord(0), profile).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+
+  // After a reboot the valid highest generation is selected. This says nothing
+  // about whether anyone confirmed it.
+  const LoadResult rl = rebootAndLoad(&loaded);
+  CHECK(rl.status == LoadStatus::OK && rl.generation == 3 && rl.slot == CalibrationSlot::A);
+}
+
+void test_commit_fails_after_publication() {
+  g_case = "nvs_commit fails after publication";
+  Seeded s;
+  seed(&s);
+  const auto profile = golden::boundProfile();
+
+  g.commit_error = 0x1234;
+  const SaveResult r = s.store.save(golden::goldenRecord(0), profile);
+  CHECK(r.status == SaveStatus::WRITE_FAILED);
+  g.commit_error = ESP_OK;
+  CHECK(s.store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(s.store.save(golden::goldenRecord(0), profile).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(g.ns["matdog_calrec"]["B"] == s.b2);
+  CalibrationRecord loaded;
+  const LoadResult rl = rebootAndLoad(&loaded);
+  CHECK(rl.status == LoadStatus::OK && rl.generation == 3);
+}
+
+void test_open_failure_is_certain_and_retryable() {
+  g_case = "open failure allows retry";
+  Seeded s;
+  seed(&s);
+  const auto profile = golden::boundProfile();
+  const auto snapshot = g.ns;
+
+  g.open_error = ESP_ERR_NVS_NOT_INITIALIZED;
+  SaveResult r = s.store.save(golden::goldenRecord(0), profile);
+  // The scan could not even read: refused before any write.
+  CHECK(r.status == SaveStatus::STORAGE_UNUSABLE);
+  CHECK(s.store.writeState() == WriteState::OPEN);
+  g.open_error = ESP_OK;
+  CHECK(g.ns == snapshot);
+
+  // Only the write-phase open fails (reads succeed): certain, retry allowed.
+  struct FlakyOpen : CalibrationRecordStorage {
+    CalibrationRecordNvsBackend inner;
+    bool fail_write_open = true;
+    StorageIoStatus read(CalibrationSlot sl, uint8_t* b, size_t c, size_t* n) override {
+      return inner.read(sl, b, c, n);
+    }
+    StorageIoStatus write(CalibrationSlot sl, const uint8_t* d, size_t n) override {
+      if (!fail_write_open) return inner.write(sl, d, n);
+      g.open_error = ESP_ERR_NVS_NOT_INITIALIZED;
+      const StorageIoStatus st = inner.write(sl, d, n);
+      g.open_error = ESP_OK;
+      return st;
+    }
+  } flaky;
+  CalibrationRecordStore store(&flaky);
+  r = store.save(golden::goldenRecord(0), profile);
+  CHECK(r.status == SaveStatus::WRITE_FAILED && r.io == StorageIoStatus::NOT_MODIFIED);
+  CHECK(store.writeState() == WriteState::OPEN);
+  CHECK(g.ns == snapshot);
+  flaky.fail_write_open = false;
+  r = store.save(golden::goldenRecord(0), profile);
+  CHECK(r.status == SaveStatus::OK && r.generation == 3 && r.slot == CalibrationSlot::A);
+  CHECK(g.ns["matdog_calrec"]["B"] == s.b2);
+}
+
 }  // namespace
 
 int main() {
   test_absent_and_round_trip();
   test_error_mapping();
   test_store_over_nvs_backend();
+  test_set_blob_fails_before_publication();
+  test_set_blob_partial_publication();
+  test_set_blob_full_publication_with_error();
+  test_commit_fails_after_publication();
+  test_open_failure_is_certain_and_retryable();
   std::printf("test_calibration_record_nvs_backend: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;
 }

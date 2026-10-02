@@ -42,6 +42,15 @@ const char* toString(SaveStatus status) {
     case SaveStatus::NO_SPACE:             return "NO_SPACE";
     case SaveStatus::READBACK_FAILED:      return "READBACK_FAILED";
     case SaveStatus::READBACK_MISMATCH:    return "READBACK_MISMATCH";
+    case SaveStatus::BLOCKED_UNCERTAIN_WRITE: return "BLOCKED_UNCERTAIN_WRITE";
+  }
+  return "UNKNOWN";
+}
+
+const char* toString(WriteState state) {
+  switch (state) {
+    case WriteState::OPEN:                    return "OPEN";
+    case WriteState::BLOCKED_UNCERTAIN_WRITE: return "BLOCKED_UNCERTAIN_WRITE";
   }
   return "UNKNOWN";
 }
@@ -147,6 +156,13 @@ SaveResult CalibrationRecordStore::save(const CalibrationRecord& record,
   SaveResult result;
   if (storage_ == nullptr) return result;  // BAD_ARGUMENT
 
+  // Refuse before reading or validating anything: a retry after an uncertain
+  // write could overwrite the last record known to be good.
+  if (write_state_ != WriteState::OPEN) {
+    result.status = SaveStatus::BLOCKED_UNCERTAIN_WRITE;
+    return result;
+  }
+
   // Validate before touching storage. The generation is the store's business:
   // validate a copy carrying a placeholder.
   decoded_[0] = record;
@@ -210,21 +226,27 @@ SaveResult CalibrationRecordStore::save(const CalibrationRecord& record,
 
   const StorageIoStatus wio = storage_->write(result.slot, buffer_, length);
   if (wio != StorageIoStatus::OK) {
+    // Only an explicit NOT_MODIFIED proves the slot was left alone.
+    if (wio != StorageIoStatus::NOT_MODIFIED) write_state_ = WriteState::BLOCKED_UNCERTAIN_WRITE;
     result.status = wio == StorageIoStatus::NO_SPACE ? SaveStatus::NO_SPACE : SaveStatus::WRITE_FAILED;
     result.io = wio;
     result.generation = 0;
     return result;
   }
 
+  // The write reported success: from here on the slot holds new data, so any
+  // failure to confirm it leaves the outcome uncertain.
   size_t read_length = 0;
   const StorageIoStatus rio = storage_->read(result.slot, verify_, sizeof(verify_), &read_length);
   if (rio != StorageIoStatus::OK) {
+    write_state_ = WriteState::BLOCKED_UNCERTAIN_WRITE;
     result.status = SaveStatus::READBACK_FAILED;
     result.io = rio;
     result.generation = 0;
     return result;
   }
   if (read_length != length || memcmp(verify_, buffer_, length) != 0) {
+    write_state_ = WriteState::BLOCKED_UNCERTAIN_WRITE;
     result.status = SaveStatus::READBACK_MISMATCH;
     result.generation = 0;
     return result;

@@ -53,11 +53,13 @@ StorageIoStatus CalibrationRecordNvsBackend::read(CalibrationSlot slot, uint8_t*
 
 StorageIoStatus CalibrationRecordNvsBackend::write(CalibrationSlot slot, const uint8_t* data,
                                                    size_t length) {
-  if (data == nullptr || length == 0) return StorageIoStatus::IO_ERROR;
+  if (data == nullptr || length == 0) return StorageIoStatus::NOT_MODIFIED;
 
+  // Failing to open touches no calibration slot: the only error the store may
+  // retry past. From nvs_set_blob onwards every error is uncertain.
   nvs_handle_t handle = 0;
   esp_err_t err = nvs_open(kNamespace, NVS_READWRITE, &handle);
-  if (err != ESP_OK) return mapWriteError(err);
+  if (err != ESP_OK) return StorageIoStatus::NOT_MODIFIED;
 
   err = nvs_set_blob(handle, keyOf(slot), data, length);
   if (err == ESP_OK) err = nvs_commit(handle);

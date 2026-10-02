@@ -50,7 +50,8 @@ using golden::goldenRecord;
 
 enum class WriteFault {
   NONE,
-  FAIL_BEFORE_WRITE,   // nothing reaches the slot, IO error
+  FAIL_BEFORE_WRITE,   // nothing reaches the slot, storage says NOT_MODIFIED (certain)
+  FAIL_NOTHING_WRITTEN,  // nothing reaches the slot, but storage only says IO_ERROR (uncertain)
   TORN,                // half the bytes reach the slot, then IO error
   FAIL_AFTER_DATA,     // all bytes reach the slot, commit reported as failed
   NO_SPACE,            // refused, slot untouched
@@ -90,6 +91,8 @@ class FakeStorage : public CalibrationRecordStorage {
       case WriteFault::NONE:
         break;
       case WriteFault::FAIL_BEFORE_WRITE:
+        return StorageIoStatus::NOT_MODIFIED;
+      case WriteFault::FAIL_NOTHING_WRITTEN:
         return StorageIoStatus::IO_ERROR;
       case WriteFault::TORN:
         present[i] = true;
@@ -254,12 +257,22 @@ void test_failure_before_write() {
   fs.fault = WriteFault::FAIL_BEFORE_WRITE;
   const SaveResult r = store.save(record(), boundProfile());
   CHECK(r.status == SaveStatus::WRITE_FAILED);
+  CHECK(r.io == StorageIoStatus::NOT_MODIFIED);
   CHECK(r.slot == CalibrationSlot::A);  // target was the older slot
   CHECK(r.previous_record_intact);
   CHECK_EQ(r.previous_generation, 2);
   CHECK(fs.data[0] == a && fs.data[1] == b);
+  CHECK(store.writeState() == WriteState::OPEN);  // certain: storage was not modified
   fs.fault = WriteFault::NONE;
   expectSelected(store, 2, CalibrationSlot::B, false);
+
+  // Retry on the SAME instance behaves as before: it succeeds into the older slot.
+  const SaveResult retry = store.save(record(), boundProfile());
+  CHECK(retry.status == SaveStatus::OK);
+  CHECK(retry.slot == CalibrationSlot::A);
+  CHECK_EQ(retry.generation, 3);
+  CHECK(fs.data[1] == b);
+  CHECK(store.writeState() == WriteState::OPEN);
 }
 
 void test_failure_during_write_torn() {
@@ -284,13 +297,20 @@ void test_failure_during_write_torn() {
   CHECK(l.degraded);  // the newest save was lost and reported as such
   CHECK(l.report[0].state == SlotState::CORRUPT);
 
-  // The next save heals it: it overwrites the damaged slot, never the good one.
-  const SaveResult next = store.save(record(), boundProfile());
+  // The failed instance refuses to write again; the good slot stays untouched.
+  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(fs.data[1] == b);
+
+  // After a reboot (new instance) the next save heals it: it overwrites the
+  // damaged slot, never the good one.
+  CalibrationRecordStore rebooted(&fs);
+  const SaveResult next = rebooted.save(record(), boundProfile());
   CHECK(next.status == SaveStatus::OK);
   CHECK(next.slot == CalibrationSlot::A);
   CHECK_EQ(next.generation, 3);
   CHECK(fs.data[1] == b);
-  expectSelected(store, 3, CalibrationSlot::A, false);
+  expectSelected(rebooted, 3, CalibrationSlot::A, false);
 }
 
 void test_failure_during_commit() {
@@ -311,9 +331,11 @@ void test_failure_during_commit() {
   const LoadResult l = store.load(boundProfile(), &loaded);
   CHECK(l.status == LoadStatus::OK);
   // Complete and CRC-valid: it is a legitimate generation 3 (the caller was
-  // told the save failed; retrying yields generation 4 and the same content).
+  // told the save failed; after a reboot the next save yields generation 4).
   CHECK_EQ(l.generation, 3);
-  const SaveResult retry = store.save(record(), boundProfile());
+  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CalibrationRecordStore rebooted(&fs);
+  const SaveResult retry = rebooted.save(record(), boundProfile());
   CHECK(retry.status == SaveStatus::OK);
   CHECK_EQ(retry.generation, 4);
   CHECK(retry.slot == CalibrationSlot::B);
@@ -329,8 +351,11 @@ void test_no_space() {
   CHECK(r.status == SaveStatus::NO_SPACE);
   CHECK(r.io == StorageIoStatus::NO_SPACE);
   CHECK(r.previous_record_intact);
+  // Backends cannot promise that NO_SPACE left the slot alone: treated as uncertain.
+  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
   fs.fault = WriteFault::NONE;
   expectSelected(store, 2, CalibrationSlot::B, false);
+  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
 }
 
 void test_readback_failures() {
@@ -343,6 +368,7 @@ void test_readback_failures() {
     const SaveResult r = store.save(record(), boundProfile());
     CHECK(r.status == SaveStatus::READBACK_MISMATCH);
     CHECK_EQ(r.generation, 0);  // no success is claimed
+    CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
     fs.fault = WriteFault::NONE;
     expectSelected(store, 2, CalibrationSlot::B, true);  // recovered, flagged
   }
@@ -354,6 +380,7 @@ void test_readback_failures() {
     const SaveResult r = store.save(record(), boundProfile());
     CHECK(r.status == SaveStatus::READBACK_FAILED);
     CHECK_EQ(r.generation, 0);
+    CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
   }
 }
 
@@ -581,6 +608,163 @@ void test_roundtrip_content_equality() {
   CHECK(std::memcmp(a, b, na) == 0);
 }
 
+// --- P2.1: write-uncertainty block -----------------------------------------
+
+// SAVE confirmed B/2; the next SAVE fails with an uncertain error but leaves a
+// complete valid A/3. Without the block a retry would select A/3, target B and
+// overwrite the last confirmed record.
+void seedConfirmedB2ThenUncertainA3(FakeStorage* fs, CalibrationRecordStore* store) {
+  seedTwo(fs, store);
+  fs->fault = WriteFault::FAIL_AFTER_DATA;
+  const SaveResult r = store->save(record(), boundProfile());
+  CHECK(r.status == SaveStatus::WRITE_FAILED);  // never turned into success
+  CHECK_EQ(r.generation, 0);
+  CHECK(r.slot == CalibrationSlot::A);
+  fs->fault = WriteFault::NONE;
+}
+
+void test_uncertain_error_blocks_retry() {
+  g_case = "uncertain error blocks retry";
+  FakeStorage fs;
+  CalibrationRecordStore store(&fs);
+  seedConfirmedB2ThenUncertainA3(&fs, &store);
+  const std::vector<uint8_t> b2 = fs.data[1];
+  const std::vector<uint8_t> a3 = fs.data[0];
+  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(std::strcmp(toString(store.writeState()), "BLOCKED_UNCERTAIN_WRITE") == 0);
+
+  fs.reads = 0;
+  fs.writes = 0;
+  const SaveResult retry = store.save(record(), boundProfile());
+  CHECK(retry.status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(std::strcmp(toString(retry.status), "BLOCKED_UNCERTAIN_WRITE") == 0);
+  CHECK_EQ(retry.generation, 0);
+  CHECK(!retry.previous_record_intact);  // nothing was scanned
+  CHECK_EQ(fs.writes, 0);
+  CHECK_EQ(fs.reads, 0);
+  CHECK(fs.data[1] == b2);  // the last confirmed record is byte-identical
+  CHECK(fs.data[0] == a3);
+
+  // Even a retry whose write would itself tear the slot never gets to write.
+  fs.fault = WriteFault::TORN;
+  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CHECK_EQ(fs.writes, 0);
+  CHECK(fs.data[1] == b2);
+  fs.fault = WriteFault::NONE;
+}
+
+void test_repeated_attempts_cannot_overwrite() {
+  g_case = "repeated attempts after uncertain error";
+  FakeStorage fs;
+  CalibrationRecordStore store(&fs);
+  seedConfirmedB2ThenUncertainA3(&fs, &store);
+  const std::vector<uint8_t> b2 = fs.data[1];
+  for (int i = 0; i < 5; ++i) {
+    CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  }
+  CHECK_EQ(fs.writes, 1);  // only the original, failed attempt
+  CHECK(fs.data[1] == b2);
+}
+
+void test_load_does_not_unlock() {
+  g_case = "load does not unlock";
+  FakeStorage fs;
+  CalibrationRecordStore store(&fs);
+  seedConfirmedB2ThenUncertainA3(&fs, &store);
+  const std::vector<uint8_t> b2 = fs.data[1];
+
+  // LOAD stays available and reports what is in storage: the valid highest generation.
+  expectSelected(store, 3, CalibrationSlot::A, false);
+  CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  expectSelected(store, 3, CalibrationSlot::A, false);
+  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  CHECK(fs.data[1] == b2);
+}
+
+void test_reboot_selects_highest_valid_record() {
+  g_case = "reboot after uncertain error";
+  FakeStorage fs;
+  {
+    CalibrationRecordStore store(&fs);
+    seedConfirmedB2ThenUncertainA3(&fs, &store);
+  }
+  // New instance = reboot. Nothing remembers which record the operator saw
+  // confirmed: the valid record with the highest generation is simply selected.
+  CalibrationRecordStore rebooted(&fs);
+  CHECK(rebooted.writeState() == WriteState::OPEN);
+  expectSelected(rebooted, 3, CalibrationSlot::A, false);
+  const SaveResult r = rebooted.save(record(), boundProfile());
+  CHECK(r.status == SaveStatus::OK);
+  CHECK(r.slot == CalibrationSlot::B);
+  CHECK_EQ(r.generation, 4);
+  CHECK(r.previous_record_intact);
+  CHECK_EQ(r.previous_generation, 3);  // the selected record, not "the last confirmed"
+}
+
+void test_every_uncertain_outcome_blocks() {
+  g_case = "uncertain outcomes block";
+  const WriteFault faults[] = {WriteFault::FAIL_NOTHING_WRITTEN, WriteFault::TORN,
+                               WriteFault::FAIL_AFTER_DATA, WriteFault::NO_SPACE,
+                               WriteFault::SILENT_CORRUPTION};
+  for (WriteFault f : faults) {
+    FakeStorage fs;
+    CalibrationRecordStore store(&fs);
+    seedTwo(&fs, &store);
+    const std::vector<uint8_t> b = fs.data[1];
+    fs.fault = f;
+    CHECK(store.save(record(), boundProfile()).status != SaveStatus::OK);
+    CHECK(store.writeState() == WriteState::BLOCKED_UNCERTAIN_WRITE);
+    fs.fault = WriteFault::NONE;
+    CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+    CHECK(fs.data[1] == b);
+  }
+}
+
+void test_certain_errors_do_not_block() {
+  g_case = "certain errors do not block";
+  const auto profile = boundProfile();
+  FakeStorage fs;
+  CalibrationRecordStore store(&fs);
+  seedTwo(&fs, &store);
+  const std::vector<uint8_t> a = fs.data[0], b = fs.data[1];
+
+  // Rejected before any storage access.
+  CalibrationRecord bad = record();
+  bad.parameters_approved = 1;
+  CHECK(store.save(bad, profile).status == SaveStatus::INVALID_RECORD);
+  CHECK(store.writeState() == WriteState::OPEN);
+
+  // Could not read a slot: refused before any write.
+  fs.fail_read[0] = true;
+  CHECK(store.save(record(), profile).status == SaveStatus::STORAGE_UNUSABLE);
+  CHECK(store.writeState() == WriteState::OPEN);
+  fs.fail_read[0] = false;
+
+  // Storage said it did not modify anything.
+  fs.fault = WriteFault::FAIL_BEFORE_WRITE;
+  CHECK(store.save(record(), profile).status == SaveStatus::WRITE_FAILED);
+  CHECK(store.writeState() == WriteState::OPEN);
+  CHECK(fs.data[0] == a && fs.data[1] == b);
+  fs.fault = WriteFault::NONE;
+
+  const SaveResult ok = store.save(record(), profile);
+  CHECK(ok.status == SaveStatus::OK);
+  CHECK_EQ(ok.generation, 3);
+  CHECK(fs.data[1] == b);
+}
+
+void test_uncertain_failure_on_first_save_blocks() {
+  g_case = "uncertain failure on first save";
+  FakeStorage fs;
+  CalibrationRecordStore store(&fs);
+  fs.fault = WriteFault::FAIL_AFTER_DATA;  // A/1 lands, error reported
+  CHECK(store.save(record(), boundProfile()).status == SaveStatus::WRITE_FAILED);
+  fs.fault = WriteFault::NONE;
+  CHECK(store.save(record(), boundProfile()).status == SaveStatus::BLOCKED_UNCERTAIN_WRITE);
+  expectSelected(store, 1, CalibrationSlot::A, false);
+}
+
 }  // namespace
 
 int main() {
@@ -597,6 +781,13 @@ int main() {
   test_both_slots_unusable();
   test_storage_errors_fail_closed();
   test_roundtrip_content_equality();
+  test_uncertain_error_blocks_retry();
+  test_repeated_attempts_cannot_overwrite();
+  test_load_does_not_unlock();
+  test_reboot_selects_highest_valid_record();
+  test_every_uncertain_outcome_blocks();
+  test_certain_errors_do_not_block();
+  test_uncertain_failure_on_first_save_blocks();
   std::printf("test_calibration_record_store: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;
 }
