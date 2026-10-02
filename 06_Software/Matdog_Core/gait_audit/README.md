@@ -88,6 +88,30 @@ collision/contact/support results. Full triangle and solid-containment checks
 are performed by the offline Python model. TROT's static support margin remains
 recorded but does not certify or reject its unproven dynamics.
 
+## Completion tools (added after the checkpoint)
+
+The preserved checkpoint artifacts are never rewritten; everything below writes new files.
+
+| Tool | Output | Purpose |
+|---|---|---|
+| `audit_gate.py` | `full_case_audit.json` | Independent per-frame pass predicate. Raw `complete` is only `not errors` per case (and "all planned cases evaluated" at top level). |
+| `contact_discrepancy.py` | `contact_discrepancy.json` | Analytic G2 cylinder vs canonical foot mesh: mesh-minus-analytic height as a function of foot pitch, per saved frame, plus the continuous stance-pitch sweep check. |
+| `dense_ground_probe.py` | `dense_ground_probe.json` | Re-evaluates the 19 saved passes at 80..1600 intervals (ground and support only). |
+| `robust_search.py`, `dense_robust_full.py`, `dense_representatives.py` | `robust_search.json`, `dense_robust_full.json`, `dense_representatives.json` | New targeted search for density-robust sets and 400-interval full-mesh rechecks. |
+| `select_representatives.py` | `representatives.json` | Representatives must pass every gate; `render.py` refuses anything else. |
+| `derivatives.py` | `derivative_tables.json` | q, qdot, qddot peaks at T = 0.5, 1, 2, 4 s with an independent finite-difference check. |
+| `diag_screen.py`, `diag_frontier_full.py`, `diag_stride_extension.py` | `kinematic_diagnostic_screen.json`, `diag_frontier_full.json`, `diag_stride_extension.json` | DIAGNOSTICS ONLY: foot_link events within the 10 um patch band are quarantined to expose what else limits the stride. Not acceptance. |
+| `lifecycle_probe.py` | `lifecycle_probe.json` | 5 ms ground-policy probe of STAND -> gait -> STAND. |
+| `envelope_summary.py` | `envelope_summary.json` | Tiered maximum-tested-passing tables. |
+| `revalidate_saved.py` | `revalidate_saved.json` | Saved frames vs the current production core. |
+| `test_gait_audit.py`, `validate.py`, `artifact_manifest.py` | `validation_results.json`, `artifact_manifest.json` | Artifact gates, one-shot validation, provenance index. |
+
+`select_representatives.py` and `test_gait_audit.py` import `survey` before `contact_discrepancy`: the latter prepends
+`pose_audit/`, which has its own `survey.py` and `render.py`.
+
+Order after changing source: `validate.py`, then write `REPORT.md`, then `artifact_manifest.py`, then
+`artifact_manifest.py --check` and `test_gait_audit.py` again.
+
 ## Reproduction
 
 Use the pinned G3.5 Python environment (`pose_audit/requirements.txt`). From the

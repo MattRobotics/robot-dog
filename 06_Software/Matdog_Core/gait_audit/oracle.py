@@ -88,5 +88,7 @@ def main():
   lifecycle_metrics['frames']+=len(frames)
  assert lifecycle_metrics['max_qdot_error']<1e-6 and lifecycle_metrics['max_qddot_error']<.001
  report=dict(status='PASS',lifecycle=lifecycle_metrics,sample_count=count,numerical_ik_legs=dls,metrics=metrics,scope='Kinematic oracle. Mesh/support validity is a separate survey gate.')
- (OUT/'oracle_results.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
+ # The checkpoint's oracle_results.json is preserved; a final-source run is written beside it.
+ name=sys.argv[sys.argv.index('--output')+1] if '--output' in sys.argv else 'oracle_results.json'
+ (OUT/name).write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
 if __name__=='__main__':main()

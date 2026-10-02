@@ -1,0 +1,783 @@
+{
+  "scope": "Maximum TESTED passing values on finite sampled grids. Not physical maxima, not global limits, not a continuous valid box.",
+  "tiers": [
+    "Four evidence tiers are kept apart and never merged:",
+    "  STRICT_SAVED   independent audit pass of the preserved raw full-mesh sets (audit_gate.py)",
+    "  STRICT_ROBUST  full-mesh pass at 400 intervals, ground screen pass at 1600 intervals (robust_search.json)",
+    "  DIAGNOSTIC     micrometre foot_link events quarantined (diag_screen.py, diag_stride_extension.py); no acceptance"
+  ],
+  "by_type_height": {
+    "WALK_60mm": {
+      "type": "WALK",
+      "height_mm": 60,
+      "strict_saved": {
+        "cases": 0,
+        "passing_ids": [],
+        "passing_x_mm": [],
+        "passing_and_pitch_sweep_ok_ids": []
+      },
+      "strict_robust": {
+        "survivor_count": 0,
+        "x_mm": [],
+        "lifts_mm": [],
+        "duties": []
+      },
+      "strict_screen": {
+        "cases": 4,
+        "passing": 0,
+        "passing_x_mm_span": null
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": null,
+        "cases": 4,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": null,
+        "cases": 0,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      }
+    },
+    "WALK_80mm": {
+      "type": "WALK",
+      "height_mm": 80,
+      "strict_saved": {
+        "cases": 4,
+        "passing_ids": [
+          18,
+          3012,
+          4000
+        ],
+        "passing_x_mm": [
+          -10.0,
+          10.0,
+          15.0
+        ],
+        "passing_and_pitch_sweep_ok_ids": [
+          18,
+          3012,
+          4000
+        ]
+      },
+      "strict_robust": {
+        "survivor_count": 4,
+        "x_mm": [
+          -10.0,
+          -10.0,
+          10.0,
+          10.0
+        ],
+        "lifts_mm": [
+          5.0,
+          10.0
+        ],
+        "duties": [
+          0.8
+        ]
+      },
+      "strict_screen": {
+        "cases": 178,
+        "passing": 30,
+        "passing_x_mm_span": [
+          -10.0,
+          20.0
+        ]
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 200.0,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": 200.0,
+        "uniform_extension_first_block_abs_x_mm": 180.0,
+        "uniform_extension_first_block_categories": [
+          "SUPPORT_INVALID"
+        ]
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": 10.0,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": 100.0,
+        "uniform_extension_first_block_categories": [
+          "SUPPORT_INVALID"
+        ]
+      }
+    },
+    "WALK_90mm": {
+      "type": "WALK",
+      "height_mm": 90,
+      "strict_saved": {
+        "cases": 0,
+        "passing_ids": [],
+        "passing_x_mm": [],
+        "passing_and_pitch_sweep_ok_ids": []
+      },
+      "strict_robust": {
+        "survivor_count": 4,
+        "x_mm": [
+          -10.0,
+          -10.0,
+          -10.0,
+          -10.0
+        ],
+        "lifts_mm": [
+          5.0,
+          10.0
+        ],
+        "duties": [
+          0.8,
+          0.9
+        ]
+      },
+      "strict_screen": {
+        "cases": 0,
+        "passing": 0,
+        "passing_x_mm_span": null
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": null,
+        "cases": 0,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": null,
+        "cases": 0,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      }
+    },
+    "WALK_100mm": {
+      "type": "WALK",
+      "height_mm": 100,
+      "strict_saved": {
+        "cases": 4,
+        "passing_ids": [
+          222,
+          287,
+          3032
+        ],
+        "passing_x_mm": [
+          -12.5,
+          -10.0,
+          10.0
+        ],
+        "passing_and_pitch_sweep_ok_ids": [
+          222,
+          287,
+          3032
+        ]
+      },
+      "strict_robust": {
+        "survivor_count": 0,
+        "x_mm": [],
+        "lifts_mm": [],
+        "duties": []
+      },
+      "strict_screen": {
+        "cases": 178,
+        "passing": 29,
+        "passing_x_mm_span": [
+          -12.5,
+          40.0
+        ]
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 250.0,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": 250.0,
+        "uniform_extension_first_block_abs_x_mm": 100.0,
+        "uniform_extension_first_block_categories": [
+          "SUPPORT_INVALID"
+        ]
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": 12.5,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": 100.0,
+        "uniform_extension_first_block_categories": [
+          "SUPPORT_INVALID"
+        ]
+      }
+    },
+    "WALK_120mm": {
+      "type": "WALK",
+      "height_mm": 120,
+      "strict_saved": {
+        "cases": 3,
+        "passing_ids": [
+          416,
+          426,
+          3053
+        ],
+        "passing_x_mm": [
+          -15.0,
+          -10.0,
+          20.0
+        ],
+        "passing_and_pitch_sweep_ok_ids": [
+          416,
+          426
+        ]
+      },
+      "strict_robust": {
+        "survivor_count": 0,
+        "x_mm": [],
+        "lifts_mm": [],
+        "duties": []
+      },
+      "strict_screen": {
+        "cases": 178,
+        "passing": 38,
+        "passing_x_mm_span": [
+          -15.0,
+          20.0
+        ]
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 200.0,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": 200.0,
+        "uniform_extension_first_block_abs_x_mm": 140.0,
+        "uniform_extension_first_block_categories": [
+          "SUPPORT_INVALID"
+        ]
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": 20.0,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": 100.0,
+        "uniform_extension_first_block_categories": [
+          "SUPPORT_INVALID"
+        ]
+      }
+    },
+    "WALK_140mm": {
+      "type": "WALK",
+      "height_mm": 140,
+      "strict_saved": {
+        "cases": 0,
+        "passing_ids": [],
+        "passing_x_mm": [],
+        "passing_and_pitch_sweep_ok_ids": []
+      },
+      "strict_robust": {
+        "survivor_count": 0,
+        "x_mm": [],
+        "lifts_mm": [],
+        "duties": []
+      },
+      "strict_screen": {
+        "cases": 156,
+        "passing": 0,
+        "passing_x_mm_span": null
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 160.0,
+        "cases": 80,
+        "uniform_extension_last_pass_abs_x_mm": 160.0,
+        "uniform_extension_first_block_abs_x_mm": 180.0,
+        "uniform_extension_first_block_categories": [
+          "JOINT_LIMIT_BLOCKED"
+        ]
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": 40.0,
+        "cases": 80,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": 100.0,
+        "uniform_extension_first_block_categories": [
+          "SUPPORT_INVALID"
+        ]
+      }
+    },
+    "WALK_150mm": {
+      "type": "WALK",
+      "height_mm": 150,
+      "strict_saved": {
+        "cases": 1,
+        "passing_ids": [],
+        "passing_x_mm": [],
+        "passing_and_pitch_sweep_ok_ids": []
+      },
+      "strict_robust": {
+        "survivor_count": 0,
+        "x_mm": [],
+        "lifts_mm": [],
+        "duties": []
+      },
+      "strict_screen": {
+        "cases": 159,
+        "passing": 4,
+        "passing_x_mm_span": [
+          0.0,
+          0.0
+        ]
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 100.0,
+        "cases": 83,
+        "uniform_extension_last_pass_abs_x_mm": 100.0,
+        "uniform_extension_first_block_abs_x_mm": 120.0,
+        "uniform_extension_first_block_categories": [
+          "JOINT_LIMIT_BLOCKED"
+        ]
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": null,
+        "cases": 80,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": 100.0,
+        "uniform_extension_first_block_categories": [
+          "SUPPORT_INVALID"
+        ]
+      }
+    },
+    "WALK_160mm": {
+      "type": "WALK",
+      "height_mm": 160,
+      "strict_saved": {
+        "cases": 0,
+        "passing_ids": [],
+        "passing_x_mm": [],
+        "passing_and_pitch_sweep_ok_ids": []
+      },
+      "strict_robust": {
+        "survivor_count": 0,
+        "x_mm": [],
+        "lifts_mm": [],
+        "duties": []
+      },
+      "strict_screen": {
+        "cases": 4,
+        "passing": 0,
+        "passing_x_mm_span": null
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 10.0,
+        "cases": 4,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": null,
+        "cases": 0,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      }
+    },
+    "TROT_60mm": {
+      "type": "TROT",
+      "height_mm": 60,
+      "strict_saved": {
+        "cases": 0,
+        "passing_ids": [],
+        "passing_x_mm": [],
+        "passing_and_pitch_sweep_ok_ids": []
+      },
+      "strict_robust": {
+        "survivor_count": 0,
+        "x_mm": [],
+        "lifts_mm": [],
+        "duties": []
+      },
+      "strict_screen": {
+        "cases": 4,
+        "passing": 1,
+        "passing_x_mm_span": [
+          10.0,
+          10.0
+        ]
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 10.0,
+        "cases": 4,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": null,
+        "cases": 0,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      }
+    },
+    "TROT_80mm": {
+      "type": "TROT",
+      "height_mm": 80,
+      "strict_saved": {
+        "cases": 4,
+        "passing_ids": [
+          1040,
+          1046,
+          3069,
+          3084
+        ],
+        "passing_x_mm": [
+          -50.0,
+          -40.0,
+          40.0,
+          50.0
+        ],
+        "passing_and_pitch_sweep_ok_ids": [
+          1040,
+          1046
+        ]
+      },
+      "strict_robust": {
+        "survivor_count": 8,
+        "x_mm": [
+          -30.0,
+          -30.0,
+          -20.0,
+          -20.0,
+          20.0,
+          20.0,
+          30.0,
+          30.0
+        ],
+        "lifts_mm": [
+          5.0,
+          10.0
+        ],
+        "duties": [
+          0.5,
+          0.8
+        ]
+      },
+      "strict_screen": {
+        "cases": 178,
+        "passing": 98,
+        "passing_x_mm_span": [
+          -50.0,
+          50.0
+        ]
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 250.0,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": 250.0,
+        "uniform_extension_first_block_abs_x_mm": 300.0,
+        "uniform_extension_first_block_categories": [
+          "GROUND_COLLISION"
+        ]
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": 250.0,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": 250.0,
+        "uniform_extension_first_block_abs_x_mm": 300.0,
+        "uniform_extension_first_block_categories": [
+          "GROUND_COLLISION"
+        ]
+      }
+    },
+    "TROT_90mm": {
+      "type": "TROT",
+      "height_mm": 90,
+      "strict_saved": {
+        "cases": 0,
+        "passing_ids": [],
+        "passing_x_mm": [],
+        "passing_and_pitch_sweep_ok_ids": []
+      },
+      "strict_robust": {
+        "survivor_count": 4,
+        "x_mm": [
+          -20.0,
+          -20.0,
+          20.0,
+          20.0
+        ],
+        "lifts_mm": [
+          5.0,
+          10.0
+        ],
+        "duties": [
+          0.8
+        ]
+      },
+      "strict_screen": {
+        "cases": 0,
+        "passing": 0,
+        "passing_x_mm_span": null
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": null,
+        "cases": 0,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": null,
+        "cases": 0,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      }
+    },
+    "TROT_100mm": {
+      "type": "TROT",
+      "height_mm": 100,
+      "strict_saved": {
+        "cases": 5,
+        "passing_ids": [
+          1230,
+          1238,
+          3092,
+          3105
+        ],
+        "passing_x_mm": [
+          -60.0,
+          -45.0,
+          45.0,
+          60.0
+        ],
+        "passing_and_pitch_sweep_ok_ids": [
+          3092,
+          3105
+        ]
+      },
+      "strict_robust": {
+        "survivor_count": 0,
+        "x_mm": [],
+        "lifts_mm": [],
+        "duties": []
+      },
+      "strict_screen": {
+        "cases": 178,
+        "passing": 98,
+        "passing_x_mm_span": [
+          -60.0,
+          60.0
+        ]
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 300.0,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": 300.0,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": 300.0,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": 300.0,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      }
+    },
+    "TROT_120mm": {
+      "type": "TROT",
+      "height_mm": 120,
+      "strict_saved": {
+        "cases": 4,
+        "passing_ids": [
+          3116,
+          3125
+        ],
+        "passing_x_mm": [
+          -30.0,
+          30.0
+        ],
+        "passing_and_pitch_sweep_ok_ids": [
+          3116,
+          3125
+        ]
+      },
+      "strict_robust": {
+        "survivor_count": 4,
+        "x_mm": [
+          -20.0,
+          -20.0,
+          20.0,
+          20.0
+        ],
+        "lifts_mm": [
+          5.0,
+          10.0
+        ],
+        "duties": [
+          0.7
+        ]
+      },
+      "strict_screen": {
+        "cases": 178,
+        "passing": 78,
+        "passing_x_mm_span": [
+          -40.0,
+          40.0
+        ]
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 300.0,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": 300.0,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": 300.0,
+        "cases": 91,
+        "uniform_extension_last_pass_abs_x_mm": 300.0,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      }
+    },
+    "TROT_140mm": {
+      "type": "TROT",
+      "height_mm": 140,
+      "strict_saved": {
+        "cases": 0,
+        "passing_ids": [],
+        "passing_x_mm": [],
+        "passing_and_pitch_sweep_ok_ids": []
+      },
+      "strict_robust": {
+        "survivor_count": 0,
+        "x_mm": [],
+        "lifts_mm": [],
+        "duties": []
+      },
+      "strict_screen": {
+        "cases": 156,
+        "passing": 0,
+        "passing_x_mm_span": null
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 200.0,
+        "cases": 80,
+        "uniform_extension_last_pass_abs_x_mm": 200.0,
+        "uniform_extension_first_block_abs_x_mm": 250.0,
+        "uniform_extension_first_block_categories": [
+          "JOINT_LIMIT_BLOCKED"
+        ]
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": 200.0,
+        "cases": 80,
+        "uniform_extension_last_pass_abs_x_mm": 200.0,
+        "uniform_extension_first_block_abs_x_mm": 250.0,
+        "uniform_extension_first_block_categories": [
+          "JOINT_LIMIT_BLOCKED"
+        ]
+      }
+    },
+    "TROT_150mm": {
+      "type": "TROT",
+      "height_mm": 150,
+      "strict_saved": {
+        "cases": 1,
+        "passing_ids": [],
+        "passing_x_mm": [],
+        "passing_and_pitch_sweep_ok_ids": []
+      },
+      "strict_robust": {
+        "survivor_count": 0,
+        "x_mm": [],
+        "lifts_mm": [],
+        "duties": []
+      },
+      "strict_screen": {
+        "cases": 156,
+        "passing": 12,
+        "passing_x_mm_span": [
+          0.0,
+          0.0
+        ]
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 140.0,
+        "cases": 80,
+        "uniform_extension_last_pass_abs_x_mm": 140.0,
+        "uniform_extension_first_block_abs_x_mm": 160.0,
+        "uniform_extension_first_block_categories": [
+          "JOINT_LIMIT_BLOCKED"
+        ]
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": 140.0,
+        "cases": 80,
+        "uniform_extension_last_pass_abs_x_mm": 140.0,
+        "uniform_extension_first_block_abs_x_mm": 160.0,
+        "uniform_extension_first_block_categories": [
+          "JOINT_LIMIT_BLOCKED"
+        ]
+      }
+    },
+    "TROT_160mm": {
+      "type": "TROT",
+      "height_mm": 160,
+      "strict_saved": {
+        "cases": 0,
+        "passing_ids": [],
+        "passing_x_mm": [],
+        "passing_and_pitch_sweep_ok_ids": []
+      },
+      "strict_robust": {
+        "survivor_count": 0,
+        "x_mm": [],
+        "lifts_mm": [],
+        "duties": []
+      },
+      "strict_screen": {
+        "cases": 4,
+        "passing": 0,
+        "passing_x_mm_span": null
+      },
+      "diagnostic_forward": {
+        "max_tested_passing_abs_x_mm": 10.0,
+        "cases": 4,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      },
+      "diagnostic_backward": {
+        "max_tested_passing_abs_x_mm": null,
+        "cases": 0,
+        "uniform_extension_last_pass_abs_x_mm": null,
+        "uniform_extension_first_block_abs_x_mm": null,
+        "uniform_extension_first_block_categories": null
+      }
+    }
+  },
+  "strict_screen_first_failure_composition": {
+    "SUPPORT_INVALID": 263,
+    "FOOT_LINK_GROUND_PENETRATION": 1380,
+    "CONTACT_INVALID": 255,
+    "NUMERICALLY_ILL_CONDITIONED": 1,
+    "IK_UNREACHABLE": 42,
+    "FOOT_LINK_GROUND_PENETRATION + SUPPORT_INVALID": 16,
+    "FOOT_LINK_GROUND_PENETRATION + FOOT_LINK_MISSING_MESH_SUPPORT": 2,
+    "JOINT_LIMIT_BLOCKED": 3
+  },
+  "strict_screen_total": 2352,
+  "strict_screen_passing": 390,
+  "diagnostic_screen_total": 2352,
+  "diagnostic_screen_passing": 1245,
+  "max_pure_fore_aft_quarantined_foot_penetration_um": 5.197742998785948,
+  "lateral_yaw": {
+    "cases": 600,
+    "strict_screen_passing_nonzero_lateral_or_yaw": 2,
+    "diagnostic_passing": 36,
+    "diagnostic_category_counts": {
+      "CONTACT_INVALID": 282,
+      "FOOT_MESH_MICROMETRE": 342,
+      "GROUND_COLLISION": 306,
+      "SUPPORT_INVALID": 114
+    },
+    "g2_contact_status_note": "all 255 diagnostic CONTACT_INVALID-only lateral/yaw cases are solveGait CONTACT_INVALID, i.e. the unchanged G2 nominal-strip contact tilt validity"
+  }
+}

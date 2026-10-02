@@ -1,0 +1,391 @@
+{
+  "scope": "Saved frames vs current production gait core (bridge); no policy or mesh involved",
+  "worst_abs_difference": 0.0,
+  "cases": [
+    {
+      "artifact": "full_cases.json",
+      "id": 18,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 34,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 222,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 226,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 287,
+      "frames": 201,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 416,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 426,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 925,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 1040,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 1046,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 1230,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 1238,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 1311,
+      "frames": 201,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 1435,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 1441,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "full_cases.json",
+      "id": 1948,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "refinement_full.json",
+      "id": 3012,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "refinement_full.json",
+      "id": 3032,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "refinement_full.json",
+      "id": 3053,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "refinement_full.json",
+      "id": 3069,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "refinement_full.json",
+      "id": 3084,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "refinement_full.json",
+      "id": 3092,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "refinement_full.json",
+      "id": 3105,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "refinement_full.json",
+      "id": 3116,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "refinement_full.json",
+      "id": 3125,
+      "frames": 81,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "refinement_full.json",
+      "id": 4000,
+      "frames": 101,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "dense_representatives.json",
+      "id": 287,
+      "frames": 401,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "dense_representatives.json",
+      "id": 1238,
+      "frames": 201,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "dense_representatives.json",
+      "id": 3105,
+      "frames": 201,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "dense_representatives.json",
+      "id": 1046,
+      "frames": 201,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "dense_representatives.json",
+      "id": 3084,
+      "frames": 201,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "dense_robust_full.json",
+      "id": 357,
+      "frames": 401,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "dense_robust_full.json",
+      "id": 61,
+      "frames": 401,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "dense_robust_full.json",
+      "id": 29,
+      "frames": 401,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    },
+    {
+      "artifact": "dense_robust_full.json",
+      "id": 309,
+      "frames": 401,
+      "max_abs_difference": {
+        "q": 0.0,
+        "qdot": 0.0,
+        "qddot": 0.0,
+        "body": 0.0
+      }
+    }
+  ]
+}
