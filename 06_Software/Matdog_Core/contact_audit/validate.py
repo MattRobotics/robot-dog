@@ -87,14 +87,14 @@ def main():
     # contract preservation: only the intended additions relative to the accepted G4 head
     names = [l for l in git('diff', '--name-status', G4_HEAD + '..HEAD').split('\n') if l]
     allowed_added = re.compile(r'^(05_Firmware/MATDOG_Controller/(src/motion/ContactMode\.(h|cpp)|scripts/tests/test_contact_mode\.cpp)|06_Software/Matdog_Core/contact_audit/.*|09_Logs/Validation_Reports/G41_Contact_Reconciliation/.*)$')
-    allowed_modified = {'05_Firmware/MATDOG_Controller/scripts/tests/run_motion_host_tests.sh'}
+    allowed_modified = {'05_Firmware/MATDOG_Controller/scripts/tests/run_motion_host_tests.sh', '05_Firmware/MATDOG_Controller/scripts/tests/test_motion_oracle.py'}  # host oracle include allowlist gains ContactMode.h, as G4 did for Gait.h/Locomotion.h
     bad = []
     for l in names:
         status, path = l.split('\t', 1)
         if not ((status == 'A' and allowed_added.match(path)) or (status == 'M' and (path in allowed_modified or allowed_added.match(path)))):
             bad.append(l)
     gate = {'name': 'accepted_g1_g4_files_unchanged_vs_g4_head', 'command': f'git diff --name-status {G4_HEAD}..HEAD', 'returncode': 0, 'passed': not bad,
-            'summary': 'only G4.1 additions and the host-runner line changed; G1/G2/G3/G3.5/G4 sources, geometry and evidence untouched', 'unexpected_changes': bad}
+            'summary': 'only G4.1 additions, the host-runner line and the host-oracle include allowlist changed; G1/G2/G3/G3.5/G4 sources, geometry and evidence untouched', 'unexpected_changes': bad}
     print(('PASS ' if gate['passed'] else 'FAIL ') + gate['name'], bad[:5])
     gates.append(gate)
     digest, count = source_digest()
