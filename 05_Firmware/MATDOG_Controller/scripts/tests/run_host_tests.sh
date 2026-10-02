@@ -459,6 +459,37 @@ CALREC_SRCS=(
   "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
   "${CALREC_SRCS[@]}"
 
+# P3a.1: both REAL CommandRouter translation units, including USB framing,
+# dispatch and explicit Q0 promotion. Platform transports / unrelated device
+# service methods are fakes; the calibration and persistence code stays real.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -ffunction-sections -fdata-sections -Wl,--gc-sections \
+  -DMATDOG_ACTIVE_HARDWARE_PROFILE=::matdog::config::HardwareProfile::ROBOT_POWERED \
+  -DMATDOG_OTA_INGEST_ENABLED=0 -I"$SCRIPT_DIR/router_stubs" -I"$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_command_router_persistence" \
+  "$SCRIPT_DIR/test_command_router_persistence.cpp" \
+  "$SCRIPT_DIR/router_fake_hardware.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationRecordNvsBackend.cpp" \
+  "$SKETCH_DIR/src/core/CommandRouter.cpp" \
+  "$SKETCH_DIR/src/core/CommandRouterPersistence.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationSaveGate.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0EvidencePreparation.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Promotion.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
+  "$SKETCH_DIR/src/calibration/FirstMotionExecutor.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationSessionOrchestrator.cpp" \
+  "$SKETCH_DIR/src/core/Availability.cpp" \
+  "$SKETCH_DIR/src/core/PowerState.cpp" \
+  "$SKETCH_DIR/src/core/ServiceReadiness.cpp" \
+  "$SKETCH_DIR/src/servo/ServoProfile.cpp" \
+  "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/update/OtaPolicy.cpp" \
+  "$SKETCH_DIR/src/update/OtaBootGuard.cpp" \
+  "$SKETCH_DIR/src/status/LedStatusPolicy.cpp" \
+  "$SKETCH_DIR/src/power/DalyProtocol.cpp" \
+  "${CALREC_SRCS[@]}"
+
 # The HostLink readiness classifier suite links the REAL pure classifier -
 # no module pointer, no hardware call - I6 (2026-09-25 objective change).
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -548,6 +579,7 @@ done
 "$OUT/test_calibration_record_store"
 "$OUT/test_calibration_persistence_service"
 "$OUT/test_calibration_save_gate"
+"$OUT/test_command_router_persistence"
 "$OUT/test_calibration_record_nvs_backend"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"

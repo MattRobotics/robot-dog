@@ -124,7 +124,17 @@ void CommandRouter::buildSaveGateFacts(calibration::SaveGateFacts* f) const {
   f->q0_capture_state_complete =
       modules_.q0_capture->status().state == calibration::Q0CaptureState::COMPLETE;
   f->q0_capture = modules_.q0_capture->freshCapture();
+  f->promoted_capture_session_id = modules_.q0_capture->status().promoted_capture_session_id;
+  f->promoted_geometry = modules_.q0_capture->status().promoted_geometry;
   f->transforms = &modules_.actuator_policy->transforms();
+}
+
+bool CommandRouter::isPersistCommand(const String& upper) {
+  static const char prefix[] = "@CALIBRATION PERSIST";
+  const char* line = upper.c_str();
+  const size_t length = sizeof(prefix) - 1;
+  return strncmp(line, prefix, length) == 0 &&
+         (line[length] == '\0' || line[length] == ' ');
 }
 
 void CommandRouter::printPersistenceStatus() {
@@ -179,6 +189,11 @@ void CommandRouter::printPersistenceStatus() {
 }
 
 void CommandRouter::handlePersistCommand(const String& upper) {
+  if (!isPersistCommand(upper)) {
+    Serial.println("CALIBRATION_PERSIST=REFUSED");
+    Serial.println("REASON=USAGE");
+    return;
+  }
   if (modules_.persistence == nullptr) {
     Serial.println("CALIBRATION_PERSIST=BLOCKED");
     Serial.println("REASON=PERSISTENCE_NOT_BOUND");

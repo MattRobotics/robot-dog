@@ -554,10 +554,10 @@ void test_ack_uncertain_error_blocks_writes() {
     CHECK(a.ack.status == AckStatus::MARKER_WRITE_FAILED || a.ack.status == AckStatus::MARKER_VERIFY_FAILED);
     CHECK(a.uncertain);
     if (f == MarkerFault::AFTER_DATA) {
-      // The ACK did land, but the error was reported: the read-back in the
-      // service's reload is the evidence that clears the doubt.
+      // The ACK landed, but uncertainty remains latched for mutating calls.
       CHECK(b.snap().verdict == PersistenceVerdict::VALID_ACKNOWLEDGED);
-      CHECK(!b.svc.ackUncertain());
+      CHECK(b.svc.ackUncertain());
+      CHECK(b.svc.writesBlocked());
     } else if (f == MarkerFault::IO_NOTHING) {
       CHECK(b.snap().verdict == PersistenceVerdict::AWAITING_ACK);
       CHECK(b.svc.ackUncertain());
@@ -574,7 +574,65 @@ void test_ack_uncertain_error_blocks_writes() {
       CHECK(b.snap().verdict != PersistenceVerdict::VALID_ACKNOWLEDGED);
     }
     // A fresh boot of the same storage is the way out: it classifies what is really there.
-    if (f != MarkerFault::AFTER_DATA) {
+    Booted rebooted(&fs);
+    CHECK(!rebooted.svc.writesBlocked());
+    if (f == MarkerFault::AFTER_DATA) {
+      // Persisted ACK with its reply lost: reboot sees generation 2 as acked.
+      CHECK(rebooted.svc.calibrationAvailable());
+      CHECK_EQ(rebooted.snap().loaded_generation, 2);
+      const int writes = fs.marker_writes + fs.slot_writes;
+      CHECK(rebooted.svc.acknowledge(2, boundProfile()).ack.status == AckStatus::ALREADY_ACKNOWLEDGED);
+      CHECK_EQ(fs.marker_writes + fs.slot_writes, writes);
+    }
+  }
+}
+
+void test_uncertain_operations_block_every_mutating_entry_point() {
+  g_case = "uncertain operation blocks SAVE ACK RECONCILE";
+  for (int operation = 0; operation < 3; ++operation) {
+    for (MarkerFault fault : {MarkerFault::IO_NOTHING, MarkerFault::AFTER_DATA, MarkerFault::SILENT}) {
+      FakeStorage fs;
+      seed(&fs, 1);
+      const auto acknowledged = fs.data[0];
+      if (operation != 0) {
+        CalibrationRecordStore store(&fs);
+        CHECK(store.save(goldenRecord(0), boundProfile()).status == SaveStatus::OK);
+      }
+      Booted b(&fs);
+      fs.marker_fault = fault;
+      fs.marker_fault_at = fs.marker_writes + (operation == 0 ? 2 : 1);
+      if (operation == 0) {
+        CHECK(b.svc.save(goldenRecord(0), boundProfile()).uncertain);
+      } else if (operation == 1) {
+        CHECK(b.svc.acknowledge(2, boundProfile()).uncertain);
+      } else {
+        // Original finding: discard B/2, but the marker write is uncertain.
+        CHECK(b.svc.reconcile(ReconciliationAction::ADOPT_VALID_RECORD, 1, true,
+                              boundProfile()).uncertain);
+      }
+      CHECK(b.svc.writesBlocked());
+      const auto marker = fs.marker_data;
+      const auto a = fs.data[0], c = fs.data[1];
+      const int writes = fs.marker_writes + fs.slot_writes;
+      CHECK(b.svc.save(goldenRecord(0), boundProfile()).guard == ServiceGuard::WRITES_BLOCKED);
+      CHECK(b.svc.reconcile(ReconciliationAction::ADOPT_VALID_RECORD, 1, true,
+                            boundProfile()).status == ReconcileStatus::WRITES_BLOCKED);
+      const ServiceAckResult ack = b.svc.acknowledge(2, boundProfile());
+      if (operation == 1 && fault == MarkerFault::AFTER_DATA) {
+        CHECK(ack.guard == ServiceGuard::OK);
+        CHECK(ack.ack.status == AckStatus::ALREADY_ACKNOWLEDGED);
+      } else {
+        CHECK(ack.guard == ServiceGuard::WRITES_BLOCKED);
+      }
+      CHECK_EQ(fs.marker_writes + fs.slot_writes, writes);
+      CHECK(fs.marker_data == marker && fs.data[0] == a && fs.data[1] == c);
+      CHECK(fs.data[0] == acknowledged);
+      CHECK(b.svc.writesBlocked());
+      // A read failure cannot turn the read-only exception into a write.
+      fs.fail_marker_read = true;
+      CHECK(b.svc.acknowledge(2, boundProfile()).guard == ServiceGuard::WRITES_BLOCKED);
+      CHECK_EQ(fs.marker_writes + fs.slot_writes, writes);
+      fs.fail_marker_read = false;
       Booted rebooted(&fs);
       CHECK(!rebooted.svc.writesBlocked());
     }
@@ -809,6 +867,7 @@ int main() {
   test_ack_outcomes();
   test_ack_invalid_record();
   test_ack_uncertain_error_blocks_writes();
+  test_uncertain_operations_block_every_mutating_entry_point();
   test_save_uncertain_blocks_writes();
   test_reconcile_adopt_awaiting_generation();
   test_reconcile_pending_adopt_and_refusals();

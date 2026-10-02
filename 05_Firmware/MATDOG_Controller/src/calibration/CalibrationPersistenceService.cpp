@@ -197,16 +197,29 @@ ServiceAckResult CalibrationPersistenceService::acknowledge(
     out.guard = ServiceGuard::NVS_NOT_READY;
     return out;
   }
+  if (writesBlocked()) {
+    // A blocked service may VERIFY an already-persistent ACK, never attempt
+    // another marker write. Re-scan instead of trusting the cached snapshot.
+    const LoadResult fresh = store_.load(profile, &scratch_);
+    memset(static_cast<void*>(&scratch_), 0, sizeof(scratch_));
+    refresh(fresh);
+    if (generation != 0 && fresh.status == LoadStatus::OK &&
+        fresh.assessment.cls == PersistenceClass::CONSISTENT &&
+        fresh.generation == generation) {
+      out.guard = ServiceGuard::OK;
+      out.ack.status = AckStatus::ALREADY_ACKNOWLEDGED;
+      out.ack.generation = generation;
+      out.ack.persistence = fresh.assessment.cls;
+    } else {
+      out.guard = ServiceGuard::WRITES_BLOCKED;
+    }
+    return out;
+  }
   out.guard = ServiceGuard::OK;
   out.ack = store_.acknowledge(generation, profile);
   out.uncertain = isUncertainAck(out.ack.status);
   if (out.uncertain) ack_uncertain_ = true;
   load(profile);
-  // A positive read-back of a CONSISTENT store is the evidence the doubt needed.
-  if (ack_uncertain_ && snapshot_.verdict == PersistenceVerdict::VALID_ACKNOWLEDGED &&
-      snapshot_.loaded_generation == generation) {
-    ack_uncertain_ = false;
-  }
   return out;
 }
 

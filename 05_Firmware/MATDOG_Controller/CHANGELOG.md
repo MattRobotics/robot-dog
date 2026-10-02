@@ -1,5 +1,23 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — P3a.1 corrective persistence integration (offline, no hardware) — 2026-10-02
+
+- SAVE now requires a RAM attestation of the exact current `capture_session_id`,
+  recorded only after explicit current-installation Q0 promotion admits all twelve
+  transforms. New capture, failed start, reset and boot clear it. Historical transforms
+  with identical ticks cannot attest a new capture. Existing geometry and per-joint
+  record/transform comparisons still apply; Q0 values and kinematics are unchanged.
+- The service refuses every mutating SAVE/ACK/RECONCILE after an uncertain outcome.
+  A repeated ACK may only verify an already acknowledged, valid generation by a fresh
+  read-only scan; it never writes or clears the block. The marker/A/B protocol is unchanged.
+- PERSIST dispatch and handler require a complete token (space or end of line).
+  `PERSISTACK` and `PERSISTSAVE` cannot reach a storage operation.
+- Host coverage now compiles both real CommandRouter translation units, exercising
+  USB framing, dispatch, the explicit Q0 promotion command and the persistence handler.
+  Only platform transport and unrelated hardware methods are simulated. Tests check
+  malformed arguments, generation bounds, authorization gates, read-only commands,
+  identical recapture and uncertain reconciliation with storage write counts/bytes.
+
 ## Unreleased — P3a Controller integration of Calibration Persistence V1 (offline, no hardware) — 2026-10-02
 
 Wires the P2–P2.4.1 persistence into the Controller. It adds diagnostics and two explicit,

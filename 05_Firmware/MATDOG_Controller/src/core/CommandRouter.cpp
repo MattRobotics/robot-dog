@@ -296,7 +296,7 @@ void CommandRouter::handleLine(String line) {
       Serial.println("HINT=create src/config/WifiCredentials.local.h and rebuild");
     }
     printWifiStatus();
-  } else if (upper.startsWith("@CALIBRATION PERSIST")) {
+  } else if (isPersistCommand(upper)) {
     handlePersistCommand(upper);
   } else if (upper == "@CALIBRATION Q0 STATUS") {
     printCalibrationQ0Status();
@@ -420,9 +420,12 @@ void CommandRouter::handleLine(String line) {
     for (uint8_t i = 0; i < prepared.transform_count; ++i) {
       if (modules_.actuator_policy->transforms().admit(prepared.transforms[i])) ++admitted;
     }
+    const bool promotion_complete = modules_.q0_capture->notePromotionCompleted(
+        fresh_capture.capture_session_id, admitted,
+        modules_.actuator_policy->currentGeometryTag());
     Serial.printf("CALIBRATION_Q0_PROMOTE=%s admitted=%u/%u source=CURRENT_BOOT_CAPTURE "
                   "capture_session=%lu\n",
-                 admitted == prepared.transform_count ? "OK" : "PARTIAL",
+                 promotion_complete ? "OK" : "PARTIAL",
                  (unsigned)admitted, (unsigned)prepared.transform_count,
                  (unsigned long)fresh_capture.capture_session_id);
     Serial.println("CALIBRATION_Q0_PROMOTE_NOTE RAM-only; no EEPROM write; no motion; "

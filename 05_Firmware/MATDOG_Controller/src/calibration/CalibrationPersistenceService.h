@@ -132,7 +132,8 @@ class CalibrationPersistenceService {
   // doubt. This is information, never permission to move or to admit
   // JointTransforms.
   bool calibrationAvailable() const;
-  // Saves / reconciliations are refused for the rest of this boot.
+  // All mutating operations are refused for the rest of this boot. An ACK
+  // already present may only be verified with a fresh, read-only scan.
   bool writesBlocked() const;
   WriteState storeWriteState() const { return store_.writeState(); }
   bool ackUncertain() const { return ack_uncertain_; }
@@ -162,7 +163,6 @@ class CalibrationPersistenceService {
  private:
   bool nvsReady() const { return snapshot_.nvs == NvsInitStatus::READY; }
   void refresh(const LoadResult& result);
-  void resolveAckUncertaintyIfConsistent();
 
   CalibrationRecordStorage* storage_;
   CalibrationRecordStore store_;

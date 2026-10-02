@@ -77,6 +77,8 @@ struct SaveGateFacts {
   // q0
   bool q0_capture_state_complete = false;
   actuator::FreshQ0Capture q0_capture;
+  uint32_t promoted_capture_session_id = 0;
+  actuator::GeometryProvenanceTag promoted_geometry = actuator::kNoGeometryProvenance;
   const actuator::JointTransformTable* transforms = nullptr;
 };
 

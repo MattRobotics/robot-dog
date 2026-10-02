@@ -10,6 +10,97 @@ terminology.
 This document will be updated in place as hardware sessions progress; it is not
 rewritten per session.
 
+## P3a.1 corrective integration — offline verification, 2026-10-02
+
+Initial branch: `feat/calibration-persistence-record-store-v1`; initial HEAD:
+`90a2f62b012dc535f479206a2397aef6d1d94f33`. The worktree was clean before this task.
+Only the three independent review findings were corrected. No device was accessed.
+
+### Corrections and original reproductions
+
+1. **Current Q0 capture promotion:** `CalibrationQ0CaptureSession` keeps a RAM-only
+   attestation of the promoted capture ID and geometry. The explicit Q0 PROMOTE handler
+   records it only after preparing the current installation and admitting all 12 transforms.
+   The SAVE gate checks that identity as well as the existing geometry, promoted transform
+   and per-joint record Q0 checks. A new capture, invalid start, reset or boot clears the
+   attestation. The real session and real command path reproduce: first capture promoted;
+   second capture with identical ticks; SAVE CHECK refuses `Q0_NOT_PROMOTED`; explicit
+   promotion of the second capture permits CHECK. Partial capture/promotion, failed capture,
+   stale ID, wrong geometry and a restarted numeric ID after boot also refuse.
+2. **Uncertain write block:** the service checks its block before invoking mutating ACK.
+   After uncertain SAVE, ACK or RECONCILE, subsequent SAVE/ACK/RECONCILE cannot write.
+   The sole exception is a fresh read-only verification of an already acknowledged valid
+   generation; it returns ALREADY_ACKNOWLEDGED and leaves the block latched. The original
+   A/1 acknowledged, B/2 awaiting, uncertain ADOPT 1, then ACK 2 sequence is tested both
+   through the service and actual command handler: write counts, marker bytes and A/1 bytes
+   stay unchanged. Lost persisted-ACK reply, duplicate ACK and reboot recovery are covered.
+3. **Complete PERSIST token:** dispatch and handler share the same prefix boundary check
+   (space or end of line). `PERSISTACK` and `PERSISTSAVE` refuse without a storage write.
+   Parser tests compile both actual router translation units and exercise USB framing,
+   normalization, dispatch, promotion and the PERSIST handler. Arduino transport and unrelated
+   device service methods are fakes; persistence, gates and Q0 implementations are real.
+
+Parser coverage includes STATUS, SAVE CHECK, missing subcommands/generation, negative/zero/
+maximum/overflow generations, nonnumeric suffix, extra tokens, misplaced or absent
+CONFIRM_DISCARD, maintenance/session/run/executor/capture/diagnostic/authority/permit/operator
+and SAFE_OFF gates. SAVE authorization tests begin with writable storage so AWAITING_ACK
+cannot mask a missing gate. STATUS/CHECK and malformed commands never write; the transport
+counter stays zero. No parser logic is duplicated in the tests.
+
+### Results
+
+- Complete host suite: **44 executables, 436,805 checks, zero failures**.
+- Persistence service: **500 checks**; SAVE gate: **604**; actual CommandRouter: **608**.
+- P2/P2.4.1 suites pass unchanged, including store fault injection and reboot/ACK regressions.
+- Static audit: **PASS**, 201 source files scanned.
+- Layout suite: **57 tests, PASS**, using the installed ESP32 core 3.3.11 generator.
+- Negative controls use temporary files only: baseline `90a2f62` gate produces **4 failures**,
+  baseline service **27 failures**, restoration of the original dispatch/handler prefix
+  behavior **64 failures**. The corrected versions of the same suites pass.
+- Both clean offline builds pass with ESP32 core **3.3.11**, 16 MiB/custom partition FQBN,
+  PSRAM OPI, and explicit **MATDOG_OTA_INGEST_ENABLED=0**. Build directories and outputs are
+  under `/tmp`; existing exported firmware/manifests in the repository were not overwritten.
+  Verification build ID is `90a2f62-p3a1-offline`, from the corrected pre-commit working tree.
+
+| Profile | Sketch flash report | Application .bin | Global RAM | RAM left for locals |
+|---|---:|---:|---:|---:|
+| USB_ONLY | 1,120,187 B | 1,120,336 B | 73,876 B | 253,804 B |
+| ROBOT_POWERED | 1,123,319 B | 1,123,472 B | 73,876 B | 253,804 B |
+
+Both actual generated tables pass `matdog_layout.py check-build`:
+`MATDOG_16M_2x5M_NVS_V1`, SHA256
+`8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7`.
+App slots remain 5,242,880 B each; MATDOG NVS remains at `0xFE0000`, size `0x10000`.
+Both images use 21.4% of a slot. The layout tests cover canonical 3072-byte tables and
+4096-byte padded regions; no device table was read.
+
+`xtensa-esp32s3-elf-nm -C` finds defined `T` symbols in both ELFs for the NVS backend begin,
+service LOAD/SAVE/ACK/RECONCILE, SAVE gate, capture promotion attestation, and router
+prefix check/facts/handler. These are linked implementations, not just compiled objects.
+
+### Changed files and boundaries
+
+Production changes are confined to `src/calibration/CalibrationQ0CaptureSession.{h,cpp}`,
+`CalibrationSaveGate.{h,cpp}`, `CalibrationPersistenceService.{h,cpp}` and
+`src/core/CommandRouter.{h,cpp}`, `CommandRouterPersistence.cpp`.
+Tests change `scripts/tests/run_host_tests.sh`, `test_calibration_save_gate.cpp`,
+`test_calibration_persistence_service.cpp` and add `calibration_persistence_fixture.h`,
+`test_command_router_persistence.cpp`, `router_fake_hardware.cpp` and `router_stubs/`
+(Arduino, SPI, SCServo, BNO08x, NeoPixel, ESP OTA/HTTP and FreeRTOS declarations).
+Documentation changes are this dated section and `CHANGELOG.md`.
+
+No regression was observed. Marker/A/B protocol, partition table, flashing scripts/manifests,
+OTA, motion/gait, JointTransform arithmetic, geometric data, servo allocation and historical
+Q0/hardware evidence are unchanged. No P3b/RESTORE, new grant, motion or servo EEPROM write
+was introduced. This task creates only one local corrective commit, without push/PR/merge.
+
+Physical NVS durability and real power-cut behavior remain unproven by host storage faults.
+Legacy device-layout migration and hardware flash authorization remain separate gates;
+these temporary verification artifacts are not hardware release artifacts. Authenticated
+image-layout verification for OTA remains pending, and ingest stays disabled. Clean builds
+still report pre-existing SCServo warnings (including ReadMode array bounds) and a multiline
+comment warning in the local Wi-Fi configuration; none originates in the corrective code.
+
 ## Present-day baseline and next gate
 
 The official Controller baseline is now merged and tagged. The session records below preserve the

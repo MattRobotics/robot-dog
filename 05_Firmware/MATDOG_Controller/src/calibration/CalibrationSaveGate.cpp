@@ -87,7 +87,10 @@ SaveGateResult evaluateSaveGate(const SaveGateFacts& f, CalibrationRecord* recor
       f.q0_capture.candidate_count != kLegServoSlotCount) {
     return refuse(SaveGateReason::Q0_CAPTURE_NOT_COMPLETE);
   }
-  if (!actuator::freshQ0CaptureIsPromoted(f.q0_capture, *f.transforms, f.geometry_tag)) {
+  if (f.q0_capture.capture_session_id == 0 ||
+      f.promoted_capture_session_id != f.q0_capture.capture_session_id ||
+      f.promoted_geometry != f.geometry_tag ||
+      !actuator::freshQ0CaptureIsPromoted(f.q0_capture, *f.transforms, f.geometry_tag)) {
     return refuse(SaveGateReason::Q0_NOT_PROMOTED);
   }
 

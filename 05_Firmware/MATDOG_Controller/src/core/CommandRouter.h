@@ -247,6 +247,7 @@ class CommandRouter {
   // CommandRouterPersistence.cpp. Touches no servo, no transform table, no
   // authority; only STATUS and SAVE CHECK are read-only.
   void handlePersistCommand(const String& upper);
+  static bool isPersistCommand(const String& upper);
   void printPersistenceStatus();
   void buildSaveGateFacts(calibration::SaveGateFacts* facts) const;
   // nullptr when no actuator activity could be going on, else a REASON= token.
