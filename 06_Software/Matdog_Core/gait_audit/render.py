@@ -10,7 +10,17 @@ sys.path.insert(0,str(ROOT/'06_Software/Matdog_Core/pose_audit'))
 from model import Model,LEGS
 OUT=ROOT/'09_Logs/Validation_Reports/G4_Gait_Envelope'
 COLORS=['#167b92','#3b94a8','#825fbb','#a280c5']
-SNAPSHOTS={0:(1.15,1.4,1.65,1.9),1:(1.05,1.3,1.55,1.8)}  # WALK: mid-swing of RH/RF/LH/LF; TROT: all-stance and each diagonal pair mid-swing
+def snapshots(frames,duty,kind):
+ # Frames chosen from the leg phases, so the views show swings for any duty factor.
+ # WALK: mid-swing of RH, RF, LH, LF. TROT: mid-swing of each diagonal pair and an all-stance frame between them.
+ def mid(i):
+  swing=[f for f in frames if not f['leg_phase'][i][1]]
+  return min(swing,key=lambda f:abs((f['leg_phase'][i][0]-duty)/(1-duty)-.5))
+ near=lambda s:min(frames,key=lambda f:abs(f['phase']-s))
+ if kind==0:return [mid(LEGS.index(l)) for l in ('rh','rf','lh','lf')]
+ b,a=mid(LEGS.index('rf')),mid(LEGS.index('lf'))  # RF+LH then LF+RH within one cycle
+ after=(a['phase']+b['phase']+1)/2
+ return [b,near((a['phase']+b['phase'])/2),a,near(after-1 if after>2 else after)]
 def representative(entry):
  # Only an explicitly recorded, audited representative may be rendered; a failed candidate is refused.
  case=next(c for c in json.loads((OUT/entry['frames_source']).read_text())['cases'] if c['id']==entry['id'])
@@ -20,7 +30,7 @@ def main():
  reps=json.loads((OUT/'representatives.json').read_text())['representatives'];model=Model();(OUT/'views').mkdir(exist_ok=True)
  for entry in reps:
   kind=0 if entry['type']=='WALK' else 1;name=entry['name'];r=representative(entry);p=r['parameters']
-  frames=r['frames'];chosen=[min(frames,key=lambda f:abs(f['phase']-s)) for s in SNAPSHOTS[kind]]
+  frames=r['frames'];chosen=snapshots(frames,p['duty'],kind)
   caption=f"{p['height_m']*1000:.0f} mm body · {p['advance_x_m']*1000:+.0f} mm/cycle · {p['lift_m']*1000:.0f} mm lift · duty {p['duty']:g} · id{entry['id']}\n{entry['status']}"
   for axes,label in (((0,2),'side'),((0,1),'top')):
    fig,axs=plt.subplots(2,2,figsize=(11,7),layout='constrained');fig.suptitle(f'MATDOG {name.upper()} — canonical collision meshes · {label} view\n{caption} · OFFLINE MODEL',fontsize=13)
