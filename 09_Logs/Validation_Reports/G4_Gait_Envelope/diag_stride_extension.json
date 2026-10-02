@@ -1,0 +1,3592 @@
+{
+  "scope": "DIAGNOSTIC stride extension, no self-collision, micrometre foot events quarantined; not acceptance",
+  "cases": [
+    {
+      "id": 5000,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.3828802499237245,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.2883877880424506,
+      "max_condition": 4.7053783679480095
+    },
+    {
+      "id": 5001,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.788432865457116,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.2749157955840049,
+      "max_condition": 5.036600153720768
+    },
+    {
+      "id": 5002,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.2762043759640425,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.263620561713116,
+      "max_condition": 5.381093011036
+    },
+    {
+      "id": 5003,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.276204375960573,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.2544137942090212,
+      "max_condition": 5.748006220461597
+    },
+    {
+      "id": 5004,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.8240589659635504,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.24720872559652562,
+      "max_condition": 6.149048698270265
+    },
+    {
+      "id": 5005,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 4.097404092594237,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.24192171245936067,
+      "max_condition": 6.599769503679014
+    },
+    {
+      "id": 5006,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "GROUND_COLLISION",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 4.863367413072972,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.23658916862661128,
+      "max_condition": 8.115350108971445
+    },
+    {
+      "id": 5007,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "CONTACT_INVALID",
+        "FOOT_MESH_MICROMETRE",
+        "GROUND_COLLISION",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 5.101929524513327,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.24168924435955885,
+      "max_condition": 11.03772712743128
+    },
+    {
+      "id": 5008,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.3828802499167856,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.2883877880424506,
+      "max_condition": 4.7053783679480095
+    },
+    {
+      "id": 5009,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.788432865457116,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.2749157955840049,
+      "max_condition": 5.0366001537207685
+    },
+    {
+      "id": 5010,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.27620437598139,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.26362056171311554,
+      "max_condition": 5.381093011036
+    },
+    {
+      "id": 5011,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.2762043759709814,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.254413794209021,
+      "max_condition": 5.748006220461597
+    },
+    {
+      "id": 5012,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.8240589659427338,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.24720872559652562,
+      "max_condition": 6.149048698270265
+    },
+    {
+      "id": 5013,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 4.097404092637605,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.24192171245936067,
+      "max_condition": 6.599769503679012
+    },
+    {
+      "id": 5014,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "GROUND_COLLISION"
+      ],
+      "max_foot_penetration_um": 4.863367413121544,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.23658916862661128,
+      "max_condition": 8.115350108971437
+    },
+    {
+      "id": 5015,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "CONTACT_INVALID",
+        "FOOT_MESH_MICROMETRE",
+        "GROUND_COLLISION",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 5.101929524516796,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.24168924435955885,
+      "max_condition": 11.03772712743128
+    },
+    {
+      "id": 5016,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.221477116166187,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.5257888618363824,
+      "max_condition": 5.06304689173458
+    },
+    {
+      "id": 5017,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.541122203679469,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.5120928575695722,
+      "max_condition": 5.285237913342259
+    },
+    {
+      "id": 5018,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.0682563616456218,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.5001979579349181,
+      "max_condition": 5.7254617420341924
+    },
+    {
+      "id": 5019,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.333474561183214,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.4900735670880847,
+      "max_condition": 6.209776766423025
+    },
+    {
+      "id": 5020,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.8180330371208324,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.4816876191449113,
+      "max_condition": 6.757799185974654
+    },
+    {
+      "id": 5021,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.604274834440729,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.4750077813091096,
+      "max_condition": 7.399057326535002
+    },
+    {
+      "id": 5022,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 4.862085655622794,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.3569855583511643,
+      "max_condition": 9.818781171724286
+    },
+    {
+      "id": 5023,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 13,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 5.197742998785948,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.010214436235065127,
+      "max_condition": 15.62499405964816
+    },
+    {
+      "id": 5024,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.221477116166187,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.5257888618363826,
+      "max_condition": 5.06304689173458
+    },
+    {
+      "id": 5025,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.5411222036950813,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.5120928575695725,
+      "max_condition": 5.28523791334226
+    },
+    {
+      "id": 5026,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.068256361649091,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.5001979579349181,
+      "max_condition": 5.725461742034193
+    },
+    {
+      "id": 5027,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.3334745611745404,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.4900735670880847,
+      "max_condition": 6.209776766423025
+    },
+    {
+      "id": 5028,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.8180330371208324,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.4816876191449113,
+      "max_condition": 6.757799185974652
+    },
+    {
+      "id": 5029,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.604274834473689,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.4750077813091096,
+      "max_condition": 7.399057326534997
+    },
+    {
+      "id": 5030,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 4.862085655629733,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.3569855583511651,
+      "max_condition": 9.818781171724277
+    },
+    {
+      "id": 5031,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 19,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 5.197742998785948,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.010214436235066349,
+      "max_condition": 15.624994059648131
+    },
+    {
+      "id": 5032,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.271755016054755,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.6696504038928232,
+      "max_condition": 6.009095802795976
+    },
+    {
+      "id": 5033,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.9672802752331306,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.6148948988740907,
+      "max_condition": 6.273771722828697
+    },
+    {
+      "id": 5034,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.973636637119623,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.5520978568820106,
+      "max_condition": 6.567283625118289
+    },
+    {
+      "id": 5035,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.973636637119623,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.48034595329770025,
+      "max_condition": 7.148933095020784
+    },
+    {
+      "id": 5036,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.9699232640775377,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.39523388046426633,
+      "max_condition": 8.022303695583787
+    },
+    {
+      "id": 5037,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.3493144634827443,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.29632588136251015,
+      "max_condition": 9.156384302188457
+    },
+    {
+      "id": 5038,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 12,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 4.343708672823951,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.12105445755902366,
+      "max_condition": 10.985297968546963
+    },
+    {
+      "id": 5039,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 9,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "IK_UNREACHABLE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.829243862257109,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.15048371657812099,
+      "max_condition": 10.677164034551133
+    },
+    {
+      "id": 5040,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.271755016018326,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.6696504038928234,
+      "max_condition": 6.009095802795976
+    },
+    {
+      "id": 5041,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.9672802752435388,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.6148948988740907,
+      "max_condition": 6.273771722828697
+    },
+    {
+      "id": 5042,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.973636637116153,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.5520978568820111,
+      "max_condition": 6.567283625118292
+    },
+    {
+      "id": 5043,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.973636637119623,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.48034595329770025,
+      "max_condition": 7.148933095020784
+    },
+    {
+      "id": 5044,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.9699232640775377,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.3952338804642668,
+      "max_condition": 8.022303695583782
+    },
+    {
+      "id": 5045,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.3493144634827443,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.2963258813625109,
+      "max_condition": 9.156384302188444
+    },
+    {
+      "id": 5046,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5047,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "IK_UNREACHABLE"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5048,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.621688908969327,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.3076829105595238,
+      "max_condition": 8.792878521015137
+    },
+    {
+      "id": 5049,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.217899537872812,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.2400979376359278,
+      "max_condition": 9.541396791316451
+    },
+    {
+      "id": 5050,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.982172598666594,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.15900558449412594,
+      "max_condition": 10.601975955450092
+    },
+    {
+      "id": 5051,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.4609228796271543,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.06004432318961195,
+      "max_condition": 12.244585842230274
+    },
+    {
+      "id": 5052,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 12,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.5707211872518934,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.06688481641668353,
+      "max_condition": 12.115276830400934
+    },
+    {
+      "id": 5053,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 11,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.7398681073410867,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.08682653798458295,
+      "max_condition": 12.3426477394643
+    },
+    {
+      "id": 5054,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 9,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.540438955357966,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.016755957328282167,
+      "max_condition": 13.130161737607693
+    },
+    {
+      "id": 5055,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5056,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.6216889089936135,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.3076829105595238,
+      "max_condition": 8.792878521015137
+    },
+    {
+      "id": 5057,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.217899537872812,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.2400979376359278,
+      "max_condition": 9.541396791316451
+    },
+    {
+      "id": 5058,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.9821725986423075,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.15900558449412638,
+      "max_condition": 10.601975955450083
+    },
+    {
+      "id": 5059,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.460922879620215,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.06004432318961195,
+      "max_condition": 12.24458584223027
+    },
+    {
+      "id": 5060,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5061,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5062,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "IK_UNREACHABLE"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5063,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "IK_UNREACHABLE"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5064,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.1562900313503173,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.06024474550540626,
+      "max_condition": 12.583857486698264
+    },
+    {
+      "id": 5065,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 12,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.528249419258722,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.05018248763768318,
+      "max_condition": 12.792606604663012
+    },
+    {
+      "id": 5066,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 11,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.2323137112641454,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.05018248763768318,
+      "max_condition": 12.79260660466301
+    },
+    {
+      "id": 5067,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 10,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.5290255964757065,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.018138226063490248,
+      "max_condition": 13.499710202418449
+    },
+    {
+      "id": 5068,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 8,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 2.6076823263967293,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.04503963668734379,
+      "max_condition": 12.901634729014791
+    },
+    {
+      "id": 5069,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 7,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED",
+        "SUPPORT_INVALID"
+      ],
+      "max_foot_penetration_um": 3.1757105311835954,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.03982008618225197,
+      "max_condition": 13.013964238893902
+    },
+    {
+      "id": 5070,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5071,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": -0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "IK_UNREACHABLE"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5072,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.1562900313503173,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.060244745505406816,
+      "max_condition": 12.583857486698253
+    },
+    {
+      "id": 5073,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5074,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5075,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5076,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "IK_UNREACHABLE"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5077,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "IK_UNREACHABLE"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5078,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "IK_UNREACHABLE"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5079,
+      "parameters": {
+        "type": 0.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.8,
+        "advance_x_m": 0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.004,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "IK_UNREACHABLE"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5080,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 1.8563444211441156,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.31019875361621363,
+      "max_condition": 4.647215423017594
+    },
+    {
+      "id": 5081,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 1.8563444211397786,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.29418146027190994,
+      "max_condition": 4.647215423017594
+    },
+    {
+      "id": 5082,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.4190400050010803,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.2813353595077843,
+      "max_condition": 4.779855763778428
+    },
+    {
+      "id": 5083,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.3828802499167856,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.27151136139286036,
+      "max_condition": 5.0513382564397675
+    },
+    {
+      "id": 5084,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.6151570527901264,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.26456456392530336,
+      "max_condition": 5.3318739768325285
+    },
+    {
+      "id": 5085,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.27620437598139,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.25654480500475385,
+      "max_condition": 5.626375491798172
+    },
+    {
+      "id": 5086,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.579354910748442,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.24220938597651265,
+      "max_condition": 6.4667428415100945
+    },
+    {
+      "id": 5087,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "GROUND_COLLISION"
+      ],
+      "max_foot_penetration_um": 4.376220517127508,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.2367023923723106,
+      "max_condition": 7.585960747436036
+    },
+    {
+      "id": 5088,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 1.8563444211441156,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.3101987536162141,
+      "max_condition": 4.647215423017594
+    },
+    {
+      "id": 5089,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 1.8563444211441156,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.29418146027191017,
+      "max_condition": 4.647215423017594
+    },
+    {
+      "id": 5090,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.419040005028836,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.2813353595077843,
+      "max_condition": 4.779855763778428
+    },
+    {
+      "id": 5091,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.3828802499115813,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.27151136139286014,
+      "max_condition": 5.05133825643977
+    },
+    {
+      "id": 5092,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.615157052784922,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.2645645639253036,
+      "max_condition": 5.331873976832526
+    },
+    {
+      "id": 5093,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.27620437598139,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.25654480500475385,
+      "max_condition": 5.626375491798169
+    },
+    {
+      "id": 5094,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.5793549107432376,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.24220938597651287,
+      "max_condition": 6.4667428415100945
+    },
+    {
+      "id": 5095,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.08,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "GROUND_COLLISION"
+      ],
+      "max_foot_penetration_um": 4.376220517127508,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.2367023923723104,
+      "max_condition": 7.5859607474360375
+    },
+    {
+      "id": 5096,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 1.5642999441570908,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.5451705081900224,
+      "max_condition": 4.819295885722152
+    },
+    {
+      "id": 5097,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.1283847916088448,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.5289890104748896,
+      "max_condition": 4.953184601921831
+    },
+    {
+      "id": 5098,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 1.9222024170541598,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.5154565058511871,
+      "max_condition": 5.0856716946677345
+    },
+    {
+      "id": 5099,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.3156532802156433,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.5045222008511838,
+      "max_condition": 5.303781568185939
+    },
+    {
+      "id": 5100,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.976013614696196,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.49613348443080385,
+      "max_condition": 5.66170372923167
+    },
+    {
+      "id": 5101,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.0682563616577645,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.4902390352284247,
+      "max_condition": 6.0474587627424015
+    },
+    {
+      "id": 5102,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.293991237135474,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.47539171197446906,
+      "max_condition": 7.20680320883772
+    },
+    {
+      "id": 5103,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 4.2895436074223,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.44279862473280607,
+      "max_condition": 8.918016826747374
+    },
+    {
+      "id": 5104,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 1.5642999441570908,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.5451705081900227,
+      "max_condition": 4.819295885722149
+    },
+    {
+      "id": 5105,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.128384791563742,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.5289890104748893,
+      "max_condition": 4.953184601921831
+    },
+    {
+      "id": 5106,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 1.9222024170845176,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.5154565058511871,
+      "max_condition": 5.0856716946677345
+    },
+    {
+      "id": 5107,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.3156532802156433,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.504522200851184,
+      "max_condition": 5.303781568185942
+    },
+    {
+      "id": 5108,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.976013614696196,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.4961334844308041,
+      "max_condition": 5.661703729231664
+    },
+    {
+      "id": 5109,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.068256361649091,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.4902390352284247,
+      "max_condition": 6.0474587627424015
+    },
+    {
+      "id": 5110,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.2939912371198616,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.47539171197446883,
+      "max_condition": 7.20680320883772
+    },
+    {
+      "id": 5111,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.1,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 4.28954360741883,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.4427986247328052,
+      "max_condition": 8.91801682674738
+    },
+    {
+      "id": 5112,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 1.6456638953716087,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.7385471302445413,
+      "max_condition": 5.644163590075198
+    },
+    {
+      "id": 5113,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.1150688404199256,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.7036041867697761,
+      "max_condition": 5.839760475533934
+    },
+    {
+      "id": 5114,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.408634670336002,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.6640123246583759,
+      "max_condition": 6.047177534834688
+    },
+    {
+      "id": 5115,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.3717827487539784,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.6176186120291037,
+      "max_condition": 6.2683630958995264
+    },
+    {
+      "id": 5116,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.6642471444814078,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.564809399378576,
+      "max_condition": 6.510182648624267
+    },
+    {
+      "id": 5117,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.973636637112684,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.5058531715677396,
+      "max_condition": 6.904122469186757
+    },
+    {
+      "id": 5118,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.31835155714319,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.325739068275514,
+      "max_condition": 8.801641342137358
+    },
+    {
+      "id": 5119,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 4.303328067745485,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.0735377456338977,
+      "max_condition": 12.621408552541274
+    },
+    {
+      "id": 5120,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 1.6456638953716087,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.7385471302445411,
+      "max_condition": 5.644163590075197
+    },
+    {
+      "id": 5121,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.1150688404199256,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.7036041867697761,
+      "max_condition": 5.839760475533935
+    },
+    {
+      "id": 5122,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.40863467034641,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.6640123246583763,
+      "max_condition": 6.047177534834687
+    },
+    {
+      "id": 5123,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.3717827487539784,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.6176186120291037,
+      "max_condition": 6.268363095899523
+    },
+    {
+      "id": 5124,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.6642471444987548,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.5648093993785767,
+      "max_condition": 6.510182648624267
+    },
+    {
+      "id": 5125,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.973636637119623,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.5058531715677402,
+      "max_condition": 6.904122469186748
+    },
+    {
+      "id": 5126,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.31835155714319,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.32573906827551435,
+      "max_condition": 8.801641342137358
+    },
+    {
+      "id": 5127,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.12,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 4.303328067745485,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.07353774563389714,
+      "max_condition": 12.621408552541288
+    },
+    {
+      "id": 5128,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.1604771604614994,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.3897768860809887,
+      "max_condition": 7.991604601708277
+    },
+    {
+      "id": 5129,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.40771730954277,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.34871074460845075,
+      "max_condition": 8.379819215140076
+    },
+    {
+      "id": 5130,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.4706355900173254,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.3011630035955949,
+      "max_condition": 8.85797385888316
+    },
+    {
+      "id": 5131,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.7616917330375994,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.24573269072610016,
+      "max_condition": 9.464673407773057
+    },
+    {
+      "id": 5132,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.366782270130056,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.17813609554205567,
+      "max_condition": 10.299386987881174
+    },
+    {
+      "id": 5133,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.9881055104395706,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.09872352484067681,
+      "max_condition": 11.506561984948645
+    },
+    {
+      "id": 5134,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 4,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 4.200548944144692,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.04959249136499855,
+      "max_condition": 12.447475256509343
+    },
+    {
+      "id": 5135,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5136,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.1604771604614994,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.3897768860809887,
+      "max_condition": 7.991604601708277
+    },
+    {
+      "id": 5137,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.407717309525423,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.34871074460845075,
+      "max_condition": 8.379819215140076
+    },
+    {
+      "id": 5138,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.4706355900121215,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.30116300359559534,
+      "max_condition": 8.857973858883152
+    },
+    {
+      "id": 5139,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.7616917330375994,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.24573269072610104,
+      "max_condition": 9.464673407773061
+    },
+    {
+      "id": 5140,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 3.3667822701335255,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.17813609554205767,
+      "max_condition": 10.299386987881144
+    },
+    {
+      "id": 5141,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.9881055104395706,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.09872352484067859,
+      "max_condition": 11.506561984948611
+    },
+    {
+      "id": 5142,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5143,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.14,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5144,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.517735840387378,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.16262816102315758,
+      "max_condition": 10.740307374900885
+    },
+    {
+      "id": 5145,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.5177358403839083,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.11227724501940761,
+      "max_condition": 11.590049967913563
+    },
+    {
+      "id": 5146,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.7045455346375036,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.05205285638045909,
+      "max_condition": 12.751807752913802
+    },
+    {
+      "id": 5147,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 5,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 3.3167369830611193,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.018138226063489693,
+      "max_condition": 13.499710202418468
+    },
+    {
+      "id": 5148,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 4,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 2.5961621864037387,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.0009754592275419416,
+      "max_condition": 13.90787025695637
+    },
+    {
+      "id": 5149,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 2,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 3.2323137112710842,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.05018248763768318,
+      "max_condition": 12.792606604663012
+    },
+    {
+      "id": 5150,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5151,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": -0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5152,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.1,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.517735840385643,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.16262816102315758,
+      "max_condition": 10.740307374900885
+    },
+    {
+      "id": 5153,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.12,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.517735840387378,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.11227724501940761,
+      "max_condition": 11.590049967913563
+    },
+    {
+      "id": 5154,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.14,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 41,
+      "categories": [
+        "FOOT_MESH_MICROMETRE"
+      ],
+      "max_foot_penetration_um": 2.70454553462883,
+      "kinematic_diagnostic_pass": true,
+      "min_joint_margin_rad": 0.052052856380459644,
+      "max_condition": 12.75180775291379
+    },
+    {
+      "id": 5155,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.16,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 18,
+      "categories": [
+        "FOOT_MESH_MICROMETRE",
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 3.3167369830593847,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": 0.018138226063490248,
+      "max_condition": 13.499710202418449
+    },
+    {
+      "id": 5156,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.18,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5157,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.2,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "JOINT_LIMIT_BLOCKED"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5158,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.25,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "IK_UNREACHABLE"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    },
+    {
+      "id": 5159,
+      "parameters": {
+        "type": 1.0,
+        "height_m": 0.15,
+        "lift_m": 0.01,
+        "duty": 0.6,
+        "advance_x_m": 0.3,
+        "advance_y_m": 0.0,
+        "yaw_rad": 0.0,
+        "sway_x_m": 0.0,
+        "max_condition": 10000.0
+      },
+      "frames": 0,
+      "categories": [
+        "IK_UNREACHABLE"
+      ],
+      "max_foot_penetration_um": 0.0,
+      "kinematic_diagnostic_pass": false,
+      "min_joint_margin_rad": null,
+      "max_condition": 0.0
+    }
+  ]
+}
