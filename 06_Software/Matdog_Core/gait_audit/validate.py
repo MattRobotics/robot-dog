@@ -74,12 +74,13 @@ def main():
     gates.append(run('g35_pose_audit_tests', [PY, str(ROOT / '06_Software/Matdog_Core/pose_audit/test_pose_audit.py')], cwd=ROOT / '06_Software/Matdog_Core/pose_audit', env=env))
     gates.append(run('g35_artifact_manifest_check', [PY, str(ROOT / '06_Software/Matdog_Core/pose_audit/artifact_manifest.py'), '--check'], env=env, expect_stdout='ARTIFACT_MANIFEST OK'))
     gates.append(run('host_motion_runner_g1_g2_g3_g35_g4', ['bash', str(TESTS / 'run_motion_host_tests.sh')], env=env))
-    gates.append(run('static_audit', [PY, str(FW / 'scripts/static_audit.py')], env=env, expect_stdout='STATIC_AUDIT PASS'))
+    gates.append(run('static_audit', [PY, str(FW / 'scripts/static_audit.py')], env=env, expect_stdout='STATIC_AUDIT = PASS'))
     san = [CXX, *flags, '-g', '-O1', '-fsanitize=address,undefined', '-fno-omit-frame-pointer', *srcs, '-o', str(tmp / 'test_gait_san')]
     gates.append(run('g4_asan_ubsan_build', san))
     gates.append(run('g4_asan_ubsan_run', [str(tmp / 'test_gait_san')], env={'ASAN_OPTIONS': 'detect_leaks=1:halt_on_error=1', 'UBSAN_OPTIONS': 'halt_on_error=1:print_stacktrace=1'}, expect_stdout='GAIT_HOST = PASS'))
     gates.append(run('git_diff_check_worktree', ['git', 'diff', '--check']))
-    gates.append(run('git_diff_check_vs_baseline', ['git', 'diff', '--check', BASELINE + '..HEAD']))
+    # CR at end of line is allowed: the preserved checkpoint CSV and verbatim request text carry CRLF and must stay byte-identical.
+    gates.append(run('git_diff_check_vs_baseline', ['git', '-c', 'core.whitespace=cr-at-eol', 'diff', '--check', BASELINE + '..HEAD']))
     changed = git('diff', '--name-status', BASELINE + '..HEAD', '--', '05_Firmware/MATDOG_Controller/src/motion').split('\n')
     allowed = {'05_Firmware/MATDOG_Controller/src/motion/' + n for n in ('Gait.cpp', 'Gait.h', 'Locomotion.cpp', 'Locomotion.h')}
     added = {l.split('\t')[1] for l in changed if l.startswith('A\t')}

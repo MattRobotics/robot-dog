@@ -48,8 +48,8 @@ def main():
   axs[2].plot(phase,mask.sum(axis=1),color='#167b92');axs[2].set_ylabel('Declared support count');axs[2].set_xlabel('Normalized cycle phase')
   for ax in axs:ax.grid(alpha=.2)
   fig.suptitle(f'{name.upper()} — '+('quasi-static support study' if kind==0 else 'dynamic stability NOT YET PROVEN'));fig.savefig(OUT/'views'/f'{name}_phase.png',dpi=150,metadata={'Software':'MATDOG G4 deterministic render'});plt.close(fig)
-  with (OUT/f'{name}_cycle.csv').open('w') as file:
-   writer=csv.writer(file);writer.writerow(['phase',*[f'{l}_{j}_{quantity}' for quantity in ('rad','rad_s','rad_s2') for l in LEGS for j in ('hip','upper','lower')],*[f'{l}_{axis}_world_m' for l in LEGS for axis in ('x','y','z')],'body_x_m','body_y_m','body_z_m','support_margin_m','classification'])
+  with (OUT/f'{name}_cycle.csv').open('w',newline='') as file:
+   writer=csv.writer(file,lineterminator='\n');writer.writerow(['phase',*[f'{l}_{j}_{quantity}' for quantity in ('rad','rad_s','rad_s2') for l in LEGS for j in ('hip','upper','lower')],*[f'{l}_{axis}_world_m' for l in LEGS for axis in ('x','y','z')],'body_x_m','body_y_m','body_z_m','support_margin_m','classification'])
    for f in frames:writer.writerow([f['phase'],*f['q'],*f['qdot'],*f['qddot'],*np.array(f['contacts_world_m']).ravel(),*np.array(f['body'])[:3,3],f['support_margin_m'],';'.join(f['classification'])])
- print('Rendered six engineering views and two complete cycle CSV files')
+ print(f'Rendered {3*len(reps)} engineering views and {len(reps)} complete cycle CSV files')
 if __name__=='__main__':main()
