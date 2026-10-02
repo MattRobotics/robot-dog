@@ -1,15 +1,85 @@
 # MATDOG M0 — Migrazione flash e recupero, validati offline
 
-Data: 2026-10-02. Stato: **M0 completato offline; nessuna autorizzazione hardware**.
-Base approvata: `be0c12979e5b4b8ddc9dd21772d0d106e4358f4a`, branch di ingresso
-`feat/calibration-persistence-record-store-v1`, inizialmente pulito. P3a resta invariato.
-Questo documento pianifica una sessione futura sullo stesso ESP32-S3; non ne attesta
-lo stato attuale. I comandi hardware sotto sono istruzioni condizionate, **non eseguite**.
+Data: 2026-10-02. **M0.2: backup Gate A verificato; Gate B BLOCKED.**
+Base firmware immutabile: `be0c12979e5b4b8ddc9dd21772d0d106e4358f4a`.
+Branch `feat/calibration-persistence-record-store-v1`, HEAD di ingresso M0.2
+`174aa04`. P3a e il writer M0.1 restano invariati.
+
+Il Gate A hardware descritto sotto è stato eseguito dall'operatore e riferito
+nella sessione; i log/file locali lo documentano. **M0.2 esegue soltanto L**:
+nessun nuovo accesso hardware, backup, reset, boot, W o erase. Le istruzioni
+hardware riportano un ingresso già avvenuto o template futuri sospesi; non sono
+un'autorizzazione a ripeterli. Il backup positivo non abilita B, C, R o R2.
 
 Classi: **L** = file locali; **R** = lettura del dispositivo, senza scrittura flash;
 **W** = scrittura con cancellazione dei settori indirizzati; **B** = boot/reset/transizione
 ROM, che può attivare le normali scritture del firmware/core. R non significa
-assenza di interazione hardware. M0 ha eseguito esclusivamente L.
+assenza di interazione hardware. M0/M0.1 e questo correttivo M0.2 hanno eseguito esclusivamente L.
+
+## Stato vincolante M0.2 — installazione realmente usata
+
+| Elemento | Configurazione del Gate A reale |
+|---|---|
+| Alimentazione | Batteria → DALY BMS, **KEY ON** → rail servo/LED e TECNOIOT → **5 V ESP32-S3** |
+| Collegamento host | USB di servizio esterna: **GPIO19/D−, GPIO20/D+, GND**; **nessun VBUS** |
+| USB-C integrata | Non utilizzata nelle operazioni descritte; non è la procedura standard M0.2 |
+| Periferiche | Servo bus, LED ring, DALY e TECNOIOT rimangono alimentati e collegati; nessuna misura 0 V o isolamento dei segnali è qui dichiarata |
+| Accesso ROM fisico | **BOOT ed EN sotto la cover, non accessibili** con robot assemblato |
+| Sicurezza meccanica | Robot sostenuto, zampe libere, disgiuntore accessibile |
+| Stato servo pre-ROM | Tutti i **13** verificati dall'operatore: torque=0, speed=0, current=0; non è una garanzia dopo power-cycle/reset periferico |
+| Chip verificato | ESP32-S3 v0.2; MAC `14:c1:9f:22:75:94`; flash 16 MiB; PSRAM 8 MiB |
+| Security | Secure Boot e Flash Encryption disabilitati |
+| Legacy osservato | `dfcecb670d05`, **ROBOT_POWERED**, app0 `0x10000`, size `0x300000`, OTA UNDEFINED, ingest DISABLED |
+
+Cablaggio coerente con [elettronica](../../04_Electronics/README.md) e
+[alimentazione/porta di servizio](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
+Nessuna modifica alla progettazione elettrica è proposta o eseguita.
+L'alimentazione USB-C con rail isolati resta soltanto un'**alternativa futura**
+che richiederebbe una diversa configurazione fisica qualificata, non un requisito
+retroattivo per dichiarare valido questo backup.
+
+Il backup reale è in
+`~/MATDOG/backups/esp32/m0-20261002T173142Z-14c19f227594`: due file distinti
+`read-a-16m.bin` e `read-b-16m.bin`, ciascuno 16.777.216 byte, identici byte per
+byte, SHA comune
+`856435baa1402086bd38dee0a4c1e0c6ee13e8d814cfc7ddc8bed30dbed5afb7`.
+I file e `fullflash.sha256.txt` sono stati verificati localmente; non ripetere
+acquisizioni né altre operazioni hardware in M0.2. I log esistenti riportano
+identità, security e `Staying in bootloader`; la permanenza in ROM fra le due
+acquisizioni e la verifica dei 13 servo sono confermate dall'operatore.
+Non inventare log runtime/servo assenti dalla directory.
+
+```text
+GATE_A_BACKUP_VERIFIED=YES
+M0_RUNBOOK_HARDWARE_ALIGNED=YES
+RECOVERY_PATH_READY=NO
+GATE_B_MIGRATION_READY=NO
+HARDWARE_FLASH_AUTHORIZED=NO
+```
+
+## Recupero fisico attuale — blocco prima di ogni W
+
+L'ingresso `usb-reset` con firmware legacy funzionante è dimostrato. **Non è
+una dimostrazione del recupero dopo una W app0/tabella interrotta.**
+
+| Stato dopo un guasto | Percorso disponibile / limite |
+|---|---|
+| ROM ancora attiva, alimentazione e USB conservate | Letture e possibile R1/R2 tecnicamente raggiungibili, solo con nuova R/R2; il writer non li avvia da un errore. Non provato fisicamente con una W fallita |
+| Reset/brownout/power loss durante W app0 | App parziale può non partire; il nuovo app1 è vuoto. Non assumere CDC del firmware, torque sicuro dopo reset dei servo o fallback OTA |
+| Tabella parziale/corrotta dopo reset | Il bootloader può rifiutare la tabella; la ROM può ripristinarla **se raggiungibile**. La recuperabilità dei byte non prova la raggiungibilità della ROM |
+| USB assente/bloccata o robot disalimentato | La porta esterna non fornisce 5 V; BOOT/EN non accessibili. Disgiuntore utile per arresto elettrico, ma non equivale a ingresso ROM e può far perdere lo stato torque-off |
+
+**Gate B resta BLOCKED.** Per rimuovere questo blocco occorre rendere disponibili
+BOOT/EN con accesso di manutenzione alla cover (senza ridisegnare l'elettronica),
+identificare i controlli reali e qualificare ingresso ROM/recupero indipendente
+dall'applicazione; oppure dimostrare un metodo alternativo sulla configurazione
+assemblata anche quando l'app/tabella non sono utilizzabili. Il solo usb-reset
+su legacy valido, l'uscita `Staying in bootloader`, un file di backup, i test
+host e la disponibilità teorica della ROM non soddisfano questo requisito.
+Nessuna prova hardware del recupero è richiesta o autorizzata da M0.2.
+Non provare un power-cycle, usb-reset ripetuto, UART0 improvvisata o una W
+come esperimento di recupero. Se USB/ROM si perde: STOP, conservare evidenze,
+mettere in sicurezza il robot e predisporre accesso fisico con incarico distinto.
 
 ## Mappa completa e contratto
 
@@ -116,19 +186,65 @@ SHA del file, manifest e banner MATDOG. Il manifest già esportato nel checkout
 originario è DIRTY, riferito a `ff0543c…`, e non descrive il binario attuale:
 non è un candidato M0, pur restando conservato.
 
-**Candidato del primo boot: USB_ONLY.** Servo power, batteria/DALY e rail LED
-sono attesi spenti; questo coincide con l'isolamento fisico richiesto e riduce
-le aspettative di periferiche alimentate. Il profilo non interrompe fisicamente
-l'alimentazione e non sostituisce l'isolamento. ROBOT_POWERED attende tutti quei
-rail attivi: è una build di confronto offline, non il candidato del primo boot.
-Questa scelta **non autorizza alcun caricamento**.
+## Candidato primo boot nella configurazione assemblata
+
+**ROBOT_POWERED è il candidato coerente da qualificare**, già compilato da
+be0c129; non è ancora abilitato nel piano/writer M0.1 e non è autorizzato al flash.
+USB_ONLY non è un profilo di sicurezza per questo cablaggio: dichiara servo,
+batteria e LED non alimentati, mentre sono alimentati. Non spegne quei rail.
+
+| Comportamento del sorgente approvato | USB_ONLY | ROBOT_POWERED |
+|---|---|---|
+| Aspettative servo/batteria/LED | false/false/false, diagnostica di disponibilità non rappresentativa | true/true/true, corrisponde ai rail reali |
+| ServoBus / DALY | UART inizializzate anche qui; il polling DALY non è un isolamento elettrico | Stessi trasporti, aspettative powered |
+| LED GPIO47 | INPUT, nessun frame: non spegne né osserva un ring già alimentato; stato precedente non attestato | Boot clear/show OFF, poi normale policy di stato può cambiare i LED |
+| Startup servo | Nessun ping/census/torque/movimento automatico | Identica assenza di startup torque/movimento; **nessun torque-off automatico da presumere** |
+| Authority/persistence | NONE, permit revocato; LOAD senza RESTORE | Identico percorso; il profilo non autorizza attuazione o SAVE |
+
+Riferimenti esatti: `HardwareProfile.h`, `BuildConfig.h`,
+`Controller::begin/update`, `ServoBus::begin`, `DalyBms::update`, `LedRing::begin`.
+USB_ONLY non mostra un torque-on automatico nei sorgenti, ma **non è qualificato
+come primo boot sicuro e diagnosticamente adeguato su questi rail powered**.
+ROBOT_POWERED descrive l'impianto correttamente; la sicurezza del primo boot
+resta da qualificare, con B/C distinti e recupero fisico pronto.
+
+**Modifiche minime future, non eseguite in M0.2:**
+
+1. Piano esplicitamente ROBOT_POWERED, non inferito dal manifest o da un env
+   ereditato; Manifest V2 esistente, SHA applicazione
+   `7cc1cbbc024e58630ed93fd0df8b7491659c0c20d6e1a4916333230eb1a82be0`,
+   manifest `d5c92755d958203d89eb0e439b2dce80a6faa79302000b7088b1a3209ce1ea48`,
+   stessa tabella/FQBN/BUILD_ID/OTA=0. Nessuna nuova build o modifica di artefatti.
+2. `migration_m0.py`/writer: selettore atteso esplicito e pin del candidato robot,
+   mantenendo USB_ONLY soltanto per la sua alternativa qualificata; riusare
+   Manifest V2/layout e lasciare invariati contatori 1/1, divieti di reset,
+   reconnect, retry, chaining e tutte le verifiche. Attualmente la richiesta
+   ROBOT_POWERED è correttamente rifiutata con `PROFILE_MISMATCH`.
+3. Immagine robot 1.123.472 byte (`0x112490`): W
+   `[0x10000,0x122490)`, erase/readback `[0x10000,0x123000)` = **275 settori**;
+   lettura app `0x113000`, nuovi padding/snapshot/hash locali sul backup fresco.
+   La tabella resta 3072 byte e un settore. Il piano USB da 274 settori non va riusato.
+4. Test positivi ROBOT_POWERED con artefatto già attestato e negativi profilo/hash/
+   offset errati; fault injection reale API per entrambi i profili e R1/R2,
+   senza ridurre protezioni. Nessun mock del firmware per certificare recupero fisico.
+5. Piano C powered dedicato: banner ROBOT_POWERED con rail YES, authority NONE,
+   startup torque/motion/scan DISABLED, persistence NO_RECORD, OTA ingest DISABLED;
+   diagnostica DALY/LED e letture di stato dei 13 servo nominate esplicitamente.
+   `@SERVO READ` richiede MAINTENANCE: l'eventuale cambio modo deve essere nominato
+   nel futuro gate C e non concede authority/torque. Non dichiarare servo sicuri
+   dai soli status cached. Nessun torque, movimento, calibrazione, SAVE, ACK,
+   RECONCILE, RESTORE o promozione di trasformazioni è autorizzato dal primo boot.
+
+Il writer corrente **non viene adattato né forzato** in questo correttivo
+solo documentale. Non usare flash_app_only, una CLI W o un manifest editato
+per superare il rifiuto. La fonte be0c129 resta immutabile.
 
 ## Bootloader e otadata effettivi
 
-Il backup storico del 29 settembre contiene il bootloader generato dal core
-corrente, byte per byte, più padding FF fino a `0x8000`. La compatibilità sul
-dispositivo futuro va riconfermata dal backup nuovo: `migration_m0.py plan`
-rifiuta ogni differenza, senza proporre un aggiornamento del bootloader.
+Il backup fresco del 2 ottobre conferma il bootloader generato dal core
+corrente, byte per byte, più padding FF fino a `0x8000`, già osservato nel
+backup storico. Il preflight locale è PASS: `migration_m0.py plan` rifiuta
+ogni differenza, senza proporre un aggiornamento del bootloader.
 Entrambi i layout hanno due sottotipi OTA contigui, app0 a `0x10000`, otadata a
 `0xE000` e tabella MD5 a `0x8000`; il bootloader legge indirizzi e dimensioni
 dalla tabella. Non incorpora gli offset legacy degli slot.
@@ -170,6 +286,9 @@ REPO="$HOME/MATDOG/github/robot-dog"
 SCRIPTS="$REPO/05_Firmware/MATDOG_Controller/scripts"
 M0_ROOT="$HOME/MATDOG/verification-artifacts/MATDOG_M0_FLASH_LAYOUT_be0c129_20261002T150453Z"
 USB="$M0_ROOT/source-usb/05_Firmware/MATDOG_Controller/build/esp32.esp32.esp32s3"
+ROBOT="$M0_ROOT/source-robot/05_Firmware/MATDOG_Controller/build/esp32.esp32.esp32s3"
+# APP/MANIFEST USB sono soltanto riferimenti del checker invariato/template storico.
+# NON selezionano un candidato operativo M0.2; B resta BLOCKED.
 APP="$USB/MATDOG_Controller.ino.bin"
 TABLE="$USB/MATDOG_Controller.ino.partitions.bin"
 MANIFEST="$USB/matdog_build_manifest.txt"
@@ -196,13 +315,17 @@ test "$(sha256sum "$HIST" | cut -d' ' -f1)" = 7290a3271fa11e0a73a438bc963795d2a5
 
 Atteso: dimensione e SHA coincidono. Il file e il companion manifest restano
 conservati. Non usarlo come backup fresco, né inferire da esso la FFAT attuale.
-Il nuovo backup userà directory e nomi diversi, senza sovrascrittura.
+Il backup fresco del 2 ottobre è già in una directory distinta, verificata al passo 8; non sovrascrivere né ripetere le acquisizioni.
 
-### 3. L — Rivalidare il candidato e il sorgente esatto
+### 3. L — Verificare entrambi gli artefatti esistenti, senza abilitarli
+
+I controlli USB sono regressioni del checker invariato; i controlli ROBOT
+attestano il candidato coerente ancora da qualificare. Nessuno dei due PASS
+concede B/C o seleziona automaticamente un binario da flashare.
 
 ```bash
-test "$(git -C "$M0_ROOT/source-usb" rev-parse HEAD)" = be0c12979e5b4b8ddc9dd21772d0d106e4358f4a
-test -z "$(git -C "$M0_ROOT/source-usb" status --porcelain)"
+test "$(GIT_OPTIONAL_LOCKS=0 git -C "$M0_ROOT/source-usb" rev-parse HEAD)" = be0c12979e5b4b8ddc9dd21772d0d106e4358f4a
+test -z "$(GIT_OPTIONAL_LOCKS=0 git -C "$M0_ROOT/source-usb" status --porcelain)"
 test "$(stat -c%s "$APP")" -eq 1120352
 test "$(sha256sum "$APP" | cut -d' ' -f1)" = f0f3df4e83708f04d4e7acb44ab35794028521a0abfe50fa95b219694c498c3e
 test "$(sha256sum "$TABLE" | cut -d' ' -f1)" = 8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7
@@ -222,120 +345,137 @@ Controllare anche `logs/effective-compiler-usb.json` e il BUILD_ID incorporato.
 STOP per ogni incompatibilità, immagine vuota/oversize o toolchain diversa.
 `image-info` opera su file: non apre la porta.
 
-### 4. Gate A — Autorizzazione separata a backup/preflight
+Attestazione locale del candidato powered già prodotto, senza cambiare APP del
+checker USB o attivare writer:
 
-Prima di qualsiasi R/B richiedere una registrazione dell'operatore con sessione,
-dispositivo/MAC atteso, condizioni elettriche, letture diagnostiche consentite,
-ingresso manuale in ROM e due acquisizioni complete. L'autorizzazione A non
-consente W, erase, OTA, primo boot del candidato o attuazione. M0 non la concede.
+```bash
+test "$(GIT_OPTIONAL_LOCKS=0 git -C "$M0_ROOT/source-robot" rev-parse HEAD)" = be0c12979e5b4b8ddc9dd21772d0d106e4358f4a
+test -z "$(GIT_OPTIONAL_LOCKS=0 git -C "$M0_ROOT/source-robot" status --porcelain)"
+test "$(stat -c%s "$ROBOT/MATDOG_Controller.ino.bin")" -eq 1123472
+test "$(sha256sum "$ROBOT/MATDOG_Controller.ino.bin" | cut -d' ' -f1)" = 7cc1cbbc024e58630ed93fd0df8b7491659c0c20d6e1a4916333230eb1a82be0
+test "$(sha256sum "$ROBOT/matdog_build_manifest.txt" | cut -d' ' -f1)" = d5c92755d958203d89eb0e439b2dce80a6faa79302000b7088b1a3209ce1ea48
+python3 "$SCRIPTS/build_manifest.py" verify --manifest "$ROBOT/matdog_build_manifest.txt" \
+  --binary "$ROBOT/MATDOG_Controller.ino.bin" \
+  --head be0c12979e5b4b8ddc9dd21772d0d106e4358f4a --tree-state CLEAN \
+  --expected-fqbn "$FQBN" --requested-profile ROBOT_POWERED --requested-ota-ingest 0
+"$ESPTOOL" --chip esp32s3 image-info "$ROBOT/MATDOG_Controller.ino.bin"
+```
 
-### 5. B/R — Isolare e identificare fisicamente
+### 4. Gate A — Backup già completato, non autorizzazione alla migrazione
 
-Utilizzare esclusivamente la **USB-C integrata nella scheda ESP32-S3**, con
-cavo stabile, per alimentazione e comunicazione M0. La porta USB esterna del
-robot collega GPIO19, GPIO20 e GND: **VBUS non è collegato**, quindi non alimenta
-la scheda e non sostituisce la USB-C in questo preflight. Collegare un solo host.
+L'operatore ha autorizzato ed eseguito l'ingresso **usb-reset** iniziale, le
+letture ROM successive **no-reset** e due acquisizioni complete. Il loro
+confronto/SHA è verificato offline al passo 8; i file originali si conservano.
+Non chiedere né effettuare nuovi accessi hardware per questo incarico.
+Il positivo Gate A backup non concede W, erase, OTA, boot del candidato,
+attuazione, B/C o recovery. Nessuna nuova transizione ROM/legacy è parte di M0.2.
 
-Robot sostenuto meccanicamente; batteria e caricatore scollegati, nessun
-alimentatore esterno. **Isolare fisicamente il ramo TECNOIOT verso ESP32**, per
-escludere alimentazioni concorrenti e back-power. Scollegare i rami servo e LED;
-misurare e documentare **0 V** sui due rail, anche con la USB-C collegata.
-Isolare i segnali verso periferiche spente: UART servo **GPIO17/18**, DALY
-**GPIO15/16**, LED **GPIO47**. BNO085 sulla 3V3 ESP32 è ammesso soltanto senza
-una seconda alimentazione o ritorni. **BOOT ed EN devono restare accessibili**
-per le sole transizioni ROM autorizzate; durante W BOOT resta fisicamente basso.
-Documentare foto/schema e misure. Questo isolamento è coerente con
-[`04_Electronics/README.md`](../../04_Electronics/README.md) e
-[`MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
-**USB_ONLY non è una protezione elettrica**. Profilo software, chiave DALY e
-SAFE_OFF non provano l'isolamento; nessun comando servo fa parte del preflight.
+### 5. B/R — Registrare alimentazione e stato fisico reali
 
-Un solo proprietario USB; chiudere monitor, viewer, servizi di calibrazione,
-upload automatici e altri processi seriali. Usare il by-id, non un ttyACM
-ipotizzato. MAC storico atteso `14:c1:9f:22:75:94`; un diverso dispositivo
-impone STOP e nuova identificazione, non modifica automatica del valore atteso.
+Durante il Gate A il robot ha usato batteria/DALY **KEY ON**, servo bus e LED
+alimentati, TECNOIOT→5 V ESP32 e la sola porta esterna USB19/20/GND senza VBUS.
+La USB-C integrata non è stata usata. I segnali UART servo GPIO17/18, DALY
+GPIO15/16 e LED GPIO47 restano collegati a periferiche alimentate; BNO085 è
+sulla 3V3 ESP32. Non attribuire al setup isolamento o misure 0 V mai effettuati.
 
-### 6. R/B — Rilevare firmware e slot realmente in esecuzione
+I 13 servo erano verificati torque=0, speed=0 e current=0 **prima** del reset
+USB. Robot sostenuto, zampe libere, disgiuntore accessibile. Questa evidenza
+non prova il comportamento dopo brownout/power-cycle e non autorizza torque
+o movimento. BOOT/EN sono sotto la cover, non disponibili; il recupero fisico
+resta il blocco di B indicato sopra. Non aprire cover o modificare alimentazione
+in questo incarico. Conservare quanto riferito dall'operatore senza creare
+fotografie, misure o log servo fittizi.
 
-Se il firmware legacy è già in esecuzione, aprire un reader senza reset
-intenzionale e richiedere solo `@STATUS` e `@OTA STATUS`. Registrare banner,
-BUILD_ID, profilo, `OTA_IMAGE running=... @...`, stato OTA/reset e log grezzo.
-Aprire con DTR/RTS inattivi impostati **prima** dell'open; un reset inatteso
-impone STOP. Non usare una utility di calibrazione come reader.
+Un solo proprietario USB per le eventuali sessioni hardware future; porta by-id
+identificata, MAC atteso `14:c1:9f:22:75:94`. Nessuna nuova apertura della porta
+in M0.2. La precedente configurazione USB-C isolata è solo alternativa futura,
+non il preflight standard per l'installazione assemblata.
+### 6. R/B — Evidenza runtime legacy già acquisita
 
-Se si parte direttamente in ROM, il dump prova lo slot *selezionato*, non quello
-che era realmente in esecuzione: non inventare quest'ultima osservazione.
-Occorre autorizzare esplicitamente anche un boot diagnostico del firmware
-legacy isolato, salvare prima uno snapshot ROM, acquisire il runtime, tornare
-in ROM e acquisire la coppia finale di backup **dopo** quel boot. Conservare
-anche lo snapshot precedente. Nessuna migrazione senza questa evidenza.
+L'operatore ha osservato `dfcecb670d05`, ROBOT_POWERED, app0 `0x10000`, size
+`0x300000`, OTA UNDEFINED e ingest DISABLED prima dell'ingresso ROM. Il backup
+fresco contiene il BUILD_ID NUL-terminato e una app0 con checksum/digest validi.
+I log locali disponibili non includono l'intero transcript runtime/servo:
+la sua provenienza è la dichiarazione dell'operatore, non un log inventato.
 
-Registrare `CURRENT_OFFSET` e `CURRENT_BUILD_ID` dai dati ottenuti. Lo slot
-deve essere app0 legacy `0x10000`, dimensione `0x300000`. Pending verification,
-rollback, fallback o divergenza fra runtime e selezione del dump impongono STOP.
+Usare `CURRENT_OFFSET=0x10000`, `CURRENT_BUILD_ID=dfcecb670d05` e il MAC
+verificato soltanto per l'analisi locale di questa acquisizione. Non avviare
+nuovamente legacy o reader. Per un'altra sessione non inferire lo slot realmente
+eseguito dalla sola selezione otadata. Pending, fallback o divergenze sono STOP.
+### 7. B/R — Ingresso USB ROM già verificato; nessun reset durante M0.2
 
-### 7. B/R — Entrare in ROM e controllare identità/security
-
-Ingresso manuale: GPIO0/BOOT basso durante EN/reset, come da
-[selezione boot ESP32-S3 Espressif](https://docs.espressif.com/projects/esptool/en/latest/esp32s3/advanced-topics/boot-mode-selection.html).
-Mantenere la condizione di ROM anche in caso di reset accidentale fino al gate C.
-Non cortocircuitare linee sconosciute. Se BOOT/EN o l'isolamento non sono
-accessibili, STOP: non sostituire la procedura con reset automatici.
+Comando **già eseguito dall'operatore**, esptool 5.3.1:
 
 ```bash
 PORT=/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00
-SESSION="$HOME/MATDOG/backups/esp32/m0-$(date -u +%Y%m%dT%H%M%SZ)-14c19f227594"
-mkdir "$SESSION"
-ESP=("$ESPTOOL" --chip esp32s3 --port "$PORT" --baud 115200 \
-     --before no-reset --after no-reset --no-stub)
-"${ESP[@]}" read-mac | tee "$SESSION/read-mac-before.log"
-"${ESP[@]}" flash-id | tee "$SESSION/flash-id.log"
-"${ESP[@]}" get-security-info | tee "$SESSION/security-info.log"
+SESSION="$HOME/MATDOG/backups/esp32/m0-20261002T173142Z-14c19f227594"
+# TRASCRIZIONE del Gate A: NON rilanciare in M0.2.
+"$ESPTOOL" --chip esp32s3 --port "$PORT" --baud 115200 \
+  --before usb-reset --after no-reset --no-stub --connect-attempts 1 read-mac
 ```
 
-Atteso: chip ESP32-S3, MAC esatto, flash rilevata 16 MiB. Registrare USB serial,
-chip revision, JEDEC ID, data/ora e tool/versione; eFuse security coerente con
-secure boot/flash encryption disabilitati e ROM read/write disponibile.
-STOP se security è ignota/attiva, il chip/flash non coincidono, porta assente
-o readback non consentito. Non usare `--force`, non programmare eFuse.
-Le opzioni impediscono i reset impliciti e usano ROM senza stub, secondo
-[le opzioni esptool](https://docs.espressif.com/projects/esptool/en/latest/esp32s3/esptool/advanced-options.html).
-Un errore di connessione non autorizza un reset o una diversa modalità.
+`usb-reset` è un **reset iniziale B esplicitamente autorizzato**, non R pura:
+`USBJTAGSerialReset` del 5.3.1 applica la sequenza DTR/RTS per ingresso ROM.
+Il log `rom-entry.log` conferma chip/MAC e `Staying in bootloader`; non implica
+GPIO0 tenuto fisicamente basso né un percorso cold-recovery dimostrato.
+BOOT/EN non sono stati azionati manualmente.
 
-### 8. R — Due acquisizioni complete indipendenti
+Le successive letture già effettuate hanno usato `no-reset/no-reset/no-stub`.
+Per eventuali operazioni future già autorizzate, mantenere questo contesto
+ROM separato dal reset iniziale (non invocato da M0.2):
 
 ```bash
+ESP=("$ESPTOOL" --chip esp32s3 --port "$PORT" --baud 115200 \
+  --before no-reset --after no-reset --no-stub --connect-attempts 1)
+```
+
+Il writer M0.1 usa la stessa API/USB nativa 303a:1001 e può connettersi una volta
+in `no-reset` a una ROM già entrata con usb-reset. Non contiene il reset iniziale,
+non lo ripete su errore, non invia FLASH_END e non esce automaticamente dalla ROM.
+I contatori 1/1 e tutti i rifiuti restano invariati. Non richiede un nuovo reset
+per ogni invocazione; questo è compatibilità del percorso software, **non**
+prova di recupero fisico o autorizzazione W. Il commento M0.1 su BOOT trattenuto
+riguarda il template isolato, non una garanzia ottenuta sull'hardware assemblato.
+Un errore, un reset inatteso o la perdita ROM non autorizza reconnect/reset/retry.
+Security/flash confermati in `security-info.log`/`flash-id.log`; nessun force/eFuse.
+### 8. L — Verificare la doppia acquisizione completata, senza ripeterla
+
+Il dispositivo è rimasto in ROM durante le due acquisizioni riferite
+`BACKUP_IDENTICI=YES`, `GATE_A_DOPPIA_ACQUISIZIONE=PASS`. Controlli M0.2 soltanto
+su file preesistenti:
+
+```bash
+SESSION="$HOME/MATDOG/backups/esp32/m0-20261002T173142Z-14c19f227594"
 A_IMAGE="$SESSION/read-a-16m.bin"
 B_IMAGE="$SESSION/read-b-16m.bin"
-test ! -e "$A_IMAGE" && test ! -e "$B_IMAGE"
-"${ESP[@]}" read-flash 0x0 0x1000000 "$A_IMAGE" | tee "$SESSION/read-a.log"
-"${ESP[@]}" read-mac | tee "$SESSION/read-mac-between.log"
-"${ESP[@]}" read-flash 0x0 0x1000000 "$B_IMAGE" | tee "$SESSION/read-b.log"
 test "$(stat -c%s "$A_IMAGE")" -eq 16777216
 test "$(stat -c%s "$B_IMAGE")" -eq 16777216
 cmp "$A_IMAGE" "$B_IMAGE"
-sha256sum "$A_IMAGE" "$B_IMAGE" | tee "$SESSION/fullflash.sha256.txt"
-NEW_BACKUP_SHA256="$(sha256sum "$A_IMAGE" | cut -d' ' -f1)"
+sha256sum --check "$SESSION/fullflash.sha256.txt"
+NEW_BACKUP_SHA256=856435baa1402086bd38dee0a4c1e0c6ee13e8d814cfc7ddc8bed30dbed5afb7
 ```
 
-Due processi/read-flash realmente distinti, con log e orari; mai una copia,
-hardlink o un rehash della prima acquisizione. Nessun boot/W fra le letture.
-Atteso: 16 MiB ciascuna, byte identici e SHA identico; file leggibili integralmente.
-Errori USB, acquisizione parziale o un solo byte diverso impongono STOP.
-Archiviare i tentativi falliti con nome separato; risolvere connessione/alimentazione
-e rifare **due** acquisizioni, senza scegliere per maggioranza né concatenare
-pezzi senza una verifica indipendente completa. Il precedente NO_STUB_FULL
-evita una fragilità già documentata delle letture con stub/ri-enumerazione.
+File distinti/inode distinti, confronto completo e SHA comune verificati.
+Il confronto locale conferma i dati; l'indipendenza delle acquisizioni e la
+permanenza ROM derivano dai log esistenti e dalla dichiarazione dell'operatore.
+Conservare **tutti** i file/log originali senza sovrascriverli. Non acquisire una
+terza lettura, non ripetere backup o reset in questa fase. Un file mancante,
+size/hash differente o mismatch avrebbe imposto STOP, non una maggioranza.
+### 9. L — Estratti offline del backup fresco
 
-### 9. L — Estrarre, verificare, archiviare
+Gli esiti M0.2 sono nel nuovo bundle
+`~/MATDOG/verification-artifacts/MATDOG_M0_2_HARDWARE_ALIGNMENT_174aa04_20261002T190017Z`.
+Le directory `regions` e `usb-only-file-plan` sono già prodotte: non sovrascriverle.
+Per riprodurre l'analisi scegliere una nuova directory di output, senza hardware:
 
 ```bash
+OFFLINE_ROOT="${OFFLINE_ROOT:?scegliere una nuova directory locale per la riproduzione}"
 python3 "$SCRIPTS/migration_m0.py" archive --backup "$A_IMAGE" --repeat "$B_IMAGE" \
-  --backup-sha256 "$NEW_BACKUP_SHA256" --out "$SESSION/regions"
-"$ESPTOOL" --chip esp32s3 image-info "$SESSION/regions/legacy_app0.bin" \
-  | tee "$SESSION/installed-app0-image-info.log"
+  --backup-sha256 "$NEW_BACKUP_SHA256" --out "$OFFLINE_ROOT/regions"
+"$ESPTOOL" --chip esp32s3 image-info "$OFFLINE_ROOT/regions/legacy_app0.bin" \
+  | tee "$OFFLINE_ROOT/installed-app0-image-info.log"
 "$ESPTOOL" --chip esp32s3 image-info "$USB/MATDOG_Controller.ino.bootloader.bin" \
-  | tee "$SESSION/bootloader-reference-image-info.log"
+  | tee "$OFFLINE_ROOT/bootloader-reference-image-info.log"
 ```
 
 Atteso: `FILE_CHECKS=PASS`, `AUTHORIZATION_GRANTED=NO`; tabella legacy canonica
@@ -357,18 +497,25 @@ BACKUP_SIZE, BACKUP_SHA256 e verifica del secondo supporto. Il formato KEY=VALUE
 compatibile con `backup_gate_logic.py` non basta da solo a provare identità,
 freschezza o indipendenza: gli allegati e la firma dell'operatore sono necessari.
 
-### 10. L — Preparare il piano tecnico sul nuovo backup
+### 10. L — Preflight strutturale, non un piano operativo powered
+
+Il checker invariato accetta solo USB_ONLY. È stato eseguito sul nuovo backup
+come verifica delle precondizioni/layout e regressione del candidato storico:
+**FILE_CHECKS=PASS non seleziona USB_ONLY per il robot assemblato**.
+La verifica del manifest ROBOT_POWERED con `build_manifest.py` è PASS; il piano
+ROBOT_POWERED con `migration_m0.py` invariato dà invece il rifiuto atteso
+`STOP=PROFILE_MISMATCH`, senza produrre un piano powered.
 
 ```bash
-CURRENT_OFFSET="${CURRENT_OFFSET:?richiesto offset dal runtime legacy}"
-CURRENT_BUILD_ID="${CURRENT_BUILD_ID:?richiesto BUILD_ID dal runtime legacy}"
-OBSERVED_MAC="${OBSERVED_MAC:?richiesto MAC da read-mac}"
+CURRENT_OFFSET=0x10000
+CURRENT_BUILD_ID=dfcecb670d05
+OBSERVED_MAC=14:c1:9f:22:75:94
 python3 "$SCRIPTS/migration_m0.py" plan --backup "$A_IMAGE" --repeat "$B_IMAGE" \
   --backup-sha256 "$NEW_BACKUP_SHA256" --sdkconfig "$USB/sdkconfig" \
   --bootloader "$USB/MATDOG_Controller.ino.bootloader.bin" \
   --running-offset "$CURRENT_OFFSET" --installed-build-id "$CURRENT_BUILD_ID" \
   --expected-mac 14:c1:9f:22:75:94 --observed-mac "$OBSERVED_MAC" \
-  --binary "$APP" --manifest "$MANIFEST" --out "$SESSION/plan"
+  --binary "$APP" --manifest "$MANIFEST" --out "$OFFLINE_ROOT/usb-only-file-plan"
 ```
 
 Atteso: `FILE_CHECKS=PASS`, `AUTHORIZATION_GRANTED=NO`, slot 0, azioni
@@ -384,27 +531,35 @@ di MAC o acquisizione indipendente. Le prove dei passi precedenti restano obblig
 SHA del risultato finale previsto e intervalli effettivi. Qualunque STOP
 interrompe il percorso; un nuovo backup o un'eccezione richiede nuova revisione.
 
-### 11. Gate B — Autorizzare separatamente la migrazione
+### 11. Gate B — BLOCKED, nessuna migrazione pronta
 
-Richiedere accettazione esplicita di: stesso dispositivo/sessione; receipt e
-**SHA del nuovo backup**; firmware USB SHA della tabella artefatti; tabella V1
-SHA; perdita della semantica/posizione FFAT; app1 nuovo vuoto senza fallback;
-sole due W del piano; nessun erase/bootloader/otadata/NVS write; stop e recupero.
-Gli elementi di `MIGRATION_PRECONDITIONS` devono essere tutti esplicitamente
-soddisfatti. Una autorizzazione al backup, al build o a un precedente flash
-non soddisfa questo gate. Registrare `AUTHORIZED_BACKUP_SHA256` dal receipt
-approvato, non assegnarlo automaticamente dal file che si sta per usare.
+Le precondizioni del backup/layout sono PASS ma non bastano. Mancano un accesso
+fisico BOOT/EN utilizzabile o un recupero alternativo dimostrato da stato guasto,
+e un piano/writer/primo boot qualificati ROBOT_POWERED. Anche la copia su secondo
+supporto e il recovery receipt prima di B non sono attestati dai soli tre file
+di backup; non inventarne il completamento. **Nessuna W in M0.2.**
 
-### 12. R/L — Ultimo controllo, senza scritture automatiche
+Il Gate A positivo autorizzava letture/reset iniziale, non W o primo boot del
+candidato. Non impostare `AUTHORIZED_BACKUP_SHA256` come effetto di un PASS,
+non concedere B/C/R/R2 e non provare a migrare per verificare la recuperabilità.
+### 12. L — STOP operativo; controlli locali consentiti
 
-Rivalidare MAC, sorgente/manifest del passo 3, receipt e copie backup;
-`test "$NEW_BACKUP_SHA256" = "$AUTHORIZED_BACKUP_SHA256"`.
-La coppia di backup deve appartenere all'attuale sessione ROM congelata:
-se c'è stato un boot o una modifica nel frattempo, STOP e nuovi backup/piano/gate B.
-Confermare visivamente BOOT basso/ROM, rail isolati, cavo e alimentazione stabili.
-Non eseguire `flash_app_only.sh`: continua a rifiutare il legacy; il suo wrapper
-usa reset ordinari e non governa questa transazione. `upload.sh` resta uno stub
-di rifiuto. Nessun preflight chiama W come effetto collaterale.
+Riconciliare soltanto evidenze, manifest, hash e report locali. Non aprire la
+porta per confermare nuovamente MAC o ROM. Backup e preflight di M0.2 non attestano
+uno stato futuro dopo un boot, power-cycle o modifica: allora serviranno una
+nuova valutazione della freschezza e gate distinti, non la ripetizione di backup
+in questo incarico. Nessun `flash_app_only.sh`, upload, CLI W o override profilo.
+
+## Template sospeso M0/M0.1 — solo alternativa USB isolata futura
+
+**Le sezioni seguenti fino a R2 non sono il piano operativo della configurazione
+assemblata.** Conservano il template tecnico USB_ONLY per una diversa
+configurazione fisica isolata con BOOT/EN accessibili, da qualificare separatamente.
+Non usare questi comandi, le loro attese 274 settori o la whitelist USB per il
+candidato ROBOT_POWERED. Le protezioni del writer restano riferimenti obbligatori
+anche per l'eventuale adattamento powered; non sono un modo di sbloccare Gate B.
+<details>
+<summary>Template USB_ONLY sospeso — da non eseguire sulla configurazione assemblata M0.2</summary>
 
 ### M0.1 — Contratto di ogni W (B oppure R/R2)
 
@@ -760,32 +915,28 @@ Atteso: dimensione, SHA e **tutti i byte** del backup originale; ogni errore
 impone STOP in ROM. Successivo boot legacy diagnostico autorizzato e verificato
 come R1. Il file qui è il backup device-specific, non un `.merged.bin` di build.
 
-## Checklist del preflight e autorizzazioni
+</details>
 
-- [ ] A registrata, con sessione, MAC, R e transizioni ROM/legacy diagnostico previste.
-- [ ] USB-C integrata per alimentazione/comunicazione; esterna GPIO19/20/GND senza VBUS.
-- [ ] Batteria/caricatore/alimentatore assenti; ramo TECNOIOT verso ESP32 isolato;
-      rail servo/LED misurati 0 V; GPIO17/18,15/16,47 isolati; BNO senza altra fonte;
-      BOOT/EN accessibili; robot sostenuto. USB_ONLY non prova isolamento.
-- [ ] Writer M0.1 e sorgenti API 5.3.1 verificati; contatori effettivi 1/1;
-      ogni W separata e nessun retry/reset/recovery automatico.
-- [ ] Porta by-id e chip/MAC/seriale/JEDEC/revision verificati; security nota e compatibile.
-- [ ] Nessun altro proprietario USB; ROM stabile, nessun reset implicito/stub.
-- [ ] Firmware/profilo e slot realmente in esecuzione registrati e riconciliati col dump.
-- [ ] Due acquisizioni complete indipendenti, 16 MiB, byte/SHA identici, log/orari leggibili.
-- [ ] Estratti e default NVS verificati; copia del backup su secondo supporto riletta.
-- [ ] Backup 29 settembre preservato; nuovo receipt legato allo stesso dispositivo.
-- [ ] Tabella legacy esatta; bootloader interamente uguale al riferimento; config OTA nota.
-- [ ] CRC/stati entrambi i settori noti e stabili; app0 selezionato e realmente eseguito.
-- [ ] Tutta la FFAT legacy, nuovo app1 e tutti i 64 KiB destinazione NVS verificati FF.
-- [ ] Candidato CLEAN commit approvato, BUILD_ID incorporato, USB_ONLY, OTA ingest 0,
-      FQBN/core/OPI, firmware/table/manifest SHA e intervalli verificati.
-- [ ] Piano locale PASS e nessuna W nel preflight; perdita semantica FFAT accettata.
-- [ ] B registrata con SHA backup/candidato/table, sole due W, isolamento e recupero.
-- [ ] Dopo W: verify-flash, readback e snapshot globale PASS; ancora ROM.
-- [ ] C distinta, diagnostica e transizioni autorizzate; nessuna concessione a storage/motion.
-- [ ] Eventuale R/R2 distinta, regioni e motivo dichiarati, stesso dispositivo, verify e boot
-      verificati prima di ogni dichiarazione di rollback riuscito.
+## Checklist attuale M0.2 — separazione dei gate
+
+- [x] Hardware reale documentato: batteria/DALY KEY ON, TECNOIOT→ESP32, rail powered;
+      porta USB esterna senza VBUS; USB-C non usata; BOOT/EN non accessibili.
+- [x] Robot sostenuto, zampe libere, disgiuntore accessibile; 13 torque/speed/current
+      zero pre-ROM riferiti dall'operatore, senza estendere la validità post-reset.
+- [x] Ingresso usb-reset già verificato; successive letture no-reset; identità/security note.
+- [x] A/B distinti, completi, identici, SHA fresco atteso; nessuna nuova acquisizione.
+- [x] Regioni archiviate offline: tabella legacy, bootloader noto/padding, otadata
+      stabile/app0, FFAT/app1 nuovo/destinazione NVS interamente FF.
+- [x] App legacy dfcecb670d05 presente, checksum/digest validi; source be0c129 immutabile.
+- [x] Manifest/immagini offline USB e ROBOT attestati; rifiuto powered del checker
+      attuale preservato. Il PASS USB locale non è un piano di migrazione hardware.
+- [ ] Recupero fisico disponibile/qualificato indipendente da app/tabella: **BLOCKED**.
+- [ ] Secondo supporto riletto e receipt device-specific per un eventuale B/R futuro.
+- [ ] Piano/writer/test powered e readback da 275 settori qualificati senza bypass.
+- [ ] B distinto con recupero pronto e candidato/backup nominativi: **non concesso**.
+- [ ] C powered distinto con diagnostica e ritorno ROM realizzabili: **non concesso**.
+- [ ] Eventuale R/R2 distinta, stesso dispositivo, verifica integrale prima di
+      dichiarare rollback: **nessun recupero eseguito o certificato fisicamente**.
 
 ## Validazione offline e limiti residui
 
@@ -821,14 +972,20 @@ Per il correttivo e i test reali API con trasporto simulato vedere il
 Il criterio del passo 18 resta invariato: 64 KiB `matdog_nvs` interamente FF
 nel flusso USB_ONLY/LOAD/STATUS approvato; nessuna modifica al firmware NVS.
 
-Rischi residui: stato presente del chip sconosciuto; indipendenza delle letture
-non dimostrabile da due file soli; affidabilità elettrica/USB e accesso ROM da
-provare; durability NVS e interruzioni reali di potenza non provate offline;
+Rischi residui M0.2: identità/stato riferiti al Gate A, non a un futuro boot;
+nessun recupero da guasto dimostrato con BOOT/EN coperti; servo powered e stato
+torque-off non garantito dopo reset dei servo; USB senza VBUS e alimentazione
+comune alle rail; indipendenza delle letture attestata dall'operatore/log;
+stabilità elettrica/USB e ritorno ROM dopo guasto da qualificare; durability NVS e interruzioni reali di potenza non provate offline;
 app1 vuoto non offre fallback; flash/table W non atomiche; primo boot può
 eseguire recovery core/NVS; credenziali volutamente assenti; warning SCServo
 preesistenti; perdita del banner CDC possibile. Una condizione fuori dal
 percorso M0 richiede una nuova decisione concreta, non un bypass.
 
-**Chiusura M0:** documentazione, build, analisi storica e test locali completati.
-Autorizzazioni A/B/C/R mancanti e volutamente separate; nessun accesso al robot,
-flash, erase, OTA, reset, movimento, push, PR o merge eseguito.
+Per stato del backup reale, analisi regionale, confronto profili e verifiche:
+[rapporto M0.2](../../09_Logs/Development_Log/2026-10-02_M0_2_HARDWARE_ALIGNMENT.md).
+
+**Chiusura M0.2:** backup Gate A verificato localmente e runbook allineato;
+**recupero non pronto, Gate B BLOCKED, flash non autorizzato**. Il Gate A hardware
+è stato effettuato dall'operatore; questo correttivo non ha effettuato accessi
+al robot, flash, erase, OTA, reset, movimento, push, PR o merge.
