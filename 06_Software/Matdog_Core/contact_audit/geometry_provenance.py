@@ -82,7 +82,8 @@ def main():
         notes=['Geometry V5 (calibration compiler) consumes the same URDF and meshes; it does not define a different foot or contact geometry.',
                'The G2 YAML mesh audit (hash e43737..., lowest z 16.7 um) refers to the VISUAL foot STL; G3.5/G4 collision checks use the COLLISION foot STL (different file, different tessellation and registration).',
                'The four collision foot STLs differ in bytes (triangle order) but hold the same vertex set in foot_link.'])
-    save('geometry_provenance.json', result)
+    if '--check' not in sys.argv:  # --check never rewrites evidence (the calibration worktree HEAD moves independently)
+        save('geometry_provenance.json', result)
     print(json.dumps(result['assessment'], indent=1))
     return 0 if result['assessment']['geometry_consistent'] else 1
 

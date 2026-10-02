@@ -73,7 +73,7 @@ def main():
     gates.append(run('g4_artifact_manifest_check', [PY, str(ROOT / '06_Software/Matdog_Core/gait_audit/artifact_manifest.py'), '--check'], env=env, expect='ARTIFACT_MANIFEST OK'))
     gates.append(run('g35_pose_audit_tests', [PY, str(ROOT / '06_Software/Matdog_Core/pose_audit/test_pose_audit.py')], cwd=ROOT / '06_Software/Matdog_Core/pose_audit', env=env))
     gates.append(run('g35_artifact_manifest_check', [PY, str(ROOT / '06_Software/Matdog_Core/pose_audit/artifact_manifest.py'), '--check'], env=env, expect='ARTIFACT_MANIFEST OK'))
-    gates.append(run('geometry_provenance_recheck', [PY, str(HERE / 'geometry_provenance.py')], cwd=HERE, env=env, expect='"geometry_consistent": true'))
+    gates.append(run('geometry_provenance_recheck', [PY, str(HERE / 'geometry_provenance.py'), '--check'], cwd=HERE, env=env, expect='"geometry_consistent": true'))
     gates.append(run('g41_contact_tests', [PY, str(HERE / 'test_contact_audit.py')], cwd=HERE, env=env))
     gates.append(run('lifecycle_replay_bit_identical_2ms', [PY, str(HERE / 'replay_compare.py')], cwd=HERE, env=env, expect='REPLAY_COMPARE PASS'))
     gates.append(run('host_motion_runner_g1_g2_g3_g35_g4_g41', ['bash', str(TESTS / 'run_motion_host_tests.sh')], env=env))
