@@ -1,0 +1,1115 @@
+{
+  "purpose": "Why the strict 1 um mesh/contact policy rejects the saved lifecycles and some steady cases",
+  "unchanged": [
+    "G2 analytic eccentric-cylinder contact reference",
+    "1 um ground tolerance",
+    "canonical collision meshes"
+  ],
+  "foot_mesh": {
+    "usable_fit_rings": 2,
+    "mesh_circle_centre_offset_um": {
+      "dx": 4.53477102720537,
+      "dz": 3.5763164805769145,
+      "magnitude": 5.775308462621481
+    },
+    "radius_minus_G2_R_um": -0.6461401652292296,
+    "full_tessellation_note": "tread rings carry irregular 94/482-vertex triangulation; fillet rings 55 vertices (6.545 deg)",
+    "delta_um": {
+      "min": -5.7750346203686025,
+      "max": 16.265368354848043,
+      "at_min_pitch_deg": -128.28000000004704
+    },
+    "ideal_offset_circle_um": {
+      "min": -5.775308462001899,
+      "max": 5.775308462001899
+    },
+    "tessellation_residual_um": {
+      "min": -0.0010046088650584872,
+      "max": 11.859365167198678
+    },
+    "fraction_of_pitch_angles_below_minus_1um": 0.40791666666666665,
+    "pitch_intervals_below_minus_1um_deg": [
+      [
+        -67.92,
+        -63.91
+      ],
+      [
+        -63.63,
+        -61.66
+      ],
+      [
+        -60.83,
+        -59.41
+      ],
+      [
+        -58.45,
+        -54.95
+      ],
+      [
+        -54.86,
+        -53.84
+      ],
+      [
+        -53.66,
+        -52.74
+      ],
+      [
+        -51.23,
+        -50.56
+      ],
+      [
+        -50.01,
+        -49.49
+      ],
+      [
+        -48.7,
+        -48.47
+      ]
+    ],
+    "lifecycle_start_sweeps": {
+      "rear_start_sweep": {
+        "pitch_deg": [
+          -51.6,
+          -38.9
+        ],
+        "delta_min_um": -1.2617886536586687,
+        "delta_max_um": 2.7738068225195702,
+        "fraction_below_minus_1um": 0.1141732283464567
+      },
+      "front_start_sweep": {
+        "pitch_deg": [
+          -43.6,
+          -20.6
+        ],
+        "delta_min_um": -0.49744633240367264,
+        "delta_max_um": 3.4835573853430475,
+        "fraction_below_minus_1um": 0.0
+      }
+    }
+  },
+  "measured_vs_prediction": {
+    "max_abs_error_um": 6.071587677070056e-12,
+    "meaning": "delta(phi) computed from the foot mesh alone reproduces every saved stance mesh-minus-analytic offset"
+  },
+  "steady_cases": [
+    {
+      "source": "full",
+      "id": 18,
+      "type": "WALK",
+      "height_m": 0.08,
+      "advance_x_m": -0.01,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.4970899411781138,
+      "stance_pitch_range_deg": [
+        -45.33647153062091,
+        -12.680213321288191
+      ],
+      "pitch_interval_min_delta_um": -0.5731145010789973,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "full",
+      "id": 34,
+      "type": "WALK",
+      "height_m": 0.08,
+      "advance_x_m": 0.02,
+      "raw_classification": [
+        "SUPPORT_INVALID"
+      ],
+      "sampled_min_stance_delta_um": -0.5780743539858524,
+      "stance_pitch_range_deg": [
+        -48.13555350362504,
+        -10.129396325289216
+      ],
+      "pitch_interval_min_delta_um": -0.8037697096143631,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "full",
+      "id": 222,
+      "type": "WALK",
+      "height_m": 0.1,
+      "advance_x_m": -0.01,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.5317490117864171,
+      "stance_pitch_range_deg": [
+        -45.44362064586785,
+        -19.543046048696286
+      ],
+      "pitch_interval_min_delta_um": -0.5731137111483764,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "full",
+      "id": 226,
+      "type": "WALK",
+      "height_m": 0.1,
+      "advance_x_m": 0.04,
+      "raw_classification": [
+        "GROUND_COLLISION"
+      ],
+      "sampled_min_stance_delta_um": -1.1262157586268418,
+      "stance_pitch_range_deg": [
+        -51.13530999580981,
+        -15.06883413351584
+      ],
+      "pitch_interval_min_delta_um": -1.2617901210092153,
+      "pitch_interval_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "source": "full",
+      "id": 287,
+      "type": "WALK",
+      "height_m": 0.1,
+      "advance_x_m": 0.01,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.5730589468927461,
+      "stance_pitch_range_deg": [
+        -45.3800913260068,
+        -19.193731501851378
+      ],
+      "pitch_interval_min_delta_um": -0.5731145542465371,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "full",
+      "id": 416,
+      "type": "WALK",
+      "height_m": 0.12,
+      "advance_x_m": 0.02,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.8020770595525833,
+      "stance_pitch_range_deg": [
+        -47.390168912918384,
+        -27.0301099921074
+      ],
+      "pitch_interval_min_delta_um": -0.8037696378991599,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "full",
+      "id": 426,
+      "type": "WALK",
+      "height_m": 0.12,
+      "advance_x_m": -0.01,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.8020770595525833,
+      "stance_pitch_range_deg": [
+        -47.75318225911126,
+        -27.170879746438366
+      ],
+      "pitch_interval_min_delta_um": -0.8037689215711213,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "full",
+      "id": 925,
+      "type": "WALK",
+      "height_m": 0.15,
+      "advance_x_m": 0.02,
+      "raw_classification": [
+        "GROUND_COLLISION"
+      ],
+      "sampled_min_stance_delta_um": -1.7621454935232497,
+      "stance_pitch_range_deg": [
+        -56.197976257120565,
+        -40.6852159469344
+      ],
+      "pitch_interval_min_delta_um": -1.7621454935223824,
+      "pitch_interval_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "source": "full",
+      "id": 1040,
+      "type": "TROT",
+      "height_m": 0.08,
+      "advance_x_m": -0.04,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.799643700558246,
+      "stance_pitch_range_deg": [
+        -47.71703187310189,
+        -10.75841947736097
+      ],
+      "pitch_interval_min_delta_um": -0.8037684243109022,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "full",
+      "id": 1046,
+      "type": "TROT",
+      "height_m": 0.08,
+      "advance_x_m": 0.04,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.7996437005573787,
+      "stance_pitch_range_deg": [
+        -47.42134696305508,
+        -10.547694457313144
+      ],
+      "pitch_interval_min_delta_um": -0.8037693483928937,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "full",
+      "id": 1230,
+      "type": "TROT",
+      "height_m": 0.1,
+      "advance_x_m": -0.06,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.9440446572528405,
+      "stance_pitch_range_deg": [
+        -49.18448589904065,
+        -16.98044592722331
+      ],
+      "pitch_interval_min_delta_um": -1.0332376606005111,
+      "pitch_interval_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "source": "full",
+      "id": 1238,
+      "type": "TROT",
+      "height_m": 0.1,
+      "advance_x_m": 0.06,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.9440446572528405,
+      "stance_pitch_range_deg": [
+        -48.78498141742776,
+        -16.724158322903016
+      ],
+      "pitch_interval_min_delta_um": -1.0332391265528706,
+      "pitch_interval_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "source": "full",
+      "id": 1311,
+      "type": "TROT",
+      "height_m": 0.1,
+      "advance_x_m": 0.01,
+      "raw_classification": [
+        "CONTACT_INVALID"
+      ],
+      "sampled_min_stance_delta_um": -0.44168114236679823,
+      "stance_pitch_range_deg": [
+        -42.730989398108534,
+        -21.059285062246804
+      ],
+      "pitch_interval_min_delta_um": -0.44168114236853295,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "full",
+      "id": 1435,
+      "type": "TROT",
+      "height_m": 0.12,
+      "advance_x_m": -0.04,
+      "raw_classification": [
+        "GROUND_COLLISION"
+      ],
+      "sampled_min_stance_delta_um": -1.0090564609363528,
+      "stance_pitch_range_deg": [
+        -48.72275861660629,
+        -26.416516669365773
+      ],
+      "pitch_interval_min_delta_um": -1.0332386053170384,
+      "pitch_interval_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "source": "full",
+      "id": 1441,
+      "type": "TROT",
+      "height_m": 0.12,
+      "advance_x_m": 0.04,
+      "raw_classification": [
+        "GROUND_COLLISION"
+      ],
+      "sampled_min_stance_delta_um": -1.0090564609363528,
+      "stance_pitch_range_deg": [
+        -48.480160415930875,
+        -26.265110026492632
+      ],
+      "pitch_interval_min_delta_um": -1.0090564609363528,
+      "pitch_interval_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "source": "full",
+      "id": 1948,
+      "type": "TROT",
+      "height_m": 0.15,
+      "advance_x_m": 0.02,
+      "raw_classification": [
+        "GROUND_COLLISION"
+      ],
+      "sampled_min_stance_delta_um": -1.4873506791433788,
+      "stance_pitch_range_deg": [
+        -53.95437707089352,
+        -42.03120602885306
+      ],
+      "pitch_interval_min_delta_um": -1.4874788622429302,
+      "pitch_interval_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "source": "refi",
+      "id": 3012,
+      "type": "WALK",
+      "height_m": 0.08,
+      "advance_x_m": 0.015,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.5646118733312888,
+      "stance_pitch_range_deg": [
+        -45.92548517341641,
+        -11.396809348723044
+      ],
+      "pitch_interval_min_delta_um": -0.5731132821235052,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "refi",
+      "id": 3032,
+      "type": "WALK",
+      "height_m": 0.1,
+      "advance_x_m": -0.0125,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.6045690896907054,
+      "stance_pitch_range_deg": [
+        -45.979571587204425,
+        -19.188030347828015
+      ],
+      "pitch_interval_min_delta_um": -0.6045690896915729,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "refi",
+      "id": 3053,
+      "type": "WALK",
+      "height_m": 0.12,
+      "advance_x_m": -0.015,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.989153625483713,
+      "stance_pitch_range_deg": [
+        -48.72275861660629,
+        -26.573493579755738
+      ],
+      "pitch_interval_min_delta_um": -1.0332386053170384,
+      "pitch_interval_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "source": "refi",
+      "id": 3069,
+      "type": "TROT",
+      "height_m": 0.08,
+      "advance_x_m": -0.05,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.9974990564671354,
+      "stance_pitch_range_deg": [
+        -49.47963747125933,
+        -9.561188512978571
+      ],
+      "pitch_interval_min_delta_um": -1.0332393528007104,
+      "pitch_interval_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "source": "refi",
+      "id": 3084,
+      "type": "TROT",
+      "height_m": 0.08,
+      "advance_x_m": 0.05,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.9720192983104712,
+      "stance_pitch_range_deg": [
+        -49.114062245745814,
+        -9.305608467932476
+      ],
+      "pitch_interval_min_delta_um": -1.0332384573173703,
+      "pitch_interval_check": "FAIL_BELOW_-1um"
+    },
+    {
+      "source": "refi",
+      "id": 3092,
+      "type": "TROT",
+      "height_m": 0.1,
+      "advance_x_m": -0.045,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.9440446572528405,
+      "stance_pitch_range_deg": [
+        -48.38514166292344,
+        -17.433839433247986
+      ],
+      "pitch_interval_min_delta_um": -0.944044657249371,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "refi",
+      "id": 3105,
+      "type": "TROT",
+      "height_m": 0.1,
+      "advance_x_m": 0.045,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.8037130770112422,
+      "stance_pitch_range_deg": [
+        -48.08504686692158,
+        -17.238770059177583
+      ],
+      "pitch_interval_min_delta_um": -0.8037684784967247,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "refi",
+      "id": 3116,
+      "type": "TROT",
+      "height_m": 0.12,
+      "advance_x_m": -0.03,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.8013003939266738,
+      "stance_pitch_range_deg": [
+        -48.237696554092274,
+        -26.683402959616643
+      ],
+      "pitch_interval_min_delta_um": -0.8037698462966952,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "refi",
+      "id": 3125,
+      "type": "TROT",
+      "height_m": 0.12,
+      "advance_x_m": 0.03,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.8013003939266738,
+      "stance_pitch_range_deg": [
+        -48.05593837040425,
+        -26.568724234171025
+      ],
+      "pitch_interval_min_delta_um": -0.8037698847711272,
+      "pitch_interval_check": "OK"
+    },
+    {
+      "source": "refi",
+      "id": 4000,
+      "type": "WALK",
+      "height_m": 0.08,
+      "advance_x_m": 0.01,
+      "raw_classification": [
+        "KINEMATICALLY_VALID"
+      ],
+      "sampled_min_stance_delta_um": -0.4970899411781138,
+      "stance_pitch_range_deg": [
+        -44.99846126640306,
+        -12.262211169680517
+      ],
+      "pitch_interval_min_delta_um": -0.5731145111299851,
+      "pitch_interval_check": "OK"
+    }
+  ],
+  "steady_sampled_pass_but_pitch_interval_fail": [
+    1230,
+    1238,
+    3053,
+    3069,
+    3084
+  ],
+  "lifecycle": [
+    {
+      "type": "WALK",
+      "failure_counts": {
+        "GROUND_PENETRATION": 8,
+        "UNDECLARED_GROUND_CONTACT": 1
+      },
+      "rows": [
+        {
+          "time_s": 0.15000000000000002,
+          "state": 5,
+          "leg": "lf",
+          "role": "STANCE",
+          "analytic_contact_z_um": -8.673617379884035e-12,
+          "mesh_min_z_um": -0.4316235062947274,
+          "mesh_minus_analytic_um": -0.4316235062860538,
+          "pitch_deg": -42.70769046638812,
+          "predicted_delta_um": -0.4316235062834517,
+          "failure": []
+        },
+        {
+          "time_s": 0.15000000000000002,
+          "state": 5,
+          "leg": "rf",
+          "role": "STANCE",
+          "analytic_contact_z_um": -8.673617379884035e-12,
+          "mesh_min_z_um": -0.4316235062947274,
+          "mesh_minus_analytic_um": -0.4316235062860538,
+          "pitch_deg": -42.70769046638812,
+          "predicted_delta_um": -0.4316235062834517,
+          "failure": []
+        },
+        {
+          "time_s": 0.15000000000000002,
+          "state": 5,
+          "leg": "rh",
+          "role": "STANCE",
+          "analytic_contact_z_um": -1.734723475976807e-12,
+          "mesh_min_z_um": -1.216327005820056,
+          "mesh_minus_analytic_um": -1.216327005818321,
+          "pitch_deg": -51.03243473448249,
+          "predicted_delta_um": -1.2163270058165865,
+          "failure": [
+            "GROUND_PENETRATION:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 0.15000000000000002,
+          "state": 5,
+          "leg": "lh",
+          "role": "STANCE",
+          "analytic_contact_z_um": -1.734723475976807e-12,
+          "mesh_min_z_um": -1.216327005820056,
+          "mesh_minus_analytic_um": -1.216327005818321,
+          "pitch_deg": -51.03243473448249,
+          "predicted_delta_um": -1.2163270058165865,
+          "failure": [
+            "GROUND_PENETRATION:lh_foot_link"
+          ]
+        },
+        {
+          "time_s": 0.25,
+          "state": 5,
+          "leg": "rh",
+          "role": "STANCE",
+          "analytic_contact_z_um": -1.214306433183765e-11,
+          "mesh_min_z_um": -1.1438669115342026,
+          "mesh_minus_analytic_um": -1.1438669115220597,
+          "pitch_deg": -49.6944814294028,
+          "predicted_delta_um": -1.1438669115237943,
+          "failure": [
+            "GROUND_PENETRATION:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 0.25,
+          "state": 5,
+          "leg": "lh",
+          "role": "STANCE",
+          "analytic_contact_z_um": -1.214306433183765e-11,
+          "mesh_min_z_um": -1.1438669115359374,
+          "mesh_minus_analytic_um": -1.1438669115237943,
+          "pitch_deg": -49.6944814294028,
+          "predicted_delta_um": -1.1438669115237943,
+          "failure": [
+            "GROUND_PENETRATION:lh_foot_link"
+          ]
+        },
+        {
+          "time_s": 4.25,
+          "state": 4,
+          "leg": "rh",
+          "role": "SWING",
+          "analytic_contact_z_um": 0.08992801552205887,
+          "mesh_min_z_um": 0.0045193144816713104,
+          "mesh_minus_analytic_um": -0.08540870104038756,
+          "pitch_deg": -39.25168195724445,
+          "predicted_delta_um": -0.08540870104038756,
+          "failure": [
+            "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 4.25,
+          "state": 4,
+          "leg": "lh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 3.469446951953614e-12,
+          "mesh_min_z_um": -0.5282355867355232,
+          "mesh_minus_analytic_um": -0.5282355867389926,
+          "pitch_deg": -43.827627101280584,
+          "predicted_delta_um": -0.5282355867372579,
+          "failure": []
+        },
+        {
+          "time_s": 6.75,
+          "state": 4,
+          "leg": "rh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 1.3877787807814457e-11,
+          "mesh_min_z_um": -1.1438669115073143,
+          "mesh_minus_analytic_um": -1.1438669115211921,
+          "pitch_deg": -49.694481429402806,
+          "predicted_delta_um": -1.1438669115203248,
+          "failure": [
+            "GROUND_PENETRATION:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 6.75,
+          "state": 4,
+          "leg": "lh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 1.3877787807814457e-11,
+          "mesh_min_z_um": -1.1438669115073143,
+          "mesh_minus_analytic_um": -1.1438669115211921,
+          "pitch_deg": -49.694481429402806,
+          "predicted_delta_um": -1.1438669115203248,
+          "failure": [
+            "GROUND_PENETRATION:lh_foot_link"
+          ]
+        },
+        {
+          "time_s": 6.8500000000000005,
+          "state": 4,
+          "leg": "lf",
+          "role": "STANCE",
+          "analytic_contact_z_um": -8.673617379884035e-12,
+          "mesh_min_z_um": -0.4316235062947274,
+          "mesh_minus_analytic_um": -0.4316235062860538,
+          "pitch_deg": -42.70769046638812,
+          "predicted_delta_um": -0.4316235062834517,
+          "failure": []
+        },
+        {
+          "time_s": 6.8500000000000005,
+          "state": 4,
+          "leg": "rf",
+          "role": "STANCE",
+          "analytic_contact_z_um": -8.673617379884035e-12,
+          "mesh_min_z_um": -0.4316235062947274,
+          "mesh_minus_analytic_um": -0.4316235062860538,
+          "pitch_deg": -42.70769046638812,
+          "predicted_delta_um": -0.4316235062834517,
+          "failure": []
+        },
+        {
+          "time_s": 6.8500000000000005,
+          "state": 4,
+          "leg": "rh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 1.0408340855860843e-11,
+          "mesh_min_z_um": -1.216327005807913,
+          "mesh_minus_analytic_um": -1.2163270058183213,
+          "pitch_deg": -51.03243473448249,
+          "predicted_delta_um": -1.2163270058165865,
+          "failure": [
+            "GROUND_PENETRATION:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 6.8500000000000005,
+          "state": 4,
+          "leg": "lh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 1.0408340855860843e-11,
+          "mesh_min_z_um": -1.216327005807913,
+          "mesh_minus_analytic_um": -1.2163270058183213,
+          "pitch_deg": -51.03243473448249,
+          "predicted_delta_um": -1.2163270058165865,
+          "failure": [
+            "GROUND_PENETRATION:lh_foot_link"
+          ]
+        }
+      ],
+      "worst_mesh_ground_um": -1.216327005820056
+    },
+    {
+      "type": "TROT",
+      "failure_counts": {
+        "GROUND_PENETRATION": 12,
+        "UNDECLARED_GROUND_CONTACT": 7
+      },
+      "rows": [
+        {
+          "time_s": 0.15000000000000002,
+          "state": 5,
+          "leg": "lf",
+          "role": "STANCE",
+          "analytic_contact_z_um": -1.3877787807814457e-11,
+          "mesh_min_z_um": -0.4433455816675938,
+          "mesh_minus_analytic_um": -0.443345581653716,
+          "pitch_deg": -42.73550554949,
+          "predicted_delta_um": -0.44334558165111393,
+          "failure": []
+        },
+        {
+          "time_s": 0.15000000000000002,
+          "state": 5,
+          "leg": "rf",
+          "role": "STANCE",
+          "analytic_contact_z_um": -1.3877787807814457e-11,
+          "mesh_min_z_um": -0.4433455816675938,
+          "mesh_minus_analytic_um": -0.443345581653716,
+          "pitch_deg": -42.73550554949,
+          "predicted_delta_um": -0.44334558165111393,
+          "failure": []
+        },
+        {
+          "time_s": 0.15000000000000002,
+          "state": 5,
+          "leg": "rh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 0.0,
+          "mesh_min_z_um": -1.1830004575108521,
+          "mesh_minus_analytic_um": -1.1830004575108521,
+          "pitch_deg": -51.07722283228135,
+          "predicted_delta_um": -1.1830004575108521,
+          "failure": [
+            "GROUND_PENETRATION:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 0.15000000000000002,
+          "state": 5,
+          "leg": "lh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 0.0,
+          "mesh_min_z_um": -1.1830004575108521,
+          "mesh_minus_analytic_um": -1.1830004575108521,
+          "pitch_deg": -51.07722283228135,
+          "predicted_delta_um": -1.1830004575108521,
+          "failure": [
+            "GROUND_PENETRATION:lh_foot_link"
+          ]
+        },
+        {
+          "time_s": 0.2,
+          "state": 5,
+          "leg": "lf",
+          "role": "STANCE",
+          "analytic_contact_z_um": 3.469446951953614e-12,
+          "mesh_min_z_um": -0.26104777144835345,
+          "mesh_minus_analytic_um": -0.2610477714518229,
+          "pitch_deg": -41.84870030679436,
+          "predicted_delta_um": -0.26104777145138924,
+          "failure": []
+        },
+        {
+          "time_s": 0.2,
+          "state": 5,
+          "leg": "rf",
+          "role": "STANCE",
+          "analytic_contact_z_um": 3.469446951953614e-12,
+          "mesh_min_z_um": -0.26104777144835345,
+          "mesh_minus_analytic_um": -0.2610477714518229,
+          "pitch_deg": -41.84870030679436,
+          "predicted_delta_um": -0.26104777145138924,
+          "failure": []
+        },
+        {
+          "time_s": 0.2,
+          "state": 5,
+          "leg": "rh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 6.938893903907228e-12,
+          "mesh_min_z_um": -1.0361380691110977,
+          "mesh_minus_analytic_um": -1.0361380691180366,
+          "pitch_deg": -50.57558528899026,
+          "predicted_delta_um": -1.0361380691180366,
+          "failure": [
+            "GROUND_PENETRATION:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 0.2,
+          "state": 5,
+          "leg": "lh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 6.938893903907228e-12,
+          "mesh_min_z_um": -1.0361380691110977,
+          "mesh_minus_analytic_um": -1.0361380691180366,
+          "pitch_deg": -50.57558528899026,
+          "predicted_delta_um": -1.0361380691180366,
+          "failure": [
+            "GROUND_PENETRATION:lh_foot_link"
+          ]
+        },
+        {
+          "time_s": 0.25,
+          "state": 5,
+          "leg": "rh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 8.673617379884035e-12,
+          "mesh_min_z_um": -1.1211686257468072,
+          "mesh_minus_analytic_um": -1.1211686257554807,
+          "pitch_deg": -49.87100412918807,
+          "predicted_delta_um": -1.121168625755481,
+          "failure": [
+            "GROUND_PENETRATION:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 0.25,
+          "state": 5,
+          "leg": "lh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 8.673617379884035e-12,
+          "mesh_min_z_um": -1.1211686257450726,
+          "mesh_minus_analytic_um": -1.121168625753746,
+          "pitch_deg": -49.87100412918807,
+          "predicted_delta_um": -1.121168625755481,
+          "failure": [
+            "GROUND_PENETRATION:lh_foot_link"
+          ]
+        },
+        {
+          "time_s": 5.65,
+          "state": 4,
+          "leg": "rh",
+          "role": "SWING",
+          "analytic_contact_z_um": 0.5175875188376255,
+          "mesh_min_z_um": 0.8330527141316678,
+          "mesh_minus_analytic_um": 0.31546519529404227,
+          "pitch_deg": -41.12266619315396,
+          "predicted_delta_um": 0.3154651952927412,
+          "failure": [
+            "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 5.7,
+          "state": 4,
+          "leg": "rh",
+          "role": "SWING",
+          "analytic_contact_z_um": 0.09095273756018485,
+          "mesh_min_z_um": 0.3846894337262291,
+          "mesh_minus_analytic_um": 0.29373669616604425,
+          "pitch_deg": -41.13163985634614,
+          "predicted_delta_um": 0.29373669616430953,
+          "failure": [
+            "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 5.75,
+          "state": 4,
+          "leg": "rh",
+          "role": "SWING",
+          "analytic_contact_z_um": 0.011329818278005277,
+          "mesh_min_z_um": 0.2915143206315765,
+          "mesh_minus_analytic_um": 0.28018450235357123,
+          "pitch_deg": -41.137314692538986,
+          "predicted_delta_um": 0.28018450235270387,
+          "failure": [
+            "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 5.800000000000001,
+          "state": 4,
+          "leg": "rh",
+          "role": "SWING",
+          "analytic_contact_z_um": 0.0008606495030538674,
+          "mesh_min_z_um": 0.2733512868501563,
+          "mesh_minus_analytic_um": 0.27249063734710244,
+          "pitch_deg": -41.14056397109502,
+          "predicted_delta_um": 0.27249063734580137,
+          "failure": [
+            "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 5.8500000000000005,
+          "state": 4,
+          "leg": "rh",
+          "role": "SWING",
+          "analytic_contact_z_um": 3.0027319172787337e-05,
+          "mesh_min_z_um": 0.2687418906490574,
+          "mesh_minus_analytic_um": 0.2687118633298846,
+          "pitch_deg": -41.142167282163065,
+          "predicted_delta_um": 0.2687118633298846,
+          "failure": [
+            "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 5.9,
+          "state": 4,
+          "leg": "rh",
+          "role": "SWING",
+          "analytic_contact_z_um": 2.542202559574491e-07,
+          "mesh_min_z_um": 0.267256522376233,
+          "mesh_minus_analytic_um": 0.26725626815597703,
+          "pitch_deg": -41.14278620676708,
+          "predicted_delta_um": 0.26725626815597703,
+          "failure": [
+            "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 5.95,
+          "state": 4,
+          "leg": "rh",
+          "role": "SWING",
+          "analytic_contact_z_um": 7.632783294297951e-11,
+          "mesh_min_z_um": 0.26690804856175854,
+          "mesh_minus_analytic_um": 0.2669080484854307,
+          "pitch_deg": -41.14293438077544,
+          "predicted_delta_um": 0.26690804848586436,
+          "failure": [
+            "UNDECLARED_GROUND_CONTACT:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 6.75,
+          "state": 4,
+          "leg": "rh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 2.0816681711721685e-11,
+          "mesh_min_z_um": -1.1211686257346642,
+          "mesh_minus_analytic_um": -1.121168625755481,
+          "pitch_deg": -49.87100412918809,
+          "predicted_delta_um": -1.121168625755481,
+          "failure": [
+            "GROUND_PENETRATION:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 6.75,
+          "state": 4,
+          "leg": "lh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 2.0816681711721685e-11,
+          "mesh_min_z_um": -1.1211686257346642,
+          "mesh_minus_analytic_um": -1.121168625755481,
+          "pitch_deg": -49.87100412918809,
+          "predicted_delta_um": -1.121168625755481,
+          "failure": [
+            "GROUND_PENETRATION:lh_foot_link"
+          ]
+        },
+        {
+          "time_s": 6.800000000000001,
+          "state": 4,
+          "leg": "lf",
+          "role": "STANCE",
+          "analytic_contact_z_um": 3.469446951953614e-12,
+          "mesh_min_z_um": -0.26104777144835345,
+          "mesh_minus_analytic_um": -0.2610477714518229,
+          "pitch_deg": -41.84870030679436,
+          "predicted_delta_um": -0.26104777145138924,
+          "failure": []
+        },
+        {
+          "time_s": 6.800000000000001,
+          "state": 4,
+          "leg": "rf",
+          "role": "STANCE",
+          "analytic_contact_z_um": 3.469446951953614e-12,
+          "mesh_min_z_um": -0.26104777144835345,
+          "mesh_minus_analytic_um": -0.2610477714518229,
+          "pitch_deg": -41.84870030679436,
+          "predicted_delta_um": -0.26104777145138924,
+          "failure": []
+        },
+        {
+          "time_s": 6.800000000000001,
+          "state": 4,
+          "leg": "rh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 6.938893903907228e-12,
+          "mesh_min_z_um": -1.0361380691110977,
+          "mesh_minus_analytic_um": -1.0361380691180366,
+          "pitch_deg": -50.575585288990276,
+          "predicted_delta_um": -1.0361380691163018,
+          "failure": [
+            "GROUND_PENETRATION:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 6.800000000000001,
+          "state": 4,
+          "leg": "lh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 6.938893903907228e-12,
+          "mesh_min_z_um": -1.0361380691110977,
+          "mesh_minus_analytic_um": -1.0361380691180366,
+          "pitch_deg": -50.575585288990276,
+          "predicted_delta_um": -1.0361380691163018,
+          "failure": [
+            "GROUND_PENETRATION:lh_foot_link"
+          ]
+        },
+        {
+          "time_s": 6.8500000000000005,
+          "state": 4,
+          "leg": "lf",
+          "role": "STANCE",
+          "analytic_contact_z_um": -1.3877787807814457e-11,
+          "mesh_min_z_um": -0.4433455816675938,
+          "mesh_minus_analytic_um": -0.443345581653716,
+          "pitch_deg": -42.73550554949,
+          "predicted_delta_um": -0.44334558165111393,
+          "failure": []
+        },
+        {
+          "time_s": 6.8500000000000005,
+          "state": 4,
+          "leg": "rf",
+          "role": "STANCE",
+          "analytic_contact_z_um": -1.3877787807814457e-11,
+          "mesh_min_z_um": -0.4433455816675938,
+          "mesh_minus_analytic_um": -0.443345581653716,
+          "pitch_deg": -42.73550554949,
+          "predicted_delta_um": -0.44334558165111393,
+          "failure": []
+        },
+        {
+          "time_s": 6.8500000000000005,
+          "state": 4,
+          "leg": "rh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 0.0,
+          "mesh_min_z_um": -1.1830004575125868,
+          "mesh_minus_analytic_um": -1.1830004575125868,
+          "pitch_deg": -51.077222832281365,
+          "predicted_delta_um": -1.1830004575125868,
+          "failure": [
+            "GROUND_PENETRATION:rh_foot_link"
+          ]
+        },
+        {
+          "time_s": 6.8500000000000005,
+          "state": 4,
+          "leg": "lh",
+          "role": "STANCE",
+          "analytic_contact_z_um": 0.0,
+          "mesh_min_z_um": -1.1830004575125868,
+          "mesh_minus_analytic_um": -1.1830004575125868,
+          "pitch_deg": -51.077222832281365,
+          "predicted_delta_um": -1.1830004575125868,
+          "failure": [
+            "GROUND_PENETRATION:lh_foot_link"
+          ]
+        }
+      ],
+      "worst_mesh_ground_um": -1.1830004575125868
+    }
+  ]
+}
