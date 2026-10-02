@@ -1,0 +1,214 @@
+{
+  "purpose": "Compare contact-model alternatives on the exact G4 lifecycle foot motions (WALK 357 and TROT 61, 5 ms)",
+  "registered_offset_um": 5.775205430843154,
+  "registered_radius_change_nm": 0.6152998267144882,
+  "circumscribing_radius_increase_um": 5.775041939201642,
+  "alternatives": {
+    "WALK_357": {
+      "A0_G2_nominal_strict_mesh_test": {
+        "reference_shift_um": [
+          0.0,
+          0.0
+        ],
+        "mesh_minus_reference_um_all": [
+          -1.260162506476481,
+          5.483622815534092
+        ],
+        "mesh_minus_reference_um_stance": [
+          -1.260162506476481,
+          5.3493904122702
+        ],
+        "max_reference_rate_um_per_s": 0.0,
+        "penetration_samples_below_minus_1um": 76,
+        "role": "reproduces the G4 rejection"
+      },
+      "A1_registered_reference": {
+        "reference_shift_um": [
+          -1.3243580499401735,
+          2.7210446155378722
+        ],
+        "mesh_minus_reference_um_all": [
+          8.754783685971379e-05,
+          3.021274141579132
+        ],
+        "mesh_minus_reference_um_stance": [
+          8.754783685971379e-05,
+          3.021274141579132
+        ],
+        "max_reference_rate_um_per_s": 18.830263742240653,
+        "penetration_samples_below_minus_1um": 0,
+        "role": "candidate G2.1 contract"
+      },
+      "A2_analytic_tread_authority": {
+        "reference_shift_um": [
+          0.0,
+          0.0
+        ],
+        "mesh_minus_reference_um_all": [
+          -1.260162506476481,
+          5.483622815534092
+        ],
+        "mesh_minus_reference_um_stance": [
+          -1.260162506476481,
+          5.3493904122702
+        ],
+        "max_reference_rate_um_per_s": 0.0,
+        "penetration_samples_below_minus_1um": 76,
+        "declared_uncertainty_um": 5.775205430843154,
+        "role": "policy only, G2 constants unchanged"
+      },
+      "A3_exact_mesh_support_function": {
+        "reference_shift_um": [
+          -1.260162506476481,
+          5.483622815534092
+        ],
+        "mesh_minus_reference_um_all": [
+          0.0,
+          0.0
+        ],
+        "mesh_minus_reference_um_stance": [
+          0.0,
+          0.0
+        ],
+        "max_reference_rate_um_per_s": 454.1534235728839,
+        "penetration_samples_below_minus_1um": 0,
+        "role": "mesh is the reference"
+      },
+      "A4_circumscribing_cylinder": {
+        "reference_shift_um": [
+          -5.775041939201642,
+          -5.775041939201642
+        ],
+        "mesh_minus_reference_um_all": [
+          4.514879432725161,
+          11.258664754735733
+        ],
+        "mesh_minus_reference_um_stance": [
+          4.514879432725161,
+          11.124432351471842
+        ],
+        "max_reference_rate_um_per_s": 0.0,
+        "penetration_samples_below_minus_1um": 0,
+        "radius_increase_um": 5.775041939201642,
+        "role": "conservative envelope"
+      },
+      "A5_widen_tolerance": {
+        "required_tolerance_um": 1.260162506476481,
+        "role": "REJECTED: arbitrary, would still be sampling dependent"
+      }
+    },
+    "TROT_61": {
+      "A0_G2_nominal_strict_mesh_test": {
+        "reference_shift_um": [
+          0.0,
+          0.0
+        ],
+        "mesh_minus_reference_um_all": [
+          -1.2613397133050264,
+          5.502558039740396
+        ],
+        "mesh_minus_reference_um_stance": [
+          -1.2613397133050264,
+          5.502558039740396
+        ],
+        "max_reference_rate_um_per_s": 0.0,
+        "penetration_samples_below_minus_1um": 99,
+        "role": "reproduces the G4 rejection"
+      },
+      "A1_registered_reference": {
+        "reference_shift_um": [
+          -1.3243580499401735,
+          2.691657158694402
+        ],
+        "mesh_minus_reference_um_all": [
+          0.00011321335886010919,
+          3.020469132907988
+        ],
+        "mesh_minus_reference_um_stance": [
+          0.00011321335886010919,
+          3.020469132907988
+        ],
+        "max_reference_rate_um_per_s": 16.217994438792584,
+        "penetration_samples_below_minus_1um": 0,
+        "role": "candidate G2.1 contract"
+      },
+      "A2_analytic_tread_authority": {
+        "reference_shift_um": [
+          0.0,
+          0.0
+        ],
+        "mesh_minus_reference_um_all": [
+          -1.2613397133050264,
+          5.502558039740396
+        ],
+        "mesh_minus_reference_um_stance": [
+          -1.2613397133050264,
+          5.502558039740396
+        ],
+        "max_reference_rate_um_per_s": 0.0,
+        "penetration_samples_below_minus_1um": 99,
+        "declared_uncertainty_um": 5.775205430843154,
+        "role": "policy only, G2 constants unchanged"
+      },
+      "A3_exact_mesh_support_function": {
+        "reference_shift_um": [
+          -1.2613397133050264,
+          5.502558039740396
+        ],
+        "mesh_minus_reference_um_all": [
+          0.0,
+          0.0
+        ],
+        "mesh_minus_reference_um_stance": [
+          0.0,
+          0.0
+        ],
+        "max_reference_rate_um_per_s": 488.1218181328889,
+        "penetration_samples_below_minus_1um": 0,
+        "role": "mesh is the reference"
+      },
+      "A4_circumscribing_cylinder": {
+        "reference_shift_um": [
+          -5.775041939201642,
+          -5.775041939201642
+        ],
+        "mesh_minus_reference_um_all": [
+          4.5137022258966155,
+          11.277599978942039
+        ],
+        "mesh_minus_reference_um_stance": [
+          4.5137022258966155,
+          11.277599978942039
+        ],
+        "max_reference_rate_um_per_s": 0.0,
+        "penetration_samples_below_minus_1um": 0,
+        "radius_increase_um": 5.775041939201642,
+        "role": "conservative envelope"
+      },
+      "A5_widen_tolerance": {
+        "required_tolerance_um": 1.2613397133050264,
+        "role": "REJECTED: arbitrary, would still be sampling dependent"
+      }
+    },
+    "A1_registered_reference_impact": {
+      "max_abs_delta_q_rad": 4.638668873013785e-05,
+      "max_abs_delta_qdot_rad_s": 8.994558215735999e-05,
+      "max_abs_delta_qddot_rad_s2": 0.0024716949464929226,
+      "relative_qdot_change": 2.8463011907824426e-05,
+      "relative_qddot_change": 1.301813360194886e-05,
+      "canonical_stand_delta_q_rad": 4.518545773662952e-05,
+      "newton_seconds_per_frame": 0.013597242156579441,
+      "contact_point_shift_um_bound": 5.775820730669868,
+      "files_embedding_G2_radius": [
+        "MATDOG_Controller/scripts/tests/test_contact_stand_oracle.py",
+        "MATDOG_Controller/src/motion/CONTACT_STAND.md",
+        "MATDOG_Controller/src/motion/FootContactData.h",
+        "Matdog_Core/contact_audit/alternatives.py",
+        "Matdog_Core/contact_audit/test_contact_audit.py",
+        "Matdog_Core/gait_audit/contact_discrepancy.py",
+        "Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml",
+        "Matdog_Core/kinematics/tests/test_matdog_foot_contact.py"
+      ]
+    }
+  }
+}

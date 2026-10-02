@@ -1,0 +1,254 @@
+{
+  "purpose": "Per-foot mesh-minus-analytic height over each G4.1 lifecycle (unchanged G2 reference, collision mesh)",
+  "note": "identical collision geometry in foot_link; differences between feet are only the pitch they pass through",
+  "cases": {
+    "WALK_357": {
+      "lf": {
+        "pitch_deg": [
+          -43.51338063706547,
+          -10.48713517489757
+        ],
+        "mesh_minus_analytic_um_all": [
+          -0.4970912043083392,
+          5.483622815534092
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -0.4970912043083392,
+          4.94969326573537
+        ],
+        "samples_below_minus_1um": 0
+      },
+      "rf": {
+        "pitch_deg": [
+          -43.51338063706547,
+          -10.14836487099992
+        ],
+        "mesh_minus_analytic_um_all": [
+          -0.4970912043083392,
+          5.3493904122702
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -0.4970912043083392,
+          5.3493904122702
+        ],
+        "samples_below_minus_1um": 0
+      },
+      "rh": {
+        "pitch_deg": [
+          -51.515539866351276,
+          -33.6085364801744
+        ],
+        "mesh_minus_analytic_um_all": [
+          -1.260162506476481,
+          2.7969843470806306
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -1.260162506476481,
+          2.7969843470806306
+        ],
+        "samples_below_minus_1um": 38
+      },
+      "lh": {
+        "pitch_deg": [
+          -51.515539866351276,
+          -35.818431434910906
+        ],
+        "mesh_minus_analytic_um_all": [
+          -1.260162506476481,
+          2.7889348709932147
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -1.260162506476481,
+          2.7889348709932147
+        ],
+        "samples_below_minus_1um": 38
+      }
+    },
+    "WALK_287": {
+      "lf": {
+        "pitch_deg": [
+          -43.51338063706547,
+          -16.995422466040022
+        ],
+        "mesh_minus_analytic_um_all": [
+          -0.49746705993794493,
+          4.791025582972022
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -0.49746705993794493,
+          4.791025582972022
+        ],
+        "samples_below_minus_1um": 0
+      },
+      "rf": {
+        "pitch_deg": [
+          -43.51338063706547,
+          -16.727769173650877
+        ],
+        "mesh_minus_analytic_um_all": [
+          -0.49746705993794493,
+          4.8127263207499436
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -0.49746705993794493,
+          4.791018804630245
+        ],
+        "samples_below_minus_1um": 0
+      },
+      "rh": {
+        "pitch_deg": [
+          -51.515539866351276,
+          -35.212347671236394
+        ],
+        "mesh_minus_analytic_um_all": [
+          -1.2617901400530096,
+          2.7339150462935002
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -1.2617901400530096,
+          2.7339150462935002
+        ],
+        "samples_below_minus_1um": 44
+      },
+      "lh": {
+        "pitch_deg": [
+          -51.515539866351276,
+          -37.10280253964535
+        ],
+        "mesh_minus_analytic_um_all": [
+          -1.2617901400530096,
+          2.7625081607061257
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -1.2617901400530096,
+          2.7625081607061257
+        ],
+        "samples_below_minus_1um": 44
+      }
+    },
+    "TROT_61": {
+      "lf": {
+        "pitch_deg": [
+          -43.51338063706547,
+          -11.262156674452374
+        ],
+        "mesh_minus_analytic_um_all": [
+          -0.49740577361817584,
+          5.488080445816348
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -0.49740577361817584,
+          5.488080445816348
+        ],
+        "samples_below_minus_1um": 0
+      },
+      "rf": {
+        "pitch_deg": [
+          -43.51338063706547,
+          -10.478420851684675
+        ],
+        "mesh_minus_analytic_um_all": [
+          -0.49740577361817584,
+          5.502558039740396
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -0.49740577361817584,
+          5.502558039740396
+        ],
+        "samples_below_minus_1um": 0
+      },
+      "rh": {
+        "pitch_deg": [
+          -51.515539866351276,
+          -35.35851117548368
+        ],
+        "mesh_minus_analytic_um_all": [
+          -1.2613397133050264,
+          2.796190520739164
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -1.2613397133050264,
+          2.796190520739164
+        ],
+        "samples_below_minus_1um": 59
+      },
+      "lh": {
+        "pitch_deg": [
+          -51.515539866351276,
+          -34.10401542339736
+        ],
+        "mesh_minus_analytic_um_all": [
+          -1.2613397133050264,
+          2.796190520739164
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -1.2613397133050264,
+          2.796190520739164
+        ],
+        "samples_below_minus_1um": 40
+      }
+    },
+    "TROT_309": {
+      "lf": {
+        "pitch_deg": [
+          -43.51338063706547,
+          -25.021726633206644
+        ],
+        "mesh_minus_analytic_um_all": [
+          -0.4968778346600006,
+          2.5297075755895126
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -0.4968778346600006,
+          2.5297075755895126
+        ],
+        "samples_below_minus_1um": 0
+      },
+      "rf": {
+        "pitch_deg": [
+          -43.51338063706547,
+          -24.281500238690167
+        ],
+        "mesh_minus_analytic_um_all": [
+          -0.4968778346600006,
+          3.4621545040251083
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -0.4968778346600006,
+          2.5297075755895126
+        ],
+        "samples_below_minus_1um": 0
+      },
+      "rh": {
+        "pitch_deg": [
+          -51.515539866351276,
+          -40.01655926291985
+        ],
+        "mesh_minus_analytic_um_all": [
+          -1.2611630684725843,
+          2.743353542942681
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -1.2611630684725843,
+          2.36604609687302
+        ],
+        "samples_below_minus_1um": 93
+      },
+      "lh": {
+        "pitch_deg": [
+          -51.515539866351276,
+          -38.679016497523
+        ],
+        "mesh_minus_analytic_um_all": [
+          -1.2611630684725843,
+          2.791686581564423
+        ],
+        "mesh_minus_analytic_um_stance": [
+          -1.2611630684725843,
+          2.791686581564423
+        ],
+        "samples_below_minus_1um": 62
+      }
+    }
+  }
+}

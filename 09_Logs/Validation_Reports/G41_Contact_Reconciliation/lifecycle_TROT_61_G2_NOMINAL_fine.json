@@ -1,0 +1,162 @@
+{
+  "name": "TROT_61",
+  "variant": "G2_NOMINAL",
+  "kind": "TROT",
+  "dt_s": 0.0005,
+  "samples": 14001,
+  "seconds": 678.2,
+  "parameters": [
+    1.0,
+    0.08,
+    0.01,
+    0.8,
+    0.02,
+    0.0,
+    0.0,
+    0.0,
+    10000.0
+  ],
+  "terminal": {
+    "max_contact_difference_in_body_frame_m": 0.0,
+    "max_joint_difference_rad": 0.0,
+    "body_height_difference_m": 0.0,
+    "final_state": "STAND",
+    "final_max_abs_qdot": 0.0,
+    "final_max_abs_qddot": 0.0,
+    "start_state": "GAIT_START",
+    "body_travel_x_m": 0.06
+  },
+  "verification": {
+    "joint_limit_margin": {
+      "sampled_min_rad": 0.3049188401684514,
+      "certified_lower_bound_rad": 0.3049146910371652,
+      "q_second_difference_bound": 132.77220115881505,
+      "status": "CONTINUOUSLY_VERIFIED_BOUNDED"
+    },
+    "ik_branch": {
+      "changes_at_samples": 0,
+      "max_joint_step_rad": 0.001688097704251268,
+      "status": "CONTINUOUSLY_VERIFIED_BOUNDED",
+      "note": "joint steps are small against the elbow/hip branch separation; branch identity is continuous along the path"
+    },
+    "derivatives": {
+      "max_abs_qdot_rad_s": 3.376227345318011,
+      "max_abs_qddot_rad_s2": 88.51744146199302,
+      "max_qdot_step": 0.04425754240019075,
+      "max_qddot_step": 3.4528687286905164,
+      "finite": true,
+      "status": "SAMPLED_ONLY"
+    },
+    "tread_analytic_stance_exact": {
+      "max_abs_z_m": 5.724587470723463e-17,
+      "status": "CONTINUOUSLY_VERIFIED_ANALYTIC",
+      "note": "world-locked anchor at z = 0; IK residual is the evaluated floor, the analytic IK has no interior error"
+    },
+    "tread_analytic_swing_nonnegative": {
+      "status": "CONTINUOUSLY_VERIFIED_ANALYTIC",
+      "closed_form": "z(u) = 64 h u^3 (1-u)^3 >= 0 on [0,1], zero only at lift-off and touchdown",
+      "sampled_min_swing_z_m": -2.6020852139652106e-17
+    },
+    "tread_mesh_vs_reference": {
+      "sampled_min_um": -1.2617758473158769,
+      "all_pitch_exact_lower_bound_um": -5.775041939201642,
+      "declared_uncertainty_um": 5.776205430843154,
+      "scope": "axis tilt = 0 (pure fore/aft planar gait), any foot pitch",
+      "status": "CONTINUOUSLY_VERIFIED_ANALYTIC"
+    },
+    "nonfoot_ground_clearance": {
+      "sampled_min_m": 0.0024700929121531517,
+      "certified_lower_bound_m": 0.0024605480144605195,
+      "vertical_acceleration_constant_m_s2": 305.43672616423214,
+      "status": "CONTINUOUSLY_VERIFIED_BOUNDED"
+    },
+    "self_separation": {
+      "sampled_min_m": 0.013787832260131826,
+      "speed_bound_m_s": 3.1382945141438334,
+      "certified_lower_bound_m": 0.012218685003059908,
+      "collisions_at_samples": 0,
+      "status": "CONTINUOUSLY_VERIFIED_BOUNDED",
+      "note": "separation is Lipschitz in time with the sum of the two link point speeds; speed bound = 1.5 x (max leg joint speed sum x 0.30 m reach + 0.5 m/s body)"
+    },
+    "support_margin_trot": {
+      "sampled_min_m": -0.002995744512059865,
+      "status": "DIAGNOSTIC_ONLY_DYNAMICS_NOT_PROVEN"
+    },
+    "legacy_v1_strict": {
+      "penetration_samples": 543,
+      "undeclared_samples": 14,
+      "worst_foot_mesh_z_um": -1.2617760368708457,
+      "verdict": "FAIL"
+    },
+    "contact_events": {
+      "count": 12,
+      "first": [
+        {
+          "t": 2.2365,
+          "leg": [
+            "rf",
+            "lh"
+          ],
+          "to": "SWING"
+        },
+        {
+          "t": 2.4845,
+          "leg": [
+            "rf",
+            "lh"
+          ],
+          "to": "STANCE"
+        },
+        {
+          "t": 2.8,
+          "leg": [
+            "lf",
+            "rh"
+          ],
+          "to": "SWING"
+        },
+        {
+          "t": 3.0,
+          "leg": [
+            "lf",
+            "rh"
+          ],
+          "to": "STANCE"
+        },
+        {
+          "t": 3.3005,
+          "leg": [
+            "rf",
+            "lh"
+          ],
+          "to": "SWING"
+        },
+        {
+          "t": 3.5,
+          "leg": [
+            "rf",
+            "lh"
+          ],
+          "to": "STANCE"
+        }
+      ]
+    }
+  },
+  "final": {
+    "state": "STAND",
+    "max_abs_qdot": 0.0,
+    "max_abs_qddot": 0.0
+  },
+  "all_statuses": {
+    "joint_limit_margin": "CONTINUOUSLY_VERIFIED_BOUNDED",
+    "ik_branch": "CONTINUOUSLY_VERIFIED_BOUNDED",
+    "derivatives": "SAMPLED_ONLY",
+    "tread_analytic_stance_exact": "CONTINUOUSLY_VERIFIED_ANALYTIC",
+    "tread_analytic_swing_nonnegative": "CONTINUOUSLY_VERIFIED_ANALYTIC",
+    "tread_mesh_vs_reference": "CONTINUOUSLY_VERIFIED_ANALYTIC",
+    "nonfoot_ground_clearance": "CONTINUOUSLY_VERIFIED_BOUNDED",
+    "self_separation": "CONTINUOUSLY_VERIFIED_BOUNDED",
+    "support_margin_trot": "DIAGNOSTIC_ONLY_DYNAMICS_NOT_PROVEN"
+  },
+  "lifecycle_verdict": "PASS_WITH_SAMPLED_ONLY_ITEMS"
+}

@@ -1,0 +1,1030 @@
+{
+  "nominal_cad": {
+    "source": "MATDOG_FOOT_CONTACT_GEOMETRY.yaml cad_validation",
+    "radius_mm": 14.9,
+    "centre_foot_link_mm": [
+      0.0,
+      0.0,
+      14.9
+    ],
+    "tread_width_mm": 13.899999999999999,
+    "fillet_mm": 2.0
+  },
+  "analytic_g2": {
+    "identical_to_nominal_cad": true,
+    "role": "stable contact geometry for IK (YAML note); the collision mesh is for collision validation"
+  },
+  "meshes": [
+    {
+      "kind": "collision",
+      "leg": "lf",
+      "file": "meshes/collision/lf_foot_link.stl",
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "faces": 2248,
+      "raw_vertices": 6744,
+      "origin_xyz": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "unique_vertices": 1126,
+      "outer_ring_vertices": 576,
+      "outer_ring_y_slices": 2,
+      "circle_fit": {
+        "centre_dx_um": 4.532310372628898,
+        "centre_dz_um": 3.5775475351225436,
+        "centre_offset_um": 5.774139215493586,
+        "radius_minus_nominal_um": -1.081393553280241,
+        "residual_rms_um": 1.2392438806397437,
+        "residual_min_um": -1.423360580742744,
+        "residual_max_um": 1.0843284820299255
+      },
+      "extents_vs_nominal": {
+        "x_min_um": 4.534149000000321,
+        "x_max_um": 4.511452000000374,
+        "z_min_um": 3.598968,
+        "z_max_um": 3.5526279999996415
+      },
+      "nominal_radius_translated_circle_minimax": {
+        "dx_um": 4.534437054790434,
+        "dz_um": 3.5765735508413856,
+        "offset_um": 5.775205430842673,
+        "max_radial_excess_um": 0.0006152998267144882,
+        "min_radial_excess_um": -2.5026818441103993,
+        "vertices_within_0p01um_of_circle": 327
+      },
+      "rings": [
+        {
+          "y_mm": -4.95,
+          "vertices": 94,
+          "max_gap_deg": 6.545458844797177,
+          "min_gap_deg": 0.04195805292013413,
+          "max_chord_sagitta_um": 24.298619772173023
+        },
+        {
+          "y_mm": 5.05,
+          "vertices": 482,
+          "max_gap_deg": 4.5734256111849305,
+          "min_gap_deg": 1.0657275404460693e-09,
+          "max_chord_sagitta_um": 11.864381046258417
+        }
+      ],
+      "delta_um": {
+        "min": -5.775034487176534,
+        "max": 16.265368807253516,
+        "pitch_at_min_deg": -128.28000000004704,
+        "fraction_below_minus_1um": 0.40791666666666665,
+        "fraction_above_plus_1um": 0.4817777777777778
+      },
+      "ideal_offset_circle_delta_um": {
+        "min": -4.692745644803736,
+        "max": 6.8555327513642155
+      },
+      "tessellation_residual_um": {
+        "min": -1.084316430779222,
+        "max": 10.77725444663789
+      },
+      "distinct_lowest_vertices_over_pitch": 287,
+      "numeric_error": {
+        "float64_vs_longdouble_um": 2.5832669336978142e-12,
+        "float32_stl_quantisation_max_um": 4.990244328872961e-07
+      }
+    },
+    {
+      "kind": "visual",
+      "leg": "lf",
+      "file": "meshes/lf_foot_link.stl",
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+      "faces": 9410,
+      "raw_vertices": 28230,
+      "origin_xyz": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "unique_vertices": 4706,
+      "outer_ring_vertices": 1569,
+      "outer_ring_y_slices": 119,
+      "circle_fit": {
+        "centre_dx_um": 4.5792438102565844,
+        "centre_dz_um": 3.5296184219199556,
+        "centre_offset_um": 5.781667586270414,
+        "radius_minus_nominal_um": -1.9482881205897669,
+        "residual_rms_um": 2.457111630742707,
+        "residual_min_um": -6.597198506826107,
+        "residual_max_um": 2.022493732637201
+      },
+      "extents_vs_nominal": {
+        "x_min_um": 4.553222999999565,
+        "x_max_um": -2.897644000000865,
+        "z_min_um": 16.735077,
+        "z_max_um": 3.4172060000003945
+      },
+      "nominal_radius_translated_circle_minimax": {
+        "dx_um": 4.53531879628799,
+        "dz_um": 3.580606170874363,
+        "offset_um": 5.778395723283991,
+        "max_radial_excess_um": 0.009840155669460504,
+        "min_radial_excess_um": -8.483102143085757,
+        "vertices_within_0p01um_of_circle": 841
+      },
+      "rings": [
+        {
+          "y_mm": -5.1000000000000005,
+          "vertices": 5,
+          "max_gap_deg": 329.64114743859204,
+          "min_gap_deg": 4.153667798089015,
+          "max_chord_sagitta_um": 29276.319024338172
+        },
+        {
+          "y_mm": -5.0920000000000005,
+          "vertices": 2,
+          "max_gap_deg": 329.3371496813365,
+          "min_gap_deg": 30.66285031866353,
+          "max_chord_sagitta_um": 29265.919697855104
+        },
+        {
+          "y_mm": -5.071,
+          "vertices": 2,
+          "max_gap_deg": 329.08129836415367,
+          "min_gap_deg": 30.918701635846315,
+          "max_chord_sagitta_um": 29257.089025101544
+        },
+        {
+          "y_mm": -5.038,
+          "vertices": 2,
+          "max_gap_deg": 328.9118429667446,
+          "min_gap_deg": 31.088157033255424,
+          "max_chord_sagitta_um": 29251.200888147017
+        },
+        {
+          "y_mm": -5.0,
+          "vertices": 2,
+          "max_gap_deg": 328.8539402681088,
+          "min_gap_deg": 31.146059731891253,
+          "max_chord_sagitta_um": 29249.18172358054
+        },
+        {
+          "y_mm": -4.95,
+          "vertices": 62,
+          "max_gap_deg": 31.14473853450752,
+          "min_gap_deg": 0.06158636670446448,
+          "max_chord_sagitta_um": 546.8755869495482
+        },
+        {
+          "y_mm": -4.0,
+          "vertices": 41,
+          "max_gap_deg": 51.22009336786869,
+          "min_gap_deg": 0.0001803522728161301,
+          "max_chord_sagitta_um": 1463.633059169952
+        },
+        {
+          "y_mm": -3.9859999999999998,
+          "vertices": 11,
+          "max_gap_deg": 59.999752776898816,
+          "min_gap_deg": 29.999902835648694,
+          "max_chord_sagitta_um": 1995.944391786561
+        },
+        {
+          "y_mm": -3.9779999999999998,
+          "vertices": 33,
+          "max_gap_deg": 59.9995724100306,
+          "min_gap_deg": 2.0336228091676616e-05,
+          "max_chord_sagitta_um": 1995.9326670956302
+        },
+        {
+          "y_mm": -3.967,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -3.9659999999999997,
+          "vertices": 22,
+          "max_gap_deg": 59.99962322976124,
+          "min_gap_deg": 0.0001083441627276706,
+          "max_chord_sagitta_um": 1995.9359706128314
+        },
+        {
+          "y_mm": -3.945,
+          "vertices": 11,
+          "max_gap_deg": 59.99978573077717,
+          "min_gap_deg": 29.99987048001969,
+          "max_chord_sagitta_um": 1995.9465339464011
+        },
+        {
+          "y_mm": -3.933,
+          "vertices": 22,
+          "max_gap_deg": 59.99966951768083,
+          "min_gap_deg": 4.4651491439403084e-05,
+          "max_chord_sagitta_um": 1995.9389795435914
+        },
+        {
+          "y_mm": -3.9170000000000003,
+          "vertices": 33,
+          "max_gap_deg": 59.999662635749495,
+          "min_gap_deg": 4.394237910803401e-06,
+          "max_chord_sagitta_um": 1995.93853218581
+        },
+        {
+          "y_mm": -3.898,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -3.883,
+          "vertices": 11,
+          "max_gap_deg": 59.999715608670954,
+          "min_gap_deg": 29.999881148392003,
+          "max_chord_sagitta_um": 1995.9419756751108
+        },
+        {
+          "y_mm": -3.8800000000000003,
+          "vertices": 22,
+          "max_gap_deg": 59.99969795636784,
+          "min_gap_deg": 4.865304674009723e-07,
+          "max_chord_sagitta_um": 1995.9408281919914
+        },
+        {
+          "y_mm": -3.827,
+          "vertices": 33,
+          "max_gap_deg": 59.999678852235306,
+          "min_gap_deg": 2.1544366749095837e-06,
+          "max_chord_sagitta_um": 1995.9395863334444
+        },
+        {
+          "y_mm": -3.8049999999999997,
+          "vertices": 11,
+          "max_gap_deg": 59.999766318474485,
+          "min_gap_deg": 29.999889644146833,
+          "max_chord_sagitta_um": 1995.9452720536733
+        },
+        {
+          "y_mm": -3.751,
+          "vertices": 22,
+          "max_gap_deg": 59.99961512334183,
+          "min_gap_deg": 0.00010433185480490377,
+          "max_chord_sagitta_um": 1995.935443657961
+        },
+        {
+          "y_mm": -3.7239999999999998,
+          "vertices": 33,
+          "max_gap_deg": 59.99969393671773,
+          "min_gap_deg": 1.2627509186326945e-06,
+          "max_chord_sagitta_um": 1995.9405668957827
+        },
+        {
+          "y_mm": -3.721,
+          "vertices": 11,
+          "max_gap_deg": 59.99973706089748,
+          "min_gap_deg": 29.99988893724202,
+          "max_chord_sagitta_um": 1995.94337017162
+        },
+        {
+          "y_mm": -3.625,
+          "vertices": 33,
+          "max_gap_deg": 59.999733477924444,
+          "min_gap_deg": 2.7085399094066197e-06,
+          "max_chord_sagitta_um": 1995.9431372613399
+        },
+        {
+          "y_mm": -3.2590000000000003,
+          "vertices": 1,
+          "max_gap_deg": 359.99999999999994,
+          "min_gap_deg": 359.99999999999994,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -3.249,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -3.039,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -2.917,
+          "vertices": 22,
+          "max_gap_deg": 59.999739526646266,
+          "min_gap_deg": 1.3410890745479513e-06,
+          "max_chord_sagitta_um": 1995.9435304570195
+        },
+        {
+          "y_mm": -2.774,
+          "vertices": 11,
+          "max_gap_deg": 59.999744192387006,
+          "min_gap_deg": 29.999905919089933,
+          "max_chord_sagitta_um": 1995.9438337523761
+        },
+        {
+          "y_mm": -2.54,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -2.396,
+          "vertices": 11,
+          "max_gap_deg": 59.99971634955497,
+          "min_gap_deg": 29.999906760507468,
+          "max_chord_sagitta_um": 1995.9420238360785
+        },
+        {
+          "y_mm": -2.352,
+          "vertices": 11,
+          "max_gap_deg": 59.99975611338869,
+          "min_gap_deg": 29.99990473149326,
+          "max_chord_sagitta_um": 1995.9446086743271
+        },
+        {
+          "y_mm": -2.3489999999999998,
+          "vertices": 11,
+          "max_gap_deg": 59.99971324263376,
+          "min_gap_deg": 29.999915810797305,
+          "max_chord_sagitta_um": 1995.9418218714939
+        },
+        {
+          "y_mm": -2.332,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -2.314,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -2.009,
+          "vertices": 22,
+          "max_gap_deg": 59.99971141821265,
+          "min_gap_deg": 3.87167392163863e-06,
+          "max_chord_sagitta_um": 1995.9417032754898
+        },
+        {
+          "y_mm": -1.9580000000000002,
+          "vertices": 22,
+          "max_gap_deg": 59.99973920557849,
+          "min_gap_deg": 5.920447646531349e-07,
+          "max_chord_sagitta_um": 1995.9435095860865
+        },
+        {
+          "y_mm": -1.9220000000000002,
+          "vertices": 11,
+          "max_gap_deg": 59.999752897157336,
+          "min_gap_deg": 29.999904961798443,
+          "max_chord_sagitta_um": 1995.9443996039388
+        },
+        {
+          "y_mm": -1.618,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -1.588,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -1.3780000000000001,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -1.3010000000000002,
+          "vertices": 11,
+          "max_gap_deg": 59.99972688420949,
+          "min_gap_deg": 29.99990517093847,
+          "max_chord_sagitta_um": 1995.9427086385576
+        },
+        {
+          "y_mm": -1.1340000000000001,
+          "vertices": 22,
+          "max_gap_deg": 59.99973896131448,
+          "min_gap_deg": 6.647903031887093e-06,
+          "max_chord_sagitta_um": 1995.943493707763
+        },
+        {
+          "y_mm": -1.0859999999999999,
+          "vertices": 11,
+          "max_gap_deg": 59.999746085639,
+          "min_gap_deg": 29.999886633554087,
+          "max_chord_sagitta_um": 1995.9439568227729
+        },
+        {
+          "y_mm": -0.966,
+          "vertices": 11,
+          "max_gap_deg": 59.999756912205434,
+          "min_gap_deg": 29.99989026671791,
+          "max_chord_sagitta_um": 1995.9446606012282
+        },
+        {
+          "y_mm": -0.959,
+          "vertices": 11,
+          "max_gap_deg": 59.99973291453646,
+          "min_gap_deg": 29.999924740344884,
+          "max_chord_sagitta_um": 1995.943100638445
+        },
+        {
+          "y_mm": -0.9079999999999999,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -0.7020000000000001,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -0.652,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": -0.256,
+          "vertices": 22,
+          "max_gap_deg": 59.99966683972884,
+          "min_gap_deg": 0.0001046231745812866,
+          "max_chord_sagitta_um": 1995.93880546416
+        },
+        {
+          "y_mm": -0.25,
+          "vertices": 22,
+          "max_gap_deg": 59.99962815776046,
+          "min_gap_deg": 8.384292662908165e-05,
+          "max_chord_sagitta_um": 1995.936290955676
+        },
+        {
+          "y_mm": -0.23299999999999998,
+          "vertices": 11,
+          "max_gap_deg": 59.99974696791921,
+          "min_gap_deg": 29.999882930631134,
+          "max_chord_sagitta_um": 1995.9440141751904
+        },
+        {
+          "y_mm": -0.229,
+          "vertices": 11,
+          "max_gap_deg": 59.999759546386045,
+          "min_gap_deg": 29.999896859046032,
+          "max_chord_sagitta_um": 1995.9448318355492
+        },
+        {
+          "y_mm": -0.09899999999999999,
+          "vertices": 11,
+          "max_gap_deg": 59.99973006037923,
+          "min_gap_deg": 29.99989726014801,
+          "max_chord_sagitta_um": 1995.942915104668
+        },
+        {
+          "y_mm": -0.089,
+          "vertices": 22,
+          "max_gap_deg": 59.99965103773525,
+          "min_gap_deg": 4.6713821241764715e-05,
+          "max_chord_sagitta_um": 1995.9377782606457
+        },
+        {
+          "y_mm": -0.087,
+          "vertices": 22,
+          "max_gap_deg": 59.999626906565034,
+          "min_gap_deg": 0.00010914651490877626,
+          "max_chord_sagitta_um": 1995.936209622158
+        },
+        {
+          "y_mm": -0.075,
+          "vertices": 11,
+          "max_gap_deg": 59.9997378438028,
+          "min_gap_deg": 29.999910478723265,
+          "max_chord_sagitta_um": 1995.9434210641887
+        },
+        {
+          "y_mm": -0.073,
+          "vertices": 11,
+          "max_gap_deg": 59.99974712972416,
+          "min_gap_deg": 29.999891183499162,
+          "max_chord_sagitta_um": 1995.9440246932834
+        },
+        {
+          "y_mm": -0.06899999999999999,
+          "vertices": 11,
+          "max_gap_deg": 59.99974377272199,
+          "min_gap_deg": 29.999895956899923,
+          "max_chord_sagitta_um": 1995.9438064721508
+        },
+        {
+          "y_mm": 0.06899999999999999,
+          "vertices": 11,
+          "max_gap_deg": 59.99977420739255,
+          "min_gap_deg": 29.999884180873682,
+          "max_chord_sagitta_um": 1995.9457848711197
+        },
+        {
+          "y_mm": 0.087,
+          "vertices": 22,
+          "max_gap_deg": 59.999626906565034,
+          "min_gap_deg": 9.751178613444299e-05,
+          "max_chord_sagitta_um": 1995.936209622158
+        },
+        {
+          "y_mm": 0.089,
+          "vertices": 22,
+          "max_gap_deg": 59.99965103773525,
+          "min_gap_deg": 4.6713821241764715e-05,
+          "max_chord_sagitta_um": 1995.9377782606457
+        },
+        {
+          "y_mm": 0.093,
+          "vertices": 11,
+          "max_gap_deg": 59.99971839610485,
+          "min_gap_deg": 29.999911213984394,
+          "max_chord_sagitta_um": 1995.9421568715138
+        },
+        {
+          "y_mm": 0.094,
+          "vertices": 11,
+          "max_gap_deg": 59.99973924235087,
+          "min_gap_deg": 29.999913497043348,
+          "max_chord_sagitta_um": 1995.9435119764655
+        },
+        {
+          "y_mm": 0.09899999999999999,
+          "vertices": 11,
+          "max_gap_deg": 59.99973675005699,
+          "min_gap_deg": 29.999915935308533,
+          "max_chord_sagitta_um": 1995.9433499655088
+        },
+        {
+          "y_mm": 0.25,
+          "vertices": 22,
+          "max_gap_deg": 59.99961435874,
+          "min_gap_deg": 8.397785495047236e-05,
+          "max_chord_sagitta_um": 1995.9353939552975
+        },
+        {
+          "y_mm": 0.256,
+          "vertices": 22,
+          "max_gap_deg": 59.99966683972884,
+          "min_gap_deg": 0.0001046231745812866,
+          "max_chord_sagitta_um": 1995.93880546416
+        },
+        {
+          "y_mm": 0.652,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 0.703,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 0.9079999999999999,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 0.966,
+          "vertices": 11,
+          "max_gap_deg": 59.999719260583284,
+          "min_gap_deg": 29.999919626900027,
+          "max_chord_sagitta_um": 1995.9422130667072
+        },
+        {
+          "y_mm": 1.0,
+          "vertices": 22,
+          "max_gap_deg": 59.9997096933889,
+          "min_gap_deg": 2.354684423098964e-06,
+          "max_chord_sagitta_um": 1995.9415911537906
+        },
+        {
+          "y_mm": 1.039,
+          "vertices": 11,
+          "max_gap_deg": 59.99971888457433,
+          "min_gap_deg": 29.999898923155406,
+          "max_chord_sagitta_um": 1995.9421886243438
+        },
+        {
+          "y_mm": 1.145,
+          "vertices": 11,
+          "max_gap_deg": 59.99975834411067,
+          "min_gap_deg": 29.999876178828263,
+          "max_chord_sagitta_um": 1995.9447536819068
+        },
+        {
+          "y_mm": 1.324,
+          "vertices": 11,
+          "max_gap_deg": 59.9997440592369,
+          "min_gap_deg": 29.999887849781647,
+          "max_chord_sagitta_um": 1995.9438250969847
+        },
+        {
+          "y_mm": 1.3780000000000001,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 1.588,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 1.617,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 1.6520000000000001,
+          "vertices": 11,
+          "max_gap_deg": 59.9997286906003,
+          "min_gap_deg": 29.9998987727223,
+          "max_chord_sagitta_um": 1995.9428260625346
+        },
+        {
+          "y_mm": 1.657,
+          "vertices": 11,
+          "max_gap_deg": 59.999750240736425,
+          "min_gap_deg": 29.999886001140407,
+          "max_chord_sagitta_um": 1995.9442269239105
+        },
+        {
+          "y_mm": 1.681,
+          "vertices": 11,
+          "max_gap_deg": 59.99974586291238,
+          "min_gap_deg": 29.99989602935405,
+          "max_chord_sagitta_um": 1995.9439423444828
+        },
+        {
+          "y_mm": 1.732,
+          "vertices": 11,
+          "max_gap_deg": 59.99970778013051,
+          "min_gap_deg": 29.999931907494314,
+          "max_chord_sagitta_um": 1995.94146678295
+        },
+        {
+          "y_mm": 1.9580000000000002,
+          "vertices": 22,
+          "max_gap_deg": 59.999719572938766,
+          "min_gap_deg": 1.7035300992738747e-06,
+          "max_chord_sagitta_um": 1995.9422333712937
+        },
+        {
+          "y_mm": 2.009,
+          "vertices": 22,
+          "max_gap_deg": 59.9997449686723,
+          "min_gap_deg": 2.3529562051016973e-06,
+          "max_chord_sagitta_um": 1995.9438842146178
+        },
+        {
+          "y_mm": 2.2680000000000002,
+          "vertices": 22,
+          "max_gap_deg": 59.99975755465992,
+          "min_gap_deg": 1.0695391171763352e-07,
+          "max_chord_sagitta_um": 1995.9447023638388
+        },
+        {
+          "y_mm": 2.314,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 2.332,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 2.54,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 2.679,
+          "vertices": 11,
+          "max_gap_deg": 59.99975708030267,
+          "min_gap_deg": 29.999884865772202,
+          "max_chord_sagitta_um": 1995.9446715283511
+        },
+        {
+          "y_mm": 2.7030000000000003,
+          "vertices": 11,
+          "max_gap_deg": 59.99975283306584,
+          "min_gap_deg": 29.999887513977544,
+          "max_chord_sagitta_um": 1995.9443954376857
+        },
+        {
+          "y_mm": 3.039,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 3.0509999999999997,
+          "vertices": 11,
+          "max_gap_deg": 59.99976307192901,
+          "min_gap_deg": 29.99988186312252,
+          "max_chord_sagitta_um": 1995.94506101269
+        },
+        {
+          "y_mm": 3.112,
+          "vertices": 11,
+          "max_gap_deg": 59.99976315095863,
+          "min_gap_deg": 29.99986342938885,
+          "max_chord_sagitta_um": 1995.945066149994
+        },
+        {
+          "y_mm": 3.249,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 3.258,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 3.625,
+          "vertices": 33,
+          "max_gap_deg": 59.99973020446707,
+          "min_gap_deg": 1.2881248622704426e-06,
+          "max_chord_sagitta_um": 1995.9429244710614
+        },
+        {
+          "y_mm": 3.7030000000000003,
+          "vertices": 11,
+          "max_gap_deg": 59.9997564786269,
+          "min_gap_deg": 29.9998975282351,
+          "max_chord_sagitta_um": 1995.944632416554
+        },
+        {
+          "y_mm": 3.7239999999999998,
+          "vertices": 33,
+          "max_gap_deg": 59.99969735940414,
+          "min_gap_deg": 2.2994678231001875e-06,
+          "max_chord_sagitta_um": 1995.9407893865348
+        },
+        {
+          "y_mm": 3.751,
+          "vertices": 22,
+          "max_gap_deg": 59.99961512334183,
+          "min_gap_deg": 0.00010433185480490377,
+          "max_chord_sagitta_um": 1995.935443657961
+        },
+        {
+          "y_mm": 3.787,
+          "vertices": 11,
+          "max_gap_deg": 59.99970055609086,
+          "min_gap_deg": 29.99989678308157,
+          "max_chord_sagitta_um": 1995.940997186253
+        },
+        {
+          "y_mm": 3.827,
+          "vertices": 33,
+          "max_gap_deg": 59.999677532776296,
+          "min_gap_deg": 5.235898198272923e-06,
+          "max_chord_sagitta_um": 1995.93950056241
+        },
+        {
+          "y_mm": 3.867,
+          "vertices": 11,
+          "max_gap_deg": 59.99975828979486,
+          "min_gap_deg": 29.999867758573487,
+          "max_chord_sagitta_um": 1995.94475015112
+        },
+        {
+          "y_mm": 3.8800000000000003,
+          "vertices": 11,
+          "max_gap_deg": 59.99971567985099,
+          "min_gap_deg": 29.999929171683572,
+          "max_chord_sagitta_um": 1995.9419803021497
+        },
+        {
+          "y_mm": 3.8899999999999997,
+          "vertices": 11,
+          "max_gap_deg": 59.99974290804114,
+          "min_gap_deg": 29.99991258861929,
+          "max_chord_sagitta_um": 1995.9437502637795
+        },
+        {
+          "y_mm": 3.898,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 3.9170000000000003,
+          "vertices": 33,
+          "max_gap_deg": 59.999662635749495,
+          "min_gap_deg": 1.0306279313144986e-06,
+          "max_chord_sagitta_um": 1995.93853218581
+        },
+        {
+          "y_mm": 3.933,
+          "vertices": 22,
+          "max_gap_deg": 59.99966951768083,
+          "min_gap_deg": 4.4651491439403084e-05,
+          "max_chord_sagitta_um": 1995.9389795435914
+        },
+        {
+          "y_mm": 3.934,
+          "vertices": 11,
+          "max_gap_deg": 59.999748380360806,
+          "min_gap_deg": 29.999877765216205,
+          "max_chord_sagitta_um": 1995.9441059906264
+        },
+        {
+          "y_mm": 3.9659999999999997,
+          "vertices": 11,
+          "max_gap_deg": 59.999758671608696,
+          "min_gap_deg": 29.999871291748736,
+          "max_chord_sagitta_um": 1995.9447749708427
+        },
+        {
+          "y_mm": 3.967,
+          "vertices": 1,
+          "max_gap_deg": 360.0,
+          "min_gap_deg": 360.0,
+          "max_chord_sagitta_um": 29796.10342375882
+        },
+        {
+          "y_mm": 3.972,
+          "vertices": 11,
+          "max_gap_deg": 59.999780255856784,
+          "min_gap_deg": 29.99987666969398,
+          "max_chord_sagitta_um": 1995.9461780502957
+        },
+        {
+          "y_mm": 3.9779999999999998,
+          "vertices": 33,
+          "max_gap_deg": 59.999573203590636,
+          "min_gap_deg": 4.1295963217554234e-07,
+          "max_chord_sagitta_um": 1995.9327186806777
+        },
+        {
+          "y_mm": 3.979,
+          "vertices": 11,
+          "max_gap_deg": 59.999754203853456,
+          "min_gap_deg": 29.99988752267034,
+          "max_chord_sagitta_um": 1995.9444845454211
+        },
+        {
+          "y_mm": 4.0,
+          "vertices": 41,
+          "max_gap_deg": 51.22009336786869,
+          "min_gap_deg": 0.00015686633809017884,
+          "max_chord_sagitta_um": 1463.633059169952
+        },
+        {
+          "y_mm": 4.95,
+          "vertices": 62,
+          "max_gap_deg": 31.14473853450752,
+          "min_gap_deg": 0.06158636670446448,
+          "max_chord_sagitta_um": 546.8755869495482
+        },
+        {
+          "y_mm": 5.0,
+          "vertices": 2,
+          "max_gap_deg": 328.8539402681088,
+          "min_gap_deg": 31.146059731891253,
+          "max_chord_sagitta_um": 29249.18172358054
+        },
+        {
+          "y_mm": 5.038,
+          "vertices": 2,
+          "max_gap_deg": 328.9118429667446,
+          "min_gap_deg": 31.088157033255424,
+          "max_chord_sagitta_um": 29251.200888147017
+        },
+        {
+          "y_mm": 5.071,
+          "vertices": 2,
+          "max_gap_deg": 329.08129836415367,
+          "min_gap_deg": 30.918701635846315,
+          "max_chord_sagitta_um": 29257.089025101544
+        },
+        {
+          "y_mm": 5.0920000000000005,
+          "vertices": 2,
+          "max_gap_deg": 329.3371496813365,
+          "min_gap_deg": 30.66285031866353,
+          "max_chord_sagitta_um": 29265.919697855104
+        },
+        {
+          "y_mm": 5.1000000000000005,
+          "vertices": 5,
+          "max_gap_deg": 329.64114743859204,
+          "min_gap_deg": 4.153667798089015,
+          "max_chord_sagitta_um": 29276.319024338172
+        }
+      ],
+      "delta_um": {
+        "min": -5.783427289240972,
+        "max": 54.93212246888285,
+        "pitch_at_min_deg": -128.19000000004712,
+        "fraction_below_minus_1um": 0.3555833333333333,
+        "fraction_above_plus_1um": 0.5688055555555556
+      },
+      "ideal_offset_circle_delta_um": {
+        "min": -3.8333794475027267,
+        "max": 7.729955688682262
+      },
+      "tessellation_residual_um": {
+        "min": -2.022466165782527,
+        "max": 51.900599590142505
+      },
+      "distinct_lowest_vertices_over_pitch": 462,
+      "numeric_error": {
+        "float64_vs_longdouble_um": 2.7985946893238633e-12,
+        "float32_stl_quantisation_max_um": 5.000028169277471e-07
+      }
+    }
+  ],
+  "four_feet_collision_mesh": {
+    "lf": {
+      "max_vertex_difference_vs_lf_um": 0.0,
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    "rf": {
+      "max_vertex_difference_vs_lf_um": 0.0,
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    "rh": {
+      "max_vertex_difference_vs_lf_um": 0.0,
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    "lh": {
+      "max_vertex_difference_vs_lf_um": 0.0,
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    }
+  },
+  "findings": {
+    "reproduced_offset_um": 5.774139215493586,
+    "g4_reported_offset_um": 5.775,
+    "collision_vs_visual_centre_difference_um": 0.06708164771335312,
+    "summary": [
+      "The collision mesh tread is a circle of diameter 29.8 mm (radius within 1 um of nominal) translated rigidly by the reproduced offset in the foot_link x-z plane.",
+      "The visual mesh of the SAME foot is registered differently, so the offset is a property of each STL export, not of the design geometry. The G2 YAML audit used the visual STL; G3.5/G4 used the collision STL.",
+      "Mesh-minus-analytic height is a deterministic function of foot pitch: delta = u.d + dR + tessellation residual, with d the centre offset. The offset is why delta reaches -d for some pitches.",
+      "The tread vertices lie inside, and on, the nominal-radius circle translated rigidly by the offset (maximum radial excess ~0): tessellation inscribes a polygon in that translated circle, so it can only raise the mesh above it. The least-squares circle scatter (about 1 um) is vertex placement noise.",
+      "The lowest mesh element is always a vertex; no horizontal edge or face is ever the lowest feature, so the vertex support function is exact.",
+      "Numerical evaluation error (float64 vs long double, float32 STL quantisation) is below 0.01 um and cannot explain the micrometre events."
+    ],
+    "all_four_feet_identical_in_foot_link": true
+  }
+}

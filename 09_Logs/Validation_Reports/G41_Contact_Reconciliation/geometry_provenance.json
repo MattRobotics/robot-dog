@@ -1,0 +1,361 @@
+{
+  "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+  "sha256sums_entries": 36,
+  "sha256sums_mismatches": [],
+  "g2_yaml": {
+    "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+    "matches": true,
+    "mesh_sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+    "mesh_is_visual_foot_stl": true,
+    "mesh_is_collision_foot_stl": false
+  },
+  "g35_pose_library": {
+    "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf": {
+      "recorded": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "current": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl": {
+      "recorded": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "current": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl": {
+      "recorded": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "current": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl": {
+      "recorded": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "current": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl": {
+      "recorded": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "current": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl": {
+      "recorded": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "current": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl": {
+      "recorded": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "current": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl": {
+      "recorded": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "current": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl": {
+      "recorded": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "current": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl": {
+      "recorded": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "current": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl": {
+      "recorded": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "current": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl": {
+      "recorded": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "current": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl": {
+      "recorded": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "current": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl": {
+      "recorded": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "current": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl": {
+      "recorded": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "current": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl": {
+      "recorded": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "current": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl": {
+      "recorded": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "current": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl": {
+      "recorded": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "current": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml": {
+      "recorded": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
+      "current": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966"
+    }
+  },
+  "g4_definitions": {
+    "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf": {
+      "recorded": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "current": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl": {
+      "recorded": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "current": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl": {
+      "recorded": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "current": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl": {
+      "recorded": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "current": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl": {
+      "recorded": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "current": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl": {
+      "recorded": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "current": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl": {
+      "recorded": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "current": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl": {
+      "recorded": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "current": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl": {
+      "recorded": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "current": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl": {
+      "recorded": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "current": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl": {
+      "recorded": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "current": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl": {
+      "recorded": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "current": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl": {
+      "recorded": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "current": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl": {
+      "recorded": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "current": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl": {
+      "recorded": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "current": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl": {
+      "recorded": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "current": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl": {
+      "recorded": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "current": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl": {
+      "recorded": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "current": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml": {
+      "recorded": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
+      "current": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966"
+    }
+  },
+  "g35_pose_library_all_match": true,
+  "g4_definitions_all_match": true,
+  "generated_geometry_checks": {
+    "matdog_motion_geometry_export.py": {
+      "returncode": 0,
+      "tail": [
+        "MOTION_GEOMETRY = PASS (Geometry V5 / live URDF)"
+      ]
+    },
+    "matdog_contact_stand_export.py": {
+      "returncode": 0,
+      "tail": [
+        "CONTACT_STAND_GEOMETRY = PASS"
+      ]
+    }
+  },
+  "calibration_worktree_read_only_comparison": {
+    "worktree_present": true,
+    "urdf_and_stl_files_differing": [],
+    "foot_contact_yaml_identical": true,
+    "head": "174aa0415eb85e4ecc32a69ac5134bc6b0b9bd4c"
+  },
+  "foot_meshes": {
+    "lf_collision": {
+      "file": "meshes/collision/lf_foot_link.stl",
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "faces": 2248,
+      "raw_vertices": 6744,
+      "origin_xyz": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "unique_vertices": 1126,
+      "max_vertex_spread_vs_lf_collision_m": 0.0
+    },
+    "lf_visual": {
+      "file": "meshes/lf_foot_link.stl",
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+      "faces": 9410,
+      "raw_vertices": 28230,
+      "origin_xyz": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "unique_vertices": 4706,
+      "max_vertex_spread_vs_lf_collision_m": null
+    },
+    "rf_collision": {
+      "file": "meshes/collision/rf_foot_link.stl",
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "faces": 2248,
+      "raw_vertices": 6744,
+      "origin_xyz": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "unique_vertices": 1126,
+      "max_vertex_spread_vs_lf_collision_m": 0.0
+    },
+    "rf_visual": {
+      "file": "meshes/rf_foot_link.stl",
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+      "faces": 9410,
+      "raw_vertices": 28230,
+      "origin_xyz": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "unique_vertices": 4706,
+      "max_vertex_spread_vs_lf_collision_m": null
+    },
+    "rh_collision": {
+      "file": "meshes/collision/rh_foot_link.stl",
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "faces": 2248,
+      "raw_vertices": 6744,
+      "origin_xyz": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "unique_vertices": 1126,
+      "max_vertex_spread_vs_lf_collision_m": 0.0
+    },
+    "rh_visual": {
+      "file": "meshes/rh_foot_link.stl",
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+      "faces": 9410,
+      "raw_vertices": 28230,
+      "origin_xyz": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "unique_vertices": 4706,
+      "max_vertex_spread_vs_lf_collision_m": null
+    },
+    "lh_collision": {
+      "file": "meshes/collision/lh_foot_link.stl",
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "faces": 2248,
+      "raw_vertices": 6744,
+      "origin_xyz": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "unique_vertices": 1126,
+      "max_vertex_spread_vs_lf_collision_m": 0.0
+    },
+    "lh_visual": {
+      "file": "meshes/lh_foot_link.stl",
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc",
+      "faces": 9410,
+      "raw_vertices": 28230,
+      "origin_xyz": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "unique_vertices": 4706,
+      "max_vertex_spread_vs_lf_collision_m": null
+    }
+  },
+  "g2_cad_nominal": {
+    "center": [
+      0.0,
+      0.0,
+      0.0149
+    ],
+    "axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "radius": 0.0149,
+    "tread_width": 0.0139,
+    "fillet": 0.002,
+    "support_width": 0.0099,
+    "tilt": 0.034906585
+  },
+  "assessment": {
+    "geometry_consistent": true,
+    "notes": [
+      "Geometry V5 (calibration compiler) consumes the same URDF and meshes; it does not define a different foot or contact geometry.",
+      "The G2 YAML mesh audit (hash e43737..., lowest z 16.7 um) refers to the VISUAL foot STL; G3.5/G4 collision checks use the COLLISION foot STL (different file, different tessellation and registration).",
+      "The four collision foot STLs differ in bytes (triangle order) but hold the same vertex set in foot_link."
+    ]
+  }
+}
