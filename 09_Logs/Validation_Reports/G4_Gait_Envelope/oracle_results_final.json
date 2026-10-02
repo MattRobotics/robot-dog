@@ -1,0 +1,21 @@
+{
+  "status": "PASS",
+  "lifecycle": {
+    "max_qdot_error": 2.7869795195256675e-07,
+    "max_qddot_error": 1.809259968050484e-05,
+    "frames": 46
+  },
+  "sample_count": 3872,
+  "numerical_ik_legs": 16,
+  "metrics": {
+    "max_body": 5.5077470362263625e-17,
+    "max_target_m": 5.551115123125783e-17,
+    "max_urdf_contact_m": 1.1959531388233124e-16,
+    "max_qdot_error": 1.9325782263379665e-07,
+    "max_qddot_error": 6.76232944840649e-06,
+    "max_numeric_ik_rad": 1.5987211554602254e-14,
+    "max_periodic_q_rad": 2.7755575615628914e-15,
+    "max_world_stance_drift_m": 1.689731085869606e-16
+  },
+  "scope": "Kinematic oracle. Mesh/support validity is a separate survey gate."
+}

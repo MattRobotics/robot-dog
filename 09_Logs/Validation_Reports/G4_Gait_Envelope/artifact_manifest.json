@@ -1,0 +1,706 @@
+{
+  "scope": "G4 offline gait study; no hardware artifact, serial log, or actuator command is indexed",
+  "excluded": [
+    "artifact_manifest.json (self)"
+  ],
+  "artifact_count": 57,
+  "artifacts": [
+    {
+      "path": "G4_CHECKPOINT_REQUEST.txt",
+      "sha256": "aca394ac518ae77111d63753a4a77d9e33a3fdbf841ffa3d60b85032589884bb",
+      "bytes": 10522,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "G4_CLAUDE_HANDOFF_2026-09-29.md",
+      "sha256": "d2f118a2b264346969b0c0216c69c478b73096e8fa9ada41c139e168b2a9f441",
+      "bytes": 28416,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "G4_ORIGINAL_REQUEST.txt",
+      "sha256": "5c555eb8ca35da8f77bc2b33641889c568746b09ec2a83025ce81072fc433588",
+      "bytes": 27341,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "REPORT.md",
+      "sha256": "ad69065ae9fc1d7e4956410e8ae4e918551359fad660339fff4bca9b55d6856d",
+      "bytes": 41421,
+      "producer": "hand-written from the saved artifacts"
+    },
+    {
+      "path": "checkpoint_logs/matdog-g4-full.log",
+      "sha256": "f13e3ec81a8b56dd7c3b2d84b948714dc73b6e16a2ddccb3978b9e27fd5a176a",
+      "bytes": 689,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "checkpoint_logs/matdog-g4-lifecycle.log",
+      "sha256": "b9e116011238a391f6143e4482803c5a74f97805d87fbb09bc6dbf4ab8d90e6d",
+      "bytes": 127,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "checkpoint_logs/matdog-g4-manifest.log",
+      "sha256": "9f22884d623df2927a415198cf3d5f24f59a32d9211487eca984e43c2997a49d",
+      "bytes": 44,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "checkpoint_logs/matdog-g4-oracle.log",
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "bytes": 684,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "checkpoint_logs/matdog-g4-pose-regression.log",
+      "sha256": "c5dca781dbcc8663ea502a70e19442204ee261e300a188794d1e6fb9070f8ec1",
+      "bytes": 3001,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "checkpoint_logs/matdog-g4-refine.log",
+      "sha256": "5af71af44e409510620903f8248771a2dbb0061d317be82b26b82f726aae9bd8",
+      "bytes": 370,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "checkpoint_logs/matdog-g4-sanitizer.log",
+      "sha256": "bea572b2d3723d21a530915a7cc4c738b0e53e8310120d6232d6f2a18996b5af",
+      "bytes": 44,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "checkpoint_logs/matdog-g4-screen.log",
+      "sha256": "edf0cdf330c51a4d7f86b2c75dafbd6e98688f07a02e90fcb912aa9b647623d9",
+      "bytes": 566,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "checkpoint_logs/matdog-g4-static.log",
+      "sha256": "622fc95fe2b2ff2f85573f48b57ea3a6492e1b65e27008b7885c4bc827ded82e",
+      "bytes": 143,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "checkpoint_logs/targeted_checkpoint_validation.log",
+      "sha256": "c9bd09f1fe3df5eef47a3dfe8d10ed23fe87187e72ad052c3d5f1a1862ee9745",
+      "bytes": 330,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "checkpoint_manifest.json",
+      "sha256": "850665c64a73657d068ddcb65e779894d99446f93715d50bc6879d8a1a985dee",
+      "bytes": 4641,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "contact_discrepancy.json",
+      "sha256": "4e717231df55097b1c6ee7926c29890d3bdaaf295a12f146442f46f6bcc890f7",
+      "bytes": 32944,
+      "producer": "contact_discrepancy.py"
+    },
+    {
+      "path": "definitions.json",
+      "sha256": "6f6c7ebd273797a0331390ad4768aa200f9c403bbade55d7efe791ec57652da6",
+      "bytes": 4764,
+      "producer": "survey.py"
+    },
+    {
+      "path": "dense_ground_probe.json",
+      "sha256": "655b8d2e8b74ca2f9cd5a08bc301e8dd7096264f47abd5732bd67c25ad48dd47",
+      "bytes": 79797,
+      "producer": "dense_ground_probe.py"
+    },
+    {
+      "path": "dense_representatives.json",
+      "sha256": "77dd9737148fd9febc1973c8c7ef4fd08f8c9a08280060ba0355083bfef201ec",
+      "bytes": 6587562,
+      "producer": "dense_representatives.py"
+    },
+    {
+      "path": "dense_robust_full.json",
+      "sha256": "f26bc0c501874f662b13a7aac0299812b332153178d5f53e7fa46afa3f3b4c23",
+      "bytes": 8754439,
+      "producer": "dense_robust_full.py"
+    },
+    {
+      "path": "derivative_tables.json",
+      "sha256": "140ba5bf47cf168748db74a1d9021419f3520272db496772021baaa994f6c67c",
+      "bytes": 28881,
+      "producer": "derivatives.py"
+    },
+    {
+      "path": "diag_frontier_full.json",
+      "sha256": "26a6cd5412109a6f91710c7210f60f58373f232a42c37fa83e201d9e543dcdf2",
+      "bytes": 8455486,
+      "producer": "diag_frontier_full.py"
+    },
+    {
+      "path": "diag_stride_extension.json",
+      "sha256": "faceb74bcc6a68b60021d51528f79576eeb3ff0fe34414b5a8d4462574539fd7",
+      "bytes": 90674,
+      "producer": "diag_stride_extension.py"
+    },
+    {
+      "path": "envelope_grid.csv",
+      "sha256": "198db73446dbf5be9efb183bf62606487f4f47b646e3b7e0bc5a822a06247557",
+      "bytes": 150741,
+      "producer": "survey.py"
+    },
+    {
+      "path": "envelope_summary.json",
+      "sha256": "3aece45fc05aafee456b57616447a386e6b2cc7ef729599a570ad034ec7cfe5e",
+      "bytes": 20494,
+      "producer": "envelope_summary.py"
+    },
+    {
+      "path": "full_case_audit.json",
+      "sha256": "1994377950d42062046cb901619d4d6dab21f9d760d80a2724afd49b7f745c53",
+      "bytes": 66725,
+      "producer": "audit_gate.py"
+    },
+    {
+      "path": "full_cases.json",
+      "sha256": "cdd1d29da08a726120bf962cfc527356bcade5a16fcccde34c44b7f69957ff3a",
+      "bytes": 8435622,
+      "producer": "survey.py"
+    },
+    {
+      "path": "handoff_state.json",
+      "sha256": "cc30f7a653e68bdde95f17acbd0e744888a6877b563709d1390f3db80a3b1670",
+      "bytes": 52278,
+      "producer": "checkpoint (preserved handoff material)"
+    },
+    {
+      "path": "kinematic_diagnostic_screen.json",
+      "sha256": "b529708d4a49f7d16f050a7e5115123951cf0c16f29262ee44c43b79e12751b7",
+      "bytes": 1306394,
+      "producer": "diag_screen.py"
+    },
+    {
+      "path": "lifecycle_audit.json",
+      "sha256": "37cdda86a0e3c4e822779b93ee031cac2387b9118de6c8711f0c88a19fbc83ec",
+      "bytes": 1156904,
+      "producer": "lifecycle_audit.py"
+    },
+    {
+      "path": "lifecycle_probe.json",
+      "sha256": "4359e610ca5ebea7a0b8e2b03c5820515bb163ea687989636f430ded2d267018",
+      "bytes": 7761,
+      "producer": "lifecycle_probe.py"
+    },
+    {
+      "path": "oracle_results.json",
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "bytes": 684,
+      "producer": "oracle.py"
+    },
+    {
+      "path": "oracle_results_final.json",
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "bytes": 684,
+      "producer": "oracle.py"
+    },
+    {
+      "path": "refinement_full.json",
+      "sha256": "020ac10bc6b327a427be3e2da362e69f708cd63e3fdbac98b17d34ca72e7a24f",
+      "bytes": 4562995,
+      "producer": "refine.py"
+    },
+    {
+      "path": "refinement_screen.json",
+      "sha256": "4de3e6eacd399ef0e5eef0acc12349b8551ddf697a7cf0d7c66f93c4cd834539",
+      "bytes": 605147,
+      "producer": "refine.py"
+    },
+    {
+      "path": "representatives.json",
+      "sha256": "229dc84815906eb4c2ddd953223892f20e4d886e7a1adff73d9ece62a3701608",
+      "bytes": 9936,
+      "producer": "select_representatives.py"
+    },
+    {
+      "path": "revalidate_saved.json",
+      "sha256": "490c1fc6ee56b0f28d6c153ff4dfbbe8225f43d50f27992987f8ba070ab352bf",
+      "bytes": 7520,
+      "producer": "revalidate_saved.py"
+    },
+    {
+      "path": "robust_search.json",
+      "sha256": "c2eb765d3e47e1d77210018db6568fbbf4d9d8ec5fb5f6c0f7474c46c0801847",
+      "bytes": 226659,
+      "producer": "robust_search.py"
+    },
+    {
+      "path": "screen.json",
+      "sha256": "2c72b6a73492961f1f866b079e725882b74234b4f431d78248c3347554b87cef",
+      "bytes": 3912844,
+      "producer": "survey.py"
+    },
+    {
+      "path": "trot_120mm_cycle.csv",
+      "sha256": "39347cf84bd927fa994c2bf011b3154e3babfe75a574048b8dc752e75c67f135",
+      "bytes": 312261,
+      "producer": "render.py"
+    },
+    {
+      "path": "trot_cycle.csv",
+      "sha256": "78b34e7e5210b84a9a9ec95258abec060560498d9dc109580171c970a78d8799",
+      "bytes": 310514,
+      "producer": "render.py"
+    },
+    {
+      "path": "validation_results.json",
+      "sha256": "a0af396692b96645b317dcf7e8e77371b50b0d33a52ea3250a2523810336a16e",
+      "bytes": 9883,
+      "producer": "validate.py"
+    },
+    {
+      "path": "views/trot_120mm_phase.png",
+      "sha256": "cc395a8823165cf3fe2f4e910491b1aa7de053c699e43c771931ca7f8d6bdbd1",
+      "bytes": 76249,
+      "producer": "render.py"
+    },
+    {
+      "path": "views/trot_120mm_side.png",
+      "sha256": "d2411f3370c3ba746d6f599fb6a830c5c621285e52f0cc07968916ea6ec246bb",
+      "bytes": 426791,
+      "producer": "render.py"
+    },
+    {
+      "path": "views/trot_120mm_top.png",
+      "sha256": "c65f224df4c725ccd0b0d471caaf14afe6590892eb2bfa0f1d4044392d07632a",
+      "bytes": 466707,
+      "producer": "render.py"
+    },
+    {
+      "path": "views/trot_phase.png",
+      "sha256": "b31ba2c6579b8c972b497f18a4ab47beb82eade5f53aee9ce35272f1d5de10b9",
+      "bytes": 74741,
+      "producer": "render.py"
+    },
+    {
+      "path": "views/trot_side.png",
+      "sha256": "1b60298f4ce0b19a8e2be828a5e18b44e07ae241843125e384e9a4da405d80b5",
+      "bytes": 411488,
+      "producer": "render.py"
+    },
+    {
+      "path": "views/trot_top.png",
+      "sha256": "3623d53693b1334d8a7d0f090dc1aa4e2f7e2cf9f94101d00a11a9d043de11ae",
+      "bytes": 463239,
+      "producer": "render.py"
+    },
+    {
+      "path": "views/walk_100mm_phase.png",
+      "sha256": "48c6661052fd72787088ef6c49e390eae2f138c51f64c1fc164ef49f360ae378",
+      "bytes": 89701,
+      "producer": "render.py"
+    },
+    {
+      "path": "views/walk_100mm_side.png",
+      "sha256": "a89b19a732ff13ee507b41b906efc940f2af18fde1739f7541326370236dc08b",
+      "bytes": 414820,
+      "producer": "render.py"
+    },
+    {
+      "path": "views/walk_100mm_top.png",
+      "sha256": "fa35b29571f21abe70961e784c00537a8abff2546b4ef0dd064abb0a782c1344",
+      "bytes": 464206,
+      "producer": "render.py"
+    },
+    {
+      "path": "views/walk_phase.png",
+      "sha256": "5bab888e4887df0bbb434c12cbaeb5a32a1d0e19bbc2652a154bd43bc90b2363",
+      "bytes": 87421,
+      "producer": "render.py"
+    },
+    {
+      "path": "views/walk_side.png",
+      "sha256": "19ab584a5f4c8ede2b11af59dea464745f6f72d77325aa9b187e0f70f69e89d1",
+      "bytes": 404401,
+      "producer": "render.py"
+    },
+    {
+      "path": "views/walk_top.png",
+      "sha256": "610c7b62b6e83a69c15e212e02b1553b4a3f329b87ea8ec33aa7f746fa78d747",
+      "bytes": 457956,
+      "producer": "render.py"
+    },
+    {
+      "path": "walk_100mm_cycle.csv",
+      "sha256": "a2bd7951d87b2d68a91e7f210ef94dc10435b11b8144faf6262a84e2c4a8111b",
+      "bytes": 329476,
+      "producer": "render.py"
+    },
+    {
+      "path": "walk_cycle.csv",
+      "sha256": "d0ce50e8047a4a387ac78da16df2d37b0e5c089338d428be0653bc8fa66b5a21",
+      "bytes": 311591,
+      "producer": "render.py"
+    },
+    {
+      "path": "xgo_architecture.json",
+      "sha256": "4abb64c8adb4f17300f612edbd115344a78e6a521a09445c43626f991b24dcd6",
+      "bytes": 13100,
+      "producer": "xgo_evidence.py"
+    }
+  ],
+  "preserved_checkpoint_checks": [
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/G4_CHECKPOINT_REQUEST.txt",
+      "checkpoint_sha256": "aca394ac518ae77111d63753a4a77d9e33a3fdbf841ffa3d60b85032589884bb",
+      "current_sha256": "aca394ac518ae77111d63753a4a77d9e33a3fdbf841ffa3d60b85032589884bb",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/G4_CLAUDE_HANDOFF_2026-09-29.md",
+      "checkpoint_sha256": "d2f118a2b264346969b0c0216c69c478b73096e8fa9ada41c139e168b2a9f441",
+      "current_sha256": "d2f118a2b264346969b0c0216c69c478b73096e8fa9ada41c139e168b2a9f441",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/G4_ORIGINAL_REQUEST.txt",
+      "checkpoint_sha256": "5c555eb8ca35da8f77bc2b33641889c568746b09ec2a83025ce81072fc433588",
+      "current_sha256": "5c555eb8ca35da8f77bc2b33641889c568746b09ec2a83025ce81072fc433588",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-full.log",
+      "checkpoint_sha256": "f13e3ec81a8b56dd7c3b2d84b948714dc73b6e16a2ddccb3978b9e27fd5a176a",
+      "current_sha256": "f13e3ec81a8b56dd7c3b2d84b948714dc73b6e16a2ddccb3978b9e27fd5a176a",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-lifecycle.log",
+      "checkpoint_sha256": "b9e116011238a391f6143e4482803c5a74f97805d87fbb09bc6dbf4ab8d90e6d",
+      "current_sha256": "b9e116011238a391f6143e4482803c5a74f97805d87fbb09bc6dbf4ab8d90e6d",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-manifest.log",
+      "checkpoint_sha256": "9f22884d623df2927a415198cf3d5f24f59a32d9211487eca984e43c2997a49d",
+      "current_sha256": "9f22884d623df2927a415198cf3d5f24f59a32d9211487eca984e43c2997a49d",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-oracle.log",
+      "checkpoint_sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "current_sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-pose-regression.log",
+      "checkpoint_sha256": "c5dca781dbcc8663ea502a70e19442204ee261e300a188794d1e6fb9070f8ec1",
+      "current_sha256": "c5dca781dbcc8663ea502a70e19442204ee261e300a188794d1e6fb9070f8ec1",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-refine.log",
+      "checkpoint_sha256": "5af71af44e409510620903f8248771a2dbb0061d317be82b26b82f726aae9bd8",
+      "current_sha256": "5af71af44e409510620903f8248771a2dbb0061d317be82b26b82f726aae9bd8",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-sanitizer.log",
+      "checkpoint_sha256": "bea572b2d3723d21a530915a7cc4c738b0e53e8310120d6232d6f2a18996b5af",
+      "current_sha256": "bea572b2d3723d21a530915a7cc4c738b0e53e8310120d6232d6f2a18996b5af",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-screen.log",
+      "checkpoint_sha256": "edf0cdf330c51a4d7f86b2c75dafbd6e98688f07a02e90fcb912aa9b647623d9",
+      "current_sha256": "edf0cdf330c51a4d7f86b2c75dafbd6e98688f07a02e90fcb912aa9b647623d9",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-static.log",
+      "checkpoint_sha256": "622fc95fe2b2ff2f85573f48b57ea3a6492e1b65e27008b7885c4bc827ded82e",
+      "current_sha256": "622fc95fe2b2ff2f85573f48b57ea3a6492e1b65e27008b7885c4bc827ded82e",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/targeted_checkpoint_validation.log",
+      "checkpoint_sha256": "c9bd09f1fe3df5eef47a3dfe8d10ed23fe87187e72ad052c3d5f1a1862ee9745",
+      "current_sha256": "c9bd09f1fe3df5eef47a3dfe8d10ed23fe87187e72ad052c3d5f1a1862ee9745",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/definitions.json",
+      "checkpoint_sha256": "6f6c7ebd273797a0331390ad4768aa200f9c403bbade55d7efe791ec57652da6",
+      "current_sha256": "6f6c7ebd273797a0331390ad4768aa200f9c403bbade55d7efe791ec57652da6",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/envelope_grid.csv",
+      "checkpoint_sha256": "198db73446dbf5be9efb183bf62606487f4f47b646e3b7e0bc5a822a06247557",
+      "current_sha256": "198db73446dbf5be9efb183bf62606487f4f47b646e3b7e0bc5a822a06247557",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/full_cases.json",
+      "checkpoint_sha256": "cdd1d29da08a726120bf962cfc527356bcade5a16fcccde34c44b7f69957ff3a",
+      "current_sha256": "cdd1d29da08a726120bf962cfc527356bcade5a16fcccde34c44b7f69957ff3a",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/handoff_state.json",
+      "checkpoint_sha256": "cc30f7a653e68bdde95f17acbd0e744888a6877b563709d1390f3db80a3b1670",
+      "current_sha256": "cc30f7a653e68bdde95f17acbd0e744888a6877b563709d1390f3db80a3b1670",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/lifecycle_audit.json",
+      "checkpoint_sha256": "37cdda86a0e3c4e822779b93ee031cac2387b9118de6c8711f0c88a19fbc83ec",
+      "current_sha256": "37cdda86a0e3c4e822779b93ee031cac2387b9118de6c8711f0c88a19fbc83ec",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/oracle_results.json",
+      "checkpoint_sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "current_sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/refinement_full.json",
+      "checkpoint_sha256": "020ac10bc6b327a427be3e2da362e69f708cd63e3fdbac98b17d34ca72e7a24f",
+      "current_sha256": "020ac10bc6b327a427be3e2da362e69f708cd63e3fdbac98b17d34ca72e7a24f",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/refinement_screen.json",
+      "checkpoint_sha256": "4de3e6eacd399ef0e5eef0acc12349b8551ddf697a7cf0d7c66f93c4cd834539",
+      "current_sha256": "4de3e6eacd399ef0e5eef0acc12349b8551ddf697a7cf0d7c66f93c4cd834539",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/screen.json",
+      "checkpoint_sha256": "2c72b6a73492961f1f866b079e725882b74234b4f431d78248c3347554b87cef",
+      "current_sha256": "2c72b6a73492961f1f866b079e725882b74234b4f431d78248c3347554b87cef",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/xgo_architecture.json",
+      "checkpoint_sha256": "4abb64c8adb4f17300f612edbd115344a78e6a521a09445c43626f991b24dcd6",
+      "current_sha256": "4abb64c8adb4f17300f612edbd115344a78e6a521a09445c43626f991b24dcd6",
+      "status": "PRESERVED"
+    }
+  ],
+  "provenance_input_checks": [
+    {
+      "artifact": "full_case_audit.json",
+      "input": "full_cases.json",
+      "recorded_sha256": "cdd1d29da08a726120bf962cfc527356bcade5a16fcccde34c44b7f69957ff3a",
+      "current_sha256": "cdd1d29da08a726120bf962cfc527356bcade5a16fcccde34c44b7f69957ff3a",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "full_case_audit.json",
+      "input": "refinement_full.json",
+      "recorded_sha256": "020ac10bc6b327a427be3e2da362e69f708cd63e3fdbac98b17d34ca72e7a24f",
+      "current_sha256": "020ac10bc6b327a427be3e2da362e69f708cd63e3fdbac98b17d34ca72e7a24f",
+      "status": "MATCH"
+    }
+  ],
+  "definitions_source_checks": [
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+      "recorded_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "current_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl",
+      "recorded_sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "current_sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl",
+      "recorded_sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "current_sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl",
+      "recorded_sha256": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "current_sha256": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl",
+      "recorded_sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "current_sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl",
+      "recorded_sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "current_sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl",
+      "recorded_sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "current_sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl",
+      "recorded_sha256": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "current_sha256": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl",
+      "recorded_sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "current_sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl",
+      "recorded_sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "current_sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl",
+      "recorded_sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "current_sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl",
+      "recorded_sha256": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "current_sha256": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl",
+      "recorded_sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "current_sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl",
+      "recorded_sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "current_sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl",
+      "recorded_sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "current_sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl",
+      "recorded_sha256": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "current_sha256": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl",
+      "recorded_sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "current_sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "status": "MATCH"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl",
+      "recorded_sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "current_sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "status": "MATCH"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp",
+      "recorded_sha256": "68f1b4efcf3460502a83f89c1e96ff621cecc25111bd55d8ab9f479fd4226510",
+      "current_sha256": "a6c497c393641577988d9773f001a4280e875422bc22d7588bd2fb8979198823",
+      "status": "HISTORICAL_GENERATOR_REVISION"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Gait.h",
+      "recorded_sha256": "e308c64acff060b8be78796c5db21078a4de5f2b3b9b38f26d186ed0e6173914",
+      "current_sha256": "e308c64acff060b8be78796c5db21078a4de5f2b3b9b38f26d186ed0e6173914",
+      "status": "MATCH"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp",
+      "recorded_sha256": "2a9a6df04b23a1ec3823f196a9547167d7f1469b25e5f401dc47650ded12e6de",
+      "current_sha256": "2a9a6df04b23a1ec3823f196a9547167d7f1469b25e5f401dc47650ded12e6de",
+      "status": "MATCH"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Locomotion.h",
+      "recorded_sha256": "0b29b56bfa69b7cb190a45b21a9b9ceb9342ba2068950af33444c6bd2dce6501",
+      "current_sha256": "0b29b56bfa69b7cb190a45b21a9b9ceb9342ba2068950af33444c6bd2dce6501",
+      "status": "MATCH"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/bridge.cpp",
+      "recorded_sha256": "79f4a3bcda03dbfb4605614e58788eedda205f0e0c2244af2e4e0b86bf40a9ed",
+      "current_sha256": "79f4a3bcda03dbfb4605614e58788eedda205f0e0c2244af2e4e0b86bf40a9ed",
+      "status": "MATCH"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/core.py",
+      "recorded_sha256": "3bd288deb467d7e1dc4c91d640dd4c68dfeb2847c468ba06649ff7e79e3d6d4b",
+      "current_sha256": "f70613d11fa3885ce143c8f00417eb3dce9651942aa8ebbe7edd9543f6a1489b",
+      "status": "HISTORICAL_GENERATOR_REVISION"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/lifecycle_audit.py",
+      "recorded_sha256": "c28d816c1414dfbf06ae76f85dc6f3bfc126e5be01e7a1499327474acac1ea68",
+      "current_sha256": "c28d816c1414dfbf06ae76f85dc6f3bfc126e5be01e7a1499327474acac1ea68",
+      "status": "MATCH"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/oracle.py",
+      "recorded_sha256": "9441315c7242593224950df3ce14c4c5b09f7e830bca170dda250d782904c73c",
+      "current_sha256": "84ec1ff5f381292da246be9cb6b963ac29e4fcaf6567ad83c663ccbb79c13549",
+      "status": "HISTORICAL_GENERATOR_REVISION"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/refine.py",
+      "recorded_sha256": "6d670d73e7535d33160a7873b521e16a6c8ce7b42e7c980d0e373f04a0cb7900",
+      "current_sha256": "6d670d73e7535d33160a7873b521e16a6c8ce7b42e7c980d0e373f04a0cb7900",
+      "status": "MATCH"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/render.py",
+      "recorded_sha256": "9a6e86033c9d877260eddc78b5a2231bca31308d4ee8971d116d67ed0e9a5ba2",
+      "current_sha256": "8a715f61093051fb9bb124372098cb6056c09c896ca38ea1eeeae30379d54e3b",
+      "status": "HISTORICAL_GENERATOR_REVISION"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/survey.py",
+      "recorded_sha256": "606f1cf29b8ccc1c85816d5af09c2e2a4922a723beae4484dc6e44b645c5ec05",
+      "current_sha256": "606f1cf29b8ccc1c85816d5af09c2e2a4922a723beae4484dc6e44b645c5ec05",
+      "status": "MATCH"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/xgo_evidence.py",
+      "recorded_sha256": "d6b704a106163e46b4a783e63830980fdebc90c5d2eda5c495ddf96f3f06d5d8",
+      "current_sha256": "d6b704a106163e46b4a783e63830980fdebc90c5d2eda5c495ddf96f3f06d5d8",
+      "status": "MATCH"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml",
+      "recorded_sha256": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
+      "current_sha256": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
+      "status": "MATCH"
+    }
+  ],
+  "summary": {
+    "changed_preserved_checkpoint_files": [],
+    "stale_inputs": [],
+    "changed_canonical_sources": [],
+    "historical_generator_revisions": [
+      "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp",
+      "06_Software/Matdog_Core/gait_audit/core.py",
+      "06_Software/Matdog_Core/gait_audit/oracle.py",
+      "06_Software/Matdog_Core/gait_audit/render.py"
+    ]
+  }
+}
