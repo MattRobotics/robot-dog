@@ -49,6 +49,7 @@ class Controller {
  private:
   void printBootBanner();
   void updateQ0Capture();
+  void updateStartupQualification();
   // Every tick, before any command is processed: rebuilds
   // CalibrationMotionPermitFacts from live state, re-checks the permit
   // against them, and pushes the (possibly just-revoked) result into
@@ -77,6 +78,7 @@ class Controller {
   // never touches a servo: SAFE_OFF was the executor's, verified before the
   // executor turned terminal.
   void updateFullLegFinalization();
+  bool verifyStartupNeckOff();
   // Evidence line per search step / probe transition (see its definition).
   void printFullLegSearchEvent();
   // Evidence line per sequence phase / step / joint transition.
@@ -195,6 +197,8 @@ class Controller {
   // (Objective B) as every other motion path, plus the geometry-validated
   // sequence plan for every move and probe it makes.
   calibration::FullLegCalibrationExecutor full_leg_calibration_;
+  calibration::StartupRecoveryQualification startup_qualification_;
+  bool startup_qualification_reported_=false;
   // The run in flight (armed by the FULL LEG command once the executor
   // accepted it) and the RAM-only record of every leg run in this power-up.
   // Neither is persisted: a reboot starts with an empty store.

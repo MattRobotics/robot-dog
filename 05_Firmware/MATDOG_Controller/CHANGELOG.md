@@ -1719,3 +1719,16 @@ H1/H2/H3/H4/H5/H6 hardware re-validation.
   separation; dirty state, failed tests, conflicts and remote errors stop it.
 - Initial pose remains blocked pending mechanical qualification after shutdown.
   No firmware code, partition, EEPROM or safety limit changed in this step.
+
+
+## 2026-10-03 — explicit RF startup recovery (offline)
+
+The earlier STARTUP_Q0_REFERENCE block is superseded by the verified complete
+source `full_cal_nvs_20261003_134848` (RF UPPER2106). A separate immutable
+reference supports only explicit fresh-readback-qualified RF return21→22→32;
+no boot authority or transform restore. Targeted host tests, affected static
+audit and clean ROBOT_POWERED build are recorded in the release package.
+Geometry V5 support bands remain absolute±10 for passive joints; mechanical
+support/installation continuity are operator GO prerequisites. No hardware
+PASS, serial access or flashing is claimed. See
+[technical assessment](STARTUP_RECOVERY_OFFLINE_ASSESSMENT.md).

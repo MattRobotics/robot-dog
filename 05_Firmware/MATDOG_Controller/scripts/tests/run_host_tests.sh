@@ -100,6 +100,7 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_actuator_write_policy" \
   "$SCRIPT_DIR/test_actuator_write_policy.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -115,6 +116,7 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_calibration_geometry" \
   "$SCRIPT_DIR/test_calibration_geometry.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -165,6 +167,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
@@ -184,6 +187,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationPopulationEvidence.cpp" \
@@ -256,6 +260,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_actuator_runtime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -274,6 +279,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -291,6 +297,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -309,6 +316,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -346,6 +354,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -365,6 +374,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
@@ -390,6 +400,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -421,6 +432,7 @@ CALREC_SRCS=(
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp"
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp"
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp"
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp"
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp"
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp"
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp"
@@ -549,6 +561,15 @@ done
   -o "$OUT/test_http_mailbox" \
   "$SCRIPT_DIR/test_http_mailbox.cpp"
 
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -o "$OUT/test_startup_recovery_qualification" \
+  "$SCRIPT_DIR/test_startup_recovery_qualification.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryQualification.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
+
 "$OUT/test_servo_population"
 "$OUT/test_servo_profile"
 "$OUT/test_daly_protocol"
@@ -577,6 +598,7 @@ done
 "$OUT/test_contact_probe_engine"
 "$OUT/test_operational_envelope"
 "$OUT/test_full_leg_calibration_executor"
+"$OUT/test_startup_recovery_qualification"
 "$OUT/test_full_leg_calibration_plan"
 "$OUT/test_full_leg_calibration_finalizer"
 "$OUT/test_calibration_record"
@@ -595,3 +617,6 @@ python3 "$SCRIPT_DIR/test_command_router_framing_mutations.py"
 "$OUT/test_hmac256"
 "$OUT/test_ota_session"
 "$OUT/test_http_mailbox"
+
+python3 "$SCRIPT_DIR/test_matdog_startup_reference.py"
+python3 "$SCRIPT_DIR/test_static_audit_startup.py"

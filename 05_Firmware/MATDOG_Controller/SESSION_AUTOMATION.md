@@ -9,57 +9,39 @@ calibrator and one serial connection at a time. No-argument invocation and
 `--offline-check` perform file/Git checks only. Hardware stages require
 `--hardware-session --session-dir /absolute/new/session/path`.
 
-## Current admission: INITIAL_POSE_BLOCKED
+## Current admission: explicit qualified startup program
 
-The package's `initial-pose-plan.json` deliberately has `qualified_path=false`.
-This stops calibration before hardware I/O. Application-only flashing is
-independent of this mechanical gate. Do not flip that flag
-as an operator override. Releasing the gate requires an actual qualified
-mechanical procedure with evidence and a new reviewed package.
+The distributed package pins the CLEAN firmware build and verified complete
+reference from `full_cal_nvs_20261003_134848`. `qualified_path=true` admits only
+the tested fixed RF LOWER MAX return, with fresh population/readbacks and the
+absolute support bands in STARTUP_RECOVERY_OFFLINE_ASSESSMENT.md. It is not an
+operator override or a hardware PASS. Installation continuity, body/passive
+joint support against gravity, clear area, disconnect and charger-off are
+mandatory physical GO conditions. If those cannot be established without
+moving the robot, stop with SAFE_OFF.
 
-The CR2-C runbook establishes nominal URDF Q0 manually with torque OFF and
-physical square/jigs, supported against gravity. It does not qualify a path
-from the observed RF/RH residual pose after shutdown while forbidding forced
-reducer back-driving, cover removal and RESET. The same-boot recovery witness
-of firmware `125d981b02a3` cannot authorize an earlier boot. Historical positions
-are diagnostic context only. The physical placement/qualification required to
-remove this block is documented in the package's `INITIAL_POSE_PLAN.md`.
+1. Flash: all canonical identity/binary/backup/layout/OTA/NVS gates, one
+   application-only write, then signature/MAINTENANCE/NONE/SAFE_OFF13 verification.
+   Mechanical Q0 does not gate flashing; this stage issues no repositioning.
+2. Calibration: consume FLASH_OK and same-boot proof, check fresh encoder
+   compatibility, then one operator GO for the entire procedure. The existing
+   native runner qualifies the startup path read-only; if needed it executes
+   only 21→22→32 and verifies nominal/SAFE_OFF. It then acquires/promotes new
+   Fresh Q0, INITIAL RECOVERY, LF/RF/RH/LH, export24/24, SAVE CHECK/SAVE/ACK.
+   Historical reference values never enter the normal transform table; old LF
+   contacts are not combined with the new capture.
+3. Finalization: real operator power cycle; read-only ACK generation/record
+   verification and motion unauthorized. Only after hardware PASS do relevant
+   regressions, actual-evidence documentation and controlled isolated merge run.
+   Dirty trees, different firmware, conflicts, gait ancestry and unavailable
+   remote stop integration; no force push. None of this is executed offline.
 
-## Stage contracts once the gate has been qualified
-
-1. The first stage pins CLEAN firmware commit `125d981b02a38673c8c54f2096632c99fd1f29ff`
-   and its canonical build directory in a detached flash worktree. It checks
-   hashes and the historical backup locally, then calls only the unchanged
-   `scripts/flash_app_only.sh`. That script verifies ESP32-S3 MAC, installed
-   partition table/active slot and effective erase range, performs one
-   application write and independent flash verification. An independent native
-   connection checks signature, MAINTENANCE, authority NONE, SAFE_OFF 13/13,
-   and twelve valid torque-off encoder readings before `FLASH_OK.json`.
-   Those readings may be far from Q0; no pose attestation or repositioning is
-   performed in this stage. FLASH_OK explicitly records nominal_pose_verified=false.
-   USB failure stops; no repeated writes, BOOT/EN request or full-image fallback.
-2. The second stage retains the qualified pose gate, consumes FLASH_OK, checks
-   the same boot and actual torque-off encoders, then requires the operator's
-   physical GO checklist. FLASH_OK supplies no motion authorization. The native
-   runner executes `--phase all --no-flash`, fresh Q0 12/12, promotion, recovery
-   and LF/RF/RH/LH export 24/24, followed by `--phase persist --no-flash`.
-   SAVE/ACK exact generation and the application identity are recorded.
-3. The third stage requires a real operator power cycle, observes USB absent and
-   returned, and invokes native `--phase verify-persistence` in read-only mode.
-   It checks a new uptime, exact ACK generation, record intact and motion
-   unauthorized. Only then are relevant regressions run and actual evidence
-   appended to VALIDATION, CHANGELOG, runbook and architecture in a separate
-   documentation commit. Integration uses an isolated worktree, refuses dirty
-   state, conflicts, divergent main, gait ancestry or different firmware,
-   reruns regressions on the merged tree and pushes main without force.
-   An unavailable remote/conflict retains the local result and reports BLOCKED.
-
-Any consumed or failed session refuses automatic retry. Native errors and
-operator SIGINT/SIGTERM trigger ABORT/SAFE_OFF while the link is available;
-link loss leaves firmware protections and the accessible physical disconnect
-indispensable. Every stage exports its logs, manifest and evidence hashes.
-Tests use synthetic controllers or temporary local Git repositories; these
-receipts never qualify the packaged initial-pose gate or real hardware.
+Any consumed/failed session refuses automatic retry. The scoped startup grant
+is explicit and can only prime at the current position and return the three
+fixed joints to the immutable references. Unknown poses or support-band drift
+refuse before torque or trigger SAFE_OFF. Boot does not start qualification or
+restore authority. See the single technical report in the release package for
+hashes, test results and residual physical assumptions.
 
 ## DALY guard on the existing native link
 
@@ -79,22 +61,10 @@ protections during mechanical contact. Real bus/load timing remains unvalidated.
 
 ## Provenance
 
-Firmware/application build ID and SHA remain pinned to `125d981b02a3`; host
-runner/DALY/tooling and later documentation have separate commits. No firmware,
-Geometry V5, EEPROM, partition or NVS erase change is part of this tooling step.
-The frozen flash worktree remains CLEAN at the firmware commit. The original
-checkout and gait worktree are preserved. Main has not been integrated offline.
-
-## Startup qualification follow-up
-
-The RF LOWER direction is +1 in the bound profile; the corrected observed
-path uses +351 ticks, with no intended-stop pair excluded. The old observed
-negative-sign CAD case is superseded. The targeted startup tool covers support
-bands independently and reports geometry evidence only. It does not grant
-authority or restore Q0 after a reboot. Read-only boot LOAD discards decoded
-record values; fresh promoted Q0 are RAM-only. A coherent twelve-joint reference
-for the RF LOWER MAX interruption must be established before a startup motion
-can be admitted. An earlier LF acquisition (RF UPPER 2107) must not be completed
-with the later RF interruption's reference (2106). The package's final report
-records the admission decision; this host change does not implement a powered
-startup executor.
+Firmware and tools are bound to the new clean release commit, recorded in the
+package manifests. The previous candidate125d981 and installed be0c12979e5b
+images are preserved. Geometry V5, EEPROM, partition table and NVS layout are
+unchanged. Boot LOAD remains diagnostic/read-only; the new immutable reference
+is accessible solely by the explicit startup command pair. Original checkout,
+gait worktree and historical package snapshots are preserved. No main merge
+has been performed offline.

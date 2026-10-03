@@ -91,6 +91,8 @@ class FakeController:
         self.bms_comm = "OK"
         self.bms_age = 100
         self.bms_fault_leg = None
+        self.startup_positions=None
+        self.startup_fault=None
 
     def bms_status(self):
         self.emit("DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS",
@@ -121,6 +123,20 @@ class FakeController:
     def handle(self, cmd):
         self.sent.append(cmd)
         u = cmd.upper()
+        if u=="@CALIBRATION STARTUP QUALIFY RF_RETURN_20261003":
+            from matdog_startup_reference import GEOMETRY,classify_positions
+            self.emit("CALIBRATION_STARTUP_QUALIFICATION=STARTED read_only=1 authority=NONE reference=20261003_134848")
+            if self.startup_fault=='qualification':
+                return self.emit("CALIBRATION_STARTUP_QUALIFICATION=REFUSED reason=STARTUP_POSE_UNRECOGNIZED bus=22 motion_authorized=0")
+            route=classify_positions(self.startup_positions or self.q0)
+            return self.emit(f"CALIBRATION_STARTUP_QUALIFICATION=PASS route={route} reference=20261003_134848 geometry={GEOMETRY} samples=3x12 motion_authorized=0 reason=NONE")
+        if u=="@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN":
+            self.emit("CALIBRATION_STARTUP_RECOVERY=ARMED route=RF_LOWER_MAX_RETURN torque_limit=500 reference_admitted=0 phase=PREFLIGHT")
+            if self.startup_fault=='recovery':
+                return self.emit("CALIBRATION_STARTUP_RECOVERY_RESULT verdict=FAILED recovered=0/12 failure=HARD_CURRENT_ABORT failed_phase=RETURN_LOWER_HELD last_decision=ACCEPT")
+            self.startup_positions=None
+            return self.emit("CALIBRATION_STARTUP_RECOVERY_RESULT verdict=PASS recovered=12/12 failure=NONE failed_phase=- last_decision=ACCEPT",
+                "CALIBRATION_STARTUP_CLOSE safe_off=13/13 authority=NONE motion_authorized=0 reference_admitted=0")
         if u == "":
             return
         if u == "@IMU STREAM OFF":
@@ -140,7 +156,8 @@ class FakeController:
             if self.run:
                 return self.emit("SERVO_READ=BLOCKED", "REASON=MOTION_EXECUTOR_ACTIVE")
             b = int(m.group(1))
-            return self.emit(f"SERVO_READ id={b} position={self.q0.get(b, 2048)} speed=0 load=0 "
+            positions=self.startup_positions or self.q0
+            return self.emit(f"SERVO_READ id={b} position={positions.get(b, 2048)} speed=0 load=0 "
                              f"voltage=120 temp=31 torque=0 current=0")
         if u == "@STATUS":
             return self.emit(f"SYSTEM health=READY power_state=RUN mode=MAINTENANCE "
@@ -850,6 +867,41 @@ class RunnerTest(unittest.TestCase):
         finally:
             hw.flash = real_flash
         self.assertEqual(flashed, [])
+
+    def test_startup_then_fresh_four_legs_save_ack_reboot(self):
+        from matdog_startup_reference import Q0 as reference
+        self.controller.q0=dict(reference)
+        self.controller.startup_positions=dict(reference,**{})
+        self.controller.startup_positions.update({21:2348,22:1080,32:1665})
+        self.assertEqual(self.run_phase('all','--require-daly','--qualified-startup-recovery'),0)
+        commands=self.sent()
+        startup=commands.index('@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN')
+        capture=commands.index('@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE')
+        self.assertLess(startup,capture)
+        self.assertEqual(commands.count('@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN'),1)
+        self.assertEqual(len(self.controller.records),4)
+        self.assertEqual(self.run_phase('persist','--require-daly'),0)
+        self.controller.uptime_ms=100
+        self.assertEqual(self.run_phase('verify-persistence'),0)
+
+    def test_startup_nominal_issues_no_startup_motion(self):
+        from matdog_startup_reference import Q0 as reference
+        self.controller.q0=dict(reference)
+        self.assertEqual(self.run_phase('all','--require-daly','--qualified-startup-recovery'),0)
+        self.assertNotIn('@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN',self.sent())
+
+    def test_startup_failure_stops_before_fresh_capture(self):
+        from matdog_startup_reference import Q0 as reference
+        for failure in ('qualification','recovery'):
+            with self.subTest(failure=failure):
+                self.controller=FakeController();self.controller.q0=dict(reference)
+                self.controller.startup_positions=dict(reference)
+                self.controller.startup_positions.update({21:2348,22:1080,32:1665})
+                self.controller.startup_fault=failure
+                self.assertEqual(self.run_phase('all','--require-daly','--qualified-startup-recovery'),1)
+                self.assertNotIn('@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE',self.sent())
+                self.assertIn('@CALIBRATION SESSION ABORT',self.sent())
+                self.assertLessEqual(self.sent().count('@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN'),1)
 
 
 if __name__ == "__main__":

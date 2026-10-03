@@ -42,6 +42,7 @@
 #include "../../src/calibration/FullLegCalibrationExecutor.h"
 #include "../../src/calibration/FullLegCalibrationPlan.h"
 #include "../../src/calibration/ThermalConfirmation.h"
+#include "../../src/calibration/StartupRecoveryReference.h"
 #include "kinematic_servo_sim.h"
 
 using namespace matdog;
@@ -368,6 +369,7 @@ struct Rig {
 
   FullLegCalibrationContext ctx() const {
     FullLegCalibrationContext c{};
+    c.startup_motion_permit=full.request().startup_recovery;
     c.session_active = session;
     c.origin = CalibrationOrigin::LIVE_SESSION;
     c.lease = lease;
@@ -390,6 +392,7 @@ struct Rig {
     b.motion_permit_authority_generation = lease.generation;
     b.auxiliary_parked = false;
     b.sequence_active = full.sequenceActive();
+    b.startup_recovery_only=full.request().startup_recovery;
     b.sequence_leg = full.leg();
     b.sequence_phase = full.sequencePhase();
     b.sequence_prerequisites_verified = full.prerequisitesVerified();
@@ -1970,13 +1973,76 @@ void test_diagnostics_math_is_v25() {
 
 void test_names() {
   g_case = "names";
-  for (uint8_t i = 0; i <= static_cast<uint8_t>(FullLegFailure::OPERATOR_ABORT); ++i) {
+  for (uint8_t i = 0; i <= static_cast<uint8_t>(FullLegFailure::STARTUP_POSE_OUTSIDE_CERTIFICATE); ++i) {
     CHECK(std::strcmp(toString(static_cast<FullLegFailure>(i)), "UNKNOWN") != 0);
   }
   for (uint8_t i = 0; i <= static_cast<uint8_t>(FullLegStep::FAILED); ++i) {
     CHECK(std::strcmp(toString(static_cast<FullLegStep>(i)), "UNKNOWN") != 0);
   }
   CHECK(std::strcmp(toString(static_cast<FullLegFailure>(200)), "UNKNOWN") == 0);
+}
+
+void prepareStartup(Rig& r) {
+  r.policy.transforms().clear();r.report_phases=false;
+  for (const auto& ref:kStartupReference) {
+    auto& j=r.backend.joint[ref.bus];j.pos=ref.q0;j.goal=3000;j.torque=false;
+  }
+  r.backend.joint[21].pos=2348;r.backend.joint[22].pos=1080;r.backend.joint[32].pos=1665;
+}
+void startStartup(Rig& r) {
+  auto context=r.ctx();context.startup_motion_permit=true;
+  CHECK(r.full.startStartupRecovery(context,r.t));
+}
+void test_startup_recovery() {
+  {
+    g_case="startup: correct reference, no witness, exact RF/RH residuals, sequential return, SAFE_OFF";
+    Rig r(Leg::RF);prepareStartup(r);startStartup(r);finishRecovery(r);
+    CHECK(r.full.status().step==FullLegStep::COMPLETE);
+    CHECK_EQ(r.full.status().recovered_joints,12);CHECK_EQ(r.full.status().contacts_accepted,0);
+    CHECK(r.policy.transforms().empty());CHECK_EQ(r.torqueOnCount(),0);
+    std::vector<uint8_t> returns;
+    for (const auto& event:r.backend.events) {
+      if (event.kind==Ev::GOAL && event.torque_before) {
+        returns.push_back(event.bus);CHECK(event.tick==startupReference(event.bus)->q0);
+      }
+      if (event.kind==Ev::TORQUE) {
+        const auto previous=std::find_if(r.backend.events.begin(),r.backend.events.end(),[&](const Event& e){
+          return e.kind==Ev::GOAL && e.bus==event.bus && !e.torque_before && e.tick==e.position;});
+        CHECK(previous!=r.backend.events.end());
+      }
+    }
+    CHECK(returns==std::vector<uint8_t>({21,22,32}));
+    for (const auto& ref:kStartupReference) CHECK(std::abs(r.backend.joint[ref.bus].position()-ref.q0)<=10);
+    CHECK(!r.full.startPostAbortRecovery(r.req(),r.ctx(),r.t));
+  }
+  for (int fault=0;fault<9;++fault) {
+    g_case="startup: geometric rejection and failures keep SAFE_OFF";
+    Rig r(Leg::RF);prepareStartup(r);
+    if (fault==0) r.backend.joint[22].pos=2106;
+    if (fault==1) r.backend.joint[21].read_fails=true;
+    if (fault==2) r.backend.joint[13].pos=1990; // absolute support band, not drift about a wrong entry
+    startStartup(r);
+    Hook hook=once([](Rig& rig){return rig.full.status().phase==CalibrationPhase::RETURN_LOWER_HELD &&
+                                  rig.full.status().step==FullLegStep::MOVE_MONITOR;},[fault](Rig& rig){
+      if(fault==3) rig.backend.joint[21].current_override=200;
+      if(fault==4) rig.backend.joint[21].temperature=80;
+      if(fault==5) {rig.backend.joint[21].has_stop_low=true;rig.backend.joint[21].stop_low=2200;}
+      if(fault==6) rig.permit=false;
+      if(fault==7) rig.backend.joint[32].pos=1649; // q=409 outside absolute 388..408
+      if(fault==8) rig.backend.joint[21].read_fails=true;
+    });
+    finishRecovery(r,hook);
+    CHECK(r.full.status().step==FullLegStep::FAILED);
+    if(fault<3) for(const auto& event:r.backend.events) CHECK(event.kind==Ev::SAFE_OFF);
+    CHECK_EQ(r.torqueOnCount(),0);CHECK(r.policy.transforms().empty());
+  }
+  {
+    g_case="startup cannot use an ordinary permit or caller-crafted request";
+    Rig r(Leg::RF);prepareStartup(r);
+    CHECK(!r.full.startStartupRecovery(r.ctx(),r.t));
+    auto request=r.req();request.startup_recovery=true;request.recovery_only=true;
+    CHECK(!r.full.start(request,r.ctx(),r.t));CHECK(r.backend.events.empty());
+  }
 }
 
 }  // namespace
@@ -2011,6 +2077,7 @@ int main() {
   test_post_abort_recovery();
   test_post_abort_all_supported_phases();
   test_names();
+  test_startup_recovery();
 
   std::printf("test_full_leg_calibration_executor: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;

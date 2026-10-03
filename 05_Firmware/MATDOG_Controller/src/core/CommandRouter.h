@@ -5,6 +5,7 @@
 
 #include "../calibration/CalibrationManager.h"
 #include "../calibration/CalibrationQ0CaptureSession.h"
+#include "../calibration/StartupRecoveryQualification.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/WifiManager.h"
 #include "../power/DalyBms.h"
@@ -145,6 +146,7 @@ class CommandRouter {
     // first-motion SAFE_OFF (the SAVE gate's SAFE_OFF evidence).
     calibration::CalibrationPersistenceService* persistence;
     const servo::SafeOffResult* first_motion_safe_off_result;
+    calibration::StartupRecoveryQualification* startup_qualification=nullptr;
   };
 
   void begin(const Modules& modules);

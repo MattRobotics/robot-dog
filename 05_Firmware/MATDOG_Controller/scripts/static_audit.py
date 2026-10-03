@@ -6038,6 +6038,67 @@ def check_calibration_persistence_integration(files, sketch_dir):
              f"CommandRouterPersistence.cpp (P3a)")
 
 
+def check_startup_recovery_wiring(files):
+    """Pin the single explicit startup program and its isolated authority scope."""
+    by_name={p.name:code for p,code in files}
+    required={
+        'CommandRouter.cpp': ('"@CALIBRATION STARTUP QUALIFY RF_RETURN_20261003"',
+            '"@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN"','!q->ready(millis())',
+            'q->nominal()', '!modules_.actuator_policy->transforms().empty()',
+            'startupReferenceMatches(*modules_.geometry_profile)', 'q->consumeForExecution(millis())',
+            'inputs.startup_recovery_only=true', 'inputs.startup_reference_qualified=true',
+            'context.startup_motion_permit=token.startup_recovery_only'),
+        'Controller.cpp': ('void Controller::updateStartupQualification()',
+            'servo_census_.start()', 'servo_preflight_.start()',
+            'servo_bus_.readControlFeedback(startup_qualification_.bus(),&t)',
+            'startup_qualification_.observe(s,millis())',
+            'inputs.startup_recovery_only=startup_qualification_.phase()==calibration::StartupQualificationPhase::EXECUTING',
+            'full_leg_calibration_.request().startup_recovery', 'startupReferenceMatches(geometry_profile_)',
+            'ctx.startup_recovery_only=inputs.startup_recovery_only', 'startup_qualification_.complete(pass)',
+            'pass ? "13/13" : "NOT_CERTIFIED"'),
+        'FullLegCalibrationExecutor.cpp': ('request.startup_recovery && !starting_startup_',
+            '!context.startup_motion_permit', '!policy_->transforms().empty()',
+            'makeStartupRecoveryRequest(*geometry_,&r)', 'startupPositionInBand(',
+            'request_.startup_recovery ? CalibrationPhase::TORQUE_OFF : CalibrationPhase::INITIAL_RECOVERY',
+            'FullLegFailure::STARTUP_POSE_OUTSIDE_CERTIFICATE'),
+        'ActuatorWritePolicy.cpp': ('if (bootstrap_.startup_recovery_only &&',
+            '!bootstrap_.startup_recovery || !bootstrap_.sequence_active',
+            'if (bootstrap_.startup_recovery)', '!bootstrap_.startup_recovery_only',
+            'startupReferenceMatches(*geometry_)', 'identityPermitsEvidenceReuse(command.joint,bootstrap_.recovery_joint)',
+            'command.target_urad==0', 'command.target_tick==ref->q0'),
+        'CalibrationMotionPermit.cpp': ('startup_reference_qualified', 'bound_startup_recovery_only_',
+            'token.startup_recovery_only', 'facts.startup_recovery_only'),
+        'StartupRecoveryQualification.cpp': ('phase_!=StartupQualificationPhase::IDLE',
+            '!populationIsCurrentPass(r.evidence)', 'if (!s.read_ok)', 's.torque_enable!=0',
+            'kSearchHardCurrentAbortRaw','kThermalLimitC', 'if (++pass_<3)',
+            'startupPositionInBand(', '!ready(now_ms) || nominal_'),
+        'StartupRecoveryReference.cpp': ('plan->upper_for_lower!=1570796', 'plan->park_target!=610865',
+            'plan->park_leg!=Leg::RH', 'plan->park_joint!=JointKind::UPPER',
+            'int32_t lo=-10,hi=10', 'if (lower && bus==21) hi=367',
+            'if (lower && bus==22) { lo=1014;hi=1034; }',
+            'if ((lower || upper) && bus==32) { lo=388;hi=408; }',
+            'if (upper && bus==22) hi=1034', 'if (rear && bus==32) hi=408'),
+        'StartupRecoveryReference.h': ('0x3713f4ddc43b204eULL','{21,1997,1,"NEW03"}',
+            '{22,2106,-1,"ELR03"}','{32,2058,-1,"ELR02"}')}
+    for name,tokens in required.items():
+        for token in tokens:
+            if not contains_ws(by_name.get(name,''),token):fail(f'{name}: startup safety contract missing {token!r}')
+    router=by_name.get('CommandRouter.cpp','')
+    if sum(code.count('->startStartupRecovery(') for _,code in files)!=1:
+        fail('startup executor must have exactly one explicit production caller')
+    for command in ('@CALIBRATION STARTUP QUALIFY RF_RETURN_20261003',
+                    '@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN'):
+        if router.count('"'+command+'"')!=1:fail('startup command must remain exact and parameterless')
+    controller=by_name.get('Controller.cpp','')
+    begin=re.search(r'void Controller::begin\([^)]*\)\s*\{(.*?)\n\}',controller,re.S)
+    if not begin or any(token in begin.group(1) for token in ('startup_qualification_.start(',
+            'startStartupRecovery(', 'startup_qualification_.observe(', 'motion_permit_.grant(')):
+        fail('boot must not qualify, start or authorize startup recovery')
+    for name in ('StartupRecoveryQualification.cpp','StartupRecoveryReference.cpp'):
+        for token in ('ServoBus','EnableTorque','admit(', 'Preferences','nvs_set', 'Arduino.h'):
+            if token in by_name.get(name,''):fail(f'{name}: data/qualification must remain pure: {token}')
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -6060,6 +6121,7 @@ def main():
     check_led_status_boundaries(files)
     check_actuator_runtime_boundaries(files)
     check_calibration_execution_engine_boundaries(files)
+    check_startup_recovery_wiring(files)
     check_actuator_infrastructure_wired_fail_closed(files)
     check_first_motion_command_wiring(files)
     check_full_leg_calibration_wiring(files)

@@ -93,7 +93,12 @@ bool CommandRouter::q0CaptureOwnsServoDiagnostics() const {
 }
 
 bool CommandRouter::motionExecutorBusy() const {
-  return modules_.first_motion->active() || modules_.full_leg_calibration->active();
+  const auto* startup=modules_.startup_qualification;
+  const bool observing=startup && startup->phase()!=calibration::StartupQualificationPhase::IDLE &&
+    startup->phase()!=calibration::StartupQualificationPhase::READY &&
+    startup->phase()!=calibration::StartupQualificationPhase::COMPLETE &&
+    startup->phase()!=calibration::StartupQualificationPhase::REFUSED;
+  return modules_.first_motion->active() || modules_.full_leg_calibration->active() || observing;
 }
 
 bool CommandRouter::servoDiagnosticBusy() const {
@@ -748,6 +753,68 @@ void CommandRouter::handleLine(String line) {
         "CALIBRATION_FIRST_MOTION_NOTE no_write_in_command_handler; "
         "next_Controller_tick_revalidates_all_dynamic_prerequisites");
 
+  } else if (upper == "@CALIBRATION STARTUP QUALIFY RF_RETURN_20261003") {
+    auto* q=modules_.startup_qualification;
+    if (q==nullptr || !build::kServoPowerAvailable || servoDiagnosticBusy() ||
+        modules_.operating_mode->mode()!=OperatingMode::MAINTENANCE ||
+        modules_.system_state->systemHealth()!=SystemHealth::READY ||
+        modules_.authority->current()!=ActuatorAuthority::NONE || modules_.calibration->sessionLive() ||
+        modules_.motion_permit->active() || !modules_.actuator_policy->transforms().empty() ||
+        !calibration::startupReferenceMatches(*modules_.geometry_profile) || !q->start(millis())) {
+      Serial.println("CALIBRATION_STARTUP_QUALIFICATION=REFUSED reason=STARTUP_ADMISSION_OR_ATTEMPT_CONSUMED");return;
+    }
+    Serial.println("CALIBRATION_STARTUP_QUALIFICATION=STARTED read_only=1 authority=NONE reference=20261003_134848");
+
+  } else if (upper == "@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN") {
+    auto* q=modules_.startup_qualification;
+    if (q==nullptr || !q->ready(millis()) || q->nominal() || servoDiagnosticBusy() ||
+        modules_.operating_mode->mode()!=OperatingMode::MAINTENANCE ||
+        modules_.system_state->systemHealth()!=SystemHealth::READY ||
+        modules_.authority->current()!=ActuatorAuthority::NONE || modules_.calibration->sessionLive() ||
+        modules_.motion_permit->active() || !modules_.actuator_policy->transforms().empty() ||
+        !calibration::startupReferenceMatches(*modules_.geometry_profile)) {
+      Serial.println("CALIBRATION_STARTUP_RECOVERY=REFUSED reason=NO_FRESH_QUALIFIED_STARTUP_POSE");return;
+    }
+    if (!q->consumeForExecution(millis())) {
+      Serial.println("CALIBRATION_STARTUP_RECOVERY=REFUSED reason=STARTUP_ATTEMPT_CONSUMED");return;
+    }
+    if (modules_.calibration->startSession(calibration::Leg::RF,OperatingMode::MAINTENANCE,
+          calibration::CalibrationOrigin::LIVE_SESSION)!=calibration::SessionResult::STARTED ||
+        !modules_.calibration->submitPopulationEvidence(q->populationEvidence()) ||
+        modules_.calibration->activate()!=calibration::SessionResult::OK) {
+      modules_.calibration->abortSession();q->refuse("STARTUP_SESSION_FAILED");
+      Serial.println("CALIBRATION_STARTUP_RECOVERY=REFUSED reason=STARTUP_SESSION_FAILED");return;
+    }
+    modules_.motion_authorization->revoke();
+    modules_.motion_authorization->operator_authorized=true;
+    calibration::CalibrationMotionPermitLiveInputs inputs{};
+    inputs.operator_calibration_motion_authorized=true;inputs.robot_powered_profile=build::kServoPowerAvailable;
+    inputs.mode=modules_.operating_mode->mode();inputs.system_health=modules_.system_state->systemHealth();
+    inputs.session_active=modules_.calibration->sessionLive();inputs.origin=modules_.calibration->status().origin;
+    inputs.session_id=modules_.calibration->status().session_id;
+    inputs.current_population_pass=calibration::populationIsCurrentPass(modules_.calibration->status().population);
+    inputs.current_geometry_bound=calibration::startupReferenceMatches(*modules_.geometry_profile);
+    inputs.startup_recovery_only=true;inputs.startup_reference_qualified=true;
+    inputs.authority=modules_.authority->current();inputs.authority_generation=modules_.authority->generation();
+    inputs.authority_inhibited=modules_.authority->inhibited();
+    const auto facts=calibration::buildCalibrationMotionPermitFacts(inputs);
+    calibration::CalibrationMotionPermitToken token{};
+    const auto granted=modules_.motion_permit->grant(facts,&token);
+    modules_.motion_authorization->token=token;
+    calibration::FullLegCalibrationContext context{};
+    context.session_active=inputs.session_active;context.origin=inputs.origin;
+    context.lease=modules_.calibration->authorityLease();context.mode=inputs.mode;
+    context.motion_permit_active=granted==calibration::CalibrationPermitStatus::ACTIVE && token.valid();
+    context.startup_motion_permit=token.startup_recovery_only;
+    context.authority=inputs.authority;context.authority_generation=inputs.authority_generation;
+    context.authority_inhibited=inputs.authority_inhibited;
+    if (!context.motion_permit_active || !modules_.full_leg_calibration->startStartupRecovery(context,millis())) {
+      modules_.motion_permit->revoke(calibration::CalibrationPermitRevokeReason::EXPLICIT);
+      modules_.motion_authorization->revoke();modules_.calibration->abortSession();q->refuse("STARTUP_EXECUTOR_START_FAILED");
+      Serial.println("CALIBRATION_STARTUP_RECOVERY=REFUSED reason=STARTUP_EXECUTOR_START_FAILED");return;
+    }
+    Serial.println("CALIBRATION_STARTUP_RECOVERY=ARMED route=RF_LOWER_MAX_RETURN torque_limit=500 reference_admitted=0 phase=PREFLIGHT");
+
   } else if (upper == "@CALIBRATION SESSION ABORT") {
     // Complete de-escalation. SAFE_OFF itself remains outside the manager and
     // outside authority; permit revocation alone is same-tick effective for
@@ -758,6 +825,9 @@ void CommandRouter::handleLine(String line) {
         calibration::CalibrationPermitRevokeReason::EXPLICIT);
     modules_.motion_authorization->revoke();
     modules_.calibration->abortSession();
+    if (modules_.startup_qualification && modules_.startup_qualification->phase()!=calibration::StartupQualificationPhase::EXECUTING &&
+        modules_.startup_qualification->phase()!=calibration::StartupQualificationPhase::IDLE)
+      modules_.startup_qualification->refuse("STARTUP_OPERATOR_ABORT");
 
     Serial.println("CALIBRATION_SESSION_ABORT=OK");
     Serial.println("CALIBRATION_SESSION_ABORT_NOTE permit=REVOKED authority=RELEASED");
@@ -1199,6 +1269,8 @@ void CommandRouter::printHelp() {
   Serial.println("  @CALIBRATION SESSION ABORT");
   Serial.println("  @CALIBRATION EVIDENCE DISCARD CONFIRM_NEW_Q0 (RAM only; required before a new acquisition)");
   Serial.println("  @CALIBRATION POST_ABORT RECOVERY <LF|RF|RH|LH> CONFIRM_Q0_RECOVERY (current-boot witness only)");
+  Serial.println("  @CALIBRATION STARTUP QUALIFY RF_RETURN_20261003 (read-only, once per boot)");
+  Serial.println("  @CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN");
   Serial.println("  @CALIBRATION INITIAL RECOVERY <LF|RF|RH|LH> CONFIRM_Q0_RECOVERY");
   Serial.println("  @CALIBRATION FULL LEG <LF|RF|RH|LH> CONFIRM_FULL_CALIBRATION");
   Serial.println("                           (the session's leg: all SIX contacts, UPPER/LOWER/HIP x");

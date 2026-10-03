@@ -178,6 +178,7 @@ enum class FullLegFailure : uint8_t {
   DYNAMIC_PREREQUISITE_LOST,      // permit / session / authority / mode
   PHASE_REPORT_REJECTED,          // the session refused the V25 phase order
   OPERATOR_ABORT,
+  STARTUP_POSE_OUTSIDE_CERTIFICATE, // appended: persisted enum values stay unchanged
 };
 
 struct FullLegCalibrationConfig {
@@ -230,9 +231,11 @@ struct FullLegCalibrationRequest {
   // SAFE_OFF path; COMPLETE only with all twelve joints actively recovered.
   bool recovery_only = false;
   bool post_abort_recovery = false; // only startPostAbortRecovery may set this
+  bool startup_recovery = false; // fixed reference/program; never a current-boot witness
 };
 
 struct FullLegCalibrationContext {
+  bool startup_motion_permit=false;
   bool session_active = false;
   CalibrationOrigin origin = CalibrationOrigin::NONE;
   core::AuthorityLease lease{};
@@ -348,6 +351,7 @@ class FullLegCalibrationExecutor {
   bool startPostAbortRecovery(const FullLegCalibrationRequest& current,
                               const FullLegCalibrationContext& context, uint32_t now_ms);
   void invalidateRecoveryWitness() { recovery_witness_ = false; }
+  bool startStartupRecovery(const FullLegCalibrationContext& context,uint32_t now_ms);
   void recoveryGrant(actuator::CalibrationBootstrapContext* context) const;
   // Fresh safety checks with no backend write while thermal verdict is pending.
   void monitorOnly(const FullLegCalibrationContext& context, uint32_t now_ms,
@@ -453,6 +457,7 @@ class FullLegCalibrationExecutor {
   void fail(FullLegFailure failure);
   void captureRecoveryWitness();
   bool recoveryPoseCompatible(uint8_t index, int32_t position) const;
+  bool qualifiedRecovery() const { return request_.post_abort_recovery || request_.startup_recovery; }
   // The round-robin watch target: a population joint neither energized nor
   // otherwise monitored this tick.
   bool watchIndex(uint8_t* out) const;
@@ -539,6 +544,7 @@ class FullLegCalibrationExecutor {
   uint16_t safe_off_verified_mask_ = 0;  // bit per population index
   bool recovery_witness_ = false;
   bool starting_post_abort_ = false;
+  bool starting_startup_ = false;
   CalibrationPhase aborted_phase_ = CalibrationPhase::PREFLIGHT;
   actuator::GeometryProvenanceTag aborted_geometry_ = actuator::kNoGeometryProvenance;
   uint16_t aborted_tick_[kFullLegPopulation] = {0};

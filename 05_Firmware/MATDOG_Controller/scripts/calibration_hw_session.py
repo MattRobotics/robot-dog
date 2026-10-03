@@ -407,6 +407,35 @@ class Session:
 
     # -- INITIAL RECOVERY: all twelve actively to q0, verified -------------------
 
+    def startup_recovery(self):
+        from matdog_startup_reference import Q0,GEOMETRY,classify_positions
+        before=self.read_positions("fresh positions before startup qualification")
+        classify_positions({bus:value[0] for bus,value in before.items()})
+        mark=self.mark()
+        self.link.send("@CALIBRATION STARTUP QUALIFY RF_RETURN_20261003")
+        self.wait_for(r"CALIBRATION_STARTUP_QUALIFICATION=STARTED read_only=1 authority=NONE reference=20261003_134848",
+                      mark,5.0,(r"CALIBRATION_STARTUP_QUALIFICATION=REFUSED.*",))
+        proof=self.wait_for(r"CALIBRATION_STARTUP_QUALIFICATION=PASS route=(NOMINAL|RF_LOWER_MAX_RETURN) "
+                            rf"reference=20261003_134848 geometry={GEOMETRY} samples=3x12 motion_authorized=0 reason=NONE",
+                            mark,15.0,(r"CALIBRATION_STARTUP_QUALIFICATION=REFUSED.*",))
+        route=proof.group(1)
+        if route!='NOMINAL':
+            mark=self.mark()
+            self.link.send("@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN")
+            self.wait_for(r"CALIBRATION_STARTUP_RECOVERY=ARMED route=RF_LOWER_MAX_RETURN torque_limit=500 reference_admitted=0 phase=PREFLIGHT",
+                          mark,5.0,(r"CALIBRATION_STARTUP_RECOVERY=REFUSED.*",))
+            result=self._monitor(re.compile(r"CALIBRATION_STARTUP_RECOVERY_RESULT verdict=(\S+) recovered=(\d+)/(\d+) "
+                         r"failure=(\S+) failed_phase=(\S+) last_decision=(\S+)"),mark,"STARTUP RECOVERY",RECOVERY_WATCHDOG_S)
+            if result.group(1,2,3,4)!=('PASS','12','12','NONE'):
+                raise SessionFailure('startup recovery failed: '+result.group(0))
+            self.wait_for(r"CALIBRATION_STARTUP_CLOSE safe_off=13/13 authority=NONE motion_authorized=0 reference_admitted=0",mark,5.0)
+        self.safe_off_all()
+        self.authority_none()
+        after=self.read_positions("positions after explicit startup qualification/recovery")
+        if set(after)!=set(Q0) or any(abs(after[b][0]-Q0[b])>10 or after[b][1]!=0 for b in Q0):
+            raise SessionFailure('STARTUP_Q0_NOT_VERIFIED_12_OF_12')
+        self.log.say('PASS  startup '+route+'; reference-only, SAFE_OFF 13/13, authority NONE; fresh Q0 follows')
+
     def initial_recovery(self, leg, q0=None, post_abort=False):
         kind = "POST_ABORT" if post_abort else "INITIAL"
         mark = self.mark()
@@ -859,6 +888,9 @@ def run(args, link_factory=SerialLink):
     if phase not in PHASES:
         raise SystemExit(f"--phase must be one of {PHASES}")
     flashing = phase in ("prepare", "all") and not args.no_flash
+    startup=getattr(args,'qualified_startup_recovery',False)
+    if startup and (phase!='all' or not args.no_flash or not args.require_daly or not args.confirm_operator_go):
+        raise SystemExit('qualified startup requires --phase all --no-flash --require-daly and operator GO')
     if flashing and not re.fullmatch(r"[0-9a-f]{64}", args.backup_sha256 or ""):
         raise SystemExit("--backup-sha256 <64 hex> is required to flash: the operator-authorized "
                          "SHA256 of the --backup full-flash image (flash_app_only.sh checks it)")
@@ -909,6 +941,7 @@ def run(args, link_factory=SerialLink):
             session.wait_health_ready()
             session.authority_none()
         if phase in ("q0", "all"):
+            if startup: session.startup_recovery()
             session.read_positions("raw positions before Q0 CAPTURE")
             q0 = session.q0_capture()
             capture_session = session.q0_promote()
@@ -1033,6 +1066,8 @@ def main(argv=None):
     p.add_argument("--expected-boot-anchor", type=float, help="Require continuity with the admitted boot before any calibration")
     p.add_argument("--confirm-q0-pose", action="store_true")
     p.add_argument("--confirm-operator-go", action="store_true")
+    p.add_argument("--qualified-startup-recovery",action="store_true",
+                   help="Explicit fixed RF return using reference 20261003_134848; fresh firmware qualification before torque")
     p.add_argument("--no-flash", action="store_true", help="the board already runs this build")
     p.add_argument("--no-lf-min-crosscheck", action="store_true")
     p.add_argument("--imu-stream-off", action="store_true", default=True)

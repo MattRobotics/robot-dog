@@ -22,6 +22,8 @@
 
 #include "../../src/actuator/ActuatorWritePolicy.h"
 #include "../../src/actuator/CalibrationGeometryProfileData.h"
+#include "../../src/actuator/CalibrationSequencePlanData.h"
+#include "../../src/calibration/StartupRecoveryReference.h"
 
 using namespace matdog;
 using namespace matdog::actuator;
@@ -1121,10 +1123,43 @@ static void test_tostring_is_total() {
   CHECK(std::strcmp(toString(static_cast<TransactionState>(99)), "UNKNOWN") == 0);
 }
 
+static void test_startup_scope_cannot_become_generic_motion() {
+  g_case="startup reference scoped transaction";
+  ActuatorAuthorityArbiter arbiter;arbiter.reset(AuthorityClearReason::BOOT);
+  auto profile=boundProfile();SafeActuatorPolicy policy;policy.begin(&arbiter);
+  policy.bindGeometry(&profile,&geometry_data::kProvenance);
+  policy.bindSequencePlan(&sequence_plan_data::kPlan);
+  const auto lease=grant(arbiter,ActuatorAuthority::CALIBRATION,OperatingMode::MAINTENANCE);
+  setCalibrationPermit(policy,lease);
+  auto ctx=policy.bootstrapContext();ctx.startup_recovery_only=true;ctx.startup_recovery=true;
+  ctx.sequence_active=true;ctx.sequence_leg=Leg::RF;
+  ctx.sequence_phase=calibration::CalibrationPhase::RETURN_LOWER_HELD;
+  ctx.recovery_joint=joint(Leg::RF,JointKind::LOWER,"NEW03");ctx.recovery_prime_tick=2348;
+  ctx.recovery_target_urad=0;policy.setBootstrapContext(ctx);
+  ActuatorCommand move=command(ActuatorOperation::CALIBRATION_SEQUENCE_MOVE,ctx.recovery_joint,1997);
+  move.sequence_phase=ctx.sequence_phase;move.sequence_move=SequenceMoveKind::TO_PLAN_TARGET;move.target_urad=0;
+  ActuatorTransaction txn{};
+  auto decision=[&](const ActuatorCommand& cmd) {auto result=policy.plan(cmd,lease,OperatingMode::MAINTENANCE,&txn);policy.abort(&txn);return result;};
+  CHECK_DECISION(decision(move),WriteDecision::ACCEPT);CHECK(policy.transforms().empty());
+  move.target_tick=1998;CHECK_DECISION(decision(move),WriteDecision::REJECT_SEQUENCE_TARGET);
+  move.target_tick=1997;move.target_urad=1;CHECK_DECISION(decision(move),WriteDecision::REJECT_SEQUENCE_TARGET);
+  move.target_urad=0;move.joint=joint(Leg::RF,JointKind::UPPER,"ELR03");
+  CHECK_DECISION(decision(move),WriteDecision::REJECT_SEQUENCE_TARGET);
+  CHECK_DECISION(decision(command(ActuatorOperation::POSITION_COMMAND,ctx.recovery_joint,1997)),WriteDecision::REJECT_SEQUENCE_TARGET);
+  CHECK_DECISION(decision(command(ActuatorOperation::TORQUE_ENABLE,lfLower())),WriteDecision::REJECT_SEQUENCE_PRIME);
+  move.joint=ctx.recovery_joint;move.sequence_move=SequenceMoveKind::PRIME_AT_PRESENT;move.target_tick=2348;
+  CHECK_DECISION(decision(move),WriteDecision::ACCEPT);
+  move.target_tick=2331;CHECK_DECISION(decision(move),WriteDecision::REJECT_SEQUENCE_PRIME);
+  ctx.startup_recovery=false;policy.setBootstrapContext(ctx);
+  CHECK_DECISION(decision(move),WriteDecision::REJECT_SEQUENCE_TARGET);
+  CHECK(policy.transforms().empty());
+}
+
 int main() {
   std::printf("MATDOG Safe Actuator Layer write-policy offline tests\n");
 
   test_no_arbiter_is_a_refusal_not_a_free_pass();
+  test_startup_scope_cannot_become_generic_motion();
   test_no_authority_rejects();
   test_wrong_owner_rejects();
   test_stale_generation_rejects();

@@ -15,15 +15,16 @@ import matdog_release_session as release
 
 class SimulatedOperations:
     def __init__(self,config):
-        self.config=config; self.calls=[]; self.fail=None; self.bad=None
+        self.config=config; self.calls=[]; self.fail=None; self.bad=None; self.positions=release.native.CR2C
     def inspect(self,config,directory,safe_off=True):
         self.calls.append('inspect')
         result=dict(hardware_observed=True,build_id=config['build_id'],application_sha256=config['application_sha256'],
                     uptime_ms=100000,observed_epoch=time.time(),safe_off_ids=release.native.INSTALLED,
                     mode='MAINTENANCE',authority='NONE',
-                    positions={str(b):[p,0] for b,p in release.native.CR2C.items()})
-        if self.bad=='pose':
+                    positions={str(b):[p,0] for b,p in self.positions.items()})
+        if self.bad in ('pose','unknown'):
             for bus,position in [('21',2348),('22',1080),('32',1665)]:result['positions'][bus][0]=position
+        if self.bad=='unknown':result['positions']['23'][0]+=11
         if self.bad=='missing': del result['positions']['32']
         if self.bad=='invalid': result['positions']['21'][0]=4096
         if self.bad=='uart': raise release.ReleaseFailure('UART lost')
@@ -82,6 +83,35 @@ class StageTests(unittest.TestCase):
     def tearDown(self): self.tmp.cleanup()
     def flash(self): release.phase_flash(self.package,self.config,self.directory,self.ops)
     def calibrate(self): release.phase_calibrate(self.package,self.config,self.directory,self.ops)
+    def startup_plan(self):
+        from matdog_startup_reference import Q0,UNITS,GEOMETRY
+        self.ops.positions=Q0
+        (self.package/'initial-pose-plan.json').write_text(json.dumps(dict(
+            qualified_path=True,startup_recovery_enabled=True,qualification_evidence='SYNTHETIC_TEST_ONLY')))
+        (self.package/'evidence').mkdir()
+        (self.package/'evidence/startup-reference.json').write_text(json.dumps(dict(reference_status='VERIFIED_12_OF_12',
+            same_boot=True,q0=Q0,units=UNITS,geometry=GEOMETRY)))
+        (self.package/'evidence/startup-geometry-v5.json').write_text(json.dumps(dict(status='PASS',
+            support_tolerance_ticks=10,rf_lower_direction=1,outcomes=[dict(status='PASS')] * 396)))
+    def test_startup_residual_one_command_through_save_ack(self):
+        self.startup_plan();self.ops.bad='pose';self.flash();self.calibrate()
+        args=next(v[1] for v in self.ops.calls if isinstance(v,tuple) and v[0]=='all')
+        self.assertIn('--qualified-startup-recovery',args)
+        self.assertEqual(sum(call=='attestation' for call in self.ops.calls),1)
+        self.assertEqual(release.load(self.directory/'CALIBRATION_SAVE_ACK_OK.json')['generation'],1)
+    def test_startup_incompatible_pose_stops_before_go_and_motion(self):
+        self.startup_plan();self.ops.bad='unknown';self.flash()
+        with self.assertRaisesRegex(release.ReleaseFailure,'STARTUP_POSE_UNRECOGNIZED'):self.calibrate()
+        self.assertNotIn('attestation',self.ops.calls)
+        self.assertFalse(any(isinstance(v,tuple) for v in self.ops.calls))
+    def test_startup_capsule_mismatch_refused(self):
+        self.startup_plan();path=self.package/'evidence/startup-reference.json'
+        data=release.load(path);data['q0']['22']=2107;path.write_text(json.dumps(data))
+        with self.assertRaisesRegex(release.ReleaseFailure,'STARTUP_REFERENCE_MISMATCH'):release.pose_gate(self.package)
+    def test_startup_geometry_support_mismatch_refused(self):
+        self.startup_plan();path=self.package/'evidence/startup-geometry-v5.json'
+        data=release.load(path);data['support_tolerance_ticks']=26;path.write_text(json.dumps(data))
+        with self.assertRaisesRegex(release.ReleaseFailure,'STARTUP_GEOMETRY_NOT_QUALIFIED'):release.pose_gate(self.package)
     def test_three_stages_positive_simulation(self):
         self.flash();self.calibrate()
         with patch.object(release,'finalize_git',return_value='d'*40) as merge:

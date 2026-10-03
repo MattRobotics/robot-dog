@@ -173,3 +173,15 @@ unqualified initial pose before hardware I/O; no-argument invocation is file-onl
 No cover removal, physical RESET, BOOT/EN request or forced reducer movement is
 a fallback in this mandate. Physical square/jig Q0 and a qualified placement
 procedure must be established before a future OFFLINE_READY.
+
+
+## Startup after power-off — separate explicit path
+
+The same-boot witness is never reused after reboot. The release-stage command
+02 handles only the fixed qualified RF LOWER MAX pose using verified reference
+20261003_134848 and fresh 3x12 readbacks, current population and all protections.
+It primes and restores21→22→32, then closes SAFE_OFF13/NONE before Fresh Q0.
+Body/passive joints require gravity support and unchanged installation. A pose
+outside the absolute certificate or invalid telemetry is refused; no automatic
+retry and no boot movement. The precise gates and residual physical assumptions
+are in STARTUP_RECOVERY_OFFLINE_ASSESSMENT.md and the packaged final report.

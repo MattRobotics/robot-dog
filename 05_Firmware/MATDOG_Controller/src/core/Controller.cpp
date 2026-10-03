@@ -212,6 +212,7 @@ void Controller::begin() {
       &full_leg_evidence_,
       &persistence_,
       &first_motion_safe_off_result_,
+      &startup_qualification_,
   };
   service_.begin(modules);
   // Never starts the listening socket here — see network/HttpTransport.h.
@@ -326,6 +327,66 @@ void Controller::updateQ0Capture() {
 // modules_.motion_authorization pointer) — this function reads it, never
 // sets it, matching the SAME split CalibrationMotionPermit.h documents for
 // buildCalibrationMotionPermitFacts()'s two call sites.
+void Controller::updateStartupQualification() {
+  using Phase=calibration::StartupQualificationPhase;
+  const Phase phase=startup_qualification_.phase();
+  if (phase==Phase::IDLE || phase==Phase::EXECUTING || phase==Phase::COMPLETE) return;
+  if (phase!=Phase::READY && phase!=Phase::REFUSED) {
+    if (operating_mode_.mode()!=OperatingMode::MAINTENANCE || system_state_.systemHealth()!=SystemHealth::READY ||
+        authority_.current()!=ActuatorAuthority::NONE || millis()-startup_qualification_.startedMs()>10000)
+      startup_qualification_.refuse("STARTUP_READ_ONLY_PREREQUISITE_OR_TIMEOUT");
+    else switch (phase) {
+      case Phase::CENSUS_START:
+        if (servo_census_.start()) startup_qualification_.censusStarted();
+        else startup_qualification_.refuse("STARTUP_CENSUS_START_FAILED");
+        break;
+      case Phase::CENSUS_WAIT:
+        if (servo_census_.state()==servo::ServoCensus::State::COMPLETE) startup_qualification_.censusComplete();
+        break;
+      case Phase::PREFLIGHT_START:
+        if (servo_preflight_.start()) startup_qualification_.preflightStarted();
+        else startup_qualification_.refuse("STARTUP_PREFLIGHT_START_FAILED");
+        break;
+      case Phase::PREFLIGHT_WAIT:
+        if (servo_preflight_.state()==servo::ServoPreflight::State::COMPLETE) {
+          calibration::PopulationEvidenceBuildContext context{};
+          context.current_observation_bundle=true;context.session_ms=millis();
+          startup_qualification_.population(calibration::buildCurrentLegPopulationEvidence(
+              servo_census_.result(),servo_preflight_.result(),context));
+        }
+        break;
+      case Phase::OBSERVING: {
+        servo::ServoBus::ControlFeedbackSnapshot t{};
+        actuator::TelemetrySample s{};
+        s.read_ok=servo_bus_.readControlFeedback(startup_qualification_.bus(),&t);
+        s.sampled_at_ms=millis();
+        if (s.read_ok) {
+          s.present_position=t.present_position;s.torque_enable=t.torque_enable;
+          s.present_speed=t.present_speed;s.present_current=t.present_current;
+          s.present_temperature=t.present_temperature;s.servo_status=t.status;
+        }
+        // Read-only qualification: a hot/invalid reading refuses admission.
+        // The powered executor retains the existing adaptive confirmation.
+        startup_qualification_.observe(s,millis());
+        break;
+      }
+      default:break;
+    }
+  }
+  if (!startup_qualification_reported_ && (startup_qualification_.phase()==Phase::READY || startup_qualification_.phase()==Phase::REFUSED)) {
+    startup_qualification_reported_=true;
+    if (startup_qualification_.phase()==Phase::REFUSED) {
+      Serial.printf("CALIBRATION_STARTUP_QUALIFICATION=REFUSED reason=%s bus=%u motion_authorized=0\n",
+                    startup_qualification_.reason(),(unsigned)startup_qualification_.failedBus());
+      return;
+    }
+    Serial.printf("CALIBRATION_STARTUP_QUALIFICATION=%s route=%s reference=20261003_134848 geometry=%llx samples=3x12 motion_authorized=0 reason=%s\n",
+      startup_qualification_.phase()==Phase::READY ? "PASS" : "REFUSED",
+      startup_qualification_.nominal() ? "NOMINAL" : "RF_LOWER_MAX_RETURN",
+      (unsigned long long)calibration::kStartupReferenceGeometry,startup_qualification_.reason());
+  }
+}
+
 void Controller::updateCalibrationMotionPermit() {
   calibration::CalibrationMotionPermitLiveInputs inputs{};
   inputs.operator_calibration_motion_authorized = motion_authorization_.operator_authorized;
@@ -341,6 +402,9 @@ void Controller::updateCalibrationMotionPermit() {
       actuator_policy_.currentGeometryTag() != actuator::kNoGeometryProvenance;
   inputs.promoted_transforms_complete =
       actuator_policy_.transforms().size() == calibration::kLegServoSlotCount;
+  inputs.startup_recovery_only=startup_qualification_.phase()==calibration::StartupQualificationPhase::EXECUTING;
+  inputs.startup_reference_qualified=inputs.startup_recovery_only &&
+      full_leg_calibration_.request().startup_recovery && calibration::startupReferenceMatches(geometry_profile_);
   inputs.authority = authority_.current();
   inputs.authority_generation = authority_.generation();
   inputs.authority_inhibited = authority_.inhibited();
@@ -380,6 +444,7 @@ void Controller::updateCalibrationMotionPermit() {
   // window is never open: no production path parks outside the sequence.
   ctx.auxiliary_parked = false;
   ctx.sequence_active = full_leg_calibration_.sequenceActive();
+  ctx.startup_recovery_only=inputs.startup_recovery_only;
   ctx.sequence_leg = full_leg_calibration_.leg();
   ctx.sequence_phase = full_leg_calibration_.sequencePhase();
   ctx.sequence_prerequisites_verified = full_leg_calibration_.prerequisitesVerified();
@@ -485,6 +550,7 @@ void Controller::updateFullLegCalibration(uint32_t now_ms) {
   }
 
   calibration::FullLegCalibrationContext context{};
+  context.startup_motion_permit=motion_authorization_.token.startup_recovery_only;
   context.session_active = calibration_.sessionLive();
   context.origin = calibration_.status().origin;
   context.lease = calibration_.authorityLease();
@@ -696,6 +762,10 @@ void Controller::printFullLegHeldObservation(const char* tag,
 // authorization it revokes are the same RAM objects the per-tick refresh
 // already re-checks, so cleanup between legs is finished before the next
 // command line is processed.
+bool Controller::verifyStartupNeckOff() {
+  return servo_bus_.safeOff(51)==servo::SafeOffResult::VERIFIED_OFF;
+}
+
 void Controller::updateFullLegFinalization() {
   if (recovery_result_pending_ && !full_leg_calibration_.active() &&
       full_leg_calibration_.request().recovery_only) {
@@ -704,16 +774,25 @@ void Controller::updateFullLegFinalization() {
     // SAFE_OFF verified, all twelve verified at q0 torque-off.
     recovery_result_pending_ = false;
     const calibration::FullLegCalibrationStatus& s = full_leg_calibration_.status();
-    const bool pass = s.step == calibration::FullLegStep::COMPLETE;
+    const bool startup=full_leg_calibration_.request().startup_recovery;
+    const bool neck_off=!startup || verifyStartupNeckOff();
+    const bool pass = s.step == calibration::FullLegStep::COMPLETE && neck_off;
     Serial.printf("CALIBRATION_%s_RECOVERY_RESULT verdict=%s recovered=%u/%u failure=%s "
                   "failed_phase=%s last_decision=%s\n",
-                  full_leg_calibration_.request().post_abort_recovery ? "POST_ABORT" : "INITIAL",
+                  startup ? "STARTUP" : full_leg_calibration_.request().post_abort_recovery ? "POST_ABORT" : "INITIAL",
                   pass ? "PASS" : "FAILED", (unsigned)s.recovered_joints,
                   (unsigned)full_leg_calibration_.request().population_count,
-                  calibration::toString(s.failure),
+                  neck_off ? calibration::toString(s.failure) : "STARTUP_NECK_SAFE_OFF_UNVERIFIED",
                   s.failure == calibration::FullLegFailure::NONE ? "-"
                                                                  : calibration::toString(s.failed_phase),
                   actuator::toString(s.last_policy_decision));
+    if (startup) {
+      motion_permit_.revoke(calibration::CalibrationPermitRevokeReason::EXPLICIT);
+      motion_authorization_.revoke();calibration_.abortSession();
+      startup_qualification_.complete(pass);
+      Serial.printf("CALIBRATION_STARTUP_CLOSE safe_off=%s authority=%s motion_authorized=0 reference_admitted=0\n",
+                    pass ? "13/13" : "NOT_CERTIFIED",toString(authority_.current()));
+    }
   }
   if (!full_leg_run_.armed) return;
   const calibration::FullLegStep step = full_leg_calibration_.status().step;
@@ -863,6 +942,7 @@ void Controller::update(uint32_t now_ms) {
   // CR2-B: advances at most one read-only acquisition action per tick.
   // It never acquires actuator authority and never writes the servo bus.
   updateQ0Capture();
+  updateStartupQualification();
   // CR3 continuation: advances the first-motion attempt (if any) by at most
   // one backend call, and independently forces real SAFE_OFF retries while
   // one is required — see updateFirstMotion()'s own comment.

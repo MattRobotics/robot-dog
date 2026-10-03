@@ -3357,3 +3357,16 @@ and the package's INITIAL_POSE_PLAN.md. Synthetic PASS cannot remove this block.
 Targeted offline results: native runner 42/42; DALY guard 6/6; release-stage,
 artifact failure and temporary local Git integration tests 18/18. These are
 simulations/file checks, with no serial, flashing or real main integration.
+
+
+## 2026-10-03 — startup reference correction and offline qualification
+
+The earlier STARTUP_Q0_REFERENCE block is superseded by the verified complete
+source `full_cal_nvs_20261003_134848` (RF UPPER2106). A separate immutable
+reference supports only explicit fresh-readback-qualified RF return21→22→32;
+no boot authority or transform restore. Targeted host tests, affected static
+audit and clean ROBOT_POWERED build are recorded in the release package.
+Geometry V5 support bands remain absolute±10 for passive joints; mechanical
+support/installation continuity are operator GO prerequisites. No hardware
+PASS, serial access or flashing is claimed. See
+[technical assessment](STARTUP_RECOVERY_OFFLINE_ASSESSMENT.md).

@@ -180,6 +180,18 @@ def pose_gate(package):
     require(plan.get('qualified_path') is True and bool(plan.get('qualification_evidence')),
             'INITIAL_POSE_BLOCKED: '+plan.get('block_reason',
                 'no qualified startup path and reference for all twelve joints'))
+    if plan.get('startup_recovery_enabled') is True:
+        from matdog_startup_reference import Q0,UNITS,GEOMETRY
+        reference=load(package/'evidence/startup-reference.json')
+        geometry=load(package/'evidence/startup-geometry-v5.json')
+        require(reference.get('reference_status')=='VERIFIED_12_OF_12' and reference.get('same_boot') is True and
+                reference.get('q0')=={str(k):v for k,v in Q0.items()} and
+                reference.get('units')=={str(k):v for k,v in UNITS.items()} and reference.get('geometry')==GEOMETRY,
+                'STARTUP_REFERENCE_MISMATCH')
+        require(geometry.get('status')=='PASS' and geometry.get('support_tolerance_ticks')==10 and
+                geometry.get('rf_lower_direction')==1 and len(geometry.get('outcomes',[]))==396 and
+                all(item.get('status','').startswith('PASS') for item in geometry['outcomes']),
+                'STARTUP_GEOMETRY_NOT_QUALIFIED')
 
 
 def check_safe_off_positions(config, record):
@@ -231,14 +243,21 @@ def phase_calibrate(package, config, directory, ops):
     pose_gate(package)
     flash=load(directory/'FLASH_OK.json'); check_safe_off_positions(config,flash)
     fresh=ops.inspect(config,directory)
-    check_positions(config,fresh)
+    startup=load(package/'initial-pose-plan.json').get('startup_recovery_enabled') is True
+    if startup:
+        from matdog_startup_reference import classify_positions
+        check_safe_off_positions(config,fresh)
+        try: classify_positions({int(b):value[0] for b,value in fresh['positions'].items()})
+        except ValueError as error: raise ReleaseFailure(str(error)) from error
+    else: check_positions(config,fresh)
     anchor=flash['observed_epoch']-flash['uptime_ms']/1000
     require(abs(fresh['observed_epoch']-fresh['uptime_ms']/1000-anchor)<=3,'reboot or host-clock change after FLASH_OK')
-    require(ops.attestation('Operatore presente; Q0 a dime; robot sostenuto; zona libera; disgiuntore accessibile; caricatore scollegato.'),
+    require(ops.attestation('GO per l’intera procedura: installazione e riferimenti invariati; operatore presente; corpo e giunti passivi sostenuti contro gravità; zona libera; disgiuntore accessibile; caricatore scollegato.' if startup else
+                            'Operatore presente; Q0 a dime; robot sostenuto; zona libera; disgiuntore accessibile; caricatore scollegato.'),
             'hardware execution prerequisites not attested')
     write_new(directory/'calibration-started.json', {'attempt':1,'boot_anchor':anchor})
     result=ops.run_native(config,directory,'all',['--confirm-q0-pose','--confirm-operator-go','--require-daly',
-                              '--expected-boot-anchor',str(anchor)])
+                              '--expected-boot-anchor',str(anchor)]+(['--qualified-startup-recovery'] if startup else []))
     require(result.get('hardware_observed') is True and result.get('contacts_accepted')==24 and result.get('fresh_q0') is True,
             'full calibration is not actual fresh 24/24')
     require(result.get('build_id')==config['build_id'] and isinstance(result.get('daly'),dict) and
