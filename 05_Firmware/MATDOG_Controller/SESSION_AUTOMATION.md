@@ -12,7 +12,8 @@ calibrator and one serial connection at a time. No-argument invocation and
 ## Current admission: INITIAL_POSE_BLOCKED
 
 The package's `initial-pose-plan.json` deliberately has `qualified_path=false`.
-This stops flashing and calibration before hardware I/O. Do not flip that flag
+This stops calibration before hardware I/O. Application-only flashing is
+independent of this mechanical gate. Do not flip that flag
 as an operator override. Releasing the gate requires an actual qualified
 mechanical procedure with evidence and a new reviewed package.
 
@@ -33,10 +34,13 @@ remove this block is documented in the package's `INITIAL_POSE_PLAN.md`.
    partition table/active slot and effective erase range, performs one
    application write and independent flash verification. An independent native
    connection checks signature, MAINTENANCE, authority NONE, SAFE_OFF 13/13,
-   encoders and physical nominal-pose attestation before `FLASH_OK.json`.
+   and twelve valid torque-off encoder readings before `FLASH_OK.json`.
+   Those readings may be far from Q0; no pose attestation or repositioning is
+   performed in this stage. FLASH_OK explicitly records nominal_pose_verified=false.
    USB failure stops; no repeated writes, BOOT/EN request or full-image fallback.
-2. The second stage consumes FLASH_OK, checks the same boot and actual torque-off
-   encoders, then requires the operator's physical GO checklist. The native
+2. The second stage retains the qualified pose gate, consumes FLASH_OK, checks
+   the same boot and actual torque-off encoders, then requires the operator's
+   physical GO checklist. FLASH_OK supplies no motion authorization. The native
    runner executes `--phase all --no-flash`, fresh Q0 12/12, promotion, recovery
    and LF/RF/RH/LH export 24/24, followed by `--phase persist --no-flash`.
    SAVE/ACK exact generation and the application identity are recorded.
@@ -80,3 +84,17 @@ runner/DALY/tooling and later documentation have separate commits. No firmware,
 Geometry V5, EEPROM, partition or NVS erase change is part of this tooling step.
 The frozen flash worktree remains CLEAN at the firmware commit. The original
 checkout and gait worktree are preserved. Main has not been integrated offline.
+
+## Startup qualification follow-up
+
+The RF LOWER direction is +1 in the bound profile; the corrected observed
+path uses +351 ticks, with no intended-stop pair excluded. The old observed
+negative-sign CAD case is superseded. The targeted startup tool covers support
+bands independently and reports geometry evidence only. It does not grant
+authority or restore Q0 after a reboot. Read-only boot LOAD discards decoded
+record values; fresh promoted Q0 are RAM-only. A coherent twelve-joint reference
+for the RF LOWER MAX interruption must be established before a startup motion
+can be admitted. An earlier LF acquisition (RF UPPER 2107) must not be completed
+with the later RF interruption's reference (2106). The package's final report
+records the admission decision; this host change does not implement a powered
+startup executor.

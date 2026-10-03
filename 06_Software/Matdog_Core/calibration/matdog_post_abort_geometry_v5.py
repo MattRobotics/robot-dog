@@ -42,10 +42,12 @@ def validate(checker, leg, phase, upper_offset=0, park_offset=0, hip_offset=0, l
 
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--output',required=True);ap.add_argument('--corners',action='store_true');args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--output',required=True);ap.add_argument('--corners',action='store_true')
+    ap.add_argument('--observed-only',action='store_true',help='Recheck only the corrected 3 October RF/RH path')
+    args=ap.parse_args()
     assert sha256(URDF)==EXPECTED_URDF_SHA256
     checker=Checker(RobotSceneV5.from_urdf(URDF));results=[]
-    for leg in ['lf','rf','rh','lh']:
+    for leg in ([] if args.observed_only else ['lf','rf','rh','lh']):
         for phase in ['UPPER','LOWER']:
             results+=validate(checker,leg,phase)
             if args.corners:
@@ -58,10 +60,11 @@ def main():
                                 park_offset=park_offset,hip_offset=hip_offset)
     # The exact observed RF/RH residual pose, followed by its dependency order.
     base={'rf_hip_joint':0.,'rf_upper_leg_joint':1026*TICK,
-          'rf_lower_leg_joint':-351*TICK,'rh_upper_leg_joint':393*TICK}
+          'rf_lower_leg_joint':351*TICK,'rh_upper_leg_joint':393*TICK}
     for joint in ['rf_lower_leg_joint','rf_upper_leg_joint','rh_upper_leg_joint']:
-        result=checker.sweep(base,joint,base[joint],0.,math.radians(.5),
-                             None if joint.startswith('rh_') else active_pair(checker.model,joint))
+        # RF LOWER's allocation direction is +1, despite the URDF motorDirection.
+        # This return remains inside the joint domain: no stop pair is excluded.
+        result=checker.sweep(base,joint,base[joint],0.,math.radians(.5),None)
         results.append({'leg':'rf','phase':'OBSERVED_20261003','joint':joint,'sweep':result});base[joint]=0.
     passed=all(r['sweep']['status']=='COLLISION_FREE' for r in results)
     Path(args.output).write_text(json.dumps({'urdf_sha256':EXPECTED_URDF_SHA256,'step_deg':.5,

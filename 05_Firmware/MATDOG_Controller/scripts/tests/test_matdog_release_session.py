@@ -20,11 +20,19 @@ class SimulatedOperations:
         self.calls.append('inspect')
         result=dict(hardware_observed=True,build_id=config['build_id'],application_sha256=config['application_sha256'],
                     uptime_ms=100000,observed_epoch=time.time(),safe_off_ids=release.native.INSTALLED,
+                    mode='MAINTENANCE',authority='NONE',
                     positions={str(b):[p,0] for b,p in release.native.CR2C.items()})
-        if self.bad=='pose': result['positions']['21'][0]=2348
+        if self.bad=='pose':
+            for bus,position in [('21',2348),('22',1080),('32',1665)]:result['positions'][bus][0]=position
+        if self.bad=='missing': del result['positions']['32']
+        if self.bad=='invalid': result['positions']['21'][0]=4096
+        if self.bad=='uart': raise release.ReleaseFailure('UART lost')
+        if self.bad=='timeout': raise release.ReleaseFailure('readback timeout')
         if self.bad=='torque': result['positions']['21'][1]=1
         if self.bad=='signature': result['build_id']='old'
         if self.bad=='safe_off': result['safe_off_ids']=[]
+        if self.bad=='mode': result['mode']='RUN'
+        if self.bad=='authority': result['authority']='CALIBRATION'
         if self.bad=='boot': result['uptime_ms']=1
         return result
     def command(self,command,cwd,log,env=None):
@@ -32,7 +40,7 @@ class SimulatedOperations:
         if self.fail=='command': raise release.ReleaseFailure('simulated command failure')
         Path(log).write_text('APPLICATION_ONLY_FLASH = PASS\nFLASHED_HARDWARE_PROFILE = ROBOT_POWERED\nFLASHED_OTA_INGEST_ENABLED = 0\n'
                              if self.bad!='flash_verification' else 'write failed\n')
-    def attestation(self,text): return self.bad!='attestation'
+    def attestation(self,text): self.calls.append('attestation');return self.bad!='attestation'
     def run_native(self,config,directory,phase,extra):
         self.calls.append((phase,extra))
         if self.fail==phase: raise release.ReleaseFailure('simulated native '+phase+' failure')
@@ -83,17 +91,42 @@ class StageTests(unittest.TestCase):
         self.assertIn('--require-daly',all_args);self.assertIn('--confirm-q0-pose',all_args)
         verification=next(v[1] for v in self.ops.calls if isinstance(v,tuple) and v[0]=='verify-persistence')
         self.assertEqual(verification,[])
-    def test_unqualified_pose_blocks_before_any_hardware(self):
+    def test_unqualified_pose_does_not_block_flash_but_blocks_calibration(self):
         (self.package/'initial-pose-plan.json').write_text(json.dumps(dict(qualified_path=False)))
-        with self.assertRaisesRegex(release.ReleaseFailure,'INITIAL_POSE_BLOCKED'):self.flash()
-        self.assertEqual(self.ops.calls,[])
+        self.ops.bad='pose';self.flash()
+        self.assertFalse(release.load(self.directory/'FLASH_OK.json')['nominal_pose_verified'])
+        self.assertNotIn('attestation',self.ops.calls)
+        before=list(self.ops.calls)
+        with self.assertRaisesRegex(release.ReleaseFailure,'INITIAL_POSE_BLOCKED'):self.calibrate()
+        self.assertEqual(self.ops.calls,before)
     def test_flash_errors_never_emit_flash_ok(self):
-        for fault in ['pose','torque','signature','safe_off','flash_verification','attestation']:
+        for fault in ['torque','signature','safe_off','flash_verification','missing','invalid','uart','timeout','mode','authority']:
             with self.subTest(fault=fault):
                 self.ops.bad=fault
                 (self.directory/'flash-started.json').unlink(missing_ok=True)
                 with self.assertRaises(release.ReleaseFailure):self.flash()
                 self.assertFalse((self.directory/'FLASH_OK.json').exists())
+    def test_flash_does_not_read_pose_qualification(self):
+        (self.package/'initial-pose-plan.json').unlink()
+        self.ops.bad='attestation';self.flash()
+        self.assertNotIn('attestation',self.ops.calls)
+        self.assertEqual(self.ops.calls[-1],'inspect')
+    def test_missing_startup_reference_has_precise_pre_motion_refusal(self):
+        (self.package/'initial-pose-plan.json').write_text(json.dumps(dict(
+            qualified_path=False,block_reason='STARTUP_Q0_REFERENCE_UNAVAILABLE_12_OF_12')))
+        self.flash();before=list(self.ops.calls)
+        with self.assertRaisesRegex(release.ReleaseFailure,'STARTUP_Q0_REFERENCE_UNAVAILABLE_12_OF_12'):
+            self.calibrate()
+        self.assertEqual(self.ops.calls,before)
+        self.assertFalse((self.directory/'calibration-started.json').exists())
+    def test_residual_or_unattested_pose_cannot_start_calibration(self):
+        self.flash()
+        for fault in ['pose','torque','invalid','missing','attestation','uart','timeout']:
+            with self.subTest(fault=fault):
+                self.ops.bad=fault
+                with self.assertRaises(release.ReleaseFailure):self.calibrate()
+                self.assertFalse(any(isinstance(v,tuple) for v in self.ops.calls))
+                self.assertFalse((self.directory/'calibration-started.json').exists())
     def test_flash_repeat_is_refused(self):
         self.flash();count=len(self.ops.calls)
         with self.assertRaises(FileExistsError):self.flash()

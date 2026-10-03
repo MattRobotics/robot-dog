@@ -90,6 +90,7 @@ class Operations:
             return {'hardware_observed': True, 'build_id': config['build_id'],
                     'application_sha256': config['application_sha256'],
                     'uptime_ms': uptime, 'observed_epoch': time.time(),
+                    'mode':'MAINTENANCE','authority':'NONE',
                     'safe_off_ids': native.INSTALLED if safe_off else [],
                     'positions': {str(bus): list(value) for bus,value in positions.items()}}
         except Exception:
@@ -177,24 +178,34 @@ def preflight(package, config, ops):
 def pose_gate(package):
     plan=load(package/'initial-pose-plan.json')
     require(plan.get('qualified_path') is True and bool(plan.get('qualification_evidence')),
-            'INITIAL_POSE_BLOCKED: no qualified no-witness path under the no-cover/no-forced-reducer constraints')
+            'INITIAL_POSE_BLOCKED: '+plan.get('block_reason',
+                'no qualified startup path and reference for all twelve joints'))
 
 
-def check_positions(config, record):
+def check_safe_off_positions(config, record):
     canonical_receipt(config,record)
+    require(record.get('mode')=='MAINTENANCE' and record.get('authority')=='NONE',
+            'MAINTENANCE or authority NONE not verified')
     require(record.get('safe_off_ids')==native.INSTALLED,'SAFE_OFF not verified for all 13 servos')
     positions=record.get('positions',{})
     require(set(positions)==set(map(str,native.CR2C)),'missing/duplicate 12-joint encoder evidence')
     for bus,reference in native.CR2C.items():
         position,torque=positions[str(bus)]
-        require(0<=position<4096 and torque==0,'encoder invalid or torque not OFF: '+str(bus))
+        require(isinstance(position,int) and not isinstance(position,bool) and
+                0<=position<4096 and torque==0,'encoder invalid or torque not OFF: '+str(bus))
+
+
+def check_positions(config, record):
+    check_safe_off_positions(config,record)
+    positions=record['positions']
+    for bus,reference in native.CR2C.items():
+        position,_=positions[str(bus)]
         require(abs(position-reference)<82,'pose outside existing Q0 plausibility screen: '+str(bus))
     # Encoders are only a plausibility screen. A separate physical jig/square
     # attestation is indispensable; logs alone cannot establish nominal Q0.
 
 
 def phase_flash(package, config, directory, ops):
-    pose_gate(package)  # before any hardware I/O
     write_new(directory/'flash-started.json', {'attempt':1})
     env={'MATDOG_FLASH_PROFILE':'ROBOT_POWERED','MATDOG_FLASH_OTA_INGEST':'0',
          'MATDOG_FLASH_BACKUP':config['backup'],'MATDOG_FLASH_BACKUP_SHA256':config['backup_sha256'],
@@ -210,18 +221,15 @@ def phase_flash(package, config, directory, ops):
         require(time.monotonic()<deadline,'USB did not re-enumerate after application write')
         time.sleep(.2)
     result=ops.inspect(config,directory)
-    check_positions(config,result)
-    require(ops.attestation('Verificare Q0 reale con squadra/dime, robot sostenuto, senza forzare i riduttori. Non basta il confronto encoder.'),
-            'nominal mechanical pose not verified')
-    result.update(nominal_pose_verified=True, status='FLASH_OK')
+    check_safe_off_positions(config,result)
+    result.update(nominal_pose_verified=False, status='FLASH_OK')
     write_new(directory/'FLASH_OK.json',result)
     print('FLASH_OK')
 
 
 def phase_calibrate(package, config, directory, ops):
     pose_gate(package)
-    flash=load(directory/'FLASH_OK.json'); check_positions(config,flash)
-    require(flash.get('nominal_pose_verified') is True,'missing physical nominal-pose verification')
+    flash=load(directory/'FLASH_OK.json'); check_safe_off_positions(config,flash)
     fresh=ops.inspect(config,directory)
     check_positions(config,fresh)
     anchor=flash['observed_epoch']-flash['uptime_ms']/1000
@@ -340,6 +348,9 @@ def main(argv=None, ops=None):
         preflight(package,config,ops)
         if args.offline_check:
             print('OFFLINE_ARTIFACTS=PASS; HARDWARE_IO=NO')
+            if args.phase=='flash':
+                print('APPLICATION_ONLY_FLASH_PREPARATION=PASS; POSE_ADMISSION=CALIBRATION_ONLY')
+                return 0
             try: pose_gate(package)
             except ReleaseFailure as e:
                 print(str(e))
