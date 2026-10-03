@@ -143,6 +143,48 @@ class MigrationM0Tests(unittest.TestCase):
     def test_new_app1_stale_legacy_tail(self):
         self.stop("NEW_APP1_NOT_EMPTY", self.inspect, self.changed(0x510000, b"\xe9"))
 
+    def test_legacy_app1_data_hidden_by_app0_expansion(self):
+        for offset in (0x310000, 0x50FFFF):
+            self.stop("LEGACY_APP1_NOT_EMPTY", self.inspect, self.changed(offset, b"\0"))
+
+    def test_table_sector_erase_must_not_destroy_occupied_padding(self):
+        self.stop("TABLE_SECTOR_PADDING_OCCUPIED", self.inspect, self.changed(0x8C00, b"\0"))
+
+    def test_powered_profile_must_be_explicit_and_matching(self):
+        self.write_manifest(profile="ROBOT_POWERED")
+        self.stop("PROFILE_MISMATCH", self.artifact)
+        _, _, m, plan = m0.verified_artifact(self.binary, self.mfile, expected_profile="ROBOT_POWERED")
+        self.assertEqual(m["HARDWARE_PROFILE"], "ROBOT_POWERED")
+        self.assertEqual(plan.start, 0x10000)
+        self.stop("PROFILE_UNSUPPORTED", m0.verified_artifact, self.binary, self.mfile,
+                  expected_profile="ANY")
+
+    def test_powered_cli_plan_and_both_snapshot_stages(self):
+        self.write_manifest(profile="ROBOT_POWERED")
+        out = self.root / "powered-plan"
+        args = self.plan_args(out) + ["--profile", "ROBOT_POWERED"]
+        with patch.object(m0, "BOOTLOADER_SHA256", m0.digest(self.boot)), \
+             contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(m0.main(args), 0)
+        report = json.loads((out / "report.json").read_text())
+        self.assertEqual(report["expected_profile"], "ROBOT_POWERED")
+        self.assertFalse(report["authorization_granted"])
+        a, _ = self.backup_files()
+        binary, target, _, _ = m0.verified_artifact(self.binary, self.mfile, expected_profile="ROBOT_POWERED")
+        for stage in ("app", "table"):
+            snapshot = self.root / (stage + "-snapshot.bin")
+            snapshot.write_bytes(m0.expected_snapshot(self.before, binary, target, stage=stage))
+            check = ["check-snapshot", "--backup", str(a), "--backup-sha256", m0.digest(self.before),
+                     "--snapshot", str(snapshot), "--binary", str(self.binary), "--manifest", str(self.mfile),
+                     "--stage", stage]
+            with contextlib.redirect_stderr(io.StringIO()) as refused:
+                self.assertEqual(m0.main(check), 1)  # default USB_ONLY cannot infer powered
+            self.assertIn("PROFILE_MISMATCH", refused.getvalue())
+            with contextlib.redirect_stdout(io.StringIO()) as passed:
+                self.assertEqual(m0.main(check + ["--profile", "ROBOT_POWERED"]), 0)
+            self.assertIn("SNAPSHOT_CHECK=PASS", passed.getvalue())
+            self.assertIn("AUTHORIZATION_GRANTED=NO", passed.getvalue())
+
     def test_blank_otadata_ambiguous(self):
         self.stop("OTADATA_AMBIGUOUS", self.inspect, self.changed(0xE000, b"\xff" * 0x2000))
 

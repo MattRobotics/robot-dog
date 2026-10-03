@@ -156,6 +156,7 @@ class Transport:
 
 
 class WriterTests(unittest.TestCase):
+    profile = 'USB_ONLY'
     evidence = []
     @classmethod
     def setUpClass(cls):
@@ -183,12 +184,15 @@ class WriterTests(unittest.TestCase):
         self.target.write_bytes(table([(e.label, e.type, e.subtype, e.offset, e.size) for e in layout.EXPECTED_PARTITIONS]))
         self.manifest = self.root / 'matdog_build_manifest.txt'; self.make_manifest()
         self.addCleanup(patch.stopall)
-        patch.object(writer, 'APP_SHA256', m0.digest(self.app.read_bytes())).start()
+        self.production_candidates = {p: dict(c) for p, c in writer.REVIEWED_CANDIDATES.items()}
+        patch.dict(writer.REVIEWED_CANDIDATES, {self.profile: {
+            'bytes': self.app.stat().st_size, 'app_sha256': m0.digest(self.app.read_bytes()),
+            'manifest_sha256': m0.digest(self.manifest.read_bytes())}}).start()
         self.devices = []
 
     def make_manifest(self):
         self.manifest.write_text(manifest.render_manifest(source_commit=m0.APPROVED_COMMIT,
-            build_id=m0.APPROVED_COMMIT[:12], source_state='CLEAN', profile='USB_ONLY',
+            build_id=m0.APPROVED_COMMIT[:12], source_state='CLEAN', profile=self.profile,
             ota_ingest_enabled='0', fqbn=layout.PINNED_FQBN, application_binary=self.app.name,
             application_size=self.app.stat().st_size, application_sha256=m0.digest(self.app.read_bytes()),
             layout_id=layout.LAYOUT_ID, partition_table_sha256=layout.EXPECTED_TABLE_SHA256,
@@ -206,7 +210,7 @@ class WriterTests(unittest.TestCase):
                 '--offset', hex(offset), '--gate', 'B' if operation in ('app0', 'table') else 'R2' if operation == 'r2-full' else 'R',
                 '--backup', str(self.a), '--backup-repeat', str(self.b), '--backup-sha256', m0.digest(self.before),
                 '--port', '/dev/serial/by-id/SIMULATED_ONLY', '--mac', writer.EXPECTED_MAC,
-                '--binary', str(self.app), '--manifest', str(self.manifest)]
+                '--binary', str(self.app), '--manifest', str(self.manifest), '--profile', self.profile]
 
     def run_writer(self, args, fault=None):
         previous_devices = len(self.devices)
@@ -314,6 +318,33 @@ class WriterTests(unittest.TestCase):
         args = self.args(); args[args.index('--sha256')+1] = '0' * 64
         self.assertEqual(self.run_writer(args), 2); self.assertFalse(self.devices)
 
+    def test_other_profile_is_rejected_before_open(self):
+        args = self.args()
+        args[args.index('--profile') + 1] = 'ROBOT_POWERED' if self.profile == 'USB_ONLY' else 'USB_ONLY'
+        self.assertEqual(self.run_writer(args), 2); self.assertFalse(self.devices)
+        self.assertIn('PROFILE_MISMATCH', self.err)
+
+    def test_valid_but_unreviewed_app_is_rejected_before_open(self):
+        self.app.write_bytes(self.app.read_bytes()[:-1] + b'X')
+        self.make_manifest()
+        self.assertEqual(self.run_writer(self.args()), 2); self.assertFalse(self.devices)
+        self.assertIn('REVIEWED_APP_MISMATCH', self.err)
+
+    def test_manifest_pin_is_independent_of_manifest_fields(self):
+        self.manifest.write_bytes(self.manifest.read_bytes().replace(b'\n', b'\r\n'))
+        self.assertEqual(self.run_writer(self.args()), 2); self.assertFalse(self.devices)
+        self.assertIn('REVIEWED_MANIFEST_MISMATCH', self.err)
+
+    def test_occupied_reallocated_data_or_table_padding_is_rejected_before_open(self):
+        for off in (0x8c00, 0x310000, 0x50ffff, 0x510000, 0x610000, 0xa10000, 0xfe0000):
+            for op in ('app0', 'table'):
+                with self.subTest(off=hex(off), operation=op):
+                    changed = bytearray(self.before); changed[off] = 0
+                    self.a.write_bytes(changed); self.b.write_bytes(changed)
+                    args = self.args(op)
+                    args[args.index('--backup-sha256') + 1] = m0.digest(changed)
+                    self.assertEqual(self.run_writer(args), 2); self.assertFalse(self.devices)
+
     def test_wrong_offset_before_open(self):
         for op in ('app0', 'table', *writer.RECOVERY):
             with self.subTest(operation=op):
@@ -379,22 +410,32 @@ class WriterTests(unittest.TestCase):
             self.assertEqual(self.run_writer(self.args()), 2)
         self.assertEqual(sum(op == 2 for op, _, _ in self.devices[-1].packets), 1)
 
-    def test_original_usb_candidate_when_supplied(self):
-        root = os.environ.get('MATDOG_M0_USB')
+    def test_original_candidate_when_supplied(self):
+        root = os.environ.get('MATDOG_M0_USB' if self.profile == 'USB_ONLY' else 'MATDOG_M0_ROBOT')
         if not root:
-            self.skipTest('set MATDOG_M0_USB for immutable original-artifact integration')
+            self.skipTest('set MATDOG_M0_USB/ROBOT for immutable original-artifact integration')
         root = Path(root)
         self.app.write_bytes((root / self.app.name).read_bytes())
         self.target.write_bytes((root / self.target.name).read_bytes())
         self.manifest.write_bytes((root / self.manifest.name).read_bytes())
-        patch.object(writer, 'APP_SHA256', 'f0f3df4e83708f04d4e7acb44ab35794028521a0abfe50fa95b219694c498c3e').start()
+        patch.dict(writer.REVIEWED_CANDIDATES, self.production_candidates).start()
         # Real artifact revision fields require a simulated rev >= min.
         with patch.object(ESP32S3ROM, 'get_chip_revision', return_value=100):
             self.assertEqual(self.run_writer(self.args()), 0, self.err)
         port = self.devices[-1]
-        self.assertEqual(port.begin, (0x10000, 1120352, 0x122000))
-        self.assertEqual(port.flash[0x10000:0x121860], self.app.read_bytes())
-        self.assertEqual(port.flash[0x121860:0x122000], b'\xff' * 0x7a0)
+        size = 1120352 if self.profile == 'USB_ONLY' else 1123472
+        end = 0x122000 if self.profile == 'USB_ONLY' else 0x123000
+        self.assertEqual(port.begin, (0x10000, size, end))
+        self.assertEqual(port.flash[0x10000:0x10000 + size], self.app.read_bytes())
+        self.assertEqual(port.flash[0x10000 + size:end], b'\xff' * (end - 0x10000 - size))
+        # The table operation must accept only the same qualified pair too.
+        with patch.object(ESP32S3ROM, 'get_chip_revision', return_value=100):
+            self.assertEqual(self.run_writer(self.args('table')), 0, self.err)
+
+
+class PoweredWriterTests(WriterTests):
+    """Same real API/fault matrix with explicitly selected powered profile."""
+    profile = 'ROBOT_POWERED'
 
 
 if __name__ == '__main__':

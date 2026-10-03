@@ -1,5 +1,13 @@
 # MATDOG M0 — Migrazione flash e recupero, validati offline
 
+> **Checkpoint corrente M0.4 (2026-10-03):** per l'installazione alimentata
+> da batteria/DALY/TECNOIOT e USB nativa senza VBUS usare
+> [FLASH_LAYOUT_M0_4_ROBOT_POWERED_RUNBOOK.md](FLASH_LAYOUT_M0_4_ROBOT_POWERED_RUNBOOK.md).
+> Le condizioni BLOCKED/recupero fisico preventivo sotto descrivono M0.2:
+> sono superate dalle decisioni esplicite M0.4. Il template USB_ONLY resta
+> sospeso e non si applica al robot assemblato. Nessuna autorizzazione W è
+> concessa da alcuno dei due documenti.
+
 Data: 2026-10-02. **M0.2: backup Gate A verificato; Gate B BLOCKED.**
 Base firmware immutabile: `be0c12979e5b4b8ddc9dd21772d0d106e4358f4a`.
 Branch `feat/calibration-persistence-record-store-v1`, HEAD di ingresso M0.2

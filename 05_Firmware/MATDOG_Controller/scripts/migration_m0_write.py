@@ -15,7 +15,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import migration_m0 as m0
 
-APP_SHA256 = "f0f3df4e83708f04d4e7acb44ab35794028521a0abfe50fa95b219694c498c3e"
+REVIEWED_CANDIDATES = {
+    "USB_ONLY": {
+        "bytes": 1120352,
+        "app_sha256": "f0f3df4e83708f04d4e7acb44ab35794028521a0abfe50fa95b219694c498c3e",
+        "manifest_sha256": "b6dc29ca350af8073c3d9977cd5be89a593d637ef8279a283f1bfa49c55dc5d8",
+    },
+    "ROBOT_POWERED": {
+        "bytes": 1123472,
+        "app_sha256": "7cc1cbbc024e58630ed93fd0df8b7491659c0c20d6e1a4916333230eb1a82be0",
+        "manifest_sha256": "d5c92755d958203d89eb0e439b2dce80a6faa79302000b7088b1a3209ce1ea48",
+    },
+}
 EXPECTED_MAC = "14:c1:9f:22:75:94"
 RECOVERY = {
     "r1-app0": (0x10000, 0x310000),
@@ -46,9 +57,13 @@ def prepare(args):
     if args.operation in ("app0", "table"):
         if not args.binary or not args.manifest:
             raise m0.Stop("MANIFEST_REQUIRED")
-        app, table, _, plan = m0.verified_artifact(args.binary, args.manifest)
-        if m0.digest(app) != APP_SHA256:
+        app, table, _, plan = m0.verified_artifact(args.binary, args.manifest, expected_profile=args.profile)
+        candidate = REVIEWED_CANDIDATES[args.profile]
+        if m0.digest(app) != candidate["app_sha256"] or len(app) != candidate["bytes"]:
             raise m0.Stop("REVIEWED_APP_MISMATCH")
+        if m0.digest(m0.read_file(args.manifest)) != candidate["manifest_sha256"]:
+            raise m0.Stop("REVIEWED_MANIFEST_MISMATCH")
+        m0.check_reclassified_regions(before)
         offset, expected = (plan.start, app) if args.operation == "app0" else (0x8000, table)
         erase_end = plan.erase_end if args.operation == "app0" else 0x9000
     else:
@@ -172,7 +187,7 @@ def execute(args):
         port.dtr = False
         port.rts = False
         port.port = args.port
-        port.open()  # exactly once; manual BOOT held low throughout
+        port.open()  # exactly once; ROM already entered separately via usb-reset
         esp = rom_type(port, baud=115200)
         esp.connect(mode="no-reset", attempts=1)
         if esp.IS_STUB or esp.sync_stub_detected or esp.secure_download_mode:
@@ -191,7 +206,7 @@ def execute(args):
         if (esp.WRITE_FLASH_ATTEMPTS != 1 or loader.WRITE_BLOCK_ATTEMPTS != 1 or
             loader.ESPLoader.flash_block.__globals__["WRITE_BLOCK_ATTEMPTS"] != 1):
             raise m0.Stop("RETRY_POLICY_NOT_APPLIED")
-        print(f"M0_WRITE operation={args.operation} gate={args.gate} offset=0x{offset:x} "
+        print(f"M0_WRITE operation={args.operation} gate={args.gate} profile={args.profile} offset=0x{offset:x} "
               f"bytes={len(data)} erase_end=0x{erase_end:x} image_attempts=1 block_attempts=1", flush=True)
         cmds.write_flash(esp, [(offset, data)], flash_mode="keep", flash_freq="keep",
                          flash_size="keep", flash_type="nor", no_compress=True,
@@ -213,6 +228,8 @@ def parser():
     p.add_argument("--offset", type=lambda v: int(v, 0), required=True)
     p.add_argument("--binary")
     p.add_argument("--manifest")
+    p.add_argument("--profile", choices=m0.PROFILES, default="USB_ONLY",
+                   help="explicit ROBOT_POWERED required for its pinned M0.4 candidate")
     return p
 
 
