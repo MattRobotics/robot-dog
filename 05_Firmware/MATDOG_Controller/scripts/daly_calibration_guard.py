@@ -24,6 +24,7 @@ class DalyGuard:
         self.fault = None
         self.blocks = 0
         self.values = {}
+        self.pending = {}
 
     def fail(self, reason):
         self.fault = reason
@@ -39,7 +40,7 @@ class DalyGuard:
                 self.fail("DALY unavailable: " + line)
             self.stage = 1
             self.block_started = received
-            self.values = {}
+            self.pending = {}
             return
         if not self.stage:
             return
@@ -70,18 +71,19 @@ class DalyGuard:
                 self.fail("DALY cell topology is not the current 3S pack")
             if pack < 10.8:
                 self.fail("DALY pack below 10.8 V")
-            self.values.update(pack_v=pack, cells=3, soc_percent=float(match[3]))
+            self.pending.update(pack_v=pack, cells=3, soc_percent=float(match[3]))
         elif self.stage == 3:
             maximum, minimum, delta = map(int, match.groups())
             if minimum < 3600:
                 self.fail("DALY minimum cell below 3.60 V")
             if maximum < minimum or maximum - minimum != delta:
                 self.fail("DALY inconsistent cell extrema")
-            self.values.update(cell_min_mv=minimum, cell_max_mv=maximum, delta_mv=delta)
+            self.pending.update(cell_min_mv=minimum, cell_max_mv=maximum, delta_mv=delta)
         else:
             if match[2] != "ON" or any(int(v, 16) for v in match.groups()[3:]):
                 self.fail("DALY discharge disabled or alarms present")
             self.last = self.comm_at - self.age_s
+            self.values = dict(self.pending)  # publish only a complete validated block
             self.blocks += 1
             self.stage = 0
             return

@@ -41,6 +41,7 @@ class GuardTests(unittest.TestCase):
 
     def test_summary_does_not_refresh_old_sample(self):
         g=self.sample(); g.feed(NORMAL[0],14); g.feed('SERVO init=OK',14)
+        self.assertEqual(g.snapshot()['pack_v'],10.8)
         with self.assertRaises(DalyGuardFailure): g.check(15)
 
     def test_fault_latches_even_if_followed_by_normal(self):
