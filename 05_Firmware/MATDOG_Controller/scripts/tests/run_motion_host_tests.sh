@@ -71,3 +71,9 @@ python3 "$REPO_DIR/06_Software/Matdog_Core/pose_audit/pose_export.py" --check
   -o "$OUT/test_contact_mode" "$SCRIPT_DIR/test_contact_mode.cpp" \
   "$SKETCH_DIR"/src/motion/*.cpp
 "$OUT/test_contact_mode"
+
+# G5-A attitude contract, body stabilizer core, tilted contact IK, tilt compensation, actuator-envelope classifier.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -fno-exceptions -fno-rtti \
+  -o "$OUT/test_stabilization" "$SCRIPT_DIR/test_stabilization.cpp" \
+  "$SKETCH_DIR"/src/motion/*.cpp
+"$OUT/test_stabilization"
