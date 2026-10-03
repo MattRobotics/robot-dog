@@ -93,6 +93,16 @@ module boundaries and read-only/safety surfaces documented in the
 [Controller README](../../05_Firmware/MATDOG_Controller/README.md). A listed target capability is
 not validated merely because its precursor or standalone tool exists.
 
+## Offline motion contact contract (G4.1 decision, 2026-10-03)
+
+The offline motion stack (G1 kinematics, G2 contact, G3 startup, G3.5 poses, G4 gait, G4.1 contact reconciliation)
+is **not** a hardware-authorized motion controller. For offline lifecycle assessment the accepted foot-contact
+contract is **A2 / Contact Contract v2**: the G2 analytic tread is authoritative for the foot, contact modes follow the
+schedule, and the mesh/analytic difference (5.775 um) is a declared uncertainty, not a tolerance dial. The G2.1
+re-registration (A1) is **deferred**; G2 is unchanged; the historical 1 um policy stays documented. Hardware locomotion
+is not authorized. See the
+[decision record](../../09_Logs/Development_Log/2026-10-03_G41_CONTACT_CONTRACT_DECISION.md).
+
 ## Servo allocation versus installation
 
 These are separate facts with separate owners:
