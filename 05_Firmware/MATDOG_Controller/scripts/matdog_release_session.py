@@ -239,6 +239,8 @@ def phase_calibrate(package, config, directory, ops):
     receipt=load(directory/'persistence_ack.json')
     require(persisted.get('hardware_observed') is True and persisted.get('save_ok') is True and persisted.get('ack_ok') is True,
             'SAVE/ACK not verified on hardware')
+    require(persisted.get('build_id')==config['build_id'] and isinstance(persisted.get('daly'),dict) and
+            persisted['daly'].get('blocks',0)>0,'SAVE/ACK signature or DALY evidence missing')
     require(persisted.get('generation')==receipt.get('generation') and persisted['generation']>0 and receipt.get('build_id')==config['build_id'],
             'ACK generation/build mismatch')
     persisted.update(application_sha256=config['application_sha256'],status='CALIBRATION_SAVE_ACK_OK')
@@ -304,8 +306,10 @@ def phase_finalize(package, config, directory, ops, timeout):
         with (root/name).open('a') as out: out.write(summary)
     ops.command(['git','add',*docs],root,directory/'documentation.log')
     ops.command(['git','commit','-m','docs: record actual MATDOG calibration SAVE ACK and reboot evidence'],root,directory/'documentation.log')
+    documentation_commit=ops.text(['git','rev-parse','HEAD'],root)
     merged=finalize_git(config,directory,ops)
     write_new(directory/'FINALIZED.json',dict(result,firmware_commit=config['firmware_commit'],main_commit=merged,
+                                            host_tools_commit=config['tools_commit'],documentation_commit=documentation_commit,
                                             application_sha256=config['application_sha256']))
     print('FINALIZED_MAIN='+merged)
 
@@ -313,6 +317,7 @@ def phase_finalize(package, config, directory, ops, timeout):
 def export_evidence(package, config, directory, status, reason=None):
     shutil.copy2(package/'application/matdog_build_manifest.txt',directory/'installed-build-manifest.txt')
     report={'status':status,'reason':reason,'firmware_commit':config['firmware_commit'],
+            'host_tools_commit':config['tools_commit'],
             'application_sha256':config['application_sha256'],'hardware_validation_inferred_from_simulation':False}
     (directory/'OPERATIONAL_REPORT.json').write_text(json.dumps(report,indent=2)+'\n')
     files=[p for p in directory.rglob('*') if p.is_file() and '.git' not in p.parts and

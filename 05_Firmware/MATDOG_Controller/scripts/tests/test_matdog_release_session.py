@@ -41,7 +41,7 @@ class SimulatedOperations:
                                       daly=None if self.bad=='daly' else {'blocks':4})
         if phase=='persist':
             release.write_new(directory/'persistence_ack.json',dict(build_id=config['build_id'],generation=1,uptime_ms=100000))
-            result.update(generation=2 if self.bad=='generation' else 1,save_ok=True,ack_ok=True)
+            result.update(generation=2 if self.bad=='generation' else 1,save_ok=True,ack_ok=True,daly={'blocks':4})
         if phase=='verify-persistence': result.update(generation=1,acknowledged_record_intact=self.bad!='record',
                     motion_authorized=self.bad=='motion',authority='NONE')
         return result
@@ -63,6 +63,7 @@ class StageTests(unittest.TestCase):
         self.repo=self.root/'repo';self.repo.mkdir()
         self.port=self.root/'fake-device';self.port.touch()
         self.config=dict(build_id='125d981b02a3',application_sha256='a'*64,firmware_commit='b'*40,
+                         tools_commit='e'*40,
                          port=str(self.port),firmware_sketch=str(self.repo),tools_repo=str(self.repo),backup='fake',
                          backup_sha256='c'*64,mac='test')
         self.ops=SimulatedOperations(self.config)
