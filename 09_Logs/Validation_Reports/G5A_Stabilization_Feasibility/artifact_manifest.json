@@ -1,0 +1,145 @@
+{
+  "scope": "G5-A offline stabilization and actuator feasibility; no hardware artifact, serial log or actuator command is indexed",
+  "excluded": [
+    "artifact_manifest.json (self)"
+  ],
+  "artifact_count": 11,
+  "artifacts": [
+    {
+      "path": "REPORT.md",
+      "sha256": "0a3904a51c4956b1c9cdcd3ff694e4d0676b6a11469129d20e9b1b098030306d",
+      "bytes": 22578,
+      "producer": "build_report.py"
+    },
+    {
+      "path": "actuator_feasibility.json",
+      "sha256": "532b82f834fc43019172baa76dcb9fea9956a184f05e7dcf2b7f2434644ca96d",
+      "bytes": 68493,
+      "producer": "feasibility_table.py"
+    },
+    {
+      "path": "actuator_requirements.json",
+      "sha256": "8debd244bcbf706e102be32b7bf26881f9f13cbec19353b51898062e17fae190",
+      "bytes": 16540,
+      "producer": "stability_actuator.py"
+    },
+    {
+      "path": "frames_oracle.json",
+      "sha256": "b9d2a030e70987e0e59ec6e2c9c6eb37d10c70c53cdaf50750120e14107028f4",
+      "bytes": 367,
+      "producer": "independent_checks.py"
+    },
+    {
+      "path": "ik_oracle.json",
+      "sha256": "01debf6ebc47c47a8cb38c27b326365818ec62c40ef4a9a38bf655c1f62297a2",
+      "bytes": 17760,
+      "producer": "independent_checks.py"
+    },
+    {
+      "path": "joint_range.json",
+      "sha256": "f44868dd9c01d21a51462e1a179d6deba2edc5b92ba2e0710362f9a5e34e0d6d",
+      "bytes": 50970,
+      "producer": "joint_range.py"
+    },
+    {
+      "path": "oracle_results_g5a.json",
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "bytes": 684,
+      "producer": "run_g4_oracle.py"
+    },
+    {
+      "path": "perturbation_results.json",
+      "sha256": "dd7336008bade09b4af95f6b2dd0beb318f0bea665916dcbe14298bf0672698e",
+      "bytes": 16262,
+      "producer": "perturbation_sim.py"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "68058198bad60d5874b4276b2c04a907ad7edeb6b01ac3b730d4d71a8fba672b",
+      "bytes": 10449,
+      "producer": "provenance.py"
+    },
+    {
+      "path": "stability_assessment.json",
+      "sha256": "ca598d92fb9de8c1b39f5dec1730e9d967c01a540e253742b38b610cbfd9e337",
+      "bytes": 15457,
+      "producer": "stability_actuator.py"
+    },
+    {
+      "path": "validation_results.json",
+      "sha256": "d8e204adf27c20663baa7a0378ddccf1f81488aa895cd5f559e4b36353f6a41b",
+      "bytes": 27069,
+      "producer": "validate.py"
+    }
+  ],
+  "generator_sha256": {
+    "build_report.py": "c182d6e12f93dc524696fe2dc156362ecc045715107dec2b761cea214dec0132",
+    "feasibility_table.py": "87e579bb957f679fd0088bae0b91ca17c6683777df7a55d1400d4795d71ca688",
+    "independent_checks.py": "e4dca96492f66446dd3526f083b2ddb73007e31e87dee74b8ef30cb6ce0811bd",
+    "joint_range.py": "e1909768e0699a33fb09991d497d5f6d8e279154eeba6eb32c907230adfa5c84",
+    "perturbation_sim.py": "8135e5e7da1fec83d5090a2684a407d9dd50a320c276215c3a498cef890ffd5e",
+    "provenance.py": "5b9955266bacf9b733af1969c0e1c990daa0df9d7ed49b0d42a4693842c762b1",
+    "run_g4_oracle.py": "7cdb2172baefba3b81a00c0d7983921309233ea4e5d8a94624df88bdb1e69849",
+    "stability_actuator.py": "0be7a4da878695c4f717fef26e56fb38c8ae4d839b71698126418bf450f2220b",
+    "validate.py": "f5356080701d581c95ec75810918ae222dcf2fc33d0d1bc18385eb6f99cbcf42"
+  },
+  "accepted_preservation": [
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/REPORT.md",
+      "g41_head_sha256": "ad69065ae9fc1d7e4956410e8ae4e918551359fad660339fff4bca9b55d6856d",
+      "current_sha256": "ad69065ae9fc1d7e4956410e8ae4e918551359fad660339fff4bca9b55d6856d",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/artifact_manifest.json",
+      "g41_head_sha256": "26d03efc56d1fed542549d48b63e040911a2f997c514bc0952c6d392125646a4",
+      "current_sha256": "26d03efc56d1fed542549d48b63e040911a2f997c514bc0952c6d392125646a4",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/REPORT.md",
+      "g41_head_sha256": "89f90e16f8b68f3f066f7a546fcf0cb994146386c31a1b0ee285f985c74a5bcf",
+      "current_sha256": "89f90e16f8b68f3f066f7a546fcf0cb994146386c31a1b0ee285f985c74a5bcf",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/artifact_manifest.json",
+      "g41_head_sha256": "3f93b79f671ce5a5d79e22197efe19c1464defdff8744bca6eb495d6e63e53bd",
+      "current_sha256": "3f93b79f671ce5a5d79e22197efe19c1464defdff8744bca6eb495d6e63e53bd",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+      "g41_head_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "current_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml",
+      "g41_head_sha256": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
+      "current_sha256": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp",
+      "g41_head_sha256": "a6c497c393641577988d9773f001a4280e875422bc22d7588bd2fb8979198823",
+      "current_sha256": "a6c497c393641577988d9773f001a4280e875422bc22d7588bd2fb8979198823",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp",
+      "g41_head_sha256": "0ce86767cf1c9a7b31975a397b5e26bd439da0814fba060cc8b6dec14d0c0d90",
+      "current_sha256": "0ce86767cf1c9a7b31975a397b5e26bd439da0814fba060cc8b6dec14d0c0d90",
+      "status": "PRESERVED"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp",
+      "g41_head_sha256": "cde2c92e30befbc192e02c226178759aa6e4163cba619f73fcf830adb42447d0",
+      "current_sha256": "cde2c92e30befbc192e02c226178759aa6e4163cba619f73fcf830adb42447d0",
+      "status": "PRESERVED"
+    }
+  ],
+  "summary": {
+    "changed_accepted": []
+  }
+}
