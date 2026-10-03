@@ -150,8 +150,17 @@ python3 "$SCRIPTS/migration_m0.py" plan --profile ROBOT_POWERED \
 ```
 
 File di stato distinti e acquisizioni realmente indipendenti, size 16.777.216,
-SHA esatto atteso, `FILE_CHECKS=PASS`. Verificare copia di sicurezza su secondo
-supporto con receipt prima della W: M0.4 non ne inventa l'esistenza.
+SHA esatto atteso, `FILE_CHECKS=PASS`. Verificare copia di sicurezza indipendente
+dall'ASUS con receipt prima della W: è ammesso un secondo supporto fisico
+distinto oppure una copia remota cifrata GPG/AES-256 su GitHub Releases.
+Per la copia remota sono obbligatori upload confermato, download dal remoto,
+confronto dimensione/SHA-256 del ciphertext e decifratura verificata per
+dimensione, SHA-256 e byte rispetto all'originale. Password/chiave restano sotto
+controllo dell'operatore, fuori da repository, log e conversazione. Una directory,
+partizione o filesystem sullo stesso disco e un upload non confermato non
+soddisfano il gate. Il metodo standard è documentato in
+[09_Backups/ESP32](../../09_Backups/ESP32/README.md).
+M0.4 non presume l'esistenza della seconda copia; serve un receipt positivo.
 Se lo stato è cambiato (anche NVS/core), non aggiornare l'hash autorizzato in
 modo opportunistico: STOP, archiviare e riconciliare le differenze, verificare
 eventuale nuovo A/B e rigenerare il piano dopo revisione. Nessuna W finché

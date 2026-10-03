@@ -1,0 +1,267 @@
+{
+  "schema": "MATDOG_M0_4_P1_CHECKPOINT_V1",
+  "closed_at_utc": "2026-10-03T07:36:47.639181+00:00",
+  "baseline_commit": "b19a98e0dc7d90d7e1218d3190eb2e28c54ecc14",
+  "branch": "feat/calibration-persistence-record-store-v1",
+  "git_checkpoint": "commit containing this document; full local/remote SHA recorded in external git-checkpoint-receipt.json after push",
+  "repository_and_local_preflight": "PASS_REUSED",
+  "original_AB": "PASS_REUSED_NO_NEW_ACQUISITION",
+  "power_operator_evidence": {
+    "source": "operator current instruction",
+    "TECNOIOT": "6–24 V input → 5 V output",
+    "declared_continuous_current_A": 2.1,
+    "declared_maximum_current_A": 3,
+    "observed_normal_V": 5.3,
+    "observed_minimum_under_load_V": 5.18,
+    "repeated_actual_operating_measurements": true,
+    "no_power_anomaly_or_operating_instability_observed": true,
+    "P1_operational_requirement": "ACCEPTED",
+    "new_automated_instrument_test": false
+  },
+  "physical_continuity_operator_evidence": {
+    "source": "operator current reply",
+    "no_power_cycle_reset_or_state_changing_controller_servo_command_since_P1_reads": true,
+    "robot_supported_legs_free_disconnector_accessible_still_confirmed": true
+  },
+  "firmware": {
+    "build_id": "dfcecb670d05",
+    "profile": "ROBOT_POWERED",
+    "running": "app0 @0x10000 / 0x300000 legacy",
+    "health": "READY",
+    "mode": "MAINTENANCE",
+    "authority": "NONE",
+    "calibration_session": "NO_SESSION",
+    "motion_permit_active": false,
+    "operator_motion_authorized": false,
+    "ota_ingest": "DISABLED"
+  },
+  "USB": {
+    "identity": "14:c1:9f:22:75:94",
+    "persistent_port": "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00",
+    "kernel_device": "/dev/ttyACM0",
+    "prior_diagnostics": "PASS; port free at acquisition, CDC closed afterwards",
+    "new_port_access_during_closure": false
+  },
+  "latest_prior_status": {
+    "@STATUS": [
+      "SYSTEM health=READY power_state=RUN mode=MAINTENANCE authority=NONE uptime_ms=3366221 profile=ROBOT_POWERED",
+      "BNO085 init=OK detected=ONLINE expected=REQUIRED result=PASS",
+      "DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS",
+      "SERVO  init=OK detected=ONLINE expected=REQUIRED result=PASS",
+      "LED    init=OK detected=UNKNOWN expected=OPTIONAL result=PASS",
+      "SERVO_POP canonical=17 expected_now=13 absent_by_design=4 last_census=PASS",
+      "WIFI  state=CONNECTED connected=YES ip=192.168.1.53 rssi_dbm=-93 fault=NONE",
+      "  heap_free=233932 heap_min_free=230484"
+    ],
+    "@BMS STATUS": [
+      "DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS",
+      "  comm=OK age_ms=1739",
+      "  pack_v=11.4 current_a=-0.3 soc=64.5% cells=3",
+      "  cell_max_mv=3805 cell_min_mv=3798 delta_mv=7",
+      "  charge_mos=ON discharge_mos=ON state=STATIONARY alarms=0000 0000 0000 0000"
+    ]
+  },
+  "servo_evidence": {
+    "required_ids": [
+      11,
+      12,
+      13,
+      21,
+      22,
+      23,
+      31,
+      32,
+      33,
+      41,
+      42,
+      43,
+      51
+    ],
+    "reads": [
+      {
+        "position": 2104,
+        "speed": 0,
+        "load": 0,
+        "voltage": 114,
+        "temp": 32,
+        "torque": 0,
+        "current": 0,
+        "id": 11,
+        "reply": "SERVO_READ id=11 position=2104 speed=0 load=0 voltage=114 temp=32 torque=0 current=0"
+      },
+      {
+        "position": 2106,
+        "speed": 0,
+        "load": 0,
+        "voltage": 114,
+        "temp": 30,
+        "torque": 0,
+        "current": 0,
+        "id": 12,
+        "reply": "SERVO_READ id=12 position=2106 speed=0 load=0 voltage=114 temp=30 torque=0 current=0"
+      },
+      {
+        "position": 1975,
+        "speed": 0,
+        "load": 0,
+        "voltage": 114,
+        "temp": 31,
+        "torque": 0,
+        "current": 0,
+        "id": 13,
+        "reply": "SERVO_READ id=13 position=1975 speed=0 load=0 voltage=114 temp=31 torque=0 current=0"
+      },
+      {
+        "position": 1997,
+        "speed": 0,
+        "load": 0,
+        "voltage": 114,
+        "temp": 31,
+        "torque": 0,
+        "current": 0,
+        "id": 21,
+        "reply": "SERVO_READ id=21 position=1997 speed=0 load=0 voltage=114 temp=31 torque=0 current=0"
+      },
+      {
+        "position": 2107,
+        "speed": 0,
+        "load": 0,
+        "voltage": 114,
+        "temp": 31,
+        "torque": 0,
+        "current": 0,
+        "id": 22,
+        "reply": "SERVO_READ id=22 position=2107 speed=0 load=0 voltage=114 temp=31 torque=0 current=0"
+      },
+      {
+        "position": 2024,
+        "speed": 0,
+        "load": 0,
+        "voltage": 115,
+        "temp": 29,
+        "torque": 0,
+        "current": 0,
+        "id": 23,
+        "reply": "SERVO_READ id=23 position=2024 speed=0 load=0 voltage=115 temp=29 torque=0 current=0"
+      },
+      {
+        "position": 2036,
+        "speed": 0,
+        "load": 0,
+        "voltage": 114,
+        "temp": 31,
+        "torque": 0,
+        "current": 0,
+        "id": 31,
+        "reply": "SERVO_READ id=31 position=2036 speed=0 load=0 voltage=114 temp=31 torque=0 current=0"
+      },
+      {
+        "position": 2058,
+        "speed": 0,
+        "load": 0,
+        "voltage": 115,
+        "temp": 29,
+        "torque": 0,
+        "current": 0,
+        "id": 32,
+        "reply": "SERVO_READ id=32 position=2058 speed=0 load=0 voltage=115 temp=29 torque=0 current=0"
+      },
+      {
+        "position": 2086,
+        "speed": 0,
+        "load": 0,
+        "voltage": 115,
+        "temp": 28,
+        "torque": 0,
+        "current": 0,
+        "id": 33,
+        "reply": "SERVO_READ id=33 position=2086 speed=0 load=0 voltage=115 temp=28 torque=0 current=0"
+      },
+      {
+        "position": 2078,
+        "speed": 0,
+        "load": 0,
+        "voltage": 113,
+        "temp": 31,
+        "torque": 0,
+        "current": 0,
+        "id": 41,
+        "reply": "SERVO_READ id=41 position=2078 speed=0 load=0 voltage=113 temp=31 torque=0 current=0"
+      },
+      {
+        "position": 2082,
+        "speed": 0,
+        "load": 0,
+        "voltage": 115,
+        "temp": 30,
+        "torque": 0,
+        "current": 0,
+        "id": 42,
+        "reply": "SERVO_READ id=42 position=2082 speed=0 load=0 voltage=115 temp=30 torque=0 current=0"
+      },
+      {
+        "position": 2025,
+        "speed": 0,
+        "load": 0,
+        "voltage": 114,
+        "temp": 31,
+        "torque": 0,
+        "current": 0,
+        "id": 43,
+        "reply": "SERVO_READ id=43 position=2025 speed=0 load=0 voltage=114 temp=31 torque=0 current=0"
+      },
+      {
+        "position": 2048,
+        "speed": 0,
+        "load": 0,
+        "voltage": 114,
+        "temp": 32,
+        "torque": 0,
+        "current": 0,
+        "id": 51,
+        "reply": "SERVO_READ id=51 position=2048 speed=0 load=0 voltage=114 temp=32 torque=0 current=0"
+      }
+    ],
+    "safety": "PASS_13_OF_13",
+    "census": {
+      "raw_result_file": "servo-safety.json",
+      "terminal_census_record": "SERVO_CENSUS=PASS lo=11 hi=55",
+      "census_result": "PASS",
+      "present_expected": 13,
+      "missing_expected": 0,
+      "unexpected_id": 0,
+      "absent_by_design_present": 0,
+      "truncated": false,
+      "parser_issue": "Collector matched STARTED instead of the terminal verdict. Corrected from complete recorded RX only; no repeated census or servo reads.",
+      "hardware_repeated_for_reconciliation": false,
+      "servo_safety": "PASS_13_OF_13"
+    },
+    "new_census_or_servo_reads_during_closure": false
+  },
+  "backup_receipt": "09_Backups/ESP32/m0-20261002T173142Z-14c19f227594.receipt.json",
+  "backup_release": "https://github.com/MattRobotics/robot-dog/releases/tag/backup-esp32-m0-20261002T173142Z-14c19f227594",
+  "evidence_origin": {
+    "previous_P1_directory": "/home/matteo-manicardi/MATDOG/verification-artifacts/MATDOG_M0_4_P1_RESUME_20261003T070301Z",
+    "original_evidence_files_not_modified": true,
+    "source_signature_timeout_resolved_by_independent_status_identity": true,
+    "census_STARTED_parser_error_resolved_offline_from_recorded_terminal_PASS": true
+  },
+  "operations_during_closure": {
+    "new_automated_power_measurement": false,
+    "ROM_entry": false,
+    "hardware_reset": false,
+    "flash_erase_OTA_JTAG_movement": false,
+    "firmware_writer_manifest_or_approved_package_changed": false,
+    "backup_originals_changed": false,
+    "new_flash_acquisition": false,
+    "prepared_P2_commands_executed": false
+  },
+  "concrete_remaining_P1_blockers": [],
+  "next_step": "separate authorization for controlled P2 ROM entry and read-only checks; only while power/peripheral/mechanical continuity remains valid",
+  "verdict": {
+    "BACKUP_SECONDARY": "PASS",
+    "P1_HARDWARE_PREFLIGHT": "PASS",
+    "ROM_ENTRY_READY": "YES",
+    "HARDWARE_FLASH_AUTHORIZED": "NO"
+  }
+}

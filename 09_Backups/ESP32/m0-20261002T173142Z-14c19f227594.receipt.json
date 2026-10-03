@@ -1,0 +1,72 @@
+{
+  "schema": "MATDOG_ESP32_REMOTE_BACKUP_RECEIPT_V1",
+  "verified_at_utc": "2026-10-03T07:36:47.637874+00:00",
+  "backup_id": "m0-20261002T173142Z-14c19f227594",
+  "BACKUP_SECONDARY": "PASS",
+  "remote_independent_of_ASUS": true,
+  "repository": "MattRobotics/robot-dog",
+  "release_id": 402389731,
+  "release_tag": "backup-esp32-m0-20261002T173142Z-14c19f227594",
+  "release_url": "https://github.com/MattRobotics/robot-dog/releases/tag/backup-esp32-m0-20261002T173142Z-14c19f227594",
+  "release_published_at_utc": "2026-10-03T07:32:11Z",
+  "release_is_draft": false,
+  "release_target_commit": "2757604400db34e3107abacd994ca6fb9d0bb515",
+  "assets": [
+    {
+      "id": 607375530,
+      "name": "backup-manifest.json",
+      "size_bytes": 2392,
+      "state": "uploaded",
+      "github_digest": "sha256:5594e5544dc51be554068fff4a899def649f9683924343aff7f78e797d1cfb66",
+      "browser_download_url": "https://github.com/MattRobotics/robot-dog/releases/download/backup-esp32-m0-20261002T173142Z-14c19f227594/backup-manifest.json",
+      "downloaded_sha256": "5594e5544dc51be554068fff4a899def649f9683924343aff7f78e797d1cfb66",
+      "byte_equal_to_uploaded_file": true
+    },
+    {
+      "id": 607375529,
+      "name": "read-a-16m.bin.gpg",
+      "size_bytes": 16777303,
+      "state": "uploaded",
+      "github_digest": "sha256:a1111d3e9ddb1c6489c0ecf79ee90d8480190104bb131c2397401609f0419e31",
+      "browser_download_url": "https://github.com/MattRobotics/robot-dog/releases/download/backup-esp32-m0-20261002T173142Z-14c19f227594/read-a-16m.bin.gpg",
+      "downloaded_sha256": "a1111d3e9ddb1c6489c0ecf79ee90d8480190104bb131c2397401609f0419e31",
+      "byte_equal_to_uploaded_file": true
+    }
+  ],
+  "ciphertext_download_verification": {
+    "release_published": true,
+    "assets_uploaded": true,
+    "downloaded_ciphertext_and_manifest_byte_equal": true,
+    "remote_ciphertext_size": 16777303,
+    "remote_ciphertext_sha256": "a1111d3e9ddb1c6489c0ecf79ee90d8480190104bb131c2397401609f0419e31",
+    "result": "PASS"
+  },
+  "remote_decryption_verification": {
+    "gpg_exit_code": 0,
+    "plaintext_size": 16777216,
+    "plaintext_sha256": "856435baa1402086bd38dee0a4c1e0c6ee13e8d814cfc7ddc8bed30dbed5afb7",
+    "expected_plaintext_size": 16777216,
+    "expected_plaintext_sha256": "856435baa1402086bd38dee0a4c1e0c6ee13e8d814cfc7ddc8bed30dbed5afb7",
+    "byte_equal_to_original": true,
+    "plaintext_file_written": false,
+    "result": "PASS"
+  },
+  "local_decryption_verification": {
+    "gpg_exit_code": 0,
+    "plaintext_size": 16777216,
+    "plaintext_sha256": "856435baa1402086bd38dee0a4c1e0c6ee13e8d814cfc7ddc8bed30dbed5afb7",
+    "expected_plaintext_size": 16777216,
+    "expected_plaintext_sha256": "856435baa1402086bd38dee0a4c1e0c6ee13e8d814cfc7ddc8bed30dbed5afb7",
+    "byte_equal_to_original": true,
+    "plaintext_file_written": false,
+    "result": "PASS"
+  },
+  "original_AB_integrity": "previously verified independent acquisitions, identical; reused unchanged",
+  "original_backup_files_modified": false,
+  "flash_reacquired": false,
+  "plaintext_flash_file_in_Git_or_release": false,
+  "secret_entry": "interactive GNOME pinentry on operator desktop; no passphrase in arguments, environment, logs or conversation",
+  "symmetric_secret_cache": "disabled; isolated GPG agent stopped after verification",
+  "operator_controls_recovery_password": true,
+  "verification_scope": "Published Release plus downloaded ciphertext and manifest verified; recovered stream byte-equal to original with required size/hash and successful GPG integrity check. Does not authorize hardware actions."
+}
