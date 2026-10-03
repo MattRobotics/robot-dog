@@ -1,0 +1,2210 @@
+{
+  "scope": "Classification of semantic requirements against limits with provenance. No row is VERIFIED: no loaded-hardware measurement exists. Study requirements, not operating settings.",
+  "limits_used": {
+    "bench_slowest_healthy_unit_rad_s": 4.315374999775719,
+    "vendor_no_load_rad_s": 4.71238898038469,
+    "urdf_budget_rad_s": 3.03687289847,
+    "vendor_rated_nm": 0.980665,
+    "vendor_stall_nm": 2.941995,
+    "vendor_overload_80pct_nm": 2.353596,
+    "urdf_effort_budget_nm": 0.902244,
+    "bench_profile_accel_rad_s2": 12.049918495796488,
+    "tick_rad": 0.0015339807878856412
+  },
+  "rows": [
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_357 T=0.5 s peak joint speed",
+      "required": 6.320173174128078,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 1.4645710220911399,
+          "verdicts": {
+            "1.0": "EXCEEDS_LIMIT",
+            "1.25": "EXCEEDS_LIMIT",
+            "1.5": "EXCEEDS_LIMIT"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 1.341182402479037,
+          "verdicts": {
+            "1.0": "EXCEEDS_LIMIT",
+            "1.25": "EXCEEDS_LIMIT",
+            "1.5": "EXCEEDS_LIMIT"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_357 T=0.5 s peak joint acceleration",
+      "required": 759.4621539674183,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_357 T=1 s peak joint speed",
+      "required": 3.160086587064039,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.7322855110455699,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "EXCEEDS_LIMIT"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.6705912012395185,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "EXCEEDS_LIMIT"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_357 T=1 s peak joint acceleration",
+      "required": 189.86553849185458,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_357 T=2 s peak joint speed",
+      "required": 1.5800432935320194,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.36614275552278497,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.33529560061975927,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_357 T=2 s peak joint acceleration",
+      "required": 47.466384622963645,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_357 T=4 s peak joint speed",
+      "required": 0.7900216467660097,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.18307137776139248,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.16764780030987964,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_357 T=4 s peak joint acceleration",
+      "required": 11.866596155740911,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_287 T=0.5 s peak joint speed",
+      "required": 5.42185219175425,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 1.2564034856845667,
+          "verdicts": {
+            "1.0": "EXCEEDS_LIMIT",
+            "1.25": "EXCEEDS_LIMIT",
+            "1.5": "EXCEEDS_LIMIT"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 1.1505527693750877,
+          "verdicts": {
+            "1.0": "EXCEEDS_LIMIT",
+            "1.25": "EXCEEDS_LIMIT",
+            "1.5": "EXCEEDS_LIMIT"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_287 T=0.5 s peak joint acceleration",
+      "required": 653.3511185870157,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_287 T=1 s peak joint speed",
+      "required": 2.710926095877125,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.6282017428422834,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.5752763846875438,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_287 T=1 s peak joint acceleration",
+      "required": 163.33777964675392,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_287 T=2 s peak joint speed",
+      "required": 1.3554630479385625,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.3141008714211417,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.2876381923437719,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_287 T=2 s peak joint acceleration",
+      "required": 40.83444491168848,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_287 T=4 s peak joint speed",
+      "required": 0.6777315239692813,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.15705043571057084,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.14381909617188596,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK steady cycle",
+      "requirement": "WALK_287 T=4 s peak joint acceleration",
+      "required": 10.20861122792212,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_357 T=1 s peak |torque| (lower leg)",
+      "required": 1.0607530124169098,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor overload protection 80 % of stall (2.35 N m)",
+          "value": 2.353596,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.45069460196945854,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded torque capability on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_357 T=1 s RMS torque (lower leg)",
+      "required": 0.617142709255676,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor rated torque 10 kg cm (0.98 N m)",
+          "value": 0.980665,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.6293104263491366,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded continuous torque on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_357 T=2 s peak |torque| (lower leg)",
+      "required": 1.0346196361566573,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor overload protection 80 % of stall (2.35 N m)",
+          "value": 2.353596,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.43959100718927857,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded torque capability on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_357 T=2 s RMS torque (lower leg)",
+      "required": 0.5830871669450013,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor rated torque 10 kg cm (0.98 N m)",
+          "value": 0.980665,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.5945834377131858,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded continuous torque on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_357 T=4 s peak |torque| (lower leg)",
+      "required": 1.0281816149570644,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor overload protection 80 % of stall (2.35 N m)",
+          "value": 2.353596,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.43685560944064505,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded torque capability on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_357 T=4 s RMS torque (lower leg)",
+      "required": 0.5796132794718613,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor rated torque 10 kg cm (0.98 N m)",
+          "value": 0.980665,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.591041058334764,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded continuous torque on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_287 T=1 s peak |torque| (lower leg)",
+      "required": 0.9868694067163073,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor overload protection 80 % of stall (2.35 N m)",
+          "value": 2.353596,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.41930280588355323,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded torque capability on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_287 T=1 s RMS torque (lower leg)",
+      "required": 0.5830942596153811,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor rated torque 10 kg cm (0.98 N m)",
+          "value": 0.980665,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.5945906702241653,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded continuous torque on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_287 T=2 s peak |torque| (lower leg)",
+      "required": 0.9607988411933033,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor overload protection 80 % of stall (2.35 N m)",
+          "value": 2.353596,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.4082258982396738,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded torque capability on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_287 T=2 s RMS torque (lower leg)",
+      "required": 0.5512230436104317,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor rated torque 10 kg cm (0.98 N m)",
+          "value": 0.980665,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.5620910745365968,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded continuous torque on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_287 T=4 s peak |torque| (lower leg)",
+      "required": 0.9543458739644605,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor overload protection 80 % of stall (2.35 N m)",
+          "value": 2.353596,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.4054841501958962,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded torque capability on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (URDF masses, rigid-body, quasi-static load sharing)",
+      "requirement": "WALK_287 T=4 s RMS torque (lower leg)",
+      "required": 0.5471208086043766,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor rated torque 10 kg cm (0.98 N m)",
+          "value": 0.980665,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.5579079589914768,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded continuous torque on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (masses x1.33)",
+      "requirement": "WALK_357 T=1 s peak |torque| (lower leg)",
+      "required": 1.4114858632966945,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor overload protection 80 % of stall (2.35 N m)",
+          "value": 2.353596,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.5997145913303279,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded torque capability on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (masses x1.33)",
+      "requirement": "WALK_357 T=4 s peak |torque| (lower leg)",
+      "required": 1.3681448908702871,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor overload protection 80 % of stall (2.35 N m)",
+          "value": 2.353596,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.5812998028847292,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded torque capability on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (masses x1.33)",
+      "requirement": "WALK_287 T=1 s peak |torque| (lower leg)",
+      "required": 1.3131730008725055,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor overload protection 80 % of stall (2.35 N m)",
+          "value": 2.353596,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.5579432497644055,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded torque capability on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "WALK torque (masses x1.33)",
+      "requirement": "WALK_287 T=4 s peak |torque| (lower leg)",
+      "required": 1.269895719388193,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor overload protection 80 % of stall (2.35 N m)",
+          "value": 2.353596,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.5395555224380875,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded torque capability on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "STAND rise 0.100 -> 0.150 m",
+      "requirement": "duration 1 s peak joint speed",
+      "required": 1.5222350388463708,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.3527468734294204,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.32302830797344434,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "STAND rise 0.100 -> 0.150 m",
+      "requirement": "duration 1 s peak joint acceleration",
+      "required": 5.691809598119533,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "STAND rise 0.100 -> 0.150 m",
+      "requirement": "duration 2 s peak joint speed",
+      "required": 0.7611175194231854,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.1763734367147102,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.16151415398672217,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "STAND rise 0.100 -> 0.150 m",
+      "requirement": "duration 2 s peak joint acceleration",
+      "required": 1.4229523995298832,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "STAND rise 0.100 -> 0.150 m",
+      "requirement": "duration 4 s peak joint speed",
+      "required": 0.3805587597115927,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.0881867183573551,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.08075707699336108,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "STAND rise 0.100 -> 0.150 m",
+      "requirement": "duration 4 s peak joint acceleration",
+      "required": 0.3557380998824708,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "STAND static load",
+      "requirement": "worst static joint torque along the rise (lower leg)",
+      "required": 0.470332459038641,
+      "unit": "N m",
+      "limits": [
+        {
+          "limit": "vendor rated torque 10 kg cm (0.98 N m)",
+          "value": 0.980665,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.4796056339714796,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded continuous torque on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_357 lifecycle period 1 s peak joint speed",
+      "required": 3.154213518543045,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.7309245473932108,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "EXCEEDS_LIMIT"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.6693448973912071,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "EXCEEDS_LIMIT"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_357 lifecycle period 1 s peak joint acceleration",
+      "required": 189.86553849185427,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_357 lifecycle period 2 s peak joint speed",
+      "required": 1.5771067592715224,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.3654622736966054,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.33467244869560353,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_357 lifecycle period 2 s peak joint acceleration",
+      "required": 47.46638462296357,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_357 lifecycle period 4 s peak joint speed",
+      "required": 0.7885533796357612,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.1827311368483027,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.16733622434780177,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_357 lifecycle period 4 s peak joint acceleration",
+      "required": 11.866596155740892,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_287 lifecycle period 1 s peak joint speed",
+      "required": 2.7067196457286657,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.6272269839514157,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.5743837482422146,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_287 lifecycle period 1 s peak joint acceleration",
+      "required": 163.3377796467537,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_287 lifecycle period 2 s peak joint speed",
+      "required": 1.3533598228643329,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.31361349197570787,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.2871918741211073,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_287 lifecycle period 2 s peak joint acceleration",
+      "required": 40.83444491168842,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_287 lifecycle period 4 s peak joint speed",
+      "required": 0.6766799114321664,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.15680674598785393,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.14359593706055365,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "WALK_287 lifecycle period 4 s peak joint acceleration",
+      "required": 10.208611227922106,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_61 lifecycle period 1 s peak joint speed",
+      "required": 3.37602443978365,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.7823246971489408,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "EXCEEDS_LIMIT"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.7164146367874863,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "EXCEEDS_LIMIT"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_61 lifecycle period 1 s peak joint acceleration",
+      "required": 88.50743532634193,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_61 lifecycle period 2 s peak joint speed",
+      "required": 1.688012219891825,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.3911623485744704,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.35820731839374315,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_61 lifecycle period 2 s peak joint acceleration",
+      "required": 22.126858831585484,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_61 lifecycle period 4 s peak joint speed",
+      "required": 0.8440061099459125,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.1955811742872352,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.17910365919687157,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_61 lifecycle period 4 s peak joint acceleration",
+      "required": 5.531714707896371,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_309 lifecycle period 1 s peak joint speed",
+      "required": 1.85507815918189,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.42987646711544253,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.3936598118074822,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_309 lifecycle period 1 s peak joint acceleration",
+      "required": 39.21057148223077,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_309 lifecycle period 2 s peak joint speed",
+      "required": 0.927539079590945,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.21493823355772126,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.1968299059037411,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_309 lifecycle period 2 s peak joint acceleration",
+      "required": 9.802642870557692,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_309 lifecycle period 4 s peak joint speed",
+      "required": 0.4637695397954725,
+      "unit": "rad/s",
+      "limits": [
+        {
+          "limit": "bench no-load slowest healthy unit (2813 tick/s)",
+          "value": 4.315374999775719,
+          "provenance": "BENCH_NO_LOAD",
+          "utilization": 0.10746911677886063,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "vendor no-load 45 rpm @12 V",
+          "value": 4.71238898038469,
+          "provenance": "VENDOR_NOMINAL",
+          "utilization": 0.09841495295187055,
+          "verdicts": {
+            "1.0": "PROVISIONALLY_SUPPORTED",
+            "1.25": "PROVISIONALLY_SUPPORTED",
+            "1.5": "PROVISIONALLY_SUPPORTED"
+          }
+        },
+        {
+          "limit": "loaded velocity limit on the assembled robot",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G4.1 lifecycle semantic peaks",
+      "requirement": "TROT_309 lifecycle period 4 s peak joint acceleration",
+      "required": 2.450660717639423,
+      "unit": "rad/s^2",
+      "limits": [
+        {
+          "limit": "acceleration capability (streamed targets, any Acc)",
+          "value": null,
+          "provenance": "UNMEASURED",
+          "utilization": null,
+          "verdicts": {
+            "1.0": "REQUIRES_MEASUREMENT",
+            "1.25": "REQUIRES_MEASUREMENT",
+            "1.5": "REQUIRES_MEASUREMENT"
+          }
+        }
+      ]
+    }
+  ],
+  "verdict_counts_by_limit": {
+    "bench no-load slowest healthy unit (2813 tick/s)": {
+      "EXCEEDS_LIMIT": 2,
+      "PROVISIONALLY_SUPPORTED": 21
+    },
+    "vendor no-load 45 rpm @12 V": {
+      "EXCEEDS_LIMIT": 2,
+      "PROVISIONALLY_SUPPORTED": 21
+    },
+    "loaded velocity limit on the assembled robot": {
+      "REQUIRES_MEASUREMENT": 23
+    },
+    "acceleration capability (streamed targets, any Acc)": {
+      "REQUIRES_MEASUREMENT": 23
+    },
+    "vendor overload protection 80 % of stall (2.35 N m)": {
+      "PROVISIONALLY_SUPPORTED": 10
+    },
+    "loaded torque capability on the assembled robot": {
+      "REQUIRES_MEASUREMENT": 10
+    },
+    "vendor rated torque 10 kg cm (0.98 N m)": {
+      "PROVISIONALLY_SUPPORTED": 7
+    },
+    "loaded continuous torque on the assembled robot": {
+      "REQUIRES_MEASUREMENT": 7
+    }
+  },
+  "urdf_velocity_budget_check": [
+    {
+      "case": "WALK_357",
+      "period_s": 0.5,
+      "peak_qdot_rad_s": 6.320173174128078,
+      "velocity_budget_rad_s": 3.03687289847,
+      "within_budget": false
+    },
+    {
+      "case": "WALK_357",
+      "period_s": 1.0,
+      "peak_qdot_rad_s": 3.160086587064039,
+      "velocity_budget_rad_s": 3.03687289847,
+      "within_budget": false
+    },
+    {
+      "case": "WALK_357",
+      "period_s": 2.0,
+      "peak_qdot_rad_s": 1.5800432935320194,
+      "velocity_budget_rad_s": 3.03687289847,
+      "within_budget": true
+    },
+    {
+      "case": "WALK_357",
+      "period_s": 4.0,
+      "peak_qdot_rad_s": 0.7900216467660097,
+      "velocity_budget_rad_s": 3.03687289847,
+      "within_budget": true
+    },
+    {
+      "case": "WALK_287",
+      "period_s": 0.5,
+      "peak_qdot_rad_s": 5.42185219175425,
+      "velocity_budget_rad_s": 3.03687289847,
+      "within_budget": false
+    },
+    {
+      "case": "WALK_287",
+      "period_s": 1.0,
+      "peak_qdot_rad_s": 2.710926095877125,
+      "velocity_budget_rad_s": 3.03687289847,
+      "within_budget": true
+    },
+    {
+      "case": "WALK_287",
+      "period_s": 2.0,
+      "peak_qdot_rad_s": 1.3554630479385625,
+      "velocity_budget_rad_s": 3.03687289847,
+      "within_budget": true
+    },
+    {
+      "case": "WALK_287",
+      "period_s": 4.0,
+      "peak_qdot_rad_s": 0.6777315239692813,
+      "velocity_budget_rad_s": 3.03687289847,
+      "within_budget": true
+    }
+  ],
+  "minimum_periods": {
+    "WALK_357": {
+      "min_period_s_for_bench_speed": 0.7322855110455699,
+      "min_period_s_for_urdf_budget_speed": 1.0405725536475745,
+      "period_s_where_accel_equals_bench_profile": 3.969456234587536,
+      "bench_profile_accel_rad_s2": 12.049918495796488
+    },
+    "WALK_287": {
+      "min_period_s_for_bench_speed": 0.6282017428422834,
+      "min_period_s_for_urdf_budget_speed": 0.8926702521014003,
+      "period_s_where_accel_equals_bench_profile": 3.681724343934845,
+      "bench_profile_accel_rad_s2": 12.049918495796488
+    }
+  },
+  "command_rate_error": [
+    {
+      "update_hz": 25,
+      "case": "WALK_357",
+      "period_s": 1.0,
+      "hold_error_ticks": 82.40224680831204,
+      "linear_interpolation_error_ticks": 24.75461752732318
+    },
+    {
+      "update_hz": 25,
+      "case": "WALK_357",
+      "period_s": 4.0,
+      "hold_error_ticks": 20.60056170207801,
+      "linear_interpolation_error_ticks": 1.5471635954576988
+    },
+    {
+      "update_hz": 25,
+      "case": "WALK_287",
+      "period_s": 1.0,
+      "hold_error_ticks": 70.68996215040539,
+      "linear_interpolation_error_ticks": 21.295935508017696
+    },
+    {
+      "update_hz": 25,
+      "case": "WALK_287",
+      "period_s": 4.0,
+      "hold_error_ticks": 17.672490537601348,
+      "linear_interpolation_error_ticks": 1.330995969251106
+    },
+    {
+      "update_hz": 50,
+      "case": "WALK_357",
+      "period_s": 1.0,
+      "hold_error_ticks": 41.20112340415602,
+      "linear_interpolation_error_ticks": 6.188654381830795
+    },
+    {
+      "update_hz": 50,
+      "case": "WALK_357",
+      "period_s": 4.0,
+      "hold_error_ticks": 10.300280851039005,
+      "linear_interpolation_error_ticks": 0.3867908988644247
+    },
+    {
+      "update_hz": 50,
+      "case": "WALK_287",
+      "period_s": 1.0,
+      "hold_error_ticks": 35.344981075202696,
+      "linear_interpolation_error_ticks": 5.323983877004424
+    },
+    {
+      "update_hz": 50,
+      "case": "WALK_287",
+      "period_s": 4.0,
+      "hold_error_ticks": 8.836245268800674,
+      "linear_interpolation_error_ticks": 0.3327489923127765
+    },
+    {
+      "update_hz": 100,
+      "case": "WALK_357",
+      "period_s": 1.0,
+      "hold_error_ticks": 20.60056170207801,
+      "linear_interpolation_error_ticks": 1.5471635954576988
+    },
+    {
+      "update_hz": 100,
+      "case": "WALK_357",
+      "period_s": 4.0,
+      "hold_error_ticks": 5.150140425519503,
+      "linear_interpolation_error_ticks": 0.09669772471610617
+    },
+    {
+      "update_hz": 100,
+      "case": "WALK_287",
+      "period_s": 1.0,
+      "hold_error_ticks": 17.672490537601348,
+      "linear_interpolation_error_ticks": 1.330995969251106
+    },
+    {
+      "update_hz": 100,
+      "case": "WALK_287",
+      "period_s": 4.0,
+      "hold_error_ticks": 4.418122634400337,
+      "linear_interpolation_error_ticks": 0.08318724807819412
+    },
+    {
+      "update_hz": 200,
+      "case": "WALK_357",
+      "period_s": 1.0,
+      "hold_error_ticks": 10.300280851039005,
+      "linear_interpolation_error_ticks": 0.3867908988644247
+    },
+    {
+      "update_hz": 200,
+      "case": "WALK_357",
+      "period_s": 4.0,
+      "hold_error_ticks": 2.5750702127597513,
+      "linear_interpolation_error_ticks": 0.024174431179026543
+    },
+    {
+      "update_hz": 200,
+      "case": "WALK_287",
+      "period_s": 1.0,
+      "hold_error_ticks": 8.836245268800674,
+      "linear_interpolation_error_ticks": 0.3327489923127765
+    },
+    {
+      "update_hz": 200,
+      "case": "WALK_287",
+      "period_s": 4.0,
+      "hold_error_ticks": 2.2090613172001685,
+      "linear_interpolation_error_ticks": 0.02079681201954853
+    },
+    {
+      "update_hz": 500,
+      "case": "WALK_357",
+      "period_s": 1.0,
+      "hold_error_ticks": 4.120112340415601,
+      "linear_interpolation_error_ticks": 0.06188654381830795
+    },
+    {
+      "update_hz": 500,
+      "case": "WALK_357",
+      "period_s": 4.0,
+      "hold_error_ticks": 1.0300280851039003,
+      "linear_interpolation_error_ticks": 0.003867908988644247
+    },
+    {
+      "update_hz": 500,
+      "case": "WALK_287",
+      "period_s": 1.0,
+      "hold_error_ticks": 3.5344981075202693,
+      "linear_interpolation_error_ticks": 0.053239838770044234
+    },
+    {
+      "update_hz": 500,
+      "case": "WALK_287",
+      "period_s": 4.0,
+      "hold_error_ticks": 0.8836245268800673,
+      "linear_interpolation_error_ticks": 0.0033274899231277646
+    }
+  ],
+  "bus_and_latency": {
+    "sync_write_12_servos_bytes": 104,
+    "sync_write_12_servos_ms": 1.0399999999999998,
+    "status_read_one_servo_bytes_request_plus_response": 29,
+    "status_read_one_servo_ms_wire_only": 0.29,
+    "qc_sample_interval_ms": 2.0,
+    "qc_note": "QC reads one servo at 500 Hz: a 12-servo read-all loop is not measured; sequential reads at the QC rate would give about 24 ms",
+    "first_motion_ms_median_of_unit_medians": 71.69475,
+    "settle_ms_median_of_unit_medians": 145.00225,
+    "hysteresis_ticks": {
+      "median_of_unit_medians": 5.0,
+      "max": 7.0
+    },
+    "resolution_deg": 0.08791208791208792
+  },
+  "stabilizer_gain_bound_vs_loop_delay": [
+    {
+      "delay_steps": 0,
+      "dt_s": 0.02,
+      "max_stable_gain_per_s": 100.0
+    },
+    {
+      "delay_steps": 1,
+      "dt_s": 0.02,
+      "max_stable_gain_per_s": 49.99999999999999
+    },
+    {
+      "delay_steps": 2,
+      "dt_s": 0.02,
+      "max_stable_gain_per_s": 30.901699437494738
+    },
+    {
+      "delay_steps": 3,
+      "dt_s": 0.02,
+      "max_stable_gain_per_s": 22.252093395631437
+    },
+    {
+      "delay_steps": 4,
+      "dt_s": 0.02,
+      "max_stable_gain_per_s": 17.364817766693033
+    },
+    {
+      "delay_steps": 5,
+      "dt_s": 0.02,
+      "max_stable_gain_per_s": 14.231483827328514
+    },
+    {
+      "delay_steps": 6,
+      "dt_s": 0.02,
+      "max_stable_gain_per_s": 12.053668025532305
+    },
+    {
+      "delay_steps": 7,
+      "dt_s": 0.02,
+      "max_stable_gain_per_s": 10.452846326765345
+    },
+    {
+      "delay_steps": 8,
+      "dt_s": 0.02,
+      "max_stable_gain_per_s": 9.2268359463302
+    }
+  ]
+}

@@ -1,0 +1,498 @@
+{
+  "scope": "Rigid-body analysis from CAD URDF masses/inertias. Static equilibrium, quasi-static support and ZMP are different statements; none proves physical stability.",
+  "mass_properties": {
+    "total_mass_kg": 2.48,
+    "canonical_stand": {
+      "com_world_m": [
+        -0.008534119430495871,
+        -0.00033600806451612866,
+        0.15779167301318692
+      ],
+      "com_height_above_ground_m": 0.15779167301318692,
+      "static_margin_m": 0.09861398766695384
+    },
+    "compensated_tilt_static": [
+      {
+        "roll_deg": 0,
+        "pitch_deg": 0,
+        "status": "OK",
+        "com_xy_shift_vs_level_mm": [
+          4.085091124747531e-06,
+          3.7947076036992655e-16
+        ],
+        "static_margin_mm": 98.61399193548387,
+        "foot_forces_n": [
+          5.980981086875828,
+          6.02444854137051,
+          6.17926491312417,
+          6.13579745862949
+        ]
+      },
+      {
+        "roll_deg": 2,
+        "pitch_deg": 0,
+        "status": "OK",
+        "com_xy_shift_vs_level_mm": [
+          0.006313867168534007,
+          -0.9472816369862531
+        ],
+        "static_margin_mm": 97.66659540250093,
+        "foot_forces_n": [
+          5.919989047050771,
+          6.086000945556471,
+          6.240256952949225,
+          6.074245054443532
+        ]
+      },
+      {
+        "roll_deg": -2,
+        "pitch_deg": 0,
+        "status": "OK",
+        "com_xy_shift_vs_level_mm": [
+          0.006313867168532272,
+          0.9476910110547906
+        ],
+        "static_margin_mm": 98.3382021574646,
+        "foot_forces_n": [
+          6.042559970260616,
+          5.963430022346626,
+          6.117686029739384,
+          6.196815977653372
+        ]
+      },
+      {
+        "roll_deg": 0,
+        "pitch_deg": 2,
+        "status": "OK",
+        "com_xy_shift_vs_level_mm": [
+          0.8155103648899683,
+          -1.0299920638612292e-15
+        ],
+        "static_margin_mm": 98.61399193548387,
+        "foot_forces_n": [
+          6.01719316596871,
+          6.060660620463399,
+          6.143052834031282,
+          6.09958537953661
+        ]
+      },
+      {
+        "roll_deg": 0,
+        "pitch_deg": -2,
+        "status": "OK",
+        "com_xy_shift_vs_level_mm": [
+          -0.7503231996148323,
+          -1.0299920638612292e-15
+        ],
+        "static_margin_mm": 98.61399193548387,
+        "foot_forces_n": [
+          5.947663242915114,
+          5.991130697409793,
+          6.212582757084887,
+          6.169115302590204
+        ]
+      },
+      {
+        "roll_deg": 3,
+        "pitch_deg": 3,
+        "status": "OK",
+        "com_xy_shift_vs_level_mm": [
+          1.253586719626041,
+          -1.4136929671985348
+        ],
+        "static_margin_mm": 97.2000342676637,
+        "foot_forces_n": [
+          5.945204976030181,
+          6.171553858712132,
+          6.2150410239698255,
+          5.98869214128786
+        ]
+      },
+      {
+        "roll_deg": 5,
+        "pitch_deg": 0,
+        "status": "OK",
+        "com_xy_shift_vs_level_mm": [
+          0.03979546762884756,
+          -2.365040650161472
+        ],
+        "static_margin_mm": 96.24826095255854,
+        "foot_forces_n": [
+          5.829772063196317,
+          6.179191391158697,
+          6.3304739368036795,
+          5.981054608841305
+        ]
+      },
+      {
+        "roll_deg": 0,
+        "pitch_deg": 5,
+        "status": "OK",
+        "com_xy_shift_vs_level_mm": [
+          2.142874017657053,
+          -1.0299920638612292e-15
+        ],
+        "static_margin_mm": 98.61399193548387,
+        "foot_forces_n": [
+          6.076133972152176,
+          6.11960142664686,
+          6.08411202784782,
+          6.040644573353141
+        ]
+      }
+    ]
+  },
+  "stand_static_loads": {
+    "urdf_mass": {
+      "samples": 41,
+      "worst_torque_nm_by_joint": [
+        0.16665052020877733,
+        0.18322432648532888,
+        0.470332459038641
+      ],
+      "at_progress": [
+        0.0
+      ],
+      "mass_scale": 1.0
+    },
+    "mass_x1p33": {
+      "samples": 41,
+      "worst_torque_nm_by_joint": [
+        0.22175270834232486,
+        0.24380656346838112,
+        0.6258456108175462
+      ],
+      "at_progress": [
+        0.0
+      ],
+      "mass_scale": 1.3306451612903225
+    }
+  },
+  "walk_cycles": {
+    "WALK_357": [
+      {
+        "period_s": 1.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 3.763822232136751e-16,
+          "upper": 3.160086587064039,
+          "lower": 2.1399578494466818
+        },
+        "peak_qddot_by_class": {
+          "hip": 2.7481535650841418e-14,
+          "upper": 189.86553849185458,
+          "lower": 81.54277249719789
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.5170662714312622,
+          "upper": 0.33589519938842827,
+          "lower": 1.0607530124169098
+        },
+        "rms_torque_by_class": {
+          "hip": 0.28863510112587304,
+          "upper": 0.19166649037367292,
+          "lower": 0.617142709255676
+        },
+        "min_static_margin_mm": 1.5492216026975738,
+        "min_zmp_margin_mm": -97.01983547288084,
+        "zmp_outside_polygon_phases": 32,
+        "frames_without_nonnegative_force_solution": 190,
+        "com_horizontal_accel_peak_m_s2": 16.568812638516516,
+        "com_vertical_accel_peak_m_s2": 2.830570930617162
+      },
+      {
+        "period_s": 2.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 1.8819111160683756e-16,
+          "upper": 1.5800432935320194,
+          "lower": 1.0699789247233409
+        },
+        "peak_qddot_by_class": {
+          "hip": 6.8703839127103544e-15,
+          "upper": 47.466384622963645,
+          "lower": 20.385693124299472
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.4392697982317746,
+          "upper": 0.333132934347605,
+          "lower": 1.0346196361566573
+        },
+        "rms_torque_by_class": {
+          "hip": 0.2606609501303119,
+          "upper": 0.17944711082398485,
+          "lower": 0.5830871669450013
+        },
+        "min_static_margin_mm": 1.5492216026975738,
+        "min_zmp_margin_mm": 1.4965584408151202,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 4.142203159629129,
+        "com_vertical_accel_peak_m_s2": 0.7076427326542905
+      },
+      {
+        "period_s": 4.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 9.409555580341878e-17,
+          "upper": 0.7900216467660097,
+          "lower": 0.5349894623616704
+        },
+        "peak_qddot_by_class": {
+          "hip": 1.7175959781775886e-15,
+          "upper": 11.866596155740911,
+          "lower": 5.096423281074868
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.4368914923327974,
+          "upper": 0.3328302539220801,
+          "lower": 1.0281816149570644
+        },
+        "rms_torque_by_class": {
+          "hip": 0.2578208492114447,
+          "upper": 0.17956890237855874,
+          "lower": 0.5796132794718613
+        },
+        "min_static_margin_mm": 1.5492216026975738,
+        "min_zmp_margin_mm": 1.5360365080331801,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 1.0355507899072822,
+        "com_vertical_accel_peak_m_s2": 0.1769106831635726
+      }
+    ],
+    "WALK_287": [
+      {
+        "period_s": 1.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 2.991137860770786e-16,
+          "upper": 2.710926095877125,
+          "lower": 2.3152164429215203
+        },
+        "peak_qddot_by_class": {
+          "hip": 1.0971135705072314e-14,
+          "upper": 163.33777964675392,
+          "lower": 75.54790315260081
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.48557314130922985,
+          "upper": 0.3293668678569598,
+          "lower": 0.9868694067163073
+        },
+        "rms_torque_by_class": {
+          "hip": 0.2882151112406708,
+          "upper": 0.18498616454067557,
+          "lower": 0.5830942596153811
+        },
+        "min_static_margin_mm": 2.020529351842423,
+        "min_zmp_margin_mm": -112.60603112628176,
+        "zmp_outside_polygon_phases": 40,
+        "frames_without_nonnegative_force_solution": 198,
+        "com_horizontal_accel_peak_m_s2": 16.320693309756354,
+        "com_vertical_accel_peak_m_s2": 2.2829906105651543
+      },
+      {
+        "period_s": 2.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 1.495568930385393e-16,
+          "upper": 1.3554630479385625,
+          "lower": 1.1576082214607601
+        },
+        "peak_qddot_by_class": {
+          "hip": 2.7427839262680786e-15,
+          "upper": 40.83444491168848,
+          "lower": 18.886975788150203
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.43909863053370934,
+          "upper": 0.3259710364261901,
+          "lower": 0.9607988411933033
+        },
+        "rms_torque_by_class": {
+          "hip": 0.26243791085581314,
+          "upper": 0.1753251312611892,
+          "lower": 0.5512230436104317
+        },
+        "min_static_margin_mm": 2.020529351842423,
+        "min_zmp_margin_mm": 1.9799302122005586,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 4.080173327439089,
+        "com_vertical_accel_peak_m_s2": 0.5707476526412886
+      },
+      {
+        "period_s": 4.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 7.477844651926965e-17,
+          "upper": 0.6777315239692813,
+          "lower": 0.5788041107303801
+        },
+        "peak_qddot_by_class": {
+          "hip": 6.856959815670196e-16,
+          "upper": 10.20861122792212,
+          "lower": 4.721743947037551
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.43684869977317903,
+          "upper": 0.3256139841230623,
+          "lower": 0.9543458739644605
+        },
+        "rms_torque_by_class": {
+          "hip": 0.2589415507954585,
+          "upper": 0.17564357269000658,
+          "lower": 0.5471208086043766
+        },
+        "min_static_margin_mm": 2.020529351842423,
+        "min_zmp_margin_mm": 2.0103660869203446,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 1.0200433318597721,
+        "com_vertical_accel_peak_m_s2": 0.14268691316032214
+      }
+    ]
+  },
+  "walk_cycles_mass_x1p33": {
+    "WALK_357": [
+      {
+        "period_s": 1.0,
+        "mass_scale": 1.3306451612903225,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 3.763822232136751e-16,
+          "upper": 3.160086587064039,
+          "lower": 2.1399578494466818
+        },
+        "peak_qddot_by_class": {
+          "hip": 2.7481535650841418e-14,
+          "upper": 189.86553849185458,
+          "lower": 81.54277249719789
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.6880317321464378,
+          "upper": 0.4469573217668602,
+          "lower": 1.4114858632966945
+        },
+        "rms_torque_by_class": {
+          "hip": 0.384070900691686,
+          "upper": 0.255040087997226,
+          "lower": 0.8211979598966657
+        },
+        "min_static_margin_mm": 1.5492216026975738,
+        "min_zmp_margin_mm": -97.01983547288084,
+        "zmp_outside_polygon_phases": 32,
+        "frames_without_nonnegative_force_solution": 190,
+        "com_horizontal_accel_peak_m_s2": 16.568812638516516,
+        "com_vertical_accel_peak_m_s2": 2.830570930617162
+      },
+      {
+        "period_s": 4.0,
+        "mass_scale": 1.3306451612903225,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 9.409555580341878e-17,
+          "upper": 0.7900216467660097,
+          "lower": 0.5349894623616704
+        },
+        "peak_qddot_by_class": {
+          "hip": 1.7175959781775886e-15,
+          "upper": 11.866596155740911,
+          "lower": 5.096423281074868
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.5813475502815448,
+          "upper": 0.44287896691244516,
+          "lower": 1.3681448908702871
+        },
+        "rms_torque_by_class": {
+          "hip": 0.3430680654829708,
+          "upper": 0.23894249106824347,
+          "lower": 0.7712596057488476
+        },
+        "min_static_margin_mm": 1.5492216026975738,
+        "min_zmp_margin_mm": 1.5360365080331801,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 1.0355507899072822,
+        "com_vertical_accel_peak_m_s2": 0.1769106831635726
+      }
+    ],
+    "WALK_287": [
+      {
+        "period_s": 1.0,
+        "mass_scale": 1.3306451612903225,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 2.991137860770786e-16,
+          "upper": 2.710926095877125,
+          "lower": 2.3152164429215203
+        },
+        "peak_qddot_by_class": {
+          "hip": 1.0971135705072314e-14,
+          "upper": 163.33777964675392,
+          "lower": 75.54790315260081
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.6461255509356687,
+          "upper": 0.43827042900321267,
+          "lower": 1.3131730008725055
+        },
+        "rms_torque_by_class": {
+          "hip": 0.3835120431831506,
+          "upper": 0.24615094475170538,
+          "lower": 0.7758915551333699
+        },
+        "min_static_margin_mm": 2.020529351842423,
+        "min_zmp_margin_mm": -112.60603112628176,
+        "zmp_outside_polygon_phases": 40,
+        "frames_without_nonnegative_force_solution": 198,
+        "com_horizontal_accel_peak_m_s2": 16.320693309756354,
+        "com_vertical_accel_peak_m_s2": 2.2829906105651543
+      },
+      {
+        "period_s": 4.0,
+        "mass_scale": 1.3306451612903225,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 7.477844651926965e-17,
+          "upper": 0.6777315239692813,
+          "lower": 0.5788041107303801
+        },
+        "peak_qddot_by_class": {
+          "hip": 6.856959815670196e-16,
+          "upper": 10.20861122792212,
+          "lower": 4.721743947037551
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.5812906085691496,
+          "upper": 0.43327667242181667,
+          "lower": 1.269895719388193
+        },
+        "rms_torque_by_class": {
+          "hip": 0.3445593216229891,
+          "upper": 0.23371927011170227,
+          "lower": 0.7280236566106623
+        },
+        "min_static_margin_mm": 2.020529351842423,
+        "min_zmp_margin_mm": 2.0103660869203446,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 1.0200433318597721,
+        "com_vertical_accel_peak_m_s2": 0.14268691316032214
+      }
+    ]
+  },
+  "notes": [
+    "URDF total mass 2.48 kg; the legacy power analysis cites a 3.3 kg robot (unreconciled): results are repeated with the masses scaled by 3.3/2.48.",
+    "Load sharing among stance feet is a minimum-norm static ASSUMPTION; the real distribution depends on compliance and is unmeasured.",
+    "ZMP neglects angular momentum and base rotation; swing-leg dynamics enter only through the COM trajectory and the leg joint torques."
+  ]
+}

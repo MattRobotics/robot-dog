@@ -1,0 +1,523 @@
+{
+  "limits": {
+    "bench_max_speed_tick_s": {
+      "healthy_units": 16,
+      "min": 2813.187123238881,
+      "median": 2830.0741302185666,
+      "max": 2847.641148751636,
+      "source": "blind_metrics.csv max_tps (span/duration over the whole cruise)"
+    },
+    "bench_profile_accel_tick_s2": {
+      "median": 7855.325562718073,
+      "p95": 8748.213397522655,
+      "setting": "Acc=50 (register unit 100 tick/s^2 => 5000 nominal); a profile at ONE setting, not a capability limit"
+    },
+    "bench_first_motion_ms": {
+      "median_of_unit_medians": 71.69475,
+      "max_of_unit_medians": 75.1855
+    },
+    "bench_settle_ms": {
+      "median_of_unit_medians": 145.00225,
+      "max_of_unit_medians": 148.00799999999998
+    },
+    "bench_hysteresis_ticks": {
+      "median_of_unit_medians": 5.0,
+      "max": 7.0
+    },
+    "bench_bus_voltage_raw": {
+      "median": 111.0,
+      "unit": "raw 0.1 V"
+    },
+    "bench_conditions": "QC V6.1 bench, servos not loaded by the robot, bus ~11.0-11.1 V, 500 Hz sampling, 18 units (16 healthy, 2 capped)",
+    "vendor": {
+      "no_load_speed_rad_s": 4.71238898038469,
+      "stall_torque_nm": 2.941995,
+      "rated_torque_nm": 0.980665,
+      "test_voltage_v": 12.0,
+      "resolution_deg": 0.08791208791208792
+    },
+    "urdf_model_budget": {
+      "velocity_rad_s": 3.03687289847,
+      "effort_nm": 0.902244,
+      "source": "URDF README: conservative MATDOG nominal-operation limits for the 3S point, not a hardware validation"
+    }
+  },
+  "stand_rise": {
+    "path_joint_travel_rad": 0.8215139722774782,
+    "rates": [
+      {
+        "duration_s": 1,
+        "peak_qdot_rad_s": 1.5222350388463708,
+        "peak_qddot_rad_s2": 5.691809598119533,
+        "peak_qdot_by_class": {
+          "hip": 8.173388758706434e-13,
+          "upper": 0.9298090781622972,
+          "lower": 1.5222350388463708
+        }
+      },
+      {
+        "duration_s": 2,
+        "peak_qdot_rad_s": 0.7611175194231854,
+        "peak_qddot_rad_s2": 1.4229523995298832,
+        "peak_qdot_by_class": {
+          "hip": 4.086694379353217e-13,
+          "upper": 0.4649045390811486,
+          "lower": 0.7611175194231854
+        }
+      },
+      {
+        "duration_s": 3,
+        "peak_qdot_rad_s": 0.507411679615457,
+        "peak_qddot_rad_s2": 0.632423288679948,
+        "peak_qdot_by_class": {
+          "hip": 2.7244629195688114e-13,
+          "upper": 0.3099363593874324,
+          "lower": 0.507411679615457
+        }
+      },
+      {
+        "duration_s": 4,
+        "peak_qdot_rad_s": 0.3805587597115927,
+        "peak_qddot_rad_s2": 0.3557380998824708,
+        "peak_qdot_by_class": {
+          "hip": 2.0433471896766086e-13,
+          "upper": 0.2324522695405743,
+          "lower": 0.3805587597115927
+        }
+      },
+      {
+        "duration_s": 6,
+        "peak_qdot_rad_s": 0.2537058398077285,
+        "peak_qddot_rad_s2": 0.158105822169987,
+        "peak_qdot_by_class": {
+          "hip": 1.3622314597844057e-13,
+          "upper": 0.1549681796937162,
+          "lower": 0.2537058398077285
+        }
+      },
+      {
+        "duration_s": 8,
+        "peak_qdot_rad_s": 0.19027937985579635,
+        "peak_qddot_rad_s2": 0.0889345249706177,
+        "peak_qdot_by_class": {
+          "hip": 1.0216735948383043e-13,
+          "upper": 0.11622613477028715,
+          "lower": 0.19027937985579635
+        }
+      }
+    ],
+    "note": "semantic requirement of the G3 contact-locked rise (0.100 -> 0.150 m) for a chosen duration; the duration is not set by any approved parameter"
+  },
+  "g4_lifecycle_peaks": {
+    "WALK_357": {
+      "peak_qdot_rad_s_at_1s": 3.154213518543045,
+      "peak_qddot_rad_s2_at_1s": 189.86553849185427
+    },
+    "WALK_287": {
+      "peak_qdot_rad_s_at_1s": 2.7067196457286657,
+      "peak_qddot_rad_s2_at_1s": 163.3377796467537
+    },
+    "TROT_61": {
+      "peak_qdot_rad_s_at_1s": 3.37602443978365,
+      "peak_qddot_rad_s2_at_1s": 88.50743532634193
+    },
+    "TROT_309": {
+      "peak_qdot_rad_s_at_1s": 1.85507815918189,
+      "peak_qddot_rad_s2_at_1s": 39.21057148223077
+    }
+  },
+  "walk_cycles": {
+    "WALK_357": [
+      {
+        "period_s": 1.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 3.763822232136751e-16,
+          "upper": 3.160086587064039,
+          "lower": 2.1399578494466818
+        },
+        "peak_qddot_by_class": {
+          "hip": 2.7481535650841418e-14,
+          "upper": 189.86553849185458,
+          "lower": 81.54277249719789
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.5170662714312622,
+          "upper": 0.33589519938842827,
+          "lower": 1.0607530124169098
+        },
+        "rms_torque_by_class": {
+          "hip": 0.28863510112587304,
+          "upper": 0.19166649037367292,
+          "lower": 0.617142709255676
+        },
+        "min_static_margin_mm": 1.5492216026975738,
+        "min_zmp_margin_mm": -97.01983547288084,
+        "zmp_outside_polygon_phases": 32,
+        "frames_without_nonnegative_force_solution": 190,
+        "com_horizontal_accel_peak_m_s2": 16.568812638516516,
+        "com_vertical_accel_peak_m_s2": 2.830570930617162
+      },
+      {
+        "period_s": 2.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 1.8819111160683756e-16,
+          "upper": 1.5800432935320194,
+          "lower": 1.0699789247233409
+        },
+        "peak_qddot_by_class": {
+          "hip": 6.8703839127103544e-15,
+          "upper": 47.466384622963645,
+          "lower": 20.385693124299472
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.4392697982317746,
+          "upper": 0.333132934347605,
+          "lower": 1.0346196361566573
+        },
+        "rms_torque_by_class": {
+          "hip": 0.2606609501303119,
+          "upper": 0.17944711082398485,
+          "lower": 0.5830871669450013
+        },
+        "min_static_margin_mm": 1.5492216026975738,
+        "min_zmp_margin_mm": 1.4965584408151202,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 4.142203159629129,
+        "com_vertical_accel_peak_m_s2": 0.7076427326542905
+      },
+      {
+        "period_s": 4.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 9.409555580341878e-17,
+          "upper": 0.7900216467660097,
+          "lower": 0.5349894623616704
+        },
+        "peak_qddot_by_class": {
+          "hip": 1.7175959781775886e-15,
+          "upper": 11.866596155740911,
+          "lower": 5.096423281074868
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.4368914923327974,
+          "upper": 0.3328302539220801,
+          "lower": 1.0281816149570644
+        },
+        "rms_torque_by_class": {
+          "hip": 0.2578208492114447,
+          "upper": 0.17956890237855874,
+          "lower": 0.5796132794718613
+        },
+        "min_static_margin_mm": 1.5492216026975738,
+        "min_zmp_margin_mm": 1.5360365080331801,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 1.0355507899072822,
+        "com_vertical_accel_peak_m_s2": 0.1769106831635726
+      }
+    ],
+    "WALK_287": [
+      {
+        "period_s": 1.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 2.991137860770786e-16,
+          "upper": 2.710926095877125,
+          "lower": 2.3152164429215203
+        },
+        "peak_qddot_by_class": {
+          "hip": 1.0971135705072314e-14,
+          "upper": 163.33777964675392,
+          "lower": 75.54790315260081
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.48557314130922985,
+          "upper": 0.3293668678569598,
+          "lower": 0.9868694067163073
+        },
+        "rms_torque_by_class": {
+          "hip": 0.2882151112406708,
+          "upper": 0.18498616454067557,
+          "lower": 0.5830942596153811
+        },
+        "min_static_margin_mm": 2.020529351842423,
+        "min_zmp_margin_mm": -112.60603112628176,
+        "zmp_outside_polygon_phases": 40,
+        "frames_without_nonnegative_force_solution": 198,
+        "com_horizontal_accel_peak_m_s2": 16.320693309756354,
+        "com_vertical_accel_peak_m_s2": 2.2829906105651543
+      },
+      {
+        "period_s": 2.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 1.495568930385393e-16,
+          "upper": 1.3554630479385625,
+          "lower": 1.1576082214607601
+        },
+        "peak_qddot_by_class": {
+          "hip": 2.7427839262680786e-15,
+          "upper": 40.83444491168848,
+          "lower": 18.886975788150203
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.43909863053370934,
+          "upper": 0.3259710364261901,
+          "lower": 0.9607988411933033
+        },
+        "rms_torque_by_class": {
+          "hip": 0.26243791085581314,
+          "upper": 0.1753251312611892,
+          "lower": 0.5512230436104317
+        },
+        "min_static_margin_mm": 2.020529351842423,
+        "min_zmp_margin_mm": 1.9799302122005586,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 4.080173327439089,
+        "com_vertical_accel_peak_m_s2": 0.5707476526412886
+      },
+      {
+        "period_s": 4.0,
+        "mass_scale": 1.0,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 7.477844651926965e-17,
+          "upper": 0.6777315239692813,
+          "lower": 0.5788041107303801
+        },
+        "peak_qddot_by_class": {
+          "hip": 6.856959815670196e-16,
+          "upper": 10.20861122792212,
+          "lower": 4.721743947037551
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.43684869977317903,
+          "upper": 0.3256139841230623,
+          "lower": 0.9543458739644605
+        },
+        "rms_torque_by_class": {
+          "hip": 0.2589415507954585,
+          "upper": 0.17564357269000658,
+          "lower": 0.5471208086043766
+        },
+        "min_static_margin_mm": 2.020529351842423,
+        "min_zmp_margin_mm": 2.0103660869203446,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 1.0200433318597721,
+        "com_vertical_accel_peak_m_s2": 0.14268691316032214
+      }
+    ]
+  },
+  "walk_cycles_mass_x1p33": {
+    "WALK_357": [
+      {
+        "period_s": 1.0,
+        "mass_scale": 1.3306451612903225,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 3.763822232136751e-16,
+          "upper": 3.160086587064039,
+          "lower": 2.1399578494466818
+        },
+        "peak_qddot_by_class": {
+          "hip": 2.7481535650841418e-14,
+          "upper": 189.86553849185458,
+          "lower": 81.54277249719789
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.6880317321464378,
+          "upper": 0.4469573217668602,
+          "lower": 1.4114858632966945
+        },
+        "rms_torque_by_class": {
+          "hip": 0.384070900691686,
+          "upper": 0.255040087997226,
+          "lower": 0.8211979598966657
+        },
+        "min_static_margin_mm": 1.5492216026975738,
+        "min_zmp_margin_mm": -97.01983547288084,
+        "zmp_outside_polygon_phases": 32,
+        "frames_without_nonnegative_force_solution": 190,
+        "com_horizontal_accel_peak_m_s2": 16.568812638516516,
+        "com_vertical_accel_peak_m_s2": 2.830570930617162
+      },
+      {
+        "period_s": 4.0,
+        "mass_scale": 1.3306451612903225,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 9.409555580341878e-17,
+          "upper": 0.7900216467660097,
+          "lower": 0.5349894623616704
+        },
+        "peak_qddot_by_class": {
+          "hip": 1.7175959781775886e-15,
+          "upper": 11.866596155740911,
+          "lower": 5.096423281074868
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.5813475502815448,
+          "upper": 0.44287896691244516,
+          "lower": 1.3681448908702871
+        },
+        "rms_torque_by_class": {
+          "hip": 0.3430680654829708,
+          "upper": 0.23894249106824347,
+          "lower": 0.7712596057488476
+        },
+        "min_static_margin_mm": 1.5492216026975738,
+        "min_zmp_margin_mm": 1.5360365080331801,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 1.0355507899072822,
+        "com_vertical_accel_peak_m_s2": 0.1769106831635726
+      }
+    ],
+    "WALK_287": [
+      {
+        "period_s": 1.0,
+        "mass_scale": 1.3306451612903225,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 2.991137860770786e-16,
+          "upper": 2.710926095877125,
+          "lower": 2.3152164429215203
+        },
+        "peak_qddot_by_class": {
+          "hip": 1.0971135705072314e-14,
+          "upper": 163.33777964675392,
+          "lower": 75.54790315260081
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.6461255509356687,
+          "upper": 0.43827042900321267,
+          "lower": 1.3131730008725055
+        },
+        "rms_torque_by_class": {
+          "hip": 0.3835120431831506,
+          "upper": 0.24615094475170538,
+          "lower": 0.7758915551333699
+        },
+        "min_static_margin_mm": 2.020529351842423,
+        "min_zmp_margin_mm": -112.60603112628176,
+        "zmp_outside_polygon_phases": 40,
+        "frames_without_nonnegative_force_solution": 198,
+        "com_horizontal_accel_peak_m_s2": 16.320693309756354,
+        "com_vertical_accel_peak_m_s2": 2.2829906105651543
+      },
+      {
+        "period_s": 4.0,
+        "mass_scale": 1.3306451612903225,
+        "frames": 401,
+        "peak_qdot_by_class": {
+          "hip": 7.477844651926965e-17,
+          "upper": 0.6777315239692813,
+          "lower": 0.5788041107303801
+        },
+        "peak_qddot_by_class": {
+          "hip": 6.856959815670196e-16,
+          "upper": 10.20861122792212,
+          "lower": 4.721743947037551
+        },
+        "peak_abs_torque_by_class": {
+          "hip": 0.5812906085691496,
+          "upper": 0.43327667242181667,
+          "lower": 1.269895719388193
+        },
+        "rms_torque_by_class": {
+          "hip": 0.3445593216229891,
+          "upper": 0.23371927011170227,
+          "lower": 0.7280236566106623
+        },
+        "min_static_margin_mm": 2.020529351842423,
+        "min_zmp_margin_mm": 2.0103660869203446,
+        "zmp_outside_polygon_phases": 0,
+        "frames_without_nonnegative_force_solution": 158,
+        "com_horizontal_accel_peak_m_s2": 1.0200433318597721,
+        "com_vertical_accel_peak_m_s2": 0.14268691316032214
+      }
+    ]
+  },
+  "stand_static_loads": {
+    "urdf_mass": {
+      "samples": 41,
+      "worst_torque_nm_by_joint": [
+        0.16665052020877733,
+        0.18322432648532888,
+        0.470332459038641
+      ],
+      "at_progress": [
+        0.0
+      ],
+      "mass_scale": 1.0
+    },
+    "mass_x1p33": {
+      "samples": 41,
+      "worst_torque_nm_by_joint": [
+        0.22175270834232486,
+        0.24380656346838112,
+        0.6258456108175462
+      ],
+      "at_progress": [
+        0.0
+      ],
+      "mass_scale": 1.3306451612903225
+    }
+  },
+  "g4_walk_derivative_tables": {
+    "WALK_357": [
+      {
+        "period_s": 0.5,
+        "peak_qdot_rad_s": 6.320173174128078,
+        "peak_qddot_rad_s2": 759.4621539674183
+      },
+      {
+        "period_s": 1.0,
+        "peak_qdot_rad_s": 3.160086587064039,
+        "peak_qddot_rad_s2": 189.86553849185458
+      },
+      {
+        "period_s": 2.0,
+        "peak_qdot_rad_s": 1.5800432935320194,
+        "peak_qddot_rad_s2": 47.466384622963645
+      },
+      {
+        "period_s": 4.0,
+        "peak_qdot_rad_s": 0.7900216467660097,
+        "peak_qddot_rad_s2": 11.866596155740911
+      }
+    ],
+    "WALK_287": [
+      {
+        "period_s": 0.5,
+        "peak_qdot_rad_s": 5.42185219175425,
+        "peak_qddot_rad_s2": 653.3511185870157
+      },
+      {
+        "period_s": 1.0,
+        "peak_qdot_rad_s": 2.710926095877125,
+        "peak_qddot_rad_s2": 163.33777964675392
+      },
+      {
+        "period_s": 2.0,
+        "peak_qdot_rad_s": 1.3554630479385625,
+        "peak_qddot_rad_s2": 40.83444491168848
+      },
+      {
+        "period_s": 4.0,
+        "peak_qdot_rad_s": 0.6777315239692813,
+        "peak_qddot_rad_s2": 10.20861122792212
+      }
+    ]
+  }
+}

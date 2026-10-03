@@ -1,0 +1,354 @@
+{
+  "geometry": {
+    "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+    "urdf_matches_main": true,
+    "urdf_matches_sha256sums": true,
+    "full_calibration_report_urdf_prefix_suffix": [
+      "3890a3f0",
+      "1e59"
+    ],
+    "full_calibration_report_urdf_consistent": true,
+    "geometry_v5_bundle_in_report": true,
+    "g41_geometry_provenance_check_returncode": 0,
+    "foot_contact_yaml_matches_main": true,
+    "generated_motion_geometry_header_sha_tag": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+  },
+  "full_calibration": {
+    "source_ref": "main",
+    "report_path": "09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md",
+    "report_sha256": "50e05a50ec759073935b253f80e6918a895cdeabda9fe77c6ab4b13a31c2d090",
+    "contacts_parsed": 24,
+    "contacts": [
+      {
+        "leg": "lf",
+        "joint": "hip",
+        "side": "MIN",
+        "unit": "M22",
+        "bus_id": 13,
+        "direction": -1,
+        "q0_ticks": 1975,
+        "contact_ticks": 2504,
+        "measured_contact_deg": -46.49,
+        "urdf_limit_deg": -45.0
+      },
+      {
+        "leg": "lf",
+        "joint": "hip",
+        "side": "MAX",
+        "unit": "M22",
+        "bus_id": 13,
+        "direction": -1,
+        "q0_ticks": 1975,
+        "contact_ticks": 1474,
+        "measured_contact_deg": 44.03,
+        "urdf_limit_deg": 45.0
+      },
+      {
+        "leg": "lf",
+        "joint": "upper",
+        "side": "MIN",
+        "unit": "ELR01",
+        "bus_id": 12,
+        "direction": 1,
+        "q0_ticks": 2078,
+        "contact_ticks": 1461,
+        "measured_contact_deg": -54.23,
+        "urdf_limit_deg": -52.5
+      },
+      {
+        "leg": "lf",
+        "joint": "upper",
+        "side": "MAX",
+        "unit": "ELR01",
+        "bus_id": 12,
+        "direction": 1,
+        "q0_ticks": 2078,
+        "contact_ticks": 3477,
+        "measured_contact_deg": 122.96,
+        "urdf_limit_deg": 122.5
+      },
+      {
+        "leg": "lf",
+        "joint": "lower",
+        "side": "MIN",
+        "unit": "M33",
+        "bus_id": 11,
+        "direction": -1,
+        "q0_ticks": 2104,
+        "contact_ticks": 3149,
+        "measured_contact_deg": -91.85,
+        "urdf_limit_deg": -92.0
+      },
+      {
+        "leg": "lf",
+        "joint": "lower",
+        "side": "MAX",
+        "unit": "M33",
+        "bus_id": 11,
+        "direction": -1,
+        "q0_ticks": 2104,
+        "contact_ticks": 1712,
+        "measured_contact_deg": 34.45,
+        "urdf_limit_deg": 37.5
+      },
+      {
+        "leg": "rf",
+        "joint": "hip",
+        "side": "MIN",
+        "unit": "NEW01",
+        "bus_id": 23,
+        "direction": -1,
+        "q0_ticks": 2030,
+        "contact_ticks": 2544,
+        "measured_contact_deg": -45.18,
+        "urdf_limit_deg": -45.0
+      },
+      {
+        "leg": "rf",
+        "joint": "hip",
+        "side": "MAX",
+        "unit": "NEW01",
+        "bus_id": 23,
+        "direction": -1,
+        "q0_ticks": 2030,
+        "contact_ticks": 1497,
+        "measured_contact_deg": 46.85,
+        "urdf_limit_deg": 45.0
+      },
+      {
+        "leg": "rf",
+        "joint": "upper",
+        "side": "MIN",
+        "unit": "ELR03",
+        "bus_id": 22,
+        "direction": -1,
+        "q0_ticks": 2108,
+        "contact_ticks": 2728,
+        "measured_contact_deg": -54.49,
+        "urdf_limit_deg": -52.5
+      },
+      {
+        "leg": "rf",
+        "joint": "upper",
+        "side": "MAX",
+        "unit": "ELR03",
+        "bus_id": 22,
+        "direction": -1,
+        "q0_ticks": 2108,
+        "contact_ticks": 721,
+        "measured_contact_deg": 121.9,
+        "urdf_limit_deg": 122.5
+      },
+      {
+        "leg": "rf",
+        "joint": "lower",
+        "side": "MIN",
+        "unit": "NEW03",
+        "bus_id": 21,
+        "direction": 1,
+        "q0_ticks": 1995,
+        "contact_ticks": 937,
+        "measured_contact_deg": -92.99,
+        "urdf_limit_deg": -92.0
+      },
+      {
+        "leg": "rf",
+        "joint": "lower",
+        "side": "MAX",
+        "unit": "NEW03",
+        "bus_id": 21,
+        "direction": 1,
+        "q0_ticks": 1995,
+        "contact_ticks": 2357,
+        "measured_contact_deg": 31.82,
+        "urdf_limit_deg": 37.5
+      },
+      {
+        "leg": "rh",
+        "joint": "hip",
+        "side": "MIN",
+        "unit": "NEW06",
+        "bus_id": 33,
+        "direction": 1,
+        "q0_ticks": 2081,
+        "contact_ticks": 1564,
+        "measured_contact_deg": -45.44,
+        "urdf_limit_deg": -45.0
+      },
+      {
+        "leg": "rh",
+        "joint": "hip",
+        "side": "MAX",
+        "unit": "NEW06",
+        "bus_id": 33,
+        "direction": 1,
+        "q0_ticks": 2081,
+        "contact_ticks": 2595,
+        "measured_contact_deg": 45.18,
+        "urdf_limit_deg": 45.0
+      },
+      {
+        "leg": "rh",
+        "joint": "upper",
+        "side": "MIN",
+        "unit": "ELR02",
+        "bus_id": 32,
+        "direction": -1,
+        "q0_ticks": 2061,
+        "contact_ticks": 2669,
+        "measured_contact_deg": -53.44,
+        "urdf_limit_deg": -52.5
+      },
+      {
+        "leg": "rh",
+        "joint": "upper",
+        "side": "MAX",
+        "unit": "ELR02",
+        "bus_id": 32,
+        "direction": -1,
+        "q0_ticks": 2061,
+        "contact_ticks": 659,
+        "measured_contact_deg": 123.22,
+        "urdf_limit_deg": 122.5
+      },
+      {
+        "leg": "rh",
+        "joint": "lower",
+        "side": "MIN",
+        "unit": "NEW05",
+        "bus_id": 31,
+        "direction": 1,
+        "q0_ticks": 2034,
+        "contact_ticks": 991,
+        "measured_contact_deg": -91.67,
+        "urdf_limit_deg": -92.0
+      },
+      {
+        "leg": "rh",
+        "joint": "lower",
+        "side": "MAX",
+        "unit": "NEW05",
+        "bus_id": 31,
+        "direction": 1,
+        "q0_ticks": 2034,
+        "contact_ticks": 2422,
+        "measured_contact_deg": 34.1,
+        "urdf_limit_deg": 37.5
+      },
+      {
+        "leg": "lh",
+        "joint": "hip",
+        "side": "MIN",
+        "unit": "M43",
+        "bus_id": 43,
+        "direction": 1,
+        "q0_ticks": 2026,
+        "contact_ticks": 1502,
+        "measured_contact_deg": -46.05,
+        "urdf_limit_deg": -45.0
+      },
+      {
+        "leg": "lh",
+        "joint": "hip",
+        "side": "MAX",
+        "unit": "M43",
+        "bus_id": 43,
+        "direction": 1,
+        "q0_ticks": 2026,
+        "contact_ticks": 2542,
+        "measured_contact_deg": 45.35,
+        "urdf_limit_deg": 45.0
+      },
+      {
+        "leg": "lh",
+        "joint": "upper",
+        "side": "MIN",
+        "unit": "M42",
+        "bus_id": 42,
+        "direction": 1,
+        "q0_ticks": 2098,
+        "contact_ticks": 1487,
+        "measured_contact_deg": -53.7,
+        "urdf_limit_deg": -52.5
+      },
+      {
+        "leg": "lh",
+        "joint": "upper",
+        "side": "MAX",
+        "unit": "M42",
+        "bus_id": 42,
+        "direction": 1,
+        "q0_ticks": 2098,
+        "contact_ticks": 3484,
+        "measured_contact_deg": 121.82,
+        "urdf_limit_deg": 122.5
+      },
+      {
+        "leg": "lh",
+        "joint": "lower",
+        "side": "MIN",
+        "unit": "M41",
+        "bus_id": 41,
+        "direction": -1,
+        "q0_ticks": 2073,
+        "contact_ticks": 3133,
+        "measured_contact_deg": -93.16,
+        "urdf_limit_deg": -92.0
+      },
+      {
+        "leg": "lh",
+        "joint": "lower",
+        "side": "MAX",
+        "unit": "M41",
+        "bus_id": 41,
+        "direction": -1,
+        "q0_ticks": 2073,
+        "contact_ticks": 1703,
+        "measured_contact_deg": 32.52,
+        "urdf_limit_deg": 37.5
+      }
+    ],
+    "statements": [
+      "**Verdict: TRUE FULL CALIBRATION 24/24 \u2014 `all_contact_calibrated=1`.**",
+      "- `legs_envelope_accepted=0`: no operational envelope is approved yet; none exist in this build.",
+      "- **The calibration is RAM-only.** It is lost at the next power cycle. The export below is",
+      "evidence. It is not an implemented restore. No EEPROM, NVS, `PositionOffset`, servo-ID or",
+      "- **Calibration Persistence:** not implemented; the result is RAM-only."
+    ],
+    "q0_line": "11:2104 12:2078 13:1975 21:1995 22:2108 23:2030 31:2034 32:2061 33:2081 41:2073 42:2098 43:2026 (`q0_promoted.json` = export `CALIBRATION_EVIDENCE_Q0`)",
+    "read_only_interface": [
+      "MATDOG_SERVO_ALLOCATION.yaml (installation record)",
+      "q0 per joint, contacts, encoder direction (calibration evidence export)"
+    ]
+  },
+  "calibration_persistence": {
+    "branch": "feat/calibration-persistence-record-store-v1",
+    "branch_tip": "b19a98e0dc7d90d7e1218d3190eb2e28c54ecc14",
+    "recent_commits": [
+      "b19a98e M0.4: qualify pinned ROBOT_POWERED migration and writer",
+      "2757604 docs(m0): align assembled hardware and block unproven recovery",
+      "174aa04 fix(m0): disable migration write retries and clarify USB isolation",
+      "ebb6078 docs: prepare MATDOG M0 flash migration and offline recovery checks",
+      "be0c129 fix(core): reject overflowing and NUL-containing USB lines",
+      "e82cdab fix(calibration): attest current Q0 promotion and block uncertain writes"
+    ],
+    "merged_into_main": false,
+    "main_readme_statements": [
+      "> - **Calibration is RAM-only.** Evidence is exported and backed up; boot-time restoration is",
+      ">   not implemented. Operational envelopes are not approved and stand/gait are not authorized.",
+      "| Calibration Persistence V1 | **CURRENT / TO_DESIGN** |",
+      "- Calibration Persistence V1 and approved operational envelopes are not implemented.",
+      "- Calibration Persistence V1 (across reboot), the operational stand/gait workspace with its",
+      "- Stand and gait motion on hardware, stabilization, ROS 2/MoveIt 2, and complete Jetson"
+    ],
+    "conclusion": "INDEPENDENT DEPENDENCY, NOT COMPLETE: persistence is not merged into main and its documented status is TO_DESIGN/unrestored on main. Having performed calibration does not provide boot-time restoration. Not merged, cherry-picked or modified by G5-A."
+  },
+  "hardware_authorization": {
+    "stand_or_gait_authorized": false,
+    "evidence": "Full Calibration report: legs_envelope_accepted=0; README: operational envelopes not approved, stand/gait not authorized"
+  },
+  "verdict": {
+    "geometry_consistent": true,
+    "calibration_contacts_available": true
+  }
+}
