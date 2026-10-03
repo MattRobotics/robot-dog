@@ -26,6 +26,10 @@ OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -I "$SCRIPT_DIR/servo_read_stub" \
+  -o "$OUT/test_servo_read_validation" "$SCRIPT_DIR/test_servo_read_validation.cpp"
+
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
   -o "$OUT/test_servo_population" \
   "$SCRIPT_DIR/test_servo_population.cpp" \
   "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \
@@ -560,6 +564,7 @@ done
 "$OUT/test_calibration_motion_permit"
 "$OUT/test_motion_deadman"
 "$OUT/test_thermal_confirmation"
+"$OUT/test_servo_read_validation"
 "$OUT/test_ota_policy"
 "$OUT/test_ota_layout_contract"
 "$OUT/test_calibration_domain"

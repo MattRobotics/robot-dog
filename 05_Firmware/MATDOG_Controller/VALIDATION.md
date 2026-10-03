@@ -10,6 +10,28 @@ terminology.
 This document will be updated in place as hardware sessions progress; it is not
 rewritten per session.
 
+## Post-ABORT recovery and thermal acquisition — 2026-10-03
+
+Status: **IMPLEMENTED**, verified offline; hardware validation **TO_TEST**.
+The isolated branch `fix/calibration-post-abort-thermal` starts at `7b258b36c257`.
+The original dirty checkout and gait branch are preserved. No controller port,
+servo bus, reset, upload or flash was opened/executed in this task.
+
+The focused regressions replay RF LOWER 2348/Q0 1997, RF UPPER 1080/Q0 2106,
+RH UPPER 1665/Q0 2058, returning LOWER → UPPER → rear park, then all 12 Q0
+and SAFE_OFF. They cover all four legs' UPPER/LOWER probe phases, unproven
+HIP phases, unsafe dependencies, changed Q0, lost UART/permit, current,
+real heat, timeouts, and observation while thermal confirmation is pending.
+Thermal tests cover 95,117,34,34,34, true overheat, unavailable/invalid samples,
+300 ms deadline and both concentrated and sparse repeated anomalies.
+UART tests execute the actual validated transport against synthetic packets.
+Native router/NVS and runner tests cover evidence retention, discard,
+SAVE/ACK and simulated reboot. The report records final commands/results,
+CAD sampling limits, release manifest and locally verified rollback evidence.
+
+[Technical release report](../../09_Logs/Development_Log/2026-10-03_POST_ABORT_THERMAL_OFFLINE_RELEASE.md).
+[Controlled future workflow and application-only update](POST_ABORT_RECOVERY_RUNBOOK.md).
+
 ## P3a.2 USB framing hardening — offline verification, 2026-10-02
 
 Initial branch: `feat/calibration-persistence-record-store-v1`; initial HEAD:

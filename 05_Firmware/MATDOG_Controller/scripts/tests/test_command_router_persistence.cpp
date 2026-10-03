@@ -146,18 +146,30 @@ void identical_recapture_through_real_commands() {
   Fixture f;
   CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("CHECK_OK") != std::string::npos);
   const uint32_t first = f.q0.status().promoted_capture_session_id;
+  f.full_leg.recovery_witness_ = true;
+  CHECK(f.command("@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE").find("EXISTING_EVIDENCE_REQUIRES_EXPLICIT_DISCARD") != std::string::npos);
+  CHECK(f.q0.status().promoted_capture_session_id == first);
+  CHECK(f.full_leg.recovery_witness_);
+  CHECK(f.scenario.evidence.legsPresent() == 4);
+  CHECK(f.command("@CALIBRATION EVIDENCE DISCARD").find("UNKNOWN_COMMAND") != std::string::npos);
+  CHECK(f.scenario.evidence.legsPresent() == 4);
+  CHECK(f.command("@CALIBRATION EVIDENCE DISCARD CONFIRM_NEW_Q0").find("DISCARD=OK scope=RAM_ONLY NVS=UNCHANGED") != std::string::npos);
+  CHECK(f.scenario.evidence.legsPresent() == 0);
+  CHECK(!f.full_leg.recovery_witness_);
+  CHECK(f.policy.transforms().size() == 12); // discard is not an unpromotion
+  CHECK(f.q0.status().promoted_capture_session_id == first);
   CHECK(f.command("@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE").find("Q0=STARTED") != std::string::npos);
   CHECK(f.q0.status().capture_session_id != first); CHECK(f.q0.status().promoted_capture_session_id == 0);
   CHECK(f.q0.markCensusStarted()); CHECK(f.q0.submitCensus(goodCensus()));
   CHECK(f.q0.markPreflightStarted()); CHECK(f.q0.submitPreflight(goodPreflight()));
   CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("CHECK_REFUSED") != std::string::npos);
   CHECK(finishCapture(f.q0, f.scenario.golden));
-  CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("REASON=Q0_NOT_PROMOTED") != std::string::npos);
+  CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("CHECK_REFUSED") != std::string::npos);
   CHECK(f.command("@CALIBRATION Q0 PROMOTE").find("UNKNOWN_COMMAND") != std::string::npos);
   CHECK(f.q0.status().promoted_capture_session_id == 0);
   CHECK(f.command("@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION").find("PROMOTE=OK") != std::string::npos);
   CHECK(f.q0.status().promoted_capture_session_id == f.q0.status().capture_session_id);
-  CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("CHECK_OK") != std::string::npos);
+  CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("CHECK_REFUSED") != std::string::npos); // old 24/24 cannot be combined with this capture
   CHECK(f.writes() == 0); CHECK(router_test::hardware_calls == 0);
 }
 

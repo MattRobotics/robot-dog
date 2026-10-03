@@ -32,7 +32,7 @@ inline uint32_t now_ms = 1000;
 inline unsigned hardware_calls = 0;
 }
 inline uint32_t millis() { return router_test::now_ms; }
-class HardwareSerial { public: explicit HardwareSerial(int) {} };
+class HardwareSerial { public: explicit HardwareSerial(int) {} int available() { return 0; } int read() { return -1; } };
 class HostSerial {
  public:
   std::string output;

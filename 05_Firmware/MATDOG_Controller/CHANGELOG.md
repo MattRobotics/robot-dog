@@ -1,5 +1,19 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — post-ABORT recovery and thermal acquisition (offline) — 2026-10-03
+
+- Add explicit current-boot recovery for witnessed UPPER/LOWER probe interruptions,
+  restoring geometric dependencies before serial Q0 recovery and verified SAFE_OFF.
+  Retain the ordinary 64-tick gate, all protections, Q0 and completed leg records.
+- Validate servo read packet ID/width/status/checksum and bound the whole UART response.
+  Confirm only hot samples adaptively (up to five, three hot), without sleeps or
+  new commands while pending. Invalid reads and repeated anomalies fail closed.
+- Extend the existing runner with post-abort/resume and SAVE/ACK/post-reboot verification.
+  Require explicit RAM evidence discard before replacing an acquisition.
+- No hardware access, EEPROM writes, partition/NVS erasure, gait changes or boot motion.
+  See [release report](../../09_Logs/Development_Log/2026-10-03_POST_ABORT_THERMAL_OFFLINE_RELEASE.md)
+  and [workflow](POST_ABORT_RECOVERY_RUNBOOK.md).
+
 ## Unreleased — P3a.2 USB command framing hardening (offline, no hardware) — 2026-10-02
 
 - CommandRouter latches overflow or NUL for the entire USB line and discards it

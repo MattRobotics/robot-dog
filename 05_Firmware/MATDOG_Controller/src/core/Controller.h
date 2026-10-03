@@ -105,6 +105,7 @@ class Controller {
     servo::ServoBus* bus_;
   };
   ServoThermalReadPort thermal_read_port_{&servo_bus_};
+  calibration::ThermalConfirmationState thermal_state_[calibration::kFullLegPopulation];
   servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-start
   servo::ServoPreflight servo_preflight_;  // H0 leg verification; read-only, never auto-started
   imu::Bno085Imu imu_;

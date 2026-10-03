@@ -206,6 +206,7 @@ void CommandRouter::handleLine(String line) {
   upper.toUpperCase();
   // Set only by matchLegCommand() on a strict four-token match.
   calibration::Leg command_leg = calibration::Leg::LF;
+  bool command_post_abort = false;
 
   if (upper == "@HELP") {
     printHelp();
@@ -325,6 +326,17 @@ void CommandRouter::handleLine(String line) {
       Serial.println("CALIBRATION_Q0_ABORT=NO_ACTIVE_CAPTURE");
     }
     printCalibrationQ0Status();
+  } else if (upper == "@CALIBRATION EVIDENCE DISCARD CONFIRM_NEW_Q0") {
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE ||
+        modules_.calibration->sessionLive() || modules_.motion_permit->active() ||
+        modules_.full_leg_run->armed || servoDiagnosticBusy()) {
+      Serial.println("CALIBRATION_EVIDENCE_DISCARD=REFUSED");
+      Serial.println("REASON=SESSION_OR_DIAGNOSTIC_ACTIVE");
+      return;
+    }
+    modules_.full_leg_evidence->reset();
+    modules_.full_leg_calibration->invalidateRecoveryWitness();
+    Serial.println("CALIBRATION_EVIDENCE_DISCARD=OK scope=RAM_ONLY NVS=UNCHANGED");
   } else if (upper.startsWith("@CALIBRATION Q0 CAPTURE")) {
     // Read-only evidence acquisition is deliberately separate from a live
     // CalibrationManager motion session. No authority is requested here.
@@ -368,6 +380,12 @@ void CommandRouter::handleLine(String line) {
       return;
     }
 
+    if (modules_.full_leg_evidence->legsPresent() != 0 || modules_.calibration->sessionLive()) {
+      Serial.println("CALIBRATION_Q0=REFUSED");
+      Serial.println("REASON=EXISTING_EVIDENCE_REQUIRES_EXPLICIT_DISCARD");
+      return;
+    }
+    modules_.full_leg_calibration->invalidateRecoveryWitness();
     calibration::Q0CaptureConfig config{};
     config.samples_per_joint = static_cast<uint8_t>(samples);
     config.stability_budget_specified = true;
@@ -744,8 +762,9 @@ void CommandRouter::handleLine(String line) {
     Serial.println("CALIBRATION_SESSION_ABORT=OK");
     Serial.println("CALIBRATION_SESSION_ABORT_NOTE permit=REVOKED authority=RELEASED");
 
-  } else if (matchLegCommand(upper, "@CALIBRATION INITIAL RECOVERY ", " CONFIRM_Q0_RECOVERY",
-                             &command_leg)) {
+  } else if (matchLegCommand(upper, "@CALIBRATION INITIAL RECOVERY ", " CONFIRM_Q0_RECOVERY", &command_leg) ||
+             (command_post_abort = matchLegCommand(upper, "@CALIBRATION POST_ABORT RECOVERY ", " CONFIRM_Q0_RECOVERY", &command_leg))) {
+    const bool post_abort = command_post_abort;
     // The controller-verified q0 baseline required after a fresh q0 promotion
     // and before any leg is calibrated: EVERY leg joint of the robot actively
     // commanded to its promoted q0, one at a time (prime at present, RAM
@@ -800,16 +819,17 @@ void CommandRouter::handleLine(String line) {
     context.authority = modules_.authority->current();
     context.authority_generation = modules_.authority->generation();
     context.authority_inhibited = modules_.authority->inhibited();
-    if (!modules_.full_leg_calibration->start(plan.request, context, millis())) {
+    if (!(post_abort ? modules_.full_leg_calibration->startPostAbortRecovery(plan.request, context, millis())
+                     : modules_.full_leg_calibration->start(plan.request, context, millis()))) {
       Serial.println("CALIBRATION_INITIAL_RECOVERY=REFUSED");
-      Serial.println("REASON=FULL_LEG_EXECUTOR_START_REFUSED");
+      Serial.printf("REASON=%s\n", calibration::toString(modules_.full_leg_calibration->status().failure));
       return;
     }
     // Deliberately NOT armed as a leg run: nothing is finalized, nothing is
     // recorded in the evidence store, the session is not completed.
-    Serial.printf("CALIBRATION_INITIAL_RECOVERY=ARMED session_leg=%s joints=%u torque_limit=%u "
+    Serial.printf("CALIBRATION_%s_RECOVERY=ARMED session_leg=%s joints=%u torque_limit=%u "
                   "phase=PREFLIGHT\n",
-                  leg_name, (unsigned)plan.request.population_count,
+                  post_abort ? "POST_ABORT" : "INITIAL", leg_name, (unsigned)plan.request.population_count,
                   (unsigned)plan.request.torque_limit);
     for (uint8_t i = 0; i < plan.request.population_count; ++i) {
       const calibration::FullLegJoint& j = plan.request.population[i];
@@ -1177,6 +1197,8 @@ void CommandRouter::printHelp() {
   Serial.println("  @CALIBRATION MOTION ABORT");
   Serial.println("  @CALIBRATION MOTION PERMIT REVOKE");
   Serial.println("  @CALIBRATION SESSION ABORT");
+  Serial.println("  @CALIBRATION EVIDENCE DISCARD CONFIRM_NEW_Q0 (RAM only; required before a new acquisition)");
+  Serial.println("  @CALIBRATION POST_ABORT RECOVERY <LF|RF|RH|LH> CONFIRM_Q0_RECOVERY (current-boot witness only)");
   Serial.println("  @CALIBRATION INITIAL RECOVERY <LF|RF|RH|LH> CONFIRM_Q0_RECOVERY");
   Serial.println("  @CALIBRATION FULL LEG <LF|RF|RH|LH> CONFIRM_FULL_CALIBRATION");
   Serial.println("                           (the session's leg: all SIX contacts, UPPER/LOWER/HIP x");
@@ -1346,6 +1368,8 @@ void CommandRouter::printCalibrationQ0Status() {
                 (unsigned)q.completed_sample_passes, (unsigned)q.samples_per_joint,
                 (unsigned)q.next_joint_index, (unsigned)q.candidates_complete,
                 (unsigned)calibration::kLegServoSlotCount);
+  Serial.printf("CALIBRATION_Q0_PROMOTION promoted_capture=%lu geometry=%016llx\n",
+                (unsigned long)q.promoted_capture_session_id, (unsigned long long)q.promoted_geometry);
   Serial.printf("CALIBRATION_Q0_POPULATION status=%s verdict=%s observed=%u/%u\n",
                 calibration::toString(q.population_status),
                 calibration::toString(calibration::evaluateLegPopulation(population.evidence)),

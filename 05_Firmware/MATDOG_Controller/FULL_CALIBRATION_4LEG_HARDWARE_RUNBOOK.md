@@ -1,3 +1,11 @@
+> 2026-10-03 update: use [POST_ABORT_RECOVERY_RUNBOOK.md](POST_ABORT_RECOVERY_RUNBOOK.md)
+> for interrupted-session recovery, compatible resume and NVS SAVE/ACK.
+> Q0/unsaved evidence remain RAM-only; explicit persistence is now available.
+> The LF UPPER MIN historical crosscheck is absolute midpoint 1461 ±16 ticks
+> (fine passes 1463/1459 on 2026-10-01), independent of the new manual Q0.
+> It does not alter Geometry V5 or a search corridor. The older +7…+39
+> comparison below is superseded for the runner.
+
 # TRUE Full Calibration — 24 contacts, four legs (LF → RF → RH → LH) — hardware runbook
 
 Date: 2026-09-30 (replaces the 2026-09-29 UPPER-only procedure)

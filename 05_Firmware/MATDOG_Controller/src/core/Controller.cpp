@@ -383,6 +383,7 @@ void Controller::updateCalibrationMotionPermit() {
   ctx.sequence_leg = full_leg_calibration_.leg();
   ctx.sequence_phase = full_leg_calibration_.sequencePhase();
   ctx.sequence_prerequisites_verified = full_leg_calibration_.prerequisitesVerified();
+  full_leg_calibration_.recoveryGrant(&ctx);
   actuator_policy_.setBootstrapContext(ctx);
 }
 
@@ -477,6 +478,7 @@ void Controller::updateFirstMotion(uint32_t now_ms) {
 //      POST-update, so a failure this very tick is made safe this very tick;
 //      each result is handed to the NEXT update() and never reused after it.
 void Controller::updateFullLegCalibration(uint32_t now_ms) {
+  (void)now_ms; // safety ages use the actual acquisition/update clock
   if (!full_leg_calibration_.active()) {
     full_leg_safe_off_frame_ = calibration::FullLegSafeOffFrame{};
     return;
@@ -496,11 +498,13 @@ void Controller::updateFullLegCalibration(uint32_t now_ms) {
   uint8_t buses[calibration::kFullLegMaxTelemetry] = {0};
   const uint8_t n = full_leg_calibration_.telemetryRequest(buses, calibration::kFullLegMaxTelemetry);
   calibration::FullLegTelemetryFrame frame{};
+  bool thermal_pending = false;
+  bool direct_read_used = false;
   for (uint8_t i = 0; i < n; ++i) {
     servo::ServoBus::ControlFeedbackSnapshot t{};
     actuator::TelemetrySample sample{};
     sample.read_ok = servo_bus_.readControlFeedback(buses[i], &t);
-    sample.sampled_at_ms = now_ms;
+    sample.sampled_at_ms = millis();
     if (sample.read_ok) {
       sample.present_position = t.present_position;
       sample.torque_enable = t.torque_enable;
@@ -510,26 +514,41 @@ void Controller::updateFullLegCalibration(uint32_t now_ms) {
       sample.goal_position = t.goal_position;
       sample.torque_limit = t.torque_limit;
       sample.servo_status = t.status;
-      // LF V25 runtime over-limit confirmation (port.rs): a reading > 70 C is
-      // re-read twice, directly, 50 ms apart; only >= 2 of 3 over the limit
-      // reaches the monitors as over-limit (abort). Nothing else is filtered.
-      const calibration::ThermalConfirmation thermal = calibration::confirmPresentTemperature(
-          &thermal_read_port_, buses[i], sample.present_temperature);
-      sample.present_temperature = thermal.published_c;
-      if (thermal.decision != calibration::ThermalDecision::NORMAL) {
-        Serial.printf("CALIBRATION_THERMAL_CONFIRMATION bus=%u decision=%s samples=%ld,%ld,%ld "
-                      "count=%u published=%ld limit=%ld\n",
-                      (unsigned)thermal.bus_id, calibration::toString(thermal.decision),
-                      (long)thermal.samples[0], (long)thermal.samples[1], (long)thermal.samples[2],
-                      (unsigned)thermal.sample_count, (long)thermal.published_c,
-                      (long)calibration::kThermalLimitC);
+      // Do not spend a confirmation transaction on an already fatal status/current.
+      uint8_t index = 0;
+      while (index < full_leg_calibration_.request().population_count &&
+             full_leg_calibration_.request().population[index].bus_id != buses[i]) ++index;
+      if (index < calibration::kFullLegPopulation && sample.servo_status == 0 &&
+          (sample.present_current & 0x7FFF) < calibration::kSearchHardCurrentAbortRaw) {
+        auto& state = thermal_state_[index];
+        const bool due = state.directReadDue(millis());
+        calibration::ThermalConfirmation thermal = due && direct_read_used && !state.expired(millis()) ? state.result()
+            : state.update(&thermal_read_port_, buses[i], sample.present_temperature, millis());
+        if (due && !direct_read_used) direct_read_used = true;
+        thermal_pending |= thermal.decision == calibration::ThermalDecision::PENDING;
+        sample.present_temperature = thermal.decision == calibration::ThermalDecision::PENDING
+                                         ? calibration::kThermalLimitC : thermal.published_c;
+        if (thermal.decision != calibration::ThermalDecision::NORMAL &&
+            thermal.decision != calibration::ThermalDecision::PENDING) {
+          Serial.printf("CALIBRATION_THERMAL_CONFIRMATION bus=%u decision=%s samples=%ld,%ld,%ld,%ld,%ld "
+                        "count=%u published=%ld limit=%ld source=BULK_THEN_DIRECT\n",
+                        (unsigned)thermal.bus_id, calibration::toString(thermal.decision),
+                        (long)thermal.samples[0], (long)thermal.samples[1], (long)thermal.samples[2],
+                        (long)thermal.samples[3], (long)thermal.samples[4],
+                        (unsigned)thermal.sample_count, (long)thermal.published_c,
+                        (long)calibration::kThermalLimitC);
+        }
       }
     }
     frame.add(buses[i], sample);
+    if (!sample.read_ok || sample.present_temperature < 0 ||
+        sample.present_temperature > calibration::kThermalLimitC || sample.servo_status != 0 ||
+        (sample.present_current & 0x7FFF) >= calibration::kSearchHardCurrentAbortRaw) break;
   }
 
   // 2 - at most one backend write.
-  full_leg_calibration_.update(context, now_ms, frame, full_leg_safe_off_frame_);
+  if (thermal_pending) full_leg_calibration_.monitorOnly(context, millis(), frame);
+  else full_leg_calibration_.update(context, millis(), frame, full_leg_safe_off_frame_);
 
   // 3 - the V25 phase order, recorded by the session itself. A recovery-only
   // run is not a leg calibration: it reports no phase (so the leg run that
@@ -686,8 +705,9 @@ void Controller::updateFullLegFinalization() {
     recovery_result_pending_ = false;
     const calibration::FullLegCalibrationStatus& s = full_leg_calibration_.status();
     const bool pass = s.step == calibration::FullLegStep::COMPLETE;
-    Serial.printf("CALIBRATION_INITIAL_RECOVERY_RESULT verdict=%s recovered=%u/%u failure=%s "
+    Serial.printf("CALIBRATION_%s_RECOVERY_RESULT verdict=%s recovered=%u/%u failure=%s "
                   "failed_phase=%s last_decision=%s\n",
+                  full_leg_calibration_.request().post_abort_recovery ? "POST_ABORT" : "INITIAL",
                   pass ? "PASS" : "FAILED", (unsigned)s.recovered_joints,
                   (unsigned)full_leg_calibration_.request().population_count,
                   calibration::toString(s.failure),

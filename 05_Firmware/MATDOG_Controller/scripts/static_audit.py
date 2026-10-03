@@ -1657,63 +1657,54 @@ def check_calibration_search_boundaries(files):
 
 
 def check_thermal_confirmation(files):
-    """LF V25 runtime PresentTemperature over-limit confirmation (NormaCore
-    st3215 port.rs), ported 2026-09-30 after a single-sample false thermal
-    abort on hardware (M42, one > 70 C sample, 32 C a second later):
-      - the oracle constants: limit 70 C, 3 readings, 50 ms before each
-        confirmation read, >= 2 of 3 over the limit confirms;
-      - two FRESH DIRECT reads of the SAME servo, each after the wait; a read
-        that fails is fail-closed (the over-limit trigger stays published);
-      - at or below the limit nothing is read;
-      - the Controller applies it to EVERY Full-Leg sample before the frame
-        reaches the executor, and the direct read uses the operational
-        timeout. Only temperature is confirmed - no other check is touched.
-    The persistent MaxTemperature register is a different thing (preflight)."""
+    """Adaptive thermal rule and provenance-checked, bounded UART safety reads."""
     by_name = {path.name: (path, code) for path, code in files}
-    normalize = lambda text: re.sub(r"\s+", " ", text)
-    for name in ("ThermalConfirmation.h", "ThermalConfirmation.cpp", "Controller.cpp", "ServoBus.cpp"):
+    required = {
+        "ThermalConfirmation.h": (
+            "constexpr int32_t kThermalLimitC = 70;",
+            "constexpr uint8_t kThermalConfirmationReads = 5;",
+            "constexpr uint8_t kThermalConfirmedOverLimit = 3;",
+            "constexpr uint32_t kThermalConfirmationDelayMs = 50;",
+            "constexpr uint8_t kThermalMaxTransients = 3;",
+            "constexpr uint8_t kThermalMaxBootTransients = 8;"),
+        "ThermalConfirmation.cpp": (
+            "if (observed <= kThermalLimitC) return result_;",
+            "port->readPresentTemperatureDirect(bus, &value)",
+            "value < 0 || value > 255",
+            "hot >= kThermalConfirmedOverLimit", "cool >= 3",
+            "now_ms - last_read_ms_ < kThermalConfirmationDelayMs",
+            "latched_ = transients_ >= kThermalMaxTransients",
+            "boot_transients_ >= kThermalMaxBootTransients", "expired(now_ms)"),
+        "Controller.cpp": (
+            "state.update(&thermal_read_port_, buses[i], sample.present_temperature, millis())",
+            "full_leg_calibration_.monitorOnly(context, millis(), frame)",
+            "direct_read_used", "full_leg_calibration_.recoveryGrant(&ctx)"),
+        "ServoReadValidation.h": (
+            "frame[2] != id", "frame[3] != width + 2", "frame[4] != 0", "return sum == 255"),
+        "ValidatedServoRead.h": (
+            "millis() - started < IOTimeOut", "drained < 64", "validServoReadPacket(packet, size, id, width)"),
+        "ServoBus.h": ("ValidatedServoRead st_;",),
+    }
+    for name, tokens in required.items():
         if name not in by_name:
-            fail(f"{name} not found - cannot audit the thermal confirmation")
-            return
-    path, code = by_name["ThermalConfirmation.h"]
-    body = normalize(code)
-    for pinned in ("constexpr int32_t kThermalLimitC = 70;",
-                   "constexpr uint8_t kThermalConfirmationReads = 3;",
-                   "constexpr uint32_t kThermalConfirmationDelayMs = 50;",
-                   "constexpr uint8_t kThermalConfirmedOverLimit = 2;"):
-        if body.count(pinned) != 1:
-            fail(f"{path}: the LF V25 thermal confirmation constant drifted: expected {pinned!r}")
-    path, code = by_name["ThermalConfirmation.cpp"]
-    body = normalize(re.sub(r"//[^\n]*", "", code))
-    for token, why in (
-            ("if (observed_c <= kThermalLimitC) return out;", "no confirmation read at or below the limit"),
-            ("for (uint8_t i = 1; i < kThermalConfirmationReads; ++i) {", "exactly two confirmation reads"),
-            ("port->delayMs(kThermalConfirmationDelayMs); if (!port->readPresentTemperatureDirect(bus_id, "
-             "&celsius) || celsius < 0) {", "50 ms, then a fresh direct read of the SAME servo"),
-            ("out.decision = ThermalDecision::CONFIRMATION_READ_FAILED; return out;",
-             "a failed confirmation read fails closed"),
-            ("if (over_limit >= kThermalConfirmedOverLimit) {", "V25: >= 2 of 3 over the limit confirms")):
-        if token not in body:
-            fail(f"{path}: the LF V25 thermal confirmation lost {token!r} ({why})")
-    path, code = by_name["Controller.cpp"]
-    m = re.search(r"void Controller::updateFullLegCalibration\(uint32_t now_ms\) \{(.*?)\n\}", code, re.DOTALL)
-    if not m:
-        fail(f"{path}: updateFullLegCalibration() not found to audit the thermal confirmation")
-    else:
-        body = normalize(m.group(1))
-        for token in ("calibration::confirmPresentTemperature( &thermal_read_port_, buses[i], "
-                      "sample.present_temperature);",
-                      "sample.present_temperature = thermal.published_c;"):
+            fail(f"{name}: missing thermal/UART safety component")
+            continue
+        path, code = by_name[name]
+        body = re.sub(r"\s+", " ", code)
+        for token in tokens:
             if token not in body:
-                fail(f"{path}: every Full-Leg sample must pass the LF V25 thermal confirmation "
-                     f"before the executor sees it (lost {token!r})")
-    path, code = by_name["ServoBus.cpp"]
-    m = re.search(r"bool ServoBus::readPresentTemperatureDirect\([^)]*\)\s*\{(.*?)\n\}", code, re.DOTALL)
-    if not m:
-        fail(f"{path}: readPresentTemperatureDirect() not found")
-    elif "kOperationalTimeoutMs" not in m.group(1) or "SMS_STS_PRESENT_TEMPERATURE" not in m.group(1):
-        fail(f"{path}: readPresentTemperatureDirect() must be one direct PresentTemperature read "
-             f"under the operational timeout")
+                fail(f"{path}: thermal/UART safety invariant missing: {token}")
+    if "Controller.cpp" in by_name:
+        path, code = by_name["Controller.cpp"]
+        if "calibration::confirmPresentTemperature(" in code:
+            fail(f"{path}: blocking thermal confirmation in production Controller")
+    if "FullLegCalibrationExecutor.cpp" in by_name:
+        path, code = by_name["FullLegCalibrationExecutor.cpp"]
+        for token in ("captureRecoveryWitness()", "recoveryPoseCompatible", "POST_ABORT_Q0_CHANGED",
+                      "if (active() || (request.post_abort_recovery && !starting_post_abort_)) return false;",
+                      "distance > static_cast<int32_t>(actuator::kSequencePrimeMaxDistanceTicks)"):
+            if token not in code:
+                fail(f"{path}: post-ABORT proof or ordinary 64-tick gate missing: {token}")
 
 
 def check_full_leg_calibration_wiring(files):
@@ -1782,9 +1773,9 @@ def check_full_leg_calibration_wiring(files):
         return
     handle = normalize(handle_match.group(1))
 
-    if handle.count("matchLegCommand(") != 3:
-        fail(f"{router_path}: handleLine() must call matchLegCommand() exactly three times "
-             f"(SESSION START, INITIAL RECOVERY, FULL LEG); found "
+    if handle.count("matchLegCommand(") != 4:
+        fail(f"{router_path}: handleLine() must call matchLegCommand() exactly four times "
+             f"(SESSION START, INITIAL RECOVERY, POST_ABORT RECOVERY, FULL LEG); found "
              f"{handle.count('matchLegCommand(')}")
     for prefix in ("@CALIBRATION FULL LEG ", "@CALIBRATION SESSION START ",
                    "@CALIBRATION INITIAL RECOVERY "):
@@ -1963,7 +1954,7 @@ def check_full_leg_calibration_wiring(files):
         body = normalize(step_fn.group(1))
         order = ("full_leg_calibration_.telemetryRequest(buses, calibration::kFullLegMaxTelemetry)",
                  "servo_bus_.readControlFeedback(buses[i], &t)",
-                 "full_leg_calibration_.update(context, now_ms, frame, full_leg_safe_off_frame_);",
+                 "full_leg_calibration_.update(context, millis(), frame, full_leg_safe_off_frame_);",
                  "calibration_.noteExecutionPhase(full_leg_calibration_.status().phase)",
                  "full_leg_calibration_.phaseReportRejected();",
                  "full_leg_calibration_.safeOffRequest(off, calibration::kFullLegPopulation)",
@@ -2184,7 +2175,10 @@ def check_full_calibration_sequence(files, sketch_dir):
         fail(f"{c_path}: nextPhase() not found")
     else:
         body = next_fn.group(1)
-        pairs = re.findall(r"case CalibrationPhase::(\w+):\s*enterPhase\(CalibrationPhase::(\w+)", body)
+        # Ordinary V25 chain remains pinned; the explicit post-ABORT branch
+        # has its separate audited recovery order.
+        ordinary = body[body.rfind("  switch (status_.phase)"):] if "if (request_.post_abort_recovery)" in body else body
+        pairs = re.findall(r"case CalibrationPhase::(\w+):\s*enterPhase\(CalibrationPhase::(\w+)", ordinary)
         chain = [a for a, _ in pairs]
         expected = list(V25_PHASE_ORDER[:-1])
         expected.remove("INITIAL_RECOVERY")  # its successor is conditional (recovery-only run)
