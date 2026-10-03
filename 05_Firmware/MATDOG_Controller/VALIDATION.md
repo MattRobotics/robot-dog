@@ -3338,3 +3338,22 @@ cases; USB_ONLY build and ROBOT_POWERED compile clean. No hardware access, flash
 A hardware run is expected to end each leg at `HARDWARE_CONTACT_CALIBRATED` with
 `envelope_accepted=0` and 0 of 12 JointLimits admitted (unapproved placeholder parameters).
 Procedure: [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md).
+
+
+## 2026-10-03 — release automation, offline only
+
+The native runner now supports a strict DALY observer on its existing connection,
+pinned firmware-worktree verification, same-boot admission and structured phase
+receipts. Three packaged stage entry points are tested with synthetic controller
+I/O and temporary local Git repositories. Operator interruption also de-escalates
+through ABORT/SAFE_OFF; verify-persistence sends only read-only queries.
+No generic audit was repeated for this host-only tooling change. Firmware build
+`125d981b02a3` and its earlier recovery/thermal/UART/NVS host validation remain
+unchanged. Actual hardware, calibration, reboot and main merge are pending.
+Initial-pose admission is BLOCKED: no qualified post-shutdown path under the
+no-cover/no-RESET/no-forced-reducer constraints was found. See SESSION_AUTOMATION.md
+and the package's INITIAL_POSE_PLAN.md. Synthetic PASS cannot remove this block.
+
+Targeted offline results: native runner 42/42; DALY guard 6/6; release-stage,
+artifact failure and temporary local Git integration tests 18/18. These are
+simulations/file checks, with no serial, flashing or real main integration.

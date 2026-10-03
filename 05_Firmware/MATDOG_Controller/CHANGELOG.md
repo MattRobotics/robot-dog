@@ -1705,3 +1705,17 @@ merge — no new functionality. Flashed and hardware-validated as commit
 See `VALIDATION.md` Session 2.3 for the full measurement evidence
 (including live `@SERVO SAFE_OFF` timing with the servo bus unpowered) and
 H1/H2/H3/H4/H5/H6 hardware re-validation.
+
+
+## 2026-10-03 — native session / release packaging
+
+- Add optional fail-closed DALY telemetry supervision through the existing native
+  serial connection; preserve 10.8 V / 3600 mV / alarm / freshness admission.
+- Add separate frozen firmware provenance, boot continuity, structured receipts
+  and ABORT/SAFE_OFF for operator interruption. Persistence verification is read-only.
+- Add three guarded application-only / calibration+SAVE / reboot+finalization
+  entry points; retain failed evidence and prevent automatic retries.
+- Conditional isolated main integration preserves firmware identity and gait
+  separation; dirty state, failed tests, conflicts and remote errors stop it.
+- Initial pose remains blocked pending mechanical qualification after shutdown.
+  No firmware code, partition, EEPROM or safety limit changed in this step.

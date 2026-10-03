@@ -20,12 +20,14 @@ Covered:
   - a lost link sends nothing more; a silent run is ABORTed by the watchdog.
 """
 import os
+import json
 import re
 import sys
 import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import calibration_hw_session as hw  # noqa: E402
@@ -82,6 +84,20 @@ class FakeController:
         self.wrong_leg_result_first = False
         self.last_leg = None
         self.sent = []
+        self.bms_stream = False
+        self.bms_pack = 12.0
+        self.bms_cell = 4000
+        self.bms_alarm = "0000"
+        self.bms_comm = "OK"
+        self.bms_age = 100
+        self.bms_fault_leg = None
+
+    def bms_status(self):
+        self.emit("DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS",
+                  f"  comm={self.bms_comm} age_ms={self.bms_age}",
+                  f"  pack_v={self.bms_pack:.1f} current_a=0.0 soc=99.0% cells=3",
+                  f"  cell_max_mv={self.bms_cell} cell_min_mv={self.bms_cell} delta_mv=0",
+                  f"  charge_mos=ON discharge_mos=ON state=IDLE alarms={self.bms_alarm} 0000 0000 0000")
 
     def emit(self, *lines):
         self.link.inject(lines)
@@ -130,6 +146,11 @@ class FakeController:
             return self.emit(f"SYSTEM health=READY power_state=RUN mode=MAINTENANCE "
                              f"authority={self.authority} uptime_ms={self.uptime_ms} profile=ROBOT_POWERED",
                              "SERVO_POP canonical=17 expected_now=13 absent_by_design=4 last_census=NOT_RUN")
+        if u in ("@BMS STREAM ON", "@BMS STREAM OFF"):
+            self.bms_stream = u.endswith("ON")
+            return self.emit("BMS_STREAM=" + ("ON" if self.bms_stream else "OFF"))
+        if u == "@BMS STATUS":
+            return self.bms_status()
         if u == "@AUTHORITY STATUS":
             return self.emit(f"AUTHORITY owner={self.authority} generation=1 last_result=RELEASED",
                              "AUTHORITY_INHIBIT active=NO reason=NONE")
@@ -278,6 +299,9 @@ class FakeController:
         lines = []
         run = self.run
         if run:
+            if self.bms_stream:
+                if run["leg"] == self.bms_fault_leg: self.bms_pack = 10.7
+                self.bms_status()
             run["polls"] += 1
             leg = run["leg"]
             if self.lose_link_during == leg and run["kind"] == "leg" and run["polls"] == 2:
@@ -485,6 +509,29 @@ class RunnerTest(unittest.TestCase):
         self.assertFalse(any("Q0 CAPTURE" in c or "SESSION START" in c or "RECOVERY" in c or
                              "FULL LEG" in c for c in cmds))
 
+    def test_admitted_boot_anchor_is_checked_before_q0(self):
+        anchor = time.time() - self.controller.uptime_ms / 1000
+        self.assertEqual(self.run_phase("prepare", "--expected-boot-anchor", str(anchor)), 0)
+        self.assertEqual(self.run_phase("all", "--expected-boot-anchor", str(anchor - 30)), 1)
+        self.assertFalse(any("Q0 CAPTURE" in c for c in self.sent()))
+
+    def test_nonfinite_boot_anchor_cannot_bypass_admission(self):
+        self.assertEqual(self.run_phase("all", "--expected-boot-anchor", "nan"), 1)
+        self.assertFalse(any("Q0 CAPTURE" in c for c in self.sent()))
+
+    def test_interruption_aborts_and_safe_off(self):
+        with patch.object(hw.Session, 'run_full_leg', side_effect=KeyboardInterrupt('test interruption')):
+            self.assertEqual(self.run_phase("all"), 1)
+        self.assertIn("@CALIBRATION FULL LEG ABORT", self.sent())
+        self.assertTrue(all(f"@SERVO SAFE_OFF {bus}" in self.sent() for bus in hw.INSTALLED))
+
+    def test_simulation_success_receipt_cannot_claim_actual_hardware(self):
+        result = os.path.join(self.tmp, 'result.json')
+        self.assertEqual(self.run_phase("all", "--result-json", result), 0)
+        with open(result) as source: receipt = json.load(source)
+        self.assertFalse(receipt['hardware_observed'])
+        self.assertEqual(receipt['contacts_accepted'], 24)
+
     def test_q0_then_recover_stops_ready_for_go(self):
         self.ready()
         cmds = self.sent()
@@ -535,6 +582,30 @@ class RunnerTest(unittest.TestCase):
         self.ready();self.controller.capture_session=2
         mark=len(self.sent());self.assertEqual(self.run_phase("resume"),1)
         self.assertFalse(any("CONFIRM_FULL_CALIBRATION" in c for c in self.sent()[mark:]))
+
+    def test_daly_same_link_healthy_full_sequence(self):
+        self.assertEqual(self.run_phase("all", "--require-daly"), 0)
+        self.assertIn("@BMS STREAM ON", self.sent())
+        self.assertNotIn("@BMS KEY SET DISCHARGE CONFIRM", self.sent())
+        self.assertEqual(self.sent()[-1], "@BMS STREAM OFF")
+
+    def test_daly_fault_before_motion(self):
+        self.controller.bms_cell = 3599
+        self.assertEqual(self.run_phase("all", "--require-daly"), 1)
+        self.assertFalse(any("CONFIRM_FULL_CALIBRATION" in c for c in self.sent()))
+
+    def test_daly_fault_during_rf_stops_remaining_legs(self):
+        self.controller.bms_fault_leg = "RF"
+        self.assertEqual(self.run_phase("all", "--require-daly"), 1)
+        self.assertIn("@CALIBRATION FULL LEG ABORT", self.sent())
+        self.assertTrue(any(c.startswith("@SERVO SAFE_OFF") for c in self.sent()))
+        self.assertNotIn("@CALIBRATION FULL LEG RH CONFIRM_FULL_CALIBRATION", self.sent())
+
+    def test_verify_persistence_is_read_only(self):
+        self.assertEqual(self.run_phase("all"),0); self.assertEqual(self.run_phase("persist"),0)
+        self.controller.uptime_ms=500
+        mark=len(self.sent()); self.assertEqual(self.run_phase("verify-persistence"),0)
+        self.assertTrue(all(c=="" or c in ("@SYSTEM SOURCE_SIGNATURE", "@MODE STATUS", "@STATUS", "@AUTHORITY STATUS", "@CALIBRATION PERSIST STATUS") for c in self.sent()[mark:]))
 
     def test_resume_rejects_incompatible_retained_geometry(self):
         self.ready();self.controller.fail_leg="RF"

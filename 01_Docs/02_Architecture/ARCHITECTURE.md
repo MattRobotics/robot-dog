@@ -432,3 +432,17 @@ criteria are owned by
 They are deliberately not restated here: this document owns *contracts*, not *sequence*. No
 document may authorize a hardware stage — only an explicit operator authorization for that
 specific session can.
+
+
+## MATDOG release session supervision — 2026-10-03
+
+The host native calibration runner optionally consumes complete DALY telemetry
+blocks from the existing USB connection and fails closed on low voltage, alarms,
+communication failure, invalid topology or stale data. It does not access the
+DALY/ST3215 UART directly or open a concurrent USB reader. Firmware safety remains
+the authority for actuator current/thermal/position/time limits. Release-stage
+scripts pin the installed application commit independently from host/documentation
+commits. Calibration success, exact NVS ACK and a real subsequent boot gate
+documentation and isolated main integration. Initial pose after shutdown remains
+a separate mechanical admission requirement; RAM recovery witness is never
+reconstructed from logs. No automatic boot movement or motion authorization is added.

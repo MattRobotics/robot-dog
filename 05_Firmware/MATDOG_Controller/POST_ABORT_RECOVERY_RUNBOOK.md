@@ -162,3 +162,14 @@ incarico; app1 non è un fallback automatico. L'eventuale accesso manuale BOOT/E
 un ripristino completo riporterebbe layout e NVS storici e richiede una procedura
 separata. Non è un rollback applicativo. Nessun nuovo backup hardware è richiesto
 o acquisito in questa fase.
+
+
+## Offline release-stage admission, 2026-10-03
+
+See SESSION_AUTOMATION.md and the packaged INITIAL_POSE_PLAN.md. The prior boot's
+RAM witness is lost on power-off. Do not invoke post-ABORT recovery from historical
+RF/RH positions alone. The packaged three-stage automation rejects the current
+unqualified initial pose before hardware I/O; no-argument invocation is file-only.
+No cover removal, physical RESET, BOOT/EN request or forced reducer movement is
+a fallback in this mandate. Physical square/jig Q0 and a qualified placement
+procedure must be established before a future OFFLINE_READY.

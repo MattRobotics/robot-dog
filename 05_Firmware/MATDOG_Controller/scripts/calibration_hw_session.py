@@ -46,14 +46,17 @@ import datetime
 import errno
 import hashlib
 import json
+import math
 import os
 import re
 import select
+import signal
 import subprocess
 import sys
 import termios
 import threading
 import time
+from daly_calibration_guard import DalyGuard, DalyGuardFailure
 
 DEFAULT_PORT = "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00"
 INSTALLED = [11, 12, 13, 21, 22, 23, 31, 32, 33, 41, 42, 43, 51]
@@ -203,6 +206,34 @@ class Session:
         self.log = log
         self.clock = clock
         self.sleep = sleep
+        self.daly_guard = None
+
+    def check_daly(self):
+        if self.daly_guard is None:
+            return
+        guard = self.daly_guard
+        with self.link.cond:
+            lines = self.link.lines[guard.cursor:]
+            guard.cursor = len(self.link.lines)
+        try:
+            for received, text in lines:
+                guard.feed(text, received)
+            guard.check(self.clock())
+        except DalyGuardFailure as e:
+            raise SessionFailure(str(e)) from e
+
+    def start_daly_guard(self):
+        # One connection: autonomous stream, no extra command during a run.
+        self.request("@BMS STREAM OFF", r"BMS_STREAM=OFF")
+        guard = DalyGuard()
+        guard.cursor = self.mark()
+        self.request("@BMS STREAM ON", r"BMS_STREAM=ON")
+        mark = self.mark()
+        self.link.send("@BMS STATUS")
+        self.wait_for(r"  charge_mos=(ON|OFF) discharge_mos=(ON|OFF) state=\S+ alarms=[0-9A-F]{4}(?: [0-9A-F]{4}){3}", mark, 3)
+        self.daly_guard = guard
+        self.check_daly()
+        self.log.say("PASS  DALY guard active on the existing link: pack >=10.8V, cell >=3600mV, clear alarms, fresh OK")
 
     def mark(self):
         with self.link.cond:
@@ -219,6 +250,7 @@ class Session:
         deadline = self.clock() + timeout
         seen = mark
         while True:
+            self.check_daly()
             with self.link.cond:
                 lines = [t for _, t in self.link.lines[seen:]]
                 seen = len(self.link.lines)
@@ -239,6 +271,7 @@ class Session:
                     self.link.cond.wait(timeout=0.05)
 
     def request(self, command, pattern, timeout=5.0, fail_patterns=(r"REASON=.*",)):
+        self.check_daly()
         mark = self.mark()
         self.link.send(command)
         return self.wait_for(pattern, mark, timeout, fail_patterns)
@@ -535,6 +568,7 @@ class Session:
         last_state = None
         last_phase = None
         while True:
+            self.check_daly()
             with self.link.cond:
                 new = [t for _, t in self.link.lines[seen:]]
                 seen = len(self.link.lines)
@@ -699,6 +733,7 @@ class Session:
 
     def emergency_stop(self):
         """Always-allowed de-escalation; best effort, never raises."""
+        self.daly_guard = None  # a power fault must never block ABORT/SAFE_OFF
         for cmd in ("@CALIBRATION FULL LEG ABORT", "@CALIBRATION SESSION ABORT"):
             try:
                 self.link.send(cmd)
@@ -813,7 +848,7 @@ def run(args, link_factory=SerialLink):
 
     Any failure: FULL LEG ABORT + SESSION ABORT, SAFE_OFF all 13, a read-only
     evidence export, then stop - no further leg, no retry."""
-    sketch_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    sketch_dir = args.firmware_sketch_dir or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     legs = [leg.strip().upper() for leg in args.legs.split(",") if leg.strip()]
     for leg in legs:
         if leg not in LEG_MATRIX:
@@ -857,9 +892,17 @@ def run(args, link_factory=SerialLink):
         time.sleep(3.0) if link_factory is SerialLink else None  # passive: boot banner
         link.send("")  # a lone newline flushes a half-received first line
         session.request("@IMU STREAM OFF", r"IMU_STREAM=OFF", timeout=3.0, fail_patterns=()) \
-            if args.imu_stream_off else None
+            if args.imu_stream_off and phase != "verify-persistence" else None
         session.verify_signature(build_id)
         session.verify_maintenance()
+        if args.expected_boot_anchor is not None:
+            uptime = session.uptime()
+            if not math.isfinite(args.expected_boot_anchor) or abs(time.time() - uptime / 1000 - args.expected_boot_anchor) > 3:
+                raise SessionFailure("controller boot changed since the admitted preparation receipt")
+        if args.require_daly:
+            if phase == "verify-persistence":
+                raise SessionFailure("verify-persistence is read-only; it does not enable streams")
+            session.start_daly_guard()
         q0 = None
         if phase in ("prepare", "q0", "all"):
             session.safe_off_all()
@@ -933,8 +976,21 @@ def run(args, link_factory=SerialLink):
             session.authority_none()
             session.verify_persistence(receipt["generation"])
             log.say(f"PASS  post-reboot NVS generation={receipt['generation']}; motion remains unauthorized")
+        if args.result_json:
+            uptime = session.uptime()
+            session.check_daly()
+            result = {"schema": "MATDOG_RUNNER_PHASE_RESULT_V1", "phase": phase,
+                      "build_id": build_id, "uptime_ms": uptime,
+                      "observed_epoch": time.time(),
+                      "hardware_observed": link_factory is SerialLink,
+                      "daly": session.daly_guard.snapshot() if session.daly_guard else None}
+            if phase == "all": result.update(contacts_accepted=6 * len(legs), fresh_q0=True)
+            if phase == "persist": result.update(generation=generation, save_ok=True, ack_ok=True)
+            if phase == "verify-persistence": result.update(generation=receipt['generation'],
+                acknowledged_record_intact=True, motion_authorized=False, authority="NONE")
+            with open(args.result_json, "x") as f: json.dump(result, f, indent=2)
         return 0
-    except (SessionFailure, OSError, ValueError, KeyError) as e:
+    except (SessionFailure, OSError, ValueError, KeyError, KeyboardInterrupt) as e:
         log.say(f"FAIL  {e}")
         if not link.lost and phase != "verify-persistence":
             log.say("      de-escalating: FULL LEG ABORT, SESSION ABORT, SAFE_OFF all 13")
@@ -949,11 +1005,19 @@ def run(args, link_factory=SerialLink):
                 log.say(f"      evidence export unavailable: {ex}")
         return 1
     finally:
+        if session.daly_guard is not None and not link.lost:
+            session.daly_guard = None
+            try: link.send("@BMS STREAM OFF")
+            except Exception: pass
         link.close()
         log.close()
 
 
 def main(argv=None):
+    # Operator interruption must pass through the same ABORT/SAFE_OFF path.
+    def interrupted(signum, frame):
+        raise KeyboardInterrupt("runner interrupted")
+    signal.signal(signal.SIGTERM, interrupted)
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--evidence-dir", required=True)
     p.add_argument("--backup", default=os.path.expanduser(
@@ -963,6 +1027,10 @@ def main(argv=None):
     p.add_argument("--port", default=DEFAULT_PORT)
     p.add_argument("--legs", default="LF,RF,RH,LH")
     p.add_argument("--phase", default="all", choices=PHASES)
+    p.add_argument("--firmware-sketch-dir", help="Clean pinned firmware worktree supplying the native build manifest")
+    p.add_argument("--require-daly", action="store_true", help="Fail-closed 3S DALY monitor on this same USB connection")
+    p.add_argument("--result-json", help="Write a new structured success receipt; existing file is refused")
+    p.add_argument("--expected-boot-anchor", type=float, help="Require continuity with the admitted boot before any calibration")
     p.add_argument("--confirm-q0-pose", action="store_true")
     p.add_argument("--confirm-operator-go", action="store_true")
     p.add_argument("--no-flash", action="store_true", help="the board already runs this build")
