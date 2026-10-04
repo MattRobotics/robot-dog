@@ -1,5 +1,14 @@
 # MATDOG Roadmap
 
+> **Isolated network development — 2026-10-04:** branch
+> `feat/controller-wifi-ota-shelly-v1`, provisional base `1a5e008`.
+> Wi-Fi/AP/offline provisioning/NVS and TLS/HMAC OTA transport are implemented for
+> offline qualification. Hardware validation is TO_TEST; ingest remains 0 and remote
+> reboot is BLOCKED. Calibration persistence hardware PASS has not been evidenced,
+> so this branch cannot be promoted to the validated release baseline.
+> [V3 report](../../09_Logs/Validation_Reports/2026-10-04_WIFI_OTA_SHELLY_V3_OFFLINE.md).
+> Historical main/release status below does not certify this branch.
+
 **Canonical owner of the MATDOG development sequence, its dependencies, and where the project
 currently stands.** Last updated 2026-10-01.
 

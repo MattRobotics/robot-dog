@@ -668,114 +668,85 @@ never edited), applies the named timeout for that call site, and restores the pr
 value on every exit path. `begin()` never assigns `IOTimeOut` directly, so neither timeout
 can silently become a standing global override for some other call site.
 
-## Wi-Fi runtime (W1)
+## Wi-Fi / provisioning V3 — 2026-10-04
 
-**Status: implemented, compiled, offline-tested. NOT hardware-tested.** No MATDOG build has
-yet associated with an access point. Nothing below is a claim about radio behaviour on real
-hardware.
+**IMPLEMENTED / OFFLINE TESTED; hardware TO_TEST.** This isolated branch is based on
+`1a5e0085098eeb907319f6f1a00693869444d9cf`, the latest local post-abort/persistence
+integration. Its calibration persistence hardware acceptance is not evidenced:
+**CAL_PERSIST_BASE is BLOCKED**. This branch is a provisional candidate, not a release.
 
-Wi-Fi is a **station-mode network link and nothing else**. It serves no page, exposes no
-endpoint, accepts no remote command and performs no update. Those belong to later gates.
+A core-0, low-priority worker owns radio and network NVS. `WifiManager::update()` copies
+cached state with a zero-wait mutex; events only store a disconnect reason. One request
+slot reserves `config_busy` before returning. Calibration mutations, persistence writes,
+RUN entry and OTA preparation cannot overlap that reservation. Critical-state changes
+cancel a trial, stop scans and keep modem sleep OFF. Network code cannot command servos.
 
-### Ownership split
+Two infrastructure profiles share one STA; ACTIVE NVS takes precedence over the old
+compile-time credentials. The radio stays ON with no credentials. Retry/backoff is
+2–60 s; profiles alternate after failed attempts. Driver association scans all channels,
+sorts by signal and never pins a BSSID. Optional roaming defaults OFF, with -80 dBm
+threshold, 60 s scans, 8 dB hysteresis and 120 s dwell; scans are asynchronous, limited
+to twelve displayed entries and inhibited during critical activity. HT20 is default;
+HT40 is configurable and separately reports requested/effective state and application
+success. RF performance, reconnect, roaming and scheduling measurements remain TO_TEST.
 
-```text
-core/Controller
-  └── network/WifiManager     owns the radio; the ONLY unit that includes <WiFi.h>
-        └── network/WifiPolicy  pure lifecycle state machine; no Arduino, no radio
-```
+HWCDC in installed Arduino ESP32 3.3.11 cannot establish a trusted service-session
+opening from `isConnected()`, DTR or SOF activity. AUTO/ON preferences therefore both
+resolve to **NO_SLEEP**, just like OFF. The pure policy supports trusted session facts,
+but the current adapter never manufactures them. AP/provisioning and OTA force OFF.
 
-`WifiPolicy` holds every decision — when to start the radio, when to retry, how long to wait,
-what the observable state is — and is driven purely by `(now_ms, link_up)`. That is what lets
-`scripts/tests/test_wifi_policy.cpp` link the **real** state machine on the host instead of a
-copy, exactly as `DalyProtocol` and `ServoPopulation` already do.
+### Recovery AP and offline interface
 
-`WifiStatus` is a plain copyable snapshot. `CommandRouter` only formats it; it never queries
-the radio. A future Web adapter renders the same struct without a second hardware path — the
-telemetry-snapshot model in
-[`ARCHITECTURE.md`](../../01_Docs/02_Architecture/ARCHITECTURE.md#telemetry-snapshot-model).
+Protected AP name is `MATDOG-<last six STA MAC hex digits>` (e.g. `MATDOG-227594`),
+address `192.168.4.1/24`. There is no default password or admin token. Before first use,
+a separately authorized physical USB session must provision a unique WPA2 passphrase
+(8–63 characters) and a random 64-hex admin token; the token is stored as SHA-256 only.
+No credentials were provisioned during this development task. Without an AP key no AP
+is opened. AP appears on demand, without STA credentials, after repeated failures or
+under the permanent policy. Timeout is 15 min, and only expires with working STA,
+no clients and no transaction. Permanent AP must be disabled in configuration before
+an OFF request can take effect. Shared AP/STA radio can change AP channel on association.
 
-### State machine
+The embedded HTML has Dashboard, Wi-Fi, Access Point, Performance, OTA and Diagnostics;
+it needs no CDN, Internet, asset server or actuator action. GET telemetry is sanitized;
+SSID/BSSID/channel/RSSI, profiles, scans, config phase, heap, stack and timing are visible.
+Password fields are write-only. Blank retains the existing password for the same SSID;
+a changed SSID requires an explicit password. Open-network enrollment is not exposed
+by this first portal. AP changes require a working STA and apply after the last AP
+client disconnects, with `ap_reload_pending` reported until then.
 
-```text
-INACTIVE ──► IDLE ──► RADIO_STARTING ──► CONNECTING ──► CONNECTED
-   ▲                        ▲                 │             │
-   │                        └───── IDLE ◄─┐   ▼             ▼
-   └── @WIFI OFF / no credentials         └── BACKOFF ◄──────┘
-```
+HTTP port 80 serves the local portal. Writes require the actual AP socket, Host and
+Origin `http://192.168.4.1`, admin login, random HttpOnly/SameSite cookie, CSRF token,
+peer binding and 5-minute session lifetime. Login is throttled. Forms have a 1536-byte
+bound and reject duplicate/unknown fields, malformed encodings and invalid addresses.
+AP HTTP relies on the private WPA2 link; other holders of that AP passphrase share its
+trust boundary. It is not a LAN-wide cleartext administration interface.
 
-The first state is `INACTIVE`, not `DISABLED`, because `<esp32-hal-gpio.h>` `#define`s
-`DISABLED` and an enumerator by that name is textually replaced. The project has been bitten
-by this before — see the `-DDISABLED=0x00` flag in `scripts/tests/run_host_tests.sh`, which
-now also compiles the Wi-Fi suite so the clash is caught on the host, not only on device.
+### Network configuration ownership
 
-`RADIO_STARTING` is not padding. In `esp32:esp32 3.3.11`, `WiFi.begin()` reaches
-`STAClass::begin()`, which calls `waitStatusBits(ESP_NETIF_STARTED_BIT, 1000)` — a blocking
-wait of **up to one second** if the netif has not come up. Splitting the start into
-`WiFi.mode(WIFI_STA)` (which contains no such wait) and, 100 ms later, `WiFi.begin()` means
-the bit is already set when the waiting call runs, so it returns immediately.
+`NetworkConfigNvs` uses standard partition **nvs**, namespace **md_net_v1**, keys
+**active/pending**. The fixed 512-byte record includes schema, magic and CRC32.
+No initialization, erase, reset or migration occurs on corrupt/unsupported records;
+writes lock on storage faults. `matdog_nvs` and calibration A/B/save markers remain
+owned exclusively by the existing calibration backend. No diagnostic PHY erase was imported.
 
-Retries follow a doubling ladder, 2 s → 4 s → … → 60 s, reset on every successful
-association. A link that was up and then dropped restarts the ladder from the bottom: it is a
-fresh event, not accumulated retry pressure. The core's own auto-reconnect is turned **off**
-so `WifiPolicy` is the single owner of retry timing and its counters describe a process it
-actually controls.
+Web changes require a protected alternate AP path: CONFIG_PENDING → TESTING → COMMITTED
+only after a fresh driver association to the chosen SSID and a valid IP. Old association
+or stale IP cannot confirm a changed password. Timeout/critical state gives ROLLBACK to
+known-good ACTIVE. PENDING is ignored at boot. The test confirms the chosen profile;
+it does not claim that an untested secondary profile works. NVS flash operations are
+on the worker, but flash cache stalls can still affect both cores: measure on hardware.
 
-### Bounded, and measured rather than claimed
+Read-only commands: `@WIFI STATUS`, `@WIFI PROFILES STATUS`, `@WIFI AP STATUS`,
+`@WIFI SLEEP STATUS`, `@WIFI ROAM STATUS`, `@WIFI MODE STATUS`.
+Authorized software intents: `@WIFI SCAN`, `@WIFI AP ON|OFF`, `@WIFI SLEEP AUTO|ON|OFF`,
+`@WIFI ON|OFF` (OFF is temporary, 10 min), and physical USB provisioning
+`@WIFI AP KEY <unique-passphrase>` / `@WIFI ADMIN KEY <random-64-hex-token>`.
+QUEUED acknowledges an intent; inspect phase/status for completion. Malformed Wi-Fi
+commands are redacted. Never paste real secrets into a recorded terminal/history.
 
-`WifiManager::update()` performs one status-bit read, at most one radio action and one
-snapshot refresh. No loop, no `delay()`, no wait-for-result. It runs **last** among the
-Controller's services, so within a pass every timing-sensitive module has already advanced.
-RSSI/IP/channel are refreshed at most once per second, so telemetry consumers never drive
-radio queries.
-
-The claim is falsifiable: `@WIFI STATUS` reports `last_us` and `max_us`, the measured wall
-time of the last and worst tick since boot. The first `WiFi.mode()` call initializes the
-driver and allocates tens of KB of heap; that is the expensive one, it is deliberately kept
-out of `Controller::begin()`, and `@STATUS` already reports `heap_free`/`heap_min_free`.
-
-`scripts/static_audit.py` fails the build if the Wi-Fi unit acquires `waitForConnectResult`,
-the blocking `WiFi.disconnect()` overload, `WiFi.scanNetworks()`, `WiFi.SSID()`, a `delay()`,
-or a `while` loop inside `update()` — and if it ever calls `setMode(`, because a network task
-must never change `OperatingMode`.
-
-### Credentials
-
-Nothing secret is committed, and the audit keeps it that way.
-
-```bash
-cp src/config/WifiCredentials.local.h.example src/config/WifiCredentials.local.h
-$EDITOR src/config/WifiCredentials.local.h    # gitignored; never committed
-scripts/build.sh
-```
-
-Resolution order is `-DMATDOG_WIFI_SSID`/`-DMATDOG_WIFI_PASSWORD` build flags, then the local
-header, then **empty**. Empty is a supported state: the firmware builds, boots and runs
-normally, reporting `state=INACTIVE fault=NO_CREDENTIALS`, and never starts the radio. The
-local header is preferred over build flags on a workstation because a passphrase passed as
-`-D` lands in shell history, in `ps` output and in the build log `scripts/build.sh` echoes.
-
-`config::kWifiPassword` is referenced in exactly **one** place in the whole firmware — the
-`WiFi.begin()` call — and `scripts/static_audit.py` fails the build if a second reference
-appears, if `WifiStatus` gains any field whose name could hold a secret, if the `.gitignore`
-rule is deleted *or commented out*, or if the local header is ever tracked by Git. Those
-guards were verified by mutation: each one was broken on purpose and the audit caught it.
-
-This is **not** an authentication story. A credential compiled into an application image is
-readable by anyone who can read the flash. That is accepted for a home 2.4 GHz network on a
-bench robot; OTA authentication is a separate problem, deliberately unsolved here.
-
-### What Wi-Fi deliberately does not touch
-
-Wi-Fi contributes **nothing** to `SystemState` health aggregation. A missing access point is
-not a robot health fact, and the G3/G3.1-validated meaning of `SYSTEM health=` must not change
-because a router rebooted. Wi-Fi is observable through `@STATUS` (one line) and `@WIFI STATUS`
-(full snapshot) instead. Whether it should ever contribute is **TO_DESIGN**.
-
-There is no path from this module to `ServoBus`, to an actuator, or to `OperatingMode`, and
-`scripts/static_audit.py::check_no_network_to_servo_path` fails the build if a translation
-unit ever names both a network transport symbol and a servo primitive. That is the executable
-form of the permanent rule `network callback != servo command authority`.
+See [V3 report](../../09_Logs/Validation_Reports/2026-10-04_WIFI_OTA_SHELLY_V3_OFFLINE.md)
+and [hardware runbook](WIFI_OTA_SHELLY_HARDWARE_RUNBOOK.md).
 
 ## ActuatorAuthority
 
@@ -1115,48 +1086,41 @@ successful commit    -> hold KEPT until the reboot: a boot switch is pending,
 The policy still **fails closed** with no gate installed, and now also with a gate whose arbiter
 was never bound. Remaining for OTA-B: an explicit, authorized operator rollback.
 
-### Security posture — honestly stated
+### V3 transport and security — 2026-10-04
 
-OTA-A has **no authentication**. Rather than leave that as a promise, ingest is compiled out:
+HTTP OTA challenge/upload are refused. `esp_https_server` provides an optional STA-only
+443 listener, backed by a unique per-device PEM certificate/private key from gitignored
+`src/config/TlsIdentity.local.h`. The distributed candidate has no identity or HMAC
+secret. The listener requires quiet MAINTENANCE, persisted network/admin configuration
+and a 100 KB largest internal heap block; one socket, 28 KB task stack and a 5 s
+handshake timeout bound resources. These settings are provisional, not a hardware TLS
+qualification. Losing eligibility shuts down the listener outside an active safe stream.
 
-```c
-#define MATDOG_OTA_INGEST_ENABLED 0   // src/update/OtaManager.h
-```
+The existing `OtaSession` challenge/HMAC protocol and
+`OtaManager → OtaPolicy → OtaEspBackend` remain the single firmware writer. No
+ArduinoOTA, Update.h or portal writer was introduced. Metadata size/hash/build ID,
+nonce expiry/single use, partition identity, authority inhibit and first-boot rollback
+remain enforced. Timeout, truncated stream and link loss abort; hash/finalization failure
+never requests a new boot target. Success remains COMMITTED_PENDING_REBOOT, with the
+actuator inhibit held. **Authenticated remote reboot is BLOCKED / unimplemented** in V1;
+no endpoint calls restart and there is no implicit reboot.
 
-`prepare`/`openStream`/`writeChunk`/`finishStream`/`commitBootTarget` all refuse unless a
-build explicitly opts in with `-DMATDOG_OTA_INGEST_ENABLED=1`, and `scripts/static_audit.py`
-fails the build if the **source default** is anything but `0` — the same shape as the
-`USB_ONLY` hardware-profile gate. A production image therefore cannot contain a reachable
-firmware writer, and "we just haven't wired a transport yet" is not load-bearing.
+Source and final artifacts keep `MATDOG_OTA_INGEST_ENABLED=0`. Enabling ingest requires
+separate hardware acceptance of TLS resources, USB recovery, calibration baseline,
+authenticated explicit reboot and OTA/rollback gates. Offline linking of a disposable
+TLS identity does not authorize that override or deployment.
 
-### Transport: chosen and implemented (2026-09-25, I7)
-
-Everything below is bundled with `esp32:esp32 3.3.11` — no external dependency is needed by
-any option.
-
-| Option | Dependencies | Memory | Blocking | Auth | Verdict |
-|---|---|---|---|---|---|
-| **`ArduinoOTA`** | `Update.h`, UDP+TCP listener | moderate | `handle()` runs the whole transfer inline | MD5 password, weak | **Rejected.** It drives `Update.h`, which is a *second* OTA writer with its own partition logic — precisely the duplicate path the architecture forbids. Convenience is not a reason. |
-| **`WebServer`** (sync) | `WebServer` + `WiFi` | ~18 source files, heap per request | handler runs inline in `loop()` | none built in | Rejected in favor of `esp_http_server`: I8's read-only dashboard needed a server too, and `esp_http_server` serves both endpoints from one instance. |
-| **`esp_http_server`** (IDF) | IDF component, available | own task + stack | runs in its own task → callback-context rules | HMAC-SHA256, built here | **Chosen.** The cross-task handoff this requires is solved by a bounded single-slot FreeRTOS-semaphore mailbox (`src/network/HttpTransport.*`) that hands each request to the Controller thread and back — see [`09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md). |
-| **`esp_https_server`** (IDF) | + mbedTLS (already linked) | + cert storage, TLS buffers | own task | TLS, real | Available and confirmed installed, but not chosen: needs a certificate/key story that does not exist yet, and its ESP32-S3 resource cost has never been measured on this hardware. Remains the option to revisit if HMAC-over-plain-HTTP proves insufficient (e.g. a transport-confidentiality requirement, not just integrity/authentication) — `OtaSession`'s authentication layer underneath does not change either way. |
-| **Raw TCP framing over `NetworkClient`** | `WiFi` only | one socket, one chunk buffer | non-blocking reads, drained from `update()` | must be built | Not chosen: would have needed its own framing/auth protocol built from scratch, where `esp_http_server` gave headers, a body-streaming API and a well-understood request/response shape for free. |
-| **USB CDC ingest** | none | none | already on the Controller thread | physical access | Not the ingest transport: `CommandRouter`'s 96-byte line-oriented buffer blocks streaming firmware through it specifically — the network transport bypasses this parser entirely, so this is not a network-transport prerequisite either. |
-
-**Implemented:** `esp_http_server`, authenticated with a pre-shared-secret HMAC-SHA256
-challenge/response session layer (`src/update/OtaSession.*` over `src/update/Hmac256.*`),
-never `esp_https_server`/TLS this gate. `ArduinoOTA` remains rejected outright — it would
-introduce a second firmware writer.
-
-Transport and authentication are both **IMPLEMENTED / COMPILED / OFFLINE TESTED**, compiled into
-the candidate, disabled at boot (`HttpTransport::start()` is never called from
-`Controller::begin()` — reachable only via the MAINTENANCE-gated `@WEB SERVER START` command).
-Byte ingest remains compiled out by default (`MATDOG_OTA_INGEST_ENABLED=0`) regardless — the
-transport's existence does not make it reachable.
+`scripts/ota_tls_client.py` defaults to offline package verification. It requires a
+full independently checked source SHA, CLEAN manifest, exact image/hash/FQBN/profile,
+layout/table hash and ESP32-S3 identity. Explicit upload additionally requires CA+SAN
+verification and an independently provisioned DER certificate SHA256 pin, checked on
+every connection, plus the HMAC secret. It never disables TLS verification, follows
+redirects, resumes an old nonce/session or automatically reboots. The manifest is a
+provenance check, not an image signing PKI. No uploader operation was run on a device.
 
 ### Resource cost
 
-Measured against the W1 build, same FQBN and profile:
+Historical I7 measurement (2026-09-25; superseded for the V3 resource budget):
 
 ```text
 flash       959,043 B -> 967,915 B   (+8,872 B)   30% of the 3 MB slot

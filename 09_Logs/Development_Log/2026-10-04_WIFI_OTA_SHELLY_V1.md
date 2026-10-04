@@ -25,3 +25,23 @@ hardware evidence; do not promote this branch to a final release.
 Diagnostic a06314e is reference only: no PHY erase/marker imported.
 Source OTA ingest stays 0; partition layout stays MATDOG_16M_2x5M_NVS_V1.
 No shared binaries, manifests, credentials or runtime are modified.
+
+## Implementation and offline closure
+
+Worker radio owner, dual profiles/roam/AP, standard network NVS, transactional test,
+AP-local portal security, optional TLS/pinned client and atomic mailbox correlation
+implemented. No calibration data algorithm or partition layout changes.
+Physical admin/AP provisioning remains for future hardware validation; no credentials
+were provisioned on a device. HWCDC adapter retains NO_SLEEP until session proof exists.
+Remote reboot and hardware TLS/OTA acceptance remain BLOCKED/TO_TEST; ingest 0.
+
+After the workstation power loss the worktree survived; temporary logs/tools did not.
+Verification was rerun into gitignored `build/verification` on durable disk. Added a real
+WifiManager/fake-radio test and real loopback TLS rejection tests. Inherited host fixture
+and audit/linkage drift was corrected without changing calibration implementation.
+Detailed evidence and final artifact receipt are linked from the
+[V3 report](../Validation_Reports/2026-10-04_WIFI_OTA_SHELLY_V3_OFFLINE.md).
+
+Implementation commit: `96656917813408eb0fda208913ac9b83f1b7b7c5`. Full host suite and global static audit PASS;
+network 5279/5279, real adapter 108/108, client 11 tests, V3 mutation 4 tests, DOM smoke PASS.
+Final documentation commit is the CLEAN build source recorded in the generated receipt.

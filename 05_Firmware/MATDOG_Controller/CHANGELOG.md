@@ -1,5 +1,21 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — Wi-Fi / provisioning / TLS OTA V3 (isolated, offline) — 2026-10-04
+
+- Add a core-0 radio/config worker, dual STA profiles, protected recovery AP, bounded
+  asynchronous scans/optional roaming and conservative HWCDC modem-sleep fallback OFF.
+- Add offline six-tab portal, physical USB admin/AP key provisioning, AP-only writes,
+  peer-bound sessions/CSRF and ACTIVE/PENDING standard-NVS trials with readback/CRC.
+- Require STA TLS before the existing OTA nonce/HMAC writer; add a CA/SAN/pinned
+  uploader and correlate cross-task mailbox delivery atomically. No implicit reboot.
+- Reserve configuration quiet windows against calibration/persistence and RUN entry.
+  Calibration record algorithms, partition layout and defaults USB_ONLY/ingest 0 remain.
+- Add fault, mutation, real-adapter/fake-radio, TLS loopback and DOM tests; align inherited
+  stale audit pins and fixture linkage to the unchanged 1a5e008 calibration integration.
+- Provisional base; no hardware access or main merge. Remote reboot BLOCKED;
+  hardware persistence acceptance, RF timing, TLS resources and OTA/rollback TO_TEST.
+
+
 ## Unreleased — post-ABORT recovery and thermal acquisition (offline) — 2026-10-03
 
 - Add explicit current-boot recovery for witnessed UPPER/LOWER probe interruptions,

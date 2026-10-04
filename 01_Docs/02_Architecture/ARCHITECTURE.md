@@ -39,8 +39,8 @@ PERMANENT MATDOG CONTROLLER — ESP32-S3
   Controller V0.1 platform                        official baseline
   core / USB diagnostics / BNO085                 VALIDATED in USB_ONLY scope
   ServoBus / DALY / LED / power-state baseline    VALIDATED no-motion in ROBOT_POWERED (G3/G3.1)
-  Wi-Fi station runtime (link only, no server)    IMPLEMENTED, TO_TEST on hardware (W1)
-  OTA-A update core (no transport, no auth)       IMPLEMENTED, TO_TEST on hardware
+  Wi-Fi/AP/provisioning V3                      IMPLEMENTED offline, hardware TO_TEST
+  OTA single writer + TLS/HMAC adapter           IMPLEMENTED offline, ingest 0; TO_TEST
   maintenance / service / calibration modules     TO_DESIGN
   motion / IK / gait / stabilization              TO_DESIGN, later
           |
@@ -145,16 +145,17 @@ ESP32 on its own.
 ### Update policy
 
 - **DECIDED:** Wi-Fi/OTA is the normal future firmware-update path.
-- **IMPLEMENTED / TO_TEST:** a Wi-Fi **station runtime** exists in the Controller (W1). It is a
-  network link and nothing else — no server, no endpoint, no remote command, no update path — and
-  it has not yet associated with an access point on real hardware. It does not make OTA closer to
-  VALIDATED; it makes OTA implementable.
+- **IMPLEMENTED / TO_TEST (V3 isolated branch, 2026-10-04):** one core-0 worker owns
+  radio and standard-NVS network config; Controller copies snapshots. Two profiles share
+  one STA, with protected recovery AP, offline portal, bounded auth/CSRF requests and
+  test-before-commit. Calibration storage remains in `matdog_nvs`. HWCDC session proof
+  is unavailable, so modem sleep stays OFF. RF/jitter/NVS power-loss acceptance is TO_TEST.
 - **DECIDED:** native USB CDC/USB-C remains available for wired service and recovery.
-- **IMPLEMENTED / TO_TEST:** the OTA-A update core exists in the Controller — inactive-slot
-  resolution and writing, image and hash verification, a boot switch reachable from exactly one
-  validated state, and first-boot rollback validation. It has **no transport and no
-  authentication**, byte ingest is compiled out by default, and no device has received an OTA
-  image. Authority integration is **OTA-B**.
+- **IMPLEMENTED / TO_TEST:** optional per-device TLS protects STA OTA transport; the
+  existing nonce/HMAC, authority inhibit and inactive-slot writer are retained. HTTP OTA
+  is refused. Default/final ingest remains 0. Remote reboot is BLOCKED/unimplemented,
+  TLS heap/handshake measurements and OTA rollback are TO_TEST. This does not authorize
+  any deployment or promote the provisional calibration persistence base.
 - OTA must never remove or make wired recovery dependent on a working application image.
 - Controller V0.1's application-partition USB flashing procedure is not a Wi-Fi/OTA
   implementation.
@@ -446,3 +447,11 @@ commits. Calibration success, exact NVS ACK and a real subsequent boot gate
 documentation and isolated main integration. Initial pose after shutdown remains
 a separate mechanical admission requirement; RAM recovery witness is never
 reconstructed from logs. No automatic boot movement or motion authorization is added.
+
+### Future Jetson network handover contract — V3
+
+No automatic radio-off or peer discovery is implemented. A future USB UART host protocol
+must prove a trusted service session with explicit lifetime, capability and freshness,
+preserve a reachable recovery path, and obtain a software quiet window before network
+handover. Wi-Fi failure must not affect actuator ownership. An electrical USB connection,
+DTR, SOF, host ping or Jetson boot indication alone cannot authorize handover or sleep.

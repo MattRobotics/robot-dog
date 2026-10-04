@@ -1,5 +1,17 @@
 # MATDOG Controller V0.1 — Validation
 
+## Wi-Fi / provisioning / OTA V3 — offline, 2026-10-04
+
+Independent branch `feat/controller-wifi-ota-shelly-v1`, provisional base `1a5e008`.
+See [V3 report](../../09_Logs/Validation_Reports/2026-10-04_WIFI_OTA_SHELLY_V3_OFFLINE.md)
+for the matrix and [future hardware runbook](WIFI_OTA_SHELLY_HARDWARE_RUNBOOK.md).
+Host configuration/security checks, real adapter with fake radio/NVS, TLS loopback,
+HTTPS compile/link and offline DOM checks are recorded; final CLEAN USB_ONLY then
+ROBOT_POWERED builds are bound to HEAD by the generated artifact receipt.
+No hardware operation occurred. CAL_PERSIST_BASE is BLOCKED pending hardware evidence;
+remote reboot is BLOCKED/unimplemented; ingest remains 0. No historical VALIDATED label
+below applies automatically to this candidate.
+
 Current-facing status vocabulary follows the canonical meanings in the root
 [`README.md`](../../README.md#status-vocabulary): **VALIDATED**, **IMPLEMENTED**,
 **DECIDED**, **TO_TEST**, **TO_DESIGN**, **FROZEN**, **SUPERSEDED**, and
