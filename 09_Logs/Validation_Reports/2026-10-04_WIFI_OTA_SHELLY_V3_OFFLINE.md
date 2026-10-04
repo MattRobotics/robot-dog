@@ -105,8 +105,9 @@ nessun resume/redirect/TLS insecure. Il manifest non è una firma digitale.
 - `test_wifi_runtime_v3`: **108** controlli nell'adattatore WifiManager reale con radio,
   FreeRTOS e NVS simulati: stesso SSID/password diversa non commette su link vecchio,
   quiet guard, scan stop, rollback, AP reload/client e reboot senza auto-write.
-- Client OTA: **11** unittest, incluse connessioni TLS reali solo su loopback:
-  CA/SAN/pin errati rifiutati e pin rivalidato su riconnessione.
+- Client OTA: **13** unittest, incluse connessioni TLS reali solo su loopback:
+  CA/SAN/pin errati e Common Name senza SAN rifiutati; contesto TLS insecure rifiutato,
+  pin rivalidato su riconnessione.
 - Audit V3: quattro test, mutation su namespace, ACTIVE/PENDING, pin BSSID, scan critical,
   auth/CSRF/peer/TLS, correlazione mailbox, segreti CLI, writer estraneo e sleep untrusted.
   Audit globale conserva i divieti preesistenti, inclusi erase e percorsi verso ServoBus.

@@ -95,9 +95,22 @@ class TlsPeerTest(unittest.TestCase):
         cls.server.socket=context.wrap_socket(cls.server.socket,server_side=True)
         cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True)
         cls.thread.start()
+        cls.no_san=root/'no-san.pem'
+        no_san_key=root/'no-san.key'
+        subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes',
+                        '-keyout',str(no_san_key),'-out',str(cls.no_san),'-days','1',
+                        '-subj','/CN=localhost'],check=True,capture_output=True)
+        cls.no_san_server=HTTPServer(('127.0.0.1',0),Handler)
+        no_san_context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        no_san_context.load_cert_chain(str(cls.no_san),str(no_san_key))
+        cls.no_san_server.socket=no_san_context.wrap_socket(cls.no_san_server.socket,server_side=True)
+        cls.no_san_thread=threading.Thread(target=cls.no_san_server.serve_forever,daemon=True)
+        cls.no_san_thread.start()
     @classmethod
     def tearDownClass(cls):
-        cls.server.shutdown();cls.server.server_close();cls.thread.join();cls.temp.cleanup()
+        cls.server.shutdown();cls.server.server_close();cls.thread.join()
+        cls.no_san_server.shutdown();cls.no_san_server.server_close();cls.no_san_thread.join()
+        cls.temp.cleanup()
     def connect(self,hostname='localhost',ca=None,pin=None):
         context=ssl.create_default_context(cafile=str(ca or self.cert))
         connection=client.PinnedConnection(hostname,context,pin or self.pin)
@@ -117,5 +130,17 @@ class TlsPeerTest(unittest.TestCase):
         with self.assertRaises(ssl.SSLCertVerificationError):self.connect(ca=self.other)
     def test_wrong_san_refused(self):
         with self.assertRaises(ssl.SSLCertVerificationError):self.connect(hostname='127.0.0.1')
+    def test_common_name_without_san_refused(self):
+        context=ssl.create_default_context(cafile=str(self.no_san))
+        pin=hashlib.sha256(ssl.PEM_cert_to_DER_cert(self.no_san.read_text())).hexdigest()
+        connection=client.PinnedConnection('localhost',context,pin)
+        connection.port=self.no_san_server.server_port
+        self.addCleanup(connection.close)
+        with self.assertRaises(ssl.SSLCertVerificationError):connection.connect()
+    def test_insecure_context_refused(self):
+        context=ssl.create_default_context(cafile=str(self.cert))
+        context.check_hostname=False
+        with self.assertRaisesRegex(ValueError,'mandatory'):
+            client.PinnedConnection('localhost',context,self.pin)
 
 if __name__=='__main__':unittest.main()

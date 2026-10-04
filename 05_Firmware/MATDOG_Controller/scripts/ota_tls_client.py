@@ -64,6 +64,9 @@ def signed_payload(nonce, manifest):
 
 class PinnedConnection(http.client.HTTPSConnection):
     def __init__(self, hostname, context, pin):
+        if context.verify_mode != ssl.CERT_REQUIRED or not context.check_hostname:
+            raise ValueError('CA and hostname verification are mandatory')
+        context.hostname_checks_common_name = False  # Require SAN; no legacy CN fallback.
         super().__init__(hostname, port=443, context=context, timeout=10)
         self.pin = pin.lower()
 

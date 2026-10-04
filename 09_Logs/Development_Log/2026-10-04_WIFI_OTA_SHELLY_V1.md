@@ -43,5 +43,8 @@ Detailed evidence and final artifact receipt are linked from the
 [V3 report](../Validation_Reports/2026-10-04_WIFI_OTA_SHELLY_V3_OFFLINE.md).
 
 Implementation commit: `96656917813408eb0fda208913ac9b83f1b7b7c5`. Full host suite and global static audit PASS;
-network 5279/5279, real adapter 108/108, client 11 tests, V3 mutation 4 tests, DOM smoke PASS.
+network 5279/5279, real adapter 108/108, client 13 tests, V3 mutation 4 tests, DOM smoke PASS.
 Final documentation commit is the CLEAN build source recorded in the generated receipt.
+
+Final client review disabled Python legacy Common Name fallback: SAN is mandatory.
+Added missing-SAN and insecure-context negative cases before final source freeze.
