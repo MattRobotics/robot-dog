@@ -921,7 +921,9 @@ void Controller::update(uint32_t now_ms) {
   // must exist before command_router_.update() can act on it this tick.
   updateCalibrationMotionPermit();
 
+  wifi_.setContext(service_.networkCritical(),ota_.status().holds_actuator_inhibit);
   command_router_.update(now_ms);
+  wifi_.setContext(service_.networkCritical(),ota_.status().holds_actuator_inhibit);
 
   imu_.update(now_ms);
   system_state_.setImuHealth(imu_.health());

@@ -54,6 +54,7 @@ struct Fixture {
   servo::SafeOffResult safe_off = servo::SafeOffResult::VERIFIED_OFF;
   SystemState system;
   ControllerService telemetry;
+  network::WifiManager wifi;
   CommandRouter router;
 
   explicit Fixture(CalibrationRecordStorage* backend = nullptr)
@@ -72,7 +73,7 @@ struct Fixture {
     m.full_leg_calibration = &full_leg; m.full_leg_run = &run;
     m.full_leg_evidence = &scenario.evidence; m.persistence = &persistence;
     m.first_motion_safe_off_result = &safe_off;
-    m.service = &telemetry; telemetry.begin(m); router.begin(m);
+    m.wifi = &wifi; m.service = &telemetry; telemetry.begin(m); router.begin(m);
     CHECK(startCapture(q0)); CHECK(finishCapture(q0, scenario.golden));
     CHECK(command("@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION").find("PROMOTE=OK") != std::string::npos);
   }
@@ -198,7 +199,7 @@ void authorization_gates() {
         case 9: f.authority.owner_ = ActuatorAuthority::CALIBRATION; break;
         case 10: f.permit.active_ = true; break;
         case 11: f.authorization.operator_authorized = true; break;
-        case 12: f.authorization.token = {1, 1, 1}; break;
+        case 12: f.authorization.token = {false, 1, 1, 1}; break;
       }
       const int writes = f.writes();
       CHECK(f.command(commands[operation]).find("=OK") == std::string::npos);
@@ -483,7 +484,23 @@ void usb_multiple_lines_and_begin_reset() {
   framing_case = "";
 }
 
+void network_quiet_reservation() {
+  Fixture f;
+  f.wifi.config_busy_.store(true);
+  const int writes = f.writes();
+  CHECK(f.command("@MODE RUN").find("NETWORK_CONFIG_BUSY") != std::string::npos);
+  CHECK(f.mode.mode() == OperatingMode::MAINTENANCE);
+  CHECK(f.command("@CALIBRATION PERSIST SAVE CONFIRM_SAVE_FULL_CALIBRATION").find("NETWORK_CONFIG_BUSY") != std::string::npos);
+  CHECK(f.command("@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE").find("NETWORK_CONFIG_BUSY") != std::string::npos);
+  CHECK(f.command("@CALIBRATION PERSIST STATUS").find("PERSIST=STATUS") != std::string::npos);
+  CHECK(f.command("@WIFI AP KEYY never-print-this-secret").find("never-print-this-secret") == std::string::npos);
+  CHECK(f.command("@WIFI STATUS").find("WIFI_STATE") != std::string::npos);
+  CHECK(f.writes() == writes);
+  f.wifi.config_busy_.store(false);
+}
+
 int main() {
+  network_quiet_reservation();
   parser_and_read_only(); identical_recapture_through_real_commands(); authorization_gates();
   uncertain_reconciliation_through_handler();
   valid_usb_framing_limits(); invalid_usb_lines_and_recovery(); usb_multiple_lines_and_begin_reset();

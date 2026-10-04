@@ -1701,7 +1701,7 @@ def check_thermal_confirmation(files):
     if "FullLegCalibrationExecutor.cpp" in by_name:
         path, code = by_name["FullLegCalibrationExecutor.cpp"]
         for token in ("captureRecoveryWitness()", "recoveryPoseCompatible", "POST_ABORT_Q0_CHANGED",
-                      "if (active() || (request.post_abort_recovery && !starting_post_abort_)) return false;",
+                      "if (active() || (request.post_abort_recovery && !starting_post_abort_) ||\n      (request.startup_recovery && !starting_startup_)) return false;",
                       "distance > static_cast<int32_t>(actuator::kSequencePrimeMaxDistanceTicks)"):
             if token not in code:
                 fail(f"{path}: post-ABORT proof or ordinary 64-tick gate missing: {token}")
@@ -2177,7 +2177,7 @@ def check_full_calibration_sequence(files, sketch_dir):
         body = next_fn.group(1)
         # Ordinary V25 chain remains pinned; the explicit post-ABORT branch
         # has its separate audited recovery order.
-        ordinary = body[body.rfind("  switch (status_.phase)"):] if "if (request_.post_abort_recovery)" in body else body
+        ordinary = body[body.rfind("  switch (status_.phase)"):] if "if (qualifiedRecovery())" in body else body
         pairs = re.findall(r"case CalibrationPhase::(\w+):\s*enterPhase\(CalibrationPhase::(\w+)", ordinary)
         chain = [a for a, _ in pairs]
         expected = list(V25_PHASE_ORDER[:-1])
@@ -3895,6 +3895,13 @@ def check_calibration_population_evidence(files, sketch_dir):
             )
         if "buildCurrentLegPopulationEvidence(" not in inspected:
             continue
+        if path.name == "Controller.cpp":
+            # The exact base's explicit startup qualifier owns a fresh census +
+            # preflight bundle. Mask only that reviewed function, not Controller.
+            startup = re.search(r"void Controller::updateStartupQualification\(\)\s*\{(.*?)\n\}", inspected, re.DOTALL)
+            if startup and all(t in startup.group(1) for t in ("Phase::PREFLIGHT_WAIT", "servo::ServoPreflight::State::COMPLETE", "context.current_observation_bundle=true", "startup_qualification_.population(")):
+                inspected=inspected.replace(startup.group(0), "")
+            if "buildCurrentLegPopulationEvidence(" not in inspected: continue
         if path.name != "CalibrationQ0CaptureSession.cpp":
             fail(f"{path}: calls the CR1 producer outside the reviewed CR2-B same-session "
                  f"orchestrator; cached/independent diagnostics must never self-declare current")
@@ -4252,6 +4259,13 @@ def check_calibration_q0_bootstrap(files, sketch_dir):
             )
         if "buildQ0BootstrapCandidate(" not in inspected:
             continue
+        if path.name == "Controller.cpp":
+            # The exact base's explicit startup qualifier owns a fresh census +
+            # preflight bundle. Mask only that reviewed function, not Controller.
+            startup = re.search(r"void Controller::updateStartupQualification\(\)\s*\{(.*?)\n\}", inspected, re.DOTALL)
+            if startup and all(t in startup.group(1) for t in ("Phase::PREFLIGHT_WAIT", "servo::ServoPreflight::State::COMPLETE", "context.current_observation_bundle=true", "startup_qualification_.population(")):
+                inspected=inspected.replace(startup.group(0), "")
+            if "buildCurrentLegPopulationEvidence(" not in inspected: continue
         if path.name != "CalibrationQ0CaptureSession.cpp":
             fail(f"{path}: calls CR2-A outside the reviewed CR2-B acquisition coordinator")
 
@@ -4861,20 +4875,16 @@ def check_http_transport_boundaries(files, sketch_dir):
                  f"released by stop(), or a bounded START -> STOP -> START -> STOP cycle "
                  f"leaks a handle (I7/I8 hardening)")
 
-        # stop() must be reachable from every partial-failure path in
-        # start() - not just from an explicit @WEB SERVER STOP - or a
-        # failed httpd_start()/CreateBinary() attempt leaks whatever it did
-        # allocate. Counted within start()'s own body only.
-        start_body = re.search(r"bool HttpTransport::start\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
-        if not start_body:
-            fail(f"{path}: could not locate HttpTransport::start() to audit its cleanup")
-        else:
-            stop_calls_in_start = len(re.findall(r"\bstop\(\)", start_body.group(1)))
-            if stop_calls_in_start < 2:
-                fail(f"{path}: HttpTransport::start() calls stop() {stop_calls_in_start} "
-                     f"time(s) - expected at least 2 (an upfront defensive call, plus at "
-                     f"least one partial-failure cleanup path) - a failed start() attempt "
-                     f"must release whatever it already allocated (I7/I8 hardening)")
+        # V3 resources are allocated ONCE in begin(), deleted only on initial
+        # allocation failure, never under a running handler. Listener teardown
+        # runs in lifecycle(), while Controller update keeps draining the mailbox.
+        if "xSemaphoreCreate" in code[code.find("bool HttpTransport::start()") : code.find("void HttpTransport::serviceRequest")]:
+            fail(f"{path}: server lifecycle must not allocate mailbox semaphores")
+        stop_body=re.search(r"void HttpTransport::stop\(\)\s*\{(.*?)\}",code,re.DOTALL)
+        if not stop_body or any(t in stop_body.group(1) for t in ("httpd_stop(","httpd_ssl_stop(","vSemaphoreDelete(")):
+            fail(f"{path}: stop must only enqueue listener intent, never stall Controller or delete live handles")
+        if "HttpTransport::lifecycle()" not in code or "mailbox_.claimDelivery()" not in code or not contains_v3(code,"ready_sequence_.load()==id"):
+            fail(f"{path}: dedicated lifecycle or atomic correlated mailbox missing")
 
     # --- (5) the OTA shared secret: one use site, never committed ----------
     creds = by_name.get("OtaCredentials.h")
@@ -5060,7 +5070,8 @@ def check_wifi_runtime_boundaries(files, sketch_dir):
         #    state=INACTIVE together with connected=YES and a live IP/RSSI,
         #    and polls a radio that is going away.
         if body:
-            stop_case = re.search(r"case WifiAction::STOP_RADIO:(.*?)break;", body.group(1),
+            worker_body=re.search(r"void WifiManager::workerTick\(uint32_t now\)\s*\{(.*?)\n\}",code,re.DOTALL)
+            stop_case = re.search(r"case WifiAction::STOP_RADIO:(.*?)break;", worker_body.group(1) if worker_body else body.group(1),
                                   re.DOTALL)
             if not stop_case:
                 fail(f"{path}: WifiManager::update() has no STOP_RADIO case to audit")
@@ -6099,6 +6110,50 @@ def check_startup_recovery_wiring(files):
             if token in by_name.get(name,''):fail(f'{name}: data/qualification must remain pure: {token}')
 
 
+def contains_v3(code, token):
+    # Formatting-insensitive operators/identifiers; the legacy contains_ws
+    # intentionally preserves token spacing for older exact source pins.
+    return re.sub(r"\s+", "", token) in re.sub(r"\s+", "", code)
+
+
+def check_network_v3_boundaries(files, sketch_dir):
+    by_name={p.name:(p,c) for p,c in files if "scripts" not in p.parts}
+    required={
+      "NetworkConfigNvs.cpp": ('kNetworkPartition[]="nvs"','kNetworkNamespace[]="md_net_v1"','NVS_READONLY','nvs_get_blob','nvs_commit','memcmp(record,readback,size)==0'),
+      "NetworkConfig.cpp": ('phase_=ConfigPhase::ROLLBACK','storage_->pending(c)','storage_->activate(candidate_)','!alt','critical','crc(b,n-4)'),
+      "WifiManager.cpp": ('xTaskCreatePinnedToCore','xQueueCreate(1,sizeof(Request))','config_busy_.exchange(true)','modemSleep(sleep)','if(worker_status_.scan_running && context_.load()){esp_wifi_scan_stop()','drv.sta.bssid_set=false','test_fresh_&&link_up'),
+      "HttpTransport.cpp": ('req.local_authorized','portal_.authorize','!req.tls || req.ap_socket','!service_->remoteUpdateAllowed()','session_.timedOut(now_ms)','mailbox_.claimDelivery()','ready_sequence_.load()==id','httpd_ssl_start','manual_stop_'),
+      "ControllerService.h": ('OperatingMode::MAINTENANCE','bool networkCritical() const','configBusy()','sessionLive()'),
+      "CommandRouter.cpp": ('(WIFI command redacted)','NETWORK_CONFIG_BUSY'),
+      "PortalSecurity.cpp": ('return ap&&host&&origin','strcmp(host,"192.168.4.1")','portalOrigin','peer==peer_','now-issued_<300000','tokenEqual(cookie,cookie_)','tokenEqual(csrf,csrf_)','seen&(1ull<<field)'),
+    }
+    for name,tokens in required.items():
+        path,code=by_name.get(name,(sketch_dir/name,""))
+        for token in tokens:
+            if not contains_v3(code,token):fail(f"{path}: V3 security invariant missing {token!r}")
+    for path,code in files:
+        if "scripts" in path.parts:continue
+        if re.search(r"\bnvs_(set_blob|commit|open_from_partition)\s*\(",code) and path.name not in ("CalibrationRecordNvsBackend.cpp","NetworkConfigNvs.cpp"):
+            fail(f"{path}: unapproved NVS writer/owner")
+        if "esp_phy_erase_cal_data_in_nvs" in code:fail(f"{path}: diagnostic PHY erase must never enter production")
+    manager=by_name.get("WifiManager.cpp",(None,""))[1]
+    tick=re.search(r"void WifiManager::update\([^)]*\)\s*\{(.*?)\n\}",manager,re.S)
+    if not tick or any(t in tick.group(1) for t in ("WiFi.","storage_.", "nvs_", "vTaskDelay", "while", "esp_wifi_")):
+        fail("WifiManager::update must only copy a snapshot, with zero-wait synchronization")
+    for name in ("NetworkConfig.cpp","PortalSecurity.cpp","NetworkPolicy.h"):
+        code=by_name.get(name,(None,""))[1]
+        if any(t in code for t in ("Arduino.h","WiFi.h","Serial.","ServoBus")):fail(f"{name}: V3 decision/security logic must remain pure")
+    header=by_name.get("WifiPolicy.h",(None,""))[1]
+    if re.search(r"(password|admin_digest|secret|token)\s*\[",header):fail("WifiStatus must contain no credential material")
+    transport=by_name.get("HttpTransport.cpp",(None,""))[1]
+    if ".password" in transport:fail("HTTP formatter must not access network passwords")
+    if "sleep.session_trusted=" in re.sub(r"\s+","",manager):fail("HWCDC adapter must keep session_trusted false until qualified")
+    if sum(1 for _ in re.finditer(r"!req\.tls\s*\|\|\s*req\.ap_socket",transport))<2:
+        fail("Challenge and begin both require TLS and STA socket provenance")
+    ignored=(sketch_dir/".gitignore").read_text()
+    if "src/config/TlsIdentity.local.h" not in ignored:fail("TLS identity must be gitignored")
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -6142,6 +6197,7 @@ def main():
     check_no_startup_servo_traffic(files)
     check_no_network_to_servo_path(files)
     check_wifi_runtime_boundaries(files, SKETCH_DIR)
+    check_network_v3_boundaries(files, SKETCH_DIR)
     check_ota_boundaries(files, SKETCH_DIR)
     check_http_transport_boundaries(files, SKETCH_DIR)
     check_actuator_authority(files, SKETCH_DIR)

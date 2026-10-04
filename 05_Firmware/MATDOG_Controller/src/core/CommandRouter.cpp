@@ -209,6 +209,16 @@ void CommandRouter::handleLine(String line) {
 
   String upper = line;
   upper.toUpperCase();
+  // Network flash transactions reserve the quiet window before enqueueing.
+  // Existing STOP/ABORT and read-only status commands remain available.
+  if (modules_.wifi && modules_.wifi->configBusy() && upper.startsWith("@CALIBRATION") &&
+      strstr(upper.c_str(),"STATUS")==nullptr && strstr(upper.c_str(),"ABORT")==nullptr &&
+      !(upper == "@CALIBRATION MOTION PERMIT REVOKE")) {
+    Serial.println("CALIBRATION=REFUSED REASON=NETWORK_CONFIG_BUSY"); return;
+  }
+  if (modules_.wifi && modules_.wifi->configBusy() && upper == "@MODE RUN") {
+    Serial.println("MODE=REFUSED REASON=NETWORK_CONFIG_BUSY"); return;
+  }
   // Set only by matchLegCommand() on a strict four-token match.
   calibration::Leg command_leg = calibration::Leg::LF;
   bool command_post_abort = false;
@@ -303,19 +313,31 @@ void CommandRouter::handleLine(String line) {
     }
   } else if (upper == "@WIFI STATUS") {
     printWifiStatus();
+  } else if (upper == "@WIFI PROFILES STATUS" || upper == "@WIFI AP STATUS" || upper == "@WIFI SLEEP STATUS" || upper == "@WIFI ROAM STATUS" || upper == "@WIFI MODE STATUS") {
+    printWifiStatus();
+  } else if (upper == "@WIFI SCAN") {
+    Serial.println(modules_.service->scanNetwork()?"WIFI_SCAN=QUEUED":"WIFI_SCAN=REFUSED");
+  } else if (upper == "@WIFI AP ON" || upper == "@WIFI AP OFF") {
+    Serial.println(modules_.service->accessPoint(upper=="@WIFI AP ON")?"WIFI_AP=QUEUED":"WIFI_AP=REFUSED");
+  } else if (upper == "@WIFI SLEEP AUTO" || upper == "@WIFI SLEEP ON" || upper == "@WIFI SLEEP OFF") {
+    const uint8_t p=upper=="@WIFI SLEEP AUTO"?0:(upper=="@WIFI SLEEP ON"?1:2);
+    Serial.println(!modules_.service->networkCritical() && modules_.wifi->setSleep(p)?"WIFI_SLEEP=QUEUED effective=OFF fallback=HWCDC_SESSION_UNPROVEN":"WIFI_SLEEP=REFUSED");
+  } else if (upper.startsWith("@WIFI AP KEY ") || upper.startsWith("@WIFI ADMIN KEY ")) {
+    bool accepted=false;
+    if(!modules_.service->networkCritical()) {
+      if(upper.startsWith("@WIFI AP KEY ")) accepted=modules_.wifi->provisionAp(line.c_str()+13);
+      else accepted=modules_.wifi->provisionAdmin(line.c_str()+16);
+    }
+    Serial.println(accepted?"WIFI_PROVISION=QUEUED":"WIFI_PROVISION=REFUSED");
   } else if (upper == "@WIFI ON" || upper == "@WIFI OFF") {
-    // Deliberately NOT gated by operating mode. The radio is orthogonal to
-    // servo safety: it cannot block the bus (WifiManager::update() is
-    // bounded and measured) and it has no path to an actuator. Gating it on
-    // MAINTENANCE would only make the network unusable in the mode a future
-    // motion loop actually runs in.
+    // Worker rechecks critical state before changing radio mode.
+    // QUEUED is an intent; status reports the applied state.
     const bool on = (upper == "@WIFI ON");
     if (modules_.wifi->setEnabled(on, millis())) {
-      Serial.printf("WIFI=%s\n", on ? "ON" : "OFF");
+      Serial.printf("WIFI_REQUEST=QUEUED_RADIO_%s\n", on ? "ON" : "OFF");
     } else {
       Serial.println("WIFI=REFUSED");
-      Serial.println("REASON=NO_CREDENTIALS");
-      Serial.println("HINT=create src/config/WifiCredentials.local.h and rebuild");
+      Serial.println("REASON=NETWORK_REQUEST_BUSY_OR_UNAVAILABLE");
     }
     printWifiStatus();
   } else if (isPersistCommand(upper)) {
@@ -1213,7 +1235,8 @@ void CommandRouter::handleLine(String line) {
     Serial.println("NOTE=this will resolve to POWER_CUT_FAILED, not OFF.");
   } else if (line.startsWith("@")) {
     Serial.print("UNKNOWN_COMMAND=");
-    Serial.println(line);
+    if(upper.startsWith("@WIFI"))Serial.println("(WIFI command redacted)");
+    else Serial.println(line);
     Serial.println("Type @HELP for the command list.");
   }
   // Silently ignore any line that doesn't start with '@' — keeps the
@@ -1238,10 +1261,14 @@ void CommandRouter::printHelp() {
   Serial.println("  @LED TEST");
   Serial.println("  @LED SOC TEST");
   Serial.println("  @WIFI STATUS           (cached snapshot; no radio query)");
-  Serial.println("  @WIFI ON|OFF           (any mode; refused without credentials)");
-  Serial.println("  @OTA STATUS            (read-only; OTA-A ships no transport)");
+  Serial.println("  @WIFI ON|OFF           (quiet state; OFF recovery after 10 min)");
+  Serial.println("  @WIFI PROFILES|AP|SLEEP|ROAM|MODE STATUS (cached, read-only)");
+  Serial.println("  @WIFI SCAN / @WIFI AP ON|OFF (quiet state)");
+  Serial.println("  @WIFI SLEEP AUTO|ON|OFF (HWCDC fallback OFF)");
+  Serial.println("  @WIFI AP KEY <unique-passphrase> / ADMIN KEY <64-hex> (physical provisioning)");
+  Serial.println("  @OTA STATUS            (read-only; TLS/HMAC transport, ingest gate)");
   Serial.println("  @WEB SERVER STATUS     (read-only; is the listening socket up)");
-  Serial.println("  @WEB SERVER START|STOP (MAINTENANCE mode only; never auto-started)");
+  Serial.println("  @WEB SERVER START|STOP (MAINTENANCE; AP portal auto after provisioning)");
   Serial.println("  @AUTHORITY STATUS      (read-only; no owner can be acquired yet)");
   Serial.println("  @CALIBRATION STATUS    (read-only; no session can move hardware)");
   Serial.println("  @CALIBRATION PERSIST STATUS (read-only: NVS, marker, slots, last LOAD)");
@@ -1351,10 +1378,11 @@ void CommandRouter::printWebStatus() {
   // Lifecycle only: whether the listening socket is up. It carries no OTA
   // session state (that is not read here even by pointer) and no in-flight
   // request contents — see HttpTransport.h's cross-thread mailbox comment.
+  Serial.printf("WEB_TLS started=%s remote_reboot=BLOCKED\n",modules_.http_transport->tlsStarted()?"YES":"NO");
   Serial.printf("WEB_SERVER started=%s\n",
                 modules_.http_transport->started() ? "YES" : "NO");
   Serial.println("WEB_NOTE never started from Controller::begin(); "
-                 "MAINTENANCE mode required to start or stop it");
+                 "automatic AP portal after USB provisioning; manual START/STOP require MAINTENANCE");
   Serial.printf("WEB_NOTE ota_ingest_compiled=%s\n",
                 update::OtaManager::ingestEnabled() ? "ENABLED" : "DISABLED");
 }
@@ -1373,6 +1401,26 @@ void CommandRouter::printWifiStatus() {
                 w.credentials_present ? w.ssid : "(none)");
   Serial.printf("WIFI_LINK connected=%s ip=%s rssi_dbm=%ld channel=%u\n",
                 w.connected ? "YES" : "NO", ip, (long)w.rssi_dbm, (unsigned)w.channel);
+  char ap_ip[16];network::formatIpv4(w.ap_ipv4,ap_ip,sizeof(ap_ip));
+  Serial.printf("WIFI_RADIO bssid=%s mode=%s profile=%u source=%s disconnect_reason=%u bandwidth=%u\n",w.bssid,w.ap_active?"APSTA":(w.enabled?"STA":"OFF"),w.active_profile,w.nvs_active?"NVS":"COMPILE_FALLBACK",w.disconnect_reason,w.bandwidth_mhz);
+  Serial.printf("WIFI_AP active=%s ssid=%s ip=%s clients=%u provisioned=%s admin=%s\n",w.ap_active?"YES":"NO",w.ap_ssid,ap_ip,w.ap_clients,w.ap_provisioned?"YES":"NO",w.admin_provisioned?"YES":"NO");
+  Serial.printf("WIFI_SLEEP configured=%u effective=%s apply_ok=%s usb_session=UNPROVEN fallback=NO_SLEEP\n",w.sleep_configured,w.sleep_effective?"ON":"OFF",w.sleep_apply_ok?"YES":"NO");
+  Serial.printf("WIFI_CONFIG_TX phase=%s busy=%s error=%ld\n",network::toString(w.config_phase),w.config_busy?"YES":"NO",(long)w.config_error);
+  Serial.printf("WIFI_SCAN running=%s count=%u starts=%lu failures=%lu inhibited=%lu roam=%lu\n",w.scan_running?"YES":"NO",w.scan_count,(unsigned long)w.scan_starts,(unsigned long)w.scan_failures,(unsigned long)w.scan_inhibited,(unsigned long)w.roam_count);
+  Serial.printf("WIFI_WORKER max_us=%lu stack_free=%lu\n",(unsigned long)w.worker_max_us,(unsigned long)w.worker_stack_free);
+  Serial.printf("WIFI_PERFORMANCE roam_enabled=%s threshold=%d hysteresis=%u scan_ms=%lu dwell_ms=%lu bandwidth_configured=%u bandwidth_apply_ok=%s\n",
+                w.roam_enabled?"YES":"NO",w.roam_threshold,w.roam_hysteresis,
+                (unsigned long)w.scan_interval_ms,(unsigned long)w.roam_dwell_ms,
+                w.bandwidth_configured,w.bandwidth_apply_ok?"YES":"NO");
+  Serial.printf("WIFI_AP_POLICY always=%s timeout_ms=%lu reload_pending=%s\n",
+                w.ap_always?"YES":"NO",(unsigned long)w.ap_timeout_ms,w.ap_reload_pending?"YES":"NO");
+  for(unsigned i=0;i<2;++i){
+    const auto& p=w.profiles[i];char a[16],m[16],g[16],d[16];
+    network::formatIpv4(p.ip,a,sizeof(a));network::formatIpv4(p.mask,m,sizeof(m));
+    network::formatIpv4(p.gateway,g,sizeof(g));network::formatIpv4(p.dns,d,sizeof(d));
+    Serial.printf("WIFI_PROFILE index=%u enabled=%s ssid=%s dhcp=%s ip=%s mask=%s gateway=%s dns=%s\n",
+                  i,p.enabled?"YES":"NO",p.ssid,p.dhcp?"YES":"NO",a,m,g,d);
+  }
   Serial.printf("WIFI_RETRY backoff_ms=%lu state_since_ms=%lu\n",
                 (unsigned long)w.backoff_ms, (unsigned long)w.state_since_ms);
   Serial.printf("WIFI_COUNTERS radio_starts=%lu attempts=%lu connects=%lu reconnects=%lu "

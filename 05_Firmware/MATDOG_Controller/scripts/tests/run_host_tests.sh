@@ -61,7 +61,8 @@ trap 'rm -rf "$OUT"' EXIT
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -o "$OUT/test_wifi_policy" \
   "$SCRIPT_DIR/test_wifi_policy.cpp" \
-  "$SKETCH_DIR/src/network/WifiPolicy.cpp"
+  "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp"
 
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -o "$OUT/test_calibration_domain" \
@@ -488,6 +489,7 @@ CALREC_SRCS=(
   "$SCRIPT_DIR/router_nvs_stub.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationRecordNvsBackend.cpp" \
   "$SKETCH_DIR/src/core/CommandRouter.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryQualification.cpp" \
   "$SKETCH_DIR/src/core/CommandRouterPersistence.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationSaveGate.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
@@ -501,6 +503,7 @@ CALREC_SRCS=(
   "$SKETCH_DIR/src/core/ServiceReadiness.cpp" \
   "$SKETCH_DIR/src/servo/ServoProfile.cpp" \
   "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" \
   "$SKETCH_DIR/src/update/OtaPolicy.cpp" \
   "$SKETCH_DIR/src/update/OtaBootGuard.cpp" \
   "$SKETCH_DIR/src/status/LedStatusPolicy.cpp" \
@@ -620,3 +623,26 @@ python3 "$SCRIPT_DIR/test_command_router_framing_mutations.py"
 
 python3 "$SCRIPT_DIR/test_matdog_startup_reference.py"
 python3 "$SCRIPT_DIR/test_static_audit_startup.py"
+
+# V3: real configuration codec, NVS owner, transactions, USB fallback/roam,
+# portal input/auth and concurrent mailbox delivery/abandon. No device I/O.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -pthread \
+  -I "$SCRIPT_DIR/nvs_stub" -o "$OUT/test_network_v3" \
+  "$SCRIPT_DIR/test_network_v3.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
+  "$SKETCH_DIR/src/network/PortalSecurity.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+"$OUT/test_network_v3"
+
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_wifi_runtime_v3" "$SCRIPT_DIR/test_wifi_runtime_v3.cpp" \
+  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+"$OUT/test_wifi_runtime_v3"
+python3 "$SCRIPT_DIR/test_ota_tls_client.py"
+python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
+
+echo "HOST_TESTS = PASS"
