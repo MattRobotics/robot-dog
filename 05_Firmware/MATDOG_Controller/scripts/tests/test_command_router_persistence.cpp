@@ -503,6 +503,10 @@ void network_quiet_reservation() {
 void source_identity_is_read_only() {
   Fixture f;
   const FramingSnapshot before(f);
+  const auto schemas = CommandRouter::persistenceSchemaIdentity();
+  CHECK(schemas.record_schema == kCalibrationRecordSchemaV1);
+  CHECK(schemas.marker_schema == kSaveMarkerSchemaV1);
+  before.checkUnchanged(f);
   const auto out = f.command("@SYSTEM SOURCE_SIGNATURE");
   CHECK(out.find("FW_VERSION=0.2.0-dev.1") != std::string::npos);
   CHECK(out.find("GIT_SHA=") != std::string::npos);

@@ -67,6 +67,10 @@ void printUsage() {
 
 }  // namespace
 
+CommandRouter::PersistenceSchemaIdentity CommandRouter::persistenceSchemaIdentity() {
+  return {calibration::kCalibrationRecordSchemaV1, calibration::kSaveMarkerSchemaV1};
+}
+
 const char* CommandRouter::persistenceQuietViolation() const {
   if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
     return "NOT_IN_MAINTENANCE_MODE";

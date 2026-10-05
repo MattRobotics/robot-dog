@@ -18,8 +18,6 @@
 #include "../actuator/OperationalEnvelope.h"
 
 #include "../config/BuildConfig.h"
-#include "../calibration/CalibrationRecord.h"
-#include "../calibration/CalibrationSaveMarker.h"
 #include "../update/OtaLayoutContract.h"
 #include "../config/Pins.h"
 #include "../network/HttpTransport.h"
@@ -1868,6 +1866,7 @@ void CommandRouter::printBmsKeyWriteStatus() {
 
 void CommandRouter::printSourceSignature() {
   const update::OtaManagerStatus& o = modules_.service->otaStatus();
+  const PersistenceSchemaIdentity schemas = persistenceSchemaIdentity();
   Serial.printf("SOURCE_SIGNATURE build_id=%s firmware=%s version=%s profile=%s board=%s\n",
                 build::kBuildId, build::kFirmwareName, build::kFirmwareVersion,
                 build::kTestProfile, build::kBoardName);
@@ -1878,8 +1877,8 @@ void CommandRouter::printSourceSignature() {
                 build::kTestProfile);
   Serial.printf("  FLASH_LAYOUT=%s CAL_RECORD_SCHEMA=%u CAL_MARKER_SCHEMA=%u "
                 "OTA_INGEST=%u MOTION_STACK=%s MOTION_AUTHORIZED=0\n",
-                update::kLayoutId, (unsigned)calibration::kCalibrationRecordSchemaV1,
-                (unsigned)calibration::kSaveMarkerSchemaV1,
+                update::kLayoutId, (unsigned)schemas.record_schema,
+                (unsigned)schemas.marker_schema,
                 update::OtaManager::ingestEnabled() ? 1U : 0U, build::kMotionStack);
   Serial.printf("  BUILD_UTC=%s APP_SHA256=ASSOCIATED_MANIFEST RESTORE=NOT_IMPLEMENTED\n",
                 build::kBuildUtc);

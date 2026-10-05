@@ -249,6 +249,13 @@ class CommandRouter {
   // RECONCILE DECLARE_NOTHING [CONFIRM_DISCARD]. Implemented in
   // CommandRouterPersistence.cpp. Touches no servo, no transform table, no
   // authority; only STATUS and SAVE CHECK are read-only.
+  // Schema identity crosses this private facade as values only. The permitted
+  // persistence translation unit resolves the authoritative schema constants.
+  struct PersistenceSchemaIdentity {
+    uint16_t record_schema;
+    uint16_t marker_schema;
+  };
+  static PersistenceSchemaIdentity persistenceSchemaIdentity();
   void handlePersistCommand(const String& upper);
   static bool isPersistCommand(const String& upper);
   void printPersistenceStatus();
