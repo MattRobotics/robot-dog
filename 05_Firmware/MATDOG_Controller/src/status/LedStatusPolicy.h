@@ -18,7 +18,8 @@ constexpr SocDirection kSocDirection = SocDirection::CLOCKWISE;
 // Native physical index progression is clockwise. The SOC bar starts at noon.
 constexpr uint8_t kSocPixelOrder[kSocPixelCount] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0};
 
-// Increasing priority; READY includes the indeterminate battery renderer.
+// Stable numeric identifiers, NOT priority order: presentation priority is
+// determined by selectFromFacts(). READY includes indeterminate SOC rendering.
 enum class LedPresentationState : uint8_t {
   READY = 0,
   CHARGING,

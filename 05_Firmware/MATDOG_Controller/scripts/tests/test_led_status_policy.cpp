@@ -75,16 +75,16 @@ void testPriorityAndFacts() {
       const bool triggered[] = {health == SystemHealth::FAULT,
         in.firmware_update_in_progress, in.calibration_in_progress,
         in.battery_charging && in.battery_alarm, in.battery_critical,
-        health == SystemHealth::DEGRADED, in.battery_warning,
-        in.wifi_connecting, health == SystemHealth::BOOTING,
-        in.charge_complete_verified && !in.battery_alarm, in.battery_charging, true};
+        in.battery_warning, in.charge_complete_verified && !in.battery_alarm,
+        in.battery_charging, health == SystemHealth::DEGRADED,
+        in.wifi_connecting, health == SystemHealth::BOOTING, true};
       const LedPresentationState states[] = {LedPresentationState::FAULT,
         LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS,
         LedPresentationState::CALIBRATION_IN_PROGRESS, LedPresentationState::CHARGING_FAULT,
-        LedPresentationState::BATTERY_CRITICAL, LedPresentationState::DEGRADED,
-        LedPresentationState::BATTERY_WARNING, LedPresentationState::WIFI_CONNECTING,
-        LedPresentationState::BOOTING, LedPresentationState::CHARGE_COMPLETE_VERIFIED,
-        LedPresentationState::CHARGING, LedPresentationState::READY};
+        LedPresentationState::BATTERY_CRITICAL, LedPresentationState::BATTERY_WARNING,
+        LedPresentationState::CHARGE_COMPLETE_VERIFIED, LedPresentationState::CHARGING,
+        LedPresentationState::DEGRADED, LedPresentationState::WIFI_CONNECTING,
+        LedPresentationState::BOOTING, LedPresentationState::READY};
       unsigned winner = 0;
       while (!triggered[winner]) ++winner;
       CHECK_EQ(selectLedState(in), states[winner]);
@@ -425,6 +425,42 @@ LedStatusInputs chargingWith(uint16_t a0, uint16_t a1, uint16_t a2, uint16_t a3,
   return in;
 }
 
+void testChargingWhileServoNotInitialized() {
+  g_case = "KEY OFF charger connected: valid DALY must outrank unprobed servos";
+  auto in = chargingWith(0, 0, 0, 0x0010, 46.5f);
+  in.system_health = SystemHealth::BOOTING;
+  LedStatusPolicy policy;
+  CHECK_EQ(policy.state(), LedPresentationState::BOOTING);
+  checkBar(policy.update(in, 0, 60), 5, 5, 6);
+  CHECK_EQ(policy.state(), LedPresentationState::CHARGING);
+  CHECK_EQ(policy.snapshot().soc_segments, 5);
+  checkBar(policy.update(in, 1500, 60), 5, 5, 20);
+
+  in.battery_charging = false;
+  CHECK_EQ(selectLedState(in), LedPresentationState::BOOTING);
+  in.battery_charging = true;
+  in.telemetry_age_ms = kDalyTelemetryFreshnessMs + 1;
+  CHECK_EQ(selectLedState(in), LedPresentationState::BOOTING);
+  in.telemetry_age_ms = 0;
+  in.wifi_connecting = true;
+  CHECK_EQ(selectLedState(in), LedPresentationState::CHARGING);
+  in.wifi_connecting = false;
+  in.system_health = SystemHealth::DEGRADED;
+  CHECK_EQ(selectLedState(in), LedPresentationState::CHARGING);
+  in.system_health = SystemHealth::FAULT;
+  CHECK_EQ(selectLedState(in), LedPresentationState::FAULT);
+  in.system_health = SystemHealth::BOOTING;
+  in.firmware_update_in_progress = true;
+  CHECK_EQ(selectLedState(in), LedPresentationState::FIRMWARE_UPDATE_IN_PROGRESS);
+  in.firmware_update_in_progress = false;
+  in.battery_critical = true;
+  CHECK_EQ(selectLedState(in), LedPresentationState::BATTERY_CRITICAL);
+  in.battery_critical = false;
+  const uint16_t real_alarm[4] = {0, 0, 0, 0x0011};
+  in.battery_alarm = dalyAlarmBlocksChargingPresentation(real_alarm);
+  CHECK_EQ(selectLedState(in), LedPresentationState::CHARGING_FAULT);
+}
+
 void testDalyInformationalAlarmBitIsNarrow() {
   g_case = "DALY 0x0010 LED exception: the helper";
   CHECK_EQ(kDalyLedInformationalAlarm3Bits, 0x0010);
@@ -555,6 +591,7 @@ int main() {
   testQuantizationBoundariesAndPhysicalFrames();
   testCachedFreshnessAndIndeterminate();
   testChargingAndTrueFullSeparation();
+  testChargingWhileServoNotInitialized();
   testDalyInformationalAlarmBitIsNarrow();
   testNamesAndInitialState();
   std::printf("test_led_status_policy: %d checks, %d failures\n", g_checks, g_failures);
