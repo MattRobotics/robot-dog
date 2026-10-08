@@ -55,7 +55,7 @@ Not integrated:
   `matdog-controller-v0.1.0` tag; only the build id distinguishes a `main` build. Not changed
   here: it is firmware source.
 
-## Test results (first run, working tree at the merge commit)
+## Test results (first run, main checkout at the merge commit)
 
 Toolchain installed in the container, not in the repository:
 - `arduino-cli 1.5.1` (commit `01f3d4f2b`, as recorded in `SOURCE_PROVENANCE.md`);
@@ -80,8 +80,32 @@ Two environment-only failures were observed and resolved in the container:
 - missing `gen_esp32part.py` before the ESP32 core was installed.
 
 Without these, `static_audit.py` reported 4 findings and then 1. No repository file was changed
-to resolve them. The full `static_audit.py` re-run in a clean worktree with the complete
-toolchain is recorded in the follow-up section below.
+to resolve them.
+
+## Test results (clean worktree at the merge commit, complete toolchain)
+
+Detached worktree at `c358a3e5a44a7f79f3b815a3492368917a9860aa`, no local changes before or after.
+
+| Check | Result |
+|---|---|
+| `scripts/static_audit.py` (central gate; includes the host suite and nested mutation suites) | **`STATIC_AUDIT = PASS`**, exit 0 |
+| `scripts/tests/run_host_tests.sh` | PASS, exit 0; 0 suites with failures |
+| `test_matdog_layout.py` | 57 tests OK |
+| `test_build_manifest.py` | 83 tests OK |
+| `test_migration_m0.py` | 46 tests OK |
+| `test_migration_m0_write.py` | 40 tests OK (2 skipped) |
+| `test_ota_partition_logic.py` | 40 tests OK |
+| `test_command_router_framing_mutations.py` | PASS, both historical defects detected |
+| `USB_ONLY` build | PASS; manifest `SOURCE_STATE=CLEAN`, `SOURCE_COMMIT=c358a3e…`; app 1,120,304 bytes; table `8f756ecb…`; OTA ingest 0 |
+| `ROBOT_POWERED` build | PASS; `SOURCE_STATE=CLEAN`; app 1,123,408 bytes; table `8f756ecb…`; OTA ingest 0 |
+
+The same commit built from two different checkout paths gave application images of equal size.
+- **Where they differ:** in 64 bytes (65 for ROBOT_POWERED). These are `app_elf_sha256` in the
+  ESP-IDF application descriptor (image offsets `0xB0`–`0xCF`) and the image hash and checksum at
+  the end.
+- **Cause (deduction):** the ELF hash depends on the build path. The images are therefore not
+  byte-reproducible across checkout paths.
+- **Consequence:** no hash from these container builds is a release identity.
 
 Build binaries are not committed. Their hashes identify this container's builds only; they are
 not release artifacts and were not compared with any flashed image.
