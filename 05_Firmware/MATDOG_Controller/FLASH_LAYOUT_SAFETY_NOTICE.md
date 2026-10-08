@@ -95,7 +95,7 @@ The convergence audit records that the robot's partition table was written to
 
 | Item | Value |
 |---|---|
-| Firmware provenance commit | [`b3fd945bdaf37d192d97b605ac0f59b67f1dba45`](https://github.com/MattRobotics/robot-dog/commit/b3fd945bdaf37d192d97b605ac0f59b67f1dba45) (`0.2.0-dev.3`) |
+| Firmware provenance commit | `b3fd945bdaf37d192d97b605ac0f59b67f1dba45` (`0.2.0-dev.3`); not an ancestor of `main`. Its source delta was recreated on `main` as `e028dd8` (see [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md)) |
 | Branch tip | `b764c25c9530350331dbaa59ea2d84ddab3a3f69` — adds documentation only, no source |
 | Branch | `backup/matdog-dev3-preservation-20261008` — a preservation branch, not a merge candidate as named |
 | Hardware Validation 2026-10-07 | execution **COMPLETE**, acceptance **BLOCKED** |
@@ -103,8 +103,8 @@ The convergence audit records that the robot's partition table was written to
 
 The 2026-10-07 status is stated by the project owner. Its validation report, result matrix and
 defect record are **not yet in this repository** and are not reconstructed here. The latest dev.3
-evidence published on GitHub is the
-[2026-10-06 delta audit](https://github.com/MattRobotics/robot-dog/blob/b764c25c9530350331dbaa59ea2d84ddab3a3f69/09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
+evidence in this repository is the
+[2026-10-06 delta audit](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
 
 Standing limits: `MOTION_AUTHORIZED=0`; `RESTORE=NOT_IMPLEMENTED`; stand and gait hardware
 `BLOCKED`; no operational envelope approved.
@@ -118,11 +118,13 @@ historical snapshot. A full status synchronization is a separate change.
 
 ## Sources
 
-- Convergence audit (branch `audit/matdog-v0.2.0-dev1-claude-handoff`, evidence only, not for
-  merge): [`MATDOG_FIRMWARE_CONVERGENCE_AUDIT_V0_2.md`](https://github.com/MattRobotics/robot-dog/blob/b6d99573755f85993c189227b6a3f890fb15fe20/_audit/MATDOG_V0_2_DEV1_CLAUDE_HANDOFF/MATDOG_FIRMWARE_CONVERGENCE_AUDIT_V0_2.md)
-  (legacy scheme and offsets, 2026-10-03 table write, flashed `be0c129` application).
+- Convergence audit `MATDOG_FIRMWARE_CONVERGENCE_AUDIT_V0_2.md` (historical branch
+  `audit/matdog-v0.2.0-dev1-claude-handoff` at `b6d99573755f85993c189227b6a3f890fb15fe20`, evidence only,
+  not for merge; legacy scheme and offsets, 2026-10-03 table write, flashed `be0c129` application).
+  Not on `main`: `EXTERNAL_ARCHIVE_PENDING_VERIFICATION`, see
+  [`EXTERNAL_ARCHIVES.md`](../../09_Logs/EXTERNAL_ARCHIVES.md).
 - dev.3 delta audit:
-  [`MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md`](https://github.com/MattRobotics/robot-dog/blob/b764c25c9530350331dbaa59ea2d84ddab3a3f69/09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
+  [`MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md`](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
 - PR-3 integration log:
   [`2026-10-08_PR3_DEV2_DEV3_SELECTIVE_INTEGRATION.md`](../../09_Logs/Development_Log/2026-10-08_PR3_DEV2_DEV3_SELECTIVE_INTEGRATION.md).
 - PR-2 integration log:

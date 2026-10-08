@@ -59,8 +59,8 @@ touched. No flash, serial, NVS, EEPROM, OTA or motion operation was performed.
 
 The 2026-10-07 status is stated by the project owner. Its validation report, result matrix and
 defect record are not yet in this repository and are not reconstructed here. The latest dev.3
-evidence on GitHub is the
-[2026-10-06 delta audit](https://github.com/MattRobotics/robot-dog/blob/b764c25c9530350331dbaa59ea2d84ddab3a3f69/09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
+evidence in this repository is the
+[2026-10-06 delta audit](../Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
 
 ## Standing limits
 

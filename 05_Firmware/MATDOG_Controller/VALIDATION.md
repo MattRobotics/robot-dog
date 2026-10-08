@@ -76,7 +76,7 @@ Markdown, to the final tip).
 Not claimed for `main`: the integration branch result of 2026-10-05/06 (20/20 motion qualification,
 330/330 pinned files). Container binaries depend on the checkout path and are not release
 artifacts. The hardware results for dev.2 and dev.3 belong to the dev.3 candidate and are in the
-[dev.3 delta audit](https://github.com/MattRobotics/robot-dog/blob/b764c25c9530350331dbaa59ea2d84ddab3a3f69/09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
+[dev.3 delta audit](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
 The 2026-10-07 Hardware Validation (execution COMPLETE, acceptance BLOCKED) has no report in this
 repository yet.
 
