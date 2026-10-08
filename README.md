@@ -4,7 +4,21 @@ MATDOG is Matt Robotics' custom quadruped platform: a 17-DOF mechanical design w
 articulated head, an ESP32-S3 real-time controller, and a future Jetson-based high-level stack.
 This repository is the single active engineering repository for the robot.
 
-> **Current snapshot — 2026-10-01 (PR #35 merged)**
+> **⚠ FLASH SAFETY NOTICE — 2026-10-08. Do not use `main` to update the current robot.**
+>
+> - `main` still builds and flashes with the legacy scheme `PartitionScheme=app3M_fat9M_16MB`.
+>   The robot runs the flash layout `MATDOG_16M_2x5M_NVS_V1`, which `main` does not contain.
+> - `05_Firmware/MATDOG_Controller/scripts/upload.sh` on `main` rewrites the bootloader, the
+>   **partition table** and otadata on every run, and can put the legacy table back.
+> - The dev.3 candidate line (provenance `b3fd945`) contains the correct layout, but it is **not
+>   an accepted release**: the Hardware Validation of 2026-10-07 has execution COMPLETE and
+>   acceptance **BLOCKED**. It is not on `main` and is not authorized as a baseline.
+> - `MOTION_AUTHORIZED=0`. Nothing here authorizes a flash, a migration or any motion.
+>
+> Details and sources: [`FLASH_LAYOUT_SAFETY_NOTICE.md`](05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
+> The snapshot below is the historical state of `main` on 2026-10-01 and has not been updated.
+
+> **Historical snapshot — 2026-10-01 (PR #35 merged)**
 >
 > - **Installed population:** 13 ST3215 (12 leg joints plus neck ID 51); 17 canonical slots,
 >   with IDs 52–55 intentionally absent.
@@ -298,6 +312,7 @@ capabilities are integrated into the Controller.
 | What must be true before a stage may begin? | [`DEVELOPMENT_GATES.md`](05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md) |
 | How are power, wiring, and connectors implemented? | [`04_Electronics/README.md`](04_Electronics/README.md) |
 | What firmware exists? | [`05_Firmware/README.md`](05_Firmware/README.md) |
+| May `main` be flashed on the current robot? | [`FLASH_LAYOUT_SAFETY_NOTICE.md`](05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md) — **no** |
 | What is the Controller baseline and service model? | [Controller README](05_Firmware/MATDOG_Controller/README.md) |
 | What Controller behavior was actually validated? | [Controller validation](05_Firmware/MATDOG_Controller/VALIDATION.md) |
 | Which 17 units/joints/IDs are allocated? | [`MATDOG_SERVO_ALLOCATION.yaml`](06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml) |
@@ -325,7 +340,9 @@ capabilities are integrated into the Controller.
 - No motion from stale or un-restored calibration. The 2026-10-01 contact validation
   does not authorize stand, gait or load-bearing operation. Any new hardware calibration
   or motion session requires separate operator authorization.
-- No servo EEPROM/ID change or hardware reflash is authorized by this documentation.
+- No servo EEPROM/ID change or hardware reflash is authorized by this documentation. In
+  particular, never flash a `main` build onto the current robot (see the flash safety notice
+  at the top of this file).
 - `PositionOffset = 0` is the persistent baseline; mechanical mounting errors are corrected
   mechanically, not hidden in EEPROM.
 - Frozen tools and historical evidence are never edited to make them appear current.
