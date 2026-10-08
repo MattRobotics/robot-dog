@@ -613,13 +613,15 @@ void Controller::updateFullLegCalibration(uint32_t now_ms) {
                                          ? calibration::kThermalLimitC : thermal.published_c;
         if (thermal.decision != calibration::ThermalDecision::NORMAL &&
             thermal.decision != calibration::ThermalDecision::PENDING) {
+          // samples[0] is the diagnostic block-read value; the rest are the
+          // direct reads the verdict was taken from.
           Serial.printf("CALIBRATION_THERMAL_CONFIRMATION bus=%u decision=%s samples=%ld,%ld,%ld,%ld,%ld "
-                        "count=%u published=%ld limit=%ld source=BULK_THEN_DIRECT\n",
+                        "count=%u published=%ld limit=%ld source=BULK_THEN_DIRECT bulk_artifacts=%u\n",
                         (unsigned)thermal.bus_id, calibration::toString(thermal.decision),
                         (long)thermal.samples[0], (long)thermal.samples[1], (long)thermal.samples[2],
                         (long)thermal.samples[3], (long)thermal.samples[4],
                         (unsigned)thermal.sample_count, (long)thermal.published_c,
-                        (long)calibration::kThermalLimitC);
+                        (long)calibration::kThermalLimitC, (unsigned)thermal.bulk_artifacts);
         }
       }
     }

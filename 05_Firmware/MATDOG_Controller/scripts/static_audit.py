@@ -1665,16 +1665,22 @@ def check_thermal_confirmation(files):
             "constexpr uint8_t kThermalConfirmationReads = 5;",
             "constexpr uint8_t kThermalConfirmedOverLimit = 3;",
             "constexpr uint32_t kThermalConfirmationDelayMs = 50;",
-            "constexpr uint8_t kThermalMaxTransients = 3;",
-            "constexpr uint8_t kThermalMaxBootTransients = 8;"),
+            "constexpr uint8_t kThermalDirectNormalToClear = 3;"),
+        # dev.3: the block-read temperature is diagnostic. The verdict is taken
+        # from DIRECT samples only (the tally starts at samples[1]); a failed,
+        # invalid, incoherent or expired confirmation publishes a value over
+        # the limit; a refuted block-read value is counted and nothing else.
         "ThermalConfirmation.cpp": (
             "if (observed <= kThermalLimitC) return result_;",
             "port->readPresentTemperatureDirect(bus, &value)",
             "value < 0 || value > 255",
-            "hot >= kThermalConfirmedOverLimit", "cool >= 3",
+            "for (uint8_t i = 1; i < result_.sample_count; ++i) {",
+            "hot >= kThermalConfirmedOverLimit", "cool >= kThermalDirectNormalToClear",
             "now_ms - last_read_ms_ < kThermalConfirmationDelayMs",
-            "latched_ = transients_ >= kThermalMaxTransients",
-            "boot_transients_ >= kThermalMaxBootTransients", "expired(now_ms)"),
+            "result_.decision = ThermalDecision::THERMAL_TELEMETRY_FAULT; "
+            "result_.published_c = kThermalLimitC + 1;",
+            "else if (result_.sample_count == kThermalConfirmationReads) { return telemetryFault();",
+            "expired(now_ms)"),
         "Controller.cpp": (
             "state.update(&thermal_read_port_, buses[i], sample.present_temperature, millis())",
             "full_leg_calibration_.monitorOnly(context, millis(), frame)",
@@ -1694,6 +1700,23 @@ def check_thermal_confirmation(files):
         for token in tokens:
             if token not in body:
                 fail(f"{path}: thermal/UART safety invariant missing: {token}")
+    # A refuted block-read value must never accumulate into a safety verdict:
+    # no transient latch, counter threshold or sticky fault may come back.
+    for name in ("ThermalConfirmation.h", "ThermalConfirmation.cpp"):
+        if name in by_name:
+            path, code = by_name[name]
+            for banned in ("latched_", "REPEATED_ANOMALY", "kThermalMaxTransients",
+                           "kThermalMaxBootTransients", "transients_ >=", "bulk_artifacts_ >=",
+                           "bulk_artifacts_ >"):
+                if banned in code:
+                    fail(f"{path}: block-read temperature artifacts may not latch a "
+                         f"thermal verdict ({banned!r})")
+    if "ThermalConfirmation.cpp" in by_name:
+        path, code = by_name["ThermalConfirmation.cpp"]
+        body = re.sub(r"\s+", " ", code)
+        if body.count("ThermalDecision::CONFIRMED") != 2 or \
+                "if (hot >= kThermalConfirmedOverLimit) { result_.decision = ThermalDecision::CONFIRMED;" not in body:
+            fail(f"{path}: over-temperature may only be confirmed by the direct-sample majority")
     if "Controller.cpp" in by_name:
         path, code = by_name["Controller.cpp"]
         if "calibration::confirmPresentTemperature(" in code:
