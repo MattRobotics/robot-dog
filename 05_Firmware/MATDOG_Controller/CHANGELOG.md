@@ -1,5 +1,22 @@
 # MATDOG Controller — Changelog
 
+## 0.2.0-dev.2 — ROBOT_POWERED boot self-test census — 2026-10-06
+
+- ROBOT_POWERED arms exactly one canonical read-only servo census (11..55, 13 expected,
+  52..55 absent by design) in `Controller::begin()`. It advances from `update()` at one
+  Ping per tick: no torque, GoalPosition, EEPROM or SAFE_OFF write. USB_ONLY is unchanged.
+- Servo subsystem health under ROBOT_POWERED is the completed census verdict: pending is
+  BOOTING, PASS is OK, any other verdict or a census that cannot be armed is FAULT. A later
+  operator census replaces it on completion; the previous verdict is kept while it runs.
+- Boot banner: `startup_servo_census : ENABLED_READ_ONLY_INCREMENTAL` replaces
+  `startup_servo_scan : DISABLED`, plus `STARTUP_SERVO_CENSUS=RUNNING|PASS|FAIL|START_FAILED`.
+  Older entries and plans quoting the previous line describe earlier builds.
+- Static audit owns the new wiring (`check_startup_servo_selftest_wiring`, three rejected
+  mutations); `ServoBus::begin()` still may not ping. Stale `0.2.0-dev.1` test
+  expectations updated. No motion, calibration, persistence, OTA or layout change.
+- MOTION_AUTHORIZED stays 0, RESTORE stays NOT_IMPLEMENTED. See the
+  [delta audit](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV2_BOOT_SELFTEST_DELTA_AUDIT_2026-10-06.md).
+
 ## Unreleased — PR-2: selective dev.1 integration (0.2.0-dev.1) — 2026-10-08
 
 - **Merged with original SHAs.** `13da04a` and its 12 ancestors from
