@@ -92,6 +92,16 @@ The robot runs the dev.3 candidate (provenance `b3fd945`), which `main` does not
 Hardware Validation 2026-10-07: execution COMPLETE, acceptance BLOCKED (stated by the owner;
 its report and result matrix are not in the repository and are not reconstructed here).
 
+## Known inherited link defect
+
+`05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md` (line 162) links to
+`09_Logs/Development_Log/2026-09-28_G3_STARTUP_TIMED_STAND.md`. That log exists only on
+`feat/g5a-stabilization-feasibility` and `backup/history/gait-g41-pre-amend-6047e43`; it was never
+on the integration branch, so the link is already dangling in the preserved original (`13da04a`).
+It is the only broken relative link among the 210 checked in the Markdown files PR-2 changes. It
+is left as is: the file is one of the 44 pinned `src/motion` sources, and editing it would change
+its pinned SHA-256 and break byte-identity with the original.
+
 ## Open
 
 - Owner decision on the already-public XGO material on other branches.
