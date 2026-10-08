@@ -1,17 +1,22 @@
 # MATDOG Roadmap
 
-> **Flash safety — 2026-10-08, updated for PR-1.** `main` is not a flashable baseline for the
+> **Flash safety — 2026-10-08, updated for PR-2.** `main` is not a flashable baseline for the
 > current robot.
-> - Since PR-1 it carries the robot's layout `MATDOG_16M_2x5M_NVS_V1` and Calibration
->   Persistence V1, but it is not the firmware the robot runs.
-> - The layout integration authorizes no flash and accepts nothing on hardware.
+> - It carries the robot's layout `MATDOG_16M_2x5M_NVS_V1`, Calibration Persistence V1 and, since
+>   PR-2, a selective part of the dev.1 line (recovery, DALY/release stages, Wi-Fi/OTA V3,
+>   charging priority, identity `0.2.0-dev.1`, the pure motion library). It is not the firmware
+>   the robot runs.
+> - These integrations authorize no flash and accept nothing on hardware.
 > - The dev.3 line is a candidate only (Hardware Validation 2026-10-07: execution COMPLETE,
 >   acceptance BLOCKED).
+> - Deferred, not deleted: motion execution suites, oracles and the G35/G4/G4.1/G5-A evidence
+>   ([ADR-004](../../09_Logs/Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md)).
 >
-> `MOTION_AUTHORIZED=0`. See
+> `MOTION_AUTHORIZED=0`, `RESTORE=NOT_IMPLEMENTED`. See
 > [`FLASH_LAYOUT_SAFETY_NOTICE.md`](../../05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
-> Apart from the Calibration Persistence V1 rows (updated for PR-1), the sequence below still
-> reflects 2026-10-01.
+> Apart from the rows on Calibration Persistence V1 and the gait engine (updated for PR-1 and
+> PR-2), the sequence below still reflects 2026-10-01. Wi-Fi and OTA are on `main` as
+> implemented and offline-tested, hardware gates open.
 
 **Canonical owner of the MATDOG development sequence, its dependencies, and where the project
 currently stands.** Last updated 2026-10-01.
@@ -95,8 +100,8 @@ THEN       Operational Envelopes / JointLimits   BLOCKED pending approval
 THEN       Stand / Gait hardware                 BLOCKED
 ```
 
-The gait engine is developed offline on the separate feature branch `feat/gait-engine-offline-v1`;
-it is not merged and not operational.
+The pure motion library (G1 to G5-A) is on `main` since PR-2, unwired and not operational. Its
+execution suites and evidence are deferred; the research branches keep the history.
 
 Power domains, KEY/Charge-MOS semantics, every power state and the charging gates are owned by
 [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).
@@ -212,7 +217,7 @@ Each row's *Blocks* column states what it gates. Arrows are hard dependencies, n
 | 17 | **Controlled poses** | **BLOCKED** | Blocker: stage 15. |
 | 18 | **Operational IK** | **FUTURE** | Geometry/kinematics assets exist in `06_Software/Matdog_Core/`; no operational IK runs on the Controller. |
 | 19 | **Body Pose / Single Leg UI (UI-5)** | **BLOCKED** | Blockers: stages 11, 18. |
-| 20 | **Gait engine** | **IN PROGRESS — offline, separate feature branch** | Developed on `feat/gait-engine-offline-v1` (local branch, **not merged**, not operational). Hardware use is **BLOCKED** by stages 8a, 8b, 17 and 18. |
+| 20 | **Gait engine** | **IN PROGRESS — pure library on `main` (PR-2), unwired** | `src/motion` is on `main` and is checked by a source/purity gate; it has no path to the servo bus. Execution suites, oracles and evidence are **DEFERRED**. Hardware use is **BLOCKED** by stages 8a, 8b, 17 and 18. |
 | 21 | **Manual teleoperation / gait UI (UI-6, UI-7)** | **BLOCKED** | Blockers: stages 11, 20, plus a firmware-side command lease/deadman (see [ARCHITECTURE.md](ARCHITECTURE.md#continuous-command-lease--deadman)). |
 | 22 | **Preset actions** | **FUTURE** | Only MATDOG-validated actions may ever be exposed. |
 | 23 | **BNO085 closed-loop stabilization** | **FUTURE** | The IMU acquisition path is **VALIDATED**; the control loop does not exist. |

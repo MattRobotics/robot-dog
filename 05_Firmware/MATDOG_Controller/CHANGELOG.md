@@ -1,5 +1,31 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — PR-2: selective dev.1 integration (0.2.0-dev.1) — 2026-10-08
+
+- **Merged with original SHAs.** `13da04a` and its 12 ancestors from
+  `integration/matdog-controller-v0.2.0` (`125d981`…`13da04a`) enter `main` by a merge commit.
+  This brings: post-abort recovery and thermal acquisition, guarded release stages with native
+  DALY supervision, startup RF recovery, Wi-Fi provisioning and gated TLS OTA V3, charging
+  presentation priority, and the pure motion library G1 to G5-A (`src/motion`, unwired).
+- **Recreated as new commits** (the originals descend from `3f23439`, which holds third-party
+  decompiler material that must not enter the history of `main`; each message carries the
+  original SHA, and the originals are not ancestors of `main`):
+  - `1cec973`: dev.1 identity (`kFirmwareVersion = "0.2.0-dev.1"`), build provenance, isolated
+    offline build artifacts. Byte-identical.
+  - `53aa962`: safety-gate extension. Five files byte-identical. `run_host_tests.sh` states that
+    the motion execution suites are DEFERRED. `run_motion_convergence_tests.py` keeps the source,
+    purity, dependency and wiring checks, reads the new manifest
+    `motion_integration_manifest_pr2.json` and fails if a deferred artifact is present.
+  - `d7aa369`: persistence schema exposed through the owner boundary. Byte-identical.
+- **Deferred, not integrated:** 286 artifacts (listed by path and SHA-256 in the manifest): the
+  motion host tests and fresh oracles, the audit tooling, the G35/G4/G4.1/G5-A evidence, and 47
+  XGO-named files including 38 third-party decompiler extracts. No test or check was removed.
+- **Unchanged contracts:** `MOTION_AUTHORIZED=0`, `RESTORE=NOT_IMPLEMENTED`, OTA ingest default 0,
+  no actuator path from `src/motion`.
+- **Do not flash `main`** on the current robot; see
+  [`FLASH_LAYOUT_SAFETY_NOTICE.md`](FLASH_LAYOUT_SAFETY_NOTICE.md) and the
+  [PR-2 log](../../09_Logs/Development_Log/2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md).
+
 ## Unreleased — PR-1: Calibration Persistence V1 and flash layout V1 on `main` — 2026-10-08
 
 - **What merges.** `feat/calibration-persistence-record-store-v1` at `7b258b3` merges into `main`

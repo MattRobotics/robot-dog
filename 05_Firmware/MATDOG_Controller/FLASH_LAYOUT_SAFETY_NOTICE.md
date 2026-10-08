@@ -1,4 +1,4 @@
-# MATDOG flash layout safety notice — 2026-10-08 (updated for PR-1)
+# MATDOG flash layout safety notice — 2026-10-08 (updated for PR-2)
 
 **Documentation only.** This notice authorizes nothing: no flash, no migration, no calibration, no
 motion. `MOTION_AUTHORIZED=0`.
@@ -7,27 +7,30 @@ motion. `MOTION_AUTHORIZED=0`.
 
 > **Do not build from, or flash, `main` to update the current robot.**
 >
-> After PR-1, `main` carries the correct flash layout, `MATDOG_16M_2x5M_NVS_V1`. It is still **not**
-> the firmware the robot runs, and it is not an accepted release. Integrating the layout is not an
-> authorization to flash and not a hardware acceptance.
+> `main` carries the correct flash layout, `MATDOG_16M_2x5M_NVS_V1`, since PR-1, and a selective
+> part of the dev.1 line since PR-2. It is still **not** the firmware the robot runs, and it is not
+> an accepted release. Integrating the layout or the dev.1 content is not an authorization to
+> flash and not a hardware acceptance.
 
 ## Scope of this notice
 
-This version describes `main` **after PR-1**. PR-1 merges the Persistence V1 line
-`feat/calibration-persistence-record-store-v1` at
-[`7b258b36c257bd455f135aee2667d035c4929544`](https://github.com/MattRobotics/robot-dog/commit/7b258b36c257bd455f135aee2667d035c4929544)
-into `main` at
-[`a09cb76b428f46f0c6a77c049ab906da4dc4fed3`](https://github.com/MattRobotics/robot-dog/commit/a09cb76b428f46f0c6a77c049ab906da4dc4fed3)
-with a merge commit, so the 13 original commit SHAs are kept. If PR-1 is not merged, the section
-[*Before PR-1*](#before-pr-1-main-at-b65e75d-and-a09cb76) still describes `main`.
+This version describes `main` **after PR-2**. It also holds for PR-1, which merged the Persistence
+V1 line `feat/calibration-persistence-record-store-v1` at
+[`7b258b36c257bd455f135aee2667d035c4929544`](https://github.com/MattRobotics/robot-dog/commit/7b258b36c257bd455f135aee2667d035c4929544).
+PR-2 adds a selective part of the dev.1 line on top of `main`
+[`fb02b8ed11ece11052f589d9222049f167336891`](https://github.com/MattRobotics/robot-dog/commit/fb02b8ed11ece11052f589d9222049f167336891):
+the boundary commit `13da04a290fc4e06d05636b5fd553476ed2d51e5` with its original SHAs, plus three
+recreated commits (see the [PR-2 log](../../09_Logs/Development_Log/2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md)).
+If PR-2 is not merged, `main` is the PR-1 state: firmware version literal `0.1.0` and none of the
+dev.1 content.
 
-The next code integration (PR-2, the v0.2.0 integration line) must update this notice in the same
-change, together with the short notices in the root `README.md`, `05_Firmware/README.md`,
+The next integration (PR-3, the dev.2/dev.3 line) must update this notice in the same change,
+together with the short notices in the root `README.md`, `05_Firmware/README.md`,
 `05_Firmware/MATDOG_Controller/README.md` and `01_Docs/02_Architecture/ROADMAP.md`.
 
-## What `main` contains after PR-1
+## What `main` contains after PR-2
 
-| Item | Value on `main` after PR-1 | How it was checked |
+| Item | Value on `main` after PR-2 | How it was checked |
 |---|---|---|
 | Partition table source | `partitions.csv`, `LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1` | blob identical to `7b258b3` and to the dev.3 tip `b764c25` |
 | Rows | `nvs` 0x9000+0x5000 · `otadata` 0xE000+0x2000 · `app0` 0x10000+0x500000 · `app1` 0x510000+0x500000 · `ffat` 0xA10000+0x5D0000 · `matdog_nvs` 0xFE0000+0x10000 · `coredump` 0xFF0000+0x10000 | `scripts/matdog_layout.py contract` |
@@ -36,27 +39,28 @@ change, together with the short notices in the root `README.md`, `05_Firmware/RE
 | `scripts/upload.sh` | refusing stub, no hardware operation, exit 1 | executed: prints `REFUSE`, exits 1 |
 | `scripts/flash_app_only.sh` | application slot only, with a flash-layout gate that refuses a device still on the legacy table and any write range touching `matdog_nvs` | script header; host tests |
 | Calibration Persistence V1 | record, codec, A/B NVS store, SAVE/ACK/RECONCILE, boot LOAD; `RESTORE` not implemented (LOAD never admits a transform) | source; host tests |
-| Firmware version literal | `kFirmwareVersion = "0.1.0"` (unchanged by the Persistence line) | `src/config/BuildConfig.h` |
+| Firmware version literal | `kFirmwareVersion = "0.2.0-dev.1"` (PR-2); it was `0.1.0` after PR-1 | `src/config/BuildConfig.h` |
+| dev.1 content | recovery, DALY/release stages, Wi-Fi/OTA V3 (OTA ingest default 0), charging priority, pure motion library (`src/motion`, unwired) | PR-2 log |
+| Deferred (not on `main`) | motion execution suites, oracles, G35/G4/G4.1/G5-A evidence, third-party XGO material | `motion_integration_manifest_pr2.json`, [ADR-004](../../09_Logs/Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md) |
 
 ## Why `main` must still not be used on the current robot
 
 1. **It is not the firmware the robot runs.** The dev.3 report records the robot running
-   `0.2.0-dev.3`, build `b3fd945bdaf3`. `main` after PR-1 holds the older Persistence V1 line. It
-   lacks the dev.1 to dev.3 work: post-abort recovery and thermal acquisition, DALY supervision,
-   Wi-Fi/OTA V3, the boot servo census of dev.2 and the direct-read thermal verdict of dev.3.
-   Flashing it would replace dev.3 with older firmware.
-2. **No hardware acceptance comes with it.** The persistence hardware results (SAVE/ACK and LOAD
-   across a reset, 2026-10-06) were obtained with dev.3 firmware, not with a `main` build, and a
-   real power cycle was not performed. PR-1 is a code integration, checked offline.
-3. **Its version string is ambiguous.** The build reports `0.1.0`, the same number as the frozen
-   `matdog-controller-v0.1.0` tag; only the build id tells them apart.
+   `0.2.0-dev.3`, build `b3fd945bdaf3`. `main` after PR-2 identifies as `0.2.0-dev.1`. It lacks the
+   dev.2 boot servo census and the dev.3 direct-read thermal verdict. Flashing it would replace
+   dev.3 with older firmware.
+2. **No hardware acceptance comes with it.** The persistence results (SAVE/ACK and LOAD across a
+   reset, 2026-10-06) were obtained with dev.3 firmware, not with a `main` build, and a real power
+   cycle was not performed. PR-1 and PR-2 are code integrations checked offline.
+3. **The motion library is not an authorization.** It is compiled and unwired; `MOTION_AUTHORIZED=0`
+   and `RESTORE=NOT_IMPLEMENTED` hold, and stand and gait hardware stay blocked.
 4. **Any flash needs its own authorization.** Even with the correct layout, a write needs explicit
    operator authorization, a fresh verified backup and the application-only procedure with all
    its gates. `scripts/upload.sh` no longer performs any upload.
 
 ## Before PR-1: `main` at `b65e75d` and `a09cb76`
 
-Kept for traceability. Until PR-1 is merged, this is what `main` contains.
+Kept for traceability. This is what `main` contained before PR-1.
 
 | Item | `main` before PR-1 |
 |---|---|
@@ -112,6 +116,8 @@ historical snapshot. A full status synchronization is a separate change.
   (legacy scheme and offsets, 2026-10-03 table write, flashed `be0c129` application).
 - dev.3 delta audit:
   [`MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md`](https://github.com/MattRobotics/robot-dog/blob/b764c25c9530350331dbaa59ea2d84ddab3a3f69/09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
+- PR-2 integration log:
+  [`2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md`](../../09_Logs/Development_Log/2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md).
 - PR-1 integration log:
   [`2026-10-08_PR1_PERSISTENCE_LAYOUT_V1_INTEGRATION.md`](../../09_Logs/Development_Log/2026-10-08_PR1_PERSISTENCE_LAYOUT_V1_INTEGRATION.md).
 - This repository: [`partitions.csv`](partitions.csv), [`scripts/matdog_layout.py`](scripts/matdog_layout.py),
