@@ -54,6 +54,7 @@ struct Fixture {
   servo::SafeOffResult safe_off = servo::SafeOffResult::VERIFIED_OFF;
   SystemState system;
   ControllerService telemetry;
+  matdog::update::OtaManager ota;  // Read-only SOURCE_SIGNATURE status fixture.
   network::WifiManager wifi;
   CommandRouter router;
 
@@ -73,7 +74,7 @@ struct Fixture {
     m.full_leg_calibration = &full_leg; m.full_leg_run = &run;
     m.full_leg_evidence = &scenario.evidence; m.persistence = &persistence;
     m.first_motion_safe_off_result = &safe_off;
-    m.wifi = &wifi; m.service = &telemetry; telemetry.begin(m); router.begin(m);
+    m.wifi = &wifi; m.ota = &ota; m.service = &telemetry; telemetry.begin(m); router.begin(m);
     CHECK(startCapture(q0)); CHECK(finishCapture(q0, scenario.golden));
     CHECK(command("@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION").find("PROMOTE=OK") != std::string::npos);
   }
@@ -499,7 +500,24 @@ void network_quiet_reservation() {
   f.wifi.config_busy_.store(false);
 }
 
+void source_identity_is_read_only() {
+  Fixture f;
+  const FramingSnapshot before(f);
+  const auto out = f.command("@SYSTEM SOURCE_SIGNATURE");
+  CHECK(out.find("FW_VERSION=0.2.0-dev.1") != std::string::npos);
+  CHECK(out.find("GIT_SHA=") != std::string::npos);
+  CHECK(out.find("GIT_DIRTY=") != std::string::npos);
+  CHECK(out.find("HARDWARE_PROFILE=ROBOT_POWERED") != std::string::npos);
+  CHECK(out.find("FLASH_LAYOUT=MATDOG_16M_2x5M_NVS_V1") != std::string::npos);
+  CHECK(out.find("CAL_RECORD_SCHEMA=1 CAL_MARKER_SCHEMA=2") != std::string::npos);
+  CHECK(out.find("OTA_INGEST=0") != std::string::npos);
+  CHECK(out.find("MOTION_AUTHORIZED=0") != std::string::npos);
+  CHECK(out.find("APP_SHA256=ASSOCIATED_MANIFEST RESTORE=NOT_IMPLEMENTED") != std::string::npos);
+  before.checkUnchanged(f);
+}
+
 int main() {
+  source_identity_is_read_only();
   network_quiet_reservation();
   parser_and_read_only(); identical_recapture_through_real_commands(); authorization_gates();
   uncertain_reconciliation_through_handler();

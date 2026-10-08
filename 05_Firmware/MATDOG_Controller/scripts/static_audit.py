@@ -5257,6 +5257,7 @@ def check_host_tests(sketch_dir):
         if source not in runner_text:
             fail(f"{runner}: LED integration suite must link real {source}")
     result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
+    print(result.stdout, end="")  # Preserve named fresh suite evidence in the gate log.
     if result.returncode != 0:
         fail(f"{runner}: servo population/profile offline tests FAILED "
              f"(stdout={result.stdout!r} stderr={result.stderr!r})")
@@ -6154,6 +6155,21 @@ def check_network_v3_boundaries(files, sketch_dir):
     if "src/config/TlsIdentity.local.h" not in ignored:fail("TLS identity must be gitignored")
 
 
+def check_motion_convergence_gate(sketch_dir):
+    """Dev.1 pure-library/source gate, added to the current safety owner."""
+    gate = sketch_dir / "scripts" / "tests" / "run_motion_convergence_tests.py"
+    if not gate.is_file():
+        fail("dev.1 motion convergence gate is missing")
+        return
+    result = subprocess.run([sys.executable, str(gate), "--source-only"],
+                            capture_output=True, text=True)
+    if result.returncode:
+        fail("dev.1 motion source/purity/provenance gate failed: " +
+             (result.stdout + result.stderr)[-4000:])
+    else:
+        print(result.stdout.strip())
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -6229,6 +6245,7 @@ def main():
     check_calibration_persistence_integration(files, SKETCH_DIR)
     check_unknown_detection_is_not_a_verdict(files)
     check_usb_cdc_tx_never_blocks(files)
+    check_motion_convergence_gate(SKETCH_DIR)
 
     print(f"Scanned {len(files)} source files under {SKETCH_DIR}")
 

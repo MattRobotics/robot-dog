@@ -506,6 +506,9 @@ CALREC_SRCS=(
   "$SKETCH_DIR/src/network/NetworkConfig.cpp" \
   "$SKETCH_DIR/src/update/OtaPolicy.cpp" \
   "$SKETCH_DIR/src/update/OtaBootGuard.cpp" \
+  "$SKETCH_DIR/src/update/OtaAuthorityGate.cpp" \
+  "$SKETCH_DIR/src/update/OtaLayoutContract.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp" \
   "$SKETCH_DIR/src/status/LedStatusPolicy.cpp" \
   "$SKETCH_DIR/src/power/DalyProtocol.cpp" \
   "${CALREC_SRCS[@]}"
@@ -645,4 +648,16 @@ python3 "$SCRIPT_DIR/test_static_audit_startup.py"
 python3 "$SCRIPT_DIR/test_ota_tls_client.py"
 python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
 
-echo "HOST_TESTS = PASS"
+# PR-2 (selective dev.1 integration): the pure motion library is integrated, but its
+# execution suites (motion host tests, fresh oracles, audit-tool tests) are DEFERRED
+# with the artifacts they need. The source/purity/provenance gate runs and states the
+# deferral; it never reports the deferred suites as passed.
+# The calibration mutation sandbox runs the current owner suites above for every
+# mutant; the source gate is covered by the full run.
+if [[ "${MATDOG_CALIBRATION_MUTATION_ONLY:-0}" == "1" ]]; then
+  echo "HOST_TESTS = PASS (calibration mutation owner suites; motion source gate not rerun)"
+else
+  python3 "$SCRIPT_DIR/run_motion_convergence_tests.py"
+  python3 "$SCRIPT_DIR/test_dev_identity_build.py"
+  echo "HOST_TESTS = PASS (current owners and motion source gate; motion execution suites DEFERRED)"
+fi

@@ -463,11 +463,18 @@ def copy_sketch(dst: Path) -> None:
     for sub in ("src", "scripts"):
         shutil.copytree(SKETCH / sub, dst / sub,
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    # V3 host transport tests inspect the real custom partition contract.
+    for name in ("partitions.csv", ".gitignore"):
+        shutil.copy2(SKETCH / name, dst / name)
 
 
 def run_host_tests(root: Path) -> subprocess.CompletedProcess:
+    # Each mutant still runs all current calibration/persistence/network tests.
+    # The independent pure-motion corpus is qualified once by the full gate;
+    # it has no dependency on the calibration owners mutated by this suite.
+    env = dict(os.environ, MATDOG_CALIBRATION_MUTATION_ONLY="1")
     return subprocess.run(["bash", str(root / "scripts/tests/run_host_tests.sh")],
-                          cwd=root, capture_output=True, text=True, timeout=3600)
+                          cwd=root, env=env, capture_output=True, text=True, timeout=3600)
 
 
 COUNT_RX = re.compile(r"(\S+): (\d+) checks, (\d+) failures")
@@ -526,6 +533,7 @@ def main() -> int:
         if res.returncode != 0:
             print("BEHAVIOUR_MUTATIONS = FAIL (unmutated copy does not pass: "
                   f"{classify(res.stdout + res.stderr)[1]})")
+            print(res.stdout + res.stderr)
             return 1
         print("baseline (unmutated copy): host tests PASS", flush=True)
 

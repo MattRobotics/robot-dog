@@ -44,3 +44,20 @@ bool HttpTransport::start() { ++router_test::hardware_calls; return false; }
 void HttpTransport::stop() { ++router_test::hardware_calls; }
 }
 }  // namespace matdog
+
+// SOURCE_SIGNATURE reads a default cached OTA status. These platform methods
+// supply its vtable without linking any flash implementation; any invocation
+// is counted exactly like the other fake hardware above.
+namespace matdog { namespace update {
+OtaPartitionInfo OtaEspBackend::runningPartition() { ++router_test::hardware_calls; return {}; }
+OtaPartitionInfo OtaEspBackend::nextUpdatePartition() { ++router_test::hardware_calls; return {}; }
+OtaImgState OtaEspBackend::imageState(const OtaPartitionInfo&) { ++router_test::hardware_calls; return OtaImgState::UNREADABLE; }
+bool OtaEspBackend::installedLayoutConforms() { ++router_test::hardware_calls; return false; }
+bool OtaEspBackend::beginWrite(const OtaPartitionInfo&, uint32_t) { ++router_test::hardware_calls; return false; }
+bool OtaEspBackend::write(const uint8_t*, uint32_t) { ++router_test::hardware_calls; return false; }
+bool OtaEspBackend::endWrite() { ++router_test::hardware_calls; return false; }
+void OtaEspBackend::abortWrite() { ++router_test::hardware_calls; }
+bool OtaEspBackend::setBootPartition(const OtaPartitionInfo&) { ++router_test::hardware_calls; return false; }
+bool OtaEspBackend::markAppValid() { ++router_test::hardware_calls; return false; }
+bool OtaEspBackend::rollbackPossible() { ++router_test::hardware_calls; return false; }
+} }
