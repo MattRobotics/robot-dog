@@ -1,5 +1,29 @@
 # MATDOG Controller — Changelog
 
+## 0.2.0-dev.3 — thermal verdict from direct reads; automatic post-abort recovery — 2026-10-06
+
+- The PresentTemperature byte of the 15-byte feedback block read is diagnostic only. On
+  the robot it intermittently reads 71..150 on the servo that is moving while a direct
+  read 50 ms later says ~32 C (23 such samples in the 2026-10-01 24/24 run, 19 on
+  2026-10-03, 4 in 38 s on 2026-10-06). Above the limit it only opens a confirmation.
+- The thermal verdict is taken from DIRECT single-register reads alone: three direct
+  samples over the unchanged 70 C limit are `CONFIRMED`; three at or under it refute the
+  block read (`BULK_TEMP_ARTIFACT_SUSPECT`, counted, logged, never latched); a failed,
+  invalid, incoherent or expired confirmation is `THERMAL_TELEMETRY_FAULT`. Both abort
+  verdicts publish a value over the limit, so the run ends in SAFE_OFF as before.
+- Removed: the per-servo latch (three refuted samples in 30 s, eight per boot) that
+  stopped LF at UPPER MAX on 2026-10-06 with every servo at 32..35 C. Every confirmation
+  sequence that aborted before still aborts; no limit, current, contact, torque, speed or
+  geometry parameter changed.
+- `calibration_hw_session.py`: after a failed leg (SAFE_OFF 13/13 and export done) the
+  runner starts the firmware's own witnessed `POST_ABORT RECOVERY` once, only for an
+  allow-listed search verdict in an UPPER/LOWER probe phase and only with fresh proof of
+  the promoted q0, geometry, census, preflight, direct temperatures and torque-off. Thermal
+  verdicts, current, communication, readback, status and operator aborts never recover.
+  `--no-auto-recovery` disables it. The BMS stream is switched off after a failed phase.
+- No recovery across a reboot exists: see the
+  [dev.3 delta audit](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
+
 ## 0.2.0-dev.2 — ROBOT_POWERED boot self-test census — 2026-10-06
 
 - ROBOT_POWERED arms exactly one canonical read-only servo census (11..55, 13 expected,
