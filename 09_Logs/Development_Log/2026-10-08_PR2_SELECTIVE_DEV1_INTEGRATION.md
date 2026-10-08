@@ -92,15 +92,24 @@ The robot runs the dev.3 candidate (provenance `b3fd945`), which `main` does not
 Hardware Validation 2026-10-07: execution COMPLETE, acceptance BLOCKED (stated by the owner;
 its report and result matrix are not in the repository and are not reconstructed here).
 
-## Known inherited link defect
+## Historical G3 report link — corrected in the PR-2 integration
 
-`05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md` (line 162) links to
-`09_Logs/Development_Log/2026-09-28_G3_STARTUP_TIMED_STAND.md`. That log exists only on
-`feat/g5a-stabilization-feasibility` and `backup/history/gait-g41-pre-amend-6047e43`; it was never
-on the integration branch, so the link is already dangling in the preserved original (`13da04a`).
-It is the only broken relative link among the 210 checked in the Markdown files PR-2 changes. It
-is left as is: the file is one of the 44 pinned `src/motion` sources, and editing it would change
-its pinned SHA-256 and break byte-identity with the original.
+The original `05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md` at `13da04a` had a dangling relative link to
+`09_Logs/Development_Log/2026-09-28_G3_STARTUP_TIMED_STAND.md`, a historical G3 report absent
+from the integration branch. The report is preserved in the G5-A historical line at
+[commit `e1704719979789cd9c9f18741e4546725558797e`](https://github.com/MattRobotics/robot-dog/blob/e1704719979789cd9c9f18741e4546725558797e/09_Logs/Development_Log/2026-09-28_G3_STARTUP_TIMED_STAND.md)
+(blob `513acfd998440e7d684f31d26257efefbd471c9f`).
+
+A PR-2-only documentation correction replaces the relative link with the immutable GitHub
+commit URL. No historical commit, firmware source, motion algorithm, or validation evidence is
+rewritten. Of the 44 integrated `src/motion` files, 43 retain byte identity with `13da04a`;
+`STARTUP_TIMING.md` differs only in this hyperlink.
+
+The original document SHA-256 `f10077167de128c0b52b3efdc0abbac663aeef0db7c2e241e404dc6bd45607bc` and integration SHA-256
+`c866d0a1e49754773b50f7ead5f5b6de6df7b3412f454ac57f47d458f781103e` are both recorded in
+`scripts/tests/motion_integration_manifest_pr2.json` (original_sha256 and sha256).
+The original remains recoverable via `13da04a`. This corrects the one previously reported
+broken relative link; it does not upgrade any motion tests or hardware-acceptance status.
 
 ## Open
 

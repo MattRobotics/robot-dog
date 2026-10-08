@@ -162,8 +162,10 @@
     },
     {
       "path": "05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md",
-      "sha256": "f10077167de128c0b52b3efdc0abbac663aeef0db7c2e241e404dc6bd45607bc",
-      "classification": "PRESERVE_AS_EVIDENCE"
+      "sha256": "c866d0a1e49754773b50f7ead5f5b6de6df7b3412f454ac57f47d458f781103e",
+      "classification": "PRESERVE_AS_EVIDENCE",
+      "original_sha256": "f10077167de128c0b52b3efdc0abbac663aeef0db7c2e241e404dc6bd45607bc",
+      "integration_note": "PR-2 document-only correction: replace inherited dangling G3 link with historical immutable commit URL; original source remains at 13da04a."
     },
     {
       "path": "05_Firmware/MATDOG_Controller/src/motion/StandReferenceData.h",

@@ -159,5 +159,5 @@ are identical. These remain sampled offline checks, not a continuous swept
 collision proof or dynamic stability certification. C4's existing lower-leg
 fork review and COM-proxy limitations remain in force.
 
-See the [G3 validation report](../../../../09_Logs/Development_Log/2026-09-28_G3_STARTUP_TIMED_STAND.md)
+See the [G3 validation report](https://github.com/MattRobotics/robot-dog/blob/e1704719979789cd9c9f18741e4546725558797e/09_Logs/Development_Log/2026-09-28_G3_STARTUP_TIMED_STAND.md)
 for numerical results, commands and scope.
