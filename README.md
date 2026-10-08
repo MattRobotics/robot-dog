@@ -36,7 +36,7 @@ This repository is the single active engineering repository for the robot.
 | Offline tests | static audit and C++/Python host suites, USB_ONLY and ROBOT_POWERED builds: see [`VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md), section PR-3 |
 | Hardware results (historical, of the dev.2/dev.3 candidate, not of a `main` build) | 2026-10-06: boot census 13/13; fresh Q0 and calibration 24/24 under dev.3; SAVE/ACK and LOAD across a reset (no real power cycle); the automatic post-abort recovery did not run. Records: [dev.2 audit](09_Logs/Validation_Reports/MATDOG_V0_2_DEV2_BOOT_SELFTEST_DELTA_AUDIT_2026-10-06.md), [dev.3 audit](09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md). The 2026-10-07 report is not in the repository |
 | Hardware acceptance / release acceptance | none: dev.3 execution COMPLETE, acceptance BLOCKED; no `main` build accepted; no release approved |
-| Deferred | motion execution suites, fresh oracles and the G35/G4/G4.1/G5-A evidence; 38 third-party XGO extracts and XGO-derived data are **not** in this repository ([ADR-004](09_Logs/Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md)) |
+| Deferred | motion execution suites, fresh oracles and the G35/G4/G4.1/G5-A evidence; 38 third-party XGO extracts and XGO-derived data are **not reachable from `main`**; they remain present on separate public historical branches ([ADR-004](09_Logs/Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md)) |
 
 > **Historical snapshot — 2026-10-01 (PR #35 merged)**
 >
