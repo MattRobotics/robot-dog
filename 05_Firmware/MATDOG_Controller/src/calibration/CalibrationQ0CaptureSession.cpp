@@ -254,6 +254,22 @@ actuator::FreshQ0Capture CalibrationQ0CaptureSession::freshCapture() const {
   return view;
 }
 
+bool CalibrationQ0CaptureSession::notePromotionCompleted(
+    uint32_t capture_session_id, uint8_t admitted_joints,
+    actuator::GeometryProvenanceTag geometry) {
+  status_.promoted_capture_session_id = 0;
+  status_.promoted_geometry = actuator::kNoGeometryProvenance;
+  if (!freshCapture().complete || capture_session_id == 0 ||
+      capture_session_id != status_.capture_session_id ||
+      admitted_joints != kLegServoSlotCount || geometry == actuator::kNoGeometryProvenance ||
+      geometry != profile_.provenanceTag()) {
+    return false;
+  }
+  status_.promoted_capture_session_id = capture_session_id;
+  status_.promoted_geometry = geometry;
+  return true;
+}
+
 void CalibrationQ0CaptureSession::fail(Q0CaptureFailure failure) {
   if (!active()) return;
   status_.state = Q0CaptureState::FAILED;

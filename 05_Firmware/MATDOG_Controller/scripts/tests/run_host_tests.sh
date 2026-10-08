@@ -236,6 +236,12 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# The firmware-side MATDOG flash layout contract (pure, ESP-IDF-free).
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -o "$OUT/test_ota_layout_contract" \
+  "$SCRIPT_DIR/test_ota_layout_contract.cpp" \
+  "$SKETCH_DIR/src/update/OtaLayoutContract.cpp"
+
 # The Safe Actuator runtime adapter suite links the REAL adapter, the REAL
 # policy and the REAL arbiter, so the "no ACCEPT -> no backend call" and
 # "ACCEPT -> exactly one backend call" properties under test are the shipped
@@ -388,6 +394,103 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
   "$SKETCH_DIR/src/core/OperatingMode.cpp"
 
+# Calibration Persistence V1 (P2): record codec/validation, A/B store with fault
+# injection, and the NVS adapter against a host stand-in of <nvs.h>. The record
+# validator re-derives joint diagnostics through the production
+# deriveFullLegJointDiagnostics, so the executor chain is linked as above.
+CALREC_SRCS=(
+  "$SKETCH_DIR/src/calibration/CalibrationRecord.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationRecordStore.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationSaveMarker.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationPersistenceState.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationPersistenceService.cpp"
+  "$SKETCH_DIR/src/calibration/FullLegCalibrationFinalizer.cpp"
+  "$SKETCH_DIR/src/calibration/FullLegCalibrationPlan.cpp"
+  "$SKETCH_DIR/src/calibration/FullLegCalibrationExecutor.cpp"
+  "$SKETCH_DIR/src/calibration/ContactProbeEngine.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationManager.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationMotionPermit.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationPopulationEvidence.cpp"
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
+  "$SKETCH_DIR/src/actuator/OperationalEnvelope.cpp"
+  "$SKETCH_DIR/src/actuator/MotionDeadman.cpp"
+  "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp"
+  "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp"
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp"
+  "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp"
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp"
+  "$SKETCH_DIR/src/servo/ServoPopulation.cpp"
+  "$SKETCH_DIR/src/core/SystemState.cpp"
+  "$SKETCH_DIR/src/core/ActuatorAuthority.cpp"
+  "$SKETCH_DIR/src/core/OperatingMode.cpp"
+)
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_record" \
+  "$SCRIPT_DIR/test_calibration_record.cpp" "${CALREC_SRCS[@]}"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_save_marker" \
+  "$SCRIPT_DIR/test_calibration_save_marker.cpp" "${CALREC_SRCS[@]}"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_persistence_state" \
+  "$SCRIPT_DIR/test_calibration_persistence_state.cpp" "${CALREC_SRCS[@]}"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_record_store" \
+  "$SCRIPT_DIR/test_calibration_record_store.cpp" "${CALREC_SRCS[@]}"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -I"$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_calibration_record_nvs_backend" \
+  "$SCRIPT_DIR/test_calibration_record_nvs_backend.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationRecordNvsBackend.cpp" "${CALREC_SRCS[@]}"
+
+# Controller integration of the persistence (P3a): the service (boot LOAD
+# verdicts, SAVE/ACK/RECONCILE entry points) against a fake storage, and the
+# SAVE gate against the REAL Q0 capture session, promotion and transform table.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_persistence_service" \
+  "$SCRIPT_DIR/test_calibration_persistence_service.cpp" "${CALREC_SRCS[@]}"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -o "$OUT/test_calibration_save_gate" \
+  "$SCRIPT_DIR/test_calibration_save_gate.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationSaveGate.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0EvidencePreparation.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Promotion.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
+  "${CALREC_SRCS[@]}"
+
+# P3a.1/P3a.2: both REAL CommandRouter translation units, including USB framing,
+# dispatch and explicit Q0 promotion. Platform transports / unrelated device
+# service methods are fakes; the calibration and persistence code stays real.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
+  -ffunction-sections -fdata-sections -Wl,--gc-sections \
+  -DMATDOG_ACTIVE_HARDWARE_PROFILE=::matdog::config::HardwareProfile::ROBOT_POWERED \
+  -DMATDOG_OTA_INGEST_ENABLED=0 -I"$SCRIPT_DIR/router_stubs" -I"$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_command_router_persistence" \
+  "$SCRIPT_DIR/test_command_router_persistence.cpp" \
+  "$SCRIPT_DIR/router_fake_hardware.cpp" \
+  "$SCRIPT_DIR/router_nvs_stub.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationRecordNvsBackend.cpp" \
+  "$SKETCH_DIR/src/core/CommandRouter.cpp" \
+  "$SKETCH_DIR/src/core/CommandRouterPersistence.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationSaveGate.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0EvidencePreparation.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Promotion.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
+  "$SKETCH_DIR/src/calibration/FirstMotionExecutor.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationSessionOrchestrator.cpp" \
+  "$SKETCH_DIR/src/core/Availability.cpp" \
+  "$SKETCH_DIR/src/core/PowerState.cpp" \
+  "$SKETCH_DIR/src/core/ServiceReadiness.cpp" \
+  "$SKETCH_DIR/src/servo/ServoProfile.cpp" \
+  "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/update/OtaPolicy.cpp" \
+  "$SKETCH_DIR/src/update/OtaBootGuard.cpp" \
+  "$SKETCH_DIR/src/status/LedStatusPolicy.cpp" \
+  "$SKETCH_DIR/src/power/DalyProtocol.cpp" \
+  "${CALREC_SRCS[@]}"
+
 # The HostLink readiness classifier suite links the REAL pure classifier -
 # no module pointer, no hardware call - I6 (2026-09-25 objective change).
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
@@ -458,6 +561,7 @@ done
 "$OUT/test_motion_deadman"
 "$OUT/test_thermal_confirmation"
 "$OUT/test_ota_policy"
+"$OUT/test_ota_layout_contract"
 "$OUT/test_calibration_domain"
 "$OUT/test_calibration_population_evidence"
 "$OUT/test_calibration_manager"
@@ -470,6 +574,15 @@ done
 "$OUT/test_full_leg_calibration_executor"
 "$OUT/test_full_leg_calibration_plan"
 "$OUT/test_full_leg_calibration_finalizer"
+"$OUT/test_calibration_record"
+"$OUT/test_calibration_save_marker"
+"$OUT/test_calibration_persistence_state"
+"$OUT/test_calibration_record_store"
+"$OUT/test_calibration_persistence_service"
+"$OUT/test_calibration_save_gate"
+"$OUT/test_command_router_persistence"
+python3 "$SCRIPT_DIR/test_command_router_framing_mutations.py"
+"$OUT/test_calibration_record_nvs_backend"
 "$OUT/test_service_readiness"
 "$OUT/test_led_status_policy"
 "$OUT/test_led_ring_manager_USB_ONLY"

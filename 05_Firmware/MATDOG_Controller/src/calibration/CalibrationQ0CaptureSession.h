@@ -75,6 +75,10 @@ struct Q0CaptureStatus {
   PopulationEvidenceBuildStatus population_status =
       PopulationEvidenceBuildStatus::NOT_EVALUATED;
   uint8_t candidates_complete = 0;
+  // RAM-only attestation, recorded by the explicit promotion command after
+  // all twelve transforms were admitted. A new capture/reset clears it.
+  uint32_t promoted_capture_session_id = 0;
+  actuator::GeometryProvenanceTag promoted_geometry = actuator::kNoGeometryProvenance;
 };
 
 class CalibrationQ0CaptureSession {
@@ -107,6 +111,11 @@ class CalibrationQ0CaptureSession {
   // The CR3 promotion view of this capture. `complete` is true only for a
   // failure-free COMPLETE capture whose 12 candidates were all built.
   actuator::FreshQ0Capture freshCapture() const;
+
+  // Called by the explicit PROMOTE handler only after preparing the current
+  // installation and admitting all twelve transforms. Never inferred from ticks.
+  bool notePromotionCompleted(uint32_t capture_session_id, uint8_t admitted_joints,
+                              actuator::GeometryProvenanceTag geometry);
 
  private:
   bool buildReadRequest(uint8_t joint_index, uint8_t sample_pass,

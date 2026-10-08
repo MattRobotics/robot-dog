@@ -3,9 +3,15 @@
 partition, used to derive a trustworthy write offset for
 scripts/flash_app_only.sh.
 
-This exists because MATDOG_Controller's partition scheme
-(app3M_fat9M_16MB) is a dual-OTA-slot layout (app0/ota_0 and app1/ota_1),
-not a single fixed application region. Writing "the application" correctly
+This exists because MATDOG_Controller's partition layout
+(MATDOG_16M_2x5M_NVS_V1, see matdog_layout.py) is a dual-OTA-slot layout
+(app0/ota_0 and app1/ota_1), not a single fixed application region.
+
+LAYOUT GATE (P2.3). Before the active slot is resolved, the table read from
+the device must be EXACTLY the pinned layout (matdog_layout.check_table_bytes:
+entries, order and SHA-256 of the 0xC00-byte table). A device that still has
+the legacy table is refused with INSTALLED_LAYOUT_LEGACY: there is no bypass
+here - that device needs the separately authorized migration procedure. Writing "the application" correctly
 means writing whichever slot the device's own otadata currently selects.
 
 All the actual selection logic — struct layout, CRC, validity, and the
@@ -33,6 +39,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import matdog_layout
 from ota_partition_logic import (
     OtaAmbiguous,
     parse_sdkconfig_ota_flags,
@@ -64,6 +71,9 @@ def main():
     ap.add_argument("--esptool", required=True)
     ap.add_argument("--sdkconfig", required=True,
                      help="path to the sdkconfig produced by the build being flashed")
+    ap.add_argument("--expected-table-sha256", required=True,
+                     help="partition table SHA-256 the build manifest recorded; the table "
+                          "installed on the device must be exactly this one")
     args = ap.parse_args()
 
     sdkconfig_path = Path(args.sdkconfig)
@@ -84,9 +94,23 @@ def main():
         esptool_read(args.esptool, args.chip, args.port,
                      OTADATA_OFFSET, OTADATA_SIZE, ota_bin)
 
+        installed_table = part_bin.read_bytes()
+        try:
+            installed_sha256, _ = matdog_layout.check_table_bytes(installed_table)
+        except matdog_layout.LayoutRefusal as exc:
+            print(f"REFUSED={exc.code}", file=sys.stderr)
+            print(f"DETAIL={exc.detail}", file=sys.stderr)
+            raise SystemExit(f"REFUSE: installed partition table is not the "
+                             f"{matdog_layout.LAYOUT_ID} layout ({exc.code})")
+        if installed_sha256 != args.expected_table_sha256.lower():
+            raise SystemExit(f"REFUSE: installed partition table {installed_sha256} != "
+                             f"the build manifest's {args.expected_table_sha256}")
+        print(f"LAYOUT_ID={matdog_layout.LAYOUT_ID}")
+        print(f"INSTALLED_PARTITION_TABLE_SHA256={installed_sha256}")
+
         try:
             resolved = resolve_application_partition(
-                part_bin.read_bytes(), ota_bin.read_bytes(),
+                installed_table, ota_bin.read_bytes(),
                 rollback=rollback,
                 anti_rollback=anti_rollback,
             )

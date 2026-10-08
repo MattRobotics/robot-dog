@@ -47,22 +47,36 @@ explicit-authorization requirement, its own mismatch reason, never inferred
 from the profile (a `ROBOT_POWERED` build with ingest still `0` is a
 perfectly ordinary, expected combination).
 
+LAYOUT PROVENANCE (manifest V2, P2.3)
+-------------------------------------
+MATDOG flash layout V1 (scripts/matdog_layout.py, partitions.csv) puts the
+persistent MATDOG NVS partition in flash. The manifest therefore also binds
+the build to the layout it was made for: LAYOUT_ID, the SHA-256 of the
+binary partition table the build ACTUALLY produced (not of the csv), and the
+size of the application partitions. V1 manifests, and any manifest without
+this information, are refused. verify also re-hashes the table artifact next
+to the binary and requires the binary itself to embed the layout id string
+compiled into the firmware, so the claim is tied to the artifact and not to
+free-standing metadata.
+
 FAIL-CLOSED CONTRACT
 --------------------
 `verify_manifest()` returns a refusal reason for every case it cannot
 positively prove. It never has a permissive default, never infers a profile
 and never treats "absent" as "fine". The only path to OK is: manifest
 present and parseable, its schema version known, its commit equal to HEAD,
-its FQBN equal to the caller's pinned FQBN, tree clean at build time and
-now, binary present, binary size AND sha256 equal to the recorded ones,
-manifest profile recognized, and the requested profile equal to the
-manifest profile.
+its FQBN equal to the caller's pinned FQBN, the layout id / partition table
+digest / app partition size equal to the pinned MATDOG layout, tree clean at
+build time and now, binary present, binary size AND sha256 equal to the
+recorded ones (and within the application partition), manifest profile
+recognized, and the requested profile equal to the manifest profile.
 
 Usage:
     build_manifest.py write  --output P --binary P --source-commit SHA \\
                              --build-id ID --source-state CLEAN|DIRTY|NO_GIT \\
                              --profile USB_ONLY|ROBOT_POWERED --fqbn FQBN \\
                              --ota-ingest 0|1
+    (the partition table is read from <binary>.partitions.bin next to the binary)
     build_manifest.py verify --manifest P --binary P --head SHA \\
                              --expected-fqbn FQBN --tree-state CLEAN|DIRTY \\
                              --requested-profile USB_ONLY|ROBOT_POWERED \\
@@ -75,7 +89,10 @@ import hashlib
 import sys
 from pathlib import Path
 
-MANIFEST_VERSION = "1"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import matdog_layout  # noqa: E402
+
+MANIFEST_VERSION = "2"
 MANIFEST_FILENAME = "matdog_build_manifest.txt"
 
 # The only profiles that may ever appear in a manifest. Anything else —
@@ -116,6 +133,9 @@ REQUIRED_KEYS = (
     "APPLICATION_BINARY",
     "APPLICATION_SIZE",
     "APPLICATION_SHA256",
+    "LAYOUT_ID",
+    "PARTITION_TABLE_SHA256",
+    "APP_PARTITION_SIZE",
 )
 
 
@@ -139,6 +159,12 @@ class Refusal:
     OTA_INGEST_UNKNOWN = "OTA_INGEST_UNKNOWN"
     REQUESTED_OTA_INGEST_UNKNOWN = "REQUESTED_OTA_INGEST_UNKNOWN"
     OTA_INGEST_MISMATCH = "OTA_INGEST_MISMATCH"
+    LAYOUT_ID_MISMATCH = "LAYOUT_ID_MISMATCH"
+    PARTITION_TABLE_MISMATCH = "PARTITION_TABLE_MISMATCH"
+    PARTITION_TABLE_ARTIFACT_MISSING = "PARTITION_TABLE_ARTIFACT_MISSING"
+    APP_PARTITION_SIZE_MISMATCH = "APP_PARTITION_SIZE_MISMATCH"
+    APPLICATION_TOO_LARGE = "APPLICATION_TOO_LARGE"
+    LAYOUT_ID_NOT_IN_BINARY = "LAYOUT_ID_NOT_IN_BINARY"
 
 
 class Verdict:
@@ -162,8 +188,16 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+def partition_table_path_for(binary):
+    """The binary partition table the build exported next to the application."""
+    binary = Path(binary)
+    name = binary.name[:-4] if binary.name.endswith(".bin") else binary.name
+    return binary.with_name(name + ".partitions.bin")
+
+
 def render_manifest(*, source_commit, build_id, source_state, profile, ota_ingest_enabled,
-                    fqbn, application_binary, application_size, application_sha256):
+                    fqbn, application_binary, application_size, application_sha256,
+                    layout_id, partition_table_sha256, app_partition_size):
     """Renders the manifest text. Deliberately a flat, fixed-order
     KEY=VALUE format with no quoting, no nesting and no escaping: it is
     consumed by `grep '^KEY=' | cut -d= -f2-` in shell as well as by this
@@ -179,6 +213,9 @@ def render_manifest(*, source_commit, build_id, source_state, profile, ota_inges
         f"APPLICATION_BINARY={application_binary}",
         f"APPLICATION_SIZE={application_size}",
         f"APPLICATION_SHA256={application_sha256}",
+        f"LAYOUT_ID={layout_id}",
+        f"PARTITION_TABLE_SHA256={partition_table_sha256}",
+        f"APP_PARTITION_SIZE={app_partition_size}",
     ]
     return "\n".join(lines) + "\n"
 
@@ -209,7 +246,8 @@ def parse_manifest(text):
 
 def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
                     binary_exists, binary_size, binary_sha256, requested_profile,
-                    requested_ota_ingest):
+                    requested_ota_ingest, build_partition_table_sha256,
+                    binary_embeds_layout_id):
     """The fail-closed gate. Pure: every observation is passed in.
 
     `manifest` is a parsed dict (or None when the file was missing).
@@ -227,6 +265,11 @@ def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
     in particular, OTA-ingest state is never inferred from the hardware
     profile; a ROBOT_POWERED build with ingest still 0 is ordinary.
 
+    `build_partition_table_sha256` is the digest of the table artifact found
+    next to the binary NOW ("" if absent); `binary_embeds_layout_id` says
+    whether the binary contains the layout id string compiled into the
+    firmware. Both are required, like every other observation.
+
     `expected_fqbn` is deliberately a required keyword argument with no
     default: the caller (flash_app_only.sh) pins its own FQBN and must
     state it. A default here would let a caller that forgot the argument
@@ -236,15 +279,19 @@ def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
         return Verdict(False, Refusal.MANIFEST_MISSING,
                        detail="no build manifest next to the application binary")
 
+    # The version is judged first: a V1 manifest (no layout information at
+    # all) must be reported as an unsupported version, not as "incomplete".
+    version = manifest.get("MATDOG_MANIFEST_VERSION", "")
+    if version != "" and version != MANIFEST_VERSION:
+        return Verdict(False, Refusal.MANIFEST_VERSION_UNKNOWN,
+                       detail=f"manifest version {version!r} != supported "
+                              f"{MANIFEST_VERSION!r} (manifests without layout "
+                              f"information are not accepted)")
+
     missing = [k for k in REQUIRED_KEYS if k not in manifest or manifest[k] == ""]
     if missing:
         return Verdict(False, Refusal.MANIFEST_INCOMPLETE,
                        detail=f"missing/empty manifest keys: {', '.join(missing)}")
-
-    if manifest["MATDOG_MANIFEST_VERSION"] != MANIFEST_VERSION:
-        return Verdict(False, Refusal.MANIFEST_VERSION_UNKNOWN,
-                       detail=f"manifest version {manifest['MATDOG_MANIFEST_VERSION']!r} "
-                              f"!= supported {MANIFEST_VERSION!r}")
 
     if manifest["SOURCE_COMMIT"] != head_commit:
         return Verdict(False, Refusal.SOURCE_COMMIT_MISMATCH,
@@ -262,6 +309,31 @@ def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
         return Verdict(False, Refusal.FQBN_MISMATCH,
                        detail=f"manifest FQBN {manifest['FQBN']!r} != expected "
                               f"{expected_fqbn!r}")
+
+    # Flash layout: the recorded layout must be THE pinned MATDOG layout, the
+    # recorded partition table digest must be the pinned one AND equal to the
+    # table artifact the build left next to the binary, and the application
+    # partition size must be the pinned 5 MiB.
+    if manifest["LAYOUT_ID"] != matdog_layout.LAYOUT_ID:
+        return Verdict(False, Refusal.LAYOUT_ID_MISMATCH,
+                       detail=f"manifest LAYOUT_ID {manifest['LAYOUT_ID']!r} != "
+                              f"{matdog_layout.LAYOUT_ID!r}")
+    if manifest["PARTITION_TABLE_SHA256"].lower() != matdog_layout.EXPECTED_TABLE_SHA256:
+        return Verdict(False, Refusal.PARTITION_TABLE_MISMATCH,
+                       detail=f"manifest partition table {manifest['PARTITION_TABLE_SHA256']} "
+                              f"!= pinned {matdog_layout.EXPECTED_TABLE_SHA256}")
+    if manifest["APP_PARTITION_SIZE"] != str(matdog_layout.APP_SLOT_SIZE):
+        return Verdict(False, Refusal.APP_PARTITION_SIZE_MISMATCH,
+                       detail=f"manifest APP_PARTITION_SIZE {manifest['APP_PARTITION_SIZE']} "
+                              f"!= {matdog_layout.APP_SLOT_SIZE}")
+    if build_partition_table_sha256 == "":
+        return Verdict(False, Refusal.PARTITION_TABLE_ARTIFACT_MISSING,
+                       detail="the binary partition table the build produced is not next "
+                              "to the application binary")
+    if manifest["PARTITION_TABLE_SHA256"].lower() != str(build_partition_table_sha256).lower():
+        return Verdict(False, Refusal.PARTITION_TABLE_MISMATCH,
+                       detail=f"manifest partition table {manifest['PARTITION_TABLE_SHA256']} "
+                              f"!= table artifact on disk {build_partition_table_sha256}")
 
     # Both the recorded build state and the live tree must be clean. The
     # manifest's own SOURCE_STATE catches "built dirty, then committed",
@@ -288,6 +360,17 @@ def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
         return Verdict(False, Refusal.BINARY_SHA256_MISMATCH,
                        detail=f"manifest {manifest['APPLICATION_SHA256']}, "
                               f"binary on disk {binary_sha256}")
+
+    # The image must fit the application partition it is declared for, and
+    # must itself carry the layout id (identity of the artifact, not of the
+    # metadata next to it).
+    if int(binary_size) > matdog_layout.APP_SLOT_SIZE:
+        return Verdict(False, Refusal.APPLICATION_TOO_LARGE,
+                       detail=f"binary {binary_size} bytes > application partition "
+                              f"{matdog_layout.APP_SLOT_SIZE} bytes")
+    if not binary_embeds_layout_id:
+        return Verdict(False, Refusal.LAYOUT_ID_NOT_IN_BINARY,
+                       detail=f"binary does not embed '{matdog_layout.LAYOUT_MARKER}'")
 
     manifest_profile = manifest["HARDWARE_PROFILE"]
     if manifest_profile not in KNOWN_PROFILES:
@@ -365,6 +448,24 @@ def _cmd_write(args):
         print(f"DETAIL=unknown ota-ingest value {args.ota_ingest!r}", file=sys.stderr)
         return 1
 
+    # The manifest is the single choke point: it is never written for a build
+    # whose layout, table or size is not the pinned one.
+    try:
+        matdog_layout.check_fqbn(args.fqbn)
+        table_path = partition_table_path_for(binary)
+        if not table_path.is_file():
+            raise matdog_layout.LayoutRefusal(
+                Refusal.PARTITION_TABLE_ARTIFACT_MISSING, f"not found: {table_path}")
+        table_digest, _ = matdog_layout.check_table_bytes(table_path.read_bytes())
+        matdog_layout.check_app_size(binary.stat().st_size)
+        if not matdog_layout.binary_embeds_layout_id(binary.read_bytes()):
+            raise matdog_layout.LayoutRefusal(
+                Refusal.LAYOUT_ID_NOT_IN_BINARY, f"'{matdog_layout.LAYOUT_MARKER}' not in {binary}")
+    except matdog_layout.LayoutRefusal as exc:
+        print(f"REFUSED={exc.code}", file=sys.stderr)
+        print(f"DETAIL={exc.detail}", file=sys.stderr)
+        return 1
+
     text = render_manifest(
         source_commit=args.source_commit,
         build_id=args.build_id,
@@ -375,11 +476,16 @@ def _cmd_write(args):
         application_binary=binary.name,
         application_size=binary.stat().st_size,
         application_sha256=sha256_file(binary),
+        layout_id=matdog_layout.LAYOUT_ID,
+        partition_table_sha256=table_digest,
+        app_partition_size=matdog_layout.APP_SLOT_SIZE,
     )
     Path(args.output).write_text(text, encoding="utf-8")
     print(f"BUILD_MANIFEST={args.output}")
     print(f"HARDWARE_PROFILE={args.profile}")
     print(f"OTA_INGEST_ENABLED={args.ota_ingest}")
+    print(f"LAYOUT_ID={matdog_layout.LAYOUT_ID}")
+    print(f"PARTITION_TABLE_SHA256={table_digest}")
     return 0
 
 
@@ -392,6 +498,10 @@ def _cmd_verify(args):
 
     binary = Path(args.binary)
     binary_exists = binary.is_file()
+    table_path = partition_table_path_for(binary)
+    table_sha = sha256_file(table_path) if table_path.is_file() else ""
+    embeds = (binary_exists and
+              matdog_layout.binary_embeds_layout_id(binary.read_bytes()))
     verdict = verify_manifest(
         manifest,
         head_commit=args.head,
@@ -402,6 +512,8 @@ def _cmd_verify(args):
         binary_sha256=sha256_file(binary) if binary_exists else "",
         requested_profile=args.requested_profile,
         requested_ota_ingest=args.requested_ota_ingest,
+        build_partition_table_sha256=table_sha,
+        binary_embeds_layout_id=embeds,
     )
 
     if not verdict.ok:
@@ -415,6 +527,9 @@ def _cmd_verify(args):
     print(f"VERIFIED_FQBN={manifest['FQBN']}")
     print(f"VERIFIED_APPLICATION_SHA256={manifest['APPLICATION_SHA256']}")
     print(f"VERIFIED_APPLICATION_SIZE={manifest['APPLICATION_SIZE']}")
+    print(f"VERIFIED_LAYOUT_ID={manifest['LAYOUT_ID']}")
+    print(f"VERIFIED_PARTITION_TABLE_SHA256={manifest['PARTITION_TABLE_SHA256']}")
+    print(f"VERIFIED_APP_PARTITION_SIZE={manifest['APP_PARTITION_SIZE']}")
     return 0
 
 

@@ -1,5 +1,166 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — P3a.2 USB command framing hardening (offline, no hardware) — 2026-10-02
+
+- CommandRouter latches overflow or NUL for the entire USB line and discards it
+  through LF, across `update()` calls. No prefix is dispatched. LF and `begin()`
+  clear the buffer, length and error; subsequent lines are received normally.
+- The buffer stays 96 bytes: 95 payload bytes are accepted, the 96th invalidates
+  the line. CR remains ignored, preserving LF/CRLF behavior and command grammar.
+  Invalid lines report `ERROR=COMMAND_LINE_OVERFLOW` or `ERROR=COMMAND_LINE_NUL`
+  at LF; the first error is retained.
+- Real-router raw-byte regressions cover both findings for SAVE, ACK and
+  RECONCILE ADOPT, including fragmented input, recovery and `begin()` reset.
+  An integrated real NVS adapter test observes `nvs_set_blob`/`nvs_commit`:
+  rejected lines make zero calls and leave marker, slots and calibration unchanged.
+  Temporary-source mutation tests independently restore each defect and must
+  detect writes through both storage paths. Existing P2.4.1/P3a.1 tests remain.
+
+## Unreleased — P3a.1 corrective persistence integration (offline, no hardware) — 2026-10-02
+
+- SAVE now requires a RAM attestation of the exact current `capture_session_id`,
+  recorded only after explicit current-installation Q0 promotion admits all twelve
+  transforms. New capture, failed start, reset and boot clear it. Historical transforms
+  with identical ticks cannot attest a new capture. Existing geometry and per-joint
+  record/transform comparisons still apply; Q0 values and kinematics are unchanged.
+- The service refuses every mutating SAVE/ACK/RECONCILE after an uncertain outcome.
+  A repeated ACK may only verify an already acknowledged, valid generation by a fresh
+  read-only scan; it never writes or clears the block. The marker/A/B protocol is unchanged.
+- PERSIST dispatch and handler require a complete token (space or end of line).
+  `PERSISTACK` and `PERSISTSAVE` cannot reach a storage operation.
+- Host coverage now compiles both real CommandRouter translation units, exercising
+  USB framing, dispatch, the explicit Q0 promotion command and the persistence handler.
+  Only platform transport and unrelated hardware methods are simulated. Tests check
+  malformed arguments, generation bounds, authorization gates, read-only commands,
+  identical recapture and uncertain reconciliation with storage write counts/bytes.
+
+## Unreleased — P3a Controller integration of Calibration Persistence V1 (offline, no hardware) — 2026-10-02
+
+Wires the P2–P2.4.1 persistence into the Controller. It adds diagnostics and two explicit,
+operator-driven persistent actions (SAVE, ACK) plus a controlled reconciliation. It restores
+nothing and authorizes no movement: every reply states `MOTION_AUTHORIZED=0` and STATUS prints
+`RESTORE=NOT_IMPLEMENTED`. **Do not load this firmware on a device that still has the legacy
+`app3M_fat9M_16MB` partition table**: there is no `matdog_nvs` partition, the boot LOAD reports
+`NVS_UNAVAILABLE` (PARTITION_MISSING) and SAVE/ACK/RECONCILE are refused. Nothing is formatted.
+
+- **Boot:** in `Controller::begin()`, right after `geometry_profile_.bind()` and before any
+  actuator/servo/service/command init: `persistence_backend_.begin()`, then a read-only LOAD.
+  No servo bus traffic. The result is kept for diagnostics only. `CalibrationPersistenceService`
+  (pure) owns the single `CalibrationRecordStore`; the Controller owns the service (no stack copy).
+- **`@CALIBRATION PERSIST STATUS`** (read-only): NVS state, marker, acknowledged/awaiting generation,
+  slots A/B, boot and last LOAD verdict, write block, error codes, whether a valid persistent
+  calibration is available (information, not an authorization).
+- **`@CALIBRATION PERSIST SAVE CHECK` / `SAVE CONFIRM_SAVE_FULL_CALIBRATION`**: `CalibrationSaveGate`
+  proves, in a fixed order, persistence ready, no write in doubt, saveable storage state,
+  maintenance, no live session / armed run / executor / Q0 capture / servo diagnostic, authority
+  NONE, permit revoked, no operator authorization, SAFE_OFF evidence, 24/24 Full Calibration,
+  closed leg runs, current geometry, complete and PROMOTED fresh Q0, record buildable/valid/accepted
+  and record q0 == promoted q0 per joint. A fact that cannot be proven refuses and is named.
+  Success reports the generation and `ACK_REQUIRED=1 SAVE_CONCLUDED=0`.
+- **`@CALIBRATION PERSIST ACK <generation>`**: store `acknowledge()`; OK / ALREADY_ACKNOWLEDGED /
+  WRONG_GENERATION / INVALID_RECORD / UNCERTAIN.
+- **`@CALIBRATION PERSIST RECONCILE ADOPT <generation> [CONFIRM_DISCARD]` /
+  `RECONCILE DECLARE_NOTHING [CONFIRM_DISCARD]`**: maintenance only, no actuator activity, fresh
+  LOAD, `planReconciliation`, marker written and read back, state re-classified. DECLARE is refused
+  while the acknowledged record is intact; anything that drops a valid generation needs
+  `CONFIRM_DISCARD`. No automatic deletion; slots are never erased.
+- An uncertain SAVE/ACK/RECONCILE outcome blocks further persistent writes until the next boot.
+- Tests: `test_calibration_persistence_service`, `test_calibration_save_gate`; static audit
+  `check_calibration_persistence_integration`.
+
+## Unreleased — P2.4.1 Durable acknowledgment and generation protection (offline, no hardware) — 2026-10-02
+
+Fixes the blocker found by the independent review of P2.3/P2.4: "verified on flash" was treated as
+"confirmed", so a SAVE that published its last marker but never delivered `SAVE=OK` made the next
+boot serve that generation as confirmed; a later failed SAVE could then overwrite the generation
+the caller had actually acknowledged. Persistence layer only; still **not integrated** into the
+Controller (no command, no boot hook).
+
+- **Marker schema 2** (same 28 bytes, same key `M`): `acknowledged_generation` (last generation the
+  CALLER acknowledged; its slot is protected), `begun_generation`, state `IDLE` (nothing in flight),
+  `PENDING` (SAVE in flight / interrupted), `AWAITING_ACK` (record written and read back, caller has
+  not acknowledged). Schema 1 (never installed) and unknown schemas are MARKER_INCOMPATIBLE: this
+  build neither interprets nor overwrites them.
+- **SAVE** keeps acknowledged G, registers G+1 PENDING, writes + reads back the free slot, registers
+  `AWAITING_ACK`, returns `SAVE=OK generation=G+1`. `SaveStatus::OK` now means "verified, awaiting
+  ACK"; the record is not served and the previous slot is NOT reusable. No new SAVE is accepted
+  while a generation awaits its ACK (`ACKNOWLEDGMENT_REQUIRED`, zero mutations).
+- **ACK** (`CalibrationRecordStore::acknowledge(g, profile)`, pure; planned by
+  `planAcknowledgment`): rescans, requires class AWAITING_ACK and `g` == the awaiting generation,
+  writes and reads back `IDLE(g, g)`. Only then does G+1 replace G. Duplicate ACK of the
+  acknowledged generation is idempotent (`ALREADY_ACKNOWLEDGED`, no write); other generations,
+  incomplete/incompatible records, lost acknowledged generation or damaged marker are refused with
+  no mutation. An uncertain ACK write blocks later SAVEs of that instance; the ACK itself can be
+  repeated. P3a will wire the command; none exists here.
+- **Reboot:** `AWAITING_ACK` (and `AWAITING_ACK_RECORD_LOST`) are never auto-promoted;
+  ACK persisted but reply lost -> CONSISTENT; torn ACK marker -> MARKER_CORRUPT (reconciliation).
+  A lost acknowledged generation has priority over any in-flight state (no silent fallback).
+  ADOPT of the awaiting generation is an explicit operator ACK; ADOPT of the acknowledged one
+  discards the verified one; neither promotes corrupt/foreign records. A discarded older attempt
+  surviving in the other slot no longer blocks the next ACK.
+- **First SAVE** on an empty partition enters `AWAITING_ACK(0, 1)`; every interruption is
+  distinguishable by marker + record; nothing is declared available before the ACK.
+- **RAM:** store 5312 B, backend 16 B (unchanged); `LoadResult` 64 -> 68 B and `AckResult` 12 B are
+  transient. No heap. Record V1 (1088 B) and A/B layout untouched.
+- **Tests:** regression for the review finding (marker commit/set error, read-back error, power
+  loss after publication, OK without ACK, N reboots, new SAVE cut at every write) at both the
+  fake-storage and the NVS-stub level, with byte-for-byte checks of the acknowledged slot; ACK fault
+  matrix; first-SAVE matrix; lost acknowledged generation; reconciliation; two consecutive errors.
+  Mutation tests (gate removed, auto-ack) make the regressions fail. The stub still does NOT prove
+  physical flash durability, NVS page recovery or SPI power-loss behaviour.
+- P2.3 layout, manifest, flashing and OTA untouched. Nothing flashed, erased or run on the robot.
+
+## Unreleased — P2.4 Dedicated NVS and persistent SAVE recovery (offline, no hardware) — 2026-10-02
+
+Persistence layer only. **Not integrated** into the Controller: no command, no boot hook, nothing
+reads a stored calibration into the motion path.
+
+- **Dedicated partition.** `CalibrationRecordNvsBackend` uses `matdog_nvs` (0xFE0000 / 0x10000) by
+  label: `esp_partition_find_first` (type/subtype/label, geometry pinned) ->
+  `nvs_flash_init_partition("matdog_nvs")` -> `nvs_open_from_partition`. `begin()` is explicit and
+  returns a `NvsInitStatus` (READY, PARTITION_MISSING, PARTITION_GEOMETRY_MISMATCH, NO_FREE_PAGES,
+  NEW_VERSION_FOUND, INIT_FAILED, OPEN_FAILED); until READY every read is IO_ERROR and every write
+  NOT_MODIFIED. Never `nvs_flash_init()`, never any erase/format, no retry, no repair.
+- **Save marker V1** (`CalibrationSaveMarker`): 28-byte explicit little-endian blob, magic `MDMK`,
+  schema 1, CRC-32, NVS key `M`. Fields: completed generation, begun generation, state
+  (COMPLETED/PENDING). Not a journal; the 1088-byte CalibrationRecord V1 is unchanged.
+- **SAVE protocol:** validate -> scan+classify -> PENDING marker (+read-back) -> write inactive slot
+  -> full read-back -> COMPLETED marker (+read-back) -> `SaveStatus::OK`. Any outcome after the
+  PENDING marker was published that is not full success blocks the instance (P2.1 block kept); the
+  PENDING marker keeps refusing SAVEs across reboots until an explicit reconciliation.
+- **Pure classifier** (`CalibrationPersistenceState`): 13 classes. Only CONSISTENT serves a record;
+  a record newer than the marker is never promoted; marker attests G but only G-1 survives ->
+  CONFIRMED_GENERATION_LOST (not healthy); erased partition == never initialized ->
+  NEVER_INITIALIZED_OR_ERASED (no calibration, no motion). `planReconciliation()` defines the
+  explicit recovery contract (ADOPT_VALID_RECORD / DECLARE_NOTHING_CONFIRMED); nothing executes it.
+- **RAM:** `sizeof(CalibrationRecordStore)` 5312 B (unchanged: no new buffer), backend 16 B,
+  transient `LoadResult` 28 -> 64 B (stack). No dynamic allocation.
+- **Tests:** host stub extended (`nvs_open_from_partition`, `nvs_flash_init_partition`,
+  `esp_partition_find_first`; default init, bare `nvs_open` and all erase calls are NOT declared so
+  they cannot be called), power-cut and error injection at every mutating step, reboot model.
+  Static audit pins the boundaries. The stub does NOT prove physical flash durability or NVS-internal
+  page recovery.
+- Layout P2.3, manifest, flashing and OTA untouched. Nothing flashed, erased or run on the robot.
+
+## Unreleased — P2.3 Custom flash layout and flashing safety (offline, no hardware) — 2026-10-02
+
+- **Layout `MATDOG_16M_2x5M_NVS_V1`** (`partitions.csv`, `PartitionScheme=custom`): nvs 0x9000/0x5000,
+  otadata 0xE000/0x2000, app0 0x10000/5 MiB, app1 0x510000/5 MiB, ffat 0xA10000/0x5D0000,
+  **matdog_nvs 0xFE0000/0x10000**, coredump 0xFF0000/0x10000. Default NVS precedes MATDOG NVS (the
+  Arduino core erases the first nvs-subtype partition on a bad default NVS).
+- `scripts/matdog_layout.py`: pinned contract, binary-table SHA-256, 5 MiB size gate (> 5,242,880 B
+  refused, >= 4 MiB growth warning), write/erase-range check, migration contract (data only).
+- **Manifest V2** adds `LAYOUT_ID`, `PARTITION_TABLE_SHA256` (of the table the build produced) and
+  `APP_PARTITION_SIZE`; V1 manifests are rejected. The layout id string is compiled into the
+  firmware and checked in the binary.
+- `flash_app_only.sh` additionally verifies the table installed on the device, the target offset/size
+  and the effective erase range before its single write. A device with the legacy table is refused
+  (no bypass; migration is a separate procedure). `upload.sh` is now a refusing stub.
+- OTA: `OtaPolicy::prepare()` refuses (`LAYOUT_NOT_CONFORMING`) when the running partition table is
+  not the compiled-in contract. Authenticated layout declaration in the OTA metadata is a separate
+  task (OTA metadata schema 2).
+- **Not migrated**: the device still runs the legacy table. Nothing was flashed, erased or reset.
+
 ## Unreleased — TRUE 24-contact Full Calibration (LF V25 full-leg state machine × 4 legs) — 2026-09-30
 
 **HARDWARE-VALIDATED 2026-10-01: TRUE FULL CALIBRATION 24/24.**

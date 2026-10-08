@@ -151,6 +151,12 @@ bool OtaPolicy::prepare(const OtaImageMetadata& metadata) {
     return failWith(OtaFault::RUNNING_IMAGE_UNCONFIRMED);
   }
 
+  // --- Layout contract ----------------------------------------------------
+  // The slot bounds below come from the runtime table; this proves that table
+  // is the MATDOG layout (5 MiB slots, MATDOG NVS in place) before any slot
+  // is chosen, so an update can never be steered by a foreign table.
+  if (!backend_->installedLayoutConforms()) return failWith(OtaFault::LAYOUT_NOT_CONFORMING);
+
   // --- Target resolution, then the three explicit checks ----------------
   const OtaPartitionInfo target = backend_->nextUpdatePartition();
   if (!target.valid) return failWith(OtaFault::NO_INACTIVE_SLOT);
@@ -337,6 +343,7 @@ const char* toString(OtaFault fault) {
     case OtaFault::IMAGE_REJECTED:            return "IMAGE_REJECTED";
     case OtaFault::HASH_MISMATCH:             return "HASH_MISMATCH";
     case OtaFault::BOOT_SWITCH_REJECTED:      return "BOOT_SWITCH_REJECTED";
+    case OtaFault::LAYOUT_NOT_CONFORMING:     return "LAYOUT_NOT_CONFORMING";
   }
   return "UNKNOWN";
 }

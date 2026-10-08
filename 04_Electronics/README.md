@@ -55,6 +55,26 @@ disconnected, and the board re-enumerated correctly after `esptool`'s hard reset
 VBUS is not connected, this port cannot power the ESP32 on its own — diagnostics/programming
 through it require the robot already powered from its protected supply (normally KEY ON).
 
+### M0.2 assembled service configuration — 2026-10-02
+
+For the real M0 Gate A, power was battery through DALY with KEY ON: servo/LED
+rails stayed live and TECNOIOT supplied the ESP32-S3 with 5 V. The host used only
+the external GPIO19/D−, GPIO20/D+, GND service port, without VBUS; the onboard
+USB-C was not used. BOOT and EN are under the cover and unavailable while
+assembled. All 13 servos were reported torque=0, speed=0, current=0 before ROM
+entry; the robot was mechanically supported with legs free and the breaker
+accessible. This observation does not certify servo state after a power cycle.
+
+ROM entry with esptool 5.3.1 `--before usb-reset --after no-reset --no-stub
+--connect-attempts 1` was verified against the working legacy application;
+subsequent reads used `no-reset`. Two full backups are verified. Recovery after
+an interrupted app/table write or power loss has **not** been demonstrated with
+BOOT/EN inaccessible: migration Gate B remains **BLOCKED**. USB-C-only power
+with isolated rails is a different future configuration, not the standard for
+this assembled installation. No electrical redesign is part of M0.2. See the
+[current migration runbook](../05_Firmware/MATDOG_Controller/FLASH_LAYOUT_M0_RUNBOOK.md)
+and [M0.2 report](../09_Logs/Development_Log/2026-10-02_M0_2_HARDWARE_ALIGNMENT.md).
+
 ---
 
 ## Current hardware decisions

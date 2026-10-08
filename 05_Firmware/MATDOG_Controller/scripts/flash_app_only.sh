@@ -24,10 +24,20 @@
 # ambiguous/invalid/unverifiable OTA state. See scripts/ota_partition_logic.py
 # and scripts/tests/test_ota_partition_logic.py.
 #
-# scripts/upload.sh remains in the repository, with its documentation
-# corrected, as the (still occasionally legitimate — e.g. bring-up on a
-# replacement board) full-image path. It is NOT what this script runs and
-# is NOT authorized by Session 2 for routine use.
+# scripts/upload.sh is a refusing stub (P2.3): there is no full-image path.
+#
+# FLASH LAYOUT GATE (P2.3). The device must already run layout
+# MATDOG_16M_2x5M_NVS_V1 (partitions.csv). Before the single write, this
+# script proves, fail-closed and with no bypass:
+#   - the build manifest is V2 and binds LAYOUT_ID, the SHA-256 of the binary
+#     partition table the build produced, and the 5 MiB app partition size;
+#   - the table read from the device is that exact table (a device that still
+#     has the legacy table is REFUSED - migration is a separate, explicitly
+#     authorized procedure);
+#   - the target offset is the start of an app slot of that layout, with the
+#     layout's size, and the image fits it;
+#   - the effective write/erase range lies inside that slot and cannot touch
+#     MATDOG NVS (scripts/matdog_layout.py check-write).
 # G2 PRE-G3 HARDENING (review Finding 1): build.sh can produce either a
 # USB_ONLY or a ROBOT_POWERED image from the same commit, at the same path.
 # The commit/build-id gate below cannot tell them apart — the build id is
@@ -45,7 +55,7 @@ BUILD_DIR="$SKETCH_DIR/build/esp32.esp32.esp32s3"
 
 ARDUINO="${ARDUINO_CLI:-$HOME/.local/bin/arduino-cli}"
 ESPTOOL="${ESPTOOL_BIN:-$HOME/.arduino15/packages/esp32/tools/esptool_py/5.3.1/esptool}"
-FQBN='esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,DebugLevel=none,PSRAM=opi'
+FQBN='esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=custom,DebugLevel=none,PSRAM=opi'
 PORT="${MATDOG_ESP32_PORT:-/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00}"
 EXPECTED_MAC="${MATDOG_ESP32_MAC:-14:c1:9f:22:75:94}"
 
@@ -155,6 +165,19 @@ VERIFIED_OTA_INGEST_ENABLED="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_OTA_INGES
   refuse "manifest verification produced no VERIFIED_OTA_INGEST_ENABLED"
 VERIFIED_FQBN="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_FQBN=' | cut -d= -f2-)"
 [ -n "$VERIFIED_FQBN" ] || refuse "manifest verification produced no VERIFIED_FQBN"
+VERIFIED_LAYOUT_ID="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_LAYOUT_ID=' | cut -d= -f2-)"
+[ -n "$VERIFIED_LAYOUT_ID" ] || refuse "manifest verification produced no VERIFIED_LAYOUT_ID"
+VERIFIED_PARTITION_TABLE_SHA256="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_PARTITION_TABLE_SHA256=' | cut -d= -f2-)"
+[ -n "$VERIFIED_PARTITION_TABLE_SHA256" ] || \
+  refuse "manifest verification produced no VERIFIED_PARTITION_TABLE_SHA256"
+VERIFIED_APP_PARTITION_SIZE="$(echo "$MANIFEST_INFO" | grep '^VERIFIED_APP_PARTITION_SIZE=' | cut -d= -f2-)"
+[ -n "$VERIFIED_APP_PARTITION_SIZE" ] || \
+  refuse "manifest verification produced no VERIFIED_APP_PARTITION_SIZE"
+
+# The size gate is repeated here, from the actual file, independently of the
+# manifest: an image over the 5 MiB slot is never written.
+python3 "$SCRIPT_DIR/matdog_layout.py" check-fqbn --fqbn "$FQBN" >/dev/null || \
+  refuse "the pinned FQBN does not select the custom layout"
 
 # --- Gate: backup exists, correct size and an AUTHORIZED hash --------------
 [ -f "$BACKUP" ] || refuse "full-flash backup not found: $BACKUP"
@@ -195,7 +218,11 @@ SDKCONFIG="$BUILD_DIR/sdkconfig"
 [ -f "$SDKCONFIG" ] || refuse "sdkconfig not found: $SDKCONFIG (run scripts/build.sh first)"
 
 PARTITION_INFO="$(python3 "$SCRIPT_DIR/verify_application_partition.py" \
-  --port "$PORT" --esptool "$ESPTOOL" --sdkconfig "$SDKCONFIG")"
+  --port "$PORT" --esptool "$ESPTOOL" --sdkconfig "$SDKCONFIG" \
+  --expected-table-sha256 "$VERIFIED_PARTITION_TABLE_SHA256")" || \
+  refuse "installed layout / active application partition verification failed (see REFUSED=... \
+above) — a device that does not already run $VERIFIED_LAYOUT_ID needs the separately \
+authorized migration procedure, never this script"
 ROLLBACK_ENABLE="$(echo "$PARTITION_INFO" | grep '^CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=' | cut -d= -f2)"
 ANTI_ROLLBACK="$(echo "$PARTITION_INFO" | grep '^CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=' | cut -d= -f2)"
 APPLICATION_OFFSET="$(echo "$PARTITION_INFO" | grep '^APPLICATION_OFFSET=' | cut -d= -f2)"
@@ -207,6 +234,23 @@ ACTIVE_PARTITION_LABEL="$(echo "$PARTITION_INFO" | grep '^ACTIVE_PARTITION_LABEL
 [ "$APPLICATION_SIZE" -le "$MAX_PARTITION_SIZE" ] || \
   refuse "application binary ($APPLICATION_SIZE bytes) exceeds target partition \
 ($MAX_PARTITION_SIZE bytes)"
+[ "$MAX_PARTITION_SIZE" = "$VERIFIED_APP_PARTITION_SIZE" ] || \
+  refuse "target partition size $MAX_PARTITION_SIZE != manifest APP_PARTITION_SIZE \
+$VERIFIED_APP_PARTITION_SIZE"
+
+# --- Gate: target offset/size, image size and the effective write/erase ----
+# --- range against the layout contract (MATDOG NVS can never be touched) ---
+WRITE_PLAN="$(python3 "$SCRIPT_DIR/matdog_layout.py" check-write \
+  --offset "$APPLICATION_OFFSET" \
+  --partition-size "$MAX_PARTITION_SIZE" \
+  --image-size "$APPLICATION_SIZE")" || \
+  refuse "write range refused by the layout contract (see REFUSED=... above)"
+WRITE_TARGET_LABEL="$(echo "$WRITE_PLAN" | grep '^WRITE_TARGET_LABEL=' | cut -d= -f2)"
+WRITE_START="$(echo "$WRITE_PLAN" | grep '^WRITE_START=' | cut -d= -f2)"
+WRITE_END="$(echo "$WRITE_PLAN" | grep '^WRITE_END=' | cut -d= -f2)"
+ERASE_END="$(echo "$WRITE_PLAN" | grep '^ERASE_END=' | cut -d= -f2)"
+[ -n "$WRITE_TARGET_LABEL" ] && [ -n "$WRITE_START" ] && [ -n "$WRITE_END" ] && [ -n "$ERASE_END" ] || \
+  refuse "layout write plan incomplete"
 
 # --- Print every required field before writing anything --------------------
 echo "SDKCONFIG_ROLLBACK    = CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=$ROLLBACK_ENABLE"
@@ -217,6 +261,10 @@ echo "APPLICATION_SHA256    = $APPLICATION_SHA256"
 echo "APPLICATION_OFFSET    = $APPLICATION_OFFSET (partition '$ACTIVE_PARTITION_LABEL')"
 echo "APPLICATION_SIZE      = $APPLICATION_SIZE"
 echo "MAX_PARTITION_SIZE    = $MAX_PARTITION_SIZE"
+echo "LAYOUT_ID             = $VERIFIED_LAYOUT_ID"
+echo "PARTITION_TABLE_SHA256 = $VERIFIED_PARTITION_TABLE_SHA256 (build manifest == table installed on the device)"
+echo "WRITE_RANGE           = $WRITE_START .. $WRITE_END (partition '$WRITE_TARGET_LABEL')"
+echo "ERASE_RANGE           = $WRITE_START .. $ERASE_END (sector rounded; MATDOG NVS 0xfe0000..0xff0000 untouched)"
 echo "BACKUP                = $BACKUP"
 echo "BACKUP_SHA256         = $VERIFIED_BACKUP_SHA256 (verified against $([ "$BACKUP" = "$DEFAULT_BACKUP" ] && echo "the pinned historical default" || echo "an explicit authorization or recovery manifest"))"
 echo "FQBN                  = $FQBN (verified against the build manifest)"

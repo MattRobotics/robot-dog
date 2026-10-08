@@ -96,9 +96,9 @@ static OtaPartitionInfo makePartition(const char* label, uint32_t addr, uint32_t
   return p;
 }
 
-// The real MATDOG layout, from the app3M_fat9M_16MB partition table.
-static OtaPartitionInfo app0() { return makePartition("app0", 0x10000,  0x300000, 0x10); }
-static OtaPartitionInfo app1() { return makePartition("app1", 0x310000, 0x300000, 0x11); }
+// The MATDOG layout V1 app slots (partitions.csv): two 5 MiB OTA slots.
+static OtaPartitionInfo app0() { return makePartition("app0", 0x10000,  0x500000, 0x10); }
+static OtaPartitionInfo app1() { return makePartition("app1", 0x510000, 0x500000, 0x11); }
 
 class FakeBackend : public OtaBackend {
  public:
@@ -111,6 +111,7 @@ class FakeBackend : public OtaBackend {
   bool fail_set_boot = false;
   bool fail_mark_valid = false;
   bool rollback_ok = true;
+  bool layout_ok = true;
   int fail_write_after_n_chunks = -1;  // -1 = never
   uint32_t short_write_after_bytes = 0xFFFFFFFFu;  // simulate a partial write
 
@@ -126,6 +127,7 @@ class FakeBackend : public OtaBackend {
   OtaImgState imageState(const OtaPartitionInfo& p) override {
     return p.sameAs(running) ? running_state : OtaImgState::UNDEFINED;
   }
+  bool installedLayoutConforms() override { return layout_ok; }
   bool beginWrite(const OtaPartitionInfo&, uint32_t) override {
     begin_calls++;
     if (fail_begin) return false;
@@ -301,14 +303,27 @@ static void test_target_equals_running_partition() {
 
 static void test_target_is_not_an_ota_slot() {
   FakeBackend b;
-  b.next = makePartition("factory", 0x310000, 0x300000, 0x00);  // factory, not ota_N
+  b.next = makePartition("factory", 0x510000, 0x500000, 0x00);  // factory, not ota_N
   expectPrepareFails("target_is_not_an_ota_slot", b, OtaFault::TARGET_NOT_OTA_SLOT,
                      metaFor(makeImage(512)));
 
   FakeBackend b2;
-  b2.next = makePartition("test", 0x310000, 0x300000, 0x20);    // TEST app subtype
+  b2.next = makePartition("test", 0x510000, 0x500000, 0x20);    // TEST app subtype
   expectPrepareFails("target_is_test_app_subtype", b2, OtaFault::TARGET_NOT_OTA_SLOT,
                      metaFor(makeImage(512)));
+}
+
+static void test_layout_not_conforming_refuses_before_any_flash() {
+  FakeBackend b;
+  b.layout_ok = false;   // installed table is not the compiled-in MATDOG layout
+  expectPrepareFails("layout_not_conforming", b, OtaFault::LAYOUT_NOT_CONFORMING,
+                     metaFor(makeImage(512)));
+
+  // A conforming layout does not change the happy path.
+  g_case = "layout_conforming_allows_prepare";
+  FakeBackend ok; OtaPolicy p; wire(p, ok);
+  CHECK(p.prepare(metaFor(makeImage(512))));
+  CHECK_EQ((int)p.state(), (int)OtaState::TARGET_RESOLVED);
 }
 
 static void test_no_inactive_slot_available() {
@@ -321,7 +336,7 @@ static void test_no_inactive_slot_available() {
 static void test_image_larger_than_partition() {
   FakeBackend b;
   OtaImageMetadata m = metaFor(makeImage(512));
-  m.image_size = app1().size + 1;   // 3 MiB + 1
+  m.image_size = app1().size + 1;   // 5 MiB + 1
   expectPrepareFails("image_larger_than_partition", b, OtaFault::IMAGE_TOO_LARGE, m);
 
   // Exactly the partition size is allowed - the bound is <=, not <.
@@ -1156,7 +1171,7 @@ static void test_tostring_is_total() {
                              OtaState::BOOT_TARGET_SET, OtaState::FAILED};
   for (OtaState s : states) CHECK(std::strcmp(toString(s), "UNKNOWN") != 0);
 
-  for (uint8_t i = 0; i <= (uint8_t)OtaFault::BOOT_SWITCH_REJECTED; ++i) {
+  for (uint8_t i = 0; i <= (uint8_t)OtaFault::LAYOUT_NOT_CONFORMING; ++i) {
     CHECK(std::strcmp(toString((OtaFault)i), "UNKNOWN") != 0);
   }
   for (uint8_t i = 0; i <= (uint8_t)OtaImgState::UNREADABLE; ++i) {
@@ -1195,6 +1210,7 @@ int main() {
   test_target_is_always_the_inactive_slot();
   test_target_equals_running_partition();
   test_target_is_not_an_ota_slot();
+  test_layout_not_conforming_refuses_before_any_flash();
   test_no_inactive_slot_available();
   test_image_larger_than_partition();
   test_zero_length_image();
