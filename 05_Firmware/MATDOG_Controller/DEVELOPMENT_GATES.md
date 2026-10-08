@@ -1,7 +1,8 @@
 # MATDOG Controller — Development Gates
 
 **Canonical owner of the technical pass/fail authorization criteria for each Controller
-development gate.** Last updated 2026-10-01.
+development gate.** Last updated 2026-10-08 (only the Calibration Persistence V1 status
+notes below were revised; the gate criteria are as of 2026-10-01).
 
 This file answers *what must be true before this stage may begin, what it may and may not do, and
 what proves it passed*. It is not a narrative roadmap and not an evidence log:
@@ -388,6 +389,9 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
     `MEASURED_CANDIDATE`/`ACCEPTED` direction vocabulary is legacy/oracle-domain state, not a
     production readiness prerequisite. **Still TO_DESIGN** — the persistence/promotion boundary
     (whether accepted calibration is written by `PROVISIONING` or by a separate transaction).
+    *Status 2026-10-08:* in Persistence V1 on `main` the record is written by the explicit
+    `@CALIBRATION PERSIST SAVE` / `ACK` transaction; promotion into the transform table at boot
+    (`RESTORE`) is NOT_IMPLEMENTED.
   - **CR2-A q0 bootstrap foundation (2026-09-27): IMPLEMENTED / OFFLINE VALIDATED.**
     `CalibrationQ0Bootstrap.*` is a pure reducer from repeated Torque-OFF raw observations to
     per-joint `Q0Evidence` `CANDIDATE`. It requires current population evidence, exact
@@ -457,7 +461,9 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   - Known hardware risk R1: V25's LF HIP MAX contact sat exactly on the corridor entry (see the
     development log). If it recurs: stop, keep the evidence, decide from the measured stop.
   **Next after a hardware Full Calibration PASS: Calibration Persistence V1** (versioned,
-  atomic, fail-closed at boot, no ST3215 EEPROM writes) — TO_DESIGN, not started; see
+  atomic, fail-closed at boot, no ST3215 EEPROM writes) — TO_DESIGN, not started *(status on
+  2026-10-01; since PR-1 it is IMPLEMENTED and offline-tested on `main`, hardware acceptance is
+  BLOCKED and `RESTORE` is NOT_IMPLEMENTED)*; see
   [`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md).
 
 ## HostLink semantic layer

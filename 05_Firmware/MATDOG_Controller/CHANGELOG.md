@@ -1,5 +1,13 @@
 # MATDOG Controller — Changelog
 
+> **How to read (added 2026-10-08).** "Unreleased" means not part of an accepted release. The PR-1,
+> PR-2 and PR-3 entries are integrated **in source** on `main`; none is a release approval. dev.3 is
+> a candidate: Hardware Validation 2026-10-07 has execution COMPLETE and acceptance BLOCKED. A build
+> of `main` is not shown to be byte-identical to the installed firmware. **DO NOT FLASH MAIN.**
+> Entries are newest-integration first, then in the order they were written. The dated sequence and
+> the original-to-recreated SHA map are in [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and
+> [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
+
 ## Unreleased — PR-3: dev.2/dev.3 source delta on `main` (0.2.0-dev.3) — 2026-10-08
 
 - **What `main` gains.** Seven commits recreated from the dev.2/dev.3 candidate (`bac652f`,

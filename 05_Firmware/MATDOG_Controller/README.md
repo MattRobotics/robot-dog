@@ -134,7 +134,9 @@ committed.
 
 ## Update and recovery policy
 
-- **DECIDED — future normal update path:** Wi-Fi / OTA. It is not implemented in V0.1.
+- **DECIDED — future normal update path:** Wi-Fi / OTA. It is not implemented in V0.1 *(V0.1
+  statement; Wi-Fi/OTA V3 is on `main` since PR-2, OTA ingest disabled by default, hardware
+  acceptance BLOCKED)*.
 - **DECIDED — permanent wired service/recovery:** native USB CDC / USB-C remains available even
   after OTA is implemented. OTA must never remove the wired recovery path.
 - **VALIDATED for the V0.1 baseline:** the application-only flashing workflow below operates over
@@ -705,10 +707,14 @@ can silently become a standing global override for some other call site.
 
 ## Wi-Fi / provisioning V3 — 2026-10-04
 
-**IMPLEMENTED / OFFLINE TESTED; hardware TO_TEST.** This isolated branch is based on
-`1a5e0085098eeb907319f6f1a00693869444d9cf`, the latest local post-abort/persistence
-integration. Its calibration persistence hardware acceptance is not evidenced:
-**CAL_PERSIST_BASE is BLOCKED**. This branch is a provisional candidate, not a release.
+**IMPLEMENTED / OFFLINE TESTED; on `main` since PR-2; hardware acceptance BLOCKED.** No release
+is approved.
+
+> *Historical wording, 2026-10-04:* "This isolated branch is based on
+> `1a5e0085098eeb907319f6f1a00693869444d9cf`, the latest local post-abort/persistence integration.
+> Its calibration persistence hardware acceptance is not evidenced: **CAL_PERSIST_BASE is
+> BLOCKED**. This branch is a provisional candidate, not a release." The branch no longer exists
+> as a separate line; its content reached `main` through PR-2.
 
 A core-0, low-priority worker owns radio and network NVS. `WifiManager::update()` copies
 cached state with a zero-wait mutex; events only store a disconnect reason. One request
