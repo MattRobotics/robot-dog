@@ -5,6 +5,14 @@ one-sketch-per-peripheral workflow (ST3215 bench tools, BNO085 Phase C3, DALY pr
 with one modular, deployable firmware image that initializes each subsystem module
 together and reports whether its hardware is detected, expected or unavailable.
 
+> **⚠ Flash safety — 2026-10-08.** The sources, `scripts/build.sh`, `scripts/upload.sh` and
+> `scripts/flash_app_only.sh` in this tree use the legacy `PartitionScheme=app3M_fat9M_16MB`.
+> The current robot runs `MATDOG_16M_2x5M_NVS_V1`. **Do not use this tree to update the robot**;
+> `scripts/upload.sh` here also rewrites the partition table. The dev.3 line carries the correct
+> layout but is a candidate only (Hardware Validation 2026-10-07: execution COMPLETE, acceptance
+> BLOCKED). `MOTION_AUTHORIZED=0`. See
+> [`FLASH_LAYOUT_SAFETY_NOTICE.md`](FLASH_LAYOUT_SAFETY_NOTICE.md).
+
 ```text
 MATDOG Controller
 ├── core/system      boot, version, health aggregation, power-state machine,

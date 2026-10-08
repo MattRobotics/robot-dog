@@ -1,5 +1,12 @@
 # MATDOG Roadmap
 
+> **Flash safety — 2026-10-08.** `main` is not a flashable baseline for the current robot: it uses
+> the legacy partition scheme, the robot runs `MATDOG_16M_2x5M_NVS_V1`. The dev.3 line is a
+> candidate only (Hardware Validation 2026-10-07: execution COMPLETE, acceptance BLOCKED).
+> `MOTION_AUTHORIZED=0`. See
+> [`FLASH_LAYOUT_SAFETY_NOTICE.md`](../../05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
+> The sequence below is otherwise unchanged and still reflects 2026-10-01.
+
 **Canonical owner of the MATDOG development sequence, its dependencies, and where the project
 currently stands.** Last updated 2026-10-01.
 

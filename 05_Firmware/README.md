@@ -2,6 +2,10 @@
 
 This directory is reserved for low-level firmware that belongs specifically to MATDOG.
 
+> **⚠ Flash safety — 2026-10-08.** Do not build from or flash `main` to update the current robot:
+> `main` uses the legacy partition scheme, the robot runs `MATDOG_16M_2x5M_NVS_V1`. See
+> [`MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md`](MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
+
 ## Current status
 
 **Bench firmware exists and is frozen.** [`ST3215_Bench_Tools/`](ST3215_Bench_Tools/) holds three
