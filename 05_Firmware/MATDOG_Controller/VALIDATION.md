@@ -1,5 +1,40 @@
 # MATDOG Controller V0.1 — Validation
 
+## PR-2 selective dev.1 integration — offline verification, 2026-10-08
+
+Scope: offline verification of the content PR-2 brings to `main`. **No hardware, serial, flash, NVS,
+EEPROM or OTA access. No hardware validation and no acceptance of a `main` build.**
+`MOTION_AUTHORIZED=0`. The four layers are kept apart:
+
+| Layer | State |
+|---|---|
+| Code integrated | boundary `13da04a` (13 original commits), three recreated commits, new gate manifest; see the [PR-2 log](../../09_Logs/Development_Log/2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md) |
+| Offline tests | the table below |
+| Hardware validated | nothing new from PR-2 |
+| Deferred | the motion execution suites and the G35/G4/G4.1/G5-A evidence; reported as DEFERRED, never as passed |
+
+Environment: cloud container with `arduino-cli` 1.5.1, `esp32:esp32` 3.3.11, the libraries pinned
+in `SOURCE_PROVENANCE.md`, scipy, Git LFS objects. Code tree `44d72ee` (identical, outside
+Markdown, to the final tip).
+
+| Check | Result |
+|---|---|
+| `scripts/static_audit.py` (central gate, including host and nested mutation suites) | **PASS** on the code tree; the final-tip run is recorded in the PR description |
+| `scripts/tests/run_host_tests.sh` | PASS, 33 suites, 0 failures |
+| `run_motion_convergence_tests.py` (source, purity, dependency and wiring gate) | PASS: 44 integrated files and 34 canonical, retained and protected inputs match their SHA-256; no include of `motion/` outside `src/motion`; 286 deferred artifacts absent |
+| Same gate with one deferred file added | FAIL, as intended |
+| Motion host tests, fresh oracles, audit-tool tests | **DEFERRED** — not run, not integrated |
+| `MATDOG_PROFILE=USB_ONLY scripts/build.sh` | PASS; 1,174,320-byte application (22.4 % of the slot); `FW_VERSION=0.2.0-dev.1`; layout `MATDOG_16M_2x5M_NVS_V1`; table `8f756ecb…`; OTA ingest 0; manifest `SOURCE_STATE=CLEAN` |
+| `MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh` | PASS; 1,177,856 bytes (22.5 %); same layout, table and ingest; `SOURCE_STATE=CLEAN` |
+| Compiler warnings | 2 per profile, both in the third-party SCServo library |
+
+Not claimed for `main`: the integration branch result of 2026-10-05/06 (20/20 motion qualification,
+330/330 pinned files). Container binaries depend on the checkout path and are not release
+artifacts. The hardware results for dev.2 and dev.3 belong to the dev.3 candidate and are in the
+[dev.3 delta audit](https://github.com/MattRobotics/robot-dog/blob/b764c25c9530350331dbaa59ea2d84ddab3a3f69/09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
+The 2026-10-07 Hardware Validation (execution COMPLETE, acceptance BLOCKED) has no report in this
+repository yet.
+
 ## Wi-Fi / provisioning / OTA V3 — offline, 2026-10-04
 
 Independent branch `feat/controller-wifi-ota-shelly-v1`, provisional base `1a5e008`.
