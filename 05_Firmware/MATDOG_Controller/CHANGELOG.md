@@ -1,5 +1,23 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — PR-1: Calibration Persistence V1 and flash layout V1 on `main` — 2026-10-08
+
+- **What merges.** `feat/calibration-persistence-record-store-v1` at `7b258b3` merges into `main`
+  with a merge commit; the 13 original commits keep their SHAs. No source, script, test or
+  partition change is made by the merge.
+- **Already described below.** The P2.3 (flash layout V1), P2.4, P2.4.1, P3a, P3a.1 and P3a.2
+  entries, previously unreleased on a branch, are now on `main`.
+- **Commits not described below.** These add M0 migration tooling and records (offline only):
+  - `ebb6078`: M0 runbook, `migration_m0.py`, offline checks;
+  - `174aa04`: pinned esptool 5.3.1 writer with retries disabled;
+  - `2757604`: hardware alignment, unproven recovery blocked;
+  - `b19a98e`: ROBOT_POWERED migration qualification;
+  - `7b258b3`: P1 close with the encrypted backup record.
+- **What is unchanged.** Firmware version literal still `0.1.0`. `MOTION_AUTHORIZED=0`, `RESTORE`
+  not implemented, no hardware acceptance of a `main` build.
+- **Do not flash `main`** on the current robot; see
+  [`FLASH_LAYOUT_SAFETY_NOTICE.md`](FLASH_LAYOUT_SAFETY_NOTICE.md).
+
 ## Unreleased — P3a.2 USB command framing hardening (offline, no hardware) — 2026-10-02
 
 - CommandRouter latches overflow or NUL for the entire USB line and discards it

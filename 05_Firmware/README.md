@@ -2,9 +2,14 @@
 
 This directory is reserved for low-level firmware that belongs specifically to MATDOG.
 
-> **⚠ Flash safety — 2026-10-08.** Do not build from or flash `main` to update the current robot:
-> `main` uses the legacy partition scheme, the robot runs `MATDOG_16M_2x5M_NVS_V1`. See
-> [`MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md`](MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
+> **⚠ Flash safety — 2026-10-08, updated for PR-1.** Do not build from or flash `main` to update
+> the current robot.
+> - Since PR-1, `main` uses the robot's layout `MATDOG_16M_2x5M_NVS_V1` and carries Calibration
+>   Persistence V1.
+> - It is still not the firmware the robot runs (the dev.3 candidate), and the layout
+>   integration authorizes no flash and accepts nothing on hardware.
+>
+> See [`MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md`](MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
 
 ## Current status
 

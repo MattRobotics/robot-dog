@@ -5,13 +5,15 @@ one-sketch-per-peripheral workflow (ST3215 bench tools, BNO085 Phase C3, DALY pr
 with one modular, deployable firmware image that initializes each subsystem module
 together and reports whether its hardware is detected, expected or unavailable.
 
-> **⚠ Flash safety — 2026-10-08.** The sources, `scripts/build.sh`, `scripts/upload.sh` and
-> `scripts/flash_app_only.sh` in this tree use the legacy `PartitionScheme=app3M_fat9M_16MB`.
-> The current robot runs `MATDOG_16M_2x5M_NVS_V1`. **Do not use this tree to update the robot**;
-> `scripts/upload.sh` here also rewrites the partition table. The dev.3 line carries the correct
-> layout but is a candidate only (Hardware Validation 2026-10-07: execution COMPLETE, acceptance
-> BLOCKED). `MOTION_AUTHORIZED=0`. See
-> [`FLASH_LAYOUT_SAFETY_NOTICE.md`](FLASH_LAYOUT_SAFETY_NOTICE.md).
+> **⚠ Flash safety — 2026-10-08, updated for PR-1.** This tree now uses the flash layout
+> `MATDOG_16M_2x5M_NVS_V1` (`partitions.csv`, `PartitionScheme=custom`), and `scripts/upload.sh`
+> refuses every full-image upload. **Do not use this tree to update the robot.**
+> - It is not the firmware the robot runs: the robot runs the dev.3 candidate.
+> - The layout integration is neither a flash authorization nor a hardware acceptance.
+> - dev.3 is a candidate only (Hardware Validation 2026-10-07: execution COMPLETE, acceptance
+>   BLOCKED).
+>
+> `MOTION_AUTHORIZED=0`. See [`FLASH_LAYOUT_SAFETY_NOTICE.md`](FLASH_LAYOUT_SAFETY_NOTICE.md).
 
 ```text
 MATDOG Controller
@@ -96,8 +98,12 @@ Wraps `arduino-cli compile` with the pinned FQBN and injects a build id (short g
 `-dirty` suffix if the tree has uncommitted changes) visible in the boot banner and
 `@STATUS`:
 
+`PartitionScheme=custom` makes the build take its partition table from `partitions.csv`
+(`LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1`, pinned by `scripts/matdog_layout.py`; the legacy
+`app3M_fat9M_16MB` scheme is refused):
+
 ```text
-esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,DebugLevel=none,PSRAM=opi
+esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=custom,DebugLevel=none,PSRAM=opi
 ```
 
 Board: YD-ESP32-S3 N16R8 (16 MB flash, 8 MB OPI PSRAM, 240 MHz).
@@ -135,7 +141,9 @@ scripts/flash_app_only.sh
 Writes **only** the currently-active OTA application partition — never the
 bootloader, partition table or boot_app0/otadata. `scripts/verify_application_partition.py`
 determines that partition's real offset/size by reading the device's own partition
-table and otadata (the `app3M_fat9M_16MB` scheme has two OTA slots; this never assumes
+table and otadata (layout `MATDOG_16M_2x5M_NVS_V1` has two 5 MiB OTA slots; a device that
+still has the legacy table is refused, and the write range may never touch `matdog_nvs`;
+this never assumes
 which one is active, and recognizes OTA slots by the real ESP-IDF bitmask
 `(subtype & 0xF0) == PART_SUBTYPE_OTA_FLAG`, not a numeric threshold that would also
 match TEST/TEE partitions, and must be a contiguous set `{0, ..., N-1}` — a sparse OTA
@@ -186,11 +194,12 @@ The verified profile is printed in a banner immediately before the write, so the
 sees what is actually going on the device. Logic and refusal reasons live in
 `scripts/build_manifest.py`, with offline tests in `scripts/tests/test_build_manifest.py`.
 
-`scripts/upload.sh` (full Arduino upload — bootloader + partition table + boot_app0 +
-application, every time) is kept for the legitimate full-image case (e.g. bring-up on
-a replacement board) but is **not** the routine flashing path; see `VALIDATION.md`
-Session 2 for why its earlier "application-only" framing was wrong and how that was
-confirmed harmless in practice.
+`scripts/upload.sh` is a refusing stub since P2.3: it performs no hardware operation and exits
+1. It used to run a full Arduino upload (bootloader + partition table + boot_app0 +
+application, every time), which on layout V1 can put the old partition table back or
+move/erase `matdog_nvs`. A migration from the legacy layout is a separate, explicitly
+authorized procedure. See `VALIDATION.md` Session 2 for why the earlier "application-only"
+framing of the full upload was wrong.
 
 ## Static safety audit
 
@@ -604,8 +613,15 @@ adapter TO_IMPLEMENT", those statements are historical, not current status.
   `FINAL_OPERATIONAL_ENVELOPE_ACCEPTED` is unavailable until an approved stand/gait workspace
   sets `kFullLegOperationalParametersApproved` (audit-pinned `false`); 0/12 final
   `JointLimits` are admitted on purpose.
-- **Persistence.** None yet. Calibration Persistence V1 is the gate after the hardware PASS
-  ([`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md)).
+- **Persistence.** Calibration Persistence V1 is on `main` since PR-1 (2026-10-08).
+  - Storage: record and codec, A/B store in the dedicated `matdog_nvs` partition, persistent
+    SAVE recovery marker, durable acknowledgment.
+  - Commands: `@CALIBRATION PERSIST STATUS | SAVE CHECK | SAVE CONFIRM_SAVE_FULL_CALIBRATION |
+    ACK | RECONCILE`.
+  - Boot LOAD is information only: nothing is admitted into the transform table, and `RESTORE`
+    is not implemented.
+  - Offline/host-tested on `main`, with no hardware acceptance of a `main` build
+    ([`ROADMAP.md`](../../01_Docs/02_Architecture/ROADMAP.md)).
 - **Hardware procedure:** [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md).
 
 ## Calibration foundation
@@ -1255,7 +1271,7 @@ cover, and handoff section 7A for the full matrix.
 └── scripts/
     ├── build.sh
     ├── static_audit.py
-    ├── upload.sh                        full Arduino upload (not routine — see above)
+    ├── upload.sh                        refusing stub — no full-image upload (P2.3)
     ├── flash_app_only.sh                application-only flash (routine path)
     ├── verify_application_partition.py  device-I/O wrapper used by the above
     ├── ota_partition_logic.py           pure OTA slot-selection logic (offline-testable)

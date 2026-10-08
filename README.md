@@ -4,19 +4,23 @@ MATDOG is Matt Robotics' custom quadruped platform: a 17-DOF mechanical design w
 articulated head, an ESP32-S3 real-time controller, and a future Jetson-based high-level stack.
 This repository is the single active engineering repository for the robot.
 
-> **⚠ FLASH SAFETY NOTICE — 2026-10-08. Do not use `main` to update the current robot.**
+> **⚠ FLASH SAFETY NOTICE — 2026-10-08, updated for PR-1. DO NOT FLASH MAIN: do not use `main`
+> to update the current robot.**
 >
-> - `main` still builds and flashes with the legacy scheme `PartitionScheme=app3M_fat9M_16MB`.
->   The robot runs the flash layout `MATDOG_16M_2x5M_NVS_V1`, which `main` does not contain.
-> - `05_Firmware/MATDOG_Controller/scripts/upload.sh` on `main` rewrites the bootloader, the
->   **partition table** and otadata on every run, and can put the legacy table back.
-> - The dev.3 candidate line (provenance `b3fd945`) contains the correct layout, but it is **not
->   an accepted release**: the Hardware Validation of 2026-10-07 has execution COMPLETE and
->   acceptance **BLOCKED**. It is not on `main` and is not authorized as a baseline.
+> - With PR-1, `main` carries Calibration Persistence V1 and the flash layout
+>   `MATDOG_16M_2x5M_NVS_V1`. `scripts/build.sh` uses `PartitionScheme=custom` and
+>   `scripts/upload.sh` refuses every full-image upload.
+> - `main` is still **not** the firmware the robot runs. The robot runs the dev.3 candidate
+>   (provenance `b3fd945`), which contains the dev.1–dev.3 work that `main` does not have yet.
+> - The layout integration is **not** a flash authorization and **not** a hardware acceptance.
+> - dev.3 is **not an accepted release**: the Hardware Validation of 2026-10-07 has execution
+>   COMPLETE and acceptance **BLOCKED**. It is not on `main` and is not authorized as a baseline.
 > - `MOTION_AUTHORIZED=0`. Nothing here authorizes a flash, a migration or any motion.
 >
 > Details and sources: [`FLASH_LAYOUT_SAFETY_NOTICE.md`](05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
-> The snapshot below is the historical state of `main` on 2026-10-01 and has not been updated.
+> The quoted snapshot below is the historical state of `main` on 2026-10-01 and has not been
+> updated. Elsewhere in this file only the Calibration Persistence V1 statements were updated for
+> PR-1; a full status synchronization is a separate change.
 
 > **Historical snapshot — 2026-10-01 (PR #35 merged)**
 >
@@ -37,7 +41,7 @@ This repository is the single active engineering repository for the robot.
 |---|---|
 | `ROBOT_POWERED` no-motion baseline | **VALIDATED** |
 | TRUE Full Calibration software and hardware | **24/24 HARDWARE-VALIDATED — 2026-10-01** |
-| Calibration Persistence V1 | **CURRENT / TO_DESIGN** |
+| Calibration Persistence V1 | **IMPLEMENTED on `main` (PR-1, 2026-10-08)** — offline/host-tested; RESTORE not implemented; no hardware acceptance |
 | Operational envelopes / JointLimits | **BLOCKED** — not approved |
 | Telemetry integrity, LOWER MAX margins, q0 refinement | **OPEN follow-ups** |
 | Gait engine | **IN PROGRESS** — offline, independent worktree |
@@ -101,7 +105,10 @@ Every current-facing document uses these meanings:
 - `ActuatorAuthority`, the Safe Actuator policy and the four-leg Full Calibration engine are
   integrated. Only the bounded calibration write path has been hardware-validated; service/QC
   writes and operational stand/gait have not been validated.
-- Calibration Persistence V1 and approved operational envelopes are not implemented.
+- Calibration Persistence V1 (record, A/B store in the dedicated `matdog_nvs` partition,
+  SAVE/ACK/RECONCILE, boot LOAD) and the flash layout `MATDOG_16M_2x5M_NVS_V1` are on `main`
+  since PR-1 (2026-10-08), offline/host-tested. LOAD never restores a calibration into the
+  motion path (`RESTORE` not implemented). Approved operational envelopes are not implemented.
 
 ### DECIDED
 
@@ -130,7 +137,7 @@ Every current-facing document uses these meanings:
 ### TO_DESIGN
 
 - The host command/telemetry protocol carried over USB CDC.
-- Calibration Persistence V1 (across reboot), the operational stand/gait workspace with its
+- Calibration restore across reboot (`RESTORE`), the operational stand/gait workspace with its
   joint limits and margins, and the integrated maintenance, service, Servo QC and provisioning
   workflows.
 - Stand and gait motion on hardware, stabilization, ROS 2/MoveIt 2, and complete Jetson
@@ -217,7 +224,8 @@ OPEN       autonomous dock/charging              OPEN — no dock hardware evide
 COMPLETE   read-only q0 capture              VALIDATED (CR2-C, 2026-09-27)
 SUPERSEDED UPPER-only 8-contact milestone      Historical scope error
 COMPLETE   TRUE 24-contact calibration         HARDWARE PASS (2026-10-01, PR #35)
-CURRENT    Calibration Persistence V1          TO_DESIGN; restore not implemented
+CURRENT    Calibration Persistence V1          IMPLEMENTED on main (PR-1); RESTORE not
+                                                 implemented; no hardware acceptance
 OPEN       Telemetry, LOWER MAX, zero review   Before hardware locomotion
 THEN       Operational envelopes / JointLimits BLOCKED pending approval
 THEN       Stand / gait hardware               BLOCKED
@@ -239,8 +247,9 @@ presence: BNO085 acquisition runs at 50.1 Hz with the port closed (G3.1). No com
   accepted on the first attempt and SAFE_OFF 13/13 verified. [hardware-validation report](09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md).
 - **Authority:** session-scoped permits, promoted fresh q0 and the Safe Actuator layer govern
   all bounded calibration writes. No operational actuator authority is implied.
-- **Persistence:** accepted evidence was exported, but the promoted calibration is RAM-only;
-  exported data is not an implemented restore.
+- **Persistence:** in the 2026-10-01 session the promoted calibration was RAM-only and the
+  exported data is not an implemented restore. Since PR-1 `main` contains Calibration
+  Persistence V1 (SAVE/ACK/LOAD); `RESTORE` is still not implemented.
 - **Operational envelope:** not approved (`parameters_approved=0`, `envelope_accepted=0`);
   no stand or gait hardware motion is authorized.
 - **Follow-ups:** Calibration Persistence V1; telemetry integrity; LOWER MAX scout margin;
