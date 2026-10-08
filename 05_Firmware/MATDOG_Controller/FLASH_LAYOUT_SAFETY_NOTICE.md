@@ -12,9 +12,19 @@ motion. `MOTION_AUTHORIZED=0`.
 > Updating the robot from `main` risks restoring the old partition table and losing the layout
 > that holds the persisted calibration record.
 
+## Scope of this notice
+
+Every statement about `main` here describes commit
+[`b65e75d72f404499b37be055899280fc4187d5f9`](https://github.com/MattRobotics/robot-dog/commit/b65e75d72f404499b37be055899280fc4187d5f9)
+and nothing later. **PR-1**, which is to integrate layout V1 (Calibration Persistence V1 and the
+custom partition table) into `main`, **must update this notice in the same change**, together with
+the short notices that link to it in the root `README.md`, `05_Firmware/README.md`,
+`05_Firmware/MATDOG_Controller/README.md` and `01_Docs/02_Architecture/ROADMAP.md`. After that
+change the `main` column below no longer applies.
+
 ## What differs
 
-| | `main` (this branch's base, `b65e75d`) | dev.3 candidate line |
+| | `main` at `b65e75d` | dev.3 candidate line |
 |---|---|---|
 | Partition scheme | `PartitionScheme=app3M_fat9M_16MB` — the legacy Arduino scheme, pinned in `scripts/build.sh`, `scripts/upload.sh` and `scripts/flash_app_only.sh` | `PartitionScheme=custom`, table from `partitions.csv`, `LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1` |
 | Application slots | two 3 MiB slots (`app0` at `0x10000`, `app1` at `0x310000`, FFAT at `0x610000`) | two 5 MiB slots (`app0` at `0x10000`, `app1` at `0x510000`) |

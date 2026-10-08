@@ -18,7 +18,7 @@ This repository is the single active engineering repository for the robot.
 > Details and sources: [`FLASH_LAYOUT_SAFETY_NOTICE.md`](05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
 > The snapshot below is the historical state of `main` on 2026-10-01 and has not been updated.
 
-> **Current snapshot — 2026-10-01 (PR #35 merged)**
+> **Historical snapshot — 2026-10-01 (PR #35 merged)**
 >
 > - **Installed population:** 13 ST3215 (12 leg joints plus neck ID 51); 17 canonical slots,
 >   with IDs 52–55 intentionally absent.
