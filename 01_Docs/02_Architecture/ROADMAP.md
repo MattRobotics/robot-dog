@@ -1,14 +1,15 @@
 # MATDOG Roadmap
 
-> **Flash safety — 2026-10-08, updated for PR-2.** `main` is not a flashable baseline for the
+> **Flash safety — 2026-10-08, updated for PR-3.** `main` is not a flashable baseline for the
 > current robot.
-> - It carries the robot's layout `MATDOG_16M_2x5M_NVS_V1`, Calibration Persistence V1 and, since
->   PR-2, a selective part of the dev.1 line (recovery, DALY/release stages, Wi-Fi/OTA V3,
->   charging priority, identity `0.2.0-dev.1`, the pure motion library). It is not the firmware
->   the robot runs.
-> - These integrations authorize no flash and accept nothing on hardware.
-> - The dev.3 line is a candidate only (Hardware Validation 2026-10-07: execution COMPLETE,
->   acceptance BLOCKED).
+> - It carries the robot's layout `MATDOG_16M_2x5M_NVS_V1`, Calibration Persistence V1, a selective
+>   part of the dev.1 line (recovery, DALY/release stages, Wi-Fi/OTA V3, charging priority, the
+>   pure motion library) and, since PR-3, the dev.2/dev.3 source delta (boot servo census, direct-read
+>   thermal verdict, one-shot post-abort recovery in the host runner); identity `0.2.0-dev.3`.
+> - A `main` build is not the image on the robot, and these integrations authorize no flash and
+>   accept nothing on hardware.
+> - dev.3 is a candidate only (Hardware Validation 2026-10-07: execution COMPLETE, acceptance
+>   BLOCKED); no release is approved.
 > - Deferred, not deleted: motion execution suites, oracles and the G35/G4/G4.1/G5-A evidence
 >   ([ADR-004](../../09_Logs/Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md)).
 >

@@ -1,5 +1,26 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — PR-3: dev.2/dev.3 source delta on `main` (0.2.0-dev.3) — 2026-10-08
+
+- **What `main` gains.** Seven commits recreated from the dev.2/dev.3 candidate (`bac652f`,
+  `d0ede36`, `d67eaa1`, `62812cd`, `2f23247`, `b3fd945`, `b764c25`); each message carries the full
+  `Original-SHA:`. They are recreated, not merged: the originals descend from `3f23439`, which holds
+  third-party decompiler material that must not enter the history of `main` (ADR-004). The originals
+  are not ancestors of `main` and stay preserved on `backup/matdog-dev3-preservation-20261008`.
+- **Source.** The dev.2 read-only boot servo census (ROBOT_POWERED), the dev.3 thermal verdict from
+  direct reads only, the host runner's one-shot post-abort recovery, and the identity
+  `0.2.0-dev.3`. Every recreated file is byte-identical to its original; `CHANGELOG.md` differs
+  only in position of the added entries.
+- **Records.** The dev.2/dev.3 development logs and delta audits are historical records of the
+  candidate on the robot; they are not results for a `main` build.
+- **Unchanged contracts.** `MOTION_AUTHORIZED=0`, `RESTORE=NOT_IMPLEMENTED`, OTA ingest default 0,
+  layout `MATDOG_16M_2x5M_NVS_V1`, no actuator path from `src/motion`. No pre-existing anomaly was
+  corrected.
+- **Not accepted.** dev.3 Hardware Validation 2026-10-07: execution COMPLETE, acceptance BLOCKED. No
+  release is approved. **Do not flash `main`**; see
+  [`FLASH_LAYOUT_SAFETY_NOTICE.md`](FLASH_LAYOUT_SAFETY_NOTICE.md) and the
+  [PR-3 log](../../09_Logs/Development_Log/2026-10-08_PR3_DEV2_DEV3_SELECTIVE_INTEGRATION.md).
+
 ## 0.2.0-dev.3 — thermal verdict from direct reads; automatic post-abort recovery — 2026-10-06
 
 - The PresentTemperature byte of the 15-byte feedback block read is diagnostic only. On

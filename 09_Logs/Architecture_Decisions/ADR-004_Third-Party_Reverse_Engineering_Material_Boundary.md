@@ -4,7 +4,7 @@ Date: 2026-10-08
 
 ## Status
 
-Accepted (owner decision for PR-2, 2026-10-08). Does not supersede ADR-001 to ADR-003.
+Accepted (owner decision for PR-2, 2026-10-08; applied unchanged to PR-3). Does not supersede ADR-001 to ADR-003.
 
 ## Context
 
@@ -27,9 +27,11 @@ on `main`.
    the firmware that has not been reviewed, or copies that reproduce them.
 2. Provenance of excluded material is recorded by reference (repository, commit, path, SHA-256),
    never by content. The manifest `motion_integration_manifest_pr2.json` lists them as `DEFERRED`.
-3. Integration from the Integration dev.1 line is selective. History up to the boundary commit
-   `13da04a` is merged with its original SHAs. Later commits are recreated as new commits that
-   carry the original SHA in their message and leave the third-party material out.
+3. Integration from the Integration dev.1 line (PR-2) and from the dev.2/dev.3 line (PR-3) is
+   selective. In PR-2, history up to the boundary commit `13da04a` is merged with its original
+   SHAs; later commits are recreated as new commits. In PR-3 all seven commits are recreated. A
+   recreated commit carries the original SHA in its message and leaves the third-party material
+   out.
 4. No automatic merge, cherry-pick or import from the reverse-engineering repository into
    `robot-dog`. MATDOG-original results enter only after a provenance and independence review.
 5. A MATDOG component that really needs an excluded artifact is `DEFERRED` or `BLOCKED`. Tests are
@@ -46,6 +48,14 @@ on `main`.
   (including any history change) is an owner decision outside this ADR and is not performed here.
 - Re-admitting deferred material needs verifiable authorization or a clean-room regeneration, and
   its own review.
+
+## Application in PR-3
+
+The seven dev.2/dev.3 commits descend from `3f23439`, so they are recreated as new commits whose
+parent is `main` (full `Original-SHA:` in each message). Each delta was applied as a patch
+(`git cherry-pick --no-commit`) and committed anew; no original commit becomes an ancestor of
+`main`. Their deltas contain no excluded artifact. The PR-2 manifest, the DEFERRED declaration and the source/purity/wiring gate
+are unchanged.
 
 ## Verification
 

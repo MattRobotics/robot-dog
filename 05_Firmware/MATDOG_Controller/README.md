@@ -5,15 +5,15 @@ one-sketch-per-peripheral workflow (ST3215 bench tools, BNO085 Phase C3, DALY pr
 with one modular, deployable firmware image that initializes each subsystem module
 together and reports whether its hardware is detected, expected or unavailable.
 
-> **⚠ Flash safety — 2026-10-08, updated for PR-2.** This tree uses the flash layout
+> **⚠ Flash safety — 2026-10-08, updated for PR-3.** This tree uses the flash layout
 > `MATDOG_16M_2x5M_NVS_V1` (`partitions.csv`, `PartitionScheme=custom`), and `scripts/upload.sh`
 > refuses every full-image upload. **Do not use this tree to update the robot.**
-> - It is not the firmware the robot runs: the robot runs the dev.3 candidate.
-> - The firmware identity is `0.2.0-dev.1` (a selective part of the dev.1 line, PR-2); the
->   dev.2/dev.3 changes are not on `main`.
-> - These integrations are neither a flash authorization nor a hardware acceptance.
+> - The firmware identity is `0.2.0-dev.3`: the sources correspond to the dev.3 candidate on the
+>   robot (provenance `b3fd945`), apart from the deferred material. A build of this tree is a
+>   different build from the installed image; binary identity is not asserted.
 > - dev.3 is a candidate only (Hardware Validation 2026-10-07: execution COMPLETE, acceptance
->   BLOCKED).
+>   BLOCKED). No release is approved, and these integrations are neither a flash authorization
+>   nor a hardware acceptance.
 > - The pure motion library under `src/motion` is unwired. Its execution suites and the
 >   G35/G4/G4.1/G5-A evidence are deferred.
 >
