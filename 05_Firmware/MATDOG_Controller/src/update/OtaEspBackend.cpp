@@ -1,5 +1,7 @@
 #include "OtaEspBackend.h"
 
+#include "OtaLayoutContract.h"
+
 #include <Arduino.h>
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
@@ -104,6 +106,37 @@ OtaImgState OtaEspBackend::imageState(const OtaPartitionInfo& partition) {
     return OtaImgState::UNREADABLE;
   }
   return translate(state);
+}
+
+bool OtaEspBackend::installedLayoutConforms() {
+  // The runtime table, in table order, exactly as ESP-IDF loaded it. More
+  // entries than the buffer holds is itself non-conforming.
+  constexpr size_t kMax = 16;
+  LayoutPartition parts[kMax];
+  size_t n = 0;
+  bool overflow = false;
+
+  esp_partition_iterator_t it =
+      esp_partition_find(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, nullptr);
+  while (it != nullptr) {
+    const esp_partition_t* p = esp_partition_get(it);
+    if (p != nullptr) {
+      if (n >= kMax) { overflow = true; break; }
+      parts[n].label = p->label;
+      parts[n].type = static_cast<uint8_t>(p->type);
+      parts[n].subtype = static_cast<uint8_t>(p->subtype);
+      parts[n].offset = p->address;
+      parts[n].size = p->size;
+      ++n;
+    }
+    it = esp_partition_next(it);
+  }
+  if (it != nullptr) esp_partition_iterator_release(it);
+
+  const LayoutVerdict verdict =
+      overflow ? LayoutVerdict::EMPTY_OR_OVERFLOW : checkLayoutV1(parts, n);
+  last_layout_verdict_ = static_cast<uint8_t>(verdict);
+  return verdict == LayoutVerdict::OK;
 }
 
 bool OtaEspBackend::beginWrite(const OtaPartitionInfo& target, uint32_t image_size) {

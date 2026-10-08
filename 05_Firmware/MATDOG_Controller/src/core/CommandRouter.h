@@ -45,6 +45,8 @@ class FirstMotionExecutor;
 class FullLegCalibrationExecutor;
 struct FullLegRunState;
 class FullLegEvidenceStore;
+class CalibrationPersistenceService;
+struct SaveGateFacts;
 }  // namespace calibration
 
 namespace network {
@@ -138,6 +140,11 @@ class CommandRouter {
     // struct is aggregate-initialized positionally in Controller::begin().
     calibration::FullLegRunState* full_leg_run;
     calibration::FullLegEvidenceStore* full_leg_evidence;
+    // Calibration Persistence V1 (P3a): the Controller-owned service behind
+    // @CALIBRATION PERSIST ..., and a read-only view of the verdict of the last
+    // first-motion SAFE_OFF (the SAVE gate's SAFE_OFF evidence).
+    calibration::CalibrationPersistenceService* persistence;
+    const servo::SafeOffResult* first_motion_safe_off_result;
   };
 
   void begin(const Modules& modules);
@@ -149,6 +156,7 @@ class CommandRouter {
   bool bound() const { return modules_.system_state != nullptr; }
 
  private:
+  void resetLine();
   void handleLine(String line);
   bool q0CaptureOwnsServoDiagnostics() const;
   // True while either motion executor (the DIRECTION_VERIFY first-motion
@@ -234,6 +242,17 @@ class CommandRouter {
   // which this deliberately does not reach into.
   void printWebStatus();
   static void printAvailabilityLine(const char* label, const AvailabilityStatus& a);
+  // @CALIBRATION PERSIST STATUS | SAVE CHECK | SAVE CONFIRM_SAVE_FULL_CALIBRATION
+  // | ACK <gen> | RECONCILE ADOPT <gen> [CONFIRM_DISCARD] |
+  // RECONCILE DECLARE_NOTHING [CONFIRM_DISCARD]. Implemented in
+  // CommandRouterPersistence.cpp. Touches no servo, no transform table, no
+  // authority; only STATUS and SAVE CHECK are read-only.
+  void handlePersistCommand(const String& upper);
+  static bool isPersistCommand(const String& upper);
+  void printPersistenceStatus();
+  void buildSaveGateFacts(calibration::SaveGateFacts* facts) const;
+  // nullptr when no actuator activity could be going on, else a REASON= token.
+  const char* persistenceQuietViolation() const;
 
   Modules modules_{};
   bool bms_stream_enabled_ = false;
@@ -249,8 +268,12 @@ class CommandRouter {
   uint16_t evidence_export_next_ = 0;
 
   static constexpr size_t kLineBufSize = 96;
+  // LF ends a line; CR is ignored for compatibility. The first framing error
+  // discards the whole line, across update() calls, until the next LF.
+  enum class LineError : uint8_t { NONE, OVERFLOW, NUL };
   char line_buf_[kLineBufSize] = {0};
   size_t line_len_ = 0;
+  LineError line_error_ = LineError::NONE;
 };
 
 }  // namespace core

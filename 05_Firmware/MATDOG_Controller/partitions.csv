@@ -1,0 +1,15 @@
+# MATDOG flash layout V1 (LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1) - ESP32-S3, 16 MiB.
+# Authority: scripts/matdog_layout.py pins these exact values; scripts/build.sh
+# compiles with PartitionScheme=custom so this sketch-local file is the only
+# source of the table (Arduino platform.txt prebuild hook 3). Changing a row
+# is a layout change: it needs a new LAYOUT_ID and a separate migration.
+# Order matters: the core's initArduino erases the FIRST nvs-subtype partition
+# it finds on a bad default NVS, so "nvs" MUST precede "matdog_nvs".
+# Name,       Type, SubType, Offset,   Size,     Flags
+nvs,          data, nvs,     0x9000,   0x5000,
+otadata,      data, ota,     0xE000,   0x2000,
+app0,         app,  ota_0,   0x10000,  0x500000,
+app1,         app,  ota_1,   0x510000, 0x500000,
+ffat,         data, fat,     0xA10000, 0x5D0000,
+matdog_nvs,   data, nvs,     0xFE0000, 0x10000,
+coredump,     data, coredump,0xFF0000, 0x10000,

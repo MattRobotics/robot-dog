@@ -1,11 +1,17 @@
 # MATDOG Roadmap
 
-> **Flash safety — 2026-10-08.** `main` is not a flashable baseline for the current robot: it uses
-> the legacy partition scheme, the robot runs `MATDOG_16M_2x5M_NVS_V1`. The dev.3 line is a
-> candidate only (Hardware Validation 2026-10-07: execution COMPLETE, acceptance BLOCKED).
+> **Flash safety — 2026-10-08, updated for PR-1.** `main` is not a flashable baseline for the
+> current robot.
+> - Since PR-1 it carries the robot's layout `MATDOG_16M_2x5M_NVS_V1` and Calibration
+>   Persistence V1, but it is not the firmware the robot runs.
+> - The layout integration authorizes no flash and accepts nothing on hardware.
+> - The dev.3 line is a candidate only (Hardware Validation 2026-10-07: execution COMPLETE,
+>   acceptance BLOCKED).
+>
 > `MOTION_AUTHORIZED=0`. See
 > [`FLASH_LAYOUT_SAFETY_NOTICE.md`](../../05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
-> The sequence below is otherwise unchanged and still reflects 2026-10-01.
+> Apart from the Calibration Persistence V1 rows (updated for PR-1), the sequence below still
+> reflects 2026-10-01.
 
 **Canonical owner of the MATDOG development sequence, its dependencies, and where the project
 currently stands.** Last updated 2026-10-01.
@@ -81,7 +87,8 @@ COMPLETE   read-only q0 capture                 VALIDATED (2026-09-27)
 SUPERSEDED UPPER-only 8-contact milestone       Historical scope error
 COMPLETE   TRUE Full Calibration SW            INTEGRATED on main (PR #35)
 COMPLETE   Full Calibration hardware            24/24 PASS (2026-10-01)
-CURRENT    Calibration Persistence V1           TO_DESIGN
+CURRENT    Calibration Persistence V1           IMPLEMENTED on main (PR-1, offline/host-tested);
+                                                RESTORE not implemented; no HW acceptance
 OPEN       Telemetry integrity                  Prior to hardware gait
 OPEN       LOWER MAX / q0 review                Before operational approval
 THEN       Operational Envelopes / JointLimits   BLOCKED pending approval
@@ -116,7 +123,7 @@ Calibration Persistence V1
 | Gate | State | What it means |
 |---|---|---|
 | **Full Calibration HW Validation** | **COMPLETE / HARDWARE-VALIDATED** | LF/RF/RH/LH 6/6 each, 24/24 PASS on 2026-10-01, firmware `dfcecb6`. RAM-only. |
-| **Calibration Persistence V1** | **CURRENT / TO_DESIGN** | Versioned, integrity-checked, transactional storage and fail-closed boot recovery; not implemented. |
+| **Calibration Persistence V1** | **CURRENT / IMPLEMENTED on `main` (PR-1)** | Versioned, integrity-checked, A/B storage in `matdog_nvs` with SAVE/ACK/RECONCILE and boot LOAD; offline/host-tested. `RESTORE` is not implemented; no hardware acceptance of a `main` build. |
 | **Operational Envelopes / JointLimits** | **BLOCKED** | Approved workspace and margins are absent; 0/12 operational limits admitted. |
 | **Stand / Gait hardware** | **BLOCKED** | Requires persistence, approved limits and independent motion-safety validation. |
 
@@ -182,7 +189,7 @@ Each row's *Blocks* column states what it gates. Arrows are hard dependencies, n
 | 6 | **Service / Provisioning / QC** | **FUTURE** | Frozen bench tools (Bench QC V6.1, Source Signature Survey V1, Provisioner V6) remain **FROZEN** oracles; nothing is integrated into the Controller. Blocked by stage 5. |
 | 7 | **Full Leg Calibration integration** | **COMPLETE / HARDWARE-VALIDATED** | TRUE 24-contact calibration passed on 2026-10-01 (firmware `dfcecb6`); PR #35 merged. [Evidence](../../09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md). Earlier UPPER-only scope is superseded. |
 | 8 | **Formal recalibration of the installed robot** | **COMPLETE for physical contact acquisition; RAM-only** | Four legs x 6/6 contacts accepted. Not persisted across reboot and does not authorize operational motion. |
-| 8a | **Calibration Persistence V1** | **CURRENT / TO_DESIGN** | 12 q0, 24 contacts and witnesses, version, servo/geometry provenance, atomic commit, previous generation, fail-closed boot verification. Not implemented. |
+| 8a | **Calibration Persistence V1** | **CURRENT / IMPLEMENTED on `main` (PR-1, 2026-10-08)** | 12 q0, 24 contacts and witnesses, version, servo/geometry provenance, atomic commit, previous generation, fail-closed boot verification. Offline/host-tested; `RESTORE` not implemented; hardware acceptance pending. |
 | 8b | **Operational Envelopes / JointLimits** | **BLOCKED** | Needs an approved stand/gait workspace and margins; blocked by 8a. Until then 0/12 final JointLimits are admitted on purpose. Blocks stages 17 and 20 on hardware. |
 
 ### Phase 3 — Host transport, network, Web UI, OTA

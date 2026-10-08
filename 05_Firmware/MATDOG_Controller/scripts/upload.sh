@@ -1,51 +1,48 @@
 #!/usr/bin/env bash
-# FULL Arduino application upload (arduino-cli upload / esptool stub) for
-# the ESP32-S3. This writes FOUR regions every time it runs: bootloader
-# (0x0), partition table (0x8000), boot_app0/otadata (0xe000) AND the
-# application partition (0x10000) — arduino-cli's default UploadMode
-# always rewrites all four, not just the application.
+# REFUSING STUB (P2.3). There is no full-image upload any more.
 #
-# SESSION 1 CORRECTION (2026-09-15 Session 2 hardening): this script was
-# previously documented here as a "normal application upload" that "does
-# not touch the bootloader/partition table" and "only replaces the
-# application partition". That was wrong — Session 1's own upload log shows
-# writes to all four regions, and VALIDATION.md's Session 1 record has been
-# corrected to say so plainly. It happened to be harmless because the
-# bootloader/partition-table/boot_app0 bytes written were byte-identical to
-# what was already on the device (verified by a read-only flash audit at
-# the start of Session 2 — see VALIDATION.md), not because the write never
-# happened.
+# This script used to run `arduino-cli upload`, which rewrites the bootloader,
+# the partition table, otadata AND the application every time. With the MATDOG
+# V1 flash layout (partitions.csv, LAYOUT_ID MATDOG_16M_2x5M_NVS_V1) that is
+# exactly what must never happen during ordinary maintenance: a full rewrite
+# can put the old partition table back, or move/erase the persistent MATDOG
+# NVS partition.
 #
-# For a write that is actually limited to the application partition, use
-# scripts/flash_app_only.sh instead — that is the script Session 2 uses.
-# This script remains for the case that legitimately needs a full image
-# (e.g. bring-up on a replacement/blank board, or after a deliberate
-# partition-scheme change) and requires the same operator authorization any
-# bootloader/partition-table write does; it is not part of the routine
-# Session 2 flashing path.
+#   - ordinary updates:  scripts/flash_app_only.sh (application slot only, every
+#     gate in that script applies)
+#   - migration from the legacy app3M_fat9M_16MB layout: a SEPARATE procedure
+#     that does not exist yet. It needs its own explicit operator authorization
+#     for the session.
 #
-# Gates that must already be true before running this (see VALIDATION.md):
-#   - full 16 MiB backup verified (size + SHA256)
-#   - compile PASS
-#   - static safety audit PASS
-#   - existing BNO085 viewer test suite PASS
+# CONTRACT a future migration procedure must satisfy (data, not code - the
+# machine-readable form is MIGRATION_* in scripts/matdog_layout.py, tested by
+# scripts/tests/test_matdog_layout.py):
+#   preconditions, ALL required:
+#     - explicit operator authorization for that session
+#     - device identity verified
+#     - a fresh full 16 MiB backup with an authorized SHA-256
+#     - the installed table is the known legacy table
+#     - the target table SHA-256 equals the Manifest V2 value and the pinned one
+#     - the application is a Manifest V2 build for LAYOUT_ID MATDOG_16M_2x5M_NVS_V1
+#     - the default NVS content is backed up and the backup verified
+#     - the loss of the ffat data is accepted (its range moves)
+#     - the boot slot after migration is app0
+#   allowed writes: partition table (0x8000..0x9000), otadata (0xE000..0x10000),
+#     app0 (0x10000..0x510000). Nothing else.
+#   protected, never written or erased: bootloader (0x0..0x8000), default NVS
+#     (0x9000..0xE000), MATDOG NVS (0xFE0000..0xFF0000).
+#   forbidden operations: a whole-chip erase, a full-image restore, a write of a
+#     merged image.
+#
+# This stub performs no hardware operation of any kind.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKETCH_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+FQBN='esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=custom,DebugLevel=none,PSRAM=opi'
 
-ARDUINO="${ARDUINO_CLI:-$HOME/.local/bin/arduino-cli}"
-FQBN='esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,DebugLevel=none,PSRAM=opi'
-PORT="${MATDOG_ESP32_PORT:-/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00}"
-
-echo "== MATDOG Controller upload =="
-echo "sketch : $SKETCH_DIR"
-echo "port   : $PORT"
-echo "fqbn   : $FQBN"
-echo
-
-"$ARDUINO" upload \
-  --fqbn "$FQBN" \
-  --port "$PORT" \
-  --input-dir "$SKETCH_DIR/build/esp32.esp32.esp32s3" \
-  "$SKETCH_DIR"
+echo "REFUSE: scripts/upload.sh performs no upload." >&2
+echo "  Full-image uploads are disabled for layout $(python3 "$SCRIPT_DIR/matdog_layout.py" contract | grep '^LAYOUT_ID=' | cut -d= -f2)." >&2
+echo "  Ordinary update : scripts/flash_app_only.sh" >&2
+echo "  Layout migration: separate, explicitly authorized procedure (not implemented)." >&2
+echo "  fqbn            : $FQBN" >&2
+exit 1

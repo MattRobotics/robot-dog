@@ -79,7 +79,13 @@ void captureExportLine(void* user, const char* line) {
 
 void CommandRouter::begin(const Modules& modules) {
   modules_ = modules;
+  resetLine();
+}
+
+void CommandRouter::resetLine() {
+  memset(line_buf_, 0, sizeof(line_buf_));
   line_len_ = 0;
+  line_error_ = LineError::NONE;
 }
 
 bool CommandRouter::q0CaptureOwnsServoDiagnostics() const {
@@ -104,17 +110,27 @@ void CommandRouter::update(uint32_t now_ms) {
     if (c == '\r') continue;
 
     if (c == '\n') {
-      line_buf_[line_len_] = '\0';
-      if (line_len_ > 0) {
+      if (line_error_ != LineError::NONE) {
+        Serial.println(line_error_ == LineError::OVERFLOW ? "ERROR=COMMAND_LINE_OVERFLOW"
+                                                        : "ERROR=COMMAND_LINE_NUL");
+      } else if (line_len_ > 0) {
+        line_buf_[line_len_] = '\0';
         handleLine(String(line_buf_));
       }
-      line_len_ = 0;
+      resetLine();
       continue;
     }
 
-    if (line_len_ < kLineBufSize - 1) {
-      line_buf_[line_len_++] = c;
+    if (line_error_ != LineError::NONE) continue;
+    if (c == '\0') {
+      line_error_ = LineError::NUL;
+      continue;
     }
+    if (line_len_ == kLineBufSize - 1) {
+      line_error_ = LineError::OVERFLOW;
+      continue;
+    }
+    line_buf_[line_len_++] = c;
   }
 
   if (bms_stream_enabled_ && (now_ms - last_bms_stream_ms_ >= 2000)) {
@@ -296,6 +312,8 @@ void CommandRouter::handleLine(String line) {
       Serial.println("HINT=create src/config/WifiCredentials.local.h and rebuild");
     }
     printWifiStatus();
+  } else if (isPersistCommand(upper)) {
+    handlePersistCommand(upper);
   } else if (upper == "@CALIBRATION Q0 STATUS") {
     printCalibrationQ0Status();
   } else if (upper == "@CALIBRATION Q0 ABORT") {
@@ -418,9 +436,12 @@ void CommandRouter::handleLine(String line) {
     for (uint8_t i = 0; i < prepared.transform_count; ++i) {
       if (modules_.actuator_policy->transforms().admit(prepared.transforms[i])) ++admitted;
     }
+    const bool promotion_complete = modules_.q0_capture->notePromotionCompleted(
+        fresh_capture.capture_session_id, admitted,
+        modules_.actuator_policy->currentGeometryTag());
     Serial.printf("CALIBRATION_Q0_PROMOTE=%s admitted=%u/%u source=CURRENT_BOOT_CAPTURE "
                   "capture_session=%lu\n",
-                 admitted == prepared.transform_count ? "OK" : "PARTIAL",
+                 promotion_complete ? "OK" : "PARTIAL",
                  (unsigned)admitted, (unsigned)prepared.transform_count,
                  (unsigned long)fresh_capture.capture_session_id);
     Serial.println("CALIBRATION_Q0_PROMOTE_NOTE RAM-only; no EEPROM write; no motion; "
@@ -1133,6 +1154,12 @@ void CommandRouter::printHelp() {
   Serial.println("  @WEB SERVER START|STOP (MAINTENANCE mode only; never auto-started)");
   Serial.println("  @AUTHORITY STATUS      (read-only; no owner can be acquired yet)");
   Serial.println("  @CALIBRATION STATUS    (read-only; no session can move hardware)");
+  Serial.println("  @CALIBRATION PERSIST STATUS (read-only: NVS, marker, slots, last LOAD)");
+  Serial.println("  @CALIBRATION PERSIST SAVE CHECK (read-only dry run of the SAVE prerequisites)");
+  Serial.println("  @CALIBRATION PERSIST SAVE CONFIRM_SAVE_FULL_CALIBRATION (NVS only; ACK still required)");
+  Serial.println("  @CALIBRATION PERSIST ACK <generation> (acknowledges a verified SAVE; no motion)");
+  Serial.println("  @CALIBRATION PERSIST RECONCILE ADOPT <generation> [CONFIRM_DISCARD]");
+  Serial.println("  @CALIBRATION PERSIST RECONCILE DECLARE_NOTHING [CONFIRM_DISCARD]");
   Serial.println("  @CALIBRATION Q0 STATUS (cached CR2-B acquisition state; no bus transaction)");
   Serial.println("  @CALIBRATION Q0 ABORT  (stop future q0 reads; no actuator command)");
   Serial.println("  @CALIBRATION Q0 CAPTURE <samples> <stability_ticks> CONFIRM_Q0_POSE");

@@ -465,6 +465,25 @@ power source. With KEY OFF and no charger connected, plugging in this port alone
 the Controller — consistent with §11 A/C. The onboard USB-C is no longer required for normal
 service/programming access, though it remains physically present on the dev board.
 
+### M0.2 migration-readiness limit — 2026-10-02
+
+The actual M0 Gate A used this external port with battery/DALY KEY ON and
+TECNOIOT→5 V ESP32, while servo/LED rails remained powered; onboard USB-C was
+not used. BOOT/EN are beneath the cover. The operator verified all 13 servos
+with torque/speed/current zero before the authorized USB reset. Two independent
+16 MiB reads are verified locally; this does not authorize flash or boot.
+
+The verified `usb-reset` entry from a working legacy application followed by
+ROM `no-reset` reads does not certify cold recovery after power loss or a
+partially written app/partition table. With BOOT/EN inaccessible, the migration
+is blocked until physical maintenance access or another recovery method is
+available and qualified. The breaker provides electrical shutdown, not ROM
+selection. Cutting battery power also removes TECNOIOT power; plugging in the
+VBUS-less service port cannot restore it. Powered servo torque-off observed
+before ROM must not be assumed to survive a peripheral power cycle. No hardware
+test, power change, rewiring or design change is authorized by M0.2. See the
+[runbook](../05_Firmware/MATDOG_Controller/FLASH_LAYOUT_M0_RUNBOOK.md).
+
 ---
 
 ## 16. Remaining open items — **FUTURE / TO_TEST**

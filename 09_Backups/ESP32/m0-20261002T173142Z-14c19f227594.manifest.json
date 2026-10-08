@@ -1,0 +1,60 @@
+{
+  "schema": "MATDOG_ESP32_REMOTE_ENCRYPTED_BACKUP_V1",
+  "backup_id": "m0-20261002T173142Z-14c19f227594",
+  "acquisition_started_utc": "2026-10-02T17:31:42Z",
+  "archive_created_utc": "2026-10-03T07:31:16.311293+00:00",
+  "device_mac": "14:c1:9f:22:75:94",
+  "chip": "ESP32-S3",
+  "installed_firmware": {
+    "build_id": "dfcecb670d05",
+    "profile": "ROBOT_POWERED",
+    "partition": "app0",
+    "offset": "0x10000",
+    "slot_size_bytes": 3145728
+  },
+  "software_checkpoint": "b19a98e0dc7d90d7e1218d3190eb2e28c54ecc14",
+  "original": {
+    "filename": "read-a-16m.bin",
+    "size_bytes": 16777216,
+    "sha256": "856435baa1402086bd38dee0a4c1e0c6ee13e8d814cfc7ddc8bed30dbed5afb7",
+    "independent_acquisitions": 2,
+    "original_AB_identical_previously_verified": true,
+    "new_flash_acquisition": false
+  },
+  "encrypted": {
+    "filename": "read-a-16m.bin.gpg",
+    "size_bytes": 16777303,
+    "sha256": "a1111d3e9ddb1c6489c0ecf79ee90d8480190104bb131c2397401609f0419e31"
+  },
+  "encryption": {
+    "format": "OpenPGP",
+    "implementation": "GnuPG 2.4.4",
+    "mode": "symmetric",
+    "cipher": "AES-256",
+    "s2k_type": "iterated and salted (3)",
+    "s2k_digest": "SHA-256",
+    "s2k_iteration_count": 65011712,
+    "compression": "none",
+    "integrity": "OpenPGP SEIPD/MDC; successful GPG integrity verification required",
+    "secret_entry": "interactive GNOME pinentry on operator desktop",
+    "symmetric_password_cache": "disabled",
+    "key_custody": "operator; no password/key in repository, logs or Codex conversation"
+  },
+  "local_recovery_verification": {
+    "gpg_exit_code": 0,
+    "plaintext_size": 16777216,
+    "plaintext_sha256": "856435baa1402086bd38dee0a4c1e0c6ee13e8d814cfc7ddc8bed30dbed5afb7",
+    "expected_plaintext_size": 16777216,
+    "expected_plaintext_sha256": "856435baa1402086bd38dee0a4c1e0c6ee13e8d814cfc7ddc8bed30dbed5afb7",
+    "byte_equal_to_original": true,
+    "plaintext_file_written": false,
+    "result": "PASS"
+  },
+  "github": {
+    "repository": "MattRobotics/robot-dog",
+    "release_tag": "backup-esp32-m0-20261002T173142Z-14c19f227594",
+    "release_target_commit": "2757604400db34e3107abacd994ca6fb9d0bb515",
+    "tag_purpose": "archive index; installed firmware and M0.4 checkpoint recorded separately",
+    "release_url": "https://github.com/MattRobotics/robot-dog/releases/tag/backup-esp32-m0-20261002T173142Z-14c19f227594"
+  }
+}

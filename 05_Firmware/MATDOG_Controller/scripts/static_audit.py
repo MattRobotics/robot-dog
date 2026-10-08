@@ -5535,6 +5535,139 @@ def check_build_profile_provenance(sketch_dir):
              f"(stdout={result.stdout!r} stderr={result.stderr!r})")
 
 
+def check_flash_layout_safety(sketch_dir):
+    """P2.3: the MATDOG V1 flash layout and the controls that keep ordinary
+    maintenance from overwriting the persistent MATDOG NVS partition.
+
+    Offline only. Pins: partitions.csv == scripts/matdog_layout.py contract
+    (default NVS before matdog_nvs); one FQBN, with PartitionScheme=custom,
+    in build.sh / flash_app_only.sh / upload.sh; the layout gates run before
+    the manifest is written and before the single write-flash; upload.sh
+    performs no upload; no chip-erase anywhere; the OTA policy refuses a
+    non-conforming installed table before resolving a target.
+    """
+    scripts_dir = sketch_dir / "scripts"
+    layout_py = scripts_dir / "matdog_layout.py"
+    csv_path = sketch_dir / "partitions.csv"
+    build_sh = scripts_dir / "build.sh"
+    flash_sh = scripts_dir / "flash_app_only.sh"
+    upload_sh = scripts_dir / "upload.sh"
+    verifier = scripts_dir / "verify_application_partition.py"
+    tests = scripts_dir / "tests" / "test_matdog_layout.py"
+    for path in (layout_py, csv_path, build_sh, flash_sh, upload_sh, verifier, tests):
+        if not path.exists():
+            fail(f"{path}: missing - the MATDOG V1 flash-layout safety chain is incomplete")
+            return
+
+    # 1. partitions.csv is exactly the pinned contract, default NVS first.
+    sys.path.insert(0, str(scripts_dir))
+    try:
+        import matdog_layout
+    finally:
+        sys.path.pop(0)
+    rows = []
+    for line in csv_path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#")[0].strip()
+        if line:
+            rows.append([c.strip() for c in line.split(",")])
+    got = [(r[0], int(r[3], 0), int(r[4], 0)) for r in rows]
+    want = [(e.label, e.offset, e.size) for e in matdog_layout.EXPECTED_PARTITIONS]
+    if got != want:
+        fail(f"{csv_path}: partition table {got} != the pinned layout "
+             f"{matdog_layout.LAYOUT_ID} {want}")
+    nvs_labels = [r[0] for r in rows if r[1] == "data" and r[2] == "nvs"]
+    if nvs_labels != ["nvs", "matdog_nvs"]:
+        fail(f"{csv_path}: nvs-subtype partitions are {nvs_labels}; the default 'nvs' "
+             f"must precede 'matdog_nvs' (initArduino() erases the FIRST nvs partition)")
+
+    # 2. One FQBN everywhere, custom scheme.
+    for script in (build_sh, flash_sh, upload_sh):
+        m = re.search(r"^FQBN='([^']+)'", script.read_text(encoding="utf-8"), re.MULTILINE)
+        if not m or m.group(1) != matdog_layout.PINNED_FQBN:
+            fail(f"{script}: FQBN is not matdog_layout.PINNED_FQBN "
+                 f"(PartitionScheme=custom)")
+
+    # 3. build.sh: layout gate before the manifest, explicit size limit.
+    build_text = strip_shell_comments(build_sh.read_text(encoding="utf-8"))
+    gate = re.search(r'matdog_layout\.py"?\s+check-build', build_text)
+    manifest = re.search(r'build_manifest\.py"?\s+write', build_text)
+    if not gate or not manifest or gate.start() > manifest.start():
+        fail(f"{build_sh}: `matdog_layout.py check-build` (table hash, 5 MiB size gate, "
+             f"layout marker) must run before the manifest is written")
+    if "upload.maximum_size=5242880" not in build_text:
+        fail(f"{build_sh}: lost --build-property upload.maximum_size=5242880")
+    if not re.search(r"rm -f[^\n]*PARTITION_ARTIFACT", build_text):
+        fail(f"{build_sh}: does not remove the previous build's partition table artifact")
+
+    # 4. flash_app_only.sh: layout gates before the single write.
+    flash_text = strip_shell_comments(flash_sh.read_text(encoding="utf-8"))
+    write = re.search(r'"\$ESPTOOL"[^\n]*write-flash', flash_text)
+    for pattern, description in (
+            (r'matdog_layout\.py"?\s+check-write', "effective write/erase range check"),
+            (r'--expected-table-sha256\s+"\$VERIFIED_PARTITION_TABLE_SHA256"',
+             "installed-table == manifest table check"),
+            (r'\$MAX_PARTITION_SIZE"\s*=\s*"\$VERIFIED_APP_PARTITION_SIZE"',
+             "target size == manifest APP_PARTITION_SIZE check")):
+        m = re.search(pattern, flash_text)
+        if not m:
+            fail(f"{flash_sh}: lost the {description}")
+        elif write and m.start() > write.start():
+            fail(f"{flash_sh}: the {description} must come before write-flash")
+    block = flash_text[flash_text.find("check-write"):][:600]
+    if re.search(r"\|\|\s*(true|:|echo|warn)\b", block.split("WRITE_TARGET_LABEL")[0]):
+        fail(f"{flash_sh}: the write-range check swallows its failure")
+    if len([l for l in flash_text.splitlines()
+            if "write-flash" in l and not l.lstrip().startswith(("echo", "refuse"))
+            and "verify-flash" not in l]) != 1:
+        fail(f"{flash_sh}: expected exactly one write-flash invocation")
+
+    # 5. The installed-layout gate is in the verifier and has no bypass.
+    ver_text = verifier.read_text(encoding="utf-8")
+    if "check_table_bytes" not in ver_text or "--expected-table-sha256" not in ver_text:
+        fail(f"{verifier}: no longer checks the installed table against the pinned layout")
+    if re.search(r'add_argument\("--expected-table-sha256"[^)]*default=', ver_text):
+        fail(f"{verifier}: --expected-table-sha256 gained a default")
+    if re.search(r"(allow|ignore|skip|force|bypass)[-_]?(legacy|layout)", ver_text, re.I):
+        fail(f"{verifier}: a legacy/layout bypass appeared - migration is a separate procedure")
+
+    # 6. upload.sh performs no hardware operation.
+    upload_text = strip_shell_comments(upload_sh.read_text(encoding="utf-8"))
+    for token in ("arduino-cli", "$ARDUINO", "esptool", "ESPTOOL", "write-flash",
+                  "write_flash", "--port", "PORT="):
+        if token in upload_text:
+            fail(f"{upload_sh}: {token!r} - upload.sh is a refusing stub, it must not "
+                 f"perform any upload or hardware operation")
+    if not re.search(r"^exit 1\s*$", upload_text, re.MULTILINE):
+        fail(f"{upload_sh}: does not end by refusing (exit 1)")
+
+    # 7. No chip erase anywhere in the scripts.
+    for path in sorted(scripts_dir.glob("*.sh")) + sorted(scripts_dir.glob("*.py")):
+        if path.name in ("static_audit.py", "matdog_layout.py"):
+            continue
+        text = path.read_text(encoding="utf-8")
+        text = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))
+        if re.search(r"erase[-_]flash|erase[-_]region", text):
+            fail(f"{path}: references a flash erase command - none is allowed (P2.3)")
+
+    # 8. OTA: the installed layout is checked before any target is resolved.
+    policy = sketch_dir / "src" / "update" / "OtaPolicy.cpp"
+    if policy.exists():
+        text = strip_comments(policy.read_text(encoding="utf-8"))
+        prep = text.find("OtaPolicy::prepare(")
+        gate_pos = text.find("installedLayoutConforms()", prep)
+        target_pos = text.find("nextUpdatePartition()", prep)
+        if prep < 0 or gate_pos < 0:
+            fail(f"{policy}: prepare() no longer asks the backend whether the installed "
+                 f"layout conforms (LAYOUT_NOT_CONFORMING)")
+        elif target_pos >= 0 and gate_pos > target_pos:
+            fail(f"{policy}: the layout check must come before the OTA target is resolved")
+
+    result = subprocess.run([sys.executable, str(tests)], capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{tests}: flash layout offline tests FAILED "
+             f"(stdout={result.stdout[-2000:]!r} stderr={result.stderr[-2000:]!r})")
+
+
 def check_backup_gate_provenance(sketch_dir):
     """Recovery-backup hardening (2026-09-25): flash_app_only.sh's backup
     gate must PROVE a full-flash backup is authorized, never accept one by
@@ -5725,6 +5858,192 @@ def check_usb_cdc_tx_never_blocks(files):
                      f"transmit path and begins Serial before setup() (G3.1)")
 
 
+def check_calibration_persistence_boundaries(files, sketch_dir):
+    """P2.4: the calibration persistence layer lives on the dedicated
+    `matdog_nvs` partition, initializes it explicitly by label, never erases,
+    and is integrated into the Controller only through the P3a surface
+    (see check_calibration_persistence_integration).
+
+    Pins: no bare nvs_flash_init() and no erase/format/raw-partition-write call
+    anywhere in firmware sources; only the NVS backend .cpp includes <nvs*.h>
+    or <esp_partition.h> among the calibration persistence files; every nvs
+    partition name is the pinned label, and the label/offset/size constants
+    match scripts/matdog_layout.py; the persistence files do not include
+    Controller / CommandRouter / JointTransformTable / ActuatorAuthority /
+    CalibrationExecutor; nothing outside the persistence files includes the
+    store or the backend except the P3a integration surface.
+    """
+    scripts_dir = sketch_dir / "scripts"
+    tests_dir = scripts_dir / "tests"
+    firmware = [(p, code) for p, code in files if tests_dir not in p.parents]
+
+    forbidden = (
+        (r"\bnvs_flash_init\s*\(", "nvs_flash_init() initializes the DEFAULT partition and may format it"),
+        (r"\bnvs_flash_erase\w*\s*\(", "NVS erase/format"),
+        (r"\bnvs_erase_\w+\s*\(", "NVS key/namespace erase"),
+        (r"\bnvs_flash_deinit\w*\s*\(", "NVS deinit"),
+        (r"\besp_partition_erase_range\s*\(", "raw partition erase"),
+        (r"\besp_partition_write\w*\s*\(", "raw partition write"),
+        (r"\bnvs_open\s*\(", "nvs_open() opens the DEFAULT partition"),
+        (r"\bnvs_flash_init_partition_ptr\s*\(", "init by pointer bypasses the label pin"),
+    )
+    for path, code in firmware:
+        for pattern, why in forbidden:
+            if re.search(pattern, code):
+                fail(f"{path}: {pattern} is forbidden - {why} (P2.4)")
+
+    cal = sketch_dir / "src" / "calibration"
+    persistence = [cal / n for n in (
+        "CalibrationRecord.h", "CalibrationRecord.cpp", "CalibrationRecordStore.h",
+        "CalibrationRecordStore.cpp", "CalibrationSaveMarker.h", "CalibrationSaveMarker.cpp",
+        "CalibrationPersistenceState.h", "CalibrationPersistenceState.cpp",
+        "CalibrationRecordNvsBackend.h", "CalibrationRecordNvsBackend.cpp",
+        "CalibrationPersistenceService.h", "CalibrationPersistenceService.cpp")]
+    for path in persistence:
+        if not path.exists():
+            fail(f"{path}: missing - the calibration persistence layer is incomplete")
+            return
+    backend_cpp = cal / "CalibrationRecordNvsBackend.cpp"
+    persistence_set = set(persistence)
+
+    for path in persistence:
+        text = path.read_text(encoding="utf-8")
+        code = strip_comments(text)
+        if path != backend_cpp:
+            for inc in re.findall(r'#\s*include\s*[<"]([^>"]+)[>"]', code):
+                base = inc.rsplit("/", 1)[-1]
+                if base in ("nvs.h", "nvs_flash.h", "esp_partition.h", "Arduino.h", "Preferences.h"):
+                    fail(f"{path}: includes <{inc}> - only CalibrationRecordNvsBackend.cpp may "
+                         f"touch NVS/partition APIs; the rest must stay host-testable (P2.4)")
+        for inc in re.findall(r'#\s*include\s*"([^"]+)"', code):
+            base = inc.rsplit("/", 1)[-1]
+            # CalibrationRecord.cpp (P2) builds a record from the pure executor result
+            # types; that older, read-only dependency is the one allowed exception.
+            executor = "" if path.name.startswith("CalibrationRecord.") else "|FullLegCalibrationExecutor"
+            if re.match(r"(Controller|CommandRouter|JointTransformTable|ActuatorAuthority|"
+                        r"CalibrationExecutor|HostLink|SystemState" + executor + r")\.h$", base):
+                fail(f"{path}: includes {inc} - the persistence layer must not depend on the "
+                     f"Controller side (P2.4)")
+
+    # Every partition label handed to NVS is the pinned one, via the constant.
+    backend = strip_comments(backend_cpp.read_text(encoding="utf-8"))
+    for call in re.findall(r"\b(nvs_flash_init_partition|nvs_open_from_partition)\s*\(([^;]*?),", backend):
+        if call[1].strip() != "kMatdogNvsPartitionLabel":
+            fail(f"{backend_cpp}: {call[0]}({call[1].strip()}, ...) - the partition label must "
+                 f"be kMatdogNvsPartitionLabel")
+    for needed in ("nvs_flash_init_partition(", "nvs_open_from_partition(", "esp_partition_find_first("):
+        if needed not in backend:
+            fail(f"{backend_cpp}: {needed} missing - explicit by-label initialization lost")
+
+    header = strip_comments((cal / "CalibrationRecordNvsBackend.h").read_text(encoding="utf-8"))
+    sys.path.insert(0, str(scripts_dir))
+    try:
+        import matdog_layout
+    finally:
+        sys.path.pop(0)
+    mat = [e for e in matdog_layout.EXPECTED_PARTITIONS if e.label == matdog_layout.MATDOG_NVS_LABEL]
+    if len(mat) != 1:
+        fail("matdog_layout.py: no unique matdog_nvs partition to pin the backend against")
+    else:
+        for name, want in (("kMatdogNvsPartitionAddress", mat[0].offset),
+                           ("kMatdogNvsPartitionSize", mat[0].size)):
+            m = re.search(name + r"\s*=\s*(0[xX][0-9a-fA-F]+)u?", header)
+            if not m or int(m.group(1), 16) != want:
+                fail(f"{cal / 'CalibrationRecordNvsBackend.h'}: {name} != {want:#x} "
+                     f"(matdog_layout.py) - P2.3 layout drifted from the backend pin")
+        m = re.search(r'kMatdogNvsPartitionLabel\s*=\s*"([^"]+)"', header)
+        if not m or m.group(1) != matdog_layout.MATDOG_NVS_LABEL:
+            fail(f"{cal / 'CalibrationRecordNvsBackend.h'}: partition label is not "
+                 f"{matdog_layout.MATDOG_NVS_LABEL!r}")
+
+    # P3a integration surface: outside the persistence files only the Controller
+    # (owner), the router's persistence command file and the SAVE gate may
+    # include the persistence headers, and only the ones they need.
+    allowed_includers = {
+        sketch_dir / "src" / "core" / "Controller.h": {
+            "CalibrationPersistenceService.h", "CalibrationRecordNvsBackend.h"},
+        sketch_dir / "src" / "core" / "Controller.cpp": {
+            "CalibrationPersistenceService.h", "CalibrationRecordNvsBackend.h"},
+        sketch_dir / "src" / "core" / "CommandRouterPersistence.cpp": {
+            "CalibrationPersistenceService.h"},
+    }
+    for path, code in firmware:
+        if path in persistence_set:
+            continue
+        allowed = allowed_includers.get(path, set())
+        for inc in re.findall(r'#\s*include\s*"([^"]+)"', code):
+            base = inc.rsplit("/", 1)[-1]
+            if base in ("CalibrationRecordStore.h", "CalibrationRecordNvsBackend.h",
+                        "CalibrationSaveMarker.h", "CalibrationPersistenceState.h",
+                        "CalibrationPersistenceService.h") and base not in allowed:
+                fail(f"{path}: includes {inc} - only the Controller and "
+                     f"CommandRouterPersistence.cpp integrate the persistence layer (P3a)")
+
+
+def check_calibration_persistence_integration(files, sketch_dir):
+    """P3a: the persistence integration is read/write-to-NVS only. It never
+    admits a JointTransform, never touches the servo bus or a servo EEPROM,
+    never grants a permit or starts a motion, runs before any actuator wiring
+    in Controller::begin(), and every persistent write command is behind its
+    gate."""
+    core = sketch_dir / "src" / "core"
+    cal = sketch_dir / "src" / "calibration"
+    by_path = {p: c for p, c in files}
+    integration = [cal / "CalibrationPersistenceService.h", cal / "CalibrationPersistenceService.cpp",
+                   cal / "CalibrationSaveGate.h", cal / "CalibrationSaveGate.cpp",
+                   core / "CommandRouterPersistence.cpp"]
+    for path in integration:
+        if path not in by_path:
+            fail(f"{path}: missing - the P3a persistence integration is incomplete")
+            return
+    forbidden = (
+        (r"\.admit\s*\(", "admits a JointTransform"),
+        (r"\bservo_bus\w*|\bServoBus\b", "touches the servo bus"),
+        (r"(?i)eeprom", "touches servo EEPROM"),
+        (r"(?i)\btorque\w*", "touches servo torque"),
+        (r"\.grant\s*\(|->grant\s*\(", "grants a motion permit"),
+        (r"\bsafeOff\s*\(", "issues bus traffic"),
+        (r"->start\s*\(|\.start\s*\(", "starts an executor / session"),
+        (r"\bpromote\w*\s*\(", "promotes Q0"),
+    )
+    for path in integration:
+        code = by_path[path]
+        for pattern, why in forbidden:
+            if re.search(pattern, code):
+                fail(f"{path}: {pattern} - the persistence integration {why} (P3a)")
+
+    controller = by_path.get(core / "Controller.cpp", "")
+    if re.search(r"\bpersistence_\.(save|acknowledge|reconcile)\s*\(", controller):
+        fail(f"{core / 'Controller.cpp'}: persistence save/acknowledge/reconcile are explicit "
+             f"commands only; the Controller never calls them on its own (P3a)")
+    begin = controller.find("void Controller::begin(")
+    pos_init = controller.find("persistence_backend_.begin(", begin)
+    pos_load = controller.find("persistence_.load(", begin)
+    if begin < 0 or pos_init < 0 or pos_load < 0 or pos_init > pos_load:
+        fail(f"{core / 'Controller.cpp'}: Controller::begin() must init the NVS backend and run "
+             f"the boot LOAD (P3a)")
+    else:
+        for later in ("actuator_backend_.begin(", "actuator_policy_.begin(", "service_.begin(",
+                      "command_router_.begin("):
+            pos = controller.find(later, begin)
+            if pos >= 0 and pos < pos_load:
+                fail(f"{core / 'Controller.cpp'}: persistence init+LOAD must precede {later} (P3a)")
+
+    router = by_path.get(core / "CommandRouterPersistence.cpp", "")
+    pos_gate = router.find("evaluateSaveGate(")
+    for call, guard in ((".save(", "evaluateSaveGate("), (".acknowledge(", "persistenceQuietViolation()"),
+                        (".reconcile(", "persistenceQuietViolation()")):
+        pos = router.find(call)
+        pos_guard = router.find(guard)
+        if pos < 0 or pos_guard < 0 or pos_guard > pos:
+            fail(f"{core / 'CommandRouterPersistence.cpp'}: {call}...) must be preceded by "
+                 f"{guard} (P3a)")
+    router_main = by_path.get(core / "CommandRouter.cpp", "")
+    if "persistence->" in router_main or "persistence_" in router_main:
+        fail(f"{core / 'CommandRouter.cpp'}: persistence calls belong in "
+             f"CommandRouterPersistence.cpp (P3a)")
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -5793,6 +6112,9 @@ def main():
     check_led_audit_mutation_suite(SKETCH_DIR)
     check_build_profile_provenance(SKETCH_DIR)
     check_backup_gate_provenance(SKETCH_DIR)
+    check_flash_layout_safety(SKETCH_DIR)
+    check_calibration_persistence_boundaries(files, SKETCH_DIR)
+    check_calibration_persistence_integration(files, SKETCH_DIR)
     check_unknown_detection_is_not_a_verdict(files)
     check_usb_cdc_tx_never_blocks(files)
 
