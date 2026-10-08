@@ -3,8 +3,12 @@
 ## Unreleased — PR-1: Calibration Persistence V1 and flash layout V1 on `main` — 2026-10-08
 
 - **What merges.** `feat/calibration-persistence-record-store-v1` at `7b258b3` merges into `main`
-  with a merge commit; the 13 original commits keep their SHAs. No source, script, test or
-  partition change is made by the merge.
+  with a merge commit; the 13 original commits keep their SHAs.
+- **What `main` gains.** This is a code integration, not a documentation-only change. `main`
+  gains the firmware sources, scripts, tests and partition table (`partitions.csv`, layout
+  `MATDOG_16M_2x5M_NVS_V1`) developed on the Persistence V1 line.
+- **What is not altered.** None of these files differs from `7b258b3`: the merge and the PR-1
+  documentation commits change no source, script, test or partition file.
 - **Already described below.** The P2.3 (flash layout V1), P2.4, P2.4.1, P3a, P3a.1 and P3a.2
   entries, previously unreleased on a branch, are now on `main`.
 - **Commits not described below.** These add M0 migration tooling and records (offline only):

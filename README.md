@@ -252,7 +252,14 @@ presence: BNO085 acquisition runs at 50.1 Hz with the port closed (G3.1). No com
   Persistence V1 (SAVE/ACK/LOAD); `RESTORE` is still not implemented.
 - **Operational envelope:** not approved (`parameters_approved=0`, `envelope_accepted=0`);
   no stand or gait hardware motion is authorized.
-- **Follow-ups:** Calibration Persistence V1; telemetry integrity; LOWER MAX scout margin;
+- **Persistence status on `main` (PR-1):**
+  - Calibration Persistence V1 **IMPLEMENTED**: SAVE/ACK/RECONCILE and boot LOAD,
+    offline/host-tested.
+  - `RESTORE` **NOT_IMPLEMENTED**.
+  - **No hardware acceptance** for any `main` build.
+  - A real power cycle of the persistence path is **not validated**.
+- **Follow-ups:** persistence hardware acceptance (including a real power cycle) and
+  `RESTORE`; telemetry integrity; LOWER MAX scout margin;
   reviewed mechanical-zero refinement; operational workspace and limits.
 
 ### Open hardware notes

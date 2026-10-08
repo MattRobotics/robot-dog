@@ -39,6 +39,12 @@ MATDOG Controller
 
 ## Current hardware status — 2026-10-01
 
+> **Historical snapshot (2026-10-01), not the current hardware state.** The results below are
+> kept unchanged as evidence of that date. The robot has since been migrated to layout
+> `MATDOG_16M_2x5M_NVS_V1` and runs the dev.3 candidate. See
+> [`FLASH_LAYOUT_SAFETY_NOTICE.md`](FLASH_LAYOUT_SAFETY_NOTICE.md) for the current flash
+> situation.
+
 **TRUE Full Calibration: HARDWARE-VALIDATED 24/24.** The LF V25-derived full-leg sequence was
 run on the real robot: LF/RF/RH/LH each reached `HARDWARE_CONTACT_CALIBRATED` 6/6 on the first
 attempt. Firmware `dfcecb670d0565d2db1a8152b6cd7ad230bdb87d` (`ROBOT_POWERED`) ended SAFE_OFF 13/13 verified.
