@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <SCServo.h>
+#include "ValidatedServoRead.h"
 
 #include "../config/BuildConfig.h"
 #include "../core/Availability.h"
@@ -329,7 +330,7 @@ class ServoBus {
   };
 
   HardwareSerial servo_uart_{1};  // matches frozen bench source's UART index.
-  SMS_STS st_;
+  ValidatedServoRead st_;
   core::InitializationState init_ = core::InitializationState::NOT_INITIALIZED;
   core::DetectedState last_detected_ = core::DetectedState::UNKNOWN;
 

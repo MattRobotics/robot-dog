@@ -310,6 +310,14 @@ struct CalibrationBootstrapContext {
   calibration::Leg sequence_leg = calibration::Leg::LF;
   calibration::CalibrationPhase sequence_phase = calibration::CalibrationPhase::PREFLIGHT;
   bool sequence_prerequisites_verified = false;
+  // Executor-issued, single operation recovery grant after a whole-population
+  // read-only proof. No command handler can construct or widen this window.
+  bool post_abort_recovery = false;
+  bool startup_recovery_only = false; // permit scope; forbids unrelated calibration operations
+  bool startup_recovery = false; // executor-issued single-operation grant
+  calibration::JointIdentity recovery_joint{};
+  uint16_t recovery_prime_tick = 0;
+  MicroRad recovery_target_urad = 0;
 };
 
 // ---------------------------------------------------------------------------

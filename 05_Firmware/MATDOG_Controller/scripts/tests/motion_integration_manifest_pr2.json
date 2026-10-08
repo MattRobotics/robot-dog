@@ -1,0 +1,2384 @@
+{
+  "manifest_version": "PR2-SELECTIVE-1",
+  "description": "Selective integration manifest for the pure motion library on main. It describes only what is integrated and lists everything else as DEFERRED. It does not replace or re-validate the sealed integration-branch manifest.",
+  "supersedes_nothing_on_main": true,
+  "original_manifest": {
+    "branch": "integration/matdog-controller-v0.2.0",
+    "commit": "53aa9620ec0cdd38d69edfa934d68a934962dd68",
+    "path": "05_Firmware/MATDOG_Controller/scripts/tests/motion_convergence_sources.json"
+  },
+  "source_commit": "e1704719979789cd9c9f18741e4546725558797e",
+  "baseline_commit": "aee49bf306f88d56562634aeba08b767f92b247c",
+  "copied_sources": [
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.cpp",
+      "sha256": "cbe2def140c839b46cbf1df3d4ee4321a5cf5dcc8d90f7ce1a63f6b34553dfd5",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.h",
+      "sha256": "7338343b726565dad13a9af440ec90aa960ca6f83e4cd93412b3eb23e84eb57e",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp",
+      "sha256": "cde2c92e30befbc192e02c226178759aa6e4163cba619f73fcf830adb42447d0",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/BodyPose.h",
+      "sha256": "6a06577cb546e3aaf3ad60b354f4ac068c0d89b71726ee18a4a5213f3b236150",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.cpp",
+      "sha256": "21f31eb43321a4b0381631c58410862a2620e2fcae9368b5fb28ff0099ed2adb",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.h",
+      "sha256": "0b6725ad90edc1e39f3bb469f687576fa3fe5b76cb3d2ece13c5528d98b95625",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/CONTACT_STAND.md",
+      "sha256": "9f52dde7388beabd0b9cef1e9d4e6e748ea095d2487b5094ced0b8231ff46579",
+      "classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ContactMode.cpp",
+      "sha256": "0ba4354fb66f00591512666ac7e9cb0ae3f633de8e9c02e234784028f2fa2e2e",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ContactMode.h",
+      "sha256": "20473ace82c6d8b68cec99956657e23fabe3c5d8a34fd42e875ed8ea9d8c637b",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp",
+      "sha256": "0ce86767cf1c9a7b31975a397b5e26bd439da0814fba060cc8b6dec14d0c0d90",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FootContact.h",
+      "sha256": "f86582bd9e57bb6a3ef2ed4b5296f22c75c50ef30c4257797930476619a568ad",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FootContactData.h",
+      "sha256": "fe6fe1fa593199d82cf829b2c5cd83f974dc0085e7e049024cd7209cf3dbe57c",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp",
+      "sha256": "a6c497c393641577988d9773f001a4280e875422bc22d7588bd2fb8979198823",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Gait.h",
+      "sha256": "e308c64acff060b8be78796c5db21078a4de5f2b3b9b38f26d186ed0e6173914",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp",
+      "sha256": "69450b45a15e366df68f6139a1996274ecbe4f2f549cfd2d3424521c2228ae9f",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.h",
+      "sha256": "48d7b6e0b48095a6d279e992c894ad4005dc430442d93376f9b35b760e3bc84e",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/LegGeometryData.h",
+      "sha256": "343f1cebe24a791fdd20946d12c576a8951c56cfb00cd16b1961c7fd4d5b45db",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp",
+      "sha256": "824e9bd8381d058cdc67dcb072c5bf51f23b47b6b7aef6df3d06f14b040aef57",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp",
+      "sha256": "b1749fa338b619c13b5c6be322a18a14d3d4957709a0dec66df1b92aa06ec6b7",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.h",
+      "sha256": "f9d5f3fefd1aba7c4a3a494a085262422db9d0d9976aecb7bacbcd40e20bbfe6",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/LegKinematicsInternal.h",
+      "sha256": "226d4b7032dd61a7bbd0279e9a247c686f70a5ca47be9368b5698a0e740255d7",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp",
+      "sha256": "2a9a6df04b23a1ec3823f196a9547167d7f1469b25e5f401dc47650ded12e6de",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Locomotion.h",
+      "sha256": "0b29b56bfa69b7cb190a45b21a9b9ceb9342ba2068950af33444c6bd2dce6501",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp",
+      "sha256": "01aa7fbf6badaa5b89f0ebb14068247e9093dbafe8ac7755ec0722d31c00e3ed",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionState.h",
+      "sha256": "ac332cdc7ea1882f73d914eb57b0ddc645891e64b3c5591c86a51b2ed2e19a35",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/PoseReferenceData.h",
+      "sha256": "d4aa21a18cfe40145dc563d0221bde6a04e091687e5439f125cf1e04bc8e90bd",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp",
+      "sha256": "6ecac0820bc64b3798387a0bd3e421cd5cee7c1267841cacebb15a5aea2c5ac5",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/PoseSupport.h",
+      "sha256": "28fbb53006fa832c8903ef759c4cf79979d6424c78614af31c0f42eb265cd797",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/README.md",
+      "sha256": "499d88a70ee1bfe7ab66fc855a5bb0e096f04dba935b81a4b225510f2c5859b1",
+      "classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/STABILIZATION.md",
+      "sha256": "ea0d9624bb10e222b9beb79dfea9c36216ec3e7907dd27cf2b098bb397353ced",
+      "classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md",
+      "sha256": "c866d0a1e49754773b50f7ead5f5b6de6df7b3412f454ac57f47d458f781103e",
+      "classification": "PRESERVE_AS_EVIDENCE",
+      "original_sha256": "f10077167de128c0b52b3efdc0abbac663aeef0db7c2e241e404dc6bd45607bc",
+      "integration_note": "PR-2 document-only correction: replace inherited dangling G3 link with historical immutable commit URL; original source remains at 13da04a."
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StandReferenceData.h",
+      "sha256": "f10222bc306aad11515d8ec639f4c76368b194995e77c9ea8042190de473703f",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp",
+      "sha256": "1917bf8d7514822f824c06186629254cf3b8cefc8125489f42824061b33b07f5",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.h",
+      "sha256": "13eb95275affe78a09009a7035bf3a335798d94ad3128fecf735d8beb77c6e19",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StandTransition.cpp",
+      "sha256": "bab3e9de1332c9e60d26e8265fd0560989426358f7f55853a1251f60bd805039",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StandTransition.h",
+      "sha256": "7909f8542876605d88b1d9a4a28c75a9b3af012d40f7309bfeeae4bc0e16ca4a",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp",
+      "sha256": "2d67616a9572a3101d57d895973287127a038d9fe49512c0477e19de0b43a479",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.h",
+      "sha256": "bc707de17c302e04031a35929f47d1600a788a2b3a4fd298c8cce27ca8862c75",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp",
+      "sha256": "4a53f6303aa74c2fff1df9647cf5b878e4d4b6aeffab54b15c61133914ec8aef",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h",
+      "sha256": "4c54dce41551a836e266a984f090556a82e5cba18be2d07e8fade03071150eb6",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp",
+      "sha256": "fb75ce615dd017683a053233947aebb9f8afcab673953c54e0bad5ab43f9858a",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.h",
+      "sha256": "12a490c4f6e8557fb722d84704bca3106f6f5abe8f34ecd24e10ffefe9bc5042",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TimedStand.cpp",
+      "sha256": "dc5e4fc91b3564d4b5b8df9c21e029094f17f97aca305615c3522e0b7794fdda",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TimedStand.h",
+      "sha256": "c7ebf7d73d393f16a5f1020980c135c51984d6258573d3f6d10e353f2626e195",
+      "classification": "PORT_AS_RUNTIME_LIBRARY"
+    }
+  ],
+  "canonical_inputs": [
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+      "sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl",
+      "sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl",
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl",
+      "sha256": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl",
+      "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl",
+      "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl",
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl",
+      "sha256": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl",
+      "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl",
+      "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl",
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl",
+      "sha256": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl",
+      "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl",
+      "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl",
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl",
+      "sha256": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl",
+      "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl",
+      "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml",
+      "sha256": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/2026-07-08_175245_C4A_offline_safe_stand_candidate.json",
+      "sha256": "221b6551ccf1bf36cd10b2b4136da38d1d2a73af18d65e0f3486de1faa72991b"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/C4_rest_to_stand_trajectory/2026-07-08_190405_C4C_contact_locked_rest_to_stand_trajectory.json",
+      "sha256": "4b667a5995e55122b9578c39042914a373aa6bb4e0be84de11381e7f2398b7b2"
+    }
+  ],
+  "retained_dependencies": [
+    {
+      "path": "06_Software/Matdog_Core/calibration/matdog_geometry_model_v5.py",
+      "sha256": "e40925c52263329773cc69f310059c697234dc85514d220487b651f6098bf686"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_body_stance.py",
+      "sha256": "c1731c114034f30acb3a6185a2b2ccebff808492473fe4787dfb41189d70a1b3"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_foot_contact.py",
+      "sha256": "117f7790ce932a65ef17fbc12f46e1dd59a77405ebb4fad5f5336d3f8041a028"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_leg_contact.py",
+      "sha256": "4724aad75cbf0e72e434805e36357710b09ed89a6053ea2cef4f8d1bbbf06595"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_leg_ik.py",
+      "sha256": "63013e3d8ffc4a7596a9d45631c2fd38f21e57e5ad8ad16c0c5fbc3a292d7ec9"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_offline_collision_contact_policy.py",
+      "sha256": "871919f8544b3eb7e2cd2fdf21a168deec22989ad38d29b8548ecdda9a4ebe68"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_offline_rest_to_stand_trajectory.py",
+      "sha256": "10a1541f25453f6931fa7a0dbc6409f6269e61db0a594e1e0f48e9bc1840b9d3"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_offline_safe_stand_candidate.py",
+      "sha256": "fda9a5070c7c73d1820ddf5626e6ed73180fd4284c0dfc0435c47b42b51edeb6"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_offline_static_stability_support_polygon.py",
+      "sha256": "c53e31955afdedf471aa451fa6f1b749591dfe7387e7df6dbe0e950ebcca5da9"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_quadruped_leg_contact.py",
+      "sha256": "47a9ea34a344f6fc730bf794a218c75be2fc4590ee70728135aaf1e2884ecf2f"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_quadruped_leg_contact_ik.py",
+      "sha256": "9ac53cc0c60079206afbe604450afe2a234376a3ba1fc2dd807a0ef124aad928"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_urdf_fk.py",
+      "sha256": "8646de211301cd767906b2e7a5019ef7a864cd6f15c8b380777cd3ee9192a8e5"
+    }
+  ],
+  "protected_installation": [
+    {
+      "path": "06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml",
+      "sha256": "d9c66134357acbc95c13aae81180f50843cef5cef2613a2ede7927691884e769"
+    }
+  ],
+  "deferred_sources": [
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_motion_host_tests.sh",
+      "sha256": "49b2aa5f9f27b8698074c14144fc5aee8b8f9cf9b6d4978a544240f342b2d0f0",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_kinematics.cpp",
+      "sha256": "f5fc13e699b9f9c61cace28e12dcd7b2d01810b0477cd9e96a4842fef4b874c7",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/motion_oracle_driver.cpp",
+      "sha256": "5ea79808c3cc466c5f6a4f43973fa62114f77e87b179e0ed6b73b4cba7712960",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_oracle.py",
+      "sha256": "9d1fe10de5eb01fc78ec875330582d6231cd537a4417b3c685e8967523e61df0",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_contact_stand.cpp",
+      "sha256": "a3e460ce299d3836b58eec30e279ccb4d19a3f1333a1d7d9ffe65869f1095d16",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/contact_stand_oracle_driver.cpp",
+      "sha256": "07771f4390b62588b438a9a4212548a5d5b6a3f4b27d8287096cd75745172dad",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_contact_stand_oracle.py",
+      "sha256": "cd7e8e56768d37706269760ebd63987485cc56201ad794a8ae26d03a8ab4f3f6",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_startup_timed_stand.cpp",
+      "sha256": "31040375c483058b851d51b2cc5ff62877377c934abff16a167974ee95781112",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/startup_timed_oracle_driver.cpp",
+      "sha256": "000d5c315460a8530531288b6930a012e850cb648dd010c77632f5dbf2bf2928",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_startup_timed_oracle.py",
+      "sha256": "b4c9d2392de2caa0ec584d6ee5269bbebf60ff5821f76c74f695e4c9c430e02d",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_pose_support.cpp",
+      "sha256": "e17ba3ab0ac5eb4abc1dedbf2dfeefddf6977d158ec2f66e57caf7a13e8896ce",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_gait.cpp",
+      "sha256": "134dee7814454960885fedfaa01ddc2839c43a0b1550e238a6639ed059624390",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_contact_mode.cpp",
+      "sha256": "b5bed83d34bf0e767a3bbb0404a9734f50c7983669770ee070ba0f780f5ec789",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_stabilization.cpp",
+      "sha256": "fcb43dd9f158b1542844677e9db856332759b39dcf65f8c6c3ecf057901fc7b9",
+      "status": "DEFERRED",
+      "reason": "MOTION_HOST_TEST_BOUND_TO_DEFERRED_ORACLES",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_motion_geometry_export.py",
+      "sha256": "d0e22b4980b41a8c0d098f336ddaf6a4f533470ff8f95184e29217fbc08cc6e3",
+      "status": "DEFERRED",
+      "reason": "GENERATOR_OR_DECISION_RECORD_DEFERRED",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_contact_stand_export.py",
+      "sha256": "e2912d0cf8edea7db027059694a7c6dbe57e7d399c6a2b807a9fa200ddfb5f62",
+      "status": "DEFERRED",
+      "reason": "GENERATOR_OR_DECISION_RECORD_DEFERRED",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/PoseExport.java",
+      "sha256": "0a82e1e562e6a88d2abe6320c8821f17b153cfd81124f665834116bc5d0357cc",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/README.md",
+      "sha256": "daf342c5dc665bc9cba32736b7d3e1ef1ee97e48b7aea250f9850654d4550ac6",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/artifact_manifest.py",
+      "sha256": "967dc3e8a5b3cf33078e9a09f20d44ca77824e6546d50c3378e7e8a4724c35ea",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/build_report.py",
+      "sha256": "8db3a19c7009a38dd94e00b2bfe4ca1fea60ee36442b6d1c0de7517dcc578385",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/closeout.py",
+      "sha256": "2590580b9913190e89c17266c6a7c233bb2362e94cc3965d867502cd82c43e96",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/connectivity.py",
+      "sha256": "f610e57f0e05c0d3aaca05a212a6915488bc49785d723ef95fef99582b94fc5b",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/contact_bridge.cpp",
+      "sha256": "9a77d5474f0a97554467386e7a5e596d9e648a453252c0f820556f131014cf85",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/contact_modes.py",
+      "sha256": "4e4f930acca31811228cf6869367e58a1e63e4482efca19c0646f05424681657",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/diagnostics.py",
+      "sha256": "86f546aa45c32ec4f057a641b43a634563ecb792bf55d7d5b23e7a1644ad3232",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/dimensions.py",
+      "sha256": "c936b50ab33118ef3fbb29341cb62aca313cb505a377eac6bd2c64b9f6821969",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/equivalent_stand.py",
+      "sha256": "78e3b6af9b7197e2f7e17a5d2967d9e9554f9ac50bd37a60c28ff1d05e8357c9",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/evidence_closure.py",
+      "sha256": "9627cb4f5a200321ad4eda3ddedb585cf3df9f0fddafca99de9b4630a18e1f9f",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/expanded_survey.py",
+      "sha256": "5e7601cac0450249a7a6ff8e72e3d5aa2e182912e814e2a3f00eaf73af5b897b",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/ik.py",
+      "sha256": "27ee6ead719440f493b0c15e1db3aa2a9d3d87a834d52a8f412790c73e0d862c",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/lower_envelope.py",
+      "sha256": "c81a8aecb6ba0236e75366fc58cb0e2b35af8e2cba10ef4d3437b4a17921eba4",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/model.py",
+      "sha256": "d9866cd8e98debff5ca5e7cfb86bd7d69f4edc1dd450b5ec1d5da9bc65f87698",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/policy_report.py",
+      "sha256": "9c53e902168fc7e1cec99b02d1f65d24f4875b650d4c1277ee0ccb64afb1fdf6",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/pose_export.py",
+      "sha256": "331a7b88388ec3d3908877b01bbd4e3063e79555ba6d47f33d890f07d0acfbbf",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/pose_library.py",
+      "sha256": "d8aa1ebfed57a0a964be20d49a41a6e39296e9400f136acc2efea3c4a7e1cafb",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/render.py",
+      "sha256": "2f2e3765580e44866e11920bd6f13baa086e5a69bbd8560c08f7b669febf0a30",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/requirements.txt",
+      "sha256": "03dead8c49a8d6b7a211d18a7260e1ad39140b01cf4b164e612697e7124942fb",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/research_checkpoint.md",
+      "sha256": "6329c91fe70fd33433dface44862df1bc87e830462d79d51245aa6b1db5044d5",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/rest_connectivity.py",
+      "sha256": "ba9d202aa04add6cab4b4d78b408b74ae1eba1fe1d952b63f1d6b73f6cb8a725",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/retarget.py",
+      "sha256": "478e07c2ab3f514edc45ad4e4fe0767f788eac2dd59951131347ed86a35137c9",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/revalidate.py",
+      "sha256": "0399cc21f8716d14dd277e5045b3f9d376ca37f713784f32d635b74565fecc28",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/route_extension.py",
+      "sha256": "1f5b0a9dbd8762c42d6c4b548ff75448f20ac278e607c958935b7b63c2acd7f5",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/support_transfer.py",
+      "sha256": "e548af534fac5f7b954d96390f80c0ee28f04c76dd301abb012d028bb3f64aba",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/survey.py",
+      "sha256": "5e521a48ca8286536dc93603a21572510ad37c428f7973235d310fafc0a8440d",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/test_pose_audit.py",
+      "sha256": "59996c6a557b6bf46772ee45bdf1efb3355c441ea56e4a16268f5d5e8b9b5566",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/transfer_search.py",
+      "sha256": "b58b1d6ee7f8ae86d88e4a8842310d8ba52c9b67dcf2c722d43f8a62773279fc",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/transition_summary.py",
+      "sha256": "6bbe0ec421782b33cad1902f5b07692dd13c765cf79d6593e3a5037791df3a48",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/validate.py",
+      "sha256": "b57a877d4288a4ada45dae9eff329cd5c8e742ba450707c205764bea8e4256b9",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/xgo_audit.py",
+      "sha256": "615c7d44561c374a7b0fb6e6360595aa8b2d736acf8df33fde484e29b6eb835e",
+      "status": "DEFERRED",
+      "reason": "XGO_DERIVED_UNCLASSIFIED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/README.md",
+      "sha256": "23b19b0973ad450aa5d85ab9489ae6f4898a36e6f937f23b172629cc8c026579",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/artifact_manifest.py",
+      "sha256": "0e41e97404833c8065025f436929dfc9536f3101d5c3c47fc9b656234ff228b4",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/audit_gate.py",
+      "sha256": "ab73d4564a151edc0b3d61d7bfc68c838c77f1cd6e71d28cce71d0c0086637d4",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/bridge.cpp",
+      "sha256": "79f4a3bcda03dbfb4605614e58788eedda205f0e0c2244af2e4e0b86bf40a9ed",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/build_report.py",
+      "sha256": "680bbfb6d41d304e3f2cbceae60034fe07baeabbb46233aab0f4a158720d693c",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/contact_discrepancy.py",
+      "sha256": "1440edf4bb072340932da165a4463da2f40a73ba1de3216d6bddf23ec0862df7",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/core.py",
+      "sha256": "f70613d11fa3885ce143c8f00417eb3dce9651942aa8ebbe7edd9543f6a1489b",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/dense_ground_probe.py",
+      "sha256": "84199f255ad00ba5a8cec6bf0b31d8cd97a5a7f76b9197cc875935f9271fc9c4",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/dense_representatives.py",
+      "sha256": "a1b1dacae658dd234154532c2e6f87f03dcce2d6a048aa5fee069ca7092ffe3a",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/dense_robust_full.py",
+      "sha256": "de5aad9cc950461603d8968284d2f1a03db8327448b8427008968bd22fdd8e0e",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/derivatives.py",
+      "sha256": "55b5601f5e6fad58943d62efb50e1ea3b6ec4cdd504e2f7777b641bdd05eda65",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/diag_frontier_full.py",
+      "sha256": "f72278f4138c7ce6f9ec490b88a42e8af58f56982f732997ed3f1f35e8045677",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/diag_screen.py",
+      "sha256": "881a39c33b48045c5956fe1187e848dc2d2fb0cd11b511f3d177cb2a781c67df",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/diag_stride_extension.py",
+      "sha256": "1e281db30b48dd8185db578fab686972dbcdea750f1ac41f3c897f10112f95b8",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/envelope_summary.py",
+      "sha256": "78a44f9e19f91c3b2fdf2a8bc19074a46f6be1d8219668cec44f03d482747c52",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/lifecycle_audit.py",
+      "sha256": "c28d816c1414dfbf06ae76f85dc6f3bfc126e5be01e7a1499327474acac1ea68",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/lifecycle_probe.py",
+      "sha256": "0708c941fca303619629fa0e9e4d80c4b9b3f1db70e1e369eb44ee510063b701",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/oracle.py",
+      "sha256": "84ec1ff5f381292da246be9cb6b963ac29e4fcaf6567ad83c663ccbb79c13549",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/refine.py",
+      "sha256": "6d670d73e7535d33160a7873b521e16a6c8ce7b42e7c980d0e373f04a0cb7900",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/render.py",
+      "sha256": "8a715f61093051fb9bb124372098cb6056c09c896ca38ea1eeeae30379d54e3b",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/revalidate_saved.py",
+      "sha256": "defd1b0a1a8955ab02b39ee90fd05978a793b975ace64dfb1d3d5fc9c2ec3a09",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/robust_search.py",
+      "sha256": "876eca1d0a488abe6b59860fb824c1efc960d574295076f30f32ce7742654255",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/select_representatives.py",
+      "sha256": "c0d3ca84da1508371ea94a0d70dfe9243846aa8e77fff29a0755d9d29c4e013f",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/survey.py",
+      "sha256": "606f1cf29b8ccc1c85816d5af09c2e2a4922a723beae4484dc6e44b645c5ec05",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/test_gait_audit.py",
+      "sha256": "3d33417db776268fb05c0036e69baaa9ab15ebfd3205b2ca2c4eb685621be810",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/validate.py",
+      "sha256": "b55cb79d8daff5442ff7232b318b2ee78c9b8e09445210bdc2c29906e7dbf70b",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/xgo_evidence.py",
+      "sha256": "d6b704a106163e46b4a783e63830980fdebc90c5d2eda5c495ddf96f3f06d5d8",
+      "status": "DEFERRED",
+      "reason": "XGO_DERIVED_UNCLASSIFIED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/README.md",
+      "sha256": "f94146dae575b69fc96e57038c6d3dab1bab0bda3362cecf188527743a367b38",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/alternatives.py",
+      "sha256": "a347f7282508451b7b73d12c2e5fe6bc93fa37bc514bd323ca0641d48d467e6f",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/artifact_manifest.py",
+      "sha256": "6e71312bf103b50ec0a4a4b96320a960a8de9213488f7efa4286e21d6b079c2f",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/build_report.py",
+      "sha256": "76ee144f2e6a6d57e6c5f789d25e6b7d4fe46911c91e49ac29a96cb61ab7e1c0",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/common.py",
+      "sha256": "5e8b82cc952b67391cf2bf7214a73d2b2af6a6c1d3c9120a14f3a3ff893f7304",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/contact_model.py",
+      "sha256": "e672b5f38712adf8c753fe415d5c0c96bcc03d5871deb3212fc8c027ca350c9d",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/geometry_provenance.py",
+      "sha256": "4e149af6eb1bdc6f207574b52d4d5f33fc6e0bd187ced9389b43aeae9b029fe0",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/lifecycle_v2.py",
+      "sha256": "b4fef80d4750c3c00a4e236aa5b83a186f570bf785bcf3aa93008001c04b57e9",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/per_foot_discrepancy.py",
+      "sha256": "d8ea4f9389d748374cb07ff2df6759d3f760170ffb3881d33a3da85c1c53fe67",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/replay_compare.py",
+      "sha256": "00931de23e5b729ba258369c2f7ca79c77fd09d64e3df9609d442870a4b92dd1",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/root_cause.py",
+      "sha256": "101302b329502fc6a872e668a382d37cf32a52c1d10ed4521af9757ecd9fbd87",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/run_convergence.sh",
+      "sha256": "b92201150c315a74c9645179c1f149f6c6c269c60121cf99dc3986ca35d01214",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/run_g4_oracle.py",
+      "sha256": "053606388385eea9e731aaf3dfd92a565de16f9f5da4cf1d00411ab94887527d",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/run_lifecycles.sh",
+      "sha256": "c684686fb1a23c6ac19260618ccf6befd7aebbcda26593d26a17e81cdc378774",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/test_contact_audit.py",
+      "sha256": "e4174f3dc147ca52faf3802fdaaa815933019d4abbd402d94971b49a975a8ff7",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/validate.py",
+      "sha256": "fa516b5d8a4db08e5ed3e1942ac52777273d5e1927e6453fca4a953f29199915",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/artifact_manifest.py",
+      "sha256": "fbae896b960a377194e17bcba97de302ab2b0508285893e72306acaa9b1af4d9",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/bridge.cpp",
+      "sha256": "6440e1fd94eb5ade2d83c81bdd64e8bae47ce2fb75ffb83f26e0314030dc8128",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/build_report.py",
+      "sha256": "c182d6e12f93dc524696fe2dc156362ecc045715107dec2b761cea214dec0132",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/core.py",
+      "sha256": "93fa5681192f1481e66113fd1e5bba3e87dedeb5f1b0e64c22364bfd21a2613e",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/dynamics.py",
+      "sha256": "c58d95dd157e11782408eabd61ff0b535431c9ba7a5d47232e883c164b81b322",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/feasibility_table.py",
+      "sha256": "87e579bb957f679fd0088bae0b91ca17c6683777df7a55d1400d4795d71ca688",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/independent_checks.py",
+      "sha256": "e4dca96492f66446dd3526f083b2ddb73007e31e87dee74b8ef30cb6ce0811bd",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/joint_range.py",
+      "sha256": "e1909768e0699a33fb09991d497d5f6d8e279154eeba6eb32c907230adfa5c84",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/perturbation_sim.py",
+      "sha256": "8135e5e7da1fec83d5090a2684a407d9dd50a320c276215c3a498cef890ffd5e",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/provenance.py",
+      "sha256": "5b9955266bacf9b733af1969c0e1c990daa0df9d7ed49b0d42a4693842c762b1",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/run_g4_oracle.py",
+      "sha256": "7cdb2172baefba3b81a00c0d7983921309233ea4e5d8a94624df88bdb1e69849",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/stability_actuator.py",
+      "sha256": "0be7a4da878695c4f717fef26e56fb38c8ae4d839b71698126418bf450f2220b",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/test_stabilization_audit.py",
+      "sha256": "bf9ba6356c91ad0cf98ca5d9524e408bfcc7e57ac657449fa7fd3f058ceaf0b3",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/validate.py",
+      "sha256": "f5356080701d581c95ec75810918ae222dcf2fc33d0d1bc18385eb6f99cbcf42",
+      "status": "DEFERRED",
+      "reason": "TOOLING_BOUND_TO_DEFERRED_EVIDENCE",
+      "original_classification": "PORT_AS_TEST"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/REPORT.md",
+      "sha256": "d42d119e9803beaa40cd9999643c633e754db931f881fb9ecde0ca35dee0eef9",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/artifact_manifest.json",
+      "sha256": "bc7314cbfb09161d7e78a29ce9657c60df3f19afa252479f204e035867341e37",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/candidate_diagnostics.json",
+      "sha256": "547fc21881bb0224288d396f176a073e0b78f52b02c3927cb292cc1c919e3b4f",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/closeout_classification.json",
+      "sha256": "aebc8ec5f86138f5d3910cf6cb05ced460ca987328cd6e7ab33b9fcd15410a38",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/collision_policy.json",
+      "sha256": "ceca89a9024d497c58447448894952cc2f588cd3a88ec102974bd249814c8d9e",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/connectivity.json",
+      "sha256": "9b87e5a81046f0a438a1e4a3edb4128fd78467db6a2c856ec9608257c3746400",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/contact_modes.json",
+      "sha256": "8272f9b084a95c3a60e0bbd1c9c7fcd0acb91def1743dc3afc8f3f00b8e5afaa",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/dimensions.json",
+      "sha256": "a48cb093376ae57ac29ad3487777e7f3fba1d6d099775612f0542a7dad1dc100",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/envelope.json",
+      "sha256": "5ac2f97b1f21d5c1be6001452c2f85ca9e5bb1f53208549421445477b5cb9a1b",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/equivalent_stand.json",
+      "sha256": "940e6957b6983db139f6a37b658cae8a4773b9d891221dee8c2cc063d54d5f29",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/equivalent_stand_diagnostics.json",
+      "sha256": "106e1aa025f17b5fad0a29e956f1453f139651575a2b6345620c142370aa9558",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/equivalent_stand_revalidation.json",
+      "sha256": "b83c976a6c784ff35662a3962fab21722cb5f826dd3de0affb884a1c22c2bf85",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/expanded_envelope.json",
+      "sha256": "65c772c02b6f032460b1c4803777df1629d5706251b393a25670884b4f1b7983",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/lower_envelope.json",
+      "sha256": "ca5bd031bf3ddd778b31840a8f6e27d8346da9c51cd5b23e4696687636e04c99",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/pose_library.json",
+      "sha256": "746f4393a2f9de5dc532c6b48e083f2089e3cc2fa25f381dc4ef9d08f9903a58",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/rest_connectivity.json",
+      "sha256": "aac822d7f78d71d1da32d6debfea239bad88da3ccc0b874828bd92b5e7234a6c",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/rest_search.json",
+      "sha256": "52299f097cb3ae725e680d9eddc2d03756a1a9579bc73f0dc82c1e877bac182a",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/retarget_matrix.json",
+      "sha256": "8ccc0753e6c3b545cfbd673fff51ee1596dafa918f5a54dd8cbb72205735500b",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/revalidation.json",
+      "sha256": "23d955e3c3678149ee25e0cf391ed0494b4d1c914cc052d7b3419e4160db5530",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/route_extension.json",
+      "sha256": "b75b71aab14dac33af28fa26a47ce32e979d39675b9657cd63d51d0a0e05e4d0",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/support_transfer.json",
+      "sha256": "0ebe6ef3ea505a672a39f604d104f35204e2e4133ad0a585a9cdf873231abc31",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/transfer_search.json",
+      "sha256": "a7c8e14618fee04ee5b3461c9262b90e433978ce152d31449e503aa57c0a510d",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/transition_graph.json",
+      "sha256": "c01a15c153c69ffb321e160028973ecbb4ecefe804d93c65fa6273c8a9fa5fb5",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/transitions.json",
+      "sha256": "709f00a49f4a21ef4c62236166c00af27033f00c91568c7738bcc1e240f8764c",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/validation_results.json",
+      "sha256": "98ad107abd980629c26e5b643e636b6a695c92a334bceee32601c81f072d09e9",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/BODY_FOUR_FEET_RESEARCH_1.png",
+      "sha256": "117a901fee51ead80a2c2a2d9263a7e516fa295b1b8be617bde92c0edc6b8eb5",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/BODY_FOUR_FEET_RESEARCH_2.png",
+      "sha256": "a5287db393dbcdb1be99701179c42b3c9ce6c83419045621bd33930025c22b3c",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/LOW_C4.png",
+      "sha256": "70c397139d22bae8c3f4ebafad22ebe6584c1e3198475b4a6263e9ea16ec4d3c",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/LOW_CROUCH.png",
+      "sha256": "381d8128141ee5d3f78aa6b7027d5007bda5e526b5baefeec982589fa30bc9e7",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/PITCHED_CROUCH_RESEARCH.png",
+      "sha256": "00250c31d1c2c5cf2073189222af173d92118b7780046771bbb51e980b6502c9",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/REST_GROUND.png",
+      "sha256": "d3f3b3f6aeabf10de0c452695fe6157daa8cccc527944188d95897d568a492d7",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/REST_GROUND_MAX_SEPARATION.png",
+      "sha256": "5d290cea14a1f6c9214e03c7f8a0c1fcbde07a2c36a3767ee3d05b62d7a40507",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/ROLL_PREP_RESEARCH.png",
+      "sha256": "2eef6d0fd456d67faefeeb72489aad7d7b33ce89828deb01ab00f0b9b090ef07",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/STAND.png",
+      "sha256": "a2d9d70ff8296ce1b7f0ecd27ad0d27c98d3e82f57bc76159c36283556640308",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/STRETCH.png",
+      "sha256": "d22044a75c79ba7b4bb44130339afadb30bc19a97b1283071fd7757e68615dee",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/XGO_HEIGHT_RATIO_RESEARCH.png",
+      "sha256": "b06bca62c72c51b13e1d7453712582f49e8d198a9f82f1337042fa775b1b7026",
+      "status": "DEFERRED",
+      "reason": "XGO_DERIVED_UNCLASSIFIED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/views/envelope.png",
+      "sha256": "b02bebd57fa6a9884c62c67a102a04aa8451c5990d9ff82c60a03db7133ea944",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/visual_manifest.json",
+      "sha256": "e547d48ac972288114c06dd8f8b6b608388748499aeec9eba9a4b377f96a591b",
+      "status": "DEFERRED",
+      "reason": "POSE_AUDIT_DEPENDS_ON_EXCLUDED_XGO_DATA",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_catalogue.json",
+      "sha256": "2de8cd2b1e753188dc272fea6c20af513dab0a37f415b352520bd22abb837066",
+      "status": "DEFERRED",
+      "reason": "XGO_DERIVED_UNCLASSIFIED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_revision_comparison.json",
+      "sha256": "5b52d0c7c9cc566510919bf5d09f18414d88d637ac75b109117bbf8ccf6e0734",
+      "status": "DEFERRED",
+      "reason": "XGO_DERIVED_UNCLASSIFIED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_search_inventory.json",
+      "sha256": "69ab0655774ee722a0ac89dee9b7c3feaa9f8bb37ea05c7449e0d2a4cfeb7fd7",
+      "status": "DEFERRED",
+      "reason": "XGO_DERIVED_UNCLASSIFIED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7c28.txt",
+      "sha256": "a9677cf4e3060f42cb617cefd066675df2e8a5957bc423eba25ee190b816cb76",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7c40.txt",
+      "sha256": "fcfedc24564e69de40915e0b365edbd0d7cf3133b38db73b7bb4cfe649a14fd0",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7cdc.txt",
+      "sha256": "61fda2c35378287077b7836a435b3ff6baa1271c7d66056863f306e35bf1bd48",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7d08.txt",
+      "sha256": "25b608958f5ef49599d3d23a96c3b708b99e31b02607d94c69a25c94832cf318",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7d48.txt",
+      "sha256": "4812cf1c5cf78fba943b003fc2a7955d867b0914a19bedf18f6d7a1ac174b795",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7da8.txt",
+      "sha256": "917de9376722a531d2f9f4de98eb3d84bfe9ce09d059968d211642e1bee6d9d3",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7df4.txt",
+      "sha256": "b040a331cfaf9a28a5cee9e4a7a19c8c37cdda24face8ab35b3fac98e0129917",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7e40.txt",
+      "sha256": "d01c385faf793e3be66dc5ccab7c2c549f53f208e0bb0d01073c9581ca88a4fc",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7eac.txt",
+      "sha256": "0e8498e71065079c3bb5c559a8cbf0e385b101f155674f41341c7f5ec4f558c1",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7ef8.txt",
+      "sha256": "4357f688796d4b8193ed1d4e1de932274e6c68e2787f9141a33e963b2ba40cc2",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7f04.txt",
+      "sha256": "e058c570f0bbe35e89d41f99141f035d46b6b519ba66689e8ab334d9c4ea5e09",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7fa0.txt",
+      "sha256": "51570392b2662c99557342419ff2a7089eb72fb43f59da6469eb2421565b7f20",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d7fec.txt",
+      "sha256": "44793ffbced2c3a8ede4839e38a27303afa23b982b251010f614dfbfcf2e82c5",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8038.txt",
+      "sha256": "4256906e5883609c73dee8a2daac6d38619a8f4845c3dd90ad0f0b757f57f64e",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8084.txt",
+      "sha256": "4f3653c069dc40bfe945c206131d9ce24a31766c1e6735511047f52f2be161a8",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d810c.txt",
+      "sha256": "98f41b0546ce8005c3535509790527b0c3a032c7afd6ab5b5d6865a5daf895c7",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8214.txt",
+      "sha256": "45504f477a76397eff5593703945a98002281df72a5ac4424bb2f7157ba2debf",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d82a0.txt",
+      "sha256": "ae588f61d869d30d8eb1a28781af195c2af00302b086ad8c14f440e58da7029e",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d83b0.txt",
+      "sha256": "7e67dc9ae33eb7d182d4b8ac77f05ee244bb151d6cc7c776764361765a17f61a",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8460.txt",
+      "sha256": "94704c1966ec6012c4a2b161c5b0f38d64b588909a8be2e549336b47304bd671",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8560.txt",
+      "sha256": "e25e81fcd1995607c6389c9942672ee5802b709c6776c47929da8957ec5698ec",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d865c.txt",
+      "sha256": "4c54791edc6f5f876d8864d50f76107c21565e58927aeb54a5ff81338f52fdb0",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8714.txt",
+      "sha256": "1788610e26e48398add04ac42eaa57b2da02b723c1154ff7f07c770c1a89c76c",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8930.txt",
+      "sha256": "dbd354359a36c148dd3ad7e7823e07ab111323ef12a38faac0bd21c9eb44ae77",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8a50.txt",
+      "sha256": "69a2e7b04b3cc1b5aa10ca4c6b1f6eb32d67565c5b39e81c60c91474f50576cc",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8aec.txt",
+      "sha256": "35d9071ea2512b4997438543e1db900d45eb4da3465c886a73667ca43e516630",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8b54.txt",
+      "sha256": "f488b11e528d8f14788ef76ec3705cbdc33cc6e6cc4338fb77e23820fd431b89",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8ba4.txt",
+      "sha256": "538cc58066546e67eca01e8b4fea5a6f1f1a00e9705a8a69721df209c08fa65e",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8bf4.txt",
+      "sha256": "c02f7f4ccb88b04ddba47f5230c0b3b9fded5803df68dca7b62fff20f71fa361",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8cdc.txt",
+      "sha256": "0ab9421eeb2c46f41f720d158237df6ceb9d3cef9420c7901e165177b6772137",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8dac.txt",
+      "sha256": "e09002b997a567a71617eb40f4a29a13ba26f740c40ea8c5cf0c3f153686dde2",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8e80.txt",
+      "sha256": "ade4bc75e728bef90341e6ca618a5f9e9d64ce5e88319bee887938842ce7965b",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d8f54.txt",
+      "sha256": "64b811f0a8b002ecd631fc08f4fcdaa345fa245257b8f2ed13cdb912e0e0fd7a",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400d91fc.txt",
+      "sha256": "c48ad4f1c81efb0a3f880128a1551c0487b97619729500bb280f4a206439216e",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400da840.txt",
+      "sha256": "8d780da07ed93b98b5bbc57c430bb22939304e049615abf7bf7ce4f4c3a61d2d",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400daca4.txt",
+      "sha256": "97a9ab67489f95dc1145c2f7ca34ec2ec7b873f0b8b959f7f399473bf882a691",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400db1f8.txt",
+      "sha256": "42824854e5346f9b8ae4059b96ad280f552bdcabe8c02cd1ee3ae7a330c2580c",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_extracts/400db35c.txt",
+      "sha256": "94719f81551ba0c542f5a3d20089cc3347e893aa71261d25e6aea54b5c3a64db",
+      "status": "DEFERRED",
+      "reason": "XGO_THIRD_PARTY_VERBATIM_DECOMPILER_TEXT",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_static_trace.json",
+      "sha256": "48820a19db73af66690ad0bb5685dd42999604c20c0046df6182b7267478a368",
+      "status": "DEFERRED",
+      "reason": "XGO_DERIVED_UNCLASSIFIED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/xgo_table_semantics.json",
+      "sha256": "8bc8e98dab5e348ef0b4401d8513acbb0ac405f308cac1617353995b50d3232c",
+      "status": "DEFERRED",
+      "reason": "XGO_DERIVED_UNCLASSIFIED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/G4_CHECKPOINT_REQUEST.txt",
+      "sha256": "aca394ac518ae77111d63753a4a77d9e33a3fdbf841ffa3d60b85032589884bb",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/G4_CLAUDE_HANDOFF_2026-09-29.md",
+      "sha256": "d2f118a2b264346969b0c0216c69c478b73096e8fa9ada41c139e168b2a9f441",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/G4_ORIGINAL_REQUEST.txt",
+      "sha256": "5c555eb8ca35da8f77bc2b33641889c568746b09ec2a83025ce81072fc433588",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/REPORT.md",
+      "sha256": "ad69065ae9fc1d7e4956410e8ae4e918551359fad660339fff4bca9b55d6856d",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/artifact_manifest.json",
+      "sha256": "26d03efc56d1fed542549d48b63e040911a2f997c514bc0952c6d392125646a4",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-full.log",
+      "sha256": "f13e3ec81a8b56dd7c3b2d84b948714dc73b6e16a2ddccb3978b9e27fd5a176a",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-lifecycle.log",
+      "sha256": "b9e116011238a391f6143e4482803c5a74f97805d87fbb09bc6dbf4ab8d90e6d",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-manifest.log",
+      "sha256": "9f22884d623df2927a415198cf3d5f24f59a32d9211487eca984e43c2997a49d",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-oracle.log",
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-pose-regression.log",
+      "sha256": "c5dca781dbcc8663ea502a70e19442204ee261e300a188794d1e6fb9070f8ec1",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-refine.log",
+      "sha256": "5af71af44e409510620903f8248771a2dbb0061d317be82b26b82f726aae9bd8",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-sanitizer.log",
+      "sha256": "bea572b2d3723d21a530915a7cc4c738b0e53e8310120d6232d6f2a18996b5af",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-screen.log",
+      "sha256": "edf0cdf330c51a4d7f86b2c75dafbd6e98688f07a02e90fcb912aa9b647623d9",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/matdog-g4-static.log",
+      "sha256": "622fc95fe2b2ff2f85573f48b57ea3a6492e1b65e27008b7885c4bc827ded82e",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_logs/targeted_checkpoint_validation.log",
+      "sha256": "c9bd09f1fe3df5eef47a3dfe8d10ed23fe87187e72ad052c3d5f1a1862ee9745",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/checkpoint_manifest.json",
+      "sha256": "850665c64a73657d068ddcb65e779894d99446f93715d50bc6879d8a1a985dee",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/contact_discrepancy.json",
+      "sha256": "4e717231df55097b1c6ee7926c29890d3bdaaf295a12f146442f46f6bcc890f7",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/definitions.json",
+      "sha256": "6f6c7ebd273797a0331390ad4768aa200f9c403bbade55d7efe791ec57652da6",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/dense_ground_probe.json",
+      "sha256": "655b8d2e8b74ca2f9cd5a08bc301e8dd7096264f47abd5732bd67c25ad48dd47",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/dense_representatives.json",
+      "sha256": "77dd9737148fd9febc1973c8c7ef4fd08f8c9a08280060ba0355083bfef201ec",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/dense_robust_full.json",
+      "sha256": "f26bc0c501874f662b13a7aac0299812b332153178d5f53e7fa46afa3f3b4c23",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/derivative_tables.json",
+      "sha256": "140ba5bf47cf168748db74a1d9021419f3520272db496772021baaa994f6c67c",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/diag_frontier_full.json",
+      "sha256": "26a6cd5412109a6f91710c7210f60f58373f232a42c37fa83e201d9e543dcdf2",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/diag_stride_extension.json",
+      "sha256": "faceb74bcc6a68b60021d51528f79576eeb3ff0fe34414b5a8d4462574539fd7",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/envelope_grid.csv",
+      "sha256": "198db73446dbf5be9efb183bf62606487f4f47b646e3b7e0bc5a822a06247557",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/envelope_summary.json",
+      "sha256": "3aece45fc05aafee456b57616447a386e6b2cc7ef729599a570ad034ec7cfe5e",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/full_case_audit.json",
+      "sha256": "1994377950d42062046cb901619d4d6dab21f9d760d80a2724afd49b7f745c53",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/full_cases.json",
+      "sha256": "cdd1d29da08a726120bf962cfc527356bcade5a16fcccde34c44b7f69957ff3a",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/handoff_state.json",
+      "sha256": "cc30f7a653e68bdde95f17acbd0e744888a6877b563709d1390f3db80a3b1670",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/kinematic_diagnostic_screen.json",
+      "sha256": "b529708d4a49f7d16f050a7e5115123951cf0c16f29262ee44c43b79e12751b7",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/lifecycle_audit.json",
+      "sha256": "37cdda86a0e3c4e822779b93ee031cac2387b9118de6c8711f0c88a19fbc83ec",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/lifecycle_probe.json",
+      "sha256": "4359e610ca5ebea7a0b8e2b03c5820515bb163ea687989636f430ded2d267018",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/oracle_results.json",
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/oracle_results_final.json",
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/refinement_full.json",
+      "sha256": "020ac10bc6b327a427be3e2da362e69f708cd63e3fdbac98b17d34ca72e7a24f",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/refinement_screen.json",
+      "sha256": "4de3e6eacd399ef0e5eef0acc12349b8551ddf697a7cf0d7c66f93c4cd834539",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/representatives.json",
+      "sha256": "229dc84815906eb4c2ddd953223892f20e4d886e7a1adff73d9ece62a3701608",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/revalidate_saved.json",
+      "sha256": "490c1fc6ee56b0f28d6c153ff4dfbbe8225f43d50f27992987f8ba070ab352bf",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/robust_search.json",
+      "sha256": "c2eb765d3e47e1d77210018db6568fbbf4d9d8ec5fb5f6c0f7474c46c0801847",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/screen.json",
+      "sha256": "2c72b6a73492961f1f866b079e725882b74234b4f431d78248c3347554b87cef",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/trot_120mm_cycle.csv",
+      "sha256": "39347cf84bd927fa994c2bf011b3154e3babfe75a574048b8dc752e75c67f135",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/trot_cycle.csv",
+      "sha256": "78b34e7e5210b84a9a9ec95258abec060560498d9dc109580171c970a78d8799",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/validation_results.json",
+      "sha256": "a0af396692b96645b317dcf7e8e77371b50b0d33a52ea3250a2523810336a16e",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/trot_120mm_phase.png",
+      "sha256": "cc395a8823165cf3fe2f4e910491b1aa7de053c699e43c771931ca7f8d6bdbd1",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/trot_120mm_side.png",
+      "sha256": "d2411f3370c3ba746d6f599fb6a830c5c621285e52f0cc07968916ea6ec246bb",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/trot_120mm_top.png",
+      "sha256": "c65f224df4c725ccd0b0d471caaf14afe6590892eb2bfa0f1d4044392d07632a",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/trot_phase.png",
+      "sha256": "b31ba2c6579b8c972b497f18a4ab47beb82eade5f53aee9ce35272f1d5de10b9",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/trot_side.png",
+      "sha256": "1b60298f4ce0b19a8e2be828a5e18b44e07ae241843125e384e9a4da405d80b5",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/trot_top.png",
+      "sha256": "3623d53693b1334d8a7d0f090dc1aa4e2f7e2cf9f94101d00a11a9d043de11ae",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/walk_100mm_phase.png",
+      "sha256": "48c6661052fd72787088ef6c49e390eae2f138c51f64c1fc164ef49f360ae378",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/walk_100mm_side.png",
+      "sha256": "a89b19a732ff13ee507b41b906efc940f2af18fde1739f7541326370236dc08b",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/walk_100mm_top.png",
+      "sha256": "fa35b29571f21abe70961e784c00537a8abff2546b4ef0dd064abb0a782c1344",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/walk_phase.png",
+      "sha256": "5bab888e4887df0bbb434c12cbaeb5a32a1d0e19bbc2652a154bd43bc90b2363",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/walk_side.png",
+      "sha256": "19ab584a5f4c8ede2b11af59dea464745f6f72d77325aa9b187e0f70f69e89d1",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/views/walk_top.png",
+      "sha256": "610c7b62b6e83a69c15e212e02b1553b4a3f329b87ea8ec33aa7f746fa78d747",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/walk_100mm_cycle.csv",
+      "sha256": "a2bd7951d87b2d68a91e7f210ef94dc10435b11b8144faf6262a84e2c4a8111b",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/walk_cycle.csv",
+      "sha256": "d0ce50e8047a4a387ac78da16df2d37b0e5c089338d428be0653bc8fa66b5a21",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G4_Gait_Envelope/xgo_architecture.json",
+      "sha256": "4abb64c8adb4f17300f612edbd115344a78e6a521a09445c43626f991b24dcd6",
+      "status": "DEFERRED",
+      "reason": "XGO_DERIVED_UNCLASSIFIED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/REPORT.md",
+      "sha256": "89f90e16f8b68f3f066f7a546fcf0cb994146386c31a1b0ee285f985c74a5bcf",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/alternatives.json",
+      "sha256": "1d444bc8a746a97068f12698cc9b3bae44d36e4d2617b7802c69b75724fadc71",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/artifact_manifest.json",
+      "sha256": "3f93b79f671ce5a5d79e22197efe19c1464defdff8744bca6eb495d6e63e53bd",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/geometry_provenance.json",
+      "sha256": "0cbf88c78e8c5866fada9077146b82f3f78a174064145a63951f5de49e70a285",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_TROT_309_G2_1_REGISTERED_CANDIDATE.csv",
+      "sha256": "bac84e55dcffeb2c56bc5a376b86a7c066fb0f219f4a5be758502631b9767a18",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_TROT_309_G2_1_REGISTERED_CANDIDATE.json",
+      "sha256": "9c6551c87ff0aa6e5d4cdce0daa52ae74a5ea774905827e0eb909ee534679d31",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_TROT_309_G2_NOMINAL.csv",
+      "sha256": "9a3a485864d8370ccde261fa5e60597cf7ded1c27d52d72cd4f71f0f229dac90",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_TROT_309_G2_NOMINAL.json",
+      "sha256": "24f2438dc39e3723d19dff55ddc607accd58b8130fb177313afa95afcb816100",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_TROT_309_G2_NOMINAL_fine.json",
+      "sha256": "1d749556f310fc3c3aa792c8398407c0f610b9d75c947cc51843b384a037d06e",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_TROT_61_G2_1_REGISTERED_CANDIDATE.csv",
+      "sha256": "077e800742a7fa8714fa5a30ba8117ba7efaf5d5306f5d20b4839f376eb3e873",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_TROT_61_G2_1_REGISTERED_CANDIDATE.json",
+      "sha256": "ecde746946513da9c8b2bf2b3c5160ac54ae843195c81c6fa3d88195dbb03e81",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_TROT_61_G2_NOMINAL.csv",
+      "sha256": "97b875551c540a7af6edba2602d08a46da5c02f4d4d8aa53d70b7d90fa4406f4",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_TROT_61_G2_NOMINAL.json",
+      "sha256": "973aa7f5ab71507b9dc59a61745c213f89a892672b4c2e1a378a345ea345774e",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_TROT_61_G2_NOMINAL_fine.json",
+      "sha256": "096a3bdcbf951779ecc9076967be8b88b98fed89fc0bee1ae98851e153a3d9db",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_WALK_287_G2_1_REGISTERED_CANDIDATE.csv",
+      "sha256": "7e6def3c23929d26e49a69ccda34a4ca2f7db730a11851e1ed27850f291814c6",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_WALK_287_G2_1_REGISTERED_CANDIDATE.json",
+      "sha256": "5613ac6b6e813b12086e64872ed51f847a1359033842eb17cb4d70936de8af7c",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_WALK_287_G2_NOMINAL.csv",
+      "sha256": "4ed74a74b5a2fd0ba219cd16011a2753a2372015c8c0df322da5018c70cccce4",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_WALK_287_G2_NOMINAL.json",
+      "sha256": "65adf3b34ad2aa448f4b999c46889d2f75e18df1f55818d050e7e1ba9a55da65",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_WALK_287_G2_NOMINAL_fine.json",
+      "sha256": "b82bb9bdf0f38b5bb7ab4743c92b54a312826985f6c764bdcd9a52ee8d0fe7b8",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_WALK_357_G2_1_REGISTERED_CANDIDATE.csv",
+      "sha256": "d2f396051d3c7d27353e7550aa74de176eacebbf2e7f0fe6b69eff2eaa037707",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_WALK_357_G2_1_REGISTERED_CANDIDATE.json",
+      "sha256": "d0330eafd2787255a5c1e357bb317e63d82da5f330cb436b3620d34a9f599a7c",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_WALK_357_G2_NOMINAL.csv",
+      "sha256": "df72b2b151bd10661f4d9e78bb5aafbff4cd4e9047df1ab81e6d04d1157d7cdc",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_WALK_357_G2_NOMINAL.json",
+      "sha256": "11946f3ef0e362b2c14a3d3163950f211fa26d320226426d6bee7fa922f5b709",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/lifecycle_WALK_357_G2_NOMINAL_fine.json",
+      "sha256": "2c0e847a2bc48a954f8ed1a9cd3a0f01136ebbf7f13105b8a9f955d5d26af4c9",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/oracle_results_g41.json",
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/per_foot_discrepancy.json",
+      "sha256": "75e913426070ea5708e14daea6ed365f2c3090ed77527f550a9fcc52a542b29c",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/root_cause.json",
+      "sha256": "b6bd746aaddbbf171f62d7131070a88d2e9c82a6d415fe83f08dc87b89be11ce",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G41_Contact_Reconciliation/validation_results.json",
+      "sha256": "9ecd512d52e5580d43ef56d2badc3feb644d7870958191864d436283867d0340",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/REPORT.md",
+      "sha256": "0a3904a51c4956b1c9cdcd3ff694e4d0676b6a11469129d20e9b1b098030306d",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/actuator_feasibility.json",
+      "sha256": "532b82f834fc43019172baa76dcb9fea9956a184f05e7dcf2b7f2434644ca96d",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/actuator_requirements.json",
+      "sha256": "8debd244bcbf706e102be32b7bf26881f9f13cbec19353b51898062e17fae190",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/artifact_manifest.json",
+      "sha256": "e22b8e5806febd270aac3575392521a656ebe5e3790e0c2254c5bf16afc6f288",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/frames_oracle.json",
+      "sha256": "b9d2a030e70987e0e59ec6e2c9c6eb37d10c70c53cdaf50750120e14107028f4",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/ik_oracle.json",
+      "sha256": "01debf6ebc47c47a8cb38c27b326365818ec62c40ef4a9a38bf655c1f62297a2",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/joint_range.json",
+      "sha256": "f44868dd9c01d21a51462e1a179d6deba2edc5b92ba2e0710362f9a5e34e0d6d",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/oracle_results_g5a.json",
+      "sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/perturbation_results.json",
+      "sha256": "dd7336008bade09b4af95f6b2dd0beb318f0bea665916dcbe14298bf0672698e",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/provenance.json",
+      "sha256": "68058198bad60d5874b4276b2c04a907ad7edeb6b01ac3b730d4d71a8fba672b",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/stability_assessment.json",
+      "sha256": "ca598d92fb9de8c1b39f5dec1730e9d967c01a540e253742b38b610cbfd9e337",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/G5A_Stabilization_Feasibility/validation_results.json",
+      "sha256": "d8e204adf27c20663baa7a0378ddccf1f81488aa895cd5f559e4b36353f6a41b",
+      "status": "DEFERRED",
+      "reason": "EVIDENCE_INDEPENDENCE_NOT_REVIEWED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    },
+    {
+      "path": "09_Logs/Development_Log/2026-10-03_G41_CONTACT_CONTRACT_DECISION.md",
+      "sha256": "8141df014a3bba64a87c0e830f9f6472dc7d8390cb6ee29c2e8e63c3bbb92e91",
+      "status": "DEFERRED",
+      "reason": "GENERATOR_OR_DECISION_RECORD_DEFERRED",
+      "original_classification": "PRESERVE_AS_EVIDENCE"
+    }
+  ],
+  "deferred_policy": "Deferred rows record path and SHA-256 only, never content. A deferred path MUST be absent from this tree; the gate fails if one appears. Deferral is not validation: no result of the sealed manifest is claimed for these files.",
+  "scope": "Pinned pure motion library (src/motion) and canonical inputs. No live motion adapter. Execution suites (motion host tests, fresh oracles, audit-tool tests) are DEFERRED with the files they need."
+}

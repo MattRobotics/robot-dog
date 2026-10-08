@@ -67,10 +67,15 @@ void printUsage() {
 
 }  // namespace
 
+CommandRouter::PersistenceSchemaIdentity CommandRouter::persistenceSchemaIdentity() {
+  return {calibration::kCalibrationRecordSchemaV1, calibration::kSaveMarkerSchemaV1};
+}
+
 const char* CommandRouter::persistenceQuietViolation() const {
   if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
     return "NOT_IN_MAINTENANCE_MODE";
   }
+  if (modules_.wifi && modules_.wifi->configBusy()) return "NETWORK_CONFIG_BUSY";
   if (modules_.calibration->sessionLive()) return "CALIBRATION_SESSION_LIVE";
   if (modules_.full_leg_run->armed) return "LEG_RUN_NOT_FINALIZED";
   if (motionExecutorBusy()) return "MOTION_EXECUTOR_ACTIVE";

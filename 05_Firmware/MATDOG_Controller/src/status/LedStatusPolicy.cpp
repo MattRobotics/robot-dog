@@ -36,12 +36,15 @@ LedPresentationState selectFromFacts(const LedStatusInputs& in, const LedStatusS
   if (in.calibration_in_progress) return LedPresentationState::CALIBRATION_IN_PROGRESS;
   if (facts.charging_fault) return LedPresentationState::CHARGING_FAULT;
   if (facts.battery_critical) return LedPresentationState::BATTERY_CRITICAL;
-  if (in.system_health == core::SystemHealth::DEGRADED) return LedPresentationState::DEGRADED;
   if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;
-  if (in.wifi_connecting) return LedPresentationState::WIFI_CONNECTING;
-  if (in.system_health == core::SystemHealth::BOOTING) return LedPresentationState::BOOTING;
+  // A fresh DALY charging/completion fact is independent of servo census,
+  // Wi-Fi and noncritical module readiness. This changes LED presentation
+  // ONLY: SystemHealth, motion gates and DALY protection remain untouched.
   if (facts.charge_complete_verified) return LedPresentationState::CHARGE_COMPLETE_VERIFIED;
   if (facts.charging) return LedPresentationState::CHARGING;
+  if (in.system_health == core::SystemHealth::DEGRADED) return LedPresentationState::DEGRADED;
+  if (in.wifi_connecting) return LedPresentationState::WIFI_CONNECTING;
+  if (in.system_health == core::SystemHealth::BOOTING) return LedPresentationState::BOOTING;
   // Also preserves the legacy MAINTENANCE fallback.
   return LedPresentationState::READY;
 }

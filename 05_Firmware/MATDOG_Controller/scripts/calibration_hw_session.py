@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MATDOG four-leg Full Calibration - one-shot hardware session runner.
+"""MATDOG four-leg Full Calibration - phased hardware session runner.
 
     python3 scripts/calibration_hw_session.py \\
         --evidence-dir ~/MATDOG/evidence/<session> \\
@@ -23,6 +23,11 @@ What it does, in order, stopping at the FIRST failed check:
      HARDWARE_CONTACT_CALIBRATED record);
   9. SAFE_OFF 13/13, EVIDENCE EXPORT, exact END summary for all legs run.
 
+Phases post-abort/resume retain this boot's promoted acquisition and complete
+compatible legs; persist performs 24/24 SAVE CHECK/SAVE/ACK; verify-persistence
+is read-only after a separately controlled power cycle. No phase sends RESET.
+The default all phase finishes with a RAM export; persistence is explicit.
+
 Any failure: FULL LEG ABORT + SESSION ABORT (if the link is alive), SAFE_OFF
 all 13, a read-only evidence export, then stop - no further leg.
 
@@ -41,14 +46,17 @@ import datetime
 import errno
 import hashlib
 import json
+import math
 import os
 import re
 import select
+import signal
 import subprocess
 import sys
 import termios
 import threading
 import time
+from daly_calibration_guard import DalyGuard, DalyGuardFailure
 
 DEFAULT_PORT = "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00"
 INSTALLED = [11, 12, 13, 21, 22, 23, 31, 32, 33, 41, 42, 43, 51]
@@ -65,10 +73,14 @@ LEG_MATRIX = {
 # The six contacts of a leg, in the LF V25 measurement order.
 CONTACT_ORDER = [("UPPER", "MIN"), ("UPPER", "MAX"), ("LOWER", "MIN"), ("LOWER", "MAX"),
                  ("HIP", "MIN"), ("HIP", "MAX")]
-# LF_UPPER's true MIN stop was found by hand ~23 ticks past the canonical
-# contact (2026-09-29). A LF UPPER MIN contact far from that is stopped for
-# review before any other leg runs.
-LF_MIN_EXPECTED_BEYOND = (7, 39)
+# Same installed LF UPPER ELR01/bus 12, hardware evidence 2026-10-01:
+# fine1=1463, fine2=1459, midpoint=1461. Compare absolute encoder evidence,
+# independently of the manually measured Q0 / its shifted canonical contact.
+# +/-16 ticks (1.40625 degrees) is an operational historical-comparison
+# budget, chosen no larger than the native fine-pass repeatability budget.
+# It is not a qualified mechanical limit and never changes a search corridor.
+LF_MIN_REFERENCE_FINE = (1463, 1459)
+LF_MIN_ABSOLUTE_TOLERANCE_TICKS = 16
 # One whole 24-contact leg: recovery of 12 joints, 6 two-pass searches, the
 # prerequisite and return moves, cleanup. Generous; the firmware bounds every
 # move itself - this only catches a hung run.
@@ -194,6 +206,34 @@ class Session:
         self.log = log
         self.clock = clock
         self.sleep = sleep
+        self.daly_guard = None
+
+    def check_daly(self):
+        if self.daly_guard is None:
+            return
+        guard = self.daly_guard
+        with self.link.cond:
+            lines = self.link.lines[guard.cursor:]
+            guard.cursor = len(self.link.lines)
+        try:
+            for received, text in lines:
+                guard.feed(text, received)
+            guard.check(self.clock())
+        except DalyGuardFailure as e:
+            raise SessionFailure(str(e)) from e
+
+    def start_daly_guard(self):
+        # One connection: autonomous stream, no extra command during a run.
+        self.request("@BMS STREAM OFF", r"BMS_STREAM=OFF")
+        guard = DalyGuard()
+        guard.cursor = self.mark()
+        self.request("@BMS STREAM ON", r"BMS_STREAM=ON")
+        mark = self.mark()
+        self.link.send("@BMS STATUS")
+        self.wait_for(r"  charge_mos=(ON|OFF) discharge_mos=(ON|OFF) state=\S+ alarms=[0-9A-F]{4}(?: [0-9A-F]{4}){3}", mark, 3)
+        self.daly_guard = guard
+        self.check_daly()
+        self.log.say("PASS  DALY guard active on the existing link: pack >=10.8V, cell >=3600mV, clear alarms, fresh OK")
 
     def mark(self):
         with self.link.cond:
@@ -210,6 +250,7 @@ class Session:
         deadline = self.clock() + timeout
         seen = mark
         while True:
+            self.check_daly()
             with self.link.cond:
                 lines = [t for _, t in self.link.lines[seen:]]
                 seen = len(self.link.lines)
@@ -230,6 +271,7 @@ class Session:
                     self.link.cond.wait(timeout=0.05)
 
     def request(self, command, pattern, timeout=5.0, fail_patterns=(r"REASON=.*",)):
+        self.check_daly()
         mark = self.mark()
         self.link.send(command)
         return self.wait_for(pattern, mark, timeout, fail_patterns)
@@ -311,13 +353,14 @@ class Session:
         return {b: t for b, (t, _) in q0.items()}
 
     def q0_promote(self):
-        self.request("@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION",
+        promotion = self.request("@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION",
                      r"CALIBRATION_Q0_PROMOTE=OK admitted=12/12 source=CURRENT_BOOT_CAPTURE "
-                     r"capture_session=\d+",
+                     r"capture_session=(\d+)",
                      fail_patterns=(r"CALIBRATION_Q0_PROMOTE=(PARTIAL|REFUSED|BLOCKED|BUSY).*",))
         self.request("@ACTUATOR STATUS",
                      r"ACTUATOR_PROVENANCE limits_admitted=0 transforms_admitted=12 geometry_bound=YES")
         self.log.say("PASS  Q0 promoted 12/12, transforms_admitted=12")
+        return int(promotion.group(1))
 
     # -- servo positions (read-only, evidence only) --------------------------
 
@@ -364,10 +407,40 @@ class Session:
 
     # -- INITIAL RECOVERY: all twelve actively to q0, verified -------------------
 
-    def initial_recovery(self, leg, q0=None):
+    def startup_recovery(self):
+        from matdog_startup_reference import Q0,GEOMETRY,classify_positions
+        before=self.read_positions("fresh positions before startup qualification")
+        classify_positions({bus:value[0] for bus,value in before.items()})
+        mark=self.mark()
+        self.link.send("@CALIBRATION STARTUP QUALIFY RF_RETURN_20261003")
+        self.wait_for(r"CALIBRATION_STARTUP_QUALIFICATION=STARTED read_only=1 authority=NONE reference=20261003_134848",
+                      mark,5.0,(r"CALIBRATION_STARTUP_QUALIFICATION=REFUSED.*",))
+        proof=self.wait_for(r"CALIBRATION_STARTUP_QUALIFICATION=PASS route=(NOMINAL|RF_LOWER_MAX_RETURN) "
+                            rf"reference=20261003_134848 geometry={GEOMETRY} samples=3x12 motion_authorized=0 reason=NONE",
+                            mark,15.0,(r"CALIBRATION_STARTUP_QUALIFICATION=REFUSED.*",))
+        route=proof.group(1)
+        if route!='NOMINAL':
+            mark=self.mark()
+            self.link.send("@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN")
+            self.wait_for(r"CALIBRATION_STARTUP_RECOVERY=ARMED route=RF_LOWER_MAX_RETURN torque_limit=500 reference_admitted=0 phase=PREFLIGHT",
+                          mark,5.0,(r"CALIBRATION_STARTUP_RECOVERY=REFUSED.*",))
+            result=self._monitor(re.compile(r"CALIBRATION_STARTUP_RECOVERY_RESULT verdict=(\S+) recovered=(\d+)/(\d+) "
+                         r"failure=(\S+) failed_phase=(\S+) last_decision=(\S+)"),mark,"STARTUP RECOVERY",RECOVERY_WATCHDOG_S)
+            if result.group(1,2,3,4)!=('PASS','12','12','NONE'):
+                raise SessionFailure('startup recovery failed: '+result.group(0))
+            self.wait_for(r"CALIBRATION_STARTUP_CLOSE safe_off=13/13 authority=NONE motion_authorized=0 reference_admitted=0",mark,5.0)
+        self.safe_off_all()
+        self.authority_none()
+        after=self.read_positions("positions after explicit startup qualification/recovery")
+        if set(after)!=set(Q0) or any(abs(after[b][0]-Q0[b])>10 or after[b][1]!=0 for b in Q0):
+            raise SessionFailure('STARTUP_Q0_NOT_VERIFIED_12_OF_12')
+        self.log.say('PASS  startup '+route+'; reference-only, SAFE_OFF 13/13, authority NONE; fresh Q0 follows')
+
+    def initial_recovery(self, leg, q0=None, post_abort=False):
+        kind = "POST_ABORT" if post_abort else "INITIAL"
         mark = self.mark()
-        self.link.send(f"@CALIBRATION INITIAL RECOVERY {leg} CONFIRM_Q0_RECOVERY")
-        self.wait_for(rf"CALIBRATION_INITIAL_RECOVERY=ARMED session_leg={leg} joints=12 "
+        self.link.send(f"@CALIBRATION {kind} RECOVERY {leg} CONFIRM_Q0_RECOVERY")
+        self.wait_for(rf"CALIBRATION_{kind}_RECOVERY=ARMED session_leg={leg} joints=12 "
                       r"torque_limit=500 phase=PREFLIGHT", mark, 5.0,
                       (r"CALIBRATION_INITIAL_RECOVERY=REFUSED",))
         rx = re.compile(r"CALIBRATION_INITIAL_RECOVERY_TARGET bus=(\d+) leg=\w+ joint=\w+ unit=\S+ q0=(\d+)")
@@ -388,7 +461,7 @@ class Session:
                 raise SessionFailure(f"INITIAL RECOVERY target bus {bus} q0={tick} is not the promoted q0")
         self.log.say(f"RUN   INITIAL RECOVERY: 12 joints -> promoted q0, one at a time")
         result = self._monitor(
-            re.compile(r"CALIBRATION_INITIAL_RECOVERY_RESULT verdict=(\S+) recovered=(\d+)/(\d+) "
+            re.compile(rf"CALIBRATION_{kind}_RECOVERY_RESULT verdict=(\S+) recovered=(\d+)/(\d+) "
                        r"failure=(\S+) failed_phase=(\S+) last_decision=(\S+)"),
             mark, f"{leg} INITIAL RECOVERY", RECOVERY_WATCHDOG_S)
         verdict, recovered, total, failure = result.group(1, 2, 3, 4)
@@ -490,12 +563,19 @@ class Session:
             beyond = (f2 - contact) * sign
             self.log.say(f"      {leg} {key[0]:5s} {key[1]} contact scout={scout} (reference) "
                          f"fine1={f1} fine2={f2} = canonical {beyond:+d}")
-            if leg == "LF" and key == ("UPPER", "MIN") and lf_crosscheck and \
-                    not (LF_MIN_EXPECTED_BEYOND[0] <= beyond <= LF_MIN_EXPECTED_BEYOND[1]):
-                raise SessionFailure(
-                    f"LF UPPER MIN contact is canonical {beyond:+d}, but the stop was found by hand "
-                    f"at about +23: stopping for operator review before any other leg "
-                    f"(--no-lf-min-crosscheck to accept)")
+            if leg == "LF" and key == ("UPPER", "MIN") and lf_crosscheck:
+                reference = sum(LF_MIN_REFERENCE_FINE) / 2
+                midpoint = (f1 + f2) / 2
+                delta = midpoint - reference
+                self.log.say(f"      LF UPPER MIN absolute midpoint={midpoint:g} "
+                             f"reference={reference:g} (2026-10-01 ELR01/12) "
+                             f"delta={delta:+g} tolerance=+/-{LF_MIN_ABSOLUTE_TOLERANCE_TICKS}")
+                if abs(delta) > LF_MIN_ABSOLUTE_TOLERANCE_TICKS:
+                    raise SessionFailure(
+                        f"LF UPPER MIN absolute midpoint {midpoint:g} differs from "
+                        f"2026-10-01 ELR01/12 reference {reference:g} by {delta:+g} ticks "
+                        f"(budget +/-{LF_MIN_ABSOLUTE_TOLERANCE_TICKS}): "
+                        f"stopping for operator review before any other leg")
         self.log.say(f"PASS  {leg} 6/6 HARDWARE_CONTACT_CALIBRATED; cleanup verified")
 
     def _monitor(self, terminal, mark, label, watchdog_s, stop_on_match=True):
@@ -517,6 +597,7 @@ class Session:
         last_state = None
         last_phase = None
         while True:
+            self.check_daly()
             with self.link.cond:
                 new = [t for _, t in self.link.lines[seen:]]
                 seen = len(self.link.lines)
@@ -608,8 +689,80 @@ class Session:
                                  f"for {missing}")
         self.log.say(f"PASS  evidence export: {end.group(0)}")
 
+    def uptime(self):
+        m = self.request("@STATUS", r"SYSTEM .*uptime_ms=(\d+) .*")
+        return int(m.group(1))
+
+    def verify_current_q0(self, checkpoint, build_id):
+        if checkpoint.get("build_id") != build_id:
+            raise SessionFailure("resume checkpoint belongs to another application build")
+        mark = self.mark()
+        self.link.send("@CALIBRATION Q0 STATUS")
+        m = self.wait_for(r"CALIBRATION_Q0 state=COMPLETE failure=NONE session=(\d+) .*candidates=12/12", mark, 5)
+        promoted = self.wait_for(r"CALIBRATION_Q0_PROMOTION promoted_capture=(\d+) geometry=(\S+)", mark, 5)
+        self.promoted_geometry = promoted.group(2)
+        if int(m.group(1)) != checkpoint.get("capture_session") or int(promoted.group(1)) != checkpoint.get("capture_session"):
+            raise SessionFailure("resume requires the same current promoted Q0 acquisition")
+        rx = re.compile(r"  Q0 bus=(\d+) leg=\w+ joint=\w+ unit=\S+ tick=(\d+) .*state=CANDIDATE estimator=MANUAL_ZERO_POSE")
+        measured = {int(m.group(1)): int(m.group(2)) for m in
+                    (rx.fullmatch(t) for t in self.lines_since(mark)) if m}
+        expected = {int(b): t for b, t in checkpoint["q0"].items()}
+        if measured != expected or self.uptime() < checkpoint["uptime_ms"]:
+            raise SessionFailure("Q0/checkpoint mismatch or controller reboot; no automatic resume")
+        return expected
+
+    def retained_legs(self, lines, q0):
+        complete = set()
+        for leg in LEG_MATRIX:
+            leg_lines = [t for t in lines if f"leg={leg} " in t]
+            if not any(t.startswith("CALIBRATION_EVIDENCE_LEG ") and
+                       "verdict=HARDWARE_CONTACT_CALIBRATED contacts_expected=6 contacts_measured=6 contacts_accepted=6 "
+                       "diagnostics_accepted=1 contact_calibrated=1 envelope_accepted=0" in t for t in leg_lines):
+                continue
+            synthetic_end = re.fullmatch(r"CALIBRATION_EVIDENCE_EXPORT=END legs_present=(\d+) "
+                r"legs_contact_calibrated=(\d+) legs_envelope_accepted=(\d+) total_contacts_expected=24 "
+                r"total_contacts_accepted=(\d+) all_contact_calibrated=(\d)",
+                "CALIBRATION_EVIDENCE_EXPORT=END legs_present=1 legs_contact_calibrated=1 "
+                "legs_envelope_accepted=0 total_contacts_expected=24 total_contacts_accepted=6 all_contact_calibrated=0")
+            self.verify_export([leg], synthetic_end, leg_lines)
+            rx = re.compile(r"CALIBRATION_EVIDENCE_Q0 leg=\w+ joint=\w+ unit=\S+ bus=(\d+) present=1 "
+                            r"q0_tick=(\d+) state=PROMOTED origin=LIVE_SESSION geometry=(\S+)")
+            matches = [m for m in (rx.fullmatch(t) for t in leg_lines) if m]
+            if len(matches) != 3 or any(m.group(3) != self.promoted_geometry for m in matches):
+                raise SessionFailure(f"{leg}: retained Q0 evidence has duplicate records or incompatible geometry")
+            ticks = {int(m.group(1)): int(m.group(2)) for m in matches}
+            buses = set(LEG_MATRIX[leg][:3])
+            if set(ticks) != buses or any(ticks[b] != q0[b] for b in buses):
+                raise SessionFailure(f"{leg}: retained evidence does not use the current promoted Q0")
+            complete.add(leg)
+        return complete
+
+    def verify_persistence(self, generation):
+        mark = self.mark()
+        self.link.send("@CALIBRATION PERSIST STATUS")
+        self.wait_for(r"NVS=READY ESP_ERROR=0 PARTITION=matdog_nvs", mark, 5)
+        self.wait_for(rf"CLASS=CONSISTENT ACKNOWLEDGED_GENERATION={generation} PENDING_GENERATION=0 "
+                      r"AWAITING_ACK_GENERATION=0 ACKNOWLEDGED_RECORD_INTACT=1", mark, 5)
+        self.wait_for(r"WRITE_STATE=OPEN ACK_UNCERTAIN=0 RECONCILE_UNCERTAIN=0 WRITES_BLOCKED=0", mark, 5)
+        self.wait_for(r"CALIBRATION_AVAILABLE=1 MOTION_AUTHORIZED=0 RESTORE=NOT_IMPLEMENTED", mark, 5)
+
+    def persist(self):
+        end, lines = self.export()
+        self.verify_export(list(LEG_MATRIX), end, lines)
+        self.safe_off_all()
+        self.authority_none()
+        self.request("@CALIBRATION PERSIST SAVE CHECK", r"CALIBRATION_PERSIST_SAVE=CHECK_OK", timeout=10)
+        saved = self.request("@CALIBRATION PERSIST SAVE CONFIRM_SAVE_FULL_CALIBRATION",
+                             r"CALIBRATION_PERSIST_SAVE=WRITTEN_AWAITING_ACK generation=(\d+) slot=[AB]", timeout=15)
+        generation = int(saved.group(1))
+        self.request(f"@CALIBRATION PERSIST ACK {generation}",
+                     rf"CALIBRATION_PERSIST_ACK=OK generation={generation}", timeout=15)
+        self.verify_persistence(generation)
+        return generation
+
     def emergency_stop(self):
         """Always-allowed de-escalation; best effort, never raises."""
+        self.daly_guard = None  # a power fault must never block ABORT/SAFE_OFF
         for cmd in ("@CALIBRATION FULL LEG ABORT", "@CALIBRATION SESSION ABORT"):
             try:
                 self.link.send(cmd)
@@ -700,7 +853,7 @@ def wait_for_port(port, log, timeout=30.0, flashed=False):
 
 # --------------------------------------------------------------------------
 
-PHASES = ("prepare", "q0", "recover", "legs", "all")
+PHASES = ("prepare", "q0", "recover", "post-abort", "legs", "resume", "persist", "verify-persistence", "all")
 
 
 def run(args, link_factory=SerialLink):
@@ -724,7 +877,7 @@ def run(args, link_factory=SerialLink):
 
     Any failure: FULL LEG ABORT + SESSION ABORT, SAFE_OFF all 13, a read-only
     evidence export, then stop - no further leg, no retry."""
-    sketch_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    sketch_dir = args.firmware_sketch_dir or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     legs = [leg.strip().upper() for leg in args.legs.split(",") if leg.strip()]
     for leg in legs:
         if leg not in LEG_MATRIX:
@@ -735,13 +888,16 @@ def run(args, link_factory=SerialLink):
     if phase not in PHASES:
         raise SystemExit(f"--phase must be one of {PHASES}")
     flashing = phase in ("prepare", "all") and not args.no_flash
+    startup=getattr(args,'qualified_startup_recovery',False)
+    if startup and (phase!='all' or not args.no_flash or not args.require_daly or not args.confirm_operator_go):
+        raise SystemExit('qualified startup requires --phase all --no-flash --require-daly and operator GO')
     if flashing and not re.fullmatch(r"[0-9a-f]{64}", args.backup_sha256 or ""):
         raise SystemExit("--backup-sha256 <64 hex> is required to flash: the operator-authorized "
                          "SHA256 of the --backup full-flash image (flash_app_only.sh checks it)")
     if phase in ("q0", "all") and not args.confirm_q0_pose:
         raise SystemExit("--confirm-q0-pose is required: Q0 CAPTURE asserts all four legs are "
                          "physically at the manual q=0 calibration pose")
-    if phase in ("legs", "all") and not args.confirm_operator_go:
+    if phase in ("legs", "resume", "post-abort", "all") and not args.confirm_operator_go:
         raise SystemExit("--confirm-operator-go is required: the operator is physically present, "
                          "the robot is supported, the charger disconnected, the envelope clear "
                          "and the physical disconnect reachable")
@@ -768,23 +924,34 @@ def run(args, link_factory=SerialLink):
         time.sleep(3.0) if link_factory is SerialLink else None  # passive: boot banner
         link.send("")  # a lone newline flushes a half-received first line
         session.request("@IMU STREAM OFF", r"IMU_STREAM=OFF", timeout=3.0, fail_patterns=()) \
-            if args.imu_stream_off else None
+            if args.imu_stream_off and phase != "verify-persistence" else None
         session.verify_signature(build_id)
         session.verify_maintenance()
+        if args.expected_boot_anchor is not None:
+            uptime = session.uptime()
+            if not math.isfinite(args.expected_boot_anchor) or abs(time.time() - uptime / 1000 - args.expected_boot_anchor) > 3:
+                raise SessionFailure("controller boot changed since the admitted preparation receipt")
+        if args.require_daly:
+            if phase == "verify-persistence":
+                raise SessionFailure("verify-persistence is read-only; it does not enable streams")
+            session.start_daly_guard()
         q0 = None
         if phase in ("prepare", "q0", "all"):
             session.safe_off_all()
             session.wait_health_ready()
             session.authority_none()
         if phase in ("q0", "all"):
+            if startup: session.startup_recovery()
             session.read_positions("raw positions before Q0 CAPTURE")
             q0 = session.q0_capture()
-            session.q0_promote()
+            capture_session = session.q0_promote()
             with open(q0_path, "w") as f:
-                json.dump({str(b): t for b, t in sorted(q0.items())}, f, indent=1)
+                json.dump({"build_id": build_id, "capture_session": capture_session,
+                           "uptime_ms": session.uptime(), "q0": {str(b): t for b, t in sorted(q0.items())}}, f, indent=1)
         if q0 is None and os.path.exists(q0_path):
             with open(q0_path) as f:
-                q0 = {int(b): t for b, t in json.load(f).items()}
+                checkpoint = json.load(f)
+                q0 = {int(b): t for b, t in checkpoint.get("q0", checkpoint).items()}
         if phase in ("recover", "all"):
             session.open_leg_session(legs[0])
             session.read_positions("raw positions before INITIAL RECOVERY")
@@ -792,13 +959,32 @@ def run(args, link_factory=SerialLink):
             session.read_positions("raw positions after INITIAL RECOVERY")
             session.log.say(f"READY {legs[0]} session + permit live; every leg joint verified at q0. "
                             f"Next: --phase legs --confirm-operator-go (operator GO).")
-        if phase in ("legs", "all"):
+        if phase == "post-abort":
+            if q0 is None: raise SessionFailure("post-ABORT requires a Q0 checkpoint")
+            q0 = session.verify_current_q0(checkpoint, build_id)
+            session.open_leg_session(legs[0])
+            session.initial_recovery(legs[0], q0, post_abort=True)
+        retained = set()
+        failed_legs = set()
+        if phase == "resume":
+            if q0 is None: raise SessionFailure("resume requires a Q0 checkpoint")
+            q0 = session.verify_current_q0(checkpoint, build_id)
+            _, prior_lines = session.export()
+            retained = session.retained_legs(prior_lines, q0)
+            failed_legs = {m.group(1) for m in
+                (re.match(r"CALIBRATION_EVIDENCE_LEG leg=(\w+) present=1 .*verdict=FAILED ", t)
+                 for t in prior_lines) if m}
+            log.say(f"RESUME retained complete legs: {sorted(retained)}")
+        if phase in ("legs", "resume", "all"):
             for i, leg in enumerate(legs):
-                if i == 0 and session.leg_session_ready(leg):
+                if leg in retained:
+                    log.say(f"SKIP  {leg}: complete compatible evidence retained")
+                    continue
+                if (i == 0 or phase == "resume") and session.leg_session_ready(leg):
                     session.log.say(f"      {leg}: using the ready session + permit")
                 else:
                     session.open_leg_session(leg)
-                    session.initial_recovery(leg, q0)
+                    session.initial_recovery(leg, q0, post_abort=(phase == "resume" and leg in failed_legs))
                 session.run_full_leg(leg, lf_crosscheck=not args.no_lf_min_crosscheck)
                 session.read_positions(f"raw positions after {leg}")
             session.safe_off_all()
@@ -811,10 +997,35 @@ def run(args, link_factory=SerialLink):
             log.say(f"DONE  {len(legs)} leg(s) x 6 = {total} contacts HARDWARE_CONTACT_CALIBRATED"
                     + (" - TRUE FULL CALIBRATION 24/24" if total == 24 else "")
                     + f" (RAM only - export saved in {args.evidence_dir})")
+        if phase == "persist":
+            generation = session.persist()
+            with open(os.path.join(args.evidence_dir, "persistence_ack.json"), "w") as f:
+                json.dump({"generation": generation, "build_id": build_id, "uptime_ms": session.uptime()}, f, indent=2)
+            log.say(f"PASS  SAVE/ACK generation={generation}; controlled power cycle still required")
+        if phase == "verify-persistence":
+            with open(os.path.join(args.evidence_dir, "persistence_ack.json")) as f: receipt = json.load(f)
+            if receipt["build_id"] != build_id or session.uptime() >= receipt["uptime_ms"]:
+                raise SessionFailure("no evidence of the requested controlled reboot; inspect promptly after power cycle")
+            session.authority_none()
+            session.verify_persistence(receipt["generation"])
+            log.say(f"PASS  post-reboot NVS generation={receipt['generation']}; motion remains unauthorized")
+        if args.result_json:
+            uptime = session.uptime()
+            session.check_daly()
+            result = {"schema": "MATDOG_RUNNER_PHASE_RESULT_V1", "phase": phase,
+                      "build_id": build_id, "uptime_ms": uptime,
+                      "observed_epoch": time.time(),
+                      "hardware_observed": link_factory is SerialLink,
+                      "daly": session.daly_guard.snapshot() if session.daly_guard else None}
+            if phase == "all": result.update(contacts_accepted=6 * len(legs), fresh_q0=True)
+            if phase == "persist": result.update(generation=generation, save_ok=True, ack_ok=True)
+            if phase == "verify-persistence": result.update(generation=receipt['generation'],
+                acknowledged_record_intact=True, motion_authorized=False, authority="NONE")
+            with open(args.result_json, "x") as f: json.dump(result, f, indent=2)
         return 0
-    except SessionFailure as e:
+    except (SessionFailure, OSError, ValueError, KeyError, KeyboardInterrupt) as e:
         log.say(f"FAIL  {e}")
-        if not link.lost:
+        if not link.lost and phase != "verify-persistence":
             log.say("      de-escalating: FULL LEG ABORT, SESSION ABORT, SAFE_OFF all 13")
             session.emergency_stop()
             try:
@@ -827,11 +1038,19 @@ def run(args, link_factory=SerialLink):
                 log.say(f"      evidence export unavailable: {ex}")
         return 1
     finally:
+        if session.daly_guard is not None and not link.lost:
+            session.daly_guard = None
+            try: link.send("@BMS STREAM OFF")
+            except Exception: pass
         link.close()
         log.close()
 
 
 def main(argv=None):
+    # Operator interruption must pass through the same ABORT/SAFE_OFF path.
+    def interrupted(signum, frame):
+        raise KeyboardInterrupt("runner interrupted")
+    signal.signal(signal.SIGTERM, interrupted)
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--evidence-dir", required=True)
     p.add_argument("--backup", default=os.path.expanduser(
@@ -841,8 +1060,14 @@ def main(argv=None):
     p.add_argument("--port", default=DEFAULT_PORT)
     p.add_argument("--legs", default="LF,RF,RH,LH")
     p.add_argument("--phase", default="all", choices=PHASES)
+    p.add_argument("--firmware-sketch-dir", help="Clean pinned firmware worktree supplying the native build manifest")
+    p.add_argument("--require-daly", action="store_true", help="Fail-closed 3S DALY monitor on this same USB connection")
+    p.add_argument("--result-json", help="Write a new structured success receipt; existing file is refused")
+    p.add_argument("--expected-boot-anchor", type=float, help="Require continuity with the admitted boot before any calibration")
     p.add_argument("--confirm-q0-pose", action="store_true")
     p.add_argument("--confirm-operator-go", action="store_true")
+    p.add_argument("--qualified-startup-recovery",action="store_true",
+                   help="Explicit fixed RF return using reference 20261003_134848; fresh firmware qualification before torque")
     p.add_argument("--no-flash", action="store_true", help="the board already runs this build")
     p.add_argument("--no-lf-min-crosscheck", action="store_true")
     p.add_argument("--imu-stream-off", action="store_true", default=True)

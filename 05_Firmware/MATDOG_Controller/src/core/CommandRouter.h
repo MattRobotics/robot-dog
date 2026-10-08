@@ -5,6 +5,7 @@
 
 #include "../calibration/CalibrationManager.h"
 #include "../calibration/CalibrationQ0CaptureSession.h"
+#include "../calibration/StartupRecoveryQualification.h"
 #include "../imu/Bno085Imu.h"
 #include "../network/WifiManager.h"
 #include "../power/DalyBms.h"
@@ -145,6 +146,7 @@ class CommandRouter {
     // first-motion SAFE_OFF (the SAVE gate's SAFE_OFF evidence).
     calibration::CalibrationPersistenceService* persistence;
     const servo::SafeOffResult* first_motion_safe_off_result;
+    calibration::StartupRecoveryQualification* startup_qualification=nullptr;
   };
 
   void begin(const Modules& modules);
@@ -247,6 +249,13 @@ class CommandRouter {
   // RECONCILE DECLARE_NOTHING [CONFIRM_DISCARD]. Implemented in
   // CommandRouterPersistence.cpp. Touches no servo, no transform table, no
   // authority; only STATUS and SAVE CHECK are read-only.
+  // Schema identity crosses this private facade as values only. The permitted
+  // persistence translation unit resolves the authoritative schema constants.
+  struct PersistenceSchemaIdentity {
+    uint16_t record_schema;
+    uint16_t marker_schema;
+  };
+  static PersistenceSchemaIdentity persistenceSchemaIdentity();
   void handlePersistCommand(const String& upper);
   static bool isPersistCommand(const String& upper);
   void printPersistenceStatus();

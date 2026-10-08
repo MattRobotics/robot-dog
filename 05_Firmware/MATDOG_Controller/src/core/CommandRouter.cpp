@@ -18,6 +18,7 @@
 #include "../actuator/OperationalEnvelope.h"
 
 #include "../config/BuildConfig.h"
+#include "../update/OtaLayoutContract.h"
 #include "../config/Pins.h"
 #include "../network/HttpTransport.h"
 #include "ControllerService.h"
@@ -93,7 +94,12 @@ bool CommandRouter::q0CaptureOwnsServoDiagnostics() const {
 }
 
 bool CommandRouter::motionExecutorBusy() const {
-  return modules_.first_motion->active() || modules_.full_leg_calibration->active();
+  const auto* startup=modules_.startup_qualification;
+  const bool observing=startup && startup->phase()!=calibration::StartupQualificationPhase::IDLE &&
+    startup->phase()!=calibration::StartupQualificationPhase::READY &&
+    startup->phase()!=calibration::StartupQualificationPhase::COMPLETE &&
+    startup->phase()!=calibration::StartupQualificationPhase::REFUSED;
+  return modules_.first_motion->active() || modules_.full_leg_calibration->active() || observing;
 }
 
 bool CommandRouter::servoDiagnosticBusy() const {
@@ -204,8 +210,19 @@ void CommandRouter::handleLine(String line) {
 
   String upper = line;
   upper.toUpperCase();
+  // Network flash transactions reserve the quiet window before enqueueing.
+  // Existing STOP/ABORT and read-only status commands remain available.
+  if (modules_.wifi && modules_.wifi->configBusy() && upper.startsWith("@CALIBRATION") &&
+      strstr(upper.c_str(),"STATUS")==nullptr && strstr(upper.c_str(),"ABORT")==nullptr &&
+      !(upper == "@CALIBRATION MOTION PERMIT REVOKE")) {
+    Serial.println("CALIBRATION=REFUSED REASON=NETWORK_CONFIG_BUSY"); return;
+  }
+  if (modules_.wifi && modules_.wifi->configBusy() && upper == "@MODE RUN") {
+    Serial.println("MODE=REFUSED REASON=NETWORK_CONFIG_BUSY"); return;
+  }
   // Set only by matchLegCommand() on a strict four-token match.
   calibration::Leg command_leg = calibration::Leg::LF;
+  bool command_post_abort = false;
 
   if (upper == "@HELP") {
     printHelp();
@@ -297,19 +314,31 @@ void CommandRouter::handleLine(String line) {
     }
   } else if (upper == "@WIFI STATUS") {
     printWifiStatus();
+  } else if (upper == "@WIFI PROFILES STATUS" || upper == "@WIFI AP STATUS" || upper == "@WIFI SLEEP STATUS" || upper == "@WIFI ROAM STATUS" || upper == "@WIFI MODE STATUS") {
+    printWifiStatus();
+  } else if (upper == "@WIFI SCAN") {
+    Serial.println(modules_.service->scanNetwork()?"WIFI_SCAN=QUEUED":"WIFI_SCAN=REFUSED");
+  } else if (upper == "@WIFI AP ON" || upper == "@WIFI AP OFF") {
+    Serial.println(modules_.service->accessPoint(upper=="@WIFI AP ON")?"WIFI_AP=QUEUED":"WIFI_AP=REFUSED");
+  } else if (upper == "@WIFI SLEEP AUTO" || upper == "@WIFI SLEEP ON" || upper == "@WIFI SLEEP OFF") {
+    const uint8_t p=upper=="@WIFI SLEEP AUTO"?0:(upper=="@WIFI SLEEP ON"?1:2);
+    Serial.println(!modules_.service->networkCritical() && modules_.wifi->setSleep(p)?"WIFI_SLEEP=QUEUED effective=OFF fallback=HWCDC_SESSION_UNPROVEN":"WIFI_SLEEP=REFUSED");
+  } else if (upper.startsWith("@WIFI AP KEY ") || upper.startsWith("@WIFI ADMIN KEY ")) {
+    bool accepted=false;
+    if(!modules_.service->networkCritical()) {
+      if(upper.startsWith("@WIFI AP KEY ")) accepted=modules_.wifi->provisionAp(line.c_str()+13);
+      else accepted=modules_.wifi->provisionAdmin(line.c_str()+16);
+    }
+    Serial.println(accepted?"WIFI_PROVISION=QUEUED":"WIFI_PROVISION=REFUSED");
   } else if (upper == "@WIFI ON" || upper == "@WIFI OFF") {
-    // Deliberately NOT gated by operating mode. The radio is orthogonal to
-    // servo safety: it cannot block the bus (WifiManager::update() is
-    // bounded and measured) and it has no path to an actuator. Gating it on
-    // MAINTENANCE would only make the network unusable in the mode a future
-    // motion loop actually runs in.
+    // Worker rechecks critical state before changing radio mode.
+    // QUEUED is an intent; status reports the applied state.
     const bool on = (upper == "@WIFI ON");
     if (modules_.wifi->setEnabled(on, millis())) {
-      Serial.printf("WIFI=%s\n", on ? "ON" : "OFF");
+      Serial.printf("WIFI_REQUEST=QUEUED_RADIO_%s\n", on ? "ON" : "OFF");
     } else {
       Serial.println("WIFI=REFUSED");
-      Serial.println("REASON=NO_CREDENTIALS");
-      Serial.println("HINT=create src/config/WifiCredentials.local.h and rebuild");
+      Serial.println("REASON=NETWORK_REQUEST_BUSY_OR_UNAVAILABLE");
     }
     printWifiStatus();
   } else if (isPersistCommand(upper)) {
@@ -325,6 +354,17 @@ void CommandRouter::handleLine(String line) {
       Serial.println("CALIBRATION_Q0_ABORT=NO_ACTIVE_CAPTURE");
     }
     printCalibrationQ0Status();
+  } else if (upper == "@CALIBRATION EVIDENCE DISCARD CONFIRM_NEW_Q0") {
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE ||
+        modules_.calibration->sessionLive() || modules_.motion_permit->active() ||
+        modules_.full_leg_run->armed || servoDiagnosticBusy()) {
+      Serial.println("CALIBRATION_EVIDENCE_DISCARD=REFUSED");
+      Serial.println("REASON=SESSION_OR_DIAGNOSTIC_ACTIVE");
+      return;
+    }
+    modules_.full_leg_evidence->reset();
+    modules_.full_leg_calibration->invalidateRecoveryWitness();
+    Serial.println("CALIBRATION_EVIDENCE_DISCARD=OK scope=RAM_ONLY NVS=UNCHANGED");
   } else if (upper.startsWith("@CALIBRATION Q0 CAPTURE")) {
     // Read-only evidence acquisition is deliberately separate from a live
     // CalibrationManager motion session. No authority is requested here.
@@ -368,6 +408,12 @@ void CommandRouter::handleLine(String line) {
       return;
     }
 
+    if (modules_.full_leg_evidence->legsPresent() != 0 || modules_.calibration->sessionLive()) {
+      Serial.println("CALIBRATION_Q0=REFUSED");
+      Serial.println("REASON=EXISTING_EVIDENCE_REQUIRES_EXPLICIT_DISCARD");
+      return;
+    }
+    modules_.full_leg_calibration->invalidateRecoveryWitness();
     calibration::Q0CaptureConfig config{};
     config.samples_per_joint = static_cast<uint8_t>(samples);
     config.stability_budget_specified = true;
@@ -730,6 +776,68 @@ void CommandRouter::handleLine(String line) {
         "CALIBRATION_FIRST_MOTION_NOTE no_write_in_command_handler; "
         "next_Controller_tick_revalidates_all_dynamic_prerequisites");
 
+  } else if (upper == "@CALIBRATION STARTUP QUALIFY RF_RETURN_20261003") {
+    auto* q=modules_.startup_qualification;
+    if (q==nullptr || !build::kServoPowerAvailable || servoDiagnosticBusy() ||
+        modules_.operating_mode->mode()!=OperatingMode::MAINTENANCE ||
+        modules_.system_state->systemHealth()!=SystemHealth::READY ||
+        modules_.authority->current()!=ActuatorAuthority::NONE || modules_.calibration->sessionLive() ||
+        modules_.motion_permit->active() || !modules_.actuator_policy->transforms().empty() ||
+        !calibration::startupReferenceMatches(*modules_.geometry_profile) || !q->start(millis())) {
+      Serial.println("CALIBRATION_STARTUP_QUALIFICATION=REFUSED reason=STARTUP_ADMISSION_OR_ATTEMPT_CONSUMED");return;
+    }
+    Serial.println("CALIBRATION_STARTUP_QUALIFICATION=STARTED read_only=1 authority=NONE reference=20261003_134848");
+
+  } else if (upper == "@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN") {
+    auto* q=modules_.startup_qualification;
+    if (q==nullptr || !q->ready(millis()) || q->nominal() || servoDiagnosticBusy() ||
+        modules_.operating_mode->mode()!=OperatingMode::MAINTENANCE ||
+        modules_.system_state->systemHealth()!=SystemHealth::READY ||
+        modules_.authority->current()!=ActuatorAuthority::NONE || modules_.calibration->sessionLive() ||
+        modules_.motion_permit->active() || !modules_.actuator_policy->transforms().empty() ||
+        !calibration::startupReferenceMatches(*modules_.geometry_profile)) {
+      Serial.println("CALIBRATION_STARTUP_RECOVERY=REFUSED reason=NO_FRESH_QUALIFIED_STARTUP_POSE");return;
+    }
+    if (!q->consumeForExecution(millis())) {
+      Serial.println("CALIBRATION_STARTUP_RECOVERY=REFUSED reason=STARTUP_ATTEMPT_CONSUMED");return;
+    }
+    if (modules_.calibration->startSession(calibration::Leg::RF,OperatingMode::MAINTENANCE,
+          calibration::CalibrationOrigin::LIVE_SESSION)!=calibration::SessionResult::STARTED ||
+        !modules_.calibration->submitPopulationEvidence(q->populationEvidence()) ||
+        modules_.calibration->activate()!=calibration::SessionResult::OK) {
+      modules_.calibration->abortSession();q->refuse("STARTUP_SESSION_FAILED");
+      Serial.println("CALIBRATION_STARTUP_RECOVERY=REFUSED reason=STARTUP_SESSION_FAILED");return;
+    }
+    modules_.motion_authorization->revoke();
+    modules_.motion_authorization->operator_authorized=true;
+    calibration::CalibrationMotionPermitLiveInputs inputs{};
+    inputs.operator_calibration_motion_authorized=true;inputs.robot_powered_profile=build::kServoPowerAvailable;
+    inputs.mode=modules_.operating_mode->mode();inputs.system_health=modules_.system_state->systemHealth();
+    inputs.session_active=modules_.calibration->sessionLive();inputs.origin=modules_.calibration->status().origin;
+    inputs.session_id=modules_.calibration->status().session_id;
+    inputs.current_population_pass=calibration::populationIsCurrentPass(modules_.calibration->status().population);
+    inputs.current_geometry_bound=calibration::startupReferenceMatches(*modules_.geometry_profile);
+    inputs.startup_recovery_only=true;inputs.startup_reference_qualified=true;
+    inputs.authority=modules_.authority->current();inputs.authority_generation=modules_.authority->generation();
+    inputs.authority_inhibited=modules_.authority->inhibited();
+    const auto facts=calibration::buildCalibrationMotionPermitFacts(inputs);
+    calibration::CalibrationMotionPermitToken token{};
+    const auto granted=modules_.motion_permit->grant(facts,&token);
+    modules_.motion_authorization->token=token;
+    calibration::FullLegCalibrationContext context{};
+    context.session_active=inputs.session_active;context.origin=inputs.origin;
+    context.lease=modules_.calibration->authorityLease();context.mode=inputs.mode;
+    context.motion_permit_active=granted==calibration::CalibrationPermitStatus::ACTIVE && token.valid();
+    context.startup_motion_permit=token.startup_recovery_only;
+    context.authority=inputs.authority;context.authority_generation=inputs.authority_generation;
+    context.authority_inhibited=inputs.authority_inhibited;
+    if (!context.motion_permit_active || !modules_.full_leg_calibration->startStartupRecovery(context,millis())) {
+      modules_.motion_permit->revoke(calibration::CalibrationPermitRevokeReason::EXPLICIT);
+      modules_.motion_authorization->revoke();modules_.calibration->abortSession();q->refuse("STARTUP_EXECUTOR_START_FAILED");
+      Serial.println("CALIBRATION_STARTUP_RECOVERY=REFUSED reason=STARTUP_EXECUTOR_START_FAILED");return;
+    }
+    Serial.println("CALIBRATION_STARTUP_RECOVERY=ARMED route=RF_LOWER_MAX_RETURN torque_limit=500 reference_admitted=0 phase=PREFLIGHT");
+
   } else if (upper == "@CALIBRATION SESSION ABORT") {
     // Complete de-escalation. SAFE_OFF itself remains outside the manager and
     // outside authority; permit revocation alone is same-tick effective for
@@ -740,12 +848,16 @@ void CommandRouter::handleLine(String line) {
         calibration::CalibrationPermitRevokeReason::EXPLICIT);
     modules_.motion_authorization->revoke();
     modules_.calibration->abortSession();
+    if (modules_.startup_qualification && modules_.startup_qualification->phase()!=calibration::StartupQualificationPhase::EXECUTING &&
+        modules_.startup_qualification->phase()!=calibration::StartupQualificationPhase::IDLE)
+      modules_.startup_qualification->refuse("STARTUP_OPERATOR_ABORT");
 
     Serial.println("CALIBRATION_SESSION_ABORT=OK");
     Serial.println("CALIBRATION_SESSION_ABORT_NOTE permit=REVOKED authority=RELEASED");
 
-  } else if (matchLegCommand(upper, "@CALIBRATION INITIAL RECOVERY ", " CONFIRM_Q0_RECOVERY",
-                             &command_leg)) {
+  } else if (matchLegCommand(upper, "@CALIBRATION INITIAL RECOVERY ", " CONFIRM_Q0_RECOVERY", &command_leg) ||
+             (command_post_abort = matchLegCommand(upper, "@CALIBRATION POST_ABORT RECOVERY ", " CONFIRM_Q0_RECOVERY", &command_leg))) {
+    const bool post_abort = command_post_abort;
     // The controller-verified q0 baseline required after a fresh q0 promotion
     // and before any leg is calibrated: EVERY leg joint of the robot actively
     // commanded to its promoted q0, one at a time (prime at present, RAM
@@ -800,16 +912,17 @@ void CommandRouter::handleLine(String line) {
     context.authority = modules_.authority->current();
     context.authority_generation = modules_.authority->generation();
     context.authority_inhibited = modules_.authority->inhibited();
-    if (!modules_.full_leg_calibration->start(plan.request, context, millis())) {
+    if (!(post_abort ? modules_.full_leg_calibration->startPostAbortRecovery(plan.request, context, millis())
+                     : modules_.full_leg_calibration->start(plan.request, context, millis()))) {
       Serial.println("CALIBRATION_INITIAL_RECOVERY=REFUSED");
-      Serial.println("REASON=FULL_LEG_EXECUTOR_START_REFUSED");
+      Serial.printf("REASON=%s\n", calibration::toString(modules_.full_leg_calibration->status().failure));
       return;
     }
     // Deliberately NOT armed as a leg run: nothing is finalized, nothing is
     // recorded in the evidence store, the session is not completed.
-    Serial.printf("CALIBRATION_INITIAL_RECOVERY=ARMED session_leg=%s joints=%u torque_limit=%u "
+    Serial.printf("CALIBRATION_%s_RECOVERY=ARMED session_leg=%s joints=%u torque_limit=%u "
                   "phase=PREFLIGHT\n",
-                  leg_name, (unsigned)plan.request.population_count,
+                  post_abort ? "POST_ABORT" : "INITIAL", leg_name, (unsigned)plan.request.population_count,
                   (unsigned)plan.request.torque_limit);
     for (uint8_t i = 0; i < plan.request.population_count; ++i) {
       const calibration::FullLegJoint& j = plan.request.population[i];
@@ -1123,7 +1236,8 @@ void CommandRouter::handleLine(String line) {
     Serial.println("NOTE=this will resolve to POWER_CUT_FAILED, not OFF.");
   } else if (line.startsWith("@")) {
     Serial.print("UNKNOWN_COMMAND=");
-    Serial.println(line);
+    if(upper.startsWith("@WIFI"))Serial.println("(WIFI command redacted)");
+    else Serial.println(line);
     Serial.println("Type @HELP for the command list.");
   }
   // Silently ignore any line that doesn't start with '@' — keeps the
@@ -1148,10 +1262,14 @@ void CommandRouter::printHelp() {
   Serial.println("  @LED TEST");
   Serial.println("  @LED SOC TEST");
   Serial.println("  @WIFI STATUS           (cached snapshot; no radio query)");
-  Serial.println("  @WIFI ON|OFF           (any mode; refused without credentials)");
-  Serial.println("  @OTA STATUS            (read-only; OTA-A ships no transport)");
+  Serial.println("  @WIFI ON|OFF           (quiet state; OFF recovery after 10 min)");
+  Serial.println("  @WIFI PROFILES|AP|SLEEP|ROAM|MODE STATUS (cached, read-only)");
+  Serial.println("  @WIFI SCAN / @WIFI AP ON|OFF (quiet state)");
+  Serial.println("  @WIFI SLEEP AUTO|ON|OFF (HWCDC fallback OFF)");
+  Serial.println("  @WIFI AP KEY <unique-passphrase> / ADMIN KEY <64-hex> (physical provisioning)");
+  Serial.println("  @OTA STATUS            (read-only; TLS/HMAC transport, ingest gate)");
   Serial.println("  @WEB SERVER STATUS     (read-only; is the listening socket up)");
-  Serial.println("  @WEB SERVER START|STOP (MAINTENANCE mode only; never auto-started)");
+  Serial.println("  @WEB SERVER START|STOP (MAINTENANCE; AP portal auto after provisioning)");
   Serial.println("  @AUTHORITY STATUS      (read-only; no owner can be acquired yet)");
   Serial.println("  @CALIBRATION STATUS    (read-only; no session can move hardware)");
   Serial.println("  @CALIBRATION PERSIST STATUS (read-only: NVS, marker, slots, last LOAD)");
@@ -1177,6 +1295,10 @@ void CommandRouter::printHelp() {
   Serial.println("  @CALIBRATION MOTION ABORT");
   Serial.println("  @CALIBRATION MOTION PERMIT REVOKE");
   Serial.println("  @CALIBRATION SESSION ABORT");
+  Serial.println("  @CALIBRATION EVIDENCE DISCARD CONFIRM_NEW_Q0 (RAM only; required before a new acquisition)");
+  Serial.println("  @CALIBRATION POST_ABORT RECOVERY <LF|RF|RH|LH> CONFIRM_Q0_RECOVERY (current-boot witness only)");
+  Serial.println("  @CALIBRATION STARTUP QUALIFY RF_RETURN_20261003 (read-only, once per boot)");
+  Serial.println("  @CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN");
   Serial.println("  @CALIBRATION INITIAL RECOVERY <LF|RF|RH|LH> CONFIRM_Q0_RECOVERY");
   Serial.println("  @CALIBRATION FULL LEG <LF|RF|RH|LH> CONFIRM_FULL_CALIBRATION");
   Serial.println("                           (the session's leg: all SIX contacts, UPPER/LOWER/HIP x");
@@ -1257,10 +1379,11 @@ void CommandRouter::printWebStatus() {
   // Lifecycle only: whether the listening socket is up. It carries no OTA
   // session state (that is not read here even by pointer) and no in-flight
   // request contents — see HttpTransport.h's cross-thread mailbox comment.
+  Serial.printf("WEB_TLS started=%s remote_reboot=BLOCKED\n",modules_.http_transport->tlsStarted()?"YES":"NO");
   Serial.printf("WEB_SERVER started=%s\n",
                 modules_.http_transport->started() ? "YES" : "NO");
   Serial.println("WEB_NOTE never started from Controller::begin(); "
-                 "MAINTENANCE mode required to start or stop it");
+                 "automatic AP portal after USB provisioning; manual START/STOP require MAINTENANCE");
   Serial.printf("WEB_NOTE ota_ingest_compiled=%s\n",
                 update::OtaManager::ingestEnabled() ? "ENABLED" : "DISABLED");
 }
@@ -1279,6 +1402,26 @@ void CommandRouter::printWifiStatus() {
                 w.credentials_present ? w.ssid : "(none)");
   Serial.printf("WIFI_LINK connected=%s ip=%s rssi_dbm=%ld channel=%u\n",
                 w.connected ? "YES" : "NO", ip, (long)w.rssi_dbm, (unsigned)w.channel);
+  char ap_ip[16];network::formatIpv4(w.ap_ipv4,ap_ip,sizeof(ap_ip));
+  Serial.printf("WIFI_RADIO bssid=%s mode=%s profile=%u source=%s disconnect_reason=%u bandwidth=%u\n",w.bssid,w.ap_active?"APSTA":(w.enabled?"STA":"OFF"),w.active_profile,w.nvs_active?"NVS":"COMPILE_FALLBACK",w.disconnect_reason,w.bandwidth_mhz);
+  Serial.printf("WIFI_AP active=%s ssid=%s ip=%s clients=%u provisioned=%s admin=%s\n",w.ap_active?"YES":"NO",w.ap_ssid,ap_ip,w.ap_clients,w.ap_provisioned?"YES":"NO",w.admin_provisioned?"YES":"NO");
+  Serial.printf("WIFI_SLEEP configured=%u effective=%s apply_ok=%s usb_session=UNPROVEN fallback=NO_SLEEP\n",w.sleep_configured,w.sleep_effective?"ON":"OFF",w.sleep_apply_ok?"YES":"NO");
+  Serial.printf("WIFI_CONFIG_TX phase=%s busy=%s error=%ld\n",network::toString(w.config_phase),w.config_busy?"YES":"NO",(long)w.config_error);
+  Serial.printf("WIFI_SCAN running=%s count=%u starts=%lu failures=%lu inhibited=%lu roam=%lu\n",w.scan_running?"YES":"NO",w.scan_count,(unsigned long)w.scan_starts,(unsigned long)w.scan_failures,(unsigned long)w.scan_inhibited,(unsigned long)w.roam_count);
+  Serial.printf("WIFI_WORKER max_us=%lu stack_free=%lu\n",(unsigned long)w.worker_max_us,(unsigned long)w.worker_stack_free);
+  Serial.printf("WIFI_PERFORMANCE roam_enabled=%s threshold=%d hysteresis=%u scan_ms=%lu dwell_ms=%lu bandwidth_configured=%u bandwidth_apply_ok=%s\n",
+                w.roam_enabled?"YES":"NO",w.roam_threshold,w.roam_hysteresis,
+                (unsigned long)w.scan_interval_ms,(unsigned long)w.roam_dwell_ms,
+                w.bandwidth_configured,w.bandwidth_apply_ok?"YES":"NO");
+  Serial.printf("WIFI_AP_POLICY always=%s timeout_ms=%lu reload_pending=%s\n",
+                w.ap_always?"YES":"NO",(unsigned long)w.ap_timeout_ms,w.ap_reload_pending?"YES":"NO");
+  for(unsigned i=0;i<2;++i){
+    const auto& p=w.profiles[i];char a[16],m[16],g[16],d[16];
+    network::formatIpv4(p.ip,a,sizeof(a));network::formatIpv4(p.mask,m,sizeof(m));
+    network::formatIpv4(p.gateway,g,sizeof(g));network::formatIpv4(p.dns,d,sizeof(d));
+    Serial.printf("WIFI_PROFILE index=%u enabled=%s ssid=%s dhcp=%s ip=%s mask=%s gateway=%s dns=%s\n",
+                  i,p.enabled?"YES":"NO",p.ssid,p.dhcp?"YES":"NO",a,m,g,d);
+  }
   Serial.printf("WIFI_RETRY backoff_ms=%lu state_since_ms=%lu\n",
                 (unsigned long)w.backoff_ms, (unsigned long)w.state_since_ms);
   Serial.printf("WIFI_COUNTERS radio_starts=%lu attempts=%lu connects=%lu reconnects=%lu "
@@ -1346,6 +1489,8 @@ void CommandRouter::printCalibrationQ0Status() {
                 (unsigned)q.completed_sample_passes, (unsigned)q.samples_per_joint,
                 (unsigned)q.next_joint_index, (unsigned)q.candidates_complete,
                 (unsigned)calibration::kLegServoSlotCount);
+  Serial.printf("CALIBRATION_Q0_PROMOTION promoted_capture=%lu geometry=%016llx\n",
+                (unsigned long)q.promoted_capture_session_id, (unsigned long long)q.promoted_geometry);
   Serial.printf("CALIBRATION_Q0_POPULATION status=%s verdict=%s observed=%u/%u\n",
                 calibration::toString(q.population_status),
                 calibration::toString(calibration::evaluateLegPopulation(population.evidence)),
@@ -1721,9 +1866,22 @@ void CommandRouter::printBmsKeyWriteStatus() {
 
 void CommandRouter::printSourceSignature() {
   const update::OtaManagerStatus& o = modules_.service->otaStatus();
+  const PersistenceSchemaIdentity schemas = persistenceSchemaIdentity();
   Serial.printf("SOURCE_SIGNATURE build_id=%s firmware=%s version=%s profile=%s board=%s\n",
                 build::kBuildId, build::kFirmwareName, build::kFirmwareVersion,
                 build::kTestProfile, build::kBoardName);
+  // Identity only: the motion library has no operational dispatch or authority.
+  // The final application digest belongs to the associated build manifest.
+  Serial.printf("  FW_VERSION=%s GIT_SHA=%s GIT_DIRTY=%s HARDWARE_PROFILE=%s\n",
+                build::kFirmwareVersion, build::kGitSha, build::kGitDirty ? "YES" : "NO",
+                build::kTestProfile);
+  Serial.printf("  FLASH_LAYOUT=%s CAL_RECORD_SCHEMA=%u CAL_MARKER_SCHEMA=%u "
+                "OTA_INGEST=%u MOTION_STACK=%s MOTION_AUTHORIZED=0\n",
+                update::kLayoutId, (unsigned)schemas.record_schema,
+                (unsigned)schemas.marker_schema,
+                update::OtaManager::ingestEnabled() ? 1U : 0U, build::kMotionStack);
+  Serial.printf("  BUILD_UTC=%s APP_SHA256=ASSOCIATED_MANIFEST RESTORE=NOT_IMPLEMENTED\n",
+                build::kBuildUtc);
   Serial.printf("  ota_running_build_id=%s ota_running_image_state=%s reset_reason=%s\n",
                 o.running_build_id, update::toString(o.policy.running_image_state),
                 o.reset_reason);

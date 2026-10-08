@@ -54,6 +54,8 @@ struct Fixture {
   servo::SafeOffResult safe_off = servo::SafeOffResult::VERIFIED_OFF;
   SystemState system;
   ControllerService telemetry;
+  matdog::update::OtaManager ota;  // Read-only SOURCE_SIGNATURE status fixture.
+  network::WifiManager wifi;
   CommandRouter router;
 
   explicit Fixture(CalibrationRecordStorage* backend = nullptr)
@@ -72,7 +74,7 @@ struct Fixture {
     m.full_leg_calibration = &full_leg; m.full_leg_run = &run;
     m.full_leg_evidence = &scenario.evidence; m.persistence = &persistence;
     m.first_motion_safe_off_result = &safe_off;
-    m.service = &telemetry; telemetry.begin(m); router.begin(m);
+    m.wifi = &wifi; m.ota = &ota; m.service = &telemetry; telemetry.begin(m); router.begin(m);
     CHECK(startCapture(q0)); CHECK(finishCapture(q0, scenario.golden));
     CHECK(command("@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION").find("PROMOTE=OK") != std::string::npos);
   }
@@ -146,18 +148,30 @@ void identical_recapture_through_real_commands() {
   Fixture f;
   CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("CHECK_OK") != std::string::npos);
   const uint32_t first = f.q0.status().promoted_capture_session_id;
+  f.full_leg.recovery_witness_ = true;
+  CHECK(f.command("@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE").find("EXISTING_EVIDENCE_REQUIRES_EXPLICIT_DISCARD") != std::string::npos);
+  CHECK(f.q0.status().promoted_capture_session_id == first);
+  CHECK(f.full_leg.recovery_witness_);
+  CHECK(f.scenario.evidence.legsPresent() == 4);
+  CHECK(f.command("@CALIBRATION EVIDENCE DISCARD").find("UNKNOWN_COMMAND") != std::string::npos);
+  CHECK(f.scenario.evidence.legsPresent() == 4);
+  CHECK(f.command("@CALIBRATION EVIDENCE DISCARD CONFIRM_NEW_Q0").find("DISCARD=OK scope=RAM_ONLY NVS=UNCHANGED") != std::string::npos);
+  CHECK(f.scenario.evidence.legsPresent() == 0);
+  CHECK(!f.full_leg.recovery_witness_);
+  CHECK(f.policy.transforms().size() == 12); // discard is not an unpromotion
+  CHECK(f.q0.status().promoted_capture_session_id == first);
   CHECK(f.command("@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE").find("Q0=STARTED") != std::string::npos);
   CHECK(f.q0.status().capture_session_id != first); CHECK(f.q0.status().promoted_capture_session_id == 0);
   CHECK(f.q0.markCensusStarted()); CHECK(f.q0.submitCensus(goodCensus()));
   CHECK(f.q0.markPreflightStarted()); CHECK(f.q0.submitPreflight(goodPreflight()));
   CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("CHECK_REFUSED") != std::string::npos);
   CHECK(finishCapture(f.q0, f.scenario.golden));
-  CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("REASON=Q0_NOT_PROMOTED") != std::string::npos);
+  CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("CHECK_REFUSED") != std::string::npos);
   CHECK(f.command("@CALIBRATION Q0 PROMOTE").find("UNKNOWN_COMMAND") != std::string::npos);
   CHECK(f.q0.status().promoted_capture_session_id == 0);
   CHECK(f.command("@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION").find("PROMOTE=OK") != std::string::npos);
   CHECK(f.q0.status().promoted_capture_session_id == f.q0.status().capture_session_id);
-  CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("CHECK_OK") != std::string::npos);
+  CHECK(f.command("@CALIBRATION PERSIST SAVE CHECK").find("CHECK_REFUSED") != std::string::npos); // old 24/24 cannot be combined with this capture
   CHECK(f.writes() == 0); CHECK(router_test::hardware_calls == 0);
 }
 
@@ -186,7 +200,7 @@ void authorization_gates() {
         case 9: f.authority.owner_ = ActuatorAuthority::CALIBRATION; break;
         case 10: f.permit.active_ = true; break;
         case 11: f.authorization.operator_authorized = true; break;
-        case 12: f.authorization.token = {1, 1, 1}; break;
+        case 12: f.authorization.token = {false, 1, 1, 1}; break;
       }
       const int writes = f.writes();
       CHECK(f.command(commands[operation]).find("=OK") == std::string::npos);
@@ -471,7 +485,44 @@ void usb_multiple_lines_and_begin_reset() {
   framing_case = "";
 }
 
+void network_quiet_reservation() {
+  Fixture f;
+  f.wifi.config_busy_.store(true);
+  const int writes = f.writes();
+  CHECK(f.command("@MODE RUN").find("NETWORK_CONFIG_BUSY") != std::string::npos);
+  CHECK(f.mode.mode() == OperatingMode::MAINTENANCE);
+  CHECK(f.command("@CALIBRATION PERSIST SAVE CONFIRM_SAVE_FULL_CALIBRATION").find("NETWORK_CONFIG_BUSY") != std::string::npos);
+  CHECK(f.command("@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE").find("NETWORK_CONFIG_BUSY") != std::string::npos);
+  CHECK(f.command("@CALIBRATION PERSIST STATUS").find("PERSIST=STATUS") != std::string::npos);
+  CHECK(f.command("@WIFI AP KEYY never-print-this-secret").find("never-print-this-secret") == std::string::npos);
+  CHECK(f.command("@WIFI STATUS").find("WIFI_STATE") != std::string::npos);
+  CHECK(f.writes() == writes);
+  f.wifi.config_busy_.store(false);
+}
+
+void source_identity_is_read_only() {
+  Fixture f;
+  const FramingSnapshot before(f);
+  const auto schemas = CommandRouter::persistenceSchemaIdentity();
+  CHECK(schemas.record_schema == kCalibrationRecordSchemaV1);
+  CHECK(schemas.marker_schema == kSaveMarkerSchemaV1);
+  before.checkUnchanged(f);
+  const auto out = f.command("@SYSTEM SOURCE_SIGNATURE");
+  CHECK(out.find("FW_VERSION=0.2.0-dev.1") != std::string::npos);
+  CHECK(out.find("GIT_SHA=") != std::string::npos);
+  CHECK(out.find("GIT_DIRTY=") != std::string::npos);
+  CHECK(out.find("HARDWARE_PROFILE=ROBOT_POWERED") != std::string::npos);
+  CHECK(out.find("FLASH_LAYOUT=MATDOG_16M_2x5M_NVS_V1") != std::string::npos);
+  CHECK(out.find("CAL_RECORD_SCHEMA=1 CAL_MARKER_SCHEMA=2") != std::string::npos);
+  CHECK(out.find("OTA_INGEST=0") != std::string::npos);
+  CHECK(out.find("MOTION_AUTHORIZED=0") != std::string::npos);
+  CHECK(out.find("APP_SHA256=ASSOCIATED_MANIFEST RESTORE=NOT_IMPLEMENTED") != std::string::npos);
+  before.checkUnchanged(f);
+}
+
 int main() {
+  source_identity_is_read_only();
+  network_quiet_reservation();
   parser_and_read_only(); identical_recapture_through_real_commands(); authorization_gates();
   uncertain_reconciliation_through_handler();
   valid_usb_framing_limits(); invalid_usb_lines_and_recovery(); usb_multiple_lines_and_begin_reset();

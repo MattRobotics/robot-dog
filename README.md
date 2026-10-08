@@ -4,23 +4,34 @@ MATDOG is Matt Robotics' custom quadruped platform: a 17-DOF mechanical design w
 articulated head, an ESP32-S3 real-time controller, and a future Jetson-based high-level stack.
 This repository is the single active engineering repository for the robot.
 
-> **⚠ FLASH SAFETY NOTICE — 2026-10-08, updated for PR-1. DO NOT FLASH MAIN: do not use `main`
+> **⚠ FLASH SAFETY NOTICE — 2026-10-08, updated for PR-2. DO NOT FLASH MAIN: do not use `main`
 > to update the current robot.**
 >
-> - With PR-1, `main` carries Calibration Persistence V1 and the flash layout
->   `MATDOG_16M_2x5M_NVS_V1`. `scripts/build.sh` uses `PartitionScheme=custom` and
->   `scripts/upload.sh` refuses every full-image upload.
+> - `main` carries Calibration Persistence V1, the flash layout `MATDOG_16M_2x5M_NVS_V1` (PR-1)
+>   and, since PR-2, a selective part of the dev.1 line (identity `0.2.0-dev.1`). `scripts/build.sh`
+>   uses `PartitionScheme=custom` and `scripts/upload.sh` refuses every full-image upload.
 > - `main` is still **not** the firmware the robot runs. The robot runs the dev.3 candidate
->   (provenance `b3fd945`), which contains the dev.1–dev.3 work that `main` does not have yet.
-> - The layout integration is **not** a flash authorization and **not** a hardware acceptance.
+>   (provenance `b3fd945`), whose dev.2/dev.3 changes `main` does not have yet.
+> - These integrations are **not** a flash authorization and **not** a hardware acceptance. No
+>   `main` build has been accepted on hardware.
 > - dev.3 is **not an accepted release**: the Hardware Validation of 2026-10-07 has execution
 >   COMPLETE and acceptance **BLOCKED**. It is not on `main` and is not authorized as a baseline.
-> - `MOTION_AUTHORIZED=0`. Nothing here authorizes a flash, a migration or any motion.
+> - `MOTION_AUTHORIZED=0`, `RESTORE=NOT_IMPLEMENTED`. Nothing here authorizes a flash, a migration
+>   or any motion.
 >
 > Details and sources: [`FLASH_LAYOUT_SAFETY_NOTICE.md`](05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
 > The quoted snapshot below is the historical state of `main` on 2026-10-01 and has not been
-> updated. Elsewhere in this file only the Calibration Persistence V1 statements were updated for
-> PR-1; a full status synchronization is a separate change.
+> updated. Elsewhere in this file only the statements on Persistence V1, Wi-Fi/OTA, the motion
+> library and the build identity were updated; a full status synchronization is a separate change.
+
+### What is on `main` (after PR-2)
+
+| Layer | Content |
+|---|---|
+| Code integrated | Persistence V1 and layout V1; post-abort recovery; guarded release stages with DALY supervision; startup RF recovery; Wi-Fi/OTA V3 (TLS, OTA ingest compiled out by default); charging presentation priority; dev.1 identity; pure motion library G1–G5-A, **unwired** (no path to the servo bus) |
+| Offline tests | static audit and C++/Python host suites, USB_ONLY and ROBOT_POWERED builds: see [`VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md), section PR-2 |
+| Hardware validated | unchanged by PR-1 and PR-2 (2026-10-01 calibration 24/24, `ROBOT_POWERED` no-motion); no `main` build was validated |
+| Deferred | motion execution suites, fresh oracles and the G35/G4/G4.1/G5-A evidence; 38 third-party XGO extracts and XGO-derived data are **not** in this repository ([ADR-004](09_Logs/Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md)) |
 
 > **Historical snapshot — 2026-10-01 (PR #35 merged)**
 >
@@ -32,8 +43,8 @@ This repository is the single active engineering repository for the robot.
 >   all **24/24 contacts** accepted, fine-pass repeatability <= 4 ticks, SAFE_OFF 13/13.
 > - **Calibration is RAM-only.** Evidence is exported and backed up; boot-time restoration is
 >   not implemented. Operational envelopes are not approved and stand/gait are not authorized.
-> - The gait engine remains offline, in the independent, unmerged
->   `feat/gait-engine-offline-v1` worktree.
+> - The gait engine remained offline on 2026-10-01. Since PR-2 the pure motion library is on
+>   `main`, unwired; its execution suites are deferred.
 >
 > [2026-10-01 full hardware report](09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md).
 
@@ -44,7 +55,7 @@ This repository is the single active engineering repository for the robot.
 | Calibration Persistence V1 | **IMPLEMENTED on `main` (PR-1, 2026-10-08)** — offline/host-tested; RESTORE not implemented; no hardware acceptance |
 | Operational envelopes / JointLimits | **BLOCKED** — not approved |
 | Telemetry integrity, LOWER MAX margins, q0 refinement | **OPEN follow-ups** |
-| Gait engine | **IN PROGRESS** — offline, independent worktree |
+| Gait engine | **IN PROGRESS** — pure library on `main` (PR-2), unwired; execution suites and evidence DEFERRED |
 | Stand / gait hardware | **BLOCKED** |
 
 The step-by-step route, and what blocks what, is in [`ROADMAP.md`](01_Docs/02_Architecture/ROADMAP.md);
@@ -141,8 +152,8 @@ Every current-facing document uses these meanings:
   joint limits and margins, and the integrated maintenance, service, Servo QC and provisioning
   workflows.
 - Stand and gait motion on hardware, stabilization, ROS 2/MoveIt 2, and complete Jetson
-  integration. A gait engine exists offline on `feat/gait-engine-offline-v1`; it is not merged
-  and not operational.
+  integration. The pure motion library is on `main` since PR-2 but unwired and not operational;
+  its execution suites and evidence are deferred.
 
 ### FROZEN, SUPERSEDED, and HISTORICAL
 

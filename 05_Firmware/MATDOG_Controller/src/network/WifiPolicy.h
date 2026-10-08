@@ -2,6 +2,7 @@
 #define MATDOG_NETWORK_WIFI_POLICY_H
 
 #include <stdint.h>
+#include "NetworkConfig.h"
 
 // Deliberately <stdint.h>, not <Arduino.h>, and deliberately no <WiFi.h>
 // (W1): this unit carries ALL the Wi-Fi decision logic — when to start the
@@ -96,7 +97,28 @@ struct WifiCounters {
 // into the connect call; it is never stored here, never returned by an
 // accessor and therefore cannot reach a log, @STATUS, or a future web
 // response by accident. scripts/static_audit.py enforces that.
+struct WifiScanEntry { char ssid[33]{}; char bssid[18]{}; int32_t rssi=0; uint8_t channel=0; bool secure=false; };
+struct WifiProfileView { char ssid[33]{}; bool enabled=false, dhcp=true; uint32_t ip=0,mask=0,gateway=0,dns=0; };
 struct WifiStatus {
+  bool ap_reload_pending=false;
+  char bssid[18]{}, ap_ssid[33]{};
+  WifiProfileView profiles[2]{};
+  bool ap_active=false, ap_provisioned=false, admin_provisioned=false, nvs_active=false;
+  bool sleep_effective=false, sleep_apply_ok=false, usb_session_trusted=false;
+  bool bandwidth_apply_ok=false;
+  uint8_t bandwidth_configured=20;
+  uint8_t sleep_configured=0, active_profile=0, bandwidth_mhz=20;
+  uint16_t disconnect_reason=0;
+  uint8_t ap_clients=0, scan_count=0;
+  uint32_t ap_ipv4=0, scan_starts=0, scan_failures=0, scan_inhibited=0, roam_count=0;
+  uint32_t worker_max_us=0, worker_stack_free=0;
+  int32_t config_error=0;
+  ConfigPhase config_phase=ConfigPhase::IDLE;
+  bool scan_running=false, config_busy=false, roam_enabled=false;
+  int8_t roam_threshold=-80; uint8_t roam_hysteresis=8;
+  uint32_t scan_interval_ms=60000, roam_dwell_ms=120000, ap_timeout_ms=900000;
+  bool ap_always=false;
+  WifiScanEntry scan[12]{};
   WifiState state = WifiState::INACTIVE;
   WifiFault fault = WifiFault::NONE;
 
@@ -146,6 +168,7 @@ class WifiPolicy {
   // Operator intent (@WIFI ON/OFF). Switching off does not itself touch the
   // radio; the next update() returns STOP_RADIO.
   void setEnabled(bool enabled, uint32_t now_ms);
+  void adoptCredentials(bool present,bool linked,uint32_t now_ms);
 
   // One bounded evaluation. `link_up` is what the radio reports right now.
   WifiAction update(uint32_t now_ms, bool link_up);

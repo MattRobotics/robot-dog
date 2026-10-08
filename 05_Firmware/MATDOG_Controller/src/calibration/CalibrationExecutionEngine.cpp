@@ -1,4 +1,5 @@
 #include "CalibrationExecutionEngine.h"
+#include "StartupRecoveryReference.h"
 
 namespace matdog {
 namespace calibration {
@@ -86,7 +87,10 @@ CalibrationExecutionResult CalibrationExecutionEngine::execute(
 
   const actuator::JointTransform* transform =
       policy_->transforms().find(request.joint, policy_->currentGeometryTag());
-  if (transform == nullptr) {
+  const auto& grant=policy_->bootstrapContext();
+  const bool startup=grant.startup_recovery_only && grant.startup_recovery &&
+                     operation==actuator::ActuatorOperation::CALIBRATION_SEQUENCE_MOVE;
+  if (transform == nullptr && !startup) {
     result.outcome = CalibrationExecutionOutcome::REJECT_NO_TRANSFORM;
     return result;
   }
@@ -126,6 +130,11 @@ CalibrationExecutionResult CalibrationExecutionEngine::execute(
     command.target_tick = request.prime_tick;
     resolve = request.prime_tick < 4096u ? actuator::TargetResolveStatus::OK
                                          : actuator::TargetResolveStatus::REJECT_RAW_DOMAIN;
+  } else if (startup) {
+    const auto* ref=startupReference(bus_id);
+    if (ref && request.target_urad==0 && request.sequence_move==actuator::SequenceMoveKind::TO_PLAN_TARGET) {
+      command.target_tick=ref->q0;resolve=actuator::TargetResolveStatus::OK;
+    }
   } else if (operation == actuator::ActuatorOperation::DIRECTION_VERIFY) {
     resolve = actuator::resolveDeltaFromQ0(
         *geometry_, *expected_provenance_, *transform,

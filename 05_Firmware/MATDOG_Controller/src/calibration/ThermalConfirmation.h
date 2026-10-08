@@ -1,73 +1,53 @@
 #ifndef MATDOG_CALIBRATION_THERMAL_CONFIRMATION_H
 #define MATDOG_CALIBRATION_THERMAL_CONFIRMATION_H
-
 #include <stdint.h>
-
-// Runtime PresentTemperature over-limit confirmation, ported from the LF V25
-// hardware oracle (NormaCore st3215 driver, port.rs):
-//
-//   MATDOG_THERMAL_CONFIRMATION_READS = 3, MATDOG_THERMAL_CONFIRMATION_DELAY =
-//   50 ms, apply_matdog_direct_temperature(), read_motor_temperature_direct(),
-//   classify_matdog_direct_temperature_samples().
-//
-// An observation reading PresentTemperature > 70 C is NOT yet a thermal abort:
-// the same servo is read directly twice more, each read preceded by 50 ms.
-// Of the three values, >= 2 over the limit is CONFIRMED (the monitors see the
-// highest over-limit value and abort); exactly 1 is a TRANSIENT (they see the
-// last normal value and continue). A confirmation read that does not answer
-// fails closed: the monitors keep seeing the over-limit trigger and abort, as
-// before this port (V25 dropped the observation and stopped its bus worker).
-//
-// This is ONLY the runtime PresentTemperature classification. The persistent
-// MaxTemperature register (EEPROM 0x0D = 70) is verified by the servo-profile
-// preflight and is not touched here. Nothing else - communication, status,
-// TorqueEnable, TorqueLimit, GoalPosition, current, telemetry age, held
-// joints, guards, authority, permit - is confirmed or debounced.
-//
-// Pure: <stdint.h> only; the bus access and the wait are behind
-// ThermalReadPort so the rule is host-tested exactly as the Controller runs it.
-
-namespace matdog {
-namespace calibration {
-
-constexpr int32_t kThermalLimitC = 70;                // MATDOG_EXPECTED_TEMPERATURE_LIMIT_C
-constexpr uint8_t kThermalConfirmationReads = 3;      // MATDOG_THERMAL_CONFIRMATION_READS
-constexpr uint32_t kThermalConfirmationDelayMs = 50;  // MATDOG_THERMAL_CONFIRMATION_DELAY
-constexpr uint8_t kThermalConfirmedOverLimit = 2;     // classify_...: over_limit >= 2
-
+namespace matdog { namespace calibration {
+constexpr int32_t kThermalLimitC = 70;
+constexpr uint8_t kThermalConfirmationReads = 5;
+constexpr uint8_t kThermalConfirmedOverLimit = 3;
+constexpr uint32_t kThermalConfirmationDelayMs = 50;
+constexpr uint32_t kThermalAnomalyWindowMs = 30000;
+constexpr uint8_t kThermalMaxTransients = 3;
+constexpr uint8_t kThermalMaxBootTransients = 8;
 enum class ThermalDecision : uint8_t {
-  NORMAL                   = 0,  // <= 70 C: no confirmation read was made
-  TRANSIENT                = 1,  // exactly one of three over the limit: continue
-  CONFIRMED                = 2,  // >= 2 of three over the limit: abort
-  CONFIRMATION_READ_FAILED = 3,  // a direct read did not answer: abort (fail closed)
+  NORMAL, TRANSIENT, CONFIRMED, CONFIRMATION_READ_FAILED, PENDING, REPEATED_ANOMALY
 };
-
 class ThermalReadPort {
  public:
   virtual ~ThermalReadPort() = default;
-  // One FRESH, DIRECT PresentTemperature read of exactly this servo (never
-  // cached bulk telemetry). False: the servo did not answer.
   virtual bool readPresentTemperatureDirect(uint8_t bus_id, int32_t* celsius) = 0;
   virtual void delayMs(uint32_t ms) = 0;
 };
-
 struct ThermalConfirmation {
   ThermalDecision decision = ThermalDecision::NORMAL;
   uint8_t bus_id = 0;
-  uint8_t sample_count = 0;  // the triggering observation + the direct reads made
-  int32_t samples[kThermalConfirmationReads] = {0, 0, 0};
-  int32_t published_c = 0;   // the temperature the calibration monitors are given
+  uint8_t sample_count = 0;
+  int32_t samples[kThermalConfirmationReads] = {0};
+  int32_t published_c = -1;
 };
-
-// `observed_c` is the PresentTemperature of the normal observation of
-// `bus_id`. At or below the limit (or unread, < 0) it is returned unchanged
-// and the port is not touched.
+// Per-servo runtime state; no sleep in update(). A pending verdict pauses
+// sequence advancement while fresh current/position/held-role checks continue.
+// Three incidents in 30 s, or eight per boot, latch fail-closed until reboot.
+class ThermalConfirmationState {
+ public:
+  ThermalConfirmation update(ThermalReadPort* port, uint8_t bus, int32_t observed,
+                             uint32_t now_ms);
+  const ThermalConfirmation& result() const { return result_; }
+  bool expired(uint32_t now_ms) const { return pending() && now_ms - pending_started_ms_ >= 300; }
+  bool directReadDue(uint32_t now_ms) const { return pending() && now_ms - last_read_ms_ >= kThermalConfirmationDelayMs; }
+  bool pending() const { return result_.decision == ThermalDecision::PENDING; }
+ private:
+  ThermalConfirmation result_{};
+  uint32_t last_read_ms_ = 0;
+  uint32_t pending_started_ms_ = 0;
+  uint32_t window_start_ms_ = 0;
+  uint8_t transients_ = 0;
+  uint8_t boot_transients_ = 0;
+  bool latched_ = false;
+};
+// Blocking host compatibility adapter. Production uses the state above.
 ThermalConfirmation confirmPresentTemperature(ThermalReadPort* port, uint8_t bus_id,
                                               int32_t observed_c);
-
 const char* toString(ThermalDecision decision);
-
-}  // namespace calibration
-}  // namespace matdog
-
-#endif  // MATDOG_CALIBRATION_THERMAL_CONFIRMATION_H
+} }
+#endif

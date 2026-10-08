@@ -220,8 +220,7 @@ POLICY_MUTATIONS = [
     ("missing alarm words read as clean", "LedStatusPolicy.cpp",
      "if (alarms == nullptr) return true;", "if (alarms == nullptr) return false;"),
     ("critical loses priority over degraded", "LedStatusPolicy.cpp",
-     "if (facts.battery_critical) return LedPresentationState::BATTERY_CRITICAL;\n"
-     "  if (in.system_health == core::SystemHealth::DEGRADED) return LedPresentationState::DEGRADED;",
+     "if (facts.battery_critical) return LedPresentationState::BATTERY_CRITICAL;",
      "if (in.system_health == core::SystemHealth::DEGRADED) return LedPresentationState::DEGRADED;\n"
      "  if (facts.battery_critical) return LedPresentationState::BATTERY_CRITICAL;"),
     ("critical overrides charging fault", "LedStatusPolicy.cpp",
@@ -229,16 +228,22 @@ POLICY_MUTATIONS = [
      "  if (facts.battery_critical) return LedPresentationState::BATTERY_CRITICAL;",
      "if (facts.battery_critical) return LedPresentationState::BATTERY_CRITICAL;\n"
      "  if (facts.charging_fault) return LedPresentationState::CHARGING_FAULT;"),
-    ("warning overrides degraded", "LedStatusPolicy.cpp",
+    ("degraded overrides warning", "LedStatusPolicy.cpp",
+     "if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;",
      "if (in.system_health == core::SystemHealth::DEGRADED) return LedPresentationState::DEGRADED;\n"
-     "  if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;",
-     "if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;\n"
-     "  if (in.system_health == core::SystemHealth::DEGRADED) return LedPresentationState::DEGRADED;"),
+     "  if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;"),
     ("warning loses priority over Wi-Fi", "LedStatusPolicy.cpp",
-     "if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;\n"
-     "  if (in.wifi_connecting) return LedPresentationState::WIFI_CONNECTING;",
+     "if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;",
      "if (in.wifi_connecting) return LedPresentationState::WIFI_CONNECTING;\n"
      "  if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;"),
+    ("charging overrides warning", "LedStatusPolicy.cpp",
+     "if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;",
+     "if (facts.charging) return LedPresentationState::CHARGING;\n"
+     "  if (facts.battery_warning) return LedPresentationState::BATTERY_WARNING;"),
+    ("charging overrides verified completion", "LedStatusPolicy.cpp",
+     "if (facts.charge_complete_verified) return LedPresentationState::CHARGE_COMPLETE_VERIFIED;",
+     "if (facts.charging) return LedPresentationState::CHARGING;\n"
+     "  if (facts.charge_complete_verified) return LedPresentationState::CHARGE_COMPLETE_VERIFIED;"),
     ("warning uses wrong RGB", "LedStatusPolicy.cpp",
      "case LedPresentationState::BATTERY_WARNING:\n      return {255, 140, 0,",
      "case LedPresentationState::BATTERY_WARNING:\n      return {255, 0, 0,"),
@@ -275,6 +280,21 @@ POLICY_MUTATIONS = [
      "      return {255, 0, 0, triangleBrightness(now_ms, kSubtleBreathePeriodMs, kBreatheMinBrightness,\n"
      "                                           max_brightness)};"),
 ]
+
+# The reviewed dev.1 presentation order must not fall back to waiting for
+# actuator census or connectivity. Each compile-valid mutation inserts the
+# lower-priority indicator before the real charging/completion selector;
+# the exhaustive linked oracle has simultaneous facts that reject it.
+for label, condition, state in (
+        ("degraded", "in.system_health == core::SystemHealth::DEGRADED", "DEGRADED"),
+        ("Wi-Fi", "in.wifi_connecting", "WIFI_CONNECTING"),
+        ("boot", "in.system_health == core::SystemHealth::BOOTING", "BOOTING")):
+    for fact, charging_state in (("charging", "CHARGING"),
+                                 ("charge_complete_verified", "CHARGE_COMPLETE_VERIFIED")):
+        selector = f"if (facts.{fact}) return LedPresentationState::{charging_state};"
+        POLICY_MUTATIONS.append((
+            f"{label} masks {fact}", "LedStatusPolicy.cpp", selector,
+            f"if ({condition}) return LedPresentationState::{state};\n  " + selector))
 
 for fact, state in (("battery_warning", "BATTERY_WARNING"),
                     ("battery_critical", "BATTERY_CRITICAL")):

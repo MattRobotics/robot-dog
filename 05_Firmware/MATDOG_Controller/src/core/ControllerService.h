@@ -1,6 +1,10 @@
 #ifndef MATDOG_CORE_CONTROLLER_SERVICE_H
 #define MATDOG_CORE_CONTROLLER_SERVICE_H
 
+#include "../actuator/ActuatorWritePolicy.h"
+#include "../calibration/CalibrationManager.h"
+#include "../calibration/CalibrationMotionPermit.h"
+#include "../calibration/FullLegCalibrationFinalizer.h"
 #include "ActuatorAuthority.h"
 #include "Availability.h"
 #include "CommandRouter.h"
@@ -8,8 +12,6 @@
 #include "PowerState.h"
 #include "ServiceReadiness.h"
 #include "SystemState.h"
-#include "../actuator/ActuatorWritePolicy.h"
-#include "../calibration/CalibrationManager.h"
 
 // The transport-neutral semantic/telemetry layer — I6, implemented per the
 // 2026-09-25 objective-change instruction: "Serial, future Web and future
@@ -100,12 +102,8 @@ class ControllerService {
   // --- LED presentation --------------------------------------------------------
   bool ledTestRunning() const { return modules_.led->testRunning(); }
   bool ledDataPinDriven() const { return modules_.led->dataPinDriven(); }
-  status::LedPresentationState ledPresentationState() const {
-    return modules_.led_status->state();
-  }
-  const status::LedStatusSnapshot& ledSnapshot() const {
-    return modules_.led_status->snapshot();
-  }
+  status::LedPresentationState ledPresentationState() const { return modules_.led_status->state(); }
+  const status::LedStatusSnapshot& ledSnapshot() const { return modules_.led_status->snapshot(); }
   status::LedDiagnostic ledDiagnostic() const { return modules_.led->diagnostic(); }
 
   // --- Wi-Fi / OTA / Calibration (already-aggregated structs) ------------------
@@ -126,9 +124,7 @@ class ControllerService {
 
   // --- servo diagnostic results (formatting-only snapshots) --------------------
   const servo::ScanResult& servoScanResult() const { return modules_.servo_bus->lastScanResult(); }
-  const servo::CensusResult& servoCensusResult() const {
-    return modules_.servo_census->result();
-  }
+  const servo::CensusResult& servoCensusResult() const { return modules_.servo_census->result(); }
   const servo::PreflightResult& servoPreflightResult() const {
     return modules_.servo_preflight->result();
   }
@@ -158,6 +154,36 @@ class ControllerService {
   bool actuatorPolicyGeometryBound() const {
     return modules_.actuator_policy->currentGeometryTag() != actuator::kNoGeometryProvenance;
   }
+
+  // Network mutations share the Controller's safety facts; no actuator action
+  // is exposed here. Config queue sets busy atomically before returning.
+  bool networkCritical() const {
+    return powerState() != PowerState::RUN || operatingMode() != OperatingMode::MAINTENANCE ||
+           authorityOwner() != ActuatorAuthority::NONE || authorityInhibited() ||
+           (modules_.calibration && modules_.calibration->sessionLive()) ||
+           (modules_.q0_capture && modules_.q0_capture->active()) ||
+           (modules_.full_leg_run && modules_.full_leg_run->armed) ||
+           (modules_.motion_permit && modules_.motion_permit->active()) ||
+           (modules_.startup_qualification &&
+            modules_.startup_qualification->phase() !=
+                calibration::StartupQualificationPhase::IDLE &&
+            modules_.startup_qualification->phase() !=
+                calibration::StartupQualificationPhase::COMPLETE &&
+            modules_.startup_qualification->phase() !=
+                calibration::StartupQualificationPhase::REFUSED);
+  }
+  bool remoteUpdateAllowed() const {
+    return !networkCritical() && !modules_.wifi->configBusy() && wifiStatus().connected &&
+           wifiStatus().nvs_active && wifiStatus().admin_provisioned;
+  }
+  bool configureNetwork(const network::ConfigPatch& p) {
+    return !networkCritical() && modules_.wifi->configure(p);
+  }
+  bool scanNetwork() { return !networkCritical() && modules_.wifi->requestScan(); }
+  bool accessPoint(bool on) {
+    return !networkCritical() && !modules_.wifi->configBusy() && modules_.wifi->requestAp(on);
+  }
+  const uint8_t* networkAdminDigest() const { return modules_.wifi->adminDigest(); }
 
   // --- readiness -----------------------------------------------------------
   // The current repository truth, until the corresponding hardware-

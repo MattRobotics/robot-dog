@@ -1,5 +1,31 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — PR-2: selective dev.1 integration (0.2.0-dev.1) — 2026-10-08
+
+- **Merged with original SHAs.** `13da04a` and its 12 ancestors from
+  `integration/matdog-controller-v0.2.0` (`125d981`…`13da04a`) enter `main` by a merge commit.
+  This brings: post-abort recovery and thermal acquisition, guarded release stages with native
+  DALY supervision, startup RF recovery, Wi-Fi provisioning and gated TLS OTA V3, charging
+  presentation priority, and the pure motion library G1 to G5-A (`src/motion`, unwired).
+- **Recreated as new commits** (the originals descend from `3f23439`, which holds third-party
+  decompiler material that must not enter the history of `main`; each message carries the
+  original SHA, and the originals are not ancestors of `main`):
+  - `1cec973`: dev.1 identity (`kFirmwareVersion = "0.2.0-dev.1"`), build provenance, isolated
+    offline build artifacts. Byte-identical.
+  - `53aa962`: safety-gate extension. Five files byte-identical. `run_host_tests.sh` states that
+    the motion execution suites are DEFERRED. `run_motion_convergence_tests.py` keeps the source,
+    purity, dependency and wiring checks, reads the new manifest
+    `motion_integration_manifest_pr2.json` and fails if a deferred artifact is present.
+  - `d7aa369`: persistence schema exposed through the owner boundary. Byte-identical.
+- **Deferred, not integrated:** 286 artifacts (listed by path and SHA-256 in the manifest): the
+  motion host tests and fresh oracles, the audit tooling, the G35/G4/G4.1/G5-A evidence, and 47
+  XGO-named files including 38 third-party decompiler extracts. No test or check was removed.
+- **Unchanged contracts:** `MOTION_AUTHORIZED=0`, `RESTORE=NOT_IMPLEMENTED`, OTA ingest default 0,
+  no actuator path from `src/motion`.
+- **Do not flash `main`** on the current robot; see
+  [`FLASH_LAYOUT_SAFETY_NOTICE.md`](FLASH_LAYOUT_SAFETY_NOTICE.md) and the
+  [PR-2 log](../../09_Logs/Development_Log/2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md).
+
 ## Unreleased — PR-1: Calibration Persistence V1 and flash layout V1 on `main` — 2026-10-08
 
 - **What merges.** `feat/calibration-persistence-record-store-v1` at `7b258b3` merges into `main`
@@ -21,6 +47,36 @@
   not implemented, no hardware acceptance of a `main` build.
 - **Do not flash `main`** on the current robot; see
   [`FLASH_LAYOUT_SAFETY_NOTICE.md`](FLASH_LAYOUT_SAFETY_NOTICE.md).
+
+## Unreleased — Wi-Fi / provisioning / TLS OTA V3 (isolated, offline) — 2026-10-04
+
+- Add a core-0 radio/config worker, dual STA profiles, protected recovery AP, bounded
+  asynchronous scans/optional roaming and conservative HWCDC modem-sleep fallback OFF.
+- Add offline six-tab portal, physical USB admin/AP key provisioning, AP-only writes,
+  peer-bound sessions/CSRF and ACTIVE/PENDING standard-NVS trials with readback/CRC.
+- Require STA TLS before the existing OTA nonce/HMAC writer; add a CA/SAN/pinned
+  uploader and correlate cross-task mailbox delivery atomically. No implicit reboot.
+- Reserve configuration quiet windows against calibration/persistence and RUN entry.
+  Calibration record algorithms, partition layout and defaults USB_ONLY/ingest 0 remain.
+- Add fault, mutation, real-adapter/fake-radio, TLS loopback and DOM tests; align inherited
+  stale audit pins and fixture linkage to the unchanged 1a5e008 calibration integration.
+- Provisional base; no hardware access or main merge. Remote reboot BLOCKED;
+  hardware persistence acceptance, RF timing, TLS resources and OTA/rollback TO_TEST.
+
+
+## Unreleased — post-ABORT recovery and thermal acquisition (offline) — 2026-10-03
+
+- Add explicit current-boot recovery for witnessed UPPER/LOWER probe interruptions,
+  restoring geometric dependencies before serial Q0 recovery and verified SAFE_OFF.
+  Retain the ordinary 64-tick gate, all protections, Q0 and completed leg records.
+- Validate servo read packet ID/width/status/checksum and bound the whole UART response.
+  Confirm only hot samples adaptively (up to five, three hot), without sleeps or
+  new commands while pending. Invalid reads and repeated anomalies fail closed.
+- Extend the existing runner with post-abort/resume and SAVE/ACK/post-reboot verification.
+  Require explicit RAM evidence discard before replacing an acquisition.
+- No hardware access, EEPROM writes, partition/NVS erasure, gait changes or boot motion.
+  See [release report](../../09_Logs/Development_Log/2026-10-03_POST_ABORT_THERMAL_OFFLINE_RELEASE.md)
+  and [workflow](POST_ABORT_RECOVERY_RUNBOOK.md).
 
 ## Unreleased — P3a.2 USB command framing hardening (offline, no hardware) — 2026-10-02
 
@@ -1713,3 +1769,30 @@ merge — no new functionality. Flashed and hardware-validated as commit
 See `VALIDATION.md` Session 2.3 for the full measurement evidence
 (including live `@SERVO SAFE_OFF` timing with the servo bus unpowered) and
 H1/H2/H3/H4/H5/H6 hardware re-validation.
+
+
+## 2026-10-03 — native session / release packaging
+
+- Add optional fail-closed DALY telemetry supervision through the existing native
+  serial connection; preserve 10.8 V / 3600 mV / alarm / freshness admission.
+- Add separate frozen firmware provenance, boot continuity, structured receipts
+  and ABORT/SAFE_OFF for operator interruption. Persistence verification is read-only.
+- Add three guarded application-only / calibration+SAVE / reboot+finalization
+  entry points; retain failed evidence and prevent automatic retries.
+- Conditional isolated main integration preserves firmware identity and gait
+  separation; dirty state, failed tests, conflicts and remote errors stop it.
+- Initial pose remains blocked pending mechanical qualification after shutdown.
+  No firmware code, partition, EEPROM or safety limit changed in this step.
+
+
+## 2026-10-03 — explicit RF startup recovery (offline)
+
+The earlier STARTUP_Q0_REFERENCE block is superseded by the verified complete
+source `full_cal_nvs_20261003_134848` (RF UPPER2106). A separate immutable
+reference supports only explicit fresh-readback-qualified RF return21→22→32;
+no boot authority or transform restore. Targeted host tests, affected static
+audit and clean ROBOT_POWERED build are recorded in the release package.
+Geometry V5 support bands remain absolute±10 for passive joints; mechanical
+support/installation continuity are operator GO prerequisites. No hardware
+PASS, serial access or flashing is claimed. See
+[technical assessment](STARTUP_RECOVERY_OFFLINE_ASSESSMENT.md).
