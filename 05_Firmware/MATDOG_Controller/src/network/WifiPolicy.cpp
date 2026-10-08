@@ -148,6 +148,12 @@ WifiAction WifiPolicy::update(uint32_t now_ms, bool link_up) {
   return WifiAction::NONE;
 }
 
+void WifiPolicy::adoptCredentials(bool present,bool linked,uint32_t now_ms) {
+  credentials_present_=present;enabled_=present;radio_started_=true;
+  if(linked && present){++counters_.connects;fault_=WifiFault::NONE;enter(WifiState::CONNECTED,now_ms);}
+  else {fault_=present?WifiFault::NONE:WifiFault::NO_CREDENTIALS;enter(present?WifiState::IDLE:WifiState::INACTIVE,now_ms);}
+}
+
 void WifiPolicy::reportActionFailed(WifiFault fault, uint32_t now_ms) {
   fault_ = fault;
   if (fault == WifiFault::RADIO_START_FAILED) {

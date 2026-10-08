@@ -1,4 +1,5 @@
 #include "FullLegCalibrationExecutor.h"
+#include "StartupRecoveryReference.h"
 
 namespace matdog {
 namespace calibration {
@@ -161,7 +162,8 @@ void FullLegCalibrationExecutor::begin(actuator::SafeActuatorPolicy* policy,
 bool FullLegCalibrationExecutor::start(const FullLegCalibrationRequest& request,
                                        const FullLegCalibrationContext& context,
                                        uint32_t now_ms) {
-  if (active()) return false;
+  if (active() || (request.post_abort_recovery && !starting_post_abort_) ||
+      (request.startup_recovery && !starting_startup_)) return false;
 
   bool ok = policy_ != nullptr && runtime_ != nullptr && engine_ != nullptr &&
             geometry_ != nullptr && expected_provenance_ != nullptr &&
@@ -172,7 +174,7 @@ bool FullLegCalibrationExecutor::start(const FullLegCalibrationRequest& request,
     ok = j.identity.valid() && j.identity.unitKnown() && j.bus_id != 0 &&
          j.identity.leg == request.leg && static_cast<uint8_t>(j.identity.joint) == k &&
          (request.direction[k] == 1 || request.direction[k] == -1) &&
-         request.corridor[k][0].valid() && request.corridor[k][1].valid();
+         (request.startup_recovery || (request.corridor[k][0].valid() && request.corridor[k][1].valid()));
   }
   if (ok && request.has_rear_park) {
     const FullLegJoint& p = request.park;
@@ -205,6 +207,7 @@ bool FullLegCalibrationExecutor::start(const FullLegCalibrationRequest& request,
   }
 
   request_ = request;
+  recovery_witness_ = false; // consumed; recovery failures cannot reuse the original proof
   status_ = FullLegCalibrationStatus{};
   now_ms_ = now_ms;
   for (uint8_t k = 0; k < kJointKindCount; ++k) {
@@ -236,7 +239,7 @@ bool FullLegCalibrationExecutor::start(const FullLegCalibrationRequest& request,
 }
 
 bool FullLegCalibrationExecutor::continuationOk(const FullLegCalibrationContext& c) const {
-  return c.session_active && c.origin == CalibrationOrigin::LIVE_SESSION &&
+  return (!request_.startup_recovery || c.startup_motion_permit) && c.session_active && c.origin == CalibrationOrigin::LIVE_SESSION &&
          c.mode == core::OperatingMode::MAINTENANCE && c.motion_permit_active &&
          c.lease.valid() && c.lease.owner == core::ActuatorAuthority::CALIBRATION &&
          c.authority == core::ActuatorAuthority::CALIBRATION &&
@@ -279,6 +282,20 @@ void FullLegCalibrationExecutor::buildProgram() {
   const uint16_t lower_q0 = r.joint[kSlotLower].q0_tick;
   const bool hip_poses_differ = r.upper_for_hip_min_urad != r.upper_for_hip_max_urad;
 
+  if (qualifiedRecovery() && status_.phase == CalibrationPhase::PARKING) {
+    // Recreate the known holds at their witnessed present positions, ONE
+    // servo at a time. Prime before torque, never restore a stale goal.
+    if (r.has_rear_park) { addStep(Op::ENERGIZE, kSlotPark); addStep(Op::HOLD, kSlotPark); }
+    addStep(Op::ENERGIZE, kSlotHip); addStep(Op::HOLD, kSlotHip);
+    if (aborted_phase_ == CalibrationPhase::LOWER_MIN || aborted_phase_ == CalibrationPhase::LOWER_MAX) {
+      addStep(Op::ENERGIZE, kSlotUpper); addStep(Op::HOLD, kSlotUpper);
+      addStep(Op::ENERGIZE, kSlotLower);
+    } else {
+      addStep(Op::ENERGIZE, kSlotLower); addStep(Op::HOLD, kSlotLower);
+      addStep(Op::ENERGIZE, kSlotUpper);
+    }
+    return;
+  }
   switch (status_.phase) {
     case CalibrationPhase::PREFLIGHT:
       addStep(Op::VERIFY_REST, kRestPreflight);
@@ -386,6 +403,9 @@ void FullLegCalibrationExecutor::buildProgram() {
 
 void FullLegCalibrationExecutor::enterPhase(CalibrationPhase phase, uint32_t now_ms) {
   status_.phase = phase;
+  if (phase == CalibrationPhase::INITIAL_RECOVERY && qualifiedRecovery()) {
+    for (uint8_t i = 0; i < request_.population_count; ++i) population_[i].entry_known = false;
+  }
   status_.phase_changes++;
   sub_ = 0;
   op_started_ms_ = now_ms;
@@ -410,6 +430,16 @@ void FullLegCalibrationExecutor::nextPhase(uint32_t now_ms) {
   if (cleanup_) {
     status_.step = FullLegStep::FAILED;
     return;
+  }
+  if (qualifiedRecovery()) {
+    switch (status_.phase) {
+      case CalibrationPhase::PREFLIGHT: enterPhase(CalibrationPhase::PARKING, now_ms); return;
+      case CalibrationPhase::PARKING:
+        enterPhase(aborted_phase_ == CalibrationPhase::LOWER_MIN || aborted_phase_ == CalibrationPhase::LOWER_MAX
+                       ? CalibrationPhase::RETURN_LOWER_HELD : CalibrationPhase::RETURN_UPPER, now_ms); return;
+      case CalibrationPhase::CLEANUP: enterPhase(request_.startup_recovery ? CalibrationPhase::TORQUE_OFF : CalibrationPhase::INITIAL_RECOVERY, now_ms); return;
+      default: break;
+    }
   }
   switch (status_.phase) {
     case CalibrationPhase::PREFLIGHT:         enterPhase(CalibrationPhase::INITIAL_RECOVERY, now_ms); return;
@@ -452,8 +482,176 @@ void FullLegCalibrationExecutor::nextPhase(uint32_t now_ms) {
   }
 }
 
+void FullLegCalibrationExecutor::monitorOnly(const FullLegCalibrationContext& context,
+                                             uint32_t now_ms, const FullLegTelemetryFrame& telemetry) {
+  now_ms_ = now_ms;
+  if (cleanup_) return;
+  for (uint8_t n = 0; n < telemetry.count; ++n) {
+    const actuator::TelemetrySample& sample = telemetry.sample[n];
+    for (uint8_t i = 0; i < request_.population_count; ++i) {
+      if (request_.population[i].bus_id == telemetry.bus_id[n] && sampleUsable(&sample)) {
+        population_[i].last_sample = sample;
+        population_[i].has_good = true;
+        population_[i].last_good_ms = sample.sampled_at_ms;
+      }
+    }
+    if (!sampleUsable(&sample) || now_ms - sample.sampled_at_ms > kSequenceMaxTelemetryAgeMs) {
+      fail(FullLegFailure::STALE_TELEMETRY); return;
+    }
+    if (!commonSafety(sample)) return;
+    if (request_.startup_recovery && population_[0].entry_known &&
+        !startupPositionInBand(telemetry.bus_id[n],sample.present_position,status_.phase)) {
+      fail(FullLegFailure::STARTUP_POSE_OUTSIDE_CERTIFICATE);return;
+    }
+  }
+  if (!continuationOk(context)) { fail(FullLegFailure::DYNAMIC_PREREQUISITE_LOST); return; }
+  if (monitoringActive() && !monitorHeld(now_ms, telemetry)) return;
+  if (monitoringActive() && !monitorBystander(now_ms, telemetry)) return;
+  // Thermal confirmation pauses commands, not active-joint observation.
+  // Preserve RAM torque/goal readback and position-path bounds during that pause.
+  if (program_index_ >= program_count_) return;
+  const ProgramStep& p = program_[program_index_];
+  if (p.op != Op::ENERGIZE && p.op != Op::MOVE && p.op != Op::PROBE) return;
+  const SlotState& st = slot_[p.slot];
+  const FullLegJoint& j = slotJoint(p.slot);
+  const actuator::TelemetrySample* sample = telemetry.find(j.bus_id);
+  if (!sampleUsable(sample)) { fail(FullLegFailure::STALE_TELEMETRY); return; }
+  if (st.energized || (p.op == Op::ENERGIZE && sub_ == 3)) {
+    int32_t goal = st.target_tick;
+    bool exact_goal = true;
+    if (p.op == Op::ENERGIZE) goal = op_prime_tick_;
+    if (p.op == Op::PROBE && probe_.active()) {
+      const ContactProbePhase phase = probe_.status().phase;
+      exact_goal = phase == ContactProbePhase::BASELINE_MONITORING ||
+                   phase == ContactProbePhase::STEP_MONITORING ||
+                   phase == ContactProbePhase::BACKOFF_MONITORING ||
+                   phase == ContactProbePhase::RELEASE_VERIFYING;
+      goal = probe_.status().target_tick;
+    }
+    if (sample->torque_enable != 1 || sample->torque_limit != request_.torque_limit ||
+        (exact_goal && sample->goal_position != goal)) {
+      fail(FullLegFailure::MOVE_READBACK); return;
+    }
+    if (p.op == Op::MOVE && sub_ == 1) {
+      const int32_t lo = op_prime_tick_ < p.target_tick ? op_prime_tick_ : p.target_tick;
+      const int32_t hi = op_prime_tick_ > p.target_tick ? op_prime_tick_ : p.target_tick;
+      if (sample->present_position < lo - kSequenceStaticToleranceTicks ||
+          sample->present_position > hi + kSequenceStaticToleranceTicks) {
+        fail(request_.startup_recovery ? FullLegFailure::STARTUP_POSE_OUTSIDE_CERTIFICATE :
+             qualifiedRecovery() ? FullLegFailure::POST_ABORT_POSE_MISMATCH
+                                          : FullLegFailure::MOVE_READBACK); return;
+      }
+      if (static_cast<int32_t>(now_ms - op_deadline_ms_) > 0) fail(FullLegFailure::MOVE_TIMEOUT);
+    }
+    if (p.op == Op::PROBE) {
+      const uint8_t kind = static_cast<uint8_t>(j.identity.joint);
+      const int32_t a = request_.corridor[kind][0].guard_tick;
+      const int32_t b = request_.corridor[kind][1].guard_tick;
+      const int32_t lo = a < b ? a : b, hi = a > b ? a : b;
+      if (sample->present_position < lo - kSequenceStaticToleranceTicks ||
+          sample->present_position > hi + kSequenceStaticToleranceTicks)
+        fail(FullLegFailure::MOVE_READBACK);
+    }
+  }
+}
+
+void FullLegCalibrationExecutor::captureRecoveryWitness() {
+  recovery_witness_ = false;
+  if (request_.recovery_only) return;
+  aborted_phase_ = status_.phase;
+  aborted_geometry_ = policy_->currentGeometryTag();
+  if (aborted_phase_ != CalibrationPhase::LOWER_MIN && aborted_phase_ != CalibrationPhase::LOWER_MAX &&
+      aborted_phase_ != CalibrationPhase::UPPER_MIN && aborted_phase_ != CalibrationPhase::UPPER_MAX) return;
+  for (uint8_t i = 0; i < request_.population_count; ++i) {
+    const PopulationState& ps = population_[i];
+    if (!ps.entry_known || !ps.has_good || now_ms_ - ps.last_sample.sampled_at_ms > kSequenceMaxTelemetryAgeMs) return;
+    aborted_tick_[i] = static_cast<uint16_t>(ps.last_sample.present_position);
+    if (!recoveryPoseCompatible(i, aborted_tick_[i])) return;
+  }
+  recovery_witness_ = true;
+}
+
+bool FullLegCalibrationExecutor::recoveryPoseCompatible(uint8_t i, int32_t position) const {
+  if (request_.startup_recovery) return startupPositionInBand(request_.population[i].bus_id,position,CalibrationPhase::PREFLIGHT);
+  if (absDiff(position, aborted_tick_[i]) > kSequenceBystanderDriftTicks) return false;
+  const FullLegJoint& j = request_.population[i];
+  const bool lower_phase = aborted_phase_ == CalibrationPhase::LOWER_MIN || aborted_phase_ == CalibrationPhase::LOWER_MAX;
+  const JointKind moving = lower_phase ? JointKind::LOWER : JointKind::UPPER;
+  if (j.identity.leg == request_.leg && j.identity.joint == moving) {
+    const auto& a = request_.corridor[static_cast<uint8_t>(moving)][0];
+    const auto& b = request_.corridor[static_cast<uint8_t>(moving)][1];
+    const uint16_t lo = a.guard_tick < b.guard_tick ? a.guard_tick : b.guard_tick;
+    const uint16_t hi = a.guard_tick > b.guard_tick ? a.guard_tick : b.guard_tick;
+    return position >= lo && position <= hi;
+  }
+  uint16_t expected = j.q0_tick;
+  if (request_.has_rear_park && j.bus_id == request_.park.bus_id) expected = request_.park_target_tick;
+  if (lower_phase && j.bus_id == request_.joint[kSlotUpper].bus_id) expected = request_.upper_for_lower_tick;
+  return absDiff(position, expected) <= kSequenceStaticToleranceTicks;
+}
+
+bool FullLegCalibrationExecutor::startPostAbortRecovery(const FullLegCalibrationRequest& current,
+                                                        const FullLegCalibrationContext& context,
+                                                        uint32_t now_ms) {
+  if (active()) return false;
+  if (request_.startup_recovery || current.startup_recovery) return false;
+  FullLegFailure refusal = FullLegFailure::NONE;
+  const uint16_t all = static_cast<uint16_t>((1u << kFullLegPopulation) - 1u);
+  if (!recovery_witness_ || safe_off_verified_mask_ != all) refusal = FullLegFailure::POST_ABORT_NO_WITNESS;
+  if (recovery_witness_ && (policy_ == nullptr || policy_->currentGeometryTag() != aborted_geometry_))
+    refusal = FullLegFailure::POST_ABORT_Q0_CHANGED;
+  if (aborted_phase_ != CalibrationPhase::LOWER_MIN && aborted_phase_ != CalibrationPhase::LOWER_MAX &&
+      aborted_phase_ != CalibrationPhase::UPPER_MIN && aborted_phase_ != CalibrationPhase::UPPER_MAX)
+    refusal = FullLegFailure::POST_ABORT_PHASE_UNPROVEN;
+  if (current.leg != request_.leg || current.population_count != request_.population_count) refusal = FullLegFailure::POST_ABORT_Q0_CHANGED;
+  for (uint8_t i = 0; refusal == FullLegFailure::NONE && i < current.population_count; ++i) {
+    const FullLegJoint& a = current.population[i];
+    const FullLegJoint& b = request_.population[i];
+    const actuator::JointTransform* transform = policy_->transforms().find(b.identity, policy_->currentGeometryTag());
+    if (a.bus_id != b.bus_id || a.q0_tick != b.q0_tick || transform == nullptr || transform->q0_tick != b.q0_tick ||
+        !calibration::identityPermitsEvidenceReuse(a.identity, b.identity)) refusal = FullLegFailure::POST_ABORT_Q0_CHANGED;
+  }
+  if (refusal != FullLegFailure::NONE) { status_.failure = refusal; return false; }
+  FullLegCalibrationRequest recovery = request_; // never trust caller's corridors or prerequisite poses
+  recovery.recovery_only = true;
+  recovery.post_abort_recovery = true;
+  starting_post_abort_ = true;
+  const bool accepted = start(recovery, context, now_ms);
+  starting_post_abort_ = false;
+  return accepted;
+}
+
+bool FullLegCalibrationExecutor::startStartupRecovery(const FullLegCalibrationContext& context,uint32_t now_ms) {
+  FullLegCalibrationRequest r{};
+  if (!context.startup_motion_permit || policy_==nullptr || !policy_->transforms().empty() ||
+      geometry_==nullptr || !makeStartupRecoveryRequest(*geometry_,&r)) return false;
+  aborted_phase_=CalibrationPhase::LOWER_MAX; // fixed qualified route, not a fabricated witness
+  starting_startup_=true;
+  const bool ok=start(r,context,now_ms);
+  starting_startup_=false;
+  return ok;
+}
+
+void FullLegCalibrationExecutor::recoveryGrant(actuator::CalibrationBootstrapContext* context) const {
+  if (context == nullptr) return;
+  context->post_abort_recovery = false;
+  context->startup_recovery = false;
+  if (!active() || !qualifiedRecovery() || cleanup_ ||
+      status_.phase == CalibrationPhase::INITIAL_RECOVERY || program_index_ >= program_count_) return;
+  const ProgramStep& p = program_[program_index_];
+  if (p.op != Op::ENERGIZE && p.op != Op::MOVE) return;
+  const FullLegJoint& j = slotJoint(p.slot);
+  context->post_abort_recovery = request_.post_abort_recovery;
+  context->startup_recovery = request_.startup_recovery;
+  context->recovery_joint = j.identity;
+  context->recovery_target_urad = p.target_urad;
+  for (uint8_t i = 0; i < request_.population_count; ++i)
+    if (request_.population[i].bus_id == j.bus_id) context->recovery_prime_tick = aborted_tick_[i];
+}
+
 void FullLegCalibrationExecutor::fail(FullLegFailure failure) {
   if (cleanup_) return;  // the first failure is the record; cleanup is already running
+  captureRecoveryWitness();
   status_.failure = failure;
   status_.failed_phase = status_.phase;
   if (probe_.active()) probe_.abort();  // no write: the abort only records
@@ -545,6 +743,11 @@ bool FullLegCalibrationExecutor::monitorHeld(uint32_t now_ms, const FullLegTelem
     }
     if (absDiff(sample->present_position, st.target_tick) >
         static_cast<int32_t>(kSequenceStaticToleranceTicks)) {
+      failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_DRIFT);
+      return false;
+    }
+    if (qualifiedRecovery() && st.recovery_expected_known &&
+        absDiff(sample->present_position, st.recovery_expected_tick) > kSequenceStaticToleranceTicks) {
       failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_DRIFT);
       return false;
     }
@@ -645,7 +848,7 @@ bool FullLegCalibrationExecutor::monitorBystander(uint32_t now_ms, const FullLeg
     fail(participant ? FullLegFailure::PASSIVE_JOINT_MOVED : FullLegFailure::BYSTANDER_MOVED);
     return false;
   }
-  if (participant) {
+  if (participant && !qualifiedRecovery()) {
     if (absDiff(sample->present_position, j.q0_tick) >
         static_cast<int32_t>(kSequencePassiveCorridorTicks)) {
       fail(FullLegFailure::PASSIVE_JOINT_MOVED);
@@ -856,9 +1059,22 @@ void FullLegCalibrationExecutor::stepEnergize(const FullLegCalibrationContext& c
     }
     if (!commonSafety(*s)) return;
     if (s->torque_enable != 0 ||
-        absDiff(s->present_position, j.q0_tick) > static_cast<int32_t>(kSequencePassiveCorridorTicks)) {
+        (!qualifiedRecovery() &&
+         absDiff(s->present_position, j.q0_tick) > static_cast<int32_t>(kSequencePassiveCorridorTicks))) {
       fail(FullLegFailure::PASSIVE_JOINT_MOVED);
       return;
+    }
+    if (qualifiedRecovery()) {
+      uint8_t i = 0;
+      while (i < request_.population_count && request_.population[i].bus_id != j.bus_id) ++i;
+      if (i == request_.population_count || !recoveryPoseCompatible(i, s->present_position)) {
+        fail(request_.startup_recovery ? FullLegFailure::STARTUP_POSE_OUTSIDE_CERTIFICATE : FullLegFailure::POST_ABORT_POSE_MISMATCH); return;
+      }
+      const bool lower_phase = aborted_phase_ == CalibrationPhase::LOWER_MIN || aborted_phase_ == CalibrationPhase::LOWER_MAX;
+      st.recovery_expected_known = (slot == kSlotPark || slot == kSlotHip ||
+                                   (lower_phase ? slot == kSlotUpper : slot == kSlotLower));
+      st.recovery_expected_tick = slot == kSlotPark ? request_.park_target_tick
+          : (lower_phase && slot == kSlotUpper ? request_.upper_for_lower_tick : j.q0_tick);
     }
     op_prime_tick_ = static_cast<uint16_t>(s->present_position);
     if (!writePrime(ctx, j, op_prime_tick_)) return;
@@ -890,6 +1106,14 @@ void FullLegCalibrationExecutor::stepEnergize(const FullLegCalibrationContext& c
     fail(FullLegFailure::ENERGIZE_NOT_VERIFIED);
     return;
   }
+  if (qualifiedRecovery()) {
+    if (now_ms - op_started_ms_ > kSequenceMotionTimeoutMs) { fail(FullLegFailure::MOVE_TIMEOUT); return; }
+    if (absDiff(s->present_position, op_prime_tick_) > kSequenceStaticToleranceTicks ||
+        magnitude(s->present_speed) > kSequenceSettleMaxSpeedRaw) { settled_samples_ = 0; return; }
+    if (settled_samples_ == 0) settle_first_ms_ = now_ms;
+    if (settled_samples_ < 255) ++settled_samples_;
+    if (settled_samples_ < kSequenceSettledSamples || now_ms - settle_first_ms_ < kSequenceSettleWindowMs) return;
+  }
   st.energized = true;
   st.target_tick = op_prime_tick_;
   st.last_good_ms = now_ms;
@@ -915,6 +1139,8 @@ void FullLegCalibrationExecutor::stepMove(const FullLegCalibrationContext& ctx, 
     const int32_t from = sampleUsable(s) ? s->present_position : st.target_tick;
     if (!writeMove(ctx, j, p.target_urad)) return;
     st.target_tick = p.target_tick;
+    if (qualifiedRecovery()) { st.recovery_expected_known = true; st.recovery_expected_tick = p.target_tick; }
+    op_prime_tick_ = static_cast<uint16_t>(from);
     const uint32_t distance = static_cast<uint32_t>(absDiff(from, p.target_tick));
     op_deadline_ms_ = now_ms + kSequenceMotionTimeoutMs + distance * 1000u / kSequenceMinTicksPerSecond;
     op_started_ms_ = now_ms;
@@ -1215,6 +1441,7 @@ void FullLegCalibrationExecutor::stepVerifyRest(uint32_t now_ms, const FullLegTe
   const uint8_t mode = program_[program_index_].slot;
   status_.step = FullLegStep::VERIFY_REST;
   if (recover_index_ >= request_.population_count) {
+    if (request_.startup_recovery && mode==kRestFinal) status_.recovered_joints=request_.population_count;
     recover_index_ = 0;
     advanceProgram(now_ms);
     return;
@@ -1233,10 +1460,24 @@ void FullLegCalibrationExecutor::stepVerifyRest(uint32_t now_ms, const FullLegTe
                                 : FullLegFailure::REST_NOT_VERIFIED);
     return;
   }
+  if (mode == kRestPreflight && qualifiedRecovery()) {
+    if (!recoveryPoseCompatible(recover_index_, s->present_position)) {
+      fail(request_.startup_recovery ? FullLegFailure::STARTUP_POSE_OUTSIDE_CERTIFICATE : FullLegFailure::POST_ABORT_POSE_MISMATCH);
+      return;
+    }
+    PopulationState& ps = population_[recover_index_];
+    ps.entry_tick = static_cast<uint16_t>(s->present_position);
+    if (request_.startup_recovery) aborted_tick_[recover_index_]=ps.entry_tick;
+    ps.has_good = true;
+    ps.last_good_ms = now_ms;
+    if (recover_index_ + 1 == request_.population_count) {
+      for (uint8_t i = 0; i < request_.population_count; ++i) population_[i].entry_known = true;
+    }
+  }
   if (mode == kRestFinal) {
     uint8_t slot = 0;
     const PopulationState& ps = population_[recover_index_];
-    if (isParticipantBus(j.bus_id, &slot)) {
+    if (request_.startup_recovery || isParticipantBus(j.bus_id, &slot)) {
       if (absDiff(s->present_position, j.q0_tick) > static_cast<int32_t>(kSequenceRestToleranceTicks)) {
         fail(FullLegFailure::REST_NOT_VERIFIED);
         return;
@@ -1293,11 +1534,24 @@ void FullLegCalibrationExecutor::update(const FullLegCalibrationContext& context
   now_ms_ = now_ms;
   held_transients_tick_count_ = 0;
 
-  // Every tick, before any op: dynamic prerequisites, then every held joint,
-  // then one bystander. Any failure here sends the run to its SAFE_OFF.
-  if (!cleanup_ && !continuationOk(context)) fail(FullLegFailure::DYNAMIC_PREREQUISITE_LOST);
-  if (monitoringActive() && !monitorHeld(now_ms, telemetry)) return;
-  if (monitoringActive() && !monitorBystander(now_ms, telemetry)) return;
+  // Remember actual readbacks for a possible post-ABORT witness. They are
+  // never substituted for a fresh sample in movement/held-role monitoring.
+  for (uint8_t n = 0; n < telemetry.count; ++n) {
+    for (uint8_t i = 0; i < request_.population_count; ++i) {
+      if (request_.population[i].bus_id == telemetry.bus_id[n] && sampleUsable(&telemetry.sample[n])) {
+        population_[i].last_sample = telemetry.sample[n];
+        population_[i].has_good = true;
+      }
+    }
+  }
+  if (qualifiedRecovery() && !cleanup_) {
+    monitorOnly(context, now_ms, telemetry);
+    if (cleanup_) return;
+  } else {
+    if (!cleanup_ && !continuationOk(context)) fail(FullLegFailure::DYNAMIC_PREREQUISITE_LOST);
+    if (monitoringActive() && !monitorHeld(now_ms, telemetry)) return;
+    if (monitoringActive() && !monitorBystander(now_ms, telemetry)) return;
+  }
 
   if (program_index_ >= program_count_) {  // an empty phase (a rear leg's PARKING)
     nextPhase(now_ms);
@@ -1378,6 +1632,11 @@ const char* toString(FullLegStep step) {
 const char* toString(FullLegFailure failure) {
   switch (failure) {
     case FullLegFailure::NONE:                          return "NONE";
+    case FullLegFailure::POST_ABORT_NO_WITNESS: return "POST_ABORT_NO_WITNESS";
+    case FullLegFailure::POST_ABORT_POSE_MISMATCH: return "POST_ABORT_POSE_MISMATCH";
+    case FullLegFailure::POST_ABORT_PHASE_UNPROVEN: return "POST_ABORT_PHASE_UNPROVEN";
+    case FullLegFailure::POST_ABORT_Q0_CHANGED: return "POST_ABORT_Q0_CHANGED";
+    case FullLegFailure::STARTUP_POSE_OUTSIDE_CERTIFICATE: return "STARTUP_POSE_OUTSIDE_CERTIFICATE";
     case FullLegFailure::REJECT_PRECONDITIONS:          return "REJECT_PRECONDITIONS";
     case FullLegFailure::PREFLIGHT_TORQUE_ON:           return "PREFLIGHT_TORQUE_ON";
     case FullLegFailure::INITIAL_RECOVERY_OUT_OF_RANGE: return "INITIAL_RECOVERY_OUT_OF_RANGE";

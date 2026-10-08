@@ -1657,63 +1657,54 @@ def check_calibration_search_boundaries(files):
 
 
 def check_thermal_confirmation(files):
-    """LF V25 runtime PresentTemperature over-limit confirmation (NormaCore
-    st3215 port.rs), ported 2026-09-30 after a single-sample false thermal
-    abort on hardware (M42, one > 70 C sample, 32 C a second later):
-      - the oracle constants: limit 70 C, 3 readings, 50 ms before each
-        confirmation read, >= 2 of 3 over the limit confirms;
-      - two FRESH DIRECT reads of the SAME servo, each after the wait; a read
-        that fails is fail-closed (the over-limit trigger stays published);
-      - at or below the limit nothing is read;
-      - the Controller applies it to EVERY Full-Leg sample before the frame
-        reaches the executor, and the direct read uses the operational
-        timeout. Only temperature is confirmed - no other check is touched.
-    The persistent MaxTemperature register is a different thing (preflight)."""
+    """Adaptive thermal rule and provenance-checked, bounded UART safety reads."""
     by_name = {path.name: (path, code) for path, code in files}
-    normalize = lambda text: re.sub(r"\s+", " ", text)
-    for name in ("ThermalConfirmation.h", "ThermalConfirmation.cpp", "Controller.cpp", "ServoBus.cpp"):
+    required = {
+        "ThermalConfirmation.h": (
+            "constexpr int32_t kThermalLimitC = 70;",
+            "constexpr uint8_t kThermalConfirmationReads = 5;",
+            "constexpr uint8_t kThermalConfirmedOverLimit = 3;",
+            "constexpr uint32_t kThermalConfirmationDelayMs = 50;",
+            "constexpr uint8_t kThermalMaxTransients = 3;",
+            "constexpr uint8_t kThermalMaxBootTransients = 8;"),
+        "ThermalConfirmation.cpp": (
+            "if (observed <= kThermalLimitC) return result_;",
+            "port->readPresentTemperatureDirect(bus, &value)",
+            "value < 0 || value > 255",
+            "hot >= kThermalConfirmedOverLimit", "cool >= 3",
+            "now_ms - last_read_ms_ < kThermalConfirmationDelayMs",
+            "latched_ = transients_ >= kThermalMaxTransients",
+            "boot_transients_ >= kThermalMaxBootTransients", "expired(now_ms)"),
+        "Controller.cpp": (
+            "state.update(&thermal_read_port_, buses[i], sample.present_temperature, millis())",
+            "full_leg_calibration_.monitorOnly(context, millis(), frame)",
+            "direct_read_used", "full_leg_calibration_.recoveryGrant(&ctx)"),
+        "ServoReadValidation.h": (
+            "frame[2] != id", "frame[3] != width + 2", "frame[4] != 0", "return sum == 255"),
+        "ValidatedServoRead.h": (
+            "millis() - started < IOTimeOut", "drained < 64", "validServoReadPacket(packet, size, id, width)"),
+        "ServoBus.h": ("ValidatedServoRead st_;",),
+    }
+    for name, tokens in required.items():
         if name not in by_name:
-            fail(f"{name} not found - cannot audit the thermal confirmation")
-            return
-    path, code = by_name["ThermalConfirmation.h"]
-    body = normalize(code)
-    for pinned in ("constexpr int32_t kThermalLimitC = 70;",
-                   "constexpr uint8_t kThermalConfirmationReads = 3;",
-                   "constexpr uint32_t kThermalConfirmationDelayMs = 50;",
-                   "constexpr uint8_t kThermalConfirmedOverLimit = 2;"):
-        if body.count(pinned) != 1:
-            fail(f"{path}: the LF V25 thermal confirmation constant drifted: expected {pinned!r}")
-    path, code = by_name["ThermalConfirmation.cpp"]
-    body = normalize(re.sub(r"//[^\n]*", "", code))
-    for token, why in (
-            ("if (observed_c <= kThermalLimitC) return out;", "no confirmation read at or below the limit"),
-            ("for (uint8_t i = 1; i < kThermalConfirmationReads; ++i) {", "exactly two confirmation reads"),
-            ("port->delayMs(kThermalConfirmationDelayMs); if (!port->readPresentTemperatureDirect(bus_id, "
-             "&celsius) || celsius < 0) {", "50 ms, then a fresh direct read of the SAME servo"),
-            ("out.decision = ThermalDecision::CONFIRMATION_READ_FAILED; return out;",
-             "a failed confirmation read fails closed"),
-            ("if (over_limit >= kThermalConfirmedOverLimit) {", "V25: >= 2 of 3 over the limit confirms")):
-        if token not in body:
-            fail(f"{path}: the LF V25 thermal confirmation lost {token!r} ({why})")
-    path, code = by_name["Controller.cpp"]
-    m = re.search(r"void Controller::updateFullLegCalibration\(uint32_t now_ms\) \{(.*?)\n\}", code, re.DOTALL)
-    if not m:
-        fail(f"{path}: updateFullLegCalibration() not found to audit the thermal confirmation")
-    else:
-        body = normalize(m.group(1))
-        for token in ("calibration::confirmPresentTemperature( &thermal_read_port_, buses[i], "
-                      "sample.present_temperature);",
-                      "sample.present_temperature = thermal.published_c;"):
+            fail(f"{name}: missing thermal/UART safety component")
+            continue
+        path, code = by_name[name]
+        body = re.sub(r"\s+", " ", code)
+        for token in tokens:
             if token not in body:
-                fail(f"{path}: every Full-Leg sample must pass the LF V25 thermal confirmation "
-                     f"before the executor sees it (lost {token!r})")
-    path, code = by_name["ServoBus.cpp"]
-    m = re.search(r"bool ServoBus::readPresentTemperatureDirect\([^)]*\)\s*\{(.*?)\n\}", code, re.DOTALL)
-    if not m:
-        fail(f"{path}: readPresentTemperatureDirect() not found")
-    elif "kOperationalTimeoutMs" not in m.group(1) or "SMS_STS_PRESENT_TEMPERATURE" not in m.group(1):
-        fail(f"{path}: readPresentTemperatureDirect() must be one direct PresentTemperature read "
-             f"under the operational timeout")
+                fail(f"{path}: thermal/UART safety invariant missing: {token}")
+    if "Controller.cpp" in by_name:
+        path, code = by_name["Controller.cpp"]
+        if "calibration::confirmPresentTemperature(" in code:
+            fail(f"{path}: blocking thermal confirmation in production Controller")
+    if "FullLegCalibrationExecutor.cpp" in by_name:
+        path, code = by_name["FullLegCalibrationExecutor.cpp"]
+        for token in ("captureRecoveryWitness()", "recoveryPoseCompatible", "POST_ABORT_Q0_CHANGED",
+                      "if (active() || (request.post_abort_recovery && !starting_post_abort_) ||\n      (request.startup_recovery && !starting_startup_)) return false;",
+                      "distance > static_cast<int32_t>(actuator::kSequencePrimeMaxDistanceTicks)"):
+            if token not in code:
+                fail(f"{path}: post-ABORT proof or ordinary 64-tick gate missing: {token}")
 
 
 def check_full_leg_calibration_wiring(files):
@@ -1782,9 +1773,9 @@ def check_full_leg_calibration_wiring(files):
         return
     handle = normalize(handle_match.group(1))
 
-    if handle.count("matchLegCommand(") != 3:
-        fail(f"{router_path}: handleLine() must call matchLegCommand() exactly three times "
-             f"(SESSION START, INITIAL RECOVERY, FULL LEG); found "
+    if handle.count("matchLegCommand(") != 4:
+        fail(f"{router_path}: handleLine() must call matchLegCommand() exactly four times "
+             f"(SESSION START, INITIAL RECOVERY, POST_ABORT RECOVERY, FULL LEG); found "
              f"{handle.count('matchLegCommand(')}")
     for prefix in ("@CALIBRATION FULL LEG ", "@CALIBRATION SESSION START ",
                    "@CALIBRATION INITIAL RECOVERY "):
@@ -1963,7 +1954,7 @@ def check_full_leg_calibration_wiring(files):
         body = normalize(step_fn.group(1))
         order = ("full_leg_calibration_.telemetryRequest(buses, calibration::kFullLegMaxTelemetry)",
                  "servo_bus_.readControlFeedback(buses[i], &t)",
-                 "full_leg_calibration_.update(context, now_ms, frame, full_leg_safe_off_frame_);",
+                 "full_leg_calibration_.update(context, millis(), frame, full_leg_safe_off_frame_);",
                  "calibration_.noteExecutionPhase(full_leg_calibration_.status().phase)",
                  "full_leg_calibration_.phaseReportRejected();",
                  "full_leg_calibration_.safeOffRequest(off, calibration::kFullLegPopulation)",
@@ -2184,7 +2175,10 @@ def check_full_calibration_sequence(files, sketch_dir):
         fail(f"{c_path}: nextPhase() not found")
     else:
         body = next_fn.group(1)
-        pairs = re.findall(r"case CalibrationPhase::(\w+):\s*enterPhase\(CalibrationPhase::(\w+)", body)
+        # Ordinary V25 chain remains pinned; the explicit post-ABORT branch
+        # has its separate audited recovery order.
+        ordinary = body[body.rfind("  switch (status_.phase)"):] if "if (qualifiedRecovery())" in body else body
+        pairs = re.findall(r"case CalibrationPhase::(\w+):\s*enterPhase\(CalibrationPhase::(\w+)", ordinary)
         chain = [a for a, _ in pairs]
         expected = list(V25_PHASE_ORDER[:-1])
         expected.remove("INITIAL_RECOVERY")  # its successor is conditional (recovery-only run)
@@ -3901,6 +3895,13 @@ def check_calibration_population_evidence(files, sketch_dir):
             )
         if "buildCurrentLegPopulationEvidence(" not in inspected:
             continue
+        if path.name == "Controller.cpp":
+            # The exact base's explicit startup qualifier owns a fresh census +
+            # preflight bundle. Mask only that reviewed function, not Controller.
+            startup = re.search(r"void Controller::updateStartupQualification\(\)\s*\{(.*?)\n\}", inspected, re.DOTALL)
+            if startup and all(t in startup.group(1) for t in ("Phase::PREFLIGHT_WAIT", "servo::ServoPreflight::State::COMPLETE", "context.current_observation_bundle=true", "startup_qualification_.population(")):
+                inspected=inspected.replace(startup.group(0), "")
+            if "buildCurrentLegPopulationEvidence(" not in inspected: continue
         if path.name != "CalibrationQ0CaptureSession.cpp":
             fail(f"{path}: calls the CR1 producer outside the reviewed CR2-B same-session "
                  f"orchestrator; cached/independent diagnostics must never self-declare current")
@@ -4258,6 +4259,13 @@ def check_calibration_q0_bootstrap(files, sketch_dir):
             )
         if "buildQ0BootstrapCandidate(" not in inspected:
             continue
+        if path.name == "Controller.cpp":
+            # The exact base's explicit startup qualifier owns a fresh census +
+            # preflight bundle. Mask only that reviewed function, not Controller.
+            startup = re.search(r"void Controller::updateStartupQualification\(\)\s*\{(.*?)\n\}", inspected, re.DOTALL)
+            if startup and all(t in startup.group(1) for t in ("Phase::PREFLIGHT_WAIT", "servo::ServoPreflight::State::COMPLETE", "context.current_observation_bundle=true", "startup_qualification_.population(")):
+                inspected=inspected.replace(startup.group(0), "")
+            if "buildCurrentLegPopulationEvidence(" not in inspected: continue
         if path.name != "CalibrationQ0CaptureSession.cpp":
             fail(f"{path}: calls CR2-A outside the reviewed CR2-B acquisition coordinator")
 
@@ -4867,20 +4875,16 @@ def check_http_transport_boundaries(files, sketch_dir):
                  f"released by stop(), or a bounded START -> STOP -> START -> STOP cycle "
                  f"leaks a handle (I7/I8 hardening)")
 
-        # stop() must be reachable from every partial-failure path in
-        # start() - not just from an explicit @WEB SERVER STOP - or a
-        # failed httpd_start()/CreateBinary() attempt leaks whatever it did
-        # allocate. Counted within start()'s own body only.
-        start_body = re.search(r"bool HttpTransport::start\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
-        if not start_body:
-            fail(f"{path}: could not locate HttpTransport::start() to audit its cleanup")
-        else:
-            stop_calls_in_start = len(re.findall(r"\bstop\(\)", start_body.group(1)))
-            if stop_calls_in_start < 2:
-                fail(f"{path}: HttpTransport::start() calls stop() {stop_calls_in_start} "
-                     f"time(s) - expected at least 2 (an upfront defensive call, plus at "
-                     f"least one partial-failure cleanup path) - a failed start() attempt "
-                     f"must release whatever it already allocated (I7/I8 hardening)")
+        # V3 resources are allocated ONCE in begin(), deleted only on initial
+        # allocation failure, never under a running handler. Listener teardown
+        # runs in lifecycle(), while Controller update keeps draining the mailbox.
+        if "xSemaphoreCreate" in code[code.find("bool HttpTransport::start()") : code.find("void HttpTransport::serviceRequest")]:
+            fail(f"{path}: server lifecycle must not allocate mailbox semaphores")
+        stop_body=re.search(r"void HttpTransport::stop\(\)\s*\{(.*?)\}",code,re.DOTALL)
+        if not stop_body or any(t in stop_body.group(1) for t in ("httpd_stop(","httpd_ssl_stop(","vSemaphoreDelete(")):
+            fail(f"{path}: stop must only enqueue listener intent, never stall Controller or delete live handles")
+        if "HttpTransport::lifecycle()" not in code or "mailbox_.claimDelivery()" not in code or not contains_v3(code,"ready_sequence_.load()==id"):
+            fail(f"{path}: dedicated lifecycle or atomic correlated mailbox missing")
 
     # --- (5) the OTA shared secret: one use site, never committed ----------
     creds = by_name.get("OtaCredentials.h")
@@ -5066,7 +5070,8 @@ def check_wifi_runtime_boundaries(files, sketch_dir):
         #    state=INACTIVE together with connected=YES and a live IP/RSSI,
         #    and polls a radio that is going away.
         if body:
-            stop_case = re.search(r"case WifiAction::STOP_RADIO:(.*?)break;", body.group(1),
+            worker_body=re.search(r"void WifiManager::workerTick\(uint32_t now\)\s*\{(.*?)\n\}",code,re.DOTALL)
+            stop_case = re.search(r"case WifiAction::STOP_RADIO:(.*?)break;", worker_body.group(1) if worker_body else body.group(1),
                                   re.DOTALL)
             if not stop_case:
                 fail(f"{path}: WifiManager::update() has no STOP_RADIO case to audit")
@@ -6044,6 +6049,111 @@ def check_calibration_persistence_integration(files, sketch_dir):
              f"CommandRouterPersistence.cpp (P3a)")
 
 
+def check_startup_recovery_wiring(files):
+    """Pin the single explicit startup program and its isolated authority scope."""
+    by_name={p.name:code for p,code in files}
+    required={
+        'CommandRouter.cpp': ('"@CALIBRATION STARTUP QUALIFY RF_RETURN_20261003"',
+            '"@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN"','!q->ready(millis())',
+            'q->nominal()', '!modules_.actuator_policy->transforms().empty()',
+            'startupReferenceMatches(*modules_.geometry_profile)', 'q->consumeForExecution(millis())',
+            'inputs.startup_recovery_only=true', 'inputs.startup_reference_qualified=true',
+            'context.startup_motion_permit=token.startup_recovery_only'),
+        'Controller.cpp': ('void Controller::updateStartupQualification()',
+            'servo_census_.start()', 'servo_preflight_.start()',
+            'servo_bus_.readControlFeedback(startup_qualification_.bus(),&t)',
+            'startup_qualification_.observe(s,millis())',
+            'inputs.startup_recovery_only=startup_qualification_.phase()==calibration::StartupQualificationPhase::EXECUTING',
+            'full_leg_calibration_.request().startup_recovery', 'startupReferenceMatches(geometry_profile_)',
+            'ctx.startup_recovery_only=inputs.startup_recovery_only', 'startup_qualification_.complete(pass)',
+            'pass ? "13/13" : "NOT_CERTIFIED"'),
+        'FullLegCalibrationExecutor.cpp': ('request.startup_recovery && !starting_startup_',
+            '!context.startup_motion_permit', '!policy_->transforms().empty()',
+            'makeStartupRecoveryRequest(*geometry_,&r)', 'startupPositionInBand(',
+            'request_.startup_recovery ? CalibrationPhase::TORQUE_OFF : CalibrationPhase::INITIAL_RECOVERY',
+            'FullLegFailure::STARTUP_POSE_OUTSIDE_CERTIFICATE'),
+        'ActuatorWritePolicy.cpp': ('if (bootstrap_.startup_recovery_only &&',
+            '!bootstrap_.startup_recovery || !bootstrap_.sequence_active',
+            'if (bootstrap_.startup_recovery)', '!bootstrap_.startup_recovery_only',
+            'startupReferenceMatches(*geometry_)', 'identityPermitsEvidenceReuse(command.joint,bootstrap_.recovery_joint)',
+            'command.target_urad==0', 'command.target_tick==ref->q0'),
+        'CalibrationMotionPermit.cpp': ('startup_reference_qualified', 'bound_startup_recovery_only_',
+            'token.startup_recovery_only', 'facts.startup_recovery_only'),
+        'StartupRecoveryQualification.cpp': ('phase_!=StartupQualificationPhase::IDLE',
+            '!populationIsCurrentPass(r.evidence)', 'if (!s.read_ok)', 's.torque_enable!=0',
+            'kSearchHardCurrentAbortRaw','kThermalLimitC', 'if (++pass_<3)',
+            'startupPositionInBand(', '!ready(now_ms) || nominal_'),
+        'StartupRecoveryReference.cpp': ('plan->upper_for_lower!=1570796', 'plan->park_target!=610865',
+            'plan->park_leg!=Leg::RH', 'plan->park_joint!=JointKind::UPPER',
+            'int32_t lo=-10,hi=10', 'if (lower && bus==21) hi=367',
+            'if (lower && bus==22) { lo=1014;hi=1034; }',
+            'if ((lower || upper) && bus==32) { lo=388;hi=408; }',
+            'if (upper && bus==22) hi=1034', 'if (rear && bus==32) hi=408'),
+        'StartupRecoveryReference.h': ('0x3713f4ddc43b204eULL','{21,1997,1,"NEW03"}',
+            '{22,2106,-1,"ELR03"}','{32,2058,-1,"ELR02"}')}
+    for name,tokens in required.items():
+        for token in tokens:
+            if not contains_ws(by_name.get(name,''),token):fail(f'{name}: startup safety contract missing {token!r}')
+    router=by_name.get('CommandRouter.cpp','')
+    if sum(code.count('->startStartupRecovery(') for _,code in files)!=1:
+        fail('startup executor must have exactly one explicit production caller')
+    for command in ('@CALIBRATION STARTUP QUALIFY RF_RETURN_20261003',
+                    '@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN'):
+        if router.count('"'+command+'"')!=1:fail('startup command must remain exact and parameterless')
+    controller=by_name.get('Controller.cpp','')
+    begin=re.search(r'void Controller::begin\([^)]*\)\s*\{(.*?)\n\}',controller,re.S)
+    if not begin or any(token in begin.group(1) for token in ('startup_qualification_.start(',
+            'startStartupRecovery(', 'startup_qualification_.observe(', 'motion_permit_.grant(')):
+        fail('boot must not qualify, start or authorize startup recovery')
+    for name in ('StartupRecoveryQualification.cpp','StartupRecoveryReference.cpp'):
+        for token in ('ServoBus','EnableTorque','admit(', 'Preferences','nvs_set', 'Arduino.h'):
+            if token in by_name.get(name,''):fail(f'{name}: data/qualification must remain pure: {token}')
+
+
+def contains_v3(code, token):
+    # Formatting-insensitive operators/identifiers; the legacy contains_ws
+    # intentionally preserves token spacing for older exact source pins.
+    return re.sub(r"\s+", "", token) in re.sub(r"\s+", "", code)
+
+
+def check_network_v3_boundaries(files, sketch_dir):
+    by_name={p.name:(p,c) for p,c in files if "scripts" not in p.parts}
+    required={
+      "NetworkConfigNvs.cpp": ('kNetworkPartition[]="nvs"','kNetworkNamespace[]="md_net_v1"','NVS_READONLY','nvs_get_blob','nvs_commit','memcmp(record,readback,size)==0'),
+      "NetworkConfig.cpp": ('phase_=ConfigPhase::ROLLBACK','storage_->pending(c)','storage_->activate(candidate_)','!alt','critical','crc(b,n-4)'),
+      "WifiManager.cpp": ('xTaskCreatePinnedToCore','xQueueCreate(1,sizeof(Request))','config_busy_.exchange(true)','modemSleep(sleep)','if(worker_status_.scan_running && context_.load()){esp_wifi_scan_stop()','drv.sta.bssid_set=false','test_fresh_&&link_up'),
+      "HttpTransport.cpp": ('req.local_authorized','portal_.authorize','!req.tls || req.ap_socket','!service_->remoteUpdateAllowed()','session_.timedOut(now_ms)','mailbox_.claimDelivery()','ready_sequence_.load()==id','httpd_ssl_start','manual_stop_'),
+      "ControllerService.h": ('OperatingMode::MAINTENANCE','bool networkCritical() const','configBusy()','sessionLive()'),
+      "CommandRouter.cpp": ('(WIFI command redacted)','NETWORK_CONFIG_BUSY'),
+      "PortalSecurity.cpp": ('return ap&&host&&origin','strcmp(host,"192.168.4.1")','portalOrigin','peer==peer_','now-issued_<300000','tokenEqual(cookie,cookie_)','tokenEqual(csrf,csrf_)','seen&(1ull<<field)'),
+    }
+    for name,tokens in required.items():
+        path,code=by_name.get(name,(sketch_dir/name,""))
+        for token in tokens:
+            if not contains_v3(code,token):fail(f"{path}: V3 security invariant missing {token!r}")
+    for path,code in files:
+        if "scripts" in path.parts:continue
+        if re.search(r"\bnvs_(set_blob|commit|open_from_partition)\s*\(",code) and path.name not in ("CalibrationRecordNvsBackend.cpp","NetworkConfigNvs.cpp"):
+            fail(f"{path}: unapproved NVS writer/owner")
+        if "esp_phy_erase_cal_data_in_nvs" in code:fail(f"{path}: diagnostic PHY erase must never enter production")
+    manager=by_name.get("WifiManager.cpp",(None,""))[1]
+    tick=re.search(r"void WifiManager::update\([^)]*\)\s*\{(.*?)\n\}",manager,re.S)
+    if not tick or any(t in tick.group(1) for t in ("WiFi.","storage_.", "nvs_", "vTaskDelay", "while", "esp_wifi_")):
+        fail("WifiManager::update must only copy a snapshot, with zero-wait synchronization")
+    for name in ("NetworkConfig.cpp","PortalSecurity.cpp","NetworkPolicy.h"):
+        code=by_name.get(name,(None,""))[1]
+        if any(t in code for t in ("Arduino.h","WiFi.h","Serial.","ServoBus")):fail(f"{name}: V3 decision/security logic must remain pure")
+    header=by_name.get("WifiPolicy.h",(None,""))[1]
+    if re.search(r"(password|admin_digest|secret|token)\s*\[",header):fail("WifiStatus must contain no credential material")
+    transport=by_name.get("HttpTransport.cpp",(None,""))[1]
+    if ".password" in transport:fail("HTTP formatter must not access network passwords")
+    if "sleep.session_trusted=" in re.sub(r"\s+","",manager):fail("HWCDC adapter must keep session_trusted false until qualified")
+    if sum(1 for _ in re.finditer(r"!req\.tls\s*\|\|\s*req\.ap_socket",transport))<2:
+        fail("Challenge and begin both require TLS and STA socket provenance")
+    ignored=(sketch_dir/".gitignore").read_text()
+    if "src/config/TlsIdentity.local.h" not in ignored:fail("TLS identity must be gitignored")
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -6066,6 +6176,7 @@ def main():
     check_led_status_boundaries(files)
     check_actuator_runtime_boundaries(files)
     check_calibration_execution_engine_boundaries(files)
+    check_startup_recovery_wiring(files)
     check_actuator_infrastructure_wired_fail_closed(files)
     check_first_motion_command_wiring(files)
     check_full_leg_calibration_wiring(files)
@@ -6086,6 +6197,7 @@ def main():
     check_no_startup_servo_traffic(files)
     check_no_network_to_servo_path(files)
     check_wifi_runtime_boundaries(files, SKETCH_DIR)
+    check_network_v3_boundaries(files, SKETCH_DIR)
     check_ota_boundaries(files, SKETCH_DIR)
     check_http_transport_boundaries(files, SKETCH_DIR)
     check_actuator_authority(files, SKETCH_DIR)

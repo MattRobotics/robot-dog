@@ -22,6 +22,36 @@
 - **Do not flash `main`** on the current robot; see
   [`FLASH_LAYOUT_SAFETY_NOTICE.md`](FLASH_LAYOUT_SAFETY_NOTICE.md).
 
+## Unreleased — Wi-Fi / provisioning / TLS OTA V3 (isolated, offline) — 2026-10-04
+
+- Add a core-0 radio/config worker, dual STA profiles, protected recovery AP, bounded
+  asynchronous scans/optional roaming and conservative HWCDC modem-sleep fallback OFF.
+- Add offline six-tab portal, physical USB admin/AP key provisioning, AP-only writes,
+  peer-bound sessions/CSRF and ACTIVE/PENDING standard-NVS trials with readback/CRC.
+- Require STA TLS before the existing OTA nonce/HMAC writer; add a CA/SAN/pinned
+  uploader and correlate cross-task mailbox delivery atomically. No implicit reboot.
+- Reserve configuration quiet windows against calibration/persistence and RUN entry.
+  Calibration record algorithms, partition layout and defaults USB_ONLY/ingest 0 remain.
+- Add fault, mutation, real-adapter/fake-radio, TLS loopback and DOM tests; align inherited
+  stale audit pins and fixture linkage to the unchanged 1a5e008 calibration integration.
+- Provisional base; no hardware access or main merge. Remote reboot BLOCKED;
+  hardware persistence acceptance, RF timing, TLS resources and OTA/rollback TO_TEST.
+
+
+## Unreleased — post-ABORT recovery and thermal acquisition (offline) — 2026-10-03
+
+- Add explicit current-boot recovery for witnessed UPPER/LOWER probe interruptions,
+  restoring geometric dependencies before serial Q0 recovery and verified SAFE_OFF.
+  Retain the ordinary 64-tick gate, all protections, Q0 and completed leg records.
+- Validate servo read packet ID/width/status/checksum and bound the whole UART response.
+  Confirm only hot samples adaptively (up to five, three hot), without sleeps or
+  new commands while pending. Invalid reads and repeated anomalies fail closed.
+- Extend the existing runner with post-abort/resume and SAVE/ACK/post-reboot verification.
+  Require explicit RAM evidence discard before replacing an acquisition.
+- No hardware access, EEPROM writes, partition/NVS erasure, gait changes or boot motion.
+  See [release report](../../09_Logs/Development_Log/2026-10-03_POST_ABORT_THERMAL_OFFLINE_RELEASE.md)
+  and [workflow](POST_ABORT_RECOVERY_RUNBOOK.md).
+
 ## Unreleased — P3a.2 USB command framing hardening (offline, no hardware) — 2026-10-02
 
 - CommandRouter latches overflow or NUL for the entire USB line and discards it
@@ -1713,3 +1743,30 @@ merge — no new functionality. Flashed and hardware-validated as commit
 See `VALIDATION.md` Session 2.3 for the full measurement evidence
 (including live `@SERVO SAFE_OFF` timing with the servo bus unpowered) and
 H1/H2/H3/H4/H5/H6 hardware re-validation.
+
+
+## 2026-10-03 — native session / release packaging
+
+- Add optional fail-closed DALY telemetry supervision through the existing native
+  serial connection; preserve 10.8 V / 3600 mV / alarm / freshness admission.
+- Add separate frozen firmware provenance, boot continuity, structured receipts
+  and ABORT/SAFE_OFF for operator interruption. Persistence verification is read-only.
+- Add three guarded application-only / calibration+SAVE / reboot+finalization
+  entry points; retain failed evidence and prevent automatic retries.
+- Conditional isolated main integration preserves firmware identity and gait
+  separation; dirty state, failed tests, conflicts and remote errors stop it.
+- Initial pose remains blocked pending mechanical qualification after shutdown.
+  No firmware code, partition, EEPROM or safety limit changed in this step.
+
+
+## 2026-10-03 — explicit RF startup recovery (offline)
+
+The earlier STARTUP_Q0_REFERENCE block is superseded by the verified complete
+source `full_cal_nvs_20261003_134848` (RF UPPER2106). A separate immutable
+reference supports only explicit fresh-readback-qualified RF return21→22→32;
+no boot authority or transform restore. Targeted host tests, affected static
+audit and clean ROBOT_POWERED build are recorded in the release package.
+Geometry V5 support bands remain absolute±10 for passive joints; mechanical
+support/installation continuity are operator GO prerequisites. No hardware
+PASS, serial access or flashing is claimed. See
+[technical assessment](STARTUP_RECOVERY_OFFLINE_ASSESSMENT.md).

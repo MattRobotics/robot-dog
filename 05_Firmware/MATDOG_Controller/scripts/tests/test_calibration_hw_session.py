@@ -20,12 +20,14 @@ Covered:
   - a lost link sends nothing more; a silent run is ABORTed by the watchdog.
 """
 import os
+import json
 import re
 import sys
 import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import calibration_hw_session as hw  # noqa: E402
@@ -66,15 +68,38 @@ class FakeController:
         self.recovery_q0_offset = 0  # TARGET lines report a q0 this far off the promotion
         self.wrong_armed_hip = False
         self.export_short = False    # the export claims 23/24
-        self.lf_min_beyond = 23
+        self.incompatible_geometry = False
+        self.lf_min_fine = (1463, 1459)
         self.q0 = dict(Q0)
         self.build_id = BUILD_ID
+        self.uptime_ms = 100000
+        self.capture_session = 1
+        self.generation = 0
+        self.acknowledged = 0
+        self.save_fails = False
+        self.post_abort_fails = False
         self.lose_link_during = None
         self.never_finish = False
         self.decorated_result_first = False
         self.wrong_leg_result_first = False
         self.last_leg = None
         self.sent = []
+        self.bms_stream = False
+        self.bms_pack = 12.0
+        self.bms_cell = 4000
+        self.bms_alarm = "0000"
+        self.bms_comm = "OK"
+        self.bms_age = 100
+        self.bms_fault_leg = None
+        self.startup_positions=None
+        self.startup_fault=None
+
+    def bms_status(self):
+        self.emit("DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS",
+                  f"  comm={self.bms_comm} age_ms={self.bms_age}",
+                  f"  pack_v={self.bms_pack:.1f} current_a=0.0 soc=99.0% cells=3",
+                  f"  cell_max_mv={self.bms_cell} cell_min_mv={self.bms_cell} delta_mv=0",
+                  f"  charge_mos=ON discharge_mos=ON state=IDLE alarms={self.bms_alarm} 0000 0000 0000")
 
     def emit(self, *lines):
         self.link.inject(lines)
@@ -90,13 +115,28 @@ class FakeController:
         return sign, q0, q0 + sign * contact_d, q0 + sign * limit_d
 
     def contact_tick(self, leg, joint, side):
+        if leg == "LF" and (joint, side) == ("UPPER", "MIN"):
+            return self.lf_min_fine[1]
         sign, _, contact, _ = self.corridor(leg, joint, side)
-        beyond = self.lf_min_beyond if (leg == "LF" and (joint, side) == ("UPPER", "MIN")) else 4
-        return contact + sign * beyond
+        return contact + sign * 4
 
     def handle(self, cmd):
         self.sent.append(cmd)
         u = cmd.upper()
+        if u=="@CALIBRATION STARTUP QUALIFY RF_RETURN_20261003":
+            from matdog_startup_reference import GEOMETRY,classify_positions
+            self.emit("CALIBRATION_STARTUP_QUALIFICATION=STARTED read_only=1 authority=NONE reference=20261003_134848")
+            if self.startup_fault=='qualification':
+                return self.emit("CALIBRATION_STARTUP_QUALIFICATION=REFUSED reason=STARTUP_POSE_UNRECOGNIZED bus=22 motion_authorized=0")
+            route=classify_positions(self.startup_positions or self.q0)
+            return self.emit(f"CALIBRATION_STARTUP_QUALIFICATION=PASS route={route} reference=20261003_134848 geometry={GEOMETRY} samples=3x12 motion_authorized=0 reason=NONE")
+        if u=="@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN":
+            self.emit("CALIBRATION_STARTUP_RECOVERY=ARMED route=RF_LOWER_MAX_RETURN torque_limit=500 reference_admitted=0 phase=PREFLIGHT")
+            if self.startup_fault=='recovery':
+                return self.emit("CALIBRATION_STARTUP_RECOVERY_RESULT verdict=FAILED recovered=0/12 failure=HARD_CURRENT_ABORT failed_phase=RETURN_LOWER_HELD last_decision=ACCEPT")
+            self.startup_positions=None
+            return self.emit("CALIBRATION_STARTUP_RECOVERY_RESULT verdict=PASS recovered=12/12 failure=NONE failed_phase=- last_decision=ACCEPT",
+                "CALIBRATION_STARTUP_CLOSE safe_off=13/13 authority=NONE motion_authorized=0 reference_admitted=0")
         if u == "":
             return
         if u == "@IMU STREAM OFF":
@@ -116,12 +156,18 @@ class FakeController:
             if self.run:
                 return self.emit("SERVO_READ=BLOCKED", "REASON=MOTION_EXECUTOR_ACTIVE")
             b = int(m.group(1))
-            return self.emit(f"SERVO_READ id={b} position={self.q0.get(b, 2048)} speed=0 load=0 "
+            positions=self.startup_positions or self.q0
+            return self.emit(f"SERVO_READ id={b} position={positions.get(b, 2048)} speed=0 load=0 "
                              f"voltage=120 temp=31 torque=0 current=0")
         if u == "@STATUS":
             return self.emit(f"SYSTEM health=READY power_state=RUN mode=MAINTENANCE "
-                             f"authority={self.authority} uptime_ms=1234 profile=ROBOT_POWERED",
+                             f"authority={self.authority} uptime_ms={self.uptime_ms} profile=ROBOT_POWERED",
                              "SERVO_POP canonical=17 expected_now=13 absent_by_design=4 last_census=NOT_RUN")
+        if u in ("@BMS STREAM ON", "@BMS STREAM OFF"):
+            self.bms_stream = u.endswith("ON")
+            return self.emit("BMS_STREAM=" + ("ON" if self.bms_stream else "OFF"))
+        if u == "@BMS STATUS":
+            return self.bms_status()
         if u == "@AUTHORITY STATUS":
             return self.emit(f"AUTHORITY owner={self.authority} generation=1 last_result=RELEASED",
                              "AUTHORITY_INHIBIT active=NO reason=NONE")
@@ -141,6 +187,40 @@ class FakeController:
             self.promoted = True
             return self.emit("CALIBRATION_Q0_PROMOTE=OK admitted=12/12 source=CURRENT_BOOT_CAPTURE capture_session=1",
                              "CALIBRATION_Q0_PROMOTE_NOTE RAM-only; no EEPROM write")
+        if u == "@CALIBRATION Q0 STATUS":
+            lines = [f"CALIBRATION_Q0 state=COMPLETE failure=NONE session={self.capture_session} "
+                     "sample_passes=9/9 next_joint=0 candidates=12/12",
+                     f"CALIBRATION_Q0_PROMOTION promoted_capture={self.capture_session if self.promoted else 0} geometry=663f4d82f5817fb9"]
+            for bus in sorted(self.q0):
+                leg,joint,unit=UNITS[bus]
+                lines.append(f"  Q0 bus={bus} leg={leg} joint={joint} unit={unit} tick={self.q0[bus]} "
+                             "spread=0 samples=9 state=CANDIDATE estimator=MANUAL_ZERO_POSE")
+            return self.emit(*lines)
+        if u == "@CALIBRATION PERSIST SAVE CHECK":
+            return self.emit("CALIBRATION_PERSIST_SAVE=CHECK_OK" if not self.save_fails else "CALIBRATION_PERSIST_SAVE=CHECK_REFUSED", "PERSISTED=0")
+        if u == "@CALIBRATION PERSIST SAVE CONFIRM_SAVE_FULL_CALIBRATION":
+            self.generation+=1
+            return self.emit(f"CALIBRATION_PERSIST_SAVE=WRITTEN_AWAITING_ACK generation={self.generation} slot=A")
+        ack = re.fullmatch(r"@CALIBRATION PERSIST ACK (\d+)",u)
+        if ack:
+            self.acknowledged=int(ack.group(1))
+            return self.emit(f"CALIBRATION_PERSIST_ACK=OK generation={self.acknowledged}")
+        if u == "@CALIBRATION PERSIST STATUS":
+            return self.emit("NVS=READY ESP_ERROR=0 PARTITION=matdog_nvs",
+                             f"CLASS=CONSISTENT ACKNOWLEDGED_GENERATION={self.acknowledged} PENDING_GENERATION=0 "
+                             "AWAITING_ACK_GENERATION=0 ACKNOWLEDGED_RECORD_INTACT=1",
+                             "WRITE_STATE=OPEN ACK_UNCERTAIN=0 RECONCILE_UNCERTAIN=0 WRITES_BLOCKED=0",
+                             "CALIBRATION_AVAILABLE=1 MOTION_AUTHORIZED=0 RESTORE=NOT_IMPLEMENTED")
+        post = re.fullmatch(r"@CALIBRATION POST_ABORT RECOVERY (LF|RF|RH|LH) CONFIRM_Q0_RECOVERY", u)
+        if post:
+            if self.post_abort_fails:
+                return self.emit("CALIBRATION_INITIAL_RECOVERY=REFUSED", "REASON=POST_ABORT_NO_WITNESS")
+            real_emit=self.emit
+            self.emit=lambda *lines: real_emit(*(t.replace("CALIBRATION_INITIAL_RECOVERY=ARMED", "CALIBRATION_POST_ABORT_RECOVERY=ARMED") for t in lines))
+            self.handle(f"@CALIBRATION INITIAL RECOVERY {post.group(1)} CONFIRM_Q0_RECOVERY")
+            self.emit=real_emit
+            self.run['post_abort']=True
+            return
         if u == "@ACTUATOR STATUS":
             return self.emit("ACTUATOR_POLICY epoch=1 outstanding_transaction=NO last_decision=ACCEPT",
                              f"ACTUATOR_PROVENANCE limits_admitted=0 transforms_admitted="
@@ -236,6 +316,9 @@ class FakeController:
         lines = []
         run = self.run
         if run:
+            if self.bms_stream:
+                if run["leg"] == self.bms_fault_leg: self.bms_pack = 10.7
+                self.bms_status()
             run["polls"] += 1
             leg = run["leg"]
             if self.lose_link_during == leg and run["kind"] == "leg" and run["polls"] == 2:
@@ -267,8 +350,9 @@ class FakeController:
             for joint in ("UPPER", "LOWER", "HIP"):
                 for side in ("MIN", "MAX"):
                     t = self.contact_tick(self.last_leg, joint, side)
+                    f1, f2 = self.lf_min_fine if self.last_leg == "LF" and (joint, side) == ("UPPER", "MIN") else (t, t)
                     lines.append(f"CALIBRATION_FULL_LEG_CONTACT joint={joint} side={side} measured=YES "
-                                 f"scout={t} fine1={t} fine2={t} witness_accepted=YES")
+                                 f"scout={t} fine1={f1} fine2={f2} witness_accepted=YES")
         # Printed by EVERY status poll in the real firmware - never a result.
         lines.append("CALIBRATION_FULL_LEG_NOTE FULL CALIBRATION = 4 legs x 3 joints x MIN/MAX = 24 contacts; "
                      "HARDWARE_CONTACT_CALIBRATED = all 6 of a leg's contacts recorded")
@@ -281,7 +365,7 @@ class FakeController:
                     return self.later(0.05, "CALIBRATION_INITIAL_RECOVERY_RESULT verdict=FAILED recovered=4/12 "
                                             "failure=MOVE_TIMEOUT failed_phase=INITIAL_RECOVERY "
                                             "last_decision=ACCEPT")
-                return self.later(0.05, "CALIBRATION_INITIAL_RECOVERY_RESULT verdict=PASS recovered=12/12 "
+                return self.later(0.05, f"CALIBRATION_{'POST_ABORT' if run.get('post_abort') else 'INITIAL'}_RECOVERY_RESULT verdict=PASS recovered=12/12 "
                                         "failure=NONE failed_phase=- last_decision=ACCEPT")
             failed = leg == self.fail_leg
             lying = leg == self.lying_leg
@@ -335,6 +419,10 @@ class FakeController:
                          f"failed_phase={'-' if ok else 'HIP_MAX'} session_completed={1 if ok else 0} "
                          f"permit_revoked=1 authority_released=1 parameters_approved=0")
             for joint in ("UPPER", "LOWER", "HIP"):
+                bus=bus_of(leg,joint)
+                geometry="OTHER" if self.incompatible_geometry and leg=="LF" else "663f4d82f5817fb9"
+                lines.append(f"CALIBRATION_EVIDENCE_Q0 leg={leg} joint={joint} unit={UNITS[bus][2]} bus={bus} "
+                             f"present=1 q0_tick={self.q0[bus]} state=PROMOTED origin=LIVE_SESSION geometry={geometry}")
                 for side in ("MIN", "MAX"):
                     rec_ok = 1 if ok else 0
                     lines.append(f"CALIBRATION_EVIDENCE_CONTACT leg={leg} joint={joint} side={side} "
@@ -407,7 +495,7 @@ class RunnerTest(unittest.TestCase):
                 "--skip-build-check", "--build-id", BUILD_ID, "--quiet", *extra]
         if phase in ("q0", "all"):
             argv.append("--confirm-q0-pose")
-        if phase in ("legs", "all") and go:
+        if phase in ("legs", "resume", "post-abort", "all") and go:
             argv.append("--confirm-operator-go")
         return hw.run(self._parse(argv), link_factory=factory)
 
@@ -437,6 +525,29 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(sum(1 for c in cmds if c.startswith("@SERVO SAFE_OFF")), 13)
         self.assertFalse(any("Q0 CAPTURE" in c or "SESSION START" in c or "RECOVERY" in c or
                              "FULL LEG" in c for c in cmds))
+
+    def test_admitted_boot_anchor_is_checked_before_q0(self):
+        anchor = time.time() - self.controller.uptime_ms / 1000
+        self.assertEqual(self.run_phase("prepare", "--expected-boot-anchor", str(anchor)), 0)
+        self.assertEqual(self.run_phase("all", "--expected-boot-anchor", str(anchor - 30)), 1)
+        self.assertFalse(any("Q0 CAPTURE" in c for c in self.sent()))
+
+    def test_nonfinite_boot_anchor_cannot_bypass_admission(self):
+        self.assertEqual(self.run_phase("all", "--expected-boot-anchor", "nan"), 1)
+        self.assertFalse(any("Q0 CAPTURE" in c for c in self.sent()))
+
+    def test_interruption_aborts_and_safe_off(self):
+        with patch.object(hw.Session, 'run_full_leg', side_effect=KeyboardInterrupt('test interruption')):
+            self.assertEqual(self.run_phase("all"), 1)
+        self.assertIn("@CALIBRATION FULL LEG ABORT", self.sent())
+        self.assertTrue(all(f"@SERVO SAFE_OFF {bus}" in self.sent() for bus in hw.INSTALLED))
+
+    def test_simulation_success_receipt_cannot_claim_actual_hardware(self):
+        result = os.path.join(self.tmp, 'result.json')
+        self.assertEqual(self.run_phase("all", "--result-json", result), 0)
+        with open(result) as source: receipt = json.load(source)
+        self.assertFalse(receipt['hardware_observed'])
+        self.assertEqual(receipt['contacts_accepted'], 24)
 
     def test_q0_then_recover_stops_ready_for_go(self):
         self.ready()
@@ -472,6 +583,82 @@ class RunnerTest(unittest.TestCase):
             self.assertLess(r, f)
         self.assertEqual(cmds[-1], "@CALIBRATION EVIDENCE EXPORT")
         self.assertTrue(any(f.startswith("evidence_export_") for f in os.listdir(self.tmp)))
+
+    def test_resume_preserves_lf_then_recovers_rf_and_finishes_24(self):
+        self.ready();self.controller.fail_leg="RF"
+        self.assertEqual(self.run_phase("legs"),1)
+        self.controller.fail_leg=None
+        mark=len(self.sent())
+        self.assertEqual(self.run_phase("resume"),0)
+        commands=self.sent()[mark:]
+        self.assertNotIn("@CALIBRATION FULL LEG LF CONFIRM_FULL_CALIBRATION",commands)
+        self.assertIn("@CALIBRATION POST_ABORT RECOVERY RF CONFIRM_Q0_RECOVERY",commands)
+        self.assertEqual(self.controller.records['LF'],("HARDWARE_CONTACT_CALIBRATED",6))
+
+    def test_resume_rejects_a_different_acquisition(self):
+        self.ready();self.controller.capture_session=2
+        mark=len(self.sent());self.assertEqual(self.run_phase("resume"),1)
+        self.assertFalse(any("CONFIRM_FULL_CALIBRATION" in c for c in self.sent()[mark:]))
+
+    def test_daly_same_link_healthy_full_sequence(self):
+        self.assertEqual(self.run_phase("all", "--require-daly"), 0)
+        self.assertIn("@BMS STREAM ON", self.sent())
+        self.assertNotIn("@BMS KEY SET DISCHARGE CONFIRM", self.sent())
+        self.assertEqual(self.sent()[-1], "@BMS STREAM OFF")
+
+    def test_daly_fault_before_motion(self):
+        self.controller.bms_cell = 3599
+        self.assertEqual(self.run_phase("all", "--require-daly"), 1)
+        self.assertFalse(any("CONFIRM_FULL_CALIBRATION" in c for c in self.sent()))
+
+    def test_daly_fault_during_rf_stops_remaining_legs(self):
+        self.controller.bms_fault_leg = "RF"
+        self.assertEqual(self.run_phase("all", "--require-daly"), 1)
+        self.assertIn("@CALIBRATION FULL LEG ABORT", self.sent())
+        self.assertTrue(any(c.startswith("@SERVO SAFE_OFF") for c in self.sent()))
+        self.assertNotIn("@CALIBRATION FULL LEG RH CONFIRM_FULL_CALIBRATION", self.sent())
+
+    def test_verify_persistence_is_read_only(self):
+        self.assertEqual(self.run_phase("all"),0); self.assertEqual(self.run_phase("persist"),0)
+        self.controller.uptime_ms=500
+        mark=len(self.sent()); self.assertEqual(self.run_phase("verify-persistence"),0)
+        self.assertTrue(all(c=="" or c in ("@SYSTEM SOURCE_SIGNATURE", "@MODE STATUS", "@STATUS", "@AUTHORITY STATUS", "@CALIBRATION PERSIST STATUS") for c in self.sent()[mark:]))
+
+    def test_resume_rejects_incompatible_retained_geometry(self):
+        self.ready();self.controller.fail_leg="RF"
+        self.assertEqual(self.run_phase("legs"),1)
+        self.controller.incompatible_geometry=True
+        mark=len(self.sent());self.assertEqual(self.run_phase("resume"),1)
+        self.assertFalse(any("CONFIRM_FULL_CALIBRATION" in c for c in self.sent()[mark:]))
+
+    def test_resume_rejects_changed_current_q0(self):
+        self.ready();self.controller.q0[21]+=1
+        mark=len(self.sent());self.assertEqual(self.run_phase("resume"),1)
+        self.assertFalse(any("CONFIRM_FULL_CALIBRATION" in c for c in self.sent()[mark:]))
+
+    def test_save_ack_and_read_after_simulated_reboot(self):
+        self.assertEqual(self.run_phase("all"),0)
+        self.assertEqual(self.run_phase("persist"),0)
+        self.assertEqual(self.controller.acknowledged,1)
+        self.controller.uptime_ms=500
+        self.controller.promoted=False;self.controller.records={}
+        self.assertEqual(self.run_phase("verify-persistence"),0)
+        self.assertEqual(self.controller.acknowledged,1)
+
+    def test_verify_persistence_requires_reboot_evidence(self):
+        self.assertEqual(self.run_phase("all"),0);self.assertEqual(self.run_phase("persist"),0)
+        mark=len(self.sent())
+        self.assertEqual(self.run_phase("verify-persistence"),1)
+        self.assertFalse(any(c.endswith("ABORT") or c.startswith("@SERVO") for c in self.sent()[mark:]))
+
+    def test_save_check_failure_never_writes(self):
+        self.assertEqual(self.run_phase("all"),0);self.controller.save_fails=True
+        hw.POLL_S=.001
+        # Refusal is immediate through a REASON line, matching the native surface.
+        self.controller.emit_original=self.controller.emit
+        self.controller.emit=lambda *lines: self.controller.emit_original(*lines, *(["REASON=LEG_RUN_NOT_CLOSED"] if "CALIBRATION_PERSIST_SAVE=CHECK_REFUSED" in lines else []))
+        mark=len(self.sent());self.assertEqual(self.run_phase("persist"),1)
+        self.assertNotIn("@CALIBRATION PERSIST SAVE CONFIRM_SAVE_FULL_CALIBRATION",self.sent()[mark:])
 
     def test_all_in_one_invocation(self):
         self.assertEqual(self.run_phase("all"), 0)
@@ -584,8 +771,28 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(self.run_phase("legs", "--legs", "LF"), 1)
         self.assertIn("@CALIBRATION FULL LEG ABORT", self.sent())
 
-    def test_lf_upper_min_far_from_the_hand_found_stop_stops_before_rf(self):
-        self.controller.lf_min_beyond = 60
+    def test_lf_upper_min_absolute_drift_stops_before_rf(self):
+        # This contact is +23 past canonical (the old check would pass),
+        # but its absolute midpoint is 32 ticks from the hardware reference.
+        self.controller.q0[12] = 2109
+        self.controller.lf_min_fine = (1491, 1495)
+        self.ready()
+        self.assertEqual(self.run_phase("legs"), 1)
+        self.assertNotIn("@CALIBRATION SESSION START RF CONFIRM_CURRENT_Q0", self.sent())
+
+    def test_lf_upper_min_current_contact_is_independent_of_manual_q0(self):
+        self.controller.q0[12] = 2105
+        self.controller.lf_min_fine = (1461, 1465)
+        self.ready()
+        self.assertEqual(self.run_phase("legs"), 0)
+
+    def test_lf_upper_min_absolute_comparison_includes_budget_boundary(self):
+        self.controller.lf_min_fine = (1475, 1479)  # midpoint 1477 = 1461+16
+        self.ready()
+        self.assertEqual(self.run_phase("legs", "--legs", "LF"), 0)
+
+    def test_lf_upper_min_absolute_comparison_rejects_half_tick_over_budget(self):
+        self.controller.lf_min_fine = (1476, 1479)  # midpoint 1477.5
         self.ready()
         self.assertEqual(self.run_phase("legs"), 1)
         self.assertNotIn("@CALIBRATION SESSION START RF CONFIRM_CURRENT_Q0", self.sent())
@@ -660,6 +867,41 @@ class RunnerTest(unittest.TestCase):
         finally:
             hw.flash = real_flash
         self.assertEqual(flashed, [])
+
+    def test_startup_then_fresh_four_legs_save_ack_reboot(self):
+        from matdog_startup_reference import Q0 as reference
+        self.controller.q0=dict(reference)
+        self.controller.startup_positions=dict(reference,**{})
+        self.controller.startup_positions.update({21:2348,22:1080,32:1665})
+        self.assertEqual(self.run_phase('all','--require-daly','--qualified-startup-recovery'),0)
+        commands=self.sent()
+        startup=commands.index('@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN')
+        capture=commands.index('@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE')
+        self.assertLess(startup,capture)
+        self.assertEqual(commands.count('@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN'),1)
+        self.assertEqual(len(self.controller.records),4)
+        self.assertEqual(self.run_phase('persist','--require-daly'),0)
+        self.controller.uptime_ms=100
+        self.assertEqual(self.run_phase('verify-persistence'),0)
+
+    def test_startup_nominal_issues_no_startup_motion(self):
+        from matdog_startup_reference import Q0 as reference
+        self.controller.q0=dict(reference)
+        self.assertEqual(self.run_phase('all','--require-daly','--qualified-startup-recovery'),0)
+        self.assertNotIn('@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN',self.sent())
+
+    def test_startup_failure_stops_before_fresh_capture(self):
+        from matdog_startup_reference import Q0 as reference
+        for failure in ('qualification','recovery'):
+            with self.subTest(failure=failure):
+                self.controller=FakeController();self.controller.q0=dict(reference)
+                self.controller.startup_positions=dict(reference)
+                self.controller.startup_positions.update({21:2348,22:1080,32:1665})
+                self.controller.startup_fault=failure
+                self.assertEqual(self.run_phase('all','--require-daly','--qualified-startup-recovery'),1)
+                self.assertNotIn('@CALIBRATION Q0 CAPTURE 9 16 CONFIRM_Q0_POSE',self.sent())
+                self.assertIn('@CALIBRATION SESSION ABORT',self.sent())
+                self.assertLessEqual(self.sent().count('@CALIBRATION STARTUP RECOVERY CONFIRM_SUPPORTED_RF_RETURN'),1)
 
 
 if __name__ == "__main__":

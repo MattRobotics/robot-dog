@@ -1,4 +1,5 @@
 #include "ActuatorWritePolicy.h"
+#include "../calibration/StartupRecoveryReference.h"
 
 #include "CalibrationTargetResolver.h"
 
@@ -521,11 +522,50 @@ WriteDecision SafeActuatorPolicy::evaluateSequenceOperation(const ActuatorComman
       !sequenceParticipant(*leg_plan, moving->identity)) {
     return WriteDecision::REJECT_SEQUENCE_TARGET;
   }
+  if (bootstrap_.startup_recovery) {
+    if (!bootstrap_.startup_recovery_only || bootstrap_.sequence_leg!=calibration::Leg::RF ||
+        !calibration::startupReferenceMatches(*geometry_) ||
+        !calibration::identityPermitsEvidenceReuse(command.joint,bootstrap_.recovery_joint))
+      return WriteDecision::REJECT_SEQUENCE_TARGET;
+    if (command.operation==ActuatorOperation::CALIBRATION_TORQUE_LIMIT)
+      return WriteDecision::ACCEPT; // backend exposes only its fixed RAM 500 operation
+    if (command.sequence_phase!=phase) return WriteDecision::REJECT_SEQUENCE_PHASE;
+    if (command.sequence_move==SequenceMoveKind::PRIME_AT_PRESENT) {
+      const int32_t delta=static_cast<int32_t>(command.target_tick)-bootstrap_.recovery_prime_tick;
+      return delta>=-16 && delta<=16 && calibration::startupPositionInBand(moving->bus_id,command.target_tick,phase)
+        ? WriteDecision::ACCEPT : WriteDecision::REJECT_SEQUENCE_PRIME;
+    }
+    const auto* ref=calibration::startupReference(moving->bus_id);
+    return ref && (ref->bus==21 || ref->bus==22 || ref->bus==32) &&
+           command.sequence_move==SequenceMoveKind::TO_PLAN_TARGET && command.target_urad==0 &&
+           bootstrap_.recovery_target_urad==0 && command.target_tick==ref->q0
+      ? WriteDecision::ACCEPT : WriteDecision::REJECT_SEQUENCE_TARGET;
+  }
   const JointTransform* transform = transforms_.find(command.joint, currentGeometryTag());
   if (transform == nullptr) {
     return transforms_.findAny(command.joint) != nullptr
                ? WriteDecision::REJECT_EVIDENCE_GEOMETRY_MISMATCH
                : WriteDecision::REJECT_NO_ACCEPTED_TRANSFORM;
+  }
+
+  if (bootstrap_.post_abort_recovery) {
+    if (!sequenceParticipant(*leg_plan, command.joint) ||
+        !calibration::identityPermitsEvidenceReuse(command.joint, bootstrap_.recovery_joint)) {
+      return WriteDecision::REJECT_SEQUENCE_TARGET;
+    }
+    if (command.operation == ActuatorOperation::CALIBRATION_TORQUE_LIMIT) return WriteDecision::ACCEPT;
+    if (command.sequence_phase != phase) return WriteDecision::REJECT_SEQUENCE_PHASE;
+    if (command.sequence_move == SequenceMoveKind::PRIME_AT_PRESENT) {
+      const int32_t delta = static_cast<int32_t>(command.target_tick) - bootstrap_.recovery_prime_tick;
+      return command.target_tick < 4096 && delta >= -16 && delta <= 16
+                 ? WriteDecision::ACCEPT : WriteDecision::REJECT_SEQUENCE_PRIME;
+    }
+    if (command.sequence_move != SequenceMoveKind::TO_PLAN_TARGET ||
+        command.target_urad != bootstrap_.recovery_target_urad) return WriteDecision::REJECT_SEQUENCE_TARGET;
+    uint16_t expected = 0;
+    return resolveUrdfQToRaw(*geometry_, *expected_provenance_, *transform,
+                             command.target_urad, &expected) == TargetResolveStatus::OK &&
+                   expected == command.target_tick ? WriteDecision::ACCEPT : WriteDecision::REJECT_SEQUENCE_TARGET;
   }
 
   if (command.operation == ActuatorOperation::CALIBRATION_TORQUE_LIMIT) {
@@ -651,6 +691,12 @@ WriteDecision SafeActuatorPolicy::evaluate(const ActuatorCommand& command,
     }
   }
 
+  if (bootstrap_.startup_recovery_only &&
+      (!bootstrap_.startup_recovery || !bootstrap_.sequence_active ||
+       (command.operation!=ActuatorOperation::CALIBRATION_SEQUENCE_MOVE &&
+        command.operation!=ActuatorOperation::CALIBRATION_TORQUE_LIMIT &&
+        command.operation!=ActuatorOperation::TORQUE_ENABLE))) return WriteDecision::REJECT_SEQUENCE_TARGET;
+
   if (operationUsesAcceptedLimits(command.operation)) {
     const JointLimit* limit = limits_.find(command.joint, currentGeometryTag());
     if (limit == nullptr && limits_.findAny(command.joint) != nullptr) {
@@ -692,7 +738,9 @@ WriteDecision SafeActuatorPolicy::evaluate(const ActuatorCommand& command,
     if (geometry_ == nullptr) return WriteDecision::REJECT_NO_GEOMETRY_PROFILE;
     const GeometryJointRecord* moving = geometry_->findJoint(command.joint);
     if (moving == nullptr) return WriteDecision::REJECT_UNKNOWN_GEOMETRY_JOINT;
-    if (!sequenceEnergizeAllowed(*leg_plan, bootstrap_.sequence_phase, moving->identity)) {
+    if ((bootstrap_.post_abort_recovery || bootstrap_.startup_recovery)
+            ? !calibration::identityPermitsEvidenceReuse(command.joint, bootstrap_.recovery_joint)
+            : !sequenceEnergizeAllowed(*leg_plan, bootstrap_.sequence_phase, moving->identity)) {
       return WriteDecision::REJECT_SEQUENCE_PRIME;
     }
   }

@@ -143,6 +143,10 @@ enum class FullLegStep : uint8_t {
 enum class FullLegFailure : uint8_t {
   NONE = 0,
   REJECT_PRECONDITIONS,
+  POST_ABORT_NO_WITNESS,
+  POST_ABORT_POSE_MISMATCH,
+  POST_ABORT_PHASE_UNPROVEN,
+  POST_ABORT_Q0_CHANGED,
   PREFLIGHT_TORQUE_ON,            // a leg joint was torque-on at entry
   INITIAL_RECOVERY_OUT_OF_RANGE,  // > 64 ticks from q0: reposition by hand
   INITIAL_RECOVERY_NOT_SETTLED,   // recovered joint not at q0 / not torque-off
@@ -174,6 +178,7 @@ enum class FullLegFailure : uint8_t {
   DYNAMIC_PREREQUISITE_LOST,      // permit / session / authority / mode
   PHASE_REPORT_REJECTED,          // the session refused the V25 phase order
   OPERATOR_ABORT,
+  STARTUP_POSE_OUTSIDE_CERTIFICATE, // appended: persisted enum values stay unchanged
 };
 
 struct FullLegCalibrationConfig {
@@ -225,9 +230,12 @@ struct FullLegCalibrationRequest {
   // q0 promotion, before any leg is calibrated. Same policy phase table, same
   // SAFE_OFF path; COMPLETE only with all twelve joints actively recovered.
   bool recovery_only = false;
+  bool post_abort_recovery = false; // only startPostAbortRecovery may set this
+  bool startup_recovery = false; // fixed reference/program; never a current-boot witness
 };
 
 struct FullLegCalibrationContext {
+  bool startup_motion_permit=false;
   bool session_active = false;
   CalibrationOrigin origin = CalibrationOrigin::NONE;
   core::AuthorityLease lease{};
@@ -340,6 +348,14 @@ class FullLegCalibrationExecutor {
   void update(const FullLegCalibrationContext& context, uint32_t now_ms,
               const FullLegTelemetryFrame& telemetry, const FullLegSafeOffFrame& safe_off);
 
+  bool startPostAbortRecovery(const FullLegCalibrationRequest& current,
+                              const FullLegCalibrationContext& context, uint32_t now_ms);
+  void invalidateRecoveryWitness() { recovery_witness_ = false; }
+  bool startStartupRecovery(const FullLegCalibrationContext& context,uint32_t now_ms);
+  void recoveryGrant(actuator::CalibrationBootstrapContext* context) const;
+  // Fresh safety checks with no backend write while thermal verdict is pending.
+  void monitorOnly(const FullLegCalibrationContext& context, uint32_t now_ms,
+                   const FullLegTelemetryFrame& telemetry);
   void abort();
   // The session refused this run's phase report: the order is broken.
   void phaseReportRejected();
@@ -422,12 +438,15 @@ class FullLegCalibrationExecutor {
     bool has_last_sample = false;
     actuator::TelemetrySample last_sample{};
     bool speed_transient = false;
+    bool recovery_expected_known = false;
+    uint16_t recovery_expected_tick = 0;
   };
   struct PopulationState {
     bool has_good = false;
     uint32_t last_good_ms = 0;
     uint16_t entry_tick = 0;
     bool entry_known = false;
+    actuator::TelemetrySample last_sample{};
   };
 
   void enterPhase(CalibrationPhase phase, uint32_t now_ms);
@@ -436,6 +455,9 @@ class FullLegCalibrationExecutor {
   void advanceProgram(uint32_t now_ms);
   void nextPhase(uint32_t now_ms);
   void fail(FullLegFailure failure);
+  void captureRecoveryWitness();
+  bool recoveryPoseCompatible(uint8_t index, int32_t position) const;
+  bool qualifiedRecovery() const { return request_.post_abort_recovery || request_.startup_recovery; }
   // The round-robin watch target: a population joint neither energized nor
   // otherwise monitored this tick.
   bool watchIndex(uint8_t* out) const;
@@ -520,6 +542,12 @@ class FullLegCalibrationExecutor {
   bool cleanup_ = false;
   bool return_after_diagnostics_failure_ = false;
   uint16_t safe_off_verified_mask_ = 0;  // bit per population index
+  bool recovery_witness_ = false;
+  bool starting_post_abort_ = false;
+  bool starting_startup_ = false;
+  CalibrationPhase aborted_phase_ = CalibrationPhase::PREFLIGHT;
+  actuator::GeometryProvenanceTag aborted_geometry_ = actuator::kNoGeometryProvenance;
+  uint16_t aborted_tick_[kFullLegPopulation] = {0};
   uint32_t now_ms_ = 0;                  // the current update()'s time
 };
 

@@ -42,6 +42,7 @@
 #include "../../src/calibration/FullLegCalibrationExecutor.h"
 #include "../../src/calibration/FullLegCalibrationPlan.h"
 #include "../../src/calibration/ThermalConfirmation.h"
+#include "../../src/calibration/StartupRecoveryReference.h"
 #include "kinematic_servo_sim.h"
 
 using namespace matdog;
@@ -285,6 +286,7 @@ struct Rig {
   BulkGlitch bulk_temperature_glitch[256];
   SimThermalPort thermal_port{&backend};
   std::vector<ThermalConfirmation> thermal_log;
+  ThermalConfirmationState thermal_state[256];
   // Each endpoint's probe verdict as the probe itself reported it:
   // {scout, fine 1, fine 2}, 0 = not completed.
   uint16_t probe_result[3][2][3] = {};
@@ -367,6 +369,7 @@ struct Rig {
 
   FullLegCalibrationContext ctx() const {
     FullLegCalibrationContext c{};
+    c.startup_motion_permit=full.request().startup_recovery;
     c.session_active = session;
     c.origin = CalibrationOrigin::LIVE_SESSION;
     c.lease = lease;
@@ -389,9 +392,11 @@ struct Rig {
     b.motion_permit_authority_generation = lease.generation;
     b.auxiliary_parked = false;
     b.sequence_active = full.sequenceActive();
+    b.startup_recovery_only=full.request().startup_recovery;
     b.sequence_leg = full.leg();
     b.sequence_phase = full.sequencePhase();
     b.sequence_prerequisites_verified = full.prerequisitesVerified();
+    full.recoveryGrant(&b);
     policy.setBootstrapContext(b);
   }
 
@@ -455,6 +460,7 @@ struct Rig {
     uint8_t buses[kFullLegMaxTelemetry] = {0};
     const uint8_t n = full.telemetryRequest(buses, kFullLegMaxTelemetry);
     FullLegTelemetryFrame frame{};
+    bool thermal_pending=false, direct_used=false;
     for (uint8_t i = 0; i < n; ++i) {
       actuator::TelemetrySample sample = backend.joint[buses[i]].sample(t);
       BulkGlitch& g = bulk_temperature_glitch[buses[i]];
@@ -462,13 +468,15 @@ struct Rig {
         sample.present_temperature = g.value;
         --g.count;
       }
-      // Controller::updateFullLegCalibration(): the LF V25 over-limit
-      // confirmation on every sample, before the executor sees it.
       if (sample.read_ok) {
-        const ThermalConfirmation th =
-            confirmPresentTemperature(&thermal_port, buses[i], sample.present_temperature);
-        sample.present_temperature = th.published_c;
-        if (th.decision != ThermalDecision::NORMAL) thermal_log.push_back(th);
+        auto& state=thermal_state[buses[i]];
+        const bool due=state.directReadDue(t);
+        const ThermalConfirmation th=due && direct_used && !state.expired(t) ? state.result()
+            : state.update(&thermal_port,buses[i],sample.present_temperature,t);
+        if(due) direct_used=true;
+        thermal_pending |= th.decision==ThermalDecision::PENDING;
+        sample.present_temperature=th.decision==ThermalDecision::PENDING ? 70 : th.published_c;
+        if(th.decision!=ThermalDecision::NORMAL && th.decision!=ThermalDecision::PENDING) thermal_log.push_back(th);
       }
       frame.add(buses[i], sample);
       const bool fast = sample.read_ok && sample.present_speed >= 0 &&
@@ -477,7 +485,10 @@ struct Rig {
       max_fast_run[buses[i]] = std::max(max_fast_run[buses[i]], fast_run[buses[i]]);
     }
     const size_t writes_before = backend.writes.size();
-    full.update(ctx(), t, frame, safe_off_frame);
+    if(thermal_pending) {
+      full.monitorOnly(ctx(),t,frame);
+      CHECK(backend.writes.size()==writes_before); // no goal/torque write pending classification
+    } else full.update(ctx(), t, frame, safe_off_frame);
     for (uint8_t i = 0; i < full.heldSpeedTransientsThisTick(); ++i) {
       transients.push_back(full.heldSpeedTransient(i));
     }
@@ -878,8 +889,8 @@ void test_thermal_confirmation_in_the_sequence() {
       CHECK_EQ(th.samples[0], 255);
       CHECK_EQ(th.published_c, 35);
     }
-    CHECK_EQ(rig.thermal_port.direct_reads[park], 2);
-    CHECK_EQ(rig.thermal_port.waited_ms, 2 * kThermalConfirmationDelayMs);
+    CHECK_EQ(rig.thermal_port.direct_reads[park], 3);
+    CHECK_EQ(rig.thermal_port.waited_ms, 0u);
   }
   {
     g_case = "a one-sample transient on the PROBED joint mid-search -> transient, 6/6";
@@ -925,6 +936,25 @@ void test_thermal_confirmation_in_the_sequence() {
     for (int b = 0; b < 256; ++b) reads += rig.thermal_port.direct_reads[b];
     CHECK_EQ(reads, 0);
     CHECK_EQ(rig.thermal_port.waited_ms, 0u);
+  }
+  for (int fault=0; fault<3; ++fault) {
+    g_case="thermal verdict pending: active readback/current/UART still fail closed without new goals";
+    Rig rig(Leg::RF); bool triggered=false, injected=false;
+    rig.run([&](Rig& r) {
+      if (!triggered && parking_move(r)) {
+        r.bulk_temperature_glitch[r.req().park.bus_id]={95,1}; triggered=true;
+      } else if (triggered && !injected && r.thermal_state[r.req().park.bus_id].pending()) {
+        if(fault==0) r.backend.joint[r.req().park.bus_id].goal+=30;
+        if(fault==1) r.backend.joint[r.req().park.bus_id].current_override=200;
+        if(fault==2) r.backend.joint[r.req().park.bus_id].read_fails=true;
+        injected=true;
+      }
+    });
+    CHECK(triggered && injected);
+    const FullLegFailure expect[]={FullLegFailure::MOVE_READBACK,FullLegFailure::HARD_CURRENT_ABORT,
+                                   FullLegFailure::STALE_TELEMETRY};
+    CHECK(rig.full.status().failure==expect[fault]);
+    rig.backend.joint[rig.req().park.bus_id].read_fails=false; checkSafeEnd(rig);
   }
 }
 
@@ -1063,6 +1093,126 @@ void test_recovery_move_that_never_settles_times_out() {
   CHECK_EQ((int)rig.full.status().failure, (int)FullLegFailure::MOVE_TIMEOUT);
   CHECK_EQ((int)rig.full.status().failed_phase, (int)CalibrationPhase::INITIAL_RECOVERY);
   checkSafeEnd(rig);
+}
+
+
+void prepareObservedAbort(Rig& rig) {
+  // Rebase the real resolver to the 3 October promoted Q0 values.
+  for (const auto& item : std::vector<std::pair<uint8_t,uint16_t>>{{21,1997},{22,2106},{32,2058}}) {
+    for (const JointOracle& o : kOracle) if (o.bus == item.first) {
+      CHECK(rig.policy.transforms().admit(promotedTransform(identityOf(o),item.second)));
+      rig.backend.joint[o.bus].pos=item.second;
+    }
+  }
+  CHECK(resolveFullLegPlan(rig.profile, actuator::geometry_data::kProvenance, rig.policy.transforms(),
+                          &actuator::sequence_plan_data::kPlan, Leg::RF, &rig.plan)==FullLegPlanStatus::OK);
+  for (uint8_t k=0;k<3;++k) for (uint8_t side=0;side<2;++side) rig.placeStop(k,side,StopSpec().beyond_limit[k][side]);
+  CHECK(rig.start());
+  const uint32_t started=rig.t;
+  while(rig.full.active() && rig.t-started<300000) {
+    rig.tick(nullptr);
+    if (rig.full.status().phase==CalibrationPhase::LOWER_MAX && rig.sim(kLower).position()<=2352 &&
+        rig.sim(kLower).position()>=2340) { rig.full.abort(); break; }
+  }
+  while(rig.full.active() && rig.t-started<310000) rig.tick(nullptr);
+  CHECK(rig.full.status().failure==FullLegFailure::OPERATOR_ABORT);
+  CHECK(std::abs(rig.backend.joint[21].position()-2348)<=10);
+  CHECK(std::abs(rig.backend.joint[22].position()-1080)<=10);
+  CHECK(std::abs(rig.backend.joint[32].position()-1665)<=10);
+  // Torque-off residuals from the recorded session; all differences are
+  // inside the witness's allowed passive drift, with no new goal command.
+  rig.backend.joint[21].pos=2348;rig.backend.joint[22].pos=1080;rig.backend.joint[32].pos=1665;
+  rig.report_phases=false;
+}
+void finishRecovery(Rig& rig, const Hook& hook=nullptr) {
+  uint32_t start=rig.t;
+  while(rig.full.active() && rig.t-start<100000) rig.tick(hook);
+  CHECK(!rig.full.active());
+}
+void test_post_abort_all_supported_phases() {
+  for (Leg leg : kAllLegs) for(CalibrationPhase phase : {CalibrationPhase::UPPER_MIN,CalibrationPhase::UPPER_MAX,
+      CalibrationPhase::LOWER_MIN,CalibrationPhase::LOWER_MAX}) {
+    g_case="all four legs: recover only proven UPPER/LOWER probe phases";
+    Rig rig(leg);CHECK(rig.start());
+    uint32_t start=rig.t;
+    while(rig.full.active() && rig.t-start<200000) {
+      rig.tick(nullptr);
+      if(rig.full.status().phase==phase && rig.full.status().step==FullLegStep::PROBE) { rig.full.abort();break; }
+    }
+    while(rig.full.active() && rig.t-start<210000)rig.tick(nullptr);
+    CHECK(rig.full.status().failure==FullLegFailure::OPERATOR_ABORT);
+    rig.report_phases=false;
+    CHECK(rig.full.startPostAbortRecovery(rig.req(),rig.ctx(),rig.t));finishRecovery(rig);
+    CHECK(rig.full.status().step==FullLegStep::COMPLETE);checkSafeEnd(rig);
+  }
+  g_case="HIP phase has no automatic recovery qualification";
+  Rig rig(Leg::RF);CHECK(rig.start());
+  uint32_t start=rig.t;
+  while(rig.full.active() && rig.t-start<200000) {
+    rig.tick(nullptr);
+    if(rig.full.status().phase==CalibrationPhase::HIP_MIN && rig.full.status().step==FullLegStep::PROBE) {rig.full.abort();break;}
+  }
+  while(rig.full.active() && rig.t-start<210000)rig.tick(nullptr);
+  const auto writes=rig.backend.events.size();
+  CHECK(!rig.full.startPostAbortRecovery(rig.req(),rig.ctx(),rig.t));
+  CHECK(rig.full.status().failure==FullLegFailure::POST_ABORT_PHASE_UNPROVEN);
+  CHECK(writes==rig.backend.events.size());checkSafeEnd(rig);
+}
+
+void test_post_abort_recovery() {
+  {
+    g_case="observed RF LOWER MAX ABORT -> LOWER, UPPER, rear park, all 12 Q0 + SAFE_OFF";
+    Rig rig(Leg::RF);prepareObservedAbort(rig);
+    const auto first=rig.backend.events.size();
+    CHECK(rig.full.startPostAbortRecovery(rig.req(),rig.ctx(),rig.t));finishRecovery(rig);
+    CHECK(rig.full.status().step==FullLegStep::COMPLETE);
+    CHECK(rig.full.status().recovered_joints==12);
+    CHECK(rig.full.status().contacts_accepted==0);
+    for(const auto& joint : rig.full.request().population) CHECK(std::abs(rig.backend.joint[joint.bus_id].position()-joint.q0_tick)<=10);
+    checkSafeEnd(rig);
+    std::vector<uint8_t> returns;
+    for(size_t i=first;i<rig.backend.events.size();++i) {
+      const Event& e=rig.backend.events[i];
+      if(e.kind==Ev::GOAL && (e.phase==CalibrationPhase::RETURN_LOWER_HELD ||
+          e.phase==CalibrationPhase::RETURN_UPPER || e.phase==CalibrationPhase::RESTORE_PARKING)) returns.push_back(e.bus);
+    }
+    CHECK(returns==std::vector<uint8_t>({21,22,32}));
+  }
+  for (int fault=0;fault<6;++fault) {
+    g_case="post-ABORT: unsafe dependency/UART/current/thermal/timeout/permit -> SAFE_OFF";
+    Rig rig(Leg::RF);prepareObservedAbort(rig);
+    if(fault==0) rig.backend.joint[22].pos=2106; // unsafe LOWER return with wrong UPPER dependency
+    if(fault==1) rig.backend.joint[21].read_fails=true;
+    const auto first=rig.backend.events.size();
+    CHECK(rig.full.startPostAbortRecovery(rig.req(),rig.ctx(),rig.t));
+    Hook hook=once([](Rig& r) { return r.full.status().phase==CalibrationPhase::RETURN_LOWER_HELD &&
+                                      r.full.status().step==FullLegStep::MOVE_MONITOR; },
+        [fault](Rig& r) {
+          if(fault==2) r.sim(kLower).current_override=200;
+          if(fault==3) r.sim(kLower).temperature=80;
+          if(fault==4) { r.sim(kLower).has_stop_low=true;r.sim(kLower).stop_low=2200; }
+          if(fault==5) r.permit=false;
+        });
+    finishRecovery(rig,hook);
+    CHECK(rig.full.status().step==FullLegStep::FAILED);
+    const FullLegFailure expected[]={FullLegFailure::POST_ABORT_POSE_MISMATCH,FullLegFailure::STALE_TELEMETRY,
+        FullLegFailure::HARD_CURRENT_ABORT,FullLegFailure::OVER_TEMPERATURE,FullLegFailure::MOVE_TIMEOUT,
+        FullLegFailure::DYNAMIC_PREREQUISITE_LOST};
+    CHECK(rig.full.status().failure==expected[fault]);
+    if(fault<2) for(size_t i=first;i<rig.backend.events.size();++i) CHECK(rig.backend.events[i].kind==Ev::SAFE_OFF);
+    rig.backend.joint[21].read_fails=false;rig.sim(kLower).temperature=34;checkSafeEnd(rig);
+  }
+  {
+    g_case="new controller has no post-ABORT movement proof";
+    Rig rig(Leg::RF);CHECK(!rig.full.startPostAbortRecovery(rig.req(),rig.ctx(),rig.t));CHECK(rig.backend.events.empty());
+  }
+  {
+    g_case="changed promoted Q0 cannot reuse an ABORT witness";
+    Rig rig(Leg::RF);prepareObservedAbort(rig);
+    auto changed=rig.req();changed.population[0].q0_tick++;
+    const auto count=rig.backend.events.size();CHECK(!rig.full.startPostAbortRecovery(changed,rig.ctx(),rig.t));
+    CHECK(rig.full.status().failure==FullLegFailure::POST_ABORT_Q0_CHANGED);CHECK(count==rig.backend.events.size());
+  }
 }
 
 // --- held prerequisites ---------------------------------------------------------
@@ -1823,13 +1973,76 @@ void test_diagnostics_math_is_v25() {
 
 void test_names() {
   g_case = "names";
-  for (uint8_t i = 0; i <= static_cast<uint8_t>(FullLegFailure::OPERATOR_ABORT); ++i) {
+  for (uint8_t i = 0; i <= static_cast<uint8_t>(FullLegFailure::STARTUP_POSE_OUTSIDE_CERTIFICATE); ++i) {
     CHECK(std::strcmp(toString(static_cast<FullLegFailure>(i)), "UNKNOWN") != 0);
   }
   for (uint8_t i = 0; i <= static_cast<uint8_t>(FullLegStep::FAILED); ++i) {
     CHECK(std::strcmp(toString(static_cast<FullLegStep>(i)), "UNKNOWN") != 0);
   }
   CHECK(std::strcmp(toString(static_cast<FullLegFailure>(200)), "UNKNOWN") == 0);
+}
+
+void prepareStartup(Rig& r) {
+  r.policy.transforms().clear();r.report_phases=false;
+  for (const auto& ref:kStartupReference) {
+    auto& j=r.backend.joint[ref.bus];j.pos=ref.q0;j.goal=3000;j.torque=false;
+  }
+  r.backend.joint[21].pos=2348;r.backend.joint[22].pos=1080;r.backend.joint[32].pos=1665;
+}
+void startStartup(Rig& r) {
+  auto context=r.ctx();context.startup_motion_permit=true;
+  CHECK(r.full.startStartupRecovery(context,r.t));
+}
+void test_startup_recovery() {
+  {
+    g_case="startup: correct reference, no witness, exact RF/RH residuals, sequential return, SAFE_OFF";
+    Rig r(Leg::RF);prepareStartup(r);startStartup(r);finishRecovery(r);
+    CHECK(r.full.status().step==FullLegStep::COMPLETE);
+    CHECK_EQ(r.full.status().recovered_joints,12);CHECK_EQ(r.full.status().contacts_accepted,0);
+    CHECK(r.policy.transforms().empty());CHECK_EQ(r.torqueOnCount(),0);
+    std::vector<uint8_t> returns;
+    for (const auto& event:r.backend.events) {
+      if (event.kind==Ev::GOAL && event.torque_before) {
+        returns.push_back(event.bus);CHECK(event.tick==startupReference(event.bus)->q0);
+      }
+      if (event.kind==Ev::TORQUE) {
+        const auto previous=std::find_if(r.backend.events.begin(),r.backend.events.end(),[&](const Event& e){
+          return e.kind==Ev::GOAL && e.bus==event.bus && !e.torque_before && e.tick==e.position;});
+        CHECK(previous!=r.backend.events.end());
+      }
+    }
+    CHECK(returns==std::vector<uint8_t>({21,22,32}));
+    for (const auto& ref:kStartupReference) CHECK(std::abs(r.backend.joint[ref.bus].position()-ref.q0)<=10);
+    CHECK(!r.full.startPostAbortRecovery(r.req(),r.ctx(),r.t));
+  }
+  for (int fault=0;fault<9;++fault) {
+    g_case="startup: geometric rejection and failures keep SAFE_OFF";
+    Rig r(Leg::RF);prepareStartup(r);
+    if (fault==0) r.backend.joint[22].pos=2106;
+    if (fault==1) r.backend.joint[21].read_fails=true;
+    if (fault==2) r.backend.joint[13].pos=1990; // absolute support band, not drift about a wrong entry
+    startStartup(r);
+    Hook hook=once([](Rig& rig){return rig.full.status().phase==CalibrationPhase::RETURN_LOWER_HELD &&
+                                  rig.full.status().step==FullLegStep::MOVE_MONITOR;},[fault](Rig& rig){
+      if(fault==3) rig.backend.joint[21].current_override=200;
+      if(fault==4) rig.backend.joint[21].temperature=80;
+      if(fault==5) {rig.backend.joint[21].has_stop_low=true;rig.backend.joint[21].stop_low=2200;}
+      if(fault==6) rig.permit=false;
+      if(fault==7) rig.backend.joint[32].pos=1649; // q=409 outside absolute 388..408
+      if(fault==8) rig.backend.joint[21].read_fails=true;
+    });
+    finishRecovery(r,hook);
+    CHECK(r.full.status().step==FullLegStep::FAILED);
+    if(fault<3) for(const auto& event:r.backend.events) CHECK(event.kind==Ev::SAFE_OFF);
+    CHECK_EQ(r.torqueOnCount(),0);CHECK(r.policy.transforms().empty());
+  }
+  {
+    g_case="startup cannot use an ordinary permit or caller-crafted request";
+    Rig r(Leg::RF);prepareStartup(r);
+    CHECK(!r.full.startStartupRecovery(r.ctx(),r.t));
+    auto request=r.req();request.startup_recovery=true;request.recovery_only=true;
+    CHECK(!r.full.start(request,r.ctx(),r.t));CHECK(r.backend.events.empty());
+  }
 }
 
 }  // namespace
@@ -1861,7 +2074,10 @@ int main() {
   test_diagnostics_rejection_returns_the_leg_then_fails();
   test_start_refuses_incomplete_requests();
   test_diagnostics_math_is_v25();
+  test_post_abort_recovery();
+  test_post_abort_all_supported_phases();
   test_names();
+  test_startup_recovery();
 
   std::printf("test_full_leg_calibration_executor: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;

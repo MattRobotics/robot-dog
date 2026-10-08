@@ -1,0 +1,4 @@
+#pragma once
+// Use a UNIQUE per-device PEM identity, distributed to the operator out of band.
+// Define MATDOG_TLS_CERT_PEM and MATDOG_TLS_KEY_PEM as PEM string literals.
+// Do not copy example keys, disable client verification, or commit private keys.

@@ -185,6 +185,17 @@ static void test_revoke_is_final_for_token() {
 }
 
 int main() {
+  {
+    CalibrationMotionPermit p;CalibrationMotionPermitToken t{};
+    auto f=goodFacts();f.promoted_transforms_complete=false;f.startup_recovery_only=true;
+    check(p.grant(f,&t)==CalibrationPermitStatus::REJECT_TRANSFORMS,"startup needs qualified reference proof");
+    f.startup_reference_qualified=true;
+    check(p.grant(f,&t)==CalibrationPermitStatus::ACTIVE,"explicit startup scope can use separate reference");
+    check(t.startup_recovery_only,"startup token is scoped");
+    f.startup_recovery_only=false;f.promoted_transforms_complete=true;
+    check(p.check(f,t)==CalibrationPermitStatus::REVOKED,"startup token cannot become ordinary calibration");
+    check(!p.active(),"scope switch revokes rather than broadens");
+  }
   test_grant_requires_every_fact();
   test_session_and_authority_binding();
   test_dynamic_prerequisite_loss_expires_token();

@@ -26,6 +26,10 @@ OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -I "$SCRIPT_DIR/servo_read_stub" \
+  -o "$OUT/test_servo_read_validation" "$SCRIPT_DIR/test_servo_read_validation.cpp"
+
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
   -o "$OUT/test_servo_population" \
   "$SCRIPT_DIR/test_servo_population.cpp" \
   "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \
@@ -57,7 +61,8 @@ trap 'rm -rf "$OUT"' EXIT
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -o "$OUT/test_wifi_policy" \
   "$SCRIPT_DIR/test_wifi_policy.cpp" \
-  "$SKETCH_DIR/src/network/WifiPolicy.cpp"
+  "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp"
 
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -o "$OUT/test_calibration_domain" \
@@ -96,6 +101,7 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_actuator_write_policy" \
   "$SCRIPT_DIR/test_actuator_write_policy.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -111,6 +117,7 @@ trap 'rm -rf "$OUT"' EXIT
   -o "$OUT/test_calibration_geometry" \
   "$SCRIPT_DIR/test_calibration_geometry.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -161,6 +168,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationQ0Bootstrap.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp" \
@@ -180,6 +188,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationPopulationEvidence.cpp" \
@@ -252,6 +261,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SCRIPT_DIR/test_actuator_runtime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -270,6 +280,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/calibration/CalibrationExecutionEngine.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -287,6 +298,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -305,6 +317,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -342,6 +355,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -361,6 +375,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/servo/ServoPopulation.cpp" \
   "$SKETCH_DIR/src/core/ActuatorAuthority.cpp" \
@@ -386,6 +401,7 @@ trap 'rm -rf "$OUT"' EXIT
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
@@ -417,6 +433,7 @@ CALREC_SRCS=(
   "$SKETCH_DIR/src/actuator/MotionDeadman.cpp"
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp"
   "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp"
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp"
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp"
   "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp"
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp"
@@ -472,6 +489,7 @@ CALREC_SRCS=(
   "$SCRIPT_DIR/router_nvs_stub.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationRecordNvsBackend.cpp" \
   "$SKETCH_DIR/src/core/CommandRouter.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryQualification.cpp" \
   "$SKETCH_DIR/src/core/CommandRouterPersistence.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationSaveGate.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
@@ -485,6 +503,7 @@ CALREC_SRCS=(
   "$SKETCH_DIR/src/core/ServiceReadiness.cpp" \
   "$SKETCH_DIR/src/servo/ServoProfile.cpp" \
   "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" \
   "$SKETCH_DIR/src/update/OtaPolicy.cpp" \
   "$SKETCH_DIR/src/update/OtaBootGuard.cpp" \
   "$SKETCH_DIR/src/status/LedStatusPolicy.cpp" \
@@ -545,6 +564,15 @@ done
   -o "$OUT/test_http_mailbox" \
   "$SCRIPT_DIR/test_http_mailbox.cpp"
 
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -o "$OUT/test_startup_recovery_qualification" \
+  "$SCRIPT_DIR/test_startup_recovery_qualification.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryQualification.cpp" \
+  "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" \
+  "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationDomain.cpp"
+
 "$OUT/test_servo_population"
 "$OUT/test_servo_profile"
 "$OUT/test_daly_protocol"
@@ -560,6 +588,7 @@ done
 "$OUT/test_calibration_motion_permit"
 "$OUT/test_motion_deadman"
 "$OUT/test_thermal_confirmation"
+"$OUT/test_servo_read_validation"
 "$OUT/test_ota_policy"
 "$OUT/test_ota_layout_contract"
 "$OUT/test_calibration_domain"
@@ -572,6 +601,7 @@ done
 "$OUT/test_contact_probe_engine"
 "$OUT/test_operational_envelope"
 "$OUT/test_full_leg_calibration_executor"
+"$OUT/test_startup_recovery_qualification"
 "$OUT/test_full_leg_calibration_plan"
 "$OUT/test_full_leg_calibration_finalizer"
 "$OUT/test_calibration_record"
@@ -590,3 +620,29 @@ python3 "$SCRIPT_DIR/test_command_router_framing_mutations.py"
 "$OUT/test_hmac256"
 "$OUT/test_ota_session"
 "$OUT/test_http_mailbox"
+
+python3 "$SCRIPT_DIR/test_matdog_startup_reference.py"
+python3 "$SCRIPT_DIR/test_static_audit_startup.py"
+
+# V3: real configuration codec, NVS owner, transactions, USB fallback/roam,
+# portal input/auth and concurrent mailbox delivery/abandon. No device I/O.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -pthread \
+  -I "$SCRIPT_DIR/nvs_stub" -o "$OUT/test_network_v3" \
+  "$SCRIPT_DIR/test_network_v3.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
+  "$SKETCH_DIR/src/network/PortalSecurity.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+"$OUT/test_network_v3"
+
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
+  -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_wifi_runtime_v3" "$SCRIPT_DIR/test_wifi_runtime_v3.cpp" \
+  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+"$OUT/test_wifi_runtime_v3"
+python3 "$SCRIPT_DIR/test_ota_tls_client.py"
+python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
+
+echo "HOST_TESTS = PASS"

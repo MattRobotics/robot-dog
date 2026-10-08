@@ -499,94 +499,27 @@ what proves it passed*. It is not a narrative roadmap and not an evidence log:
   second transport remains **TO_DESIGN**. Full record:
   [`09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I6_HOSTLINK_IMPLEMENTATION.md).
 
-## Wi-Fi runtime
+## Wi-Fi / provisioning / OTA — V3, 2026-10-04
 
-- **PURPOSE** — bounded network connectivity for the dashboard and OTA.
-- **ENTRY** — HostLink semantic contract defined.
-- **ALLOWED** — connection management, bounded client count, bounded queues, non-blocking I/O.
-- **FORBIDDEN** — network callbacks calling servo primitives; network traffic starving
-  BNO085/DALY/ServoBus/motion; Wi-Fi loss destabilizing low-level control.
-- **PASS CRITERIA** — reconnect cycles stable; no heap leak; no scheduler starvation; no bus timing
-  degradation.
-- **NEXT** — UI-0/UI-1 and OTA.
-- **STATUS** — **PARTIAL (W1).** A station-mode runtime is **IMPLEMENTED**, **COMPILED** and
-  **OFFLINE TESTED**; it is **NOT HARDWARE TESTED** — no MATDOG build has associated with an
-  access point yet, so every PASS CRITERION above remains **TO_TEST**.
-  - Implemented: `src/network/WifiPolicy.*` (pure, host-linkable lifecycle state machine) and
-    `src/network/WifiManager.*` (sole owner of the radio, sole includer of `<WiFi.h>`),
-    `@WIFI STATUS|ON|OFF`, one `WIFI` line in `@STATUS`, credentials resolved outside Git.
-  - Offline evidence: `scripts/tests/test_wifi_policy.cpp` links the real state machine
-    (credential gate, two-phase radio start, connect deadline, backoff ladder and ceiling, link
-    loss, enable/disable, fail-closed action failures, `millis()` wraparound, IPv4 formatting).
-  - Bounded-runtime evidence is **measured, not asserted**: `@WIFI STATUS` reports `last_us` and
-    `max_us` for `WifiManager::update()`. Those numbers do not exist yet — they require the
-    hardware test.
-  - Build cost, same FQBN and profile, against frozen `19fe837`: flash 392,468 B → 959,051 B
-    (12% → 30% of the 3 MB slot); static RAM 28,536 B → 50,868 B (8% → 15%). The ~40–50 KB the
-    Wi-Fi driver allocates at first `WiFi.mode()` is heap and is **not** in those figures;
-    `@STATUS` reports `heap_free`/`heap_min_free` to observe it on device.
-  - Deliberately absent: any server, endpoint, remote command or update path. Wi-Fi is a link.
-  - Deliberately absent: any contribution to `SystemState` health aggregation — a missing access
-    point is not a robot health fact. Whether it should ever contribute is **TO_DESIGN**.
-  - Still **TO_TEST** on hardware: association, DHCP, RSSI/IP reporting, reconnect after AP loss,
-    heap stability over reconnect cycles, and the effect (if any) on BNO085/DALY/ServoBus timing.
+These V3 gate numbers are scoped to this network task; they do not rename the historical
+Controller G0–G4 gates above. Full matrix and evidence are in the
+[V3 offline report](../../09_Logs/Validation_Reports/2026-10-04_WIFI_OTA_SHELLY_V3_OFFLINE.md).
 
-## OTA
+| V3 gate | Offline implementation | Remaining acceptance |
+|---|---|---|
+| G0 inventory/base | Independent branch/worktree; immutable 1a5e008 base | CAL_PERSIST_BASE hardware PASS absent: BLOCKED promotion |
+| G1 Wi-Fi/sleep/roam | Worker, two profiles, async scans, backoff, no BSSID pin, conservative HWCDC NO_SLEEP | Actual association/roam/jitter/heap and USB states TO_TEST |
+| G2 AP/UI/NVS | Protected AP; offline six-tab portal; admin/session/CSRF; ACTIVE/PENDING trial, CRC, failure lock | Provisioning, power loss, AP recovery, calibration retention TO_TEST |
+| G3 OTA | Optional per-device TLS + existing nonce/HMAC single writer; pinned client; HTTP refused | Remote reboot unimplemented/BLOCKED; TLS resources and E2E/rollback TO_TEST; ingest stays 0 |
+| G4 offline verification | Host suites, audit/mutations, DOM smoke, TLS loopback/link, pinned builds | Final CLEAN artifacts/metrics identified by generated receipt |
+| G5 delivery | Canonical docs, development log, report and future hardware runbook | No merge/deployment/hardware authorization |
 
-- **PURPOSE** — make wireless update the normal path while wired recovery remains mandatory.
-- **ENTRY** — Wi-Fi runtime PASS; partition verifier PASS; full-flash recovery verified; USB
-  recovery proven; authority model exists.
-- **ALLOWED** — upload to the inactive slot, validation, reboot, version confirmation, rollback
-  handling.
-- **FORBIDDEN** — OTA during motion, calibration motion or an active service write transaction;
-  weakening partition/rollback checks; removing USB recovery.
-- **PASS CRITERIA** — update + reboot + identity confirmation + rollback behaviour all demonstrated;
-  refused in unsafe states.
-- **NEXT** — UI-9.
-- **STATUS** — **PARTIAL (OTA-A core + transport/auth layer complete, not hardware tested).** The
-  ENTRY condition above is **not met**: Wi-Fi runtime is implemented but not hardware-tested, so OTA
-  cannot be gate-passed.
-  - **IMPLEMENTED / COMPILED / OFFLINE TESTED** — the update core. `src/update/OtaPolicy.*` (pure
-    state machine), `OtaBootGuard.*` (first-boot rollback lifecycle), `Sha256.*` (image identity),
-    `OtaEspBackend.*` (the only unit calling `esp_ota_*`), `OtaManager.*`, `@OTA STATUS`.
-    Host-side partition-selection logic remains **IMPLEMENTED** and offline-tested (40/40).
-  - **Inactive-slot rule enforced structurally** — `target != running`, `subtype ∈ ota_0..ota_15`
-    and `image_size ≤ target.size` are explicit refusals; the backend re-checks the running
-    partition independently; `commitBootTarget()` has one call site and is reachable from exactly
-    one state, `IDENTITY_VERIFIED`. `flash_app_only.sh` is **not** reused as the OTA writer.
-  - **First-boot validation** — confirmation is earned: Controller init complete, CommandRouter
-    bound, identity readable, no PANIC/WDT/BROWNOUT reset, uptime ≥ 15 s and ≥ 2000 loop ticks.
-    The audit fails the build if `Controller::begin()` ever confirms an image. Criteria are
-    software-only and **provisional until ActuatorAuthority exists**.
-  - **Offline evidence** — 468 checks against the real state machine with a fake backend: every
-    target/metadata/stream/verification failure, the ordering property that the boot target never
-    moves outside `IDENTITY_VERIFIED`, replay/idempotence, and the whole rollback lifecycle.
-    SHA-256 checked against FIPS 180-4 vectors and against `sha256sum` on the real binary.
-  - **Transport and authentication: IMPLEMENTED / COMPILED / OFFLINE TESTED (2026-09-25, I7).**
-    `src/network/HttpTransport.*` (an `esp_http_server` adapter, the CONTROL/AUTHORIZATION plane)
-    and `src/update/OtaSession.*` (a pure, host-linkable HMAC-SHA256 challenge/response session
-    layer over `src/update/Hmac256.*`) sit in front of the one existing
-    `OtaManager`/`OtaPolicy`/`OtaEspBackend` writer — never a second writer, never ArduinoOTA. Ingest
-    remains compiled out by default (`MATDOG_OTA_INGEST_ENABLED` defaults to `0`, audit-enforced), so
-    no production image contains a reachable firmware writer regardless of whether the transport code
-    is compiled in. `HttpTransport::start()` is never called from `Controller::begin()` — reachable
-    only from the MAINTENANCE-gated `@WEB SERVER START` command, audit-enforced
-    (`check_http_transport_boundaries`). Full record:
-    [`../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md`](../../09_Logs/Development_Log/2026-09-25_I7_I8_NETWORK_TRANSPORT_IMPLEMENTATION.md).
-  - **OTA-B authorization: IMPLEMENTED / COMPILED / OFFLINE TESTED.** The OTA-A placeholder gate
-    is gone. `src/update/OtaAuthorityGate.*` is backed by the real arbiter: OTA never becomes an
-    actuator owner (the audit fails the build if an OTA entry is added to the enum) and instead
-    takes an exclusivity **inhibit** for the whole update, granted only from `authority == NONE`.
-    Because the check and the hold are one arbiter call, the TOCTOU window a plain
-    `if (authority == NONE)` leaves open across a multi-second update does not exist. The hold is
-    released on every failure, abort and reset, and deliberately kept after a successful commit
-    until the reboot.
-  - **TO_IMPLEMENT / OTA-B** — an explicit authorized operator rollback.
-  - **HARDWARE TO_TEST** — everything: no device has received an OTA image, no otadata has been
-    written, no rollback has been observed, and the measured erase/write blocking costs
-    (`@OTA STATUS` `open_us`/`write_us`/`end_us`) do not exist yet.
-  - Cost: flash 959,043 B → 967,915 B (+8,872 B, 30% of the 3 MB slot); static RAM 50,868 B →
-    51,676 B (+808 B).
+Network callbacks never gain actuator authority. Configuration reserves its quiet window
+before enqueueing; calibration/persistence mutations and RUN entry are refused while busy.
+Abort/revoke/status and USB recovery remain available. TLS resource admission is only a
+preliminary guard; it is not evidence of measured safety on this robot. No firmware-ingest
+candidate with flag 1 may be promoted under this report. Future execution uses the
+[hardware runbook](WIFI_OTA_SHELLY_HARDWARE_RUNBOOK.md) after separate authorization.
 
 ## Safe Actuator Layer
 

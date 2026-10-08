@@ -60,6 +60,8 @@ struct CalibrationMotionPermitFacts {
   bool current_population_pass = false;
   bool current_geometry_bound = false;
   bool promoted_transforms_complete = false;
+  bool startup_recovery_only = false;
+  bool startup_reference_qualified = false;
 
   core::ActuatorAuthority authority = core::ActuatorAuthority::NONE;
   uint32_t authority_generation = 0;
@@ -67,6 +69,7 @@ struct CalibrationMotionPermitFacts {
 };
 
 struct CalibrationMotionPermitToken {
+  bool startup_recovery_only = false;
   uint32_t permit_generation = 0;
   uint32_t session_id = 0;
   uint32_t authority_generation = 0;
@@ -96,6 +99,8 @@ struct CalibrationMotionPermitLiveInputs {
   bool current_population_pass = false;
   bool current_geometry_bound = false;
   bool promoted_transforms_complete = false;
+  bool startup_recovery_only = false;
+  bool startup_reference_qualified = false;
   core::ActuatorAuthority authority = core::ActuatorAuthority::NONE;
   uint32_t authority_generation = 0;
   bool authority_inhibited = false;
@@ -155,6 +160,7 @@ class CalibrationMotionPermit {
   CalibrationPermitStatus evaluateFacts(const CalibrationMotionPermitFacts& facts) const;
 
   bool active_ = false;
+  bool bound_startup_recovery_only_ = false;
   uint32_t generation_ = 0;
   uint32_t bound_session_id_ = 0;
   uint32_t bound_authority_generation_ = 0;

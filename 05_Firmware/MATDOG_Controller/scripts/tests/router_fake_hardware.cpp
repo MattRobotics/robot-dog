@@ -31,6 +31,15 @@ const char* toString(JointPreflightResult) { return "UNRELATED_PREFLIGHT_RESULT"
 }
 namespace network {
 bool WifiManager::setEnabled(bool, uint32_t) { ++router_test::hardware_calls; return false; }
+bool WifiManager::requestScan() { ++router_test::hardware_calls;return false; }
+bool WifiManager::requestAp(bool) { ++router_test::hardware_calls;return false; }
+bool WifiManager::setSleep(uint8_t) { ++router_test::hardware_calls;return false; }
+bool WifiManager::provisionAp(const char*) { ++router_test::hardware_calls;return false; }
+bool WifiManager::provisionAdmin(const char*) { ++router_test::hardware_calls;return false; }
+bool WifiManager::configure(const ConfigPatch&) { ++router_test::hardware_calls;return false; }
+bool NetworkConfigNvs::load(NetworkConfig*) { ++router_test::hardware_calls;return false; }
+bool NetworkConfigNvs::pending(const NetworkConfig&) { ++router_test::hardware_calls;return false; }
+bool NetworkConfigNvs::activate(const NetworkConfig&) { ++router_test::hardware_calls;return false; }
 bool HttpTransport::start() { ++router_test::hardware_calls; return false; }
 void HttpTransport::stop() { ++router_test::hardware_calls; }
 }

@@ -49,6 +49,7 @@ explicitly (it is not part of static_audit.py):
 
     python3 scripts/tests/test_calibration_search_behaviour_mutations.py
 """
+import argparse
 import concurrent.futures
 import os
 import re
@@ -298,27 +299,34 @@ MUTATIONS = [
      "  } else {\n    step_ticks_ = kSearchFineStepTicks;\n    next_depth = target_depth + kSearchFineStepTicks;\n"
      "    if (next_depth > guard_depth && target_depth < guard_depth) next_depth = guard_depth;\n"),
 
-    # --- LF V25 runtime PresentTemperature confirmation (2026-09-30) ---------
-    ("thermal: the two confirmation reads removed", THERMAL_CPP,
-     "  for (uint8_t i = 1; i < kThermalConfirmationReads; ++i) {",
-     "  for (uint8_t i = 1; i < 1; ++i) {"),
-    ("thermal: >= 2 of 3 weakened to 1 of 3", THERMAL_CPP,
-     "  if (over_limit >= kThermalConfirmedOverLimit) {", "  if (over_limit >= 1) {"),
+    # --- adaptive PresentTemperature confirmation ---
+    ("thermal: direct confirmation removed", THERMAL_CPP,
+     "!port->readPresentTemperatureDirect(bus, &value)", "false"),
+    ("thermal: majority weakened to 1", THERMAL_CPP,
+     "hot >= kThermalConfirmedOverLimit", "hot >= 1"),
     ("thermal: confirmation reads another servo", THERMAL_CPP,
-     "    if (!port->readPresentTemperatureDirect(bus_id, &celsius) || celsius < 0) {",
-     "    if (!port->readPresentTemperatureDirect(static_cast<uint8_t>(bus_id + 1), &celsius) ||\n"
-     "        celsius < 0) {"),
-    ("thermal: cached trigger value instead of a fresh direct read", THERMAL_CPP,
-     "    if (!port->readPresentTemperatureDirect(bus_id, &celsius) || celsius < 0) {",
-     "    celsius = observed_c;\n    if (celsius < 0) {"),
-    ("thermal: the 50 ms wait before each confirmation removed", THERMAL_CPP,
-     "    port->delayMs(kThermalConfirmationDelayMs);\n", ""),
-    ("thermal: a failed confirmation read no longer fails closed", THERMAL_CPP,
-     "    if (!port->readPresentTemperatureDirect(bus_id, &celsius) || celsius < 0) {\n"
-     "      out.decision = ThermalDecision::CONFIRMATION_READ_FAILED;\n",
-     "    if (!port->readPresentTemperatureDirect(bus_id, &celsius) || celsius < 0) {\n"
-     "      out.decision = ThermalDecision::CONFIRMATION_READ_FAILED;\n"
-     "      out.published_c = kThermalLimitC;\n"),
+     "!port->readPresentTemperatureDirect(bus, &value)",
+     "!port->readPresentTemperatureDirect(static_cast<uint8_t>(bus + 1), &value)"),
+    ("thermal: cached trigger instead of a fresh direct read", THERMAL_CPP,
+     "!port->readPresentTemperatureDirect(bus, &value)", "!(value = observed, true)"),
+    ("thermal: 50 ms sample spacing removed", THERMAL_CPP,
+     "if (now_ms - last_read_ms_ < kThermalConfirmationDelayMs) return result_;", "if (false) return result_;"),
+    ("thermal: failed confirmation published as safe", THERMAL_CPP,
+     "  if (port == nullptr || !port->readPresentTemperatureDirect(bus, &value) ||\n"
+     "      value < 0 || value > 255) {\n"
+     "    result_.decision = ThermalDecision::CONFIRMATION_READ_FAILED;\n",
+     "  if (port == nullptr || !port->readPresentTemperatureDirect(bus, &value) ||\n"
+     "      value < 0 || value > 255) {\n"
+     "    result_.decision = ThermalDecision::CONFIRMATION_READ_FAILED;\n"
+     "    result_.published_c = kThermalLimitC;\n"),
+
+    ("thermal: concentrated anomaly latch removed", THERMAL_CPP,
+     "transients_ >= kThermalMaxTransients || boot_transients_ >= kThermalMaxBootTransients",
+     "boot_transients_ >= kThermalMaxBootTransients"),
+    ("thermal: sparse anomalies ignored indefinitely", THERMAL_CPP,
+     " || boot_transients_ >= kThermalMaxBootTransients", ""),
+    ("thermal: pending deadline removed", THERMAL_CPP,
+     "expired(now_ms) || bus != result_.bus_id", "bus != result_.bus_id"),
 
     # --- the 24-contact Full Calibration orchestration ---------------------
     ("INITIAL_RECOVERY skips joints already near q0", EXEC_CPP,
@@ -340,9 +348,9 @@ MUTATIONS = [
      "      if (hip_poses_differ) {\n        // V25 per-side clearance",
      "      if (hip_poses_differ && false) {\n        // V25 per-side clearance"),
     ("held-joint drift ignored", EXEC_CPP,
-     "      failHeldRole(observeHeld(s, sample, now_ms, t), FullLegFailure::HELD_JOINT_DRIFT);\n"
-     "      return false;",
-     "      (void)0;"),
+     "    if (absDiff(sample->present_position, st.target_tick) >\n"
+     "        static_cast<int32_t>(kSequenceStaticToleranceTicks)) {",
+     "    if (false) {"),
     ("held-joint TorqueLimit readback ignored", EXEC_CPP,
      "        sample->torque_limit != static_cast<int32_t>(request_.torque_limit) ||\n"
      "        sample->goal_position != static_cast<int32_t>(st.target_tick)) {",
@@ -486,16 +494,35 @@ def classify(out: str):
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--thermal-only", action="store_true",
+                        help="Compile the real thermal suite against the thermal mutants only")
+    parser.add_argument("--anchors-only", action="store_true")
+    args = parser.parse_args()
     for name, rel, anchor, _ in MUTATIONS:
         count = (SKETCH / rel).read_text().count(anchor)
         if count != 1:
             print(f"BEHAVIOUR_MUTATIONS = FAIL (anchor for '{name}' occurs {count}x in {rel})")
             return 1
 
+    if args.anchors_only:
+        print(f"BEHAVIOUR_MUTATION_ANCHORS = PASS ({len(MUTATIONS)} anchors)")
+        return 0
+
+    selected = [m for m in MUTATIONS if m[1] == THERMAL_CPP] if args.thermal_only else MUTATIONS
+    def run_selected(root):
+        if not args.thermal_only:
+            return run_host_tests(root)
+        binary = root / "thermal_test"
+        compiled = subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror",
+            str(root / "scripts/tests/test_thermal_confirmation.cpp"),
+            str(root / THERMAL_CPP), "-o", str(binary)], capture_output=True, text=True)
+        return compiled if compiled.returncode else subprocess.run([str(binary)], capture_output=True, text=True)
+
     with tempfile.TemporaryDirectory(prefix="matdog_mut_") as tmp:
         baseline = Path(tmp) / "baseline"
         copy_sketch(baseline)
-        res = run_host_tests(baseline)
+        res = run_selected(baseline)
         if res.returncode != 0:
             print("BEHAVIOUR_MUTATIONS = FAIL (unmutated copy does not pass: "
                   f"{classify(res.stdout + res.stderr)[1]})")
@@ -508,7 +535,7 @@ def main() -> int:
             copy_sketch(root)
             path = root / rel
             path.write_text(path.read_text().replace(anchor, repl, 1))
-            res = run_host_tests(root)
+            res = run_selected(root)
             kind, detail = classify(res.stdout + res.stderr)
             ok = res.returncode != 0 and kind == "behaviour"
             if res.returncode == 0:
@@ -524,11 +551,11 @@ def main() -> int:
         jobs = int(os.environ.get("MATDOG_MUTATION_JOBS", "4"))
         caught = 0
         with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
-            for i, name, tag, detail, ok in pool.map(one, enumerate(MUTATIONS, 1)):
+            for i, name, tag, detail, ok in pool.map(one, enumerate(selected, 1)):
                 caught += ok
                 print(f"[{tag}] {i:02d} {name}: {detail}", flush=True)
 
-    total = len(MUTATIONS)
+    total = len(selected)
     verdict = "PASS" if caught == total else "FAIL"
     print(f"BEHAVIOUR_MUTATIONS = {verdict} ({caught}/{total} caught)")
     return 0 if caught == total else 1

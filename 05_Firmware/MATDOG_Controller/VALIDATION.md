@@ -1,5 +1,17 @@
 # MATDOG Controller V0.1 — Validation
 
+## Wi-Fi / provisioning / OTA V3 — offline, 2026-10-04
+
+Independent branch `feat/controller-wifi-ota-shelly-v1`, provisional base `1a5e008`.
+See [V3 report](../../09_Logs/Validation_Reports/2026-10-04_WIFI_OTA_SHELLY_V3_OFFLINE.md)
+for the matrix and [future hardware runbook](WIFI_OTA_SHELLY_HARDWARE_RUNBOOK.md).
+Host configuration/security checks, real adapter with fake radio/NVS, TLS loopback,
+HTTPS compile/link and offline DOM checks are recorded; final CLEAN USB_ONLY then
+ROBOT_POWERED builds are bound to HEAD by the generated artifact receipt.
+No hardware operation occurred. CAL_PERSIST_BASE is BLOCKED pending hardware evidence;
+remote reboot is BLOCKED/unimplemented; ingest remains 0. No historical VALIDATED label
+below applies automatically to this candidate.
+
 Current-facing status vocabulary follows the canonical meanings in the root
 [`README.md`](../../README.md#status-vocabulary): **VALIDATED**, **IMPLEMENTED**,
 **DECIDED**, **TO_TEST**, **TO_DESIGN**, **FROZEN**, **SUPERSEDED**, and
@@ -9,6 +21,28 @@ terminology.
 
 This document will be updated in place as hardware sessions progress; it is not
 rewritten per session.
+
+## Post-ABORT recovery and thermal acquisition — 2026-10-03
+
+Status: **IMPLEMENTED**, verified offline; hardware validation **TO_TEST**.
+The isolated branch `fix/calibration-post-abort-thermal` starts at `7b258b36c257`.
+The original dirty checkout and gait branch are preserved. No controller port,
+servo bus, reset, upload or flash was opened/executed in this task.
+
+The focused regressions replay RF LOWER 2348/Q0 1997, RF UPPER 1080/Q0 2106,
+RH UPPER 1665/Q0 2058, returning LOWER → UPPER → rear park, then all 12 Q0
+and SAFE_OFF. They cover all four legs' UPPER/LOWER probe phases, unproven
+HIP phases, unsafe dependencies, changed Q0, lost UART/permit, current,
+real heat, timeouts, and observation while thermal confirmation is pending.
+Thermal tests cover 95,117,34,34,34, true overheat, unavailable/invalid samples,
+300 ms deadline and both concentrated and sparse repeated anomalies.
+UART tests execute the actual validated transport against synthetic packets.
+Native router/NVS and runner tests cover evidence retention, discard,
+SAVE/ACK and simulated reboot. The report records final commands/results,
+CAD sampling limits, release manifest and locally verified rollback evidence.
+
+[Technical release report](../../09_Logs/Development_Log/2026-10-03_POST_ABORT_THERMAL_OFFLINE_RELEASE.md).
+[Controlled future workflow and application-only update](POST_ABORT_RECOVERY_RUNBOOK.md).
 
 ## P3a.2 USB framing hardening — offline verification, 2026-10-02
 
@@ -3316,3 +3350,35 @@ cases; USB_ONLY build and ROBOT_POWERED compile clean. No hardware access, flash
 A hardware run is expected to end each leg at `HARDWARE_CONTACT_CALIBRATED` with
 `envelope_accepted=0` and 0 of 12 JointLimits admitted (unapproved placeholder parameters).
 Procedure: [`FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md`](FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md).
+
+
+## 2026-10-03 — release automation, offline only
+
+The native runner now supports a strict DALY observer on its existing connection,
+pinned firmware-worktree verification, same-boot admission and structured phase
+receipts. Three packaged stage entry points are tested with synthetic controller
+I/O and temporary local Git repositories. Operator interruption also de-escalates
+through ABORT/SAFE_OFF; verify-persistence sends only read-only queries.
+No generic audit was repeated for this host-only tooling change. Firmware build
+`125d981b02a3` and its earlier recovery/thermal/UART/NVS host validation remain
+unchanged. Actual hardware, calibration, reboot and main merge are pending.
+Initial-pose admission is BLOCKED: no qualified post-shutdown path under the
+no-cover/no-RESET/no-forced-reducer constraints was found. See SESSION_AUTOMATION.md
+and the package's INITIAL_POSE_PLAN.md. Synthetic PASS cannot remove this block.
+
+Targeted offline results: native runner 42/42; DALY guard 6/6; release-stage,
+artifact failure and temporary local Git integration tests 18/18. These are
+simulations/file checks, with no serial, flashing or real main integration.
+
+
+## 2026-10-03 — startup reference correction and offline qualification
+
+The earlier STARTUP_Q0_REFERENCE block is superseded by the verified complete
+source `full_cal_nvs_20261003_134848` (RF UPPER2106). A separate immutable
+reference supports only explicit fresh-readback-qualified RF return21→22→32;
+no boot authority or transform restore. Targeted host tests, affected static
+audit and clean ROBOT_POWERED build are recorded in the release package.
+Geometry V5 support bands remain absolute±10 for passive joints; mechanical
+support/installation continuity are operator GO prerequisites. No hardware
+PASS, serial access or flashing is claimed. See
+[technical assessment](STARTUP_RECOVERY_OFFLINE_ASSESSMENT.md).

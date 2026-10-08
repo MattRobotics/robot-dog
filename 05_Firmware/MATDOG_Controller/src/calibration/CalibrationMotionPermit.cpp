@@ -21,7 +21,8 @@ CalibrationPermitStatus CalibrationMotionPermit::evaluateFacts(
   }
   if (!facts.current_population_pass) return CalibrationPermitStatus::REJECT_POPULATION;
   if (!facts.current_geometry_bound) return CalibrationPermitStatus::REJECT_GEOMETRY;
-  if (!facts.promoted_transforms_complete) return CalibrationPermitStatus::REJECT_TRANSFORMS;
+  if (facts.startup_recovery_only ? !facts.startup_reference_qualified : !facts.promoted_transforms_complete)
+    return CalibrationPermitStatus::REJECT_TRANSFORMS;
   if (facts.authority != core::ActuatorAuthority::CALIBRATION ||
       facts.authority_generation == 0) {
     return CalibrationPermitStatus::REJECT_AUTHORITY;
@@ -45,11 +46,13 @@ CalibrationPermitStatus CalibrationMotionPermit::grant(
   ++generation_;
   if (generation_ == 0) ++generation_;
   active_ = true;
+  bound_startup_recovery_only_=facts.startup_recovery_only;
   bound_session_id_ = facts.session_id;
   bound_authority_generation_ = facts.authority_generation;
   last_revoke_reason_ = CalibrationPermitRevokeReason::NONE;
 
   if (out_token != nullptr) {
+    out_token->startup_recovery_only=facts.startup_recovery_only;
     out_token->permit_generation = generation_;
     out_token->session_id = bound_session_id_;
     out_token->authority_generation = bound_authority_generation_;
@@ -67,6 +70,10 @@ CalibrationPermitStatus CalibrationMotionPermit::check(
     return CalibrationPermitStatus::REVOKED;
   }
 
+  if (facts.startup_recovery_only!=bound_startup_recovery_only_ ||
+      token.startup_recovery_only!=bound_startup_recovery_only_) {
+    revoke(CalibrationPermitRevokeReason::PREREQUISITE_LOST);return CalibrationPermitStatus::REVOKED;
+  }
   const CalibrationPermitStatus evaluated = evaluateFacts(facts);
   if (evaluated != CalibrationPermitStatus::ACTIVE) {
     CalibrationPermitRevokeReason reason = CalibrationPermitRevokeReason::PREREQUISITE_LOST;
@@ -146,6 +153,8 @@ CalibrationMotionPermitFacts buildCalibrationMotionPermitFacts(
   facts.current_population_pass = inputs.current_population_pass;
   facts.current_geometry_bound = inputs.current_geometry_bound;
   facts.promoted_transforms_complete = inputs.promoted_transforms_complete;
+  facts.startup_recovery_only=inputs.startup_recovery_only;
+  facts.startup_reference_qualified=inputs.startup_reference_qualified;
   facts.authority = inputs.authority;
   facts.authority_generation = inputs.authority_generation;
   facts.authority_inhibited = inputs.authority_inhibited;

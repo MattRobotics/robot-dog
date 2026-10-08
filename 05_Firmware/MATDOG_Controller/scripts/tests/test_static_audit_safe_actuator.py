@@ -160,7 +160,8 @@ FULL_PLAN = (r'(Serial\.println\("CALIBRATION_FULL_LEG=REFUSED"\);\s*'
              r'calibration::FullLegPlan plan\{\};')
 FULL_START = (r'if \(!modules_\.full_leg_calibration->start\(plan\.request, context, millis\(\)\)\) \{'
               r'(\s*Serial\.println\("CALIBRATION_FULL_LEG=REFUSED"\);)')
-RECOVERY_START = (r'if \(!modules_\.full_leg_calibration->start\(plan\.request, context, millis\(\)\)\) \{'
+RECOVERY_START = (r'if \(!\(post_abort \? modules_\.full_leg_calibration->startPostAbortRecovery\(plan\.request, context, millis\(\)\)'
+                  r'\s*: modules_\.full_leg_calibration->start\(plan\.request, context, millis\(\)\)\)\) \{'
                   r'(\s*Serial\.println\("CALIBRATION_INITIAL_RECOVERY=REFUSED"\);)')
 
 
@@ -792,24 +793,24 @@ def main():
 
     # --- LF V25 runtime PresentTemperature confirmation (2026-09-30) ---------
     case("thermal majority weakened to 1 of 3", "ThermalConfirmation.h",
-         r"constexpr uint8_t kThermalConfirmedOverLimit = 2;",
+         r"constexpr uint8_t kThermalConfirmedOverLimit = 3;",
          "constexpr uint8_t kThermalConfirmedOverLimit = 1;",
-         "thermal confirmation constant drifted", runner=run_thermal_checks)
+         "thermal/UART safety invariant missing", runner=run_thermal_checks)
 
     case("thermal confirmation wait removed", "ThermalConfirmation.cpp",
-         r"port->delayMs\(kThermalConfirmationDelayMs\);",
+         r"now_ms - last_read_ms_ < kThermalConfirmationDelayMs",
          "",
-         "50 ms, then a fresh direct read", runner=run_thermal_checks)
+         "thermal/UART safety invariant missing", runner=run_thermal_checks)
 
     case("thermal confirmation reads another servo", "ThermalConfirmation.cpp",
-         r"port->readPresentTemperatureDirect\(bus_id, &celsius\)",
-         "port->readPresentTemperatureDirect(static_cast<uint8_t>(bus_id + 1), &celsius)",
-         "the SAME servo", runner=run_thermal_checks)
+         r"port->readPresentTemperatureDirect\(bus, &value\)",
+         "port->readPresentTemperatureDirect(static_cast<uint8_t>(bus + 1), &value)",
+         "thermal/UART safety invariant missing", runner=run_thermal_checks)
 
     case("Controller skips the thermal confirmation", "Controller.cpp",
-         r"sample\.present_temperature = thermal\.published_c;",
-         "(void)thermal;",
-         "thermal confirmation before the executor", runner=run_thermal_checks)
+         r"state\.update\(&thermal_read_port_, buses\[i\], sample\.present_temperature, millis\(\)\)",
+         "state.result()",
+         "thermal/UART safety invariant missing", runner=run_thermal_checks)
 
     case("CommandRouter derives its own search corridor", ROUTER_CPP,
          r"void CommandRouter::printServoRead\(int id\) \{",
