@@ -1,5 +1,41 @@
 # MATDOG Controller V0.1 — Validation
 
+## PR-3 dev.2/dev.3 source delta — offline verification, 2026-10-08
+
+Scope: offline verification of the content PR-3 brings to `main` (seven recreated commits, see the
+[PR-3 log](../../09_Logs/Development_Log/2026-10-08_PR3_DEV2_DEV3_SELECTIVE_INTEGRATION.md)).
+**No hardware, serial, flash, NVS, EEPROM or OTA access. No hardware validation, no hardware
+acceptance and no release acceptance of any `main` build.** `MOTION_AUTHORIZED=0`,
+`RESTORE=NOT_IMPLEMENTED`. The layers stay apart:
+
+| Layer | State |
+|---|---|
+| Code on `main` | PR-1, PR-2 and the dev.2 boot census, dev.3 thermal verdict, runner recovery, identity `0.2.0-dev.3` |
+| Offline tests | the table below |
+| Hardware results (historical, of the dev.2/dev.3 candidate on the robot) | in the [dev.2](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV2_BOOT_SELFTEST_DELTA_AUDIT_2026-10-06.md) and [dev.3](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md) delta audits; not results for a `main` build |
+| Hardware acceptance | dev.3 Hardware Validation 2026-10-07: execution COMPLETE, acceptance **BLOCKED**; its report is not in the repository |
+| Release acceptance | none; no release approved |
+| Deferred | motion execution suites, oracles and G35/G4/G4.1/G5-A evidence (unchanged from PR-2) |
+
+Environment as for PR-2 (`arduino-cli` 1.5.1, `esp32:esp32` 3.3.11, pinned libraries, scipy, Git LFS
+objects). Consolidated code tree `1d59dbe`; the later commits are Markdown only.
+
+| Check | Result |
+|---|---|
+| `scripts/static_audit.py` (central gate, including the host and nested mutation suites) | **PASS** on the code tree; the run on the final tip is recorded in the PR description |
+| Host suites inside the gate (47 result lines) | 0 failures; mutation suites detect their mutants |
+| Motion source/purity/provenance gate | PASS; 44 integrated files and 34 inputs match their SHA-256; 286 deferred artifacts absent |
+| Motion host tests, fresh oracles, audit-tool tests | **DEFERRED** — not run, not integrated |
+| `MATDOG_PROFILE=USB_ONLY scripts/build.sh` | PASS; 1,174,320-byte application (22.4 % of the slot); `FW_VERSION=0.2.0-dev.3`; layout `MATDOG_16M_2x5M_NVS_V1`; table `8f756ecb…`; OTA ingest 0; manifest `SOURCE_STATE=CLEAN`, `SOURCE_COMMIT=1d59dbe…` |
+| `MATDOG_PROFILE=ROBOT_POWERED scripts/build.sh` | PASS; 1,178,224 bytes (22.5 %); same version, layout, table, ingest and `SOURCE_STATE` |
+| Compiler warnings | 2 per profile, both in the third-party SCServo library |
+
+Source correspondence with dev.3 is by blob comparison (PR-3 log). It is not a binary claim: the
+frozen dev.3 images recorded in the dev.3 audit are 1,178,272 bytes (ROBOT_POWERED) and 1,174,384
+bytes (USB_ONLY), the container builds above are 48 and 64 bytes smaller. The cause was not
+investigated, and the container binaries are not release artifacts and are not compared with the
+installed image.
+
 ## PR-2 selective dev.1 integration — offline verification, 2026-10-08
 
 Scope: offline verification of the content PR-2 brings to `main`. **No hardware, serial, flash, NVS,
