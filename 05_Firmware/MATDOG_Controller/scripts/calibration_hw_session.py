@@ -88,6 +88,21 @@ LEG_WATCHDOG_S = 1800.0
 RECOVERY_WATCHDOG_S = 300.0
 POLL_S = 2.0
 SILENCE_S = 10.0
+# Automatic post-abort recovery (2026-10-06). After a failed leg the runner may
+# start the firmware's own, already audited POST_ABORT RECOVERY - never a new
+# motion - and only for these kinematic search verdicts, reached with healthy
+# telemetry, current, bus and authority. Everything else stays in SAFE_OFF:
+# over-temperature or a thermal telemetry fault, a hard-current abort, stale or
+# lost communication, a torque/goal/limit readback anomaly, a servo status
+# fault, a refused or uncertain command, an operator abort, anything unknown.
+AUTO_RECOVERABLE_PROBE_FAILURES = frozenset((
+    "NO_CONTACT_BEFORE_GUARD", "EARLY_STALL_OUTSIDE_CORRIDOR", "TRACKING_FAILED",
+    "REPEATABILITY_FAILED", "INSUFFICIENT_BASELINE", "BACKOFF_CROSSES_HOME",
+    "BASELINE_PASSES_GUARD", "SCOUT_MISSING"))
+# The only interruptions the firmware recovery accepts (a witnessed probe).
+AUTO_RECOVERABLE_PHASES = ("UPPER_MIN", "UPPER_MAX", "LOWER_MIN", "LOWER_MAX")
+THERMAL_LIMIT_C = 70
+Q0_REST_TOLERANCE_TICKS = 10
 
 
 class SessionFailure(Exception):
@@ -207,6 +222,8 @@ class Session:
         self.clock = clock
         self.sleep = sleep
         self.daly_guard = None
+        self.bms_stream_started = False
+        self.leg_failure = None   # classification of the last failed leg, if any
 
     def check_daly(self):
         if self.daly_guard is None:
@@ -228,6 +245,7 @@ class Session:
         guard = DalyGuard()
         guard.cursor = self.mark()
         self.request("@BMS STREAM ON", r"BMS_STREAM=ON")
+        self.bms_stream_started = True
         mark = self.mark()
         self.link.send("@BMS STATUS")
         self.wait_for(r"  charge_mos=(ON|OFF) discharge_mos=(ON|OFF) state=\S+ alarms=[0-9A-F]{4}(?: [0-9A-F]{4}){3}", mark, 3)
@@ -529,6 +547,7 @@ class Session:
                      f"{contacts.group(3)})")
         if verdict != "HARDWARE_CONTACT_CALIBRATED" or failure != "NONE" or \
                 contacts.group(1, 2, 3) != ("6", "6", "YES"):
+            self.leg_failure = self.classify_leg_failure(leg, mark)
             raise SessionFailure(f"{leg} verdict={verdict} failure={failure} "
                                  f"contacts={contacts.group(2)}/6")
 
@@ -577,6 +596,29 @@ class Session:
                         f"(budget +/-{LF_MIN_ABSOLUTE_TOLERANCE_TICKS}): "
                         f"stopping for operator review before any other leg")
         self.log.say(f"PASS  {leg} 6/6 HARDWARE_CONTACT_CALIBRATED; cleanup verified")
+
+    def classify_leg_failure(self, leg, mark):
+        """What the firmware itself recorded about a failed leg since `mark`:
+        the last whole PROBE_FINAL record for this leg and any thermal verdict
+        that was not a refuted block-read value. Evidence for the automatic
+        recovery decision; None when the firmware printed no such record."""
+        final = re.compile(rf"CALIBRATION_FULL_LEG_PROBE_FINAL leg={leg} joint=(\S+) side=(\S+) "
+                           r"executor_failure=(\S+) failed_phase=(\S+) probe_phase=(\S+) "
+                           r"probe_failure=(\S+) .*")
+        thermal = re.compile(r"CALIBRATION_THERMAL_CONFIRMATION bus=(\d+) decision=(\S+) .*")
+        found, thermal_fault = None, []
+        for text in self.lines_since(mark):
+            m = final.fullmatch(text)
+            if m:
+                found = m
+            t = thermal.fullmatch(text)
+            if t and t.group(2) != "BULK_TEMP_ARTIFACT_SUSPECT":
+                thermal_fault.append(f"bus={t.group(1)}:{t.group(2)}")
+        if found is None:
+            return None
+        return {"leg": leg, "joint": found.group(1), "side": found.group(2),
+                "executor_failure": found.group(3), "failed_phase": found.group(4),
+                "probe_failure": found.group(6), "thermal_fault": thermal_fault}
 
     def _monitor(self, terminal, mark, label, watchdog_s, stop_on_match=True):
         """Polls FULL LEG STATUS (the only command sent while a run is in
@@ -768,15 +810,123 @@ class Session:
                 self.link.send(cmd)
             except Exception as e:  # link gone: nothing more can be done electronically
                 self.log.say(f"!!    could not send {cmd}: {e}")
-                return
+                return 0
         self.sleep(1.0)
+        verified = 0
         for bus in INSTALLED:
             try:
                 m = self.request(f"@SERVO SAFE_OFF {bus}", rf"SERVO_SAFE_OFF id={bus} result=(\S+)",
                                  timeout=3.0, fail_patterns=())
                 self.log.say(f"      SAFE_OFF {bus}: {m.group(1)}")
+                verified += m.group(1) == "VERIFIED_OFF"
             except Exception as e:
                 self.log.say(f"!!    SAFE_OFF {bus} not confirmed: {e}")
+        return verified
+
+    # -- automatic post-abort recovery (policy 2026-10-06) ---------------------------
+
+    def census_preflight(self):
+        mark = self.mark()
+        self.link.send("@SERVO CENSUS")
+        self.wait_for(r"SERVO_CENSUS=PASS lo=11 hi=55", mark, 20.0,
+                      (r"SERVO_CENSUS=(?!STARTED|PASS).*", r"ERROR=.*"))
+        self.wait_for(r"  present_expected=13 missing_expected=0 absent_by_design=4", mark, 5.0)
+        self.wait_for(r"  absent_by_design_present=0 unexpected_id=0 not_probed=0 truncated=NO", mark, 5.0)
+        mark = self.mark()
+        self.link.send("@SERVO PREFLIGHT")
+        self.wait_for(r"SERVO_PREFLIGHT=PASS profile=\S+ source_sha256=[0-9a-f]{64}", mark, 30.0,
+                      (r"SERVO_PREFLIGHT=(?!STARTED|PASS).*", r"ERROR=.*"))
+        self.wait_for(r"  evaluated=12 pass=12 no_response=0 mismatch=0 incomplete=0", mark, 5.0)
+
+    def read_installed(self):
+        """Direct, single-register reads of every installed servo (@SERVO READ)."""
+        out = {}
+        for bus in INSTALLED:
+            m = self.request(f"@SERVO READ {bus}",
+                             rf"SERVO_READ id={bus} position=(-?\d+) speed=(-?\d+) load=(-?\d+) "
+                             r"voltage=(-?\d+) temp=(-?\d+) torque=(-?\d+) current=(-?\d+)",
+                             fail_patterns=(r"SERVO_READ=BLOCKED", rf"SERVO_READ id={bus} result=\S+"))
+            out[bus] = {"position": int(m.group(1)), "temp": int(m.group(5)),
+                        "torque": int(m.group(6)), "current": int(m.group(7))}
+        return out
+
+    def auto_post_abort_recovery(self, checkpoint, build_id, verified_off, export_lines,
+                                 require_daly):
+        """After a failed leg: SAFE_OFF 13/13 and the evidence export are already
+        done. If, and only if, the failure is an allow-listed search verdict and
+        every precondition is proven fresh, start the firmware's own witnessed
+        POST_ABORT RECOVERY (one joint at a time, INITIAL RECOVERY parameters),
+        verify 12/12 at the promoted q0 and SAFE_OFF 13/13 again. One attempt,
+        never a retry. Returns a record; never raises."""
+        record = {"schema": "MATDOG_AUTO_POST_ABORT_RECOVERY_V1", "verdict": "SKIPPED",
+                  "failure": self.leg_failure, "safe_off_verified": verified_off}
+
+        def skip(reason):
+            record["reason"] = reason
+            self.log.say(f"      AUTO_RECOVERY=SKIPPED reason={reason} - robot stays in SAFE_OFF")
+            return record
+
+        f = self.leg_failure
+        if f is None:
+            return skip("NO_CLASSIFIED_LEG_FAILURE")
+        if f["thermal_fault"]:
+            return skip("THERMAL_VERDICT:" + ",".join(f["thermal_fault"]))
+        if f["probe_failure"] not in AUTO_RECOVERABLE_PROBE_FAILURES:
+            return skip("FAILURE_NOT_RECOVERABLE:" + f["probe_failure"])
+        if f["failed_phase"] not in AUTO_RECOVERABLE_PHASES:
+            return skip("PHASE_NOT_RECOVERABLE:" + f["failed_phase"])
+        if verified_off != len(INSTALLED):
+            return skip(f"SAFE_OFF_{verified_off}_OF_{len(INSTALLED)}")
+        if export_lines is None:
+            return skip("EVIDENCE_EXPORT_UNAVAILABLE")
+        if checkpoint is None:
+            return skip("NO_PROMOTED_Q0_CHECKPOINT")
+        if self.link.lost:
+            return skip("LINK_LOST")
+        try:
+            self.authority_none()
+            q0 = self.verify_current_q0(checkpoint, build_id)
+            exported = [m.group(1) for m in (re.fullmatch(
+                r"CALIBRATION_EVIDENCE_EXPORT=BEGIN .*\bgeometry=(\S+) .*", t) for t in export_lines) if m]
+            if exported != [self.promoted_geometry]:
+                raise SessionFailure(f"export geometry {exported} is not the promoted "
+                                     f"{self.promoted_geometry}")
+            self.census_preflight()
+            state = self.read_installed()
+            record["direct_reads_before"] = state
+            hot = [b for b, v in state.items() if not 0 <= v["temp"] <= THERMAL_LIMIT_C]
+            energized = [b for b, v in state.items() if v["torque"] != 0]
+            if hot or energized:
+                raise SessionFailure(f"direct reads: temperature out of range on {hot}, torque on {energized}")
+            if require_daly:
+                self.start_daly_guard()
+        except (SessionFailure, OSError, ValueError, KeyError) as e:
+            return skip(f"PRECONDITION:{e}")
+
+        leg = f["leg"]
+        self.log.say(f"RUN   AUTO POST-ABORT RECOVERY {leg}: firmware POST_ABORT RECOVERY to the "
+                     f"promoted q0, one joint at a time")
+        try:
+            self.open_leg_session(leg)
+            self.initial_recovery(leg, q0, post_abort=True)
+            self.safe_off_all()
+            after = self.read_installed()
+            record["direct_reads_after"] = after
+            off_q0 = [b for b in sorted(q0)
+                      if abs(after[b]["position"] - q0[b]) > Q0_REST_TOLERANCE_TICKS]
+            energized = [b for b, v in after.items() if v["torque"] != 0]
+            if off_q0 or energized:
+                raise SessionFailure(f"after recovery: not at q0 {off_q0}, torque on {energized}")
+        except (SessionFailure, OSError, ValueError, KeyError, KeyboardInterrupt) as e:
+            record.update(verdict="FAILED", reason=str(e))
+            self.log.say(f"FAIL  AUTO_RECOVERY {e}")
+            self.log.say("      de-escalating again: FULL LEG ABORT, SESSION ABORT, SAFE_OFF all 13; no retry")
+            record["safe_off_verified_after_failure"] = self.emergency_stop()
+            return record
+        record.update(verdict="PASS", reason="NONE", recovered="12/12")
+        self.log.say(f"PASS  Q0_RECOVERY=PASS 12/12 after the {leg} abort; SAFE_OFF 13/13 VERIFIED_OFF; "
+                     f"{leg} session + permit left live, torque off (same-boot --phase resume)")
+        return record
 
 
 # --------------------------------------------------------------------------
@@ -1027,18 +1177,37 @@ def run(args, link_factory=SerialLink):
         log.say(f"FAIL  {e}")
         if not link.lost and phase != "verify-persistence":
             log.say("      de-escalating: FULL LEG ABORT, SESSION ABORT, SAFE_OFF all 13")
-            session.emergency_stop()
+            verified_off = session.emergency_stop()
+            exported = None
             try:
                 end, lines = session.export()
                 with open(os.path.join(args.evidence_dir, f"evidence_export_{stamp}_after_failure.txt"),
                           "w") as f:
                     f.write("\n".join(lines) + "\n")
                 log.say(f"      evidence export after failure: {end.group(0)}")
+                exported = lines
             except Exception as ex:
                 log.say(f"      evidence export unavailable: {ex}")
+            # Only a failed leg of a calibration run, never an interruption.
+            if phase in ("legs", "resume", "all") and isinstance(e, SessionFailure) and \
+                    not getattr(args, "no_auto_recovery", False):
+                saved = None
+                if os.path.exists(q0_path):
+                    try:
+                        with open(q0_path) as f:
+                            saved = json.load(f)
+                    except (OSError, ValueError):
+                        saved = None
+                record = session.auto_post_abort_recovery(saved, build_id, verified_off, exported,
+                                                          args.require_daly)
+                with open(os.path.join(args.evidence_dir, f"auto_post_abort_recovery_{stamp}.json"),
+                          "w") as f:
+                    json.dump(record, f, indent=2)
         return 1
     finally:
-        if session.daly_guard is not None and not link.lost:
+        # The emergency stop drops the guard first; the stream it started must
+        # still be switched off (it was left ON after a failed phase before).
+        if (session.daly_guard is not None or session.bms_stream_started) and not link.lost:
             session.daly_guard = None
             try: link.send("@BMS STREAM OFF")
             except Exception: pass
@@ -1070,6 +1239,8 @@ def main(argv=None):
                    help="Explicit fixed RF return using reference 20261003_134848; fresh firmware qualification before torque")
     p.add_argument("--no-flash", action="store_true", help="the board already runs this build")
     p.add_argument("--no-lf-min-crosscheck", action="store_true")
+    p.add_argument("--no-auto-recovery", action="store_true",
+                   help="After a failed leg stay in SAFE_OFF; do not start the firmware POST_ABORT RECOVERY")
     p.add_argument("--imu-stream-off", action="store_true", default=True)
     p.add_argument("--skip-build-check", action="store_true", help=argparse.SUPPRESS)
     p.add_argument("--build-id", default="", help=argparse.SUPPRESS)

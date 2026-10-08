@@ -37,8 +37,12 @@ namespace servo {
 // ------
 // The census is strictly read-only: it drives ServoBus::startScan(), whose
 // only bus traffic is Ping(). No torque, no GoalPosition, no register
-// write, no EEPROM access. It is never started automatically — not at boot,
-// not on a timer (see Controller::begin(), which must not call start()).
+// write, no EEPROM access.
+//
+// Under ROBOT_POWERED, Controller schedules exactly ONE automatic canonical
+// census during startup as a health self-test. start() itself performs no
+// Ping: ServoBus::update() advances the scan one ID per Controller tick.
+// USB_ONLY does not auto-start a census. No periodic census exists.
 class ServoCensus {
  public:
   enum class State : uint8_t {
@@ -55,9 +59,9 @@ class ServoCensus {
   // caller reports that, this never blocks waiting for the bus.
   //
   // Like @SERVO SCAN, this carries bounded per-ID blocking (one Ping() per
-  // update() tick, see ServoBus.h) and is therefore MAINTENANCE-only at the
-  // command surface. The gate lives in CommandRouter alongside the existing
-  // two, not here, so there is exactly one place that policy is stated.
+  // update() tick, see ServoBus.h). Operator-triggered diagnostic use remains
+  // MAINTENANCE-only at the command surface. The ROBOT_POWERED startup call
+  // is the one reviewed Controller-owned read-only exception.
   bool start();
 
   // Call once per Controller tick, AFTER ServoBus::update(). Detects the

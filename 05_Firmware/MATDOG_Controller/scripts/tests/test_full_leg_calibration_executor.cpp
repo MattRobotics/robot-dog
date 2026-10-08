@@ -884,7 +884,7 @@ void test_thermal_confirmation_in_the_sequence() {
     CHECK_EQ(rig.thermal_log.size(), 1u);
     if (!rig.thermal_log.empty()) {
       const ThermalConfirmation& th = rig.thermal_log.front();
-      CHECK(th.decision == ThermalDecision::TRANSIENT);
+      CHECK(th.decision == ThermalDecision::BULK_ARTIFACT);
       CHECK_EQ(th.bus_id, park);
       CHECK_EQ(th.samples[0], 255);
       CHECK_EQ(th.published_c, 35);
@@ -899,6 +899,45 @@ void test_thermal_confirmation_in_the_sequence() {
                  [](Rig& r) { r.bulk_temperature_glitch[r.bus(kUpper)] = {90, 1}; }));
     checkComplete(rig);
     CHECK_EQ(rig.thermal_log.size(), 1u);
+  }
+  {
+    // The 2026-10-06 hardware stop: bus 12 showed 95, 78, 77 in the block read
+    // within 17 s while every direct read said 32..34 C. Refuted block-read
+    // values are diagnostics; ten of them inside 30 s must not end the leg.
+    g_case = "2026-10-06 M12: ten block-read spikes on the probed joint inside 30 s, 35 C direct -> 6/6";
+    Rig rig(Leg::LF);
+    const uint8_t upper = rig.bus(kUpper);
+    CHECK_EQ(upper, 12);
+    int injected = 0;
+    uint32_t first = 0, last = 0;
+    rig.run([&](Rig& r) {
+      // Only while bus 12 is the joint being stepped: as on the robot, the
+      // artifact belongs to the servo that is moving (and sampled every tick).
+      const CalibrationPhase ph = r.full.status().phase;
+      const bool searching = (ph == CalibrationPhase::UPPER_MIN || ph == CalibrationPhase::UPPER_MAX) &&
+                             r.full.status().step == FullLegStep::PROBE &&
+                             r.full.probeStatus().phase == ContactProbePhase::STEP_MONITORING;
+      if (searching && injected < 10 && !r.thermal_state[upper].pending() &&
+          (injected == 0 || r.t - last >= 1000)) {
+        r.bulk_temperature_glitch[upper] = {72 + injected * 9, 1};
+        if (injected == 0) first = r.t;
+        last = r.t;
+        ++injected;
+      }
+    });
+    checkComplete(rig);
+    CHECK_EQ(injected, 10);
+    CHECK(last - first < 30000u);
+    int artifacts = 0;
+    for (const ThermalConfirmation& th : rig.thermal_log) {
+      CHECK(th.decision == ThermalDecision::BULK_ARTIFACT);
+      CHECK_EQ(th.bus_id, upper);
+      CHECK(th.samples[0] > 70 && th.published_c == 35);
+      ++artifacts;
+    }
+    CHECK_EQ(artifacts, 10);
+    CHECK_EQ((int)rig.thermal_state[upper].bulkArtifacts(), 10);
+    CHECK_EQ(rig.thermal_port.direct_reads[upper], 30);
   }
   {
     g_case = "a real overheat of the park joint (bulk AND direct 75 C) -> CONFIRMED, abort";
@@ -922,7 +961,7 @@ void test_thermal_confirmation_in_the_sequence() {
     }));
     CHECK_EQ((int)rig.full.status().failure, (int)FullLegFailure::OVER_TEMPERATURE);
     CHECK(!rig.thermal_log.empty() &&
-          rig.thermal_log.front().decision == ThermalDecision::CONFIRMATION_READ_FAILED);
+          rig.thermal_log.front().decision == ThermalDecision::THERMAL_TELEMETRY_FAULT);
     rig.thermal_port.fail_direct[park] = false;
     checkSafeEnd(rig);
   }

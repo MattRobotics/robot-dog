@@ -30,10 +30,10 @@ bool ServoBus::begin() {
   // its own timeout explicitly via the guard; nothing relies on whatever
   // IOTimeOut happens to already be set to.
 
-  // No automatic ping/scan/torque on boot — matches the frozen bench
-  // source's own stated invariant ("Automatic ping : DISABLED") and the
-  // handoff's "no automatic motion at boot" rule. detected_ therefore
-  // stays UNKNOWN until an explicit @SERVO SCAN/READ runs.
+  // ServoBus::begin() itself performs no ping, scan, torque or write.
+  // Under ROBOT_POWERED the Controller may subsequently ARM the reviewed
+  // read-only startup census; its first Ping occurs later from update().
+  // No automatic motion, torque enable or persistent write exists here.
   init_ = core::InitializationState::INITIALIZED;
   return true;
 }

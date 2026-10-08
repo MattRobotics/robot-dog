@@ -4,34 +4,39 @@ MATDOG is Matt Robotics' custom quadruped platform: a 17-DOF mechanical design w
 articulated head, an ESP32-S3 real-time controller, and a future Jetson-based high-level stack.
 This repository is the single active engineering repository for the robot.
 
-> **⚠ FLASH SAFETY NOTICE — 2026-10-08, updated for PR-2. DO NOT FLASH MAIN: do not use `main`
+> **⚠ FLASH SAFETY NOTICE — 2026-10-08, updated for PR-3. DO NOT FLASH MAIN: do not use `main`
 > to update the current robot.**
 >
-> - `main` carries Calibration Persistence V1, the flash layout `MATDOG_16M_2x5M_NVS_V1` (PR-1)
->   and, since PR-2, a selective part of the dev.1 line (identity `0.2.0-dev.1`). `scripts/build.sh`
->   uses `PartitionScheme=custom` and `scripts/upload.sh` refuses every full-image upload.
-> - `main` is still **not** the firmware the robot runs. The robot runs the dev.3 candidate
->   (provenance `b3fd945`), whose dev.2/dev.3 changes `main` does not have yet.
+> - `main` carries Calibration Persistence V1, the flash layout `MATDOG_16M_2x5M_NVS_V1` (PR-1),
+>   a selective part of the dev.1 line (PR-2) and, since PR-3, the dev.2/dev.3 source delta. Its
+>   firmware identity is `0.2.0-dev.3`. `scripts/build.sh` uses `PartitionScheme=custom` and
+>   `scripts/upload.sh` refuses every full-image upload.
+> - The firmware sources on `main` correspond to the dev.3 candidate that runs on the robot
+>   (provenance `b3fd945`), apart from the deferred material. A build of `main` is **not** that
+>   installed image: it has a different source commit and build ID, and binary identity is not
+>   asserted.
+> - dev.3 is **not an accepted release**: the Hardware Validation of 2026-10-07 has execution
+>   COMPLETE and acceptance **BLOCKED**. No release is approved.
 > - These integrations are **not** a flash authorization and **not** a hardware acceptance. No
 >   `main` build has been accepted on hardware.
-> - dev.3 is **not an accepted release**: the Hardware Validation of 2026-10-07 has execution
->   COMPLETE and acceptance **BLOCKED**. It is not on `main` and is not authorized as a baseline.
 > - `MOTION_AUTHORIZED=0`, `RESTORE=NOT_IMPLEMENTED`. Nothing here authorizes a flash, a migration
 >   or any motion.
 >
 > Details and sources: [`FLASH_LAYOUT_SAFETY_NOTICE.md`](05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
 > The quoted snapshot below is the historical state of `main` on 2026-10-01 and has not been
 > updated. Elsewhere in this file only the statements on Persistence V1, Wi-Fi/OTA, the motion
-> library and the build identity were updated; a full status synchronization is a separate change.
+> library, the boot census, the thermal verdict and the build identity were updated; a full status
+> synchronization is a separate change.
 
-### What is on `main` (after PR-2)
+### What is on `main` (after PR-3)
 
 | Layer | Content |
 |---|---|
-| Code integrated | Persistence V1 and layout V1; post-abort recovery; guarded release stages with DALY supervision; startup RF recovery; Wi-Fi/OTA V3 (TLS, OTA ingest compiled out by default); charging presentation priority; dev.1 identity; pure motion library G1–G5-A, **unwired** (no path to the servo bus) |
-| Offline tests | static audit and C++/Python host suites, USB_ONLY and ROBOT_POWERED builds: see [`VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md), section PR-2 |
-| Hardware validated | unchanged by PR-1 and PR-2 (2026-10-01 calibration 24/24, `ROBOT_POWERED` no-motion); no `main` build was validated |
-| Deferred | motion execution suites, fresh oracles and the G35/G4/G4.1/G5-A evidence; 38 third-party XGO extracts and XGO-derived data are **not** in this repository ([ADR-004](09_Logs/Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md)) |
+| Code integrated | Persistence V1 and layout V1; post-abort recovery; guarded release stages with DALY supervision; startup RF recovery; Wi-Fi/OTA V3 (TLS, OTA ingest compiled out by default); charging presentation priority; **dev.2 read-only boot servo census**; **dev.3 thermal verdict from direct reads only** and the host runner's one-shot post-abort recovery; identity `0.2.0-dev.3`; pure motion library G1–G5-A, **unwired** (no path to the servo bus) |
+| Offline tests | static audit and C++/Python host suites, USB_ONLY and ROBOT_POWERED builds: see [`VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md), section PR-3 |
+| Hardware results (historical, of the dev.2/dev.3 candidate, not of a `main` build) | 2026-10-06: boot census 13/13; fresh Q0 and calibration 24/24 under dev.3; SAVE/ACK and LOAD across a reset (no real power cycle); the automatic post-abort recovery did not run. Records: [dev.2 audit](09_Logs/Validation_Reports/MATDOG_V0_2_DEV2_BOOT_SELFTEST_DELTA_AUDIT_2026-10-06.md), [dev.3 audit](09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md). The 2026-10-07 report is not in the repository |
+| Hardware acceptance / release acceptance | none: dev.3 execution COMPLETE, acceptance BLOCKED; no `main` build accepted; no release approved |
+| Deferred | motion execution suites, fresh oracles and the G35/G4/G4.1/G5-A evidence; 38 third-party XGO extracts and XGO-derived data are **not reachable from `main`**; they remain present on separate public historical branches ([ADR-004](09_Logs/Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md)) |
 
 > **Historical snapshot — 2026-10-01 (PR #35 merged)**
 >
@@ -202,7 +207,8 @@ no motion is thereby authorized, and no servo EEPROM, ID, `PositionOffset` or NV
 | Frozen release | `matdog-controller-v0.1.0` |
 | Tagged repository commit | `c54862f38a9cbd5e46d6b1770a6d109cc99b5c02` |
 | V0.1 USB_ONLY hardware-validated source | `5b371da5482f9b0bd2df1c37ed361250ea54ae8f` |
-| Latest hardware-validated development firmware | `dfcecb670d0565d2db1a8152b6cd7ad230bdb87d` (`ROBOT_POWERED`) |
+| Latest hardware-validated development firmware (scope: 2026-10-01 Full Calibration) | `dfcecb670d0565d2db1a8152b6cd7ad230bdb87d` (`ROBOT_POWERED`) |
+| Installed candidate (2026-10-06/07) | `0.2.0-dev.3`, provenance `b3fd945bdaf37d192d97b605ac0f59b67f1dba45`; execution COMPLETE, acceptance **BLOCKED**; not an accepted release |
 | Full Calibration merge commit on main | `1fd0f5afc3cc737d1ac82183b4ce204dcd01c402` (PR #35; documentation included) |
 | Hardware report | [hardware-validation report](09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/README.md) |
 

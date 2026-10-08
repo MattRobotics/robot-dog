@@ -1665,16 +1665,22 @@ def check_thermal_confirmation(files):
             "constexpr uint8_t kThermalConfirmationReads = 5;",
             "constexpr uint8_t kThermalConfirmedOverLimit = 3;",
             "constexpr uint32_t kThermalConfirmationDelayMs = 50;",
-            "constexpr uint8_t kThermalMaxTransients = 3;",
-            "constexpr uint8_t kThermalMaxBootTransients = 8;"),
+            "constexpr uint8_t kThermalDirectNormalToClear = 3;"),
+        # dev.3: the block-read temperature is diagnostic. The verdict is taken
+        # from DIRECT samples only (the tally starts at samples[1]); a failed,
+        # invalid, incoherent or expired confirmation publishes a value over
+        # the limit; a refuted block-read value is counted and nothing else.
         "ThermalConfirmation.cpp": (
             "if (observed <= kThermalLimitC) return result_;",
             "port->readPresentTemperatureDirect(bus, &value)",
             "value < 0 || value > 255",
-            "hot >= kThermalConfirmedOverLimit", "cool >= 3",
+            "for (uint8_t i = 1; i < result_.sample_count; ++i) {",
+            "hot >= kThermalConfirmedOverLimit", "cool >= kThermalDirectNormalToClear",
             "now_ms - last_read_ms_ < kThermalConfirmationDelayMs",
-            "latched_ = transients_ >= kThermalMaxTransients",
-            "boot_transients_ >= kThermalMaxBootTransients", "expired(now_ms)"),
+            "result_.decision = ThermalDecision::THERMAL_TELEMETRY_FAULT; "
+            "result_.published_c = kThermalLimitC + 1;",
+            "else if (result_.sample_count == kThermalConfirmationReads) { return telemetryFault();",
+            "expired(now_ms)"),
         "Controller.cpp": (
             "state.update(&thermal_read_port_, buses[i], sample.present_temperature, millis())",
             "full_leg_calibration_.monitorOnly(context, millis(), frame)",
@@ -1694,6 +1700,23 @@ def check_thermal_confirmation(files):
         for token in tokens:
             if token not in body:
                 fail(f"{path}: thermal/UART safety invariant missing: {token}")
+    # A refuted block-read value must never accumulate into a safety verdict:
+    # no transient latch, counter threshold or sticky fault may come back.
+    for name in ("ThermalConfirmation.h", "ThermalConfirmation.cpp"):
+        if name in by_name:
+            path, code = by_name[name]
+            for banned in ("latched_", "REPEATED_ANOMALY", "kThermalMaxTransients",
+                           "kThermalMaxBootTransients", "transients_ >=", "bulk_artifacts_ >=",
+                           "bulk_artifacts_ >"):
+                if banned in code:
+                    fail(f"{path}: block-read temperature artifacts may not latch a "
+                         f"thermal verdict ({banned!r})")
+    if "ThermalConfirmation.cpp" in by_name:
+        path, code = by_name["ThermalConfirmation.cpp"]
+        body = re.sub(r"\s+", " ", code)
+        if body.count("ThermalDecision::CONFIRMED") != 2 or \
+                "if (hot >= kThermalConfirmedOverLimit) { result_.decision = ThermalDecision::CONFIRMED;" not in body:
+            fail(f"{path}: over-temperature may only be confirmed by the direct-sample majority")
     if "Controller.cpp" in by_name:
         path, code = by_name["Controller.cpp"]
         if "calibration::confirmPresentTemperature(" in code:
@@ -2990,23 +3013,86 @@ def check_g2_state_is_transport_independent(files):
                  f"structured state, not formatted text")
 
 
-def check_no_startup_servo_traffic(files):
-    """No bus traffic of any kind at boot - extends the existing
-    ServoBus::begin() rule to the Controller, which now owns a census
-    service that must never be auto-started."""
+def check_startup_servo_selftest_wiring(files):
+    """ROBOT_POWERED boot runs exactly one canonical READ-ONLY census.
+
+    Controller::begin() may arm ServoCensus::start(), but may not call
+    low-level servo traffic/write primitives directly. The physical scan
+    remains incremental: ServoBus::update() owns at most one Ping per tick.
+    """
+
+    def function_body(code, signature):
+        start = code.find(signature)
+        if start < 0:
+            return None
+        brace = code.find("{", start)
+        if brace < 0:
+            return None
+        depth = 0
+        for i in range(brace, len(code)):
+            if code[i] == "{":
+                depth += 1
+            elif code[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    return code[brace + 1:i]
+        return None
+
     for path, code in files:
         if path.name != "Controller.cpp":
             continue
-        begin_match = re.search(r"void Controller::begin\(\)\s*\{(.*?)\n\}", code, re.DOTALL)
-        if not begin_match:
-            fail(f"{path}: could not locate Controller::begin() to audit startup behaviour")
-            continue
-        body = begin_match.group(1)
-        for forbidden in ("startScan(", "servo_census_.start(", ".ping(", "EnableTorque("):
-            if forbidden in body:
-                fail(f"{path}: Controller::begin() calls {forbidden!r} - boot must issue no "
-                     f"servo bus traffic, torque or scan at all")
 
+        begin_body = function_body(code, "void Controller::begin()")
+        if begin_body is None:
+            fail(f"{path}: Controller::begin() not found")
+            continue
+
+        if begin_body.count("servo_census_.start()") != 1:
+            fail(f"{path}: startup must arm exactly one servo_census_.start()")
+
+        if "if (build::kServoPowerAvailable)" not in begin_body:
+            fail(f"{path}: startup census is not ROBOT_POWERED-gated")
+
+        if "startup_servo_census_pending_ = servo_census_.start();" not in begin_body:
+            fail(f"{path}: startup census result is not explicitly tracked")
+
+        for forbidden in (
+            "startScan(",
+            ".ping(",
+            "EnableTorque(",
+            "servo_preflight_.start(",
+            "readRuntimeState(",
+            "readControlFeedback(",
+            "safeOff(",
+            "enableTorqueOn(",
+            "writeGoalPosition(",
+            "writeReviewedRamTorqueLimit(",
+        ):
+            if forbidden in begin_body:
+                fail(f"{path}: forbidden startup servo primitive {forbidden!r}")
+
+        update_body = function_body(
+            code, "void Controller::update(uint32_t now_ms)"
+        )
+        if update_body is None:
+            fail(f"{path}: Controller::update() not found")
+            continue
+
+        required = (
+            "census.verdict == servo::CensusVerdict::PASS",
+            "population_pass ? ModuleHealth::OK : ModuleHealth::FAULT",
+            "startup_servo_census_pending_",
+            "ModuleHealth::NOT_INITIALIZED",
+            "if (!build::kServoPowerAvailable)",
+            "system_state_.setServoHealth(servo_bus_.health())",
+        )
+
+        for token in required:
+            if token not in update_body:
+                fail(f"{path}: startup census health wiring missing {token!r}")
+
+        if "startup_servo_census : ENABLED_READ_ONLY_INCREMENTAL" not in code:
+            fail(f"{path}: boot banner does not declare startup census")
 
 def check_no_network_to_servo_path(files):
     """V2 permanent invariant: network callback != servo command authority.
@@ -6210,7 +6296,7 @@ def main():
     check_hardware_profile_authority(files, SKETCH_DIR)
     check_servo_population_model(files, SKETCH_DIR)
     check_g2_state_is_transport_independent(files)
-    check_no_startup_servo_traffic(files)
+    check_startup_servo_selftest_wiring(files)
     check_no_network_to_servo_path(files)
     check_wifi_runtime_boundaries(files, SKETCH_DIR)
     check_network_v3_boundaries(files, SKETCH_DIR)

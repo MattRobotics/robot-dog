@@ -74,6 +74,7 @@ FIN_CPP = "src/calibration/FullLegCalibrationFinalizer.cpp"
 FIN_H = "src/calibration/FullLegCalibrationFinalizer.h"
 ENV_CPP = "src/actuator/OperationalEnvelope.cpp"
 THERMAL_CPP = "src/calibration/ThermalConfirmation.cpp"
+THERMAL_H = "src/calibration/ThermalConfirmation.h"
 
 # (name, file, exact anchor (must occur exactly once), replacement)
 MUTATIONS = [
@@ -311,20 +312,31 @@ MUTATIONS = [
      "!port->readPresentTemperatureDirect(bus, &value)", "!(value = observed, true)"),
     ("thermal: 50 ms sample spacing removed", THERMAL_CPP,
      "if (now_ms - last_read_ms_ < kThermalConfirmationDelayMs) return result_;", "if (false) return result_;"),
-    ("thermal: failed confirmation published as safe", THERMAL_CPP,
-     "  if (port == nullptr || !port->readPresentTemperatureDirect(bus, &value) ||\n"
-     "      value < 0 || value > 255) {\n"
-     "    result_.decision = ThermalDecision::CONFIRMATION_READ_FAILED;\n",
-     "  if (port == nullptr || !port->readPresentTemperatureDirect(bus, &value) ||\n"
-     "      value < 0 || value > 255) {\n"
-     "    result_.decision = ThermalDecision::CONFIRMATION_READ_FAILED;\n"
-     "    result_.published_c = kThermalLimitC;\n"),
+    ("thermal: telemetry fault published as safe", THERMAL_CPP,
+     "  result_.published_c = kThermalLimitC + 1;\n",
+     "  result_.published_c = kThermalLimitC;\n"),
 
-    ("thermal: concentrated anomaly latch removed", THERMAL_CPP,
-     "transients_ >= kThermalMaxTransients || boot_transients_ >= kThermalMaxBootTransients",
-     "boot_transients_ >= kThermalMaxBootTransients"),
-    ("thermal: sparse anomalies ignored indefinitely", THERMAL_CPP,
-     " || boot_transients_ >= kThermalMaxBootTransients", ""),
+    # --- dev.3: the block-read value is diagnostic, direct reads decide ---
+    ("thermal: block-read sample counted as direct evidence", THERMAL_CPP,
+     "for (uint8_t i = 1; i < result_.sample_count; ++i) {",
+     "for (uint8_t i = 0; i < result_.sample_count; ++i) {"),
+    ("thermal: refuted block-read spikes latch a fault again", THERMAL_CPP,
+     "    if (bulk_artifacts_ < 0xFFFF) ++bulk_artifacts_;\n",
+     "    if (bulk_artifacts_ < 0xFFFF) ++bulk_artifacts_;\n"
+     "    if (bulk_artifacts_ >= 3) return telemetryFault();\n"),
+    ("thermal: over-temperature published from the block read alone", THERMAL_CPP,
+     "    if (observed <= kThermalLimitC) return result_;\n",
+     "    if (observed <= kThermalLimitC) return result_;\n"
+     "    result_.decision = ThermalDecision::CONFIRMED;\n    return result_;\n"),
+    ("thermal: incoherent direct samples cleared as normal", THERMAL_CPP,
+     "  } else if (result_.sample_count == kThermalConfirmationReads) {\n"
+     "    return telemetryFault();  // direct samples stayed incoherent\n",
+     "  } else if (result_.sample_count == kThermalConfirmationReads) {\n"
+     "    result_.decision = ThermalDecision::BULK_ARTIFACT;\n"
+     "    result_.published_c = kThermalLimitC;\n"),
+    ("thermal: direct confirmation cleared by two normal samples", THERMAL_H,
+     "constexpr uint8_t kThermalDirectNormalToClear = 3;",
+     "constexpr uint8_t kThermalDirectNormalToClear = 2;"),
     ("thermal: pending deadline removed", THERMAL_CPP,
      "expired(now_ms) || bus != result_.bus_id", "bus != result_.bus_id"),
 

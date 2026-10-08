@@ -93,6 +93,16 @@ class FakeController:
         self.bms_fault_leg = None
         self.startup_positions=None
         self.startup_fault=None
+        # What the firmware records about a failed leg (automatic post-abort recovery).
+        self.fail_executor_failure = "HIP_MAX_PROBE_FAILED"
+        self.fail_phase = "-"
+        self.fail_probe_failure = "NONE"
+        self.fail_thermal_record = None      # e.g. "CONFIRMED" / "THERMAL_TELEMETRY_FAULT"
+        self.servo_temp = 31
+        self.torque_left_on = None           # a bus whose direct read still shows torque
+        self.census_verdict = "PASS"
+        self.preflight_pass = 12
+        self.positions_after_recovery = None
 
     def bms_status(self):
         self.emit("DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS",
@@ -156,9 +166,20 @@ class FakeController:
             if self.run:
                 return self.emit("SERVO_READ=BLOCKED", "REASON=MOTION_EXECUTOR_ACTIVE")
             b = int(m.group(1))
-            positions=self.startup_positions or self.q0
+            positions=self.startup_positions or self.positions_after_recovery or self.q0
             return self.emit(f"SERVO_READ id={b} position={positions.get(b, 2048)} speed=0 load=0 "
-                             f"voltage=120 temp=31 torque=0 current=0")
+                             f"voltage=120 temp={self.servo_temp} torque={1 if b == self.torque_left_on else 0} current=0")
+        if u == "@SERVO CENSUS":
+            missing = 0 if self.census_verdict == "PASS" else 1
+            return self.emit("SERVO_CENSUS=STARTED lo=11 hi=55", f"SERVO_CENSUS={self.census_verdict} lo=11 hi=55",
+                             "  canonical_allocated=17 expected_now=13",
+                             f"  present_expected={13 - missing} missing_expected={missing} absent_by_design=4",
+                             "  absent_by_design_present=0 unexpected_id=0 not_probed=0 truncated=NO")
+        if u == "@SERVO PREFLIGHT":
+            ok = self.preflight_pass == 12
+            return self.emit("SERVO_PREFLIGHT=STARTED joints=12 profile=MATDOG_C018_V1",
+                             f"SERVO_PREFLIGHT={'PASS' if ok else 'FAIL'} profile=MATDOG_C018_V1 source_sha256={'a' * 64}",
+                             f"  evaluated=12 pass={self.preflight_pass} no_response={12 - self.preflight_pass} mismatch=0 incomplete=0")
         if u == "@STATUS":
             return self.emit(f"SYSTEM health=READY power_state=RUN mode=MAINTENANCE "
                              f"authority={self.authority} uptime_ms={self.uptime_ms} profile=ROBOT_POWERED",
@@ -385,10 +406,15 @@ class FakeController:
             if self.decorated_result_first:
                 final.append(f"CALIBRATION_FULL_LEG_RESULT leg={leg} verdict=FAILED failure=X trailing_text")
                 final.append(f"xCALIBRATION_FULL_LEG_RESULT leg={leg} verdict=FAILED failure=X")
+            if failed and self.fail_thermal_record:
+                final.append(f"CALIBRATION_THERMAL_CONFIRMATION bus=22 decision={self.fail_thermal_record} "
+                             "samples=95,75,76,75,0 count=4 published=76 limit=70 source=BULK_THEN_DIRECT "
+                             "bulk_artifacts=0")
             final.append(f"CALIBRATION_FULL_LEG_PROBE_FINAL leg={leg} joint=HIP side=MAX executor_failure="
-                         f"{'HIP_MAX_PROBE_FAILED' if failed else 'NONE'} failed_phase=- probe_phase=COMPLETE "
-                         f"probe_failure=NONE pass=2 stage=RELEASE target=1 pos=1 contact=1 guard=1 scout=1 "
-                         f"p1=1 p2=1 bypass=0 steps=40")
+                         f"{self.fail_executor_failure if failed else 'NONE'} "
+                         f"failed_phase={self.fail_phase if failed else '-'} probe_phase=COMPLETE "
+                         f"probe_failure={self.fail_probe_failure if failed else 'NONE'} pass=2 stage=RELEASE "
+                         f"target=1 pos=1 contact=1 guard=1 scout=1 p1=1 p2=1 bypass=0 steps=40")
             final.append(f"CALIBRATION_FULL_LEG_CONTACTS leg={leg} expected=6 measured={measured} "
                          f"accepted={accepted} diagnostics_accepted={'NO' if failed else 'YES'}")
             final.append(f"CALIBRATION_FULL_LEG_RESULT leg={leg} verdict={verdict} failure={failure}")
@@ -690,6 +716,170 @@ class RunnerTest(unittest.TestCase):
         for bus in hw.INSTALLED:
             self.assertIn(f"@SERVO SAFE_OFF {bus}", tail)
         self.assertEqual(tail[-1], "@CALIBRATION EVIDENCE EXPORT")
+
+    # --- automatic post-abort recovery (policy 2026-10-06) -------------------------
+
+    def fail_rf(self, probe_failure="NO_CONTACT_BEFORE_GUARD", phase="UPPER_MAX"):
+        self.controller.fail_leg = "RF"
+        self.controller.fail_executor_failure = phase + "_PROBE_FAILED"
+        self.controller.fail_phase = phase
+        self.controller.fail_probe_failure = probe_failure
+        self.ready()
+        mark = len(self.sent())
+        self.assertEqual(self.run_phase("legs"), 1)
+        cmds = self.sent()[mark:]
+        return cmds[cmds.index("@CALIBRATION FULL LEG RF CONFIRM_FULL_CALIBRATION"):]
+
+    def recovery_record(self):
+        names = [n for n in os.listdir(self.tmp) if n.startswith("auto_post_abort_recovery_")]
+        self.assertEqual(len(names), 1)
+        with open(os.path.join(self.tmp, names[0])) as f:
+            return json.load(f)
+
+    def test_recoverable_abort_runs_the_firmware_recovery_once(self):
+        tail = self.fail_rf()
+        post = "@CALIBRATION POST_ABORT RECOVERY RF CONFIRM_Q0_RECOVERY"
+        self.assertEqual(tail.count(post), 1)
+        # Order: ABORTs, SAFE_OFF 13, export, read-only preconditions, session, recovery, SAFE_OFF 13.
+        order = [tail.index(c) for c in (
+            "@CALIBRATION FULL LEG ABORT", "@CALIBRATION SESSION ABORT", "@SERVO SAFE_OFF 51",
+            "@CALIBRATION EVIDENCE EXPORT", "@CALIBRATION Q0 STATUS", "@SERVO CENSUS", "@SERVO PREFLIGHT",
+            "@SERVO READ 51", "@CALIBRATION SESSION START RF CONFIRM_CURRENT_Q0",
+            "@CALIBRATION MOTION PERMIT GRANT 16 CONFIRM_FIRST_MOTION", post)]
+        self.assertEqual(order, sorted(order))
+        after = tail[tail.index(post) + 1:]
+        # The fake controller implements POST_ABORT by re-dispatching INITIAL
+        # RECOVERY to itself; that entry is its own, the runner never sent it.
+        self.assertEqual(after.pop(0), "@CALIBRATION INITIAL RECOVERY RF CONFIRM_Q0_RECOVERY")
+        self.assertEqual([c for c in after if c.startswith("@SERVO SAFE_OFF")],
+                         [f"@SERVO SAFE_OFF {bus}" for bus in hw.INSTALLED])
+        self.assertEqual([c for c in after if c.startswith("@SERVO READ")],
+                         [f"@SERVO READ {bus}" for bus in hw.INSTALLED])
+        # Nothing but status polls, SAFE_OFF and reads follows the recovery: no leg, no retry.
+        self.assertEqual([c for c in after if c != "@CALIBRATION FULL LEG STATUS" and
+                          not c.startswith(("@SERVO SAFE_OFF", "@SERVO READ"))], [])
+        self.assertFalse(any("FULL LEG RH" in c or "FULL LEG LH" in c for c in tail))
+        record = self.recovery_record()
+        self.assertEqual((record["verdict"], record["recovered"], record["safe_off_verified"]), ("PASS", "12/12", 13))
+        self.assertEqual(record["failure"]["probe_failure"], "NO_CONTACT_BEFORE_GUARD")
+
+    def test_auto_recovery_then_same_boot_resume_finishes_24(self):
+        self.fail_rf("EARLY_STALL_OUTSIDE_CORRIDOR", "LOWER_MAX")
+        self.controller.fail_leg = None
+        mark = len(self.sent())
+        self.assertEqual(self.run_phase("resume"), 0)
+        cmds = self.sent()[mark:]
+        # The recovered session is reused: no second recovery, the witness was consumed once.
+        self.assertFalse(any("RECOVERY RF" in c for c in cmds), cmds)
+        self.assertNotIn("@CALIBRATION FULL LEG LF CONFIRM_FULL_CALIBRATION", cmds)
+        for leg in ("RF", "RH", "LH"):
+            self.assertIn(f"@CALIBRATION FULL LEG {leg} CONFIRM_FULL_CALIBRATION", cmds)
+
+    def test_unrecoverable_failures_stay_in_safe_off(self):
+        for failure in ("OVER_TEMPERATURE", "HARD_CURRENT_ABORT", "STALE_TELEMETRY", "COMMUNICATION_LOST",
+                        "TORQUE_UNEXPECTEDLY_OFF", "SERVO_STATUS_FAULT", "GOAL_READBACK_MISMATCH",
+                        "TORQUE_LIMIT_CHANGED", "COMMAND_UNCERTAIN", "CURRENT_NOT_RECOVERED",
+                        "UNEXPECTED_STALL_DURING_BACKOFF", "MOTION_TIMEOUT", "OPERATOR_ABORT",
+                        "REJECT_PRECONDITIONS", "SOMETHING_NEW"):
+            with self.subTest(failure=failure):
+                self.setUp()
+                tail = self.fail_rf(failure)
+                self.assertEqual(tail[-1], "@CALIBRATION EVIDENCE EXPORT")
+                self.assertFalse(any("RECOVERY" in c or "SESSION START" in c for c in tail))
+                record = self.recovery_record()
+                self.assertEqual(record["verdict"], "SKIPPED")
+                self.assertEqual(record["reason"], "FAILURE_NOT_RECOVERABLE:" + failure)
+        self.assertEqual(sorted(hw.AUTO_RECOVERABLE_PROBE_FAILURES), sorted((
+            "NO_CONTACT_BEFORE_GUARD", "EARLY_STALL_OUTSIDE_CORRIDOR", "TRACKING_FAILED",
+            "REPEATABILITY_FAILED", "INSUFFICIENT_BASELINE", "BACKOFF_CROSSES_HOME",
+            "BASELINE_PASSES_GUARD", "SCOUT_MISSING")))
+        self.assertEqual(hw.THERMAL_LIMIT_C, 70)
+
+    def test_thermal_verdict_or_unsupported_phase_never_auto_recovers(self):
+        for record_decision, phase, reason in (
+                ("CONFIRMED", "UPPER_MAX", "THERMAL_VERDICT:bus=22:CONFIRMED"),
+                ("THERMAL_TELEMETRY_FAULT", "LOWER_MIN", "THERMAL_VERDICT:bus=22:THERMAL_TELEMETRY_FAULT"),
+                (None, "HIP_MAX", "PHASE_NOT_RECOVERABLE:HIP_MAX"),
+                (None, "INITIAL_RECOVERY", "PHASE_NOT_RECOVERABLE:INITIAL_RECOVERY")):
+            with self.subTest(reason=reason):
+                self.setUp()
+                self.controller.fail_thermal_record = record_decision
+                tail = self.fail_rf("NO_CONTACT_BEFORE_GUARD", phase)
+                self.assertEqual(tail[-1], "@CALIBRATION EVIDENCE EXPORT")
+                self.assertEqual(self.recovery_record()["reason"], reason)
+        # A refuted block-read value is diagnostics, not a thermal verdict.
+        self.setUp()
+        self.controller.fail_thermal_record = "BULK_TEMP_ARTIFACT_SUSPECT"
+        tail = self.fail_rf()
+        self.assertIn("@CALIBRATION POST_ABORT RECOVERY RF CONFIRM_Q0_RECOVERY", tail)
+
+    def test_failed_precondition_blocks_the_recovery_before_any_session(self):
+        def hot(c): c.servo_temp = 71
+        def torque(c): c.torque_left_on = 32
+        def census(c): c.census_verdict = "PROFILE_MISMATCH"
+        def preflight(c): c.preflight_pass = 11
+        def acquisition(c): c.capture_session = 2
+        def q0(c):
+            changed = dict(c.q0); changed[21] += 1; c.q0 = changed
+        for change in (hot, torque, census, preflight, acquisition, q0):
+            with self.subTest(change=change.__name__):
+                self.setUp()
+                self.controller.fail_leg = "RF"
+                self.controller.fail_executor_failure = "UPPER_MAX_PROBE_FAILED"
+                self.controller.fail_phase = "UPPER_MAX"
+                self.controller.fail_probe_failure = "NO_CONTACT_BEFORE_GUARD"
+                self.ready()
+                real = self.controller.handle
+                def handle(cmd, real=real, change=change):
+                    if cmd == "@CALIBRATION EVIDENCE EXPORT":
+                        change(self.controller)  # the fault appears after the abort
+                    return real(cmd)
+                self.controller.handle = handle
+                mark = len(self.sent())
+                self.assertEqual(self.run_phase("legs"), 1)
+                tail = self.sent()[mark:]
+                tail = tail[tail.index("@CALIBRATION EVIDENCE EXPORT"):]
+                self.assertFalse(any("RECOVERY" in c or "SESSION START" in c or "PERMIT GRANT" in c for c in tail))
+                record = self.recovery_record()
+                self.assertEqual(record["verdict"], "SKIPPED")
+                self.assertTrue(record["reason"].startswith("PRECONDITION:"), record["reason"])
+
+    def test_refused_or_unverified_recovery_is_not_retried(self):
+        self.controller.post_abort_fails = True
+        tail = self.fail_rf()
+        post = "@CALIBRATION POST_ABORT RECOVERY RF CONFIRM_Q0_RECOVERY"
+        self.assertEqual(tail.count(post), 1)
+        after = tail[tail.index(post) + 1:]
+        self.assertIn("@CALIBRATION SESSION ABORT", after)
+        self.assertEqual([c for c in after if c.startswith("@SERVO SAFE_OFF")],
+                         [f"@SERVO SAFE_OFF {bus}" for bus in hw.INSTALLED])
+        record = self.recovery_record()
+        self.assertEqual((record["verdict"], record["safe_off_verified_after_failure"]), ("FAILED", 13))
+        # The firmware says PASS but a joint is not at q0: never claimed as recovered.
+        self.setUp()
+        moved = dict(Q0); moved[22] += 11
+        self.controller.positions_after_recovery = moved
+        tail = self.fail_rf()
+        self.assertEqual(tail.count(post), 1)
+        self.assertEqual(self.recovery_record()["verdict"], "FAILED")
+
+    def test_auto_recovery_can_be_disabled(self):
+        self.controller.fail_leg = "RF"
+        self.controller.fail_executor_failure = "UPPER_MAX_PROBE_FAILED"
+        self.controller.fail_phase = "UPPER_MAX"
+        self.controller.fail_probe_failure = "NO_CONTACT_BEFORE_GUARD"
+        self.ready()
+        mark = len(self.sent())
+        self.assertEqual(self.run_phase("legs", "--no-auto-recovery"), 1)
+        self.assertEqual(self.sent()[-1], "@CALIBRATION EVIDENCE EXPORT")
+        self.assertFalse(any("POST_ABORT RECOVERY" in c for c in self.sent()[mark:]))
+        self.assertFalse(any(n.startswith("auto_post_abort_recovery_") for n in os.listdir(self.tmp)))
+
+    def test_bms_stream_is_switched_off_after_a_failed_leg(self):
+        self.controller.fail_leg = "RF"
+        self.assertEqual(self.run_phase("all", "--require-daly"), 1)
+        self.assertEqual(self.sent()[-1], "@BMS STREAM OFF")
+        self.assertFalse(self.controller.bms_stream)
 
     def test_a_calibrated_verdict_without_6_contacts_is_refused(self):
         self.controller.lying_leg = "LF"

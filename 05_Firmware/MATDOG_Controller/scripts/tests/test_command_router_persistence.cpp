@@ -508,7 +508,7 @@ void source_identity_is_read_only() {
   CHECK(schemas.marker_schema == kSaveMarkerSchemaV1);
   before.checkUnchanged(f);
   const auto out = f.command("@SYSTEM SOURCE_SIGNATURE");
-  CHECK(out.find("FW_VERSION=0.2.0-dev.1") != std::string::npos);
+  CHECK(out.find("FW_VERSION=0.2.0-dev.3") != std::string::npos);
   CHECK(out.find("GIT_SHA=") != std::string::npos);
   CHECK(out.find("GIT_DIRTY=") != std::string::npos);
   CHECK(out.find("HARDWARE_PROFILE=ROBOT_POWERED") != std::string::npos);

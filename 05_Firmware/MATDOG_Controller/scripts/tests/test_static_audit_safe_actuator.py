@@ -807,6 +807,37 @@ def main():
          "port->readPresentTemperatureDirect(static_cast<uint8_t>(bus + 1), &value)",
          "thermal/UART safety invariant missing", runner=run_thermal_checks)
 
+    # --- dev.3: block-read temperature is diagnostic, direct reads decide ----
+    case("block-read sample counted as direct thermal evidence", "ThermalConfirmation.cpp",
+         r"for \(uint8_t i = 1; i < result_\.sample_count; \+\+i\) \{",
+         "for (uint8_t i = 0; i < result_.sample_count; ++i) {",
+         "thermal/UART safety invariant missing", runner=run_thermal_checks)
+
+    case("thermal telemetry fault published at the limit", "ThermalConfirmation.cpp",
+         r"result_\.published_c = kThermalLimitC \+ 1;",
+         "result_.published_c = kThermalLimitC;",
+         "thermal/UART safety invariant missing", runner=run_thermal_checks)
+
+    case("incoherent direct samples no longer fail closed", "ThermalConfirmation.cpp",
+         r"else if \(result_\.sample_count == kThermalConfirmationReads\) \{\s*return telemetryFault\(\);",
+         "else if (result_.sample_count == kThermalConfirmationReads) { return result_;",
+         "thermal/UART safety invariant missing", runner=run_thermal_checks)
+
+    case("refuted block-read values latch a thermal fault again", "ThermalConfirmation.cpp",
+         r"if \(bulk_artifacts_ < 0xFFFF\) \+\+bulk_artifacts_;",
+         "if (bulk_artifacts_ < 0xFFFF) ++bulk_artifacts_; if (bulk_artifacts_ >= 3) return telemetryFault();",
+         "may not latch a thermal verdict", runner=run_thermal_checks)
+
+    case("over-temperature confirmed from the block read alone", "ThermalConfirmation.cpp",
+         r"if \(observed <= kThermalLimitC\) return result_;",
+         "if (observed <= kThermalLimitC) return result_; result_.decision = ThermalDecision::CONFIRMED; return result_;",
+         "only be confirmed by the direct-sample majority", runner=run_thermal_checks)
+
+    case("direct clearing majority weakened to 2", "ThermalConfirmation.h",
+         r"constexpr uint8_t kThermalDirectNormalToClear = 3;",
+         "constexpr uint8_t kThermalDirectNormalToClear = 2;",
+         "thermal/UART safety invariant missing", runner=run_thermal_checks)
+
     case("Controller skips the thermal confirmation", "Controller.cpp",
          r"state\.update\(&thermal_read_port_, buses\[i\], sample\.present_temperature, millis\(\)\)",
          "state.result()",

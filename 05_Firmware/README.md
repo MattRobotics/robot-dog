@@ -2,12 +2,12 @@
 
 This directory is reserved for low-level firmware that belongs specifically to MATDOG.
 
-> **⚠ Flash safety — 2026-10-08, updated for PR-2.** Do not build from or flash `main` to update
+> **⚠ Flash safety — 2026-10-08, updated for PR-3.** Do not build from or flash `main` to update
 > the current robot.
-> - `main` uses the robot's layout `MATDOG_16M_2x5M_NVS_V1`, carries Calibration Persistence V1
->   and a selective part of the dev.1 line (identity `0.2.0-dev.1`).
-> - It is still not the firmware the robot runs (the dev.3 candidate), and these integrations
->   authorize no flash and accept nothing on hardware.
+> - `main` uses the robot's layout `MATDOG_16M_2x5M_NVS_V1`, carries Calibration Persistence V1,
+>   a selective part of the dev.1 line and the dev.2/dev.3 source delta (identity `0.2.0-dev.3`).
+> - A `main` build is not the installed image (different source commit and build ID), dev.3
+>   acceptance is BLOCKED, and these integrations authorize no flash and accept nothing on hardware.
 >
 > See [`MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md`](MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
 

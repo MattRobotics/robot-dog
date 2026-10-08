@@ -1,5 +1,67 @@
 # MATDOG Controller — Changelog
 
+## Unreleased — PR-3: dev.2/dev.3 source delta on `main` (0.2.0-dev.3) — 2026-10-08
+
+- **What `main` gains.** Seven commits recreated from the dev.2/dev.3 candidate (`bac652f`,
+  `d0ede36`, `d67eaa1`, `62812cd`, `2f23247`, `b3fd945`, `b764c25`); each message carries the full
+  `Original-SHA:`. They are recreated, not merged: the originals descend from `3f23439`, which holds
+  third-party decompiler material that must not enter the history of `main` (ADR-004). The originals
+  are not ancestors of `main` and stay preserved on `backup/matdog-dev3-preservation-20261008`.
+- **Source.** The dev.2 read-only boot servo census (ROBOT_POWERED), the dev.3 thermal verdict from
+  direct reads only, the host runner's one-shot post-abort recovery, and the identity
+  `0.2.0-dev.3`. Every recreated file is byte-identical to its original; `CHANGELOG.md` differs
+  only in position of the added entries.
+- **Records.** The dev.2/dev.3 development logs and delta audits are historical records of the
+  candidate on the robot; they are not results for a `main` build.
+- **Unchanged contracts.** `MOTION_AUTHORIZED=0`, `RESTORE=NOT_IMPLEMENTED`, OTA ingest default 0,
+  layout `MATDOG_16M_2x5M_NVS_V1`, no actuator path from `src/motion`. No pre-existing anomaly was
+  corrected.
+- **Not accepted.** dev.3 Hardware Validation 2026-10-07: execution COMPLETE, acceptance BLOCKED. No
+  release is approved. **Do not flash `main`**; see
+  [`FLASH_LAYOUT_SAFETY_NOTICE.md`](FLASH_LAYOUT_SAFETY_NOTICE.md) and the
+  [PR-3 log](../../09_Logs/Development_Log/2026-10-08_PR3_DEV2_DEV3_SELECTIVE_INTEGRATION.md).
+
+## 0.2.0-dev.3 — thermal verdict from direct reads; automatic post-abort recovery — 2026-10-06
+
+- The PresentTemperature byte of the 15-byte feedback block read is diagnostic only. On
+  the robot it intermittently reads 71..150 on the servo that is moving while a direct
+  read 50 ms later says ~32 C (23 such samples in the 2026-10-01 24/24 run, 19 on
+  2026-10-03, 4 in 38 s on 2026-10-06). Above the limit it only opens a confirmation.
+- The thermal verdict is taken from DIRECT single-register reads alone: three direct
+  samples over the unchanged 70 C limit are `CONFIRMED`; three at or under it refute the
+  block read (`BULK_TEMP_ARTIFACT_SUSPECT`, counted, logged, never latched); a failed,
+  invalid, incoherent or expired confirmation is `THERMAL_TELEMETRY_FAULT`. Both abort
+  verdicts publish a value over the limit, so the run ends in SAFE_OFF as before.
+- Removed: the per-servo latch (three refuted samples in 30 s, eight per boot) that
+  stopped LF at UPPER MAX on 2026-10-06 with every servo at 32..35 C. Every confirmation
+  sequence that aborted before still aborts; no limit, current, contact, torque, speed or
+  geometry parameter changed.
+- `calibration_hw_session.py`: after a failed leg (SAFE_OFF 13/13 and export done) the
+  runner starts the firmware's own witnessed `POST_ABORT RECOVERY` once, only for an
+  allow-listed search verdict in an UPPER/LOWER probe phase and only with fresh proof of
+  the promoted q0, geometry, census, preflight, direct temperatures and torque-off. Thermal
+  verdicts, current, communication, readback, status and operator aborts never recover.
+  `--no-auto-recovery` disables it. The BMS stream is switched off after a failed phase.
+- No recovery across a reboot exists: see the
+  [dev.3 delta audit](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
+
+## 0.2.0-dev.2 — ROBOT_POWERED boot self-test census — 2026-10-06
+
+- ROBOT_POWERED arms exactly one canonical read-only servo census (11..55, 13 expected,
+  52..55 absent by design) in `Controller::begin()`. It advances from `update()` at one
+  Ping per tick: no torque, GoalPosition, EEPROM or SAFE_OFF write. USB_ONLY is unchanged.
+- Servo subsystem health under ROBOT_POWERED is the completed census verdict: pending is
+  BOOTING, PASS is OK, any other verdict or a census that cannot be armed is FAULT. A later
+  operator census replaces it on completion; the previous verdict is kept while it runs.
+- Boot banner: `startup_servo_census : ENABLED_READ_ONLY_INCREMENTAL` replaces
+  `startup_servo_scan : DISABLED`, plus `STARTUP_SERVO_CENSUS=RUNNING|PASS|FAIL|START_FAILED`.
+  Older entries and plans quoting the previous line describe earlier builds.
+- Static audit owns the new wiring (`check_startup_servo_selftest_wiring`, three rejected
+  mutations); `ServoBus::begin()` still may not ping. Stale `0.2.0-dev.1` test
+  expectations updated. No motion, calibration, persistence, OTA or layout change.
+- MOTION_AUTHORIZED stays 0, RESTORE stays NOT_IMPLEMENTED. See the
+  [delta audit](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV2_BOOT_SELFTEST_DELTA_AUDIT_2026-10-06.md).
+
 ## Unreleased — PR-2: selective dev.1 integration (0.2.0-dev.1) — 2026-10-08
 
 - **Merged with original SHAs.** `13da04a` and its 12 ancestors from
