@@ -166,12 +166,29 @@ void Controller::begin() {
   servo_bus_.begin();
   system_state_.setServoHealth(servo_bus_.health());
 
-  // Binds the census service to the ONE ServoBus. Deliberately does not
-  // start a census: no bus traffic whatsoever happens at boot (handoff
-  // "no startup torque / no startup motion"), and scripts/static_audit.py
-  // fails the build if Controller::begin() ever starts one.
+  // Bind the ONE canonical census service to the ONE ServoBus.
+  // ROBOT_POWERED now performs an intentional boot self-test: start() only
+  // arms the incremental scan; ServoBus::update() performs at most one Ping
+  // per later Controller tick. No torque, GoalPosition or EEPROM write is
+  // reachable from ServoCensus.
   servo_census_.begin(&servo_bus_);
   servo_preflight_.begin(&servo_bus_);
+
+  if (build::kServoPowerAvailable) {
+    startup_servo_census_pending_ = servo_census_.start();
+    if (startup_servo_census_pending_) {
+      system_state_.setServoHealth(ModuleHealth::NOT_INITIALIZED);
+      Serial.printf("STARTUP_SERVO_CENSUS=RUNNING canonical=%u expected_now=%u range=%d..%d\n",
+                    (unsigned)servo::canonicalAllocatedCount(),
+                    (unsigned)servo::expectedNowCount(),
+                    servo::kCanonicalScanLo, servo::kCanonicalScanHi);
+    } else {
+      // A powered robot that cannot even start its required population
+      // self-test must fail closed rather than remain BOOTING forever.
+      system_state_.setServoHealth(ModuleHealth::FAULT);
+      Serial.println("STARTUP_SERVO_CENSUS=START_FAILED");
+    }
+  }
 
   imu_.begin();
   system_state_.setImuHealth(imu_.health());
@@ -900,7 +917,7 @@ void Controller::printBootBanner() {
   Serial.printf("reset_reason : %s\n", resetReasonName(esp_reset_reason()));
   Serial.println("startup_motion   : DISABLED");
   Serial.println("startup_torque   : DISABLED");
-  Serial.println("startup_servo_scan : DISABLED");
+  Serial.println("startup_servo_census : ENABLED_READ_ONLY_INCREMENTAL");
   Serial.println("daly_write       : KEY_LOGIC_DISCHARGE_ONLY (operator command; no MOS/power-cut write)");
   Serial.printf("operating_mode   : %s\n", toString(operating_mode_.mode()));
   // Two orthogonal axes, printed together so they can never be confused for
@@ -955,7 +972,50 @@ void Controller::update(uint32_t now_ms) {
   // Same tick the executor turned terminal: record, complete the session,
   // revoke the permit. See updateFullLegFinalization().
   updateFullLegFinalization();
-  system_state_.setServoHealth(servo_bus_.health());
+
+  // System-level servo health is a population verdict under ROBOT_POWERED,
+  // not the outcome of whichever individual Ping/read happened last.
+  //
+  // During the automatic startup census the system stays BOOTING. Once a
+  // full canonical census completes, only PASS can make the servo subsystem
+  // OK; PROFILE_MISMATCH/RANGE_INCOMPLETE fail closed as FAULT.
+  //
+  // A later operator-triggered census may replace that population verdict
+  // when it completes. While such a later census is RUNNING, retain the
+  // previous completed population health so calibration qualification does
+  // not transiently turn the whole system back into BOOTING.
+  if (!build::kServoPowerAvailable) {
+    // Preserve the proven USB_ONLY semantics.
+    system_state_.setServoHealth(servo_bus_.health());
+  } else if (servo_census_.state() == servo::ServoCensus::State::COMPLETE) {
+    const servo::CensusResult& census = servo_census_.result();
+    const bool population_pass =
+        census.verdict == servo::CensusVerdict::PASS;
+
+    system_state_.setServoHealth(
+        population_pass ? ModuleHealth::OK : ModuleHealth::FAULT);
+
+    if (startup_servo_census_pending_) {
+      startup_servo_census_pending_ = false;
+      const servo::ScanResult& raw = servo_bus_.lastScanResult();
+      Serial.printf(
+          "STARTUP_SERVO_CENSUS=%s verdict=%s expected=%u present=%u missing=%u "
+          "absent_by_design=%u absent_present=%u unexpected=%u "
+          "elapsed_ms=%lu max_ping_us=%lu\n",
+          population_pass ? "PASS" : "FAIL",
+          servo::toString(census.verdict),
+          (unsigned)census.expected_now,
+          (unsigned)census.present_expected,
+          (unsigned)census.missing_expected,
+          (unsigned)census.absent_by_design,
+          (unsigned)census.absent_by_design_present,
+          (unsigned)census.unexpected_id,
+          (unsigned long)raw.elapsed_ms,
+          (unsigned long)raw.max_ping_us);
+    }
+  } else if (startup_servo_census_pending_) {
+    system_state_.setServoHealth(ModuleHealth::NOT_INITIALIZED);
+  }
 
   system_state_.update();
 

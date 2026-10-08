@@ -21,7 +21,7 @@ import build_manifest as bm  # noqa: E402
 import matdog_layout as layout  # noqa: E402
 
 HEAD = "aee49bf306f88d56562634aeba08b767f92b247c"
-IDENTITY = {"FW_VERSION": "0.2.0-dev.1", "BUILD_UTC": "2026-10-05T00:00:00Z",
+IDENTITY = {"FW_VERSION": "0.2.0-dev.2", "BUILD_UTC": "2026-10-05T00:00:00Z",
             "BUILD_UTC_POLICY": "SOURCE_DATE_EPOCH", "CAL_RECORD_SCHEMA": "1",
             "CAL_MARKER_SCHEMA": "2", "MOTION_STACK": "G1_G5A_COMPILED_UNWIRED"}
 
@@ -141,7 +141,7 @@ def macro(name):
     m = re.search(r"-D" + name + r'=\"([^\"]+)\"', flags)
     assert m, (name, flags)
     return m.group(1)
-payload = ("MATDOG_LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1\\0" + "0.2.0-dev.1\\0" +
+payload = ("MATDOG_LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1\\0" + "0.2.0-dev.2\\0" +
            macro("MATDOG_GIT_SHA") + "\\0" + macro("MATDOG_BUILD_UTC") + "\\0" +
            "G1_G5A_COMPILED_UNWIRED\\0" + flags).encode()
 (out / "MATDOG_Controller.ino.bin").write_bytes(payload)
@@ -182,7 +182,7 @@ shutil.copyfile(os.environ["FAKE_TABLE"], out / "MATDOG_Controller.ino.partition
         result = self.run_build()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         fields = self.manifest()
-        self.assertEqual(fields["FW_VERSION"], "0.2.0-dev.1")
+        self.assertEqual(fields["FW_VERSION"], "0.2.0-dev.2")
         self.assertEqual(fields["GIT_SHA"], HEAD)
         self.assertEqual(fields["GIT_DIRTY"], "0")
         self.assertEqual(fields["BUILD_ID"], HEAD[:12])

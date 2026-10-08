@@ -421,7 +421,7 @@ static void test_usb_only_boot_table_unchanged() {
 
   core::AvailabilityStatus servo;
   servo.init = core::InitializationState::INITIALIZED;
-  servo.detected = core::DetectedState::UNKNOWN;  // no auto-scan at boot
+  servo.detected = core::DetectedState::UNKNOWN;  // startup census pending
   servo.expected = core::expectedStateForServoBus(usb);
 
   core::AvailabilityStatus led;
@@ -486,7 +486,7 @@ static void test_robot_powered_ready_is_reachable() {
   state.setLedHealth(core::toModuleHealth(core::classify(led)));
   CHECK(state.update() == core::SystemHealth::READY);
 
-  // At boot, BEFORE any census, the servo bus is honestly unproven: the
+  // While the automatic startup census is pending, the servo bus is unproven: the
   // system is BOOTING (a visible gap), not READY and not FAULT.
   servo.detected = core::DetectedState::UNKNOWN;
   CHECK(core::classify(servo) == core::Classification::UNKNOWN);

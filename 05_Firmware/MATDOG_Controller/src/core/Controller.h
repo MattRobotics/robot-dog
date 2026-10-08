@@ -108,7 +108,11 @@ class Controller {
   };
   ServoThermalReadPort thermal_read_port_{&servo_bus_};
   calibration::ThermalConfirmationState thermal_state_[calibration::kFullLegPopulation];
-  servo::ServoCensus servo_census_;  // semantic census over servo_bus_; never auto-start
+  // Canonical population census. Under ROBOT_POWERED Controller::begin()
+  // schedules exactly one read-only startup census. The scan advances
+  // incrementally from update(): Ping only, never torque/motion/EEPROM.
+  servo::ServoCensus servo_census_;
+  bool startup_servo_census_pending_ = false;
   servo::ServoPreflight servo_preflight_;  // H0 leg verification; read-only, never auto-started
   imu::Bno085Imu imu_;
   power::DalyBms daly_;
