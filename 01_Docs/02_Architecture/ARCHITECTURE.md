@@ -145,7 +145,7 @@ ESP32 on its own.
 ### Update policy
 
 - **DECIDED:** Wi-Fi/OTA is the normal future firmware-update path.
-- **IMPLEMENTED / TO_TEST (V3 isolated branch, 2026-10-04):** one core-0 worker owns
+- **IMPLEMENTED / TO_TEST (V3, on `main` since PR-2; offline qualified 2026-10-04):** one core-0 worker owns
   radio and standard-NVS network config; Controller copies snapshots. Two profiles share
   one STA, with protected recovery AP, offline portal, bounded auth/CSRF requests and
   test-before-commit. Calibration storage remains in `matdog_nvs`. HWCDC session proof
@@ -155,7 +155,9 @@ ESP32 on its own.
   existing nonce/HMAC, authority inhibit and inactive-slot writer are retained. HTTP OTA
   is refused. Default/final ingest remains 0. Remote reboot is BLOCKED/unimplemented,
   TLS heap/handshake measurements and OTA rollback are TO_TEST. This does not authorize
-  any deployment or promote the provisional calibration persistence base.
+  any deployment. The 2026-10-04 wording about a "provisional calibration persistence base" is
+  historical: Calibration Persistence V1 is on `main`, its hardware acceptance is BLOCKED and
+  `RESTORE` is NOT_IMPLEMENTED.
 - OTA must never remove or make wired recovery dependent on a working application image.
 - Controller V0.1's application-partition USB flashing procedure is not a Wi-Fi/OTA
   implementation.

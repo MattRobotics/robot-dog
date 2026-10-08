@@ -1,5 +1,14 @@
 # MATDOG Controller V0.1 — Validation
 
+> **Reading guide (added 2026-10-08).** Sections are dated records; a result is valid for its own
+> date, build and scope. The PR-2 and PR-3 sections at the top describe offline verification of what
+> was integrated into `main`; they are not hardware results. Hardware results of the dev.2/dev.3
+> candidate are in the [dev.2](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV2_BOOT_SELFTEST_DELTA_AUDIT_2026-10-06.md)
+> and [dev.3](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md)
+> delta audits. The section "Present-day baseline and next gate" below is dated 2026-10-01. The
+> chronology is in [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md), the open items in
+> [`OPEN_ITEMS.md`](../../09_Logs/OPEN_ITEMS.md).
+
 ## PR-3 dev.2/dev.3 source delta — offline verification, 2026-10-08
 
 Scope: offline verification of the content PR-3 brings to `main` (seven recreated commits, see the
@@ -67,7 +76,7 @@ Markdown, to the final tip).
 Not claimed for `main`: the integration branch result of 2026-10-05/06 (20/20 motion qualification,
 330/330 pinned files). Container binaries depend on the checkout path and are not release
 artifacts. The hardware results for dev.2 and dev.3 belong to the dev.3 candidate and are in the
-[dev.3 delta audit](https://github.com/MattRobotics/robot-dog/blob/b764c25c9530350331dbaa59ea2d84ddab3a3f69/09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
+[dev.3 delta audit](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
 The 2026-10-07 Hardware Validation (execution COMPLETE, acceptance BLOCKED) has no report in this
 repository yet.
 
@@ -281,6 +290,9 @@ still report pre-existing SCServo warnings (including ReadMode array bounds) and
 comment warning in the local Wi-Fi configuration; none originates in the corrective code.
 
 ## Present-day baseline and next gate
+
+> *Annotation 2026-10-08:* this section reflects 2026-10-01. Later status is in the PR-2 and PR-3
+> sections at the top of this file and in [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md).
 
 The official Controller baseline is now merged and tagged. The session records below preserve the
 state and merge judgements that were true when each session ended; their historical "not merged"

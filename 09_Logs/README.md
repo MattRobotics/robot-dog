@@ -14,12 +14,16 @@ automatically describe the robot after a later rebuild or architecture change.
 
 | Area | Purpose |
 |---|---|
+| [History index](HISTORY_INDEX.md) | One chronology, June–October 2026: phases, status, documents and available evidence |
+| [Open items](OPEN_ITEMS.md) | Blockers and residuals as documented at `main` after PR #40 |
+| [Commit provenance map](COMMIT_PROVENANCE_MAP.md) | PR #37–#40 merge SHAs; original SHA to recreated SHA for PR-2 and PR-3 |
+| [External archives](EXTERNAL_ARCHIVES.md) | Branches, tags and material outside `main`; all `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | [ST3215 evidence index](ST3215_EVIDENCE_INDEX.md) | Canonical navigation for bench QC, source survey, provisioning and frozen-tool evidence |
-| [`Validation_Reports/`](Validation_Reports/) | Dated hardware, software and model validation evidence; each claim is limited to its stated scope |
+| [`Validation_Reports/`](Validation_Reports/README.md) | Dated hardware, software and model validation evidence; each claim is limited to its stated scope |
 | [`Calibration/`](Calibration/) | Calibration records and the 2026-08-27 reset notice; pre-reset values are historical |
 | [`Calibration_Sessions/`](Calibration_Sessions/) | Raw and derived records from dated calibration sessions |
-| [`Development_Log/`](Development_Log/) | Chronological handoffs and milestone records; their “next steps” are historical |
-| [`Architecture_Decisions/`](Architecture_Decisions/) | Dated ADRs; consult the canonical architecture before treating an older decision as active |
+| [`Development_Log/`](Development_Log/README.md) | Chronological handoffs and milestone records; their “next steps” are historical |
+| [`Architecture_Decisions/`](Architecture_Decisions/README.md) | Dated ADRs; consult the canonical architecture before treating an older decision as active |
 | [Historical index](Historical/README.md) | Explicitly superseded material and preserved engineering archives |
 
 ## Reading rules

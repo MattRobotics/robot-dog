@@ -197,8 +197,12 @@ Seeed Bus Servo Driver
 All 17 allocated units were bench-provisioned with `PositionOffset = 0`, a servo-level
 fact distinct from joint calibration. The current installation passed TRUE Full Calibration
 24/24 on 2026-10-01. The 12 fresh q0 values, contacts and diagnostics were exported and
-archived. They are RAM-only in the Controller: after a power cycle no automatic restore exists,
-no motion is thereby authorized, and no servo EEPROM, ID, `PositionOffset` or NVS write occurred.
+archived. In that session they were RAM-only in the Controller: no automatic restore exists, no
+motion is thereby authorized, and no servo EEPROM, ID, `PositionOffset` or NVS write occurred.
+Since PR-1 an NVS record store (Calibration Persistence V1) is IMPLEMENTED on `main`. SAVE/ACK and
+LOAD across a reset were observed on the dev.3 candidate on 2026-10-06; a real power cycle was not
+shown. The runtime state is still held in RAM, automatic `RESTORE` is NOT_IMPLEMENTED, and hardware
+acceptance is BLOCKED (dev.3: execution COMPLETE, acceptance BLOCKED).
 
 ## Official firmware baseline
 
@@ -352,6 +356,11 @@ capabilities are integrated into the Controller.
 | Is calibration commandable? | [`MATDOG_JOINT_CALIBRATION.yaml`](06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml) |
 | Where is frozen ST3215 evidence? | [`ST3215_EVIDENCE_INDEX.md`](09_Logs/ST3215_EVIDENCE_INDEX.md) |
 | Where is superseded/historical material? | [`09_Logs/Historical/`](09_Logs/Historical/README.md) |
+| How did the project get here (June–October 2026)? | [`HISTORY_INDEX.md`](09_Logs/HISTORY_INDEX.md) |
+| Which decisions were taken, and which are superseded? | [ADR index](09_Logs/Architecture_Decisions/README.md) |
+| Which development logs and validation reports exist? | [Development Log index](09_Logs/Development_Log/README.md), [Validation Reports index](09_Logs/Validation_Reports/README.md) |
+| What is still open or missing? | [`OPEN_ITEMS.md`](09_Logs/OPEN_ITEMS.md) |
+| Where do original commit SHAs map after the selective integrations? | [`COMMIT_PROVENANCE_MAP.md`](09_Logs/COMMIT_PROVENANCE_MAP.md); archives held outside GitHub: [`EXTERNAL_ARCHIVES.md`](09_Logs/EXTERNAL_ARCHIVES.md) |
 | Where is Geometry Compiler verification evidence? | [`REPOSITORY_VERIFICATION_INDEX.md`](REPOSITORY_VERIFICATION_INDEX.md) (**HISTORICAL/REFERENCE**, not project status) |
 
 ## Repository layout
@@ -365,7 +374,8 @@ capabilities are integrated into the Controller.
 06_Software/    calibration, geometry, kinematics, and host-side software
 07_Media/       images, renders, and videos
 08_Tests/       repeatable validation procedures
-09_Logs/        evidence, decisions, reports, and historical archives
+09_Logs/        evidence, decisions, reports, and historical archives (start at HISTORY_INDEX.md)
+09_Backups/     manifests and receipts of encrypted flash backups (no plaintext images)
 ```
 
 ## Safety boundary
