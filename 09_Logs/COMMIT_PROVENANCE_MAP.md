@@ -2,8 +2,9 @@
 
 Maps the commits cited in MATDOG documentation to what exists on `main`. Short or full SHAs in
 older documents may name commits that live only on historical branches. A SHA that is **not an
-ancestor of `main`** is kept here as provenance only: GitHub may stop serving it once the branch
-that holds it is deleted, so this repository never relies on a permalink to it
+ancestor of `main`** is kept here as provenance only: a permalink to it may become unavailable once the
+refs (branches or tags) that make the commit reachable are removed, so this repository does not rely on
+such a permalink
 (`EXTERNAL_ARCHIVE_PENDING_VERIFICATION`, see [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md)).
 
 Baseline of this map: `main` = `9c2fe7868423f5267063285d7be93de00dc302db` (PR #40 merge).
@@ -85,7 +86,7 @@ source commit and build ID, and is not shown to be byte-identical to the install
 
 | SHA | Meaning | Where it lives | Status |
 |---|---|---|---|
-| `e1704719979789cd9c9f18741e4546725558797e` | Tip of the divergent gait / G5-A line; holds `09_Logs/Development_Log/2026-09-28_G3_STARTUP_TIMED_STAND.md` (blob `513acfd998440e7d684f31d26257efefbd471c9f`) | historical branch `feat/g5a-stabilization-feasibility` | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION`. [`STARTUP_TIMING.md`](../05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md) and the PR-2 log link to it by permalink. The permalink will not work if that branch is removed |
+| `e1704719979789cd9c9f18741e4546725558797e` | Tip of the divergent gait / G5-A line; holds `09_Logs/Development_Log/2026-09-28_G3_STARTUP_TIMED_STAND.md` (blob `513acfd998440e7d684f31d26257efefbd471c9f`) | historical branch `feat/g5a-stabilization-feasibility` | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION`. [`STARTUP_TIMING.md`](../05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md) and the PR-2 log link to it by permalink. The permalink may become unavailable when the refs that make this commit reachable are removed |
 | `3f23439` | Introduced the 38 XGO decompiler extracts | `integration/matdog-controller-v0.2.0` | Excluded by ADR-004. Not to be republished |
 | `d7aa369…` | dev.1 tip | integration and preservation branches | see PR-2 table |
 | `a06314e` | Wi-Fi PHY diagnostic | `backup/wifi-phy-a06314e-20261008` | Not integrated |

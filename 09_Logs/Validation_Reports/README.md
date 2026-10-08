@@ -6,7 +6,7 @@ motion (`MOTION_AUTHORIZED=0`). Recorded PASS/FAIL results are not edited by thi
 Current state: [root README](../../README.md). Chronology: [`HISTORY_INDEX.md`](../HISTORY_INDEX.md).
 
 Legend — **Era**: *Station* = Station-mediated, 12-servo phase (historical); *Rebuild* = after the
-2026-08-27 rebuild (17 servos, ESP32-S3 Controller). **Kind**: HW = hardware evidence, OFFLINE =
+2026-08-27 rebuild (17 allocated servo slots, of which 13 are physically installed today: 12 leg + neck ID 51; ESP32-S3 Controller). **Kind**: HW = hardware evidence, OFFLINE =
 software/model only.
 
 ## Model, kinematics and early hardware (June–July 2026)
@@ -25,7 +25,7 @@ software/model only.
 | Report | Date | Kind | Scope as recorded |
 |---|---|---|---|
 | [ST3215 Bench QC](ST3215_Bench_QC_2026-08-24/README.md) | 2026-08-24/25 | HW (bench) | 26/26 runs COMPLETE, protocol V6.1 |
-| [ST3215 Provisioning](ST3215_Provisioning_2026-08-27/README.md) | 2026-08-27 | HW (bench) | 17 units provisioned, 17/17 PASS. Does not state that 17 servos are installed today |
+| [ST3215 Provisioning](ST3215_Provisioning_2026-08-27/README.md) | 2026-08-27 | HW (bench) | Historical bench provisioning of 17 allocated units, 17/17 PASS. It does not imply that 17 servos are installed: 13 are installed today (12 leg + neck ID 51) |
 
 Navigation for the whole ST3215 evidence set: [`ST3215_EVIDENCE_INDEX.md`](../ST3215_EVIDENCE_INDEX.md).
 

@@ -26,15 +26,14 @@ Snapshot taken against `main` = `9c2fe7868423f5267063285d7be93de00dc302db`.
 | Branch | Tip | Commits not in `main` | Holds | Disposition for this documentation |
 |---|---|---:|---|---|
 | `feat/calibration-persistence-record-store-v1` | `7b258b3` | 0 | Persistence V1 line | Fully on `main` (PR #38). Nothing external |
-| `integration/pr3-dev3-selective` | `49e76fb` | 0 | PR-3 working branch | Fully on `main` (PR #40). Nothing external |
 | `integration/matdog-controller-v0.2.0` | `d7aa369` | 4 (`3f23439`, `1cec973`, `53aa962`, `d7aa369`) | dev.1 line incl. the XGO extracts | Source delta recreated on `main`; XGO excluded. `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | `backup/matdog-dev3-preservation-20261008` | `b764c25` | 11 | dev.2/dev.3 line, installed-firmware provenance `b3fd945` | Source delta recreated on `main`; original SHAs kept in [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md). `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | `feat/g5a-stabilization-feasibility` | `e170471` | 64 | Divergent gait/G5-A line; G3 report `09_Logs/Development_Log/2026-09-28_G3_STARTUP_TIMED_STAND.md`; G4/G4.1/G5-A evidence | Pure motion library is on `main`; evidence DEFERRED. `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | `audit/matdog-v0.2.0-dev1-claude-handoff` | `b6d9957` | 5 | Convergence audit handoff (`_audit/…`, 363 files, includes XGO/G35 material) | Not imported. The audit report `MATDOG_FIRMWARE_CONVERGENCE_AUDIT_V0_2.md` is `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | `backup/history/gait-g41-pre-amend-6047e43` | `6047e43` | 57 | Pre-amend gait history incl. XGO files | Not imported. `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | `backup/history/calib-endstop-preflight-c6d7ba3` | `c6d7ba3` | 1 | Pre-rewrite calibration history | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
-| `backup/history/calib-tolerance-pre-amend-b8ea0ba` | `b8ea0ba` | 49 | Pre-amend calibration history | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
-| `backup/history/calib-zero-pose-pre-rebase-f4502ec` | `f4502ec` | 45 | Pre-rebase calibration history | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
+| `backup/history/calib-tolerance-pre-amend-b8ea0ba` | `b8ea0ba` | 1 | Pre-amend calibration history | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
+| `backup/history/calib-zero-pose-pre-rebase-f4502ec` | `f4502ec` | 2 | Pre-rebase calibration history | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | `backup/wifi-phy-a06314e-20261008` | `a06314e` | 1 | Wi-Fi PHY diagnostic, not integrated | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | `backup/wip-m0-4-p2-20261008` | `43fa92a` | 1 | WIP M0.4 P2, not integrated | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 
@@ -50,7 +49,7 @@ Snapshot taken against `main` = `9c2fe7868423f5267063285d7be93de00dc302db`.
 | `archive/2026-07-31/calibration-sequence-upper-lower-hip-audit` | `cc70718` | no | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | `archive/2026-08-11/pr19-geometry-v5-pre-squash` | `2890daf` | no | Pre-squash history of PR #19. `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | `archive/2026-08-29/full-leg-calibrator-v1-h0` | `15f3fb8` | no | Calibrator V1 H0. `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
-| `matdog-urdf-rev00-kinematic-baseline` | `2b6a3a0` | no | URDF REV00 baseline. The URDF and [ADR-003](Architecture_Decisions/ADR-003_URDF_REV00_Kinematic_Baseline.md) are present on `main`; the tagged commit itself is not an ancestor. `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
+| `matdog-urdf-rev00-kinematic-baseline` | `2b6a3a0` | yes | URDF REV00 baseline; see [ADR-003](Architecture_Decisions/ADR-003_URDF_REV00_Kinematic_Baseline.md) |
 
 ## C. Material outside GitHub
 
