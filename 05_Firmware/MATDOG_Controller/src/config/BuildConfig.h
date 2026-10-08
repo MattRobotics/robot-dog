@@ -12,6 +12,18 @@
 #define MATDOG_BUILD_ID "unknown"
 #endif
 
+// Full development provenance is separate from the short OTA protocol ID.
+// An IDE build without the build script cannot claim clean Git provenance.
+#ifndef MATDOG_GIT_SHA
+#define MATDOG_GIT_SHA "unknown"
+#endif
+#ifndef MATDOG_GIT_DIRTY
+#define MATDOG_GIT_DIRTY 1
+#endif
+#ifndef MATDOG_BUILD_UTC
+#define MATDOG_BUILD_UTC "unknown"
+#endif
+
 // ---------------------------------------------------------------------------
 // ACTIVE HARDWARE PROFILE — the single G3 authorization gate.
 // ---------------------------------------------------------------------------
@@ -35,13 +47,14 @@ namespace build {
 
 constexpr const char* kFirmwareName    = "MATDOG Controller";
 
-// Release identity deliberately unchanged during the v02 development
-// branch (G2 handoff section 34): the 0.2.x release number is decided at
-// the release gate, not by a development branch name. Development builds
-// are distinguished by kBuildId (git SHA), not by this string.
-constexpr const char* kFirmwareVersion = "0.1.0";
+// This is a software development candidate, with hardware gates still held.
+constexpr const char* kFirmwareVersion = "0.2.0-dev.1";
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
+constexpr const char* kGitSha          = MATDOG_GIT_SHA;
+constexpr bool kGitDirty              = MATDOG_GIT_DIRTY != 0;
+constexpr const char* kBuildUtc        = MATDOG_BUILD_UTC;
+constexpr const char* kMotionStack     = "G1_G5A_COMPILED_UNWIRED";
 
 // The active profile and everything derived from it. kProfileExpectations
 // is the value every module consults (via core::expectedStateFor*()) to

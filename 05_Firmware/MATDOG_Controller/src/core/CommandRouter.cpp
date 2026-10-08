@@ -18,6 +18,9 @@
 #include "../actuator/OperationalEnvelope.h"
 
 #include "../config/BuildConfig.h"
+#include "../calibration/CalibrationRecord.h"
+#include "../calibration/CalibrationSaveMarker.h"
+#include "../update/OtaLayoutContract.h"
 #include "../config/Pins.h"
 #include "../network/HttpTransport.h"
 #include "ControllerService.h"
@@ -1868,6 +1871,18 @@ void CommandRouter::printSourceSignature() {
   Serial.printf("SOURCE_SIGNATURE build_id=%s firmware=%s version=%s profile=%s board=%s\n",
                 build::kBuildId, build::kFirmwareName, build::kFirmwareVersion,
                 build::kTestProfile, build::kBoardName);
+  // Identity only: the motion library has no operational dispatch or authority.
+  // The final application digest belongs to the associated build manifest.
+  Serial.printf("  FW_VERSION=%s GIT_SHA=%s GIT_DIRTY=%s HARDWARE_PROFILE=%s\n",
+                build::kFirmwareVersion, build::kGitSha, build::kGitDirty ? "YES" : "NO",
+                build::kTestProfile);
+  Serial.printf("  FLASH_LAYOUT=%s CAL_RECORD_SCHEMA=%u CAL_MARKER_SCHEMA=%u "
+                "OTA_INGEST=%u MOTION_STACK=%s MOTION_AUTHORIZED=0\n",
+                update::kLayoutId, (unsigned)calibration::kCalibrationRecordSchemaV1,
+                (unsigned)calibration::kSaveMarkerSchemaV1,
+                update::OtaManager::ingestEnabled() ? 1U : 0U, build::kMotionStack);
+  Serial.printf("  BUILD_UTC=%s APP_SHA256=ASSOCIATED_MANIFEST RESTORE=NOT_IMPLEMENTED\n",
+                build::kBuildUtc);
   Serial.printf("  ota_running_build_id=%s ota_running_image_state=%s reset_reason=%s\n",
                 o.running_build_id, update::toString(o.policy.running_image_state),
                 o.reset_reason);

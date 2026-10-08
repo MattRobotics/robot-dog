@@ -85,7 +85,9 @@ Usage:
 Exit code 0 = OK, 1 = REFUSE (reason printed as REFUSED=<CODE>).
 """
 import argparse
+import datetime
 import hashlib
+import re
 import sys
 from pathlib import Path
 
@@ -138,6 +140,17 @@ REQUIRED_KEYS = (
     "APP_PARTITION_SIZE",
 )
 
+# Additive V2 identity group. Historical V2 receipts remain verifiable using
+# their original gates; a new receipt must carry the complete group and agree
+# with those gates. APP_SHA256 is a host-side digest of the final application,
+# never a claim that the application can embed its own final hash.
+IDENTITY_KEYS = (
+    "FW_VERSION", "GIT_SHA", "GIT_DIRTY", "FLASH_LAYOUT",
+    "CAL_RECORD_SCHEMA", "CAL_MARKER_SCHEMA", "OTA_INGEST",
+    "MOTION_STACK", "MOTION_AUTHORIZED", "APP_SHA256", "BUILD_UTC",
+    "BUILD_UTC_POLICY",
+)
+
 
 # --- Refusal reason codes ---------------------------------------------------
 # Stable strings so the offline tests can assert the EXACT refusal, not just
@@ -165,6 +178,7 @@ class Refusal:
     APP_PARTITION_SIZE_MISMATCH = "APP_PARTITION_SIZE_MISMATCH"
     APPLICATION_TOO_LARGE = "APPLICATION_TOO_LARGE"
     LAYOUT_ID_NOT_IN_BINARY = "LAYOUT_ID_NOT_IN_BINARY"
+    IDENTITY_MISMATCH = "IDENTITY_MISMATCH"
 
 
 class Verdict:
@@ -197,7 +211,7 @@ def partition_table_path_for(binary):
 
 def render_manifest(*, source_commit, build_id, source_state, profile, ota_ingest_enabled,
                     fqbn, application_binary, application_size, application_sha256,
-                    layout_id, partition_table_sha256, app_partition_size):
+                    layout_id, partition_table_sha256, app_partition_size, identity=None):
     """Renders the manifest text. Deliberately a flat, fixed-order
     KEY=VALUE format with no quoting, no nesting and no escaping: it is
     consumed by `grep '^KEY=' | cut -d= -f2-` in shell as well as by this
@@ -217,7 +231,55 @@ def render_manifest(*, source_commit, build_id, source_state, profile, ota_inges
         f"PARTITION_TABLE_SHA256={partition_table_sha256}",
         f"APP_PARTITION_SIZE={app_partition_size}",
     ]
+    if identity is not None:
+        # Derive duplicate provenance fields from the existing owners, rather
+        # than accepting independent claims that can disagree with them.
+        fields = dict(identity)
+        fields.update(GIT_SHA=source_commit,
+                      GIT_DIRTY="0" if source_state == "CLEAN" else "1",
+                      FLASH_LAYOUT=layout_id, OTA_INGEST=str(ota_ingest_enabled),
+                      MOTION_AUTHORIZED="0", APP_SHA256=application_sha256)
+        problem = identity_problem(fields, source_commit=source_commit,
+                                   source_state=source_state, layout_id=layout_id,
+                                   ota_ingest=ota_ingest_enabled,
+                                   application_sha256=application_sha256)
+        if problem:
+            raise ValueError(problem)
+        lines += [f"{key}={fields[key]}" for key in IDENTITY_KEYS]
     return "\n".join(lines) + "\n"
+
+
+def identity_problem(fields, *, source_commit, source_state, layout_id,
+                     ota_ingest, application_sha256):
+    """Return the first additive identity contradiction, or None."""
+    missing = [key for key in IDENTITY_KEYS if not fields.get(key)]
+    if missing:
+        return "missing identity keys: " + ", ".join(missing)
+    if any(not isinstance(fields[key], str) or "\n" in fields[key] or "\r" in fields[key]
+           for key in IDENTITY_KEYS):
+        return "identity values must be single-line strings"
+    if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:dev|rc)\.(?:0|[1-9][0-9]*))?", fields["FW_VERSION"]):
+        return "FW_VERSION is not a supported release identity"
+    if not re.fullmatch(r"[0-9a-f]{40}", fields["GIT_SHA"]):
+        return "GIT_SHA must be a full local commit ID"
+    expected = {"GIT_SHA": source_commit,
+                "GIT_DIRTY": "0" if source_state == "CLEAN" else "1",
+                "FLASH_LAYOUT": layout_id, "OTA_INGEST": str(ota_ingest),
+                "MOTION_AUTHORIZED": "0", "APP_SHA256": application_sha256,
+                "CAL_RECORD_SCHEMA": "1", "CAL_MARKER_SCHEMA": "2",
+                "MOTION_STACK": "G1_G5A_COMPILED_UNWIRED"}
+    for key, value in expected.items():
+        if fields[key] != value:
+            return f"{key} disagrees with its owner: {fields[key]!r} != {value!r}"
+    if fields["BUILD_UTC_POLICY"] not in ("UTC_NOW", "SOURCE_DATE_EPOCH"):
+        return "unknown BUILD_UTC_POLICY"
+    try:
+        timestamp = datetime.datetime.strptime(fields["BUILD_UTC"], "%Y-%m-%dT%H:%M:%SZ")
+        if timestamp.strftime("%Y-%m-%dT%H:%M:%SZ") != fields["BUILD_UTC"]:
+            return "BUILD_UTC is not canonical UTC"
+    except ValueError:
+        return "BUILD_UTC is not canonical UTC"
+    return None
 
 
 def parse_manifest(text):
@@ -419,6 +481,15 @@ def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
                        detail=f"manifest built with OTA_INGEST_ENABLED={manifest_ota_ingest}, "
                               f"flash requested {requested_ota_ingest}{extra}")
 
+    if any(key in manifest for key in IDENTITY_KEYS):
+        problem = identity_problem(manifest, source_commit=manifest["SOURCE_COMMIT"],
+                                   source_state=manifest["SOURCE_STATE"],
+                                   layout_id=manifest["LAYOUT_ID"],
+                                   ota_ingest=manifest_ota_ingest,
+                                   application_sha256=manifest["APPLICATION_SHA256"])
+        if problem:
+            return Verdict(False, Refusal.IDENTITY_MISMATCH, detail=problem)
+
     return Verdict(True, profile=manifest_profile, ota_ingest=manifest_ota_ingest)
 
 
@@ -466,7 +537,30 @@ def _cmd_write(args):
         print(f"DETAIL={exc.detail}", file=sys.stderr)
         return 1
 
-    text = render_manifest(
+    identity = None
+    if any(getattr(args, name) is not None for name in
+           ("fw_version", "build_utc", "build_utc_policy", "motion_stack",
+            "cal_record_schema", "cal_marker_schema")):
+        identity = {"FW_VERSION": args.fw_version, "BUILD_UTC": args.build_utc,
+                    "BUILD_UTC_POLICY": args.build_utc_policy,
+                    "MOTION_STACK": args.motion_stack,
+                    "CAL_RECORD_SCHEMA": args.cal_record_schema,
+                    "CAL_MARKER_SCHEMA": args.cal_marker_schema}
+        # Firmware strings are observable in the actual application. The
+        # remaining aliases come from the already verified manifest owners.
+        for key in ("FW_VERSION", "BUILD_UTC", "MOTION_STACK"):
+            value = identity[key]
+            if not value or value.encode("ascii", errors="replace") not in binary.read_bytes():
+                print(f"REFUSED={Refusal.IDENTITY_MISMATCH}", file=sys.stderr)
+                print(f"DETAIL={key} is missing from application bytes", file=sys.stderr)
+                return 1
+        if args.source_commit.encode("ascii") not in binary.read_bytes():
+            print(f"REFUSED={Refusal.IDENTITY_MISMATCH}", file=sys.stderr)
+            print("DETAIL=full GIT_SHA is missing from application bytes", file=sys.stderr)
+            return 1
+
+    try:
+        text = render_manifest(
         source_commit=args.source_commit,
         build_id=args.build_id,
         source_state=args.source_state,
@@ -479,7 +573,12 @@ def _cmd_write(args):
         layout_id=matdog_layout.LAYOUT_ID,
         partition_table_sha256=table_digest,
         app_partition_size=matdog_layout.APP_SLOT_SIZE,
-    )
+        identity=identity,
+        )
+    except ValueError as exc:
+        print(f"REFUSED={Refusal.IDENTITY_MISMATCH}", file=sys.stderr)
+        print(f"DETAIL={exc}", file=sys.stderr)
+        return 1
     Path(args.output).write_text(text, encoding="utf-8")
     print(f"BUILD_MANIFEST={args.output}")
     print(f"HARDWARE_PROFILE={args.profile}")
@@ -550,6 +649,12 @@ def main(argv=None):
     # an unauthorized-sounding "0" for a build that was never checked.
     w.add_argument("--ota-ingest", required=True)
     w.add_argument("--fqbn", required=True)
+    w.add_argument("--fw-version")
+    w.add_argument("--build-utc")
+    w.add_argument("--build-utc-policy")
+    w.add_argument("--motion-stack")
+    w.add_argument("--cal-record-schema")
+    w.add_argument("--cal-marker-schema")
     w.set_defaults(func=_cmd_write)
 
     v = sub.add_parser("verify", help="fail-closed pre-flash manifest verification")
