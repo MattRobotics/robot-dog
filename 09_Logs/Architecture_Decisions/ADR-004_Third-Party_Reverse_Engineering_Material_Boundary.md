@@ -62,3 +62,13 @@ are unchanged.
 The PR-2 gate `run_motion_convergence_tests.py` fails if any `DEFERRED` path is present in the
 tree. The Git object closure of PR-2 was checked against the blob hashes of the excluded files
 (0 reachable).
+
+## Status update (2026-10-09)
+
+Annotation only; the decision above is unchanged and the boundary is not weakened. The GitHub branches
+that held the excluded material have been deleted and `main` remains the only branch. `main`, the 9 tags
+and the 41 pull-request refs reach none of the 284 known excluded blobs. Deleting the branches does not
+guarantee removal of material that was public before: it may persist in GitHub storage, caches, forks and
+clones. The original commits are kept in a non-public archive (owner-reported) and must not be pushed to a
+public ref. Details: [`EXTERNAL_ARCHIVES.md`](../EXTERNAL_ARCHIVES.md). Any further handling remains an
+owner decision.

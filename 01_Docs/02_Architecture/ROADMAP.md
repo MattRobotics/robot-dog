@@ -103,7 +103,9 @@ THEN       Stand / Gait hardware                 BLOCKED
 ```
 
 The pure motion library (G1 to G5-A) is on `main` since PR-2, unwired and not operational. Its
-execution suites and evidence are deferred; the research branches keep the history.
+execution suites and evidence are deferred; the research branches that held that history have been
+deleted from GitHub and the original commits are in a non-public archive (see
+[`EXTERNAL_ARCHIVES.md`](../../09_Logs/EXTERNAL_ARCHIVES.md)).
 
 Power domains, KEY/Charge-MOS semantics, every power state and the charging gates are owned by
 [`04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md`](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md).

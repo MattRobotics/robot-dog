@@ -1,7 +1,7 @@
 # Open items and blockers
 
-State as documented at `main` = `9c2fe7868423f5267063285d7be93de00dc302db` (after PR #37–#40,
-2026-10-08). Every row is taken from a document in this repository; nothing here is new evidence.
+State as documented at `main` = `ddcd1cdb87eef29cc46996d6137d3f2b4c946f17` (after PR #37–#41;
+firmware content as of PR #40, `9c2fe78…`; updated 2026-10-09). Every row is taken from a document in this repository; nothing here is new evidence.
 Standing invariants: **`MOTION_AUTHORIZED=0`**, **`RESTORE=NOT_IMPLEMENTED`**, **DO NOT FLASH
 `main`**. Current-state authority remains the [root README](../README.md).
 
@@ -46,9 +46,10 @@ fixture/operator gates not run. Full text: [dev.3 audit, Residuals](Validation_R
 | # | Item | State |
 |---|---|---|
 | E1 | Publish the 2026-10-07 report and the evidence behind the dev.2/dev.3 audits | Open; owner action |
-| E2 | Verification of the external backup of the repository, branches and evidence | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION`; see [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md) |
-| E3 | Historical branches and tags not reachable from `main` | Kept; no deletion decided. Disposition table in [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md) |
-| E4 | G3 report permalinks to commit `e170471…` in `STARTUP_TIMING.md` and the PR-2 log | Depend on a non-`main` commit. `STARTUP_TIMING.md` is pinned by the PR-2 manifest and left unchanged; any edit needs a separate authorization and the full gate |
-| E5 | XGO material already public on separate historical branches | Owner decision pending (ADR-004, PR-2 log). `main` history does not contain it |
+| E2 | Non-public encrypted archive of the Git histories and original commits | Owner-reported: backup completed; R1 key restore PASS; R2 SHA-256 208/208 PASS. Verification artifacts are not in the repository. **No second independent physical copy is declared.** See [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md) |
+| E2a | Local cleanup of the operator workstation | Not complete / not reported; final result not yet available. Do not treat as done |
+| E3 | Historical branches | **All 12 non-`main` branches deleted from GitHub** (plus the PR #41 branch after merge); last tips in [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md) §2; recovery steps in §6. Tags: 9 remain; 3 of them (`cc70718`, `2890daf`, `15f3fb8`) are not on `main` and their presence in the archive is `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
+| E4 | G3 report permalinks to commit `e170471…` in `STARTUP_TIMING.md` and the PR-2 log | Depend on a non-`main` commit whose only branch is deleted: treat as unavailable; the report is recoverable through the archive only. `STARTUP_TIMING.md` is pinned by the PR-2 manifest and left unchanged; any edit needs a separate authorization and the full gate |
+| E5 | XGO material that was public on the deleted branches | Not on `main` (0 of 284 known blobs reachable from `main`, the 9 tags and the 41 PR refs). Removal from GitHub storage, caches, forks and clones **cannot be guaranteed**; any further step is an owner decision (ADR-004) |
 | E6 | Full status synchronization of the 2026-10-01 snapshot in the root README | Partly done; the quoted snapshot stays labelled historical |
 | E7 | Service / Provisioning / QC, Wi-Fi/OTA hardware tests, Web dashboard, IMU/BMS UI | FUTURE or NOT HARDWARE TESTED, per [ROADMAP](../01_Docs/02_Architecture/ROADMAP.md) |
