@@ -65,8 +65,9 @@ tree. The Git object closure of PR-2 was checked against the blob hashes of the 
 
 ## Status update (2026-10-09)
 
-Annotation only; the decision above is unchanged and the boundary is not weakened. The GitHub branches
-that held the excluded material have been deleted and `main` remains the only branch. `main`, the 9 tags
+Annotation only; the decision above is unchanged and the boundary is not weakened. The historical GitHub
+branches that held the excluded material have been deleted. While Draft PR #42 is open its working branch
+`docs/c2-final-sync` also exists; the target is `main` alone after it is merged and that branch is deleted. `main`, the 9 tags
 and the 41 pull-request refs reach none of the 284 known excluded blobs. Deleting the branches does not
 guarantee removal of material that was public before: it may persist in GitHub storage, caches, forks and
 clones. The original commits are kept in a non-public archive (owner-reported) and must not be pushed to a

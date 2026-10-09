@@ -10,10 +10,11 @@ says so instead of describing it.
 > [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md).
 > Standing limits: `MOTION_AUTHORIZED=0` · `RESTORE=NOT_IMPLEMENTED` · **DO NOT FLASH `main`**.
 
-> **Branch status (2026-10-09).** All GitHub branches other than `main` have been deleted; 9 tags remain.
-> Dated logs and rows below that name a branch describe where the content *was*; the original commits are
-> in a non-public archive (owner-reported), see [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md). Only
-> `main` and the tags are navigable on GitHub.
+> **Branch status (2026-10-09).** The 13 historical branches recorded by the consolidation have been deleted
+> from GitHub; 9 tags remain. While Draft PR #42 is open the branch `docs/c2-final-sync` also exists; the
+> target is `main` alone after it is merged and that branch is deleted. Dated logs and rows below that name a
+> branch describe where the content *was*; the original commits are in a non-public archive (owner-reported),
+> see [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md). Navigable on GitHub: `main` and the tags.
 
 ## How to read a row
 
@@ -105,10 +106,10 @@ Per-area indexes: [ADRs](Architecture_Decisions/README.md) · [Development Log](
 | dev.3 thermal verdict from direct reads; 24/24; SAVE/ACK and LOAD across a reset; automatic recovery not triggered | 2026-10-06 | dev.3 code on `main`; candidate **not an accepted release** | [log](Development_Log/2026-10-06_THERMAL_DIRECT_VERDICT_DEV3.md), [dev.3 audit](Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md) | Audit document; raw evidence external |
 | **Hardware Validation 2026-10-07 (dev.3)** | 2026-10-07 | Execution **COMPLETE**, acceptance **BLOCKED** (owner statement) | Referenced from the [root README](../README.md); no report on `main` | **Not on `main`**; not reconstructed. `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 
-## 7. Repository convergence, PR #37 – #40 (2026-10-08)
+## 7. Repository convergence, PR #37 – #41 (2026-10-08 – 2026-10-09)
 
-Integration of **source** into `main`. Not a release, not a flash authorization, not a hardware
-acceptance. Merge and recreated SHAs: [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md).
+#37 is a safety notice (documentation); #38–#40 integrate **source** into `main`; #41 is the C1 documentation
+consolidation. None is a release, a flash authorization or a hardware acceptance. Merge and recreated SHAs: [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md).
 
 | PR | Subject | Log |
 |---|---|---|
@@ -116,6 +117,7 @@ acceptance. Merge and recreated SHAs: [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVEN
 | #38 | Persistence V1 and flash layout V1 (13 original SHAs preserved) | [PR-1](Development_Log/2026-10-08_PR1_PERSISTENCE_LAYOUT_V1_INTEGRATION.md) |
 | #39 | Selective dev.1 integration; XGO extracts excluded | [PR-2](Development_Log/2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md), [ADR-004](Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md) |
 | #40 | Selective dev.2/dev.3 source delta (7 commits recreated) | [PR-3](Development_Log/2026-10-08_PR3_DEV2_DEV3_SELECTIVE_INTEGRATION.md) |
+| #41 | C1 documentation and history consolidation (Markdown only) | this index, [`OPEN_ITEMS.md`](OPEN_ITEMS.md), [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md) |
 
 ## 8. Pull requests before #37, by period
 

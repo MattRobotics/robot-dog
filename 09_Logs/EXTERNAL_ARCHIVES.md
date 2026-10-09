@@ -18,14 +18,22 @@ publishes no key, passphrase, credential, archive path, archive hash or archive 
 | Git histories and original commits of the deleted branches | Preserved in a **non-public** archive | owner-reported |
 | Second, independent physical copy of that archive | **Not declared.** Do not assume one exists | — |
 | Local cleanup of the operator workstation | **Not complete / not reported.** Final result not yet available | — |
-| GitHub branches other than `main` | **All deleted** (section 2) | verified: `main` is the only head |
+| The 13 historical branches recorded in section 2 | **All deleted** from GitHub | verified by listing the remote heads on 2026-10-09: none of the 13 is present |
+| Branch `docs/c2-final-sync` | Exists **only while the Draft PR #42 is open** | verified. The target state is `main` alone, after the owner merges PR #42 and deletes this branch (owner action) |
 | GitHub tags | 9 remain (section 3) | verified |
 | XGO material on `main` | **None**; 0 of the 284 known excluded blobs reachable from `main` | verified (section 5) |
 
 "R1" and "R2" are the owner's names for the two restore-test steps; their detailed procedure and
 outputs are outside this repository.
 
-## 2. Deleted GitHub branches
+## 2. Deleted GitHub branches (13 records)
+
+**Counting.** The 13 records below are the 11 branches inventoried at C1 plus 2 working branches that were
+deleted after their merge: `integration/pr3-dev3-selective` (PR #40) and `docs/c1-documentation-consolidation`
+(PR #41). The inventory covers the branches tracked by the consolidation; it does not claim to list every
+branch that ever existed. The work branches of PR #37, #38 and #39 were also deleted after merge; those PRs
+are merged, their commits are in `main` through the merge commits, and they are neither listed individually
+nor reconstructed here. `docs/c2-final-sync` is not counted: it is the current Draft branch.
 
 The refs below no longer exist on GitHub. "Last tip" is the tip last verified by the cloud session
 before deletion (full SHA). "Not in `main`" is the number of commits on the branch that were not
@@ -87,7 +95,9 @@ notice) name these branches as they were; they are unchanged and are read togeth
 - **Cannot be guaranteed removed.** Those blobs were public on the branches in section 2 before the
   branches were deleted. Deleting a branch removes the ref, not copies that were already fetched,
   forks, clones, caches, previously viewed or linked commit URLs, or objects GitHub still stores.
-  This repository cannot guarantee that the material is no longer obtainable.
+  This repository cannot guarantee that the material is no longer obtainable. The cloud session that
+  wrote this document can see only the refs listed by the GitHub remote; it has no visibility into GitHub's
+  internal storage, caches or third-party copies, and it has not verified the archive or the restore tests.
 - **Not republished.** The archive and the deleted branches that carry XGO ancestry (`integration/matdog-controller-v0.2.0`,
   `backup/matdog-dev3-preservation-20261008`, `feat/g5a-stabilization-feasibility`,
   `audit/matdog-v0.2.0-dev1-claude-handoff`, `backup/history/gait-g41-pre-amend-6047e43`) must not be

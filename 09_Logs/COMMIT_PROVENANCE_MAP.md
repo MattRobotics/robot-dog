@@ -1,4 +1,4 @@
-# Commit provenance map — PR #37 to PR #40
+# Commit provenance map — PR #37 to PR #41
 
 Maps the commits cited in MATDOG documentation to what exists on `main`. Short or full SHAs in
 older documents may name commits that live only on historical branches. A SHA that is **not an
@@ -15,7 +15,7 @@ Baseline of this map: `main` = `9c2fe7868423f5267063285d7be93de00dc302db` (PR #4
 > tips and §6 for recovery. "Where it lives" columns describe where the commit was held.
 Verified with `git merge-base --is-ancestor` against `origin/main`.
 
-## Integration PRs on `main`
+## Merged PRs on `main`
 
 | PR | Merge commit on `main` | Subject | Log |
 |---|---|---|---|
@@ -25,8 +25,10 @@ Verified with `git merge-base --is-ancestor` against `origin/main`.
 | #40 | `9c2fe7868423f5267063285d7be93de00dc302db` | Selective dev.2/dev.3 source convergence (PR-3) | [`2026-10-08_PR3_…`](Development_Log/2026-10-08_PR3_DEV2_DEV3_SELECTIVE_INTEGRATION.md) |
 | #41 | `ddcd1cdb87eef29cc46996d6137d3f2b4c946f17` | Documentation and history consolidation (C1); Markdown only | [`HISTORY_INDEX.md`](HISTORY_INDEX.md) |
 
-These four merges are **integration of source into `main`**. They are not a release approval; see
-[`CHANGELOG.md`](../05_Firmware/MATDOG_Controller/CHANGELOG.md) ("Unreleased").
+Classification: **#37** is a safety notice (documentation only, no source change). **#38, #39 and #40** are
+integrations of source into `main` (#38 by merge with original SHAs, #39 partly merged and partly recreated,
+#40 recreated). **#41** is the C1 documentation consolidation (Markdown only). None of them is a release
+approval; see [`CHANGELOG.md`](../05_Firmware/MATDOG_Controller/CHANGELOG.md) ("Unreleased").
 
 ## PR #37 (docs) — original SHAs preserved
 

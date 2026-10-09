@@ -15,8 +15,8 @@ automatically describe the robot after a later rebuild or architecture change.
 | Area | Purpose |
 |---|---|
 | [History index](HISTORY_INDEX.md) | One chronology, June–October 2026: phases, status, documents and available evidence |
-| [Open items](OPEN_ITEMS.md) | Blockers and residuals as documented at `main` after PR #40 |
-| [Commit provenance map](COMMIT_PROVENANCE_MAP.md) | PR #37–#40 merge SHAs; original SHA to recreated SHA for PR-2 and PR-3 |
+| [Open items](OPEN_ITEMS.md) | Blockers and residuals; checkpoint after PR #40 (2026-10-08), updated after PR #41 and for C2 (2026-10-09) |
+| [Commit provenance map](COMMIT_PROVENANCE_MAP.md) | PR #37–#41 merge SHAs; original SHA to recreated SHA for PR-2 and PR-3 (PR #38 merged with original SHAs; PR #41 is documentation only) |
 | [External archives](EXTERNAL_ARCHIVES.md) | Deleted branches (last tips), remaining tags, the non-public archive status and recovery steps; items without evidence stay `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | [ST3215 evidence index](ST3215_EVIDENCE_INDEX.md) | Canonical navigation for bench QC, source survey, provisioning and frozen-tool evidence |
 | [`Validation_Reports/`](Validation_Reports/README.md) | Dated hardware, software and model validation evidence; each claim is limited to its stated scope |
