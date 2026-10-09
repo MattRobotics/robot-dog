@@ -14,7 +14,7 @@
   `d0ede36`, `d67eaa1`, `62812cd`, `2f23247`, `b3fd945`, `b764c25`); each message carries the full
   `Original-SHA:`. They are recreated, not merged: the originals descend from `3f23439`, which holds
   third-party decompiler material that must not enter the history of `main` (ADR-004). The originals
-  are not ancestors of `main` and stay preserved on `backup/matdog-dev3-preservation-20261008`.
+  are not ancestors of `main`. They were preserved on `backup/matdog-dev3-preservation-20261008`, a branch deleted on GitHub by 2026-10-09; the originals are in a non-public archive (owner-reported, see [`EXTERNAL_ARCHIVES.md`](../../09_Logs/EXTERNAL_ARCHIVES.md)).
 - **Source.** The dev.2 read-only boot servo census (ROBOT_POWERED), the dev.3 thermal verdict from
   direct reads only, the host runner's one-shot post-abort recovery, and the identity
   `0.2.0-dev.3`. Every recreated file is byte-identical to its original; `CHANGELOG.md` differs

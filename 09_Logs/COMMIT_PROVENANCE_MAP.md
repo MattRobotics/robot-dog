@@ -1,16 +1,21 @@
-# Commit provenance map — PR #37 to PR #40
+# Commit provenance map — PR #37 to PR #41
 
 Maps the commits cited in MATDOG documentation to what exists on `main`. Short or full SHAs in
 older documents may name commits that live only on historical branches. A SHA that is **not an
 ancestor of `main`** is kept here as provenance only: a permalink to it may become unavailable once the
 refs (branches or tags) that make the commit reachable are removed, so this repository does not rely on
 such a permalink
-(`EXTERNAL_ARCHIVE_PENDING_VERIFICATION`, see [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md)).
+(where such commits are preserved: [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md)).
 
-Baseline of this map: `main` = `9c2fe7868423f5267063285d7be93de00dc302db` (PR #40 merge).
+Baseline of this map: `main` = `9c2fe7868423f5267063285d7be93de00dc302db` (PR #40 merge). `main` is now
+`ddcd1cdb87eef29cc46996d6137d3f2b4c946f17` (PR #41 merge, documentation only).
+
+> **2026-10-09:** every non-`main` GitHub branch named below has been **deleted**. The SHAs remain valid
+> identifiers of the original commits; see [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md) §2 for the last
+> tips and §6 for recovery. "Where it lives" columns describe where the commit was held.
 Verified with `git merge-base --is-ancestor` against `origin/main`.
 
-## Integration PRs on `main`
+## Merged PRs on `main`
 
 | PR | Merge commit on `main` | Subject | Log |
 |---|---|---|---|
@@ -18,9 +23,12 @@ Verified with `git merge-base --is-ancestor` against `origin/main`.
 | #38 | `fb02b8ed11ece11052f589d9222049f167336891` | Calibration Persistence V1 and flash layout V1 (PR-1) | [`2026-10-08_PR1_…`](Development_Log/2026-10-08_PR1_PERSISTENCE_LAYOUT_V1_INTEGRATION.md) |
 | #39 | `e622a80d539c75a0cde4747419822fbdca7e34b5` | Selective dev.1 integration, no XGO extracts (PR-2) | [`2026-10-08_PR2_…`](Development_Log/2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md) |
 | #40 | `9c2fe7868423f5267063285d7be93de00dc302db` | Selective dev.2/dev.3 source convergence (PR-3) | [`2026-10-08_PR3_…`](Development_Log/2026-10-08_PR3_DEV2_DEV3_SELECTIVE_INTEGRATION.md) |
+| #41 | `ddcd1cdb87eef29cc46996d6137d3f2b4c946f17` | Documentation and history consolidation (C1); Markdown only | [`HISTORY_INDEX.md`](HISTORY_INDEX.md) |
 
-These four merges are **integration of source into `main`**. They are not a release approval; see
-[`CHANGELOG.md`](../05_Firmware/MATDOG_Controller/CHANGELOG.md) ("Unreleased").
+Classification: **#37** is a safety notice (documentation only, no source change). **#38, #39 and #40** are
+integrations of source into `main` (#38 by merge with original SHAs, #39 partly merged and partly recreated,
+#40 recreated). **#41** is the C1 documentation consolidation (Markdown only). None of them is a release
+approval; see [`CHANGELOG.md`](../05_Firmware/MATDOG_Controller/CHANGELOG.md) ("Unreleased").
 
 ## PR #37 (docs) — original SHAs preserved
 
@@ -86,12 +94,12 @@ source commit and build ID, and is not shown to be byte-identical to the install
 
 | SHA | Meaning | Where it lives | Status |
 |---|---|---|---|
-| `e1704719979789cd9c9f18741e4546725558797e` | Tip of the divergent gait / G5-A line; holds `09_Logs/Development_Log/2026-09-28_G3_STARTUP_TIMED_STAND.md` (blob `513acfd998440e7d684f31d26257efefbd471c9f`) | historical branch `feat/g5a-stabilization-feasibility` | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION`. [`STARTUP_TIMING.md`](../05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md) and the PR-2 log link to it by permalink. The permalink may become unavailable when the refs that make this commit reachable are removed |
-| `3f23439` | Introduced the 38 XGO decompiler extracts | `integration/matdog-controller-v0.2.0` | Excluded by ADR-004. Not to be republished |
-| `d7aa369…` | dev.1 tip | integration and preservation branches | see PR-2 table |
-| `a06314e` | Wi-Fi PHY diagnostic | `backup/wifi-phy-a06314e-20261008` | Not integrated |
-| `43fa92a` | WIP M0.4 P2 | `backup/wip-m0-4-p2-20261008` | Not integrated |
-| `b6d99573755f85993c189227b6a3f890fb15fe20` | Convergence audit handoff tip | `audit/matdog-v0.2.0-dev1-claude-handoff` | Contains XGO/G35 material and 87.6 MB of evidence. Not imported |
+| `e1704719979789cd9c9f18741e4546725558797e` | Tip of the divergent gait / G5-A line; holds `09_Logs/Development_Log/2026-09-28_G3_STARTUP_TIMED_STAND.md` (blob `513acfd998440e7d684f31d26257efefbd471c9f`) | formerly branch `feat/g5a-stabilization-feasibility` (deleted) | Preserved in the non-public archive (owner-reported). [`STARTUP_TIMING.md`](../05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md) and the PR-2 log link to it by permalink. With the branch deleted, the permalink should be treated as unavailable; recovery only through the non-public archive |
+| `3f23439` | Introduced the 38 XGO decompiler extracts | formerly `integration/matdog-controller-v0.2.0` (deleted) | Excluded by ADR-004. Not to be republished |
+| `d7aa369…` | dev.1 tip | formerly the integration and preservation branches (deleted) | see PR-2 table |
+| `a06314e` | Wi-Fi PHY diagnostic | formerly `backup/wifi-phy-a06314e-20261008` (deleted) | Not integrated |
+| `43fa92a` | WIP M0.4 P2 | formerly `backup/wip-m0-4-p2-20261008` (deleted) | Not integrated |
+| `b6d99573755f85993c189227b6a3f890fb15fe20` | Convergence audit handoff tip | formerly `audit/matdog-v0.2.0-dev1-claude-handoff` (deleted) | Contains XGO/G35 material and 87.6 MB of evidence. Not imported |
 | `15f3fb8f…` | Full-leg calibrator V1 H0 (tag `archive/2026-08-29/full-leg-calibrator-v1-h0`) | tag, not on `main` | `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 
 Many other hexadecimal strings in older documents are SHA-256 prefixes of files or commits from the

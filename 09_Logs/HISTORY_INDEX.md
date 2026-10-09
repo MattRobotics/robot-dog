@@ -10,6 +10,12 @@ says so instead of describing it.
 > [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md).
 > Standing limits: `MOTION_AUTHORIZED=0` · `RESTORE=NOT_IMPLEMENTED` · **DO NOT FLASH `main`**.
 
+> **Branch status (2026-10-09).** The 13 historical branches recorded by the consolidation have been deleted
+> from GitHub; 9 tags remain. While Draft PR #42 is open the branch `docs/c2-final-sync` also exists; the
+> target is `main` alone after it is merged and that branch is deleted. Dated logs and rows below that name a
+> branch describe where the content *was*; the original commits are in a non-public archive (owner-reported),
+> see [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md). Navigable on GitHub: `main` and the tags.
+
 ## How to read a row
 
 | Column | Meaning |
@@ -94,16 +100,16 @@ Per-area indexes: [ADRs](Architecture_Decisions/README.md) · [Development Log](
 | Phase | Dates | Status | Documents | Evidence available |
 |---|---|---|---|---|
 | Wi-Fi / provisioning / OTA V1 → V3 | 2026-10-04 | IMPLEMENTED / OFFLINE TESTED; **not hardware tested**; no release | [V1 log](Development_Log/2026-10-04_WIFI_OTA_SHELLY_V1.md), [V3 offline](Validation_Reports/2026-10-04_WIFI_OTA_SHELLY_V3_OFFLINE.md), [runbook](../05_Firmware/MATDOG_Controller/WIFI_OTA_SHELLY_HARDWARE_RUNBOOK.md) | Documents; code on `main` since PR #39 |
-| dev.1 convergence | 2026-10-05 | HISTORICAL record of the integration branch | [`Convergence/MATDOG_V0_2_DEV1.md`](../01_Docs/02_Architecture/Convergence/MATDOG_V0_2_DEV1.md) (quotes operator-machine paths) | Document. Branch `integration/matdog-controller-v0.2.0`: `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
-| Motion library G1 → G5-A (pure, host-tested, unwired) | G3 log dated 2026-09-28; other dates not established from `main` | Library **IMPLEMENTED**; execution suites and evidence **DEFERRED** (ADR-004); never hardware-authorized | [`src/motion/README.md`](../05_Firmware/MATDOG_Controller/src/motion/README.md), [CONTACT_STAND](../05_Firmware/MATDOG_Controller/src/motion/CONTACT_STAND.md), [STARTUP_TIMING](../05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md), [STABILIZATION](../05_Firmware/MATDOG_Controller/src/motion/STABILIZATION.md), [PR-2 manifest](../05_Firmware/MATDOG_Controller/scripts/tests/motion_integration_manifest_pr2.json) | Sources and design notes on `main`. G3 report and G4/G4.1/G5-A/G35 evidence: **not on `main`**, `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
+| dev.1 convergence | 2026-10-05 | HISTORICAL record of the integration branch | [`Convergence/MATDOG_V0_2_DEV1.md`](../01_Docs/02_Architecture/Convergence/MATDOG_V0_2_DEV1.md) (quotes operator-machine paths) | Document. Branch `integration/matdog-controller-v0.2.0` deleted; original commits in the non-public archive (owner-reported) |
+| Motion library G1 → G5-A (pure, host-tested, unwired) | G3 log dated 2026-09-28; other dates not established from `main` | Library **IMPLEMENTED**; execution suites and evidence **DEFERRED** (ADR-004); never hardware-authorized | [`src/motion/README.md`](../05_Firmware/MATDOG_Controller/src/motion/README.md), [CONTACT_STAND](../05_Firmware/MATDOG_Controller/src/motion/CONTACT_STAND.md), [STARTUP_TIMING](../05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md), [STABILIZATION](../05_Firmware/MATDOG_Controller/src/motion/STABILIZATION.md), [PR-2 manifest](../05_Firmware/MATDOG_Controller/scripts/tests/motion_integration_manifest_pr2.json) | Sources and design notes on `main`. G3 report and G4/G4.1/G5-A/G35 evidence: **not on `main`**; their branch is deleted and they remain only in the non-public archive (owner-reported). Not republished (ADR-004) |
 | dev.2 boot census; hardware 13/13; calibration stopped at LF (block-read temperature artifact) | 2026-10-06 | dev.2 code on `main`; hardware result of the candidate | [log](Development_Log/2026-10-06_BOOT_SELFTEST_CENSUS_CORRECTION.md), [dev.2 audit](Validation_Reports/MATDOG_V0_2_DEV2_BOOT_SELFTEST_DELTA_AUDIT_2026-10-06.md) | Audit document; raw evidence root is on the operator machine (`EXTERNAL_ARCHIVE_PENDING_VERIFICATION`) |
 | dev.3 thermal verdict from direct reads; 24/24; SAVE/ACK and LOAD across a reset; automatic recovery not triggered | 2026-10-06 | dev.3 code on `main`; candidate **not an accepted release** | [log](Development_Log/2026-10-06_THERMAL_DIRECT_VERDICT_DEV3.md), [dev.3 audit](Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md) | Audit document; raw evidence external |
 | **Hardware Validation 2026-10-07 (dev.3)** | 2026-10-07 | Execution **COMPLETE**, acceptance **BLOCKED** (owner statement) | Referenced from the [root README](../README.md); no report on `main` | **Not on `main`**; not reconstructed. `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 
-## 7. Repository convergence, PR #37 – #40 (2026-10-08)
+## 7. Repository convergence, PR #37 – #41 (2026-10-08 – 2026-10-09)
 
-Integration of **source** into `main`. Not a release, not a flash authorization, not a hardware
-acceptance. Merge and recreated SHAs: [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md).
+#37 is a safety notice (documentation); #38–#40 integrate **source** into `main`; #41 is the C1 documentation
+consolidation. None is a release, a flash authorization or a hardware acceptance. Merge and recreated SHAs: [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md).
 
 | PR | Subject | Log |
 |---|---|---|
@@ -111,6 +117,7 @@ acceptance. Merge and recreated SHAs: [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVEN
 | #38 | Persistence V1 and flash layout V1 (13 original SHAs preserved) | [PR-1](Development_Log/2026-10-08_PR1_PERSISTENCE_LAYOUT_V1_INTEGRATION.md) |
 | #39 | Selective dev.1 integration; XGO extracts excluded | [PR-2](Development_Log/2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md), [ADR-004](Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md) |
 | #40 | Selective dev.2/dev.3 source delta (7 commits recreated) | [PR-3](Development_Log/2026-10-08_PR3_DEV2_DEV3_SELECTIVE_INTEGRATION.md) |
+| #41 | C1 documentation and history consolidation (Markdown only) | this index, [`OPEN_ITEMS.md`](OPEN_ITEMS.md), [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md) |
 
 ## 8. Pull requests before #37, by period
 
@@ -135,8 +142,8 @@ Titles are paraphrased from the GitHub PR list (#15 is not described here); the 
 
 | Reference | Where | Class | Handling |
 |---|---|---|---|
-| G3 report permalink to commit `e170471…` | [`STARTUP_TIMING.md`](../05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md) line 162; [PR-2 log](Development_Log/2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md) | **Archive-dependent, HISTORICAL.** The commit is not an ancestor of `main`; the link works only while a branch or tag still holds it. The PR-2 log calls it "immutable": that holds for the commit, not for the availability of the link | `STARTUP_TIMING.md` is SHA-256-pinned in the PR-2 manifest and is left unchanged. Provenance in [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md); `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
-| Convergence audit report | [`FLASH_LAYOUT_SAFETY_NOTICE.md`](../05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md) Sources | Archive-dependent | Link replaced by provenance text; `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
+| G3 report permalink to commit `e170471…` | [`STARTUP_TIMING.md`](../05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md) line 162; [PR-2 log](Development_Log/2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md) | **Archive-dependent, HISTORICAL.** The commit is not an ancestor of `main`; its only branch has been deleted, so the link should be treated as unavailable. The PR-2 log calls it "immutable": that holds for the commit, not for the availability of the link | `STARTUP_TIMING.md` is SHA-256-pinned in the PR-2 manifest and is left unchanged. Provenance in [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md); recovery through the archive only ([`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md) §6) |
+| Convergence audit report | [`FLASH_LAYOUT_SAFETY_NOTICE.md`](../05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md) Sources | Archive-dependent | Link replaced by provenance text; the audit branch is deleted and the report is in the non-public archive (owner-reported) |
 | dev.3 delta audit | three documents | Equivalent file is on `main` (blob-identical to the one at `b764c25`) | Relative links |
 | Installed-firmware provenance commit `b3fd945` | several documents | Not an ancestor of `main` | SHA kept as text; recreated as `e028dd8` |
 | Operator-machine paths in older logs and in the dev.1 convergence note | various | HISTORICAL, not resolvable from the repository | Left as recorded |

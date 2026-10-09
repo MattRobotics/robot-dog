@@ -97,7 +97,7 @@ The convergence audit records that the robot's partition table was written to
 |---|---|
 | Firmware provenance commit | `b3fd945bdaf37d192d97b605ac0f59b67f1dba45` (`0.2.0-dev.3`); not an ancestor of `main`. Its source delta was recreated on `main` as `e028dd8` (see [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md)) |
 | Branch tip | `b764c25c9530350331dbaa59ea2d84ddab3a3f69` — adds documentation only, no source |
-| Branch | `backup/matdog-dev3-preservation-20261008` — a preservation branch, not a merge candidate as named |
+| Branch | `backup/matdog-dev3-preservation-20261008` — a preservation branch, not a merge candidate as named; **deleted from GitHub by 2026-10-09**, see [`EXTERNAL_ARCHIVES.md`](../../09_Logs/EXTERNAL_ARCHIVES.md) |
 | Hardware Validation 2026-10-07 | execution **COMPLETE**, acceptance **BLOCKED** |
 | Release status | **candidate, not accepted.** Not an authorized release baseline. Not on `main`. |
 
@@ -121,7 +121,7 @@ historical snapshot. A full status synchronization is a separate change.
 - Convergence audit `MATDOG_FIRMWARE_CONVERGENCE_AUDIT_V0_2.md` (historical branch
   `audit/matdog-v0.2.0-dev1-claude-handoff` at `b6d99573755f85993c189227b6a3f890fb15fe20`, evidence only,
   not for merge; legacy scheme and offsets, 2026-10-03 table write, flashed `be0c129` application).
-  Not on `main`: `EXTERNAL_ARCHIVE_PENDING_VERIFICATION`, see
+  Not on `main`; the branch is deleted and the report is in the non-public archive (owner-reported), see
   [`EXTERNAL_ARCHIVES.md`](../../09_Logs/EXTERNAL_ARCHIVES.md).
 - dev.3 delta audit:
   [`MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md`](../../09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md).
