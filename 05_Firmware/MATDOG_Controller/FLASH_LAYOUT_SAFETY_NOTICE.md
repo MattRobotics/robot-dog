@@ -1,4 +1,4 @@
-# MATDOG flash layout safety notice — 2026-10-08 (updated for PR-3)
+# MATDOG flash layout safety notice — updated 2026-10-10 (LED selective integration)
 
 **Documentation only.** This notice authorizes nothing: no flash, no migration, no calibration, no
 motion. `MOTION_AUTHORIZED=0`.
@@ -7,11 +7,10 @@ motion. `MOTION_AUTHORIZED=0`.
 
 > **Do not build from, or flash, `main` to update the current robot.**
 >
-> `main` carries the correct flash layout, `MATDOG_16M_2x5M_NVS_V1`, since PR-1, a selective part
-> of the dev.1 line since PR-2 and the dev.2/dev.3 source delta since PR-3. Its sources correspond to
-> the dev.3 candidate on the robot, but a build of `main` is **not** the installed image, and dev.3
-> is not an accepted release. Integrating code is not an authorization to flash and not a hardware
-> acceptance.
+> `main` carries the protected flash layout `MATDOG_16M_2x5M_NVS_V1` and selectively integrated
+> dev.1/dev.2/dev.3 sources. As of 2026-10-10 the robot executes separate LED-only image `fee9383`;
+> `main` includes its two LED source blobs, **not** the exact installed binary. The original dev.3
+> overall acceptance remains BLOCKED; LED-only validation does not approve a new flash or motion.
 
 ## Scope of this notice
 
@@ -43,16 +42,17 @@ and `01_Docs/02_Architecture/ROADMAP.md`.
 | Calibration Persistence V1 | record, codec, A/B NVS store, SAVE/ACK/RECONCILE, boot LOAD; `RESTORE` not implemented (LOAD never admits a transform) | source; host tests |
 | Firmware version literal | `kFirmwareVersion = "0.2.0-dev.3"` (PR-3); `0.2.0-dev.1` after PR-2, `0.1.0` after PR-1 | `src/config/BuildConfig.h` |
 | dev.2 / dev.3 content | read-only boot servo census at ROBOT_POWERED startup; thermal verdict from direct reads only; host runner starts the post-abort recovery at most once | PR-3 log |
-| Correspondence with dev.3 | every non-Markdown file under `src/` and `scripts/` is byte-identical to the dev.3 tip `b764c25` except the two PR-2 test-gate scripts and the PR-2 manifest; deferred files are absent | PR-3 log |
+| LED integration (2026-10-10) | Exact blobs of validated `fee9383` `LedRing.cpp` / `LedRing.h`: RMT DMA + bounded fallback + dirty-frame; no AP or motion delta | [LED hardware report](../../09_Logs/Validation_Reports/MATDOG_LED_RMT_DMA_DIRTY_FRAME_HW_VALIDATION_2026-10-10.md) |
+| Correspondence with dev.3 | historical PR-3 snapshot: source corresponded to dev.3 except PR-2 exceptions; since 2026-10-10 the **only new firmware source changes** are `LedRing.cpp` and `LedRing.h`, copied byte-for-byte from installed `fee9383` | PR-3 log; LED source blob comparison |
 | dev.1 content | recovery, DALY/release stages, Wi-Fi/OTA V3 (OTA ingest default 0), charging priority, pure motion library (`src/motion`, unwired) | PR-2 log |
 | Deferred (not on `main`) | motion execution suites, oracles, G35/G4/G4.1/G5-A evidence, third-party XGO material | `motion_integration_manifest_pr2.json`, [ADR-004](../../09_Logs/Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md) |
 
 ## Why `main` must still not be used on the current robot
 
-1. **It is not the installed image.** The dev.3 report records the robot running `0.2.0-dev.3`,
-   build `b3fd945bdaf3`, built from commit `b3fd945`. A build of `main` has another source commit
-   and build ID. Source equivalence does not imply an identical binary, and no binary comparison
-   was made.
+1. **It is not the installed image.** The robot was upgraded on 2026-10-10 from `b3fd945bdaf3`
+   to LED-only `fee9383156fa` (same `0.2.0-dev.3` version literal). `main` has the same LED file
+   blobs as `fee9383`, but a different source commit, build ID and application binary. A `main`
+   build has **not** been hardware-tested.
 2. **dev.3 is not accepted.** The Hardware Validation of 2026-10-07 has execution COMPLETE and
    acceptance BLOCKED; its report is not in the repository. No release is approved.
 3. **No hardware acceptance comes with `main`.** The hardware results (calibration 24/24, SAVE/ACK

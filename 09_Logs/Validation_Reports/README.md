@@ -39,6 +39,7 @@ Navigation for the whole ST3215 evidence set: [`ST3215_EVIDENCE_INDEX.md`](../ST
 | [Wi-Fi / provisioning / OTA V3 offline](2026-10-04_WIFI_OTA_SHELLY_V3_OFFLINE.md) | 2026-10-04 | OFFLINE | Offline qualification only. It names a local worktree and a branch that no longer exist; read it as historical |
 | [dev.2 boot self-test delta audit](MATDOG_V0_2_DEV2_BOOT_SELFTEST_DELTA_AUDIT_2026-10-06.md) | 2026-10-06 | HW + audit | Boot census 13/13; calibration stopped at LF under dev.2 (block-read temperature artifact) |
 | [dev.3 thermal delta audit](MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md) | 2026-10-06 | HW + audit | 24/24 under dev.3; SAVE/ACK and LOAD across a reset observed; automatic recovery not triggered; no real power cycle |
+| [LED RMT DMA + dirty-frame hardware validation](MATDOG_LED_RMT_DMA_DIRTY_FRAME_HW_VALIDATION_2026-10-10.md) | 2026-10-10 | HW (LED only) | Installed `fee9383`: active RMT DMA, 10 min SoftAP-on steady LED without observed anomalies, servo timing unchanged; **no release or motion approval** |
 
 ## Not in this directory
 

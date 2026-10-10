@@ -8,12 +8,12 @@ together and reports whether its hardware is detected, expected or unavailable.
 > **⚠ Flash safety — 2026-10-08, updated for PR-3.** This tree uses the flash layout
 > `MATDOG_16M_2x5M_NVS_V1` (`partitions.csv`, `PartitionScheme=custom`), and `scripts/upload.sh`
 > refuses every full-image upload. **Do not use this tree to update the robot.**
-> - The firmware identity is `0.2.0-dev.3`: the sources correspond to the dev.3 candidate on the
->   robot (provenance `b3fd945`), apart from the deferred material. A build of this tree is a
->   different build from the installed image; binary identity is not asserted.
-> - dev.3 is a candidate only (Hardware Validation 2026-10-07: execution COMPLETE, acceptance
->   BLOCKED). No release is approved, and these integrations are neither a flash authorization
->   nor a hardware acceptance.
+> - The version literal remains `0.2.0-dev.3`. On 2026-10-10 the installed image moved to the
+>   hardware-validated **LED-only** build `fee9383` (RMT DMA + dirty-frame); this source tree
+>   includes its two exact LED blobs. A build of `main` is **not** that installed image.
+> - The historical dev.3 Hardware Validation of 2026-10-07 remains acceptance BLOCKED. The
+>   2026-10-10 LED-specific hardware check passed, but it does not approve a general firmware
+>   release, another flash, or any motion.
 > - The pure motion library under `src/motion` is unwired. Its execution suites and the
 >   G35/G4/G4.1/G5-A evidence are deferred.
 >

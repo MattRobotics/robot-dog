@@ -11,12 +11,13 @@ This repository is the single active engineering repository for the robot.
 >   a selective part of the dev.1 line (PR-2) and, since PR-3, the dev.2/dev.3 source delta. Its
 >   firmware identity is `0.2.0-dev.3`. `scripts/build.sh` uses `PartitionScheme=custom` and
 >   `scripts/upload.sh` refuses every full-image upload.
-> - The firmware sources on `main` correspond to the dev.3 candidate that runs on the robot
->   (provenance `b3fd945`), apart from the deferred material. A build of `main` is **not** that
->   installed image: it has a different source commit and build ID, and binary identity is not
->   asserted.
-> - dev.3 is **not an accepted release**: the Hardware Validation of 2026-10-07 has execution
->   COMPLETE and acceptance **BLOCKED**. No release is approved.
+> - Since 2026-10-10, `main` also has the exact two LED source file blobs of the physically
+>   validated, **separate** LED-only firmware `fee9383` (`LED_TRANSPORT=RMT_DMA`); that firmware now
+>   runs on the robot. A build of `main` is **not** the installed binary: Git provenance and build
+>   ID differ. No flash or motion is authorized.
+> - Historical dev.3 Hardware Validation (2026-10-07): execution COMPLETE, acceptance BLOCKED.
+>   The later LED-only validation (2026-10-10) passed in its limited scope; **no general release
+>   or motion acceptance** is granted.
 > - These integrations are **not** a flash authorization and **not** a hardware acceptance. No
 >   `main` build has been accepted on hardware.
 > - `MOTION_AUTHORIZED=0`, `RESTORE=NOT_IMPLEMENTED`. Nothing here authorizes a flash, a migration
@@ -35,7 +36,8 @@ This repository is the single active engineering repository for the robot.
 | Code integrated | Persistence V1 and layout V1; post-abort recovery; guarded release stages with DALY supervision; startup RF recovery; Wi-Fi/OTA V3 (TLS, OTA ingest compiled out by default); charging presentation priority; **dev.2 read-only boot servo census**; **dev.3 thermal verdict from direct reads only** and the host runner's one-shot post-abort recovery; identity `0.2.0-dev.3`; pure motion library G1–G5-A, **unwired** (no path to the servo bus) |
 | Offline tests | static audit and C++/Python host suites, USB_ONLY and ROBOT_POWERED builds: see [`VALIDATION.md`](05_Firmware/MATDOG_Controller/VALIDATION.md), section PR-3 |
 | Hardware results (historical, of the dev.2/dev.3 candidate, not of a `main` build) | 2026-10-06: boot census 13/13; fresh Q0 and calibration 24/24 under dev.3; SAVE/ACK and LOAD across a reset (no real power cycle); the automatic post-abort recovery did not run. Records: [dev.2 audit](09_Logs/Validation_Reports/MATDOG_V0_2_DEV2_BOOT_SELFTEST_DELTA_AUDIT_2026-10-06.md), [dev.3 audit](09_Logs/Validation_Reports/MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md). The 2026-10-07 report is not in the repository |
-| Hardware acceptance / release acceptance | none: dev.3 execution COMPLETE, acceptance BLOCKED; no `main` build accepted; no release approved |
+| LED-only hardware validation (2026-10-10) | RMT DMA active on installed `fee9383`; 10-minute ring observation with SoftAP enabled and 0 anomalies; no motor activity ([report](09_Logs/Validation_Reports/MATDOG_LED_RMT_DMA_DIRTY_FRAME_HW_VALIDATION_2026-10-10.md)) |
+| Hardware acceptance / release acceptance | LED-only hardware check PASS under tested conditions; dev.3 overall acceptance BLOCKED; no `main` build accepted and no general release approved |
 | Deferred | motion execution suites, fresh oracles and the G35/G4/G4.1/G5-A evidence; 38 third-party XGO extracts and XGO-derived data are **not reachable from `main`**; the historical GitHub branches that held them have been deleted, the original commits are in a non-public archive, and removal of previously published blobs from GitHub storage, caches and clones cannot be guaranteed ([ADR-004](09_Logs/Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md)) |
 
 > **Historical snapshot — 2026-10-01 (PR #35 merged)**
