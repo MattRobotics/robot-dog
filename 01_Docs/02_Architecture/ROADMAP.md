@@ -8,10 +8,13 @@
 >   thermal verdict, one-shot post-abort recovery in the host runner); identity `0.2.0-dev.3`.
 > - A `main` build is not the image on the robot, and these integrations authorize no flash and
 >   accept nothing on hardware.
-> - dev.3 is a candidate only (Hardware Validation 2026-10-07: execution COMPLETE, acceptance
->   BLOCKED); no release is approved.
+> - Historical dev.3 acceptance (2026-10-07) remains BLOCKED; the later LED-only build `fee9383`
+>   passed its limited hardware validation on 2026-10-10. No general release is approved.
 > - Deferred, not deleted: motion execution suites, oracles and the G35/G4/G4.1/G5-A evidence
 >   ([ADR-004](../../09_Logs/Architecture_Decisions/ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md)).
+>
+> The RMT DMA + dirty-frame LED source blobs on `main` are byte-identical to the deployed LED-only
+> candidate `fee9383`; this is **not** binary/release acceptance for `main`.
 >
 > `MOTION_AUTHORIZED=0`, `RESTORE=NOT_IMPLEMENTED`. See
 > [`FLASH_LAYOUT_SAFETY_NOTICE.md`](../../05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).

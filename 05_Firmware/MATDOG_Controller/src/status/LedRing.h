@@ -10,11 +10,77 @@
 #include "../core/SystemState.h"
 #include "LedStatusPolicy.h"
 
+// The native ESP-IDF RMT driver, where the target has an RMT channel with
+// DMA (ESP32-S3: TX channel 3). Absent on the host test stubs, which keep
+// driving the recorded Adafruit_NeoPixel transport directly.
+#if defined(__has_include)
+#if __has_include("driver/rmt_tx.h") && __has_include("soc/soc_caps.h")
+#include "soc/soc_caps.h"
+#if SOC_RMT_SUPPORT_DMA
+#include "driver/rmt_tx.h"
+#define MATDOG_LED_RMT_DMA 1
+#endif
+#endif
+#endif
+#ifndef MATDOG_LED_RMT_DMA
+#define MATDOG_LED_RMT_DMA 0
+#endif
+
 namespace matdog {
 namespace status {
 
 enum class LedDiagnostic : uint8_t { NONE, CHASE, SOC_TEST };
 const char* toString(LedDiagnostic diagnostic);
+
+#if MATDOG_LED_RMT_DMA
+// WS2812 transport over RMT with DMA.
+//
+// Adafruit_NeoPixel still owns the pixel buffer, the GRB packing and the
+// brightness arithmetic, so every byte handed to the wire is the byte it
+// always was. Only show() changes. The library sends through the Arduino RMT
+// HAL, which gives the channel one 48-symbol memory block: a 288-symbol frame
+// is then refilled by the RMT threshold interrupt eleven times while it is
+// being transmitted, each refill with a 28.8 us deadline. Here the frame is
+// encoded once, in the calling task, into a DMA buffer large enough to hold
+// it whole; GDMA feeds the RMT transmitter and no interrupt takes part until
+// the transmission is over.
+//
+// If the DMA channel cannot be created, or ever fails at run time, the strip
+// goes back to the library's own show() - the transport dev.3 shipped with.
+class Ws2812DmaStrip : public Adafruit_NeoPixel {
+ public:
+  using Adafruit_NeoPixel::Adafruit_NeoPixel;
+  ~Ws2812DmaStrip() { releaseDma(); }
+
+  // The waveform Adafruit_NeoPixel's esp.c produces, unchanged: 100 ns
+  // ticks, "1" = 800 ns high + 400 ns low, "0" = 400 ns high + 800 ns low,
+  // most significant bit first, line low when idle.
+  static constexpr uint32_t kResolutionHz = 10000000;
+  static constexpr uint16_t kBit1HighTicks = 8;
+  static constexpr uint16_t kBit1LowTicks = 4;
+  static constexpr uint16_t kBit0HighTicks = 4;
+  static constexpr uint16_t kBit0LowTicks = 8;
+  // The driver splits this buffer across two DMA descriptors and only the
+  // first is free of any refill callback: half of it must hold one whole
+  // frame plus the end marker (see the static_assert below LedRing).
+  static constexpr size_t kDmaBufferSymbols = 1024;
+  // A frame lasts 0.35 ms. A transmission that has not finished by then is a
+  // fault of the transport, never a reason to stall the Controller.
+  static constexpr int kTransmitTimeoutMs = 20;
+
+  void begin();  // hides Adafruit_NeoPixel::begin()
+  void show();   // hides Adafruit_NeoPixel::show()
+  bool dmaActive() const { return channel_ != nullptr; }
+
+ private:
+  void releaseDma();
+  rmt_channel_handle_t channel_ = nullptr;
+  rmt_encoder_handle_t encoder_ = nullptr;
+};
+using LedRingStrip = Ws2812DmaStrip;
+#else
+using LedRingStrip = Adafruit_NeoPixel;
+#endif
 
 // WS2812B x12 ring driver, GPIO47.
 //
@@ -22,8 +88,9 @@ const char* toString(LedDiagnostic diagnostic);
 // grep for *led*/*ring*/*ws2812*/*neopixel* found none) — this is the one
 // genuinely new low-level module in V0.1, as anticipated by the handoff.
 //
-// Built on Adafruit_NeoPixel (mature, installed for this task; no local
-// custom WS2812 timing/RMT code).
+// Built on Adafruit_NeoPixel (mature, installed for this task) for the pixel
+// buffer, colour order and brightness. On the ESP32-S3 the frame is
+// transmitted by Ws2812DmaStrip above instead of the library's own show().
 //
 // SESSION 2 HARDENING — anti-back-power: under the current USB_ONLY profile
 // (build::kLedRailPowered == false) the 5V rail feeding the ring is
@@ -77,7 +144,7 @@ class LedRing {
   bool dataPinDriven() const { return data_pin_driven_; }
 
  private:
-  Adafruit_NeoPixel pixels_{kNumPixels, pins::kLedRingDin, NEO_GRB + NEO_KHZ800};
+  LedRingStrip pixels_{kNumPixels, pins::kLedRingDin, NEO_GRB + NEO_KHZ800};
   core::InitializationState init_ = core::InitializationState::NOT_INITIALIZED;
   LedDiagnostic diagnostic_ = LedDiagnostic::NONE;
   uint16_t test_step_ = 0;
@@ -85,6 +152,18 @@ class LedRing {
   uint32_t soc_test_started_ms_ = 0;
   uint8_t soc_test_segments_ = 0;
   bool data_pin_driven_ = false;
+  // Transmit gating for renderFrame(). It used to re-send an identical
+  // WS2812 frame on every Controller tick; it now transmits at once when the
+  // frame's bytes differ from the last ones it transmitted, and otherwise
+  // re-sends the unchanged frame once per kUnchangedRefreshMs so a ring that
+  // lost its state (re-plugged, rail dip, one corrupted frame) still
+  // recovers on its own. Every other transmit path - begin(), off(),
+  // setSolid(), both diagnostics - invalidates the cache, so the next
+  // renderFrame() always transmits. Nothing here runs under USB_ONLY.
+  static constexpr uint32_t kUnchangedRefreshMs = 250;
+  uint8_t sent_rgb_[kNumPixels][3] = {};
+  bool sent_valid_ = false;
+  uint32_t sent_at_ms_ = 0;
   static constexpr uint32_t kTestStepMs = 120;
   static constexpr uint32_t kSocTestStepMs = 600;
   static constexpr uint32_t kSocTestPauseMs = 1200;
@@ -96,6 +175,10 @@ class LedRing {
 };
 
 static_assert(LedRing::kNumPixels == kSocPixelCount, "SOC mapping must cover the ring");
+#if MATDOG_LED_RMT_DMA
+static_assert(LedRing::kNumPixels * 24 + 1 <= Ws2812DmaStrip::kDmaBufferSymbols / 2,
+              "one WS2812 frame and its end marker must fit the first DMA descriptor");
+#endif
 
 }  // namespace status
 }  // namespace matdog

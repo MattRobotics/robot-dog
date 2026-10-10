@@ -6,8 +6,9 @@ This directory is reserved for low-level firmware that belongs specifically to M
 > the current robot.
 > - `main` uses the robot's layout `MATDOG_16M_2x5M_NVS_V1`, carries Calibration Persistence V1,
 >   a selective part of the dev.1 line and the dev.2/dev.3 source delta (identity `0.2.0-dev.3`).
-> - A `main` build is not the installed image (different source commit and build ID), dev.3
->   acceptance is BLOCKED, and these integrations authorize no flash and accept nothing on hardware.
+> - On 2026-10-10 the installed **LED-only** firmware was upgraded to local commit `fee9383`;
+>   `main` now includes its exact two LED source blobs, but a build of `main` is not that installed
+>   image. Historical dev.3 overall acceptance remains BLOCKED; no general release or flash is approved.
 >
 > See [`MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md`](MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
 

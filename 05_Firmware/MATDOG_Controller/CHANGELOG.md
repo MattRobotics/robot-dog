@@ -8,6 +8,13 @@
 > the original-to-recreated SHA map are in [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and
 > [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — LED RMT DMA + dirty-frame selective source integration — 2026-10-10
+
+- **Source:** only `src/status/LedRing.cpp` and `LedRing.h` were copied byte-for-byte from the physically validated local LED candidate `fee9383156fa`. No historical dev.3 ancestry, third-party XGO material, AP implementation, actuator logic or private backups were imported.
+- **Transport:** ESP32-S3 RMT DMA for 12 WS2812B GRB LEDs (GPIO47); diagnostic `LED_TRANSPORT=RMT_DMA`, explicit fallback to the prior transport if DMA fails. Fixed-frame writes occur on change or a 250 ms refresh. `USB_ONLY` continues to withhold power-rail-driven output.
+- **Hardware evidence:** application-only flash/read-back PASS, DMA active, servo census 13/13, READY, SoftAP active without clients, ten minutes of no visually observed LED anomalies, servo timing consistent with dev.3. [Limited validation report](../../09_Logs/Validation_Reports/MATDOG_LED_RMT_DMA_DIRTY_FRAME_HW_VALIDATION_2026-10-10.md).
+- **Scope boundary:** hardware validation is of the **installed `fee9383` image**, not of a new `main` build. The dev.3 overall acceptance remains BLOCKED; `MOTION_AUTHORIZED=0`, `RESTORE=NOT_IMPLEMENTED`. The AP HTTP 403 work is separate. **DO NOT FLASH MAIN.**
+
 ## Unreleased — PR-3: dev.2/dev.3 source delta on `main` (0.2.0-dev.3) — 2026-10-08
 
 - **What `main` gains.** Seven commits recreated from the dev.2/dev.3 candidate (`bac652f`,
