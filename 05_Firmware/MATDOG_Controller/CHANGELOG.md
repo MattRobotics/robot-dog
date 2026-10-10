@@ -8,6 +8,16 @@
 > the original-to-recreated SHA map are in [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and
 > [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — WPA2 AP bring-up acknowledgment fix (local branch `fix/wpa2-ap-ack-20261010`) — 2026-10-10
+
+- **Root cause (`41753ac`).** The AP-only bring-up armed the role acknowledgments of the mode change only (`STA_STOP`, `AP_START`) and then called the stock `WiFi.softAP()`. That call writes the AP profile with `esp_wifi_set_config()`, which stops and restarts a started soft-AP inside the driver and reports `AP_STOP` then `AP_START`. Those two events were outside every armed set, so every first bring-up after boot ended in `FAULT` with `config_error=11`, while the radio stayed in AP mode. The host double did not emit these events, so the offline suites passed.
+- **Fix.** Bring-up is two serialized driver commands, each with its own complete acknowledgment set: the role change, then the AP profile (`esp_wifi_set_config` issued directly, written only when the driver profile differs). Unexpected, duplicate or missing role events still fault. The profile the driver really holds is read back and must equal the stored SSID/key with WPA2-PSK before a generation opens (`config_error=12` otherwise). The AP is never configured open.
+- **FAULT is fail-closed on the air.** After listener closure is confirmed and with no acknowledgment outstanding, the radio is switched off once; a network is no longer left visible while administration is unavailable. Reopening still needs an explicit request.
+- **Request confirmation.** Every accepted request carries a sequence number (`WIFI_PROVISION=QUEUED kind= seq=`); the worker publishes its outcome under it (`WIFI_CONFIG_TX … seq= kind= result=`). Refusals name their reason and never advance the sequence, so a `COMMITTED` left by an earlier request cannot confirm a later one. A request that meets the admission fence held by `md_http_life` is retried (bounded) instead of being dropped or refused.
+- **Diagnostics, no secrets.** `WIFI_ADMIN` (phase, driver AP/STA started, profile verified, portal), `WIFI_FAULT` (first cause, role event, armed set, count), `WIFI_RADIO mode=` now reports the driver's mode, a recovered radio error no longer stays published, and `@WIFI AP VERIFY <passphrase>` answers MATCH/MISMATCH against the stored key and the live driver profile.
+- **Tests.** `network_stubs/WiFi.h` reproduces the driver (AP starts on mode change, restarts on profile write); new `test_wifi_ap_bringup.cpp`; IR-01 protocol extended for the profile pair; static-audit pins and mutations; router invariants (MAINTENANCE, authority NONE, permit inactive, no key echo).
+- **Scope boundary.** No motion authorization, no calibration/NVS format change, no change to WPA2, cookie/CSRF/peer or OTA rules. Offline results do not prove radio authentication; hardware validation is recorded separately. `MOTION_AUTHORIZED=0`.
+
 ## Unreleased — LED RMT DMA + dirty-frame selective source integration — 2026-10-10
 
 - **Source:** only `src/status/LedRing.cpp` and `LedRing.h` were copied byte-for-byte from the physically validated local LED candidate `fee9383156fa`. No historical dev.3 ancestry, third-party XGO material, AP implementation, actuator logic or private backups were imported.

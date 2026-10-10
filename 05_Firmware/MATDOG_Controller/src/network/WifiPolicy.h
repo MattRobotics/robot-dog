@@ -118,6 +118,20 @@ struct WifiStatus {
   int8_t roam_threshold=-80; uint8_t roam_hysteresis=8;
   uint32_t scan_interval_ms=60000, roam_dwell_ms=120000, ap_timeout_ms=900000;
   bool ap_always=false;
+  // Request correlation and real driver state. Diagnostics only: there is no
+  // field here that could hold credential material.
+  //   tx_*      the last configuration request the worker consumed. A host
+  //             confirms ITS request by sequence number, never by a phase
+  //             that an earlier request may have left behind.
+  //   verify_*  result of an operator-supplied AP key comparison (1 MATCH,
+  //             2 MISMATCH, 3 NOT_AVAILABLE, 4 THROTTLED), never the key.
+  //   driver_*  what the Wi-Fi driver itself reports, independent of the
+  //             administrative phase.
+  uint32_t tx_seq=0, verify_seq=0, fault_count=0;
+  uint8_t tx_kind=0, tx_result=0, verify_stored=0, verify_driver=0;
+  uint8_t admin_phase=0, driver_mode=255, fault_site=0, last_fault_site=0;
+  uint8_t fault_event=0, fault_expected=0;
+  bool driver_ap_started=false, driver_sta_started=false, ap_config_verified=false;
   WifiScanEntry scan[12]{};
   WifiState state = WifiState::INACTIVE;
   WifiFault fault = WifiFault::NONE;

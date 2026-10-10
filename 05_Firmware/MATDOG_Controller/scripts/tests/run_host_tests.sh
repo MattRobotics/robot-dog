@@ -652,6 +652,15 @@ python3 "$SCRIPT_DIR/test_static_audit_startup.py"
   "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
   "$SKETCH_DIR/src/update/Sha256.cpp"
 "$OUT/test_ir01_lifecycle"
+# WPA2/AP bring-up regression: the soft-AP double reproduces the driver's AP
+# restart on a profile write (the root cause of config_error=11 on 41753ac).
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -pthread \
+  -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_wifi_ap_bringup" "$SCRIPT_DIR/test_wifi_ap_bringup.cpp" \
+  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/AdminAccess.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+"$OUT/test_wifi_ap_bringup"
 python3 "$SCRIPT_DIR/test_ota_tls_client.py"
 python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
 python3 "$SCRIPT_DIR/test_ap_only_transport.py"

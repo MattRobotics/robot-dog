@@ -126,3 +126,37 @@ doubles and production manager linkage. Its assertions now require WAIT_AP_CLOSE
 before reentry, and explicitly deliver queued stop/start acknowledgments for
 each command. Baseline vulnerable reproduction and all original independent
 review inputs remain separate and unchanged.
+
+## AP profile acknowledgment and request confirmation (2026-10-10)
+
+Hardware showed `config_error=11` after every boot of `41753ac`. The stock
+`WiFi.softAP()` writes the AP profile with `esp_wifi_set_config()`; on a started
+soft-AP the driver stops and restarts the interface and reports AP_STOP then
+AP_START. Those events were outside the armed set of the mode command and were
+treated as an unsolicited radio change.
+
+ENTER_ADMIN now issues two owned commands. Command 1 is the role change
+(STA_STOP/AP_START, or AP_START alone from a closed driver). Command 2 is the
+profile, issued with `esp_wifi_set_config(WIFI_IF_AP)` only after command 1 is
+fully acknowledged and the AP interface reports started; it arms AP_STOP and
+AP_START before the call. When the driver already holds the identical profile
+nothing is written and nothing is armed. A generation opens only after both
+sets are consumed, the exclusive AP state is verified and the profile read back
+from the driver equals the stored SSID and key with WPA2-PSK
+(`AP_CONFIG_MISMATCH`, `config_error=12`, otherwise). Duplicate, unrelated or
+missing role events fault exactly as before.
+
+FAULT closes the radio once (after confirmed listener closure, with no
+acknowledgment outstanding), so the network is not left visible without
+administration. A missing acknowledgment still leaves FAULT with the radio
+untouched, because no further mode command may start while one is pending.
+
+Requests are confirmed by sequence number, not by phase. `WIFI_PROVISION=QUEUED
+kind=… seq=N` is an intent; `WIFI_CONFIG_TX … seq=N kind=… result=COMMITTED`
+is its outcome. `WIFI_PROVISION=REFUSED kind=… reason=…` never advances the
+sequence. A key write accepted while the AP is active closes and reopens
+administration; a second key sent during that window is refused
+(`NOT_ADMITTED`) and must be repeated after `WIFI_ADMIN phase=ADMIN_AP`.
+`@WIFI AP VERIFY <passphrase>` compares a supplied key with the stored one and
+with the live driver profile and prints only MATCH/MISMATCH.
+

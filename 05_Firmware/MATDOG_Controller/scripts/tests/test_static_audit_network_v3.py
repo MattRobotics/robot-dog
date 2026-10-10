@@ -50,6 +50,21 @@ class NetworkAuditTest(unittest.TestCase):
           ('HttpTransport.cpp','self->admitAdmin(r)','true'),
           ('HttpTransport.cpp','gate.allowed(req.admin_generation)','true'),
         ]
+        # WPA2 bring-up: the profile write stays an acknowledged, verified,
+        # WPA2-only command, and request outcomes stay bound to their request.
+        mutations += [
+          ('WifiManager.cpp','expected_events_.store(kApStop | kApStart)','expected_events_.store(0)'),
+          ('WifiManager.cpp','if (!apConfigApplied())','if (false)'),
+          ('WifiManager.cpp','out->ap.authmode = WIFI_AUTH_WPA2_PSK','out->ap.authmode = WIFI_AUTH_OPEN'),
+          ('WifiManager.cpp','current.ap.authmode == WIFI_AUTH_WPA2_PSK','true'),
+          ('WifiManager.cpp','admin_.raiseFault(FaultSite::UNEXPECTED_ROLE_EVENT, bit, pending)','(void)pending'),
+          ('WifiManager.cpp','ok = esp_wifi_set_config(WIFI_IF_AP, &want) == ESP_OK','ok = WiFi.softAP("x", "y", 1, false, 4)'),
+          ('WifiManager.cpp','tagged.seq = ++request_seq_','tagged.seq = 0'),
+          ('WifiManager.cpp','sameKey(candidate, config_.ap_password)','true'),
+          ('WifiManager.cpp','if (!lease) return false;','if (!lease) return true;'),
+          ('CommandRouter.cpp','WIFI_PROVISION=REFUSED kind=%s reason=%s','WIFI_PROVISION=QUEUED'),
+          ('CommandRouter.cpp','seq=%lu kind=%s result=%s','result=COMMITTED'),
+        ]
         for mutation in mutations:
             with self.subTest(mutation=mutation):self.assertTrue(self.check(mutation))
     def test_second_writer(self):

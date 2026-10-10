@@ -53,6 +53,7 @@ struct Fixture {
   servo::ServoPreflight preflight;
   servo::SafeOffResult safe_off = servo::SafeOffResult::VERIFIED_OFF;
   SystemState system;
+  PowerStateMachine power;  // BOOTING: a critical context for every network request
   ControllerService telemetry;
   matdog::update::OtaManager ota;  // Read-only SOURCE_SIGNATURE status fixture.
   network::WifiManager wifi;
@@ -68,6 +69,7 @@ struct Fixture {
     CommandRouter::Modules m{};
     m.servo_bus = &bus; m.servo_census = &census; m.servo_preflight = &preflight;
     m.system_state = &system; m.operating_mode = &mode; m.authority = &authority;
+    m.power_state = &power;
     m.calibration = &calibration; m.q0_capture = &q0; m.actuator_policy = &policy;
     m.geometry_profile = &scenario.profile; m.motion_permit = &permit;
     m.motion_authorization = &authorization; m.first_motion = &first_motion;
@@ -500,6 +502,61 @@ void network_quiet_reservation() {
   f.wifi.config_busy_.store(false);
 }
 
+// The Wi-Fi command surface is a configuration plane only. Whatever it is sent,
+// accepted or refused, it leaves MAINTENANCE, actuator authority NONE, the
+// motion permit inactive and calibration storage untouched, and never echoes a
+// key. A refusal is explicit: kind and reason, never a bare or stale success.
+void wifi_commands_keep_safety_invariants() {
+  Fixture f;
+  const FramingSnapshot before(f);
+  const int writes = f.writes();
+  // Only the Wi-Fi owner's fakes may be reached from this command surface; the
+  // shared counter is restored so the zero-hardware-call invariant of the
+  // other cases keeps its meaning.
+  const int hardware_before = router_test::hardware_calls;
+  const std::string key = "never-print-this-secret";
+  const std::string token(64, 'c');
+  const std::string lines[] = {
+    "@WIFI STATUS", "@WIFI AP ON", "@WIFI AP OFF", "@WIFI ON", "@WIFI OFF",
+    "@WIFI AP VERIFY " + key, "@WIFI AP KEY " + key, "@WIFI ADMIN KEY " + token,
+    "@WIFI AP VERIFY short", "@WIFI AP VERIFYY " + key, "@WIFI SLEEP OFF", "@WIFI SCAN",
+  };
+  for (const auto& line : lines) {
+    const std::string out = f.command(line.c_str());
+    CHECK(!out.empty());
+    CHECK(out.find(key) == std::string::npos);
+    CHECK(out.find(token) == std::string::npos);
+    CHECK(f.mode.mode() == OperatingMode::MAINTENANCE);
+    CHECK(f.authority.current() == ActuatorAuthority::NONE);
+    CHECK(!f.authority.inhibited());
+    CHECK(!f.permit.active());
+    CHECK(f.writes() == writes);
+  }
+  // No radio owner behind this fixture: every request is refused, and says so.
+  std::string out = f.command(("@WIFI AP KEY " + key).c_str());
+  CHECK(out.find("WIFI_PROVISION=REFUSED kind=AP_KEY reason=") != std::string::npos);
+  CHECK(out.find("QUEUED") == std::string::npos && out.find("COMMITTED") == std::string::npos);
+  out = f.command(("@WIFI ADMIN KEY " + token).c_str());
+  CHECK(out.find("WIFI_PROVISION=REFUSED kind=ADMIN_KEY reason=") != std::string::npos);
+  out = f.command(("@WIFI AP VERIFY " + key).c_str());
+  CHECK(out.find("WIFI_AP_VERIFY=REFUSED reason=") != std::string::npos);
+  CHECK(out.find("MATCH") == std::string::npos);
+  CHECK(f.command("@WIFI AP ON").find("WIFI_AP=REFUSED reason=") != std::string::npos);
+  // The status names the request an outcome belongs to and the driver's own
+  // state; with nothing consumed it must not claim a result.
+  out = f.command("@WIFI STATUS");
+  CHECK(out.find("WIFI_CONFIG_TX phase=IDLE busy=NO error=0 seq=0 kind=NONE result=NONE") != std::string::npos);
+  CHECK(out.find("WIFI_REQUEST_LAST post=") != std::string::npos);
+  CHECK(out.find("WIFI_FAULT site=NONE event=NONE armed=0x00 count=0 last=NONE") != std::string::npos);
+  CHECK(out.find("WIFI_ADMIN phase=") != std::string::npos && out.find("portal=CLOSED") != std::string::npos);
+  CHECK(out.find("ap_profile_verified=NO") != std::string::npos);
+  CHECK(f.command("@SYSTEM SOURCE_SIGNATURE").find("MOTION_AUTHORIZED=0") != std::string::npos);
+  CHECK(f.mode.mode() == OperatingMode::MAINTENANCE && f.writes() == writes);
+  CHECK(router_test::hardware_calls - hardware_before <= 8); // Wi-Fi requests only
+  router_test::hardware_calls = hardware_before;
+  before.checkUnchanged(f);
+}
+
 void source_identity_is_read_only() {
   Fixture f;
   const FramingSnapshot before(f);
@@ -526,6 +583,7 @@ int main() {
   parser_and_read_only(); identical_recapture_through_real_commands(); authorization_gates();
   uncertain_reconciliation_through_handler();
   valid_usb_framing_limits(); invalid_usb_lines_and_recovery(); usb_multiple_lines_and_begin_reset();
+  wifi_commands_keep_safety_invariants();
   std::printf("test_command_router_persistence: %d checks, %d failures\n", checks, failures);
   return failures ? 1 : 0;
 }

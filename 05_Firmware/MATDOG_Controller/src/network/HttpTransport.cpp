@@ -128,8 +128,7 @@ bool HttpTransport::start() {
   return true;
 }
 void HttpTransport::stop() {
-  service_->networkAdminAccess().revoke();
-  service_->networkAdminAccess().radio_fault.store(true);
+  service_->networkAdminAccess().raiseFault(FaultSite::WEB_MANUAL_STOP);
   manual_stop_.store(true);
   desired_.store(false);
   tls_desired_.store(false);
@@ -164,7 +163,7 @@ void HttpTransport::lifecycleTick() {
   if (!drain) return;
   const auto phase = gate.phase.load();
   if (phase == NetworkPhase::ADMIN_AP && !WifiManager::verifyAdminRadio()) {
-    gate.revoke(); gate.radio_fault.store(true);
+    gate.raiseFault(FaultSite::HTTP_RADIO_LOST);
   }
   desired_.store(!manual_stop_.load() && !gate.closing.load() &&
                  phase == NetworkPhase::ADMIN_AP &&
@@ -181,7 +180,7 @@ void HttpTransport::lifecycleTick() {
       c.task_priority = 2;
       if (httpd_start(&server_, &c) == ESP_OK && !registerHandlers(server_)) {
         if (httpd_stop(server_) == ESP_OK) server_ = nullptr;
-        else { gate.revoke(); gate.phase.store(NetworkPhase::FAULT); }
+        else { gate.noteFault(FaultSite::LISTENER_STOP_FAILED); gate.revoke(); gate.phase.store(NetworkPhase::FAULT); }
       }
       listening_.store(server_ != nullptr);
     }
@@ -202,7 +201,7 @@ void HttpTransport::lifecycleTick() {
       if (httpd_ssl_start(&tls_server_, &c) == ESP_OK &&
           !registerHandlers(tls_server_, false)) {
         if (httpd_ssl_stop(tls_server_) == ESP_OK) tls_server_ = nullptr;
-        else { gate.revoke(); gate.phase.store(NetworkPhase::FAULT); }
+        else { gate.noteFault(FaultSite::LISTENER_STOP_FAILED); gate.revoke(); gate.phase.store(NetworkPhase::FAULT); }
       }
       tls_listening_.store(tls_server_ != nullptr);
     }

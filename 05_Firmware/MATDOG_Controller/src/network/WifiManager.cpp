@@ -16,10 +16,34 @@ namespace network {
 namespace {
 constexpr uint8_t kApStop = 1, kStaStart = 2, kStaStop = 4, kApStart = 8;
 constexpr uint32_t kRoleEventTimeoutMs = 3000;
+// The admission fence is a zero-wait mutex shared with md_http_life. A request
+// that meets it held is retried for this many worker periods, then refused.
+constexpr uint32_t kFenceRetryLimit = 40;
+constexpr uint32_t kVerifyIntervalMs = 2000;
 void copy(char *out, size_t cap, const char *in) {
   size_t n = strnlen(in, cap - 1);
   memset(out, 0, cap);
   memcpy(out, in, n);
+}
+// Constant-time equality of two zero-padded 65-byte key buffers.
+bool sameKey(const char *a, const char *b) {
+  uint8_t diff = 0;
+  for (size_t i = 0; i < 65; ++i)
+    diff |= static_cast<uint8_t>(a[i]) ^ static_cast<uint8_t>(b[i]);
+  return diff == 0;
+}
+// The eight fields the installed core itself compares before deciding whether
+// a soft-AP profile has to be written to the driver.
+bool sameApProfile(const wifi_config_t &a, const wifi_config_t &b) {
+  return strncmp(reinterpret_cast<const char *>(a.ap.ssid),
+                 reinterpret_cast<const char *>(b.ap.ssid), 32) == 0 &&
+         strncmp(reinterpret_cast<const char *>(a.ap.password),
+                 reinterpret_cast<const char *>(b.ap.password), 64) == 0 &&
+         a.ap.channel == b.ap.channel && a.ap.authmode == b.ap.authmode &&
+         a.ap.ssid_hidden == b.ap.ssid_hidden &&
+         a.ap.max_connection == b.ap.max_connection &&
+         a.ap.pairwise_cipher == b.ap.pairwise_cipher &&
+         a.ap.ftm_responder == b.ap.ftm_responder;
 }
 void macText(const uint8_t *mac, char out[18]) {
   if (!mac) {
@@ -84,7 +108,10 @@ void WifiManager::initializeWorker() {
       initial_mode == WIFI_MODE_STA) {
     admin_.phase.store(NetworkPhase::CLIENT_STA);
     admin_.closing.store(false);
-  } else admin_.phase.store(NetworkPhase::FAULT);
+  } else {
+    admin_.phase.store(NetworkPhase::FAULT);
+    noteFault(FaultSite::INIT_MODE_FAILED, 0);
+  }
   uint8_t mac[6]{};
   esp_wifi_get_mac(WIFI_IF_STA, mac);
   snprintf(worker_status_.ap_ssid, 33, "MATDOG-%02X%02X%02X", mac[3], mac[4],
@@ -111,25 +138,40 @@ void WifiManager::worker() {
     vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
+// Every refusal has a named reason, and every accepted request a sequence
+// number. The worker publishes its outcome under that number, so a result left
+// behind by an earlier request can never be read as confirmation of this one.
 bool WifiManager::post(const Request &r, bool mutation) {
-  if (!queue_ || (mutation && (context_.load() != 0 || nvs_fault_)))
-    return false;
+  last_post_seq_ = 0;
+  if (!queue_) { last_post_ = PostResult::UNAVAILABLE; return false; }
+  if (mutation && context_.load() != 0) { last_post_ = PostResult::CRITICAL; return false; }
+  if (mutation && nvs_fault_) { last_post_ = PostResult::NVS_FAULT; return false; }
   const bool bootstrap = (r.kind == RequestKind::AP_KEY || r.kind == RequestKind::ADMIN_KEY) &&
       admin_.phase.load() == NetworkPhase::CLOSED && admin_.listeners_closed.load();
-  if (mutation && !bootstrap && (!admin_.allowed(admin_.generation()) || !verifyAdminRadio())) return false;
-  if (mutation && config_busy_.exchange(true))
+  if (mutation && !bootstrap && (!admin_.allowed(admin_.generation()) || !verifyAdminRadio())) {
+    last_post_ = PostResult::NOT_ADMITTED;
     return false;
+  }
+  if (mutation && config_busy_.exchange(true)) {
+    last_post_ = PostResult::BUSY;
+    return false;
+  }
   Request tagged = r;
+  tagged.seq = ++request_seq_;
   if (mutation && !bootstrap && !tagged.generation) tagged.generation = admin_.generation();
   if (xQueueSend(static_cast<QueueHandle_t>(queue_), &tagged, 0) != pdTRUE) {
     if (mutation)
       config_busy_.store(false);
+    last_post_ = PostResult::QUEUE_FULL;
     return false;
   }
+  memset(tagged.secret, 0, sizeof(tagged.secret));
+  last_post_ = PostResult::QUEUED;
+  last_post_seq_ = tagged.seq;
   return true;
 }
 bool WifiManager::setEnabled(bool enabled, uint32_t now_ms) {
-  if (configBusy()) return false;
+  if (configBusy()) { last_post_ = PostResult::BUSY; last_post_seq_ = 0; return false; }
   (void)now_ms;
   Request r{};
   r.kind = RequestKind::ENABLE;
@@ -150,10 +192,10 @@ bool WifiManager::requestScan() {
   return post(r, false);
 }
 bool WifiManager::requestAp(bool on, uint32_t generation) {
-  if (configBusy()) return false;
-  if (generation && !admin_.allowed(generation)) return false;
-  if (!on && status_.ap_always)
-    return false;
+  last_post_seq_ = 0;
+  if (configBusy()) { last_post_ = PostResult::BUSY; return false; }
+  if (generation && !admin_.allowed(generation)) { last_post_ = PostResult::NOT_ADMITTED; return false; }
+  if (!on && status_.ap_always) { last_post_ = PostResult::INVALID; return false; }
   Request r{};
   r.kind = RequestKind::AP;
   r.generation = generation;
@@ -161,29 +203,50 @@ bool WifiManager::requestAp(bool on, uint32_t generation) {
   return post(r, false);
 }
 bool WifiManager::setSleep(uint8_t p) {
-  if (p > 2)
-    return false;
+  if (p > 2) { last_post_ = PostResult::INVALID; return false; }
   Request r{};
   r.kind = RequestKind::SLEEP;
   r.preference = p;
   return post(r, true);
 }
 bool WifiManager::provisionAp(const char *p) {
-  if (!p || strlen(p) < 8 || strlen(p) > 63)
+  if (!p || strlen(p) < 8 || strlen(p) > 63) {
+    last_post_ = PostResult::INVALID; last_post_seq_ = 0;
     return false;
+  }
   Request r{};
   r.kind = RequestKind::AP_KEY;
   copy(r.secret, 65, p);
-  return post(r, true);
+  const bool ok = post(r, true);
+  memset(r.secret, 0, sizeof(r.secret));
+  return ok;
 }
 bool WifiManager::provisionAdmin(const char *p) {
   uint8_t parsed[32];
-  if (!p || strlen(p) != 64 || !update::parseHex(p, 64, parsed))
+  if (!p || strlen(p) != 64 || !update::parseHex(p, 64, parsed)) {
+    last_post_ = PostResult::INVALID; last_post_seq_ = 0;
     return false;
+  }
+  memset(parsed, 0, sizeof(parsed));
   Request r{};
   r.kind = RequestKind::ADMIN_KEY;
   copy(r.secret, 65, p);
-  return post(r, true);
+  const bool ok = post(r, true);
+  memset(r.secret, 0, sizeof(r.secret));
+  return ok;
+}
+// Read-only: admitted in every phase, never changes configuration or radio.
+bool WifiManager::verifyAp(const char *p) {
+  if (!p || strlen(p) < 8 || strlen(p) > 63) {
+    last_post_ = PostResult::INVALID; last_post_seq_ = 0;
+    return false;
+  }
+  Request r{};
+  r.kind = RequestKind::AP_VERIFY;
+  copy(r.secret, 65, p);
+  const bool ok = post(r, false);
+  memset(r.secret, 0, sizeof(r.secret));
+  return ok;
 }
 bool WifiManager::configure(const ConfigPatch &p, uint32_t generation) {
   if (generation && !admin_.allowed(generation)) return false;
@@ -234,8 +297,8 @@ void WifiManager::observeRadioEvent(int event) {
   while (pending & bit) {
     if (expected_events_.compare_exchange_weak(pending, pending & ~bit)) return;
   }
-  admin_.revoke();
-  admin_.radio_fault.store(true);
+  // Not part of any armed command: which role event, and what was still armed.
+  admin_.raiseFault(FaultSite::UNEXPECTED_ROLE_EVENT, bit, pending);
 }
 bool WifiManager::changeMode(uint8_t target, uint32_t now) {
   if (target != WIFI_OFF && target != WIFI_STA && target != WIFI_AP) return false;
@@ -263,7 +326,9 @@ void WifiManager::startAp(uint32_t now) {
       admin_.phase.load() == NetworkPhase::ENTER_ADMIN || !config_.ap_password[0]) return;
   admin_.revoke();
   transition_admin_ = true;
-  ap_command_issued_ = false;
+  ap_step_ = ApStep::IDLE;
+  fault_close_issued_ = false;
+  worker_status_.fault_site = 0; // a new explicit request ends the fault episode
   admin_.phase.store(NetworkPhase::ENTER_ADMIN);
 }
 void WifiManager::leaveAdmin(bool return_admin, uint32_t now) {
@@ -272,37 +337,180 @@ void WifiManager::leaveAdmin(bool return_admin, uint32_t now) {
   transition_admin_ = false;
   return_admin_ = return_admin;
   leave_command_issued_ = false;
+  ap_step_ = ApStep::IDLE;
+  fault_close_issued_ = false;
+  worker_status_.fault_site = 0;
   admin_.phase.store(NetworkPhase::LEAVE_ADMIN);
 }
 void WifiManager::stopAp() { leaveAdmin(false, millis()); }
+void WifiManager::fault(FaultSite site, int32_t code) {
+  admin_.revoke();
+  admin_.phase.store(NetworkPhase::FAULT);
+  noteFault(site, code);
+}
+// The first cause of a FAULT episode is kept; the numeric code stays the
+// legacy config_error (3 driver refusal, 11 role/verification, 12 profile).
+void WifiManager::noteFault(FaultSite site, int32_t code) {
+  auto &w = worker_status_;
+  if (code) w.config_error = code;
+  if (w.fault_site) return;
+  w.fault_site = w.last_fault_site = static_cast<uint8_t>(site);
+  w.fault_expected = expected_events_.load();
+  if (site != FaultSite::UNEXPECTED_ROLE_EVENT) w.fault_event = 0;
+  ++w.fault_count;
+}
+// A verified stable state supersedes an earlier radio-class error, so the
+// published code describes the present and not a fault that was recovered.
+void WifiManager::clearRadioError() {
+  auto &w = worker_status_;
+  if (w.config_error == 3 || w.config_error == 11 || w.config_error == 12)
+    w.config_error = 0;
+  w.fault_site = 0;
+}
+// FAULT is fail-closed on the air as well: once the listeners are confirmed
+// closed and no acknowledgment is outstanding, the radio is switched off once.
+// A network that stays visible while administration is unavailable is not a
+// state this firmware keeps. Reopening still needs an explicit request.
+void WifiManager::faultClose(uint32_t now) {
+  if (fault_close_issued_) return;
+  AdminLease fence(admin_);
+  if (!fence || !admin_.listeners_closed.load()) return;
+  fault_close_issued_ = true; // one bounded attempt per fault episode
+  wifi_mode_t mode = WIFI_MODE_NULL;
+  if (esp_wifi_get_mode(&mode) != ESP_OK || mode == WIFI_MODE_NULL) return;
+  connect_due_ = false;
+  if (worker_status_.scan_running) {
+    esp_wifi_scan_stop(); WiFi.scanDelete(); worker_status_.scan_running = false;
+  }
+  WiFi.setAutoReconnect(false);
+  changeMode(WIFI_OFF, now);
+}
+// Soft-AP profile exactly as the installed core builds it, except that the
+// authentication mode is unconditional: this AP is never opened without WPA2.
+static void buildApProfile(wifi_config_t *out, const char *ssid, const char *key) {
+  memset(out, 0, sizeof(*out));
+  const size_t ssid_len = strnlen(ssid, 32);
+  memcpy(out->ap.ssid, ssid, ssid_len);
+  out->ap.ssid_len = static_cast<uint8_t>(ssid_len);
+  memcpy(out->ap.password, key, strnlen(key, 63));
+  out->ap.channel = 1;
+  out->ap.max_connection = 4;
+  out->ap.beacon_interval = 100;
+  out->ap.ssid_hidden = 0;
+  out->ap.authmode = WIFI_AUTH_WPA2_PSK;
+  out->ap.pairwise_cipher = WIFI_CIPHER_TYPE_CCMP;
+}
+// Second owned command of the bring-up. esp_wifi_set_config() on a started
+// soft-AP stops and restarts it inside the driver, which reports AP_STOP and
+// then AP_START. Those two role events are the acknowledgment set of THIS
+// command and are armed before the driver can enqueue them. When the driver
+// already holds the identical profile nothing is written and nothing is armed.
+bool WifiManager::issueApConfig(uint32_t now) {
+  wifi_config_t want, current;
+  buildApProfile(&want, worker_status_.ap_ssid, config_.ap_password);
+  memset(&current, 0, sizeof(current));
+  bool ok = esp_wifi_get_config(WIFI_IF_AP, &current) == ESP_OK;
+  if (ok && !sameApProfile(want, current)) {
+    event_since_ = now;
+    expected_events_.store(kApStop | kApStart);
+    ok = esp_wifi_set_config(WIFI_IF_AP, &want) == ESP_OK;
+    if (!ok) expected_events_.store(0);
+  }
+  memset(&want, 0, sizeof(want));
+  memset(&current, 0, sizeof(current));
+  return ok;
+}
+// The profile the driver is really using must equal the stored one before a
+// generation is opened: same SSID, same key, WPA2-PSK.
+bool WifiManager::apConfigApplied() {
+  wifi_config_t want, current;
+  buildApProfile(&want, worker_status_.ap_ssid, config_.ap_password);
+  memset(&current, 0, sizeof(current));
+  const bool ok = esp_wifi_get_config(WIFI_IF_AP, &current) == ESP_OK &&
+                  current.ap.authmode == WIFI_AUTH_WPA2_PSK &&
+                  sameApProfile(want, current);
+  memset(&want, 0, sizeof(want));
+  memset(&current, 0, sizeof(current));
+  return ok;
+}
+void WifiManager::enterAdminTick(uint32_t now) {
+  if (ap_step_ == ApStep::IDLE) {
+    worker_status_.ap_config_verified = false;
+    if (config_.ap_name[0]) copy(worker_status_.ap_ssid, 33, config_.ap_name);
+    else {
+      uint8_t mac[6]{};
+      if (esp_wifi_get_mac(WIFI_IF_STA, mac) != ESP_OK) { fault(FaultSite::MAC_READ_FAILED, 0); return; }
+      snprintf(worker_status_.ap_ssid, 33, "MATDOG-%02X%02X%02X", mac[3], mac[4], mac[5]);
+    }
+    // Command 1: role change only. WIFI_MODE_AP removes the STA driver/interface
+    // role; no hidden enableSTA.
+    if (!changeMode(WIFI_AP, now)) { fault(FaultSite::AP_MODE_COMMAND, 3); return; }
+    ap_since_ = now;
+    ap_step_ = ApStep::MODE_ISSUED;
+  }
+  if (ap_step_ == ApStep::MODE_ISSUED) {
+    // AP_START is asynchronous: the profile is not touched until the role
+    // change is completely acknowledged and the AP interface reports started.
+    if (expected_events_.load() || !WiFi.AP.started()) {
+      if (now - ap_since_ >= kRoleEventTimeoutMs) fault(FaultSite::AP_START_TIMEOUT, 11);
+      return;
+    }
+    if (!WiFi.softAPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0))) {
+      fault(FaultSite::AP_IP_CONFIG, 3); return;
+    }
+    // Command 2: the AP profile, with its own acknowledgment set.
+    if (!issueApConfig(now)) { fault(FaultSite::AP_SET_CONFIG, 3); return; }
+    ap_since_ = now;
+    ap_step_ = ApStep::CONFIG_ISSUED;
+  }
+  // Keep ENTER_ADMIN until the stock status bits and exclusive driver mode can
+  // both be verified, on this or a subsequent tick.
+  if (expected_events_.load() || !verifyAdminRadio()) {
+    if (now - ap_since_ >= kRoleEventTimeoutMs) fault(FaultSite::AP_VERIFY_TIMEOUT, 11);
+    return;
+  }
+  if (!apConfigApplied()) { fault(FaultSite::AP_CONFIG_MISMATCH, 12); return; }
+  if (!admin_.open()) { fault(FaultSite::ADMIN_OPEN_REFUSED, 0); return; }
+  worker_status_.ap_active = true;
+  worker_status_.ap_config_verified = true;
+  ap_reload_ = false;
+  ap_step_ = ApStep::IDLE;
+  clearRadioError();
+}
 void WifiManager::transitionTick(uint32_t now) {
   if (admin_.radio_fault.exchange(false)) {
-    admin_.revoke();
-    admin_.phase.store(NetworkPhase::FAULT);
-    worker_status_.config_error = 11;
+    const uint8_t source = admin_.fault_source.exchange(0);
+    const bool first = !worker_status_.fault_site;
+    fault(source ? static_cast<FaultSite>(source) : FaultSite::UNSPECIFIED, 11);
+    if (first && source == static_cast<uint8_t>(FaultSite::UNEXPECTED_ROLE_EVENT)) {
+      // Which role event arrived, and what was armed when it did.
+      worker_status_.fault_event = admin_.fault_event.load();
+      worker_status_.fault_expected = admin_.fault_expected.load();
+    }
     intent_pending_ = false;
     intent_ = NetworkConfig{};
     config_busy_.store(false);
   }
   if (admin_.phase.load() == NetworkPhase::FAULT) {
+    if (!worker_status_.fault_site) {
+      const uint8_t source = admin_.fault_source.exchange(0);
+      noteFault(source ? static_cast<FaultSite>(source) : FaultSite::UNSPECIFIED, 0);
+    }
     intent_pending_ = false;
     intent_ = NetworkConfig{};
     transaction_.update(now, false, false, true);
     config_busy_.store(false);
     ap_reload_ = false;
+    ap_step_ = ApStep::IDLE;
   }
   if (expected_events_.load()) {
-    if (now - event_since_ >= kRoleEventTimeoutMs) {
-      admin_.revoke(); admin_.phase.store(NetworkPhase::FAULT);
-      worker_status_.config_error = 11;
-    }
+    if (now - event_since_ >= kRoleEventTimeoutMs) fault(FaultSite::ROLE_ACK_TIMEOUT, 11);
     return;
   }
   const auto phase = admin_.phase.load();
+  if (phase == NetworkPhase::FAULT) { faultClose(now); return; }
   if (phase == NetworkPhase::ADMIN_AP && !verifyAdminRadio()) {
-    admin_.revoke();
-    admin_.phase.store(NetworkPhase::FAULT);
-    worker_status_.config_error = 11;
+    fault(FaultSite::ADMIN_RADIO_LOST, 11);
     return;
   }
   if (phase != NetworkPhase::ENTER_ADMIN && phase != NetworkPhase::LEAVE_ADMIN && phase != NetworkPhase::WAIT_AP_CLOSE) return;
@@ -316,65 +524,39 @@ void WifiManager::transitionTick(uint32_t now) {
   }
   WiFi.setAutoReconnect(false);
   if (transition_admin_) {
-    if (!ap_command_issued_) {
-    if (config_.ap_name[0]) copy(worker_status_.ap_ssid, 33, config_.ap_name);
-    else {
-      uint8_t mac[6]{};
-      if (esp_wifi_get_mac(WIFI_IF_STA, mac) != ESP_OK) { admin_.phase.store(NetworkPhase::FAULT); return; }
-      snprintf(worker_status_.ap_ssid, 33, "MATDOG-%02X%02X%02X", mac[3], mac[4], mac[5]);
-    }
-    // WIFI_MODE_AP removes the STA driver/interface role; no hidden enableSTA.
-    if (!changeMode(WIFI_AP, now) ||
-        !WiFi.softAPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0)) ||
-        !WiFi.softAP(worker_status_.ap_ssid, config_.ap_password, 1, false, 4)) {
-      admin_.phase.store(NetworkPhase::FAULT); worker_status_.config_error = 3; return;
-    }
-    ap_since_ = now;
-    ap_command_issued_ = true;
-    }
-    // AP_START is asynchronous: keep ENTER_ADMIN until the stock status bits
-    // and exclusive driver mode can both be verified on a subsequent tick.
-    if (expected_events_.load() || !verifyAdminRadio()) {
-      if (now - ap_since_ >= kRoleEventTimeoutMs) { admin_.phase.store(NetworkPhase::FAULT); worker_status_.config_error = 11; }
-      return;
-    }
-    if (!admin_.open()) { admin_.phase.store(NetworkPhase::FAULT); return; }
-    worker_status_.ap_active = true;
-    ap_reload_ = false;
+    enterAdminTick(now);
   } else {
     if (!enabled_) {
       if (!leave_command_issued_) {
         leave_command_issued_ = true;
         admin_.phase.store(NetworkPhase::WAIT_AP_CLOSE);
-        if (!changeMode(WIFI_OFF, now)) { admin_.phase.store(NetworkPhase::FAULT); return; }
+        if (!changeMode(WIFI_OFF, now)) { fault(FaultSite::MODE_COMMAND, 0); return; }
       }
       if (expected_events_.load()) return;
       wifi_mode_t closed_mode = WIFI_MODE_NULL;
       const auto read = esp_wifi_get_mode(&closed_mode);
       if ((read != ESP_OK && read != ESP_ERR_WIFI_NOT_INIT) ||
           closed_mode != WIFI_MODE_NULL || WiFi.AP.started() || WiFi.STA.started()) {
-        if (now - event_since_ >= kRoleEventTimeoutMs) {
-          admin_.phase.store(NetworkPhase::FAULT); worker_status_.config_error = 11;
-        }
+        if (now - event_since_ >= kRoleEventTimeoutMs) fault(FaultSite::CLOSE_VERIFY_TIMEOUT, 11);
         return;
       }
       worker_status_.ap_active = false;
+      clearRadioError();
       admin_.phase.store(NetworkPhase::CLOSED); admin_.closing.store(false); return;
     }
     if (!leave_command_issued_) {
       leave_command_issued_ = true;
       admin_.phase.store(NetworkPhase::WAIT_AP_CLOSE);
-      if (!changeMode(WIFI_STA, now)) { admin_.phase.store(NetworkPhase::FAULT); return; }
+      if (!changeMode(WIFI_STA, now)) { fault(FaultSite::MODE_COMMAND, 0); return; }
     }
     if (expected_events_.load()) return;
     wifi_mode_t mode = WIFI_MODE_NULL;
     if (esp_wifi_get_mode(&mode) != ESP_OK || mode != WIFI_MODE_STA || WiFi.AP.started() || !WiFi.STA.started()) {
-      if (now - event_since_ >= kRoleEventTimeoutMs) {
-        admin_.phase.store(NetworkPhase::FAULT); worker_status_.config_error = 11;
-      }
+      if (now - event_since_ >= kRoleEventTimeoutMs) fault(FaultSite::STA_VERIFY_TIMEOUT, 11);
       return;
     }
     worker_status_.ap_active = false;
+    clearRadioError();
     admin_.phase.store(NetworkPhase::CLIENT_STA);
     admin_.closing.store(false);
     if (intent_pending_) {
@@ -382,6 +564,7 @@ void WifiManager::transitionTick(uint32_t now) {
       // First persistent PENDING write occurs only after closure and STA mode.
       if (!transaction_.stage(intent_, intent_profile_, now, true, context_.load() != 0)) {
         worker_status_.config_error = 8;
+        worker_status_.tx_result = static_cast<uint8_t>(TxResult::REJECTED);
         worker_status_.config_phase = transaction_.phase();
         config_busy_.store(false);
         if (transaction_.phase() == ConfigPhase::STORAGE_ERROR) nvs_fault_.store(true);
@@ -433,10 +616,51 @@ void WifiManager::issueConnect(uint32_t now) {
     policy_.reportActionFailed(WifiFault::CONNECT_CALL_REJECTED, millis());
   memset(&drv, 0, sizeof(drv));
 }
-void WifiManager::consume(const Request &r, uint32_t now) {
+void WifiManager::recordTx(const Request &r, TxResult result, int32_t error) {
+  auto &w = worker_status_;
+  w.tx_seq = r.seq;
+  w.tx_kind = static_cast<uint8_t>(r.kind);
+  w.tx_result = static_cast<uint8_t>(result);
+  w.config_error = error;
+}
+// Compares, never reveals: the published result is MATCH or MISMATCH for the
+// stored key and for the profile the driver is really using. Rate limited.
+void WifiManager::verifyCandidate(const Request &r, uint32_t now) {
+  auto &w = worker_status_;
+  w.verify_seq = r.seq;
+  if (verify_used_ && now - verify_since_ < kVerifyIntervalMs) {
+    w.verify_stored = w.verify_driver = static_cast<uint8_t>(VerifyResult::THROTTLED);
+    return;
+  }
+  verify_used_ = true;
+  verify_since_ = now;
+  char candidate[65];
+  copy(candidate, 65, r.secret);
+  w.verify_stored = static_cast<uint8_t>(
+      !config_.ap_password[0] ? VerifyResult::NOT_AVAILABLE
+      : sameKey(candidate, config_.ap_password) ? VerifyResult::MATCH
+                                                : VerifyResult::MISMATCH);
+  w.verify_driver = static_cast<uint8_t>(VerifyResult::NOT_AVAILABLE);
+  wifi_mode_t mode = WIFI_MODE_NULL;
+  wifi_config_t current;
+  memset(&current, 0, sizeof(current));
+  if (esp_wifi_get_mode(&mode) == ESP_OK && mode == WIFI_MODE_AP && WiFi.AP.started() &&
+      esp_wifi_get_config(WIFI_IF_AP, &current) == ESP_OK) {
+    char active[65];
+    memset(active, 0, sizeof(active));
+    memcpy(active, current.ap.password, 64);
+    w.verify_driver = static_cast<uint8_t>(
+        current.ap.authmode == WIFI_AUTH_WPA2_PSK && sameKey(candidate, active)
+            ? VerifyResult::MATCH : VerifyResult::MISMATCH);
+    memset(active, 0, sizeof(active));
+  }
+  memset(candidate, 0, sizeof(candidate));
+  memset(&current, 0, sizeof(current));
+}
+bool WifiManager::consume(const Request &r, uint32_t now) {
   if (r.kind == RequestKind::ENABLE) {
     if (context_.load() || transaction_.busy() || intent_pending_)
-      return;
+      return true;
     enabled_ = r.on;
     off_since_ = now;
     policy_.setEnabled(enabled_, now);
@@ -445,17 +669,24 @@ void WifiManager::consume(const Request &r, uint32_t now) {
     } else if (admin_.phase.load() == NetworkPhase::CLOSED) {
       leaveAdmin(false, now);
     }
-    return;
+    return true;
   }
   if (r.kind == RequestKind::SCAN) {
     scan(now, false);
-    return;
+    return true;
+  }
+  if (r.kind == RequestKind::AP_VERIFY) {
+    verifyCandidate(r, now);
+    return true;
   }
   if (r.kind == RequestKind::AP) {
     AdminLease lease(admin_);
-    if (!lease || (r.generation && (!admin_.allowed(r.generation) || !verifyAdminRadio()))) return;
+    // The fence is momentarily held by md_http_life: keep the request for the
+    // next tick. A QUEUED request is never dropped silently.
+    if (!lease) return false;
+    if (r.generation && (!admin_.allowed(r.generation) || !verifyAdminRadio())) return true;
     if (context_.load() || transaction_.busy() || intent_pending_)
-      return;
+      return true;
     if (r.on) {
       ap_manual_ = true;
       startAp(now);
@@ -463,18 +694,19 @@ void WifiManager::consume(const Request &r, uint32_t now) {
       ap_manual_ = false;
       stopAp();
     }
-    return;
+    return true;
   }
   AdminLease lease(admin_);
+  if (!lease) return false;
   const bool bootstrap = !r.generation && !enabled_ &&
       (r.kind == RequestKind::AP_KEY || r.kind == RequestKind::ADMIN_KEY) &&
       admin_.phase.load() == NetworkPhase::CLOSED && admin_.listeners_closed.load() &&
       !WiFi.AP.started() && !WiFi.STA.started();
-  if (!lease || (r.generation && (!admin_.allowed(r.generation) || !verifyAdminRadio())) ||
+  if ((r.generation && (!admin_.allowed(r.generation) || !verifyAdminRadio())) ||
       (!r.generation && !bootstrap && admin_.phase.load() != NetworkPhase::ADMIN_AP) || context_.load() || nvs_fault_) {
     config_busy_.store(false);
-    worker_status_.config_error = 5;
-    return;
+    recordTx(r, TxResult::REJECTED, 5);
+    return true;
   }
   NetworkConfig c = config_;
   if (r.kind == RequestKind::AP_KEY)
@@ -499,9 +731,9 @@ void WifiManager::consume(const Request &r, uint32_t now) {
         c.sta[i] = p.config.sta[i];
         if (!(p.passwords & (1u << i))) {
           if (strcmp(c.sta[i].ssid, config_.sta[i].ssid) != 0) {
-            worker_status_.config_error = 6;
+            recordTx(r, TxResult::REJECTED, 6);
             config_busy_.store(false);
-            return;
+            return true;
           }
           copy(c.sta[i].password, 65, config_.sta[i].password);
         }
@@ -526,9 +758,9 @@ void WifiManager::consume(const Request &r, uint32_t now) {
     // Validate in RAM. An accepted intent is the sole authorized continuation
     // in CLIENT_STA, not permission for arbitrary administrative writes there.
     if (!validNetworkConfig(c) || p.test_profile > 1 || !c.sta[p.test_profile].enabled) {
-      worker_status_.config_error = 8;
+      recordTx(r, TxResult::REJECTED, 8);
       config_busy_.store(false);
-      return;
+      return true;
     }
     ap_manual_ = false;
     intent_ = c;
@@ -537,8 +769,8 @@ void WifiManager::consume(const Request &r, uint32_t now) {
     intent_since_ = now;
     ap_reload_ = p.ap;
     worker_status_.config_phase = ConfigPhase::CONFIG_PENDING;
-    worker_status_.config_error = 0;
-    return;
+    recordTx(r, TxResult::INTENT_PENDING, 0);
+    return true;
   }
   if (validNetworkConfig(c) && storage_.activate(c)) {
     if (r.kind == RequestKind::AP_KEY && worker_status_.ap_active)
@@ -549,13 +781,14 @@ void WifiManager::consume(const Request &r, uint32_t now) {
     transaction_.begin(&storage_, config_);
     worker_status_.nvs_active = true;
     worker_status_.config_phase = ConfigPhase::COMMITTED;
-    worker_status_.config_error = 0;
+    recordTx(r, TxResult::COMMITTED, 0);
   } else {
     nvs_fault_ = true;
-    worker_status_.config_error = 9;
     worker_status_.config_phase = ConfigPhase::STORAGE_ERROR;
+    recordTx(r, TxResult::STORAGE_ERROR, 9);
   }
   config_busy_.store(false);
+  return true;
 }
 void WifiManager::scan(uint32_t now, bool roaming) {
   if (admin_.phase.load() != NetworkPhase::CLIENT_STA ||
@@ -581,10 +814,26 @@ void WifiManager::workerTick(uint32_t now) {
       admin_.phase.load() == NetworkPhase::ADMIN_AP) leaveAdmin(true, now);
   if (intent_pending_ && admin_.phase.load() == NetworkPhase::ADMIN_AP &&
       now - intent_since_ >= 1000) leaveAdmin(true, now);
-  Request req{};
-  if (xQueueReceive(static_cast<QueueHandle_t>(queue_), &req, 0) == pdTRUE) {
-    consume(req, now);
-    memset(req.secret, 0, sizeof(req.secret));
+  if (!held_valid_ &&
+      xQueueReceive(static_cast<QueueHandle_t>(queue_), &held_, 0) == pdTRUE) {
+    held_valid_ = true;
+    held_attempts_ = 0;
+  }
+  if (held_valid_) {
+    bool done = consume(held_, now);
+    if (!done && ++held_attempts_ >= kFenceRetryLimit) {
+      // Bounded: a fence that never frees refuses the request, with a result.
+      if (held_.kind != RequestKind::AP) {
+        config_busy_.store(false);
+        recordTx(held_, TxResult::REJECTED, 5);
+      }
+      done = true;
+    }
+    if (done) {
+      memset(held_.secret, 0, sizeof(held_.secret));
+      held_ = Request{};
+      held_valid_ = false;
+    }
   }
   if (admin_.phase.load() != NetworkPhase::CLIENT_STA) {
     worker_status_.ap_active = admin_.phase.load() == NetworkPhase::ADMIN_AP;
@@ -623,6 +872,10 @@ void WifiManager::workerTick(uint32_t now) {
     transaction_.update(now, match, link_up, context_.load() != 0 || !client_verified);
     worker_status_.config_phase = transaction_.phase();
     if (!transaction_.busy()) {
+      worker_status_.tx_result = static_cast<uint8_t>(
+          transaction_.phase() == ConfigPhase::COMMITTED ? TxResult::COMMITTED
+          : transaction_.phase() == ConfigPhase::STORAGE_ERROR ? TxResult::STORAGE_ERROR
+                                                               : TxResult::ROLLBACK);
       if (transaction_.phase() == ConfigPhase::COMMITTED) {
         config_ = transaction_.active();
         worker_status_.nvs_active = true;
@@ -761,6 +1014,15 @@ void WifiManager::refreshSnapshot(uint32_t now, bool link_up) {
   w.backoff_ms = policy_.backoffMs();
   w.state_since_ms = policy_.stateSinceMs();
   w.disconnect_reason = disconnect_reason_.load();
+  // The driver's own view, independent of the administrative phase.
+  w.admin_phase = static_cast<uint8_t>(admin_.phase.load());
+  wifi_mode_t driver_mode = WIFI_MODE_NULL;
+  const auto driver_read = esp_wifi_get_mode(&driver_mode);
+  w.driver_mode = driver_read == ESP_OK ? static_cast<uint8_t>(driver_mode)
+                  : driver_read == ESP_ERR_WIFI_NOT_INIT ? 0 : 255;
+  w.driver_ap_started = WiFi.AP.started();
+  w.driver_sta_started = WiFi.STA.started();
+  if (!w.ap_active) w.ap_config_verified = false;
   w.ap_provisioned = config_.ap_password[0];
   w.admin_provisioned = hasAdmin(config_);
   w.ap_clients = w.ap_active ? WiFi.softAPgetStationNum() : 0;

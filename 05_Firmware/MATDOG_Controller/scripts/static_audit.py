@@ -6254,6 +6254,32 @@ def check_network_v3_boundaries(files, sketch_dir):
         if code.count(token)!=count:fail("AP-only fence coverage changed: "+token)
     if re.search(r"\b(?:WIFI_AP_STA|WIFI_MODE_APSTA)\b", manager):
         fail("WifiManager must never restore AP+STA")
+    # WPA2 bring-up (root cause of config_error=11 on 41753ac). The stock
+    # WiFi.softAP() writes the AP profile with esp_wifi_set_config(), which
+    # restarts a started soft-AP inside the driver (AP_STOP, AP_START). That
+    # write is therefore an owned command with its own armed acknowledgment
+    # pair, the applied profile is read back before a generation opens, and
+    # the profile is WPA2-PSK unconditionally.
+    if "WiFi.softAP(" in manager:
+        fail("WifiManager must not call the stock WiFi.softAP(): it writes the AP profile "
+             "outside the armed acknowledgment set")
+    for token in ("expected_events_.store(kApStop|kApStart)", "if(!apConfigApplied())",
+                  "out->ap.authmode=WIFI_AUTH_WPA2_PSK",
+                  "admin_.raiseFault(FaultSite::UNEXPECTED_ROLE_EVENT,bit,pending)",
+                  "tagged.seq=++request_seq_", "recordTx(r,TxResult::COMMITTED,0)",
+                  "sameKey(candidate,config_.ap_password)"):
+        if not contains_v3(manager,token):fail("WPA2 bring-up invariant missing: "+token)
+    # A request that meets the admission fence held is retried, never dropped.
+    if compact_manager.count("current.ap.authmode==WIFI_AUTH_WPA2_PSK")!=2:
+        fail("Driver profile read-back and key comparison must both require WPA2-PSK")
+    if compact_manager.count("if(!lease)returnfalse;")!=2:
+        fail("Both fenced request paths must retry on fence contention")
+    if re.search(r"ap\.authmode\s*=\s*WIFI_AUTH_OPEN", manager):
+        fail("The administrative AP must never be configured open")
+    router=by_name.get("CommandRouter.cpp",(None,""))[1]
+    for token in ('WIFI_PROVISION=REFUSED kind=%s reason=%s', 'WIFI_PROVISION=QUEUED kind=%s seq=%lu',
+                  'seq=%lu kind=%s result=%s', 'WIFI_AP_VERIFY=DONE seq=%lu stored=%s driver=%s'):
+        if not contains_v3(router,token):fail("Provisioning confirmation invariant missing: "+token)
     for token in ("self->admitAdmin(r)", "AdminLease lease(gate)", "gate.allowed(req.admin_generation)",
                   "httpd_stop(server_)==ESP_OK", "httpd_ssl_stop(tls_server_)==ESP_OK",
                   "gate.listeners_closed.store(true)", "!registerHandlers(tls_server_,false)", "SCAN_DISABLED_ADMIN_AP"):

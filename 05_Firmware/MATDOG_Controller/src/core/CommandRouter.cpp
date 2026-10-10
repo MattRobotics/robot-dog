@@ -202,6 +202,17 @@ void CommandRouter::update(uint32_t now_ms) {
   }
 
   if (evidence_export_pending_) pumpFullLegEvidenceExport();
+
+  // The key comparison runs in the Wi-Fi worker; report it exactly once.
+  if (wifi_verify_pending_seq_ &&
+      modules_.service->wifiStatus().verify_seq == wifi_verify_pending_seq_) {
+    const network::WifiStatus& w = modules_.service->wifiStatus();
+    Serial.printf("WIFI_AP_VERIFY=DONE seq=%lu stored=%s driver=%s\n",
+                  (unsigned long)w.verify_seq,
+                  network::toString(static_cast<network::VerifyResult>(w.verify_stored)),
+                  network::toString(static_cast<network::VerifyResult>(w.verify_driver)));
+    wifi_verify_pending_seq_ = 0;
+  }
 }
 
 void CommandRouter::handleLine(String line) {
@@ -319,17 +330,36 @@ void CommandRouter::handleLine(String line) {
   } else if (upper == "@WIFI SCAN") {
     Serial.println(modules_.service->scanNetwork()?"WIFI_SCAN=QUEUED":"WIFI_SCAN=REFUSED");
   } else if (upper == "@WIFI AP ON" || upper == "@WIFI AP OFF") {
-    Serial.println(modules_.service->accessPoint(upper=="@WIFI AP ON")?"WIFI_AP=QUEUED":"WIFI_AP=REFUSED");
+    if (modules_.service->networkCritical()) Serial.println("WIFI_AP=REFUSED reason=CRITICAL_CONTEXT");
+    else if (modules_.service->accessPoint(upper=="@WIFI AP ON")) Serial.printf("WIFI_AP=QUEUED seq=%lu\n",(unsigned long)modules_.wifi->lastPostSeq());
+    else Serial.printf("WIFI_AP=REFUSED reason=%s\n",network::toString(modules_.wifi->lastPost()));
   } else if (upper == "@WIFI SLEEP AUTO" || upper == "@WIFI SLEEP ON" || upper == "@WIFI SLEEP OFF") {
     const uint8_t p=upper=="@WIFI SLEEP AUTO"?0:(upper=="@WIFI SLEEP ON"?1:2);
     Serial.println(!modules_.service->networkCritical() && modules_.wifi->setSleep(p)?"WIFI_SLEEP=QUEUED effective=OFF fallback=HWCDC_SESSION_UNPROVEN":"WIFI_SLEEP=REFUSED");
-  } else if (upper.startsWith("@WIFI AP KEY ") || upper.startsWith("@WIFI ADMIN KEY ")) {
-    bool accepted=false;
-    if(!modules_.service->networkCritical()) {
-      if(upper.startsWith("@WIFI AP KEY ")) accepted=modules_.wifi->provisionAp(line.c_str()+13);
-      else accepted=modules_.wifi->provisionAdmin(line.c_str()+16);
+  } else if (upper.startsWith("@WIFI AP VERIFY ")) {
+    // Compares a supplied AP key with the stored one and with the profile the
+    // driver is really using. Only MATCH/MISMATCH is ever printed; the result
+    // is reported once by update() under this sequence number.
+    if (modules_.wifi->verifyAp(line.c_str()+16)) {
+      wifi_verify_pending_seq_ = modules_.wifi->lastPostSeq();
+      Serial.printf("WIFI_AP_VERIFY=QUEUED seq=%lu\n",(unsigned long)wifi_verify_pending_seq_);
+    } else {
+      Serial.printf("WIFI_AP_VERIFY=REFUSED reason=%s\n",network::toString(modules_.wifi->lastPost()));
     }
-    Serial.println(accepted?"WIFI_PROVISION=QUEUED":"WIFI_PROVISION=REFUSED");
+  } else if (upper.startsWith("@WIFI AP KEY ") || upper.startsWith("@WIFI ADMIN KEY ")) {
+    // QUEUED carries the sequence number under which the worker publishes the
+    // outcome of THIS request (WIFI_CONFIG_TX seq=). A refusal names its
+    // reason and never advances that sequence, so an earlier COMMITTED cannot
+    // be read as confirmation of a request that was not accepted.
+    const bool ap_key=upper.startsWith("@WIFI AP KEY ");
+    const char* kind=ap_key?"AP_KEY":"ADMIN_KEY";
+    if(modules_.service->networkCritical()) {
+      Serial.printf("WIFI_PROVISION=REFUSED kind=%s reason=CRITICAL_CONTEXT\n",kind);
+    } else if(ap_key?modules_.wifi->provisionAp(line.c_str()+13):modules_.wifi->provisionAdmin(line.c_str()+16)) {
+      Serial.printf("WIFI_PROVISION=QUEUED kind=%s seq=%lu\n",kind,(unsigned long)modules_.wifi->lastPostSeq());
+    } else {
+      Serial.printf("WIFI_PROVISION=REFUSED kind=%s reason=%s\n",kind,network::toString(modules_.wifi->lastPost()));
+    }
   } else if (upper == "@WIFI ON" || upper == "@WIFI OFF") {
     // Worker rechecks critical state before changing radio mode.
     // QUEUED is an intent; status reports the applied state.
@@ -1267,6 +1297,7 @@ void CommandRouter::printHelp() {
   Serial.println("  @WIFI SCAN / @WIFI AP ON|OFF (quiet state)");
   Serial.println("  @WIFI SLEEP AUTO|ON|OFF (HWCDC fallback OFF)");
   Serial.println("  @WIFI AP KEY <unique-passphrase> / ADMIN KEY <64-hex> (physical provisioning)");
+  Serial.println("  @WIFI AP VERIFY <passphrase> (MATCH/MISMATCH vs stored key and live driver profile)");
   Serial.println("  @OTA STATUS            (read-only; TLS/HMAC transport, ingest gate)");
   Serial.println("  @WEB SERVER STATUS     (read-only; is the listening socket up)");
   Serial.println("  @WEB SERVER START|STOP (MAINTENANCE; AP portal auto after provisioning)");
@@ -1403,10 +1434,29 @@ void CommandRouter::printWifiStatus() {
   Serial.printf("WIFI_LINK connected=%s ip=%s rssi_dbm=%ld channel=%u\n",
                 w.connected ? "YES" : "NO", ip, (long)w.rssi_dbm, (unsigned)w.channel);
   char ap_ip[16];network::formatIpv4(w.ap_ipv4,ap_ip,sizeof(ap_ip));
-  Serial.printf("WIFI_RADIO bssid=%s mode=%s profile=%u source=%s disconnect_reason=%u bandwidth=%u\n",w.bssid,w.ap_active?"APSTA":(w.enabled?"STA":"OFF"),w.active_profile,w.nvs_active?"NVS":"COMPILE_FALLBACK",w.disconnect_reason,w.bandwidth_mhz);
+  // mode= is what the driver itself reports, not an inference from the phase.
+  const char* driver_mode = w.driver_mode==0?"OFF":w.driver_mode==1?"STA":w.driver_mode==2?"AP":w.driver_mode==3?"APSTA":"UNKNOWN";
+  Serial.printf("WIFI_RADIO bssid=%s mode=%s profile=%u source=%s disconnect_reason=%u bandwidth=%u\n",w.bssid,driver_mode,w.active_profile,w.nvs_active?"NVS":"COMPILE_FALLBACK",w.disconnect_reason,w.bandwidth_mhz);
   Serial.printf("WIFI_AP active=%s ssid=%s ip=%s clients=%u provisioned=%s admin=%s\n",w.ap_active?"YES":"NO",w.ap_ssid,ap_ip,w.ap_clients,w.ap_provisioned?"YES":"NO",w.admin_provisioned?"YES":"NO");
   Serial.printf("WIFI_SLEEP configured=%u effective=%s apply_ok=%s usb_session=UNPROVEN fallback=NO_SLEEP\n",w.sleep_configured,w.sleep_effective?"ON":"OFF",w.sleep_apply_ok?"YES":"NO");
-  Serial.printf("WIFI_CONFIG_TX phase=%s busy=%s error=%ld\n",network::toString(w.config_phase),w.config_busy?"YES":"NO",(long)w.config_error);
+  // active= is the administrative phase. A network can be on the air while
+  // administration is closed, and the reverse; both are stated explicitly.
+  Serial.printf("WIFI_ADMIN phase=%s driver_ap_started=%s driver_sta_started=%s ap_profile_verified=%s portal=%s web_manual_stop=%s\n",
+                network::toString(static_cast<network::NetworkPhase>(w.admin_phase)),
+                w.driver_ap_started?"YES":"NO",w.driver_sta_started?"YES":"NO",
+                w.ap_config_verified?"YES":"NO",
+                modules_.http_transport && modules_.http_transport->started()?"LISTENING":"CLOSED",
+                modules_.http_transport && modules_.http_transport->manuallyStopped()?"YES":"NO");
+  const char* fault_event = w.fault_event==1?"AP_STOP":w.fault_event==2?"STA_START":w.fault_event==4?"STA_STOP":w.fault_event==8?"AP_START":"NONE";
+  Serial.printf("WIFI_FAULT site=%s event=%s armed=0x%02X count=%lu last=%s\n",
+                network::toString(static_cast<network::FaultSite>(w.fault_site)),fault_event,
+                (unsigned)w.fault_expected,(unsigned long)w.fault_count,
+                network::toString(static_cast<network::FaultSite>(w.last_fault_site)));
+  // seq/kind/result identify WHICH request this outcome belongs to.
+  Serial.printf("WIFI_CONFIG_TX phase=%s busy=%s error=%ld seq=%lu kind=%s result=%s\n",network::toString(w.config_phase),w.config_busy?"YES":"NO",(long)w.config_error,
+                (unsigned long)w.tx_seq,w.tx_seq?network::WifiManager::requestKindName(w.tx_kind):"NONE",
+                network::toString(static_cast<network::TxResult>(w.tx_result)));
+  Serial.printf("WIFI_REQUEST_LAST post=%s seq=%lu\n",network::toString(modules_.wifi->lastPost()),(unsigned long)modules_.wifi->lastPostSeq());
   Serial.printf("WIFI_SCAN running=%s count=%u starts=%lu failures=%lu inhibited=%lu roam=%lu\n",w.scan_running?"YES":"NO",w.scan_count,(unsigned long)w.scan_starts,(unsigned long)w.scan_failures,(unsigned long)w.scan_inhibited,(unsigned long)w.roam_count);
   Serial.printf("WIFI_WORKER max_us=%lu stack_free=%lu\n",(unsigned long)w.worker_max_us,(unsigned long)w.worker_stack_free);
   Serial.printf("WIFI_PERFORMANCE roam_enabled=%s threshold=%d hysteresis=%u scan_ms=%lu dwell_ms=%lu bandwidth_configured=%u bandwidth_apply_ok=%s\n",

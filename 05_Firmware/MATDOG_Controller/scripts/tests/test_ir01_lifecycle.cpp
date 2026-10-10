@@ -83,9 +83,15 @@ esp_err_t esp_wifi_get_mac(wifi_interface_t, uint8_t *m) {
   std::memcpy(m, mac, 6);
   return 0;
 }
-esp_err_t esp_wifi_set_config(wifi_interface_t, const wifi_config_t *c) {
+esp_err_t esp_wifi_set_config(wifi_interface_t i, const wifi_config_t *c) {
+  if (i == WIFI_IF_AP) return WiFi.setApConfig(c);
   CHECK(!c->sta.bssid_set);
   WiFi.driver = *c;
+  return 0;
+}
+esp_err_t esp_wifi_get_config(wifi_interface_t i, wifi_config_t *c) {
+  if (i == WIFI_IF_AP) return WiFi.getApConfig(c);
+  *c = WiFi.driver;
   return 0;
 }
 esp_err_t esp_wifi_connect() {
@@ -300,11 +306,21 @@ void negatives() {
   WifiRuntimeTest::tick(n,100); WifiRuntimeTest::tick(n,200);
   CHECK(n.adminAccess().phase.load()==NetworkPhase::ENTER_ADMIN);
   CHECK(n.adminAccess().generation()==0);
+  // The role change is acknowledged; the first AP profile of this driver is a
+  // second owned command. Writing it restarts the soft-AP inside the driver
+  // (AP_STOP then AP_START), and that pair must be acknowledged as well.
   WiFi.drainEvents(); WifiRuntimeTest::tick(n,250);
+  CHECK(n.adminAccess().phase.load()==NetworkPhase::ENTER_ADMIN);
+  CHECK(n.adminAccess().generation()==0 && WiFi.ap_set_calls==1);
+  CHECK(WiFi.pending_events.size()==2);
+  CHECK(WiFi.pending_events[0]==ARDUINO_EVENT_WIFI_AP_STOP);
+  CHECK(WiFi.pending_events[1]==ARDUINO_EVENT_WIFI_AP_START);
+  WifiRuntimeTest::tick(n,280); CHECK(n.adminAccess().generation()==0);
+  WiFi.drainEvents(); WifiRuntimeTest::tick(n,300);
   CHECK(n.adminAccess().allowed(n.adminAccess().generation()));
   WiFi.callback(ARDUINO_EVENT_WIFI_AP_START,{}); // duplicate after acknowledgment
   CHECK(!n.adminAccess().allowed(n.adminAccess().generation()));
-  WifiRuntimeTest::tick(n,300); CHECK(n.adminAccess().phase.load()==NetworkPhase::FAULT);
+  WifiRuntimeTest::tick(n,350); CHECK(n.adminAccess().phase.load()==NetworkPhase::FAULT);
   // Missing close acknowledgment: no new command/generation, bounded fault.
   seed(); WifiManager missing; WifiRuntimeTest::initialize(missing); enter(missing,50);
   auto gen=missing.adminAccess().generation(); WiFi.deliver_events=false;

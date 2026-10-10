@@ -64,6 +64,7 @@ public:
   void stop();
   bool started() const { return listening_.load(); }
   bool tlsStarted() const { return tls_listening_.load(); }
+  bool manuallyStopped() const { return manual_stop_.load(); }
   void update(uint32_t now_ms);
 
 private:

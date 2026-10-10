@@ -82,9 +82,15 @@ esp_err_t esp_wifi_get_mac(wifi_interface_t, uint8_t *m) {
   std::memcpy(m, mac, 6);
   return 0;
 }
-esp_err_t esp_wifi_set_config(wifi_interface_t, const wifi_config_t *c) {
+esp_err_t esp_wifi_set_config(wifi_interface_t i, const wifi_config_t *c) {
+  if (i == WIFI_IF_AP) return WiFi.setApConfig(c);
   CHECK(!c->sta.bssid_set);
   WiFi.driver = *c;
+  return 0;
+}
+esp_err_t esp_wifi_get_config(wifi_interface_t i, wifi_config_t *c) {
+  if (i == WIFI_IF_AP) return WiFi.getApConfig(c);
+  *c = WiFi.driver;
   return 0;
 }
 esp_err_t esp_wifi_connect() {
