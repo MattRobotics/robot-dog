@@ -3,12 +3,14 @@
 #include <esp_heap_caps.h>
 #include <esp_https_server.h>
 #include <esp_random.h>
+#include <esp_timer.h>
 #include <freertos/task.h>
 #include <lwip/sockets.h>
 
 #include "../config/TlsIdentity.h"
 #include "../update/Sha256.h"
 #include "PortalPage.h"
+#include "WifiManager.h"
 
 namespace matdog {
 namespace network {
@@ -33,18 +35,46 @@ bool readHexHeader(httpd_req_t *req, const char *field, uint8_t *out,
   return update::parseHex(buf, need, out);
 }
 
+// HTTPD uses a dual-stack listener with this ESP32 core. lwIP reports IPv4
+// connections on it as sockaddr_in6 with an IPv4-mapped address, not sockaddr_in.
+// Accept only actual IPv4 endpoints; native IPv6 cannot establish AP authority
+// or be reduced to the 32-bit peer identity used by PortalSession.
+bool socketIpv4(const sockaddr_storage &address, socklen_t size,
+                uint32_t &ip, uint16_t &port) {
+  if (address.ss_family == AF_INET && size >= sizeof(sockaddr_in)) {
+    sockaddr_in v4{};
+    memcpy(&v4, &address, sizeof(v4));
+    ip = v4.sin_addr.s_addr;
+    port = ntohs(v4.sin_port);
+    return true;
+  }
+  if (address.ss_family == AF_INET6 && size >= sizeof(sockaddr_in6)) {
+    sockaddr_in6 v6{};
+    memcpy(&v6, &address, sizeof(v6));
+    if (!IN6_IS_ADDR_V4MAPPED(&v6.sin6_addr))
+      return false;
+    memcpy(&ip, &v6.sin6_addr.s6_addr[12], sizeof(ip));
+    port = ntohs(v6.sin6_port);
+    return true;
+  }
+  return false;
+}
 bool socketFacts(httpd_req_t *req, HttpTransportRequest &r) {
-  sockaddr_in local{}, peer{};
+  sockaddr_storage local{}, peer{};
   socklen_t n = sizeof(local);
   int fd = httpd_req_to_sockfd(req);
-  if (getsockname(fd, reinterpret_cast<sockaddr *>(&local), &n) != 0)
+  uint32_t local_ip = 0, peer_ip = 0;
+  uint16_t local_port = 0, peer_port = 0;
+  if (getsockname(fd, reinterpret_cast<sockaddr *>(&local), &n) != 0 ||
+      !socketIpv4(local, n, local_ip, local_port))
     return false;
   n = sizeof(peer);
-  if (getpeername(fd, reinterpret_cast<sockaddr *>(&peer), &n) != 0)
+  if (getpeername(fd, reinterpret_cast<sockaddr *>(&peer), &n) != 0 ||
+      !socketIpv4(peer, n, peer_ip, peer_port))
     return false;
-  r.ap_socket = ntohl(local.sin_addr.s_addr) == 0xc0a80401u;
-  r.peer = peer.sin_addr.s_addr;
-  r.tls = ntohs(local.sin_port) == 443;
+  r.ap_socket = ntohl(local_ip) == 0xc0a80401u;
+  r.peer = peer_ip;
+  r.tls = local_port == 443;
   char host[64]{}, origin[64]{};
   httpd_req_get_hdr_value_str(req, "Host", host, sizeof(host));
   httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin));
@@ -98,6 +128,8 @@ bool HttpTransport::start() {
   return true;
 }
 void HttpTransport::stop() {
+  service_->networkAdminAccess().revoke();
+  service_->networkAdminAccess().radio_fault.store(true);
   manual_stop_.store(true);
   desired_.store(false);
   tls_desired_.store(false);
@@ -105,7 +137,7 @@ void HttpTransport::stop() {
 void HttpTransport::lifecycleEntry(void *self) {
   static_cast<HttpTransport *>(self)->lifecycle();
 }
-bool HttpTransport::registerHandlers(httpd_handle_t server) {
+bool HttpTransport::registerHandlers(httpd_handle_t server, bool admin) {
   const httpd_uri_t uris[] = {
       {"/status", HTTP_GET, &HttpTransport::handleStatus, this},
       {"/ota/challenge", HTTP_GET, &HttpTransport::handleOtaChallenge, this},
@@ -117,13 +149,28 @@ bool HttpTransport::registerHandlers(httpd_handle_t server) {
       {"/wifi/config", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/wifi/scan", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/wifi/ap", HTTP_POST, &HttpTransport::handleWifi, this}};
-  for (const auto &uri : uris)
-    if (httpd_register_uri_handler(server, &uri) != ESP_OK)
-      return false;
+  for (const auto &uri : uris) {
+    if (!admin && (strcmp(uri.uri, "/") == 0 || strncmp(uri.uri, "/wifi/", 6) == 0)) continue;
+    if (httpd_register_uri_handler(server, &uri) != ESP_OK) return false;
+  }
   return true;
 }
 void HttpTransport::lifecycle() {
-  for (;;) {
+  for (;;) { lifecycleTick(); vTaskDelay(pdMS_TO_TICKS(50)); }
+}
+void HttpTransport::lifecycleTick() {
+  auto &gate = service_->networkAdminAccess();
+  AdminLease drain(gate);
+  if (!drain) return;
+  const auto phase = gate.phase.load();
+  if (phase == NetworkPhase::ADMIN_AP && !WifiManager::verifyAdminRadio()) {
+    gate.revoke(); gate.radio_fault.store(true);
+  }
+  desired_.store(!manual_stop_.load() && !gate.closing.load() &&
+                 phase == NetworkPhase::ADMIN_AP &&
+                 gate.allowed(gate.generation()) && WifiManager::verifyAdminRadio());
+  if (phase != NetworkPhase::CLIENT_STA || gate.closing.load()) tls_desired_.store(false);
+  if (desired_.load() || tls_desired_.load()) gate.listeners_closed.store(false);
     if (desired_.load() && !server_) {
       httpd_config_t c = HTTPD_DEFAULT_CONFIG();
       c.stack_size = 24576;
@@ -133,8 +180,8 @@ void HttpTransport::lifecycle() {
       c.send_wait_timeout = 3;
       c.task_priority = 2;
       if (httpd_start(&server_, &c) == ESP_OK && !registerHandlers(server_)) {
-        httpd_stop(server_);
-        server_ = nullptr;
+        if (httpd_stop(server_) == ESP_OK) server_ = nullptr;
+        else { gate.revoke(); gate.phase.store(NetworkPhase::FAULT); }
       }
       listening_.store(server_ != nullptr);
     }
@@ -153,24 +200,25 @@ void HttpTransport::lifecycle() {
       c.prvtkey_pem = reinterpret_cast<const uint8_t *>(config::kTlsPrivateKey);
       c.prvtkey_len = sizeof(config::kTlsPrivateKey);
       if (httpd_ssl_start(&tls_server_, &c) == ESP_OK &&
-          !registerHandlers(tls_server_)) {
-        httpd_ssl_stop(tls_server_);
-        tls_server_ = nullptr;
+          !registerHandlers(tls_server_, false)) {
+        if (httpd_ssl_stop(tls_server_) == ESP_OK) tls_server_ = nullptr;
+        else { gate.revoke(); gate.phase.store(NetworkPhase::FAULT); }
       }
       tls_listening_.store(tls_server_ != nullptr);
     }
     if (!desired_.load() && server_) {
-      httpd_stop(server_);
-      server_ = nullptr;
-      listening_.store(false);
+      if (httpd_stop(server_) == ESP_OK) { server_ = nullptr; listening_.store(false); }
     }
     if (!tls_desired_.load() && tls_server_) {
-      httpd_ssl_stop(tls_server_);
-      tls_server_ = nullptr;
-      tls_listening_.store(false);
+      if (httpd_ssl_stop(tls_server_) == ESP_OK) { tls_server_ = nullptr; tls_listening_.store(false); }
     }
-    vTaskDelay(pdMS_TO_TICKS(250));
-  }
+  if (gate.closing.load() && !server_ && !tls_server_)
+    gate.listeners_closed.store(true); // successful stops, never a timeout
+}
+bool HttpTransport::admitAdmin(HttpTransportRequest &request) {
+  auto &gate = service_->networkAdminAccess();
+  request.admin_generation = gate.generation();
+  return gate.allowed(request.admin_generation) && WifiManager::verifyAdminRadio();
 }
 bool HttpTransport::dispatch(const HttpTransportRequest &request,
                              HttpTransportResponse *response) {
@@ -178,6 +226,11 @@ bool HttpTransport::dispatch(const HttpTransportRequest &request,
     return false;
   xSemaphoreTake(response_ready_,
                  0); // drain prior late wake; IDs remain authoritative
+  if (request.kind >= HttpRequestKind::WIFI_STATUS &&
+      (!service_->networkAdminAccess().allowed(request.admin_generation) ||
+       !WifiManager::verifyAdminRadio())) {
+    xSemaphoreGive(slot_free_); return false;
+  }
   pending_request_ = request;
   const uint32_t id = sequence_.fetch_add(1) + 1;
   pending_request_.sequence = id;
@@ -210,11 +263,11 @@ void HttpTransport::update(uint32_t now_ms) {
     portal_.reset();
     memcpy(previous_admin_digest_, service_->networkAdminDigest(), 32);
   }
-  if (!manual_stop_.load() && (service_->wifiStatus().ap_active &&
-                               service_->wifiStatus().admin_provisioned))
-    desired_.store(true);
+  auto &gate = service_->networkAdminAccess();
+  if (!gate.allowed(portal_generation_)) { portal_.reset(); portal_generation_ = 0; }
   tls_desired_.store(
-      !manual_stop_.load() && config::kTlsIdentityPresent &&
+      !manual_stop_.load() && !gate.closing.load() &&
+      gate.phase.load() == NetworkPhase::CLIENT_STA && config::kTlsIdentityPresent &&
       (service_->remoteUpdateAllowed() ||
        (session_.sessionAuthenticated() && service_->wifiStatus().connected)));
   if (session_.sessionAuthenticated() &&
@@ -239,6 +292,16 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   const HttpTransportRequest &req = pending_request_;
   resp.sequence = req.sequence;
 
+  auto &gate = service_->networkAdminAccess();
+  const bool admin_request = req.kind >= HttpRequestKind::WIFI_STATUS;
+  AdminLease lease(gate);
+  if (admin_request && (!lease || !gate.allowed(req.admin_generation) ||
+                        !WifiManager::verifyAdminRadio())) {
+    resp.message = "ADMIN_AP_REQUIRED"; return;
+  }
+  if (admin_request && portal_generation_ != req.admin_generation) {
+    portal_.reset(); portal_generation_ = req.admin_generation;
+  }
   switch (req.kind) {
   case HttpRequestKind::WEB_STATUS: {
     // Read-only. Every field below is a ControllerService accessor — see
@@ -327,8 +390,9 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     uint8_t random[64];
     esp_fill_random(random, sizeof(random));
     resp.ok = req.local_authorized &&
-              portal_.login(now_ms, req.peer, req.login,
-                            service_->networkAdminDigest(), random);
+              portal_.login(static_cast<uint64_t>(esp_timer_get_time()) / 1000,
+                            req.peer, req.login,
+                            gate.digest(), random);
     resp.message = resp.ok ? "OK" : "AUTH_FAILED";
     if (resp.ok) {
       strcpy(resp.cookie, portal_.cookie());
@@ -341,7 +405,8 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   case HttpRequestKind::WIFI_SCAN:
   case HttpRequestKind::WIFI_AP: {
     if (!req.local_authorized ||
-        !portal_.authorize(now_ms, req.peer, req.cookie, req.csrf)) {
+        !portal_.authorize(static_cast<uint64_t>(esp_timer_get_time()) / 1000,
+                           req.peer, req.cookie, req.csrf)) {
       resp.message = "AUTH_FAILED";
       break;
     }
@@ -350,14 +415,20 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
       resp.message = "OTA_BUSY";
       break;
     }
+    if (!gate.allowed(req.admin_generation) || !WifiManager::verifyAdminRadio()) {
+      resp.message = "ADMIN_REVOKED"; break;
+    }
+    if (req.kind == HttpRequestKind::WIFI_SCAN) {
+      resp.message = "SCAN_DISABLED_ADMIN_AP"; break;
+    }
     if (req.kind == HttpRequestKind::WIFI_CONFIG)
-      resp.ok = service_->configureNetwork(req.patch);
+      resp.ok = service_->configureNetwork(req.patch, req.admin_generation);
     if (req.kind == HttpRequestKind::WIFI_SCAN)
       resp.ok = service_->scanNetwork();
     if (req.kind == HttpRequestKind::WIFI_AP)
-      resp.ok = service_->accessPoint(req.ap_on);
+      resp.ok = service_->accessPoint(req.ap_on, req.admin_generation);
     resp.message =
-        resp.ok ? (req.kind == HttpRequestKind::WIFI_CONFIG ? "CONFIG_PENDING"
+        resp.ok ? (req.kind == HttpRequestKind::WIFI_CONFIG ? "ADMIN_CLOSING_STA_TEST_RELOGIN_REQUIRED"
                                                             : "QUEUED")
                 : "REFUSED_BUSY_OR_RECOVERY";
     break;
@@ -597,7 +668,7 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
   jsonString(w.ap_ssid, ap, sizeof(ap));
   int n = snprintf(
       resp.text, sizeof(resp.text),
-      "{\"build_id\":\"%s\",\"ota_ingest\":%u,\"tls\":%s,\"connected\":%s,"
+      "{\"network_phase\":\"%s\",\"admin_generation\":%lu,\"build_id\":\"%s\",\"ota_ingest\":%u,\"tls\":%s,\"connected\":%s,"
       "\"ssid\":\"%s\","
       "\"bssid\":\"%s\",\"ip\":\"%s\",\"rssi\":%ld,\"channel\":%u,\"ap_"
       "active\":%s,\"ap_ssid\":\"%"
@@ -614,6 +685,8 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
       "us\":%lu,\"worker_stack_free\":%lu,\"heap_free\":%lu,\"heap_min\":%lu,"
       "\"scan_starts\":%lu,"
       "\"scan_inhibited\":%lu,\"roams\":%lu,\"profiles\":[",
+      toString(service_->networkAdminAccess().phase.load()),
+      (unsigned long)service_->networkAdminAccess().generation(),
       build::kBuildId, update::OtaManager::ingestEnabled() ? 1 : 0,
       tlsStarted() ? "true" : "false", w.connected ? "true" : "false", ssid,
       bssid, ip, (long)w.rssi_dbm, w.channel, w.ap_active ? "true" : "false",
@@ -697,6 +770,10 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
   resp.message = "OK";
 }
 esp_err_t HttpTransport::handlePage(httpd_req_t *req) {
+  auto *self = static_cast<HttpTransport *>(req->user_ctx);
+  HttpTransportRequest r{};
+  if (!self->admitAdmin(r))
+    return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "ADMIN_AP_REQUIRED");
   httpd_resp_set_type(req, "text/html; charset=utf-8");
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
   httpd_resp_set_hdr(req, "X-Frame-Options", "DENY");
@@ -713,6 +790,8 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   HttpTransportRequest r{};
   if (!socketFacts(req, r))
     return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "Socket unavailable");
+  if (!self->admitAdmin(r))
+    return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "ADMIN_AP_REQUIRED");
   if (req->method == HTTP_GET)
     r.kind = HttpRequestKind::WIFI_STATUS;
   else {

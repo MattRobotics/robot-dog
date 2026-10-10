@@ -25,3 +25,7 @@ esp_err_t esp_wifi_set_ps(wifi_ps_type_t);
 esp_err_t esp_wifi_get_ps(wifi_ps_type_t *);
 esp_err_t esp_wifi_set_bandwidth(wifi_interface_t, wifi_bandwidth_t);
 esp_err_t esp_wifi_get_bandwidth(wifi_interface_t, wifi_bandwidth_t *);
+
+enum wifi_mode_t { WIFI_MODE_NULL=0, WIFI_MODE_STA=1, WIFI_MODE_AP=2, WIFI_MODE_APSTA=3 };
+constexpr int ESP_ERR_WIFI_NOT_CONNECT=-20, ESP_ERR_WIFI_CONN=-21, ESP_ERR_WIFI_NOT_INIT=-22;
+esp_err_t esp_wifi_get_mode(wifi_mode_t*);

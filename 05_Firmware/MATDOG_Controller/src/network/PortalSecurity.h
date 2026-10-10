@@ -17,17 +17,19 @@ struct ConfigPatch {
 bool parseConfigForm(const char *body, size_t length, ConfigPatch *patch);
 class PortalSession {
 public:
-  bool login(uint32_t now, uint32_t peer, const char *supplied,
+  bool login(uint64_t now, uint32_t peer, const char *supplied,
              const uint8_t digest[32], const uint8_t random[64]);
-  bool authorize(uint32_t now, uint32_t peer, const char *cookie,
-                 const char *csrf) const;
+  bool authorize(uint64_t now, uint32_t peer, const char *cookie,
+                 const char *csrf);
   const char *cookie() const { return cookie_; }
   const char *csrf() const { return csrf_; }
   void reset() { active_ = false; }
 
 private:
   bool active_ = false, attempted_ = false;
-  uint32_t issued_ = 0, last_attempt_ = 0, peer_ = 0;
+  // Monotonic milliseconds from esp_timer, never a widened millis() sample.
+  uint64_t issued_ = 0, last_attempt_ = 0;
+  uint32_t peer_ = 0;
   uint8_t failures_ = 0;
   char cookie_[65]{}, csrf_[65]{};
 };

@@ -176,12 +176,13 @@ class ControllerService {
     return !networkCritical() && !modules_.wifi->configBusy() && wifiStatus().connected &&
            wifiStatus().nvs_active && wifiStatus().admin_provisioned;
   }
-  bool configureNetwork(const network::ConfigPatch& p) {
-    return !networkCritical() && modules_.wifi->configure(p);
+  network::AdminAccess &networkAdminAccess() { return modules_.wifi->adminAccess(); }
+  bool configureNetwork(const network::ConfigPatch& p, uint32_t generation = 0) {
+    return !networkCritical() && modules_.wifi->configure(p, generation);
   }
   bool scanNetwork() { return !networkCritical() && modules_.wifi->requestScan(); }
-  bool accessPoint(bool on) {
-    return !networkCritical() && !modules_.wifi->configBusy() && modules_.wifi->requestAp(on);
+  bool accessPoint(bool on, uint32_t generation = 0) {
+    return !networkCritical() && !modules_.wifi->configBusy() && modules_.wifi->requestAp(on, generation);
   }
   const uint8_t* networkAdminDigest() const { return modules_.wifi->adminDigest(); }
 

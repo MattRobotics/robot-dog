@@ -2,6 +2,7 @@
 #define MATDOG_NETWORK_WIFI_MANAGER_H
 #include <atomic>
 
+#include "AdminAccess.h"
 #include "NetworkConfigNvs.h"
 #include "NetworkPolicy.h"
 #include "PortalSecurity.h"
@@ -20,11 +21,13 @@ public:
   void update(uint32_t now_ms);
   bool setEnabled(bool enabled, uint32_t now_ms);
   bool requestScan();
-  bool requestAp(bool on);
+  bool requestAp(bool on, uint32_t generation = 0);
   bool setSleep(uint8_t preference);
   bool provisionAp(const char *password);
   bool provisionAdmin(const char *token);
-  bool configure(const ConfigPatch &patch);
+  bool configure(const ConfigPatch &patch, uint32_t generation = 0);
+  AdminAccess &adminAccess() { return admin_; }
+  static bool verifyAdminRadio();
   bool configBusy() const { return config_busy_.load(); }
   void setContext(bool critical, bool ota) {
     context_.store((critical ? 1u : 0u) | (ota ? 2u : 0u));
@@ -49,6 +52,7 @@ private:
   };
   struct Request {
     RequestKind kind{};
+    uint32_t generation = 0;
     bool on = false;
     uint8_t preference = 0;
     char secret[65]{};
@@ -63,9 +67,22 @@ private:
   void issueConnect(uint32_t now);
   void startAp(uint32_t now);
   void stopAp();
+  void transitionTick(uint32_t now);
+  bool changeMode(uint8_t mode, uint32_t now);
+  void observeRadioEvent(int event);
+  std::atomic<uint8_t> expected_events_{0};
+  uint32_t event_since_ = 0;
+  bool leave_command_issued_ = false;
+  void leaveAdmin(bool return_admin, uint32_t now);
   void scan(uint32_t now, bool roaming);
   void publishPolicyState();
   void refreshSnapshot(uint32_t now, bool link_up);
+  AdminAccess admin_{};
+  bool ap_command_issued_ = false;
+  bool transition_admin_ = false, intent_pending_ = false, return_admin_ = false;
+  NetworkConfig intent_{};
+  uint8_t intent_profile_ = 0;
+  uint32_t intent_since_ = 0;
   WifiPolicy policy_{};
   NetworkConfigNvs storage_{};
   ConfigTransaction transaction_{};

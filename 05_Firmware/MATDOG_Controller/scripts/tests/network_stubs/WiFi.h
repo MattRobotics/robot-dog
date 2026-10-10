@@ -3,9 +3,10 @@
 #include <cstdint>
 #include <functional>
 #include <string>
-constexpr int WIFI_STA = 1, WIFI_AP_STA = 3, WIFI_OFF = 0, WL_CONNECTED = 3,
+#include <vector>
+constexpr int WIFI_STA = 1, WIFI_AP = 2, WIFI_AP_STA = 3, WIFI_OFF = 0, WL_CONNECTED = 3,
               WIFI_SCAN_RUNNING = -1, INADDR_NONE = -1;
-constexpr int ARDUINO_EVENT_WIFI_STA_DISCONNECTED = 1;
+constexpr int ARDUINO_EVENT_WIFI_STA_DISCONNECTED = 1, ARDUINO_EVENT_WIFI_AP_STOP = 2, ARDUINO_EVENT_WIFI_STA_START = 3, ARDUINO_EVENT_WIFI_STA_STOP = 4, ARDUINO_EVENT_WIFI_AP_START = 5;
 using WiFiEvent_t = int;
 struct WiFiEventInfo_t {
   struct {
@@ -24,6 +25,14 @@ private:
   uint32_t v_;
 };
 struct WifiStub {
+  struct Interface { bool running=false; bool started() const {return running;} };
+  Interface AP, STA;
+  int mode_value = WIFI_STA;
+  bool mode_read_ok=true, mode_write_ok=true;
+  bool deliver_events = true;
+  std::vector<int> pending_events;
+  void emit(int event) { if (deliver_events && callback) callback(event,{}); else pending_events.push_back(event); }
+  void drainEvents() { auto events=pending_events; pending_events.clear(); for(int e:events) if(callback) callback(e,{}); }
   bool connected = false, delayed_disconnect = false, ap = false,
        persistent_setting = true, reconnect = true;
   int channel_value = 1, clients = 0, scan_state = -2, scan_calls = 0,
@@ -38,10 +47,17 @@ struct WifiStub {
     callback = f;
   }
   bool mode(int v) {
-    if (v == WIFI_OFF) {
-      connected = false;
-      ap = false;
-    }
+    if (!mode_write_ok) return false;
+    const int old = mode_value;
+    const bool sta_started = STA.running;
+    mode_value = v; STA.running = (v & WIFI_STA) != 0;
+    AP.running = (v & WIFI_AP) != 0 && ap;
+    if (!(v & WIFI_STA)) { connected=false; ip=0; }
+    if (!(v & WIFI_AP)) { ap=false; AP.running=false; }
+    if ((old & WIFI_AP) && !(v & WIFI_AP)) emit(ARDUINO_EVENT_WIFI_AP_STOP);
+    if ((old & WIFI_STA) && !(v & WIFI_STA)) emit(ARDUINO_EVENT_WIFI_STA_STOP);
+    if ((v & WIFI_STA) && (!(old & WIFI_STA) || !sta_started)) emit(ARDUINO_EVENT_WIFI_STA_START);
+    if ((v & WIFI_AP) && !(old & WIFI_AP)) emit(ARDUINO_EVENT_WIFI_AP_START);
     return true;
   }
   int status() { return connected ? WL_CONNECTED : 0; }
@@ -59,7 +75,7 @@ struct WifiStub {
   }
   bool softAPConfig(IPAddress, IPAddress, IPAddress) { return true; }
   bool softAP(const char *s, const char *p, int, bool, int) {
-    ap = true;
+    ap = true; AP.running=true;
     ap_name = s;
     ap_key = p;
     return true;

@@ -38,7 +38,7 @@ struct HttpTransportRequest {
   uint8_t chunk_data[kHttpChunkBufferBytes]{};
   uint32_t chunk_len = 0;
   bool local_authorized = false, tls = false, ap_socket = false, ap_on = false;
-  uint32_t peer = 0;
+  uint32_t peer = 0, admin_generation = 0;
   char cookie[65]{}, csrf[65]{}, login[65]{};
   ConfigPatch patch{};
 };
@@ -74,7 +74,10 @@ private:
   static esp_err_t handleWifi(httpd_req_t *req);
   static void lifecycleEntry(void *self);
   void lifecycle();
-  bool registerHandlers(httpd_handle_t server);
+  void lifecycleTick();
+  bool admitAdmin(HttpTransportRequest &request);
+  uint32_t portal_generation_ = 0;
+  bool registerHandlers(httpd_handle_t server, bool admin = true);
   bool dispatch(const HttpTransportRequest &request,
                 HttpTransportResponse *response);
   void serviceRequest(uint32_t now_ms);

@@ -41,6 +41,15 @@ class NetworkAuditTest(unittest.TestCase):
           ('CommandRouter.cpp','(WIFI command redacted)','LEAK'),
           ('ControllerService.h','networkCritical()','bypassCritical()'),
         ]
+        mutations += [
+          ('WifiManager.cpp','mode == WIFI_MODE_AP','mode == WIFI_MODE_APSTA'),
+          ('WifiManager.cpp','AdminLease lease(admin_)','RemovedLease lease(admin_)'),
+          ('WifiManager.cpp','admin_.allowed(r.generation)','true'),
+          ('HttpTransport.cpp','httpd_stop(server_) == ESP_OK','true'),
+          ('HttpTransport.cpp','httpd_ssl_stop(tls_server_) == ESP_OK','true'),
+          ('HttpTransport.cpp','self->admitAdmin(r)','true'),
+          ('HttpTransport.cpp','gate.allowed(req.admin_generation)','true'),
+        ]
         for mutation in mutations:
             with self.subTest(mutation=mutation):self.assertTrue(self.check(mutation))
     def test_second_writer(self):

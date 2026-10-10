@@ -6210,6 +6210,8 @@ def check_network_v3_boundaries(files, sketch_dir):
       "NetworkConfig.cpp": ('phase_=ConfigPhase::ROLLBACK','storage_->pending(c)','storage_->activate(candidate_)','!alt','critical','crc(b,n-4)'),
       "WifiManager.cpp": ('xTaskCreatePinnedToCore','xQueueCreate(1,sizeof(Request))','config_busy_.exchange(true)','modemSleep(sleep)','if(worker_status_.scan_running && context_.load()){esp_wifi_scan_stop()','drv.sta.bssid_set=false','test_fresh_&&link_up'),
       "HttpTransport.cpp": ('req.local_authorized','portal_.authorize','!req.tls || req.ap_socket','!service_->remoteUpdateAllowed()','session_.timedOut(now_ms)','mailbox_.claimDelivery()','ready_sequence_.load()==id','httpd_ssl_start','manual_stop_'),
+      "AdminAccess.cpp": ('xSemaphoreTake(static_cast<SemaphoreHandle_t>(mutex_),0)',),
+      "AdminAccess.h": ('class AdminLease','admitted_.store(false)','listeners_closed.store(false)','g==generation_.load()'),
       "ControllerService.h": ('OperatingMode::MAINTENANCE','bool networkCritical() const','configBusy()','sessionLive()'),
       "CommandRouter.cpp": ('(WIFI command redacted)','NETWORK_CONFIG_BUSY'),
       "PortalSecurity.cpp": ('return ap&&host&&origin','strcmp(host,"192.168.4.1")','portalOrigin','peer==peer_','now-issued_<300000','tokenEqual(cookie,cookie_)','tokenEqual(csrf,csrf_)','seen&(1ull<<field)'),
@@ -6237,6 +6239,25 @@ def check_network_v3_boundaries(files, sketch_dir):
     if "sleep.session_trusted=" in re.sub(r"\s+","",manager):fail("HWCDC adapter must keep session_trusted false until qualified")
     if sum(1 for _ in re.finditer(r"!req\.tls\s*\|\|\s*req\.ap_socket",transport))<2:
         fail("Challenge and begin both require TLS and STA socket provenance")
+    for token in ("AdminLease lease(admin_)", "admin_.allowed(r.generation)",
+                  "mode==WIFI_MODE_AP", "!WiFi.STA.started()", "admin_.listeners_closed.load()",
+                  "admin_.phase.load()!=NetworkPhase::CLIENT_STA", "intent_pending_", "admin_.revoke()"):
+        if not contains_v3(manager,token):fail("AP-only manager invariant missing: "+token)
+    compact_manager=re.sub(r"\s+","",manager)
+    compact_transport=re.sub(r"\s+","",transport)
+    for code,token,count in ((compact_manager,"AdminLeaselease(admin_)",2),
+                             (compact_manager,"admin_.allowed(r.generation)",2),
+                             (compact_transport,"httpd_stop(server_)==ESP_OK",2),
+                             (compact_transport,"httpd_ssl_stop(tls_server_)==ESP_OK",2),
+                             (compact_transport,"self->admitAdmin(r)",2),
+                             (compact_transport,"gate.allowed(req.admin_generation)",2)):
+        if code.count(token)!=count:fail("AP-only fence coverage changed: "+token)
+    if re.search(r"\b(?:WIFI_AP_STA|WIFI_MODE_APSTA)\b", manager):
+        fail("WifiManager must never restore AP+STA")
+    for token in ("self->admitAdmin(r)", "AdminLease lease(gate)", "gate.allowed(req.admin_generation)",
+                  "httpd_stop(server_)==ESP_OK", "httpd_ssl_stop(tls_server_)==ESP_OK",
+                  "gate.listeners_closed.store(true)", "!registerHandlers(tls_server_,false)", "SCAN_DISABLED_ADMIN_AP"):
+        if not contains_v3(transport,token):fail("AP-only transport invariant missing: "+token)
     ignored=(sketch_dir/".gitignore").read_text()
     if "src/config/TlsIdentity.local.h" not in ignored:fail("TLS identity must be gitignored")
 

@@ -219,8 +219,13 @@ bool parseConfigForm(const char *body, size_t n, ConfigPatch *out) {
   *out = patch;
   return true;
 }
-bool PortalSession::login(uint32_t now, uint32_t peer, const char *supplied,
+bool PortalSession::login(uint64_t now, uint32_t peer, const char *supplied,
                           const uint8_t digest[32], const uint8_t random[64]) {
+  // A regressing clock cannot bypass throttling or preserve an old session.
+  if (attempted_ && now < last_attempt_) {
+    reset();
+    return false;
+  }
   if (attempted_ && now - last_attempt_ < (failures_ >= 5 ? 60000u : 1000u))
     return false;
   attempted_ = true;
@@ -253,9 +258,13 @@ bool PortalSession::login(uint32_t now, uint32_t peer, const char *supplied,
   update::toHex(random + 32, csrf_, sizeof(csrf_));
   return true;
 }
-bool PortalSession::authorize(uint32_t now, uint32_t peer, const char *cookie,
-                              const char *csrf) const {
-  return active_ && now - issued_ < 300000 && peer == peer_ &&
+bool PortalSession::authorize(uint64_t now, uint32_t peer, const char *cookie,
+                              const char *csrf) {
+  // Expiry is irreversible until a fresh authenticated login. Reject a clock
+  // regression too; subtraction must never revive an expired session.
+  if (active_ && !(now >= issued_ && now - issued_ < 300000))
+    reset();
+  return active_ && peer == peer_ &&
          tokenEqual(cookie, cookie_) && tokenEqual(csrf, csrf_);
 }
 } // namespace network

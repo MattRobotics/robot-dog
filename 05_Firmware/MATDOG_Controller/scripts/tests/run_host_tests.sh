@@ -641,12 +641,21 @@ python3 "$SCRIPT_DIR/test_static_audit_startup.py"
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
   -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
   -o "$OUT/test_wifi_runtime_v3" "$SCRIPT_DIR/test_wifi_runtime_v3.cpp" \
-  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/AdminAccess.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
   "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
   "$SKETCH_DIR/src/update/Sha256.cpp"
 "$OUT/test_wifi_runtime_v3"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -pthread \
+  -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_ir01_lifecycle" "$SCRIPT_DIR/test_ir01_lifecycle.cpp" \
+  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/AdminAccess.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+"$OUT/test_ir01_lifecycle"
 python3 "$SCRIPT_DIR/test_ota_tls_client.py"
 python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
+python3 "$SCRIPT_DIR/test_ap_only_transport.py"
+python3 "$SCRIPT_DIR/test_ap_session_clock.py"
 
 # PR-2 (selective dev.1 integration): the pure motion library is integrated, but its
 # execution suites (motion host tests, fresh oracles, audit-tool tests) are DEFERRED
