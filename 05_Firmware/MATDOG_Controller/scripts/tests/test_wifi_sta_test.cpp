@@ -528,7 +528,7 @@ int main() {
     CHECK(activeSsid() == "network");
   }
 
-  // ---- the Wi-Fi form as the portal sends it: router credentials + AP policy ----------------
+  // ---- one form carrying router credentials and the AP preference ---------------------------
   // One request, one transaction: both are stored, or neither.
   const char body[] =
       "p0_ssid=home-router&p0_password=router+secret%21&p0_enabled=1&p0_dhcp=1&p0_ip=0.0.0.0"
@@ -565,8 +565,8 @@ int main() {
     const uint32_t settled = m.adminAccess().generation();
     for (uint32_t t = end + 100; t < end + 5000; t += 500) WifiRuntimeTest::tick(m, t);
     CHECK(m.adminAccess().generation() == settled && m.adminAccess().allowed(settled));
-    // "Always available" refuses AP OFF: the portal cannot be closed by mistake.
-    CHECK(m.requestAp(false) == !success);
+    // In MAINTENANCE the AP is mandatory whatever the stored preference says.
+    CHECK(!m.requestAp(false));
   }
 
   // ---- the report can never carry a passphrase ---------------------------------------------

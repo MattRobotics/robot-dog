@@ -206,7 +206,9 @@ bool WifiManager::requestAp(bool on, uint32_t generation) {
   last_post_seq_ = 0;
   if (configBusy()) { last_post_ = PostResult::BUSY; return false; }
   if (generation && !admin_.allowed(generation)) { last_post_ = PostResult::NOT_ADMITTED; return false; }
-  if (!on && status_.ap_always) { last_post_ = PostResult::INVALID; return false; }
+  // The AP is closed only by the role policy (RUN with a usable router). In
+  // MAINTENANCE it is mandatory, and "AP always" keeps it in RUN as well.
+  if (!on && (status_.ap_always || !run_mode_.load())) { last_post_ = PostResult::INVALID; return false; }
   Request r{};
   r.kind = RequestKind::AP;
   r.generation = generation;
@@ -596,6 +598,7 @@ void WifiManager::transitionTick(uint32_t now) {
       intent_ = NetworkConfig{};
     } else {
       policy_.adoptCredentials(config_.sta[0].enabled || config_.sta[1].enabled, false, now);
+      sta_attempt_base_ = policy_.counters().connect_attempts; // a new router episode
       if (return_admin_) { return_admin_ = false; startAp(now); }
     }
   }
@@ -763,10 +766,8 @@ bool WifiManager::consume(const Request &r, uint32_t now) {
     if (context_.load() || transaction_.busy() || intent_pending_)
       return true;
     if (r.on) {
-      ap_manual_ = true;
       startAp(now);
     } else if (!config_.ap_always) {
-      ap_manual_ = false;
       stopAp();
     }
     return true;
@@ -837,7 +838,6 @@ bool WifiManager::consume(const Request &r, uint32_t now) {
       config_busy_.store(false);
       return true;
     }
-    ap_manual_ = false;
     intent_ = c;
     intent_profile_ = p.test_profile;
     intent_seq_ = r.seq;
@@ -882,10 +882,40 @@ void WifiManager::scan(uint32_t now, bool roaming) {
   } else
     ++worker_status_.scan_failures;
 }
+// The role the operating mode asks for, and the RUN recovery state behind it.
+RoleReason WifiManager::evaluateRole(uint32_t now) {
+  const bool run = run_mode_.load();
+  const bool profile = config_.sta[0].enabled || config_.sta[1].enabled;
+  if (run != last_run_) {
+    // A mode change starts from a clean slate in either direction.
+    last_run_ = run;
+    recovery_ = false;
+    recovery_level_ = 0;
+    link_was_up_ = false;
+    sta_attempt_base_ = policy_.counters().connect_attempts;
+  }
+  // The recovery AP is left only after its wait, and never while somebody is
+  // connected to it. Each failed return doubles the next wait.
+  if (recovery_ &&
+      now - recovery_since_ >= recoveryDwellMs(recovery_level_, config_.ap_timeout_ms) &&
+      (admin_.phase.load() != NetworkPhase::ADMIN_AP || !WiFi.softAPgetStationNum())) {
+    recovery_ = false;
+    if (recovery_level_ < 16) ++recovery_level_;
+    policy_.adoptCredentials(profile, false, now);
+    sta_attempt_base_ = policy_.counters().connect_attempts;
+  }
+  RoleInputs in;
+  in.run = run;
+  in.sta_profile = profile;
+  in.ap_always = config_.ap_always;
+  in.recovery = recovery_;
+  return selectRole(in);
+}
 void WifiManager::workerTick(uint32_t now) {
   if (!enabled_ && admin_.phase.load() == NetworkPhase::CLOSED &&
       now - off_since_ >= 600000) { enabled_ = true; leaveAdmin(false, now); }
   transitionTick(now);
+  role_ = evaluateRole(now);
   if (ap_reload_ && !intent_pending_ && !transaction_.busy() &&
       admin_.phase.load() == NetworkPhase::ADMIN_AP) leaveAdmin(true, now);
   if (intent_pending_ && admin_.phase.load() == NetworkPhase::ADMIN_AP &&
@@ -914,11 +944,11 @@ void WifiManager::workerTick(uint32_t now) {
   if (admin_.phase.load() != NetworkPhase::CLIENT_STA) {
     worker_status_.ap_active = admin_.phase.load() == NetworkPhase::ADMIN_AP;
     worker_status_.ap_reload_pending = ap_reload_;
-    if (worker_status_.ap_active && !config_.ap_always && !configBusy() &&
-        !WiFi.softAPgetStationNum() && now - ap_since_ >= config_.ap_timeout_ms) {
-      ap_manual_ = false;
+    // The AP is left for the router only when the role says so: RUN, an
+    // enabled profile, no recovery wait in force. In MAINTENANCE this is
+    // never true, so no idle timeout can close a maintenance session.
+    if (worker_status_.ap_active && roleIsSta(role_) && !configBusy())
       stopAp();
-    }
     refreshSnapshot(now, false);
     return;
   }
@@ -990,7 +1020,9 @@ void WifiManager::workerTick(uint32_t now) {
         startAp(now);
       }
     }
-  } else if (enabled_) {
+  } else if (enabled_ && roleIsSta(role_)) {
+    // Only the RUN router role connects by itself. In MAINTENANCE a stored
+    // profile is never joined outside the explicit test transaction above.
     const WifiAction action = policy_.update(now, link_up);
     switch (action) {
     case WifiAction::START_RADIO: {
@@ -1001,12 +1033,15 @@ void WifiManager::workerTick(uint32_t now) {
         leaveAdmin(false, now);
       break;
     }
-    case WifiAction::START_CONNECT:
-      if (policy_.counters().connect_timeouts &&
-          config_.sta[1 - profile_].enabled)
-        profile_ = 1 - profile_;
+    case WifiAction::START_CONNECT: {
+      // Every episode starts with the primary profile; the secondary one is
+      // the fallback for the attempt after a failure.
+      const uint8_t primary = config_.sta[0].enabled ? 0 : 1;
+      const uint32_t attempt = policy_.counters().connect_attempts - sta_attempt_base_;
+      profile_ = (attempt % 2 == 0 && config_.sta[1 - primary].enabled) ? 1 - primary : primary;
       connectProfile(now);
       break;
+    }
     case WifiAction::STOP_RADIO:
       link_up = false;
       break;
@@ -1014,10 +1049,26 @@ void WifiManager::workerTick(uint32_t now) {
       break;
     }
   }
-  if (enabled_ && !transaction_.busy() && !configBusy() &&
-      (ap_manual_ || config_.ap_always ||
-                   (!link_up && (!(config_.sta[0].enabled || config_.sta[1].enabled) ||
-                                 policy_.counters().connect_timeouts >= 2))))
+  if (roleIsSta(role_) && !transaction_.busy()) {
+    if (link_up) {
+      // Connected with an address: the failure count starts over. The recovery
+      // wait goes back to its minimum only after the link has proven stable.
+      sta_attempt_base_ = policy_.counters().connect_attempts;
+      if (!link_was_up_) { link_was_up_ = true; link_since_ = now; }
+      else if (now - link_since_ >= kStaStableMs) recovery_level_ = 0;
+    } else {
+      link_was_up_ = false;
+      // The last attempt of the episode is over (timeout or refused call) and
+      // nothing is connected: stop trying, fall back to the recovery AP.
+      if (policy_.state() == WifiState::BACKOFF &&
+          policy_.counters().connect_attempts - sta_attempt_base_ >= kStaEpisodeAttempts) {
+        recovery_ = true;
+        recovery_since_ = now;
+        role_ = RoleReason::RUN_RECOVERY_AP;
+      }
+    }
+  }
+  if (enabled_ && !transaction_.busy() && !configBusy() && !roleIsSta(role_))
     startAp(now);
   if (admin_.phase.load() != NetworkPhase::CLIENT_STA) {
     refreshSnapshot(now, false); return;
@@ -1097,7 +1148,6 @@ void WifiManager::workerTick(uint32_t now) {
   refreshSnapshot(now, link_up);
 }
 void WifiManager::refreshSnapshot(uint32_t now, bool link_up) {
-  (void)now;
   auto &w = worker_status_;
   w.state = policy_.state();
   w.fault = policy_.fault();
@@ -1109,6 +1159,14 @@ void WifiManager::refreshSnapshot(uint32_t now, bool link_up) {
   w.backoff_ms = policy_.backoffMs();
   w.state_since_ms = policy_.stateSinceMs();
   w.disconnect_reason = disconnect_reason_.load();
+  w.run_mode = last_run_;
+  w.role_reason = static_cast<uint8_t>(role_);
+  w.recovery_level = recovery_level_;
+  {
+    const uint32_t dwell = recoveryDwellMs(recovery_level_, config_.ap_timeout_ms);
+    const uint32_t waited = now - recovery_since_;
+    w.recovery_retry_ms = recovery_ && waited < dwell ? dwell - waited : 0;
+  }
   // The driver's own view, independent of the administrative phase.
   w.admin_phase = static_cast<uint8_t>(admin_.phase.load());
   wifi_mode_t driver_mode = WIFI_MODE_NULL;

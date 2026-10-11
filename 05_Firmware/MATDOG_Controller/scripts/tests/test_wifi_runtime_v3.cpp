@@ -222,7 +222,8 @@ void enter(WifiManager &m,uint32_t t) {
   CHECK(WifiManager::verifyAdminRadio()); CHECK(WiFi.mode_value==WIFI_AP);
 }
 int main() {
-  seed(); WifiManager client; WifiRuntimeTest::initialize(client);
+  // The router is joined automatically only in RUN (radio role policy).
+  seed(); WifiManager client; client.setRunMode(true); WifiRuntimeTest::initialize(client);
   WifiRuntimeTest::tick(client,100); WifiRuntimeTest::tick(client,250); WifiRuntimeTest::tick(client,400);
   CHECK(WiFi.connect_calls>0 && WiFi.mode_value==WIFI_STA && !WiFi.ap);
   CHECK(WiFi.driver.sta.scan_method==WIFI_ALL_CHANNEL_SCAN);
@@ -291,8 +292,10 @@ int main() {
   WifiRuntimeTest::tick(m,736200); CHECK(m.status().config_phase==ConfigPhase::ROLLBACK);
   CHECK(store.load(&c) && strcmp(c.sta[0].ssid,"new-network")==0);
   closeListeners(m); WifiRuntimeTest::tick(m,736250);
-  // Leave administration: STA scan remains operational.
-  CHECK(m.requestAp(false)); WifiRuntimeTest::tick(m,736300);
+  // In MAINTENANCE the AP is mandatory; RUN with a router profile leaves it,
+  // and the STA scan remains operational there.
+  CHECK(!m.requestAp(false)); CHECK(m.lastPost()==PostResult::INVALID);
+  m.setRunMode(true); WifiRuntimeTest::tick(m,736300);
   closeListeners(m); WifiRuntimeTest::tick(m,736350);
   CHECK(m.adminAccess().phase.load()==NetworkPhase::CLIENT_STA);
   CHECK(m.requestScan()); WifiRuntimeTest::tick(m,736400); CHECK(m.status().scan_running);

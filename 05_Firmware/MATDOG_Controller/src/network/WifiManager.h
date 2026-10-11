@@ -67,7 +67,11 @@ public:
                             // repeated inside the 30 s transaction window, and
                             // the candidate is committed only after association
                             // and address were held for the stability window.
-                            kStaTestRetryMs = 4000, kStaTestHoldMs = 1500;
+                            kStaTestRetryMs = 4000, kStaTestHoldMs = 1500,
+                            // RUN: failed router attempts before the recovery
+                            // AP, and how long a link must hold before the
+                            // recovery wait starts again from its minimum.
+                            kStaEpisodeAttempts = 2, kStaStableMs = 60000;
   void begin(uint32_t now_ms);
   void update(uint32_t now_ms);
   bool setEnabled(bool enabled, uint32_t now_ms);
@@ -100,6 +104,12 @@ public:
   AdminAccess &adminAccess() { return admin_; }
   static bool verifyAdminRadio();
   bool configBusy() const { return config_busy_.load(); }
+  // The operating mode chooses the radio role (network/NetworkPolicy.h):
+  // false = MAINTENANCE, administrative AP; true = RUN, router first. Reported
+  // by the Controller every tick. This is a one-way input: this class holds no
+  // reference to the mode manager, the authority arbiter or any actuator, so
+  // nothing here can change the mode, grant authority or move a servo.
+  void setRunMode(bool run) { run_mode_.store(run); }
   void setContext(bool critical, bool ota) {
     context_.store((critical ? 1u : 0u) | (ota ? 2u : 0u));
   }
@@ -149,6 +159,12 @@ private:
   void trackStaTest(uint32_t now);
   void finishStaTest(uint32_t now, bool aborted);
   void refuseStaTest(bool storage_error);
+  RoleReason evaluateRole(uint32_t now);
+  RoleReason role_ = RoleReason::MAINTENANCE_AP;
+  std::atomic<bool> run_mode_{false};
+  bool last_run_ = false, recovery_ = false, link_was_up_ = false;
+  uint8_t recovery_level_ = 0;
+  uint32_t recovery_since_ = 0, sta_attempt_base_ = 0, link_since_ = 0;
   bool apConfigApplied();
   // Bring-up is two serialized driver commands, each with its own complete
   // acknowledgment set: the role change, then the AP profile.
@@ -198,7 +214,7 @@ private:
            test_stable_since_ = 0, test_disconnects_ = 0;
   bool test_stable_ = false;
   uint32_t ap_since_ = 0, radio_poll_ms_ = 0, off_since_ = 0;
-  bool enabled_ = true, ap_manual_ = false, scan_roam_ = false;
+  bool enabled_ = true, scan_roam_ = false;
   std::atomic<bool> nvs_fault_{false};
   bool connect_due_ = false, test_fresh_ = false;
   uint32_t connect_since_ = 0, snapshot_max_us_ = 0;

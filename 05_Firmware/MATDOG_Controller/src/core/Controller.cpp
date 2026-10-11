@@ -943,6 +943,9 @@ void Controller::update(uint32_t now_ms) {
   wifi_.setContext(service_.networkCritical(),ota_.status().holds_actuator_inhibit);
   command_router_.update(now_ms);
   wifi_.setContext(service_.networkCritical(),ota_.status().holds_actuator_inhibit);
+  // The radio role follows the operating mode (MAINTENANCE: administrative AP;
+  // RUN: router first). One-way: the Wi-Fi owner reads this, it cannot set it.
+  wifi_.setRunMode(operating_mode_.mode() == OperatingMode::RUN);
 
   imu_.update(now_ms);
   system_state_.setImuHealth(imu_.health());

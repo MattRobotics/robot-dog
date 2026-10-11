@@ -230,13 +230,90 @@ Outcomes: `CONNECTED` (committed, with address and RSSI); `AUTH_REJECTED`
 `TIMEOUT`; `ABORTED` (critical context or radio fault); `STORAGE_ERROR`.
 
 Not recoverable without USB or a power cycle, as before: a radio `FAULT`
-(fail closed, radio off) needs `@WIFI AP ON` or a restart. After a successful
-commit with `ap_always` false, the next boot joins the router and opens the AP
-only as fallback (no credentials, or two connect timeouts) or on `@WIFI AP ON`.
-With no TLS identity provisioned the controller serves nothing in `CLIENT_STA`.
-With `ap_always` true the controller returns to its AP at every boot and keeps
-the router profile stored but unused; AP OFF is then refused. The Wi-Fi form
-states this choice ("Dopo il salvataggio") and, when it differs from the stored
-policy, sends it in the same request as the router credentials, so both are
-committed or neither is. A first router setup preselects "AP sempre attivo".
+(fail closed, radio off) needs `@WIFI AP ON` in MAINTENANCE, or a restart.
 
+## Radio role by operating mode (2026-10-11)
+
+The controller has exactly two operating modes, `MAINTENANCE` and `RUN`
+(`core/OperatingMode.h`). It always boots in `MAINTENANCE`; the mode changes
+only through the operator's `@MODE MAINTENANCE` / `@MODE RUN` command and is
+not persistent. The Wi-Fi owner receives the mode as a read-only flag from the
+Controller. It cannot set the mode, and it holds no reference to the authority
+arbiter, a motion permit or an actuator.
+
+The mode decides the radio role. Stored preferences only refine the RUN side.
+This supersedes the earlier behaviour in which a stored router profile was
+joined at boot and the AP closed after an idle timeout.
+
+| Mode | Condition | Role | Portal |
+|---|---|---|---|
+| MAINTENANCE | always, with or without a stored router | `ADMIN_AP` (`MAINTENANCE_AP`) | reachable at `192.168.4.1`, no idle timeout |
+| MAINTENANCE | "Prova e salva" | temporary `CLIENT_STA` transaction, then `ADMIN_AP` again | closed for the test (up to about 40 s) |
+| RUN | a router profile is enabled | `CLIENT_STA` (`RUN_STA`) | **not reachable** |
+| RUN | no enabled router profile | recovery `ADMIN_AP` (`RUN_NO_PROFILE_AP`) | read-only |
+| RUN | router attempts failed | recovery `ADMIN_AP` (`RUN_RECOVERY_AP`), router retried later | read-only |
+| RUN | preference "resta sempre sull'AP" (`ap_always`) | `ADMIN_AP` (`RUN_FORCED_AP`) | read-only |
+
+| Event | From | To |
+|---|---|---|
+| boot | — | MAINTENANCE: driver start, then verified AP. No router attempt |
+| `@MODE RUN` | AP, router profile enabled | listeners closed, AP stopped, STA started, primary profile tried |
+| `@MODE RUN` | AP, no profile or `ap_always` | AP stays; no interruption |
+| `@MODE MAINTENANCE` | STA, connected or connecting | STA stopped, verified AP, new generation, portal reachable |
+| `@MODE MAINTENANCE` | recovery AP | same AP, no interruption; the recovery wait is forgotten |
+| attempt fails (timeout 15 s, or connect call refused) | STA | next attempt after backoff: primary profile, then the secondary as fallback |
+| second failed attempt of an episode | STA | recovery AP |
+| link lost | STA connected | reconnect attempts as above; recovery AP if they fail |
+| recovery wait elapsed and nobody connected to the AP | recovery AP | STA, a new episode of two attempts |
+| link held 60 s | STA connected | recovery wait back to its minimum |
+| unexpected role event, missing acknowledgment, driver refusal | any | `FAULT`, radio closed, **no automatic reopening**, in either mode |
+| `@WIFI OFF` | quiet MAINTENANCE (ignored in a critical context, RUN included) | radio closed until `@WIFI ON` (or 10 minutes) |
+
+Retry and hysteresis. An episode is `kStaEpisodeAttempts` = 2 attempts, each
+bounded by the 15 s connect timeout. The recovery AP is then kept for 60 s,
+120 s, 240 s, … doubling after every failed return and never above the
+configured AP timeout (`ap_timeout_ms`, default 15 minutes, which is now only
+this cap). The wait goes back to 60 s only after a link has been held for
+`kStaStableMs` = 60 s, so a router that connects and drops does not produce
+fast AP/STA alternation. The recovery AP is not left while a client is
+associated to it.
+
+In MAINTENANCE `ap_timeout_ms` has no effect and AP OFF is refused: the AP
+cannot be closed by an idle timeout or by mistake. `@WIFI OFF` remains the
+explicit way to switch the radio off.
+
+A connection is reported only when the driver is associated **and** holds an
+address. A refused password never produces `connected`; it ends in the recovery
+AP with the driver reason published (`disconnect_reason`, `WIFI_RADIO`).
+
+`@WIFI STATUS` prints the role in force:
+`WIFI_POLICY mode= role= sta_profile= ap_always= recovery_level= retry_in_ms=`.
+`/wifi/status` carries the same as `policy`.
+
+### What is reachable when the controller is on the router
+
+Nothing administrative, by design. The HTTP portal and every `/wifi/` endpoint
+exist only in a verified `ADMIN_AP` generation; on the home LAN the controller
+does not serve the Dashboard, the status or any configuration, in plain HTTP or
+otherwise. It answers ICMP echo.
+
+The HTTPS listener of the earlier design served only `/status` and the OTA
+routes, only with a provisioned TLS identity, and only while remote update was
+allowed, which requires MAINTENANCE. With this policy MAINTENANCE never stays
+in `CLIENT_STA`, so that listener is not reachable either; no TLS identity is
+provisioned and OTA ingest is compiled out, so nothing that worked is lost.
+
+Consequences to be aware of:
+
+- In RUN on the router there is no Dashboard. To see it, change to MAINTENANCE
+  (USB): the STA is stopped and the verified AP is opened again.
+- In the RUN recovery AP the Dashboard is readable but configuration writes are
+  refused (network changes are allowed only in a quiet MAINTENANCE).
+- Manual scan and roaming have no practical effect: scans are suspended in RUN,
+  and MAINTENANCE no longer holds a STA link.
+
+**Requirement not implemented:** a read-only Dashboard or a remote update path
+while connected to the router needs a separate security design: a per-device
+TLS identity, an authentication that does not depend on the AP origin, and a
+decision on what may be exposed during RUN. Until that exists the Dashboard
+must not be described as accessible from the home network.

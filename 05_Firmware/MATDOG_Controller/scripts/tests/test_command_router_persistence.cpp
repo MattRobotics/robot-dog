@@ -506,6 +506,45 @@ void network_quiet_reservation() {
 // accepted or refused, it leaves MAINTENANCE, actuator authority NONE, the
 // motion permit inactive and calibration storage untouched, and never echoes a
 // key. A refusal is explicit: kind and reason, never a bare or stale success.
+// The radio role follows the operating mode, so a mode change is now also a
+// Wi-Fi event. It must remain what it was: a mode change. No authority, no
+// permit, no persistent write, and the router itself never drives the radio
+// (the Controller forwards the mode to the Wi-Fi owner as a read-only flag).
+void mode_changes_keep_actuators_closed() {
+  Fixture f;
+  const FramingSnapshot before(f);
+  const int writes = f.writes();
+  const auto hardware_before = router_test::hardware_calls;
+  CHECK(f.mode.mode() == OperatingMode::MAINTENANCE); // the only boot mode
+  for (const char* line : {"@MODE RUN", "@WIFI STATUS", "@WIFI AP ON", "@WIFI AP OFF", "@WIFI SCAN",
+                           "@MODE MAINTENANCE", "@WIFI STATUS", "@MODE RUN", "@MODE MAINTENANCE"}) {
+    const std::string out = f.command(line);
+    CHECK(!out.empty());
+    CHECK(f.authority.current() == ActuatorAuthority::NONE);
+    CHECK(!f.authority.inhibited());
+    CHECK(!f.permit.active());
+    CHECK(f.writes() == writes);
+    if (std::strncmp(line, "@MODE", 5) == 0) {
+      CHECK(f.mode.mode() == (std::strcmp(line, "@MODE RUN") == 0 ? OperatingMode::RUN : OperatingMode::MAINTENANCE));
+      CHECK(out.find("MOTION_AUTHORIZED=1") == std::string::npos);
+    } else if (std::strcmp(line, "@WIFI STATUS") == 0) {
+      CHECK(out.find("WIFI_POLICY mode=") != std::string::npos);
+    }
+  }
+  // In RUN the Wi-Fi command surface reaches no radio request at all.
+  f.command("@MODE RUN");
+  const auto reached = router_test::hardware_calls;
+  for (const char* line : {"@WIFI AP ON", "@WIFI AP OFF", "@WIFI SCAN"}) {
+    const std::string out = f.command(line);
+    CHECK(out.find("QUEUED") == std::string::npos);
+  }
+  CHECK(router_test::hardware_calls == reached);
+  f.command("@MODE MAINTENANCE");
+  CHECK(f.mode.mode() == OperatingMode::MAINTENANCE);
+  before.checkUnchanged(f);
+  router_test::hardware_calls = hardware_before;
+}
+
 void wifi_commands_keep_safety_invariants() {
   Fixture f;
   const FramingSnapshot before(f);
@@ -584,6 +623,7 @@ int main() {
   uncertain_reconciliation_through_handler();
   valid_usb_framing_limits(); invalid_usb_lines_and_recovery(); usb_multiple_lines_and_begin_reset();
   wifi_commands_keep_safety_invariants();
+  mode_changes_keep_actuators_closed();
   std::printf("test_command_router_persistence: %d checks, %d failures\n", checks, failures);
   return failures ? 1 : 0;
 }

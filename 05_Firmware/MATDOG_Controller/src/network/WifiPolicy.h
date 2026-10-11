@@ -165,6 +165,12 @@ struct WifiStatus {
   uint8_t fault_event=0, fault_expected=0;
   bool driver_ap_started=false, driver_sta_started=false, ap_config_verified=false;
   StaTestReport sta_test{};
+  // Radio role decided from the operating mode (network/NetworkPolicy.h):
+  // run_mode is what the Controller reported, role_reason the RoleReason in
+  // force, recovery_* the state of the RUN recovery AP.
+  bool run_mode=false;
+  uint8_t role_reason=0, recovery_level=0;
+  uint32_t recovery_retry_ms=0;
   WifiScanEntry scan[12]{};
   WifiState state = WifiState::INACTIVE;
   WifiFault fault = WifiFault::NONE;

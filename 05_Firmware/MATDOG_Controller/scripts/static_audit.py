@@ -6374,6 +6374,50 @@ def check_network_v3_boundaries(files, sketch_dir):
         if token not in compact_manager:fail("STA test invariant missing: "+token)
     if compact_manager.count("transaction_.update(")!=2:
         fail("The STA transaction must be advanced from the test loop and the fault path only")
+    # Radio role by operating mode (2026-10-11). MAINTENANCE keeps the
+    # administrative AP whatever is stored; only RUN joins the router, and
+    # falls back to a recovery AP with a growing wait. The mode is an INPUT to
+    # the Wi-Fi owner: it is set in exactly one place (the operator's @MODE
+    # command), forwarded by the Controller as a flag, and nothing under
+    # network/ that owns the radio can name the mode manager, the authority
+    # arbiter, a permit or an actuator.
+    policy=re.sub(r"\s+","",by_name.get("NetworkPolicy.h",(None,""))[1])
+    for token in ("if(!i.run)returnRoleReason::MAINTENANCE_AP;",
+                  "returni.recovery?RoleReason::RUN_RECOVERY_AP:RoleReason::RUN_STA;",
+                  "inlineboolroleIsSta(RoleReasonr){returnr==RoleReason::RUN_STA;}",
+                  "returndwell>cap_ms?cap_ms:static_cast<uint32_t>(dwell);"):
+        if token not in policy:fail("Radio role policy invariant missing: "+token)
+    if policy.find("if(!i.run)returnRoleReason::MAINTENANCE_AP;")>policy.find("if(i.ap_always)"):
+        fail("MAINTENANCE must outrank every stored Wi-Fi preference")
+    for token in ("role_=evaluateRole(now);",
+                  "}elseif(enabled_&&roleIsSta(role_)){",
+                  "if(worker_status_.ap_active&&roleIsSta(role_)&&!configBusy())stopAp();",
+                  "if(enabled_&&!transaction_.busy()&&!configBusy()&&!roleIsSta(role_))startAp(now);",
+                  "if(!on&&(status_.ap_always||!run_mode_.load()))",
+                  "policy_.state()==WifiState::BACKOFF&&policy_.counters().connect_attempts-sta_attempt_base_>=kStaEpisodeAttempts",
+                  "now-recovery_since_>=recoveryDwellMs(recovery_level_,config_.ap_timeout_ms)",
+                  "admin_.phase.load()!=NetworkPhase::ADMIN_AP||!WiFi.softAPgetStationNum()"):
+        if token not in compact_manager:fail("Radio role worker invariant missing: "+token)
+    for token,count in (("policy_.update(",1),("stopAp();",2),("run_mode_.load()",2)):
+        if compact_manager.count(token)!=count:fail("Radio role surface changed: "+token)
+    if "ap_timeout_ms)" in compact_manager.replace("recoveryDwellMs(recovery_level_,config_.ap_timeout_ms)",""):
+        fail("The AP timeout may only bound the RUN recovery wait; it must never close a maintenance AP")
+    for name in ("WifiManager.cpp","WifiManager.h","WifiPolicy.cpp","WifiPolicy.h","NetworkPolicy.h",
+                 "NetworkConfig.cpp","NetworkConfig.h","NetworkConfigNvs.cpp","AdminAccess.h","AdminAccess.cpp"):
+        code=by_name.get(name,(None,""))[1]
+        for token in ("OperatingMode","setMode","ActuatorAuthority","authority","ServoBus","servo_bus",
+                      "MotionPermit","permit","torque","ControllerService",'"../core/','"../servo/','"../actuator/','"../calibration/'):
+            if token in code:fail(f"{name}: the Wi-Fi owner must not reach the mode manager, authority or actuators ({token})")
+    firmware=[(p2,c2) for p2,c2 in files if "scripts" not in p2.parts]
+    setters=[p2.name for p2,c2 in firmware for _ in re.finditer(r"(?:->|\.)setMode\s*\(",c2)]
+    if setters!=["CommandRouter.cpp"]:
+        fail(f"The operating mode may be changed only by the operator's @MODE command; call sites: {setters}")
+    forwards=[p2.name for p2,c2 in firmware for _ in re.finditer(r"(?:->|\.)setRunMode\s*\(",c2)]
+    if forwards!=["Controller.cpp"]:
+        fail(f"The operating mode is forwarded to the Wi-Fi owner only by the Controller; call sites: {forwards}")
+    controller=re.sub(r"\s+","",by_name.get("Controller.cpp",(None,""))[1])
+    if "wifi_.setRunMode(operating_mode_.mode()==OperatingMode::RUN);" not in controller:
+        fail("The Controller must forward exactly `mode == RUN`; any other mode keeps the maintenance AP")
     page_path=sketch_dir/"src"/"network"/"PortalPage.h"
     check_portal_page_text(page_path.read_text() if page_path.is_file() else "",str(page_path))
 

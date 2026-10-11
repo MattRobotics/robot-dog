@@ -916,7 +916,9 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
       "\"sta_test\":{\"seq\":%lu,\"outcome\":\"%s\",\"ssid\":\"%s\","
       "\"profile\":%u,\"associated\":%s,\"reason\":%u,\"attempts\":%u,"
       "\"ip\":\"%s\",\"rssi\":%ld,\"channel\":%u,\"elapsed_ms\":%lu,"
-      "\"rolled_back\":%s},\"scan\":[",
+      "\"rolled_back\":%s},"
+      "\"policy\":{\"run\":%s,\"role\":\"%s\",\"recovery_level\":%u,"
+      "\"retry_in_ms\":%lu},\"scan\":[",
       w.ap_reload_pending ? "true" : "false",
       w.sleep_apply_ok ? "true" : "false", w.bandwidth_configured,
       w.bandwidth_apply_ok ? "true" : "false", (unsigned long)w.max_update_us,
@@ -931,7 +933,9 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
       w.sta_test.reason, w.sta_test.attempts, test_ip,
       (long)w.sta_test.rssi_dbm, w.sta_test.channel,
       (unsigned long)w.sta_test.elapsed_ms,
-      w.sta_test.rolled_back ? "true" : "false");
+      w.sta_test.rolled_back ? "true" : "false", w.run_mode ? "true" : "false",
+      toString(static_cast<RoleReason>(w.role_reason)), w.recovery_level,
+      (unsigned long)w.recovery_retry_ms);
   if (n < 0 || static_cast<size_t>(n) >= sizeof(resp.text) - used) {
     resp.message = "STATUS_OVERFLOW";
     return;

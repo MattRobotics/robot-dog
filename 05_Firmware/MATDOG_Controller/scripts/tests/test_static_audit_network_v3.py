@@ -85,6 +85,24 @@ class NetworkAuditTest(unittest.TestCase):
           ('WifiManager.cpp','if (!match) test_stable_ = false;','if (!match) {}'),
           ('WifiManager.cpp','!sta_link_.load()','true'),
         ]
+        # Radio role by operating mode.
+        mutations += [
+          ('NetworkPolicy.h','if (!i.run)\n    return RoleReason::MAINTENANCE_AP;','if (!i.run && !i.sta_profile)\n    return RoleReason::MAINTENANCE_AP;'),
+          ('NetworkPolicy.h','return i.recovery ? RoleReason::RUN_RECOVERY_AP : RoleReason::RUN_STA;','return RoleReason::RUN_STA;'),
+          ('NetworkPolicy.h','return r == RoleReason::RUN_STA;','return r != RoleReason::RUN_FORCED_AP;'),
+          ('NetworkPolicy.h','return dwell > cap_ms ? cap_ms : static_cast<uint32_t>(dwell);','return 0;'),
+          ('WifiManager.cpp','} else if (enabled_ && roleIsSta(role_)) {','} else if (enabled_) {'),
+          ('WifiManager.cpp','if (worker_status_.ap_active && roleIsSta(role_) && !configBusy())','if (worker_status_.ap_active && !configBusy() && now - ap_since_ >= config_.ap_timeout_ms)'),
+          ('WifiManager.cpp','if (enabled_ && !transaction_.busy() && !configBusy() && !roleIsSta(role_))','if (enabled_ && !transaction_.busy() && !configBusy() && config_.ap_always)'),
+          ('WifiManager.cpp','if (!on && (status_.ap_always || !run_mode_.load()))','if (!on && status_.ap_always)'),
+          ('WifiManager.cpp','policy_.counters().connect_attempts - sta_attempt_base_ >= kStaEpisodeAttempts','false'),
+          ('WifiManager.cpp','(admin_.phase.load() != NetworkPhase::ADMIN_AP || !WiFi.softAPgetStationNum())','true'),
+          ('WifiManager.cpp','role_ = evaluateRole(now);','role_ = RoleReason::RUN_STA;'),
+          ('Controller.cpp','wifi_.setRunMode(operating_mode_.mode() == OperatingMode::RUN);','wifi_.setRunMode(operating_mode_.mode() != OperatingMode::MAINTENANCE);'),
+          ('Controller.cpp','wifi_.setRunMode(operating_mode_.mode() == OperatingMode::RUN);','wifi_.setRunMode(true); operating_mode_.setMode(OperatingMode::RUN);'),
+          ('WifiManager.h','void setRunMode(bool run) { run_mode_.store(run); }','void setRunMode(bool run) { run_mode_.store(run); } OperatingModeManager *mode_ = nullptr;'),
+          ('HttpTransport.cpp','service_->wifiStatus();','service_->wifiStatus(); service_->wifi().setRunMode(true);'),
+        ]
         for mutation in mutations:
             with self.subTest(mutation=mutation):self.assertTrue(self.check(mutation))
     def test_portal_page(self):

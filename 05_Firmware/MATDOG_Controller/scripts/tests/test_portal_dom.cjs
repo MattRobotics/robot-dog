@@ -24,7 +24,8 @@ const wifiBase = {network_phase: 'ADMIN_AP', admin_generation: 3, build_id: '837
   bandwidth_mhz: 20, ap_timeout_ms: 900000, ap_always: false,
   profiles: [profile, {...profile, enabled: false}], ap_reload_pending: false,
   sta_enabled: true, sta_credentials: true, sta_state: 'IDLE', sta_fault: 'NONE',
-  admin_provisioned: true, sta_test: noTest, scan: []};
+  admin_provisioned: true, sta_test: noTest,
+  policy: {run: false, role: 'MAINTENANCE_AP', recovery_level: 0, retry_in_ms: 0}, scan: []};
 const statusBase = {build_id: '837f5237de88', system_health: 'READY', power_state: 'RUN',
   mode: 'MAINTENANCE', authority: 'NONE', imu_availability: 'PASS', bms_availability: 'PASS',
   servo_availability: 'PASS', led_availability: 'PASS', imu_stream: 'ON', imu_rv_count: '1000',
@@ -198,6 +199,21 @@ const row = (page, list, label) => {
   eq(row(p, '#staList', 'Ultima disconnessione STA').textContent, 'codice 201 · rete non trovata', 'disconnect reason readable');
   eq(row(p, '#staList', 'Rete del router').textContent, xss, 'router SSID as text');
   ok(p.q('#staNote').textContent.includes('non indicano un guasto'), 'explicit note');
+  // ---- radio role policy: MAINTENANCE keeps the AP, the saved router waits for RUN ----
+  eq(row(p, '#apList', 'Policy radio').textContent, 'MAINTENANCE · AP amministrativo, sempre attivo', 'policy in force shown');
+  ok(p.q('#staNote').textContent.includes('Il router verrà usato in RUN'), 'saved router is not presented as a failed connection');
+  eq(p.q('#lockNote').hidden, true, 'configuration open in MAINTENANCE');
+  ok(!p.q('#apOn') && !p.q('#apOff') && !p.q('[name=boot_policy]'), 'no control contradicts the mode policy');
+  ok(!row(p, '#apList', 'Nuovo tentativo sul router'), 'no retry announced in MAINTENANCE');
+  p.close();
+  p = await boot({status: {mode: 'RUN'}, wifi: {policy: {run: true, role: 'RUN_RECOVERY_AP', recovery_level: 1, retry_in_ms: 42000}}});
+  eq(row(p, '#apList', 'Policy radio').textContent, 'RUN · AP di recupero: router non raggiungibile', 'recovery AP explained');
+  eq(row(p, '#apList', 'Policy radio').className, 'warn', 'recovery is not shown as nominal');
+  eq(row(p, '#apList', 'Nuovo tentativo sul router').textContent, 'tra 42 s', 'next router attempt shown');
+  eq(p.q('#lockNote').hidden, false, 'configuration locked outside MAINTENANCE is stated');
+  p.close();
+  p = await boot({status: {mode: 'RUN'}, wifi: {sta_credentials: false, policy: {run: true, role: 'RUN_NO_PROFILE_AP', recovery_level: 0, retry_in_ms: 0}}});
+  eq(row(p, '#apList', 'Policy radio').textContent, 'RUN · AP di recupero: nessun router configurato', 'no-profile recovery explained');
   p.close();
   p = await boot({wifi: {sta_credentials: false}});
   eq(p.q('#staBadge').textContent, 'NON CONFIGURATO', 'no router configured');
@@ -245,16 +261,17 @@ const row = (page, list, label) => {
   ok(![...Array(p.dom.window.localStorage.length).keys()].some(i => p.dom.window.localStorage.getItem(p.dom.window.localStorage.key(i)).includes(p.device.token)), 'token never stored by the page');
   ok(!p.dom.window.document.cookie, 'page script sets no cookie');
   // an expired session is reopened without the token, then the write is retried
-  p.device.expireOnce = true; p.q('#apOn').click(); await settle();
+  const write = async page => { page.q('#performanceForm').dispatchEvent(new page.dom.window.Event('submit', {cancelable: true})); await settle(); };
+  p.device.expireOnce = true; await write(p);
   const tail = p.device.calls.slice(-3).map(c => c.url).join(',');
-  eq(tail, '/wifi/ap,/wifi/session,/wifi/ap', 'expired session: resume, then retry');
+  eq(tail, '/wifi/config,/wifi/session,/wifi/config', 'expired session: resume, then retry');
   eq(p.q('#adminState').textContent, 'Amministratore connesso', 'still connected');
   // explicit logout
   p.q('#logout').click(); await settle();
   eq(p.q('#adminState').textContent, 'Sola lettura', 'logged out');
   eq(p.dom.window.localStorage.getItem('md_remember'), null, 'hint removed');
-  const before = p.device.calls.length; p.q('#apOn').click(); await settle();
-  eq(p.device.calls.slice(before).filter(c => c.url === '/wifi/ap').length, 0, 'no write after logout');
+  const before = p.device.calls.length; await write(p);
+  eq(p.device.calls.slice(before).filter(c => c.url === '/wifi/config').length, 0, 'no write after logout');
   eq(p.q('#login').hidden, false, 'login requested for a write');
   p.close();
 
@@ -306,8 +323,7 @@ const row = (page, list, label) => {
   p.device.confirm = true; wform.dispatchEvent(new p.dom.window.Event('submit', {cancelable: true})); await settle();
   const config = p.device.calls.filter(c => c.url === '/wifi/config').pop();
   ok(config.body.includes('p0_ssid=casa') && config.body.includes('p0_password=router-secret') && config.body.includes('test_profile=0'), 'config form posted');
-  ok(!config.body.includes('boot_policy'), 'page-only field never sent');
-  ok(!config.body.includes('ap_always'), 'AP policy untouched when the choice equals the device state');
+  ok(!config.body.includes('ap_always') && !config.body.includes('ap_name'), 'router form leaves the AP settings alone');
   eq(config.csrf, p.device.csrf, 'CSRF header on the write');
   eq(p.q('[name=p0_password]').value, '', 'password cleared after sending');
   ok(!p.d.body.textContent.includes('router-secret'), 'password never rendered');
@@ -320,19 +336,6 @@ const row = (page, list, label) => {
   ok(p.q('#message').textContent.includes('Credenziali rifiutate') && p.q('#message').textContent.includes('Rollback eseguito'), 'result announced when the AP returns');
   eq(p.q('#wifi').hidden, false, 'Wi-Fi section opened on the result');
   eq(p.q('#adminState').textContent, 'Amministratore connesso', 'no new login after the test');
-  p.close();
-  // first router setup: the AP policy defaults to "always", and travels with the credentials
-  p = await boot({storage: {md_remember: '1'}, session: true, wifi: {sta_credentials: false, profiles: [{...profile, ssid: '', enabled: false}, {...profile, ssid: '', enabled: false}], active_profile: 0}});
-  eq(p.q('[name=boot_policy]').value, '1', 'first setup defaults to the reachable choice');
-  p.q('[name=p0_ssid]').value = 'casa'; p.q('[name=p0_password]').value = 'router-secret';
-  p.q('#wifiForm').dispatchEvent(new p.dom.window.Event('submit', {cancelable: true})); await settle();
-  const first = new URLSearchParams(p.device.calls.filter(c => c.url === '/wifi/config').pop().body);
-  eq(first.get('ap_always'), '1', 'AP policy sent with the router credentials');
-  eq(first.get('ap_name'), 'MATDOG-227594', 'AP name preserved');
-  eq(first.get('ap_password'), '', 'AP password preserved (empty keeps)');
-  eq(first.get('ap_timeout_ms'), '900000', 'AP timeout preserved');
-  eq(first.get('p0_enabled'), '1', 'tested profile activated');
-  ok(!first.has('boot_policy'), 'page-only field never sent');
   p.close();
   // a request the worker refused is reported with its reason
   p = await boot({storage: {md_remember: '1', md_watch: JSON.stringify({seq: 0, t: Date.now() - 5000, ap: 'MATDOG-227594'})}, session: true, wifi: {config_error: 6}});

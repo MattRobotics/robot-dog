@@ -1457,6 +1457,10 @@ void CommandRouter::printWifiStatus() {
                 (unsigned long)w.tx_seq,w.tx_seq?network::WifiManager::requestKindName(w.tx_kind):"NONE",
                 network::toString(static_cast<network::TxResult>(w.tx_result)));
   Serial.printf("WIFI_REQUEST_LAST post=%s seq=%lu\n",network::toString(modules_.wifi->lastPost()),(unsigned long)modules_.wifi->lastPostSeq());
+  // The radio role the operating mode asks for (network/NetworkPolicy.h).
+  Serial.printf("WIFI_POLICY mode=%s role=%s sta_profile=%s ap_always=%s recovery_level=%u retry_in_ms=%lu\n",
+                w.run_mode?"RUN":"MAINTENANCE",network::toString(static_cast<network::RoleReason>(w.role_reason)),
+                w.credentials_present?"YES":"NO",w.ap_always?"YES":"NO",(unsigned)w.recovery_level,(unsigned long)w.recovery_retry_ms);
   // Why the last router test ended as it did. No credential can appear here.
   {
     const network::StaTestReport& t=w.sta_test;char test_ip[16];network::formatIpv4(t.ipv4,test_ip,sizeof(test_ip));
