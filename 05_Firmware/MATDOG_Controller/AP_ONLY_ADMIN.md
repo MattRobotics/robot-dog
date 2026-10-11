@@ -241,8 +241,8 @@ not persistent. The Wi-Fi owner receives the mode as a read-only flag from the
 Controller. It cannot set the mode, and it holds no reference to the authority
 arbiter, a motion permit or an actuator.
 
-The mode decides the radio role. Stored preferences only refine the RUN side.
-This supersedes the earlier behaviour in which a stored router profile was
+The mode decides the radio role, together with one stored fact: whether a
+router profile is enabled. This supersedes the earlier behaviour in which a stored router profile was
 joined at boot and the AP closed after an idle timeout.
 
 | Mode | Condition | Role | Portal |
@@ -252,13 +252,12 @@ joined at boot and the AP closed after an idle timeout.
 | RUN | a router profile is enabled | `CLIENT_STA` (`RUN_STA`) | **not reachable** |
 | RUN | no enabled router profile | recovery `ADMIN_AP` (`RUN_NO_PROFILE_AP`) | read-only |
 | RUN | router attempts failed | recovery `ADMIN_AP` (`RUN_RECOVERY_AP`), router retried later | read-only |
-| RUN | preference "resta sempre sull'AP" (`ap_always`) | `ADMIN_AP` (`RUN_FORCED_AP`) | read-only |
 
 | Event | From | To |
 |---|---|---|
 | boot | — | MAINTENANCE: driver start, then verified AP. No router attempt |
 | `@MODE RUN` | AP, router profile enabled | listeners closed, AP stopped, STA started, primary profile tried |
-| `@MODE RUN` | AP, no profile or `ap_always` | AP stays; no interruption |
+| `@MODE RUN` | AP, no router profile enabled | AP stays; no interruption |
 | `@MODE MAINTENANCE` | STA, connected or connecting | STA stopped, verified AP, new generation, portal reachable |
 | `@MODE MAINTENANCE` | recovery AP | same AP, no interruption; the recovery wait is forgotten |
 | attempt fails (timeout 15 s, or connect call refused) | STA | next attempt after backoff: primary profile, then the secondary as fallback |
@@ -278,9 +277,17 @@ this cap). The wait goes back to 60 s only after a link has been held for
 fast AP/STA alternation. The recovery AP is not left while a client is
 associated to it.
 
-In MAINTENANCE `ap_timeout_ms` has no effect and AP OFF is refused: the AP
-cannot be closed by an idle timeout or by mistake. `@WIFI OFF` remains the
-explicit way to switch the radio off.
+In MAINTENANCE `ap_timeout_ms` has no effect. AP OFF is refused in every mode:
+only the role policy closes the AP, so it cannot be closed by an idle timeout
+or by mistake. `@WIFI OFF` remains the explicit way to switch the radio off.
+
+**Legacy `ap_always`.** Records written by earlier firmware may carry
+`ap_always = true` ("AP sempre disponibile"). The field is still decoded,
+kept in the record, written back unchanged by the AP form and reported
+(`WIFI_AP_POLICY always=`, `WIFI_POLICY legacy_ap_always=…(IGNORED)`,
+`ap_always` in `/wifi/status`), but it is not an input of the role decision:
+with a router profile enabled, RUN joins the router whatever the flag says.
+The NVS record format is unchanged and nothing is erased or migrated.
 
 A connection is reported only when the driver is associated **and** holds an
 address. A refused password never produces `connected`; it ends in the recovery

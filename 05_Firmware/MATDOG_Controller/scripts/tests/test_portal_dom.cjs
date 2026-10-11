@@ -205,6 +205,15 @@ const row = (page, list, label) => {
   eq(p.q('#lockNote').hidden, true, 'configuration open in MAINTENANCE');
   ok(!p.q('#apOn') && !p.q('#apOff') && !p.q('[name=boot_policy]'), 'no control contradicts the mode policy');
   ok(!row(p, '#apList', 'Nuovo tentativo sul router'), 'no retry announced in MAINTENANCE');
+  eq(p.q('#legacyNote').hidden, true, 'no legacy note without the legacy flag');
+  eq(p.q('#apForm [name=ap_always]').type, 'hidden', 'the old AP-always preference is no longer a choice');
+  p.close();
+  // a record inherited from older firmware still carries ap_always: shown as ignored, kept as it is
+  p = await boot({storage: {md_remember: '1'}, session: true, wifi: {ap_always: true}});
+  eq(p.q('#legacyNote').hidden, false, 'legacy flag disclosed');
+  ok(p.q('#legacyNote').textContent.includes('Non ha più effetto'), 'and stated as having no effect');
+  p.q('#apForm').dispatchEvent(new p.dom.window.Event('submit', {cancelable: true})); await settle();
+  eq(new URLSearchParams(p.device.calls.filter(c => c.url === '/wifi/config').pop().body).get('ap_always'), '1', 'the stored value is sent back unchanged, not cleared');
   p.close();
   p = await boot({status: {mode: 'RUN'}, wifi: {policy: {run: true, role: 'RUN_RECOVERY_AP', recovery_level: 1, retry_in_ms: 42000}}});
   eq(row(p, '#apList', 'Policy radio').textContent, 'RUN · AP di recupero: router non raggiungibile', 'recovery AP explained');

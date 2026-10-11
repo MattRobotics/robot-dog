@@ -104,7 +104,9 @@ public:
   AdminAccess &adminAccess() { return admin_; }
   static bool verifyAdminRadio();
   bool configBusy() const { return config_busy_.load(); }
-  // The operating mode chooses the radio role (network/NetworkPolicy.h):
+  // The operating mode chooses the radio role (network/NetworkPolicy.h). The
+  // "AP always" flag of older records is kept in storage and status but is not
+  // consulted: it cannot keep the controller off a configured router in RUN.
   // false = MAINTENANCE, administrative AP; true = RUN, router first. Reported
   // by the Controller every tick. This is a one-way input: this class holds no
   // reference to the mode manager, the authority arbiter or any actuator, so

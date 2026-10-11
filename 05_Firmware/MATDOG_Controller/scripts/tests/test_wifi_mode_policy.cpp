@@ -296,22 +296,24 @@ bool clean(WifiManager &m) { // no radio fault, no error=11
 int main() {
   // ---- the pure decision ---------------------------------------------------------
   using R = RoleReason;
-  for (int bits = 0; bits < 16; ++bits) {
+  for (int bits = 0; bits < 8; ++bits) {
     RoleInputs in;
-    in.run = bits & 1; in.sta_profile = bits & 2; in.ap_always = bits & 4; in.recovery = bits & 8;
+    in.run = bits & 1; in.sta_profile = bits & 2; in.recovery = bits & 4;
     const R r = selectRole(in);
-    if (!in.run) CHECK(r == R::MAINTENANCE_AP);          // maintenance outranks every preference
-    else if (in.ap_always) CHECK(r == R::RUN_FORCED_AP);
+    if (!in.run) CHECK(r == R::MAINTENANCE_AP);          // maintenance outranks everything stored
     else if (!in.sta_profile) CHECK(r == R::RUN_NO_PROFILE_AP);
     else CHECK(r == (in.recovery ? R::RUN_RECOVERY_AP : R::RUN_STA));
-    CHECK(roleIsSta(r) == (in.run && in.sta_profile && !in.ap_always && !in.recovery));
+    CHECK(roleIsSta(r) == (in.run && in.sta_profile && !in.recovery));
   }
+  // The decision has exactly these inputs: the old "AP always" flag is not one.
+  CHECK(sizeof(RoleInputs) == 3 * sizeof(bool));
   CHECK(recoveryDwellMs(0, 900000) == 60000 && recoveryDwellMs(1, 900000) == 120000);
   CHECK(recoveryDwellMs(3, 900000) == 480000 && recoveryDwellMs(4, 900000) == 900000);
   CHECK(recoveryDwellMs(200, 900000) == 900000 && recoveryDwellMs(5, 60000) == 60000);
   std::map<std::string, int> names;
-  for (int i = 0; i <= 4; ++i) ++names[toString(static_cast<R>(i))];
-  CHECK(names.size() == 5 && !names.count("UNKNOWN"));
+  for (int i = 0; i <= 3; ++i) ++names[toString(static_cast<R>(i))];
+  CHECK(names.size() == 4 && !names.count("UNKNOWN"));
+  CHECK(std::string(toString(static_cast<R>(4))) == "UNKNOWN"); // the forced-AP role no longer exists
 
   // ---- 1. boot in MAINTENANCE with a router already configured -> AP ---------------
   {
@@ -384,12 +386,65 @@ int main() {
     CHECK(verifiedAp(m) && m.adminAccess().generation() == generation && WiFi.connect_calls == 0);
     CHECK(clean(m));
   }
+  // ---- legacy record with ap_always=YES: it can no longer block the router in RUN -------
   {
-    // "AP always" is honoured in RUN as well: the stored router is not joined.
-    store(true, false, true); WifiManager m; m.setRunMode(true); WifiRuntimeTest::initialize(m);
-    CHECK(until(m, Phase::ADMIN_AP, 3000) != UINT32_MAX && role(m) == R::RUN_FORCED_AP);
+    store(true, false, true); WifiManager m; WifiRuntimeTest::initialize(m);
+    // MAINTENANCE is unchanged by the flag: administrative AP, no router attempt.
+    CHECK(until(m, Phase::ADMIN_AP, 3000) != UINT32_MAX && verifiedAp(m) && role(m) == R::MAINTENANCE_AP);
+    CHECK(m.status().ap_always); // still read from the record and reported
     advance(m, 3600 * 1000u, 500);
-    CHECK(verifiedAp(m) && WiFi.connect_calls == 0 && !m.requestAp(false));
+    CHECK(verifiedAp(m) && WiFi.connect_calls == 0);
+    // RUN: the router is tried and joined, exactly as without the flag.
+    m.setRunMode(true);
+    CHECK(until(m, Phase::CLIENT_STA, 3000) != UINT32_MAX && role(m) == R::RUN_STA);
+    advance(m, 500);
+    CHECK(WiFi.connect_calls == 1 && driverSsid() == "home-router");
+    association("home-router"); advance(m, 500);
+    CHECK(m.status().connected && m.status().state == WifiState::CONNECTED);
+    advance(m, 3600 * 1000u, 500);
+    CHECK(phase(m) == Phase::CLIENT_STA && m.status().connected && clean(m));
+    // Router lost for good: recovery AP and periodic retries, as for any record.
+    WiFi.connected = false; WiFi.ip = 0; sta(ARDUINO_EVENT_WIFI_STA_DISCONNECTED, 200);
+    CHECK(until(m, Phase::ADMIN_AP, 60000) != UINT32_MAX && role(m) == R::RUN_RECOVERY_AP && verifiedAp(m));
+    const int calls = WiFi.connect_calls;
+    CHECK(until(m, Phase::CLIENT_STA, 70000) != UINT32_MAX);
+    advance(m, 500);
+    CHECK(WiFi.connect_calls == calls + 1);
+    // Back to MAINTENANCE: administrative AP.
+    m.setRunMode(false);
+    CHECK(until(m, Phase::ADMIN_AP, 3000) != UINT32_MAX && verifiedAp(m) && role(m) == R::MAINTENANCE_AP);
+    // The stored record was neither rewritten nor migrated: same bytes, flag intact.
+    CHECK(sets == 0 && commits == 0);
+    NetworkConfig c{}; NetworkConfigNvs nvs;
+    CHECK(nvs.load(&c) && c.ap_always && std::strcmp(c.sta[0].ssid, "home-router") == 0);
+    CHECK(m.status().ap_always);
+  }
+  {
+    // Legacy flag and no router profile: RUN has nothing to join -> recovery AP.
+    store(false, false, true); WifiManager m; m.setRunMode(true); WifiRuntimeTest::initialize(m);
+    CHECK(until(m, Phase::ADMIN_AP, 3000) != UINT32_MAX && role(m) == R::RUN_NO_PROFILE_AP);
+    advance(m, 3600 * 1000u, 500);
+    CHECK(verifiedAp(m) && WiFi.connect_calls == 0 && sets == 0);
+  }
+  {
+    // A reboot with the legacy record: MAINTENANCE AP, then RUN joins the router.
+    store(true, true, true); WifiManager m; WifiRuntimeTest::initialize(m);
+    CHECK(until(m, Phase::ADMIN_AP, 3000) != UINT32_MAX && WiFi.connect_calls == 0);
+    WiFi = WifiStub{}; now = clock_ms = 0;
+    WifiManager rebooted; rebooted.setRunMode(true); WifiRuntimeTest::initialize(rebooted);
+    advance(rebooted, 1000);
+    CHECK(phase(rebooted) == Phase::CLIENT_STA && !WiFi.ap);
+    CHECK(WiFi.connect_calls == 1 && driverSsid() == "home-router" && role(rebooted) == R::RUN_STA);
+    CHECK(rebooted.status().ap_always && sets == 0);
+  }
+  {
+    // AP OFF is no operator request in any mode: only the role policy closes the AP.
+    store(false, false); WifiManager m; m.setRunMode(true); WifiRuntimeTest::initialize(m);
+    CHECK(until(m, Phase::ADMIN_AP, 3000) != UINT32_MAX);
+    CHECK(!m.requestAp(false) && m.lastPost() == PostResult::INVALID);
+    m.setRunMode(false);
+    CHECK(!m.requestAp(false) && m.lastPost() == PostResult::INVALID);
+    advance(m, 5000); CHECK(verifiedAp(m));
   }
 
   // ---- 5/6. RUN, router absent or password refused -> bounded tries, recovery AP ------

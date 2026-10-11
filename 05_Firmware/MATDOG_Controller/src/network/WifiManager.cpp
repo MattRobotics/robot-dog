@@ -206,9 +206,10 @@ bool WifiManager::requestAp(bool on, uint32_t generation) {
   last_post_seq_ = 0;
   if (configBusy()) { last_post_ = PostResult::BUSY; return false; }
   if (generation && !admin_.allowed(generation)) { last_post_ = PostResult::NOT_ADMITTED; return false; }
-  // The AP is closed only by the role policy (RUN with a usable router). In
-  // MAINTENANCE it is mandatory, and "AP always" keeps it in RUN as well.
-  if (!on && (status_.ap_always || !run_mode_.load())) { last_post_ = PostResult::INVALID; return false; }
+  // Closing the AP is not an operator request any more: only the role policy
+  // closes it (RUN with a usable router). In MAINTENANCE it is mandatory, and
+  // a recovery AP is left by the policy alone.
+  if (!on) { last_post_ = PostResult::INVALID; return false; }
   Request r{};
   r.kind = RequestKind::AP;
   r.generation = generation;
@@ -765,11 +766,7 @@ bool WifiManager::consume(const Request &r, uint32_t now) {
     if (r.generation && (!admin_.allowed(r.generation) || !verifyAdminRadio())) return true;
     if (context_.load() || transaction_.busy() || intent_pending_)
       return true;
-    if (r.on) {
-      startAp(now);
-    } else if (!config_.ap_always) {
-      stopAp();
-    }
+    if (r.on) startAp(now);
     return true;
   }
   AdminLease lease(admin_);
@@ -907,7 +904,6 @@ RoleReason WifiManager::evaluateRole(uint32_t now) {
   RoleInputs in;
   in.run = run;
   in.sta_profile = profile;
-  in.ap_always = config_.ap_always;
   in.recovery = recovery_;
   return selectRole(in);
 }

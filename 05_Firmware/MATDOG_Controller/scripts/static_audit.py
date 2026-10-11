@@ -6387,18 +6387,27 @@ def check_network_v3_boundaries(files, sketch_dir):
                   "inlineboolroleIsSta(RoleReasonr){returnr==RoleReason::RUN_STA;}",
                   "returndwell>cap_ms?cap_ms:static_cast<uint32_t>(dwell);"):
         if token not in policy:fail("Radio role policy invariant missing: "+token)
-    if policy.find("if(!i.run)returnRoleReason::MAINTENANCE_AP;")>policy.find("if(i.ap_always)"):
-        fail("MAINTENANCE must outrank every stored Wi-Fi preference")
+    # The stored "AP always" preference of earlier firmware is carried, never
+    # consulted: it must not be able to keep RUN off a configured router.
+    role_unit=policy[policy.find("enumclassRoleReason"):policy.find("constexpruint32_tkRecoveryDwellInitialMs")]
+    if not role_unit or "ap_always" in role_unit or "FORCED" in role_unit:
+        fail("The legacy AP-always preference must not be an input of the radio role decision")
+    if "structRoleInputs{boolrun=false,sta_profile=false,recovery=false;};" not in policy:
+        fail("The radio role decision takes exactly: run, sta_profile, recovery")
+    if policy.find("if(!i.run)returnRoleReason::MAINTENANCE_AP;")>policy.find("if(!i.sta_profile)"):
+        fail("MAINTENANCE must outrank everything stored")
+    if sorted(re.findall(r"[^;{}]*ap_always[^;{}]*;",compact_manager))!=["c.ap_always=p.config.ap_always;","w.ap_always=config_.ap_always;"]:
+        fail("WifiManager may only carry the stored ap_always (form -> record, record -> status), never act on it")
     for token in ("role_=evaluateRole(now);",
                   "}elseif(enabled_&&roleIsSta(role_)){",
                   "if(worker_status_.ap_active&&roleIsSta(role_)&&!configBusy())stopAp();",
                   "if(enabled_&&!transaction_.busy()&&!configBusy()&&!roleIsSta(role_))startAp(now);",
-                  "if(!on&&(status_.ap_always||!run_mode_.load()))",
+                  "if(!on){last_post_=PostResult::INVALID;returnfalse;}",
                   "policy_.state()==WifiState::BACKOFF&&policy_.counters().connect_attempts-sta_attempt_base_>=kStaEpisodeAttempts",
                   "now-recovery_since_>=recoveryDwellMs(recovery_level_,config_.ap_timeout_ms)",
                   "admin_.phase.load()!=NetworkPhase::ADMIN_AP||!WiFi.softAPgetStationNum()"):
         if token not in compact_manager:fail("Radio role worker invariant missing: "+token)
-    for token,count in (("policy_.update(",1),("stopAp();",2),("run_mode_.load()",2)):
+    for token,count in (("policy_.update(",1),("stopAp();",1),("run_mode_.load()",1)):
         if compact_manager.count(token)!=count:fail("Radio role surface changed: "+token)
     if "ap_timeout_ms)" in compact_manager.replace("recoveryDwellMs(recovery_level_,config_.ap_timeout_ms)",""):
         fail("The AP timeout may only bound the RUN recovery wait; it must never close a maintenance AP")

@@ -40,8 +40,8 @@ private:
   uint32_t last_scan_ = 0, last_roam_ = 0;
 };
 // ---- Radio role by operating mode (2026-10-11) ---------------------------------
-// One radio, one role at a time. The controller's operating mode decides it;
-// stored Wi-Fi preferences only refine the RUN side.
+// One radio, one role at a time. The controller's operating mode decides it,
+// together with one stored fact: whether a router profile is enabled.
 //
 //   MAINTENANCE  -> ADMIN_AP, always. A stored router profile is not used; the
 //                   only STA activity is the explicit, temporary "Prova e
@@ -51,6 +51,10 @@ private:
 //                   credentials also leads to the recovery AP, from which the
 //                   router is tried again after a growing wait.
 //
+// The stored "AP always" preference of earlier firmware (NetworkConfig) is
+// NOT an input: a record that still carries it is read and kept as it is, and
+// it can no longer keep the controller off a configured router in RUN.
+//
 // This is a pure decision: it reads the mode, it can never change it, and it
 // has no access to authority, permits or actuators.
 enum class RoleReason : uint8_t {
@@ -58,16 +62,13 @@ enum class RoleReason : uint8_t {
   RUN_STA = 1,            // run: join the configured router
   RUN_NO_PROFILE_AP = 2,  // run: no enabled router profile -> recovery AP
   RUN_RECOVERY_AP = 3,    // run: router attempts failed -> recovery AP, retry later
-  RUN_FORCED_AP = 4,      // run: operator preference "AP always" -> AP
 };
 struct RoleInputs {
-  bool run = false, sta_profile = false, ap_always = false, recovery = false;
+  bool run = false, sta_profile = false, recovery = false;
 };
 inline RoleReason selectRole(const RoleInputs &i) {
   if (!i.run)
     return RoleReason::MAINTENANCE_AP;
-  if (i.ap_always)
-    return RoleReason::RUN_FORCED_AP;
   if (!i.sta_profile)
     return RoleReason::RUN_NO_PROFILE_AP;
   return i.recovery ? RoleReason::RUN_RECOVERY_AP : RoleReason::RUN_STA;
@@ -79,7 +80,6 @@ inline const char *toString(RoleReason r) {
   case RoleReason::RUN_STA: return "RUN_STA";
   case RoleReason::RUN_NO_PROFILE_AP: return "RUN_NO_PROFILE_AP";
   case RoleReason::RUN_RECOVERY_AP: return "RUN_RECOVERY_AP";
-  case RoleReason::RUN_FORCED_AP: return "RUN_FORCED_AP";
   }
   return "UNKNOWN";
 }
