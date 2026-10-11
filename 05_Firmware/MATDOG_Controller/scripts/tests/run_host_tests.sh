@@ -635,8 +635,18 @@ python3 "$SCRIPT_DIR/test_static_audit_startup.py"
   "$SKETCH_DIR/src/network/NetworkConfig.cpp" \
   "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
   "$SKETCH_DIR/src/network/PortalSecurity.cpp" \
-  "$SKETCH_DIR/src/update/Sha256.cpp"
+  "$SKETCH_DIR/src/update/Sha256.cpp" "$SKETCH_DIR/src/update/Hmac256.cpp"
 "$OUT/test_network_v3"
+
+# Remembered-device credential and session resume (persistent administrator
+# recognition): pure PortalSecurity, HMAC and SHA-256, synthetic credentials.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -fsanitize=address,undefined \
+  -fno-omit-frame-pointer -I "$SKETCH_DIR/src" -o "$OUT/test_portal_device" \
+  "$SCRIPT_DIR/test_portal_device.cpp" \
+  "$SKETCH_DIR/src/network/PortalSecurity.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp" "$SKETCH_DIR/src/update/Hmac256.cpp"
+"$OUT/test_portal_device"
 
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
   -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
@@ -661,6 +671,16 @@ python3 "$SCRIPT_DIR/test_static_audit_startup.py"
   "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
   "$SKETCH_DIR/src/update/Sha256.cpp"
 "$OUT/test_wifi_ap_bringup"
+# STA router test: outcome report, bounded retry, stability hold, and the
+# return to a verified AP with the known-good configuration after a failure.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -pthread \
+  -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_wifi_sta_test" "$SCRIPT_DIR/test_wifi_sta_test.cpp" \
+  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/AdminAccess.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
+  "$SKETCH_DIR/src/network/PortalSecurity.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp" "$SKETCH_DIR/src/update/Hmac256.cpp"
+"$OUT/test_wifi_sta_test"
 python3 "$SCRIPT_DIR/test_ota_tls_client.py"
 python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
 python3 "$SCRIPT_DIR/test_ap_only_transport.py"

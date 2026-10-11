@@ -6,6 +6,7 @@
 #include <esp_timer.h>
 #include <freertos/task.h>
 #include <lwip/sockets.h>
+#include <stdarg.h>
 
 #include "../config/TlsIdentity.h"
 #include "../update/Sha256.h"
@@ -81,6 +82,26 @@ bool socketFacts(httpd_req_t *req, HttpTransportRequest &r) {
   r.local_authorized = portalOrigin(r.ap_socket, host, origin);
   return true;
 }
+// One 64-character cookie value, by exact name. Missing, wrong length or a
+// name that is only a suffix of another leaves `out` empty, which every
+// consumer treats as "no credential".
+void cookieValue(const char *header, const char *name, char out[65]) {
+  out[0] = 0;
+  const size_t n = strlen(name);
+  for (const char *p = header; *p;) {
+    while (*p == ' ' || *p == ';')
+      ++p;
+    size_t len = 0;
+    while (p[len] && p[len] != ';')
+      ++len;
+    if (len == n + 65 && strncmp(p, name, n) == 0 && p[n] == '=') {
+      memcpy(out, p + n + 1, 64);
+      out[64] = 0;
+      return;
+    }
+    p += len;
+  }
+}
 void jsonString(const char *in, char *out, size_t cap) {
   size_t n = 0;
   for (size_t i = 0; in[i] && n + 2 < cap; ++i) {
@@ -147,7 +168,9 @@ bool HttpTransport::registerHandlers(httpd_handle_t server, bool admin) {
       {"/wifi/login", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/wifi/config", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/wifi/scan", HTTP_POST, &HttpTransport::handleWifi, this},
-      {"/wifi/ap", HTTP_POST, &HttpTransport::handleWifi, this}};
+      {"/wifi/ap", HTTP_POST, &HttpTransport::handleWifi, this},
+      {"/wifi/session", HTTP_POST, &HttpTransport::handleWifi, this},
+      {"/wifi/logout", HTTP_POST, &HttpTransport::handleWifi, this}};
   for (const auto &uri : uris) {
     if (!admin && (strcmp(uri.uri, "/") == 0 || strncmp(uri.uri, "/wifi/", 6) == 0)) continue;
     if (httpd_register_uri_handler(server, &uri) != ESP_OK) return false;
@@ -173,8 +196,11 @@ void HttpTransport::lifecycleTick() {
     if (desired_.load() && !server_) {
       httpd_config_t c = HTTPD_DEFAULT_CONFIG();
       c.stack_size = 24576;
-      c.max_uri_handlers = 12;
+      c.max_uri_handlers = 14;
       c.max_open_sockets = 2;
+      // A phone browser may open more connections than the two this listener
+      // holds; the least recently used one is closed instead of stalling.
+      c.lru_purge_enable = true;
       c.recv_wait_timeout = 3;
       c.send_wait_timeout = 3;
       c.task_priority = 2;
@@ -376,6 +402,11 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     resp.text_len = (n > 0 && static_cast<size_t>(n) < sizeof(resp.text))
                         ? static_cast<size_t>(n)
                         : sizeof(resp.text) - 1;
+    // Dashboard extension (2026-10-11). Appended after the original keys so
+    // their order is unchanged. Same rule as above: cached state only, no
+    // bus transaction, no NVS read. A value that is not known is printed as
+    // not known, never as a stale number.
+    statusExtension(resp, bms, cal);
     resp.ok = true;
     resp.message = "OK";
     break;
@@ -386,7 +417,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     break;
   }
   case HttpRequestKind::WIFI_LOGIN: {
-    uint8_t random[64];
+    uint8_t random[64 + kPortalDeviceIdBytes];
     esp_fill_random(random, sizeof(random));
     resp.ok = req.local_authorized &&
               portal_.login(static_cast<uint64_t>(esp_timer_get_time()) / 1000,
@@ -397,7 +428,51 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
       strcpy(resp.cookie, portal_.cookie());
       strcpy(resp.text, portal_.csrf());
       resp.text_len = 64;
+      // "Remember this device" is only ever issued by a token login.
+      if (req.remember)
+        portalDeviceIssue(gate.digest(), random + 64, resp.device);
     }
+    memset(random, 0, sizeof(random));
+    break;
+  }
+  case HttpRequestKind::WIFI_SESSION: {
+    // Page load or expired session. The holder of the live session is told
+    // its CSRF token again; otherwise a remembered-device credential opens a
+    // fresh session. No token, no NVS access, no wall clock.
+    const uint64_t now = static_cast<uint64_t>(esp_timer_get_time()) / 1000;
+    bool resumed = false;
+    if (req.local_authorized && !portal_.current(now, req.peer, req.cookie)) {
+      uint8_t random[64];
+      esp_fill_random(random, sizeof(random));
+      resumed = portal_.resume(now, req.peer, req.device, gate.digest(), random);
+      memset(random, 0, sizeof(random));
+    }
+    resp.ok = req.local_authorized &&
+              portal_.current(now, req.peer, resumed ? portal_.cookie() : req.cookie);
+    resp.message = resp.ok ? "OK" : "AUTH_FAILED";
+    if (resp.ok) {
+      strcpy(resp.cookie, portal_.cookie());
+      strcpy(resp.text, portal_.csrf());
+      resp.text_len = 64;
+      // Sent back only after it verified, so the browser renews its lifetime.
+      if (resumed)
+        memcpy(resp.device, req.device, sizeof(resp.device));
+    }
+    break;
+  }
+  case HttpRequestKind::WIFI_LOGOUT: {
+    // Ends the session if the caller holds it; the response clears the
+    // browser's cookies either way. A remembered device is not individually
+    // revocable: a new administrator token revokes all of them.
+    if (!req.local_authorized) {
+      resp.message = "AUTH_FAILED";
+      break;
+    }
+    if (portal_.current(static_cast<uint64_t>(esp_timer_get_time()) / 1000,
+                        req.peer, req.cookie))
+      portal_.reset();
+    resp.ok = true;
+    resp.message = "LOGGED_OUT";
     break;
   }
   case HttpRequestKind::WIFI_CONFIG:
@@ -526,6 +601,107 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     resp.message = "UNKNOWN_REQUEST";
     break;
   }
+}
+
+void HttpTransport::statusExtension(
+    HttpTransportResponse &resp, const power::DalySample &bms,
+    const calibration::CalibrationSessionStatus &cal) {
+  size_t used = resp.text_len;
+  auto add = [&](const char *format, ...) {
+    if (used >= sizeof(resp.text) - 1)
+      return;
+    va_list args;
+    va_start(args, format);
+    const int n = vsnprintf(resp.text + used, sizeof(resp.text) - used, format, args);
+    va_end(args);
+    // A line that does not fit is dropped whole, never sent truncated.
+    if (n > 0 && static_cast<size_t>(n) < sizeof(resp.text) - used)
+      used += static_cast<size_t>(n);
+    else
+      resp.text[used] = 0;
+  };
+  const uint32_t now = millis(); // DALY may have stamped after the tick sample
+  const bool valid = service_->bmsHasValidSample();
+  const uint32_t sample_age = valid ? now - bms.sampled_at_ms : 0;
+  const auto &wifi = service_->wifiStatus();
+  const auto &led = service_->ledSnapshot();
+  const auto &census = service_->servoCensusResult();
+  add("uptime_ms=%lu\nauthority_inhibited=%s\nauthority_inhibit_reason=%s\n",
+      (unsigned long)service_->uptimeMillis(now),
+      service_->authorityInhibited() ? "YES" : "NO",
+      core::toString(service_->authorityInhibitReason()));
+  add("imu_detected=%s\nbms_detected=%s\nservo_detected=%s\nled_detected=%s\n",
+      core::toString(service_->imuAvailability().detected),
+      core::toString(service_->bmsAvailability().detected),
+      core::toString(service_->servoAvailability().detected),
+      core::toString(service_->ledAvailability().detected));
+  add("imu_runtime_resets=%lu\n", (unsigned long)service_->imuRuntimeResetCount());
+  // Fresh is the controller's own contract (power/DalyProtocol.h): a valid
+  // sample, the latest poll OK, and an age within kDalyTelemetryFreshnessMs.
+  add("bms_sample_age_ms=%lu\nbms_fresh=%s\nbms_fresh_limit_ms=%lu\n",
+      (unsigned long)sample_age,
+      valid && service_->bmsLastCommResult() == power::DalyCommResult::OK &&
+              sample_age <= power::kDalyTelemetryFreshnessMs
+          ? "YES"
+          : "NO",
+      (unsigned long)power::kDalyTelemetryFreshnessMs);
+  if (valid) {
+    add("bms_current_a=%.1f\nbms_state=%s\nbms_charge_mos=%s\n"
+        "bms_discharge_mos=%s\nbms_alarms=%04X %04X %04X %04X\n",
+        bms.pack_current_a, bms.state_name, bms.charge_mos_on ? "ON" : "OFF",
+        bms.discharge_mos_on ? "ON" : "OFF", bms.alarms[0], bms.alarms[1],
+        bms.alarms[2], bms.alarms[3]);
+    add("bms_cells=%u\nbms_cell_min_mv=%u\nbms_cell_max_mv=%u\n"
+        "bms_cell_delta_mv=%u\n",
+        (unsigned)bms.cell_count, (unsigned)bms.cell_min_mv,
+        (unsigned)bms.cell_max_mv, (unsigned)bms.cell_delta_mv);
+    char cells[8 * 6 + 1];
+    size_t w = 0;
+    for (unsigned i = 0; i < bms.cell_count && i < 8; ++i)
+      w += snprintf(cells + w, sizeof(cells) - w, "%s%u", i ? "," : "",
+                    (unsigned)bms.cell_mv[i]);
+    cells[w] = 0;
+    add("bms_cell_mv=%s\n", cells);
+  }
+  // Compile-time population facts plus the verdict of the last census, if
+  // one ran. NOT_RUN stays NOT_RUN: no population is implied.
+  add("servo_canonical=%u\nservo_expected_now=%u\nservo_census=%s\n",
+      (unsigned)servo::canonicalAllocatedCount(),
+      (unsigned)servo::expectedNowCount(), servo::toString(census.verdict));
+  if (census.verdict != servo::CensusVerdict::NOT_RUN)
+    add("servo_census_present=%u\nservo_census_missing=%u\n",
+        (unsigned)census.present_expected, (unsigned)census.missing_expected);
+  add("calibration_holds_authority=%s\ncalibration_stale=%s\n",
+      cal.holds_authority ? "YES" : "NO",
+      cal.current_calibration_stale ? "YES" : "NO");
+  const auto &persist = service_->calibrationPersistence();
+  if (persist.published)
+    add("calibration_available=%s\ncalibration_persist_verdict=%s\n"
+        "calibration_ack_generation=%lu\ncalibration_record_intact=%s\n"
+        "calibration_nvs=%s\n",
+        persist.available ? "YES" : "NO", persist.verdict,
+        (unsigned long)persist.acknowledged_generation,
+        persist.record_intact ? "YES" : "NO", persist.nvs);
+  add("led_soc_valid=%s\nled_soc_segments=%u\nled_charging=%s\n"
+      "led_charging_fault=%s\nled_battery_warning=%s\n"
+      "led_battery_critical=%s\nled_diagnostic=%s\n",
+      led.soc_valid ? "YES" : "NO", (unsigned)led.soc_segments,
+      led.charging ? "YES" : "NO", led.charging_fault ? "YES" : "NO",
+      led.battery_warning ? "YES" : "NO", led.battery_critical ? "YES" : "NO",
+      status::toString(service_->ledDiagnostic()));
+  if (led.soc_valid)
+    add("led_soc_percent=%.1f\n", led.soc_percent);
+  add("network_phase=%s\nwifi_enabled=%s\nap_active=%s\nap_clients=%u\n"
+      "heap_free=%lu\nheap_min_free=%lu\nloop_stack_min_free=%lu\n",
+      toString(service_->networkAdminAccess().phase.load()),
+      wifi.enabled ? "YES" : "NO", wifi.ap_active ? "YES" : "NO",
+      (unsigned)wifi.ap_clients,
+      (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+      (unsigned long)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+      // Lowest free stack ever seen on the Controller task, which formats
+      // this response: evidence that the portal stays inside its budget.
+      (unsigned long)uxTaskGetStackHighWaterMark(nullptr));
+  resp.text_len = used;
 }
 
 // ---------------------------------------------------------------------------
@@ -660,7 +836,9 @@ esp_err_t HttpTransport::handleOtaUpdate(httpd_req_t *req) {
 
 void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
   const auto &w = service_->wifiStatus();
-  char ip[16], ssid[67], bssid[37], ap[67];
+  char ip[16], ssid[67], bssid[37], ap[67], test_ip[16], test_ssid[67];
+  formatIpv4(w.sta_test.ipv4, test_ip, 16);
+  jsonString(w.sta_test.ssid, test_ssid, sizeof(test_ssid));
   formatIpv4(w.ipv4, ip, 16);
   jsonString(w.ssid, ssid, sizeof(ssid));
   jsonString(w.bssid, bssid, sizeof(bssid));
@@ -732,13 +910,28 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
       "],\"ap_reload_pending\":%s,\"sleep_apply_ok\":%s,\"bandwidth_"
       "configured\":%u,"
       "\"bandwidth_apply_ok\":%s,\"snapshot_max_us\":%lu,\"connects\":%lu,"
-      "\"connect_timeouts\":%lu,\"link_losses\":%lu,\"scan\":[",
+      "\"connect_timeouts\":%lu,\"link_losses\":%lu,"
+      "\"sta_enabled\":%s,\"sta_credentials\":%s,\"sta_state\":\"%s\","
+      "\"sta_fault\":\"%s\",\"admin_provisioned\":%s,"
+      "\"sta_test\":{\"seq\":%lu,\"outcome\":\"%s\",\"ssid\":\"%s\","
+      "\"profile\":%u,\"associated\":%s,\"reason\":%u,\"attempts\":%u,"
+      "\"ip\":\"%s\",\"rssi\":%ld,\"channel\":%u,\"elapsed_ms\":%lu,"
+      "\"rolled_back\":%s},\"scan\":[",
       w.ap_reload_pending ? "true" : "false",
       w.sleep_apply_ok ? "true" : "false", w.bandwidth_configured,
       w.bandwidth_apply_ok ? "true" : "false", (unsigned long)w.max_update_us,
       (unsigned long)w.counters.connects,
       (unsigned long)w.counters.connect_timeouts,
-      (unsigned long)w.counters.link_losses);
+      (unsigned long)w.counters.link_losses, w.enabled ? "true" : "false",
+      w.credentials_present ? "true" : "false", toString(w.state),
+      toString(w.fault), w.admin_provisioned ? "true" : "false",
+      (unsigned long)w.sta_test.seq,
+      toString(static_cast<StaTestOutcome>(w.sta_test.outcome)), test_ssid,
+      w.sta_test.profile, w.sta_test.associated ? "true" : "false",
+      w.sta_test.reason, w.sta_test.attempts, test_ip,
+      (long)w.sta_test.rssi_dbm, w.sta_test.channel,
+      (unsigned long)w.sta_test.elapsed_ms,
+      w.sta_test.rolled_back ? "true" : "false");
   if (n < 0 || static_cast<size_t>(n) >= sizeof(resp.text) - used) {
     resp.message = "STATUS_OVERFLOW";
     return;
@@ -818,18 +1011,18 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
     }
     if (strcmp(req->uri, "/wifi/login") == 0) {
       r.kind = HttpRequestKind::WIFI_LOGIN;
-      if (read != 70 || strncmp(body, "token=", 6) != 0)
+      // token=<64 hex>, optionally followed by &remember=1 and nothing else.
+      r.remember = read == 81 && memcmp(body + 70, "&remember=1", 11) == 0;
+      if ((read != 70 && !r.remember) || strncmp(body, "token=", 6) != 0)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid login");
       memcpy(r.login, body + 6, 64);
     } else {
-      char cookie[128]{};
+      char cookie[256]{};
       httpd_req_get_hdr_value_str(req, "Cookie", cookie, sizeof(cookie));
-      const char *start = strstr(cookie, "md_session=");
-      if (start) {
-        start += 11;
-        if (strlen(start) >= 64 && (start[64] == 0 || start[64] == ';'))
-          memcpy(r.cookie, start, 64);
-      }
+      cookieValue(cookie, "md_session", r.cookie);
+      if (strcmp(req->uri, "/wifi/session") == 0)
+        cookieValue(cookie, "md_device", r.device);
+      memset(cookie, 0, sizeof(cookie));
       httpd_req_get_hdr_value_str(req, "X-Csrf-Token", r.csrf, sizeof(r.csrf));
       if (strcmp(req->uri, "/wifi/config") == 0) {
         r.kind = HttpRequestKind::WIFI_CONFIG;
@@ -848,6 +1041,15 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
           return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
                                      "Invalid AP action");
         r.ap_on = body[3] == '1';
+      } else if (strcmp(req->uri, "/wifi/session") == 0 ||
+                 strcmp(req->uri, "/wifi/logout") == 0) {
+        r.kind = req->uri[6] == 's' ? HttpRequestKind::WIFI_SESSION
+                                    : HttpRequestKind::WIFI_LOGOUT;
+        if (read)
+          return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                     "Empty body required");
+      } else {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Unknown action");
       }
     }
     memset(body, 0, sizeof(body));
@@ -863,14 +1065,32 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, resp.text, resp.text_len);
   }
-  if (r.kind == HttpRequestKind::WIFI_LOGIN) {
-    char cookie[160];
+  // The session cookie is short-lived and goes with every /wifi/ request. The
+  // remembered-device cookie is long-lived (400 days, renewed on each use) and
+  // is scoped to /wifi/session, so it is sent only to open a session.
+  char cookie[160], device[176];
+  if (r.kind == HttpRequestKind::WIFI_LOGIN ||
+      r.kind == HttpRequestKind::WIFI_SESSION) {
     snprintf(
         cookie, sizeof(cookie),
         "md_session=%s; HttpOnly; SameSite=Strict; Path=/wifi/; Max-Age=300",
         resp.cookie);
     httpd_resp_set_hdr(req, "Set-Cookie", cookie);
+    if (resp.device[0]) {
+      snprintf(device, sizeof(device),
+               "md_device=%s; HttpOnly; SameSite=Strict; Path=/wifi/session; Max-Age=34560000",
+               resp.device);
+      httpd_resp_set_hdr(req, "Set-Cookie", device);
+    }
     return httpd_resp_send(req, resp.text, resp.text_len);
+  }
+  if (r.kind == HttpRequestKind::WIFI_LOGOUT) {
+    httpd_resp_set_hdr(
+        req, "Set-Cookie",
+        "md_session=; HttpOnly; SameSite=Strict; Path=/wifi/; Max-Age=0");
+    httpd_resp_set_hdr(
+        req, "Set-Cookie",
+        "md_device=; HttpOnly; SameSite=Strict; Path=/wifi/session; Max-Age=0");
   }
   return httpd_resp_sendstr(req, resp.message);
 }

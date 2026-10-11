@@ -97,6 +97,38 @@ struct WifiCounters {
 // into the connect call; it is never stored here, never returned by an
 // accessor and therefore cannot reach a log, @STATUS, or a future web
 // response by accident. scripts/static_audit.py enforces that.
+// Outcome of the last "Prova e salva" STA test, kept so the operator can read
+// WHY a router test ended the way it did after the AP is back. Diagnostics
+// only: SSID, driver reason code and addresses, never a passphrase.
+enum class StaTestOutcome : uint8_t {
+  NONE          = 0,  // no test since boot
+  RUNNING       = 1,  // PENDING written, association in progress
+  CONNECTED     = 2,  // associated, IP held for the stability window, committed
+  AUTH_REJECTED = 3,  // router refused the WPA2 handshake (wrong password)
+  AP_NOT_FOUND  = 4,  // no router with that SSID / compatible security in range
+  NO_IP         = 5,  // associated, but no address before the deadline
+  TIMEOUT       = 6,  // deadline reached without a conclusive driver reason
+  ABORTED       = 7,  // critical context or radio fault ended the test
+  STORAGE_ERROR = 8,  // NVS refused the PENDING or ACTIVE write
+};
+struct StaTestReport {
+  uint32_t seq = 0;         // request sequence that started this test
+  uint32_t elapsed_ms = 0;  // from PENDING to the verdict
+  uint32_t ipv4 = 0;        // address held at commit, else 0
+  int32_t rssi_dbm = 0;     // at commit, else 0
+  uint16_t reason = 0;      // last STA_DISCONNECTED reason seen during the test
+  uint8_t outcome = 0;      // StaTestOutcome
+  uint8_t profile = 0, attempts = 0, channel = 0;
+  bool associated = false;  // the router accepted the credentials at least once
+  bool rolled_back = false; // ACTIVE left untouched, known-good restored
+  char ssid[33]{};
+};
+// Pure verdict for a test that did NOT commit. `reason` is the driver's
+// wifi_err_reason_t; `associated` means STA_CONNECTED was observed.
+StaTestOutcome classifyStaTestFailure(bool storage_error, bool aborted,
+                                      bool associated, uint16_t reason);
+const char* toString(StaTestOutcome outcome);
+
 struct WifiScanEntry { char ssid[33]{}; char bssid[18]{}; int32_t rssi=0; uint8_t channel=0; bool secure=false; };
 struct WifiProfileView { char ssid[33]{}; bool enabled=false, dhcp=true; uint32_t ip=0,mask=0,gateway=0,dns=0; };
 struct WifiStatus {
@@ -132,6 +164,7 @@ struct WifiStatus {
   uint8_t admin_phase=0, driver_mode=255, fault_site=0, last_fault_site=0;
   uint8_t fault_event=0, fault_expected=0;
   bool driver_ap_started=false, driver_sta_started=false, ap_config_verified=false;
+  StaTestReport sta_test{};
   WifiScanEntry scan[12]{};
   WifiState state = WifiState::INACTIVE;
   WifiFault fault = WifiFault::NONE;

@@ -251,10 +251,16 @@ int main() {
   WifiRuntimeTest::tick(m,702300); association("stale");
   WifiRuntimeTest::tick(m,702350); CHECK(commits==1);
   association("new-network"); WifiRuntimeTest::tick(m,702400);
+  // Association + address must be HELD: one matching tick is not proof.
+  CHECK(commits==1 && m.status().config_phase==ConfigPhase::TESTING);
+  WifiRuntimeTest::tick(m,702400+WifiManager::kStaTestHoldMs-1); CHECK(commits==1);
+  WifiRuntimeTest::tick(m,702400+WifiManager::kStaTestHoldMs);
   CHECK(commits==2); CHECK(!m.configBusy());
+  CHECK(m.status().sta_test.outcome==static_cast<uint8_t>(StaTestOutcome::CONNECTED));
+  CHECK(m.status().sta_test.ipv4==0x3501a8c0 && !m.status().sta_test.rolled_back);
   CHECK(m.status().config_phase==ConfigPhase::COMMITTED);
   CHECK(m.adminAccess().phase.load()==NetworkPhase::ENTER_ADMIN);
-  closeListeners(m); WifiRuntimeTest::tick(m,702450);
+  closeListeners(m); WifiRuntimeTest::tick(m,704450);
   CHECK(m.adminAccess().generation()!=generation);
   CHECK(!m.adminAccess().allowed(generation));
   CHECK(m.status().config_phase==ConfigPhase::COMMITTED);
@@ -263,43 +269,43 @@ int main() {
   // Queue accepted under old generation then revoked before worker mutation.
   int writes=sets; generation=m.adminAccess().generation();
   CHECK(m.configure(patch("queued-stale"),generation)); m.adminAccess().revoke();
-  WifiRuntimeTest::tick(m,702500); CHECK(sets==writes); CHECK(!m.configBusy());
+  WifiRuntimeTest::tick(m,704500); CHECK(sets==writes); CHECK(!m.configBusy());
   // Explicit re-entry is mandatory; no spontaneous reopen on radio start.
-  WiFi.callback(ARDUINO_EVENT_WIFI_AP_STOP,{}); WifiRuntimeTest::tick(m,702550);
+  WiFi.callback(ARDUINO_EVENT_WIFI_AP_STOP,{}); WifiRuntimeTest::tick(m,704550);
   CHECK(!m.adminAccess().allowed(generation));
-  WiFi.ap=true; WiFi.AP.running=true; WifiRuntimeTest::tick(m,702600);
+  WiFi.ap=true; WiFi.AP.running=true; WifiRuntimeTest::tick(m,704600);
   CHECK(m.adminAccess().phase.load()==NetworkPhase::FAULT);
-  enter(m,702650); CHECK(m.adminAccess().generation()!=generation);
+  enter(m,704650); CHECK(m.adminAccess().generation()!=generation);
   // Unknown driver state/APSTA deny, and a consumed request never persists.
   CHECK(m.configure(patch("unknown"))); WiFi.mode_read_ok=false;
-  WifiRuntimeTest::tick(m,702750); CHECK(sets==writes);
+  WifiRuntimeTest::tick(m,704750); CHECK(sets==writes);
   CHECK(m.adminAccess().phase.load()==NetworkPhase::FAULT);
-  WiFi.mode_read_ok=true; enter(m,702800);
+  WiFi.mode_read_ok=true; enter(m,704800);
   CHECK(m.configure(patch("apsta"))); WiFi.mode_value=WIFI_AP_STA; WiFi.STA.running=true;
-  CHECK(!WifiManager::verifyAdminRadio()); WifiRuntimeTest::tick(m,702900);
-  CHECK(sets==writes); enter(m,702950);
+  CHECK(!WifiManager::verifyAdminRadio()); WifiRuntimeTest::tick(m,704900);
+  CHECK(sets==writes); enter(m,704950);
   // Rollback test, then fresh ADMIN generation with old ACTIVE intact.
-  CHECK(m.configure(patch("wrong-password"))); WifiRuntimeTest::tick(m,703050);
-  WifiRuntimeTest::tick(m,704100); closeListeners(m); WifiRuntimeTest::tick(m,704150);
-  WifiRuntimeTest::tick(m,704300); WiFi.connected=false;
-  WifiRuntimeTest::tick(m,734200); CHECK(m.status().config_phase==ConfigPhase::ROLLBACK);
+  CHECK(m.configure(patch("wrong-password"))); WifiRuntimeTest::tick(m,705050);
+  WifiRuntimeTest::tick(m,706100); closeListeners(m); WifiRuntimeTest::tick(m,706150);
+  WifiRuntimeTest::tick(m,706300); WiFi.connected=false;
+  WifiRuntimeTest::tick(m,736200); CHECK(m.status().config_phase==ConfigPhase::ROLLBACK);
   CHECK(store.load(&c) && strcmp(c.sta[0].ssid,"new-network")==0);
-  closeListeners(m); WifiRuntimeTest::tick(m,734250);
+  closeListeners(m); WifiRuntimeTest::tick(m,736250);
   // Leave administration: STA scan remains operational.
-  CHECK(m.requestAp(false)); WifiRuntimeTest::tick(m,734300);
-  closeListeners(m); WifiRuntimeTest::tick(m,734350);
+  CHECK(m.requestAp(false)); WifiRuntimeTest::tick(m,736300);
+  closeListeners(m); WifiRuntimeTest::tick(m,736350);
   CHECK(m.adminAccess().phase.load()==NetworkPhase::CLIENT_STA);
-  CHECK(m.requestScan()); WifiRuntimeTest::tick(m,734400); CHECK(m.status().scan_running);
-  m.setContext(true,true); WifiRuntimeTest::tick(m,734450);
+  CHECK(m.requestScan()); WifiRuntimeTest::tick(m,736400); CHECK(m.status().scan_running);
+  m.setContext(true,true); WifiRuntimeTest::tick(m,736450);
   CHECK(!m.status().scan_running && !m.status().sleep_effective);
   m.setContext(false,false);
-  CHECK(m.setEnabled(false,734500)); WifiRuntimeTest::tick(m,734500);
-  closeListeners(m); WifiRuntimeTest::tick(m,734550);
+  CHECK(m.setEnabled(false,736500)); WifiRuntimeTest::tick(m,736500);
+  closeListeners(m); WifiRuntimeTest::tick(m,736550);
   CHECK(m.adminAccess().phase.load()==NetworkPhase::CLOSED && WiFi.mode_value==WIFI_OFF);
-  CHECK(m.provisionAp("bootstrap-replacement-key")); WifiRuntimeTest::tick(m,734600);
+  CHECK(m.provisionAp("bootstrap-replacement-key")); WifiRuntimeTest::tick(m,736600);
   CHECK(m.status().config_phase==ConfigPhase::COMMITTED);
-  CHECK(m.setEnabled(true,734650)); WifiRuntimeTest::tick(m,734650);
-  closeListeners(m); WifiRuntimeTest::tick(m,734700);
+  CHECK(m.setEnabled(true,736650)); WifiRuntimeTest::tick(m,736650);
+  closeListeners(m); WifiRuntimeTest::tick(m,736700);
   CHECK(m.adminAccess().phase.load()==NetworkPhase::CLIENT_STA);
   CHECK(!m.provisionAp("refused-in-client-mode"));
   // Reboot loads ACTIVE, never promotes PENDING or writes.

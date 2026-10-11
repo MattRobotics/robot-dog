@@ -1457,6 +1457,14 @@ void CommandRouter::printWifiStatus() {
                 (unsigned long)w.tx_seq,w.tx_seq?network::WifiManager::requestKindName(w.tx_kind):"NONE",
                 network::toString(static_cast<network::TxResult>(w.tx_result)));
   Serial.printf("WIFI_REQUEST_LAST post=%s seq=%lu\n",network::toString(modules_.wifi->lastPost()),(unsigned long)modules_.wifi->lastPostSeq());
+  // Why the last router test ended as it did. No credential can appear here.
+  {
+    const network::StaTestReport& t=w.sta_test;char test_ip[16];network::formatIpv4(t.ipv4,test_ip,sizeof(test_ip));
+    Serial.printf("WIFI_STA_TEST seq=%lu outcome=%s associated=%s reason=%u attempts=%u ip=%s rssi_dbm=%ld elapsed_ms=%lu rollback=%s\n",
+                  (unsigned long)t.seq,network::toString(static_cast<network::StaTestOutcome>(t.outcome)),
+                  t.associated?"YES":"NO",(unsigned)t.reason,(unsigned)t.attempts,test_ip,(long)t.rssi_dbm,
+                  (unsigned long)t.elapsed_ms,t.rolled_back?"YES":"NO");
+  }
   Serial.printf("WIFI_SCAN running=%s count=%u starts=%lu failures=%lu inhibited=%lu roam=%lu\n",w.scan_running?"YES":"NO",w.scan_count,(unsigned long)w.scan_starts,(unsigned long)w.scan_failures,(unsigned long)w.scan_inhibited,(unsigned long)w.roam_count);
   Serial.printf("WIFI_WORKER max_us=%lu stack_free=%lu\n",(unsigned long)w.worker_max_us,(unsigned long)w.worker_stack_free);
   Serial.printf("WIFI_PERFORMANCE roam_enabled=%s threshold=%d hysteresis=%u scan_ms=%lu dwell_ms=%lu bandwidth_configured=%u bandwidth_apply_ok=%s\n",

@@ -26,5 +26,5 @@ with tempfile.TemporaryDirectory(prefix='matdog-f02-') as d:
                     '-fsanitize=address,undefined','-fno-omit-frame-pointer',
                     '-I',str(chosen),str(here/'test_ap_session_clock.cpp'),
                     str(chosen/'network/PortalSecurity.cpp'),str(src/'network/NetworkConfig.cpp'),
-                    str(src/'update/Sha256.cpp'),'-o',str(exe)],check=True)
+                    str(src/'update/Sha256.cpp'),str(src/'update/Hmac256.cpp'),'-o',str(exe)],check=True)
     raise SystemExit(subprocess.run([str(exe)]).returncode)

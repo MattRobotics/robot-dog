@@ -6203,6 +6203,52 @@ def contains_v3(code, token):
     return re.sub(r"\s+", "", token) in re.sub(r"\s+", "", code)
 
 
+def check_portal_page_text(page, where="src/network/PortalPage.h"):
+    """The AP portal is one self-contained document served with no Internet.
+
+    Checked on the RAW file, not on comment-stripped code: stripping `//` would
+    hide exactly the thing looked for (the tail of an external URL). The page
+    renders controller data as text only, keeps no credential in script-visible
+    storage, never puts one in a URL, and carries no static validation claim.
+    """
+    if page.count('R"MATDOG(')!=1 or page.count(')MATDOG"')!=1:
+        fail(f"{where}: portal page raw literal not found");return
+    body=page.split('R"MATDOG(',1)[1].split(')MATDOG"',1)[0]
+    if body.count("<script>")!=1 or body.count("</script>")!=1:
+        fail(f"{where}: exactly one inline script expected");return
+    script=body.split("<script>",1)[1].split("</script>",1)[0]
+    for token in ("<script src","<link","<img","<iframe","<object","<embed","@import","url(","https://","//cdn","srcset"):
+        if token in body:fail(f"{where}: external or embedded resource {token!r}; the portal must work offline")
+    for host in re.findall(r"http://([^\s\"'<)]+)",body):
+        if not host.startswith("192.168.4.1"):fail(f"{where}: external URL http://{host}")
+    for token in ("innerHTML","outerHTML","insertAdjacentHTML","document.write","eval(","new Function","srcdoc"):
+        if token in script:fail(f"{where}: {token} - controller data must be rendered as text")
+    for token in ("document.cookie","sessionStorage","location.search","location.hash","indexedDB"):
+        if token in script:fail(f"{where}: {token} - credentials stay in HttpOnly cookies, never in script or a URL")
+    if re.search(r"fetch\([^)]*\?",script):fail(f"{where}: a request URL carries a query string")
+    if script.count("localStorage.setItem")!=1 or script.count("localStorage.getItem")!=1:
+        fail(f"{where}: localStorage must be reached only through the one `store` wrapper")
+    keys=set(re.findall(r"store\.set\('([^']+)'",script))
+    if not keys or not keys<={"md_remember","md_login","md_watch"}:
+        fail(f"{where}: unexpected stored key(s) {sorted(keys)}; only non-secret hints may be stored")
+    if re.search(r"store\.set\([^)]*(csrf|token|password)",script):
+        fail(f"{where}: a credential is written to storage")
+    for token in ("offline candidate","prove hardware sono ancora","HARDWARE VALIDATED"):
+        if token in body:fail(f"{where}: static validation/candidate text {token!r}; status must come from the device")
+    interval=re.search(r"\bPOLL_MS=(\d+)",script)
+    if not interval or int(interval.group(1))<2000:
+        fail(f"{where}: POLL_MS missing or below 2000 ms; the portal must not flood the controller")
+    if script.count("fetch(")!=2:
+        fail(f"{where}: requests must go through the one GET helper and the one POST helper")
+    for name in ("dashboard","wifi","ap","performance","ota","diagnostics"):
+        if f'data-page="{name}"' not in body or f'<section id="{name}"' not in body:
+            fail(f"{where}: portal section {name!r} missing")
+    for endpoint in ("'/status'","'/wifi/status'","'/wifi/session'","'/wifi/logout'","'/wifi/login'"):
+        if endpoint not in script:fail(f"{where}: endpoint {endpoint} not used")
+    if re.search(r"/(servo|motion|torque|actuator|calibration)[/'\"]",script,re.I):
+        fail(f"{where}: the portal must not address an actuator or calibration endpoint")
+
+
 def check_network_v3_boundaries(files, sketch_dir):
     by_name={p.name:(p,c) for p,c in files if "scripts" not in p.parts}
     required={
@@ -6286,6 +6332,50 @@ def check_network_v3_boundaries(files, sketch_dir):
         if not contains_v3(transport,token):fail("AP-only transport invariant missing: "+token)
     ignored=(sketch_dir/".gitignore").read_text()
     if "src/config/TlsIdentity.local.h" not in ignored:fail("TLS identity must be gitignored")
+    # Persistent administrator recognition (2026-10-11). A remembered device
+    # holds an HMAC of the administrator digest: stateless, never written to
+    # NVS, void without an administrator and revoked by a new token. It can
+    # only open the ordinary short session; every write still needs that
+    # session's cookie, its CSRF token, the same peer and the AP origin.
+    security=re.sub(r"\s+","",by_name.get("PortalSecurity.cpp",(None,""))[1])
+    for token in ("peer==peer_","tokenEqual(cookie,cookie_)","tokenEqual(csrf,csrf_)","now-issued_<300000"):
+        if security.count(token)!=1:fail("Portal session check must exist exactly once: "+token)
+    for token in ("update::hmac256(digest,32,message,sizeof(message),tag)","!anyByte(digest,32)",
+                  "diff|=raw[16+i]^tag[i]","if(!portalDeviceValid(digest,device))",
+                  "if(!device||!device[0])returnfalse;",
+                  "returncurrent(now,peer,cookie)&&tokenEqual(csrf,csrf_);"):
+        if token not in security:fail("Remembered-device invariant missing: "+token)
+    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",1),("portal_.resume(",1),
+                        ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/wifi/",4),
+                        ("Path=/wifi/session;Max-Age=",2)):
+        if compact_transport.count(token)!=count:fail("Portal credential surface changed: "+token)
+    for token in ("if(req.remember)portalDeviceIssue(gate.digest(),random+64,resp.device)",
+                  "if(req.local_authorized&&!portal_.current(now,req.peer,req.cookie))",
+                  "resp.ok=req.local_authorized&&portal_.current(",
+                  '{"/wifi/session",HTTP_POST','{"/wifi/logout",HTTP_POST',
+                  "r.remember=read==81&&memcmp(body+70,\"&remember=1\",11)==0",
+                  "Path=/wifi/session;Max-Age=34560000"):
+        if token not in compact_transport:fail("Remembered-device transport invariant missing: "+token)
+    for token in ("httpd_req_get_url_query","httpd_query_key_value","Serial.","ESP_LOG","log_e(","log_i(","log_d("):
+        if token in transport:fail("HTTP transport must never read credentials from a URL or log: "+token)
+    if re.search(r"(?<![a-z_])printf\(",transport):fail("HTTP transport must not print")
+    kinds=re.search(r"enumclassHttpRequestKind:uint8_t\{(.*?)\};",re.sub(r"\s+","",by_name.get("HttpTransport.h",(None,""))[1]))
+    order=kinds.group(1).split(",") if kinds else []
+    if not all(k in order for k in ("WIFI_STATUS","WIFI_SESSION","WIFI_LOGOUT")) or \
+       min(order.index("WIFI_SESSION"),order.index("WIFI_LOGOUT"))<order.index("WIFI_STATUS"):
+        fail("Session and logout must be administrative request kinds (after WIFI_STATUS)")
+    # STA router test: the candidate is committed only on a HELD link to the
+    # tested SSID; a retry is one more connect, never configuration or mode.
+    for token in ("constboolproven=match&&now-test_stable_since_>=kStaTestHoldMs;",
+                  "transaction_.update(now,proven,link_up,critical)",
+                  "if(!match)test_stable_=false;",
+                  "!sta_link_.load()","now-test_connect_ms_>=kStaTestRetryMs",
+                  "if(!critical&&test_fresh_&&!link_up"):
+        if token not in compact_manager:fail("STA test invariant missing: "+token)
+    if compact_manager.count("transaction_.update(")!=2:
+        fail("The STA transaction must be advanced from the test loop and the fault path only")
+    page_path=sketch_dir/"src"/"network"/"PortalPage.h"
+    check_portal_page_text(page_path.read_text() if page_path.is_file() else "",str(page_path))
 
 
 def check_motion_convergence_gate(sketch_dir):

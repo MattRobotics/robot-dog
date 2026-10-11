@@ -43,6 +43,15 @@
 namespace matdog {
 namespace core {
 
+struct CalibrationPersistenceView {
+  bool published = false;       // false until the Controller's first tick
+  bool available = false;       // valid acknowledged record, writes not blocked
+  bool record_intact = false;   // the acknowledged generation's record is intact
+  uint32_t acknowledged_generation = 0;
+  const char* verdict = "NOT_RUN";  // static strings owned by the persistence layer
+  const char* nvs = "NOT_INITIALIZED";
+};
+
 class ControllerService {
  public:
   using Modules = CommandRouter::Modules;
@@ -120,6 +129,18 @@ class ControllerService {
   }
   const actuator::Q0BootstrapCandidate* calibrationQ0Candidates() const {
     return modules_.q0_capture->candidates();
+  }
+
+  // Calibration persistence, as a plain view. Only the Controller integrates
+  // the persistence layer (P3a), so it publishes this copy of the last LOAD's
+  // RAM snapshot each tick; nothing here reads NVS or names a persistence
+  // type. "Available" is evidence that a valid acknowledged record exists; it
+  // is not a motion permit and admits no JointTransform.
+  void setCalibrationPersistenceView(const CalibrationPersistenceView& view) {
+    calibration_persistence_ = view;
+  }
+  const CalibrationPersistenceView& calibrationPersistence() const {
+    return calibration_persistence_;
   }
 
   // --- servo diagnostic results (formatting-only snapshots) --------------------
@@ -200,6 +221,7 @@ class ControllerService {
 
  private:
   Modules modules_{};
+  CalibrationPersistenceView calibration_persistence_{};
 };
 
 }  // namespace core

@@ -24,6 +24,9 @@ fixture=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.As
 fixture=fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <atomic>\n#include <thread>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"')
 fixture=fixture.replace('memset(p,0x42,n)', 'static unsigned seed=0;memset(p,++seed,n)')
 fixture=fixture.replace('constexpr int ESP_OK=0, HTTP_GET=0','constexpr int HTTP_GET=0')
+# The portal now answers with two Set-Cookie headers; the HTTPD double keeps both.
+fixture=fixture.replace('{ r->response_headers[k]=v;return 0; }','{ auto &h=r->response_headers[k]; if(std::string(k)=="Set-Cookie"&&!h.empty())h+="\\n"; else h.clear(); h+=v; return 0; }')
+assert 'h+="\\n"' in fixture
 fixture=fixture.replace('struct FakeService {', '''class WifiManager { public: static bool verifyAdminRadio(); };
 struct FakeService {
  AdminAccess gate;
@@ -62,7 +65,7 @@ BaseType_t xSemaphoreGive(SemaphoreHandle_t h) {static_cast<std::mutex*>(h)->unl
 namespace matdog { namespace config { constexpr bool kTlsIdentityPresent=true; const char kTlsCertificate[]="cert",kTlsPrivateKey[]="key"; } }
 constexpr int MALLOC_CAP_INTERNAL=1;
 size_t heap_caps_get_largest_free_block(int){return 200000;}
-struct httpd_config_t {int stack_size,max_uri_handlers,max_open_sockets,recv_wait_timeout,send_wait_timeout,task_priority;};
+struct httpd_config_t {int stack_size,max_uri_handlers,max_open_sockets,recv_wait_timeout,send_wait_timeout,task_priority;bool lru_purge_enable;};
 struct httpd_ssl_config_t {httpd_config_t httpd;int tls_handshake_timeout_ms;const uint8_t *servercert,*prvtkey_pem;size_t servercert_len,prvtkey_len;};
 #define HTTPD_DEFAULT_CONFIG() httpd_config_t{}
 #define HTTPD_SSL_CONFIG_DEFAULT() httpd_ssl_config_t{}
@@ -103,7 +106,7 @@ int main() {
  s.service.gate.phase.store(NetworkPhase::ADMIN_AP);
  registered.clear();check(s.registerHandlers(nullptr,false),"register HTTPS role");
  check(registered.size()==3&&std::none_of(registered.begin(),registered.end(),[](auto &u){return u=="/"||u.find("/wifi/")==0;}),"HTTPS has only non-admin routes");
- registered.clear();check(s.registerHandlers(nullptr,true)&&registered.size()==10,"HTTP admin route inventory");
+ registered.clear();check(s.registerHandlers(nullptr,true)&&registered.size()==12,"HTTP admin route inventory");
  for(int mode:{WIFI_STA,WIFI_AP_STA}) {WiFi.mode_value=mode;check(action(s)==403,"driver STA/APSTA deny");}
  adminRadio();WiFi.mode_read_ok=false;check(action(s)==403,"driver unverifiable deny");WiFi.mode_read_ok=true;
  WiFi.STA.running=true;check(action(s)==403,"operational STA bits deny");adminRadio();
@@ -140,6 +143,95 @@ int main() {
  // Drain refuses acknowledgement while a production lease owns the fence.
  HttpTransport drain;drain.lifecycleTick();{AdminLease lease(drain.service.gate);check(bool(lease),"lease acquired");drain.service.gate.revoke();std::thread closer([&]{drain.lifecycleTick();});closer.join();check(!drain.service.gate.listeners_closed.load(),"cannot acknowledge before lease drained");}
  drain.lifecycleTick();check(drain.service.gate.listeners_closed.load(),"drained closure acknowledges");
+ // ---- Remembered device: persistent administrator recognition ----------------
+ // Synthetic token only. The credential is stateless on the controller, so
+ // "reboot" is a brand-new transport object holding the same admin digest.
+ const auto npos=std::string::npos;
+ adminRadio();endpoints();HttpTransport dev;provision(dev);clock_ms+=5000;
+ auto plain=request(dev,"/wifi/login","token="+token);run(plain);
+ check(plain.status==200&&plain.response_headers["Set-Cookie"].find("md_device=")==npos,"plain login issues no device credential");
+ for(const char*bad:{"&remember=0","&remember=1x","&other=1","&remember=1&remember=1"}){clock_ms+=1000;auto r=request(dev,"/wifi/login","token="+token+bad);run(r);check(r.status==400,"malformed remember flag");}
+ clock_ms+=1000;auto rem=request(dev,"/wifi/login","token="+token+"&remember=1");run(rem);check(rem.status==200,"remember login");
+ std::string set=rem.response_headers["Set-Cookie"];size_t at=set.find("md_device=");
+ check(set.find("md_session=")==0&&set.find("HttpOnly; SameSite=Strict; Path=/wifi/; Max-Age=300")!=npos,"session cookie unchanged by remember");
+ check(at!=npos&&set.find("HttpOnly; SameSite=Strict; Path=/wifi/session; Max-Age=34560000",at)!=npos,"device cookie protected and scoped to the session endpoint");
+ std::string device=set.substr(at+10,64);check(device.size()==64&&device!=dev.portal_.cookie()&&device!=token,"device credential is neither the token nor the session");
+ clock_ms+=1000;auto wrongrem=request(dev,"/wifi/login","token="+std::string(64,'b')+"&remember=1");run(wrongrem);
+ check(wrongrem.status==403&&wrongrem.response_headers.count("Set-Cookie")==0,"failed login issues nothing");
+ clock_ms+=1000;loginOk(dev);
+ // It opens a session; it never is one.
+ writes=dev.service.mutations;
+ check(action(dev,"/wifi/ap","on=1",device.c_str(),device.c_str())==403,"device credential is not a session cookie");
+ {auto r=request(dev,"/wifi/ap","on=1");r.headers["Cookie"]="md_device="+device;r.headers["X-Csrf-Token"]=dev.portal_.csrf();run(r);check(r.status==403,"device cookie alone authorizes no write");}
+ check(dev.service.mutations==writes,"no mutation from a device credential");
+ auto resume=[&](HttpTransport &s,const std::string &cookies){auto r=request(s,"/wifi/session","");if(!cookies.empty())r.headers["Cookie"]=cookies;run(r);return r;};
+ // Live session, page reload: its own cookie returns its own CSRF, same peer only.
+ std::string live=dev.portal_.cookie(),live_csrf=dev.portal_.csrf();
+ auto reload=resume(dev,"md_session="+live);
+ check(reload.status==200&&reload.response==live_csrf&&live==dev.portal_.cookie(),"live session re-reads its CSRF, not replaced");
+ check(reload.response_headers["Set-Cookie"].find("md_device=")==npos,"no device credential without proof");
+ endpoints(true,0xc0a80401u,0xc0a80403u);check(resume(dev,"md_session="+live).status==403,"another peer cannot read the CSRF");endpoints();
+ check(resume(dev,"").status==403,"no cookie, no CSRF");
+ check(resume(dev,"md_session="+std::string(64,'0')).status==403,"forged session cookie gets no CSRF");
+ check(resume(dev,"md_session="+live).status==200,"absent credentials are not throttled attempts");
+ // New AP generation (after an STA test): the session is gone, the device is recognised.
+ clock_ms+=2000;dev.service.gate.revoke();dev.service.gate.open();
+ check(action(dev,"/wifi/ap","on=1",live.c_str(),live_csrf.c_str())==403,"old session dead in a new generation");
+ auto back=resume(dev,"md_session="+live+"; md_device="+device);
+ check(back.status==200&&back.response.size()==64&&back.response==dev.portal_.csrf(),"device recognised without the token");
+ check(std::string(dev.portal_.cookie())!=live&&back.response!=live_csrf,"fresh session, fresh CSRF");
+ check(back.response_headers["Set-Cookie"].find("md_device="+device)!=npos,"device cookie lifetime renewed");
+ check(action(dev)==200&&dev.service.mutations==writes+1,"write authorized after resume");
+ // Session expiry: silent renewal instead of a new login.
+ clock_ms+=300000;check(action(dev)==403,"session still expires after 5 minutes");
+ check(resume(dev,"md_device="+device).status==200&&action(dev)==200,"expired session renewed from the device");
+ // Forgery and throttling.
+ std::string forged=device;forged[63]=forged[63]=='0'?'1':'0';std::string other=device;other[0]=other[0]=='0'?'1':'0';
+ dev.portal_.reset();clock_ms+=2000;
+ check(resume(dev,"md_device="+forged).status==403,"forged tag refused");
+ check(resume(dev,"md_device="+device).status==403,"valid credential throttled right after a failure");
+ clock_ms+=1000;check(resume(dev,"md_device="+other).status==403,"forged id refused");
+ // The throttle is over here, so these refusals are about the cookie itself.
+ // Malformed cookies carry no credential at all: refused, and not counted.
+ clock_ms+=1000;
+ check(resume(dev,"md_device="+device.substr(0,63)).status==403,"short credential refused");
+ check(resume(dev,"md_device="+device+"0").status==403,"long credential refused");
+ check(resume(dev,"xmd_device="+device).status==403,"cookie name must match exactly");
+ check(resume(dev,"md_device_old="+device).status==403,"cookie name is not a prefix match");
+ check(resume(dev,"other=1; md_device="+device+"; z=2").status==200,"credential found among other cookies; malformed ones were not attempts");
+ dev.portal_.reset();
+ for(const std::string &bad:{forged,other,token,forged,other}){clock_ms+=1000;check(resume(dev,"md_device="+bad).status==403,"forged credential or token refused");}
+ clock_ms+=1000;check(resume(dev,"md_device="+device).status==403,"five failures: long throttle");
+ clock_ms+=58999;check(resume(dev,"md_device="+device).status==403,"throttle 60 s minus one");
+ clock_ms+=1;check(resume(dev,"md_device="+device).status==200,"throttle releases");
+ // Same origin, method and shape rules as every other write.
+ for(const char*k:{"Host","Origin"}){auto r=request(dev,"/wifi/session","");r.headers["Cookie"]="md_device="+device;r.headers[k]="evil.invalid";run(r);check(r.status==403,"resume requires AP Host/Origin");}
+ for(const char*path:{"/wifi/session?x=1","/wifi/sessions","/wifi/logout/","/wifi/other"}){auto r=request(dev,path,"");r.headers["Cookie"]="md_device="+device;run(r);check(r.status==400,"only the exact paths are actions");}
+ {auto r=request(dev,"/wifi/session","x=1");r.headers["Cookie"]="md_device="+device;run(r);check(r.status==400,"resume takes no body");}
+ {auto r=request(dev,"/wifi/session","");r.headers["Cookie"]="md_device="+device;r.method=HTTP_GET;run(r);check(r.response.size()!=64,"GET never returns a CSRF token");}
+ endpoint(local_addr,local_len,0xc0a80110u,true,443);check(resume(dev,"md_device="+device).status==403,"no resume over the STA/TLS socket");endpoints();
+ for(auto phase:{NetworkPhase::CLIENT_STA,NetworkPhase::ENTER_ADMIN,NetworkPhase::LEAVE_ADMIN,NetworkPhase::CLOSED,NetworkPhase::FAULT}){dev.service.gate.phase.store(phase);check(resume(dev,"md_device="+device).status==403,"resume only in ADMIN_AP");}
+ dev.service.gate.phase.store(NetworkPhase::ADMIN_AP);
+ for(int mode:{WIFI_STA,WIFI_AP_STA}){WiFi.mode_value=mode;check(resume(dev,"md_device="+device).status==403,"resume needs the verified AP radio");}
+ adminRadio();
+ // Reboot: nothing was stored, the same digest recognises the same device.
+ HttpTransport reboot;provision(reboot);clock_ms+=1000;
+ check(resume(reboot,"md_device="+device).status==200&&action(reboot)==200,"device survives a controller restart");
+ // A new administrator token revokes every remembered device.
+ {uint8_t next[32];matdog::update::Sha256 sha;std::string t2(64,'c');sha.update(reinterpret_cast<const uint8_t*>(t2.data()),64);sha.finish(next);reboot.service.gate.setDigest(next);}
+ reboot.portal_.reset();clock_ms+=2000;check(resume(reboot,"md_device="+device).status==403,"token change revokes the device");
+ {uint8_t zero[32]{};HttpTransport blank;blank.service.gate.setDigest(zero);check(resume(blank,"md_device="+device).status==403,"no administrator: nothing is remembered");}
+ // Explicit logout.
+ clock_ms+=2000;check(resume(dev,"md_device="+device).status==200,"session before logout");
+ live=dev.portal_.cookie();live_csrf=dev.portal_.csrf();
+ auto logout=[&](const std::string &cookies){auto r=request(dev,"/wifi/logout","");if(!cookies.empty())r.headers["Cookie"]=cookies;run(r);return r;};
+ check(logout("md_session="+std::string(64,'0')).status==200&&action(dev)==200,"another client cannot end the session");
+ endpoints(true,0xc0a80401u,0xc0a80403u);logout("md_session="+live);endpoints();check(action(dev)==200,"another peer cannot end the session");
+ auto out=logout("md_session="+live);
+ check(out.status==200&&out.response=="LOGGED_OUT","logout accepted");
+ check(out.response_headers["Set-Cookie"].find("md_session=; HttpOnly; SameSite=Strict; Path=/wifi/; Max-Age=0")!=npos&&out.response_headers["Set-Cookie"].find("md_device=; HttpOnly; SameSite=Strict; Path=/wifi/session; Max-Age=0")!=npos,"logout clears both cookies");
+ writes=dev.service.mutations;check(action(dev,"/wifi/ap","on=1",live.c_str(),live_csrf.c_str())==403&&dev.service.mutations==writes,"session ended by logout");
+ {auto r=request(dev,"/wifi/logout","");r.headers["Origin"]="http://evil.invalid";run(r);check(r.status==403,"logout requires the AP origin");}
  printf("AP_ONLY_TRANSPORT_PASS: %u checks (production paths; HTTPD/TLS/driver doubles)\n",checks);
 }
 '''
@@ -155,5 +247,5 @@ verify='bool WifiManager::verifyAdminRadio()'+between(w,'bool WifiManager::verif
 unit=fixture.replace('// PRODUCTION_TYPES',types).replace('// PRODUCTION_HELPERS',helpers+register+page+lifecycle+admit+verify).replace('// PRODUCTION_HANDLER',handler).replace('// PRODUCTION_SERVICE_CASES',cases)
 with tempfile.TemporaryDirectory(prefix='matdog-ap-only-') as d:
     cpp,exe=Path(d)/'probe.cpp',Path(d)/'probe';cpp.write_text(unit)
-    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-O1','-pthread','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(src),'-I',str(here/'network_stubs'),'-I',str(here/'nvs_stub'),str(cpp),str(src/'network/AdminAccess.cpp'),str(src/'network/PortalSecurity.cpp'),str(src/'network/NetworkConfig.cpp'),str(src/'update/Sha256.cpp'),'-o',str(exe)],check=True)
+    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-O1','-pthread','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(src),'-I',str(here/'network_stubs'),'-I',str(here/'nvs_stub'),str(cpp),str(src/'network/AdminAccess.cpp'),str(src/'network/PortalSecurity.cpp'),str(src/'network/NetworkConfig.cpp'),str(src/'update/Sha256.cpp'),str(src/'update/Hmac256.cpp'),'-o',str(exe)],check=True)
     subprocess.run([str(exe)],check=True)

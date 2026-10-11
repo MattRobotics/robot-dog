@@ -62,7 +62,12 @@ class WifiManager {
 public:
   static constexpr uint32_t kRadioSettleMs = 100, kConnectTimeoutMs = 15000,
                             kBackoffInitialMs = 2000, kBackoffMaxMs = 60000,
-                            kRadioPollIntervalMs = 1000;
+                            kRadioPollIntervalMs = 1000,
+                            // STA test ("Prova e salva"): a failed attempt is
+                            // repeated inside the 30 s transaction window, and
+                            // the candidate is committed only after association
+                            // and address were held for the stability window.
+                            kStaTestRetryMs = 4000, kStaTestHoldMs = 1500;
   void begin(uint32_t now_ms);
   void update(uint32_t now_ms);
   bool setEnabled(bool enabled, uint32_t now_ms);
@@ -140,6 +145,10 @@ private:
   void faultClose(uint32_t now);
   void enterAdminTick(uint32_t now);
   bool issueApConfig(uint32_t now);
+  void beginStaTest(uint32_t now);
+  void trackStaTest(uint32_t now);
+  void finishStaTest(uint32_t now, bool aborted);
+  void refuseStaTest(bool storage_error);
   bool apConfigApplied();
   // Bring-up is two serialized driver commands, each with its own complete
   // acknowledgment set: the role change, then the AP profile.
@@ -181,6 +190,13 @@ private:
   std::atomic<unsigned> context_{0};
   std::atomic<bool> config_busy_{false};
   std::atomic<uint16_t> disconnect_reason_{0};
+  // STA test evidence, written by the event task, read by the worker.
+  std::atomic<uint16_t> sta_reason_{0};
+  std::atomic<uint32_t> sta_disconnects_{0};
+  std::atomic<bool> sta_associated_{false}, sta_link_{false};
+  uint32_t intent_seq_ = 0, test_since_ = 0, test_connect_ms_ = 0,
+           test_stable_since_ = 0, test_disconnects_ = 0;
+  bool test_stable_ = false;
   uint32_t ap_since_ = 0, radio_poll_ms_ = 0, off_since_ = 0;
   bool enabled_ = true, ap_manual_ = false, scan_roam_ = false;
   std::atomic<bool> nvs_fault_{false};

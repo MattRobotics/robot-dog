@@ -26,7 +26,9 @@ enum class HttpRequestKind : uint8_t {
   WIFI_LOGIN,
   WIFI_CONFIG,
   WIFI_SCAN,
-  WIFI_AP
+  WIFI_AP,
+  WIFI_SESSION,
+  WIFI_LOGOUT
 };
 constexpr size_t kHttpChunkBufferBytes = 1024, kHttpStatusTextBytes = 4096;
 struct HttpTransportRequest {
@@ -37,9 +39,10 @@ struct HttpTransportRequest {
   uint8_t signature[update::kHmac256DigestBytes]{};
   uint8_t chunk_data[kHttpChunkBufferBytes]{};
   uint32_t chunk_len = 0;
-  bool local_authorized = false, tls = false, ap_socket = false, ap_on = false;
+  bool local_authorized = false, tls = false, ap_socket = false, ap_on = false,
+       remember = false;
   uint32_t peer = 0, admin_generation = 0;
-  char cookie[65]{}, csrf[65]{}, login[65]{};
+  char cookie[65]{}, csrf[65]{}, login[65]{}, device[65]{};
   ConfigPatch patch{};
 };
 struct HttpTransportResponse {
@@ -48,7 +51,7 @@ struct HttpTransportResponse {
   char text[kHttpStatusTextBytes]{};
   size_t text_len = 0;
   uint32_t sequence = 0;
-  char cookie[65]{};
+  char cookie[65]{}, device[65]{};
   uint8_t nonce[update::kOtaNonceBytes]{};
   update::OtaAuthResult auth_result = update::OtaAuthResult::REJECTED_NO_SECRET;
 };
@@ -83,6 +86,9 @@ private:
                 HttpTransportResponse *response);
   void serviceRequest(uint32_t now_ms);
   void wifiResponse(HttpTransportResponse &response);
+  void statusExtension(HttpTransportResponse &response,
+                       const power::DalySample &bms,
+                       const calibration::CalibrationSessionStatus &cal);
   core::ControllerService *service_ = nullptr;
   update::OtaManager *ota_ = nullptr;
   update::OtaSession session_{};

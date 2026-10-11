@@ -196,5 +196,5 @@ unit = fixture.replace('// PRODUCTION_TYPES', types).replace('// PRODUCTION_HELP
 with tempfile.TemporaryDirectory(prefix='matdog-ap-offline-') as d:
     cpp, exe = Path(d)/'test.cpp', Path(d)/'test'
     cpp.write_text(unit)
-    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-O1','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(src),str(cpp),str(src/'network/PortalSecurity.cpp'),str(src/'network/NetworkConfig.cpp'),str(src/'update/Sha256.cpp'),'-o',str(exe)],check=True)
+    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-O1','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(src),str(cpp),str(src/'network/PortalSecurity.cpp'),str(src/'network/NetworkConfig.cpp'),str(src/'update/Sha256.cpp'),str(src/'update/Hmac256.cpp'),'-o',str(exe)],check=True)
     subprocess.run([str(exe), *(['original'] if a.expect_original_defect else [])],check=True)

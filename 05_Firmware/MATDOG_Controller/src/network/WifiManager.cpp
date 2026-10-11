@@ -97,8 +97,19 @@ void WifiManager::initializeWorker() {
   transaction_.begin(&storage_, config_);
   admin_.setDigest(config_.admin_digest); // no generation is admitted at boot
   WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
-    if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED)
+    if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
       disconnect_reason_.store(info.wifi_sta_disconnected.reason);
+      sta_reason_.store(info.wifi_sta_disconnected.reason);
+      sta_link_.store(false);
+      sta_disconnects_.fetch_add(1);
+    }
+    if (event == ARDUINO_EVENT_WIFI_STA_CONNECTED) {
+      // The router accepted the credentials; an earlier attempt's reason no
+      // longer describes the link.
+      sta_reason_.store(0);
+      sta_associated_.store(true);
+      sta_link_.store(true);
+    }
     observeRadioEvent(event);
   });
   event_since_ = millis();
@@ -487,6 +498,7 @@ void WifiManager::transitionTick(uint32_t now) {
       worker_status_.fault_event = admin_.fault_event.load();
       worker_status_.fault_expected = admin_.fault_expected.load();
     }
+    if (intent_pending_) refuseStaTest(false);
     intent_pending_ = false;
     intent_ = NetworkConfig{};
     config_busy_.store(false);
@@ -496,9 +508,15 @@ void WifiManager::transitionTick(uint32_t now) {
       const uint8_t source = admin_.fault_source.exchange(0);
       noteFault(source ? static_cast<FaultSite>(source) : FaultSite::UNSPECIFIED, 0);
     }
+    if (transaction_.busy()) {
+      transaction_.update(now, false, false, true);
+      worker_status_.config_phase = transaction_.phase();
+      finishStaTest(now, true);
+    } else if (intent_pending_) {
+      refuseStaTest(false);
+    }
     intent_pending_ = false;
     intent_ = NetworkConfig{};
-    transaction_.update(now, false, false, true);
     config_busy_.store(false);
     ap_reload_ = false;
     ap_step_ = ApStep::IDLE;
@@ -568,9 +586,11 @@ void WifiManager::transitionTick(uint32_t now) {
         worker_status_.config_phase = transaction_.phase();
         config_busy_.store(false);
         if (transaction_.phase() == ConfigPhase::STORAGE_ERROR) nvs_fault_.store(true);
+        refuseStaTest(transaction_.phase() == ConfigPhase::STORAGE_ERROR);
         startAp(now);
       } else {
         profile_ = intent_profile_;
+        beginStaTest(now);
         connectProfile(now);
       }
       intent_ = NetworkConfig{};
@@ -611,10 +631,65 @@ void WifiManager::issueConnect(uint32_t now) {
   drv.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
   drv.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
   drv.sta.bssid_set = false;
+  test_connect_ms_ = now;
+  test_disconnects_ = sta_disconnects_.load();
+  if (transaction_.busy() && worker_status_.sta_test.attempts < 255)
+    ++worker_status_.sta_test.attempts;
   if (esp_wifi_set_config(WIFI_IF_STA, &drv) != ESP_OK ||
       esp_wifi_connect() != ESP_OK)
     policy_.reportActionFailed(WifiFault::CONNECT_CALL_REJECTED, millis());
   memset(&drv, 0, sizeof(drv));
+}
+// ---- STA test report ------------------------------------------------------
+// The transaction decides COMMITTED/ROLLBACK exactly as before. These helpers
+// only record what was observed, so the operator can tell a refused password
+// from a missing router or a DHCP failure once the AP is back.
+void WifiManager::beginStaTest(uint32_t now) {
+  auto &t = worker_status_.sta_test;
+  t = StaTestReport{};
+  t.seq = intent_seq_;
+  t.outcome = static_cast<uint8_t>(StaTestOutcome::RUNNING);
+  t.profile = intent_profile_;
+  copy(t.ssid, 33, transaction_.candidate().sta[intent_profile_].ssid);
+  test_since_ = now;
+  test_stable_ = false;
+  sta_reason_.store(0);
+  sta_associated_.store(false);
+}
+void WifiManager::trackStaTest(uint32_t now) {
+  auto &t = worker_status_.sta_test;
+  t.elapsed_ms = now - test_since_;
+  t.reason = sta_reason_.load();
+  t.associated = sta_associated_.load();
+}
+void WifiManager::finishStaTest(uint32_t now, bool aborted) {
+  auto &t = worker_status_.sta_test;
+  trackStaTest(now);
+  const ConfigPhase phase = transaction_.phase();
+  if (phase == ConfigPhase::COMMITTED) {
+    t.outcome = static_cast<uint8_t>(StaTestOutcome::CONNECTED);
+    t.ipv4 = static_cast<uint32_t>(WiFi.localIP());
+    t.rssi_dbm = WiFi.RSSI();
+    t.channel = WiFi.channel();
+    t.rolled_back = false;
+    return;
+  }
+  t.outcome = static_cast<uint8_t>(classifyStaTestFailure(
+      phase == ConfigPhase::STORAGE_ERROR, aborted, t.associated, t.reason));
+  // A failed ACTIVE write leaves storage in doubt; every other failure leaves
+  // the known-good ACTIVE record untouched.
+  t.rolled_back = phase == ConfigPhase::ROLLBACK;
+}
+// The accepted intent never reached the radio: nothing was tested.
+void WifiManager::refuseStaTest(bool storage_error) {
+  auto &t = worker_status_.sta_test;
+  t = StaTestReport{};
+  t.seq = intent_seq_;
+  t.profile = intent_profile_;
+  copy(t.ssid, 33, intent_.sta[intent_profile_ > 1 ? 0 : intent_profile_].ssid);
+  t.outcome = static_cast<uint8_t>(
+      classifyStaTestFailure(storage_error, true, false, 0));
+  t.rolled_back = !storage_error;
 }
 void WifiManager::recordTx(const Request &r, TxResult result, int32_t error) {
   auto &w = worker_status_;
@@ -765,6 +840,7 @@ bool WifiManager::consume(const Request &r, uint32_t now) {
     ap_manual_ = false;
     intent_ = c;
     intent_profile_ = p.test_profile;
+    intent_seq_ = r.seq;
     intent_pending_ = true;
     intent_since_ = now;
     ap_reload_ = p.ap;
@@ -869,9 +945,28 @@ void WifiManager::workerTick(uint32_t now) {
     const bool client_verified = !admin_.closing.load() &&
         admin_.phase.load() == NetworkPhase::CLIENT_STA &&
         esp_wifi_get_mode(&mode) == ESP_OK && mode == WIFI_MODE_STA;
-    transaction_.update(now, match, link_up, context_.load() != 0 || !client_verified);
+    const bool critical = context_.load() != 0 || !client_verified;
+    // A link that only flickers up is not proof: the candidate is committed
+    // after association and address were held without interruption.
+    if (!match) test_stable_ = false;
+    else if (!test_stable_) { test_stable_ = true; test_stable_since_ = now; }
+    const bool proven = match && now - test_stable_since_ >= kStaTestHoldMs;
+    // The driver reported the attempt over and nothing is associated: try
+    // again inside the same transaction window. The profile is already in the
+    // driver; this never touches configuration, mode or storage.
+    if (!critical && test_fresh_ && !link_up && !sta_link_.load() &&
+        sta_disconnects_.load() != test_disconnects_ &&
+        now - test_connect_ms_ >= kStaTestRetryMs) {
+      test_connect_ms_ = now;
+      test_disconnects_ = sta_disconnects_.load();
+      if (worker_status_.sta_test.attempts < 255) ++worker_status_.sta_test.attempts;
+      esp_wifi_connect();
+    }
+    trackStaTest(now);
+    transaction_.update(now, proven, link_up, critical);
     worker_status_.config_phase = transaction_.phase();
     if (!transaction_.busy()) {
+      finishStaTest(now, critical);
       worker_status_.tx_result = static_cast<uint8_t>(
           transaction_.phase() == ConfigPhase::COMMITTED ? TxResult::COMMITTED
           : transaction_.phase() == ConfigPhase::STORAGE_ERROR ? TxResult::STORAGE_ERROR

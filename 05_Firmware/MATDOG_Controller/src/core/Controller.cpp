@@ -1074,6 +1074,21 @@ void Controller::update(uint32_t now_ms) {
     led_status_.update(led_now_ms, led_inputs);
   }
 
+  // Read-only copy of the calibration persistence RAM snapshot for the
+  // telemetry layer (Dashboard). No NVS access, no load, no write: only the
+  // facts @CALIBRATION PERSIST STATUS already prints.
+  {
+    const calibration::PersistenceSnapshot& persisted = persistence_.snapshot();
+    CalibrationPersistenceView view;
+    view.published = true;
+    view.available = persistence_.calibrationAvailable();
+    view.record_intact = persisted.assessment.acknowledged_record_intact;
+    view.acknowledged_generation = persisted.assessment.acknowledged_generation;
+    view.verdict = calibration::toString(persisted.verdict);
+    view.nvs = calibration::toString(persisted.nvs);
+    service_.setCalibrationPersistenceView(view);
+  }
+
   // Drains at most one pending HTTP request, if the Web server was ever
   // started (see @WEB SERVER START). A no-op, bounded check when it was
   // not — see network/HttpTransport.h for the cross-thread handoff this

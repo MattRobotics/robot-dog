@@ -160,3 +160,83 @@ administration; a second key sent during that window is refused
 `@WIFI AP VERIFY <passphrase>` compares a supplied key with the stored one and
 with the live driver profile and prints only MATCH/MISMATCH.
 
+## Dashboard, remembered device and STA test report (2026-10-11)
+
+Nothing in this section changes the exclusive `ADMIN_AP` / `CLIENT_STA`
+contract above: one radio, and the portal exists only in a verified AP
+generation.
+
+**Reading is open inside the AP, writing is not.** `GET /status` and
+`GET /wifi/status` need no login; any client that knows the WPA2 key can read
+them. Every `/wifi/` POST that changes anything needs the session cookie, the
+CSRF header, the same peer address, the AP Host/Origin and an admitted
+generation. Knowing the AP key is not administrative permission.
+
+**Session.** Unchanged: opened by the 64-hex administrator token, bound to the
+peer, 5 minutes, ended by a new generation, an administrator-digest change or
+`POST /wifi/logout`.
+
+**Remembered device.** With "Ricorda questo dispositivo" the login also sets
+`md_device`, a credential derived from the administrator digest with
+HMAC-SHA256 and a random 16-byte id. The controller stores nothing per device
+and writes nothing to NVS; verification is a recomputation. Consequences, all
+intended:
+
+- it survives a controller restart and needs no clock;
+- it is void when no administrator is provisioned;
+- provisioning a new administrator token (`@WIFI ADMIN KEY`, USB) revokes every
+  remembered device at once. There is no per-device revocation; "Esci" removes
+  the credential from that browser and ends its session;
+- it is sent only to `POST /wifi/session` (`Path=/wifi/session`), which answers
+  with a fresh ordinary session. It is never accepted as a session cookie or as
+  a CSRF token, so by itself it authorizes no write;
+- wrong credentials are throttled (1 s, 60 s after five), independently of the
+  token throttle. A request carrying no credential is not an attempt.
+
+Trust boundary, stated plainly: the portal is plain HTTP inside WPA2-PSK. A
+client that holds the AP key and captures another client's handshake can read
+that client's traffic, which already included the administrator token at
+login; the remembered credential is exposed to the same observer, less often
+than the session cookie. Keep the AP key private; change the administrator
+token to revoke.
+
+**Dashboard.** The page polls `/status` then `/wifi/status`, sequentially, every
+4 s while visible, and renders cached controller state only. A BMS value is
+shown as current only while `bms_fresh=YES` (the controller's
+`kDalyTelemetryFreshnessMs` contract); otherwise N/D or STALE. Battery bar
+colours use page constants (`BAT_LOW` 30 %, `BAT_CRIT` 15 %) or the
+controller's own warning/critical facts. The page has no actuator, calibration
+or motion endpoint.
+
+**STA test ("Prova e salva").** Sequence seen by the operator:
+
+1. The request is accepted in RAM; about one second later the AP and the portal
+   close. The phone is disconnected. This is expected and unavoidable.
+2. In exclusive `CLIENT_STA` the candidate is written as `PENDING` and tested
+   for at most 30 s. A failed attempt is retried (at most every 4 s). The
+   candidate becomes `ACTIVE` only if association to the tested SSID and an
+   address are held for 1.5 s.
+3. Whatever the result, the firmware returns to a freshly verified AP with the
+   stored AP key. On failure `ACTIVE` was never written: the known-good
+   configuration is intact, also across a power cut during the test (`PENDING`
+   is never promoted at boot).
+4. Reconnect the phone to the AP. A remembered device is recognised without the
+   token. The portal shows the outcome; `@WIFI STATUS` prints it as
+   `WIFI_STA_TEST`.
+
+Outcomes: `CONNECTED` (committed, with address and RSSI); `AUTH_REJECTED`
+(driver reason 15, 202 or 204: the router refused the WPA2 handshake);
+`AP_NOT_FOUND` (201, 210–212); `NO_IP` (associated, no address);
+`TIMEOUT`; `ABORTED` (critical context or radio fault); `STORAGE_ERROR`.
+
+Not recoverable without USB or a power cycle, as before: a radio `FAULT`
+(fail closed, radio off) needs `@WIFI AP ON` or a restart. After a successful
+commit with `ap_always` false, the next boot joins the router and opens the AP
+only as fallback (no credentials, or two connect timeouts) or on `@WIFI AP ON`.
+With no TLS identity provisioned the controller serves nothing in `CLIENT_STA`.
+With `ap_always` true the controller returns to its AP at every boot and keeps
+the router profile stored but unused; AP OFF is then refused. The Wi-Fi form
+states this choice ("Dopo il salvataggio") and, when it differs from the stored
+policy, sends it in the same request as the router credentials, so both are
+committed or neither is. A first router setup preselects "AP sempre attivo".
+

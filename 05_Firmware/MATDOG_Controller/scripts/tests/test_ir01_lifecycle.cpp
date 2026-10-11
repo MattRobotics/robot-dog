@@ -275,10 +275,13 @@ void rotationOrStage(int kind) {
     CHECK(commits==1);
     WifiRuntimeTest::tick(m,1500); association("new-network");
     WifiRuntimeTest::tick(m,1600);
+    // The link must be held for the stability window before the commit.
+    CHECK(m.adminAccess().phase.load()==NetworkPhase::CLIENT_STA && commits==1);
+    WifiRuntimeTest::tick(m,1600+WifiManager::kStaTestHoldMs);
     CHECK(m.adminAccess().phase.load()==NetworkPhase::ENTER_ADMIN);
-    closeListeners(m); WifiRuntimeTest::tick(m,1650);
+    closeListeners(m); WifiRuntimeTest::tick(m,1650+WifiManager::kStaTestHoldMs);
     CHECK(!m.adminAccess().allowed(old));
-    WiFi.drainEvents(); WifiRuntimeTest::tick(m,1700);
+    WiFi.drainEvents(); WifiRuntimeTest::tick(m,1700+WifiManager::kStaTestHoldMs);
     CHECK(m.adminAccess().phase.load()==NetworkPhase::ADMIN_AP);
     CHECK(commits==2);
   }
