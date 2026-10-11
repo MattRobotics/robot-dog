@@ -110,6 +110,6 @@ Handoff operativo: [Motion 2026-10-12](../Development_Log/2026-10-12_MOTION_ENAB
 
 Solo estratti testuali selezionati senza SSID/router IP/MAC/segreti sono pubblicati.
 Nessun raw flash, binario, backup, dump NVS, cookie, token o credenziale aggiunto.
-[Media](../../06_Media/Dashboard/2026-10-11/README.md): due mockup illustrativi
+[Media](../../07_Media/Dashboard/2026-10-11/README.md): due mockup illustrativi
 pubblicati, entrambi i file Wi-Fi esclusi e conservati localmente. L'esclusione
 dello screenshot reale limita l'audit pubblico della prova STA ma protegge la privacy.

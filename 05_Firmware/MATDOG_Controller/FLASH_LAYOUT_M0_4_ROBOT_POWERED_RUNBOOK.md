@@ -159,7 +159,7 @@ dimensione, SHA-256 e byte rispetto all'originale. Password/chiave restano sotto
 controllo dell'operatore, fuori da repository, log e conversazione. Una directory,
 partizione o filesystem sullo stesso disco e un upload non confermato non
 soddisfano il gate. Il metodo standard è documentato in
-[09_Backups/ESP32](../../09_Backups/ESP32/README.md).
+[10_Backups/ESP32](../../10_Backups/ESP32/README.md).
 M0.4 non presume l'esistenza della seconda copia; serve un receipt positivo.
 Se lo stato è cambiato (anche NVS/core), non aggiornare l'hash autorizzato in
 modo opportunistico: STOP, archiviare e riconciliare le differenze, verificare

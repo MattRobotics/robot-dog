@@ -67,7 +67,7 @@ notice) name these branches as they were; they are unchanged and are read togeth
 | `matdog-controller-v0.1.0` | `c54862f` | yes | Frozen Controller V0.1 |
 | `matdog-controller-nextgen-hw-validated-v1` | `c45858c` | yes | NextGen candidate, hardware-validated for its scope |
 | `matdog-led-v2-focused-hw-validated-v1` | `88062e1` | yes | LED V2 focused hardware validation |
-| `backup-esp32-m0-20261002T173142Z-14c19f227594` | `2757604` | yes | Release carrying the encrypted ESP32 flash backup; manifest and receipt in [`09_Backups/ESP32/`](../09_Backups/ESP32/README.md) |
+| `backup-esp32-m0-20261002T173142Z-14c19f227594` | `2757604` | yes | Release carrying the encrypted ESP32 flash backup; manifest and receipt in [`10_Backups/ESP32/`](../10_Backups/ESP32/README.md) |
 | `archive/2026-07-31/milestone-i-clean-room-spec` | `002f067` | yes | Milestone I spec snapshot |
 | `matdog-urdf-rev00-kinematic-baseline` | `2b6a3a0` | yes | URDF REV00 baseline; see [ADR-003](Architecture_Decisions/ADR-003_URDF_REV00_Kinematic_Baseline.md) |
 | `archive/2026-07-31/calibration-sequence-upper-lower-hip-audit` | `cc70718` | **no** | Held only by this tag. Whether it is also in the non-public archive: `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |

@@ -11,7 +11,7 @@ seriale. Trascrizione integrale flash e risposte post-flash recuperate dalla
 conversazione: output originale incollato dall’operatore, non log automatico
 nativo Asus. SHA256SUMS 5/5 PASS; [appendice pubblica](../Validation_Reports/HW_Closeout_2026-10-11/MATDOG_2026-10-11_EVIDENCE_APPENDIX.md).
 La lacuna di contenuto è chiusa; vecchi report di arresto restano storici. Due mockup privacy-safe pubblicati; due immagini Wi-Fi
-sensibili lasciate locali. Vedi [media](../../06_Media/Dashboard/2026-10-11/README.md).
+sensibili lasciate locali. Vedi [media](../../07_Media/Dashboard/2026-10-11/README.md).
 
 Decisione rete: [ADR-005](../Architecture_Decisions/ADR-005_Non_Motion_Closeout_and_Maintenance_Network_Boundary.md).
 Residui nel [registro unico](../OPEN_ITEMS.md#closeout-2026-10-11--fase-successiva).

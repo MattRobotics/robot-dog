@@ -132,3 +132,11 @@ Root `README.md`, `05_Firmware/README.md`, the Controller `README.md`,
 - **Divergence from the dev.3 line:** the dev.3 line modifies `CHANGELOG.md`, `VALIDATION.md`
   and the Controller `README.md` further. The next integration (PR-2) must merge those on top of
   these PR-1 documentation edits.
+
+
+### Repository path annotation — 2026-10-11
+
+The Evidence row above describes the unchanged-file guarantee of the 2026-10-08
+integration and retains its historical wording. A later layout-only move places
+ESP32 backup metadata in [10_Backups/ESP32](../../10_Backups/ESP32/README.md),
+with the manifest and receipt JSON bytes unchanged.

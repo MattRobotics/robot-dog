@@ -11,7 +11,7 @@ documentale non identifica un nuovo firmware installato.
 incollato dall’operatore, hash verificati; non log automatico nativo Asus);
 [handoff Motion 2026-10-12](09_Logs/Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md),
 [open items](09_Logs/OPEN_ITEMS.md#closeout-2026-10-11--fase-successiva),
-[media illustrativi](06_Media/Dashboard/2026-10-11/README.md).
+[media illustrativi](07_Media/Dashboard/2026-10-11/README.md).
 Dashboard AP 192.168.4.1; STA temporanea positiva e COMMITTED, LAN MAINTENANCE
 rinviata. NVS gen1 integra non concede motion permit: MAINTENANCE, NONE,
 MOTION_AUTHORIZED=0, RESTORE=NOT_IMPLEMENTED. Nessun flash/main/motion autorizzato.
@@ -395,7 +395,7 @@ capabilities are integrated into the Controller.
 07_Media/       images, renders, and videos
 08_Tests/       repeatable validation procedures
 09_Logs/        evidence, decisions, reports, and historical archives (start at HISTORY_INDEX.md)
-09_Backups/     manifests and receipts of encrypted flash backups (no plaintext images)
+10_Backups/     manifests and receipts of encrypted flash backups (no plaintext images)
 ```
 
 ## Safety boundary
