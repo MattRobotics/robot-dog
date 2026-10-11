@@ -1,5 +1,7 @@
 # Validation reports — index
 
+Latest scoped closure: [MATDOG hardware non-motion 2026-10-11](MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) — baseline validated, motion not validated; final flash/NVS operator-reported, raw final logs missing.
+
 Each entry is evidence for its recorded date and scope only. A PASS here does not carry over to a
 later firmware, a later mechanical state or a later power architecture, and no entry authorizes
 motion (`MOTION_AUTHORIZED=0`). Recorded PASS/FAIL results are not edited by this index.

@@ -1,5 +1,11 @@
 # MATDOG Roadmap
 
+**Update 2026-10-11:** [non-motion closeout](../../09_Logs/Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md)
+closes the limited hardware baseline on b08322d. Temporary STA and AP Dashboard
+operator evidence supersede blanket historical “no association/UI hardware test”
+statements below; normal RUN STA, LAN MAINTENANCE and OTA remain unqualified.
+Motion suites DEFERRED and operational motion NO-GO; [handoff](../../09_Logs/Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
+
 > **Flash safety — 2026-10-08, updated for PR-3.** `main` is not a flashable baseline for the
 > current robot.
 > - It carries the robot's layout `MATDOG_16M_2x5M_NVS_V1`, Calibration Persistence V1, a selective

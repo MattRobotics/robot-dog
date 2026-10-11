@@ -1,5 +1,22 @@
 # MATDOG — Custom Quadruped Robot
 
+## Closeout hardware non-motion — 2026-10-11
+
+**BASELINE HARDWARE NON-MOTION VALIDATED; MOTION NOT VALIDATED.**
+Installato operatore: `b08322dedc5564c080f691dc98047511ef2b953f`,
+ROBOT_POWERED, APP-ONLY app0, layout V1, OTA_INGEST=0. Il successivo HEAD
+documentale non identifica un nuovo firmware installato.
+[Report e limiti di evidenza](09_Logs/Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md)
+(APP-ONLY/NVS finale riferiti, log grezzo finale mancante);
+[handoff Motion 2026-10-12](09_Logs/Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md),
+[open items](09_Logs/OPEN_ITEMS.md#closeout-2026-10-11--fase-successiva),
+[media illustrativi](06_Media/Dashboard/2026-10-11/README.md).
+Dashboard AP 192.168.4.1; STA temporanea positiva e COMMITTED, LAN MAINTENANCE
+rinviata. NVS gen1 integra non concede motion permit: MAINTENANCE, NONE,
+MOTION_AUTHORIZED=0, RESTORE=NOT_IMPLEMENTED. Nessun flash/main/motion autorizzato.
+Le tabelle main e le sessioni sotto sono snapshot storici con il loro scope.
+
+
 MATDOG is Matt Robotics' custom quadruped platform: a 17-DOF mechanical design with an
 articulated head, an ESP32-S3 real-time controller, and a future Jetson-based high-level stack.
 This repository is the single active engineering repository for the robot.
@@ -12,8 +29,8 @@ This repository is the single active engineering repository for the robot.
 >   firmware identity is `0.2.0-dev.3`. `scripts/build.sh` uses `PartitionScheme=custom` and
 >   `scripts/upload.sh` refuses every full-image upload.
 > - Since 2026-10-10, `main` also has the exact two LED source file blobs of the physically
->   validated, **separate** LED-only firmware `fee9383` (`LED_TRANSPORT=RMT_DMA`); that firmware now
->   runs on the robot. A build of `main` is **not** the installed binary: Git provenance and build
+>   validated, **separate** LED-only firmware `fee9383` (`LED_TRANSPORT=RMT_DMA`); that firmware ran
+>   on the robot in that session (superseded installed identity: closeout above). A build of `main` is **not** the installed binary: Git provenance and build
 >   ID differ. No flash or motion is authorized.
 > - Historical dev.3 Hardware Validation (2026-10-07): execution COMPLETE, acceptance BLOCKED.
 >   The later LED-only validation (2026-10-10) passed in its limited scope; **no general release

@@ -1,5 +1,13 @@
 # MATDOG Wi-Fi / OTA V3 — runbook hardware futuro
 
+**Aggiornamento 2026-10-11:** [closeout](../../09_Logs/Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md)
+registra AP Dashboard e prova STA temporanea positivi (evidenza operatore),
+fix STA_STOP b08322d e limiti di audit. Il runbook sotto è una proposta storica
+V3: non tutte le sue prove sono state eseguite né descrive la policy finale.
+MAINTENANCE resta AP esclusivo; niente Dashboard LAN, niente RUN per rete.
+Le prove incomplete restano NOT TESTED, OTA e security non promossi a PASS.
+
+
 **TO_TEST, non eseguito.** Questo documento non autorizza flash, seriale, provisioning,
 reboot, OTA, movimento, erase o merge. Il candidato consegnato è ROBOT_POWERED,
 ingest 0, base provvisoria. Ogni fase hardware richiede una successiva autorizzazione.
