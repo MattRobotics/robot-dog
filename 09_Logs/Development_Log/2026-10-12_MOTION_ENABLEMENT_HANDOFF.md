@@ -10,7 +10,8 @@ Questo è un piano operativo per la successiva sessione autorizzata, non un perm
   build breve operatore `b08322dedc55`; APP-ONLY app0, ROBOT_POWERED,
   layout MATDOG_16M_2x5M_NVS_V1, OTA_INGEST=0. SHA documentale diverso dal firmware.
 - NVS gen1 VALID_ACKNOWLEDGED, record integro, A valido/B assente e reconciliation
-  non richiesta riferiti post-flash; vedi limiti delle prove nel closeout.
+  non richiesta documentati nelle risposte originali post-flash recuperate; vedi provenienza
+  nell’appendice del closeout (output incollato, non log automatico Asus).
   Non equivale a calibrazione ammessa: precedente stato operativo
   STALE_PENDING_FULL_RECALIBRATION; RESTORE=NOT_IMPLEMENTED.
 - MAINTENANCE, authority NONE, MOTION_AUTHORIZED=0. Stato power RUN non è mode RUN.
@@ -24,8 +25,8 @@ Questo è un piano operativo per la successiva sessione autorizzata, non un perm
    possono concedere autorità attuatori. Non usare RUN per raggiungere la LAN.
 2. Identificare firmware realmente in esecuzione e acquisire evidenza testuale
    redatta dello stato safety, del record NVS e dei fault. Non assumere i dati
-   dell'11 ottobre come stato corrente. Se necessario, recuperare i log grezzi
-   finali preesistenti; nessun dump NVS/flash o segreto pubblicato.
+   dell'11 ottobre come stato corrente. Trascrizioni finali già recuperate e
+   hash verificati nel closeout; nessun dump NVS/flash o segreto pubblicato.
 3. Verificare fixture/supporto stabile, spazio libero, integrità cablaggi e
    meccanica, corrispondenza ID/mapping/segni e disponibilità dell'arresto sicuro.
    Confermare census 13/13 e preflight zampe 12/12 mediante procedura autorizzata.

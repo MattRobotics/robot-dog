@@ -7,7 +7,8 @@ Installato operatore: `b08322dedc5564c080f691dc98047511ef2b953f`,
 ROBOT_POWERED, APP-ONLY app0, layout V1, OTA_INGEST=0. Il successivo HEAD
 documentale non identifica un nuovo firmware installato.
 [Report e limiti di evidenza](09_Logs/Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md)
-(APP-ONLY/NVS finale riferiti, log grezzo finale mancante);
+([appendice recuperata](09_Logs/Validation_Reports/HW_Closeout_2026-10-11/MATDOG_2026-10-11_EVIDENCE_APPENDIX.md): output originale
+incollato dall’operatore, hash verificati; non log automatico nativo Asus);
 [handoff Motion 2026-10-12](09_Logs/Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md),
 [open items](09_Logs/OPEN_ITEMS.md#closeout-2026-10-11--fase-successiva),
 [media illustrativi](06_Media/Dashboard/2026-10-11/README.md).

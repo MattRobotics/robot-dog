@@ -4,8 +4,8 @@
 
 Chiusura del perimetro non-motion sulla branch `feat/wifi-finalization-20261011`;
 non è accettazione generale di release, né autorizzazione di calibrazione, torque,
-gait, locomozione, flash, OTA o merge su main. La chiusura incorpora evidenza
-operatore e ne dichiara sotto i limiti di audit. Nessuna nuova misura hardware è
+gait, locomozione, flash, OTA o merge su main. La chiusura incorpora output originali incollati dall’operatore, recuperati
+dalla conversazione e verificati per integrità; dichiara sotto la provenienza. Nessuna nuova misura hardware è
 stata eseguita per scrivere questo report.
 
 ## Identità e perimetro
@@ -20,8 +20,8 @@ stata eseguita per scrivere questo report.
 - Applicazione dichiarata flashata APP-ONLY, `app0@0x010000`, SHA-256
   `ccbce2ff6ffee9a5e132bad8646f379fb31fdd305c0d577df992e85e2ebf4b43`.
   Il pacchetto riferisce `APPLICATION_ONLY_FLASH = PASS` e
-  `Verification successful (digest matched)`: attestazione operatore E1,
-  **non un log grezzo del flash finale disponibile in questa revisione**.
+  `Verification successful (digest matched)`: contenuto confermato nella
+  trascrizione integrale originale recuperata E9, non log automatico nativo Asus.
 - Il binario build corrente è stato ricompilato nella successiva analisi LAN:
   non è assunto identico al binario installato. Non ricompilato o riflashato nel closeout.
 
@@ -42,33 +42,36 @@ I FAIL storici restano registrati anche se un controllo successivo è positivo.
 | E6 | [Audit dev.3 2026-10-06](MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md) | Census 13/13, preflight 12/12 e torque off storici; SAVE/ACK/LOAD attraverso reset, nessun vero power-cycle. |
 | E7 | [Power/charging closeout 2026-09-24](../Development_Log/2026-09-24_MATDOG_POWER_CHARGING_USB_VALIDATION_CLOSEOUT.md) e [power canonico](../../04_Electronics/MATDOG_POWER_STATES_AND_CHARGING.md) | KEY OFF senza charger/USB e alimentazione del bus dal charger comune: evidenza storica, non nuova misura. |
 | E8 | `~/MATDOG/verification-artifacts/lan-maintenance-feasibility-b08322d/feasibility.md`; policy sorgente b08322d | Analisi architetturale, nessuna implementazione LAN o prova hardware LAN. |
+| E9 | [Appendice integrativa](HW_Closeout_2026-10-11/MATDOG_2026-10-11_EVIDENCE_APPENDIX.md) e tre originali LOCAL_ONLY nel supplemento locale | SHA256SUMS 5/5 PASS; trascrizione integrale output flash e risposte seriali post-flash/STA incollate dall’operatore e recuperate dalla conversazione. Contenuto disponibile e tracciabile, non cattura automatica nativa Asus; nessun nuovo test. |
 
 I report locali `MATDOG_WIFI_FINALIZATION_20261011/RAPPORTO_HARDWARE.md`,
 `FLASH_LOG.md` e `HARDWARE_VALIDATION_MATRIX.md` descrivono tentativi precedenti
 arrestati (backup fallito e poi USB senza risposte); NON sono log del flash finale.
 Non cancellati né riscritti. I dati finali riferiti da E1 sono successivi.
-Manca nel set consultato il log grezzo finale b08322d di flash/post-flash/STA:
-conferma APP-ONLY e integrità NVS finale sono **PASS riferiti dall'operatore**,
-con riscontro candidato E2 e storico E4, non verifica indipendente della sessione.
-Conservare questa lacuna come residuo di audit; non inventare un log per colmarla.
+Il supplemento E9 recupera integralmente il contenuto finale flash/post-flash/STA:
+la precedente lacuna di contenuto è chiusa. APP-ONLY, digest e NVS finale sono
+**PASS documentati nell'output originale dell’operatore**. Non esiste una cattura
+automatica nativa Asus di questi testi; gli hash verificano gli allegati ricevuti,
+non una nuova verifica indipendente del dispositivo. Registrazione automatica
+per sessioni future è un miglioramento di processo, non un test hardware pendente.
 
 ## Matrice finale
 
 | Controllo | Esito | Evidenza / limite |
 |---|---|---|
-| Identità sorgente installata b08322d | PASS | E1: operatore + build breve nello screenshot; SHA completo dichiarato, candidato E2 coerente |
-| APP-ONLY app0, digest matched | PASS (operatore) | E1; E2 solo piano/manifest, manca log grezzo finale |
-| ROBOT_POWERED / layout V1 / OTA_INGEST=0 | PASS | E2 candidato + E1 post-flash riferito; E4 storico |
-| READY, MAINTENANCE, authority NONE, motion_allowed=NO | PASS (operatore) | E1 finale; E4 storico. `power_state=RUN` è stato elettrico, non `mode=RUN` né permit |
-| BNO085, DALY, bus servo online | PASS (operatore) | E1 finale; E4 registrato sulla build precedente. Non è qualifica completa sensori/attuatori |
+| Identità sorgente installata b08322d | PASS | E9 output flash SOURCE_COMMIT completo; E1 build breve nello screenshot; E2 coerente |
+| APP-ONLY app0, digest matched | PASS (output operatore) | E9 trascrizione integrale: digest matched, write/erase APP0, NVS esclusa; E2 piano/manifest |
+| ROBOT_POWERED / layout V1 / OTA_INGEST=0 | PASS | E9 output originale conferma profilo/layout/OTA; E2 candidato, E4 storico |
+| READY, MAINTENANCE, authority NONE, motion_allowed=NO | PASS (output operatore) | E9 risposte seriali finali; E4 storico. `power_state=RUN` è stato elettrico, non `mode=RUN` né permit |
+| BNO085, DALY, bus servo online | PASS (output operatore) | E9 risposte finali; E4 sulla build precedente. Non è qualifica completa sensori/attuatori |
 | Census 13/13, 4 assenti per design; preflight zampe 12/12, torque off | PASS (storico) | E4/E6; non presentato come nuova scansione post-flash |
-| NVS VALID_ACKNOWLEDGED, generazione 1 integra dopo flash | PASS (operatore) | E1 finale; E4 storico: SLOT_A=VALID, SLOT_B=ABSENT, RECONCILIATION_REQUIRED=0 |
-| AP e Dashboard sei tab a 192.168.4.1 | PASS (operatore) | E1: ADMIN_AP, portal LISTENING senza fault; screenshot reale prova tab Wi-Fi |
+| NVS VALID_ACKNOWLEDGED, generazione 1 integra dopo flash | PASS (output operatore) | E9 finale: gen1 integra, SLOT_A=VALID, SLOT_B=ABSENT, DEGRADED=0; RECONCILIATION_REQUIRED=0 è E1 riferito/E4 storico, non campo stampato in E9 |
+| AP e Dashboard sei tab a 192.168.4.1 | PASS (output operatore) | E9 ADMIN_AP, portal LISTENING senza fault; E1 sei tab e screenshot tab Wi-Fi |
 | STA_STOP prima della patch | FAIL (storico) | E1 riferisce UNEXPECTED_ROLE_EVENT STA_STOP e AP perso; E3 riproduce regressione offline |
-| Fix STA_STOP e successiva prova STA temporanea | PASS | E3 offline e E1 screenshot reale CONNECTED/COMMITTED; seq=1, associated=YES, attempts=1, elapsed_ms=7900, reason=0 sono riferiti nell'input, non nel log grezzo; UI mostra 8 s, 1 tentativo, RSSI -58 dBm |
-| Profilo primary/credenziali persistite e ritorno AP | PASS (operatore) | E1 COMMITTED e ritorno AP; non prova persistenza su power-cycle. connected=NO in MAINTENANCE è atteso |
-| LED barra SOC, avanzamento charging e breathing successivo | PASS (operatore) | E1; escursione verde poco evidente. Trasporto storico E5; mockup non probatori |
-| DALY telemetria sana | PASS (operatore) | E1 prima del flash: SOC 98.9%, pack 11.9 V, min/max 3972..3985 mV, delta 13 mV, nessun allarme; non certifica FULL/termination |
+| Fix STA_STOP e successiva prova STA temporanea | PASS | E3 offline, E9 seriale originale CONNECTED/COMMITTED: seq=1, associated=YES, attempts=1, elapsed_ms=7900, reason=0, rollback=NO; E1 screenshot coerente |
+| Profilo primary/credenziali persistite e ritorno AP | PASS (output operatore) | E9 COMMITTED, profilo index=0 enabled=YES, source NVS riferita E1 e ritorno AP; non prova persistenza su power-cycle. connected=NO in MAINTENANCE è atteso |
+| LED barra SOC, avanzamento charging e breathing successivo | PASS (osservazione operatore) | E1; escursione verde poco evidente. Trasporto storico E5; mockup non probatori |
+| DALY telemetria sana | PASS (osservazione operatore) | E1 prima del flash: SOC 98.9%, pack 11.9 V, min/max 3972..3985 mV, delta 13 mV, nessun allarme; non certifica FULL/termination |
 | Charging termination/cutoff e qualifica unattended/dock | NOT TESTED | Nessuna piena qualifica; E7 osservazioni limitate di charging manuale |
 | KEY config su vero ciclo BMS; discrepanza MOS scarica | NOT TESTED | E1/E7; KEY OFF riferito con discharge_mos ON da investigare, nessuna forzatura MOS |
 | LED SOC <=30 ambra / <=15 rosso e maggiore escursione charging | DEFERRED | Implementazione/validazione richieste per fase successiva, solo simulazione SOC |
@@ -86,7 +89,7 @@ Il commit `b08322d` rende esplicita la proprietà del restart STA provocato dall
 configurazione bandwidth: registra gli ACK attesi stop/start e serializza il
 worker fino al loro completamento prima di associazione, commit o ritorno AP.
 Non ignora indiscriminatamente gli eventi imprevisti. Il diff sorgente e la
-regressione E3 sostengono la correzione; la prova positiva E1 conferma il risultato
+regressione E3 sostengono la correzione; la prova positiva E9 e lo screenshot E1 confermano il risultato
 operatore. L'interruzione temporanea AP durante «Prova e salva» è intenzionale.
 IP DHCP e SSID domestici non sono riportati qui.
 

@@ -14,7 +14,7 @@ integro gen1 non chiude accettazione della calibrazione operativa né motion.
 | C — MOTION | Calibrazione operativa e permit da completare; NVS valido non significa motion permit. RESTORE NOT_IMPLEMENTED; gait, torque operativo e locomozione reali NOT TESTED. Motion execution suites DEFERRED, mai PASS. Limiti/envelope e gate safety ancora bloccanti. |
 | D — BMS / POWER | Charging solo osservazioni manuali limitate; termination/cutoff, unattended/dock non qualificati. Con KEY OFF e charger il bus può restare alimentato. discharge_mos ON con KEY riferito OFF è discrepanza da investigare senza forzare MOS. Persistenza KEY su vero ciclo BMS non testata. |
 | E — SECURITY | NOT TESTED approfondito: durata/revoca sessioni admin, accessi non autorizzati e CSRF/read-only server-side. Login o label UI non provano enforcement. |
-| F — AUDIT | Log grezzo finale flash/post-flash b08322d non reperito: APP-ONLY e NVS finale PASS operatore, non indipendenti. Recuperare evidenze preesistenti se disponibili, redigerle prima di pubblicare; non ripetere flash/hardware per colmare il documento. |
+| F — AUDIT | Lacuna contenuto CHIUSA: trascrizione integrale flash e seriali post-flash/STA recuperate dalla conversazione, originali incollati dall’operatore; SHA256SUMS 5/5 PASS. [Appendice redatta](Validation_Reports/HW_Closeout_2026-10-11/MATDOG_2026-10-11_EVIDENCE_APPENDIX.md). Non log automatico nativo Asus; migliorare cattura automatica in future sessioni, nessun test hardware pendente per questa normalizzazione. |
 
 [Handoff Motion 2026-10-12](Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
 
