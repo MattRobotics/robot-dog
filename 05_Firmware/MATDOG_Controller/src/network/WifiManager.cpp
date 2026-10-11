@@ -911,6 +911,13 @@ void WifiManager::workerTick(uint32_t now) {
   if (!enabled_ && admin_.phase.load() == NetworkPhase::CLOSED &&
       now - off_since_ >= 600000) { enabled_ = true; leaveAdmin(false, now); }
   transitionTick(now);
+  // A bandwidth change restarts the running STA in the installed driver.
+  // Drain its complete acknowledgment before association, commit or AP return;
+  // role events have no generation tag, so commands must remain serialized.
+  if (admin_.phase.load() == NetworkPhase::CLIENT_STA && expected_events_.load()) {
+    refreshSnapshot(now, false);
+    return;
+  }
   role_ = evaluateRole(now);
   if (ap_reload_ && !intent_pending_ && !transaction_.busy() &&
       admin_.phase.load() == NetworkPhase::ADMIN_AP) leaveAdmin(true, now);
@@ -1130,16 +1137,22 @@ void WifiManager::workerTick(uint32_t now) {
     const auto desired_bw =
         config_.bandwidth_mhz == 40 ? WIFI_BW_HT40 : WIFI_BW_HT20;
     wifi_bandwidth_t actual_bw = WIFI_BW_HT20;
-    worker_status_.bandwidth_apply_ok =
-        esp_wifi_get_bandwidth(WIFI_IF_STA, &actual_bw) == ESP_OK &&
-        actual_bw == desired_bw;
-    if (!worker_status_.bandwidth_apply_ok)
+    const bool bandwidth_read = esp_wifi_get_bandwidth(WIFI_IF_STA, &actual_bw) == ESP_OK;
+    worker_status_.bandwidth_apply_ok = bandwidth_read && actual_bw == desired_bw;
+    // wifi_set_bw_process in esp32s3-libs 3.3.11 calls _do_wifi_stop(1)
+    // and _do_wifi_start(1) when STA bandwidth differs. This is an owned
+    // radio command, not a harmless setter. Never arm on an unknown read,
+    // never overlap another command, and never admit an AP generation here.
+    if (bandwidth_read && !worker_status_.bandwidth_apply_ok &&
+        !expected_events_.load() && !admin_.radio_fault.load() &&
+        admin_.phase.load() == NetworkPhase::CLIENT_STA &&
+        !admin_.closing.load() && WiFi.STA.started() && !WiFi.AP.started()) {
+      event_since_ = now;
+      expected_events_.store(kStaStop | kStaStart);
       worker_status_.bandwidth_apply_ok =
           esp_wifi_set_bandwidth(WIFI_IF_STA, desired_bw) == ESP_OK;
-    if (worker_status_.ap_active &&
-        (esp_wifi_get_bandwidth(WIFI_IF_AP, &actual_bw) != ESP_OK ||
-         actual_bw != WIFI_BW_HT20))
-      esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20);
+      if (!worker_status_.bandwidth_apply_ok) fault(FaultSite::MODE_COMMAND, 3);
+    }
   }
   refreshSnapshot(now, link_up);
 }

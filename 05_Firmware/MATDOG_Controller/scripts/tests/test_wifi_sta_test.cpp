@@ -28,7 +28,10 @@ uint32_t now = 0;
   } while (0)
 WifiStub WiFi;
 wifi_ps_type_t ps = WIFI_PS_NONE;
-wifi_bandwidth_t bw = WIFI_BW_HT20;
+wifi_bandwidth_t bw = WIFI_BW_HT40; // installed driver's initial STA bandwidth
+bool bandwidth_write_ok = true, bandwidth_read_ok = true, bandwidth_restart = true;
+int bandwidth_writes = 0;
+bool bandwidth_defer_events = false;
 uint32_t millis() { return now; }
 uint32_t micros() { return now * 1000; }
 struct Q {
@@ -124,10 +127,22 @@ esp_err_t esp_wifi_get_ps(wifi_ps_type_t *v) {
   return 0;
 }
 esp_err_t esp_wifi_set_bandwidth(wifi_interface_t, wifi_bandwidth_t v) {
+  ++bandwidth_writes;
+  if (!bandwidth_write_ok) return -1;
+  const bool changed = bw != v;
   bw = v;
+  // Installed libnet80211 wifi_set_bw_process stops/starts the requested role.
+  if (changed && bandwidth_restart && WiFi.STA.running) {
+    const bool deliver = WiFi.deliver_events;
+    if (bandwidth_defer_events) WiFi.deliver_events = false;
+    WiFi.emit(ARDUINO_EVENT_WIFI_STA_STOP);
+    WiFi.emit(ARDUINO_EVENT_WIFI_STA_START);
+    WiFi.deliver_events = deliver;
+  }
   return 0;
 }
 esp_err_t esp_wifi_get_bandwidth(wifi_interface_t, wifi_bandwidth_t *v) {
+  if (!bandwidth_read_ok) return -1;
   *v = bw;
   return 0;
 }
@@ -179,6 +194,7 @@ public:
     m.workerTick(t);
     publish(m);
   }
+  static uint8_t pending(WifiManager &m) { return m.expected_events_.load(); }
   static void publish(WifiManager &m) {
     m.shared_status_ = m.worker_status_;
     std::memcpy(m.shared_admin_digest_, m.config_.admin_digest, 32);
@@ -190,6 +206,10 @@ public:
 void seed() {
   blobs.clear();
   WiFi = WifiStub{};
+  bw = WIFI_BW_HT40;
+  bandwidth_write_ok = bandwidth_read_ok = bandwidth_restart = true;
+  bandwidth_writes = 0;
+  bandwidth_defer_events = false;
   NetworkConfig c{};
   std::strcpy(c.sta[0].ssid, "network");
   std::strcpy(c.sta[0].password, "correct-password");
@@ -248,7 +268,7 @@ std::string activeSsid() {
 // Returns the time of that first attempt; `stage` is when PENDING was written
 // (the start of the 30 s transaction window).
 uint32_t startTest(WifiManager &m, const char *ssid, uint32_t *stage, uint32_t *seq,
-                   const ConfigPatch *form = nullptr) {
+                   const ConfigPatch *form = nullptr, bool pause_at_stage = false) {
   WifiRuntimeTest::initialize(m);
   enter(m, 50);
   const uint32_t generation = m.adminAccess().generation();
@@ -263,8 +283,11 @@ uint32_t startTest(WifiManager &m, const char *ssid, uint32_t *stage, uint32_t *
   CHECK(m.adminAccess().phase.load() == NetworkPhase::CLIENT_STA && WiFi.mode_value == WIFI_STA);
   CHECK(m.status().config_phase == ConfigPhase::TESTING && commits == 1);
   CHECK(outcome(m) == StaTestOutcome::RUNNING && m.status().sta_test.seq == *seq);
+  CHECK(!m.adminAccess().radio_fault.load() && m.status().fault_count == 0);
+  CHECK(bw == WIFI_BW_HT20 && bandwidth_writes == 1);
   CHECK(std::strcmp(m.status().sta_test.ssid, ssid) == 0);
   *stage = 2100;
+  if (pause_at_stage) return *stage;
   const int before = WiFi.connect_calls;
   WifiRuntimeTest::tick(m, 2250);
   CHECK(WiFi.connect_calls == before + 1 && m.status().sta_test.attempts == 1);
@@ -309,6 +332,123 @@ int main() {
   {
     seed(); WifiManager m; WifiRuntimeTest::initialize(m);
     CHECK(outcome(m) == O::NONE && m.status().sta_test.seq == 0);
+  }
+
+  // ---- owned bandwidth restart: drain both events before connect/commit/AP return ----
+  {
+    seed(); bandwidth_defer_events = true;
+    WifiManager m; uint32_t stage = 0, seq = 0;
+    startTest(m, "home-router", &stage, &seq, nullptr, true);
+    const uint32_t generation = m.adminAccess().generation();
+    CHECK(WifiRuntimeTest::pending(m) == 6); // STA_STOP | STA_START
+    CHECK(WiFi.pending_events == std::vector<int>({ARDUINO_EVENT_WIFI_STA_STOP,
+                                                 ARDUINO_EVENT_WIFI_STA_START}));
+    CHECK(!m.adminAccess().allowed(generation));
+    CHECK(!m.configure(patch("stale-request"), generation));
+    const int calls = WiFi.connect_calls;
+    association("home-router"); // stale link cannot prove the candidate while ack is pending
+    WifiRuntimeTest::tick(m, stage + 150);
+    CHECK(WiFi.connect_calls == calls && commits == 1 && bandwidth_writes == 1);
+    sta(ARDUINO_EVENT_WIFI_STA_STOP);
+    CHECK(WifiRuntimeTest::pending(m) == 2 && !m.adminAccess().radio_fault.load());
+    WifiRuntimeTest::tick(m, stage + 200);
+    CHECK(WiFi.connect_calls == calls && commits == 1 && m.configBusy());
+    WiFi.connected = false; WiFi.ip = 0;
+    sta(ARDUINO_EVENT_WIFI_STA_START); WiFi.pending_events.clear();
+    WifiRuntimeTest::tick(m, stage + 250);
+    CHECK(WifiRuntimeTest::pending(m) == 0 && WiFi.connect_calls == calls + 1);
+    sta(ARDUINO_EVENT_WIFI_STA_CONNECTED); association("home-router");
+    WifiRuntimeTest::tick(m, stage + 500);
+    WifiRuntimeTest::tick(m, stage + 500 + WifiManager::kStaTestHoldMs);
+    CHECK(outcome(m) == O::CONNECTED && commits == 2 && activeSsid() == "home-router");
+    CHECK(m.adminAccess().phase.load() == NetworkPhase::ENTER_ADMIN);
+    // Returning to AP is also fenced: a new generation requires its own acks.
+    closeListeners(m); WiFi.deliver_events = false;
+    WifiRuntimeTest::tick(m, stage + 2050);
+    CHECK(!m.adminAccess().allowed(generation) && m.adminAccess().generation() == generation);
+    CHECK(WifiRuntimeTest::pending(m) == 12); // STA_STOP | AP_START
+    WifiRuntimeTest::tick(m, stage + 2100);
+    CHECK(m.adminAccess().phase.load() == NetworkPhase::ENTER_ADMIN);
+    WiFi.deliver_events = true; WiFi.drainEvents();
+    WifiRuntimeTest::tick(m, stage + 2150);
+    CHECK(m.adminAccess().phase.load() == NetworkPhase::ADMIN_AP);
+    CHECK(m.adminAccess().generation() != generation && !m.adminAccess().allowed(generation));
+    CHECK(m.adminAccess().allowed(m.adminAccess().generation()) && WifiManager::verifyAdminRadio());
+    CHECK(m.status().fault_count == 0 && m.status().ap_config_verified);
+  }
+
+  // ---- missing restart acknowledgment: bounded fault, rollback, no ACTIVE write ----
+  {
+    seed(); bandwidth_defer_events = true;
+    WifiManager m; uint32_t stage = 0, seq = 0;
+    startTest(m, "home-router", &stage, &seq, nullptr, true);
+    sta(ARDUINO_EVENT_WIFI_STA_STOP); // missing STA_START must never allow progress
+    WifiRuntimeTest::tick(m, stage + 2999);
+    CHECK(outcome(m) == O::RUNNING && m.configBusy() && WiFi.connect_calls == 0);
+    WifiRuntimeTest::tick(m, stage + 3000);
+    CHECK(m.adminAccess().phase.load() == NetworkPhase::FAULT);
+    CHECK(m.status().fault_site == static_cast<uint8_t>(FaultSite::ROLE_ACK_TIMEOUT));
+    WifiRuntimeTest::tick(m, stage + 3050);
+    CHECK(outcome(m) == O::ABORTED && m.status().config_phase == ConfigPhase::ROLLBACK);
+    CHECK(!m.configBusy() && commits == 1 && activeSsid() == "network");
+    CHECK(!m.adminAccess().allowed(m.adminAccess().generation()));
+  }
+
+  // ---- duplicate/unowned STA_STOP still revokes and aborts immediately ----
+  for (bool during_test : {false, true}) {
+    seed(); WifiManager m; uint32_t stage = 0, seq = 0;
+    if (during_test) startTest(m, "home-router", &stage, &seq);
+    else { WifiRuntimeTest::initialize(m); enter(m, 50); }
+    const uint32_t generation = m.adminAccess().generation();
+    CHECK(WifiRuntimeTest::pending(m) == 0);
+    sta(ARDUINO_EVENT_WIFI_STA_STOP);
+    CHECK(m.adminAccess().radio_fault.load() && !m.adminAccess().allowed(generation));
+    WifiRuntimeTest::tick(m, during_test ? stage + 200 : 150);
+    CHECK(m.adminAccess().phase.load() == NetworkPhase::FAULT);
+    CHECK(m.status().fault_site == static_cast<uint8_t>(FaultSite::UNEXPECTED_ROLE_EVENT));
+    CHECK(m.status().fault_event == 4 && m.status().fault_expected == 0);
+    CHECK(activeSsid() == "network" && commits == (during_test ? 1 : 0));
+    if (during_test) CHECK(outcome(m) == O::ABORTED && m.status().sta_test.rolled_back);
+  }
+
+  // A second STOP while only START remains armed is also unexpected.
+  {
+    seed(); bandwidth_defer_events = true;
+    WifiManager m; uint32_t stage = 0, seq = 0;
+    startTest(m, "home-router", &stage, &seq, nullptr, true);
+    sta(ARDUINO_EVENT_WIFI_STA_STOP);
+    sta(ARDUINO_EVENT_WIFI_STA_STOP);
+    CHECK(m.adminAccess().radio_fault.load());
+    WifiRuntimeTest::tick(m, stage + 50);
+    CHECK(m.adminAccess().phase.load() == NetworkPhase::FAULT);
+    CHECK(m.status().fault_site == static_cast<uint8_t>(FaultSite::UNEXPECTED_ROLE_EVENT));
+    CHECK(m.status().fault_event == 4 && m.status().fault_expected == 2);
+    CHECK(outcome(m) == O::ABORTED && m.status().sta_test.rolled_back && WiFi.connect_calls == 0);
+  }
+
+  // ---- equal/unknown bandwidth never arms a speculative restart ----
+  for (bool read_ok : {true, false}) {
+    seed(); bw = WIFI_BW_HT20; bandwidth_read_ok = read_ok;
+    WifiManager m; WifiRuntimeTest::initialize(m); enter(m, 50);
+    CHECK(m.configure(patch("home-router"), m.adminAccess().generation()));
+    WifiRuntimeTest::tick(m, 1000); WifiRuntimeTest::tick(m, 2050);
+    closeListeners(m); WifiRuntimeTest::tick(m, 2100);
+    CHECK(m.adminAccess().phase.load() == NetworkPhase::CLIENT_STA);
+    CHECK(bandwidth_writes == 0 && WifiRuntimeTest::pending(m) == 0);
+    CHECK(m.status().bandwidth_apply_ok == read_ok && m.status().fault_count == 0);
+  }
+  // A refused owned setter must fail closed rather than start association.
+  {
+    seed(); bandwidth_write_ok = false;
+    WifiManager m; WifiRuntimeTest::initialize(m); enter(m, 50);
+    CHECK(m.configure(patch("home-router"), m.adminAccess().generation()));
+    WifiRuntimeTest::tick(m, 1000); WifiRuntimeTest::tick(m, 2050);
+    closeListeners(m); WifiRuntimeTest::tick(m, 2100);
+    CHECK(m.adminAccess().phase.load() == NetworkPhase::FAULT);
+    CHECK(m.status().fault_site == static_cast<uint8_t>(FaultSite::MODE_COMMAND));
+    WifiRuntimeTest::tick(m, 2150);
+    CHECK(outcome(m) == O::ABORTED && m.status().config_phase == ConfigPhase::ROLLBACK);
+    CHECK(WiFi.connect_calls == 0 && commits == 1 && activeSsid() == "network");
   }
 
   // ---- refused by the router, router absent: retry, rollback, AP back ------------
