@@ -3,12 +3,15 @@
 #include <esp_heap_caps.h>
 #include <esp_https_server.h>
 #include <esp_random.h>
+#include <esp_timer.h>
 #include <freertos/task.h>
 #include <lwip/sockets.h>
+#include <stdarg.h>
 
 #include "../config/TlsIdentity.h"
 #include "../update/Sha256.h"
 #include "PortalPage.h"
+#include "WifiManager.h"
 
 namespace matdog {
 namespace network {
@@ -33,23 +36,71 @@ bool readHexHeader(httpd_req_t *req, const char *field, uint8_t *out,
   return update::parseHex(buf, need, out);
 }
 
+// HTTPD uses a dual-stack listener with this ESP32 core. lwIP reports IPv4
+// connections on it as sockaddr_in6 with an IPv4-mapped address, not sockaddr_in.
+// Accept only actual IPv4 endpoints; native IPv6 cannot establish AP authority
+// or be reduced to the 32-bit peer identity used by PortalSession.
+bool socketIpv4(const sockaddr_storage &address, socklen_t size,
+                uint32_t &ip, uint16_t &port) {
+  if (address.ss_family == AF_INET && size >= sizeof(sockaddr_in)) {
+    sockaddr_in v4{};
+    memcpy(&v4, &address, sizeof(v4));
+    ip = v4.sin_addr.s_addr;
+    port = ntohs(v4.sin_port);
+    return true;
+  }
+  if (address.ss_family == AF_INET6 && size >= sizeof(sockaddr_in6)) {
+    sockaddr_in6 v6{};
+    memcpy(&v6, &address, sizeof(v6));
+    if (!IN6_IS_ADDR_V4MAPPED(&v6.sin6_addr))
+      return false;
+    memcpy(&ip, &v6.sin6_addr.s6_addr[12], sizeof(ip));
+    port = ntohs(v6.sin6_port);
+    return true;
+  }
+  return false;
+}
 bool socketFacts(httpd_req_t *req, HttpTransportRequest &r) {
-  sockaddr_in local{}, peer{};
+  sockaddr_storage local{}, peer{};
   socklen_t n = sizeof(local);
   int fd = httpd_req_to_sockfd(req);
-  if (getsockname(fd, reinterpret_cast<sockaddr *>(&local), &n) != 0)
+  uint32_t local_ip = 0, peer_ip = 0;
+  uint16_t local_port = 0, peer_port = 0;
+  if (getsockname(fd, reinterpret_cast<sockaddr *>(&local), &n) != 0 ||
+      !socketIpv4(local, n, local_ip, local_port))
     return false;
   n = sizeof(peer);
-  if (getpeername(fd, reinterpret_cast<sockaddr *>(&peer), &n) != 0)
+  if (getpeername(fd, reinterpret_cast<sockaddr *>(&peer), &n) != 0 ||
+      !socketIpv4(peer, n, peer_ip, peer_port))
     return false;
-  r.ap_socket = ntohl(local.sin_addr.s_addr) == 0xc0a80401u;
-  r.peer = peer.sin_addr.s_addr;
-  r.tls = ntohs(local.sin_port) == 443;
+  r.ap_socket = ntohl(local_ip) == 0xc0a80401u;
+  r.peer = peer_ip;
+  r.tls = local_port == 443;
   char host[64]{}, origin[64]{};
   httpd_req_get_hdr_value_str(req, "Host", host, sizeof(host));
   httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin));
   r.local_authorized = portalOrigin(r.ap_socket, host, origin);
   return true;
+}
+// One 64-character cookie value, by exact name. Missing, wrong length or a
+// name that is only a suffix of another leaves `out` empty, which every
+// consumer treats as "no credential".
+void cookieValue(const char *header, const char *name, char out[65]) {
+  out[0] = 0;
+  const size_t n = strlen(name);
+  for (const char *p = header; *p;) {
+    while (*p == ' ' || *p == ';')
+      ++p;
+    size_t len = 0;
+    while (p[len] && p[len] != ';')
+      ++len;
+    if (len == n + 65 && strncmp(p, name, n) == 0 && p[n] == '=') {
+      memcpy(out, p + n + 1, 64);
+      out[64] = 0;
+      return;
+    }
+    p += len;
+  }
 }
 void jsonString(const char *in, char *out, size_t cap) {
   size_t n = 0;
@@ -98,6 +149,7 @@ bool HttpTransport::start() {
   return true;
 }
 void HttpTransport::stop() {
+  service_->networkAdminAccess().raiseFault(FaultSite::WEB_MANUAL_STOP);
   manual_stop_.store(true);
   desired_.store(false);
   tls_desired_.store(false);
@@ -105,7 +157,7 @@ void HttpTransport::stop() {
 void HttpTransport::lifecycleEntry(void *self) {
   static_cast<HttpTransport *>(self)->lifecycle();
 }
-bool HttpTransport::registerHandlers(httpd_handle_t server) {
+bool HttpTransport::registerHandlers(httpd_handle_t server, bool admin) {
   const httpd_uri_t uris[] = {
       {"/status", HTTP_GET, &HttpTransport::handleStatus, this},
       {"/ota/challenge", HTTP_GET, &HttpTransport::handleOtaChallenge, this},
@@ -116,25 +168,45 @@ bool HttpTransport::registerHandlers(httpd_handle_t server) {
       {"/wifi/login", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/wifi/config", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/wifi/scan", HTTP_POST, &HttpTransport::handleWifi, this},
-      {"/wifi/ap", HTTP_POST, &HttpTransport::handleWifi, this}};
-  for (const auto &uri : uris)
-    if (httpd_register_uri_handler(server, &uri) != ESP_OK)
-      return false;
+      {"/wifi/ap", HTTP_POST, &HttpTransport::handleWifi, this},
+      {"/wifi/session", HTTP_POST, &HttpTransport::handleWifi, this},
+      {"/wifi/logout", HTTP_POST, &HttpTransport::handleWifi, this}};
+  for (const auto &uri : uris) {
+    if (!admin && (strcmp(uri.uri, "/") == 0 || strncmp(uri.uri, "/wifi/", 6) == 0)) continue;
+    if (httpd_register_uri_handler(server, &uri) != ESP_OK) return false;
+  }
   return true;
 }
 void HttpTransport::lifecycle() {
-  for (;;) {
+  for (;;) { lifecycleTick(); vTaskDelay(pdMS_TO_TICKS(50)); }
+}
+void HttpTransport::lifecycleTick() {
+  auto &gate = service_->networkAdminAccess();
+  AdminLease drain(gate);
+  if (!drain) return;
+  const auto phase = gate.phase.load();
+  if (phase == NetworkPhase::ADMIN_AP && !WifiManager::verifyAdminRadio()) {
+    gate.raiseFault(FaultSite::HTTP_RADIO_LOST);
+  }
+  desired_.store(!manual_stop_.load() && !gate.closing.load() &&
+                 phase == NetworkPhase::ADMIN_AP &&
+                 gate.allowed(gate.generation()) && WifiManager::verifyAdminRadio());
+  if (phase != NetworkPhase::CLIENT_STA || gate.closing.load()) tls_desired_.store(false);
+  if (desired_.load() || tls_desired_.load()) gate.listeners_closed.store(false);
     if (desired_.load() && !server_) {
       httpd_config_t c = HTTPD_DEFAULT_CONFIG();
       c.stack_size = 24576;
-      c.max_uri_handlers = 12;
+      c.max_uri_handlers = 14;
       c.max_open_sockets = 2;
+      // A phone browser may open more connections than the two this listener
+      // holds; the least recently used one is closed instead of stalling.
+      c.lru_purge_enable = true;
       c.recv_wait_timeout = 3;
       c.send_wait_timeout = 3;
       c.task_priority = 2;
       if (httpd_start(&server_, &c) == ESP_OK && !registerHandlers(server_)) {
-        httpd_stop(server_);
-        server_ = nullptr;
+        if (httpd_stop(server_) == ESP_OK) server_ = nullptr;
+        else { gate.noteFault(FaultSite::LISTENER_STOP_FAILED); gate.revoke(); gate.phase.store(NetworkPhase::FAULT); }
       }
       listening_.store(server_ != nullptr);
     }
@@ -153,24 +225,25 @@ void HttpTransport::lifecycle() {
       c.prvtkey_pem = reinterpret_cast<const uint8_t *>(config::kTlsPrivateKey);
       c.prvtkey_len = sizeof(config::kTlsPrivateKey);
       if (httpd_ssl_start(&tls_server_, &c) == ESP_OK &&
-          !registerHandlers(tls_server_)) {
-        httpd_ssl_stop(tls_server_);
-        tls_server_ = nullptr;
+          !registerHandlers(tls_server_, false)) {
+        if (httpd_ssl_stop(tls_server_) == ESP_OK) tls_server_ = nullptr;
+        else { gate.noteFault(FaultSite::LISTENER_STOP_FAILED); gate.revoke(); gate.phase.store(NetworkPhase::FAULT); }
       }
       tls_listening_.store(tls_server_ != nullptr);
     }
     if (!desired_.load() && server_) {
-      httpd_stop(server_);
-      server_ = nullptr;
-      listening_.store(false);
+      if (httpd_stop(server_) == ESP_OK) { server_ = nullptr; listening_.store(false); }
     }
     if (!tls_desired_.load() && tls_server_) {
-      httpd_ssl_stop(tls_server_);
-      tls_server_ = nullptr;
-      tls_listening_.store(false);
+      if (httpd_ssl_stop(tls_server_) == ESP_OK) { tls_server_ = nullptr; tls_listening_.store(false); }
     }
-    vTaskDelay(pdMS_TO_TICKS(250));
-  }
+  if (gate.closing.load() && !server_ && !tls_server_)
+    gate.listeners_closed.store(true); // successful stops, never a timeout
+}
+bool HttpTransport::admitAdmin(HttpTransportRequest &request) {
+  auto &gate = service_->networkAdminAccess();
+  request.admin_generation = gate.generation();
+  return gate.allowed(request.admin_generation) && WifiManager::verifyAdminRadio();
 }
 bool HttpTransport::dispatch(const HttpTransportRequest &request,
                              HttpTransportResponse *response) {
@@ -178,6 +251,11 @@ bool HttpTransport::dispatch(const HttpTransportRequest &request,
     return false;
   xSemaphoreTake(response_ready_,
                  0); // drain prior late wake; IDs remain authoritative
+  if (request.kind >= HttpRequestKind::WIFI_STATUS &&
+      (!service_->networkAdminAccess().allowed(request.admin_generation) ||
+       !WifiManager::verifyAdminRadio())) {
+    xSemaphoreGive(slot_free_); return false;
+  }
   pending_request_ = request;
   const uint32_t id = sequence_.fetch_add(1) + 1;
   pending_request_.sequence = id;
@@ -210,11 +288,11 @@ void HttpTransport::update(uint32_t now_ms) {
     portal_.reset();
     memcpy(previous_admin_digest_, service_->networkAdminDigest(), 32);
   }
-  if (!manual_stop_.load() && (service_->wifiStatus().ap_active &&
-                               service_->wifiStatus().admin_provisioned))
-    desired_.store(true);
+  auto &gate = service_->networkAdminAccess();
+  if (!gate.allowed(portal_generation_)) { portal_.reset(); portal_generation_ = 0; }
   tls_desired_.store(
-      !manual_stop_.load() && config::kTlsIdentityPresent &&
+      !manual_stop_.load() && !gate.closing.load() &&
+      gate.phase.load() == NetworkPhase::CLIENT_STA && config::kTlsIdentityPresent &&
       (service_->remoteUpdateAllowed() ||
        (session_.sessionAuthenticated() && service_->wifiStatus().connected)));
   if (session_.sessionAuthenticated() &&
@@ -239,6 +317,16 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   const HttpTransportRequest &req = pending_request_;
   resp.sequence = req.sequence;
 
+  auto &gate = service_->networkAdminAccess();
+  const bool admin_request = req.kind >= HttpRequestKind::WIFI_STATUS;
+  AdminLease lease(gate);
+  if (admin_request && (!lease || !gate.allowed(req.admin_generation) ||
+                        !WifiManager::verifyAdminRadio())) {
+    resp.message = "ADMIN_AP_REQUIRED"; return;
+  }
+  if (admin_request && portal_generation_ != req.admin_generation) {
+    portal_.reset(); portal_generation_ = req.admin_generation;
+  }
   switch (req.kind) {
   case HttpRequestKind::WEB_STATUS: {
     // Read-only. Every field below is a ControllerService accessor — see
@@ -314,6 +402,11 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     resp.text_len = (n > 0 && static_cast<size_t>(n) < sizeof(resp.text))
                         ? static_cast<size_t>(n)
                         : sizeof(resp.text) - 1;
+    // Dashboard extension (2026-10-11). Appended after the original keys so
+    // their order is unchanged. Same rule as above: cached state only, no
+    // bus transaction, no NVS read. A value that is not known is printed as
+    // not known, never as a stale number.
+    statusExtension(resp, bms, cal);
     resp.ok = true;
     resp.message = "OK";
     break;
@@ -324,24 +417,70 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     break;
   }
   case HttpRequestKind::WIFI_LOGIN: {
-    uint8_t random[64];
+    uint8_t random[64 + kPortalDeviceIdBytes];
     esp_fill_random(random, sizeof(random));
     resp.ok = req.local_authorized &&
-              portal_.login(now_ms, req.peer, req.login,
-                            service_->networkAdminDigest(), random);
+              portal_.login(static_cast<uint64_t>(esp_timer_get_time()) / 1000,
+                            req.peer, req.login,
+                            gate.digest(), random);
     resp.message = resp.ok ? "OK" : "AUTH_FAILED";
     if (resp.ok) {
       strcpy(resp.cookie, portal_.cookie());
       strcpy(resp.text, portal_.csrf());
       resp.text_len = 64;
+      // "Remember this device" is only ever issued by a token login.
+      if (req.remember)
+        portalDeviceIssue(gate.digest(), random + 64, resp.device);
     }
+    memset(random, 0, sizeof(random));
+    break;
+  }
+  case HttpRequestKind::WIFI_SESSION: {
+    // Page load or expired session. The holder of the live session is told
+    // its CSRF token again; otherwise a remembered-device credential opens a
+    // fresh session. No token, no NVS access, no wall clock.
+    const uint64_t now = static_cast<uint64_t>(esp_timer_get_time()) / 1000;
+    bool resumed = false;
+    if (req.local_authorized && !portal_.current(now, req.peer, req.cookie)) {
+      uint8_t random[64];
+      esp_fill_random(random, sizeof(random));
+      resumed = portal_.resume(now, req.peer, req.device, gate.digest(), random);
+      memset(random, 0, sizeof(random));
+    }
+    resp.ok = req.local_authorized &&
+              portal_.current(now, req.peer, resumed ? portal_.cookie() : req.cookie);
+    resp.message = resp.ok ? "OK" : "AUTH_FAILED";
+    if (resp.ok) {
+      strcpy(resp.cookie, portal_.cookie());
+      strcpy(resp.text, portal_.csrf());
+      resp.text_len = 64;
+      // Sent back only after it verified, so the browser renews its lifetime.
+      if (resumed)
+        memcpy(resp.device, req.device, sizeof(resp.device));
+    }
+    break;
+  }
+  case HttpRequestKind::WIFI_LOGOUT: {
+    // Ends the session if the caller holds it; the response clears the
+    // browser's cookies either way. A remembered device is not individually
+    // revocable: a new administrator token revokes all of them.
+    if (!req.local_authorized) {
+      resp.message = "AUTH_FAILED";
+      break;
+    }
+    if (portal_.current(static_cast<uint64_t>(esp_timer_get_time()) / 1000,
+                        req.peer, req.cookie))
+      portal_.reset();
+    resp.ok = true;
+    resp.message = "LOGGED_OUT";
     break;
   }
   case HttpRequestKind::WIFI_CONFIG:
   case HttpRequestKind::WIFI_SCAN:
   case HttpRequestKind::WIFI_AP: {
     if (!req.local_authorized ||
-        !portal_.authorize(now_ms, req.peer, req.cookie, req.csrf)) {
+        !portal_.authorize(static_cast<uint64_t>(esp_timer_get_time()) / 1000,
+                           req.peer, req.cookie, req.csrf)) {
       resp.message = "AUTH_FAILED";
       break;
     }
@@ -350,14 +489,20 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
       resp.message = "OTA_BUSY";
       break;
     }
+    if (!gate.allowed(req.admin_generation) || !WifiManager::verifyAdminRadio()) {
+      resp.message = "ADMIN_REVOKED"; break;
+    }
+    if (req.kind == HttpRequestKind::WIFI_SCAN) {
+      resp.message = "SCAN_DISABLED_ADMIN_AP"; break;
+    }
     if (req.kind == HttpRequestKind::WIFI_CONFIG)
-      resp.ok = service_->configureNetwork(req.patch);
+      resp.ok = service_->configureNetwork(req.patch, req.admin_generation);
     if (req.kind == HttpRequestKind::WIFI_SCAN)
       resp.ok = service_->scanNetwork();
     if (req.kind == HttpRequestKind::WIFI_AP)
-      resp.ok = service_->accessPoint(req.ap_on);
+      resp.ok = service_->accessPoint(req.ap_on, req.admin_generation);
     resp.message =
-        resp.ok ? (req.kind == HttpRequestKind::WIFI_CONFIG ? "CONFIG_PENDING"
+        resp.ok ? (req.kind == HttpRequestKind::WIFI_CONFIG ? "ADMIN_CLOSING_STA_TEST_RELOGIN_REQUIRED"
                                                             : "QUEUED")
                 : "REFUSED_BUSY_OR_RECOVERY";
     break;
@@ -456,6 +601,107 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     resp.message = "UNKNOWN_REQUEST";
     break;
   }
+}
+
+void HttpTransport::statusExtension(
+    HttpTransportResponse &resp, const power::DalySample &bms,
+    const calibration::CalibrationSessionStatus &cal) {
+  size_t used = resp.text_len;
+  auto add = [&](const char *format, ...) {
+    if (used >= sizeof(resp.text) - 1)
+      return;
+    va_list args;
+    va_start(args, format);
+    const int n = vsnprintf(resp.text + used, sizeof(resp.text) - used, format, args);
+    va_end(args);
+    // A line that does not fit is dropped whole, never sent truncated.
+    if (n > 0 && static_cast<size_t>(n) < sizeof(resp.text) - used)
+      used += static_cast<size_t>(n);
+    else
+      resp.text[used] = 0;
+  };
+  const uint32_t now = millis(); // DALY may have stamped after the tick sample
+  const bool valid = service_->bmsHasValidSample();
+  const uint32_t sample_age = valid ? now - bms.sampled_at_ms : 0;
+  const auto &wifi = service_->wifiStatus();
+  const auto &led = service_->ledSnapshot();
+  const auto &census = service_->servoCensusResult();
+  add("uptime_ms=%lu\nauthority_inhibited=%s\nauthority_inhibit_reason=%s\n",
+      (unsigned long)service_->uptimeMillis(now),
+      service_->authorityInhibited() ? "YES" : "NO",
+      core::toString(service_->authorityInhibitReason()));
+  add("imu_detected=%s\nbms_detected=%s\nservo_detected=%s\nled_detected=%s\n",
+      core::toString(service_->imuAvailability().detected),
+      core::toString(service_->bmsAvailability().detected),
+      core::toString(service_->servoAvailability().detected),
+      core::toString(service_->ledAvailability().detected));
+  add("imu_runtime_resets=%lu\n", (unsigned long)service_->imuRuntimeResetCount());
+  // Fresh is the controller's own contract (power/DalyProtocol.h): a valid
+  // sample, the latest poll OK, and an age within kDalyTelemetryFreshnessMs.
+  add("bms_sample_age_ms=%lu\nbms_fresh=%s\nbms_fresh_limit_ms=%lu\n",
+      (unsigned long)sample_age,
+      valid && service_->bmsLastCommResult() == power::DalyCommResult::OK &&
+              sample_age <= power::kDalyTelemetryFreshnessMs
+          ? "YES"
+          : "NO",
+      (unsigned long)power::kDalyTelemetryFreshnessMs);
+  if (valid) {
+    add("bms_current_a=%.1f\nbms_state=%s\nbms_charge_mos=%s\n"
+        "bms_discharge_mos=%s\nbms_alarms=%04X %04X %04X %04X\n",
+        bms.pack_current_a, bms.state_name, bms.charge_mos_on ? "ON" : "OFF",
+        bms.discharge_mos_on ? "ON" : "OFF", bms.alarms[0], bms.alarms[1],
+        bms.alarms[2], bms.alarms[3]);
+    add("bms_cells=%u\nbms_cell_min_mv=%u\nbms_cell_max_mv=%u\n"
+        "bms_cell_delta_mv=%u\n",
+        (unsigned)bms.cell_count, (unsigned)bms.cell_min_mv,
+        (unsigned)bms.cell_max_mv, (unsigned)bms.cell_delta_mv);
+    char cells[8 * 6 + 1];
+    size_t w = 0;
+    for (unsigned i = 0; i < bms.cell_count && i < 8; ++i)
+      w += snprintf(cells + w, sizeof(cells) - w, "%s%u", i ? "," : "",
+                    (unsigned)bms.cell_mv[i]);
+    cells[w] = 0;
+    add("bms_cell_mv=%s\n", cells);
+  }
+  // Compile-time population facts plus the verdict of the last census, if
+  // one ran. NOT_RUN stays NOT_RUN: no population is implied.
+  add("servo_canonical=%u\nservo_expected_now=%u\nservo_census=%s\n",
+      (unsigned)servo::canonicalAllocatedCount(),
+      (unsigned)servo::expectedNowCount(), servo::toString(census.verdict));
+  if (census.verdict != servo::CensusVerdict::NOT_RUN)
+    add("servo_census_present=%u\nservo_census_missing=%u\n",
+        (unsigned)census.present_expected, (unsigned)census.missing_expected);
+  add("calibration_holds_authority=%s\ncalibration_stale=%s\n",
+      cal.holds_authority ? "YES" : "NO",
+      cal.current_calibration_stale ? "YES" : "NO");
+  const auto &persist = service_->calibrationPersistence();
+  if (persist.published)
+    add("calibration_available=%s\ncalibration_persist_verdict=%s\n"
+        "calibration_ack_generation=%lu\ncalibration_record_intact=%s\n"
+        "calibration_nvs=%s\n",
+        persist.available ? "YES" : "NO", persist.verdict,
+        (unsigned long)persist.acknowledged_generation,
+        persist.record_intact ? "YES" : "NO", persist.nvs);
+  add("led_soc_valid=%s\nled_soc_segments=%u\nled_charging=%s\n"
+      "led_charging_fault=%s\nled_battery_warning=%s\n"
+      "led_battery_critical=%s\nled_diagnostic=%s\n",
+      led.soc_valid ? "YES" : "NO", (unsigned)led.soc_segments,
+      led.charging ? "YES" : "NO", led.charging_fault ? "YES" : "NO",
+      led.battery_warning ? "YES" : "NO", led.battery_critical ? "YES" : "NO",
+      status::toString(service_->ledDiagnostic()));
+  if (led.soc_valid)
+    add("led_soc_percent=%.1f\n", led.soc_percent);
+  add("network_phase=%s\nwifi_enabled=%s\nap_active=%s\nap_clients=%u\n"
+      "heap_free=%lu\nheap_min_free=%lu\nloop_stack_min_free=%lu\n",
+      toString(service_->networkAdminAccess().phase.load()),
+      wifi.enabled ? "YES" : "NO", wifi.ap_active ? "YES" : "NO",
+      (unsigned)wifi.ap_clients,
+      (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+      (unsigned long)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+      // Lowest free stack ever seen on the Controller task, which formats
+      // this response: evidence that the portal stays inside its budget.
+      (unsigned long)uxTaskGetStackHighWaterMark(nullptr));
+  resp.text_len = used;
 }
 
 // ---------------------------------------------------------------------------
@@ -590,14 +836,16 @@ esp_err_t HttpTransport::handleOtaUpdate(httpd_req_t *req) {
 
 void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
   const auto &w = service_->wifiStatus();
-  char ip[16], ssid[67], bssid[37], ap[67];
+  char ip[16], ssid[67], bssid[37], ap[67], test_ip[16], test_ssid[67];
+  formatIpv4(w.sta_test.ipv4, test_ip, 16);
+  jsonString(w.sta_test.ssid, test_ssid, sizeof(test_ssid));
   formatIpv4(w.ipv4, ip, 16);
   jsonString(w.ssid, ssid, sizeof(ssid));
   jsonString(w.bssid, bssid, sizeof(bssid));
   jsonString(w.ap_ssid, ap, sizeof(ap));
   int n = snprintf(
       resp.text, sizeof(resp.text),
-      "{\"build_id\":\"%s\",\"ota_ingest\":%u,\"tls\":%s,\"connected\":%s,"
+      "{\"network_phase\":\"%s\",\"admin_generation\":%lu,\"build_id\":\"%s\",\"ota_ingest\":%u,\"tls\":%s,\"connected\":%s,"
       "\"ssid\":\"%s\","
       "\"bssid\":\"%s\",\"ip\":\"%s\",\"rssi\":%ld,\"channel\":%u,\"ap_"
       "active\":%s,\"ap_ssid\":\"%"
@@ -614,6 +862,8 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
       "us\":%lu,\"worker_stack_free\":%lu,\"heap_free\":%lu,\"heap_min\":%lu,"
       "\"scan_starts\":%lu,"
       "\"scan_inhibited\":%lu,\"roams\":%lu,\"profiles\":[",
+      toString(service_->networkAdminAccess().phase.load()),
+      (unsigned long)service_->networkAdminAccess().generation(),
       build::kBuildId, update::OtaManager::ingestEnabled() ? 1 : 0,
       tlsStarted() ? "true" : "false", w.connected ? "true" : "false", ssid,
       bssid, ip, (long)w.rssi_dbm, w.channel, w.ap_active ? "true" : "false",
@@ -660,13 +910,32 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
       "],\"ap_reload_pending\":%s,\"sleep_apply_ok\":%s,\"bandwidth_"
       "configured\":%u,"
       "\"bandwidth_apply_ok\":%s,\"snapshot_max_us\":%lu,\"connects\":%lu,"
-      "\"connect_timeouts\":%lu,\"link_losses\":%lu,\"scan\":[",
+      "\"connect_timeouts\":%lu,\"link_losses\":%lu,"
+      "\"sta_enabled\":%s,\"sta_credentials\":%s,\"sta_state\":\"%s\","
+      "\"sta_fault\":\"%s\",\"admin_provisioned\":%s,"
+      "\"sta_test\":{\"seq\":%lu,\"outcome\":\"%s\",\"ssid\":\"%s\","
+      "\"profile\":%u,\"associated\":%s,\"reason\":%u,\"attempts\":%u,"
+      "\"ip\":\"%s\",\"rssi\":%ld,\"channel\":%u,\"elapsed_ms\":%lu,"
+      "\"rolled_back\":%s},"
+      "\"policy\":{\"run\":%s,\"role\":\"%s\",\"recovery_level\":%u,"
+      "\"retry_in_ms\":%lu},\"scan\":[",
       w.ap_reload_pending ? "true" : "false",
       w.sleep_apply_ok ? "true" : "false", w.bandwidth_configured,
       w.bandwidth_apply_ok ? "true" : "false", (unsigned long)w.max_update_us,
       (unsigned long)w.counters.connects,
       (unsigned long)w.counters.connect_timeouts,
-      (unsigned long)w.counters.link_losses);
+      (unsigned long)w.counters.link_losses, w.enabled ? "true" : "false",
+      w.credentials_present ? "true" : "false", toString(w.state),
+      toString(w.fault), w.admin_provisioned ? "true" : "false",
+      (unsigned long)w.sta_test.seq,
+      toString(static_cast<StaTestOutcome>(w.sta_test.outcome)), test_ssid,
+      w.sta_test.profile, w.sta_test.associated ? "true" : "false",
+      w.sta_test.reason, w.sta_test.attempts, test_ip,
+      (long)w.sta_test.rssi_dbm, w.sta_test.channel,
+      (unsigned long)w.sta_test.elapsed_ms,
+      w.sta_test.rolled_back ? "true" : "false", w.run_mode ? "true" : "false",
+      toString(static_cast<RoleReason>(w.role_reason)), w.recovery_level,
+      (unsigned long)w.recovery_retry_ms);
   if (n < 0 || static_cast<size_t>(n) >= sizeof(resp.text) - used) {
     resp.message = "STATUS_OVERFLOW";
     return;
@@ -697,6 +966,10 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
   resp.message = "OK";
 }
 esp_err_t HttpTransport::handlePage(httpd_req_t *req) {
+  auto *self = static_cast<HttpTransport *>(req->user_ctx);
+  HttpTransportRequest r{};
+  if (!self->admitAdmin(r))
+    return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "ADMIN_AP_REQUIRED");
   httpd_resp_set_type(req, "text/html; charset=utf-8");
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
   httpd_resp_set_hdr(req, "X-Frame-Options", "DENY");
@@ -713,6 +986,8 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   HttpTransportRequest r{};
   if (!socketFacts(req, r))
     return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "Socket unavailable");
+  if (!self->admitAdmin(r))
+    return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "ADMIN_AP_REQUIRED");
   if (req->method == HTTP_GET)
     r.kind = HttpRequestKind::WIFI_STATUS;
   else {
@@ -740,18 +1015,18 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
     }
     if (strcmp(req->uri, "/wifi/login") == 0) {
       r.kind = HttpRequestKind::WIFI_LOGIN;
-      if (read != 70 || strncmp(body, "token=", 6) != 0)
+      // token=<64 hex>, optionally followed by &remember=1 and nothing else.
+      r.remember = read == 81 && memcmp(body + 70, "&remember=1", 11) == 0;
+      if ((read != 70 && !r.remember) || strncmp(body, "token=", 6) != 0)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid login");
       memcpy(r.login, body + 6, 64);
     } else {
-      char cookie[128]{};
+      char cookie[256]{};
       httpd_req_get_hdr_value_str(req, "Cookie", cookie, sizeof(cookie));
-      const char *start = strstr(cookie, "md_session=");
-      if (start) {
-        start += 11;
-        if (strlen(start) >= 64 && (start[64] == 0 || start[64] == ';'))
-          memcpy(r.cookie, start, 64);
-      }
+      cookieValue(cookie, "md_session", r.cookie);
+      if (strcmp(req->uri, "/wifi/session") == 0)
+        cookieValue(cookie, "md_device", r.device);
+      memset(cookie, 0, sizeof(cookie));
       httpd_req_get_hdr_value_str(req, "X-Csrf-Token", r.csrf, sizeof(r.csrf));
       if (strcmp(req->uri, "/wifi/config") == 0) {
         r.kind = HttpRequestKind::WIFI_CONFIG;
@@ -770,6 +1045,15 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
           return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
                                      "Invalid AP action");
         r.ap_on = body[3] == '1';
+      } else if (strcmp(req->uri, "/wifi/session") == 0 ||
+                 strcmp(req->uri, "/wifi/logout") == 0) {
+        r.kind = req->uri[6] == 's' ? HttpRequestKind::WIFI_SESSION
+                                    : HttpRequestKind::WIFI_LOGOUT;
+        if (read)
+          return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                     "Empty body required");
+      } else {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Unknown action");
       }
     }
     memset(body, 0, sizeof(body));
@@ -785,14 +1069,32 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, resp.text, resp.text_len);
   }
-  if (r.kind == HttpRequestKind::WIFI_LOGIN) {
-    char cookie[160];
+  // The session cookie is short-lived and goes with every /wifi/ request. The
+  // remembered-device cookie is long-lived (400 days, renewed on each use) and
+  // is scoped to /wifi/session, so it is sent only to open a session.
+  char cookie[160], device[176];
+  if (r.kind == HttpRequestKind::WIFI_LOGIN ||
+      r.kind == HttpRequestKind::WIFI_SESSION) {
     snprintf(
         cookie, sizeof(cookie),
         "md_session=%s; HttpOnly; SameSite=Strict; Path=/wifi/; Max-Age=300",
         resp.cookie);
     httpd_resp_set_hdr(req, "Set-Cookie", cookie);
+    if (resp.device[0]) {
+      snprintf(device, sizeof(device),
+               "md_device=%s; HttpOnly; SameSite=Strict; Path=/wifi/session; Max-Age=34560000",
+               resp.device);
+      httpd_resp_set_hdr(req, "Set-Cookie", device);
+    }
     return httpd_resp_send(req, resp.text, resp.text_len);
+  }
+  if (r.kind == HttpRequestKind::WIFI_LOGOUT) {
+    httpd_resp_set_hdr(
+        req, "Set-Cookie",
+        "md_session=; HttpOnly; SameSite=Strict; Path=/wifi/; Max-Age=0");
+    httpd_resp_set_hdr(
+        req, "Set-Cookie",
+        "md_device=; HttpOnly; SameSite=Strict; Path=/wifi/session; Max-Age=0");
   }
   return httpd_resp_sendstr(req, resp.message);
 }

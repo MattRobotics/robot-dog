@@ -1,5 +1,7 @@
 # Development Log — index
 
+Latest: [closeout 2026-10-11](2026-10-11_HW_NON_MOTION_CLOSEOUT.md) · [Motion handoff 2026-10-12](2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
+
 Chronological handoffs and milestone records. A log states what was current **on its date**; its
 "next steps" are historical. Status of a result is whatever the log itself records for its scope; this
 index adds no status of its own. Current state: [root README](../../README.md). Whole-project

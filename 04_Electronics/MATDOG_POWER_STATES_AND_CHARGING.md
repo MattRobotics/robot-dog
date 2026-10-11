@@ -1,5 +1,14 @@
 # MATDOG — Power States, KEY Semantics and Charging
 
+**Aggiornamento 2026-10-11:** [closeout non-motion](../09_Logs/Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md):
+barra SOC/charging e breathing successivo osservati dall'operatore, non piena
+qualifica charging. Le indicazioni FUTURE storiche sul LED sotto non descrivono
+questa osservazione successiva; soglie <=30 ambra / <=15 rosso e maggiore
+escursione verde restano da implementare/validare via simulazione. KEY OFF con
+charger non isola il bus; osservazione MOS scarica ON con KEY riferito OFF da
+investigare. Termination e persistenza KEY su vero ciclo BMS non qualificate.
+Residui nel [registro](../09_Logs/OPEN_ITEMS.md#closeout-2026-10-11--fase-successiva).
+
 **Canonical owner** of MATDOG's power domains, power states, the physical `KEY` button, Charge/
 Discharge MOS policy, daily use, storage, service isolation and charging (manual and autonomous).
 

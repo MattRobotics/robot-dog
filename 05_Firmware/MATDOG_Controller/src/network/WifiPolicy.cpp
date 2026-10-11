@@ -186,6 +186,37 @@ const char* toString(WifiFault fault) {
   return "UNKNOWN";
 }
 
+// wifi_err_reason_t values (esp_wifi_types): 15 4WAY_HANDSHAKE_TIMEOUT,
+// 202 AUTH_FAIL, 204 HANDSHAKE_TIMEOUT are how a wrong WPA2 passphrase is
+// reported; 201/210/211/212 are the NO_AP_FOUND family. `reason` is cleared
+// by every accepted association, so a specific reason always belongs to the
+// LAST attempt; an accepted association that then produced no address is a
+// DHCP/addressing failure.
+StaTestOutcome classifyStaTestFailure(bool storage_error, bool aborted,
+                                      bool associated, uint16_t reason) {
+  if (storage_error) return StaTestOutcome::STORAGE_ERROR;
+  if (aborted) return StaTestOutcome::ABORTED;
+  if (reason == 15 || reason == 202 || reason == 204) return StaTestOutcome::AUTH_REJECTED;
+  if (reason == 201 || (reason >= 210 && reason <= 212)) return StaTestOutcome::AP_NOT_FOUND;
+  if (associated) return StaTestOutcome::NO_IP;
+  return StaTestOutcome::TIMEOUT;
+}
+
+const char* toString(StaTestOutcome outcome) {
+  switch (outcome) {
+    case StaTestOutcome::NONE:          return "NONE";
+    case StaTestOutcome::RUNNING:       return "RUNNING";
+    case StaTestOutcome::CONNECTED:     return "CONNECTED";
+    case StaTestOutcome::AUTH_REJECTED: return "AUTH_REJECTED";
+    case StaTestOutcome::AP_NOT_FOUND:  return "AP_NOT_FOUND";
+    case StaTestOutcome::NO_IP:         return "NO_IP";
+    case StaTestOutcome::TIMEOUT:       return "TIMEOUT";
+    case StaTestOutcome::ABORTED:       return "ABORTED";
+    case StaTestOutcome::STORAGE_ERROR: return "STORAGE_ERROR";
+  }
+  return "UNKNOWN";
+}
+
 void formatIpv4(uint32_t ipv4, char* out, uint32_t out_size) {
   if (out == nullptr || out_size == 0) return;
 

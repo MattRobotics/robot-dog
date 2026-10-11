@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "../update/Hmac256.h"
 #include "../update/Sha256.h"
 namespace matdog {
 namespace network {
@@ -53,7 +54,50 @@ bool tokenEqual(const char *a, const char *b) {
     v |= a[i] ^ b[i];
   return v == 0;
 }
+// Domain separation: the admin digest is also the login verifier.
+constexpr char kDeviceLabel[] = "MATDOG-PORTAL-DEVICE-1";
+bool anyByte(const uint8_t *bytes, size_t n) {
+  uint8_t v = 0;
+  for (size_t i = 0; i < n; ++i)
+    v |= bytes[i];
+  return v != 0;
+}
+void deviceTag(const uint8_t digest[32], const uint8_t id[kPortalDeviceIdBytes],
+               uint8_t tag[update::kHmac256DigestBytes]) {
+  uint8_t message[sizeof(kDeviceLabel) - 1 + kPortalDeviceIdBytes];
+  memcpy(message, kDeviceLabel, sizeof(kDeviceLabel) - 1);
+  memcpy(message + sizeof(kDeviceLabel) - 1, id, kPortalDeviceIdBytes);
+  update::hmac256(digest, 32, message, sizeof(message), tag);
+}
 } // namespace
+void portalDeviceIssue(const uint8_t digest[32],
+                       const uint8_t id[kPortalDeviceIdBytes], char out[65]) {
+  static const char digits[] = "0123456789abcdef";
+  uint8_t tag[update::kHmac256DigestBytes];
+  deviceTag(digest, id, tag);
+  for (size_t i = 0; i < kPortalDeviceIdBytes; ++i) {
+    out[2 * i] = digits[id[i] >> 4];
+    out[2 * i + 1] = digits[id[i] & 15];
+    out[32 + 2 * i] = digits[tag[i] >> 4];
+    out[32 + 2 * i + 1] = digits[tag[i] & 15];
+  }
+  out[64] = 0;
+  memset(tag, 0, sizeof(tag));
+}
+bool portalDeviceValid(const uint8_t digest[32], const char *credential) {
+  // No administrator provisioned: nothing can be remembered.
+  if (!credential || strlen(credential) != 64 || !anyByte(digest, 32))
+    return false;
+  uint8_t raw[32], tag[update::kHmac256DigestBytes];
+  if (!update::parseHex(credential, 64, raw))
+    return false;
+  deviceTag(digest, raw, tag);
+  uint8_t diff = 0;
+  for (size_t i = 0; i < 16; ++i)
+    diff |= raw[16 + i] ^ tag[i];
+  memset(tag, 0, sizeof(tag));
+  return diff == 0;
+}
 bool portalOrigin(bool ap, const char *host, const char *origin) {
   return ap && host && origin &&
          (strcmp(host, "192.168.4.1") == 0 ||
@@ -219,8 +263,13 @@ bool parseConfigForm(const char *body, size_t n, ConfigPatch *out) {
   *out = patch;
   return true;
 }
-bool PortalSession::login(uint32_t now, uint32_t peer, const char *supplied,
+bool PortalSession::login(uint64_t now, uint32_t peer, const char *supplied,
                           const uint8_t digest[32], const uint8_t random[64]) {
+  // A regressing clock cannot bypass throttling or preserve an old session.
+  if (attempted_ && now < last_attempt_) {
+    reset();
+    return false;
+  }
   if (attempted_ && now - last_attempt_ < (failures_ >= 5 ? 60000u : 1000u))
     return false;
   attempted_ = true;
@@ -246,17 +295,53 @@ bool PortalSession::login(uint32_t now, uint32_t peer, const char *supplied,
     return false;
   }
   failures_ = 0;
+  open(now, peer, random);
+  return true;
+}
+void PortalSession::open(uint64_t now, uint32_t peer, const uint8_t random[64]) {
   active_ = true;
   issued_ = now;
   peer_ = peer;
   update::toHex(random, cookie_, sizeof(cookie_));
   update::toHex(random + 32, csrf_, sizeof(csrf_));
+}
+bool PortalSession::resume(uint64_t now, uint32_t peer, const char *device,
+                           const uint8_t digest[32], const uint8_t random[64]) {
+  // No credential presented is not an attempt: a browser without the cookie
+  // must not be able to hold the throttle against the owner's device.
+  if (!device || !device[0])
+    return false;
+  // Same fail-closed clock rule as login(); a bad credential is throttled so
+  // the comparison cannot be driven at request rate.
+  if (resume_failed_ && now < resume_failed_at_) {
+    reset();
+    return false;
+  }
+  if (resume_failed_ &&
+      now - resume_failed_at_ < (resume_failures_ >= 5 ? 60000u : 1000u))
+    return false;
+  if (!portalDeviceValid(digest, device)) {
+    resume_failed_ = true;
+    resume_failed_at_ = now;
+    if (resume_failures_ < 5)
+      ++resume_failures_;
+    return false;
+  }
+  resume_failed_ = false;
+  resume_failures_ = 0;
+  open(now, peer, random);
   return true;
 }
-bool PortalSession::authorize(uint32_t now, uint32_t peer, const char *cookie,
-                              const char *csrf) const {
-  return active_ && now - issued_ < 300000 && peer == peer_ &&
-         tokenEqual(cookie, cookie_) && tokenEqual(csrf, csrf_);
+bool PortalSession::current(uint64_t now, uint32_t peer, const char *cookie) {
+  // Expiry is irreversible until a fresh authenticated login. Reject a clock
+  // regression too; subtraction must never revive an expired session.
+  if (active_ && !(now >= issued_ && now - issued_ < 300000))
+    reset();
+  return active_ && peer == peer_ && tokenEqual(cookie, cookie_);
+}
+bool PortalSession::authorize(uint64_t now, uint32_t peer, const char *cookie,
+                              const char *csrf) {
+  return current(now, peer, cookie) && tokenEqual(csrf, csrf_);
 }
 } // namespace network
 } // namespace matdog

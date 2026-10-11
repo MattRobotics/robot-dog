@@ -1,5 +1,24 @@
 # Open items and blockers
 
+## Closeout 2026-10-11 — fase successiva
+
+Aggiornamento della sola baseline non-motion sulla branch di lavoro:
+[report finale](Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md).
+Le sezioni storiche sotto restano riferite a main/2026-10-09; il PASS del record
+integro gen1 non chiude accettazione della calibrazione operativa né motion.
+
+| Area | Stato e lavoro necessario |
+|---|---|
+| A — LED | DEFERRED: SOC <=30% breathing ambra; <=15% breathing rosso; migliorare escursione breathing verde charging quasi-off → luminoso, senza lampeggio netto. Producer, isteresi e precedenza da implementare e validare con SOC simulato, senza scarica fisica profonda. |
+| B — NETWORK | Dashboard LAN in MAINTENANCE DEFERRED per complessità architetturale. AP attuale 192.168.4.1; STA temporanea router positiva e primary COMMITTED/persistito riferiti, power-cycle non provato. Futura separazione LAN read-only / admin AP / OTA: ADR-005. Non usare RUN per accesso LAN; STA normale RUN NOT TESTED sul robot. |
+| C — MOTION | Calibrazione operativa e permit da completare; NVS valido non significa motion permit. RESTORE NOT_IMPLEMENTED; gait, torque operativo e locomozione reali NOT TESTED. Motion execution suites DEFERRED, mai PASS. Limiti/envelope e gate safety ancora bloccanti. |
+| D — BMS / POWER | Charging solo osservazioni manuali limitate; termination/cutoff, unattended/dock non qualificati. Con KEY OFF e charger il bus può restare alimentato. discharge_mos ON con KEY riferito OFF è discrepanza da investigare senza forzare MOS. Persistenza KEY su vero ciclo BMS non testata. |
+| E — SECURITY | NOT TESTED approfondito: durata/revoca sessioni admin, accessi non autorizzati e CSRF/read-only server-side. Login o label UI non provano enforcement. |
+| F — AUDIT | Lacuna contenuto CHIUSA: trascrizione integrale flash e seriali post-flash/STA recuperate dalla conversazione, originali incollati dall’operatore; SHA256SUMS 5/5 PASS. [Appendice redatta](Validation_Reports/HW_Closeout_2026-10-11/MATDOG_2026-10-11_EVIDENCE_APPENDIX.md). Non log automatico nativo Asus; migliorare cattura automatica in future sessioni, nessun test hardware pendente per questa normalizzazione. |
+
+[Handoff Motion 2026-10-12](Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
+
+
 State as documented at `main` = `ddcd1cdb87eef29cc46996d6137d3f2b4c946f17` (after PR #37–#41;
 firmware content as of PR #40, `9c2fe78…`; updated 2026-10-09). Every row is taken from a document in this repository; nothing here is new evidence.
 Standing invariants: **`MOTION_AUTHORIZED=0`**, **`RESTORE=NOT_IMPLEMENTED`**, **DO NOT FLASH

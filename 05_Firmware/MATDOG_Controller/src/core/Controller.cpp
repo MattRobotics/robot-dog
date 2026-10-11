@@ -943,6 +943,9 @@ void Controller::update(uint32_t now_ms) {
   wifi_.setContext(service_.networkCritical(),ota_.status().holds_actuator_inhibit);
   command_router_.update(now_ms);
   wifi_.setContext(service_.networkCritical(),ota_.status().holds_actuator_inhibit);
+  // The radio role follows the operating mode (MAINTENANCE: administrative AP;
+  // RUN: router first). One-way: the Wi-Fi owner reads this, it cannot set it.
+  wifi_.setRunMode(operating_mode_.mode() == OperatingMode::RUN);
 
   imu_.update(now_ms);
   system_state_.setImuHealth(imu_.health());
@@ -1072,6 +1075,21 @@ void Controller::update(uint32_t now_ms) {
     // No reviewed charge-completion policy exists yet: the reserved
     // charge_complete_verified input stays false, including at 100% SOC.
     led_status_.update(led_now_ms, led_inputs);
+  }
+
+  // Read-only copy of the calibration persistence RAM snapshot for the
+  // telemetry layer (Dashboard). No NVS access, no load, no write: only the
+  // facts @CALIBRATION PERSIST STATUS already prints.
+  {
+    const calibration::PersistenceSnapshot& persisted = persistence_.snapshot();
+    CalibrationPersistenceView view;
+    view.published = true;
+    view.available = persistence_.calibrationAvailable();
+    view.record_intact = persisted.assessment.acknowledged_record_intact;
+    view.acknowledged_generation = persisted.assessment.acknowledged_generation;
+    view.verdict = calibration::toString(persisted.verdict);
+    view.nvs = calibration::toString(persisted.nvs);
+    service_.setCalibrationPersistenceView(view);
   }
 
   // Drains at most one pending HTTP request, if the Web server was ever

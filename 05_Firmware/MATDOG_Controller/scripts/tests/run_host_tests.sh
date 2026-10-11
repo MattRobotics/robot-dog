@@ -635,18 +635,65 @@ python3 "$SCRIPT_DIR/test_static_audit_startup.py"
   "$SKETCH_DIR/src/network/NetworkConfig.cpp" \
   "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
   "$SKETCH_DIR/src/network/PortalSecurity.cpp" \
-  "$SKETCH_DIR/src/update/Sha256.cpp"
+  "$SKETCH_DIR/src/update/Sha256.cpp" "$SKETCH_DIR/src/update/Hmac256.cpp"
 "$OUT/test_network_v3"
+
+# Remembered-device credential and session resume (persistent administrator
+# recognition): pure PortalSecurity, HMAC and SHA-256, synthetic credentials.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -fsanitize=address,undefined \
+  -fno-omit-frame-pointer -I "$SKETCH_DIR/src" -o "$OUT/test_portal_device" \
+  "$SCRIPT_DIR/test_portal_device.cpp" \
+  "$SKETCH_DIR/src/network/PortalSecurity.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp" "$SKETCH_DIR/src/update/Hmac256.cpp"
+"$OUT/test_portal_device"
 
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 \
   -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
   -o "$OUT/test_wifi_runtime_v3" "$SCRIPT_DIR/test_wifi_runtime_v3.cpp" \
-  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/AdminAccess.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
   "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
   "$SKETCH_DIR/src/update/Sha256.cpp"
 "$OUT/test_wifi_runtime_v3"
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -pthread \
+  -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_ir01_lifecycle" "$SCRIPT_DIR/test_ir01_lifecycle.cpp" \
+  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/AdminAccess.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+"$OUT/test_ir01_lifecycle"
+# WPA2/AP bring-up regression: the soft-AP double reproduces the driver's AP
+# restart on a profile write (the root cause of config_error=11 on 41753ac).
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -pthread \
+  -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_wifi_ap_bringup" "$SCRIPT_DIR/test_wifi_ap_bringup.cpp" \
+  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/AdminAccess.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+"$OUT/test_wifi_ap_bringup"
+# STA router test: outcome report, bounded retry, stability hold, and the
+# return to a verified AP with the known-good configuration after a failure.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -pthread \
+  -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_wifi_sta_test" "$SCRIPT_DIR/test_wifi_sta_test.cpp" \
+  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/AdminAccess.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
+  "$SKETCH_DIR/src/network/PortalSecurity.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp" "$SKETCH_DIR/src/update/Hmac256.cpp"
+"$OUT/test_wifi_sta_test"
+# Radio role by operating mode: MAINTENANCE keeps the administrative AP, RUN
+# joins the router and falls back to a recovery AP with a growing wait.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -pthread \
+  -I "$SCRIPT_DIR/network_stubs" -I "$SCRIPT_DIR/nvs_stub" \
+  -o "$OUT/test_wifi_mode_policy" "$SCRIPT_DIR/test_wifi_mode_policy.cpp" \
+  "$SKETCH_DIR/src/network/WifiManager.cpp" "$SKETCH_DIR/src/network/AdminAccess.cpp" "$SKETCH_DIR/src/network/WifiPolicy.cpp" \
+  "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
+  "$SKETCH_DIR/src/update/Sha256.cpp"
+"$OUT/test_wifi_mode_policy"
 python3 "$SCRIPT_DIR/test_ota_tls_client.py"
 python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
+python3 "$SCRIPT_DIR/test_ap_only_transport.py"
+python3 "$SCRIPT_DIR/test_ap_session_clock.py"
 
 # PR-2 (selective dev.1 integration): the pure motion library is integrated, but its
 # execution suites (motion host tests, fresh oracles, audit-tool tests) are DEFERRED

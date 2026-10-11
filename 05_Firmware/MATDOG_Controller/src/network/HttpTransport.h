@@ -26,7 +26,9 @@ enum class HttpRequestKind : uint8_t {
   WIFI_LOGIN,
   WIFI_CONFIG,
   WIFI_SCAN,
-  WIFI_AP
+  WIFI_AP,
+  WIFI_SESSION,
+  WIFI_LOGOUT
 };
 constexpr size_t kHttpChunkBufferBytes = 1024, kHttpStatusTextBytes = 4096;
 struct HttpTransportRequest {
@@ -37,9 +39,10 @@ struct HttpTransportRequest {
   uint8_t signature[update::kHmac256DigestBytes]{};
   uint8_t chunk_data[kHttpChunkBufferBytes]{};
   uint32_t chunk_len = 0;
-  bool local_authorized = false, tls = false, ap_socket = false, ap_on = false;
-  uint32_t peer = 0;
-  char cookie[65]{}, csrf[65]{}, login[65]{};
+  bool local_authorized = false, tls = false, ap_socket = false, ap_on = false,
+       remember = false;
+  uint32_t peer = 0, admin_generation = 0;
+  char cookie[65]{}, csrf[65]{}, login[65]{}, device[65]{};
   ConfigPatch patch{};
 };
 struct HttpTransportResponse {
@@ -48,7 +51,7 @@ struct HttpTransportResponse {
   char text[kHttpStatusTextBytes]{};
   size_t text_len = 0;
   uint32_t sequence = 0;
-  char cookie[65]{};
+  char cookie[65]{}, device[65]{};
   uint8_t nonce[update::kOtaNonceBytes]{};
   update::OtaAuthResult auth_result = update::OtaAuthResult::REJECTED_NO_SECRET;
 };
@@ -64,6 +67,7 @@ public:
   void stop();
   bool started() const { return listening_.load(); }
   bool tlsStarted() const { return tls_listening_.load(); }
+  bool manuallyStopped() const { return manual_stop_.load(); }
   void update(uint32_t now_ms);
 
 private:
@@ -74,11 +78,17 @@ private:
   static esp_err_t handleWifi(httpd_req_t *req);
   static void lifecycleEntry(void *self);
   void lifecycle();
-  bool registerHandlers(httpd_handle_t server);
+  void lifecycleTick();
+  bool admitAdmin(HttpTransportRequest &request);
+  uint32_t portal_generation_ = 0;
+  bool registerHandlers(httpd_handle_t server, bool admin = true);
   bool dispatch(const HttpTransportRequest &request,
                 HttpTransportResponse *response);
   void serviceRequest(uint32_t now_ms);
   void wifiResponse(HttpTransportResponse &response);
+  void statusExtension(HttpTransportResponse &response,
+                       const power::DalySample &bms,
+                       const calibration::CalibrationSessionStatus &cal);
   core::ControllerService *service_ = nullptr;
   update::OtaManager *ota_ = nullptr;
   update::OtaSession session_{};

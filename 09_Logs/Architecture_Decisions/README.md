@@ -1,5 +1,7 @@
 # Architecture decisions — index
 
+[ADR-005](ADR-005_Non_Motion_Closeout_and_Maintenance_Network_Boundary.md) — 2026-10-11, Accepted: non-motion closeout; AP administration retained; LAN read-only/OTA separation deferred.
+
 Dated decision records. Each ADR keeps the text it had when it was written; later status changes
 are added as annotations, never by rewriting the original decision.
 Current architecture: [`ARCHITECTURE.md`](../../01_Docs/02_Architecture/ARCHITECTURE.md).

@@ -275,6 +275,8 @@ class CommandRouter {
   bool q0_capture_result_pending_ = false;
   bool evidence_export_pending_ = false;
   uint16_t evidence_export_next_ = 0;
+  // Sequence of an @WIFI AP VERIFY whose worker result is still to be printed.
+  uint32_t wifi_verify_pending_seq_ = 0;
 
   static constexpr size_t kLineBufSize = 96;
   // LF ends a line; CR is ignored for compatibility. The first framing error

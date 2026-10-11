@@ -6203,6 +6203,52 @@ def contains_v3(code, token):
     return re.sub(r"\s+", "", token) in re.sub(r"\s+", "", code)
 
 
+def check_portal_page_text(page, where="src/network/PortalPage.h"):
+    """The AP portal is one self-contained document served with no Internet.
+
+    Checked on the RAW file, not on comment-stripped code: stripping `//` would
+    hide exactly the thing looked for (the tail of an external URL). The page
+    renders controller data as text only, keeps no credential in script-visible
+    storage, never puts one in a URL, and carries no static validation claim.
+    """
+    if page.count('R"MATDOG(')!=1 or page.count(')MATDOG"')!=1:
+        fail(f"{where}: portal page raw literal not found");return
+    body=page.split('R"MATDOG(',1)[1].split(')MATDOG"',1)[0]
+    if body.count("<script>")!=1 or body.count("</script>")!=1:
+        fail(f"{where}: exactly one inline script expected");return
+    script=body.split("<script>",1)[1].split("</script>",1)[0]
+    for token in ("<script src","<link","<img","<iframe","<object","<embed","@import","url(","https://","//cdn","srcset"):
+        if token in body:fail(f"{where}: external or embedded resource {token!r}; the portal must work offline")
+    for host in re.findall(r"http://([^\s\"'<)]+)",body):
+        if not host.startswith("192.168.4.1"):fail(f"{where}: external URL http://{host}")
+    for token in ("innerHTML","outerHTML","insertAdjacentHTML","document.write","eval(","new Function","srcdoc"):
+        if token in script:fail(f"{where}: {token} - controller data must be rendered as text")
+    for token in ("document.cookie","sessionStorage","location.search","location.hash","indexedDB"):
+        if token in script:fail(f"{where}: {token} - credentials stay in HttpOnly cookies, never in script or a URL")
+    if re.search(r"fetch\([^)]*\?",script):fail(f"{where}: a request URL carries a query string")
+    if script.count("localStorage.setItem")!=1 or script.count("localStorage.getItem")!=1:
+        fail(f"{where}: localStorage must be reached only through the one `store` wrapper")
+    keys=set(re.findall(r"store\.set\('([^']+)'",script))
+    if not keys or not keys<={"md_remember","md_login","md_watch"}:
+        fail(f"{where}: unexpected stored key(s) {sorted(keys)}; only non-secret hints may be stored")
+    if re.search(r"store\.set\([^)]*(csrf|token|password)",script):
+        fail(f"{where}: a credential is written to storage")
+    for token in ("offline candidate","prove hardware sono ancora","HARDWARE VALIDATED"):
+        if token in body:fail(f"{where}: static validation/candidate text {token!r}; status must come from the device")
+    interval=re.search(r"\bPOLL_MS=(\d+)",script)
+    if not interval or int(interval.group(1))<2000:
+        fail(f"{where}: POLL_MS missing or below 2000 ms; the portal must not flood the controller")
+    if script.count("fetch(")!=2:
+        fail(f"{where}: requests must go through the one GET helper and the one POST helper")
+    for name in ("dashboard","wifi","ap","performance","ota","diagnostics"):
+        if f'data-page="{name}"' not in body or f'<section id="{name}"' not in body:
+            fail(f"{where}: portal section {name!r} missing")
+    for endpoint in ("'/status'","'/wifi/status'","'/wifi/session'","'/wifi/logout'","'/wifi/login'"):
+        if endpoint not in script:fail(f"{where}: endpoint {endpoint} not used")
+    if re.search(r"/(servo|motion|torque|actuator|calibration)[/'\"]",script,re.I):
+        fail(f"{where}: the portal must not address an actuator or calibration endpoint")
+
+
 def check_network_v3_boundaries(files, sketch_dir):
     by_name={p.name:(p,c) for p,c in files if "scripts" not in p.parts}
     required={
@@ -6210,6 +6256,8 @@ def check_network_v3_boundaries(files, sketch_dir):
       "NetworkConfig.cpp": ('phase_=ConfigPhase::ROLLBACK','storage_->pending(c)','storage_->activate(candidate_)','!alt','critical','crc(b,n-4)'),
       "WifiManager.cpp": ('xTaskCreatePinnedToCore','xQueueCreate(1,sizeof(Request))','config_busy_.exchange(true)','modemSleep(sleep)','if(worker_status_.scan_running && context_.load()){esp_wifi_scan_stop()','drv.sta.bssid_set=false','test_fresh_&&link_up'),
       "HttpTransport.cpp": ('req.local_authorized','portal_.authorize','!req.tls || req.ap_socket','!service_->remoteUpdateAllowed()','session_.timedOut(now_ms)','mailbox_.claimDelivery()','ready_sequence_.load()==id','httpd_ssl_start','manual_stop_'),
+      "AdminAccess.cpp": ('xSemaphoreTake(static_cast<SemaphoreHandle_t>(mutex_),0)',),
+      "AdminAccess.h": ('class AdminLease','admitted_.store(false)','listeners_closed.store(false)','g==generation_.load()'),
       "ControllerService.h": ('OperatingMode::MAINTENANCE','bool networkCritical() const','configBusy()','sessionLive()'),
       "CommandRouter.cpp": ('(WIFI command redacted)','NETWORK_CONFIG_BUSY'),
       "PortalSecurity.cpp": ('return ap&&host&&origin','strcmp(host,"192.168.4.1")','portalOrigin','peer==peer_','now-issued_<300000','tokenEqual(cookie,cookie_)','tokenEqual(csrf,csrf_)','seen&(1ull<<field)'),
@@ -6237,8 +6285,150 @@ def check_network_v3_boundaries(files, sketch_dir):
     if "sleep.session_trusted=" in re.sub(r"\s+","",manager):fail("HWCDC adapter must keep session_trusted false until qualified")
     if sum(1 for _ in re.finditer(r"!req\.tls\s*\|\|\s*req\.ap_socket",transport))<2:
         fail("Challenge and begin both require TLS and STA socket provenance")
+    for token in ("AdminLease lease(admin_)", "admin_.allowed(r.generation)",
+                  "mode==WIFI_MODE_AP", "!WiFi.STA.started()", "admin_.listeners_closed.load()",
+                  "admin_.phase.load()!=NetworkPhase::CLIENT_STA", "intent_pending_", "admin_.revoke()"):
+        if not contains_v3(manager,token):fail("AP-only manager invariant missing: "+token)
+    compact_manager=re.sub(r"\s+","",manager)
+    compact_transport=re.sub(r"\s+","",transport)
+    for code,token,count in ((compact_manager,"AdminLeaselease(admin_)",2),
+                             (compact_manager,"admin_.allowed(r.generation)",2),
+                             (compact_transport,"httpd_stop(server_)==ESP_OK",2),
+                             (compact_transport,"httpd_ssl_stop(tls_server_)==ESP_OK",2),
+                             (compact_transport,"self->admitAdmin(r)",2),
+                             (compact_transport,"gate.allowed(req.admin_generation)",2)):
+        if code.count(token)!=count:fail("AP-only fence coverage changed: "+token)
+    if re.search(r"\b(?:WIFI_AP_STA|WIFI_MODE_APSTA)\b", manager):
+        fail("WifiManager must never restore AP+STA")
+    # WPA2 bring-up (root cause of config_error=11 on 41753ac). The stock
+    # WiFi.softAP() writes the AP profile with esp_wifi_set_config(), which
+    # restarts a started soft-AP inside the driver (AP_STOP, AP_START). That
+    # write is therefore an owned command with its own armed acknowledgment
+    # pair, the applied profile is read back before a generation opens, and
+    # the profile is WPA2-PSK unconditionally.
+    if "WiFi.softAP(" in manager:
+        fail("WifiManager must not call the stock WiFi.softAP(): it writes the AP profile "
+             "outside the armed acknowledgment set")
+    for token in ("expected_events_.store(kApStop|kApStart)", "if(!apConfigApplied())",
+                  "out->ap.authmode=WIFI_AUTH_WPA2_PSK",
+                  "admin_.raiseFault(FaultSite::UNEXPECTED_ROLE_EVENT,bit,pending)",
+                  "tagged.seq=++request_seq_", "recordTx(r,TxResult::COMMITTED,0)",
+                  "sameKey(candidate,config_.ap_password)"):
+        if not contains_v3(manager,token):fail("WPA2 bring-up invariant missing: "+token)
+    # A request that meets the admission fence held is retried, never dropped.
+    if compact_manager.count("current.ap.authmode==WIFI_AUTH_WPA2_PSK")!=2:
+        fail("Driver profile read-back and key comparison must both require WPA2-PSK")
+    if compact_manager.count("if(!lease)returnfalse;")!=2:
+        fail("Both fenced request paths must retry on fence contention")
+    if re.search(r"ap\.authmode\s*=\s*WIFI_AUTH_OPEN", manager):
+        fail("The administrative AP must never be configured open")
+    router=by_name.get("CommandRouter.cpp",(None,""))[1]
+    for token in ('WIFI_PROVISION=REFUSED kind=%s reason=%s', 'WIFI_PROVISION=QUEUED kind=%s seq=%lu',
+                  'seq=%lu kind=%s result=%s', 'WIFI_AP_VERIFY=DONE seq=%lu stored=%s driver=%s'):
+        if not contains_v3(router,token):fail("Provisioning confirmation invariant missing: "+token)
+    for token in ("self->admitAdmin(r)", "AdminLease lease(gate)", "gate.allowed(req.admin_generation)",
+                  "httpd_stop(server_)==ESP_OK", "httpd_ssl_stop(tls_server_)==ESP_OK",
+                  "gate.listeners_closed.store(true)", "!registerHandlers(tls_server_,false)", "SCAN_DISABLED_ADMIN_AP"):
+        if not contains_v3(transport,token):fail("AP-only transport invariant missing: "+token)
     ignored=(sketch_dir/".gitignore").read_text()
     if "src/config/TlsIdentity.local.h" not in ignored:fail("TLS identity must be gitignored")
+    # Persistent administrator recognition (2026-10-11). A remembered device
+    # holds an HMAC of the administrator digest: stateless, never written to
+    # NVS, void without an administrator and revoked by a new token. It can
+    # only open the ordinary short session; every write still needs that
+    # session's cookie, its CSRF token, the same peer and the AP origin.
+    security=re.sub(r"\s+","",by_name.get("PortalSecurity.cpp",(None,""))[1])
+    for token in ("peer==peer_","tokenEqual(cookie,cookie_)","tokenEqual(csrf,csrf_)","now-issued_<300000"):
+        if security.count(token)!=1:fail("Portal session check must exist exactly once: "+token)
+    for token in ("update::hmac256(digest,32,message,sizeof(message),tag)","!anyByte(digest,32)",
+                  "diff|=raw[16+i]^tag[i]","if(!portalDeviceValid(digest,device))",
+                  "if(!device||!device[0])returnfalse;",
+                  "returncurrent(now,peer,cookie)&&tokenEqual(csrf,csrf_);"):
+        if token not in security:fail("Remembered-device invariant missing: "+token)
+    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",1),("portal_.resume(",1),
+                        ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/wifi/",4),
+                        ("Path=/wifi/session;Max-Age=",2)):
+        if compact_transport.count(token)!=count:fail("Portal credential surface changed: "+token)
+    for token in ("if(req.remember)portalDeviceIssue(gate.digest(),random+64,resp.device)",
+                  "if(req.local_authorized&&!portal_.current(now,req.peer,req.cookie))",
+                  "resp.ok=req.local_authorized&&portal_.current(",
+                  '{"/wifi/session",HTTP_POST','{"/wifi/logout",HTTP_POST',
+                  "r.remember=read==81&&memcmp(body+70,\"&remember=1\",11)==0",
+                  "Path=/wifi/session;Max-Age=34560000"):
+        if token not in compact_transport:fail("Remembered-device transport invariant missing: "+token)
+    for token in ("httpd_req_get_url_query","httpd_query_key_value","Serial.","ESP_LOG","log_e(","log_i(","log_d("):
+        if token in transport:fail("HTTP transport must never read credentials from a URL or log: "+token)
+    if re.search(r"(?<![a-z_])printf\(",transport):fail("HTTP transport must not print")
+    kinds=re.search(r"enumclassHttpRequestKind:uint8_t\{(.*?)\};",re.sub(r"\s+","",by_name.get("HttpTransport.h",(None,""))[1]))
+    order=kinds.group(1).split(",") if kinds else []
+    if not all(k in order for k in ("WIFI_STATUS","WIFI_SESSION","WIFI_LOGOUT")) or \
+       min(order.index("WIFI_SESSION"),order.index("WIFI_LOGOUT"))<order.index("WIFI_STATUS"):
+        fail("Session and logout must be administrative request kinds (after WIFI_STATUS)")
+    # STA router test: the candidate is committed only on a HELD link to the
+    # tested SSID; a retry is one more connect, never configuration or mode.
+    for token in ("constboolproven=match&&now-test_stable_since_>=kStaTestHoldMs;",
+                  "transaction_.update(now,proven,link_up,critical)",
+                  "if(!match)test_stable_=false;",
+                  "!sta_link_.load()","now-test_connect_ms_>=kStaTestRetryMs",
+                  "if(!critical&&test_fresh_&&!link_up"):
+        if token not in compact_manager:fail("STA test invariant missing: "+token)
+    if compact_manager.count("transaction_.update(")!=2:
+        fail("The STA transaction must be advanced from the test loop and the fault path only")
+    # Radio role by operating mode (2026-10-11). MAINTENANCE keeps the
+    # administrative AP whatever is stored; only RUN joins the router, and
+    # falls back to a recovery AP with a growing wait. The mode is an INPUT to
+    # the Wi-Fi owner: it is set in exactly one place (the operator's @MODE
+    # command), forwarded by the Controller as a flag, and nothing under
+    # network/ that owns the radio can name the mode manager, the authority
+    # arbiter, a permit or an actuator.
+    policy=re.sub(r"\s+","",by_name.get("NetworkPolicy.h",(None,""))[1])
+    for token in ("if(!i.run)returnRoleReason::MAINTENANCE_AP;",
+                  "returni.recovery?RoleReason::RUN_RECOVERY_AP:RoleReason::RUN_STA;",
+                  "inlineboolroleIsSta(RoleReasonr){returnr==RoleReason::RUN_STA;}",
+                  "returndwell>cap_ms?cap_ms:static_cast<uint32_t>(dwell);"):
+        if token not in policy:fail("Radio role policy invariant missing: "+token)
+    # The stored "AP always" preference of earlier firmware is carried, never
+    # consulted: it must not be able to keep RUN off a configured router.
+    role_unit=policy[policy.find("enumclassRoleReason"):policy.find("constexpruint32_tkRecoveryDwellInitialMs")]
+    if not role_unit or "ap_always" in role_unit or "FORCED" in role_unit:
+        fail("The legacy AP-always preference must not be an input of the radio role decision")
+    if "structRoleInputs{boolrun=false,sta_profile=false,recovery=false;};" not in policy:
+        fail("The radio role decision takes exactly: run, sta_profile, recovery")
+    if policy.find("if(!i.run)returnRoleReason::MAINTENANCE_AP;")>policy.find("if(!i.sta_profile)"):
+        fail("MAINTENANCE must outrank everything stored")
+    if sorted(re.findall(r"[^;{}]*ap_always[^;{}]*;",compact_manager))!=["c.ap_always=p.config.ap_always;","w.ap_always=config_.ap_always;"]:
+        fail("WifiManager may only carry the stored ap_always (form -> record, record -> status), never act on it")
+    for token in ("role_=evaluateRole(now);",
+                  "}elseif(enabled_&&roleIsSta(role_)){",
+                  "if(worker_status_.ap_active&&roleIsSta(role_)&&!configBusy())stopAp();",
+                  "if(enabled_&&!transaction_.busy()&&!configBusy()&&!roleIsSta(role_))startAp(now);",
+                  "if(!on){last_post_=PostResult::INVALID;returnfalse;}",
+                  "policy_.state()==WifiState::BACKOFF&&policy_.counters().connect_attempts-sta_attempt_base_>=kStaEpisodeAttempts",
+                  "now-recovery_since_>=recoveryDwellMs(recovery_level_,config_.ap_timeout_ms)",
+                  "admin_.phase.load()!=NetworkPhase::ADMIN_AP||!WiFi.softAPgetStationNum()"):
+        if token not in compact_manager:fail("Radio role worker invariant missing: "+token)
+    for token,count in (("policy_.update(",1),("stopAp();",1),("run_mode_.load()",1)):
+        if compact_manager.count(token)!=count:fail("Radio role surface changed: "+token)
+    if "ap_timeout_ms)" in compact_manager.replace("recoveryDwellMs(recovery_level_,config_.ap_timeout_ms)",""):
+        fail("The AP timeout may only bound the RUN recovery wait; it must never close a maintenance AP")
+    for name in ("WifiManager.cpp","WifiManager.h","WifiPolicy.cpp","WifiPolicy.h","NetworkPolicy.h",
+                 "NetworkConfig.cpp","NetworkConfig.h","NetworkConfigNvs.cpp","AdminAccess.h","AdminAccess.cpp"):
+        code=by_name.get(name,(None,""))[1]
+        for token in ("OperatingMode","setMode","ActuatorAuthority","authority","ServoBus","servo_bus",
+                      "MotionPermit","permit","torque","ControllerService",'"../core/','"../servo/','"../actuator/','"../calibration/'):
+            if token in code:fail(f"{name}: the Wi-Fi owner must not reach the mode manager, authority or actuators ({token})")
+    firmware=[(p2,c2) for p2,c2 in files if "scripts" not in p2.parts]
+    setters=[p2.name for p2,c2 in firmware for _ in re.finditer(r"(?:->|\.)setMode\s*\(",c2)]
+    if setters!=["CommandRouter.cpp"]:
+        fail(f"The operating mode may be changed only by the operator's @MODE command; call sites: {setters}")
+    forwards=[p2.name for p2,c2 in firmware for _ in re.finditer(r"(?:->|\.)setRunMode\s*\(",c2)]
+    if forwards!=["Controller.cpp"]:
+        fail(f"The operating mode is forwarded to the Wi-Fi owner only by the Controller; call sites: {forwards}")
+    controller=re.sub(r"\s+","",by_name.get("Controller.cpp",(None,""))[1])
+    if "wifi_.setRunMode(operating_mode_.mode()==OperatingMode::RUN);" not in controller:
+        fail("The Controller must forward exactly `mode == RUN`; any other mode keeps the maintenance AP")
+    page_path=sketch_dir/"src"/"network"/"PortalPage.h"
+    check_portal_page_text(page_path.read_text() if page_path.is_file() else "",str(page_path))
 
 
 def check_motion_convergence_gate(sketch_dir):

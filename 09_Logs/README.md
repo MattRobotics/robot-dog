@@ -1,5 +1,7 @@
 # MATDOG logs and evidence
 
+Latest: [non-motion closeout](Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) · [Motion handoff](Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
+
 > **CHRONOLOGY AND EVIDENCE — NOT CURRENT-STATE AUTHORITY**
 >
 > Start with the [root README](../README.md) for today's hardware, firmware baseline, validation
