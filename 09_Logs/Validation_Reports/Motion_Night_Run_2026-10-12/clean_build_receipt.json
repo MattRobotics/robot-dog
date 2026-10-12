@@ -1,0 +1,30 @@
+{
+  "schema": "MATDOG_COMMITTED_SOFTWARE_BUILD_RECEIPT_V1",
+  "result": "PASS_SOFTWARE_BUILD_MANIFEST",
+  "source_commit": "6ad910a5980353f02faa48a9353f35f9f77a1586",
+  "source_state": "CLEAN",
+  "source_tree_sha256": "a4f1facf3da9107edad964c58d74308998392707ed46de1a601b8cfc099247d1",
+  "application_sha256": "eaa8c28c584acc303b0d9eafe7f854476185d4edc757a54cfef0961aead021eb",
+  "application_bytes": 1327120,
+  "static_ram_bytes": 128172,
+  "static_ram_total": 327680,
+  "layout": "MATDOG_16M_2x5M_NVS_V1",
+  "partition_table_sha256": "8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7",
+  "flash_size_bytes": 16777216,
+  "app_slot_bytes": 5242880,
+  "app_slots": 2,
+  "hardware_profile": "ROBOT_POWERED",
+  "core": "esp32 3.3.11",
+  "FQBN": "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=custom,DebugLevel=none,PSRAM=opi",
+  "manifest_sha256": "2172298b81e4f43af2669ad3a9a9ecc200112c708919e9cf70715e730869f562",
+  "MOTION_AUTHORIZED": 0,
+  "OTA_INGEST": 0,
+  "hardware_validated": false,
+  "flash_authorized": false,
+  "physical_ready": false,
+  "original_dirty_receipt_preserved": true,
+  "warnings": [
+    "SCServo SMS_STS.cpp array subscript -23 in cached ReadMode(-1) dependency",
+    "SCServo SCSCL.cpp unused ACC parameter"
+  ]
+}
