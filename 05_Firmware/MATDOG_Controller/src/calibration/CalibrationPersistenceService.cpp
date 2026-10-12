@@ -171,6 +171,39 @@ bool CalibrationPersistenceService::calibrationAvailable() const {
          !writesBlocked();
 }
 
+ServiceRecordReadResult CalibrationPersistenceService::readAcknowledgedRecord(
+    const actuator::CalibrationGeometryProfile& profile, CalibrationRecord* out) {
+  ServiceRecordReadResult result;
+  if (out == nullptr || out == &scratch_) {
+    result.guard = ServiceGuard::OK;
+    result.load_status = LoadStatus::BAD_ARGUMENT;
+    return result;
+  }
+  *out = CalibrationRecord{};
+  if (!nvsReady()) {
+    load(profile);
+    return result;
+  }
+  // Even an apparently consistent fresh LOAD cannot clear an uncertain write.
+  if (writesBlocked()) {
+    load(profile);
+    result.guard = ServiceGuard::WRITES_BLOCKED;
+    result.load_status = snapshot_.load_status;
+    return result;
+  }
+  result.guard = ServiceGuard::OK;
+  const LoadResult fresh = store_.load(profile, out);
+  refresh(fresh);
+  result.load_status = fresh.status;
+  if (fresh.status == LoadStatus::OK &&
+      fresh.assessment.cls == PersistenceClass::CONSISTENT) {
+    result.generation = fresh.generation;
+  } else {
+    *out = CalibrationRecord{};
+  }
+  return result;
+}
+
 ServiceSaveResult CalibrationPersistenceService::save(
     const CalibrationRecord& record, const actuator::CalibrationGeometryProfile& profile) {
   ServiceSaveResult out;

@@ -1,10 +1,12 @@
 #ifndef MATDOG_NETWORK_PORTAL_PAGE_H
 #define MATDOG_NETWORK_PORTAL_PAGE_H
+#include "MotionDashboard.h"
 // The AP-local portal: one self-contained document, no external resource.
 //
 // Data model. The Dashboard renders two existing read-only endpoints and
-// nothing else: GET /status (controller telemetry, key=value) and
-// GET /wifi/status (network state, JSON). Every value shown is a cached
+// GET /status (controller telemetry, key=value) and
+// GET /wifi/status (network state, JSON). MotionDashboard adds the Controller
+// semantic /api/motion service. Every value shown is a cached
 // controller value; the page never causes a BMS, IMU or servo-bus transaction.
 //
 // Refresh. POLL_MS = 4000: the two requests are issued one after the other on
@@ -107,7 +109,7 @@ function renderStatus(){
  const mods=$('#mods');mods.textContent='';
  for(const [k,label] of [['imu','IMU'],['bms','BMS'],['servo','SERVO'],['led','LED']]){const v=s[k+'_availability']||'UNKNOWN';mods.append(E('span','chip '+(CLASS[v]||''),label+' '+v))}
  rows('#sysList',[['Calibrazione in corso',yn(s.calibration_holds_authority)],['Inibizione attuatori',s.authority_inhibited==='YES'?'ATTIVA · '+s.authority_inhibit_reason:'non attiva'],['Stato OTA',s.ota_state],['Memoria libera',s.heap_free?Math.round(s.heap_free/1024)+' kB (minimo '+Math.round(s.heap_min_free/1024)+' kB)':null],['Stack controller libero (minimo)',s.loop_stack_min_free?s.loop_stack_min_free+' B':null]]);
- $('#safety').textContent=why.length?'Stato di sicurezza: attuatori bloccati (fail-closed). Questa pagina non contiene comandi di movimento.':'Stato di sicurezza: gli attuatori possono essere comandati dal controller.';
+ $('#safety').textContent=why.length?'Stato di sicurezza: attuatori bloccati (fail-closed). I comandi Motion sono subordinati alle capability del Controller.':'Stato di sicurezza: gli attuatori possono essere comandati dal controller.';
  // Battery: a value is shown as current only when the controller calls it fresh.
  const valid=s.bms_valid==='YES',fresh=s.bms_fresh==='YES',soc=parseFloat(s.bms_soc_percent),bar=$('#socBar');
  const crit=s.led_battery_critical==='YES'||soc<=BAT_CRIT,low=s.led_battery_warning==='YES'||soc<=BAT_LOW;
@@ -252,6 +254,6 @@ document.querySelectorAll('form').forEach(f=>{if(f.id!=='loginForm')f.addEventLi
 try{const w=JSON.parse(store.get('md_watch'));if(w&&Date.now()-w.t<600000)watch=w;else store.set('md_watch',null)}catch(e){}
 authUi();setInterval(link,1000);
 (async()=>{if(store.get('md_remember')||Date.now()-(+store.get('md_login')||0)<SESSION_MS)await resume();refresh()})();
-</script></html>)MATDOG";
+</script>)MATDOG" MATDOG_MOTION_DASHBOARD "</html>";
 } }
 #endif

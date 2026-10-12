@@ -604,7 +604,7 @@ void source_identity_is_read_only() {
   CHECK(schemas.marker_schema == kSaveMarkerSchemaV1);
   before.checkUnchanged(f);
   const auto out = f.command("@SYSTEM SOURCE_SIGNATURE");
-  CHECK(out.find("FW_VERSION=0.2.0-dev.3") != std::string::npos);
+  CHECK(out.find("FW_VERSION=0.2.0-dev.4") != std::string::npos);
   CHECK(out.find("GIT_SHA=") != std::string::npos);
   CHECK(out.find("GIT_DIRTY=") != std::string::npos);
   CHECK(out.find("HARDWARE_PROFILE=ROBOT_POWERED") != std::string::npos);
@@ -612,7 +612,7 @@ void source_identity_is_read_only() {
   CHECK(out.find("CAL_RECORD_SCHEMA=1 CAL_MARKER_SCHEMA=2") != std::string::npos);
   CHECK(out.find("OTA_INGEST=0") != std::string::npos);
   CHECK(out.find("MOTION_AUTHORIZED=0") != std::string::npos);
-  CHECK(out.find("APP_SHA256=ASSOCIATED_MANIFEST RESTORE=NOT_IMPLEMENTED") != std::string::npos);
+  CHECK(out.find("APP_SHA256=ASSOCIATED_MANIFEST RESTORE=LOCAL_EXPLICIT_RAM_ONLY") != std::string::npos);
   before.checkUnchanged(f);
 }
 

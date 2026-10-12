@@ -99,6 +99,7 @@ bool CommandRouter::motionExecutorBusy() const {
     startup->phase()!=calibration::StartupQualificationPhase::READY &&
     startup->phase()!=calibration::StartupQualificationPhase::COMPLETE &&
     startup->phase()!=calibration::StartupQualificationPhase::REFUSED;
+  if(modules_.service && modules_.service->motionActive())return true;
   return modules_.first_motion->active() || modules_.full_leg_calibration->active() || observing;
 }
 
@@ -371,6 +372,8 @@ void CommandRouter::handleLine(String line) {
       Serial.println("REASON=NETWORK_REQUEST_BUSY_OR_UNAVAILABLE");
     }
     printWifiStatus();
+  } else if (upper.startsWith("@CALIBRATION RESTORE")) {
+    handleRuntimeRestoreCommand(upper);
   } else if (isPersistCommand(upper)) {
     handlePersistCommand(upper);
   } else if (upper == "@CALIBRATION Q0 STATUS") {
@@ -1943,7 +1946,7 @@ void CommandRouter::printSourceSignature() {
                 update::kLayoutId, (unsigned)schemas.record_schema,
                 (unsigned)schemas.marker_schema,
                 update::OtaManager::ingestEnabled() ? 1U : 0U, build::kMotionStack);
-  Serial.printf("  BUILD_UTC=%s APP_SHA256=ASSOCIATED_MANIFEST RESTORE=NOT_IMPLEMENTED\n",
+  Serial.printf("  BUILD_UTC=%s APP_SHA256=ASSOCIATED_MANIFEST RESTORE=LOCAL_EXPLICIT_RAM_ONLY\n",
                 build::kBuildUtc);
   Serial.printf("  ota_running_build_id=%s ota_running_image_state=%s reset_reason=%s\n",
                 o.running_build_id, update::toString(o.policy.running_image_state),

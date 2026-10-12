@@ -266,11 +266,12 @@ def identity_problem(fields, *, source_commit, source_state, layout_id,
                 "GIT_DIRTY": "0" if source_state == "CLEAN" else "1",
                 "FLASH_LAYOUT": layout_id, "OTA_INGEST": str(ota_ingest),
                 "MOTION_AUTHORIZED": "0", "APP_SHA256": application_sha256,
-                "CAL_RECORD_SCHEMA": "1", "CAL_MARKER_SCHEMA": "2",
-                "MOTION_STACK": "G1_G5A_COMPILED_UNWIRED"}
+                "CAL_RECORD_SCHEMA": "1", "CAL_MARKER_SCHEMA": "2"}
     for key, value in expected.items():
         if fields[key] != value:
             return f"{key} disagrees with its owner: {fields[key]!r} != {value!r}"
+    if fields["MOTION_STACK"] not in ("G1_G5A_COMPILED_UNWIRED", "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED"):
+        return "MOTION_STACK is not a qualified software architecture identity"
     if fields["BUILD_UTC_POLICY"] not in ("UTC_NOW", "SOURCE_DATE_EPOCH"):
         return "unknown BUILD_UTC_POLICY"
     try:

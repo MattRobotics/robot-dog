@@ -1,26 +1,17 @@
 /**
- * MATDOG BNO085 full-body viewer — application wiring.
- *
- * Data flow:
- *
- *   Web Serial (read-only)  ─┐
- *                            ├─> parseSensorLine -> RV record
- *   synthetic RV lines      ─┘        │
- *                                     v
- *                      OrientationController (raw / reference / viewer)
- *                                     │
- *                                     v
- *                  MatdogRobot.setRootOrientation(base_link)
- *                                     │
- *                          articulated URDF collision scene graph
- *
- * Joint values are a separate channel (`robot.setJointAngle`) that the IMU
- * path never touches; ST3215 telemetry is intentionally not wired up.
+ * MATDOG host Digital Twin: read-only Controller motion telemetry and BNO085
+ * orientation compose on the canonical articulated collision scene graph.
+ * Actual/target joint radians are independent channels; physical contact and
+ * support-plane height are never inferred from the IMU or encoder geometry.
  */
 
 import './style.css';
 
-import { Vector3 } from 'three';
+import { Vector3, type BufferGeometry } from 'three';
+import { MotionTelemetryStream, JOINT_NAMES } from './motion/telemetry';
+import { parseOfflineTrace } from './motion/offlineTrace';
+import { MotionTwinController } from './motion/twinController';
+import { syntheticMotionStatus } from './motion/syntheticMotion';
 
 import { OrientationController } from './frame/orientationController';
 import { RAD_TO_DEG, sh2ToRollPitchYaw, type Sh2Quaternion } from './frame/orientation';
@@ -76,6 +67,15 @@ const status: SensorStatus = {
 const orientation = new OrientationController();
 let robot: MatdogRobot | null = null;
 let viewerScene: ViewerScene | null = null;
+let twin: MotionTwinController | null = null;
+const motionStream = new MotionTelemetryStream();
+let motionMode: 'off' | 'synthetic' | 'live' | 'trace' = 'off';
+let motionStartMs = 0;
+let motionTimer = 0;
+let liveBusy = false;
+let traceRecords: unknown[] = [];
+let traceIndex = 0;
+let traceOriginMs = 0;
 
 /* ------------------------------------------------------------------ UI --- */
 
@@ -141,7 +141,10 @@ let lastRvTimestamp: number | null = null;
 
 function applyRawQuaternion(q: Sh2Quaternion): boolean {
   const accepted = orientation.update(q);
-  if (accepted && robot) robot.setRootOrientation(orientation.viewerThreeQuaternion());
+  if (accepted && robot) {
+    robot.setRootOrientation(orientation.viewerThreeQuaternion());
+    twin?.target.setRootOrientation(orientation.viewerThreeQuaternion());
+  }
   renderOrientation();
   return accepted;
 }
@@ -202,6 +205,7 @@ function feedSerialText(text: string): number {
 const serial = new Bno085SerialReader({
   onState: (state, detail) => {
     renderSerialState(state, detail);
+    if (state === 'CONNECTED') stopMotionFeed();
     if (state === 'DISCONNECTED') {
       lastRvTimestamp = null;
       status.rvRateHz = null;
@@ -215,11 +219,13 @@ btnDisconnect.addEventListener('click', () => void serial.disconnect());
 btnRecenter.addEventListener('click', () => {
   orientation.recenter();
   if (robot) robot.setRootOrientation(orientation.viewerThreeQuaternion());
+  twin?.target.setRootOrientation(orientation.viewerThreeQuaternion());
   renderOrientation();
 });
 btnClearReference.addEventListener('click', () => {
   orientation.clearReference();
   if (robot) robot.setRootOrientation(orientation.viewerThreeQuaternion());
+  twin?.target.setRootOrientation(orientation.viewerThreeQuaternion());
   renderOrientation();
 });
 
@@ -285,6 +291,108 @@ function setUpSyntheticPanel(): void {
   }
 }
 
+/* ---------------------------------------------------------- motion twin --- */
+function renderMotion(): void {
+  const frame = motionStream.frame, age = motionStream.ageMs(performance.now());
+  const stale = motionMode === 'off' || motionStream.isStale(performance.now());
+  element('twin-fresh').textContent = frame ? stale ? 'STALE' : 'FRESH' : 'NO DATA';
+  element('twin-fresh').className = 'badge ' + (stale ? 'state-error' : 'state-connected');
+  twin?.setStale(stale);
+  if (!frame) return;
+  if (frame.quaternion === null) {
+    element('q-raw').textContent = 'UNKNOWN (no current Controller quaternion)';
+    element('q-viewer').textContent = 'UNKNOWN'; element('rpy-viewer').textContent = 'UNKNOWN';
+  }
+  element('twin-executor').textContent = `${frame.executorState} / ${frame.standState} / ${frame.owner}`;
+  element('twin-time').textContent = `${frame.controllerNowMs.toFixed(0)} / ${frame.sampledAtMs.toFixed(0)} ms / ${age?.toFixed(0)} ms`;
+  element('twin-height').textContent = frame.baseHeightM === null ? 'UNKNOWN (support plane unavailable)' : `${(frame.baseHeightM * 1000).toFixed(1)} mm above reported support plane`;
+  const error = frame.trackingErrorRad === null ? 'UNKNOWN' : `${frame.trackingErrorRad.toFixed(4)} rad`;
+  element('twin-fault').textContent = `${frame.fault} / tracking ${error} · ${frame.reason}`;
+  element('twin-feet').textContent = frame.feet.map((f) => `${f.leg} ${f.contact} phase ${f.phase?.toFixed(2) ?? '—'}`).join(' · ');
+  element('twin-joints').textContent = JOINT_NAMES.map((name) => `${name.padEnd(22)} ${frame.actual?.[name]?.toFixed(4) ?? 'UNKNOWN'} / ${frame.target?.[name]?.toFixed(4) ?? 'UNKNOWN'}`).join('\n');
+  element('twin-diagnostic').textContent = twin?.diagnostic || '';
+}
+function applyMotionStatus(value: unknown): boolean {
+  if (!motionStream.accept(value, performance.now())) {
+    element('twin-diagnostic').textContent = 'Rejected telemetry: malformed, unsupported version, or timestamp regression.';
+    return false;
+  }
+  const frame = motionStream.frame!;
+  twin?.apply(frame);
+  if (frame.quaternion) {
+    orientation.update(frame.quaternion);
+    // Recenter belongs to the technical viewer only; it also rotates the target ghost.
+    robot?.setRootOrientation(orientation.viewerThreeQuaternion());
+    twin?.target.setRootOrientation(orientation.viewerThreeQuaternion());
+    renderOrientation();
+  }
+  renderMotion(); return true;
+}
+function stopMotionFeed(): void {
+  motionMode = 'off'; window.clearTimeout(motionTimer);
+  btnRecenter.disabled = false; btnClearReference.disabled = false;
+  renderMotion();
+  element('twin-source').textContent = 'Feed paused; samples will become STALE. No command was sent.';
+}
+async function sampleMotion(): Promise<void> {
+  window.clearTimeout(motionTimer);
+  if (document.hidden || motionMode === 'off' || liveBusy) return;
+  if (motionMode === 'synthetic') applyMotionStatus(syntheticMotionStatus(performance.now() - motionStartMs));
+  if (motionMode === 'trace') {
+    const until = traceOriginMs + performance.now() - motionStartMs;
+    while (traceIndex < traceRecords.length) {
+      const entry = traceRecords[traceIndex] as { now_ms?: number };
+      if (typeof entry.now_ms !== 'number' || entry.now_ms > until) break;
+      applyMotionStatus(entry); traceIndex += 1;
+    }
+    if (traceIndex === traceRecords.length) { stopMotionFeed(); element('twin-source').textContent = 'Offline trace completed. Final sample is retained with its timestamp.'; return; }
+  }
+  if (motionMode === 'live') {
+    liveBusy = true;
+    const abort = new AbortController(), timeout = window.setTimeout(() => abort.abort(), 800);
+    try {
+      // Same-origin GET only. An optional host Vite proxy exposes this read-only route.
+      const response = await fetch('/api/motion/status', { cache: 'no-store', signal: abort.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!applyMotionStatus(await response.json())) throw new Error('invalid motion status');
+    } catch (error) {
+      element('twin-diagnostic').textContent = `Read-only Controller feed unavailable: ${error instanceof Error ? error.message : String(error)}`;
+    } finally { liveBusy = false; window.clearTimeout(timeout); }
+  }
+  renderMotion();
+  if ((motionMode as string) !== 'off' && !document.hidden) motionTimer = window.setTimeout(() => void sampleMotion(), motionMode === 'live' ? 1000 : 100);
+}
+function startMotionFeed(mode: 'synthetic' | 'live' | 'trace'): void {
+  stopMotionFeed(); motionStream.reset(); motionMode = mode; motionStartMs = performance.now();
+  // Full motion data shares a support-plane world frame with feet/trajectories.
+  // Recenter remains available for standalone IMU inspection after feed pause.
+  orientation.clearReference(); btnRecenter.disabled = true; btnClearReference.disabled = true;
+  element('twin-source').textContent = mode === 'synthetic'
+    ? 'SYNTHETIC DISPLAY FIXTURE: prone → acquire → rise 150 mm → WALK → STOP → intermediate restart. Illustrative values; physical and trajectory qualification are separate.'
+    : mode === 'trace' ? 'OFFLINE TRACE REPLAY: source timestamps and joint targets are preserved. Synthetic evidence is not hardware qualification.'
+      : 'Controller HTTP read-only feed (1 Hz). No automatic serial access or hardware commands.';
+  void sampleMotion();
+}
+element('btn-motion-synthetic').addEventListener('click', () => startMotionFeed('synthetic'));
+element('btn-motion-live').addEventListener('click', () => startMotionFeed('live'));
+element('btn-motion-pause').addEventListener('click', stopMotionFeed);
+function loadMotionTrace(text: string): void {
+  const records = parseOfflineTrace(text);
+  traceOriginMs = records[0]!.now_ms as number;
+  traceRecords = records; traceIndex = 0; startMotionFeed('trace');
+}
+element<HTMLInputElement>('motion-trace-file').addEventListener('change', async (event) => {
+  const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return;
+  try {
+    if (file.size > 10 * 1024 * 1024) throw new Error('trace exceeds 10 MiB');
+    loadMotionTrace(await file.text());
+  } catch (error) { element('twin-diagnostic').textContent = `Trace rejected: ${error instanceof Error ? error.message : String(error)}`; }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) window.clearTimeout(motionTimer); else void sampleMotion();
+});
+window.setInterval(() => { if (!document.hidden) { renderMotion(); renderStatus(); } }, 500);
+
 /* ----------------------------------------------------------------- boot --- */
 
 function renderModelInfo(model: UrdfModel, sourceLabel: string): void {
@@ -329,12 +437,18 @@ async function boot(): Promise<void> {
     }
     const model = parseUrdf(await response.text());
 
-    robot = await buildRobot({
-      model,
-      urdfUrl: CANONICAL_URDF_URL,
-      loadMeshGeometry: createFetchStlLoader(),
-      styleForLink,
-    });
+    const fetchGeometry = createFetchStlLoader();
+    const meshCache = new Map<string, Promise<BufferGeometry>>();
+    const loadMeshGeometry = (url: string): Promise<BufferGeometry> => {
+      let geometry = meshCache.get(url);
+      if (!geometry) { geometry = fetchGeometry(url); meshCache.set(url, geometry); }
+      return geometry;
+    };
+    robot = await buildRobot({ model, urdfUrl: CANONICAL_URDF_URL, loadMeshGeometry, styleForLink });
+    const target = await buildRobot({ model, urdfUrl: CANONICAL_URDF_URL, loadMeshGeometry, styleForLink });
+    twin = new MotionTwinController(robot, target);
+    viewer.robotAnchor.add(target.rootObject);
+    viewer.scene.add(twin.overlay);
     robot.resetJoints();
     viewer.robotAnchor.add(robot.rootObject);
     robot.setRootOrientation(orientation.viewerThreeQuaternion());
@@ -365,6 +479,17 @@ async function boot(): Promise<void> {
     setUpSyntheticPanel();
     emitSyntheticAngles();
   }
+  const motion = new URLSearchParams(window.location.search).get('motion');
+  if (motion === 'synthetic') startMotionFeed('synthetic');
+  if (motion === 'live') startMotionFeed('live');
+  if (motion === 'trace') {
+    try {
+      // Fixed same-origin staged test output; no arbitrary URL or hardware route.
+      const response = await fetch('./motion/adaptive_motion_synthetic.jsonl', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}; stage the offline trace first`);
+      loadMotionTrace(await response.text());
+    } catch (error) { element('twin-diagnostic').textContent = `Trace unavailable: ${error instanceof Error ? error.message : String(error)}`; }
+  }
 }
 
 /* ------------------------------------------------- dev/test entry point --- */
@@ -380,6 +505,9 @@ declare global {
       renderInfo: () => { triangles: number; calls: number; frame: number; aspect: number };
       linkWorldPosition: (linkName: string) => { x: number; y: number; z: number } | null;
       applyRawQuaternion: (q: Sh2Quaternion) => boolean;
+      applyMotionStatus: (status: unknown) => boolean;
+      startMotionSynthetic: () => void;
+      stopMotionFeed: () => void;
       feedSerialText: (text: string) => number;
       recenter: () => void;
       clearReference: () => void;
@@ -396,6 +524,9 @@ window.matdogViewer = {
   orientation: () => orientation,
   setSyntheticRpyDeg,
   applyRawQuaternion,
+  applyMotionStatus,
+  startMotionSynthetic: () => startMotionFeed('synthetic'),
+  stopMotionFeed,
   feedSerialText,
   recenter: () => btnRecenter.click(),
   clearReference: () => btnClearReference.click(),
@@ -440,6 +571,10 @@ window.matdogViewer = {
     linkCount: robot?.linkNames.length ?? 0,
     jointCount: robot?.jointNames.length ?? 0,
     joints: robot?.jointSnapshot() ?? {},
+    targets: twin?.target.jointSnapshot() ?? {},
+    targetVisible: twin?.target.rootObject.visible ?? false,
+    motion: motionStream.frame,
+    motionStale: motionMode === 'off' || motionStream.isStale(performance.now()),
   }),
 };
 

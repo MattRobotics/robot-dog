@@ -7,10 +7,13 @@
 #include <freertos/task.h>
 #include <lwip/sockets.h>
 #include <stdarg.h>
+#include <memory>
+#include <new>
 
 #include "../config/TlsIdentity.h"
 #include "../update/Sha256.h"
 #include "PortalPage.h"
+#include "../core/MotionJson.h"
 #include "WifiManager.h"
 
 namespace matdog {
@@ -170,9 +173,12 @@ bool HttpTransport::registerHandlers(httpd_handle_t server, bool admin) {
       {"/wifi/scan", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/wifi/ap", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/wifi/session", HTTP_POST, &HttpTransport::handleWifi, this},
-      {"/wifi/logout", HTTP_POST, &HttpTransport::handleWifi, this}};
+      {"/wifi/logout", HTTP_POST, &HttpTransport::handleWifi, this},
+      {"/api/motion/status", HTTP_GET, &HttpTransport::handleMotion, this},
+      {"/api/motion/capabilities", HTTP_GET, &HttpTransport::handleMotion, this},
+      {"/api/motion/command", HTTP_POST, &HttpTransport::handleMotion, this}};
   for (const auto &uri : uris) {
-    if (!admin && (strcmp(uri.uri, "/") == 0 || strncmp(uri.uri, "/wifi/", 6) == 0)) continue;
+    if (!admin && (strcmp(uri.uri, "/") == 0 || strncmp(uri.uri, "/wifi/", 6) == 0 || strncmp(uri.uri, "/api/motion/", 12) == 0)) continue;
     if (httpd_register_uri_handler(server, &uri) != ESP_OK) return false;
   }
   return true;
@@ -196,7 +202,7 @@ void HttpTransport::lifecycleTick() {
     if (desired_.load() && !server_) {
       httpd_config_t c = HTTPD_DEFAULT_CONFIG();
       c.stack_size = 24576;
-      c.max_uri_handlers = 14;
+      c.max_uri_handlers = 18;
       c.max_open_sockets = 2;
       // A phone browser may open more connections than the two this listener
       // holds; the least recently used one is closed instead of stalling.
@@ -246,7 +252,7 @@ bool HttpTransport::admitAdmin(HttpTransportRequest &request) {
   return gate.allowed(request.admin_generation) && WifiManager::verifyAdminRadio();
 }
 bool HttpTransport::dispatch(const HttpTransportRequest &request,
-                             HttpTransportResponse *response) {
+                             HttpTransportResponse *response, char* large_text, size_t large_cap) {
   if (xSemaphoreTake(slot_free_, pdMS_TO_TICKS(kDispatchTimeoutMs)) != pdTRUE)
     return false;
   xSemaphoreTake(response_ready_,
@@ -271,6 +277,13 @@ bool HttpTransport::dispatch(const HttpTransportRequest &request,
       break;
     if (ready_sequence_.load() == id) {
       *response = pending_response_;
+      if(request.kind==HttpRequestKind::MOTION_CAPABILITIES && response->ok) {
+        // Copy while the mailbox slot is held. The Controller never receives
+        // the caller's heap pointer, so abandoned requests cannot write freed memory.
+        if(!large_text || response->text_len>=large_cap) {
+          response->ok=false;response->message="CAPABILITY_BUFFER_REQUIRED";
+        } else memcpy(large_text,motion_capabilities_,response->text_len+1);
+      }
       xSemaphoreGive(slot_free_);
       return true;
     }
@@ -412,6 +425,26 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     break;
   }
 
+  case HttpRequestKind::MOTION_STATUS:
+    resp.ok=service_->motionStatus(resp.text,sizeof(resp.text),now_ms);
+    resp.message=resp.ok?"OK":"MOTION_STATUS_UNAVAILABLE";
+    resp.text_len=resp.ok?strlen(resp.text):0;break;
+  case HttpRequestKind::MOTION_CAPABILITIES:
+    resp.ok=service_->motionCapabilities(motion_capabilities_,sizeof(motion_capabilities_));
+    resp.message=resp.ok?"OK":"MOTION_CAPABILITIES_UNAVAILABLE";
+    resp.text_len=resp.ok?strlen(motion_capabilities_):0;break;
+  case HttpRequestKind::MOTION_COMMAND: {
+    if(!req.local_authorized || !portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,
+                                                  req.peer,req.cookie,req.csrf)) {
+      resp.message="AUTH_FAILED";break;
+    }
+    // A semantic ack is returned also for Controller refusals. No bus pointer,
+    // actuator register, lease request or operational permit exists in Web.
+    const auto ack=service_->motionCommand(req.motion_command,now_ms);
+    resp.ok=service_->motionAck(ack,resp.text,sizeof(resp.text));
+    resp.message=resp.ok?"OK":"ACK_UNAVAILABLE";
+    resp.text_len=resp.ok?strlen(resp.text):0;break;
+  }
   case HttpRequestKind::WIFI_STATUS: {
     wifiResponse(resp);
     break;
@@ -981,6 +1014,48 @@ esp_err_t HttpTransport::handlePage(httpd_req_t *req) {
       "'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
   return httpd_resp_send(req, kPortalPage, sizeof(kPortalPage) - 1);
 }
+esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
+  auto* self=static_cast<HttpTransport*>(req->user_ctx);
+  HttpTransportRequest r{};
+  if(!socketFacts(req,r) || !self->admitAdmin(r))
+    return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"ADMIN_AP_REQUIRED");
+  if(req->method==HTTP_GET) {
+    r.kind=strcmp(req->uri,"/api/motion/status")==0?HttpRequestKind::MOTION_STATUS:HttpRequestKind::MOTION_CAPABILITIES;
+  } else {
+    if(!r.local_authorized || req->content_len<=0 || req->content_len>1024)
+      return httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,"Origin or bounded body required");
+    char type[64]{};httpd_req_get_hdr_value_str(req,"Content-Type",type,sizeof(type));
+    if(strcmp(type,"application/json"))return httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,"JSON required");
+    char body[1025]{};size_t used=0;const uint32_t since=millis();
+    while(used<static_cast<size_t>(req->content_len)) {
+      if(millis()-since>3000)return httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,"Body timeout");
+      const int got=httpd_req_recv(req,body+used,req->content_len-used);
+      if(got<=0)return httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,"Truncated body");
+      used+=got;
+    }
+    const char* reason=nullptr;
+    if(!core::parseMotionJson(body,used,&r.motion_command,&reason))
+      return httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,reason);
+    // The AP transport identifies the client; owner is not a bus authority.
+    if(r.motion_command.owner!=motion::ClientOwner::DASHBOARD)
+      return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"Dashboard owner required");
+    char cookie[256]{};httpd_req_get_hdr_value_str(req,"Cookie",cookie,sizeof(cookie));
+    cookieValue(cookie,"md_session",r.cookie);
+    httpd_req_get_hdr_value_str(req,"X-Csrf-Token",r.csrf,sizeof(r.csrf));
+    r.kind=HttpRequestKind::MOTION_COMMAND;
+  }
+  std::unique_ptr<char[]> catalog;
+  if(r.kind==HttpRequestKind::MOTION_CAPABILITIES) {
+    catalog.reset(new(std::nothrow) char[kMotionCapabilitiesBytes]);
+    if(!catalog)return httpd_resp_send_err(req,HTTPD_500_INTERNAL_SERVER_ERROR,"Capability buffer unavailable");
+  }
+  HttpTransportResponse resp{};
+  if(!self->dispatch(r,&resp,catalog.get(),catalog?kMotionCapabilitiesBytes:0))return httpd_resp_send_err(req,HTTPD_500_INTERNAL_SERVER_ERROR,"Controller busy");
+  if(!resp.ok)return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,resp.message);
+  httpd_resp_set_type(req,"application/json");httpd_resp_set_hdr(req,"Cache-Control","no-store");
+  return httpd_resp_send(req,catalog?catalog.get():resp.text,resp.text_len);
+}
+
 esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   auto *self = static_cast<HttpTransport *>(req->user_ctx);
   HttpTransportRequest r{};
@@ -1077,7 +1152,7 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
       r.kind == HttpRequestKind::WIFI_SESSION) {
     snprintf(
         cookie, sizeof(cookie),
-        "md_session=%s; HttpOnly; SameSite=Strict; Path=/wifi/; Max-Age=300",
+        "md_session=%s; HttpOnly; SameSite=Strict; Path=/; Max-Age=300",
         resp.cookie);
     httpd_resp_set_hdr(req, "Set-Cookie", cookie);
     if (resp.device[0]) {
@@ -1091,7 +1166,7 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   if (r.kind == HttpRequestKind::WIFI_LOGOUT) {
     httpd_resp_set_hdr(
         req, "Set-Cookie",
-        "md_session=; HttpOnly; SameSite=Strict; Path=/wifi/; Max-Age=0");
+        "md_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0");
     httpd_resp_set_hdr(
         req, "Set-Cookie",
         "md_device=; HttpOnly; SameSite=Strict; Path=/wifi/session; Max-Age=0");

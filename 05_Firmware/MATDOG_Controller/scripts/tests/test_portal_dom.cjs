@@ -7,7 +7,10 @@ const path = require('path');
 const assert = require('assert');
 const network = path.join(__dirname, '../../src/network');
 const source = fs.readFileSync(path.join(network, 'PortalPage.h'), 'utf8');
-const html = source.split('R"MATDOG(')[1].split(')MATDOG";')[0];
+// The six existing portal features are isolated here; the appended Motion fragment
+// is executed by test_motion_dashboard_dom.cjs with Controller capability fixtures.
+const literals = [...source.matchAll(/R"MATDOG\(([\s\S]*?)\)MATDOG"/g)].map(m => m[1]);
+const html = literals[0] + "</html>";
 const security = fs.readFileSync(path.join(network, 'PortalSecurity.cpp'), 'utf8');
 
 const xss = '<img src=x onerror=alert(1)>';

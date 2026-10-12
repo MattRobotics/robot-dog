@@ -43,6 +43,11 @@ class Bno085Imu {
   bool streamEnabled() const { return stream_enabled_; }
   void setStreamEnabled(bool enabled) { stream_enabled_ = enabled; }
 
+  struct OrientationSnapshot { bool valid=false;uint32_t sampled_at_ms=0;double wxyz[4]{1,0,0,0}; };
+  OrientationSnapshot orientationSnapshot() const {
+    OrientationSnapshot o;o.valid=rv_count_>0;o.sampled_at_ms=last_rv_ms_;
+    o.wxyz[0]=rv_w_;o.wxyz[1]=rv_x_;o.wxyz[2]=rv_y_;o.wxyz[3]=rv_z_;return o;
+  }
   uint32_t rvCount() const { return rv_count_; }
   uint32_t runtimeResetCount() const { return runtime_reset_count_; }
 
@@ -61,6 +66,7 @@ class Bno085Imu {
   uint32_t mag_count_ = 0;
   uint32_t game_count_ = 0;
   uint32_t rv_count_ = 0;
+  uint32_t last_rv_ms_=0;
   uint32_t acc_count_ = 0;
   uint32_t gyr_count_ = 0;
 

@@ -84,6 +84,14 @@ struct ServiceAckResult {
   bool uncertain = false;  // MARKER_WRITE_FAILED / MARKER_VERIFY_FAILED
 };
 
+// Evidence-only export for the runtime RESTORE service. This is a fresh LOAD,
+// never an ACK, reconciliation, calibration acceptance or motion permit.
+struct ServiceRecordReadResult {
+  ServiceGuard guard = ServiceGuard::NVS_NOT_READY;
+  LoadStatus load_status = LoadStatus::BAD_ARGUMENT;
+  uint32_t generation = 0;
+};
+
 enum class ReconcileStatus : uint8_t {
   OK = 0,                       // marker written, read back, state re-classified
   NVS_NOT_READY,
@@ -125,6 +133,12 @@ class CalibrationPersistenceService {
   // snapshot. Never writes, never serves the record to anyone. With a backend
   // that is not READY nothing is read at all.
   void load(const actuator::CalibrationGeometryProfile& profile);
+
+  // Rechecks both slots, CRC/semantics, installation identity and the marker.
+  // Serves only the acknowledged CONSISTENT generation, with no uncertain write.
+  // `out` must not alias scratchRecord(); failure clears it. Never writes.
+  ServiceRecordReadResult readAcknowledgedRecord(
+      const actuator::CalibrationGeometryProfile& profile, CalibrationRecord* out);
 
   const PersistenceSnapshot& snapshot() const { return snapshot_; }
 

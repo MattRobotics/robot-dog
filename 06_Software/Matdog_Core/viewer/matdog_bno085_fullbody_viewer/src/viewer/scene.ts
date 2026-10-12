@@ -123,7 +123,7 @@ export function createViewerScene(container: HTMLElement): ViewerScene {
 
   const resetCamera = (): void => {
     // Behind-left-above: the nose (+X) points away to the right of frame.
-    camera.position.set(-0.42, -0.46, 0.34);
+    camera.position.set(-0.60, -0.65, 0.48);
     controls.target.set(0, 0, 0.05);
     controls.update();
   };
@@ -182,8 +182,11 @@ export function createViewerScene(container: HTMLElement): ViewerScene {
     renderer.render(scene, camera);
   };
 
-  const tick = (): void => {
+  let lastRenderedMs = -Infinity;
+  const tick = (timestampMs = performance.now()): void => {
     animationHandle = requestAnimationFrame(tick);
+    if (document.hidden || timestampMs - lastRenderedMs < 1000 / 30) return;
+    lastRenderedMs = timestampMs;
     renderFrame();
   };
 

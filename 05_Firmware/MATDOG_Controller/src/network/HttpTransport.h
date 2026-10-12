@@ -28,8 +28,12 @@ enum class HttpRequestKind : uint8_t {
   WIFI_SCAN,
   WIFI_AP,
   WIFI_SESSION,
-  WIFI_LOGOUT
+  WIFI_LOGOUT,
+  MOTION_STATUS,
+  MOTION_CAPABILITIES,
+  MOTION_COMMAND
 };
+constexpr size_t kMotionCapabilitiesBytes=20480;
 constexpr size_t kHttpChunkBufferBytes = 1024, kHttpStatusTextBytes = 4096;
 struct HttpTransportRequest {
   HttpRequestKind kind = HttpRequestKind::NONE;
@@ -44,6 +48,7 @@ struct HttpTransportRequest {
   uint32_t peer = 0, admin_generation = 0;
   char cookie[65]{}, csrf[65]{}, login[65]{}, device[65]{};
   ConfigPatch patch{};
+  motion::MotionCommand motion_command{};
 };
 struct HttpTransportResponse {
   bool ok = false;
@@ -76,6 +81,7 @@ private:
   static esp_err_t handleOtaUpdate(httpd_req_t *req);
   static esp_err_t handlePage(httpd_req_t *req);
   static esp_err_t handleWifi(httpd_req_t *req);
+  static esp_err_t handleMotion(httpd_req_t *req);
   static void lifecycleEntry(void *self);
   void lifecycle();
   void lifecycleTick();
@@ -83,7 +89,7 @@ private:
   uint32_t portal_generation_ = 0;
   bool registerHandlers(httpd_handle_t server, bool admin = true);
   bool dispatch(const HttpTransportRequest &request,
-                HttpTransportResponse *response);
+                HttpTransportResponse *response, char* large_text=nullptr, size_t large_cap=0);
   void serviceRequest(uint32_t now_ms);
   void wifiResponse(HttpTransportResponse &response);
   void statusExtension(HttpTransportResponse &response,
@@ -103,6 +109,7 @@ private:
   HttpMailbox mailbox_{};
   HttpTransportRequest pending_request_{};
   HttpTransportResponse pending_response_{};
+  char motion_capabilities_[kMotionCapabilitiesBytes]{};
   static constexpr uint32_t kDispatchTimeoutMs = 3000;
 };
 } // namespace network

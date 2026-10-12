@@ -103,6 +103,12 @@ void Controller::begin() {
   // model; binding it authorises nothing without a live session + permit.
   actuator_policy_.bindSequencePlan(&actuator::sequence_plan_data::kPlan);
   actuator_runtime_.begin(&actuator_policy_, &actuator_backend_);
+  motion_executor_.begin(&actuator_policy_, &actuator_runtime_, &geometry_profile_,
+                         &actuator::geometry_data::kProvenance, &authority_);
+  motion_coordinator_.begin(&motion_executor_, &actuator_policy_);
+  motion_service_.begin(&motion_executor_, &motion_coordinator_);
+  // No boot restore, planner approval, authority request, torque or permit.
+
   calibration_execution_.begin(&actuator_policy_, &actuator_runtime_, &geometry_profile_,
                                &actuator::geometry_data::kProvenance);
   // A reboot/default construction always starts revoked (CalibrationMotionPermit.h)
@@ -230,8 +236,10 @@ void Controller::begin() {
       &persistence_,
       &first_motion_safe_off_result_,
       &startup_qualification_,
+      &runtime_restore_,
   };
   service_.begin(modules);
+  service_.bindMotionService(&motion_service_);
   // Never starts the listening socket here — see network/HttpTransport.h.
   // The secret is passed as raw bytes (strlen of the configured string, or
   // 0 if none was configured); OtaSession fails closed on a zero-length
@@ -935,6 +943,64 @@ void Controller::printBootBanner() {
   Serial.println();
 }
 
+void Controller::updateOperationalMotion(uint32_t now_ms) {
+  const auto& calibration = runtime_restore_.snapshot();
+  MotionReadiness ready;
+  ready.calibration_restored=calibration.restored;
+  ready.calibration_accepted=calibration.calibration_accepted;
+  ready.limits_approved=calibration.operational_limits_approved;
+  // Offline integration does not qualify physical loaded tracking, contact
+  // observation, prime/torque startup or bounded sequential bus timing.
+  ready.hardware_approved=false;
+  ready.operational_permit=operational_facts_.operator_permit;
+  ready.support_observable=false;
+  ready.mode=operating_mode_.mode();
+  ready.authority_live=authority_.current()==ActuatorAuthority::MOTION;
+  ready.inhibited=authority_.inhibited();
+  ready.fault=system_state_.systemHealth()==SystemHealth::FAULT;
+  ready.power_ok=power_state_.state()==PowerState::RUN;
+  const auto& battery=daly_.sample();
+  ready.bms_ok=battery.valid && now_ms-battery.sampled_at_ms<=3000;
+  for(unsigned i=0;i<4;i++)ready.bms_ok=ready.bms_ok && battery.alarms[i]==0;
+  operational_facts_.mode=ready.mode;
+  operational_facts_.calibration_accepted=ready.calibration_accepted;
+  operational_facts_.envelopes_approved=ready.limits_approved;
+  operational_facts_.hardware_qualified=ready.hardware_approved;
+  operational_facts_.bms_ok=ready.bms_ok;
+  operational_facts_.power_ok=ready.power_ok;
+  operational_facts_.fault=ready.fault;
+  // Validate measured support/pose before the next actuator step. A revoked
+  // fixture or lost held contact must stop WRITING without waiting for its ACK.
+  motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms);
+  motion_executor_.update(operational_facts_,operational_feedback_,now_ms);
+  // Terminal service results must use this tick's validated planner/executor.
+  motion_service_.refresh(ready,now_ms);
+  MotionTelemetry telemetry;
+  const auto orientation=imu_.orientationSnapshot();
+  telemetry.quaternion_valid=orientation.valid;
+  telemetry.quaternion_at_ms=orientation.sampled_at_ms;
+  for(unsigned i=0;i<4;i++)telemetry.quaternion[i]=orientation.wxyz[i];
+  // base_link height/contact/joints stay unknown until independent measured
+  // observations and runtime transforms exist; IMU never invents height.
+  motion_service_.publishTelemetry(telemetry);
+  if(motion_executor_.status().safe_off_required) {
+    // SAFE_OFF is ungated and independent of owner, mode, permit and policy.
+    // One leg joint per tick; repeatedly verify every failed joint.
+    const auto* joint=servo::legServoAt(motion_safe_off_next_);
+    if(joint && servo_bus_.safeOff(joint->bus_id)==servo::SafeOffResult::VERIFIED_OFF)
+      motion_safe_off_mask_|=static_cast<uint16_t>(1u<<motion_safe_off_next_);
+    motion_safe_off_next_=static_cast<uint8_t>((motion_safe_off_next_+1)%12);
+    if(motion_safe_off_mask_==0x0fff){
+      motion_executor_.confirmSafeOff(true);
+      operational_facts_.operator_permit=false;
+      operational_facts_.lease=AuthorityLease{};
+      if(authority_.current()==ActuatorAuthority::MOTION)
+        authority_.forceClear(AuthorityClearReason::OWNER_TEARDOWN);
+      motion_safe_off_mask_=0;motion_safe_off_next_=0;
+    }
+  } else { motion_safe_off_mask_=0;motion_safe_off_next_=0; }
+}
+
 void Controller::update(uint32_t now_ms) {
   // First, unconditionally: the freshest possible permit/bootstrap state
   // must exist before command_router_.update() can act on it this tick.
@@ -977,6 +1043,7 @@ void Controller::update(uint32_t now_ms) {
   // Same tick the executor turned terminal: record, complete the session,
   // revoke the permit. See updateFullLegFinalization().
   updateFullLegFinalization();
+  updateOperationalMotion(now_ms);
 
   // System-level servo health is a population verdict under ROBOT_POWERED,
   // not the outcome of whichever individual Ping/read happened last.

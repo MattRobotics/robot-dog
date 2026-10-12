@@ -47,6 +47,7 @@ class FullLegCalibrationExecutor;
 struct FullLegRunState;
 class FullLegEvidenceStore;
 class CalibrationPersistenceService;
+class CalibrationRuntimeRestore;
 struct SaveGateFacts;
 }  // namespace calibration
 
@@ -147,6 +148,7 @@ class CommandRouter {
     calibration::CalibrationPersistenceService* persistence;
     const servo::SafeOffResult* first_motion_safe_off_result;
     calibration::StartupRecoveryQualification* startup_qualification=nullptr;
+    calibration::CalibrationRuntimeRestore* runtime_restore=nullptr;
   };
 
   void begin(const Modules& modules);
@@ -257,6 +259,7 @@ class CommandRouter {
   };
   static PersistenceSchemaIdentity persistenceSchemaIdentity();
   void handlePersistCommand(const String& upper);
+  void handleRuntimeRestoreCommand(const String& upper);
   static bool isPersistCommand(const String& upper);
   void printPersistenceStatus();
   void buildSaveGateFacts(calibration::SaveGateFacts* facts) const;

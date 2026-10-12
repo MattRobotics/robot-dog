@@ -10,6 +10,8 @@
 #include "../calibration/CalibrationExecutionEngine.h"
 #include "../calibration/CalibrationManager.h"
 #include "../calibration/CalibrationPersistenceService.h"
+#include "../calibration/CalibrationRuntimeRestore.h"
+#include "../execution/MotionCoordinator.h"
 #include "../calibration/CalibrationRecordNvsBackend.h"
 #include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/CalibrationQ0CaptureSession.h"
@@ -48,6 +50,7 @@ class Controller {
 
  private:
   void printBootBanner();
+  void updateOperationalMotion(uint32_t now_ms);
   void updateQ0Capture();
   void updateStartupQualification();
   // Every tick, before any command is processed: rebuilds
@@ -166,6 +169,15 @@ class Controller {
   actuator::SafeActuatorPolicy actuator_policy_;
   actuator::ActuatorRuntime actuator_runtime_;
   calibration::CalibrationExecutionEngine calibration_execution_;
+  calibration::CalibrationRuntimeRestore runtime_restore_;
+  execution::MotionExecutor motion_executor_;
+  execution::MotionCoordinator motion_coordinator_;
+  MotionService motion_service_;
+  execution::MotionExecutionFacts operational_facts_{};
+  execution::JointFeedback operational_feedback_{};
+  uint16_t motion_safe_off_mask_=0;
+  uint8_t motion_safe_off_next_=0;
+
   // CR3-M5: the session-scoped, RAM-only physical-motion permit — distinct
   // from the final hardware_motion_authorized flag, which stays false
   // throughout (CalibrationManager.h). Reset at boot.

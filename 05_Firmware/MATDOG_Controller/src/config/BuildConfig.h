@@ -48,13 +48,13 @@ namespace build {
 constexpr const char* kFirmwareName    = "MATDOG Controller";
 
 // This is a software development candidate, with hardware gates still held.
-constexpr const char* kFirmwareVersion = "0.2.0-dev.3";
+constexpr const char* kFirmwareVersion = "0.2.0-dev.4";
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;
 constexpr bool kGitDirty              = MATDOG_GIT_DIRTY != 0;
 constexpr const char* kBuildUtc        = MATDOG_BUILD_UTC;
-constexpr const char* kMotionStack     = "G1_G5A_COMPILED_UNWIRED";
+constexpr const char* kMotionStack     = "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED";
 
 // The active profile and everything derived from it. kProfileExpectations
 // is the value every module consults (via core::expectedStateFor*()) to

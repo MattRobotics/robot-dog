@@ -48,7 +48,7 @@ def check_sources():
         failures.append("excluded third-party extracts directory is present")
     motion = FW / "src/motion"
     local_headers = {p.name for p in motion.glob("*.h")}
-    allowed_standard = {"stdint.h", "cmath", "limits"}
+    allowed_standard = {"stdint.h", "stddef.h", "cmath", "limits", "cstring"}
     forbidden = re.compile(r"\b(?:Arduino|Adafruit|ServoBus|Preferences|HardwareSerial|WiFi|GoalPosition|raw_ticks|EEPROM|EnableTorque|WritePosEx|sh2_saveDcdNow)\b|\b(?:malloc|calloc|realloc|free|millis|micros|delay)\s*\(")
     for path in sorted(motion.iterdir()):
         if path.suffix not in (".h", ".cpp"):
@@ -60,12 +60,18 @@ def check_sources():
                 failures.append("motion dependency escape: " + str(path.relative_to(ROOT)) + ": " + name)
         if forbidden.search(code):
             failures.append("hardware/allocation primitive in pure motion: " + str(path.relative_to(ROOT)))
-    # The port remains a library: no existing runtime owner may acquire a motion dependency.
+    # Authorized Motion Enablement adds exactly these Controller-owned adapters.
+    # Pure geometry remains bus/authority/network-free; no arbitrary owner is permitted.
+    reviewed_adapters = {"core/Controller.h", "core/Controller.cpp", "core/ControllerService.h",
+                         "core/MotionService.h", "core/MotionService.cpp", "core/MotionJson.h", "core/MotionJson.cpp",
+                         "execution/MotionExecutor.h", "execution/MotionExecutor.cpp",
+                         "execution/MotionCoordinator.h", "execution/MotionCoordinator.cpp",
+                         "network/HttpTransport.h", "network/HttpTransport.cpp"}
     for path in sorted((FW / "src").rglob("*")):
         if not path.is_file() or path.suffix not in (".h", ".cpp") or path.is_relative_to(motion):
             continue
         code = re.sub(r"/\*.*?\*/|//[^\n]*", "", path.read_text(), flags=re.S)
-        if re.search(r'#\s*include\s*[<"][^>"]*motion/|\b(?:matdog\s*::\s*)?motion\s*::', code):
+        if re.search(r'#\s*include\s*[<"][^>"]*motion/|\b(?:matdog\s*::\s*)?motion\s*::', code) and str(path.relative_to(FW / "src")) not in reviewed_adapters:
             failures.append("live motion wiring outside pure library: " + str(path.relative_to(ROOT)))
         if "esp_phy_erase_cal_data_in_nvs" in code:
             failures.append("diagnostic PHY erase imported: " + str(path.relative_to(ROOT)))
@@ -75,7 +81,7 @@ def check_sources():
                 deferred_file_count=len(pins["deferred_sources"]),
                 manifest_version=pins["manifest_version"],
                 hardware_or_network_access=False, historical_evidence_regenerated=False,
-                pure_library=True, runtime_actuator_or_imu_wiring_added=False)
+                pure_library=True, runtime_actuator_or_imu_wiring_added=True, physical_motion_authorized=False)
 
 
 def main():

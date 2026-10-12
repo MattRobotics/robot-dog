@@ -75,8 +75,8 @@ export function resolveMeshUrl(urdfUrl: string, filename: string): string {
 }
 
 /**
- * The assembled robot. `setJointAngle` is the integration point for future
- * ST3215 joint-state telemetry; nothing in this class talks to any bus.
+ * The assembled robot. `setJointAngle` accepts semantic Controller radians;
+ * nothing in this class talks to any bus.
  */
 export class MatdogRobot {
   readonly rootObject: Object3D;
@@ -135,9 +135,10 @@ export class MatdogRobot {
    * Sets one joint, in radians, clamped to the URDF limits.
    * Fixed joints are rejected. Returns the value actually applied.
    *
-   * FUTURE ST3215 INTEGRATION POINT: a joint-state consumer converts servo
-   * counts to radians (MATDOG_JOINT_CALIBRATION.yaml semantics) and calls
-   * this method. This viewer never writes to a servo bus.
+   * Calibration and runtime mapping belong to the Controller. The viewer
+   * receives radians and never converts encoder ticks or writes a servo bus.
+   * MotionTwinController rejects invalid measured channels before this
+   * low-level display setter can clamp them.
    */
   setJointAngle(jointName: string, radians: number): number {
     const handle = this.joints.get(jointName);

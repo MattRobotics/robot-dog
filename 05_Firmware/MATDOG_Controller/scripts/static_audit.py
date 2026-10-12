@@ -1083,7 +1083,8 @@ def check_actuator_runtime_boundaries(files):
 
     allowed_dirs = {"actuator", "calibration", "tests"}
     allowed_names = {"ActuatorRuntime.h", "ActuatorRuntime.cpp", "Controller.h", "Controller.cpp",
-                     "ServoBusActuatorBackend.h", "ServoBusActuatorBackend.cpp"}
+                     "ServoBusActuatorBackend.h", "ServoBusActuatorBackend.cpp",
+                     "MotionExecutor.h", "MotionExecutor.cpp"}
     for path, code in files:
         if path.name in allowed_names:
             continue
@@ -3523,7 +3524,7 @@ def check_safe_actuator_boundaries(files, sketch_dir):
     # in the repository qualifies to: MATDOG_JOINT_CALIBRATION.yaml records
     # {min: null, max: null} for all twelve leg joints.
     for path, code in files:
-        if path.name in policy_units or "/scripts/" in str(path).replace(os.sep, "/"):
+        if path.name in policy_units + ("CalibrationRuntimeRestore.h", "CalibrationRuntimeRestore.cpp") or "/scripts/" in str(path).replace(os.sep, "/"):
             continue
         if re.search(r"\blimits\(\)\.admit\(|\bActuatorLimitTable\b", code):
             fail(f"{path}: populates or holds an ActuatorLimitTable - accepted joint bounds "
@@ -6052,6 +6053,7 @@ def check_calibration_persistence_boundaries(files, sketch_dir):
     # (owner), the router's persistence command file and the SAVE gate may
     # include the persistence headers, and only the ones they need.
     allowed_includers = {
+        sketch_dir / "src" / "calibration" / "CalibrationRuntimeRestore.h": {"CalibrationPersistenceService.h"},
         sketch_dir / "src" / "core" / "Controller.h": {
             "CalibrationPersistenceService.h", "CalibrationRecordNvsBackend.h"},
         sketch_dir / "src" / "core" / "Controller.cpp": {
@@ -6073,11 +6075,9 @@ def check_calibration_persistence_boundaries(files, sketch_dir):
 
 
 def check_calibration_persistence_integration(files, sketch_dir):
-    """P3a: the persistence integration is read/write-to-NVS only. It never
-    admits a JointTransform, never touches the servo bus or a servo EEPROM,
-    never grants a permit or starts a motion, runs before any actuator wiring
-    in Controller::begin(), and every persistent write command is behind its
-    gate."""
+    """P3a persistent writes remain gated. Local runtime RESTORE adds exactly
+    twelve torque-off reads and RAM restore, independently audited below;
+    persistent writes still cannot admit transforms, write actuators or permits."""
     core = sketch_dir / "src" / "core"
     cal = sketch_dir / "src" / "calibration"
     by_path = {p: c for p, c in files}
@@ -6100,6 +6100,22 @@ def check_calibration_persistence_integration(files, sketch_dir):
     )
     for path in integration:
         code = by_path[path]
+        if path.name == "CommandRouterPersistence.cpp":
+            start=code.find("void CommandRouter::handleRuntimeRestoreCommand(")
+            end=code.find("CommandRouter::PersistenceSchemaIdentity",start)
+            if start<0 or end<start:
+                fail("Local RAM RESTORE handler missing")
+            else:
+                restore=code[start:end]
+                for token in ("count!=4", "CONFIRM_CURRENT_INSTALLATION", "persistenceQuietViolation()",
+                              "for(uint8_t i=0;i<12;i++)", "readRuntimeState(joint->bus_id,&state)",
+                              "state.torque_enable!=0", "request.torque_off_confirmed=off",
+                              "request.current_installation_confirmed=true", "modules_.runtime_restore->restore("):
+                    if token not in restore: fail("Local RESTORE invariant missing: "+token)
+                for token in ("safeOff(", "->grant(", ".grant(", "->acquire(", "->arm(", "->save(",
+                              "writeTorque", "writePosition", "writeRegister", "writeEeprom"):
+                    if token in restore:fail("Local RESTORE may only read torque and restore RAM: "+token)
+                code=code[:start]+code[end:]
         for pattern, why in forbidden:
             if re.search(pattern, code):
                 fail(f"{path}: {pattern} - the persistence integration {why} (P3a)")
@@ -6295,7 +6311,7 @@ def check_network_v3_boundaries(files, sketch_dir):
                              (compact_manager,"admin_.allowed(r.generation)",2),
                              (compact_transport,"httpd_stop(server_)==ESP_OK",2),
                              (compact_transport,"httpd_ssl_stop(tls_server_)==ESP_OK",2),
-                             (compact_transport,"self->admitAdmin(r)",2),
+                             (compact_transport,"self->admitAdmin(r)",3),
                              (compact_transport,"gate.allowed(req.admin_generation)",2)):
         if code.count(token)!=count:fail("AP-only fence coverage changed: "+token)
     if re.search(r"\b(?:WIFI_AP_STA|WIFI_MODE_APSTA)\b", manager):
@@ -6345,8 +6361,8 @@ def check_network_v3_boundaries(files, sketch_dir):
                   "if(!device||!device[0])returnfalse;",
                   "returncurrent(now,peer,cookie)&&tokenEqual(csrf,csrf_);"):
         if token not in security:fail("Remembered-device invariant missing: "+token)
-    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",1),("portal_.resume(",1),
-                        ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/wifi/",4),
+    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",2),("portal_.resume(",1),
+                        ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/",4),
                         ("Path=/wifi/session;Max-Age=",2)):
         if compact_transport.count(token)!=count:fail("Portal credential surface changed: "+token)
     for token in ("if(req.remember)portalDeviceIssue(gate.digest(),random+64,resp.device)",
