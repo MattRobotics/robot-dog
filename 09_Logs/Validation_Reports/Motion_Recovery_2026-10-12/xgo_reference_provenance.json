@@ -1,0 +1,38 @@
+{
+  "schema": "MATDOG_READ_ONLY_ARCHITECTURAL_REFERENCE_V1",
+  "source_repository_modified": false,
+  "content_imported": false,
+  "firmware_tables_imported": false,
+  "references": [
+    {
+      "repository": "https://github.com/MattRobotics/xgolite-low-level-reconstruction",
+      "commit": "a1b34a8594e5bc76c76b1e3ddf89a3aef2b98298",
+      "path": "docs/reverse/milestone_h2_matdog_transfer_boundary.md",
+      "sha256": "aead97776d9aa807d9d2cd3daa1a1a3425bdf95cc4b7bf9f9e4e757e442aa140"
+    },
+    {
+      "repository": "https://github.com/MattRobotics/xgolite-low-level-reconstruction",
+      "commit": "a1b34a8594e5bc76c76b1e3ddf89a3aef2b98298",
+      "path": "docs/reverse/milestone_g_gait_scheduler_reconstruction.md",
+      "sha256": "c10ecfcfb44a7e517fb31f0350004e02b69684e72be0dfd1c80f8043f6ac3c70"
+    },
+    {
+      "repository": "https://github.com/MattRobotics/xgolite-low-level-reconstruction",
+      "commit": "a1b34a8594e5bc76c76b1e3ddf89a3aef2b98298",
+      "path": "docs/reverse/milestone_g2_gait_writer_mathematics.md",
+      "sha256": "aa10351c3aaa02829fe5c8821e4bea05ff4e86b542c675793643c6332d56e14d"
+    },
+    {
+      "repository": "https://github.com/MattRobotics/xgolite-low-level-reconstruction",
+      "commit": "a1b34a8594e5bc76c76b1e3ddf89a3aef2b98298",
+      "path": "evidence/h2/lite_action_catalog.csv",
+      "sha256": "40ae023c54d110575bdfdac60c0ac13f1244e9df3a0bf336429655fcef4cc8ca"
+    },
+    {
+      "repository": "https://github.com/MattRobotics/xgolite-low-level-reconstruction",
+      "commit": "a1b34a8594e5bc76c76b1e3ddf89a3aef2b98298",
+      "path": "evidence/h2/matdog_transfer_requirements.csv",
+      "sha256": "3cf1a88a2152f06980ecb306a9f89e9f16ba89e9ead29d7d26054dd9c76772c5"
+    }
+  ]
+}

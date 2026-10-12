@@ -1,0 +1,1372 @@
+{
+  "schema": "MATDOG_NIGHT_PUBLICATION_AUDIT_V1",
+  "baseline": "fdd04345c39b50137cc7cdc50fb08cd592b8c2af",
+  "origin_main": "fdd04345c39b50137cc7cdc50fb08cd592b8c2af",
+  "branch": "matdog/motion-night-20261012",
+  "files": [
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/build_manifest.py",
+      "kind": "test/tool",
+      "status": "M",
+      "bytes": 33772,
+      "sha256": "ffdec5469087c84c845803281db1f3a76e8960152fbe7a9d311816bb95946c7a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/motion_dashboard_demo.py",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 8114,
+      "sha256": "edeedaa104a20080b7f89bb14b93263180ca4597d195944587abf8272b1a39e7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/motion_rc_receipt.py",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 6220,
+      "sha256": "309c0ce6510dfcac5857c4ba415b34d17d360c1e4b94797abf409defa3e635fd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/static_audit.py",
+      "kind": "test/tool",
+      "status": "M",
+      "bytes": 379068,
+      "sha256": "d239f3f0b997627e7c780e3e8d34c1e10b3a59a66d3782aa473f1832de55b5d6"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/audit_adaptive_motion_geometry.py",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 11012,
+      "sha256": "0b4c0e6365070cc804fc265d73ab8453f465d600f8dec5970901fd2dd788b642"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/audit_prone_family.py",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 3980,
+      "sha256": "1ebff723a18149655a3b3f7a55be3a7ceeba5545f10cd1a8f23ece20456045c9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/probe_prone_recovery_family.py",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 10094,
+      "sha256": "f458c5d61157bb6e7f9b9e71ab432d1a2d13286931f5315edd857102785210c9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/render_motion_recovery.py",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 14123,
+      "sha256": "9d7e00af37368a2547013cb1dc017feda72dc9819a545c2cb737c7cdb4b7368f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_adaptive_motion_tests.py",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 1641,
+      "sha256": "6c1cf7aaad49b0361b5a542ba57cbe74c440d2ebf420106e0ef3372fed1c31d9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_calibration_restore_tests.sh",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 1556,
+      "sha256": "fb6477ab8f8414543790a065bf092db8fbde5a545112d77bbf3b2e92a116972c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_host_tests.sh",
+      "kind": "test/tool",
+      "status": "M",
+      "bytes": 37202,
+      "sha256": "d24a71b775cb385b5e1a11ba345f1f245864ef754b9a41c129be606df9db105e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_motion_convergence_tests.py",
+      "kind": "test/tool",
+      "status": "M",
+      "bytes": 5807,
+      "sha256": "09a3c94da26709aad53f68a0ae2e882285ce7abf0153c67bbe6f29223ce13d81"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_motion_enablement_tests.sh",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 933,
+      "sha256": "ffba519a2c729ec531103db0e3d6825fe792faecde0a78c5d82951c45a83e668"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_motion_lifecycle_tests.sh",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 1133,
+      "sha256": "a2fd4b2a99cab88ea7c545cffec8f6d4fcfdc29eabc72507651270d4caa8456b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_motion_service_executor_tests.sh",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 1997,
+      "sha256": "f8acc18177aa8e5c5eb18c1c5e104b757fe7432208a0a4dc1a6f7f3821ebe187"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_adaptive_motion.cpp",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 23369,
+      "sha256": "ab698818ec064fef950df56e36ee97207dd1c41db6e5939e5efb562aebb2c6c1"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ap_only_transport.py",
+      "kind": "test/tool",
+      "status": "M",
+      "bytes": 24278,
+      "sha256": "2586ed3397ff11f17f0c5a9743cad4f386909782349d62866a5a9b81648c8a9a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ap_transport.py",
+      "kind": "test/tool",
+      "status": "M",
+      "bytes": 16267,
+      "sha256": "416a68d7f0ef1c5fa179ffa6243c050d0511b2058f1afcc766332366b1597067"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_runtime_restore.cpp",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 15899,
+      "sha256": "f91a50f55b6042fa86bdcc51cab2a34d356cf885e3fd668dd10727d222d90a0c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_command_router_persistence.cpp",
+      "kind": "test/tool",
+      "status": "M",
+      "bytes": 32577,
+      "sha256": "86d731e6bfb510568bcb21b37effc9cb78d7f36238a9a5e9636f3a36a5fb1fb5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_dev_identity_build.py",
+      "kind": "test/tool",
+      "status": "M",
+      "bytes": 13059,
+      "sha256": "4563750851a01b0be37609a3fa114d495e64fa9fa17385e35f708e71b2498182"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_browser.cjs",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 5554,
+      "sha256": "1ca900998609fba674b733affe2e3e0e56453b92fa8381ef90db39f02f197a80"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_dashboard_dom.cjs",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 8285,
+      "sha256": "a2a72614d9e836a689ea5232e34bb2f73a7c660742a9ab40af0408735ab3fbc2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_http_transport.py",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 15910,
+      "sha256": "e4bb0707c290ed064046e3f9f000ac46fae742b7f4265e1535d82cce1c09d418"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_lifecycle.cpp",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 15884,
+      "sha256": "689bf1ddf3b9981f2b4a682e5b9cbbb8e807c06e88c2d39cc16b1107d90cb7dd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_rc_receipt.py",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 4007,
+      "sha256": "d1b34cc15b6e453bbaa0bec5912b83d8d3994bb28279e114d3a9cba2c9839ac4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_safety_boundaries.py",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 5948,
+      "sha256": "bb3692961a33e7bea0279951e967f087ad471ca1c049a15ee047474a402df516"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_service_executor.cpp",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 33611,
+      "sha256": "92071e0b399bb1bd7e2a1ea612163104265be37cc236b20d85dc79436802d644"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_transport_mode.py",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 7033,
+      "sha256": "e37e1cff2c8517b38e829912087164c9a1e823e8857e70ebc379390de312881a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_paired_motion_browser.cjs",
+      "kind": "test/tool",
+      "status": "A",
+      "bytes": 5205,
+      "sha256": "b92137084999bc9f6d7b9e8e527ad763908a4ec2c96230ee8345c817c110a543"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_portal_dom.cjs",
+      "kind": "test/tool",
+      "status": "M",
+      "bytes": 26386,
+      "sha256": "fc0b41cf3a3e4137da7d81bc89a9830047449f67052f19882a857794f7215f23"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationPersistenceService.cpp",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 15042,
+      "sha256": "fd1c78d20148a85a183f6fff236e655aeaeb697f7f19ed44d14df8fc43a37e2d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationPersistenceService.h",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 8743,
+      "sha256": "cf7ca5bd0006f349bb1905587cf832d1d8ff195fcce32bfa8078004e5e6d3552"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRuntimeRestore.cpp",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 11561,
+      "sha256": "a4bf11ba67cbb3c5e20b2e518f55a383677486f34d5b5ace1f4f13bd240399e4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRuntimeRestore.h",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 5314,
+      "sha256": "5bbc07f4743f784e74c1d6d0360f380f1ed4d288a85c27e0b96a7187de6aef36"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/config/BuildConfig.h",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 4758,
+      "sha256": "8723e93f7e9d4509cba6626770c22768a27506490f5e65cbc860ea6889dbcb92"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/CommandRouter.cpp",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 115224,
+      "sha256": "0dfb599bdc69925f9090e74082f69176ff039d8cc4a3c94471c90f2fb84cb7a1"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/CommandRouter.h",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 14609,
+      "sha256": "dfbfe662ff7208c407893f5a8953f0da002acf831ad0ac714de7d9d995032393"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/CommandRouterPersistence.cpp",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 20808,
+      "sha256": "b52d4a1225b7a792f95d765009d1d2565dc081153a23b0e122777a68242ba7bf"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/Controller.cpp",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 62205,
+      "sha256": "2a8be2d899dbc1487145d231fb8a65cc59ae373f23a929c45929c41296987c54"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/Controller.h",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 14193,
+      "sha256": "ca72e2b3ea7608d35a44a4fc4d935d6806b60e96d18fd3f404591b9a96c66c45"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/ControllerService.h",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 12697,
+      "sha256": "582d0ba8077b72a130d8d038f19f825d761895bf3aba96560e3d8abfef667712"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/MotionJson.cpp",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 4518,
+      "sha256": "a02102dbf6a8347d4ecdbd068bb3e57396547ee483354cbd973b774e12a392be"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/MotionJson.h",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 382,
+      "sha256": "42893e00246ae3fe61c1790393eca7acbae96adf219304b0a5b38b3e3b4a608d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/MotionService.cpp",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 12410,
+      "sha256": "ad5051e778bd8c1e23cb7e8da185b86cf861e59b78874709c510dbb213598087"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/MotionService.h",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 2702,
+      "sha256": "fd7be00c1e0e0d3ed730fc45db80dfc0506aee217ed8d19d67bf958bd271daba"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/MotionCoordinator.cpp",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 4729,
+      "sha256": "147f32022cfd216c9bac5dd6e409a611818f3325c0d2bd7f6aefee88331c5eae"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/MotionCoordinator.h",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 1737,
+      "sha256": "02c227d334afe7be7b1fb3405f5361c107d564a05a8d484f85145d90c1f28ecd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/MotionExecutor.cpp",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 9836,
+      "sha256": "01bfff9998fc2ef88fb3bbdaff0a1180339048ef63ce949a92e0e9ae84d5381e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/MotionExecutor.h",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 3724,
+      "sha256": "9a5ba0a7d17bd03a66ffea6354a24f65b2c46abee1cbe1595af18085f64997a5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/imu/Bno085Imu.cpp",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 7278,
+      "sha256": "1978711df6bf92fcd685cd9e6daadc7c30337f528246eef877c6e98c175aec67"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/imu/Bno085Imu.h",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 3504,
+      "sha256": "c7e4f0a6de609123fd33f9bec647c222b65482d9dfde76a838d8046033281fcd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/AdaptiveStand.cpp",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 14316,
+      "sha256": "1d91f0824567e4876fb8bd5e0cd32d0979e216e943f5da6356a333669142fc80"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/AdaptiveStand.h",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 2894,
+      "sha256": "4ff3089682ead7ab1265cdbf6441a02cd76cebe02bafe6d397c14325eec7ce65"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FeedbackWalk.cpp",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 9052,
+      "sha256": "985cab9912689a902e8c01faafe25509404c218dbeed0f17666af802ddca514e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FeedbackWalk.h",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 2095,
+      "sha256": "26b62f02bb2a21db2ab980f6e50dcd05e142064c67e02c241f05aa57b2d8efc5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionContract.cpp",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 7007,
+      "sha256": "60948758bf68fa5928c562483c02e4e48b69ac6c0186250705849ee9bfc20581"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionContract.h",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 1849,
+      "sha256": "9a1ec8da68e9cfaf66528f59069a0cae15e2877087e5cbb7d182bef346d997e4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionFeedback.cpp",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 8673,
+      "sha256": "9ca13fbe1f932a265da29e13afc034664f801bdc05ded4ad0feaea045621fdec"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionFeedback.h",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 4137,
+      "sha256": "a66c36be968f659ae5727dc0f0b548ca9664370d15c4e0e3612fe75745c66582"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/HttpTransport.cpp",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 52195,
+      "sha256": "4a95352457fe352adc7cc5236bc1622cb0cd3115575e17a62d4763b99757ddf5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/HttpTransport.h",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 4249,
+      "sha256": "7cd69537118a73495b4050433859ef69d560ac7ac1f8f7f88235d97131790065"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/MotionDashboard.h",
+      "kind": "runtime source",
+      "status": "A",
+      "bytes": 18143,
+      "sha256": "117f2dd464825af973450ac4ee8834817db66b582c6fa9303b823f36307a4b10"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/PortalPage.h",
+      "kind": "runtime source",
+      "status": "M",
+      "bytes": 39548,
+      "sha256": "d0ebe903ea2aa70465e92e3b5c4cbb95741c771ab236485996f40db105666565"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/README.md",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 1527,
+      "sha256": "b64779bd5b2d3ad069b200f99572fb36d5e1337aaa2f05a16648daa307c041e4"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/build_adapters.py",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 1333,
+      "sha256": "82cd8a4ee5ffbc2c3ddfb45aea042437bbdea4aa55d95886808ab10c51d57c98"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/continuous_pair_path.py",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 12752,
+      "sha256": "3e836291a5952a3d37b2d696e863607bd9e2688de2d776f7eea554521b894d68"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/core_adapter.cpp",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 3114,
+      "sha256": "a9d23a6e1c48a8a4cbd515bf37213c67c5efcf119b48aadf9d23097dc1f2b8b5"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/core_python.py",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 1304,
+      "sha256": "8d7e12f590f4a719218ffc93b0ba79028e4091fa5565f2fe7914be7751af65e7"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/export_evidence.py",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 8935,
+      "sha256": "af719382451c26b42b2b3bd4f06668cb1ab0589a34603c883f6b97d88fa91bb1"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/paired_acquisition.py",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 12109,
+      "sha256": "da60275132f21b7e65635e63fe4d0c8f43d4924b987e01db4b6def9c2011c912"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/paired_prone_model.py",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 16379,
+      "sha256": "f82cf101658c08db46a6db04a573c6823f771b0dd1bcc843998f1ff6d8e4ece2"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/serve_trace.py",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 1456,
+      "sha256": "4d1236a4999a436b69f80a659a6c22023fbbb173561c36f7ef9eb205ea161c99"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/test_frozen_geometry.py",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 7585,
+      "sha256": "575b08b552609df5ec495fcfe22d09597b1cf63246dad7ff9ac9e201958dc3ee"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/verify_strengthened.py",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 1487,
+      "sha256": "0c7a76838ad3ec9f35f6ebfedc57db3fdb7f9e6e87d8b8d873e5b297dcd56dc3"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/walk_adapter.cpp",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 1771,
+      "sha256": "6be1666d171423b29d776e7a0ed58b72b0a3021e83ea507180c9ff4b30499d18"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/walk_after_stand.py",
+      "kind": "offline geometry compiler",
+      "status": "A",
+      "bytes": 6601,
+      "sha256": "db675ede2eb1c0ef7d94dd8da03d42e18f835c653a6b9afc782b9973af3e9ced"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/.gitignore",
+      "kind": "viewer",
+      "status": "M",
+      "bytes": 274,
+      "sha256": "2ab0df6f77d507fb603e3c3710e3e255b3b661f6871fb823b935906503d88981"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/README.md",
+      "kind": "viewer",
+      "status": "M",
+      "bytes": 23172,
+      "sha256": "97b91b46dda2cd0bda175d3373f55efa83c8c165d55238bc96042d471300333b"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/docs/MOTION_ASSET_BUDGET.json",
+      "kind": "viewer",
+      "status": "A",
+      "bytes": 5770,
+      "sha256": "73a7baa01116ed9315d4cb80481224c5cf6ff8d852be935a7049e658450236ca"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/docs/MOTION_TWIN.md",
+      "kind": "viewer",
+      "status": "A",
+      "bytes": 10949,
+      "sha256": "2318fb9528ca90f06aa3d9cfc67b7100807f52b411098c85d3bfecbd03802164"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/index.html",
+      "kind": "viewer",
+      "status": "M",
+      "bytes": 5851,
+      "sha256": "4e02a4d42093a3ab2ba27804ec6dc73392635693f1f4ccaaf6b9d7d7456b2687"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/scripts/sync_canonical_assets.mjs",
+      "kind": "viewer",
+      "status": "M",
+      "bytes": 8171,
+      "sha256": "9d28e799cdb2c991d5e23202fdd75c19f386c10e207db2a6fcf6d187d89b72c6"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/main.ts",
+      "kind": "viewer",
+      "status": "M",
+      "bytes": 24499,
+      "sha256": "b506fafaf5b971b0972327c2961057d9ce9fb0bb3ce0c9148eb0937d5ac8b818"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/offlineTrace.ts",
+      "kind": "viewer",
+      "status": "A",
+      "bytes": 2445,
+      "sha256": "e2c71a4e046b34a25b91fd0767d89e427407b3d1017a7ee4cc41b907089bdcf0"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/syntheticMotion.ts",
+      "kind": "viewer",
+      "status": "A",
+      "bytes": 2693,
+      "sha256": "88908cefd9ed76e78155ae135f3271f8c80ef6b3b408581e9fef98793a494d88"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/telemetry.ts",
+      "kind": "viewer",
+      "status": "A",
+      "bytes": 6291,
+      "sha256": "23b5b79edaf7e1cebc10e45814ab2f36808cd47d0e301f49439d671ea80ea7cc"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/twinController.ts",
+      "kind": "viewer",
+      "status": "A",
+      "bytes": 4420,
+      "sha256": "7ab314edfbba611dd0a02df0779b76e3518bba981a7293f12876b25ccaf87341"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/urdf/buildRobot.ts",
+      "kind": "viewer",
+      "status": "M",
+      "bytes": 11138,
+      "sha256": "3a4873602dbac079b8774fafae5eb61ba66166036ca3306f4066e7c32f674db7"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/viewer/scene.ts",
+      "kind": "viewer",
+      "status": "M",
+      "bytes": 6677,
+      "sha256": "e0b9b3fa6b8e769eadeb6fe6b447da096a76a6139e6d01b5fa649ba4685fee44"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/tests/motionTwin.test.ts",
+      "kind": "viewer",
+      "status": "A",
+      "bytes": 9973,
+      "sha256": "8d6d380775555b6a61fbd3ea439893e878521aabcb48fe200528719151eaa68d"
+    },
+    {
+      "path": "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/vite.config.ts",
+      "kind": "viewer",
+      "status": "M",
+      "bytes": 1112,
+      "sha256": "bd3c04e081cf287b90ce2360f2ccc853b166afc1d61e7bbd7b19c82f1edbf685"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/MOTION_CONTRACT_AND_RELEASE.md",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 11016,
+      "sha256": "425c0061237491d83bed49b42b76bda3b7053498b27f04c41aa2904cc707bc5f"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/PROPOSED_PR.md",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 2497,
+      "sha256": "da8a0c7957cb80f18b1e46e8eb47e4083ee18f79f9b0a16473994536a4a019df"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/adaptive_motion_C4_compatibility.md",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 6695,
+      "sha256": "464630b960675a72f39f667bf35aa29d866423fd26e2bc757c42d3ec97e37a6f"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/adaptive_motion_synthetic.jsonl",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 2674194,
+      "sha256": "63814089f69072536f28eb48e25398e74cfbf2f3222d5504bd735b580ad35464"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/adaptive_motion_unsatisfied.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 919482,
+      "sha256": "0508f324583ab5c8209ab144d3908939555acfe86d51b5864724ec726f988c60"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/browser/browser_checks.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 5453,
+      "sha256": "c35254e2e0d9e52a0d3ece426ca76ed370463add0861819437b6a3c0ed6ea685"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/browser/dashboard_motion_desktop.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 544109,
+      "sha256": "f8defd7fd1bf2a6c3ef31e617ae4de79f885a4eb8cc4e692fc89efcd9ecfc548"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/browser/dashboard_motion_mobile.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 807465,
+      "sha256": "ecd88290f34cc1b8c44e149b188e8255ba3579369595aa24e6f3d4a9f6529058"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/browser/twin_synthetic_walk.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 322987,
+      "sha256": "e3d00f8c88fd773169959bbfd8e27bc75a0b31a2f39128e051ff9832e982f629"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/browser/twin_trace_acquire.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 317488,
+      "sha256": "aaf0f8a4b80f1614a3d04ea01c34588796bede79c41c42f0e5d5d448b1eac02b"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/dashboard_twin_checks.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 1122,
+      "sha256": "4e0f7ae8179e5884b0a626de3abfedc6b77dc01877267593d649bef0e9c57d90"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/motion_browser.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 160,
+      "sha256": "78bd506608b2f2ee6f6ca8a442dbd79eca9eb626a44cadeda0555c84bdd90774"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/motion_dashboard_dom.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 134,
+      "sha256": "9faec13876d938c310223a00ad68a45da0e4bc53e564e55d9210d20574a88f46"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/motion_http_transport.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 124,
+      "sha256": "c3d050f1645d5de5dc79ff90332092318588a1d522088902cbf3483b0fcff70d"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/motion_release_unsatisfied.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 5082,
+      "sha256": "08fc43d49e06a673c1fa36a9ade923c8c3ae60ff4a25724253fd8f56e4289678"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/motion_transport_mode.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 2509,
+      "sha256": "63b0b4cce76d586212416aeb1fcb966b35f6bc8dbcffe068b05dbc830e3a362f"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/motion_transport_mode.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 166,
+      "sha256": "a7f5d5df94393cd5cd92ebf92bf6feb78d39c7df2cec1c7a2a8730c775134d75"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/portal_dom.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 174,
+      "sha256": "bb5df3968f9a36c90ce1bfb3d7e7686e95378bce4402e02e823d9a4b36719bc8"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Enablement_2026-10-12/viewer_verify.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 2325,
+      "sha256": "b0e6fee3b41a36430bafde4794aba0f39930c4873f439fb74bff805ab944743f"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/HARDWARE_DOSSIER.md",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 5130,
+      "sha256": "8a7dc2dfc8c8f21f7eb61470336368e832aa0592918f5e216ef62118f73393c0"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/OBSERVATION_TEMPLATE.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 2493,
+      "sha256": "5ad811acb1a0d3a1a97c4514782568781edf2858696cb6e63a3d4e9abf536839"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/acquisition_keypoints.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 100463,
+      "sha256": "fd3a2913b84c309f35caf543a74b1c7af42af175224d7952594b862822e45d19"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/adapter_build_receipt.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 4780,
+      "sha256": "f6117201688029a2eff73f9e94d761362f16cc75474cf4523e31b5d861290c37"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/adjacent_swept.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 742,
+      "sha256": "10ef046f6389f966e8993b2d9a07306e4e09de2075478fc15369c6443f66e9ac"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/browser/browser_checks.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 1851,
+      "sha256": "34dc6086f7e3fbfedee843022c4e06131e35fd784c09dc948ab26be780eb750b"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/browser/dashboard_desktop.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 555126,
+      "sha256": "0072ed9b929c6e51adfc4220f910fa15e969c27de8d3bb866ff0ba5fdeb66d0b"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/browser/dashboard_mobile.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 816431,
+      "sha256": "5fd85a84302516ac88eedce7b564211586dda707ef1b4ddbb79927b7fa499146"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/browser/twin_INTERMEDIATE_RESTART_50MM.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 250668,
+      "sha256": "470b7d5f58d3ed3146003848d7f9d60ac9d2cda3cecf3ec6616993ae07e5cc3d"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/browser/twin_PRE_ALIGN.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 242886,
+      "sha256": "504b801979fa67900ca43793997fe922ad4783ade4a53fac3ac43afe52302909"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/browser/twin_STAND_150.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 256383,
+      "sha256": "2951a1672de132cb1f7d1e61c32529660be5c505e11a20e6360301f8796b6718"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/browser/twin_WALK.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 259021,
+      "sha256": "c5771f9c13739172c02e6503128078841ce6982a56db2dfb6be36cda82a9aac2"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/browser_final.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 129,
+      "sha256": "8a01a11460b237c214b50714cd7707a4b333ba7d26a31df4ca65e6eef852f36d"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/canonical_motion_3d.gif",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 457152,
+      "sha256": "094e30227aaf2d5e6287e1c0aca9f0069aa11add0d6d03f9706d6c020400d975"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/canonical_motion_3d.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 144709,
+      "sha256": "b2ff64942ef70c0a1d740185201d546d84eed42ad95620df5019905180b20d70"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/check_adjacent_swept.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 4709,
+      "sha256": "892b9dc6231f9e019be05e5cf8255dfca94e3cf75b3c1d6333d9d95d0fdfac2b"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/continuous_pair_path.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 2909197,
+      "sha256": "f86ad336ffdaa1bf287f54d8a1a233494bf935156439610fd35ebc25bed411f2"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/export_manifest.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 4138,
+      "sha256": "9912645000558354ba34003013d064219bbec2445e0c54c5f6e846f6db4572fb"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/feet_contacts.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 98000,
+      "sha256": "faaf8550c1025dbc580875d462f05b98eeb46d8df233c44e3828ee6925d604ec"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/geometry_proof_receipt.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 18499,
+      "sha256": "762d1ecce9984cd75408cbc5d16ec32f2e5b8238c3c8c106735c7fb31b559bd5"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/independent_geometry_tests_final.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 1051,
+      "sha256": "3abed332908418ad9ea4a0e92c2dfba7cbee7de2268e60e8dea9ae0d6032e595"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/initial_family.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 33265,
+      "sha256": "c7179c01fadd5e73d43afa07013815e3f1dd80802dbcf2930fd95f24e420f3ef"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/integrated_regressions.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 147294,
+      "sha256": "163edb19d5b0ff5f6ea570679df3176bb07a46ab69584df1160518b19650df4b"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/joint_readiness.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 5911,
+      "sha256": "040343278a2eb4c7fd24128f54a37556705cf8af44948e1875fcfcd65489ffb1"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/keypoint_world_transforms.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 150167,
+      "sha256": "a9bd90c7f318353ca761fcdfb2e1f53ee14917fb89e54928527ec4aba14d118d"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/paired_angles_height_attitude.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 166080,
+      "sha256": "69b459575e394beb5b9eb1fe64fd5537264cd75e16e4bcf90155fab1c5f7b266"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/paired_joint_trajectory.csv",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 137851,
+      "sha256": "4f7a5fb22a7bd8d5394c841edb6acf4c84a5138cf9fcd1c5e63f8d91e85173a9"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/paired_motion_trace.jsonl",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 820322,
+      "sha256": "e40f16c5ab03995db19fcd5de71ca991778decfa41ddb811cdd40871efe0d281"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/preservation_audit.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 539,
+      "sha256": "74a4db67920d4de2a1052fd6218e054d5463bb8e6131b0a2c28f42073bdecbce"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/projections_xz_yz.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 354535,
+      "sha256": "dbad7b335840671ac0c600d8b00b20ec2843eb20122153c457caba964aff0f37"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/rebuilt_walk_adapter_replay.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 223,
+      "sha256": "22d7d26ad0b77949e0a0f9334b96144c04c29d2d3bdab0a460d3d5ac9e2b8171"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/regression_results.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 2321,
+      "sha256": "0003ab7aee22832c092599afd4c1253b7ff0d76d2692d9d7aa7dd578867092c7"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/segment56_diagnosis.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 3321,
+      "sha256": "131e1b4e25f074bd0eaa29c24248f07a216f6db1acc71dab0708767a8cab5b95"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/strengthened_nonadjacent_v2.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 49370,
+      "sha256": "7fd1f3c860af90162a247dd99ae439e3c6a1c173f70486d3fe98b081cdf024ae"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/strengthened_nonadjacent_v2.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 215,
+      "sha256": "97168606ee9d4e1ad4ed9b05803ddb7dd6f4b8887ce420b88c4d92aea8a914e5"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/viewer_regressions.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 2326,
+      "sha256": "e9dc366934d46ff639605e6ccfddd0e480910551cd38569a54ee09d470345d9e"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Night_Run_2026-10-12/walk_after_stand.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 1412457,
+      "sha256": "155323b2103c011403f1bb4c65dbb120db69d2bbcdbffd27b43fb3273868c57f"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/MOTION_RECOVERY_REPORT.md",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 12784,
+      "sha256": "52170b40d2ebfe3304c4c4976a064b494ce2d8147b26fe55602a0423c4376707"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/PRONE_EVIDENCE.md",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 7757,
+      "sha256": "5972761b2468737ea8397f0a4ebf23591209618b80396c7d26106d272e350d26"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/XGO_ADR004_BOUNDARY.md",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 1417,
+      "sha256": "4e18f70eceb3adade499fba1b11f8226f5a5bb6957981e05f54f75548041e912"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/adaptive_partial_support.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 306,
+      "sha256": "b7fbb37ecf0318264e9509f9a442212768be5596e60dd2bc4c3fb89b5cef32a6"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/aggregate_environment_failure.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 2844,
+      "sha256": "3ac816aa3ee5cdf4ab9f9e36db572705afe61a19bb2083d8faec0df2e85f22a8"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/bounded_family.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 447,
+      "sha256": "a81b16bb572c15bcf221de0d0aec964c1f32b6f973df1e2d6255971a921fecce"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/bounded_family/bounded_family.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 33524,
+      "sha256": "a5da34a5a0fa5bd93f318ff0ff612385cafee6a010708c584f46e905b09c1eb7"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/bounded_family/coordinated_fold_margin_0.03.jsonl",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 22694,
+      "sha256": "c368fe041cdf49c83a46cc5933ea39791f5f90d9ba1c517bac588a6bdf2810a7"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/bounded_family/coordinated_fold_margin_0.08.jsonl",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 21580,
+      "sha256": "5f5631395d2b9696e68392a7a36c2c9edd089cb7baf18e080b8f59590b924dea"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/bounded_family/coordinated_fold_margin_0.13.jsonl",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 20201,
+      "sha256": "cb4bbc45a39ac96909e54040b2c9b287f42e0d71fad512fc16a2c126575ebabf"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/bounded_family/rear_first_fold_margin_0.03.jsonl",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 22694,
+      "sha256": "c368fe041cdf49c83a46cc5933ea39791f5f90d9ba1c517bac588a6bdf2810a7"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/bounded_family/rear_first_fold_margin_0.08.jsonl",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 21580,
+      "sha256": "5f5631395d2b9696e68392a7a36c2c9edd089cb7baf18e080b8f59590b924dea"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/bounded_family/rear_first_fold_margin_0.13.jsonl",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 20201,
+      "sha256": "cb4bbc45a39ac96909e54040b2c9b287f42e0d71fad512fc16a2c126575ebabf"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/bounded_rock_first.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 165,
+      "sha256": "4dac4522d0eb9df62157b93f0a10b67613d19995b9ca83373d46f3c9d7d8ba3a"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/coordinator_rearm.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 82,
+      "sha256": "b4ce9e82546b95b9c12c525b69c70ed60ac0cb16589de702e96d90c60f20d72c"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/folded_candidate_figures/canonical_3d_sequence.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 202509,
+      "sha256": "9c33c88f4174ffb68456d05fd42632f749d2dc0985b8bf1ec1911ea97ecd3116"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/folded_candidate_figures/canonical_3d_sequence.svg",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 270172,
+      "sha256": "789fbbf86a00c667849fd27a93291a475de62aba8cb8d729a7d9ce6fe0795061"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/folded_candidate_figures/figures_manifest.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 9847,
+      "sha256": "464009664e447fa316001f6a331f9e7ecdd48a6e1405957d0fae826a894f3335"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/folded_candidate_figures/foot_trajectories_contacts.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 139145,
+      "sha256": "35b506a8e53e77e25498495a3f78d26efe2c0ee7bd7deb35fff228e3d42a606f"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/folded_candidate_figures/foot_trajectories_contacts.svg",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 86433,
+      "sha256": "6454fc4bd98850aea9e8d27f821e9ea1710a9807655d6e67e4b81aa03301a18e"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/folded_candidate_figures/height_attitude_com.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 93598,
+      "sha256": "de07ed512a6cbd8731950a904f38700224182826ef8579cf9a1a0d990dee072b"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/folded_candidate_figures/height_attitude_com.svg",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 54131,
+      "sha256": "2c628b1d13f812936eb79f302e37f8f7952798ffef9858a63c6a9b23ab9e4028"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/folded_candidate_figures/projections_xz_yz.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 794025,
+      "sha256": "ce4b5c4329d164b16912a7bb5c1ad17b0a81ed9f091033693b3f162644117056"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/folded_candidate_figures/projections_xz_yz.svg",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 1058863,
+      "sha256": "69368c7aee1c83e9b712a251d388d89a47b3405c042a63ddb889e696fba63391"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/independent_folded_witnesses.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 47325,
+      "sha256": "11b7f480df1d71f7182c455b323f33078a61a75c9d0aaf521f1df72938608b9f"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/independent_geometry.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 103,
+      "sha256": "784b9d4eb71b77d57cfbf108e110a3718bccbf5026c7ee447fe670a33a42dd4b"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/legacy_fixture_sequence_not_geometry_approved.jsonl",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 2786758,
+      "sha256": "ccedecdd1f792b1703e11ab4452e7fabf6e1f3b058c30017d268a8f4ee47a887"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/motion_http_transport_current.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 124,
+      "sha256": "c3d050f1645d5de5dc79ff90332092318588a1d522088902cbf3483b0fcff70d"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/previous_complete_regressions.log",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 147113,
+      "sha256": "00e0b5622aeeec3524d008474cce88ca4470603171b03c10625508e7cc1015eb"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prior_fixture_collision_witnesses.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 20321,
+      "sha256": "fc0b5da4818f8ee7436207d121c424f6aee3f4672963e9d98fde8041d56e2535"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prior_geometry_reuse.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 672,
+      "sha256": "2ad5f86c580f45eb74dd34476e58360327cb2832754828d0857ae8477d0cf97e"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prior_route_comparison/canonical_3d_sequence.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 449358,
+      "sha256": "99a3c212c2c44bcb73a3ba0d6fcad2f82c468e37e8a033d64f455dd2f208549f"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prior_route_comparison/canonical_3d_sequence.svg",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 599307,
+      "sha256": "461d28b17efa31b898196579d8479fde6cd90a416824e3eb556a38e24a4c3b71"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prior_route_comparison/figures_manifest.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 7553,
+      "sha256": "b49fed7999a89a420a974c3c356f6253b953359db28de9d906903cb0341076ee"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prior_route_comparison/foot_trajectories_contacts.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 153860,
+      "sha256": "93d2a56ba48671baef5150113879eeb9f1519b28be2f7dfaaa087356e8b08369"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prior_route_comparison/foot_trajectories_contacts.svg",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 310398,
+      "sha256": "b3c3b42a3d0cfe324c6d4b5358bbf85ab64222bbc05f2b8e549386c85295a55c"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prior_route_comparison/height_attitude_com.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 100305,
+      "sha256": "5671750c7cb944f5b93139b06e8aafb0619af3983ff4bfd15b22028a0a8cbe50"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prior_route_comparison/height_attitude_com.svg",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 55428,
+      "sha256": "1ce59cb17124d23c810cb5bbe17843eda850f7559906776309122e7f24165684"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prior_route_comparison/projections_xz_yz.png",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 384229,
+      "sha256": "38b8420a8d1bda982c3b9f02fcdd1f62c379fbf33608ccf80240d3aa4fd11918"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prior_route_comparison/projections_xz_yz.svg",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 512471,
+      "sha256": "04f3bdd154b50a980f46aa3b1a032040ff97f047974045e5032d3f69131e0431"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/prone_evidence.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 20263,
+      "sha256": "d3a4fd786c50e45aaac612bbb81db190398a3dd80bf58ffe7ec1017ba57aecf5"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/regression_results.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 3629,
+      "sha256": "c660459be01ffe4d55193463a626818980f8e3dd0646822b94aa8370d3306966"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/rock_first_correction/bounded_family.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 11376,
+      "sha256": "4cd0abc4db669d27d91606373a8b830f92aabc768be7cd3b4afcd43d0b601def"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/rock_first_correction/coordinated_fold_margin_0.03.jsonl",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 35787,
+      "sha256": "d7d74aaf9c193f6f8c4404fff4d68e30ca6f76035faa71e02fcafad8d881f783"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/rock_first_correction/rear_first_fold_margin_0.03.jsonl",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 35787,
+      "sha256": "d7d74aaf9c193f6f8c4404fff4d68e30ca6f76035faa71e02fcafad8d881f783"
+    },
+    {
+      "path": "09_Logs/Validation_Reports/Motion_Recovery_2026-10-12/xgo_reference_provenance.json",
+      "kind": "report/evidence",
+      "status": "A",
+      "bytes": 1740,
+      "sha256": "7b030d6d1b72771b0b79b8a27e35c58246f001d8a629ff949b59950daf3a7a36"
+    }
+  ],
+  "excluded": [],
+  "problems": [],
+  "deletions": [],
+  "original_files_preserved": true,
+  "adr004": "MATDOG originals and interface/reference metadata only; no XGO reverse code/firmware/constants imported",
+  "large_artifacts_external": "All firmware/ELF/host .so and full historical package remain under verification-artifacts"
+}

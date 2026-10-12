@@ -1,0 +1,46 @@
+CalibrationRuntimeRestore: 884 checks, 0 failures (offline; no hardware or approved production bounds)
+test_calibration_persistence_service: 500 checks, 0 failures
+MotionServiceExecutor: 2422 checks, 0 failures (synthetic approvals; no hardware)
+MotionLifecycle: 498 checks, 0 failures (offline, synthetic qualifications only)
+recoverable folded prone -> acquisition -> STAND 150mm: 1425 feedback frames
+WALK forward -> coordinated STOP: 488 feedback frames
+intermediate 117mm -> STAND 150mm: 200 feedback frames
+ADAPTIVE_MOTION_PASS checks=11280 hardware_access=false physical_readiness=false dynamic_stability=false
+AP_ONLY_TRANSPORT_PASS: 131 checks (production paths; HTTPD/TLS/driver doubles)
+MOTION_HTTP_TRANSPORT = PASS (56 production-handler/security/service checks; HTTPD/socket/mailbox/driver facts are doubles)
+MOTION_TRANSPORT_MODE = PASS (31 semantic checks; 2077 total including driver/queue/fence assertions). RUN_STA lacks motion admission; RUN recovery AP is compatible.
+MOTION_SAFETY_BOUNDARIES: 48 checks, 0 failures; hardware qualification=false
+test_binary_mutation (__main__.ReceiptTests.test_binary_mutation) ... ok
+test_manifest_mutations (__main__.ReceiptTests.test_manifest_mutations) ... ok
+test_partition_mutation (__main__.ReceiptTests.test_partition_mutation) ... ok
+test_source_inventory_mutation (__main__.ReceiptTests.test_source_inventory_mutation) ... ok
+test_verified_software_still_refuses_flash (__main__.ReceiptTests.test_verified_software_still_refuses_flash) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.933s
+
+OK
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'jsdom'
+Require stack:
+- /home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/scripts/tests/test_portal_dom.cjs
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/scripts/tests/test_portal_dom.cjs:4:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/scripts/tests/test_portal_dom.cjs'
+  ]
+}
+
+Node.js v22.22.2

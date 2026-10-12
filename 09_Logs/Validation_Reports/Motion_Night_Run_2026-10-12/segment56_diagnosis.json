@@ -1,0 +1,106 @@
+{
+  "segment_index": 56,
+  "interval_failed_at": [
+    0.9999980926513672,
+    1
+  ],
+  "interpretation": "Stronger AABB bound inconclusive; this targeted triangle-surface bound is separate evidence at the endpoint, not a whole swept 100um certificate. No trajectory change.",
+  "rows": [
+    {
+      "pair": [
+        "rh_hip_link",
+        "rh_lower_leg_link"
+      ],
+      "boolean_result": {
+        "link_a": "rh_hip_link",
+        "link_b": "rh_lower_leg_link",
+        "status": "SEPARATED_HULL",
+        "clearance_m": 4.6734527605535314e-05,
+        "clearance_kind": "LOWER_BOUND",
+        "witness_triangle_a": null,
+        "witness_triangle_b": null
+      },
+      "triangle_surface_lower_bound_result": {
+        "link_a": "rh_hip_link",
+        "link_b": "rh_lower_leg_link",
+        "status": "SEPARATED_NARROW",
+        "clearance_m": 0.001,
+        "clearance_kind": "LOWER_BOUND",
+        "witness_triangle_a": null,
+        "witness_triangle_b": null
+      },
+      "q_rad": {
+        "rh_hip_joint": 0.0,
+        "rh_upper_leg_joint": 1.875785875644031,
+        "rh_lower_leg_joint": -1.455702911835,
+        "lh_hip_joint": -0.0,
+        "lh_upper_leg_joint": 1.875785875644031,
+        "lh_lower_leg_joint": -1.455702911835,
+        "rf_hip_joint": 0.0,
+        "rf_upper_leg_joint": 1.4503775031382897,
+        "rf_lower_leg_joint": -1.605702911835,
+        "lf_hip_joint": -0.0,
+        "lf_upper_leg_joint": 1.4503775031382897,
+        "lf_lower_leg_joint": -1.605702911835
+      },
+      "base_parameters": {
+        "ur": 1.875785875644031,
+        "uf": 1.4503775031382897,
+        "p": 0.15811980480658888,
+        "x": -0.002082182912109326,
+        "z": 0.018597536863774893,
+        "lr": -1.455702911835,
+        "lf": -1.605702911835,
+        "h": 0.0
+      }
+    },
+    {
+      "pair": [
+        "lh_hip_link",
+        "lh_lower_leg_link"
+      ],
+      "boolean_result": {
+        "link_a": "lh_hip_link",
+        "link_b": "lh_lower_leg_link",
+        "status": "SEPARATED_HULL",
+        "clearance_m": 4.673452760556307e-05,
+        "clearance_kind": "LOWER_BOUND",
+        "witness_triangle_a": null,
+        "witness_triangle_b": null
+      },
+      "triangle_surface_lower_bound_result": {
+        "link_a": "lh_hip_link",
+        "link_b": "lh_lower_leg_link",
+        "status": "SEPARATED_NARROW",
+        "clearance_m": 0.001,
+        "clearance_kind": "LOWER_BOUND",
+        "witness_triangle_a": null,
+        "witness_triangle_b": null
+      },
+      "q_rad": {
+        "rh_hip_joint": 0.0,
+        "rh_upper_leg_joint": 1.875785875644031,
+        "rh_lower_leg_joint": -1.455702911835,
+        "lh_hip_joint": -0.0,
+        "lh_upper_leg_joint": 1.875785875644031,
+        "lh_lower_leg_joint": -1.455702911835,
+        "rf_hip_joint": 0.0,
+        "rf_upper_leg_joint": 1.4503775031382897,
+        "rf_lower_leg_joint": -1.605702911835,
+        "lf_hip_joint": -0.0,
+        "lf_upper_leg_joint": 1.4503775031382897,
+        "lf_lower_leg_joint": -1.605702911835
+      },
+      "base_parameters": {
+        "ur": 1.875785875644031,
+        "uf": 1.4503775031382897,
+        "p": 0.15811980480658888,
+        "x": -0.002082182912109326,
+        "z": 0.018597536863774893,
+        "lr": -1.455702911835,
+        "lf": -1.605702911835,
+        "h": 0.0
+      }
+    }
+  ]
+}

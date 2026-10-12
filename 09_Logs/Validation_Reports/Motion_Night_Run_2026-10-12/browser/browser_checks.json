@@ -1,0 +1,104 @@
+{
+  "result": "PASS",
+  "browser": "155.0.8059.39",
+  "actions": 48,
+  "disabled": 46,
+  "preserved_maintenance_tabs": 6,
+  "desktop": true,
+  "mobile": true,
+  "states": [
+    {
+      "phase": "PRE_ALIGN",
+      "xyz": [
+        0,
+        0,
+        0.01138982122856749
+      ],
+      "triangles": 119716
+    },
+    {
+      "phase": "REAR_DEPLOY",
+      "xyz": [
+        -0.0000010622587676071742,
+        0,
+        0.010899931275363794
+      ],
+      "triangles": 119716
+    },
+    {
+      "phase": "FRONT_DEPLOY",
+      "xyz": [
+        -0.002571771342321604,
+        0,
+        0.020467654859841075
+      ],
+      "triangles": 119716
+    },
+    {
+      "phase": "CONTACT_LOCKED_RISE",
+      "xyz": [
+        -0.004226467075023519,
+        0,
+        0.021554381591240877
+      ],
+      "triangles": 119716
+    },
+    {
+      "phase": "STAND_150",
+      "xyz": [
+        0,
+        0,
+        0.15
+      ],
+      "triangles": 119716
+    },
+    {
+      "phase": "WALK",
+      "xyz": [
+        -0.03999999149786647,
+        0,
+        0.15
+      ],
+      "triangles": 119716
+    },
+    {
+      "phase": "STOPPING",
+      "xyz": [
+        -0.037965634375,
+        0,
+        0.15
+      ],
+      "triangles": 119716
+    },
+    {
+      "phase": "SIMULATED_REARM_STAND",
+      "xyz": [
+        0.005,
+        0,
+        0.15
+      ],
+      "triangles": 119716
+    },
+    {
+      "phase": "INTERMEDIATE_RESTART_50MM",
+      "xyz": [
+        0,
+        0,
+        0.05
+      ],
+      "triangles": 119716
+    },
+    {
+      "phase": "RESTART_STAND_150",
+      "xyz": [
+        0,
+        0,
+        0.15
+      ],
+      "triangles": 119716
+    }
+  ],
+  "display_write_requests": [],
+  "live_hardware_telemetry": false,
+  "production_http_enforcement_log": "integrated_regressions.log: 56 production-handler checks; this demo server is a display fixture"
+}

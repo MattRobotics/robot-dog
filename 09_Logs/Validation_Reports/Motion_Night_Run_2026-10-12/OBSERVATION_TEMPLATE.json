@@ -1,0 +1,110 @@
+{
+  "schema": "MATDOG_FUTURE_READONLY_OBSERVATION_V1",
+  "source": "UNMEASURED_TEMPLATE",
+  "firmware_installed_commit": "b08322dedc5564c080f691dc98047511ef2b953f",
+  "calibration_generation": 1,
+  "observed_at_utc": null,
+  "controller_uptime_ms": null,
+  "mapping_record_sha256": null,
+  "installation_identity_confirmed": false,
+  "torque_state_observed": null,
+  "fresh_joint_samples": [
+    {
+      "joint": "lf_hip_joint",
+      "bus_id": 13,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    },
+    {
+      "joint": "lf_upper_leg_joint",
+      "bus_id": 12,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    },
+    {
+      "joint": "lf_lower_leg_joint",
+      "bus_id": 11,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    },
+    {
+      "joint": "rf_hip_joint",
+      "bus_id": 23,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    },
+    {
+      "joint": "rf_upper_leg_joint",
+      "bus_id": 22,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    },
+    {
+      "joint": "rf_lower_leg_joint",
+      "bus_id": 21,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    },
+    {
+      "joint": "rh_hip_joint",
+      "bus_id": 33,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    },
+    {
+      "joint": "rh_upper_leg_joint",
+      "bus_id": 32,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    },
+    {
+      "joint": "rh_lower_leg_joint",
+      "bus_id": 31,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    },
+    {
+      "joint": "lh_hip_joint",
+      "bus_id": 43,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    },
+    {
+      "joint": "lh_upper_leg_joint",
+      "bus_id": 42,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    },
+    {
+      "joint": "lh_lower_leg_joint",
+      "bus_id": 41,
+      "raw_encoder": null,
+      "semantic_rad": null,
+      "sample_ms": null
+    }
+  ],
+  "base_world_transform": null,
+  "support_plane_measurement": null,
+  "imu_quaternion": null,
+  "belly_contact_observation": null,
+  "foot_bearing_evidence": {
+    "LF": null,
+    "RF": null,
+    "RH": null,
+    "LH": null
+  },
+  "operator_present": null,
+  "servo_power_stop_verified": false,
+  "authority_permit_granted": false
+}

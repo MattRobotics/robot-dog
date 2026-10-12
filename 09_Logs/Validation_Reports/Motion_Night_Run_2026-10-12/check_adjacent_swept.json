@@ -1,0 +1,201 @@
+{
+  "schema": "MATDOG_ADJACENT_SWEPT_BOUNDED_V1",
+  "hardware_authorized": false,
+  "trajectory_changed": false,
+  "all_adjacent_swept_certified": false,
+  "elapsed_s": 182.56711858599738,
+  "rows": [
+    {
+      "joint": "lf_hip_joint",
+      "pair": [
+        "base_link",
+        "lf_hip_link"
+      ],
+      "angle_domain_rad": [
+        -0.017453292519943295,
+        -0.0
+      ],
+      "status": "PASS_CONTINUOUS",
+      "reason": "",
+      "boxes": 15,
+      "minimum_certified_bound_m": 1.5124321977705876e-05,
+      "witness": null
+    },
+    {
+      "joint": "lf_upper_leg_joint",
+      "pair": [
+        "lf_hip_link",
+        "lf_upper_leg_link"
+      ],
+      "angle_domain_rad": [
+        0.4098757733501,
+        1.5153154116982845
+      ],
+      "status": "BLOCKED",
+      "reason": "BOUND_CERTIFICATION_BUDGET_EXHAUSTED",
+      "boxes": 69,
+      "minimum_certified_bound_m": 3.465286386436962e-05,
+      "witness": null
+    },
+    {
+      "joint": "lf_lower_leg_joint",
+      "pair": [
+        "lf_upper_leg_link",
+        "lf_lower_leg_link"
+      ],
+      "angle_domain_rad": [
+        -1.605702911835,
+        0.34957295253198556
+      ],
+      "status": "BLOCKED",
+      "reason": "BOUND_CERTIFICATION_BUDGET_EXHAUSTED",
+      "boxes": 0,
+      "minimum_certified_bound_m": null,
+      "witness": null
+    },
+    {
+      "joint": "rf_hip_joint",
+      "pair": [
+        "base_link",
+        "rf_hip_link"
+      ],
+      "angle_domain_rad": [
+        0.0,
+        0.017453292519943295
+      ],
+      "status": "BLOCKED",
+      "reason": "BOUND_CERTIFICATION_BUDGET_EXHAUSTED",
+      "boxes": 0,
+      "minimum_certified_bound_m": null,
+      "witness": null
+    },
+    {
+      "joint": "rf_upper_leg_joint",
+      "pair": [
+        "rf_hip_link",
+        "rf_upper_leg_link"
+      ],
+      "angle_domain_rad": [
+        0.4098757733501,
+        1.5153154116982845
+      ],
+      "status": "BLOCKED",
+      "reason": "BOUND_CERTIFICATION_BUDGET_EXHAUSTED",
+      "boxes": 0,
+      "minimum_certified_bound_m": null,
+      "witness": null
+    },
+    {
+      "joint": "rf_lower_leg_joint",
+      "pair": [
+        "rf_upper_leg_link",
+        "rf_lower_leg_link"
+      ],
+      "angle_domain_rad": [
+        -1.605702911835,
+        0.34957295253198556
+      ],
+      "status": "BLOCKED",
+      "reason": "BOUND_CERTIFICATION_BUDGET_EXHAUSTED",
+      "boxes": 0,
+      "minimum_certified_bound_m": null,
+      "witness": null
+    },
+    {
+      "joint": "rh_hip_joint",
+      "pair": [
+        "base_link",
+        "rh_hip_link"
+      ],
+      "angle_domain_rad": [
+        0.0,
+        0.017453292519943295
+      ],
+      "status": "BLOCKED",
+      "reason": "BOUND_CERTIFICATION_BUDGET_EXHAUSTED",
+      "boxes": 0,
+      "minimum_certified_bound_m": null,
+      "witness": null
+    },
+    {
+      "joint": "rh_upper_leg_joint",
+      "pair": [
+        "rh_hip_link",
+        "rh_upper_leg_link"
+      ],
+      "angle_domain_rad": [
+        0.8983379778627721,
+        2.0620350577615905
+      ],
+      "status": "BLOCKED",
+      "reason": "BOUND_CERTIFICATION_BUDGET_EXHAUSTED",
+      "boxes": 0,
+      "minimum_certified_bound_m": null,
+      "witness": null
+    },
+    {
+      "joint": "rh_lower_leg_joint",
+      "pair": [
+        "rh_upper_leg_link",
+        "rh_lower_leg_link"
+      ],
+      "angle_domain_rad": [
+        -1.605702911835,
+        0.0007756156372446272
+      ],
+      "status": "BLOCKED",
+      "reason": "BOUND_CERTIFICATION_BUDGET_EXHAUSTED",
+      "boxes": 0,
+      "minimum_certified_bound_m": null,
+      "witness": null
+    },
+    {
+      "joint": "lh_hip_joint",
+      "pair": [
+        "base_link",
+        "lh_hip_link"
+      ],
+      "angle_domain_rad": [
+        -0.017453292519943295,
+        -0.0
+      ],
+      "status": "BLOCKED",
+      "reason": "BOUND_CERTIFICATION_BUDGET_EXHAUSTED",
+      "boxes": 0,
+      "minimum_certified_bound_m": null,
+      "witness": null
+    },
+    {
+      "joint": "lh_upper_leg_joint",
+      "pair": [
+        "lh_hip_link",
+        "lh_upper_leg_link"
+      ],
+      "angle_domain_rad": [
+        0.8983379778627721,
+        2.0620350577615905
+      ],
+      "status": "BLOCKED",
+      "reason": "BOUND_CERTIFICATION_BUDGET_EXHAUSTED",
+      "boxes": 0,
+      "minimum_certified_bound_m": null,
+      "witness": null
+    },
+    {
+      "joint": "lh_lower_leg_joint",
+      "pair": [
+        "lh_upper_leg_link",
+        "lh_lower_leg_link"
+      ],
+      "angle_domain_rad": [
+        -1.605702911835,
+        0.0007756156372446272
+      ],
+      "status": "BLOCKED",
+      "reason": "BOUND_CERTIFICATION_BUDGET_EXHAUSTED",
+      "boxes": 0,
+      "minimum_certified_bound_m": null,
+      "witness": null
+    }
+  ]
+}
