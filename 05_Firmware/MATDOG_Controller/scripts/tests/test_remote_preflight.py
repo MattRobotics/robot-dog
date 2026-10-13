@@ -6,6 +6,8 @@ FW=Path(__file__).resolve().parents[2];sys.path.insert(0,str(FW/'scripts/release
 import motion_remote_preflight as p
 import review_preflash
 import verify_designated_candidate as provenance
+import verify_application_partition as partition_reader
+from unittest.mock import patch
 from compile_record_decoder import compile_decoder
 class Tests(unittest.TestCase):
  def test_plan_has_no_execution(self):
@@ -130,6 +132,22 @@ class SerialTests(unittest.TestCase):
   with self.assertRaises(RuntimeError):r.read('@CALIBRATION RESTORE 1')
 
 class RomBackupTests(unittest.TestCase):
+ def test_canonical_flasher_has_one_rom_write_and_independent_rom_verify(self):
+  text=(FW/'scripts/flash_app_only.sh').read_text();invocations=[line for line in text.splitlines() if '"$ESPTOOL" --chip' in line]
+  self.assertEqual(len(invocations),3);self.assertEqual(sum(' write-flash ' in line for line in invocations),1);self.assertEqual(sum(' verify-flash ' in line for line in invocations),1)
+  for line in invocations:
+   for flags in ('--no-stub','--baud 115200','--connect-attempts 1','--before no-reset','--after no-reset'):self.assertIn(flags,line)
+  self.assertNotIn('sleep 2',text);self.assertIn('POST_FLASH_STATE = ROM',text)
+ def test_partition_reader_rom_flags_deadline_and_exact_length(self):
+  with tempfile.TemporaryDirectory() as temp:
+   output=Path(temp)/'partition.bin';output.write_bytes(bytes(4096))
+   with patch.object(partition_reader.subprocess,'run',return_value=subprocess.CompletedProcess([],0,'','')) as run:
+    partition_reader.esptool_read('not-executed','esp32s3','not-opened',0x8000,4096,output)
+    command=run.call_args.args[0]
+    for flag in ('--no-stub','--baud','--connect-attempts','--before','--after'):self.assertIn(flag,command)
+    self.assertEqual(command[command.index('--baud')+1],'115200');self.assertEqual(command[command.index('--before')+1],'no-reset');self.assertEqual(command[command.index('--after')+1],'no-reset');self.assertEqual(run.call_args.kwargs['timeout'],120)
+    output.write_bytes(bytes(4095))
+    with self.assertRaises(SystemExit):partition_reader.esptool_read('not-executed','esp32s3','not-opened',0x8000,4096,output)
  def test_rom_method_deadline_and_single_connect_are_pinned(self):
   command=p.rom_command('/not/executed/esptool','/not/opened/port','read-flash',['0x0',str(p.SIZE),'new.bin'])
   self.assertEqual(command[command.index('--baud')+1],'115200');self.assertIn('--no-stub',command)

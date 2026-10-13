@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline provenance gate for the one designated app-only candidate.
 A later documentation commit can refer to an earlier clean compiled source;
-Firmware differences reject. One explicitly pinned host-only serial repair
+Firmware differences reject. Explicitly pinned host-only serial/ROM repairs
 has a separate receipt; it never relabels the compiled source or image SHA.
 """
 import argparse,hashlib,json,subprocess
@@ -13,6 +13,9 @@ HOST_SERIAL_PATCH_FILES=(
  '05_Firmware/MATDOG_Controller/scripts/release/review_preflash.py',
  '05_Firmware/MATDOG_Controller/scripts/tests/test_remote_preflight.py',
  '05_Firmware/MATDOG_Controller/scripts/verify_designated_candidate.py',
+ '05_Firmware/MATDOG_Controller/scripts/flash_app_only.sh',
+ '05_Firmware/MATDOG_Controller/scripts/verify_application_partition.py',
+ '05_Firmware/MATDOG_Controller/scripts/tests/test_matdog_layout.py',
 )
 def verify_host_serial_patch(root,source,image_sha,changed):
  """Only the named host repair, with old/new exact byte identities, can pass."""

@@ -17,21 +17,40 @@
     },
     "05_Firmware/MATDOG_Controller/scripts/tests/test_remote_preflight.py": {
       "compiled_source_file_sha256": "3e65b017c983b114a150ce2536ad0159b7972d509c55afa54df4f586d65504ce",
-      "current_file_sha256": "68ba28fdf1c9e03293ab002ab9a3c05f269979f42f78844eec91b7f5a323fa3a"
+      "current_file_sha256": "5e0c0d6c118e491cfc273120092edd4601e1ec53b19f7a336cd667eb06be4ec8"
     },
     "05_Firmware/MATDOG_Controller/scripts/verify_designated_candidate.py": {
       "compiled_source_file_sha256": "424a10e0c9c850a13d2e6a89d421903bdebbd903e32cec8e32d14fef402748b2",
-      "current_file_sha256": "7c714b6c47a9337a42630ea17d9ddd7a0714bc76522e47cb5878644d7797f321"
+      "current_file_sha256": "1ee4a9ca7050d8272b56d2ee1c0721b72f12baecf5f0f18b86d3590bfbcfaa97"
+    },
+    "05_Firmware/MATDOG_Controller/scripts/flash_app_only.sh": {
+      "compiled_source_file_sha256": "11f6fb385d887fa018fdfe92b711b102b1e5dae499f58cd54efa5353454f190d",
+      "current_file_sha256": "411f86c8522ff5f123308ee9915229f11f88b518b5f48c0311fc37d9efd01f8e"
+    },
+    "05_Firmware/MATDOG_Controller/scripts/verify_application_partition.py": {
+      "compiled_source_file_sha256": "26ce0711571adabf11e9e3a2e700bd99bb076881addec8903d4cb18c59ceeac7",
+      "current_file_sha256": "bd1260fa3c056a4aac657b7dfabc23566a0499a35a56189a43d55726c00542b5"
+    },
+    "05_Firmware/MATDOG_Controller/scripts/tests/test_matdog_layout.py": {
+      "compiled_source_file_sha256": "3fdeb8c672a2dbed317bb6cda7ac90f80d5e450b4e90ae5b8e02c6a12f89b9d2",
+      "current_file_sha256": "6040faf93547a3fd0ecef2346480f01e4dd16f166ba4175e81fae7d2125d9c05"
     }
   },
   "tests": {
     "command": "PYTHONDONTWRITEBYTECODE=1 python3 05_Firmware/MATDOG_Controller/scripts/tests/test_remote_preflight.py -v",
-    "count": 21,
+    "count": 23,
     "result": "PASS",
     "log": "test_logs/preflight_rom_backup_fix.log",
-    "log_sha256": "62f3b7b436eedcc1d14b0dd435ed0b54bc85708ebe2cbb01bbeb190b998a7514",
+    "log_sha256": "71529203e32b1a7ed1ab348ac5100d0e0d67e143ea0299ac33420e0a4be3d49c",
     "existing_private_capture_contracts": "10/10 PASS; offline parsing of already acquired capture; capture remains private",
-    "fresh_hardware_evidence": false
+    "fresh_hardware_evidence": false,
+    "targeted_app_only_audit": {
+      "result": "PASS",
+      "checks": 4,
+      "log": "test_logs/rom_backup_fix_targeted_audit.log",
+      "log_sha256": "003c51f0b6713365707b9359b6b238b4b9bd0e87e115b27527106c0a74f98d85"
+    },
+    "full_static_audit": "Stopped to avoid unrelated firmware suite repeats; not claimed PASS. Frozen firmware qualification remains unchanged."
   },
   "serial_deadlines_seconds": {
     "status_reads": 20,
@@ -42,7 +61,8 @@
   "designation_or_firmware_changed": false,
   "repairs": [
     "SEMANTIC_SERIAL_RESPONSE_FRAMING",
-    "ROM_NOSTUB_115200_BOUNDED_STREAMED_BACKUP_AND_RESUME"
+    "ROM_NOSTUB_115200_BOUNDED_STREAMED_BACKUP_AND_RESUME",
+    "CANONICAL_APP_ONLY_ROM_TRANSPORT_NO_STUB_NO_AUTOMATIC_BOOT"
   ],
   "updated_utc": "2026-10-13T18:00:38.680249+00:00",
   "rom_backup": {

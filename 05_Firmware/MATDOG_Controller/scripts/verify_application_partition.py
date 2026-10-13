@@ -53,15 +53,20 @@ OTADATA_SIZE = 0x2000
 
 
 def esptool_read(esptool, chip, port, offset, length, out_path):
+    out_path = Path(out_path)
     result = subprocess.run(
-        [esptool, "--chip", chip, "--port", port, "read-flash",
+        [esptool, "--chip", chip, "--port", port, "--baud", "115200",
+         "--no-stub", "--connect-attempts", "1", "--before", "no-reset",
+         "--after", "no-reset", "read-flash",
          hex(offset), hex(length), str(out_path)],
-        capture_output=True, text=True,
+        capture_output=True, text=True, timeout=120,
     )
     if result.returncode != 0:
         print(result.stdout)
         print(result.stderr, file=sys.stderr)
         raise SystemExit(f"esptool read-flash failed at offset {hex(offset)}")
+    if not out_path.is_file() or out_path.stat().st_size != length:
+        raise SystemExit(f"esptool read-flash incomplete at offset {hex(offset)}")
 
 
 def main():
