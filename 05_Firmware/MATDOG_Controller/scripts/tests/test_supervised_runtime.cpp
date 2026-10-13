@@ -5,6 +5,7 @@ motion::FeedbackPolicy pairedPolicy(){motion::FeedbackPolicy p;p.mode=motion::Fe
 #undef main
 #include "stl_gait_adapter.cpp"
 #include <fstream>
+#include "../../src/motion/FirstStrideReference.h"
 // Instruments/servo completion are simulated. Fixed fixture height never
 // follows virtual route height. Compare the actual FeedbackWalk planner.
 int main(){
@@ -12,6 +13,8 @@ int main(){
  auto record=[&](const char* phase,double now,unsigned segment,const motion::FeedbackFrame& f){if(!trace)return;trace<<phase<<","<<now<<","<<segment<<","<<f.target.sequence<<",0.3,"<<f.body.translationM.x<<","<<f.body.translationM.z<<","<<atan2(f.body.rotation[0][2],f.body.rotation[0][0]);for(auto q:f.target.legs)trace<<","<<q.hip<<","<<q.upper<<","<<q.lower;trace<<"\n";};
  Rig rig;auto p=pairedPolicy();p.mode=motion::FeedbackMode::FIXTURE_REVIEW;p.fixtureTrialRatesReviewed=true;p.loadedRatesVerified=false;p.routeTubeReviewed=true;p.fixtureLimitVariant=true;p.routeFirstKnot=0;p.routeLastKnot=251;p.routeJointTubeRad=.0012;p.routePositionTubeM=.001;p.routeRotationTube=.001;
  p.samplePeriodS=.05;p.maxJointStepRad=.0015;p.maxTrackingErrorRad=.0009;
+ unsigned failed=99;CHECK(motion::compiledFirstStrideFitsLimits(p,motion::compiledFirstStrideTubeRad(),&failed));
+ auto narrow=p;narrow.jointLimits[1][2].upper=32.21191*3.141592653589793/180;CHECK(!motion::compiledFirstStrideFitsLimits(narrow,motion::compiledFirstStrideTubeRad(),&failed)&&failed==5);CHECK(!motion::compiledFirstStrideFitsLimits(p,.006,&failed));
  motion::AcquisitionRoute route;route.pairedProne=true;route.supervisedSegments=true;route.timeScale=9;route.geometryIdentityVerified=true;route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
  motion::AdaptiveObservation o;o.actual=motion::pairedProneSample(0,0,true).target;o.body.translationM.z=.3;o.externalSupportConfirmed=o.flatPlaneConfirmed=o.stationary=true;o.heightSource=o.supportSource=motion::EvidenceSource::EXTERNAL_MEASURED;
  double now=1;o.stampS=now;motion::AdaptiveStand stand;motion::AdaptiveStandRequest request;request.targetHeightM=.15;request.acquisition=&route;CHECK(stand.request(request,p,now));

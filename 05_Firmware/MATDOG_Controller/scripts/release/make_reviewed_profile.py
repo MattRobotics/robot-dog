@@ -78,6 +78,10 @@ def create(d):
         if not w['status'] == 'PASS_CONTINUOUS_TARGET_BOXES':
             raise ValueError('review field outside qualified scope')
         table = json.loads((REPORT / 'compiled_first_stride_receipt.json').read_text())
+        for i,(lo,hi) in enumerate(table['joint_target_ranges_rad']):
+            j=joints[i]
+            if lo-table['runtime_error_tube_rad']<(j['required_min_urad']+j['margin_urad'])*1e-6 or hi+table['runtime_error_tube_rad']>(j['required_max_urad']-j['margin_urad'])*1e-6:
+                raise ValueError('WALK_TUBE_OUTSIDE_REVIEWED_LIMITS JOINT='+str(i))
         scale = d['walk_time_scale']
         if not 9 <= scale <= 100:
             raise ValueError('review field outside qualified scope')

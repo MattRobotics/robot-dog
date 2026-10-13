@@ -74,6 +74,7 @@ struct Fixture {
     CHECK(executor.arm(facts,envelope,feedback,100));
     ready.calibration_restored=ready.calibration_accepted=ready.limits_approved=true;
     ready.hardware_approved=ready.operational_permit=ready.support_observable=true;
+    ready.walk_qualified=true;ready.max_vx=.01;ready.max_vy=.01;ready.max_yaw_rate=.1; // synthetic scope approval
     ready.power_ok=ready.bms_ok=ready.authority_live=true;ready.mode=core::OperatingMode::RUN;
     service.begin(&executor,&planner);service.refresh(ready,100);
   }

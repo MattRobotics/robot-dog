@@ -1,5 +1,6 @@
 #include "Controller.h"
 #include "LocalMotionCommand.h"
+#include "../motion/FirstStrideReference.h"
 #include "../servo/ServoPopulation.h"
 #include "../actuator/CalibrationGeometryProfileData.h"
 #include <esp_random.h>
@@ -70,6 +71,11 @@ bool Controller::localValidationCommand(const char* line,uint32_t now,char* out,
    for(unsigned i=0;i<4;++i){const double q[]={f.target.legs[i].hip,f.target.legs[i].upper,f.target.legs[i].lower};for(unsigned j=0;j<3;++j){const auto& b=r.feedback.jointLimits[i][j];if(q[j]-p.joint_tube_rad<b.lower||q[j]+p.joint_tube_rad>b.upper){reason="CORRIDOR_TUBE_OUTSIDE_APPROVED_LIMITS";return reply();}}}
   }
   if(p.last_knot!=251){reason="COMPLETE_STAND_CORRIDOR_REQUIRED";return reply();}
+  if(r.scope==execution::TrialScope::SUPERVISED_FIXTURE_WALK||r.scope==execution::TrialScope::AUTONOMOUS_WALK){
+   unsigned joint=0;if(!motion::compiledFirstStrideFitsLimits(r.feedback,p.walk_tube_rad,&joint)){
+    snprintf(out,size,"VALIDATION=REFUSED REASON=WALK_TUBE_OUTSIDE_APPROVED_LIMITS JOINT=%u",joint);return false;
+   }
+  }
   ok=bindReviewedMotionRuntime(r);if(ok){servo_bus_.setValidationTimeout(p.transaction_timeout_ms);servo_bus_.setValidationDrive(p.drive_speed,p.drive_acceleration);}
   reason=ok?"RAM_PROFILE_ADMITTED_NO_PERMIT":"RUNTIME_PROFILE_REJECTED";return reply();
  }

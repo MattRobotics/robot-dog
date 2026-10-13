@@ -2,7 +2,7 @@
   "schema": "MATDOG_COMPILED_FIRST_STRIDE_V1",
   "frames": 19081,
   "data_sha256": "9a4efe0a558b1e86164a4e347ce978c4c49f82d9f60a0e36e88789a8b7f01ab6",
-  "header_sha256": "e0c0be881fc0575185471f124d36bcbb6fd73fc0711826e6485e8fd4c7e62b40",
+  "header_sha256": "1d2d181aec20190df00028785103fa440e3a5d7f254dacd4d4e35f468f724f9b",
   "table_bytes": 1831776,
   "position_error_rad": 5.959421045531599e-08,
   "velocity_encoding_error_rad_s": 9.99999574880856e-07,
@@ -13,5 +13,55 @@
   "runtime_error_tube_rad": 0.005999940405789545,
   "minimum_time_scale": 9,
   "scope": "frozen 5mm forward, zero vy/yaw, one stride; actual runtime targets are float table rows; drive rates stay independently reviewed; no loaded/contact claim",
-  "hardware_qualified": false
+  "hardware_qualified": false,
+  "joint_target_ranges_rad": [
+    [
+      -2.220446049250313e-16,
+      2.220446049250313e-16
+    ],
+    [
+      0.08218066394329071,
+      0.6363492012023926
+    ],
+    [
+      0.3299139440059662,
+      0.5564783811569214
+    ],
+    [
+      -2.220446049250313e-16,
+      2.220446049250313e-16
+    ],
+    [
+      0.05681948736310005,
+      0.6273757219314575
+    ],
+    [
+      0.3299139440059662,
+      0.5794077515602112
+    ],
+    [
+      -2.220446049250313e-16,
+      2.220446049250313e-16
+    ],
+    [
+      0.6566348671913147,
+      1.0554643869400024
+    ],
+    [
+      -0.04961485043168068,
+      0.2254401296377182
+    ],
+    [
+      -2.220446049250313e-16,
+      2.220446049250313e-16
+    ],
+    [
+      0.6737082004547119,
+      1.0575412511825562
+    ],
+    [
+      -0.04961485043168068,
+      0.24651390314102173
+    ]
+  ]
 }

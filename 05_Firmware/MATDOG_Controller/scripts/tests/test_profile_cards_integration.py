@@ -2,7 +2,7 @@
 """Real offline card generator -> real bounded firmware parser. No devices.
 All approvals below are synthetic test fixtures, never operator evidence.
 """
-import copy,hashlib,json,subprocess,sys,tempfile,unittest
+import copy,hashlib,json,subprocess,sys,tempfile,unittest,math,xml.etree.ElementTree as ET
 from pathlib import Path
 FW=Path(__file__).resolve().parents[2];sys.path.insert(0,str(FW/'scripts/release'))
 import make_reviewed_profile as maker
@@ -16,7 +16,11 @@ class Tests(unittest.TestCase):
  def tearDownClass(cls):cls.temp.cleanup()
  def data(self,scope,clock=9):
   reviews={k:dict(approved=True,evidence_sha256='a'*64) for k in (*maker.REQUIRED,'external_bearing_support_observer','loaded_tracking','loaded_stability_contact_compliance')}
-  return dict(generation=1,operator_name='SYNTHETIC_TEST_ONLY',review_utc='2026-10-13T12:00:00Z',current_record_sha256='d'*64,scope=scope,reviews=reviews,route='FIXTURE_LIMIT_COMPATIBLE' if scope in (3,4) else 'CANONICAL',corridor=[0 if scope in (3,4) else 114,251],execution=dict(velocity_rad_s=.065,acceleration_rad_s2=.3,tracking_rad=.0009,feedback_age_ms=40,batch_timeout_ms=2000,tracking_timeout_ms=2500,imu_age_ms=100,temperature_max_c=60,voltage_min_dv=50,voltage_max_dv=140,output_ceiling=500,transaction_timeout_ms=10,contact_inset_ticks=18),drive=dict(speed_raw=20,acceleration_raw=1,speed_rad_s_per_raw=.001533980787,acceleration_rad_s2_per_raw=.15),error_budget_rad=[.000766990394,.0003],max_joint_step_rad=.0015,joint_limits=[dict(reviewed=True,required_min_urad=-100000,required_max_urad=100000,margin_urad=1000) for _ in range(12)],stand_time_scale=9,measured_fixture_anchor_xyz_rpy=[0,0,.3,0,0,0],fixture_position_tube_m=.001,fixture_rotation_tube=.001,walk_time_scale=clock,walk_step_rad=.004)
+  urdf=ET.parse(FW.parents[1]/'03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf').getroot();limits=[]
+  for leg in ('lf','rf','rh','lh'):
+   for part in ('hip','upper_leg','lower_leg'):
+    b=urdf.find(f"joint[@name='{leg}_{part}_joint']/limit");limits.append(dict(reviewed=True,required_min_urad=math.ceil(float(b.attrib['lower'])*1e6),required_max_urad=math.floor(float(b.attrib['upper'])*1e6),margin_urad=1000))
+  return dict(generation=1,operator_name='SYNTHETIC_TEST_ONLY',review_utc='2026-10-13T12:00:00Z',current_record_sha256='d'*64,scope=scope,reviews=reviews,route='FIXTURE_LIMIT_COMPATIBLE' if scope in (3,4) else 'CANONICAL',corridor=[0 if scope in (3,4) else 114,251],execution=dict(velocity_rad_s=.065,acceleration_rad_s2=.3,tracking_rad=.0009,feedback_age_ms=40,batch_timeout_ms=2000,tracking_timeout_ms=2500,imu_age_ms=100,temperature_max_c=60,voltage_min_dv=50,voltage_max_dv=140,output_ceiling=500,transaction_timeout_ms=10,contact_inset_ticks=18),drive=dict(speed_raw=20,acceleration_raw=1,speed_rad_s_per_raw=.001533980787,acceleration_rad_s2_per_raw=.15),error_budget_rad=[.000766990394,.0003],max_joint_step_rad=.0015,joint_limits=limits,stand_time_scale=9,measured_fixture_anchor_xyz_rpy=[0,0,.3,0,0,0],fixture_position_tube_m=.001,fixture_rotation_tube=.001,walk_time_scale=clock,walk_step_rad=.004)
  def parses(self,cards):return subprocess.run([str(self.binary)],input=cards,text=True).returncode==0
  def test_all_scopes_and_slow_clocks_roundtrip(self):
   for scope in (1,2,3,4):
@@ -36,4 +40,6 @@ class Tests(unittest.TestCase):
   with self.assertRaises(ValueError):maker.create(d)
   d=self.data(4,8)
   with self.assertRaises(ValueError):maker.create(d)
+  d=self.data(4);d['joint_limits'][5]['required_max_urad']=math.floor(math.radians(32.21191)*1e6)
+  with self.assertRaisesRegex(ValueError,'JOINT=5'):maker.create(d)
 if __name__=='__main__':unittest.main()
