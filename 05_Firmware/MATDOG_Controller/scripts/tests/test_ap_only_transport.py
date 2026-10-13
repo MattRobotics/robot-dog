@@ -21,7 +21,7 @@ def between(s,a,b):
     return s.split(a,1)[1].split(b,1)[0]
 tree=ast.parse((here/'test_ap_transport.py').read_text())
 fixture=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='fixture' for t in n.targets))
-fixture=fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <atomic>\n#include <thread>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"')
+fixture=fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <atomic>\n#include <thread>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"\n#include "motion/MotionContract.h"\n#include "network/NetworkPolicy.h"')
 fixture=fixture.replace('memset(p,0x42,n)', 'static unsigned seed=0;memset(p,++seed,n)')
 fixture=fixture.replace('constexpr int ESP_OK=0, HTTP_GET=0','constexpr int HTTP_GET=0')
 # The portal now answers with two Set-Cookie headers; the HTTPD double keeps both.
@@ -30,11 +30,20 @@ assert 'h+="\\n"' in fixture
 fixture=fixture.replace('struct FakeService {', '''class WifiManager { public: static bool verifyAdminRadio(); };
 struct FakeService {
  AdminAccess gate;
+ struct {bool run_mode=false,connected=false;uint32_t ipv4=0;uint8_t role_reason=0;} motion_wifi;
+ const auto& wifiStatus() const {return motion_wifi;}
  FakeService() { gate.begin(); gate.phase.store(NetworkPhase::ADMIN_AP); gate.open(); }
  AdminAccess &networkAdminAccess() {return gate;}
 ''')
 fixture=fixture.replace('configureNetwork(const ConfigPatch&)', 'configureNetwork(const ConfigPatch&,uint32_t)').replace('accessPoint(bool)', 'accessPoint(bool,uint32_t)')
-fixture=fixture.replace(' static esp_err_t handleWifi', ''' uint32_t portal_generation_=0;
+fixture=fixture.replace(' static esp_err_t handleWifi', ''' bool portal_sta_=false;
+ bool http_readonly_=false;
+ bool registerReadOnlyHandlers(void*);
+ bool readOnlyAdmitted(const HttpTransportRequest&) const;
+ bool admitReadOnly(HttpTransportRequest&);
+ bool admitMotion(HttpTransportRequest&);
+ bool motionStaAdmitted(const HttpTransportRequest&) const;
+ uint32_t portal_generation_=0;
  bool revoke_before_service=false;
  bool admitAdmin(HttpTransportRequest&);
  void lifecycleTick();
@@ -43,6 +52,7 @@ fixture=fixture.replace(' static esp_err_t handleWifi', ''' uint32_t portal_gene
  bool registerHandlers(void*,bool=true);
  static esp_err_t handlePage(httpd_req_t*);
  static esp_err_t handleStatus(httpd_req_t*) {return 0;}
+ static esp_err_t handleMotion(httpd_req_t*) {return 0;}
  static esp_err_t handleOtaChallenge(httpd_req_t*) {return 0;}
  static esp_err_t handleOtaUpdate(httpd_req_t*) {return 0;}
  static esp_err_t handleWifi''')
@@ -105,8 +115,8 @@ int main() {
  auto page=request(s,"/","");page.method=HTTP_GET;check(HttpTransport::handlePage(&page)==0&&page.status==403,"page denied in CLIENT_STA");
  s.service.gate.phase.store(NetworkPhase::ADMIN_AP);
  registered.clear();check(s.registerHandlers(nullptr,false),"register HTTPS role");
- check(registered.size()==3&&std::none_of(registered.begin(),registered.end(),[](auto &u){return u=="/"||u.find("/wifi/")==0;}),"HTTPS has only non-admin routes");
- registered.clear();check(s.registerHandlers(nullptr,true)&&registered.size()==12,"HTTP admin route inventory");
+ check(registered.size()==10&&std::none_of(registered.begin(),registered.end(),[](auto &u){return u.find("/wifi/")==0;}),"HTTPS exposes scoped motion/auth routes and no WiFi administration");
+ registered.clear();check(s.registerHandlers(nullptr,true)&&registered.size()==18,"HTTP admin route inventory");
  for(int mode:{WIFI_STA,WIFI_AP_STA}) {WiFi.mode_value=mode;check(action(s)==403,"driver STA/APSTA deny");}
  adminRadio();WiFi.mode_read_ok=false;check(action(s)==403,"driver unverifiable deny");WiFi.mode_read_ok=true;
  WiFi.STA.running=true;check(action(s)==403,"operational STA bits deny");adminRadio();
@@ -153,7 +163,7 @@ int main() {
  for(const char*bad:{"&remember=0","&remember=1x","&other=1","&remember=1&remember=1"}){clock_ms+=1000;auto r=request(dev,"/wifi/login","token="+token+bad);run(r);check(r.status==400,"malformed remember flag");}
  clock_ms+=1000;auto rem=request(dev,"/wifi/login","token="+token+"&remember=1");run(rem);check(rem.status==200,"remember login");
  std::string set=rem.response_headers["Set-Cookie"];size_t at=set.find("md_device=");
- check(set.find("md_session=")==0&&set.find("HttpOnly; SameSite=Strict; Path=/wifi/; Max-Age=300")!=npos,"session cookie unchanged by remember");
+ check(set.find("md_session=")==0&&set.find("HttpOnly; SameSite=Strict; Path=/; Max-Age=300")!=npos,"session cookie unchanged by remember");
  check(at!=npos&&set.find("HttpOnly; SameSite=Strict; Path=/wifi/session; Max-Age=34560000",at)!=npos,"device cookie protected and scoped to the session endpoint");
  std::string device=set.substr(at+10,64);check(device.size()==64&&device!=dev.portal_.cookie()&&device!=token,"device credential is neither the token nor the session");
  clock_ms+=1000;auto wrongrem=request(dev,"/wifi/login","token="+std::string(64,'b')+"&remember=1");run(wrongrem);
@@ -229,7 +239,7 @@ int main() {
  endpoints(true,0xc0a80401u,0xc0a80403u);logout("md_session="+live);endpoints();check(action(dev)==200,"another peer cannot end the session");
  auto out=logout("md_session="+live);
  check(out.status==200&&out.response=="LOGGED_OUT","logout accepted");
- check(out.response_headers["Set-Cookie"].find("md_session=; HttpOnly; SameSite=Strict; Path=/wifi/; Max-Age=0")!=npos&&out.response_headers["Set-Cookie"].find("md_device=; HttpOnly; SameSite=Strict; Path=/wifi/session; Max-Age=0")!=npos,"logout clears both cookies");
+ check(out.response_headers["Set-Cookie"].find("md_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0")!=npos&&out.response_headers["Set-Cookie"].find("md_device=; HttpOnly; SameSite=Strict; Path=/wifi/session; Max-Age=0")!=npos,"logout clears both cookies");
  writes=dev.service.mutations;check(action(dev,"/wifi/ap","on=1",live.c_str(),live_csrf.c_str())==403&&dev.service.mutations==writes,"session ended by logout");
  {auto r=request(dev,"/wifi/logout","");r.headers["Origin"]="http://evil.invalid";run(r);check(r.status==403,"logout requires the AP origin");}
  printf("AP_ONLY_TRANSPORT_PASS: %u checks (production paths; HTTPD/TLS/driver doubles)\n",checks);
@@ -242,7 +252,7 @@ cases='case HttpRequestKind::WIFI_STATUS:'+between(c,'case HttpRequestKind::WIFI
 lifecycle='void HttpTransport::lifecycleTick()'+between(c,'void HttpTransport::lifecycleTick()','bool HttpTransport::admitAdmin(')
 admit='bool HttpTransport::admitAdmin('+between(c,'bool HttpTransport::admitAdmin(','bool HttpTransport::dispatch(')
 register='bool HttpTransport::registerHandlers'+between(c,'bool HttpTransport::registerHandlers','void HttpTransport::lifecycle()')
-page='esp_err_t HttpTransport::handlePage'+between(c,'esp_err_t HttpTransport::handlePage','esp_err_t HttpTransport::handleWifi')
+page='esp_err_t HttpTransport::handlePage'+between(c,'esp_err_t HttpTransport::handlePage','esp_err_t HttpTransport::handleMotion')
 verify='bool WifiManager::verifyAdminRadio()'+between(w,'bool WifiManager::verifyAdminRadio()','// Arduino delivers role events asynchronously.')
 unit=fixture.replace('// PRODUCTION_TYPES',types).replace('// PRODUCTION_HELPERS',helpers+register+page+lifecycle+admit+verify).replace('// PRODUCTION_HANDLER',handler).replace('// PRODUCTION_SERVICE_CASES',cases)
 with tempfile.TemporaryDirectory(prefix='matdog-ap-only-') as d:

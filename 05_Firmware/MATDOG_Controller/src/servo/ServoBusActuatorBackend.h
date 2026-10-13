@@ -20,6 +20,7 @@ namespace servo {
 class ServoBusActuatorBackend final : public actuator::ActuatorBackend {
  public:
   void begin(ServoBus* bus) { bus_ = bus; }
+  actuator::BackendWriteOutcome reduceValidationOutputWhileOff(uint8_t id,uint16_t ceiling){return bus_?translate(bus_->reduceValidationOutputWhileOff(id,ceiling)):actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;}
   bool bound() const { return bus_ != nullptr; }
 
   actuator::BackendWriteOutcome enableTorque(uint8_t bus_id) override {

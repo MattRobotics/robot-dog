@@ -136,7 +136,7 @@ SafeOffResult ServoBus::safeOff(int id) {
   // — this is the safety de-escalation path, reachable from any
   // OperatingMode, and must not inherit a timeout tuned for
   // MAINTENANCE-only absence detection.
-  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+  ScopedIOTimeout guard(st_,validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs);
 
   // The write's own ACK (SCS::Ack(), via EnableTorque -> writeByte) is
   // informational only — see the SafeOffResult comment in ServoBus.h for
@@ -162,7 +162,7 @@ SafeOffResult ServoBus::safeOff(int id) {
 ServoWriteVerifyResult ServoBus::enableTorqueOn(int id) {
   if (id < 0 || id > 253) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
 
-  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+  ScopedIOTimeout guard(st_,validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs);
   st_.EnableTorque(static_cast<uint8_t>(id), 1);
 
   // Independent readback is the sole authority, matching safeOff()'s rule:
@@ -184,12 +184,26 @@ ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick,
   }
   const bool search = profile == GoalMotionProfile::SEARCH_ENVELOPE;
 
-  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+  ScopedIOTimeout guard(st_, validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs);
   st_.WritePosEx(
       static_cast<uint8_t>(id),
       static_cast<s16>(target_tick),
-      search ? kSearchEnvelopeSpeed : kBoundedWriteSpeed,
-      search ? kSearchEnvelopeAcceleration : kBoundedWriteAcceleration);
+      search ? kSearchEnvelopeSpeed : validation_speed_?validation_speed_:kBoundedWriteSpeed,
+      search ? kSearchEnvelopeAcceleration : validation_acceleration_?validation_acceleration_:kBoundedWriteAcceleration);
+
+  if(!search&&validation_speed_){
+    // The explicit validation profile requires independent SRAM readback of
+    // the complete holding command before MotionSession can enable torque.
+    uint8_t control[10]{};
+    if(st_.Read(static_cast<uint8_t>(id),SMS_STS_TORQUE_ENABLE,control,sizeof(control))!=static_cast<int>(sizeof(control))){
+      last_detected_=core::DetectedState::NO_RESPONSE;
+      return ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE;
+    }
+    auto word=[&](unsigned address){const unsigned i=address-SMS_STS_TORQUE_ENABLE;return static_cast<uint16_t>(control[i]|(control[i+1]<<8));};
+    last_detected_=core::DetectedState::ONLINE;
+    return word(SMS_STS_GOAL_POSITION_L)==target_tick&&word(SMS_STS_GOAL_SPEED_L)==validation_speed_&&control[SMS_STS_ACC-SMS_STS_TORQUE_ENABLE]==validation_acceleration_?
+        ServoWriteVerifyResult::VERIFIED_APPLIED:ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
+  }
 
   // Verified by reading back the internal GoalPosition register itself, not
   // present_position: present_position only catches up to the target over
@@ -218,11 +232,25 @@ ServoWriteVerifyResult ServoBus::writeReviewedRamTorqueLimit(int id) {
                                   static_cast<int32_t>(kReviewedRamTorqueLimit));
 }
 
+ServoWriteVerifyResult ServoBus::reduceValidationOutputWhileOff(int id,uint16_t ceiling){
+ if(id<0||id>253||!ceiling||ceiling>1000)return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
+ ScopedIOTimeout guard(st_,validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs);
+ // De-escalation only, SRAM address 48. No authority acquisition, no EEPROM.
+ if(st_.readByte(id,SMS_STS_TORQUE_ENABLE)!=0)return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
+ const int current=st_.readWord(id,SMS_STS_TORQUE_LIMIT_L);
+ if(current<0||current>1023||ceiling>current)return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
+ if(current!=ceiling)st_.writeWord(id,SMS_STS_TORQUE_LIMIT_L,ceiling);
+ return classifyServoWriteVerify(st_.readWord(id,SMS_STS_TORQUE_LIMIT_L),ceiling);
+}
 bool ServoBus::readControlFeedback(int id, ControlFeedbackSnapshot* out) {
+ return readControlFeedbackBudgeted(id,out,kOperationalTimeoutMs);
+}
+bool ServoBus::readControlFeedbackBudgeted(int id, ControlFeedbackSnapshot* out,uint32_t timeout_ms) {
   if (id < 0 || id > 253 || out == nullptr) return false;
   *out = ControlFeedbackSnapshot{};
 
-  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+  if(timeout_ms<2||timeout_ms>kOperationalTimeoutMs)return false;
+  ScopedIOTimeout guard(st_,timeout_ms);
 
   // Block 1: SMS_STS_TORQUE_ENABLE (40) .. SMS_STS_TORQUE_LIMIT_H (49).
   uint8_t control[SMS_STS_TORQUE_LIMIT_H - SMS_STS_TORQUE_ENABLE + 1] = {0};
@@ -248,6 +276,7 @@ bool ServoBus::readControlFeedback(int id, ControlFeedbackSnapshot* out) {
   const int f0 = SMS_STS_PRESENT_POSITION_L;
   out->torque_enable = control[SMS_STS_TORQUE_ENABLE - c0];
   out->goal_position = le16(control, SMS_STS_GOAL_POSITION_L - c0);
+  out->goal_speed=le16(control,SMS_STS_GOAL_SPEED_L-c0);out->goal_acceleration=control[SMS_STS_ACC-c0];
   out->torque_limit = le16(control, SMS_STS_TORQUE_LIMIT_L - c0);
   out->present_position = le16(feedback, SMS_STS_PRESENT_POSITION_L - f0);
   out->present_speed = le16(feedback, SMS_STS_PRESENT_SPEED_L - f0);

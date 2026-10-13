@@ -1,0 +1,1 @@
+MOTION_TRANSPORT_MODE = PASS (38 semantic checks; 2173 total including driver/queue/fence assertions). RUN_STA rejects AP administration; authenticated Motion TLS is tested separately. RUN recovery AP is compatible.

@@ -1,0 +1,22 @@
+# Dodici JointLimits — review, 0/12 approvati offline
+
+Fonti: gen1 del 6 ottobre (q0/fine2 nella matrice storica), contatti 24/24 del 1 ottobre e URDF. Sono proposte storiche per review, non letture attuali né limiti approvati. ADMIT rilegge il record acknowledged, confronta SHA/generation/identità e richiede 12/12 qualificati atomicamente. I margini sotto sottraggono il tube completo ±6 mrad ai range nominali; restano da verificare l’inset sui contatti, l’arrotondamento raw e il montaggio attuale.
+
+| Joint / bus | Proposta storica ° | Variante finale ° | WALK finale ° | Margine proposta dopo tube ° | Rischio / verifica richiesta |
+|---|---|---|---|---|---|
+| lf_hip_joint / 13 | -44.47266 / 43.94531 | -1.00000 / 0.00000 | -0.00000 / 0.00000 | 43.12888 | SHA/currentness gen1, physical unit M22, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking |
+| lf_upper_leg_joint / 12 | -52.50000 / 119.88281 | 23.48415 / 86.82118 | 10.11855 / 34.21829 | 32.71786 | SHA/currentness gen1, physical unit ELR01, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking; LF UPPER MIN residuale storico 1–3 tick: endpoint non qualificato, non richiesto dalla route |
+| lf_lower_leg_joint / 11 | -90.52734 / 32.78320 | -88.50000 / 20.02905 | 18.90268 / 27.45150 | 1.68357 | SHA/currentness gen1, physical unit M33, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking; −92° originale escluso; fixture finale front −88,5° / rear −89° |
+| rf_hip_joint / 23 | -43.85742 / 45.00000 | 0.00000 / 1.00000 | -0.00000 / 0.00000 | 43.51365 | SHA/currentness gen1, physical unit NEW01, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking |
+| rf_upper_leg_joint / 22 | -52.50000 / 119.13574 | 23.48415 / 86.82118 | 8.82048 / 33.58408 | 31.97079 | SHA/currentness gen1, physical unit ELR03, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking |
+| rf_lower_leg_joint / 21 | -89.38477 / 32.21191 | -88.50000 / 20.02905 | 18.90268 / 28.44766 | 0.54099 | SHA/currentness gen1, physical unit NEW03, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking; −92° originale escluso; fixture finale front −88,5° / rear −89° |
+| rh_hip_joint / 33 | -44.38477 / 43.11035 | 0.00000 / 1.00000 | -0.00000 / 0.00000 | 41.76658 | SHA/currentness gen1, physical unit NEW06, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking |
+| rh_upper_leg_joint / 32 | -51.59180 / 121.64062 | 51.47097 / 118.14591 | 41.41135 / 59.64651 | 3.15094 | SHA/currentness gen1, physical unit ELR02, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking |
+| rh_lower_leg_joint / 31 | -90.04395 / 32.78320 | -89.00000 / 0.04444 | -2.84272 / 8.61904 | 0.70017 | SHA/currentness gen1, physical unit NEW05, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking; −92° originale escluso; fixture finale front −88,5° / rear −89° |
+| lh_hip_joint / 43 | -45.00000 / 43.68164 | -1.00000 / 0.00000 | -0.00000 / 0.00000 | 43.33787 | SHA/currentness gen1, physical unit M43, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking |
+| lh_upper_leg_joint / 42 | -52.03125 / 120.80566 | 51.47097 / 118.14591 | 42.30539 / 59.90552 | 2.31598 | SHA/currentness gen1, physical unit M42, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking |
+| lh_lower_leg_joint / 41 | -89.91211 / 32.51953 | -89.00000 / 0.04444 | -2.84235 / 9.61764 | 0.56833 | SHA/currentness gen1, physical unit M41, mapping, fine2/inset e limiti raw; freshness/rates/ceiling/tracking; −92° originale escluso; fixture finale front −88,5° / rear −89° |
+
+Il ramo storico WALK con sway 40 mm arriva a RF LOWER +33,19762° (con tube +33,54139°), oltre +32,21191° proposti. Il candidato usa **sway 30 mm**, lift/advance 5 mm invariati, RF LOWER massimo +28,44766°: il difetto è risolto sul target, senza allargare il limite. Certificato specifico 19.080 intervalli e dodici adiacenti PASS. Il lift ridotto a 2 mm, provato solo come probe locale, non risolveva il picco e non è adottato.
+
+ADMIT rifiuta qualunque limite raw che non contenga la falcata ±tube prima del grant. I margini non qualificano velocità/accelerazione, compliance, forze o dinamica. BNO085/encoder/BMS non provano appoggio. Se un dato corrente non è qualificabile: joint BLOCKED, scope WALK negato; STAND scope 3 resta indipendente. [Matrice storica con ID/direction/fonti](../Motion_Hardware_Readiness_2026-10-13/JOINT_LIMITS.md).

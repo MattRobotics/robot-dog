@@ -115,7 +115,7 @@ class HttpTransport {
  FakeService service; FakeService*service_=&service; PortalSession portal_;
  struct {bool sessionAuthenticated(){return false;}}session_;
  static esp_err_t handleWifi(httpd_req_t*);
- void wifiResponse(HttpTransportResponse&r){r.ok=true;strcpy(r.text,"{}");r.text_len=2;}
+ void wifiResponse(HttpTransportResponse&r,bool=false){r.ok=true;strcpy(r.text,"{}");r.text_len=2;}
  bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out){
   HttpTransportResponse resp{};[[maybe_unused]] const uint32_t now_ms=static_cast<uint32_t>(clock_ms);
   switch(req.kind){
@@ -152,7 +152,7 @@ int main(int argc,char**){
  auto login=request(s,"/wifi/login","token="+token);run(login);
  if(original){check(login.status==403 && login.response=="Protected AP origin required","original mapped AP reproduces recorded 403");HttpTransportRequest facts{};check(socketFacts(&login,facts)&&!facts.ap_socket&&facts.peer==0,"original reads IPv6 flowinfo as IPv4 and loses peer");printf("ORIGINAL_DEFECT_REPRODUCED: %u checks; correct headers, mapped AP accepted socket, zero mutations\n",checks);return 0;}
  check(login.status==200,"mapped AP browser login");
- check(login.response_headers["Set-Cookie"].find("HttpOnly; SameSite=Strict; Path=/wifi/; Max-Age=300")!=std::string::npos,"cookie protections");
+ check(login.response_headers["Set-Cookie"].find("HttpOnly; SameSite=Strict; Path=/; Max-Age=300")!=std::string::npos,"cookie protections");
  HttpTransportRequest facts{};check(socketFacts(&login,facts)&&facts.ap_socket&&facts.peer==htonl(0xc0a80402u),"mapped AP and peer extracted");
  for(bool mapped:{false,true}){endpoints(mapped);for(const char*host:{"192.168.4.1","192.168.4.1:80"})for(const char*origin:{"http://192.168.4.1","http://192.168.4.1:80"}){HttpTransport x;provision(x);auto r=request(x,"/wifi/login","token="+token,host,origin);run(r);check(r.status==200,"IPv4/mapped explicit allowed header variants");}}
  endpoints();

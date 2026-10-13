@@ -296,24 +296,24 @@ bool clean(WifiManager &m) { // no radio fault, no error=11
 int main() {
   // ---- the pure decision ---------------------------------------------------------
   using R = RoleReason;
-  for (int bits = 0; bits < 8; ++bits) {
+  for (int bits = 0; bits < 16; ++bits) {
     RoleInputs in;
-    in.run = bits & 1; in.sta_profile = bits & 2; in.recovery = bits & 4;
+    in.run = bits & 1; in.sta_profile = bits & 2; in.recovery = bits & 4; in.maintenance_lan = bits & 8;
     const R r = selectRole(in);
-    if (!in.run) CHECK(r == R::MAINTENANCE_AP);          // maintenance outranks everything stored
+    if (!in.run) CHECK(r == (in.maintenance_lan && in.sta_profile && !in.recovery ? R::MAINTENANCE_STA_READONLY : R::MAINTENANCE_AP));
     else if (!in.sta_profile) CHECK(r == R::RUN_NO_PROFILE_AP);
     else CHECK(r == (in.recovery ? R::RUN_RECOVERY_AP : R::RUN_STA));
-    CHECK(roleIsSta(r) == (in.run && in.sta_profile && !in.recovery));
+    CHECK(roleIsSta(r) == ((in.run || in.maintenance_lan) && in.sta_profile && !in.recovery));
   }
   // The decision has exactly these inputs: the old "AP always" flag is not one.
-  CHECK(sizeof(RoleInputs) == 3 * sizeof(bool));
+  CHECK(sizeof(RoleInputs) == 4 * sizeof(bool));
   CHECK(recoveryDwellMs(0, 900000) == 60000 && recoveryDwellMs(1, 900000) == 120000);
   CHECK(recoveryDwellMs(3, 900000) == 480000 && recoveryDwellMs(4, 900000) == 900000);
   CHECK(recoveryDwellMs(200, 900000) == 900000 && recoveryDwellMs(5, 60000) == 60000);
   std::map<std::string, int> names;
   for (int i = 0; i <= 3; ++i) ++names[toString(static_cast<R>(i))];
   CHECK(names.size() == 4 && !names.count("UNKNOWN"));
-  CHECK(std::string(toString(static_cast<R>(4))) == "UNKNOWN"); // the forced-AP role no longer exists
+  CHECK(std::string(toString(static_cast<R>(5))) == "UNKNOWN"); // the forced-AP role no longer exists
 
   // ---- 1. boot in MAINTENANCE with a router already configured -> AP ---------------
   {

@@ -1,0 +1,10 @@
+test_binary_mutation (__main__.ReceiptTests.test_binary_mutation) ... ok
+test_manifest_mutations (__main__.ReceiptTests.test_manifest_mutations) ... ok
+test_partition_mutation (__main__.ReceiptTests.test_partition_mutation) ... ok
+test_source_inventory_mutation (__main__.ReceiptTests.test_source_inventory_mutation) ... ok
+test_verified_software_still_refuses_flash (__main__.ReceiptTests.test_verified_software_still_refuses_flash) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.453s
+
+OK

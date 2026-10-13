@@ -491,6 +491,11 @@ CALREC_SRCS=(
   "$SKETCH_DIR/src/core/CommandRouter.cpp" \
   "$SKETCH_DIR/src/calibration/StartupRecoveryQualification.cpp" \
   "$SKETCH_DIR/src/core/CommandRouterPersistence.cpp" \
+  "$SKETCH_DIR/src/core/MotionService.cpp" \
+  "$SKETCH_DIR/src/core/MotionJson.cpp" \
+  "$SKETCH_DIR/src/execution/MotionExecutor.cpp" \
+  "$SKETCH_DIR/src/motion/MotionContract.cpp" \
+  "$SKETCH_DIR/src/calibration/CalibrationRuntimeRestore.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationSaveGate.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationQ0CaptureSession.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationQ0EvidencePreparation.cpp" \

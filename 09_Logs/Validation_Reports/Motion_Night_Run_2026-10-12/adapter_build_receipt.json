@@ -1,0 +1,66 @@
+{
+  "core_adapter": {
+    "command": [
+      "g++",
+      "-std=c++17",
+      "-O2",
+      "-shared",
+      "-fPIC",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-I",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/06_Software/Matdog_Core/motion/paired_prone/core_adapter.cpp",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp",
+      "-o",
+      "/home/matteo-manicardi/MATDOG/verification-artifacts/MOTION_NIGHT_RUN_20261012/adapter_verify/core_adapter.so"
+    ],
+    "source_sha256": {
+      "06_Software/Matdog_Core/motion/paired_prone/core_adapter.cpp": "a9d23a6e1c48a8a4cbd515bf37213c67c5efcf119b48aadf9d23097dc1f2b8b5",
+      "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "b1749fa338b619c13b5c6be322a18a14d3d4957709a0dec66df1b92aa06ec6b7",
+      "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp": "824e9bd8381d058cdc67dcb072c5bf51f23b47b6b7aef6df3d06f14b040aef57",
+      "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "0ce86767cf1c9a7b31975a397b5e26bd439da0814fba060cc8b6dec14d0c0d90",
+      "05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp": "cde2c92e30befbc192e02c226178759aa6e4163cba619f73fcf830adb42447d0",
+      "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "fb75ce615dd017683a053233947aebb9f8afcab673953c54e0bad5ab43f9858a"
+    },
+    "library_sha256": "2d4ee3e048b8a0076a0e82a823bd31a2cc7a3ca61c10d5a34201d9b1ed35678e"
+  },
+  "walk_adapter": {
+    "command": [
+      "g++",
+      "-std=c++17",
+      "-O2",
+      "-shared",
+      "-fPIC",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-I",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/06_Software/Matdog_Core/motion/paired_prone/walk_adapter.cpp",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp",
+      "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp",
+      "-o",
+      "/home/matteo-manicardi/MATDOG/verification-artifacts/MOTION_NIGHT_RUN_20261012/adapter_verify/walk_adapter.so"
+    ],
+    "source_sha256": {
+      "06_Software/Matdog_Core/motion/paired_prone/walk_adapter.cpp": "6be1666d171423b29d776e7a0ed58b72b0a3021e83ea507180c9ff4b30499d18",
+      "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "b1749fa338b619c13b5c6be322a18a14d3d4957709a0dec66df1b92aa06ec6b7",
+      "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp": "824e9bd8381d058cdc67dcb072c5bf51f23b47b6b7aef6df3d06f14b040aef57",
+      "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "0ce86767cf1c9a7b31975a397b5e26bd439da0814fba060cc8b6dec14d0c0d90",
+      "05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp": "cde2c92e30befbc192e02c226178759aa6e4163cba619f73fcf830adb42447d0",
+      "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "a6c497c393641577988d9773f001a4280e875422bc22d7588bd2fb8979198823",
+      "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp": "1917bf8d7514822f824c06186629254cf3b8cefc8125489f42824061b33b07f5"
+    },
+    "library_sha256": "c48437985cc704d0ad39131b92c29dca2e08c7ed69f132c39811d09029295f3f"
+  }
+}

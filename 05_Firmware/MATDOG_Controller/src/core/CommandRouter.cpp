@@ -99,6 +99,7 @@ bool CommandRouter::motionExecutorBusy() const {
     startup->phase()!=calibration::StartupQualificationPhase::READY &&
     startup->phase()!=calibration::StartupQualificationPhase::COMPLETE &&
     startup->phase()!=calibration::StartupQualificationPhase::REFUSED;
+  if(modules_.service && modules_.service->motionActive())return true;
   return modules_.first_motion->active() || modules_.full_leg_calibration->active() || observing;
 }
 
@@ -221,6 +222,18 @@ void CommandRouter::handleLine(String line) {
 
   String upper = line;
   upper.toUpperCase();
+  if(upper.startsWith("@MOTION VALIDATION ")) {
+    char response[768]{};
+    if(modules_.validation_command)
+      modules_.validation_command(modules_.validation_context,line.c_str()+19,millis(),response,sizeof(response));
+    else snprintf(response,sizeof(response),"VALIDATION=REFUSED REASON=ADAPTER_NOT_BOUND");
+    Serial.println(response);return;
+  }
+  if (upper == "@WIFI LAN ON" || upper == "@WIFI LAN OFF") {
+    if (modules_.authority->current()!=ActuatorAuthority::NONE || modules_.operating_mode->mode()!=OperatingMode::MAINTENANCE) { Serial.println("LAN=REJECT_MODE_OR_OWNER"); return; }
+    modules_.wifi->setMaintenanceLan(upper == "@WIFI LAN ON");
+    Serial.println("LAN=REQUESTED_READ_ONLY_ROLE; ASUS_TRANSPORT_MUST_BE_INDEPENDENT"); return;
+  }
   // Network flash transactions reserve the quiet window before enqueueing.
   // Existing STOP/ABORT and read-only status commands remain available.
   if (modules_.wifi && modules_.wifi->configBusy() && upper.startsWith("@CALIBRATION") &&
@@ -371,6 +384,8 @@ void CommandRouter::handleLine(String line) {
       Serial.println("REASON=NETWORK_REQUEST_BUSY_OR_UNAVAILABLE");
     }
     printWifiStatus();
+  } else if (upper.startsWith("@CALIBRATION RESTORE")) {
+    handleRuntimeRestoreCommand(upper);
   } else if (isPersistCommand(upper)) {
     handlePersistCommand(upper);
   } else if (upper == "@CALIBRATION Q0 STATUS") {
@@ -1943,7 +1958,8 @@ void CommandRouter::printSourceSignature() {
                 update::kLayoutId, (unsigned)schemas.record_schema,
                 (unsigned)schemas.marker_schema,
                 update::OtaManager::ingestEnabled() ? 1U : 0U, build::kMotionStack);
-  Serial.printf("  BUILD_UTC=%s APP_SHA256=ASSOCIATED_MANIFEST RESTORE=NOT_IMPLEMENTED\n",
+  Serial.printf("  SUPERVISED_VALIDATION_CAPABLE=%u BOOT_MOTION_AUTHORIZED=0 LOCAL_PROFILE=RAM_ONLY\n",build::kSupervisedValidationCapable?1u:0u);
+  Serial.printf("  BUILD_UTC=%s APP_SHA256=ASSOCIATED_MANIFEST RESTORE=LOCAL_EXPLICIT_RAM_ONLY\n",
                 build::kBuildUtc);
   Serial.printf("  ota_running_build_id=%s ota_running_image_state=%s reset_reason=%s\n",
                 o.running_build_id, update::toString(o.policy.running_image_state),

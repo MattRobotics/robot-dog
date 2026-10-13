@@ -42,19 +42,27 @@
 #define MATDOG_ACTIVE_HARDWARE_PROFILE ::matdog::config::HardwareProfile::USB_ONLY
 #endif
 
+// Capability only: no authority at boot or from this macro.
+#ifndef MATDOG_SUPERVISED_VALIDATION
+#define MATDOG_SUPERVISED_VALIDATION 0
+#endif
 namespace matdog {
 namespace build {
 
 constexpr const char* kFirmwareName    = "MATDOG Controller";
 
 // This is a software development candidate, with hardware gates still held.
-constexpr const char* kFirmwareVersion = "0.2.0-dev.3";
+constexpr const char* kFirmwareVersion = "0.2.0-dev.4";
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;
 constexpr bool kGitDirty              = MATDOG_GIT_DIRTY != 0;
 constexpr const char* kBuildUtc        = MATDOG_BUILD_UTC;
-constexpr const char* kMotionStack     = "G1_G5A_COMPILED_UNWIRED";
+constexpr const char* kMotionStack     = "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED";
+// A new source review is required for any operationally authorized image.
+// There is deliberately no build override or HTTP authority flag.
+constexpr bool kOperationalMotionAuthorized = false;
+constexpr bool kSupervisedValidationCapable = MATDOG_SUPERVISED_VALIDATION == 1;
 
 // The active profile and everything derived from it. kProfileExpectations
 // is the value every module consults (via core::expectedStateFor*()) to

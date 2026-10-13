@@ -430,7 +430,9 @@ class TestUploadAndScripts(unittest.TestCase):
 
     def test_flash_script_checks_layout_before_the_single_write(self):
         text = (SCRIPTS / "flash_app_only.sh").read_text()
-        write = text.index('"$ESPTOOL" --chip esp32s3 --port "$PORT" write-flash')
+        invocation = re.search(r'"\$ESPTOOL" --chip esp32s3 --port "\$PORT"[^\n]* write-flash', text)
+        self.assertIsNotNone(invocation)
+        write = invocation.start()
         for needle in ("matdog_layout.py\" check-write", "--expected-table-sha256",
                        "VERIFIED_LAYOUT_ID", "backup_gate_logic.py", "read-mac"):
             idx = text.index(needle)

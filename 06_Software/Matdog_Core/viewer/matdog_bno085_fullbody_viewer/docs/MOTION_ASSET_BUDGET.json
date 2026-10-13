@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "measured_date": "2026-10-12",
+  "integration": "host_served_link_only",
+  "embedded_portal_utf8_bytes": 55776,
+  "motion_fragment_utf8_bytes": 17774,
+  "canonical_assets_bytes": 6019607,
+  "host_dist_bytes": 8907951,
+  "host_dist_gzip_sum_bytes": 2637945,
+  "app_partition_bytes": 5242880,
+  "ffat_partition_bytes": 6094848,
+  "fits_app_uncompressed": false,
+  "fits_existing_ffat_uncompressed": false,
+  "ffat_shortfall_bytes": 2813103,
+  "canonical_urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+  "collision_mesh_count": 17,
+  "asset_files": [
+    {
+      "path": "assets/index-ByqyU6O3.js",
+      "bytes": 581261,
+      "sha256": "820667c7ba2dcab34da328da2efd9e03ab8685739215cb94152b2224080e2ceb"
+    },
+    {
+      "path": "assets/index-DqCDLfYX.css",
+      "bytes": 3160,
+      "sha256": "958250ac527a0d0ef73cb1cfac0720a5500d73c41d87ead6bf948e4c5cb3d8fe"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/CANONICAL_PROVENANCE.json",
+      "bytes": 7144,
+      "sha256": "7f849a1c83984611824e3f5aba3ca9f1d475f602276b9e07b29e4590a9798aa9"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/matt_robodog_rev00.urdf",
+      "bytes": 26235,
+      "sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/base_link.stl",
+      "bytes": 1102284,
+      "sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/lf_foot_link.stl",
+      "bytes": 112484,
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/lf_hip_link.stl",
+      "bytes": 300884,
+      "sha256": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl",
+      "bytes": 616884,
+      "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl",
+      "bytes": 190184,
+      "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/lh_foot_link.stl",
+      "bytes": 112484,
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/lh_hip_link.stl",
+      "bytes": 300984,
+      "sha256": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl",
+      "bytes": 616884,
+      "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl",
+      "bytes": 190184,
+      "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/rf_foot_link.stl",
+      "bytes": 112484,
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/rf_hip_link.stl",
+      "bytes": 300884,
+      "sha256": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl",
+      "bytes": 617684,
+      "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl",
+      "bytes": 190384,
+      "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/rh_foot_link.stl",
+      "bytes": 112484,
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/rh_hip_link.stl",
+      "bytes": 300984,
+      "sha256": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl",
+      "bytes": 617684,
+      "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    {
+      "path": "canonical/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl",
+      "bytes": 190384,
+      "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    {
+      "path": "index.html",
+      "bytes": 5952,
+      "sha256": "46375ce7406110f393fb35994f9a39eb03408b35674a33253ded6816dd4f7953"
+    },
+    {
+      "path": "motion/TRACE_PROVENANCE.json",
+      "bytes": 294,
+      "sha256": "efda7d9d91eb7c366c86ad0ec4c6364512c2e9e8d697e4d60161a46e5cd011c8"
+    },
+    {
+      "path": "motion/adaptive_motion_synthetic.jsonl",
+      "bytes": 2297677,
+      "sha256": "5457e095df85e543bd986e0c38c06a226bbcbd25a832869d7372134bd289aff3"
+    }
+  ],
+  "firmware_layout_modified": false,
+  "firmware_3d_asset_storage_written": false,
+  "notes": [
+    "Measured host output is not bundled in firmware.",
+    "The app partition stores firmware; its free margin must be measured by the full firmware build.",
+    "No asset-partition write is included in APP-ONLY procedure.",
+    "Optional offline trace was staged for this demo; host_dist_core_bytes excludes motion/ replay files. Both sizes exceed the existing FFAT partition."
+  ],
+  "offline_trace_assets_bytes": 2297971,
+  "host_dist_core_bytes": 6609980
+}

@@ -1221,7 +1221,7 @@ def main():
          r"bool ServoBus::readRuntimeState\(int id, RuntimeState\* out\) \{",
          "void ServoBus::rogue(int id) { st_.writeWord((uint8_t)id, 31, 0); }\n"
          "bool ServoBus::readRuntimeState(int id, RuntimeState* out) {",
-         "exactly one raw writeWord()", runner=run_servo_write_checks)
+         "exactly two reviewed raw writeWord()", runner=run_servo_write_checks)
     case("a raw byte write appears", BUS_CPP,
          r"bool ServoBus::readRuntimeState\(int id, RuntimeState\* out\) \{",
          "void ServoBus::rogue(int id) { st_.writeByte((uint8_t)id, 5, 1); }\n"

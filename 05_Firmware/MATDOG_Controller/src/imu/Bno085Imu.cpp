@@ -117,6 +117,7 @@ void Bno085Imu::update(uint32_t now_ms) {
         rv_accuracy_ = sensor_value_.un.rotationVector.accuracy;
         rv_status_ = sensor_value_.status;
         rv_count_++;
+        last_rv_ms_=now_ms;
         break;
 
       case SH2_ACCELEROMETER:

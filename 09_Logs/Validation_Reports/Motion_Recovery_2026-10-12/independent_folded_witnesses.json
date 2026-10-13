@@ -1,0 +1,1383 @@
+{
+  "schema": "MATDOG_PRONE_INDEPENDENT_WITNESSES_V1",
+  "hardware_access": false,
+  "physical_readiness": false,
+  "link_count": 17,
+  "collision_mesh_count": 17,
+  "nonadjacent_pairs": 120,
+  "obstruction_pairs": 132,
+  "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+  "meshes": {
+    "base_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl",
+      "sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f"
+    },
+    "lf_hip_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl",
+      "sha256": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97"
+    },
+    "lf_upper_leg_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl",
+      "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    "lf_lower_leg_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl",
+      "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    "lf_foot_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl",
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    "rf_hip_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl",
+      "sha256": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33"
+    },
+    "rf_upper_leg_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl",
+      "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    "rf_lower_leg_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl",
+      "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    "rf_foot_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl",
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    "rh_hip_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl",
+      "sha256": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea"
+    },
+    "rh_upper_leg_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl",
+      "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    "rh_lower_leg_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl",
+      "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    "rh_foot_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl",
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    "lh_hip_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl",
+      "sha256": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da"
+    },
+    "lh_upper_leg_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl",
+      "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    "lh_lower_leg_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl",
+      "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    "lh_foot_link": {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl",
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    }
+  },
+  "sampling_cannot_prove_continuous_clearance": true,
+  "candidates": [
+    {
+      "id": "rear_first_fold_margin_0.03",
+      "trace_sha256": "d7d74aaf9c193f6f8c4404fff4d68e30ca6f76035faa71e02fcafad8d881f783",
+      "evaluated_poses": {
+        "initial": {
+          "frame": 0,
+          "q_rad": {
+            "lf_hip_joint": 0.06651081085363081,
+            "lf_upper_leg_joint": 1.5707963267948966,
+            "lf_lower_leg_joint": -1.5757029118349999,
+            "rf_hip_joint": -0.06665968507769685,
+            "rf_upper_leg_joint": 1.5707963267948966,
+            "rf_lower_leg_joint": -1.5757029118349999,
+            "rh_hip_joint": -0.45106345548318955,
+            "rh_upper_leg_joint": 1.5707963267948966,
+            "rh_lower_leg_joint": -1.5757029118349999,
+            "lh_hip_joint": 0.45090304651579804,
+            "lh_upper_leg_joint": 1.5707963267948966,
+            "lh_lower_leg_joint": -1.5757029118349999
+          },
+          "base_position_m": [
+            0.0,
+            0.0,
+            1.0928757898653885e-16
+          ],
+          "rotation_world_from_base": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "plane_world": "Z=0",
+          "plane_by_link": {
+            "base_link": {
+              "minimum_z_m": 0.0,
+              "lowest_vertex_world_m": [
+                -0.13080000305175782,
+                -0.04551471710205078,
+                0.0
+              ],
+              "expected_belly_contact": true
+            },
+            "lf_hip_link": {
+              "minimum_z_m": 0.03527487407315405,
+              "lowest_vertex_world_m": [
+                0.085,
+                0.048247695075848626,
+                0.03527487407315405
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_upper_leg_link": {
+              "minimum_z_m": 0.033917692997570456,
+              "lowest_vertex_world_m": [
+                0.028532630920410154,
+                0.07723591860885042,
+                0.033917692997570456
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_lower_leg_link": {
+              "minimum_z_m": 0.0019296236297900709,
+              "lowest_vertex_world_m": [
+                0.12775079368072584,
+                0.08955521203211714,
+                0.0019296236297900709
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_foot_link": {
+              "minimum_z_m": -9.96177565567788e-10,
+              "lowest_vertex_world_m": [
+                0.12977407151633316,
+                0.09223939332087933,
+                -9.96177565567788e-10
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_hip_link": {
+              "minimum_z_m": 0.035274985510072125,
+              "lowest_vertex_world_m": [
+                0.085,
+                -0.048249366199469075,
+                0.035274985510072125
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_upper_leg_link": {
+              "minimum_z_m": 0.03392212004879809,
+              "lowest_vertex_world_m": [
+                0.028532630920410154,
+                -0.07723779146050891,
+                0.03392212004879809
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_lower_leg_link": {
+              "minimum_z_m": 0.0019358850607446975,
+              "lowest_vertex_world_m": [
+                0.12775079368072584,
+                -0.089561846946245,
+                0.0019358850607446975
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_foot_link": {
+              "minimum_z_m": -9.967281405613704e-10,
+              "lowest_vertex_world_m": [
+                0.12977407151633316,
+                -0.09214653718942994,
+                -9.967281405613704e-10
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_hip_link": {
+              "minimum_z_m": 0.015295096898891365,
+              "lowest_vertex_world_m": [
+                -0.14,
+                -0.04850630320223323,
+                0.015295096898891365
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.02585059508607447,
+              "lowest_vertex_world_m": [
+                -0.17041542434692383,
+                -0.07928291341386688,
+                0.02585059508607447
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": 0.0007346868251412366,
+              "lowest_vertex_world_m": [
+                -0.09659938215157937,
+                -0.1019250652178792,
+                0.0007346868251412366
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_foot_link": {
+              "minimum_z_m": -9.895407080545704e-10,
+              "lowest_vertex_world_m": [
+                -0.09592991393792534,
+                -0.10573250162592546,
+                -9.895407080545704e-10
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_hip_link": {
+              "minimum_z_m": 0.015294935622991392,
+              "lowest_vertex_world_m": [
+                -0.14,
+                0.04850450582235816,
+                0.015294935622991392
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_upper_leg_link": {
+              "minimum_z_m": 0.02584549683012985,
+              "lowest_vertex_world_m": [
+                -0.17041542434692383,
+                0.07928280883459199,
+                0.02584549683012985
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_lower_leg_link": {
+              "minimum_z_m": 0.0007259568881509745,
+              "lowest_vertex_world_m": [
+                -0.09659938215157937,
+                0.10192093153040933,
+                0.0007259568881509745
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_foot_link": {
+              "minimum_z_m": -9.956480488161612e-10,
+              "lowest_vertex_world_m": [
+                -0.09593098845144558,
+                0.10580772376289713,
+                -9.956480488161612e-10
+              ],
+              "expected_belly_contact": false
+            }
+          },
+          "mesh_collision": false,
+          "first_intersection_pair": null,
+          "nonadjacent_worst_pair": {
+            "link_a": "lf_hip_link",
+            "link_b": "lf_lower_leg_link",
+            "status": "SEPARATED_NARROW",
+            "clearance_m": 0.001,
+            "clearance_kind": "LOWER_BOUND",
+            "witness_triangle_a": null,
+            "witness_triangle_b": null
+          },
+          "signed_penetration_depth_m": null,
+          "contact_load_unknown": true,
+          "continuous_clearance_qualified": false
+        },
+        "last_before_failure": {
+          "frame": 23,
+          "q_rad": {
+            "lf_hip_joint": 0.0,
+            "lf_upper_leg_joint": 1.5707963267948966,
+            "lf_lower_leg_joint": -1.5757029118349999,
+            "rf_hip_joint": -0.0,
+            "rf_upper_leg_joint": 1.5707963267948966,
+            "rf_lower_leg_joint": -1.5757029118349999,
+            "rh_hip_joint": -0.7187521756212791,
+            "rh_upper_leg_joint": 1.6292503879823828,
+            "rh_lower_leg_joint": -1.329311305658572,
+            "lh_hip_joint": 0.7187521756212791,
+            "lh_upper_leg_joint": 1.6292503879823828,
+            "lh_lower_leg_joint": -1.329311305658572
+          },
+          "base_position_m": [
+            0.0,
+            0.0,
+            0.019546508183595875
+          ],
+          "rotation_world_from_base": [
+            [
+              0.9887710779360422,
+              -0.0,
+              -0.14943813247359922
+            ],
+            [
+              0.0,
+              1.0,
+              -0.0
+            ],
+            [
+              0.14943813247359922,
+              0.0,
+              0.9887710779360422
+            ]
+          ],
+          "plane_world": "Z=0",
+          "plane_by_link": {
+            "base_link": {
+              "minimum_z_m": 0.0,
+              "lowest_vertex_world_m": [
+                -0.12933126001152417,
+                -0.04551471710205078,
+                0.0
+              ],
+              "expected_belly_contact": true
+            },
+            "lf_hip_link": {
+              "minimum_z_m": 0.0671029299410973,
+              "lowest_vertex_world_m": [
+                0.07877784745486922,
+                0.04749999999999999,
+                0.0671029299410973
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_upper_leg_link": {
+              "minimum_z_m": 0.05534865383915047,
+              "lowest_vertex_world_m": [
+                0.023445695017179524,
+                0.11527279281616211,
+                0.05534865383915047
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_lower_leg_link": {
+              "minimum_z_m": 0.03211350221242751,
+              "lowest_vertex_world_m": [
+                0.005206176582844387,
+                0.0865,
+                0.03211350221242751
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_foot_link": {
+              "minimum_z_m": 0.03591898907050594,
+              "lowest_vertex_world_m": [
+                0.12635486890525174,
+                0.08905000019073486,
+                0.03591898907050594
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_hip_link": {
+              "minimum_z_m": 0.0671029299410973,
+              "lowest_vertex_world_m": [
+                0.07877784745486922,
+                -0.0615,
+                0.0671029299410973
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_upper_leg_link": {
+              "minimum_z_m": 0.05534865383915047,
+              "lowest_vertex_world_m": [
+                0.023445695017179524,
+                -0.11527279281616211,
+                0.05534865383915047
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_lower_leg_link": {
+              "minimum_z_m": 0.03211350221242751,
+              "lowest_vertex_world_m": [
+                0.005206176582844387,
+                -0.1015,
+                0.03211350221242751
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_foot_link": {
+              "minimum_z_m": 0.03591898907050594,
+              "lowest_vertex_world_m": [
+                0.12635486890525174,
+                -0.09894999980926514,
+                0.03591898907050594
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_hip_link": {
+              "minimum_z_m": 0.013704028321722062,
+              "lowest_vertex_world_m": [
+                -0.14070689750638748,
+                -0.0474523343507231,
+                0.013704028321722062
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.027549527481731586,
+              "lowest_vertex_world_m": [
+                -0.20060073611354462,
+                -0.07456561817711437,
+                0.027549527481731586
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": -9.960434317612954e-10,
+              "lowest_vertex_world_m": [
+                -0.11366468676921138,
+                -0.12220171338251501,
+                -9.960434317612954e-10
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_foot_link": {
+              "minimum_z_m": 1.4788455144194856e-05,
+              "lowest_vertex_world_m": [
+                -0.11212285475764298,
+                -0.1265016532108398,
+                1.4788455144194856e-05
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_hip_link": {
+              "minimum_z_m": 0.013704028321722062,
+              "lowest_vertex_world_m": [
+                -0.14070689750638748,
+                0.0474523343507231,
+                0.013704028321722062
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_upper_leg_link": {
+              "minimum_z_m": 0.027549527481731586,
+              "lowest_vertex_world_m": [
+                -0.20060073611354462,
+                0.07456561817711437,
+                0.027549527481731586
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_lower_leg_link": {
+              "minimum_z_m": -9.960434317612954e-10,
+              "lowest_vertex_world_m": [
+                -0.11366468676921138,
+                0.12220171338251501,
+                -9.960434317612954e-10
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_foot_link": {
+              "minimum_z_m": 1.874112241618403e-05,
+              "lowest_vertex_world_m": [
+                -0.11213180882365953,
+                0.12656087265482807,
+                1.874112241618403e-05
+              ],
+              "expected_belly_contact": false
+            }
+          },
+          "mesh_collision": false,
+          "first_intersection_pair": null,
+          "nonadjacent_worst_pair": {
+            "link_a": "lf_hip_link",
+            "link_b": "lf_lower_leg_link",
+            "status": "SEPARATED_NARROW",
+            "clearance_m": 0.001,
+            "clearance_kind": "LOWER_BOUND",
+            "witness_triangle_a": null,
+            "witness_triangle_b": null
+          },
+          "signed_penetration_depth_m": null,
+          "contact_load_unknown": true,
+          "continuous_clearance_qualified": false
+        },
+        "failure": {
+          "frame": 24,
+          "q_rad": {
+            "lf_hip_joint": 0.0,
+            "lf_upper_leg_joint": 1.5707963267948966,
+            "lf_lower_leg_joint": -1.5757029118349999,
+            "rf_hip_joint": -0.0,
+            "rf_upper_leg_joint": 1.5707963267948966,
+            "rf_lower_leg_joint": -1.5757029118349999,
+            "rh_hip_joint": -0.785398163397,
+            "rh_upper_leg_joint": 1.6574171885522815,
+            "rh_lower_leg_joint": -1.2105845124763353,
+            "lh_hip_joint": 0.45090304651579804,
+            "lh_upper_leg_joint": 1.5707963267948966,
+            "lh_lower_leg_joint": -1.5757029118349999
+          },
+          "base_position_m": [
+            0.0,
+            0.0,
+            0.019546508183595875
+          ],
+          "rotation_world_from_base": [
+            [
+              0.9887710779360422,
+              -0.0,
+              -0.14943813247359922
+            ],
+            [
+              0.0,
+              1.0,
+              -0.0
+            ],
+            [
+              0.14943813247359922,
+              0.0,
+              0.9887710779360422
+            ]
+          ],
+          "plane_world": "Z=0",
+          "plane_by_link": {
+            "base_link": {
+              "minimum_z_m": 0.0,
+              "lowest_vertex_world_m": [
+                -0.12933126001152417,
+                -0.04551471710205078,
+                0.0
+              ],
+              "expected_belly_contact": true
+            },
+            "lf_hip_link": {
+              "minimum_z_m": 0.0671029299410973,
+              "lowest_vertex_world_m": [
+                0.07877784745486922,
+                0.04749999999999999,
+                0.0671029299410973
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_upper_leg_link": {
+              "minimum_z_m": 0.05534865383915047,
+              "lowest_vertex_world_m": [
+                0.023445695017179524,
+                0.11527279281616211,
+                0.05534865383915047
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_lower_leg_link": {
+              "minimum_z_m": 0.03211350221242751,
+              "lowest_vertex_world_m": [
+                0.005206176582844387,
+                0.0865,
+                0.03211350221242751
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_foot_link": {
+              "minimum_z_m": 0.03591898907050594,
+              "lowest_vertex_world_m": [
+                0.12635486890525174,
+                0.08905000019073486,
+                0.03591898907050594
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_hip_link": {
+              "minimum_z_m": 0.0671029299410973,
+              "lowest_vertex_world_m": [
+                0.07877784745486922,
+                -0.0615,
+                0.0671029299410973
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_upper_leg_link": {
+              "minimum_z_m": 0.05534865383915047,
+              "lowest_vertex_world_m": [
+                0.023445695017179524,
+                -0.11527279281616211,
+                0.05534865383915047
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_lower_leg_link": {
+              "minimum_z_m": 0.03211350221242751,
+              "lowest_vertex_world_m": [
+                0.005206176582844387,
+                -0.1015,
+                0.03211350221242751
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_foot_link": {
+              "minimum_z_m": 0.03591898907050594,
+              "lowest_vertex_world_m": [
+                0.12635486890525174,
+                -0.09894999980926514,
+                0.03591898907050594
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_hip_link": {
+              "minimum_z_m": 0.01372558417367044,
+              "lowest_vertex_world_m": [
+                -0.14071015535477213,
+                -0.048201645898313654,
+                0.01372558417367044
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.03094228447645203,
+              "lowest_vertex_world_m": [
+                -0.20134296319521144,
+                -0.07205857460303126,
+                0.03094228447645203
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": -0.0035390706534725418,
+              "lowest_vertex_world_m": [
+                -0.12200603116661952,
+                -0.1312483281565883,
+                -0.0035390706534725418
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_foot_link": {
+              "minimum_z_m": -0.003395600617078852,
+              "lowest_vertex_world_m": [
+                -0.12251525500020753,
+                -0.13540619168331428,
+                -0.003395600617078852
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_hip_link": {
+              "minimum_z_m": 0.013748359620199446,
+              "lowest_vertex_world_m": [
+                -0.14071359752684967,
+                0.04850450582235816,
+                0.013748359620199446
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_upper_leg_link": {
+              "minimum_z_m": 0.015742075691132396,
+              "lowest_vertex_world_m": [
+                -0.1981235557594513,
+                0.07928285538411806,
+                0.015742075691132396
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_lower_leg_link": {
+              "minimum_z_m": -0.0012770562165779417,
+              "lowest_vertex_world_m": [
+                -0.21730315145975393,
+                0.09684503295998291,
+                -0.0012770562165779417
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_foot_link": {
+              "minimum_z_m": 0.005106676941250913,
+              "lowest_vertex_world_m": [
+                -0.09653910672310705,
+                0.10573561288606723,
+                0.005106676941250913
+              ],
+              "expected_belly_contact": false
+            }
+          },
+          "mesh_collision": false,
+          "first_intersection_pair": null,
+          "nonadjacent_worst_pair": {
+            "link_a": "lf_hip_link",
+            "link_b": "lf_lower_leg_link",
+            "status": "SEPARATED_NARROW",
+            "clearance_m": 0.001,
+            "clearance_kind": "LOWER_BOUND",
+            "witness_triangle_a": null,
+            "witness_triangle_b": null
+          },
+          "signed_penetration_depth_m": null,
+          "contact_load_unknown": true,
+          "continuous_clearance_qualified": false
+        }
+      },
+      "diagnostic_sample_max_abs_rate_rad_s": [
+        0.50174285617505,
+        0.0,
+        0.0,
+        0.502301023424956,
+        0.0,
+        0.0,
+        3.5308858824247666,
+        0.7041700142474696,
+        2.9681698295559222,
+        6.6962282276370395,
+        1.4613515296871575,
+        6.159790154410711
+      ],
+      "timing_is_approved_execution_timing": false,
+      "runtime_ik_branch_and_limits_qualified": false,
+      "accepted_complete_prone_to_stand": false
+    },
+    {
+      "id": "coordinated_fold_margin_0.03",
+      "trace_sha256": "d7d74aaf9c193f6f8c4404fff4d68e30ca6f76035faa71e02fcafad8d881f783",
+      "evaluated_poses": {
+        "initial": {
+          "frame": 0,
+          "q_rad": {
+            "lf_hip_joint": 0.06651081085363081,
+            "lf_upper_leg_joint": 1.5707963267948966,
+            "lf_lower_leg_joint": -1.5757029118349999,
+            "rf_hip_joint": -0.06665968507769685,
+            "rf_upper_leg_joint": 1.5707963267948966,
+            "rf_lower_leg_joint": -1.5757029118349999,
+            "rh_hip_joint": -0.45106345548318955,
+            "rh_upper_leg_joint": 1.5707963267948966,
+            "rh_lower_leg_joint": -1.5757029118349999,
+            "lh_hip_joint": 0.45090304651579804,
+            "lh_upper_leg_joint": 1.5707963267948966,
+            "lh_lower_leg_joint": -1.5757029118349999
+          },
+          "base_position_m": [
+            0.0,
+            0.0,
+            1.0928757898653885e-16
+          ],
+          "rotation_world_from_base": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "plane_world": "Z=0",
+          "plane_by_link": {
+            "base_link": {
+              "minimum_z_m": 0.0,
+              "lowest_vertex_world_m": [
+                -0.13080000305175782,
+                -0.04551471710205078,
+                0.0
+              ],
+              "expected_belly_contact": true
+            },
+            "lf_hip_link": {
+              "minimum_z_m": 0.03527487407315405,
+              "lowest_vertex_world_m": [
+                0.085,
+                0.048247695075848626,
+                0.03527487407315405
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_upper_leg_link": {
+              "minimum_z_m": 0.033917692997570456,
+              "lowest_vertex_world_m": [
+                0.028532630920410154,
+                0.07723591860885042,
+                0.033917692997570456
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_lower_leg_link": {
+              "minimum_z_m": 0.0019296236297900709,
+              "lowest_vertex_world_m": [
+                0.12775079368072584,
+                0.08955521203211714,
+                0.0019296236297900709
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_foot_link": {
+              "minimum_z_m": -9.96177565567788e-10,
+              "lowest_vertex_world_m": [
+                0.12977407151633316,
+                0.09223939332087933,
+                -9.96177565567788e-10
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_hip_link": {
+              "minimum_z_m": 0.035274985510072125,
+              "lowest_vertex_world_m": [
+                0.085,
+                -0.048249366199469075,
+                0.035274985510072125
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_upper_leg_link": {
+              "minimum_z_m": 0.03392212004879809,
+              "lowest_vertex_world_m": [
+                0.028532630920410154,
+                -0.07723779146050891,
+                0.03392212004879809
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_lower_leg_link": {
+              "minimum_z_m": 0.0019358850607446975,
+              "lowest_vertex_world_m": [
+                0.12775079368072584,
+                -0.089561846946245,
+                0.0019358850607446975
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_foot_link": {
+              "minimum_z_m": -9.967281405613704e-10,
+              "lowest_vertex_world_m": [
+                0.12977407151633316,
+                -0.09214653718942994,
+                -9.967281405613704e-10
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_hip_link": {
+              "minimum_z_m": 0.015295096898891365,
+              "lowest_vertex_world_m": [
+                -0.14,
+                -0.04850630320223323,
+                0.015295096898891365
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.02585059508607447,
+              "lowest_vertex_world_m": [
+                -0.17041542434692383,
+                -0.07928291341386688,
+                0.02585059508607447
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": 0.0007346868251412366,
+              "lowest_vertex_world_m": [
+                -0.09659938215157937,
+                -0.1019250652178792,
+                0.0007346868251412366
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_foot_link": {
+              "minimum_z_m": -9.895407080545704e-10,
+              "lowest_vertex_world_m": [
+                -0.09592991393792534,
+                -0.10573250162592546,
+                -9.895407080545704e-10
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_hip_link": {
+              "minimum_z_m": 0.015294935622991392,
+              "lowest_vertex_world_m": [
+                -0.14,
+                0.04850450582235816,
+                0.015294935622991392
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_upper_leg_link": {
+              "minimum_z_m": 0.02584549683012985,
+              "lowest_vertex_world_m": [
+                -0.17041542434692383,
+                0.07928280883459199,
+                0.02584549683012985
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_lower_leg_link": {
+              "minimum_z_m": 0.0007259568881509745,
+              "lowest_vertex_world_m": [
+                -0.09659938215157937,
+                0.10192093153040933,
+                0.0007259568881509745
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_foot_link": {
+              "minimum_z_m": -9.956480488161612e-10,
+              "lowest_vertex_world_m": [
+                -0.09593098845144558,
+                0.10580772376289713,
+                -9.956480488161612e-10
+              ],
+              "expected_belly_contact": false
+            }
+          },
+          "mesh_collision": false,
+          "first_intersection_pair": null,
+          "nonadjacent_worst_pair": {
+            "link_a": "lf_hip_link",
+            "link_b": "lf_lower_leg_link",
+            "status": "SEPARATED_NARROW",
+            "clearance_m": 0.001,
+            "clearance_kind": "LOWER_BOUND",
+            "witness_triangle_a": null,
+            "witness_triangle_b": null
+          },
+          "signed_penetration_depth_m": null,
+          "contact_load_unknown": true,
+          "continuous_clearance_qualified": false
+        },
+        "last_before_failure": {
+          "frame": 23,
+          "q_rad": {
+            "lf_hip_joint": 0.0,
+            "lf_upper_leg_joint": 1.5707963267948966,
+            "lf_lower_leg_joint": -1.5757029118349999,
+            "rf_hip_joint": -0.0,
+            "rf_upper_leg_joint": 1.5707963267948966,
+            "rf_lower_leg_joint": -1.5757029118349999,
+            "rh_hip_joint": -0.7187521756212791,
+            "rh_upper_leg_joint": 1.6292503879823828,
+            "rh_lower_leg_joint": -1.329311305658572,
+            "lh_hip_joint": 0.7187521756212791,
+            "lh_upper_leg_joint": 1.6292503879823828,
+            "lh_lower_leg_joint": -1.329311305658572
+          },
+          "base_position_m": [
+            0.0,
+            0.0,
+            0.019546508183595875
+          ],
+          "rotation_world_from_base": [
+            [
+              0.9887710779360422,
+              -0.0,
+              -0.14943813247359922
+            ],
+            [
+              0.0,
+              1.0,
+              -0.0
+            ],
+            [
+              0.14943813247359922,
+              0.0,
+              0.9887710779360422
+            ]
+          ],
+          "plane_world": "Z=0",
+          "plane_by_link": {
+            "base_link": {
+              "minimum_z_m": 0.0,
+              "lowest_vertex_world_m": [
+                -0.12933126001152417,
+                -0.04551471710205078,
+                0.0
+              ],
+              "expected_belly_contact": true
+            },
+            "lf_hip_link": {
+              "minimum_z_m": 0.0671029299410973,
+              "lowest_vertex_world_m": [
+                0.07877784745486922,
+                0.04749999999999999,
+                0.0671029299410973
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_upper_leg_link": {
+              "minimum_z_m": 0.05534865383915047,
+              "lowest_vertex_world_m": [
+                0.023445695017179524,
+                0.11527279281616211,
+                0.05534865383915047
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_lower_leg_link": {
+              "minimum_z_m": 0.03211350221242751,
+              "lowest_vertex_world_m": [
+                0.005206176582844387,
+                0.0865,
+                0.03211350221242751
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_foot_link": {
+              "minimum_z_m": 0.03591898907050594,
+              "lowest_vertex_world_m": [
+                0.12635486890525174,
+                0.08905000019073486,
+                0.03591898907050594
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_hip_link": {
+              "minimum_z_m": 0.0671029299410973,
+              "lowest_vertex_world_m": [
+                0.07877784745486922,
+                -0.0615,
+                0.0671029299410973
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_upper_leg_link": {
+              "minimum_z_m": 0.05534865383915047,
+              "lowest_vertex_world_m": [
+                0.023445695017179524,
+                -0.11527279281616211,
+                0.05534865383915047
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_lower_leg_link": {
+              "minimum_z_m": 0.03211350221242751,
+              "lowest_vertex_world_m": [
+                0.005206176582844387,
+                -0.1015,
+                0.03211350221242751
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_foot_link": {
+              "minimum_z_m": 0.03591898907050594,
+              "lowest_vertex_world_m": [
+                0.12635486890525174,
+                -0.09894999980926514,
+                0.03591898907050594
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_hip_link": {
+              "minimum_z_m": 0.013704028321722062,
+              "lowest_vertex_world_m": [
+                -0.14070689750638748,
+                -0.0474523343507231,
+                0.013704028321722062
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.027549527481731586,
+              "lowest_vertex_world_m": [
+                -0.20060073611354462,
+                -0.07456561817711437,
+                0.027549527481731586
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": -9.960434317612954e-10,
+              "lowest_vertex_world_m": [
+                -0.11366468676921138,
+                -0.12220171338251501,
+                -9.960434317612954e-10
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_foot_link": {
+              "minimum_z_m": 1.4788455144194856e-05,
+              "lowest_vertex_world_m": [
+                -0.11212285475764298,
+                -0.1265016532108398,
+                1.4788455144194856e-05
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_hip_link": {
+              "minimum_z_m": 0.013704028321722062,
+              "lowest_vertex_world_m": [
+                -0.14070689750638748,
+                0.0474523343507231,
+                0.013704028321722062
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_upper_leg_link": {
+              "minimum_z_m": 0.027549527481731586,
+              "lowest_vertex_world_m": [
+                -0.20060073611354462,
+                0.07456561817711437,
+                0.027549527481731586
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_lower_leg_link": {
+              "minimum_z_m": -9.960434317612954e-10,
+              "lowest_vertex_world_m": [
+                -0.11366468676921138,
+                0.12220171338251501,
+                -9.960434317612954e-10
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_foot_link": {
+              "minimum_z_m": 1.874112241618403e-05,
+              "lowest_vertex_world_m": [
+                -0.11213180882365953,
+                0.12656087265482807,
+                1.874112241618403e-05
+              ],
+              "expected_belly_contact": false
+            }
+          },
+          "mesh_collision": false,
+          "first_intersection_pair": null,
+          "nonadjacent_worst_pair": {
+            "link_a": "lf_hip_link",
+            "link_b": "lf_lower_leg_link",
+            "status": "SEPARATED_NARROW",
+            "clearance_m": 0.001,
+            "clearance_kind": "LOWER_BOUND",
+            "witness_triangle_a": null,
+            "witness_triangle_b": null
+          },
+          "signed_penetration_depth_m": null,
+          "contact_load_unknown": true,
+          "continuous_clearance_qualified": false
+        },
+        "failure": {
+          "frame": 24,
+          "q_rad": {
+            "lf_hip_joint": 0.0,
+            "lf_upper_leg_joint": 1.5707963267948966,
+            "lf_lower_leg_joint": -1.5757029118349999,
+            "rf_hip_joint": -0.0,
+            "rf_upper_leg_joint": 1.5707963267948966,
+            "rf_lower_leg_joint": -1.5757029118349999,
+            "rh_hip_joint": -0.785398163397,
+            "rh_upper_leg_joint": 1.6574171885522815,
+            "rh_lower_leg_joint": -1.2105845124763353,
+            "lh_hip_joint": 0.45090304651579804,
+            "lh_upper_leg_joint": 1.5707963267948966,
+            "lh_lower_leg_joint": -1.5757029118349999
+          },
+          "base_position_m": [
+            0.0,
+            0.0,
+            0.019546508183595875
+          ],
+          "rotation_world_from_base": [
+            [
+              0.9887710779360422,
+              -0.0,
+              -0.14943813247359922
+            ],
+            [
+              0.0,
+              1.0,
+              -0.0
+            ],
+            [
+              0.14943813247359922,
+              0.0,
+              0.9887710779360422
+            ]
+          ],
+          "plane_world": "Z=0",
+          "plane_by_link": {
+            "base_link": {
+              "minimum_z_m": 0.0,
+              "lowest_vertex_world_m": [
+                -0.12933126001152417,
+                -0.04551471710205078,
+                0.0
+              ],
+              "expected_belly_contact": true
+            },
+            "lf_hip_link": {
+              "minimum_z_m": 0.0671029299410973,
+              "lowest_vertex_world_m": [
+                0.07877784745486922,
+                0.04749999999999999,
+                0.0671029299410973
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_upper_leg_link": {
+              "minimum_z_m": 0.05534865383915047,
+              "lowest_vertex_world_m": [
+                0.023445695017179524,
+                0.11527279281616211,
+                0.05534865383915047
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_lower_leg_link": {
+              "minimum_z_m": 0.03211350221242751,
+              "lowest_vertex_world_m": [
+                0.005206176582844387,
+                0.0865,
+                0.03211350221242751
+              ],
+              "expected_belly_contact": false
+            },
+            "lf_foot_link": {
+              "minimum_z_m": 0.03591898907050594,
+              "lowest_vertex_world_m": [
+                0.12635486890525174,
+                0.08905000019073486,
+                0.03591898907050594
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_hip_link": {
+              "minimum_z_m": 0.0671029299410973,
+              "lowest_vertex_world_m": [
+                0.07877784745486922,
+                -0.0615,
+                0.0671029299410973
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_upper_leg_link": {
+              "minimum_z_m": 0.05534865383915047,
+              "lowest_vertex_world_m": [
+                0.023445695017179524,
+                -0.11527279281616211,
+                0.05534865383915047
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_lower_leg_link": {
+              "minimum_z_m": 0.03211350221242751,
+              "lowest_vertex_world_m": [
+                0.005206176582844387,
+                -0.1015,
+                0.03211350221242751
+              ],
+              "expected_belly_contact": false
+            },
+            "rf_foot_link": {
+              "minimum_z_m": 0.03591898907050594,
+              "lowest_vertex_world_m": [
+                0.12635486890525174,
+                -0.09894999980926514,
+                0.03591898907050594
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_hip_link": {
+              "minimum_z_m": 0.01372558417367044,
+              "lowest_vertex_world_m": [
+                -0.14071015535477213,
+                -0.048201645898313654,
+                0.01372558417367044
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.03094228447645203,
+              "lowest_vertex_world_m": [
+                -0.20134296319521144,
+                -0.07205857460303126,
+                0.03094228447645203
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": -0.0035390706534725418,
+              "lowest_vertex_world_m": [
+                -0.12200603116661952,
+                -0.1312483281565883,
+                -0.0035390706534725418
+              ],
+              "expected_belly_contact": false
+            },
+            "rh_foot_link": {
+              "minimum_z_m": -0.003395600617078852,
+              "lowest_vertex_world_m": [
+                -0.12251525500020753,
+                -0.13540619168331428,
+                -0.003395600617078852
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_hip_link": {
+              "minimum_z_m": 0.013748359620199446,
+              "lowest_vertex_world_m": [
+                -0.14071359752684967,
+                0.04850450582235816,
+                0.013748359620199446
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_upper_leg_link": {
+              "minimum_z_m": 0.015742075691132396,
+              "lowest_vertex_world_m": [
+                -0.1981235557594513,
+                0.07928285538411806,
+                0.015742075691132396
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_lower_leg_link": {
+              "minimum_z_m": -0.0012770562165779417,
+              "lowest_vertex_world_m": [
+                -0.21730315145975393,
+                0.09684503295998291,
+                -0.0012770562165779417
+              ],
+              "expected_belly_contact": false
+            },
+            "lh_foot_link": {
+              "minimum_z_m": 0.005106676941250913,
+              "lowest_vertex_world_m": [
+                -0.09653910672310705,
+                0.10573561288606723,
+                0.005106676941250913
+              ],
+              "expected_belly_contact": false
+            }
+          },
+          "mesh_collision": false,
+          "first_intersection_pair": null,
+          "nonadjacent_worst_pair": {
+            "link_a": "lf_hip_link",
+            "link_b": "lf_lower_leg_link",
+            "status": "SEPARATED_NARROW",
+            "clearance_m": 0.001,
+            "clearance_kind": "LOWER_BOUND",
+            "witness_triangle_a": null,
+            "witness_triangle_b": null
+          },
+          "signed_penetration_depth_m": null,
+          "contact_load_unknown": true,
+          "continuous_clearance_qualified": false
+        }
+      },
+      "diagnostic_sample_max_abs_rate_rad_s": [
+        0.50174285617505,
+        0.0,
+        0.0,
+        0.502301023424956,
+        0.0,
+        0.0,
+        3.5308858824247666,
+        0.7041700142474696,
+        2.9681698295559222,
+        6.6962282276370395,
+        1.4613515296871575,
+        6.159790154410711
+      ],
+      "timing_is_approved_execution_timing": false,
+      "runtime_ik_branch_and_limits_qualified": false,
+      "accepted_complete_prone_to_stand": false
+    }
+  ]
+}

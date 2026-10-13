@@ -174,6 +174,20 @@ const invokedDirectly =
 if (invokedDirectly) {
   try {
     syncCanonicalAssets();
+    const traceOption = process.argv.indexOf('--motion-trace');
+    if (traceOption !== -1) {
+      const source = process.argv[traceOption + 1];
+      if (!source) throw new Error('--motion-trace requires a JSONL path');
+      const buffer = readFileSync(resolve(source));
+      if (buffer.length > 10 * 1024 * 1024) throw new Error('trace exceeds 10 MiB');
+      const records = buffer.toString('utf8').split(/\r?\n/).filter((line) => line.trim()).map((line) => JSON.parse(line));
+      if (!records.length || records.length > 10000 || records.some((frame) => frame.version !== 1 || !Number.isFinite(frame.now_ms) || !frame.telemetry)) throw new Error('invalid version 1 offline JSONL trace');
+      const traceDir = join(VIEWER_DIR, 'public', 'motion');
+      mkdirSync(traceDir, { recursive: true });
+      writeFileSync(join(traceDir, 'adaptive_motion_synthetic.jsonl'), buffer);
+      writeFileSync(join(traceDir, 'TRACE_PROVENANCE.json'), JSON.stringify({ source: relative(findRepoRoot(), resolve(source)), bytes: buffer.length, frames: records.length, sha256: sha256(buffer), note: 'Offline source evidence only. No hardware qualification.' }, null, 2) + '\n');
+      console.log(`[sync] offline trace staged: ${records.length} frames, sha256 ${sha256(buffer)}`);
+    }
   } catch (error) {
     console.error(`[sync] FAILED: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);

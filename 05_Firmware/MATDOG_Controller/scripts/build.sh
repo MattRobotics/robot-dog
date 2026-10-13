@@ -132,6 +132,13 @@ case "${MATDOG_OTA_INGEST_VALIDATION:-}" in
     ;;
 esac
 
+VALIDATION_FLAG="";VALIDATION_ID="${MATDOG_SUPERVISED_VALIDATION:-0}"
+case "$VALIDATION_ID" in
+ 0) ;;
+ 1) [ "$PROFILE_ID" = ROBOT_POWERED ] && [ "$OTA_INGEST_ID" = 0 ] || { echo "validation requires ROBOT_POWERED/OTA0" >&2;exit 1; };VALIDATION_FLAG=" -DMATDOG_SUPERVISED_VALIDATION=1" ;;
+ *) echo "MATDOG_SUPERVISED_VALIDATION must be 0 or 1" >&2;exit 1 ;;
+esac
+
 echo "== MATDOG Controller build =="
 echo "sketch     : $SKETCH_DIR"
 echo "fqbn       : $FQBN"
@@ -268,7 +275,7 @@ python3 "$SCRIPT_DIR/matdog_layout.py" check-fqbn --fqbn "$FQBN" >/dev/null
 "$ARDUINO" "${CLI_OPTIONS[@]}" compile \
   --fqbn "$FQBN" \
   --build-property "upload.maximum_size=5242880" \
-  --build-property "compiler.cpp.extra_flags=-DMATDOG_BUILD_ID=\"${BUILD_ID}\" -DMATDOG_GIT_SHA=\"${SOURCE_COMMIT}\" -DMATDOG_GIT_DIRTY=${GIT_DIRTY} -DMATDOG_BUILD_UTC=\"${BUILD_UTC}\"${PROFILE_FLAG}${OTA_INGEST_FLAG}" \
+  --build-property "compiler.cpp.extra_flags=-DMATDOG_BUILD_ID=\"${BUILD_ID}\" -DMATDOG_GIT_SHA=\"${SOURCE_COMMIT}\" -DMATDOG_GIT_DIRTY=${GIT_DIRTY} -DMATDOG_BUILD_UTC=\"${BUILD_UTC}\"${PROFILE_FLAG}${OTA_INGEST_FLAG}${VALIDATION_FLAG}" \
   --warnings all \
   "${COMPILE_OPTIONS[@]}" \
   "$SKETCH_DIR" \
@@ -323,3 +330,14 @@ python3 "$SCRIPT_DIR/build_manifest.py" write \
   --motion-stack "$MOTION_STACK" \
   --cal-record-schema 1 \
   --cal-marker-schema 2
+
+printf "SUPERVISED_VALIDATION_CAPABLE=%s\nBOOT_MOTION_AUTHORIZED=0\n" "$VALIDATION_ID" >> "$MANIFEST"
+
+python3 - "$SKETCH_DIR/src/config/TlsIdentity.local.h" "$MANIFEST" <<'PY_TLS'
+import hashlib,re,sys
+from pathlib import Path
+p=Path(sys.argv[1]);manifest=Path(sys.argv[2])
+# Private key/header are never copied into the public receipt.
+header_hash=hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else 'ABSENT'
+with manifest.open('a') as f:f.write('PRIVATE_TLS_CONFIGURATION_SHA256='+header_hash+'\n')
+PY_TLS

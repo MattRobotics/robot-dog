@@ -1,0 +1,15 @@
+# Closeout acquisizione reale ROM — 13 ottobre 2026
+
+**NO-GO prima della scrittura.** Motivo bloccante: manca una copia corrente indipendente verificata e recuperabile. Il tentativo GPG tramite pinentry sicuro ha restituito `problem with the agent: Timeout` e `error creating passphrase: Operation cancelled`. Nessuna credenziale è stata generata, letta da Codex o inserita in argomenti/env/log. Nessun ciphertext è stato creato o pubblicato; nessun prompt/retry aggiuntivo.
+
+**PASS reali:** identità ESP32-S3/MAC/flash 16 MiB; due acquisizioni integrali ROM/no-stub 115200, 16.777.216 byte ciascuna, in 1586,4 e 1550,9 s; SHA256 e confronto integrale identici. SHA corrente **`9a2bf4bd25b581abc50eabadb70c5c4f54c802c789fdbd908723040939e76c83`**. Layout MATDOG_16M_2x5M_NVS_V1, app0 attiva a `0x10000`, immagine installata `b08322dedc5564c080f691dc98047511ef2b953f` valida, 1.226.384 byte; SHA app installata `ccbce2ff6ffee9a5e132bad8646f379fb31fdd305c0d577df992e85e2ebf4b43`. Record gen-1 integro validato dal decoder/validatore C++ di produzione.
+
+Sessione privata: `/home/matteo-manicardi/MATDOG/private-preflight/20261013T180138Z`. `preflight_report.json`, `FINAL_OPERATIONS_REPORT.json`, `recovery_receipt.json`, `recovery_commands.log`, log ROM e A/B conservati, senza sovrascrivere gli originali precedenti. Il backup del 10 ottobre è stato verificato e preservato come storico, non riutilizzato come corrente.
+
+Le 23 risposte della sessione `20261013T170557Z`, inclusi 13 torque OFF, sono state rivalidate offline e riutilizzate con provenance storica. Nessun nuovo readback encoder/servo/IMU/BMS dopo il reset. Continuità dell’alimentazione/configurazione e presenza fisica con arresto d’emergenza non sono state attestate e non vengono inferite dalla fixture o dall’attività del PC. Non è stata concessa review preflash positiva.
+
+Un unico ingresso USB-JTAG nella ROM, poi no-reset/no-stub e un tentativo di connessione per operazione. Nessun ulteriore reset, boot, flash, grant Motion, torque ON, movimento, scrittura servo EEPROM/NVS/BMS. **Stato lasciato: MCU in ROM, applicazione b08322d invariata.** I 13 OFF restano l’ultima osservazione pre-ROM, senza attribuire freshness attuale.
+
+Il candidato è invariato: compiled source `b147f3884b227ec819e98a6f00c214a0aac2278e`, SHA256 `5577bd3c8da5f6c44d8fb9ca9b3d049399e73ccf37d218e716b773e3a87b5914`, 3.643.120 byte. Nessuna nuova compilazione o immagine concorrente. Host fix `10a680a` / `ecb6512`, 23 test offline e quattro gate APP-ONLY originali PASS. Flasher canonico ora ROM/no-stub, singola app-only write e verifica indipendente, nessun boot automatico; **non eseguito**.
+
+[Receipt pubblico senza dati sensibili](REMOTE_BACKUP_CLOSEOUT.json) · [riparazione host e test](ROM_BACKUP_FIX.md) · [runbook recupero](../../../10_Backups/ESP32/README.md). Il prossimo avanzamento richiede recuperabilità indipendente con credenziale disponibile tramite pinentry e review dei gate fisici prima della singola scrittura; non richiede un nuovo firmware.

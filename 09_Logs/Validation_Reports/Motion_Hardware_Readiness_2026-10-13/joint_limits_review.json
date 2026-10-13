@@ -1,0 +1,860 @@
+{
+  "schema": "MATDOG_JOINT_REVIEW_V2",
+  "approved_count": 0,
+  "no_historical_q0_runtime_import": true,
+  "route_sha256": "f86ad336ffdaa1bf287f54d8a1a233494bf935156439610fd35ebc25bed411f2",
+  "joints": [
+    {
+      "joint": "lf_hip_joint",
+      "bus_id": 13,
+      "unit": "M22",
+      "direction": -1,
+      "q0_historical_20261001": 1975,
+      "measured_contacts_deg": [
+        -46.0546875,
+        45.52734375
+      ],
+      "october1_contacts_deg": [
+        -46.49,
+        44.03
+      ],
+      "gen1_reference_q0_review_only": 1983,
+      "measured_fine_ticks": [
+        2507.0,
+        1465.0
+      ],
+      "repeatability_uncertainty_ticks": 2.0,
+      "proposal_inset_ticks": 18.0,
+      "proposal_operational_deg": [
+        -44.47265625,
+        43.9453125
+      ],
+      "approved": false,
+      "route_range_deg": [
+        -1.0,
+        -0.0
+      ],
+      "route_margin_to_proposal_deg": 43.47265625,
+      "minimum_urdf_margin_deg": 43.999999999974314,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          -0.017453292519943295,
+          -0.0
+        ],
+        "REAR_DEPLOY": [
+          -0.0,
+          -0.0
+        ],
+        "FRONT_DEPLOY": [
+          -0.0,
+          -0.0
+        ],
+        "LOAD_TRANSFER": [
+          -0.0,
+          -0.0
+        ],
+        "CONTACT_LOCKED_RISE": [
+          -0.0,
+          -0.0
+        ],
+        "FLAT_CONTACT_RISE": [
+          -0.0,
+          -0.0
+        ],
+        "C4_C_RISE": [
+          -0.0,
+          -0.0
+        ],
+        "STAND_150": [
+          -0.0,
+          -0.0
+        ]
+      },
+      "status": "CANDIDATE_REVIEW_REQUIRED",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "installation/zero/backlash/loaded tracking unknown",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    },
+    {
+      "joint": "lf_upper_leg_joint",
+      "bus_id": 12,
+      "unit": "ELR01",
+      "direction": 1,
+      "q0_historical_20261001": 2078,
+      "measured_contacts_deg": [
+        -56.337890625,
+        121.46484375
+      ],
+      "october1_contacts_deg": [
+        -54.23,
+        122.96
+      ],
+      "gen1_reference_q0_review_only": 2095,
+      "measured_fine_ticks": [
+        1454.0,
+        3477.0
+      ],
+      "repeatability_uncertainty_ticks": 2.0,
+      "proposal_inset_ticks": 18.0,
+      "proposal_operational_deg": [
+        -52.49999999999868,
+        119.8828125
+      ],
+      "approved": false,
+      "route_range_deg": [
+        23.484151937621434,
+        86.82117772144048
+      ],
+      "route_margin_to_proposal_deg": 33.06163477855952,
+      "minimum_urdf_margin_deg": 35.67882227855645,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          1.4615259421016524,
+          1.5153154116982845
+        ],
+        "REAR_DEPLOY": [
+          1.4326940731628244,
+          1.5153154116982845
+        ],
+        "FRONT_DEPLOY": [
+          1.367214022986577,
+          1.4327677732835395
+        ],
+        "LOAD_TRANSFER": [
+          1.3643542779264533,
+          1.367214022986577
+        ],
+        "CONTACT_LOCKED_RISE": [
+          1.1978286277159544,
+          1.3643542779264533
+        ],
+        "FLAT_CONTACT_RISE": [
+          0.8596743930162446,
+          1.1978286277159544
+        ],
+        "C4_C_RISE": [
+          0.4098757733501002,
+          0.8596743930162446
+        ],
+        "STAND_150": [
+          0.4098757733501,
+          0.4098757733501002
+        ]
+      },
+      "status": "CANDIDATE_REVIEW_REQUIRED",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "LF UPPER MAX reduced spare travel beyond URDF; loaded margin unknown",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    },
+    {
+      "joint": "lf_lower_leg_joint",
+      "bus_id": 11,
+      "unit": "M33",
+      "direction": -1,
+      "q0_historical_20261001": 2104,
+      "measured_contacts_deg": [
+        -92.021484375,
+        34.27734375
+      ],
+      "october1_contacts_deg": [
+        -91.85,
+        34.45
+      ],
+      "gen1_reference_q0_review_only": 2102,
+      "measured_fine_ticks": [
+        3149.0,
+        1712.0
+      ],
+      "repeatability_uncertainty_ticks": 1.0,
+      "proposal_inset_ticks": 17.0,
+      "proposal_operational_deg": [
+        -90.52734375,
+        32.783203125
+      ],
+      "approved": false,
+      "route_range_deg": [
+        -92.00000000001242,
+        20.02905481200984
+      ],
+      "route_margin_to_proposal_deg": -1.4726562500124203,
+      "minimum_urdf_margin_deg": 0.0,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          -1.605702911835,
+          -1.605702911835
+        ],
+        "REAR_DEPLOY": [
+          -1.605702911835,
+          -1.605702911835
+        ],
+        "FRONT_DEPLOY": [
+          -1.605702911835,
+          -1.595702911835
+        ],
+        "LOAD_TRANSFER": [
+          -1.595702911835,
+          -1.5887950860890516
+        ],
+        "CONTACT_LOCKED_RISE": [
+          -1.5887950860890516,
+          -1.0655245865317615
+        ],
+        "FLAT_CONTACT_RISE": [
+          -1.0655245865317615,
+          -0.47191223388456166
+        ],
+        "C4_C_RISE": [
+          -0.47191223388456166,
+          0.3495729525319855
+        ],
+        "STAND_150": [
+          0.3495729525319855,
+          0.34957295253198556
+        ]
+      },
+      "status": "ROUTE_INCOMPATIBLE_WITH_PROPOSAL",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "initial LOWER at URDF stop and contact uncertainty",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    },
+    {
+      "joint": "rf_hip_joint",
+      "bus_id": 23,
+      "unit": "NEW01",
+      "direction": -1,
+      "q0_historical_20261001": 2030,
+      "measured_contacts_deg": [
+        -45.3955078125,
+        46.8017578125
+      ],
+      "october1_contacts_deg": [
+        -45.18,
+        46.85
+      ],
+      "gen1_reference_q0_review_only": 2030,
+      "measured_fine_ticks": [
+        2546.5,
+        1497.5
+      ],
+      "repeatability_uncertainty_ticks": 1.5,
+      "proposal_inset_ticks": 17.5,
+      "proposal_operational_deg": [
+        -43.857421875,
+        44.999999999974314
+      ],
+      "approved": false,
+      "route_range_deg": [
+        0.0,
+        1.0
+      ],
+      "route_margin_to_proposal_deg": 43.857421875,
+      "minimum_urdf_margin_deg": 43.999999999974314,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          0.0,
+          0.017453292519943295
+        ],
+        "REAR_DEPLOY": [
+          0.0,
+          0.0
+        ],
+        "FRONT_DEPLOY": [
+          0.0,
+          0.0
+        ],
+        "LOAD_TRANSFER": [
+          0.0,
+          0.0
+        ],
+        "CONTACT_LOCKED_RISE": [
+          0.0,
+          0.0
+        ],
+        "FLAT_CONTACT_RISE": [
+          0.0,
+          0.0
+        ],
+        "C4_C_RISE": [
+          0.0,
+          0.0
+        ],
+        "STAND_150": [
+          0.0,
+          0.0
+        ]
+      },
+      "status": "CANDIDATE_REVIEW_REQUIRED",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "installation/zero/backlash/loaded tracking unknown",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    },
+    {
+      "joint": "rf_upper_leg_joint",
+      "bus_id": 22,
+      "unit": "ELR03",
+      "direction": -1,
+      "q0_historical_20261001": 2108,
+      "measured_contacts_deg": [
+        -55.546875,
+        120.8056640625
+      ],
+      "october1_contacts_deg": [
+        -54.49,
+        121.9
+      ],
+      "gen1_reference_q0_review_only": 2096,
+      "measured_fine_ticks": [
+        2728.0,
+        721.5
+      ],
+      "repeatability_uncertainty_ticks": 3.0,
+      "proposal_inset_ticks": 19.0,
+      "proposal_operational_deg": [
+        -52.49999999999868,
+        119.1357421875
+      ],
+      "approved": false,
+      "route_range_deg": [
+        23.484151937621434,
+        86.82117772144048
+      ],
+      "route_margin_to_proposal_deg": 32.31456446605952,
+      "minimum_urdf_margin_deg": 35.67882227855645,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          1.4615259421016524,
+          1.5153154116982845
+        ],
+        "REAR_DEPLOY": [
+          1.4326940731628244,
+          1.5153154116982845
+        ],
+        "FRONT_DEPLOY": [
+          1.367214022986577,
+          1.4327677732835395
+        ],
+        "LOAD_TRANSFER": [
+          1.3643542779264533,
+          1.367214022986577
+        ],
+        "CONTACT_LOCKED_RISE": [
+          1.1978286277159544,
+          1.3643542779264533
+        ],
+        "FLAT_CONTACT_RISE": [
+          0.8596743930162446,
+          1.1978286277159544
+        ],
+        "C4_C_RISE": [
+          0.4098757733501002,
+          0.8596743930162446
+        ],
+        "STAND_150": [
+          0.4098757733501,
+          0.4098757733501002
+        ]
+      },
+      "status": "CANDIDATE_REVIEW_REQUIRED",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "installation/zero/backlash/loaded tracking unknown",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    },
+    {
+      "joint": "rf_lower_leg_joint",
+      "bus_id": 21,
+      "unit": "NEW03",
+      "direction": 1,
+      "q0_historical_20261001": 1995,
+      "measured_contacts_deg": [
+        -90.9228515625,
+        33.75
+      ],
+      "october1_contacts_deg": [
+        -92.99,
+        31.82
+      ],
+      "gen1_reference_q0_review_only": 1971,
+      "measured_fine_ticks": [
+        936.5,
+        2355.0
+      ],
+      "repeatability_uncertainty_ticks": 1.5,
+      "proposal_inset_ticks": 17.5,
+      "proposal_operational_deg": [
+        -89.384765625,
+        32.2119140625
+      ],
+      "approved": false,
+      "route_range_deg": [
+        -92.00000000001242,
+        20.02905481200984
+      ],
+      "route_margin_to_proposal_deg": -2.6152343750124203,
+      "minimum_urdf_margin_deg": 0.0,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          -1.605702911835,
+          -1.605702911835
+        ],
+        "REAR_DEPLOY": [
+          -1.605702911835,
+          -1.605702911835
+        ],
+        "FRONT_DEPLOY": [
+          -1.605702911835,
+          -1.595702911835
+        ],
+        "LOAD_TRANSFER": [
+          -1.595702911835,
+          -1.5887950860890516
+        ],
+        "CONTACT_LOCKED_RISE": [
+          -1.5887950860890516,
+          -1.0655245865317615
+        ],
+        "FLAT_CONTACT_RISE": [
+          -1.0655245865317615,
+          -0.47191223388456166
+        ],
+        "C4_C_RISE": [
+          -0.47191223388456166,
+          0.3495729525319855
+        ],
+        "STAND_150": [
+          0.3495729525319855,
+          0.34957295253198556
+        ]
+      },
+      "status": "ROUTE_INCOMPATIBLE_WITH_PROPOSAL",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "initial LOWER at URDF stop and contact uncertainty",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    },
+    {
+      "joint": "rh_hip_joint",
+      "bus_id": 33,
+      "unit": "NEW06",
+      "direction": 1,
+      "q0_historical_20261001": 2081,
+      "measured_contacts_deg": [
+        -45.9228515625,
+        44.6484375
+      ],
+      "october1_contacts_deg": [
+        -45.44,
+        45.18
+      ],
+      "gen1_reference_q0_review_only": 2087,
+      "measured_fine_ticks": [
+        1564.5,
+        2595.0
+      ],
+      "repeatability_uncertainty_ticks": 1.5,
+      "proposal_inset_ticks": 17.5,
+      "proposal_operational_deg": [
+        -44.384765625,
+        43.1103515625
+      ],
+      "approved": false,
+      "route_range_deg": [
+        0.0,
+        1.0
+      ],
+      "route_margin_to_proposal_deg": 42.1103515625,
+      "minimum_urdf_margin_deg": 43.999999999974314,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          0.0,
+          0.017453292519943295
+        ],
+        "REAR_DEPLOY": [
+          0.0,
+          0.0
+        ],
+        "FRONT_DEPLOY": [
+          0.0,
+          0.0
+        ],
+        "LOAD_TRANSFER": [
+          0.0,
+          0.0
+        ],
+        "CONTACT_LOCKED_RISE": [
+          0.0,
+          0.0
+        ],
+        "FLAT_CONTACT_RISE": [
+          0.0,
+          0.0
+        ],
+        "C4_C_RISE": [
+          0.0,
+          0.0
+        ],
+        "STAND_150": [
+          0.0,
+          0.0
+        ]
+      },
+      "status": "CANDIDATE_REVIEW_REQUIRED",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "installation/zero/backlash/loaded tracking unknown",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    },
+    {
+      "joint": "rh_upper_leg_joint",
+      "bus_id": 32,
+      "unit": "ELR02",
+      "direction": -1,
+      "q0_historical_20261001": 2061,
+      "measured_contacts_deg": [
+        -53.173828125,
+        123.22265625
+      ],
+      "october1_contacts_deg": [
+        -53.44,
+        123.22
+      ],
+      "gen1_reference_q0_review_only": 2061,
+      "measured_fine_ticks": [
+        2666.0,
+        659.0
+      ],
+      "repeatability_uncertainty_ticks": 2.0,
+      "proposal_inset_ticks": 18.0,
+      "proposal_operational_deg": [
+        -51.591796875,
+        121.640625
+      ],
+      "approved": false,
+      "route_range_deg": [
+        51.47097470785362,
+        118.14590601775406
+      ],
+      "route_margin_to_proposal_deg": 3.494718982245942,
+      "minimum_urdf_margin_deg": 4.354093982242873,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          1.5707963267948966,
+          1.5707963267948966
+        ],
+        "REAR_DEPLOY": [
+          1.5707963267948966,
+          2.0620350577615905
+        ],
+        "FRONT_DEPLOY": [
+          2.0278511019447825,
+          2.0620350577615905
+        ],
+        "LOAD_TRANSFER": [
+          2.0271026979009394,
+          2.0278511019447825
+        ],
+        "CONTACT_LOCKED_RISE": [
+          2.013197145823754,
+          2.0271026979009394
+        ],
+        "FLAT_CONTACT_RISE": [
+          1.405114809337283,
+          2.024152288483368
+        ],
+        "C4_C_RISE": [
+          0.8983379778627721,
+          1.405114809337283
+        ],
+        "STAND_150": [
+          0.8983379778627721,
+          0.8983379778627724
+        ]
+      },
+      "status": "CANDIDATE_REVIEW_REQUIRED",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "installation/zero/backlash/loaded tracking unknown",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    },
+    {
+      "joint": "rh_lower_leg_joint",
+      "bus_id": 31,
+      "unit": "NEW05",
+      "direction": 1,
+      "q0_historical_20261001": 2034,
+      "measured_contacts_deg": [
+        -91.6259765625,
+        34.365234375
+      ],
+      "october1_contacts_deg": [
+        -91.67,
+        34.1
+      ],
+      "gen1_reference_q0_review_only": 2034,
+      "measured_fine_ticks": [
+        991.5,
+        2425.0
+      ],
+      "repeatability_uncertainty_ticks": 2.0,
+      "proposal_inset_ticks": 18.0,
+      "proposal_operational_deg": [
+        -90.0439453125,
+        32.783203125
+      ],
+      "approved": false,
+      "route_range_deg": [
+        -92.00000000001242,
+        0.044439502538467
+      ],
+      "route_margin_to_proposal_deg": -1.9560546875124203,
+      "minimum_urdf_margin_deg": 0.0,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          -1.605702911835,
+          -1.605702911835
+        ],
+        "REAR_DEPLOY": [
+          -1.605702911835,
+          -1.3057029118349999
+        ],
+        "FRONT_DEPLOY": [
+          -1.3057029118349999,
+          -1.3057029118349999
+        ],
+        "LOAD_TRANSFER": [
+          -1.3057029118349999,
+          -1.3046568587867609
+        ],
+        "CONTACT_LOCKED_RISE": [
+          -1.3046568587867609,
+          -1.2266384254381475
+        ],
+        "FLAT_CONTACT_RISE": [
+          -1.2266384254381475,
+          -0.6870345429133973
+        ],
+        "C4_C_RISE": [
+          -0.6870345429133973,
+          0.0007756156372446272
+        ],
+        "STAND_150": [
+          0.000775615637244538,
+          0.0007756156372446272
+        ]
+      },
+      "status": "ROUTE_INCOMPATIBLE_WITH_PROPOSAL",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "initial LOWER at URDF stop and contact uncertainty",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    },
+    {
+      "joint": "lh_hip_joint",
+      "bus_id": 43,
+      "unit": "M43",
+      "direction": 1,
+      "q0_historical_20261001": 2026,
+      "measured_contacts_deg": [
+        -46.5380859375,
+        45.2197265625
+      ],
+      "october1_contacts_deg": [
+        -46.05,
+        45.35
+      ],
+      "gen1_reference_q0_review_only": 2028,
+      "measured_fine_ticks": [
+        1498.5,
+        2542.5
+      ],
+      "repeatability_uncertainty_ticks": 1.5,
+      "proposal_inset_ticks": 17.5,
+      "proposal_operational_deg": [
+        -44.999999999974314,
+        43.681640625
+      ],
+      "approved": false,
+      "route_range_deg": [
+        -1.0,
+        -0.0
+      ],
+      "route_margin_to_proposal_deg": 43.681640625,
+      "minimum_urdf_margin_deg": 43.999999999974314,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          -0.017453292519943295,
+          -0.0
+        ],
+        "REAR_DEPLOY": [
+          -0.0,
+          -0.0
+        ],
+        "FRONT_DEPLOY": [
+          -0.0,
+          -0.0
+        ],
+        "LOAD_TRANSFER": [
+          -0.0,
+          -0.0
+        ],
+        "CONTACT_LOCKED_RISE": [
+          -0.0,
+          -0.0
+        ],
+        "FLAT_CONTACT_RISE": [
+          -0.0,
+          -0.0
+        ],
+        "C4_C_RISE": [
+          -0.0,
+          -0.0
+        ],
+        "STAND_150": [
+          -0.0,
+          -0.0
+        ]
+      },
+      "status": "CANDIDATE_REVIEW_REQUIRED",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "installation/zero/backlash/loaded tracking unknown",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    },
+    {
+      "joint": "lh_upper_leg_joint",
+      "bus_id": 42,
+      "unit": "M42",
+      "direction": 1,
+      "q0_historical_20261001": 2098,
+      "measured_contacts_deg": [
+        -53.61328125,
+        122.3876953125
+      ],
+      "october1_contacts_deg": [
+        -53.7,
+        121.82
+      ],
+      "gen1_reference_q0_review_only": 2092,
+      "measured_fine_ticks": [
+        1482.0,
+        3484.5
+      ],
+      "repeatability_uncertainty_ticks": 2.0,
+      "proposal_inset_ticks": 18.0,
+      "proposal_operational_deg": [
+        -52.03125,
+        120.8056640625
+      ],
+      "approved": false,
+      "route_range_deg": [
+        51.47097470785362,
+        118.14590601775406
+      ],
+      "route_margin_to_proposal_deg": 2.659758044745942,
+      "minimum_urdf_margin_deg": 4.354093982242873,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          1.5707963267948966,
+          1.5707963267948966
+        ],
+        "REAR_DEPLOY": [
+          1.5707963267948966,
+          2.0620350577615905
+        ],
+        "FRONT_DEPLOY": [
+          2.0278511019447825,
+          2.0620350577615905
+        ],
+        "LOAD_TRANSFER": [
+          2.0271026979009394,
+          2.0278511019447825
+        ],
+        "CONTACT_LOCKED_RISE": [
+          2.013197145823754,
+          2.0271026979009394
+        ],
+        "FLAT_CONTACT_RISE": [
+          1.405114809337283,
+          2.024152288483368
+        ],
+        "C4_C_RISE": [
+          0.8983379778627721,
+          1.405114809337283
+        ],
+        "STAND_150": [
+          0.8983379778627721,
+          0.8983379778627724
+        ]
+      },
+      "status": "CANDIDATE_REVIEW_REQUIRED",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "installation/zero/backlash/loaded tracking unknown",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    },
+    {
+      "joint": "lh_lower_leg_joint",
+      "bus_id": 41,
+      "unit": "M41",
+      "direction": -1,
+      "q0_historical_20261001": 2073,
+      "measured_contacts_deg": [
+        -91.5380859375,
+        34.1455078125
+      ],
+      "october1_contacts_deg": [
+        -93.16,
+        32.52
+      ],
+      "gen1_reference_q0_review_only": 2092,
+      "measured_fine_ticks": [
+        3133.5,
+        1703.5
+      ],
+      "repeatability_uncertainty_ticks": 2.5,
+      "proposal_inset_ticks": 18.5,
+      "proposal_operational_deg": [
+        -89.912109375,
+        32.51953125
+      ],
+      "approved": false,
+      "route_range_deg": [
+        -92.00000000001242,
+        0.044439502538467
+      ],
+      "route_margin_to_proposal_deg": -2.0878906250124203,
+      "minimum_urdf_margin_deg": 0.0,
+      "phase_ranges_rad": {
+        "PRE_ALIGN": [
+          -1.605702911835,
+          -1.605702911835
+        ],
+        "REAR_DEPLOY": [
+          -1.605702911835,
+          -1.3057029118349999
+        ],
+        "FRONT_DEPLOY": [
+          -1.3057029118349999,
+          -1.3057029118349999
+        ],
+        "LOAD_TRANSFER": [
+          -1.3057029118349999,
+          -1.3046568587867609
+        ],
+        "CONTACT_LOCKED_RISE": [
+          -1.3046568587867609,
+          -1.2266384254381475
+        ],
+        "FLAT_CONTACT_RISE": [
+          -1.2266384254381475,
+          -0.6870345429133973
+        ],
+        "C4_C_RISE": [
+          -0.6870345429133973,
+          0.0007756156372446272
+        ],
+        "STAND_150": [
+          0.000775615637244538,
+          0.0007756156372446272
+        ]
+      },
+      "status": "ROUTE_INCOMPATIBLE_WITH_PROPOSAL",
+      "source": "October 1 identity/direction + MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md gen-1 fresh q0/fine contacts; current installation must be independently matched",
+      "risk": "initial LOWER at URDF stop and contact uncertainty",
+      "verification_required": "current record integrity+generation+physical identity; neutral witness; supervised read-only encoder and measured linkage pose; rates/stop timing review"
+    }
+  ]
+}

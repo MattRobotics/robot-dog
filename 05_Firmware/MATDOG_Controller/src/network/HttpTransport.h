@@ -28,8 +28,13 @@ enum class HttpRequestKind : uint8_t {
   WIFI_SCAN,
   WIFI_AP,
   WIFI_SESSION,
-  WIFI_LOGOUT
+  WIFI_LOGOUT,
+  MOTION_STATUS,
+  MOTION_CAPABILITIES,
+  MOTION_COMMAND,
+  MOTION_LOGIN, MOTION_SESSION, MOTION_LOGOUT
 };
+constexpr size_t kMotionCapabilitiesBytes=20480;
 constexpr size_t kHttpChunkBufferBytes = 1024, kHttpStatusTextBytes = 4096;
 struct HttpTransportRequest {
   HttpRequestKind kind = HttpRequestKind::NONE;
@@ -41,9 +46,10 @@ struct HttpTransportRequest {
   uint32_t chunk_len = 0;
   bool local_authorized = false, tls = false, ap_socket = false, ap_on = false,
        remember = false;
-  uint32_t peer = 0, admin_generation = 0;
+  uint32_t peer = 0, admin_generation = 0, local_ipv4=0;
   char cookie[65]{}, csrf[65]{}, login[65]{}, device[65]{};
   ConfigPatch patch{};
+  motion::MotionCommand motion_command{};
 };
 struct HttpTransportResponse {
   bool ok = false;
@@ -76,16 +82,24 @@ private:
   static esp_err_t handleOtaUpdate(httpd_req_t *req);
   static esp_err_t handlePage(httpd_req_t *req);
   static esp_err_t handleWifi(httpd_req_t *req);
+  static esp_err_t handleMotion(httpd_req_t *req);
   static void lifecycleEntry(void *self);
   void lifecycle();
   void lifecycleTick();
   bool admitAdmin(HttpTransportRequest &request);
+  bool admitReadOnly(HttpTransportRequest&);
+  bool readOnlyAdmitted(const HttpTransportRequest&) const;
+  bool registerReadOnlyHandlers(httpd_handle_t);
+  bool http_readonly_=false;
   uint32_t portal_generation_ = 0;
+  bool portal_sta_=false;
+  bool admitMotion(HttpTransportRequest&);
+  bool motionStaAdmitted(const HttpTransportRequest&) const;
   bool registerHandlers(httpd_handle_t server, bool admin = true);
   bool dispatch(const HttpTransportRequest &request,
-                HttpTransportResponse *response);
+                HttpTransportResponse *response, char* large_text=nullptr, size_t large_cap=0);
   void serviceRequest(uint32_t now_ms);
-  void wifiResponse(HttpTransportResponse &response);
+  void wifiResponse(HttpTransportResponse &response,bool redact_network_names=false);
   void statusExtension(HttpTransportResponse &response,
                        const power::DalySample &bms,
                        const calibration::CalibrationSessionStatus &cal);
@@ -103,6 +117,7 @@ private:
   HttpMailbox mailbox_{};
   HttpTransportRequest pending_request_{};
   HttpTransportResponse pending_response_{};
+  char motion_capabilities_[kMotionCapabilitiesBytes]{};
   static constexpr uint32_t kDispatchTimeoutMs = 3000;
 };
 } // namespace network

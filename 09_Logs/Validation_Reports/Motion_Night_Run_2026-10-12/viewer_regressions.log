@@ -1,0 +1,50 @@
+
+> matdog-bno085-fullbody-viewer@0.1.0 verify
+> npm run sync:assets && npm run typecheck && vitest run && vite build
+
+
+> matdog-bno085-fullbody-viewer@0.1.0 sync:assets
+> node scripts/sync_canonical_assets.mjs
+
+[sync] canonical URDF : 03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
+[sync] urdf sha256    : 3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59
+[sync] collision meshes staged: 17
+[sync] staged into    : public/canonical/matt_robodog_rev00
+
+> matdog-bno085-fullbody-viewer@0.1.0 typecheck
+> tsc --noEmit
+
+
+ RUN  v3.2.7 /home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer
+
+ ✓ tests/lineParser.test.ts (9 tests) 85ms
+ ✓ tests/orientation.test.ts (16 tests) 45ms
+ ✓ tests/robotGraph.test.ts (17 tests) 347ms
+ ✓ tests/canonicalModel.test.ts (9 tests) 787ms
+   ✓ canonical asset staging > stages the URDF verbatim plus exactly the collision meshes  512ms
+ ✓ tests/motionTwin.test.ts (9 tests) 1205ms
+   ✓ offline trace adapter > replays actual Motion Core JSONL with source stamps and source-declared contacts preserved  1029ms
+ ✓ tests/safetyBoundary.test.ts (8 tests) 2441ms
+   ✓ safety boundary > contains no serial write path at all  902ms
+   ✓ safety boundary > never emits a firmware, DCD or calibration command  602ms
+   ✓ safety boundary > never touches the servo bus, torque, EEPROM or the battery system  567ms
+
+ Test Files  6 passed (6)
+      Tests  68 passed (68)
+   Start at  23:01:39
+   Duration  3.61s (transform 1.25s, setup 0ms, collect 2.76s, tests 4.91s, environment 8ms, prepare 1.77s)
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 22 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   5.95 kB │ gzip:   1.98 kB
+dist/assets/index-DqCDLfYX.css    3.16 kB │ gzip:   1.19 kB
+dist/assets/index-CurDGvT9.js   581.69 kB │ gzip: 151.07 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.72s

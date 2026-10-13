@@ -230,6 +230,7 @@ class ServoBus {
   struct ControlFeedbackSnapshot {
     int torque_enable = -1;
     int goal_position = -1;
+    int goal_speed=-1,goal_acceleration=-1;
     int torque_limit = -1;
     int present_position = -1;
     int present_speed = -1;
@@ -240,6 +241,10 @@ class ServoBus {
     int present_current = -1;
   };
   bool readControlFeedback(int id, ControlFeedbackSnapshot* out);
+  bool readControlFeedbackBudgeted(int id,ControlFeedbackSnapshot* out,uint32_t timeout_ms);
+  ServoWriteVerifyResult reduceValidationOutputWhileOff(int id,uint16_t ceiling);
+  void setValidationDrive(uint16_t speed,uint8_t acceleration){validation_speed_=speed>=1&&speed<=40?speed:0;validation_acceleration_=acceleration>=1&&acceleration<=10?acceleration:0;}
+  void setValidationTimeout(uint32_t ms){validation_timeout_ms_=ms>=2&&ms<=20?ms:0;}
 
   // Read-only runtime snapshot (present position/speed/load/voltage/temp).
   // Returns false if the servo does not answer within the bounded timeout.
@@ -314,6 +319,8 @@ class ServoBus {
   // "leave it at whatever it already was" case. Deliberately not
   // copyable/movable: exactly one guard per transaction, matching "no
   // overengineering" from the handoff.
+  uint32_t validation_timeout_ms_=0;
+  uint16_t validation_speed_=0;uint8_t validation_acceleration_=0;
   class ScopedIOTimeout {
    public:
     ScopedIOTimeout(SMS_STS& st, unsigned long timeout_ms)

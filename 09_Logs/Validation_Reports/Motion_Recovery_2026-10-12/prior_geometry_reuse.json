@@ -1,0 +1,18 @@
+{
+  "schema": "MATDOG_GEOMETRY_REUSE_V1",
+  "frames": 2319,
+  "geometry_fields_equal": true,
+  "compared_fields": [
+    "actual_rad",
+    "target_rad",
+    "quaternion",
+    "base_height_m",
+    "feet"
+  ],
+  "previous_sha256": "63814089f69072536f28eb48e25398e74cfbf2f3222d5504bd735b580ad35464",
+  "current_sha256": "ccedecdd1f792b1703e11ab4452e7fabf6e1f3b058c30017d268a8f4ee47a887",
+  "new_field": "explicit base_position_m; same rotation/height/joints/feet; XY translation does not affect self-collision or flat-plane clearance",
+  "reused_audit": "../Motion_Enablement_2026-10-12/adaptive_motion_unsatisfied.json",
+  "collision_frames": 212,
+  "geometry_pass": false
+}

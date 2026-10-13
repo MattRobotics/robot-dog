@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Offline provenance gate for the one designated app-only candidate.
+A later documentation commit can refer to an earlier clean compiled source;
+Firmware differences reject. Explicitly pinned host-only serial/ROM repairs
+has a separate receipt; it never relabels the compiled source or image SHA.
+"""
+import argparse,hashlib,json,subprocess
+from pathlib import Path
+HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[2]
+def git(*args):return subprocess.check_output(['git','-C',str(ROOT),*args],text=True).strip()
+HOST_SERIAL_PATCH_FILES=(
+ '05_Firmware/MATDOG_Controller/scripts/release/motion_remote_preflight.py',
+ '05_Firmware/MATDOG_Controller/scripts/release/review_preflash.py',
+ '05_Firmware/MATDOG_Controller/scripts/tests/test_remote_preflight.py',
+ '05_Firmware/MATDOG_Controller/scripts/verify_designated_candidate.py',
+ '05_Firmware/MATDOG_Controller/scripts/flash_app_only.sh',
+ '05_Firmware/MATDOG_Controller/scripts/verify_application_partition.py',
+ '05_Firmware/MATDOG_Controller/scripts/tests/test_matdog_layout.py',
+)
+def verify_host_serial_patch(root,source,image_sha,changed):
+ """Only the named host repair, with old/new exact byte identities, can pass."""
+ if set(changed)!=set(HOST_SERIAL_PATCH_FILES):raise ValueError('compiled source differs outside the pinned host serial repair')
+ receipt=root/'09_Logs/Validation_Reports/Final_Release_Candidate_2026-10-13/PREFLIGHT_SERIAL_FIX.json'
+ r=json.loads(receipt.read_text())
+ if r.get('purpose')!='PREFLIGHT_SERIAL_RESPONSE_FRAMING_FIX' or r.get('status')!='PASS' or r.get('compiled_source_commit')!=source or r.get('application_sha256')!=image_sha or set(r.get('files',{}))!=set(HOST_SERIAL_PATCH_FILES):raise ValueError('host serial repair receipt mismatch')
+ for name in HOST_SERIAL_PATCH_FILES:
+  original=subprocess.check_output(['git','-C',str(root),'show',source+':'+name])
+  pair=r['files'][name]
+  if pair.get('compiled_source_file_sha256')!=hashlib.sha256(original).hexdigest() or pair.get('current_file_sha256')!=hashlib.sha256((root/name).read_bytes()).hexdigest():raise ValueError('host serial repair byte identity mismatch: '+name)
+def verify(path):
+ if git('status','--porcelain'):raise ValueError('current worktree must be clean')
+ d=json.loads(path.read_text());source=d['source_commit'];head=git('rev-parse','HEAD')
+ subprocess.run(['git','-C',str(ROOT),'merge-base','--is-ancestor',source,head],check=True)
+ changed=git('diff','--name-only',source,head,'--','05_Firmware/MATDOG_Controller','06_Software/Matdog_Core/motion/paired_prone').splitlines()
+ if changed:verify_host_serial_patch(ROOT,source,d['application_sha256'],changed)
+ root=Path(d['artifact_directory']);image=root/'MATDOG_Controller.ino.bin';manifest={}
+ for line in (root/'matdog_build_manifest.txt').read_text().splitlines():
+  if '=' in line:k,v=line.split('=',1);manifest[k]=v
+ digest=hashlib.sha256(image.read_bytes()).hexdigest()
+ if manifest['SOURCE_COMMIT']!=source or manifest['SOURCE_STATE']!='CLEAN' or manifest['APPLICATION_SHA256']!=digest or digest!=d['application_sha256']:raise ValueError('candidate source/image receipt mismatch')
+ if manifest.get('SUPERVISED_VALIDATION_CAPABLE')!='1' or manifest.get('BOOT_MOTION_AUTHORIZED')!='0' or manifest['OTA_INGEST_ENABLED']!='0' or manifest['HARDWARE_PROFILE']!='ROBOT_POWERED':raise ValueError('candidate capability/profile mismatch')
+ if d.get('release_ready')!='PASS':raise ValueError('designated release review is not PASS')
+ return source,root
+def verify_frozen_qualification(root,source):
+ """Reuse completed suites only with exact compiled inventory and log identities.
+ No test process is launched. The separately pinned host repairs must carry
+ their own successful regression and APP-ONLY audit receipts.
+ """
+ report=root/'09_Logs/Validation_Reports/Final_Release_Candidate_2026-10-13'
+ def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+ build=json.loads((report/'BUILD_RECEIPT.json').read_text())
+ tests_path=report/'TEST_RECEIPT.json';tests=json.loads(tests_path.read_text())
+ if build.get('status')!='PASS' or build.get('source_commit')!=source or build.get('test_receipt_sha256')!=sha(tests_path) or tests.get('status')!='PASS':raise ValueError('frozen qualification identity/status mismatch')
+ inventory=tests.get('source_files',{})
+ if not inventory:raise ValueError('frozen qualification has no source inventory')
+ for name,expected in inventory.items():
+  path=root/name
+  if not path.resolve().is_relative_to(root.resolve()):raise ValueError('qualification inventory path escapes repository')
+  original=subprocess.check_output(['git','-C',str(root),'show',source+':'+name])
+  if hashlib.sha256(original).hexdigest()!=expected:raise ValueError('qualification differs from compiled source: '+name)
+  if name not in HOST_SERIAL_PATCH_FILES and sha(path)!=expected:raise ValueError('qualified source changed: '+name)
+ def logs(entries):
+  if not entries:raise ValueError('qualification logs absent')
+  for entry in entries:
+   if entry.get('status',entry.get('result'))!='PASS' or entry.get('exit_code',0)!=0:raise ValueError('qualification test not PASS')
+   if 'log' not in entry:
+    name=entry.get('name','').removeprefix('geometry_')
+    expected=build.get('certificates_sha256',{}).get(name)
+    if not expected or sha(report/name)!=expected:raise ValueError('qualified certificate identity mismatch')
+    continue
+   path=report/entry['log']
+   if not path.resolve().is_relative_to(report.resolve()) or sha(path)!=entry['log_sha256']:raise ValueError('qualification log identity mismatch')
+ logs(tests.get('tests',[]))
+ full=next((x for x in tests['tests'] if x['name']=='full_static_and_host_led_network_nvs_startup'),None)
+ if full is None or 'STATIC_AUDIT = PASS' not in (report/full['log']).read_text():raise ValueError('completed static audit PASS absent')
+ repair=json.loads((report/'PREFLIGHT_SERIAL_FIX.json').read_text())
+ host=repair['tests'];audit=host['targeted_app_only_audit']
+ if host.get('result')!='PASS' or audit.get('result')!='PASS' or audit.get('checks')!=4:raise ValueError('host repair qualification incomplete')
+ logs([dict(status=host['result'],log=host['log'],log_sha256=host['log_sha256']),dict(status=audit['result'],log=audit['log'],log_sha256=audit['log_sha256'])])
+ reuse=host.get('frozen_qualification_gate',{})
+ if reuse.get('result')!='PASS':raise ValueError('frozen qualification gate regression incomplete')
+ logs([dict(status=reuse['result'],log=reuse['log'],log_sha256=reuse['log_sha256'])])
+ return 'STATIC_AUDIT = PASS (frozen source/log identities; separately qualified host repairs; no repeated firmware suites)'
+if __name__=='__main__':
+ p=argparse.ArgumentParser();p.add_argument('designation',type=Path);p.add_argument('--field',choices=('source','directory','qualification'),required=True);a=p.parse_args();source,root=verify(a.designation);print(verify_frozen_qualification(ROOT,source) if a.field=='qualification' else source if a.field=='source' else root)

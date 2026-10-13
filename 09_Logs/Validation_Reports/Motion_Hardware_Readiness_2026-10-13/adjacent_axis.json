@@ -1,0 +1,214 @@
+{
+  "schema": "MATDOG_ADJACENT_AXIS_INTERVAL_V1",
+  "source_sha256": "f86ad336ffdaa1bf287f54d8a1a233494bf935156439610fd35ebc25bed411f2",
+  "trajectory_changed": false,
+  "all_adjacent_swept_certified": true,
+  "roundoff_m": 1e-09,
+  "hardware_authorized": false,
+  "rows": [
+    {
+      "joint": "lf_hip_joint",
+      "domain_rad": [
+        -0.017453292519943295,
+        -0.0
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "base_link",
+        "lf_hip_link"
+      ],
+      "checks": 280087,
+      "candidates": 280087,
+      "minimum_projection_bound_m": 0.00010000020323758188,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "lf_upper_leg_joint",
+      "domain_rad": [
+        0.4098757733501,
+        1.5153154116982845
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "lf_hip_link",
+        "lf_upper_leg_link"
+      ],
+      "checks": 454910,
+      "candidates": 423438,
+      "minimum_projection_bound_m": 3.267840856194348e-08,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "lf_lower_leg_joint",
+      "domain_rad": [
+        -1.605702911835,
+        0.34957295253198556
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "lf_upper_leg_link",
+        "lf_lower_leg_link"
+      ],
+      "checks": 1814127,
+      "candidates": 1589949,
+      "minimum_projection_bound_m": 3.414502936938224e-08,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rf_hip_joint",
+      "domain_rad": [
+        0.0,
+        0.017453292519943295
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "base_link",
+        "rf_hip_link"
+      ],
+      "checks": 271918,
+      "candidates": 271918,
+      "minimum_projection_bound_m": 0.00010000019995934309,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rf_upper_leg_joint",
+      "domain_rad": [
+        0.4098757733501,
+        1.5153154116982845
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "rf_hip_link",
+        "rf_upper_leg_link"
+      ],
+      "checks": 450611,
+      "candidates": 422229,
+      "minimum_projection_bound_m": 3.267840856194348e-08,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rf_lower_leg_joint",
+      "domain_rad": [
+        -1.605702911835,
+        0.34957295253198556
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "rf_upper_leg_link",
+        "rf_lower_leg_link"
+      ],
+      "checks": 1807030,
+      "candidates": 1587706,
+      "minimum_projection_bound_m": 2.056052972962508e-08,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rh_hip_joint",
+      "domain_rad": [
+        0.0,
+        0.017453292519943295
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "base_link",
+        "rh_hip_link"
+      ],
+      "checks": 294928,
+      "candidates": 294928,
+      "minimum_projection_bound_m": 0.00010000078706784379,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rh_upper_leg_joint",
+      "domain_rad": [
+        0.8983379778627721,
+        2.0620350577615905
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "rh_hip_link",
+        "rh_upper_leg_link"
+      ],
+      "checks": 600158,
+      "candidates": 553130,
+      "minimum_projection_bound_m": 1.591987176316766e-07,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rh_lower_leg_joint",
+      "domain_rad": [
+        -1.605702911835,
+        0.0007756156372446272
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "rh_upper_leg_link",
+        "rh_lower_leg_link"
+      ],
+      "checks": 1365027,
+      "candidates": 1266635,
+      "minimum_projection_bound_m": 8.904980557973175e-09,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "lh_hip_joint",
+      "domain_rad": [
+        -0.017453292519943295,
+        -0.0
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "base_link",
+        "lh_hip_link"
+      ],
+      "checks": 307367,
+      "candidates": 307367,
+      "minimum_projection_bound_m": 0.00010000078370062063,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "lh_upper_leg_joint",
+      "domain_rad": [
+        0.8983379778627721,
+        2.0620350577615905
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "lh_hip_link",
+        "lh_upper_leg_link"
+      ],
+      "checks": 608481,
+      "candidates": 557705,
+      "minimum_projection_bound_m": 1.2091544991602133e-07,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "lh_lower_leg_joint",
+      "domain_rad": [
+        -1.605702911835,
+        0.0007756156372446272
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "lh_upper_leg_link",
+        "lh_lower_leg_link"
+      ],
+      "checks": 1370966,
+      "candidates": 1270782,
+      "minimum_projection_bound_m": 8.904980557973175e-09,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    }
+  ]
+}

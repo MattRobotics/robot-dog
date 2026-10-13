@@ -1,0 +1,189 @@
+{
+  "schema": "MATDOG_12_JOINT_READINESS_V1",
+  "approved_count": 0,
+  "joints": [
+    {
+      "joint": "lf_hip_joint",
+      "bus_id": 13,
+      "unit_label_expected": "M22",
+      "urdf_limit_rad": [
+        -0.785398163397,
+        0.785398163397
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    },
+    {
+      "joint": "lf_upper_leg_joint",
+      "bus_id": 12,
+      "unit_label_expected": "ELR01",
+      "urdf_limit_rad": [
+        -0.916297857297,
+        2.138028333693
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    },
+    {
+      "joint": "lf_lower_leg_joint",
+      "bus_id": 11,
+      "unit_label_expected": "M33",
+      "urdf_limit_rad": [
+        -1.605702911835,
+        0.654498469498
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    },
+    {
+      "joint": "rf_hip_joint",
+      "bus_id": 23,
+      "unit_label_expected": "NEW01",
+      "urdf_limit_rad": [
+        -0.785398163397,
+        0.785398163397
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    },
+    {
+      "joint": "rf_upper_leg_joint",
+      "bus_id": 22,
+      "unit_label_expected": "ELR03",
+      "urdf_limit_rad": [
+        -0.916297857297,
+        2.138028333693
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    },
+    {
+      "joint": "rf_lower_leg_joint",
+      "bus_id": 21,
+      "unit_label_expected": "NEW03",
+      "urdf_limit_rad": [
+        -1.605702911835,
+        0.654498469498
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    },
+    {
+      "joint": "rh_hip_joint",
+      "bus_id": 33,
+      "unit_label_expected": "NEW06",
+      "urdf_limit_rad": [
+        -0.785398163397,
+        0.785398163397
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    },
+    {
+      "joint": "rh_upper_leg_joint",
+      "bus_id": 32,
+      "unit_label_expected": "ELR02",
+      "urdf_limit_rad": [
+        -0.916297857297,
+        2.138028333693
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    },
+    {
+      "joint": "rh_lower_leg_joint",
+      "bus_id": 31,
+      "unit_label_expected": "NEW05",
+      "urdf_limit_rad": [
+        -1.605702911835,
+        0.654498469498
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    },
+    {
+      "joint": "lh_hip_joint",
+      "bus_id": 43,
+      "unit_label_expected": "M43",
+      "urdf_limit_rad": [
+        -0.785398163397,
+        0.785398163397
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    },
+    {
+      "joint": "lh_upper_leg_joint",
+      "bus_id": 42,
+      "unit_label_expected": "M42",
+      "urdf_limit_rad": [
+        -0.916297857297,
+        2.138028333693
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    },
+    {
+      "joint": "lh_lower_leg_joint",
+      "bus_id": 41,
+      "unit_label_expected": "M41",
+      "urdf_limit_rad": [
+        -1.605702911835,
+        0.654498469498
+      ],
+      "operational_min_rad": null,
+      "operational_max_rad": null,
+      "operational_approved": false,
+      "gen1_q0_ticks": "READ_FROM_VERIFIED_CURRENT_RECORD_ONLY",
+      "installed_unit_identity_confirmed_in_this_run": false,
+      "neutral_mapping_measured_in_this_run": false
+    }
+  ],
+  "record_generation_expected": 1,
+  "no_legacy_offsets_imported": true,
+  "read_only_verification_not_performed_on_hardware": true
+}

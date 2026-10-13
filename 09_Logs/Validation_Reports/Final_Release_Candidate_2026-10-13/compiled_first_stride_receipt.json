@@ -1,0 +1,73 @@
+{
+  "parameters": {
+    "sway_x_m": 0.03,
+    "lift_m": 0.005,
+    "advance_x_m": 0.005
+  },
+  "producer_adapter_sha256": "42c1f40725e0ca3bfcb41739ea38e9288ff9637df70117bfa7e96923d159cced",
+  "joint_target_ranges_rad": [
+    [
+      -2.220446049250313e-16,
+      2.220446049250313e-16
+    ],
+    [
+      0.17660202085971832,
+      0.5972219109535217
+    ],
+    [
+      0.3299139440059662,
+      0.47911903262138367
+    ],
+    [
+      -2.220446049250313e-16,
+      2.220446049250313e-16
+    ],
+    [
+      0.1539464294910431,
+      0.5861527323722839
+    ],
+    [
+      0.3299139440059662,
+      0.4965053200721741
+    ],
+    [
+      -2.220446049250313e-16,
+      2.220446049250313e-16
+    ],
+    [
+      0.7227643132209778,
+      1.0410280227661133
+    ],
+    [
+      -0.04961484298110008,
+      0.15043069422245026
+    ],
+    [
+      -2.220446049250313e-16,
+      2.220446049250313e-16
+    ],
+    [
+      0.7383683919906616,
+      1.045548677444458
+    ],
+    [
+      -0.04960837587714195,
+      0.1678595244884491
+    ]
+  ],
+  "schema": "MATDOG_COMPILED_FIRST_STRIDE_V1",
+  "frames": 19081,
+  "data_sha256": "3666ad6c3f28608e03769dfb97533908834d32ce1bf7a0311a447f0666aea5fa",
+  "header_sha256": "374666f68c314974e32c61a38e6bcbc9a436012254117e86d47826933acdab28",
+  "table_bytes": 1831776,
+  "position_error_rad": 5.958840620934325e-08,
+  "velocity_encoding_error_rad_s": 9.999640121919403e-07,
+  "acceleration_encoding_error_rad_s2": 1.999994880242783e-06,
+  "maximum_velocity_rad_s": 0.03717961314867827,
+  "maximum_acceleration_rad_s2": 0.006202034033118992,
+  "maximum_joint_target_step_rad": 0.0018589496612548828,
+  "runtime_error_tube_rad": 0.005999940411593791,
+  "minimum_time_scale": 9,
+  "scope": "frozen 5mm forward, zero vy/yaw, one stride; actual runtime targets are float table rows; drive rates stay independently reviewed; no loaded/contact claim",
+  "hardware_qualified": false
+}

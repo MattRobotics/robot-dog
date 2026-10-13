@@ -1,0 +1,80 @@
+{
+  "schema": "MATDOG_NIGHT_OFFLINE_RESULTS_V1",
+  "aggregate_result": "PASS",
+  "hardware_validated": false,
+  "suites": [
+    {
+      "name": "RESTORE",
+      "checks": 884,
+      "failures": 0
+    },
+    {
+      "name": "Persistence",
+      "checks": 500,
+      "failures": 0
+    },
+    {
+      "name": "MotionService_Executor_Coordinator_rearm",
+      "checks": 2422,
+      "failures": 0
+    },
+    {
+      "name": "MotionLifecycle",
+      "checks": 498,
+      "failures": 0
+    },
+    {
+      "name": "AdaptiveStand_WALK",
+      "checks": 11484,
+      "failures": 0
+    },
+    {
+      "name": "AP_transport",
+      "checks": 131,
+      "failures": 0
+    },
+    {
+      "name": "Motion_HTTP",
+      "checks": 56,
+      "failures": 0
+    },
+    {
+      "name": "Motion_transport_mode_all_assertions",
+      "checks": 2077,
+      "failures": 0
+    },
+    {
+      "name": "SafetyBoundaries",
+      "checks": 48,
+      "failures": 0
+    },
+    {
+      "name": "Portal_DOM",
+      "checks": 167,
+      "failures": 0
+    }
+  ],
+  "listed_assertion_subtotal": 18267,
+  "dashboard_dom": "PASS (48 catalog actions; deadman and rejection cases)",
+  "receipt_suite_tests": 5,
+  "viewer_tests": 68,
+  "viewer_files": 6,
+  "independent_prone_geometry_tests": 7,
+  "fresh_browser": "PASS desktop/mobile, XYZ, 12+12 joints, 17 STL, stale and display isolation",
+  "complete_static_host_mutation_gate": "PASS; see integrated_regressions.log; intentional mutants detected, not production failures",
+  "historical_deferred_artifacts": 286,
+  "environment_jsdom": "RESOLVED via isolated NODE_PATH; fresh final aggregate passed",
+  "runtime_production_failures": 0,
+  "qualification_blockers": [
+    "Adjacent continuous sweep incomplete",
+    "Nonadjacent 3mm operational policy not qualified",
+    "Synthetic initial pose and sliding/contact/loads unmeasured",
+    "New paired pitched route not runtime-integrated",
+    "Production physical facts/permit/arm producers absent",
+    "Normal RUN_STA authenticated motion transport absent",
+    "0 of 12 operational envelopes approved",
+    "Live nonzero velocity changes stop/refuse; require fresh command from readmitted STAND",
+    "WALK study contact adapter and sway parameters not adopted by FeedbackWalk runtime",
+    "WALK continuous sweep and dynamics/loaded tracking open"
+  ]
+}

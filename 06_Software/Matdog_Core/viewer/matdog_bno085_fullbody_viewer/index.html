@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MATDOG — BNO085 full-body viewer</title>
+    <title>MATDOG — Motion Digital Twin</title>
   </head>
   <body>
     <div id="app">
       <aside id="panel">
         <header>
-          <h1>MATDOG BNO085</h1>
-          <p class="subtitle">full-body collision viewer · IMU phase</p>
+          <h1>MATDOG Motion Digital Twin</h1>
+          <p class="subtitle">actual / target · canonical collision geometry</p>
         </header>
 
         <section class="block">
@@ -25,6 +25,18 @@
             <button id="btn-recenter" type="button">Recenter</button>
             <button id="btn-clear-reference" type="button">Clear recenter</button>
           </div>
+        </section>
+
+        <section class="block" id="motion-block">
+          <div class="row"><h2>Motion telemetry</h2><span id="twin-fresh" class="badge state-disconnected">NO DATA</span></div>
+          <div class="buttons"><button id="btn-motion-synthetic">Synthetic demo</button><button id="btn-motion-live">Controller read-only</button><button id="btn-motion-pause">Pause feed</button></div>
+          <label class="detail">Replay offline trace (JSON / JSONL)<input id="motion-trace-file" type="file" accept=".json,.jsonl,application/json,application/x-ndjson"></label>
+          <p id="twin-source" class="detail">Telemetry off. Existing Web Serial orientation remains available.</p>
+          <p class="detail">Solid grey: measured joints. Cyan wireframe: targets. Green feet: reported support; amber: swing; grey: unknown. Contact is reported, never inferred from IMU or encoders.</p>
+          <dl><dt>Executor / stand / owner</dt><dd id="twin-executor">—</dd><dt>Controller / sample / transport age</dt><dd id="twin-time">—</dd><dt>base_link height above support plane</dt><dd id="twin-height">UNKNOWN (not measured by IMU)</dd><dt>Fault / tracking error</dt><dd id="twin-fault">—</dd><dt>Four feet / gait phases</dt><dd id="twin-feet">—</dd></dl>
+          <details><summary>12 joints · actual / target (rad)</summary><pre id="twin-joints">—</pre></details>
+          <p id="twin-diagnostic" class="detail"></p>
+          <p class="detail">Rendering capped at 30 Hz; HTTP telemetry 1 Hz; synthetic/replay 10 Hz. Hidden tabs suspend sampling and rendering. Stale samples remain marked; target and contact overlays are hidden.</p>
         </section>
 
         <section class="block">

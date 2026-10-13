@@ -1,0 +1,178 @@
+{
+  "result": "PASS",
+  "browser": "155.0.8059.39",
+  "environment": "Fresh owned headless Chromium; SwiftShader software rendering; no hardware.",
+  "action_count": 48,
+  "disabled_actions": 46,
+  "preserved_tabs": 6,
+  "display_requests_write_count": 0,
+  "screenshots": [
+    "dashboard_motion_desktop.png",
+    "dashboard_motion_mobile.png",
+    "twin_trace_acquire.png",
+    "twin_synthetic_walk.png"
+  ],
+  "trace": {
+    "snapshot": {
+      "serialState": "DISCONNECTED",
+      "orientation": {
+        "raw": {
+          "w": 1,
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "viewer": {
+          "w": 1,
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "reference": null,
+        "isRecentered": false,
+        "sampleCount": 11
+      },
+      "status": {
+        "rvAccuracyRad": null,
+        "rvStatus": null,
+        "rvCount": null,
+        "rvLastMs": null,
+        "rvRateHz": null,
+        "magMagnitude": null,
+        "magStatus": null,
+        "runtimeResets": null
+      },
+      "collisionMeshCount": 17,
+      "linkCount": 17,
+      "jointCount": 16,
+      "joints": {
+        "lf_hip_joint": 0.25286728705138234,
+        "lf_upper_leg_joint": 1.9617597045896382,
+        "lf_lower_leg_joint": 0.5824350237788325,
+        "rf_hip_joint": -0.25286728705138195,
+        "rf_upper_leg_joint": 1.9617597045896382,
+        "rf_lower_leg_joint": 0.5824350237788325,
+        "rh_hip_joint": -4.440892098500626e-16,
+        "rh_upper_leg_joint": 2.048747484334793,
+        "rh_lower_leg_joint": 0.45307537513811613,
+        "lh_hip_joint": 2.220446049250313e-16,
+        "lh_upper_leg_joint": 2.048747484334793,
+        "lh_lower_leg_joint": 0.45307537513811613
+      },
+      "targets": {
+        "lf_hip_joint": 0.25040579704707033,
+        "lf_upper_leg_joint": 1.9629342340229012,
+        "lf_lower_leg_joint": 0.5804899940623378,
+        "rf_hip_joint": -0.2504057970470699,
+        "rf_upper_leg_joint": 1.9629342340229012,
+        "rf_lower_leg_joint": 0.5804899940623378,
+        "rh_hip_joint": -4.440892098500626e-16,
+        "rh_upper_leg_joint": 2.0489397936965554,
+        "rh_lower_leg_joint": 0.452379335433961,
+        "lh_hip_joint": 1.942890293094024e-16,
+        "lh_upper_leg_joint": 2.0489397936965554,
+        "lh_lower_leg_joint": 0.452379335433961
+      },
+      "targetVisible": true,
+      "motion": {
+        "controllerNowMs": 399,
+        "sampledAtMs": 399,
+        "executorState": "SIMULATION",
+        "standState": "ACQUIRE_SUPPORT",
+        "owner": "offline_trace",
+        "fault": "NONE",
+        "reason": "OFFLINE TRACE: SYNTHETIC_NOT_HARDWARE_QUALIFIED",
+        "quaternion": {
+          "w": 1,
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actual": {
+          "lf_hip_joint": 0.25286728705138234,
+          "lf_upper_leg_joint": 1.9617597045896382,
+          "lf_lower_leg_joint": 0.5824350237788325,
+          "rf_hip_joint": -0.25286728705138195,
+          "rf_upper_leg_joint": 1.9617597045896382,
+          "rf_lower_leg_joint": 0.5824350237788325,
+          "rh_hip_joint": -4.440892098500626e-16,
+          "rh_upper_leg_joint": 2.048747484334793,
+          "rh_lower_leg_joint": 0.45307537513811613,
+          "lh_hip_joint": 2.220446049250313e-16,
+          "lh_upper_leg_joint": 2.048747484334793,
+          "lh_lower_leg_joint": 0.45307537513811613
+        },
+        "target": {
+          "lf_hip_joint": 0.25040579704707033,
+          "lf_upper_leg_joint": 1.9629342340229012,
+          "lf_lower_leg_joint": 0.5804899940623378,
+          "rf_hip_joint": -0.2504057970470699,
+          "rf_upper_leg_joint": 1.9629342340229012,
+          "rf_lower_leg_joint": 0.5804899940623378,
+          "rh_hip_joint": -4.440892098500626e-16,
+          "rh_upper_leg_joint": 2.0489397936965554,
+          "rh_lower_leg_joint": 0.452379335433961,
+          "lh_hip_joint": 1.942890293094024e-16,
+          "lh_upper_leg_joint": 2.0489397936965554,
+          "lh_lower_leg_joint": 0.452379335433961
+        },
+        "baseHeightM": 1.0999563076780766e-16,
+        "feet": [
+          {
+            "leg": "LF",
+            "position": [
+              -0.07886388772048974,
+              0.0954862880088273,
+              0.04665876890822887
+            ],
+            "contact": "swing",
+            "phase": null,
+            "trajectory": []
+          },
+          {
+            "leg": "RF",
+            "position": [
+              -0.07886388772048974,
+              -0.09548628800882732,
+              0.046658768908228856
+            ],
+            "contact": "swing",
+            "phase": null,
+            "trajectory": []
+          },
+          {
+            "leg": "RH",
+            "position": [
+              -0.2991488567868699,
+              -0.09399999999999999,
+              0.017194489748470817
+            ],
+            "contact": "swing",
+            "phase": null,
+            "trajectory": []
+          },
+          {
+            "leg": "LH",
+            "position": [
+              -0.2991488567868699,
+              0.094,
+              0.017194489748470803
+            ],
+            "contact": "swing",
+            "phase": null,
+            "trajectory": []
+          }
+        ],
+        "trackingErrorRad": 0,
+        "stale": false
+      },
+      "motionStale": false
+    },
+    "render": {
+      "triangles": 120388,
+      "calls": 44,
+      "frame": 8,
+      "aspect": 1.104
+    }
+  }
+}

@@ -6,6 +6,7 @@
 #include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/FullLegCalibrationFinalizer.h"
 #include "ActuatorAuthority.h"
+#include "MotionService.h"
 #include "Availability.h"
 #include "CommandRouter.h"
 #include "OperatingMode.h"
@@ -55,6 +56,16 @@ struct CalibrationPersistenceView {
 class ControllerService {
  public:
   using Modules = CommandRouter::Modules;
+  void bindMotionService(MotionService* motion) { motion_=motion; }
+  motion::MotionAck motionCommand(const motion::MotionCommand& command,uint32_t now_ms) {
+    return motion_?motion_->command(command,now_ms):motion::MotionAck{};
+  }
+  bool motionStatus(char* out,size_t cap,uint32_t now_ms) const { return motion_&&motion_->statusJson(out,cap,now_ms); }
+  bool motionCapabilities(char* out,size_t cap) const { return motion_&&motion_->capabilitiesJson(out,cap); }
+  bool motionAck(const motion::MotionAck& ack,char* out,size_t cap) const { return motion_&&motion_->ackJson(ack,out,cap); }
+  bool motionActive() const { return motion_&&motion_->busy(); }
+  void motionDisconnected(uint32_t now_ms) { if(motion_)motion_->disconnected(now_ms); }
+
 
   void begin(const Modules& modules) { modules_ = modules; }
 
@@ -179,7 +190,7 @@ class ControllerService {
   // Network mutations share the Controller's safety facts; no actuator action
   // is exposed here. Config queue sets busy atomically before returning.
   bool networkCritical() const {
-    return powerState() != PowerState::RUN || operatingMode() != OperatingMode::MAINTENANCE ||
+    return motionActive() || powerState() != PowerState::RUN || operatingMode() != OperatingMode::MAINTENANCE ||
            authorityOwner() != ActuatorAuthority::NONE || authorityInhibited() ||
            (modules_.calibration && modules_.calibration->sessionLive()) ||
            (modules_.q0_capture && modules_.q0_capture->active()) ||
@@ -221,6 +232,7 @@ class ControllerService {
 
  private:
   Modules modules_{};
+  MotionService* motion_=nullptr;
   CalibrationPersistenceView calibration_persistence_{};
 };
 

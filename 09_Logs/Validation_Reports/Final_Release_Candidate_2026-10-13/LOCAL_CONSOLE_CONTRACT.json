@@ -1,0 +1,27 @@
+{
+  "status": "PASS_STATIC_COMMAND_CONTRACT",
+  "controller_adapter_sha256": "a839d837b4de63a5c60a1f953df99cfcf673e855630edbf0d1c3d5f46359abb5",
+  "console_sha256": "e748f5ebdcf166b1e349eca915209f904ed59db80d8ebd188171d93f6fcab138",
+  "matching_commands": [
+    "STATUS",
+    "STOP",
+    "PRESENT",
+    "GRANT",
+    "STAND",
+    "NEXT",
+    "WALK_START",
+    "WALK",
+    "RENEW"
+  ],
+  "matching_status_fields": [
+    "UPTIME_MS",
+    "WALK_VX",
+    "PLANNER",
+    "SEGMENT",
+    "NONCE"
+  ],
+  "physical_local_keyboard_and_tty_required": true,
+  "ssh_execution_refused": true,
+  "hardware_access": false,
+  "runtime_adapter_compile": "required in clean ESP32-S3 final build"
+}

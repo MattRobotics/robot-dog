@@ -1,0 +1,118 @@
+{
+  "schema": "MATDOG_RECOVERY_RESULTS_V1",
+  "base_commit": "fdd04345c39b50137cc7cdc50fb08cd592b8c2af",
+  "hardware_access": false,
+  "hardware_pass": false,
+  "motion_authorized": false,
+  "natural_prone_to_stand_geometric_pass": false,
+  "fresh_after_partial_support_change": [
+    {
+      "suite": "AdaptiveStand/FeedbackWalk",
+      "checks": 11484,
+      "failures": 0,
+      "log": "adaptive_partial_support.log"
+    },
+    {
+      "suite": "MotionService/Coordinator/Executor/rearm",
+      "checks": 2422,
+      "failures": 0,
+      "log": "coordinator_rearm.log"
+    },
+    {
+      "suite": "Motion safety boundaries",
+      "checks": 48,
+      "failures": 0
+    },
+    {
+      "suite": "Production Motion HTTP handler",
+      "checks": 56,
+      "failures": 0,
+      "log": "motion_http_transport_current.log"
+    }
+  ],
+  "reused_unchanged_sources": [
+    {
+      "suite": "Calibration runtime RESTORE",
+      "checks": 884,
+      "failures": 0
+    },
+    {
+      "suite": "Calibration persistence",
+      "checks": 500,
+      "failures": 0
+    },
+    {
+      "suite": "Motion lifecycle",
+      "checks": 498,
+      "failures": 0
+    },
+    {
+      "suite": "AP admission fixture",
+      "checks": 131,
+      "failures": 0
+    },
+    {
+      "suite": "Operating-mode transport",
+      "semantic_checks": 31,
+      "total_checks": 2077,
+      "failures": 0
+    },
+    {
+      "suite": "Portal DOM",
+      "checks": 167,
+      "failures": 0
+    },
+    {
+      "suite": "Motion DOM",
+      "visible_actions": 48,
+      "preserved_tabs": 6,
+      "failures": 0
+    },
+    {
+      "suite": "Viewer Vitest",
+      "tests": 67,
+      "files": 6,
+      "failures": 0
+    },
+    {
+      "suite": "Receipt verifier",
+      "tests": 5,
+      "manifest_mutations": 12,
+      "failures": 0
+    }
+  ],
+  "baseline_full_static_host_mutation": "previous_complete_regressions.log: PASS; intentional mutation defects detected, not residual production failures",
+  "latest_aggregate_environment_failure": "aggregate_environment_failure.log stopped before DOM: missing jsdom due NODE_PATH omission. No claim of complete aggregate PASS. Earlier successful DOM/browser logs retained.",
+  "deferred_historical_oracles": 286,
+  "geometry": {
+    "legacy_trace_frames": 2319,
+    "legacy_intersecting_frames": 212,
+    "legacy_unexplained_ground_penetration_frames": 0,
+    "full_mesh_audit_reused_only_after_geometry_field_equality": "prior_geometry_reuse.json",
+    "bounded_initial_hypotheses": 3,
+    "initial_prescribed_recipes": 6,
+    "one_rock_first_correction_recipes": 2,
+    "complete_natural_prone_to_stand_passes": 0,
+    "persistent_failure": "frame 24 RH HIP -0.785398163397 rad; lower-ground -0.0035390706534725418 m; foot-ground -0.003395600617078852 m"
+  },
+  "simulation_state_machine": {
+    "legacy_fixture_sequence_feedback_frames": 1425,
+    "walk_and_coordinated_stop_frames": 488,
+    "intermediate_117mm_to_150mm_frames": 200,
+    "already_standing_153mm_adjustment_frames": 200,
+    "contact_evidence": "explicit synthetic facts; XYZ alone never proves support",
+    "geometry_pass_for_full_legacy_acquisition": false
+  },
+  "controller_physical_capabilities": {
+    "catalog": 48,
+    "software_implemented_entries": 7,
+    "planned_backend_disabled_entries": 41,
+    "physical_disabled_entries": 46,
+    "physical_available": [
+      "STOP",
+      "STATUS"
+    ]
+  },
+  "ventral_transfer_guards": "Confirmed feet=15 plus bellySupported cannot bypass acquisition; belly release is required before RISE, STAND confirmation and WALK start/continuation.",
+  "diagnostic_trace_equal_after_ventral_guard_change": true
+}

@@ -1,0 +1,55 @@
+{
+  "result": "INDEPENDENT_RECOVERY_PASS",
+  "session": "20261013T180138Z",
+  "release_tag": "backup-esp32-recovery-20261013-20261013T191201Z-14c19f227594",
+  "flash_executed": false,
+  "motion_executed": false,
+  "password_channel": "native graphical pinentry only; isolated agent; no symmetric cache",
+  "previous_failed_receipt_preserved": true,
+  "plaintext_sha256": "9a2bf4bd25b581abc50eabadb70c5c4f54c802c789fdbd908723040939e76c83",
+  "plaintext_size_bytes": 16777216,
+  "capture_report_sha256": "f0a536bd277d5a697aa97148b8523db7512364a4e87c44b280c11f0791e28954",
+  "stage": "VERIFY_PREVIOUS_ARCHIVE_UNCHANGED",
+  "previous_release": {
+    "id": 402389731,
+    "tag_name": "backup-esp32-m0-20261002T173142Z-14c19f227594",
+    "assets": [
+      {
+        "id": 607375530,
+        "name": "backup-manifest.json",
+        "size": 2392
+      },
+      {
+        "id": 607375529,
+        "name": "read-a-16m.bin.gpg",
+        "size": 16777303
+      }
+    ]
+  },
+  "local_recovery": "PASS",
+  "release_url": "https://github.com/MattRobotics/robot-dog/releases/tag/backup-esp32-recovery-20261013-20261013T191201Z-14c19f227594",
+  "release_id": 412019919,
+  "assets": [
+    {
+      "id": 637991914,
+      "name": "backup-manifest.json",
+      "size": 1246,
+      "browser_download_url": "https://github.com/MattRobotics/robot-dog/releases/download/backup-esp32-recovery-20261013-20261013T191201Z-14c19f227594/backup-manifest.json"
+    },
+    {
+      "id": 637991910,
+      "name": "current-fullflash-16m.bin.gpg",
+      "size": 829386,
+      "browser_download_url": "https://github.com/MattRobotics/robot-dog/releases/download/backup-esp32-recovery-20261013-20261013T191201Z-14c19f227594/current-fullflash-16m.bin.gpg"
+    }
+  ],
+  "not_latest": true,
+  "ciphertext_sha256": "8e4d978eaacc8fc8d773e5b56efa60f23727b119deeda82d4bd38c4dfec14eb6",
+  "ciphertext_size_bytes": 829386,
+  "recovered_sha256": "9a2bf4bd25b581abc50eabadb70c5c4f54c802c789fdbd908723040939e76c83",
+  "recovered_size_bytes": 16777216,
+  "cryptographic_integrity": "GOODMDC_LOCAL_AND_REMOTE_PASS",
+  "verified_at_utc": "2026-10-13T19:12:46.451139+00:00",
+  "private_receipt_path": "/home/matteo-manicardi/MATDOG/private-preflight/20261013T180138Z/recovery-final-20261013T191201Z/recovery_receipt.json",
+  "plaintext_stays_private": true
+}

@@ -1,0 +1,200 @@
+{
+  "schema": "MATDOG_HARDWARE_READINESS_TEST_RESULTS_V1",
+  "recorded_utc": "2026-10-13T05:53:37.253756+00:00",
+  "software_source_commit": "f62e89b1f482ebb2aee6cca5f5ec148d7509b383",
+  "baseline_commit": "4097ec7b49ae1670d488d15e172b09fd97e84026",
+  "integrated_result": "PASS",
+  "integrated_command": "NODE_PATH=/tmp/matdog-dashboard-deps/node_modules bash 05_Firmware/MATDOG_Controller/scripts/tests/run_motion_enablement_tests.sh",
+  "integrated_exit_code": 0,
+  "integrated_log_local": "/home/matteo-manicardi/MATDOG/verification-artifacts/MOTION_HARDWARE_READINESS_20261013/integrated-final.log",
+  "integrated_log_sha256": "9fd7e353cc3031649d6b23d99081fd56a37b51178cfb66fe67adce6f7b2ab38f",
+  "tests": [
+    {
+      "suite": "RESTORE",
+      "status": "PASS",
+      "checks": 884,
+      "hardware_evidence": false
+    },
+    {
+      "suite": "Calibration persistence",
+      "status": "PASS",
+      "checks": 500,
+      "hardware_evidence": false
+    },
+    {
+      "suite": "MotionService/Coordinator/Executor",
+      "status": "PASS",
+      "checks": 2422,
+      "hardware_evidence": false
+    },
+    {
+      "suite": "Paired runtime route",
+      "status": "PASS",
+      "checks": 37937,
+      "hardware_evidence": false
+    },
+    {
+      "suite": "MotionSession/feedback/lifecycle",
+      "status": "PASS",
+      "checks": 498,
+      "hardware_evidence": false
+    },
+    {
+      "suite": "AdaptiveStand/FeedbackWalk/STOP/rearm/velocity transitions",
+      "status": "PASS",
+      "checks": 15883,
+      "hardware_evidence": false
+    },
+    {
+      "suite": "AP-only production transport",
+      "status": "PASS",
+      "checks": 131,
+      "hardware_evidence": false
+    },
+    {
+      "suite": "Motion production HTTP/TLS/session/CSRF",
+      "status": "PASS",
+      "checks": 65,
+      "hardware_evidence": false
+    },
+    {
+      "suite": "Radio mode/driver/queue/generation fences",
+      "status": "PASS",
+      "checks": 2077,
+      "hardware_evidence": false
+    },
+    {
+      "suite": "Motion safety boundaries",
+      "status": "PASS",
+      "checks": 61,
+      "hardware_evidence": false
+    },
+    {
+      "suite": "Receipt mutation tests",
+      "status": "PASS",
+      "hardware_evidence": false,
+      "tests": 5
+    },
+    {
+      "suite": "Portal DOM",
+      "status": "PASS",
+      "checks": 167,
+      "hardware_evidence": false
+    },
+    {
+      "suite": "Motion Dashboard DOM",
+      "status": "PASS",
+      "hardware_evidence": false,
+      "actions": 48
+    },
+    {
+      "suite": "Static audit and current owners host regressions",
+      "status": "PASS",
+      "evidence": "STATIC_AUDIT = PASS; population/profile/DALY/WiFi/authority/actuator/calibration/startup/USB framing/source-convergence regressions. Historical G1-G5 execution suites are deferred by this audit selection; the current Motion suites above are executed explicitly by the integration runner."
+    },
+    {
+      "suite": "Adjacent continuous geometry",
+      "status": "PASS",
+      "pairs": 12,
+      "canonical_meshes": 17,
+      "excluded_triangles": 0,
+      "proof": "adjacent_axis.json + assembly_nesting.json"
+    },
+    {
+      "suite": "Nonadjacent continuous 3mm reference",
+      "status": "PASS",
+      "segments": 251,
+      "pairs_per_segment": 120,
+      "minimum_lower_bound_m": 0.0030064599155375914,
+      "proof": "nonadjacent_3mm.json"
+    },
+    {
+      "suite": "STL/contact G4 positions",
+      "status": "PASS",
+      "samples": 214,
+      "maximum_error_rad": 3.219646771412954e-15,
+      "proof": "stl_gait_runtime.json"
+    },
+    {
+      "suite": "STL/contact G4 complete derivatives",
+      "status": "BLOCKED",
+      "stable_samples": 210,
+      "refused_samples": 4,
+      "reason": "ADAPTED_DERIVATIVE_NOT_CONVERGED at witness switches; runtime rejects these frames. This is a fail-closed test success, not a derivative qualification PASS."
+    },
+    {
+      "suite": "Browser final embedded Dashboard",
+      "status": "PASS",
+      "actions": 48,
+      "observed": [
+        "prime/arm OFF",
+        "LOCAL_TRIAL_EVIDENCE_REQUIRED",
+        "RESTORE REQUIRED",
+        "limits UNAPPROVED",
+        "permit REVOKED",
+        "actual UNKNOWN",
+        "target NONE",
+        "STAND/joystick disabled",
+        "STOP OFFLINE_FIXTURE_ACK_ONLY"
+      ],
+      "backend": "localhost read-only demo with physical commands disabled; no device drivers",
+      "screenshot_local": "/home/matteo-manicardi/MATDOG/verification-artifacts/MOTION_HARDWARE_READINESS_20261013/dashboard-final-offline.jpg"
+    },
+    {
+      "suite": "ROBOT_POWERED build / manifest / 16MiB 2x5MiB / SHA256",
+      "status": "PASS",
+      "source_commit": "f62e89b1f482ebb2aee6cca5f5ec148d7509b383",
+      "authority": 0,
+      "ota_ingest": 0,
+      "proof": "BUILD_RECEIPT.json + SOURCE_MANIFEST.json"
+    },
+    {
+      "suite": "Resolved committed source / LFS objects / frozen route identity",
+      "status": "PASS",
+      "tracked_files": 466,
+      "proof": "SOURCE_MANIFEST.json"
+    }
+  ],
+  "physical_gate_findings": [
+    {
+      "status": "FAIL_CANDIDATE_ENVELOPE_COMPARISON",
+      "scope": "autonomous prone entry",
+      "reason": "Four initial LOWER angles -92deg are outside inset candidate limits by LF1.472656, RF2.615234, RH1.956055, LH2.087891 degrees. Proposed limits are not approved hardware limits."
+    },
+    {
+      "status": "BLOCKED",
+      "scope": "A fixture micro",
+      "reason": "Current installed image/record/identity/12 accepted workspace limits; external fixture/kill/operator evidence; specific micro geometry corridor; electrical/thermal/output/prime/feedback WCET/tracking/STOP qualification; approved local operator adapter and image are missing."
+    },
+    {
+      "status": "BLOCKED",
+      "scope": "B autonomous STAND",
+      "reason": "Additionally pose membership at encoder resolution, absolute body observation, transition/load/support evidence, loaded geometry and asynchronous/quantization/tracking tube are unqualified."
+    },
+    {
+      "status": "BLOCKED",
+      "scope": "B WALK",
+      "reason": "Additionally STL witness-switch derivative qualification, continuous first-stride/velocity-box swept and loaded dynamic stance/swing/entry/stop/restart evidence are missing."
+    }
+  ],
+  "resolved_development_failures": [
+    {
+      "status": "RESOLVED",
+      "reason": "Obsolete remembered-device network invariant and associated mutation baseline updated to preserve AP-only administrator credentials while testing separate Motion TLS."
+    },
+    {
+      "status": "RESOLVED",
+      "reason": "Misleading-indentation warning in new lifecycle denial test corrected before final campaign."
+    },
+    {
+      "status": "RESOLVED",
+      "reason": "b4060f0 build missing ESP-IDF radio declarations; f62e89b build succeeds."
+    }
+  ],
+  "post_campaign_change": "Only Motion transport test print wording changed; targeted transport rerun PASS 31 semantic / 2077 total. No compiled firmware changed.",
+  "no_hardware_access": true,
+  "flash_authorized": false,
+  "motion_authorized": false,
+  "readiness_A": "NO_GO",
+  "readiness_B": "NO_GO"
+}

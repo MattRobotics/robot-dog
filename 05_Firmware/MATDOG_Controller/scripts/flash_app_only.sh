@@ -52,6 +52,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKETCH_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$SKETCH_DIR/../.." && pwd)"
 BUILD_DIR="$SKETCH_DIR/build/esp32.esp32.esp32s3"
+# Explicit designated-candidate path; offline proof still requires a clean tree
+# and byte-identical compiled firmware plus pinned host repairs. HEAD is not source.
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ]; then
+  BUILD_DIR="$(python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field directory)"
+fi
 
 ARDUINO="${ARDUINO_CLI:-$HOME/.local/bin/arduino-cli}"
 ESPTOOL="${ESPTOOL_BIN:-$HOME/.arduino15/packages/esp32/tools/esptool_py/5.3.1/esptool}"
@@ -113,6 +118,10 @@ inspectable commit rather than an untracked mix of edits."
 fi
 SOURCE_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 SOURCE_COMMIT_SHORT="$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD)"
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ]; then
+  SOURCE_COMMIT="$(python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field source)"
+  SOURCE_COMMIT_SHORT="${SOURCE_COMMIT:0:12}"
+fi
 
 # --- Gate: application binary present and matches this exact commit -------
 [ -f "$APPLICATION_BINARY" ] || refuse "application binary not found: $APPLICATION_BINARY \
@@ -198,13 +207,22 @@ VERIFIED_BACKUP_SHA256="$(echo "$BACKUP_GATE_INFO" | grep '^VERIFIED_BACKUP_SHA2
 [ -n "$VERIFIED_BACKUP_SHA256" ] || refuse "backup verification produced no VERIFIED_BACKUP_SHA256"
 
 # --- Gate: static safety audit PASS ----------------------------------------
-if ! python3 "$SCRIPT_DIR/static_audit.py" "$SKETCH_DIR"; then
-  refuse "static safety audit did not PASS"
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ]; then
+  # The frozen release already completed its campaign. Reuse only after
+  # proving all compiled source bytes, successful log hashes and the
+  # independently qualified, exact host-only repairs. No generic skip flag.
+  if ! python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field qualification; then
+    refuse "frozen static safety qualification did not PASS"
+  fi
+else
+  if ! python3 "$SCRIPT_DIR/static_audit.py" "$SKETCH_DIR"; then
+    refuse "static safety audit did not PASS"
+  fi
 fi
 
 # --- Gate: serial device present and identity matches ----------------------
 [ -e "$PORT" ] || refuse "expected serial device not present: $PORT"
-DEVICE_MAC="$("$ESPTOOL" --chip esp32s3 --port "$PORT" read-mac 2>/dev/null \
+DEVICE_MAC="$("$ESPTOOL" --chip esp32s3 --port "$PORT" --baud 115200 --no-stub --connect-attempts 1 --before no-reset --after no-reset read-mac 2>/dev/null \
   | grep -oE '([0-9a-f]{2}:){5}[0-9a-f]{2}' | head -1 || true)"
 [ -n "$DEVICE_MAC" ] || refuse "could not read device MAC over $PORT"
 [ "$DEVICE_MAC" = "$EXPECTED_MAC" ] || \
@@ -280,7 +298,7 @@ echo
 
 # --- The one and only write: exactly one <offset> <file> pair -------------
 echo "Writing application partition only (no bootloader/partition-table/boot_app0/NVS)..."
-"$ESPTOOL" --chip esp32s3 --port "$PORT" write-flash \
+"$ESPTOOL" --chip esp32s3 --port "$PORT" --baud 115200 --no-stub --connect-attempts 1 --before no-reset --after no-reset write-flash \
   "$APPLICATION_OFFSET" "$APPLICATION_BINARY"
 
 # --- Post-write verification ------------------------------------------------
@@ -294,8 +312,9 @@ echo "Writing application partition only (no bootloader/partition-table/boot_app
 # and reports a clear pass/fail without staging a local copy.
 echo
 echo "Verifying written application partition (esptool verify-flash)..."
-sleep 2  # let the device finish its post-write reset/re-enumeration
-if ! "$ESPTOOL" --chip esp32s3 --port "$PORT" verify-flash \
+# The supervised workflow already entered ROM. No stub, reconnect retry or
+# automatic boot is permitted; retain ROM after independent verification.
+if ! "$ESPTOOL" --chip esp32s3 --port "$PORT" --baud 115200 --no-stub --connect-attempts 1 --before no-reset --after no-reset verify-flash \
     "$APPLICATION_OFFSET" "$APPLICATION_BINARY"; then
   refuse "post-write verify-flash failed — flash may be corrupted, investigate before \
 trusting this device"
@@ -304,3 +323,4 @@ fi
 echo "APPLICATION_ONLY_FLASH = PASS"
 echo "FLASHED_HARDWARE_PROFILE = $VERIFIED_HARDWARE_PROFILE"
 echo "FLASHED_OTA_INGEST_ENABLED = $VERIFIED_OTA_INGEST_ENABLED"
+echo "POST_FLASH_STATE = ROM (boot requires the supervised post-flash procedure)"

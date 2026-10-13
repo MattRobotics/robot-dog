@@ -112,6 +112,7 @@ class LedStatusPolicy {
 
  private:
   LedStatusSnapshot snapshot_;
+  uint8_t soc_level_ = 0; // presentation-only hysteresis: 0 normal, 1 warning, 2 critical
 };
 
 }  // namespace status

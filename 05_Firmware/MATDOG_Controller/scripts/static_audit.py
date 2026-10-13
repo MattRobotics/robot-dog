@@ -374,10 +374,12 @@ def check_goal_position_register_boundary(files, sketch_dir):
 
 
 def check_servo_id_write(files):
-    """No raw register write may exist in ServoBus EXCEPT the one reviewed RAM
+    """Only the two specifically reviewed RAM 48 writers may exist in ServoBus.
+    The bounded validation reducer is checked independently below. The original
     TorqueLimit write of the 24-contact Full Calibration sequence (LF V25
     prepare_motor(): TorqueLimit 500 before TorqueEnable). That one write:
-      - is the only writeWord() call, and no writeByte() call exists at all;
+      - is the only fixed-value writer; the second can only reduce RAM 48,
+        and no writeByte() call exists at all;
       - lives inside ServoBus::writeReviewedRamTorqueLimit(int id);
       - targets SMS_STS_TORQUE_LIMIT_L (RAM 48) - never EEPROM Max Torque, an
         ID, an offset, a lock or any other register;
@@ -391,8 +393,8 @@ def check_servo_id_write(files):
         if re.search(r"\bwriteByte\(", code):
             fail(f"{path}: raw writeByte() call found - ServoBus has no reviewed byte write")
         words = [m.start() for m in re.finditer(r"\bwriteWord\(", code)]
-        if len(words) != 1:
-            fail(f"{path}: exactly one raw writeWord() (the reviewed RAM TorqueLimit) may "
+        if len(words) != 2:
+            fail(f"{path}: exactly two reviewed raw writeWord() calls (RAM TorqueLimit) may "
                  f"exist in ServoBus, found {len(words)}")
             continue
         body = re.search(r"ServoWriteVerifyResult ServoBus::writeReviewedRamTorqueLimit\(int id\)"
@@ -412,6 +414,13 @@ def check_servo_id_write(files):
                 fail(f"{path}: writeReviewedRamTorqueLimit() lost {required!r}")
         if re.search(r"\bst_\.Error\b", text):
             fail(f"{path}: writeReviewedRamTorqueLimit() must decide by readback only")
+        reducer = re.search(r"ServoWriteVerifyResult ServoBus::reduceValidationOutputWhileOff\(int id,uint16_t ceiling\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not reducer or not (reducer.start() <= words[1] <= reducer.end()):
+            fail(f"{path}: second raw writer must be the reviewed RAM-only output reducer")
+        else:
+            compact=re.sub(r"\s+", "", reducer.group(1))
+            for token in ("id<0||id>253||!ceiling||ceiling>1000", "st_.readByte(id,SMS_STS_TORQUE_ENABLE)!=0", "current<0||current>1023||ceiling>current", "if(current!=ceiling)st_.writeWord(id,SMS_STS_TORQUE_LIMIT_L,ceiling);", "returnclassifyServoWriteVerify(st_.readWord(id,SMS_STS_TORQUE_LIMIT_L),ceiling);"):
+                if token not in compact:fail(f"{path}: reduceValidationOutputWhileOff() lost {token!r}")
     by_name = {p.name: c for p, c in files}
     header = re.sub(r"\s+", " ", by_name.get("ServoBus.h", ""))
     if header.count("static constexpr uint16_t kReviewedRamTorqueLimit = 500;") != 1:
@@ -1054,20 +1063,11 @@ def check_uncertain_write_propagation(files, sketch_dir):
 
 
 def check_actuator_runtime_boundaries(files):
-    """I4: the Safe Actuator runtime adapter (src/actuator/ActuatorRuntime.*)
-    must stay host-linkable exactly like ActuatorWritePolicy itself, and its
-    mere existence must not make ordinary physical motion reachable. There is
-    CR3-M3 adds exactly one production ServoBusActuatorBackend and two narrow
-    ServoBus write primitives, but Controller remains null-wired until the
-    separately reviewed activation gate.
-
-    2026-09-25 objective change: Controller.{h,cpp} may now own an
-    ActuatorRuntime instance as fail-closed status/lifecycle infrastructure
-    (it must be wired with a null backend - see
-    check_actuator_infrastructure_wired_fail_closed()). Every OTHER file
-    stays excluded, in particular CommandRouter.cpp and ControllerService.h:
-    neither may reference this class by name, which is what keeps "Controller
-    owns one" from silently growing into "a command can reach one"."""
+    """Safe Actuator runtime stays host-linkable. Only the reviewed sole
+    backend, Controller, calibration, Executor and scoped local MotionSession
+    may reference it. Network/command presentation cannot acquire a runtime
+    or authority. Physical calls remain gated independently at plan/execute.
+    """
     names = {p.name for p, _ in files}
     for required in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
         if required not in names:
@@ -1083,7 +1083,8 @@ def check_actuator_runtime_boundaries(files):
 
     allowed_dirs = {"actuator", "calibration", "tests"}
     allowed_names = {"ActuatorRuntime.h", "ActuatorRuntime.cpp", "Controller.h", "Controller.cpp",
-                     "ServoBusActuatorBackend.h", "ServoBusActuatorBackend.cpp"}
+                     "ServoBusActuatorBackend.h", "ServoBusActuatorBackend.cpp",
+                     "MotionExecutor.h", "MotionExecutor.cpp", "MotionSession.h", "MotionSession.cpp"}
     for path, code in files:
         if path.name in allowed_names:
             continue
@@ -1091,7 +1092,7 @@ def check_actuator_runtime_boundaries(files):
             continue
         if re.search(r"\bActuatorRuntime\b", code):
             fail(f"{path}: references ActuatorRuntime - I4's runtime adapter has no production "
-                 f"backend (ServoBus exposes no torque-on/GoalPosition write) and must not be "
+                 f"outside the reviewed Controller/Executor/Session lifecycle and must not be "
                  f"constructed or referenced outside src/actuator/, src/calibration/, "
                  f"Controller.{{h,cpp}} (fail-closed status infrastructure only) or the offline "
                  f"test suite")
@@ -2586,16 +2587,23 @@ def check_led_status_boundaries(files):
                 if count != 2:
                     fail(f"{path}: {fact} must have exactly two false defaults")
             elif path.name == "LedStatusPolicy.cpp":
+                level = "2" if fact == "battery_critical" else "1"
+                remaining, count = re.subn(rf"snapshot_\.{fact}\s*=\s*inputs\.{fact}\s*\|\|\s*soc_level_=={level};", "", remaining)
+                if count != 1:
+                    fail(f"{path}: {fact} must consume reviewed hysteretic SOC state and preserve external alarms")
+                compact = re.sub(r"\s+", "", code)
+                for guard in ("if(snapshot_.soc_valid)", "if(!snapshot_.charging)", "if(soc<=15)soc_level_=2;", "soc_level_==2&&soc<18", "soc<=30||(soc_level_!=0&&soc<33)"):
+                    if guard not in compact: fail(f"{path}: missing SOC freshness/hysteresis boundary: {guard}")
                 for allowed in (rf"\bfacts\.{fact}\s*=\s*in\.{fact}\s*;",
                                 rf"\bif\s*\(facts\.{fact}\)\s*return\s+"
                                 rf"LedPresentationState::{state}\s*;"):
                     remaining, count = re.subn(allowed, "", remaining)
                     if count != 1:
                         fail(f"{path}: {fact} requires one exact passthrough and selector read")
-            elif path.name == "CommandRouter.cpp":
+            elif path.name in ("CommandRouter.cpp", "HttpTransport.cpp"):
                 remaining, count = re.subn(rf'\bled\.{fact}\s*\?\s*""\s*:\s*""',
                                           "", remaining)
-                if count != 1 or f"{fact}=%s" not in code:
+                if count != 1 or (f"{fact}=%s" not in code and f"led_{fact}=%s" not in code):
                     fail(f"{path}: @LED STATUS must observe reserved {fact}")
             if re.search(rf"\b{fact}\b", remaining):
                 fail(f"{path}: {fact} has no reviewed production producer; "
@@ -3523,7 +3531,7 @@ def check_safe_actuator_boundaries(files, sketch_dir):
     # in the repository qualifies to: MATDOG_JOINT_CALIBRATION.yaml records
     # {min: null, max: null} for all twelve leg joints.
     for path, code in files:
-        if path.name in policy_units or "/scripts/" in str(path).replace(os.sep, "/"):
+        if path.name in policy_units + ("CalibrationRuntimeRestore.h", "CalibrationRuntimeRestore.cpp") or "/scripts/" in str(path).replace(os.sep, "/"):
             continue
         if re.search(r"\blimits\(\)\.admit\(|\bActuatorLimitTable\b", code):
             fail(f"{path}: populates or holds an ActuatorLimitTable - accepted joint bounds "
@@ -6052,6 +6060,7 @@ def check_calibration_persistence_boundaries(files, sketch_dir):
     # (owner), the router's persistence command file and the SAVE gate may
     # include the persistence headers, and only the ones they need.
     allowed_includers = {
+        sketch_dir / "src" / "calibration" / "CalibrationRuntimeRestore.h": {"CalibrationPersistenceService.h"},
         sketch_dir / "src" / "core" / "Controller.h": {
             "CalibrationPersistenceService.h", "CalibrationRecordNvsBackend.h"},
         sketch_dir / "src" / "core" / "Controller.cpp": {
@@ -6073,11 +6082,9 @@ def check_calibration_persistence_boundaries(files, sketch_dir):
 
 
 def check_calibration_persistence_integration(files, sketch_dir):
-    """P3a: the persistence integration is read/write-to-NVS only. It never
-    admits a JointTransform, never touches the servo bus or a servo EEPROM,
-    never grants a permit or starts a motion, runs before any actuator wiring
-    in Controller::begin(), and every persistent write command is behind its
-    gate."""
+    """P3a persistent writes remain gated. Local runtime RESTORE adds exactly
+    twelve torque-off reads and RAM restore, independently audited below;
+    persistent writes still cannot admit transforms, write actuators or permits."""
     core = sketch_dir / "src" / "core"
     cal = sketch_dir / "src" / "calibration"
     by_path = {p: c for p, c in files}
@@ -6100,6 +6107,22 @@ def check_calibration_persistence_integration(files, sketch_dir):
     )
     for path in integration:
         code = by_path[path]
+        if path.name == "CommandRouterPersistence.cpp":
+            start=code.find("void CommandRouter::handleRuntimeRestoreCommand(")
+            end=code.find("CommandRouter::PersistenceSchemaIdentity",start)
+            if start<0 or end<start:
+                fail("Local RAM RESTORE handler missing")
+            else:
+                restore=code[start:end]
+                for token in ("count!=4", "CONFIRM_CURRENT_INSTALLATION", "persistenceQuietViolation()",
+                              "for(uint8_t i=0;i<12;i++)", "readRuntimeState(joint->bus_id,&state)",
+                              "state.torque_enable!=0", "request.torque_off_confirmed=off",
+                              "request.current_installation_confirmed=true", "modules_.runtime_restore->restore("):
+                    if token not in restore: fail("Local RESTORE invariant missing: "+token)
+                for token in ("safeOff(", "->grant(", ".grant(", "->acquire(", "->arm(", "->save(",
+                              "writeTorque", "writePosition", "writeRegister", "writeEeprom"):
+                    if token in restore:fail("Local RESTORE may only read torque and restore RAM: "+token)
+                code=code[:start]+code[end:]
         for pattern, why in forbidden:
             if re.search(pattern, code):
                 fail(f"{path}: {pattern} - the persistence integration {why} (P3a)")
@@ -6245,7 +6268,7 @@ def check_portal_page_text(page, where="src/network/PortalPage.h"):
             fail(f"{where}: portal section {name!r} missing")
     for endpoint in ("'/status'","'/wifi/status'","'/wifi/session'","'/wifi/logout'","'/wifi/login'"):
         if endpoint not in script:fail(f"{where}: endpoint {endpoint} not used")
-    if re.search(r"/(servo|motion|torque|actuator|calibration)[/'\"]",script,re.I):
+    if re.search(r"/(servo|motion|torque|actuator|calibration)[/'\"]",re.sub(r"/api/motion/(?:login|session|logout)", "", script),re.I):
         fail(f"{where}: the portal must not address an actuator or calibration endpoint")
 
 
@@ -6295,7 +6318,7 @@ def check_network_v3_boundaries(files, sketch_dir):
                              (compact_manager,"admin_.allowed(r.generation)",2),
                              (compact_transport,"httpd_stop(server_)==ESP_OK",2),
                              (compact_transport,"httpd_ssl_stop(tls_server_)==ESP_OK",2),
-                             (compact_transport,"self->admitAdmin(r)",2),
+                             (compact_transport,"self->admitAdmin(r)",1),
                              (compact_transport,"gate.allowed(req.admin_generation)",2)):
         if code.count(token)!=count:fail("AP-only fence coverage changed: "+token)
     if re.search(r"\b(?:WIFI_AP_STA|WIFI_MODE_APSTA)\b", manager):
@@ -6345,15 +6368,15 @@ def check_network_v3_boundaries(files, sketch_dir):
                   "if(!device||!device[0])returnfalse;",
                   "returncurrent(now,peer,cookie)&&tokenEqual(csrf,csrf_);"):
         if token not in security:fail("Remembered-device invariant missing: "+token)
-    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",1),("portal_.resume(",1),
-                        ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/wifi/",4),
+    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",2),("portal_.resume(",1),
+                        ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/",4),
                         ("Path=/wifi/session;Max-Age=",2)):
         if compact_transport.count(token)!=count:fail("Portal credential surface changed: "+token)
     for token in ("if(req.remember)portalDeviceIssue(gate.digest(),random+64,resp.device)",
                   "if(req.local_authorized&&!portal_.current(now,req.peer,req.cookie))",
                   "resp.ok=req.local_authorized&&portal_.current(",
                   '{"/wifi/session",HTTP_POST','{"/wifi/logout",HTTP_POST',
-                  "r.remember=read==81&&memcmp(body+70,\"&remember=1\",11)==0",
+                  "r.remember=!motion_auth&&read==81&&memcmp(body+70,\"&remember=1\",11)==0",
                   "Path=/wifi/session;Max-Age=34560000"):
         if token not in compact_transport:fail("Remembered-device transport invariant missing: "+token)
     for token in ("httpd_req_get_url_query","httpd_query_key_value","Serial.","ESP_LOG","log_e(","log_i(","log_d("):
@@ -6382,9 +6405,9 @@ def check_network_v3_boundaries(files, sketch_dir):
     # network/ that owns the radio can name the mode manager, the authority
     # arbiter, a permit or an actuator.
     policy=re.sub(r"\s+","",by_name.get("NetworkPolicy.h",(None,""))[1])
-    for token in ("if(!i.run)returnRoleReason::MAINTENANCE_AP;",
+    for token in ("if(!i.run)returni.maintenance_lan&&i.sta_profile&&!i.recovery?RoleReason::MAINTENANCE_STA_READONLY:RoleReason::MAINTENANCE_AP;",
                   "returni.recovery?RoleReason::RUN_RECOVERY_AP:RoleReason::RUN_STA;",
-                  "inlineboolroleIsSta(RoleReasonr){returnr==RoleReason::RUN_STA;}",
+                  "inlineboolroleIsSta(RoleReasonr){returnr==RoleReason::RUN_STA||r==RoleReason::MAINTENANCE_STA_READONLY;}",
                   "returndwell>cap_ms?cap_ms:static_cast<uint32_t>(dwell);"):
         if token not in policy:fail("Radio role policy invariant missing: "+token)
     # The stored "AP always" preference of earlier firmware is carried, never
@@ -6392,9 +6415,9 @@ def check_network_v3_boundaries(files, sketch_dir):
     role_unit=policy[policy.find("enumclassRoleReason"):policy.find("constexpruint32_tkRecoveryDwellInitialMs")]
     if not role_unit or "ap_always" in role_unit or "FORCED" in role_unit:
         fail("The legacy AP-always preference must not be an input of the radio role decision")
-    if "structRoleInputs{boolrun=false,sta_profile=false,recovery=false;};" not in policy:
-        fail("The radio role decision takes exactly: run, sta_profile, recovery")
-    if policy.find("if(!i.run)returnRoleReason::MAINTENANCE_AP;")>policy.find("if(!i.sta_profile)"):
+    if "structRoleInputs{boolrun=false,sta_profile=false,recovery=false;boolmaintenance_lan=false;};" not in policy:
+        fail("The radio role decision takes run, sta_profile, recovery and RAM-only maintenance_lan")
+    if policy.find("if(!i.run)returni.maintenance_lan&&i.sta_profile&&!i.recovery?RoleReason::MAINTENANCE_STA_READONLY:RoleReason::MAINTENANCE_AP;")>policy.find("if(!i.sta_profile)"):
         fail("MAINTENANCE must outrank everything stored")
     if sorted(re.findall(r"[^;{}]*ap_always[^;{}]*;",compact_manager))!=["c.ap_always=p.config.ap_always;","w.ap_always=config_.ap_always;"]:
         fail("WifiManager may only carry the stored ap_always (form -> record, record -> status), never act on it")
@@ -6446,6 +6469,21 @@ def check_motion_convergence_gate(sketch_dir):
         print(result.stdout.strip())
 
 
+def check_operational_session_boundaries(files):
+    by_name={p.name:(p,c) for p,c in files if "scripts" not in p.parts}
+    session=by_name.get("MotionSession.cpp",(None,""))[1]
+    for token in ('if(!image)', 'gate(e,input,fb,now)', 'policy_->plan(', 'runtime_->execute(',
+                  'fb.torque_on[i]||!resolve(', 'executor_->arm(', 'policy_->epoch()!=epoch_',
+                  'e.scope==TrialScope::FIXTURE_MICRO', 'AUTONOMOUS_SUPPORT_LOAD_REQUIRED', 'WALK_DYNAMICS_REQUIRED'):
+        if token not in session:fail("MotionSession operational invariant missing: "+token)
+    config=by_name.get("BuildConfig.h",(None,""))[1]
+    if not re.search(r'constexpr bool kOperationalMotionAuthorized\s*=\s*false\s*;',config):
+        fail("Operational image must retain MOTION_AUTHORIZED=0")
+    for path,code in files:
+        if path.parent.name=="network" and any(t in code for t in ('requestLocalMotionTrial(', 'requestFixtureMicro(', 'bindReviewedMotionRuntime(', '.request(core::ActuatorAuthority::MOTION')):
+            fail(str(path)+": network may not grant operational authority or trial evidence")
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -6453,6 +6491,7 @@ def main():
         fail(f"no source files found under {SKETCH_DIR}")
 
     check_forbidden_literals(files)
+    check_operational_session_boundaries(files)
     check_torque_enable(files)
     check_servo_motion_write_surface(files)
     check_servo_id_write(files)

@@ -1,0 +1,5 @@
+check_app_only_script_never_targets_other_partitions: completed
+check_build_profile_provenance: completed
+check_flash_layout_safety: completed
+check_backup_gate_provenance: completed
+TARGETED_APP_ONLY_AUDIT=PASS

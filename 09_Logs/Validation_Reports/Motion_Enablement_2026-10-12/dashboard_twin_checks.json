@@ -1,0 +1,26 @@
+{
+  "result": "PASS",
+  "date": "2026-10-12",
+  "scope": "Dashboard, host twin, offline replay, extracted production HTTP integration",
+  "viewer_tests": 67,
+  "portal_dom_checks": 167,
+  "motion_catalog_actions": 48,
+  "motion_disabled_actions": 46,
+  "http_handler_checks": 56,
+  "trace_samples": 2319,
+  "hardware_writes": 0,
+  "real_hardware_telemetry_available": false,
+  "fixture_servers": {
+    "dashboard": "http://127.0.0.1:5185",
+    "viewer_synthetic": "http://127.0.0.1:5183/?motion=synthetic",
+    "viewer_core_trace": "http://127.0.0.1:5183/?motion=trace"
+  },
+  "browser_report": "browser/browser_checks.json",
+  "asset_budget": "../../../06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/docs/MOTION_ASSET_BUDGET.json",
+  "limits": [
+    "Browser uses SwiftShader software rendering, not robot hardware.",
+    "HTTPD/socket/mailbox/driver observations are host doubles; handler, service cases, JSON parser, MotionService and PortalSession are production code.",
+    "Offline trace evidence remains SYNTHETIC_NOT_HARDWARE_QUALIFIED.",
+    "3D assets are host only; no flash or NVS writes."
+  ]
+}
