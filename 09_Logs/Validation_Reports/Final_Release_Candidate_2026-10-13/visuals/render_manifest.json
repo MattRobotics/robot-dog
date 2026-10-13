@@ -1,10 +1,10 @@
 {
   "schema": "MATDOG_FINAL_VISUAL_EVIDENCE_V1",
-  "runtime_csv_sha256": "ff33aadeab40d303c9f11dad1bd97ec2b067f85109ca1801e12cf5d8626d7f89",
+  "runtime_csv_sha256": "1d58082fa8aa066f51a501714c4b56449fc0ab8af6890069f743a0b7b91953e7",
   "frames": 30009,
   "public_replay_frames": 2309,
   "canonical_route_sha256": "f86ad336ffdaa1bf287f54d8a1a233494bf935156439610fd35ebc25bed411f2",
-  "fixture_recipe_sha256": "2662856821324bbbb1e7bf2991f7809521edc69d433d2668183bda353cce9ce6",
+  "fixture_recipe_sha256": "ba83dbcb38483d03a9a6054927dc01810ce901bad29e5d1f3c970a831846e70c",
   "meshes": {
     "base_link": {
       "triangles": 22044,
@@ -95,5 +95,5 @@
   "hardware": false,
   "body_pose": "SYNTHETIC FIXED FIXTURE 300mm; not an operational measurement or preset",
   "target_values": "actual production planner test export; ideal feedback doubles",
-  "renderer_sha256": "af90aeb73b03e497275202f79824483bc6e34c455d26bbbe2636c50dd0e78c07"
+  "renderer_sha256": "51e4769736278b8ba105c23a13617aae7cea918b26a5a81af79e7189e6b7fda7"
 }

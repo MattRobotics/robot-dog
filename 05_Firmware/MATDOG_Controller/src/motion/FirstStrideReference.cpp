@@ -1,9 +1,13 @@
 #include "FirstStrideReference.h"
 #include "FirstStrideData.h"
+#include "CertifiedMotionEvidence.h"
 #include <cmath>
+#include <cstring>
 namespace matdog { namespace motion {
 const char* compiledFirstStrideDigest(){return first_stride_data::kDataSha256;}
 double compiledFirstStrideTubeRad(){return .006-first_stride_data::kQuantizationError;}
+double compiledFirstStrideSwayM(){return first_stride_data::kSwayM;}
+bool compiledFirstStrideIntegrityPinned(){return first_stride_data::kSwayM==.03&&first_stride_data::kSamples==19081&&!std::strcmp(first_stride_data::kDataSha256,certified_evidence::kFirstStrideDataSha256);}
 bool compiledFirstStrideFitsLimits(const FeedbackPolicy& p,double tube,unsigned* failed){
  if(!std::isfinite(tube)||tube<=0||tube>compiledFirstStrideTubeRad())return false;
  for(unsigned i=0;i<12;++i){const auto& b=p.jointLimits[i/3][i%3];

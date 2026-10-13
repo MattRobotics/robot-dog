@@ -36,7 +36,7 @@ def create(d):
         raise ValueError('review field outside qualified scope')
     if not (route != 'FIXTURE_LIMIT_COMPATIBLE' or scope in (3, 4)):
         raise ValueError('review field outside qualified scope')
-    proof_path = REPORT / ('fixture_limit_compatible_route_6mrad.json' if route == 'FIXTURE_LIMIT_COMPATIBLE' else 'stand_tracking_tube_6mrad.json')
+    proof_path = REPORT / ('fixture_final_margin_route_6mrad.json' if route == 'FIXTURE_LIMIT_COMPATIBLE' else 'stand_tracking_tube_6mrad.json')
     proof = json.loads(proof_path.read_text())
     if not proof['status'] in ('PASS_FIXTURE_ROUTE_TUBE', 'PASS_GEOMETRY_TUBE'):
         raise ValueError('review field outside qualified scope')
@@ -73,7 +73,7 @@ def create(d):
     if scope == 2:
         lines.append('DYNAMICS ' + d['reviews']['loaded_stability_contact_compliance']['evidence_sha256'])
     if scope in (2, 4):
-        wpath = REPORT / 'first_stride_qualified_clock_swept_6mrad.json'
+        wpath = REPORT / 'first_stride_30mm_qualified_clock_swept_6mrad.json'
         w = json.loads(wpath.read_text())
         if not w['status'] == 'PASS_CONTINUOUS_TARGET_BOXES':
             raise ValueError('review field outside qualified scope')
@@ -91,7 +91,7 @@ def create(d):
             raise ValueError('review field outside qualified scope')
         if not d['walk_step_rad'] <= 0.01:
             raise ValueError('review field outside qualified scope')
-        lines.extend([f'WALK_CLOCK {scale} {d['walk_step_rad']}', f'WALK 90 90 .005 .8 .04 8 {0.005 / (90 * scale):.17g} 0 0 {digest(wpath)} {table['runtime_error_tube_rad']:.17g}'])
+        lines.extend([f'WALK_CLOCK {scale} {d['walk_step_rad']}', f'WALK 90 90 .005 .8 .03 8 {0.005 / (90 * scale):.17g} 0 0 {digest(wpath)} {table['runtime_error_tube_rad']:.17g}'])
     sha = hashlib.sha256(('\n'.join(lines) + '\n').encode()).hexdigest()
     lines.append(f'SEAL {sha} {CONFIRM}')
     if not all((len(x) <= 240 for x in lines)):

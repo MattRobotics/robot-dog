@@ -48,7 +48,7 @@
   "server": "localhost Python visual fixture; enforcement verified separately on production C++ handlers",
   "portal_sha256": "2e0ba45bf9932cf8ab132791ac2efd5dbc9da5effdfb6630913287d7ab21cd29",
   "motion_page_sha256": "1cbe3d6b4a8f8ba351d3b67c54d21d53b0ba1b4327c2c26c34b45fc604359b21",
-  "trace_sha256": "efcb5d71895c1eec69ab41e8ff30be469de6df62e30620f32d6ac4982aa40af0",
+  "trace_sha256": "c03b31fc4ab08b05b6e7d49ce42fbd8fc30c0d044847668a77c0681889b6e3eb",
   "files": [
     "admin_ap.png",
     "dashboard_motion_desktop.png",

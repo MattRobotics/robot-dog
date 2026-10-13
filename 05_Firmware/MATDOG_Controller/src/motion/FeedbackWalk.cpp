@@ -21,10 +21,10 @@ bool FeedbackWalk::start(const AdaptiveStand& stand,const AdaptiveObservation& o
                          const WalkSpecification& s,const FeedbackPolicy& p,double now){
   *this=FeedbackWalk{};policy_=p;if(s.maxJointStepRad>0)policy_.maxJointStepRad=s.maxJointStepRad;if(s.compiledFirstStride)policy_.samplePeriodS*=s.firstStrideTimeScale/9;specification_=s;lastNow_=now;targetSequence_=s.firstTargetSequence;
   if(!validFeedbackPolicy(policy_)||!std::isfinite(s.firstStrideTimeScale)||s.firstStrideTimeScale<1||s.firstStrideTimeScale>100||(s.compiledFirstStride&&(!s.firstStrideOnly||s.firstStrideTimeScale<9))){reject(FeedbackReason::INVALID_POLICY);return false;}
+  if(s.compiledFirstStride&&(!compiledFirstStrideIntegrityPinned()||s.swayXM!=compiledFirstStrideSwayM()||s.periodS!=90||s.rampDurationS!=90||s.liftM!=.005||s.duty!=.8||s.standShiftDurationS!=8||!s.stlContactReference||!s.smoothStlReference||std::abs(s.maxVxMps-.005/(90*s.firstStrideTimeScale))>1e-12||s.maxVyMps!=0||s.maxYawRateRadS!=0)){reject(FeedbackReason::INVALID_POLICY);return false;}
   if((s.stlContactReference&&(!positive(s.standShiftDurationS)||!std::isfinite(s.swayXM)))||stand.state()!=AdaptiveStandState::STAND||!positive(s.periodS)||!positive(s.rampDurationS)||!positive(s.liftM)||
     !positive(s.maxVxMps)||(!std::isfinite(s.maxVyMps)||s.maxVyMps<0)||(!std::isfinite(s.maxYawRateRadS)||s.maxYawRateRadS<0)||!positive(s.maxCommandTtlS)||s.firstTargetSequence==0||
     !validCommand(c,now)||zero(c)){reject(FeedbackReason::INVALID_COMMAND);return false;}
-  if(s.compiledFirstStride&&(s.periodS!=90||s.rampDurationS!=90||s.liftM!=.005||s.duty!=.8||s.swayXM!=.04||s.standShiftDurationS!=8||s.maxVyMps!=0||s.maxYawRateRadS!=0||std::abs(s.maxVxMps*s.periodS*s.firstStrideTimeScale-.005)>1e-12)){reject(FeedbackReason::INVALID_COMMAND);return false;}
   auto r=checkObservation(o,p,now);if(r!=FeedbackReason::OK){reject(r);return false;}
   if((p.mode==FeedbackMode::FIXTURE_REVIEW?!o.externalSupportConfirmed:o.confirmedFeet!=15)||o.bellySupported||!o.stationary){reject(FeedbackReason::SUPPORT_INVALID);return false;}
   auto planning=o;

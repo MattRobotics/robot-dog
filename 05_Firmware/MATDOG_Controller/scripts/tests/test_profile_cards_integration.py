@@ -28,7 +28,7 @@ class Tests(unittest.TestCase):
     cards=maker.create(self.data(scope,clock));self.assertTrue(self.parses(cards),(scope,clock))
     if scope==1:self.assertNotIn('DYNAMICS ',cards)
  def test_proof_quantization_budget_and_hash_mutations(self):
-  cards=maker.create(self.data(4));self.assertFalse(self.parses(cards.replace('WALK 90 90 .005 .8 .04 8','WALK 90 90 .006 .8 .04 8')))
+  cards=maker.create(self.data(4));self.assertFalse(self.parses(cards.replace('WALK 90 90 .005 .8 .03 8','WALK 90 90 .006 .8 .03 8')))
   self.assertFalse(self.parses('\n'.join((' '.join(line.split()[:-1])+ ' 0.006') if line.startswith('WALK ') else line for line in cards.splitlines())+'\n'))
   self.assertFalse(self.parses(cards.replace('CLOCK 9','CLOCK 8',1)))
   self.assertFalse(self.parses(cards.replace('RECORD '+'d'*64,'RECORD '+'e'*64)))
@@ -40,6 +40,6 @@ class Tests(unittest.TestCase):
   with self.assertRaises(ValueError):maker.create(d)
   d=self.data(4,8)
   with self.assertRaises(ValueError):maker.create(d)
-  d=self.data(4);d['joint_limits'][5]['required_max_urad']=math.floor(math.radians(32.21191)*1e6)
+  d=self.data(4);d['joint_limits'][5]['required_max_urad']=math.floor(math.radians(25)*1e6)
   with self.assertRaisesRegex(ValueError,'JOINT=5'):maker.create(d)
 if __name__=='__main__':unittest.main()

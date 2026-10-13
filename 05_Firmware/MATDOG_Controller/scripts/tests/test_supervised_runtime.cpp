@@ -14,7 +14,7 @@ int main(){
  Rig rig;auto p=pairedPolicy();p.mode=motion::FeedbackMode::FIXTURE_REVIEW;p.fixtureTrialRatesReviewed=true;p.loadedRatesVerified=false;p.routeTubeReviewed=true;p.fixtureLimitVariant=true;p.routeFirstKnot=0;p.routeLastKnot=251;p.routeJointTubeRad=.0012;p.routePositionTubeM=.001;p.routeRotationTube=.001;
  p.samplePeriodS=.05;p.maxJointStepRad=.0015;p.maxTrackingErrorRad=.0009;
  unsigned failed=99;CHECK(motion::compiledFirstStrideFitsLimits(p,motion::compiledFirstStrideTubeRad(),&failed));
- auto narrow=p;narrow.jointLimits[1][2].upper=32.21191*3.141592653589793/180;CHECK(!motion::compiledFirstStrideFitsLimits(narrow,motion::compiledFirstStrideTubeRad(),&failed)&&failed==5);CHECK(!motion::compiledFirstStrideFitsLimits(p,.006,&failed));
+ auto narrow=p;narrow.jointLimits[1][2].upper=25*3.141592653589793/180;CHECK(!motion::compiledFirstStrideFitsLimits(narrow,motion::compiledFirstStrideTubeRad(),&failed)&&failed==5);CHECK(!motion::compiledFirstStrideFitsLimits(p,.006,&failed));
  motion::AcquisitionRoute route;route.pairedProne=true;route.supervisedSegments=true;route.timeScale=9;route.geometryIdentityVerified=true;route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
  motion::AdaptiveObservation o;o.actual=motion::pairedProneSample(0,0,true).target;o.body.translationM.z=.3;o.externalSupportConfirmed=o.flatPlaneConfirmed=o.stationary=true;o.heightSource=o.supportSource=motion::EvidenceSource::EXTERNAL_MEASURED;
  double now=1;o.stampS=now;motion::AdaptiveStand stand;motion::AdaptiveStandRequest request;request.targetHeightM=.15;request.acquisition=&route;CHECK(stand.request(request,p,now));
@@ -36,16 +36,16 @@ int main(){
   if(stand.state()==motion::AdaptiveStandState::REJECTED){printf("fixture stand rejected %s frame=%u segment=%u\n",motion::feedbackReasonName(f.reason),frames,stand.proneSegment());break;}
  }
  CHECK(stand.state()==motion::AdaptiveStandState::STAND);CHECK(segments==251&&frames>7000);CHECK(o.confirmedFeet==0&&o.body.translationM.z==.3);
- motion::WalkSpecification s;s.periodS=s.rampDurationS=90;s.liftM=.005;s.duty=.8;s.swayXM=.04;s.standShiftDurationS=8;s.compiledFirstStride=s.firstStrideOnly=s.smoothStlReference=s.stlContactReference=true;s.maxVxMps=.005/(90*9);s.maxCommandTtlS=.25;s.firstStrideTimeScale=9;s.maxJointStepRad=.004;
+ motion::WalkSpecification s;s.periodS=s.rampDurationS=90;s.liftM=.005;s.duty=.8;s.swayXM=.03;s.standShiftDurationS=8;s.compiledFirstStride=s.firstStrideOnly=s.smoothStlReference=s.stlContactReference=true;s.maxVxMps=.005/(90*9);s.maxVyMps=s.maxYawRateRadS=0;s.maxCommandTtlS=.25;s.firstStrideTimeScale=9;s.maxJointStepRad=.004;
  motion::PlanarVelocityCommand c;c.vxMps=s.maxVxMps;c.stampS=now;c.ttlS=.2;c.sequence=1;
  motion::FeedbackWalk walk;CHECK(walk.start(stand,o,c,s,p,now));unsigned walkFrames=0;double maxError=0;
  for(unsigned loop=0;loop<50000&&walk.state()!=motion::FeedbackWalkState::STAND;++loop){now+=.051;o.stampS=now;c.stampS=now;++c.sequence;CHECK(walk.command(c,now));auto f=walk.update(o,now);
   if(f.target.valid&&!f.executable){motion::SegmentAssessment a;a.sequence=f.target.sequence;a.stampS=now;a.source=motion::EvidenceSource::OFFLINE_CERTIFIED;a.fixtureTrialEnvelopeReviewed=true;a.geometryIdentityVerified=a.sweptCollisionClear=a.continuousBoundsConfirmed=a.supportCompatible=a.loadedTrackingQualified=true;CHECK(walk.assess(a,now));f=walk.update(o,now);}
   if(f.target.valid&&f.executable&&f.target.sequence!=sequence){++walkFrames;const double t=walkFrames*.05/9;double cycle=0,rate=0,acc=0,x=0,v=0,a=0;int hold=0;
-   if(t<8){auto law=motion::quinticTimeLaw(t/8,8);x=-.04*law.progress;v=-.04*law.velocity;a=-.04*law.acceleration;hold=1;}
-   else if(t>=98){auto law=motion::quinticTimeLaw(std::fmin(1.,(t-98)/8),8);cycle=1;x=-.04*(1-law.progress);v=.04*law.velocity;a=.04*law.acceleration;hold=1;}
+   if(t<8){auto law=motion::quinticTimeLaw(t/8,8);x=-.03*law.progress;v=-.03*law.velocity;a=-.03*law.acceleration;hold=1;}
+   else if(t>=98){auto law=motion::quinticTimeLaw(std::fmin(1.,(t-98)/8),8);cycle=1;x=-.03*(1-law.progress);v=.03*law.velocity;a=.03*law.acceleration;hold=1;}
    else{auto law=motion::quinticTimeLaw((t-8)/90,90);cycle=law.progress;rate=law.velocity;acc=law.acceleration;}
-   double expected[40]{};CHECK(replay_soft(cycle,rate,acc,x,v,a,hold,0,.001,expected)==0);
+   double expected[40]{};CHECK(replay_soft_qualified(cycle,rate,acc,x,v,a,hold,0,.001,expected)==0);
    for(unsigned i=0;i<12;++i){auto q=f.target.legs[i/3];const double actual=i%3==0?q.hip:i%3==1?q.upper:q.lower;maxError=std::fmax(maxError,std::abs(actual-expected[i]));CHECK(std::abs(actual-expected[i])<1e-7);}
    CHECK(f.requiredFeet==0&&f.externalSupportRequired&&o.confirmedFeet==0);o.actual=f.target;o.acknowledgedSequence=f.target.sequence;sequence=f.target.sequence;record("WALK",now,251,f);
   }

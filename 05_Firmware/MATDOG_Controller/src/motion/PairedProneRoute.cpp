@@ -18,7 +18,7 @@ Vector3 point(unsigned link,Vector3 v,const double* p){
  return add(rx(v,h),m->hipOrigin);
 }
 }
-const char* pairedProneDigest(bool variant){return variant?"2662856821324bbbb1e7bf2991f7809521edc69d433d2668183bda353cce9ce6":paired_data::kRouteSha256;}
+const char* pairedProneDigest(bool variant){return variant?"ba83dbcb38483d03a9a6054927dc01810ce901bad29e5d1f3c970a831846e70c":paired_data::kRouteSha256;}
 double pairedProneDuration(unsigned i){return i<kPairedProneSegments?paired_data::kSegments[i].duration:0;}
 PronePhase pairedPronePhase(unsigned i){return static_cast<PronePhase>(i<kPairedProneSegments?paired_data::kSegments[i].phase:4);}
 LocomotionFrame pairedProneSample(unsigned i,double u,bool variant,double beginProgress){
@@ -26,7 +26,7 @@ LocomotionFrame pairedProneSample(unsigned i,double u,bool variant,double beginP
  if(i>=kPairedProneSegments||!std::isfinite(beginProgress)||beginProgress<0||beginProgress>=1||!std::isfinite(u)||u<0||u>1)return f;
  const auto law=quinticTimeLaw(u,pairedProneDuration(i));if(!law.valid)return f;
  double p[8],v[8],a[8];
- for(unsigned j=0;j<8;++j){const double floor=j==3?-88.9*3.14159265358979323846/180:-89.4*3.14159265358979323846/180;
+ for(unsigned j=0;j<8;++j){const double floor=j==3?-88.5*3.14159265358979323846/180:-89.0*3.14159265358979323846/180;
   const bool constrained=variant&&(j==1||j==3);
   const double start=constrained?std::fmax(floor,paired_data::kKnots[i].p[j]):paired_data::kKnots[i].p[j];
   const double end=constrained?std::fmax(floor,paired_data::kKnots[i+1].p[j]):paired_data::kKnots[i+1].p[j],delta=end-start;
@@ -93,7 +93,7 @@ PairedProneCursor pairedProneCursor(const AdaptiveObservation& o,const FeedbackP
  for(unsigned i=p.routeFirstKnot;i<p.routeLastKnot&&i<251;++i){double lo=0,hi=1;bool fits=true;
   for(unsigned leg=0;leg<4&&fits;++leg){auto a=paired_data::kKnots[i].p,b=paired_data::kKnots[i+1].p;const auto q=o.actual.legs[leg];const double actual[3]={q.hip,q.upper,q.lower};const unsigned slot[3]={7,leg<2?2u:0u,leg<2?3u:1u};
    for(unsigned j=0;j<3;++j){const double sign=j==0&&(leg==0||leg==3)?-1:1;double x=sign*a[slot[j]],y=sign*b[slot[j]];
-    if(j==2&&p.fixtureLimitVariant){const double floor=(leg<2?-88.9:-89.4)*3.14159265358979323846/180;x=std::fmax(x,floor);y=std::fmax(y,floor);}
+    if(j==2&&p.fixtureLimitVariant){const double floor=(leg<2?-88.5:-89.0)*3.14159265358979323846/180;x=std::fmax(x,floor);y=std::fmax(y,floor);}
     const double d=y-x;if(!std::isfinite(actual[j])){fits=false;break;}
     if(std::abs(d)<1e-15){if(std::abs(actual[j]-x)>p.routeJointTubeRad)fits=false;}
     else{const double a=(actual[j]-x-p.routeJointTubeRad)/d,b=(actual[j]-x+p.routeJointTubeRad)/d;lo=std::fmax(lo,std::fmin(a,b));hi=std::fmin(hi,std::fmax(a,b));if(lo>hi)fits=false;}
@@ -118,7 +118,7 @@ int pairedProneMatch(const AdaptiveObservation& o,const FeedbackPolicy& policy){
   for(unsigned leg=0;leg<4;++leg){const auto q=o.actual.legs[leg];
    if(!std::isfinite(q.hip)||!std::isfinite(q.upper)||!std::isfinite(q.lower)||
       std::abs(q.hip-((leg==0||leg==3)?-p[7]:p[7]))>qtol||
-      std::abs(q.upper-p[leg<2?2:0])>qtol||std::abs(q.lower-(policy.fixtureLimitVariant?std::fmax(p[leg<2?3:1],(leg<2?-88.9:-89.4)*3.14159265358979323846/180):p[leg<2?3:1]))>qtol)jointsFit=false;}
+      std::abs(q.upper-p[leg<2?2:0])>qtol||std::abs(q.lower-(policy.fixtureLimitVariant?std::fmax(p[leg<2?3:1],(leg<2?-88.5:-89.0)*3.14159265358979323846/180):p[leg<2?3:1]))>qtol)jointsFit=false;}
   if(!jointsFit)continue; // bounded cheap search, hull evaluation only for matches
   const auto f=pairedProneSample(knot==kPairedProneSegments?knot-1:knot,knot==kPairedProneSegments?1:0,policy.fixtureLimitVariant);
   if(!f.target.valid)continue;

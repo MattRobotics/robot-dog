@@ -24,7 +24,7 @@ Nessuna immagine qui mostra una validazione hardware eseguita oggi. Screenshot: 
 
 ![Target, body virtuale e fixture sintetica](runtime_targets_height_attitude.png)
 
-[Manifest renderer e mesh](render_manifest.json) · [certificato variante](../fixture_limit_compatible_route_6mrad.json) · [tube canonico](../stand_tracking_tube_6mrad.json) · [prima falcata swept](../first_stride_qualified_clock_swept_6mrad.json) · [encoding runtime in flash](../compiled_first_stride_receipt.json).
+[Manifest renderer e mesh](render_manifest.json) · [certificato variante](../fixture_final_margin_route_6mrad.json) · [tube canonico](../stand_tracking_tube_6mrad.json) · [prima falcata swept](../first_stride_30mm_qualified_clock_swept_6mrad.json) · [encoding runtime in flash](../compiled_first_stride_receipt.json).
 
 ## Digital Twin e animazioni conservate
 
