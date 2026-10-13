@@ -883,7 +883,9 @@ void WifiManager::scan(uint32_t now, bool roaming) {
 RoleReason WifiManager::evaluateRole(uint32_t now) {
   const bool run = run_mode_.load();
   const bool profile = config_.sta[0].enabled || config_.sta[1].enabled;
-  if (run != last_run_) {
+  const bool lan=maintenance_lan_.load();
+  if (run != last_run_ || lan != last_maintenance_lan_) {
+    last_maintenance_lan_=lan;
     // A mode change starts from a clean slate in either direction.
     last_run_ = run;
     recovery_ = false;
@@ -903,6 +905,7 @@ RoleReason WifiManager::evaluateRole(uint32_t now) {
   }
   RoleInputs in;
   in.run = run;
+  in.maintenance_lan=lan;
   in.sta_profile = profile;
   in.recovery = recovery_;
   return selectRole(in);

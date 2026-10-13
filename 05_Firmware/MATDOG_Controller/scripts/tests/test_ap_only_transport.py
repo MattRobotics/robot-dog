@@ -37,6 +37,10 @@ struct FakeService {
 ''')
 fixture=fixture.replace('configureNetwork(const ConfigPatch&)', 'configureNetwork(const ConfigPatch&,uint32_t)').replace('accessPoint(bool)', 'accessPoint(bool,uint32_t)')
 fixture=fixture.replace(' static esp_err_t handleWifi', ''' bool portal_sta_=false;
+ bool http_readonly_=false;
+ bool registerReadOnlyHandlers(void*);
+ bool readOnlyAdmitted(const HttpTransportRequest&) const;
+ bool admitReadOnly(HttpTransportRequest&);
  bool admitMotion(HttpTransportRequest&);
  bool motionStaAdmitted(const HttpTransportRequest&) const;
  uint32_t portal_generation_=0;

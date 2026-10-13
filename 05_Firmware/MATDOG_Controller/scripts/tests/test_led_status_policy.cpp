@@ -122,10 +122,10 @@ void testReservedBatteryFacts() {
       policy.update(in, 1500, 60);
       CHECK(!in.battery_warning);
       CHECK(!in.battery_critical);
-      CHECK(!policy.snapshot().battery_warning);
-      CHECK(!policy.snapshot().battery_critical);
-      CHECK(policy.state() != LedPresentationState::BATTERY_WARNING);
-      CHECK(policy.state() != LedPresentationState::BATTERY_CRITICAL);
+      const bool low=std::isfinite(soc)&&soc>=0&&soc<=30&&!(mask&1);
+      const bool critical=low&&soc<=15;
+      CHECK_EQ(policy.snapshot().battery_warning,low&&!critical);
+      CHECK_EQ(policy.snapshot().battery_critical,critical);
     }
   }
   g_case = "reserved facts pass through independently of DALY and SOC validity";
@@ -165,7 +165,7 @@ void testReservedBatteryEffects() {
                                 : LedPresentationState::BATTERY_WARNING;
     const uint8_t green = critical ? 0 : 140;
     const uint8_t peak = critical ? 30 : 20;
-    auto in = ready(0);
+    auto in = ready(55);
     in.battery_warning = !critical;
     in.battery_critical = critical;
     LedStatusPolicy policy;
@@ -286,8 +286,8 @@ void testQuantizationBoundariesAndPhysicalFrames() {
     CHECK_EQ(socCompletedSegments(upper), n);
     if (n % 3 == 0) CHECK_EQ(static_cast<double>(upper), boundary);
     LedStatusPolicy policy;
-    checkBar(policy.update(ready(lower), 0, 60), n - 1);
-    checkBar(policy.update(ready(upper), 0, 60), n);
+    checkBar(socBarFrame(socCompletedSegments(lower),60), n - 1);
+    checkBar(socBarFrame(socCompletedSegments(upper),60), n);
   }
   CHECK_EQ(socCompletedSegments(-100), 0);
   CHECK_EQ(socCompletedSegments(-0.01f), 0);
@@ -304,18 +304,18 @@ void testQuantizationBoundariesAndPhysicalFrames() {
     LedStatusPolicy policy;
     auto in = ready(percent);
     const auto frame = policy.update(in, 123, 60);
-    CHECK_EQ(policy.state(), LedPresentationState::READY);
+    CHECK_EQ(policy.state(),percent<=15?LedPresentationState::BATTERY_CRITICAL:percent<=30?LedPresentationState::BATTERY_WARNING:LedPresentationState::READY);
     CHECK(policy.snapshot().soc_valid);
     CHECK_EQ(policy.snapshot().soc_segments, n);
     CHECK_EQ(policy.snapshot().soc_percent, percent);
-    checkBar(frame, n);
+    if(percent>30)checkBar(frame, n);
     checkBar(socBarFrame(n, 60), n);
   }
   checkBar(socBarFrame(255, 60), 12);
   for (float percent : {-99.0f, 101.0f}) {
     LedStatusPolicy policy;
-    checkBar(policy.update(ready(percent), 0, 60), percent < 0 ? 0 : 12);
-    CHECK(policy.snapshot().soc_valid);
+    checkUniform(policy.update(ready(percent), 0, 60),255,140,0,6);
+    CHECK(!policy.snapshot().soc_valid);
   }
 }
 
@@ -377,14 +377,14 @@ void testChargingAndTrueFullSeparation() {
     in.battery_charging = true;
     LedStatusPolicy policy;
     const int pulsing = n == 12 ? 11 : n;
-    checkBar(policy.update(in, 0, 60), n, pulsing, 6);
+    checkBar(policy.update(in, 0, 60), n, pulsing, 2);
     CHECK_EQ(policy.state(), LedPresentationState::CHARGING);
     CHECK(!policy.snapshot().charge_complete_verified);
-    checkBar(policy.update(in, 1500, 60), n, pulsing, 20);
+    checkBar(policy.update(in, 1500, 60), n, pulsing, 60);
     for (uint32_t t = 0; t <= 3000; t += 75) {
       const auto frame = policy.update(in, t, 60);
-      CHECK(frame.pixels[kExpectedOrder[pulsing]].brightness >= 6);
-      for (const auto& e : frame.pixels) CHECK(e.brightness <= 20);
+      CHECK(frame.pixels[kExpectedOrder[pulsing]].brightness >= 2);
+      for (const auto& e : frame.pixels) CHECK(e.brightness <= 60);
     }
   }
   g_case = "no full producer from numeric SOC";
@@ -431,10 +431,10 @@ void testChargingWhileServoNotInitialized() {
   in.system_health = SystemHealth::BOOTING;
   LedStatusPolicy policy;
   CHECK_EQ(policy.state(), LedPresentationState::BOOTING);
-  checkBar(policy.update(in, 0, 60), 5, 5, 6);
+  checkBar(policy.update(in, 0, 60), 5, 5, 2);
   CHECK_EQ(policy.state(), LedPresentationState::CHARGING);
   CHECK_EQ(policy.snapshot().soc_segments, 5);
-  checkBar(policy.update(in, 1500, 60), 5, 5, 20);
+  checkBar(policy.update(in, 1500, 60), 5, 5, 60);
 
   in.battery_charging = false;
   CHECK_EQ(selectLedState(in), LedPresentationState::BOOTING);
@@ -509,8 +509,8 @@ void testDalyInformationalAlarmBitIsNarrow() {
     CHECK(!policy.snapshot().charging_fault);
     CHECK(policy.snapshot().soc_valid);
     CHECK_EQ(policy.snapshot().soc_segments, 6);
-    checkBar(f, 6, 6, 6);                          // 6 fixed, the 7th breathing
-    checkBar(policy.update(in, 1500, 60), 6, 6, 20);
+    checkBar(f, 6, 6, 2);                          // 6 fixed, the 7th breathing
+    checkBar(policy.update(in, 1500, 60), 6, 6, 60);
   }
   g_case = "DALY 0x0010 LED exception: every other alarm is still a charging fault";
   for (const auto& in : {chargingWith(0, 0, 0, 0), chargingWith(0, 0, 0, 0x0010)}) {
@@ -552,7 +552,7 @@ void testDalyInformationalAlarmBitIsNarrow() {
     // 100 percent, charging, informational bit: 11 fixed + the last breathing.
     in = chargingWith(0, 0, 0, 0x0010, 100.0f);
     LedStatusPolicy policy;
-    checkBar(policy.update(in, 0, 60), 12, 11, 6);
+    checkBar(policy.update(in, 0, 60), 12, 11, 2);
     CHECK_EQ(policy.state(), LedPresentationState::CHARGING);
     CHECK(!policy.snapshot().charge_complete_verified);
   }
@@ -563,6 +563,16 @@ void testDalyInformationalAlarmBitIsNarrow() {
   CHECK_EQ(socCompletedSegments(100.0f), 12);
 }
 
+void testSocHysteresisAndContinuousCharging(){
+ g_case="SOC thresholds, hysteresis and freshness";LedStatusPolicy p;
+ const float soc[]={31,30,31,32.9f,33,15,17.9f,18,32,33};
+ const LedPresentationState expected[]={LedPresentationState::READY,LedPresentationState::BATTERY_WARNING,LedPresentationState::BATTERY_WARNING,LedPresentationState::BATTERY_WARNING,LedPresentationState::READY,LedPresentationState::BATTERY_CRITICAL,LedPresentationState::BATTERY_CRITICAL,LedPresentationState::BATTERY_WARNING,LedPresentationState::BATTERY_WARNING,LedPresentationState::READY};
+ for(unsigned i=0;i<10;++i){p.update(ready(soc[i]),i*100,60);CHECK_EQ(p.state(),expected[i]);}
+ auto in=ready(10);p.update(in,0,60);in.telemetry_age_ms=kDalyTelemetryFreshnessMs+1;p.update(in,100,60);CHECK(!p.snapshot().soc_valid);CHECK(!p.snapshot().battery_critical);
+ in=ready(10);in.battery_charging=true;p.update(in,0,60);CHECK_EQ(p.state(),LedPresentationState::CHARGING);
+ // Frame-to-frame continuity, including the 3 s wrap. No endpoint flicker.
+ int previous=-1;for(unsigned t=0;t<=6000;t+=10){const auto f=p.update(in,t,60);const int b=f.pixels[kExpectedOrder[1]].brightness;if(previous>=0)CHECK(std::abs(b-previous)<=2);previous=b;}
+}
 void testNamesAndInitialState() {
   g_case = "names and initial state";
   const char* names[] = {"READY", "CHARGING", "CHARGE_COMPLETE_VERIFIED", "BOOTING",
@@ -593,6 +603,7 @@ int main() {
   testChargingAndTrueFullSeparation();
   testChargingWhileServoNotInitialized();
   testDalyInformationalAlarmBitIsNarrow();
+  testSocHysteresisAndContinuousCharging();
   testNamesAndInitialState();
   std::printf("test_led_status_policy: %d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;

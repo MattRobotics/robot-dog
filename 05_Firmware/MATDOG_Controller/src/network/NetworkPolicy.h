@@ -61,21 +61,24 @@ enum class RoleReason : uint8_t {
   MAINTENANCE_AP = 0,     // maintenance: administrative AP, portal reachable
   RUN_STA = 1,            // run: join the configured router
   RUN_NO_PROFILE_AP = 2,  // run: no enabled router profile -> recovery AP
+  MAINTENANCE_STA_READONLY = 4,
   RUN_RECOVERY_AP = 3,    // run: router attempts failed -> recovery AP, retry later
 };
 struct RoleInputs {
   bool run = false, sta_profile = false, recovery = false;
+  bool maintenance_lan = false;
 };
 inline RoleReason selectRole(const RoleInputs &i) {
   if (!i.run)
-    return RoleReason::MAINTENANCE_AP;
+    return i.maintenance_lan && i.sta_profile && !i.recovery ? RoleReason::MAINTENANCE_STA_READONLY : RoleReason::MAINTENANCE_AP;
   if (!i.sta_profile)
     return RoleReason::RUN_NO_PROFILE_AP;
   return i.recovery ? RoleReason::RUN_RECOVERY_AP : RoleReason::RUN_STA;
 }
-inline bool roleIsSta(RoleReason r) { return r == RoleReason::RUN_STA; }
+inline bool roleIsSta(RoleReason r) { return r == RoleReason::RUN_STA || r == RoleReason::MAINTENANCE_STA_READONLY; }
 inline const char *toString(RoleReason r) {
   switch (r) {
+  case RoleReason::MAINTENANCE_STA_READONLY: return "MAINTENANCE_STA_READONLY";
   case RoleReason::MAINTENANCE_AP: return "MAINTENANCE_AP";
   case RoleReason::RUN_STA: return "RUN_STA";
   case RoleReason::RUN_NO_PROFILE_AP: return "RUN_NO_PROFILE_AP";

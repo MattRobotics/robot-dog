@@ -62,6 +62,14 @@ int main() {
  using R=RoleReason;
  {
   store(true,false);WifiManager wifi;matdog::core::MotionService motion;motion.begin(nullptr,nullptr);
+  applyControllerMode(wifi,motion,OperatingMode::MAINTENANCE);WifiRuntimeTest::initialize(wifi);wifi.setMaintenanceLan(true);
+  ASSERT_MODE(until(wifi,Phase::CLIENT_STA,3000)!=UINT32_MAX);advance(wifi,500);association("home-router");advance(wifi,500);
+  ASSERT_MODE(role(wifi)==R::MAINTENANCE_STA_READONLY&&wifi.status().connected);ASSERT_MODE(!admitted(wifi));
+  rejectedMotion(motion,"MODE_RUN_REQUIRED");wifi.setMaintenanceLan(false);
+  ASSERT_MODE(until(wifi,Phase::ADMIN_AP,3000)!=UINT32_MAX);ASSERT_MODE(role(wifi)==R::MAINTENANCE_AP&&verifiedAp(wifi));
+ }
+ {
+  store(true,false);WifiManager wifi;matdog::core::MotionService motion;motion.begin(nullptr,nullptr);
   applyControllerMode(wifi,motion,OperatingMode::MAINTENANCE);WifiRuntimeTest::initialize(wifi);
   ASSERT_MODE(until(wifi,Phase::ADMIN_AP,3000)!=UINT32_MAX);
   ASSERT_MODE(verifiedAp(wifi)&&admitted(wifi));

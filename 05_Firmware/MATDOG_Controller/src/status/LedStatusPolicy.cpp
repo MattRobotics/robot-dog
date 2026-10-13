@@ -52,7 +52,7 @@ LedPresentationState selectFromFacts(const LedStatusInputs& in, const LedStatusS
 LedStatusSnapshot factsFor(const LedStatusInputs& in) {
   LedStatusSnapshot facts;
   const bool fresh = telemetryFresh(in);
-  facts.soc_valid = fresh && std::isfinite(in.soc_percent);
+  facts.soc_valid = fresh && std::isfinite(in.soc_percent) && in.soc_percent >= 0 && in.soc_percent <= 100;
   if (facts.soc_valid) {
     facts.soc_percent = in.soc_percent;
     facts.soc_segments = socCompletedSegments(in.soc_percent);
@@ -157,6 +157,21 @@ const char* toString(LedPresentationState state) {
 LedFrame LedStatusPolicy::update(const LedStatusInputs& inputs, uint32_t now_ms,
                                  uint8_t max_brightness) {
   snapshot_ = factsFor(inputs);
+  // SOC affects presentation only. No KEY, MOS or charging-policy writes.
+  // Enter at 30/15; release at 33/18. Stale data renders UNKNOWN and cannot
+  // assert a low-SOC alarm; the latch survives to avoid threshold chatter.
+  if (snapshot_.soc_valid) {
+    const float soc=snapshot_.soc_percent;
+    if (soc<=15) soc_level_=2;
+    else if (soc_level_==2 && soc<18) {}
+    else if (soc<=30 || (soc_level_!=0 && soc<33)) soc_level_=1;
+    else soc_level_=0;
+    if (!snapshot_.charging) {
+      snapshot_.battery_critical=inputs.battery_critical || soc_level_==2;
+      snapshot_.battery_warning=inputs.battery_warning || soc_level_==1;
+    }
+  }
+  snapshot_.presentation=selectFromFacts(inputs,snapshot_);
   if (state() == LedPresentationState::READY || state() == LedPresentationState::CHARGING) {
     if (!snapshot_.soc_valid) {
       return uniformFrame({255, 140, 0, subtleBrightness(now_ms, max_brightness)});
@@ -166,7 +181,11 @@ LedFrame LedStatusPolicy::update(const LedStatusInputs& inputs, uint32_t now_ms,
       // At reported 100%, keep the final logical segment pulsing. Never FULL.
       const uint8_t next = snapshot_.soc_segments < kSocPixelCount
                                ? snapshot_.soc_segments : kSocPixelCount - 1;
-      frame.pixels[kSocPixelOrder[next]] = ledEffectFor(state(), now_ms, max_brightness);
+      // Raised-cosine pulse: continuous slope at extrema, visibly spans the
+      // full ceiling instead of the old subtle one-third brightness.
+      const double phase=(now_ms%3000)/3000.0;
+      const auto pulse=static_cast<uint8_t>(std::lround(2+(max_brightness>2?max_brightness-2:0)*(.5-.5*std::cos(6.283185307179586*phase))));
+      frame.pixels[kSocPixelOrder[next]] = {0,255,0,static_cast<uint8_t>(pulse>max_brightness?max_brightness:pulse)};
     }
     return frame;
   }

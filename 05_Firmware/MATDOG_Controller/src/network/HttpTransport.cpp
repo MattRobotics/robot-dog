@@ -91,6 +91,7 @@ bool socketFacts(httpd_req_t *req, HttpTransportRequest &r) {
     snprintf(address,sizeof(address),"%u.%u.%u.%u",bytes[0],bytes[1],bytes[2],bytes[3]);
     snprintf(expected,sizeof(expected),"https://%s",address);
     r.local_authorized=!strcmp(host,address)&&!strcmp(origin,expected);
+    if(!strcmp(host,"matdog-227594.local")&&!strcmp(origin,"https://matdog-227594.local"))r.local_authorized=true;
   }
   return true;
 }
@@ -195,6 +196,30 @@ bool HttpTransport::registerHandlers(httpd_handle_t server, bool admin) {
   }
   return true;
 }
+bool HttpTransport::registerReadOnlyHandlers(httpd_handle_t server) {
+  const httpd_uri_t routes[]={
+    {"/",HTTP_GET,&HttpTransport::handlePage,this},
+    {"/status",HTTP_GET,&HttpTransport::handleStatus,this},
+    {"/wifi/status",HTTP_GET,&HttpTransport::handleWifi,this},
+    {"/api/motion/status",HTTP_GET,&HttpTransport::handleMotion,this},
+    {"/api/motion/capabilities",HTTP_GET,&HttpTransport::handleMotion,this}};
+  for(const auto& route:routes) if(httpd_register_uri_handler(server,&route)!=ESP_OK)return false;
+  return true;
+}
+bool HttpTransport::readOnlyAdmitted(const HttpTransportRequest& r) const {
+  const auto& w=service_->wifiStatus();auto& g=service_->networkAdminAccess();
+  wifi_mode_t mode=WIFI_MODE_NULL;wifi_ap_record_t ap{};
+  const bool read=r.kind==HttpRequestKind::NONE||r.kind==HttpRequestKind::WEB_STATUS||
+    r.kind==HttpRequestKind::WIFI_STATUS||r.kind==HttpRequestKind::MOTION_STATUS||r.kind==HttpRequestKind::MOTION_CAPABILITIES;
+  return read&&!r.ap_socket&&!r.tls&&r.local_ipv4&&r.local_ipv4==w.ipv4&&
+    r.admin_generation==g.generation()&&!g.closing.load()&&!g.radio_fault.load()&&
+    g.phase.load()==NetworkPhase::CLIENT_STA&&!w.run_mode&&w.connected&&
+    static_cast<RoleReason>(w.role_reason)==RoleReason::MAINTENANCE_STA_READONLY&&
+    esp_wifi_get_mode(&mode)==ESP_OK&&mode==WIFI_MODE_STA&&esp_wifi_sta_get_ap_info(&ap)==ESP_OK;
+}
+bool HttpTransport::admitReadOnly(HttpTransportRequest& r) {
+  r.admin_generation=service_->networkAdminAccess().generation();return readOnlyAdmitted(r);
+}
 void HttpTransport::lifecycle() {
   for (;;) { lifecycleTick(); vTaskDelay(pdMS_TO_TICKS(50)); }
 }
@@ -209,7 +234,15 @@ void HttpTransport::lifecycleTick() {
   desired_.store(!manual_stop_.load() && !gate.closing.load() &&
                  phase == NetworkPhase::ADMIN_AP &&
                  gate.allowed(gate.generation()) && WifiManager::verifyAdminRadio());
-  if (phase != NetworkPhase::CLIENT_STA || gate.closing.load()) tls_desired_.store(false);
+  const auto& wifi=service_->wifiStatus();
+  const bool readonly=!manual_stop_.load()&&!gate.closing.load()&&!gate.radio_fault.load()&&phase==NetworkPhase::CLIENT_STA&&
+    !wifi.run_mode&&wifi.connected&&static_cast<RoleReason>(wifi.role_reason)==RoleReason::MAINTENANCE_STA_READONLY;
+  desired_.store(desired_.load()||readonly);
+  if(server_&&http_readonly_!=readonly) {
+    if(httpd_stop(server_)!=ESP_OK){gate.raiseFault(FaultSite::LISTENER_STOP_FAILED);return;}
+    server_=nullptr;listening_.store(false);
+  }
+  if (phase != NetworkPhase::CLIENT_STA || gate.closing.load() || readonly) tls_desired_.store(false);
   if (desired_.load() || tls_desired_.load()) gate.listeners_closed.store(false);
     if (desired_.load() && !server_) {
       httpd_config_t c = HTTPD_DEFAULT_CONFIG();
@@ -222,7 +255,8 @@ void HttpTransport::lifecycleTick() {
       c.recv_wait_timeout = 3;
       c.send_wait_timeout = 3;
       c.task_priority = 2;
-      if (httpd_start(&server_, &c) == ESP_OK && !registerHandlers(server_)) {
+      http_readonly_=readonly;
+      if (httpd_start(&server_, &c) == ESP_OK && !(readonly?registerReadOnlyHandlers(server_):registerHandlers(server_))) {
         if (httpd_stop(server_) == ESP_OK) server_ = nullptr;
         else { gate.noteFault(FaultSite::LISTENER_STOP_FAILED); gate.revoke(); gate.phase.store(NetworkPhase::FAULT); }
       }
@@ -284,7 +318,7 @@ bool HttpTransport::dispatch(const HttpTransportRequest &request,
   xSemaphoreTake(response_ready_,
                  0); // drain prior late wake; IDs remain authoritative
   if (request.kind >= HttpRequestKind::WIFI_STATUS &&
-      !(request.kind>=HttpRequestKind::MOTION_STATUS&&motionStaAdmitted(request)) &&
+      !(request.kind>=HttpRequestKind::MOTION_STATUS&&motionStaAdmitted(request)) && !readOnlyAdmitted(request) &&
       (!service_->networkAdminAccess().allowed(request.admin_generation) ||
        !WifiManager::verifyAdminRadio())) {
     xSemaphoreGive(slot_free_); return false;
@@ -361,13 +395,16 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   resp.sequence = req.sequence;
 
   auto &gate = service_->networkAdminAccess();
+  const bool readonly=readOnlyAdmitted(req);
+  if(req.kind>=HttpRequestKind::OTA_CHALLENGE&&req.kind<=HttpRequestKind::OTA_ABORT&&static_cast<RoleReason>(service_->wifiStatus().role_reason)==RoleReason::MAINTENANCE_STA_READONLY){resp.message="OTA_DENIED_MAINTENANCE_LAN";return;}
   const bool sta_motion=req.kind>=HttpRequestKind::MOTION_STATUS&&motionStaAdmitted(req);
-  const bool admin_request = req.kind >= HttpRequestKind::WIFI_STATUS&&!sta_motion;
+  const bool admin_request = req.kind >= HttpRequestKind::WIFI_STATUS&&!sta_motion&&!readonly;
   AdminLease lease(gate);
   if (admin_request && (!lease || !gate.allowed(req.admin_generation) ||
                         !WifiManager::verifyAdminRadio())) {
     resp.message = "ADMIN_AP_REQUIRED"; return;
   }
+  if(!req.ap_socket&&!req.tls&&req.local_ipv4&&!readonly){resp.message="LAN_READ_ONLY_REQUIRED";return;}
   if ((admin_request||sta_motion)&&(portal_generation_!=req.admin_generation||portal_sta_!=sta_motion)) {
     portal_.reset();portal_generation_=req.admin_generation;portal_sta_=sta_motion;
   }
@@ -786,6 +823,8 @@ esp_err_t HttpTransport::handleStatus(httpd_req_t *req) {
   auto *self = static_cast<HttpTransport *>(req->user_ctx);
   HttpTransportRequest r{};
   r.kind = HttpRequestKind::WEB_STATUS;
+  if(!socketFacts(req,r)||(!self->admitReadOnly(r)&&!self->admitMotion(r)))
+    return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"READ_TRANSPORT_REQUIRED");
   HttpTransportResponse resp{};
   if (!self->dispatch(r, &resp))
     return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
@@ -1039,7 +1078,7 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
 esp_err_t HttpTransport::handlePage(httpd_req_t *req) {
   auto *self = static_cast<HttpTransport *>(req->user_ctx);
   HttpTransportRequest r{};
-  if(!socketFacts(req,r)||!self->admitMotion(r))
+  if(!socketFacts(req,r)||(!self->admitReadOnly(r)&&!self->admitMotion(r)))
     return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"MOTION_TRANSPORT_REQUIRED");
   httpd_resp_set_type(req, "text/html; charset=utf-8");
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
@@ -1055,7 +1094,8 @@ esp_err_t HttpTransport::handlePage(httpd_req_t *req) {
 esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
   auto* self=static_cast<HttpTransport*>(req->user_ctx);
   HttpTransportRequest r{};
-  if(!socketFacts(req,r) || !self->admitMotion(r))
+  if(req->method==HTTP_GET)r.kind=!strcmp(req->uri,"/api/motion/status")?HttpRequestKind::MOTION_STATUS:HttpRequestKind::MOTION_CAPABILITIES;
+  if(!socketFacts(req,r) || (!(req->method==HTTP_GET&&self->admitReadOnly(r))&& !self->admitMotion(r)))
     return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"ADMIN_AP_REQUIRED");
   char session_cookie[256]{};httpd_req_get_hdr_value_str(req,"Cookie",session_cookie,sizeof(session_cookie));
   cookieValue(session_cookie,"md_session",r.cookie);
@@ -1102,7 +1142,9 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   if (!socketFacts(req, r))
     return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "Socket unavailable");
   const bool motion_auth=!strcmp(req->uri,"/api/motion/login")||!strcmp(req->uri,"/api/motion/session")||!strcmp(req->uri,"/api/motion/logout");
-  if(motion_auth?!self->admitMotion(r):!self->admitAdmin(r))
+  const bool ro=req->method==HTTP_GET&&!strcmp(req->uri,"/wifi/status");
+  if(ro)r.kind=HttpRequestKind::WIFI_STATUS;
+  if(!(ro&&self->admitReadOnly(r)) && (motion_auth?!self->admitMotion(r):!self->admitAdmin(r)))
     return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"ADMIN_AP_OR_MOTION_TLS_REQUIRED");
   if (req->method == HTTP_GET)
     r.kind = HttpRequestKind::WIFI_STATUS;

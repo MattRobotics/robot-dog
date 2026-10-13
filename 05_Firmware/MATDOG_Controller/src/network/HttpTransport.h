@@ -87,6 +87,10 @@ private:
   void lifecycle();
   void lifecycleTick();
   bool admitAdmin(HttpTransportRequest &request);
+  bool admitReadOnly(HttpTransportRequest&);
+  bool readOnlyAdmitted(const HttpTransportRequest&) const;
+  bool registerReadOnlyHandlers(httpd_handle_t);
+  bool http_readonly_=false;
   uint32_t portal_generation_ = 0;
   bool portal_sta_=false;
   bool admitMotion(HttpTransportRequest&);

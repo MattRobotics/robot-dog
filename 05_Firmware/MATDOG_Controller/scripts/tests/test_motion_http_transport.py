@@ -38,6 +38,8 @@ struct FakeService {
  bool motionAck(const motion::MotionAck& ack,char* out,size_t cap) { return motion.ackJson(ack,out,cap); }
 ''')
 fixture = fixture.replace(' static esp_err_t handleWifi(httpd_req_t*);', ''' bool portal_sta_=false;
+ bool admitReadOnly(HttpTransportRequest&);
+ bool readOnlyAdmitted(const HttpTransportRequest&) const;
  bool admitMotion(HttpTransportRequest&);
  bool motionStaAdmitted(const HttpTransportRequest&) const;
  uint32_t portal_generation_=0;
@@ -148,6 +150,17 @@ int main() {
  s.revoke_before_service=true;auto pending=motionRequest(s,command("MOTION.STOP"));runMotion(pending);check(pending.status==403,"revocation between handler and Controller service fences request");s.revoke_before_service=false;s.service.gate.open();
  auto old=motionRequest(s,command("MOTION.STOP"));runMotion(old);check(old.status==403,"generation change resets portal session");login(s);
  s.busy=true;auto busy=request(s,"/api/motion/status","");busy.method=HTTP_GET;runMotion(busy);check(busy.status==500&&busy.response=="Controller busy","mailbox failure explicit");s.busy=false;
+ // MAINTENANCE LAN has a separate GET-only contract; no session or command.
+ s.service.gate.phase.store(NetworkPhase::CLIENT_STA);s.service.gate.radio_fault.store(false);
+ s.service.motion_wifi.run_mode=false;s.service.motion_wifi.connected=true;s.service.motion_wifi.role_reason=static_cast<uint8_t>(RoleReason::MAINTENANCE_STA_READONLY);
+ s.service.gate.closing.store(false);s.busy=false;s.revoke_before_service=false;WiFi.connected=true;WiFi.mode_value=WIFI_STA;
+ endpoint(local_addr,local_len,0xc0a80110u,true,80);
+ auto ro=request(s,"/api/motion/status","");ro.method=HTTP_GET;runMotion(ro);check(ro.status==200,"LAN maintenance status allowed without grant");
+ auto rocap=request(s,"/api/motion/capabilities","");rocap.method=HTTP_GET;runMotion(rocap);check(rocap.status==200,"LAN maintenance catalog allowed");
+ const unsigned before=s.service.command_calls;auto denied=motionRequest(s,command("MOTION.STAND"));runMotion(denied);check(denied.status==403&&s.service.command_calls==before,"LAN command denied before service");
+ auto rologin=request(s,"/api/motion/login","token="+token);run(rologin);check(rologin.status==403,"LAN cannot create operational session");
+ s.service.gate.closing.store(true);auto closed=ro;runMotion(closed);check(closed.status==403,"LAN read revoked during radio transition");
+ s.service.gate.closing.store(false);WiFi.mode_value=WIFI_AP_STA;auto dual=ro;runMotion(dual);check(dual.status==403,"LAN APSTA never admitted");
  check(s.service.mutations==0,"no configuration or actuator writes from motion API harness");
  printf("MOTION_HTTP_TRANSPORT = PASS (%u production-handler/security/service checks; HTTPD/socket/mailbox/driver facts are doubles)\n",checks);
 }
@@ -163,6 +176,7 @@ cases = 'case HttpRequestKind::MOTION_STATUS:'+between(c, 'case HttpRequestKind:
 login_case = 'case HttpRequestKind::MOTION_LOGIN: case HttpRequestKind::WIFI_LOGIN:'+between(c, 'case HttpRequestKind::WIFI_LOGIN:', 'case HttpRequestKind::WIFI_SESSION:')
 copy_start = c.index('      if(request.kind==HttpRequestKind::MOTION_CAPABILITIES')
 copy = c[copy_start:c.index('      xSemaphoreGive(slot_free_);', copy_start)]
+admit += 'bool HttpTransport::readOnlyAdmitted'+between(c,'bool HttpTransport::readOnlyAdmitted','void HttpTransport::lifecycle()')
 unit = fixture.replace('// PRODUCTION_TYPES',types).replace('// PRODUCTION_HELPERS',helpers+admit+verify).replace('// PRODUCTION_HANDLER',handler+wifi_handler).replace('// PRODUCTION_SERVICE_CASES',cases+login_case).replace('// PRODUCTION_SERVICE_ADMISSION',admission).replace('// PRODUCTION_CATALOG_COPY',copy)
 with tempfile.TemporaryDirectory(prefix='matdog-motion-http-') as temp:
     cpp, exe = Path(temp)/'probe.cpp', Path(temp)/'probe';cpp.write_text(unit)
