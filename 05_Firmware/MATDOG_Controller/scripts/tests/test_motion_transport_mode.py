@@ -102,7 +102,7 @@ int main() {
   ASSERT_MODE(!wifi.configure(patch("another-router")));
   ASSERT_MODE(sets==0&&commits==0);
  }
- printf("MOTION_TRANSPORT_MODE = %s (%u semantic checks; %d total including driver/queue/fence assertions). RUN_STA lacks motion admission; RUN recovery AP is compatible.\n",failures?"FAIL":"PASS",semantic_checks,checks);
+ printf("MOTION_TRANSPORT_MODE = %s (%u semantic checks; %d total including driver/queue/fence assertions). RUN_STA rejects AP administration; authenticated Motion TLS is tested separately. RUN recovery AP is compatible.\n",failures?"FAIL":"PASS",semantic_checks,checks);
  return failures?1:0;
 }
 '''

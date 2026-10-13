@@ -1,0 +1,1882 @@
+{
+  "schema": "MATDOG_MOTION_READINESS_SOURCE_MANIFEST_V1",
+  "compiled_source_commit": "f62e89b1f482ebb2aee6cca5f5ec148d7509b383",
+  "files": [
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/README.md",
+      "sha256": "fce17deda68e640e83de27f7be5a8ac5067f975ae66f658d4ae11862c4f291c0"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/SHA256SUMS.txt",
+      "sha256": "60fff604eae0857c7c61f115bbe3922949ababdd827fab61c74e1673336c39e1"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+      "sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/base_link.stl",
+      "sha256": "644a83e98fd116f3fc8e5d8792ca2b60b0bdb09bcafa4fc49140d641079e4b6b"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl",
+      "sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl",
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl",
+      "sha256": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl",
+      "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl",
+      "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl",
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl",
+      "sha256": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl",
+      "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl",
+      "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl",
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl",
+      "sha256": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl",
+      "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl",
+      "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl",
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl",
+      "sha256": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl",
+      "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl",
+      "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/lf_foot_link.stl",
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/lf_hip_link.stl",
+      "sha256": "7d28351aba669cc1a8e11ad60b89db001f9689b728e4e8eb05849af69e1e4879"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/lf_lower_leg_link.stl",
+      "sha256": "97f2bb775768fdbcef59638916eaef2cd34b21bf01e6197ef3900b0df85d7ae2"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/lf_upper_leg_link.stl",
+      "sha256": "3c484b110a622274d1f8446b30329b8e16a0ff542d25da2a39334d41e8f4f169"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/lh_foot_link.stl",
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/lh_hip_link.stl",
+      "sha256": "543f6f04a4dc45a0b176eba8db8ab7819ab20a328aa4f7fd9c9d4b77c1612094"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/lh_lower_leg_link.stl",
+      "sha256": "97f2bb775768fdbcef59638916eaef2cd34b21bf01e6197ef3900b0df85d7ae2"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/lh_upper_leg_link.stl",
+      "sha256": "3c484b110a622274d1f8446b30329b8e16a0ff542d25da2a39334d41e8f4f169"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/rf_foot_link.stl",
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/rf_hip_link.stl",
+      "sha256": "ebd664b3db2065ac3341184a6b12700caca6cdece57adae72f935882ed9df4c0"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/rf_lower_leg_link.stl",
+      "sha256": "c52ae662c09455f53db5bc8efc13332919942c7f938ada5a8c0e987f54ac3bc8"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/rf_upper_leg_link.stl",
+      "sha256": "08fab5e3229280f21a52c6cfbfdab32f1e8345aae6e10648360ae30fe1e06b16"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/rh_foot_link.stl",
+      "sha256": "e43737c4cbc5d618431ecf2ce9ba20a4803f5a7b7f800974a6d8b2c7534091bc"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/rh_hip_link.stl",
+      "sha256": "2e9f31952e51b5748546c803c06d72316a3a776226f1f72775c1e8d383e1f325"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/rh_lower_leg_link.stl",
+      "sha256": "c52ae662c09455f53db5bc8efc13332919942c7f938ada5a8c0e987f54ac3bc8"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/meshes/rh_upper_leg_link.stl",
+      "sha256": "08fab5e3229280f21a52c6cfbfdab32f1e8345aae6e10648360ae30fe1e06b16"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx",
+      "sha256": "381675b4c4fae0305ed2a2e882c0b9b43f513d9f0e53afff41e60801d798b13f"
+    },
+    {
+      "path": "03_CAD/URDF/matt_robodog_rev00/urdf_studio/matt_robodog_rev00.usp",
+      "sha256": "03417781c29960854df16c609e8f4a27f2f543f3b47a7c2c67245defffaafc50"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/.gitignore",
+      "sha256": "5f7116715f14bb08c6e4b6a7bb446b40b18006171a332f40bbfde6199d813b26"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/AP_ONLY_ADMIN.md",
+      "sha256": "9399412147eb4b11a8dedcbe7892fa137712171c231762822f53fcf89422ce81"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/CALIBRATION_BOOTSTRAP.md",
+      "sha256": "c4cc7987e6359113e0b9db3609ba9648b6fa2735ff4cdf2ac48fe000d14bb537"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/CALIBRATION_MAINTENANCE_REQUIREMENT.md",
+      "sha256": "347280de2d9189688201feefad56b31cf16e7e6fea46f1ce81ccac489b17c3c9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/CALIBRATION_READINESS.md",
+      "sha256": "c59fd1ddf658ed991962ab9414f78d7aec7ead4097fd6dc5f5ee888f9a15e071"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/CALIBRATION_SOURCE_PRECEDENCE.md",
+      "sha256": "e8127878580034e2ee9b8489ee1d41c5a3c27395708fb127f58a9fd25d502844"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/CHANGELOG.md",
+      "sha256": "c4727a3841fcb51b736af1d0584d4947054409d213971f7b2b8746dfb37c2995"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/CR2C_Q0_HARDWARE_READONLY_RUNBOOK.md",
+      "sha256": "bd75566eebc9285b197c07507a5b09b205d04f56e41fb8ca1fbe01e98892d2fd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/CR3_Q0_ACCEPTANCE_PROMOTION_PLAN.md",
+      "sha256": "e9c7bb231a84acd204247e0af0dd097784ad1ff313ddb92e0558d506020a6437"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/DEVELOPMENT_GATES.md",
+      "sha256": "5e664f103e834d0a812822911f0b829d20aa730176c50438ee4f6783d89c8ef6"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/FLASH_LAYOUT_M0_4_ROBOT_POWERED_RUNBOOK.md",
+      "sha256": "82714084529a9abfd546a6e0a3161bf06499c110e26123ec2e1a0e384ac08c5d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/FLASH_LAYOUT_M0_RUNBOOK.md",
+      "sha256": "421cd5de90b288cc651881be1b536c2e75fb1770174a76c2771c0670bd517e5f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md",
+      "sha256": "39b2be1cd7bd3bd8a3fb7909bca5009ed4db605b89011feac3769da2affddfd9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md",
+      "sha256": "c8ad1cd71cba82bf328937c9f205cfaf2a01a7603f4f95d31bb61cb423017a54"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/G3_ROBOT_POWERED_VALIDATION_PLAN.md",
+      "sha256": "7971bcfe5df6209b45dc8c3e0ccf54c762218ba69caae733ee3b2eab6fee4489"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/H0_LEG_PREFLIGHT_RUNBOOK.md",
+      "sha256": "6aac8605ef6d59e9c49c52aa8732425b7ed839358e412717c55527a10dcbd1f3"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/MATDOG_Controller.ino",
+      "sha256": "954e79773d596a9724cf2947d95f2f17ea6d7d9d80d1acda793582a72033a3c9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/POST_ABORT_RECOVERY_RUNBOOK.md",
+      "sha256": "5f4f7b6dba7d0490f1aca7e74a904f02dc90344d476b9e2b4381ed7e7f0f497f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/README.md",
+      "sha256": "6f7100c1659f645a4e667005cb8c6407d23df48f64d24ee0db00284fc7ab48f2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/SAFE_ACTUATOR_LAYER.md",
+      "sha256": "903348e2a50c9b0f67112eb0f8c381f0a5d75b03805ac652e4d05b030fb92d41"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/SESSION_AUTOMATION.md",
+      "sha256": "40214da0065fffbaf4653fb06849fa2ba374ca122db62a77420ce63efaa98c1f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/SOURCE_PROVENANCE.md",
+      "sha256": "c1427688b389d0c89dd290025f3415b8f4d5a6fb0558c0c729e08e95a6c64ce4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/STARTUP_RECOVERY_OFFLINE_ASSESSMENT.md",
+      "sha256": "bef892537a42eebd324d643be5228d98b83a5c49430cd488464340914b49c549"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/VALIDATION.md",
+      "sha256": "85f5ee2fa3635e8a7747f960d5f89a5ad70c19d1bea4aaa3f6f1c52b43e62da7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/WIFI_OTA_SHELLY_HARDWARE_RUNBOOK.md",
+      "sha256": "c5945ae74ebb07b5aeefe0c7c313b3404b5ae137c448bf00a1e52745c8cd7e8d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/partitions.csv",
+      "sha256": "09a2cf4c432914b4fa8ab15e3cfc40fc63c5d2305376b7173f134621f0d92ab4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/backup_gate_logic.py",
+      "sha256": "3dbe6034d12376358ac59e74dff86feacbb083450fd034ccbcb940f7b271e376"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/build.sh",
+      "sha256": "6af7ff3be1b78a4a75556e07f81a3fd09d9982819af0ee59618109886b1bf0ec"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/build_manifest.py",
+      "sha256": "ffdec5469087c84c845803281db1f3a76e8960152fbe7a9d311816bb95946c7a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/calibration_hw_session.py",
+      "sha256": "e9f75e1636116634be6f5ea0e356e4018f6e83ac253340b1262092d2718ee955"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/daly_calibration_guard.py",
+      "sha256": "b331cbbfc0126e87367ee0d5b15686e4041ecbfd1160c1c2f0a8909d9e2550b0"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/flash_app_only.sh",
+      "sha256": "ef6e3ba0c1b07e32f3926f280a29fa78006350588d8f1feaf1e7447a51507f47"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/matdog_layout.py",
+      "sha256": "cf784c34b8e629228f8ab4caf685f229bf2f8a568e6390c53ed6c61508afa1e0"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/matdog_release_session.py",
+      "sha256": "159fd590299e40b2e5b4a3ec2e77fc2b4e5bc7d5df197b6e291ba6e11add37fe"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/matdog_startup_reference.py",
+      "sha256": "e0d5760042bf99f3aca203e9e4f6ec039248fa548c96ddedf7ab4f2f130fc283"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/migration_m0.py",
+      "sha256": "29f3fc877b45fe0a47716f3418d0fd51cc5a9136336efd471faacb139a29b227"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/migration_m0_esptool531.json",
+      "sha256": "aba9d7f40503cdc355b07d41feeb5b55a90002c5841d82a73e5fe5b8bf88cb5e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/migration_m0_write.py",
+      "sha256": "84ed753ce67b833c39bff16b6e07ef9aaf941380852fc8bd507fecea95bc4809"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/motion_dashboard_demo.py",
+      "sha256": "edeedaa104a20080b7f89bb14b93263180ca4597d195944587abf8272b1a39e7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/motion_rc_receipt.py",
+      "sha256": "309c0ce6510dfcac5857c4ba415b34d17d360c1e4b94797abf409defa3e635fd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/ota_partition_logic.py",
+      "sha256": "13c535a4e4e9b8b1f8dbd6515e334d5210d3b02ac0a9e5fbf12386c204b888df"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/ota_tls_client.py",
+      "sha256": "32b868cd9bee70337892441f3e519fc9d0fec057c7e13f949caec8159758b46d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/release/matdog_01_flash.sh",
+      "sha256": "70a97edf84a85eab5deddebf605dc428572b2cbeb07c7704371b008cb1a34b81"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/release/matdog_02_full_calibration.sh",
+      "sha256": "67d43a4008289b76275cbd22787bb461c538a992b7f43a085f557d063cb849d4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/release/matdog_03_verify_and_finalize.sh",
+      "sha256": "b41edb2a4937000bbfa8b34a9e346636a23afdcacba85e5d5658a9aa7160a1ed"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/static_audit.py",
+      "sha256": "c182681de1a6712eb81bfa9e4c2291de15c3588d8416aae5c59e94bdbe5f0d13"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/audit_adaptive_motion_geometry.py",
+      "sha256": "0b4c0e6365070cc804fc265d73ab8453f465d600f8dec5970901fd2dd788b642"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/audit_prone_family.py",
+      "sha256": "1ebff723a18149655a3b3f7a55be3a7ceeba5545f10cd1a8f23ece20456045c9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/calibration_persistence_fixture.h",
+      "sha256": "0ab0246ba6c4eb4e7e478fc028f61ff6a2317dd0998cd5344e2c28edb11fe2dd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/calibration_record_golden.h",
+      "sha256": "28e301aa81eee71f70d44fd300d95e1b51d03e5c523db9e07d908a8edfe8d242"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/kinematic_servo_sim.h",
+      "sha256": "395f6961e147ca530e86cb2ead6ef735450c5ca96fed8c6f1e12af6216a6010f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/led_stubs/Adafruit_NeoPixel.h",
+      "sha256": "035dc1675bd302faffb8e2da06f3d67270b4368fe45a511cba7eb434c1bcaf46"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/led_stubs/Arduino.h",
+      "sha256": "4bd617dab04c5b08d6a57e3d9c6e85d79f2b3a8170381f361256e32b044d0381"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/lf_v25_oracle_fixture.h",
+      "sha256": "6fbfdd3d996036c21cd2e3a5151c96ae6f7a78ebdb02dcfcd2926be7a2642dae"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/motion_integration_manifest_pr2.json",
+      "sha256": "1b660841efca39be144f7c89b6f541bef6654b8b25e7c2a9a7af1ab3c0a756a3"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/network_stubs/Arduino.h",
+      "sha256": "34016d3c548ac0b9bd57b2d3129bd956e819ae1b2037934f8904464a62ed3c7d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/network_stubs/WiFi.h",
+      "sha256": "f3501e60e9355fdc2c7275ad249df573d7881199e49f784193f489f598b22806"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/network_stubs/esp_wifi.h",
+      "sha256": "2407b186cd6bf7680965602c46bd48b6f308148e9ba27457bee66dc3cc7eb18f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/network_stubs/freertos/FreeRTOS.h",
+      "sha256": "58e1bf72dab7765b2ecfed539e4007ad52bd6d90d89eba255bac0a9f3418a176"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/network_stubs/freertos/queue.h",
+      "sha256": "c4647eff283c9fe152fa3f3c0c166fd25c575a01caf4ea98f0a69ea55be7b06d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/network_stubs/freertos/semphr.h",
+      "sha256": "0c5e4e3eac2a4454b4e3a5063cfe3f7618b0588c49368966e810091afc4c3535"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/network_stubs/freertos/task.h",
+      "sha256": "96f2811091da795bdfd01f74768dc8e6bb8fc264c456103e3dc0b2c4d59d5a5f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/nvs_stub/esp_partition.h",
+      "sha256": "f2d6e169bb9d696b1d2b670eb5984657f07fa91fae16cc77c6b482d0051bb573"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/nvs_stub/nvs.h",
+      "sha256": "8dc290be143eeb929f1952a3ad470ae67c82986df4f67659736bfa6f604f8959"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/nvs_stub/nvs_flash.h",
+      "sha256": "566cf37361ea161d9cd950bbe2cdf549e949ce317123561dc49f69e9fbc6c787"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/probe_prone_recovery_family.py",
+      "sha256": "f458c5d61157bb6e7f9b9e71ab432d1a2d13286931f5315edd857102785210c9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/render_motion_recovery.py",
+      "sha256": "9d7e00af37368a2547013cb1dc017feda72dc9819a545c2cb737c7cdb4b7368f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_fake_hardware.cpp",
+      "sha256": "c2b9c7c9ff7d4054c5203d0512fd6855c8dcc1b7c97f8078a318c323642de2ad"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_nvs_stub.cpp",
+      "sha256": "035c17fd9a98d116ed817cf28519067fd56fb6ef21caf19f62826879a895be7f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_nvs_stub.h",
+      "sha256": "63072dc9b56126a6690cf209a5c8e830e5eb565cbbdbe9551f63590c53d2347b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_stubs/Adafruit_BNO08x.h",
+      "sha256": "0b9714a56c5a67e891e478834ebef06fe929afc4508f06a5528f83d28bce1a2a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_stubs/Adafruit_NeoPixel.h",
+      "sha256": "5a88b208b88b76d179d814168c39e5b06b4b6a49c249a0d303620eaa2b064c8c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_stubs/Arduino.h",
+      "sha256": "6b6f0d8209079f212a3cb3b8575a5d93079ffe0257d38a27687b8fa96589e37c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_stubs/SCServo.h",
+      "sha256": "1949fc8817c3c6e0e18f6fb67ebef8baad32164568d18bfe7c665ad29c6f7dd4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_stubs/SPI.h",
+      "sha256": "b3adf106d95b8934f690943f2921308b90be5b766c4c8ba250c792de56400201"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_stubs/esp_http_server.h",
+      "sha256": "085b23649240ac0221b77c88aa90fc678dee48cba947b6f6b5a5c9e23a61b0f7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_stubs/esp_ota_ops.h",
+      "sha256": "d1125eca9b8a42dc61a2f04ef94df2530077183df62085180a24d03b3ed30231"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_stubs/freertos/FreeRTOS.h",
+      "sha256": "b3adf106d95b8934f690943f2921308b90be5b766c4c8ba250c792de56400201"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/router_stubs/freertos/semphr.h",
+      "sha256": "802f614369b1ec19c3402669f1a23674808e2a2e438b39cfd874cf56c26212ba"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_adaptive_motion_tests.py",
+      "sha256": "6c1cf7aaad49b0361b5a542ba57cbe74c440d2ebf420106e0ef3372fed1c31d9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_calibration_restore_tests.sh",
+      "sha256": "fb6477ab8f8414543790a065bf092db8fbde5a545112d77bbf3b2e92a116972c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_host_tests.sh",
+      "sha256": "d24a71b775cb385b5e1a11ba345f1f245864ef754b9a41c129be606df9db105e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_motion_convergence_tests.py",
+      "sha256": "bb531aa5923504459eb874c9e1ab306dcdff054e0f6f040b9dc4a558b6bacfdc"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_motion_enablement_tests.sh",
+      "sha256": "e8422f2b1159ca3c064cc85bb3b205bcc2c2ffb0d78cf813fd65802cf2b224f0"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_motion_lifecycle_tests.sh",
+      "sha256": "a2fd4b2a99cab88ea7c545cffec8f6d4fcfdc29eabc72507651270d4caa8456b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_motion_service_executor_tests.sh",
+      "sha256": "e93d88029be12a3813222fa49b8da9728158a4a6ac1042bb8539e81b4b2ba784"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_paired_runtime_tests.py",
+      "sha256": "8b6a1cb4a33f9d45b42167ac3a9a68f3ac0e054cbcbb2cb0c121da266ae41346"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/servo_read_stub/SCServo.h",
+      "sha256": "46b0a028c59cc8bfc2dd6d967b95427cc8c58d299cfc5852fda362ccb5603612"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/stl_gait_adapter.cpp",
+      "sha256": "9f9fb1c6387b287a0d5e5d37e58a753032b2e5dfc210f2226c37ee08e1502b90"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_actuator_authority.cpp",
+      "sha256": "dcb5d1204dc75966f16d03394f742c6f3e543dae42452842339f86854a6609da"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_actuator_runtime.cpp",
+      "sha256": "03d44c7c95510f5933daf528e3304867cb2fc1948d12cfbcec8683e46a8a01f9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_actuator_write_policy.cpp",
+      "sha256": "ab3e3d441888667d51e3dfae9c62bc1e8409c5069774d5aaaddd058c42cf2b54"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_adaptive_motion.cpp",
+      "sha256": "652be50b8a06c0fc71f294f5da9fb3f0f4446ad1dcf41984b0f84e49ce55c6d2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ap_ingress.py",
+      "sha256": "5622ce595b58e63841a40cff2d61b11f024f7d6811ef85a2e05916d791f7fc15"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ap_only_transport.py",
+      "sha256": "d374cf717ec5847df809338446ac4168eab4b9b73675d62c00d5115502e51177"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ap_session_clock.cpp",
+      "sha256": "6dd4932a2bea344bc1a7cab4855b2fdd264baaebdea4d9e555d6bfb25dc9a702"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ap_session_clock.py",
+      "sha256": "be6a56146274bd4461da57de6903aa887571fa5bcdffc4c3e2231e20db69725b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ap_transport.py",
+      "sha256": "416a68d7f0ef1c5fa179ffa6243c050d0511b2058f1afcc766332366b1597067"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_backup_gate_logic.py",
+      "sha256": "564d20e5d1932daa2fff5854a0d91dbc2e4d6132115cac10416060600ddca2cc"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_build_manifest.py",
+      "sha256": "6be5c40c40262c297740fca3f076fae15ffd9ea9cf4941a12aff5542e9c447e5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_domain.cpp",
+      "sha256": "c7d17d089b4834c08656753d118ac9e699698f771c388292492be779fcdf509d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_execution_engine.cpp",
+      "sha256": "76bbfe8906e986c8551607de0caf5a4f7313888e95dd1378a0ee04da5b32d3b4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_geometry.cpp",
+      "sha256": "6bcd06f7912100330a79f00b8419687522879450d833503836348feb12e9b2b6"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_hw_session.py",
+      "sha256": "81fc6daeeaafb6e2115cb0c896341be282e9d56155dfc41e1b23bca1e3838881"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_manager.cpp",
+      "sha256": "b7eb98e7935846d35507a51f2dbc0c6a5ae0e31fa9fbba3858f24529540ca1ef"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_motion_permit.cpp",
+      "sha256": "1d264dbc22252d1902de3d3b4525f33f9e4653ef524f9b24d7631c5feee115b8"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_persistence_service.cpp",
+      "sha256": "f9f192fc73fe961cf0afd990455da28ff3f6d66be68d2b46b4df0b22487aa535"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_persistence_state.cpp",
+      "sha256": "cec6f264a609774bd1ab33febf91da2615883918b3f7d00f20543500171bbc9d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_population_evidence.cpp",
+      "sha256": "380b72b246fd1065153d94073bbdfa3a9519debf4016ebeca32b86b2f4c8f04c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_q0_bootstrap.cpp",
+      "sha256": "4065b24366cc6b2584895d1a08c42b17ab6268aba0cc20c9f5ddf4aef59bc312"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_q0_capture_session.cpp",
+      "sha256": "285e699cadb2d96109761cb1f0b4b3c277b1634e51da57cfb454af2352d595bd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_record.cpp",
+      "sha256": "50f22b0a9d55d0abd8a2829b91c6d1d9cd1c71d882c007be1ff6e71749005abd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_record_nvs_backend.cpp",
+      "sha256": "759ba8cf4bbf3793d1029519f7eb8a9c6bba25e71b1ba768065459c1864c10ac"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_record_store.cpp",
+      "sha256": "1d019f94f63feddb38f5d2ca8681ab881fac0233d0206b78c089b61d1db6bd13"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_runtime_restore.cpp",
+      "sha256": "f91a50f55b6042fa86bdcc51cab2a34d356cf885e3fd668dd10727d222d90a0c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_save_gate.cpp",
+      "sha256": "ce9af43ef9352486e54178ef65fce0ee2d34318cfbdecb15ef5994d17c345efd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_save_marker.cpp",
+      "sha256": "47e1649c969df7d9ee4d458aa0fbe7512beda90175aacc38b0f7f748f3352166"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_search_behaviour_mutations.py",
+      "sha256": "544e294f3f8e2a9fe67b5b7fe0d1ba58c2bd5dfbb72965c2d3b99d58bcc2946c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_session_orchestrator.cpp",
+      "sha256": "8763f6deff7af0cecdc5793be855eb1179ce9216ac0bb0fb222a146f7200ae39"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_command_router_framing_mutations.py",
+      "sha256": "6de58e1ef89eaffb43be286cd32f335e00892aad13d8dffe896bd7bcfb9906b0"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_command_router_persistence.cpp",
+      "sha256": "86d731e6bfb510568bcb21b37effc9cb78d7f36238a9a5e9636f3a36a5fb1fb5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_contact_probe_engine.cpp",
+      "sha256": "5a2d6e33770dadce1e3ff6fb2779d2721262917bb02c12ec9914d087add59a14"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_cr3_q0_evidence_preparation.cpp",
+      "sha256": "a823bc258de439645f32c33d4057700076363a144c5310dfd1cece7965e2224c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_cr3_q0_fresh_promotion.cpp",
+      "sha256": "d107ec98586037cae0100a9d091c1eb9815e0bec7fc835fd34fb46fa0f66ef90"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_cr3_q0_transform.cpp",
+      "sha256": "5872a9aee937851241b672a9a9e21be2508cb2586a2557dcd42aa23fae2a0275"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_daly_calibration_guard.py",
+      "sha256": "2b47ab15e58bcd6f85d2a0909f6ecfe517e2568bacaede6c26c531acc877fc61"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_daly_protocol.cpp",
+      "sha256": "91b6b960ca30580fbdff3b8a76d22ff5778e53646a7ecd9b9667f13ff600b11a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_dev_identity_build.py",
+      "sha256": "4563750851a01b0be37609a3fa114d495e64fa9fa17385e35f708e71b2498182"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_first_motion_executor.cpp",
+      "sha256": "bbcfe4071b5bd0d0d240787431ccb1f1c792196e01a9e88979341a04efc83647"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_full_leg_calibration_executor.cpp",
+      "sha256": "2f676dc4444cc389e8b020dcbe8f403f8be67a9789f9029ca3d9c4370e93403a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_full_leg_calibration_finalizer.cpp",
+      "sha256": "db6eba70f2334ceda1f3e2237cd60a42a90a4a6fff0cb633ddaf45514516f15a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_full_leg_calibration_plan.cpp",
+      "sha256": "5fee9c050dd99ef92b59a52a005e7512bfe29f2c540206870049a748d272e55d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_hmac256.cpp",
+      "sha256": "308f279b2a0e5fd91e91bf4f4e731e75870cf05c93f0667259ec3682b7215645"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_http_mailbox.cpp",
+      "sha256": "d5f0453c75d60155a44e3f6cab507f7213c828ff04d8b69bf0b7a6f77b95e062"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ir01_lifecycle.cpp",
+      "sha256": "fcfeb2ced65ebfe1d736b941e51aa57489f681cd7b2345fea41354046607ee64"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_led_ring_manager.cpp",
+      "sha256": "80368b3528d34c475544106f6bacbbeeb5f7cd31db46b40c849037e5ee64c22f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_led_status_policy.cpp",
+      "sha256": "b7f0dfdf3d5e5b55f9693986a364c6c958201ddd6d70cdba921b1d438d0ffece"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_matdog_layout.py",
+      "sha256": "3fdeb8c672a2dbed317bb6cda7ac90f80d5e450b4e90ae5b8e02c6a12f89b9d2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_matdog_release_session.py",
+      "sha256": "0ed28c9266bb8beade455623d40e5298f3c5db4433f9df52fb939e33513bc63d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_matdog_startup_reference.py",
+      "sha256": "b0674066bc0725decba8da714d749da1b1dcc6c5259fd786fbf2f998e01be6e3"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_migration_m0.py",
+      "sha256": "1ee07f60dde6624604829d2989e9ac3ba806ea3461ea7fdb27df06ee83f3fe2f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_migration_m0_write.py",
+      "sha256": "b23b26e9efc82d229fcbfbae1083cf9d765f327307e048242084846d10b34f36"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_browser.cjs",
+      "sha256": "1ca900998609fba674b733affe2e3e0e56453b92fa8381ef90db39f02f197a80"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_dashboard_dom.cjs",
+      "sha256": "a2a72614d9e836a689ea5232e34bb2f73a7c660742a9ab40af0408735ab3fbc2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_deadman.cpp",
+      "sha256": "ea6ff5922177fdf698c4ec24e55da20fa865b9aa1bb970bda5f58c5386f697f0"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_http_transport.py",
+      "sha256": "52a8b3243166d03652e7373773ac1d8bb8ce8bf187062dd3aa3c9e4099365b97"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_lifecycle.cpp",
+      "sha256": "689bf1ddf3b9981f2b4a682e5b9cbbb8e807c06e88c2d39cc16b1107d90cb7dd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_rc_receipt.py",
+      "sha256": "d1b34cc15b6e453bbaa0bec5912b83d8d3994bb28279e114d3a9cba2c9839ac4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_safety_boundaries.py",
+      "sha256": "5998ddd5accdd6fdda6e757a1807df4a1160f93650b4225048d8354aead6b53e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_service_executor.cpp",
+      "sha256": "92071e0b399bb1bd7e2a1ea612163104265be37cc236b20d85dc79436802d644"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_transport_mode.py",
+      "sha256": "19351fef8d6ddd95f5aa553ce30c64c82d92a26cca4bdb8e486ae64866d7057f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_network_v3.cpp",
+      "sha256": "55445af42775f00ec72531f02cb1c987bfdc397650785bed0d719347418a5985"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_operational_envelope.cpp",
+      "sha256": "933c9828aa51c9892c0b1bbbef01caa9dd8b7b6e9bbafbcba15cd29d4cab6c83"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ota_layout_contract.cpp",
+      "sha256": "635b548ce50f352aa109652d5081a8071cdec505a4b85d35c0384f247fd66324"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ota_partition_logic.py",
+      "sha256": "51c006185d9a7127ad64558b36fcb83daec45bed999f255a34e425927a3eca9a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ota_policy.cpp",
+      "sha256": "5ed1f85da6ced24dc1871ba6d388cf5f116c3df2e14be29bf0accf8fa19bce13"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ota_session.cpp",
+      "sha256": "b0cd1341e16bcb38740208f3d61e062eaa5933d57e114e8d6ddce093d6b6b678"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_ota_tls_client.py",
+      "sha256": "78507e39930f7661c3cba8673f0a4f98ba38be686e2436c12d558af026cf5297"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_paired_motion_browser.cjs",
+      "sha256": "b92137084999bc9f6d7b9e8e527ad763908a4ec2c96230ee8345c817c110a543"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_paired_runtime.cpp",
+      "sha256": "d633310a929f5d8a014425b92f72d4b583fde1023ddda0b4e575b1f017d6aec4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_portal_device.cpp",
+      "sha256": "d233c523ee5a30a6cd7ceda9c4513fb470bade9843650a5349ae91aecb330ceb"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_portal_dom.cjs",
+      "sha256": "fc0b41cf3a3e4137da7d81bc89a9830047449f67052f19882a857794f7215f23"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_service_readiness.cpp",
+      "sha256": "8d95cc1f83477e0cf72c49f2284566d6ee9a8f20b2c45a1bc37950c620014f1f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_servo_population.cpp",
+      "sha256": "14ac89400b6b1c647edaf8ea74cafae75c73a3df92506d404a249bb61f2dac09"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_servo_profile.cpp",
+      "sha256": "ec6df996608570652d5e9d6f386ace7062c23d6d0c25491a5f9466bee0ec5f23"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_servo_read_validation.cpp",
+      "sha256": "d78409cf142ca65231a559a6d8457340a20ac3b6aef7fbedfa1e334f41bc816e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_startup_recovery_qualification.cpp",
+      "sha256": "cdc560210593f0c046b42ae693dd1ea7396a280b0422a5a8d7e3599e8804d85e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_static_audit_daly.py",
+      "sha256": "d86c4a0274808d0d92073b5e9fa1a07bdd3fbbd389292c9fb490305811d96d8e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_static_audit_led.py",
+      "sha256": "6d6c2c9eaed9ca43ef5e61d337ffb63d8d2944760e19e37ed6e08b93db9995ca"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_static_audit_network_v3.py",
+      "sha256": "bbbb2ea079a47a6b5865b3f6cf7da82ea4848356fc6559468b01f7a206c0bf87"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_static_audit_safe_actuator.py",
+      "sha256": "61e183dbba4ecbff1b0d8f25914b1bbad4b43099825804de7d84f85d6e203ee3"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_static_audit_startup.py",
+      "sha256": "57b75b48256281864b52d786a4d8916165a4dd3c6bac99a2b4a4ee282d7c7eda"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_stl_gait_adapter.py",
+      "sha256": "da05226f4560016d80c16d0c7d072b301349625ec8a20f0ab583b965b66836b6"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_thermal_confirmation.cpp",
+      "sha256": "9f6b8cb44add444ea59f5ffefcb4a59746303317862b61ef0968313a79fbf868"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_wifi_ap_bringup.cpp",
+      "sha256": "b7a46506dd4692230398510b4baeafd56b43bce131bd1c181472fc5315f466c4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_wifi_mode_policy.cpp",
+      "sha256": "3edcdc4704738a5bde72aedef66b1f11349918cc499809f170e9af8438286ee9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_wifi_policy.cpp",
+      "sha256": "afb7687b473eedef024e6e1e4b442b5e8fcd227162919460e1ba2d6ade80ac8f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_wifi_runtime_v3.cpp",
+      "sha256": "c602cfaa6a296916d282005af241aedff0f07f0726a5f4f39aa7bb8d086e8d36"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_wifi_sta_test.cpp",
+      "sha256": "1ad513dccf8a1e073cedcc1a1f5b07f228abb7b6b9e71f9272e580e07b3e6e5f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/upload.sh",
+      "sha256": "d3c87eb90768f13ca9df26212e454bdbfa08cbfd0cd703cd140e600b053d34af"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/verify_application_partition.py",
+      "sha256": "26ce0711571adabf11e9e3a2e700bd99bb076881addec8903d4cb18c59ceeac7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/ActuatorRuntime.cpp",
+      "sha256": "9af793d06aefbbe71af887d38602f70886134e93d9100ea5872d02877350603d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/ActuatorRuntime.h",
+      "sha256": "8000e9ade22711568c28e193281440b235c64ba662b0fa1f1cc1d9d50e8e6d4d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/ActuatorWritePolicy.cpp",
+      "sha256": "f023a294cab83393f02f25c37b506eec79ca73dc49e8e0b49de33215d92e9955"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/ActuatorWritePolicy.h",
+      "sha256": "238d9f5fcc653fcb43da112503e4bc964032731b26990bcbc6355caf93e29761"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationGeometryProfile.cpp",
+      "sha256": "1faa4a70b0d6894f3cfcea3317a0921d6361a0da362ff42fb005790e9bc6ecb2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationGeometryProfile.h",
+      "sha256": "889e9c6e0851b940037ce3d2bffeaafdddd1300d76d3b7235973de807a63f7c3"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationGeometryProfileData.h",
+      "sha256": "f9ec5a95dd5f60be14ae9557a4d1729d01ca99642c782828d9b2c947720d71eb"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationQ0Bootstrap.cpp",
+      "sha256": "063d62a3caa1d3c814ad8b576839789d8dc35a7db6516f02ed9afea6385c7c3c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationQ0Bootstrap.h",
+      "sha256": "53f4edb3a1f33268b1c58abb984af2008e34f47e37bb4466a25b8869ba34af80"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationQ0EvidenceData.h",
+      "sha256": "68b24cd1a400d05a6b39a6c36c964c7916676058666114a0ccf40a7f2d4ecb4e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationQ0EvidencePreparation.cpp",
+      "sha256": "11131295bf72dcd2deb65d6543500397601bd63514dd0d0612b2e9d0813b6a42"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationQ0EvidencePreparation.h",
+      "sha256": "c5abe7f995ecd8acc5da7ed806a139a32128da05695b8668fe9e09d56f32217d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationQ0Promotion.cpp",
+      "sha256": "c8c07ead40a4e1948e63bf6952918a43c302940c21f4dc0245ad9a3ef6bbffd1"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationQ0Promotion.h",
+      "sha256": "0ee24405a257f8014a84ca98c07d6de0ae4f1a672a5a935cc6d6c75e6ea1ce88"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationSequencePlan.cpp",
+      "sha256": "f3afa1fc952994849fa644e85ea37cf6ab196b5fb72e455d97d7613b3b53547c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationSequencePlan.h",
+      "sha256": "7ba17487a87709a68b25fba4d1c615ab04599241cb038ff3ec658377f5fb6350"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationSequencePlanData.h",
+      "sha256": "367f6a6084b026c75a1467f689a2d7756812ced2603c52800582b263263122fc"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationTargetResolver.cpp",
+      "sha256": "c9cf4a0a5b139ef91acddde6a972eca44e82a49830409adcb52189f2954f6511"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/CalibrationTargetResolver.h",
+      "sha256": "60b6c878d0b17a8ec49e954bcec0a6a36b0ff7241b719310851fbc567e3d16f5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/MotionDeadman.cpp",
+      "sha256": "3b1edfa9cd51206245c4961fe74390ea1dd5bd9b7e35c7d5dedc745f54466e86"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/MotionDeadman.h",
+      "sha256": "a8bae346ff1bfefc912e4cac3f125dc194da5de3bec8e378f66d7a6feae2f453"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/OperationalEnvelope.cpp",
+      "sha256": "711ec2dabe9a0194f72d5e489434c1413d0bc634eafe3fa982523b545c98cd61"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/actuator/OperationalEnvelope.h",
+      "sha256": "8b07d5cb6e5fcc6d6f6f3eb2faca535bd8e37c3b7663ea43bb3c1855ef61a145"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationDomain.cpp",
+      "sha256": "d3ca781ba25211de6411049dcb140175c63f4989913161d21547494a2f537628"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationDomain.h",
+      "sha256": "d17afdca284339fc209e6f6b602ce98989542e99c47bd32d53859ffdcb1fbd30"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationExecutionEngine.cpp",
+      "sha256": "eb3319e5d842fbda6612434d56ba81a104b64ec5a5b04831b4ad9c7c10657998"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationExecutionEngine.h",
+      "sha256": "c536148078b93eaded23ada1089c460269f76bc0d4f86ebe26584604d56c299d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationManager.cpp",
+      "sha256": "f81147eb635855b7f4b8faa3286fc7c5965ac4aaf53aaac95e133c40bf496d4b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationManager.h",
+      "sha256": "5c6b97134c2ee227cab26af43b8296f51edcbdc2d73ccc771f5471ed03b3ddd0"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationMotionPermit.cpp",
+      "sha256": "c2d9d8ffdeeae043df1e08d63c1df7594b713496a6a354081037f9e1cd151d24"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationMotionPermit.h",
+      "sha256": "d362a5dd6006f0d608467d7120094cfa37f7cdae1b4e16c85be9077b61e5bc1e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationPersistenceService.cpp",
+      "sha256": "fd1c78d20148a85a183f6fff236e655aeaeb697f7f19ed44d14df8fc43a37e2d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationPersistenceService.h",
+      "sha256": "cf7ca5bd0006f349bb1905587cf832d1d8ff195fcce32bfa8078004e5e6d3552"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationPersistenceState.cpp",
+      "sha256": "156120d1517e7605629fbd008f0a0ee9b18b74ca7ec2bbf4239162251c615aec"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationPersistenceState.h",
+      "sha256": "f92d5a25c0c38e96fd58eebbe5f065f547a8f724ecbd7904c3dd7345d4ad3d38"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationPopulationEvidence.cpp",
+      "sha256": "d24a91b8390f68b68c4a10cad975bf9035f7b85e56ffbaa691c08666e2ba7d1d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationPopulationEvidence.h",
+      "sha256": "b1b3a1bf204c8c1fe52b5f870573fcf4cce2b35bdaaf4d5d9271e26a4e16e797"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationQ0CaptureSession.cpp",
+      "sha256": "272443dfc1f7cda54897d7856e4bc5744f21574bb793a1c77dcd2a786222f4e4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationQ0CaptureSession.h",
+      "sha256": "f68c626d63d278972f7458ab527b63f66d2c55fbdcb04342ad813dc19d9be0f8"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRecord.cpp",
+      "sha256": "3c7e895b126fc9a5195a4405731ebfb4cd9b3f2dc3d7bec86b705920cdf339af"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRecord.h",
+      "sha256": "55f28283648e9a58ef75be14843ea3087524901342aaf0fe83ab69f49a3760b8"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRecordNvsBackend.cpp",
+      "sha256": "5d3c910821a1b57dd187d06586691c475bc1504939634f1dc4fdea9d36a599a5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRecordNvsBackend.h",
+      "sha256": "e927511d14bbfbac7be990ad6c1d292182af83e6aa9840c315efcac3a336f741"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRecordStore.cpp",
+      "sha256": "c817709b119041d208fef4c1f75836007db92120caa60248205b71c659a69d51"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRecordStore.h",
+      "sha256": "e182529b57ae3164da7bd29e310cd0effeeab6350cd408f5bdf941e3f53159b7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRuntimeRestore.cpp",
+      "sha256": "a4bf11ba67cbb3c5e20b2e518f55a383677486f34d5b5ace1f4f13bd240399e4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRuntimeRestore.h",
+      "sha256": "5bbc07f4743f784e74c1d6d0360f380f1ed4d288a85c27e0b96a7187de6aef36"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationSaveGate.cpp",
+      "sha256": "3b9f86b60f97f65761593e32b031128f33b7216fa41a5c7d2a57657434cb250b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationSaveGate.h",
+      "sha256": "5065e3ce7a019a685f053c95f65f950d15d46c39e792884db85b5b995933622b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationSaveMarker.cpp",
+      "sha256": "335e4fd598a0456dbfa8e4a425a757733bdca367f3e3ed68cacaf6b8697b5483"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationSaveMarker.h",
+      "sha256": "f70a85842ab46a1f852145d196899b49ff008cf44824851d00846e6997eef25d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationSessionOrchestrator.cpp",
+      "sha256": "a33db3bc9afe7be90aa6d33d2958239528c814697ef1a7e24bb053add0d64686"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/CalibrationSessionOrchestrator.h",
+      "sha256": "acf78c8bd3fb9b56dd192e4fdc74c13382b99376e963f2da2445d81dbd412bf7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/ContactProbeEngine.cpp",
+      "sha256": "070ea328dcdc85aaab2bbe614f92c86e306472ad2a92f841819321429af8cf1e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/ContactProbeEngine.h",
+      "sha256": "ae72dc5524dff8937928e54144b0b0bbbb2b7ff939e7f5da967fb5da87dbccab"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/FirstMotionExecutor.cpp",
+      "sha256": "2d73c86b870294295e944792977ee5ba8b8ffc8ac5efcfed3727ed420424968d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/FirstMotionExecutor.h",
+      "sha256": "89ceb55e1aec2455910b4c246f0ff871877ff88abb45fb9bd69dcae2ff4ee261"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/FullLegCalibrationExecutor.cpp",
+      "sha256": "0854413c1282993bd3b15a8fd8bb5445340241d3ec34c163daf58750d58f0f82"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/FullLegCalibrationExecutor.h",
+      "sha256": "a5e019424df377860fe5b43538cbd3120f12f7eacf28c40891df2cc5d286e01b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/FullLegCalibrationFinalizer.cpp",
+      "sha256": "ef1eb113dba159e95ee772407e03cd03d4dfdb62f5904d2af43f08c6c3453973"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/FullLegCalibrationFinalizer.h",
+      "sha256": "bbfbfc35e05e10d5d9ad828bccc1976aa8354c1d639b3968a8b238c1294f668d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/FullLegCalibrationPlan.cpp",
+      "sha256": "a22ace41469ba471462042f7df7cc9a4908eea61636ada494d8455ac4838868b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/FullLegCalibrationPlan.h",
+      "sha256": "7b79848182600b9fe1ef4cf5f663197ecb1a30c5d2b2059f999802cec8f44191"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/StartupRecoveryQualification.cpp",
+      "sha256": "66419a2a7cdc434f287cdd7e20a8fd278f9d197bce30281203578d1fc62c2c8c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/StartupRecoveryQualification.h",
+      "sha256": "419fd9b18ebce8c3349970f8705f1bd5281e46cca745f1249d7cee8efca1b157"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/StartupRecoveryReference.cpp",
+      "sha256": "484df97b214fa1f1231e0158861605a079132c4c7c10e9207278810f7c38b936"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/StartupRecoveryReference.h",
+      "sha256": "e9875600edc2d26a22277eeaf1bd777950dc966c47b280a9d335f4fda8d08257"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/ThermalConfirmation.cpp",
+      "sha256": "0d37000a4b52233b280d916df8d9a13c981be148ce5327625247f553f38eed14"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/calibration/ThermalConfirmation.h",
+      "sha256": "54ad8de9fe71e38f44bdc5fdf822002e40123dbdea1647166fc840403b383298"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/config/BuildConfig.h",
+      "sha256": "243e5422ca0a4c1b565b88f8a42e081176ba3a85a90945f8e51df9977e1c82cd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/config/HardwareProfile.h",
+      "sha256": "1894b35ddae4a8f9b613c1abc1a355e313f28531af2315259ea205252e46987d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/config/OtaCredentials.h",
+      "sha256": "7c6905f0acad709fb56001aa82c81c2216b6e4da1a76ce6880672ff92a44b09d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/config/OtaCredentials.local.h.example",
+      "sha256": "4b7e840b86d732833675e92eb1389267d602557c95444690a1a70beb766d4b93"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/config/Pins.h",
+      "sha256": "48cda54531b51904037aff064ec846612beb6942a1806bc6fdf3185de43fad8d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/config/TlsIdentity.h",
+      "sha256": "c9808ece917c8907a7f26ae49f35d75ca5babe0d593b0cab364fc9bcb08f8301"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/config/TlsIdentity.local.h.example",
+      "sha256": "886314a5fb69f3aa039f8aaf2b4dcc0f6859c6bfce8a2af7ba6d98b0aaaf8c26"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/config/WifiCredentials.h",
+      "sha256": "ccd0c837eb0bf8fc7969074be9a58a3e7e4223f99fc071b66db5a64230d125e3"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/config/WifiCredentials.local.h.example",
+      "sha256": "5f41e9bfb8b85da60f062582941a1d524d6424fd328505265abf4dcb771fe279"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/ActuatorAuthority.cpp",
+      "sha256": "627b73930ff2799aec05ca1323f90ea8673ce4d4de0394aa4715a99236625d84"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/ActuatorAuthority.h",
+      "sha256": "e25319ddf856706fea6d72abd466e3c2a82b46c2365bedec675a477c53e3f9ec"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/Availability.cpp",
+      "sha256": "e0977005f286fd0948bc38d82c2e1cc2a03ad676926179afd1ad5090f9815055"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/Availability.h",
+      "sha256": "ade4763c83fdac4e838976215f04e11e765b81d74edaa1b63082f452a649e845"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/CommandRouter.cpp",
+      "sha256": "0dfb599bdc69925f9090e74082f69176ff039d8cc4a3c94471c90f2fb84cb7a1"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/CommandRouter.h",
+      "sha256": "dfbfe662ff7208c407893f5a8953f0da002acf831ad0ac714de7d9d995032393"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/CommandRouterPersistence.cpp",
+      "sha256": "b52d4a1225b7a792f95d765009d1d2565dc081153a23b0e122777a68242ba7bf"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/Controller.cpp",
+      "sha256": "e936d796015db68bb7307bac6b58de85f8b0caa36d9b934e4b5fbd86cf5341d2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/Controller.h",
+      "sha256": "aab67c500251f3c8e152eb004de9c55b22dad52e02c93bb947da76e4cc4d07b5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/ControllerService.h",
+      "sha256": "582d0ba8077b72a130d8d038f19f825d761895bf3aba96560e3d8abfef667712"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/MotionJson.cpp",
+      "sha256": "a02102dbf6a8347d4ecdbd068bb3e57396547ee483354cbd973b774e12a392be"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/MotionJson.h",
+      "sha256": "42893e00246ae3fe61c1790393eca7acbae96adf219304b0a5b38b3e3b4a608d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/MotionService.cpp",
+      "sha256": "4f9b8e4b71aabe8c83a82a7e5d3b69568ae1249ea72b3e4668894cd7cb17a3d8"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/MotionService.h",
+      "sha256": "74396520284c34b099f687007146b0561e8e69b5ed2e8848c6e08d127ffd9e25"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/OperatingMode.cpp",
+      "sha256": "b2385b9d0923d8302f47773cc98a28a5447ddd43ec418f09862bc6d7c51af007"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/OperatingMode.h",
+      "sha256": "e4eef051b643289f93bbf66461f54d5202a0274eb438fcc35c7752288fd1bb2d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/PowerState.cpp",
+      "sha256": "69391c07898c0401b3df90948638b72a0b15ed69bcc6ee9bd344dfa2aef943b4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/PowerState.h",
+      "sha256": "17f32cfb5a429ec5d497ae00b83394d2c0b1c4cb7e5a513a148d8ad91ff25fdf"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/ServiceReadiness.cpp",
+      "sha256": "9c3d0deda86bd369dbedf0cd093996b962aa022adebb6463d6222b44aa55ec91"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/ServiceReadiness.h",
+      "sha256": "bc8c004d13405a3bbc868b6ceaa282d6ec136ed3ed11c7b7edfc527a00c786f2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/SystemState.cpp",
+      "sha256": "dc5d1e8fa3db3c3a64466d5751f9728324b02054cf0e01cf77d75cf00a718b3b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/core/SystemState.h",
+      "sha256": "94f07f328a0bdec72060d98fa89b93e1fde1d81c66aa0de82925a112b911a9ff"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/MotionCoordinator.cpp",
+      "sha256": "47a782c8c588c00a0d26eecdae927ff73e06ddc687181f6d3b589ea4eda03390"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/MotionCoordinator.h",
+      "sha256": "2be99fbef65cd9ea0c204612923a42f6b11ac8c2498098275411f65ecf219a1a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/MotionExecutor.cpp",
+      "sha256": "01bfff9998fc2ef88fb3bbdaff0a1180339048ef63ce949a92e0e9ae84d5381e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/MotionExecutor.h",
+      "sha256": "9a5ba0a7d17bd03a66ffea6354a24f65b2c46abee1cbe1595af18085f64997a5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/MotionSession.cpp",
+      "sha256": "71411f273e82a4fa8ccc11d87f78ba8db5a6708f7dda36ba2113f4ac2aa6c6e6"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/MotionSession.h",
+      "sha256": "8433f193cf49f1259796fd7b66adc8b23a4c527c8df6ca2837b4f051c2b3a5bc"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/OperationalFeedback.cpp",
+      "sha256": "75fffa52ecbf3087a01bd0ca336fc1c1ff2f6089a0bda49f2267df62ba50d528"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/OperationalFeedback.h",
+      "sha256": "3ffb67324516ccd17c801a9612e1764360dfe34dfe2c9f8b6d5cc956e5ba9a23"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/execution/ReviewedMotionRuntime.h",
+      "sha256": "018e5d6a5b7affd112612b66f01228aa810ba5f9b02bd6f8ebca2002bea3f9ee"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/imu/Bno085Imu.cpp",
+      "sha256": "1978711df6bf92fcd685cd9e6daadc7c30337f528246eef877c6e98c175aec67"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/imu/Bno085Imu.h",
+      "sha256": "c7e4f0a6de609123fd33f9bec647c222b65482d9dfde76a838d8046033281fcd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.cpp",
+      "sha256": "cbe2def140c839b46cbf1df3d4ee4321a5cf5dcc8d90f7ce1a63f6b34553dfd5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.h",
+      "sha256": "7338343b726565dad13a9af440ec90aa960ca6f83e4cd93412b3eb23e84eb57e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/AdaptiveStand.cpp",
+      "sha256": "bfeb7b2d13c56e287ea3f14e5a126a07f35ca259e9f881e90d097e571084afb7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/AdaptiveStand.h",
+      "sha256": "a0911f93596c1d3bb843f534d9e448f4f83b3c299bfad823c75d25fff1ded799"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp",
+      "sha256": "cde2c92e30befbc192e02c226178759aa6e4163cba619f73fcf830adb42447d0"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/BodyPose.h",
+      "sha256": "6a06577cb546e3aaf3ad60b354f4ac068c0d89b71726ee18a4a5213f3b236150"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.cpp",
+      "sha256": "21f31eb43321a4b0381631c58410862a2620e2fcae9368b5fb28ff0099ed2adb"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.h",
+      "sha256": "0b6725ad90edc1e39f3bb469f687576fa3fe5b76cb3d2ece13c5528d98b95625"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/CONTACT_STAND.md",
+      "sha256": "9f52dde7388beabd0b9cef1e9d4e6e748ea095d2487b5094ced0b8231ff46579"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ContactMode.cpp",
+      "sha256": "0ba4354fb66f00591512666ac7e9cb0ae3f633de8e9c02e234784028f2fa2e2e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ContactMode.h",
+      "sha256": "20473ace82c6d8b68cec99956657e23fabe3c5d8a34fd42e875ed8ea9d8c637b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FeedbackWalk.cpp",
+      "sha256": "31efb9c238d82bc5c08b7f4b88da9ce3626ae9b3a1f56704be7de91f9e7f285a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FeedbackWalk.h",
+      "sha256": "e5cc6c9db69aa07f2f77eb5dbb33bda927c47b9e8ec1ab9d53487c51afe9486a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp",
+      "sha256": "0ce86767cf1c9a7b31975a397b5e26bd439da0814fba060cc8b6dec14d0c0d90"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FootContact.h",
+      "sha256": "f86582bd9e57bb6a3ef2ed4b5296f22c75c50ef30c4257797930476619a568ad"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FootContactData.h",
+      "sha256": "fe6fe1fa593199d82cf829b2c5cd83f974dc0085e7e049024cd7209cf3dbe57c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp",
+      "sha256": "a6c497c393641577988d9773f001a4280e875422bc22d7588bd2fb8979198823"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Gait.h",
+      "sha256": "e308c64acff060b8be78796c5db21078a4de5f2b3b9b38f26d186ed0e6173914"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp",
+      "sha256": "69450b45a15e366df68f6139a1996274ecbe4f2f549cfd2d3424521c2228ae9f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.h",
+      "sha256": "48d7b6e0b48095a6d279e992c894ad4005dc430442d93376f9b35b760e3bc84e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/LegGeometryData.h",
+      "sha256": "343f1cebe24a791fdd20946d12c576a8951c56cfb00cd16b1961c7fd4d5b45db"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp",
+      "sha256": "824e9bd8381d058cdc67dcb072c5bf51f23b47b6b7aef6df3d06f14b040aef57"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp",
+      "sha256": "b1749fa338b619c13b5c6be322a18a14d3d4957709a0dec66df1b92aa06ec6b7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.h",
+      "sha256": "f9d5f3fefd1aba7c4a3a494a085262422db9d0d9976aecb7bacbcd40e20bbfe6"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/LegKinematicsInternal.h",
+      "sha256": "226d4b7032dd61a7bbd0279e9a247c686f70a5ca47be9368b5698a0e740255d7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp",
+      "sha256": "2a9a6df04b23a1ec3823f196a9547167d7f1469b25e5f401dc47650ded12e6de"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Locomotion.h",
+      "sha256": "0b29b56bfa69b7cb190a45b21a9b9ceb9342ba2068950af33444c6bd2dce6501"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionContract.cpp",
+      "sha256": "60948758bf68fa5928c562483c02e4e48b69ac6c0186250705849ee9bfc20581"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionContract.h",
+      "sha256": "9a1ec8da68e9cfaf66528f59069a0cae15e2877087e5cbb7d182bef346d997e4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionFeedback.cpp",
+      "sha256": "8a3e3a823563f446e8fe7c7f337364d2a2a5ec796b7b27cf47d4110964562283"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionFeedback.h",
+      "sha256": "470e3ae98758f8d0bad700302bda0462419ee9ed5a73e35e1523289c7a130296"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp",
+      "sha256": "01aa7fbf6badaa5b89f0ebb14068247e9093dbafe8ac7755ec0722d31c00e3ed"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/MotionState.h",
+      "sha256": "ac332cdc7ea1882f73d914eb57b0ddc645891e64b3c5591c86a51b2ed2e19a35"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/PairedProneData.h",
+      "sha256": "357c52f351199994a65ea5a1b32da0c567f66538617bb8c6187e0a0127a18e4d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/PairedProneRoute.cpp",
+      "sha256": "64569a1c293f2c99f44127e040eb1a6af166570e18138d607118b157295e5035"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/PairedProneRoute.h",
+      "sha256": "caf82db4c6d0190f47bac9deaf292bc5a94ec0acec64fd55e553e374ea79163f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/PoseReferenceData.h",
+      "sha256": "d4aa21a18cfe40145dc563d0221bde6a04e091687e5439f125cf1e04bc8e90bd"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp",
+      "sha256": "6ecac0820bc64b3798387a0bd3e421cd5cee7c1267841cacebb15a5aea2c5ac5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/PoseSupport.h",
+      "sha256": "28fbb53006fa832c8903ef759c4cf79979d6424c78614af31c0f42eb265cd797"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/README.md",
+      "sha256": "499d88a70ee1bfe7ab66fc855a5bb0e096f04dba935b81a4b225510f2c5859b1"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/STABILIZATION.md",
+      "sha256": "ea0d9624bb10e222b9beb79dfea9c36216ec3e7907dd27cf2b098bb397353ced"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md",
+      "sha256": "c866d0a1e49754773b50f7ead5f5b6de6df7b3412f454ac57f47d458f781103e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StandReferenceData.h",
+      "sha256": "f10222bc306aad11515d8ec639f4c76368b194995e77c9ea8042190de473703f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp",
+      "sha256": "1917bf8d7514822f824c06186629254cf3b8cefc8125489f42824061b33b07f5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.h",
+      "sha256": "13eb95275affe78a09009a7035bf3a335798d94ad3128fecf735d8beb77c6e19"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StandTransition.cpp",
+      "sha256": "bab3e9de1332c9e60d26e8265fd0560989426358f7f55853a1251f60bd805039"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StandTransition.h",
+      "sha256": "7909f8542876605d88b1d9a4a28c75a9b3af012d40f7309bfeeae4bc0e16ca4a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp",
+      "sha256": "2d67616a9572a3101d57d895973287127a038d9fe49512c0477e19de0b43a479"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.h",
+      "sha256": "bc707de17c302e04031a35929f47d1600a788a2b3a4fd298c8cce27ca8862c75"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StlContactGait.cpp",
+      "sha256": "e7e45967e1a502f0cefc9be9768b362457c21485982051c97a21e270d0af82ae"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/StlContactGait.h",
+      "sha256": "3254bc3a7c684d7ff867fef44a1e82f7c212a9a5d419f8216d2090045a0f9fb9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp",
+      "sha256": "4a53f6303aa74c2fff1df9647cf5b878e4d4b6aeffab54b15c61133914ec8aef"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h",
+      "sha256": "4c54dce41551a836e266a984f090556a82e5cba18be2d07e8fade03071150eb6"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp",
+      "sha256": "fb75ce615dd017683a053233947aebb9f8afcab673953c54e0bad5ab43f9858a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.h",
+      "sha256": "12a490c4f6e8557fb722d84704bca3106f6f5abe8f34ecd24e10ffefe9bc5042"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TimedStand.cpp",
+      "sha256": "dc5e4fc91b3564d4b5b8df9c21e029094f17f97aca305615c3522e0b7794fdda"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/TimedStand.h",
+      "sha256": "c7ebf7d73d393f16a5f1020980c135c51984d6258573d3f6d10e353f2626e195"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/AdminAccess.cpp",
+      "sha256": "d1725bd889bb63a5e2ed42d1e5388cb5c74961facbd4bd9241bcd02e96269121"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/AdminAccess.h",
+      "sha256": "d15a08cff91c60bde2863b614abea10c2ae0853a50fa6b66876b4ef617da87f7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/HttpMailbox.h",
+      "sha256": "42b7d476512598bdc0f3653f390a5e30a785d7f7e198ad2a4a3f4de3f9b214f9"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/HttpTransport.cpp",
+      "sha256": "96293318dafbd74ef2f967326185ba54949b0ea5881a398d55aa7b6181943bf4"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/HttpTransport.h",
+      "sha256": "c25061132ed9caabe44463afa497dda645a00a97dfedcd3c6e8caa7e627f669b"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/MotionDashboard.h",
+      "sha256": "aac14bbd2e18c93c6eae7f42d74d084ceaed003d86b8e717ff063f7738900e6f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/NetworkConfig.cpp",
+      "sha256": "5b27302e06940b34b3af16428769088481c1d6f7cf047bf67b8452f7e346a082"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/NetworkConfig.h",
+      "sha256": "1e21cf65d217dd4175d7f2f9f788151be5bcd21ca9f17b1e36db659ea61b1672"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/NetworkConfigNvs.cpp",
+      "sha256": "fe5eac4a1cb73930909cf7b07cb4156833f1fbefe4daed6b4cd2975413f2be44"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/NetworkConfigNvs.h",
+      "sha256": "4e25d0872db817e719d73305043d5aa3ea400d3233629b21435eb1e9133c8f3c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/NetworkPolicy.h",
+      "sha256": "b2853f414c407ac864d4c6e5d8dfc9332e487056a4091ebf1cb6366a63dc019e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/PortalPage.h",
+      "sha256": "878f4130c1c375e962d48fb0710227c28ac14bff7d2856bab7cb8289b566d4f3"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/PortalSecurity.cpp",
+      "sha256": "6d08c19aba1a3fc10839944994e93af8a63cc27e836a4a6e0056e8ee2bff901c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/PortalSecurity.h",
+      "sha256": "4f1de31d1a4e1184c0d000df611508e9aa57f9d471b1ed66cb073ecffae3e04c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/WifiManager.cpp",
+      "sha256": "bc8d49bde484fc3bccbd8787a972225c28678f5a7cd2867a05bc86b52703ea61"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/WifiManager.h",
+      "sha256": "440f0c3aac50288218a4e68e53cb6879fa8bae1ee115b2840024df13a6c14c28"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/WifiPolicy.cpp",
+      "sha256": "e63d8e9e6fbc27a3044ae2372fe94838082afae21910c886e79d7a29182820c2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/network/WifiPolicy.h",
+      "sha256": "b721eeeab41c5c0a38f09c3415cdf09ddd26ba2617179acce0a573f7716350d5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/power/DalyBms.cpp",
+      "sha256": "fee7b389a6f045d4d6def2b3b44e4d2423ca24c3b3e0608eb4260b032c2698ac"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/power/DalyBms.h",
+      "sha256": "c5af07e749c5ababe452262756417a5517529cd48a7fc11359aa70b4d34642fa"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/power/DalyProtocol.cpp",
+      "sha256": "ccfc322c4c2a4f34cd2dec4e355eaab25438ef404e395a76997c92eac995bd79"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/power/DalyProtocol.h",
+      "sha256": "b820b59681a8727c90bdad543252ae6e920f716697c6c02a1ad58ff518e7704e"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoBus.cpp",
+      "sha256": "27f23667588c23c1357bdbe22999686b50a9670466bf35764200c9f99eed6d7a"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoBus.h",
+      "sha256": "d55f39f029ad0dfe724ae8230366433d5a8059c2eb44f88ca315517b1da2842c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoBusActuatorBackend.cpp",
+      "sha256": "72dbd166aa9fd067940df4884bdfa82c903cc4b8b83f650d33f20fa9f2c56774"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoBusActuatorBackend.h",
+      "sha256": "d451d3198b4f9dd9a8d3322cf6d713f1694ba97ee9d310491d518bf85e04af62"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoCensus.cpp",
+      "sha256": "a40e0e49c5f0c218a1443bbf40f30b54c7e9665fe8781d6df266a1b87e0e64ee"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoCensus.h",
+      "sha256": "a3cfb9fdb42a6c5ecd2b4c3f5576363745a0c72a7862d0281707d127c5b6c985"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoPopulation.cpp",
+      "sha256": "7059e2201bfe7f899d8c99b8faa2cb77898767f67063bde7b9bc9959403430a3"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoPopulation.h",
+      "sha256": "2746896f859c1680fc2dea191dfeeaf8fb357ef6d4974a6b8b8103ae04b5be86"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoPreflight.cpp",
+      "sha256": "8a3814d559c36853c07592312564e509a1d0052ae8359dffab309347442dcfa8"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoPreflight.h",
+      "sha256": "dfdefb0b5c8dc9ed12834a6dadfa38f6c9e751140971c0ab4f8ae09a0fc5ab01"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoProfile.cpp",
+      "sha256": "97a7caf8dc584e42fcd75292abaf97c3f21fa626ca39e1678ef7584dcb3ae6ad"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoProfile.h",
+      "sha256": "d7760b3dac30659cd5021d4c9806080bdc5ecb3dbefa1242443948602a25dea5"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoProfileData.h",
+      "sha256": "0f72ae361a96deb70d247f8a9516a84f10d33c82581a0fcaf3eafcd01e8de2f6"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoReadValidation.h",
+      "sha256": "3fdba17ec27920799d80ddf2c833649efd2c9df1fd460b9eccda09b9fd87ea53"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ValidatedServoRead.h",
+      "sha256": "a35755a8159944699a87cf9be4f28459b432b6d09b9aa89dea4d7b57a44ef744"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/status/LedRing.cpp",
+      "sha256": "0004380ee5d1f39a0f852a99a411f9e1146c40a454e1ff9d55c68e1bad650197"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/status/LedRing.h",
+      "sha256": "3ad6858dcd33942f56190a33c230b5da83a898115802e80727cb3054e2be78fc"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/status/LedStatusManager.cpp",
+      "sha256": "92c05dbb2fbd163ea380a7bbabcb9a37cd5ff1fd42ece400c55199d6476eddec"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/status/LedStatusManager.h",
+      "sha256": "c2a68a5c4f0bc95a252deb08cc234df46c530c02a47175336272d2e25306afd3"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/status/LedStatusPolicy.cpp",
+      "sha256": "1369a0601e8b5a489934c1bf9a485b80e8819edd448c0f8b84a8a2aa8dda0578"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/status/LedStatusPolicy.h",
+      "sha256": "158c651a78edcb4886f3ee22ea9a06dfdd9fd1f1a51192d2c5ede7e965e1ae47"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/Hmac256.cpp",
+      "sha256": "848bb6069ec01d81ddc0b7a88c39c640df8a9e9aec4c4f7ebef2079b1a808e43"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/Hmac256.h",
+      "sha256": "7ff422997dc6ce33ab61cef5c56c9e9f51f7179773f7741b800e65d8cda5bb6d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaAuthorityGate.cpp",
+      "sha256": "aa31d879912ef7a50b74737f6b93175713024d087fd553bdf21d43ea98d285b1"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaAuthorityGate.h",
+      "sha256": "d102da26a0fdcacddf8af1595c52d539ade8feaa7ade9b6335b56a2bf655da3f"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaBootGuard.cpp",
+      "sha256": "dd03115c26b902201d44a3f714b159220025a372e79d42ebaa3e9d3b4419d8f3"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaBootGuard.h",
+      "sha256": "0802953e8f7e66a6a916a5b2896d15f6a486c86130a0aa247864d98c1544bff2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaEspBackend.cpp",
+      "sha256": "0393a5a58a5db7fb14893e8b265ec6e11012b066ed5b361b40093218c64c58cf"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaEspBackend.h",
+      "sha256": "68bbf8c59094d3ead3f28a5c3f2ec32502e9a61e41757760a5c40e64d1027022"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaLayoutContract.cpp",
+      "sha256": "91caa8fc99942b7dbd088baff4b1b730a10ac43abe9047dc063661070550f311"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaLayoutContract.h",
+      "sha256": "301b6b94d0a25da7bc287713f56cf13eb2511f9afe487f205a28b5ad6a95c4c3"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaManager.cpp",
+      "sha256": "ed569ffd4fc9be3e5d09e76c08aa78800c07f91b5baee297759bf54a8c2c8bf2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaManager.h",
+      "sha256": "7bd92f1b689dd4e04571a1bfe2f95f3b2eda78db555d77a4f4c62762edc9879c"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaPolicy.cpp",
+      "sha256": "123d16b520d05634ee20b4598d1fd49b648e8f98f77765af4580071b16f2169d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaPolicy.h",
+      "sha256": "af4713e853bac843a0ce335214d46787e901b9aa93265fea2eb373ccf7bf0a20"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaSession.cpp",
+      "sha256": "66100daa8a8b4f3d4caf9c5591b7bfebaa7ed7efc6ef235fafd4f8837a0da1db"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/OtaSession.h",
+      "sha256": "d0c94bb27ccf7ad4bdc3bb9a72b38afe855a1626a3c6debf56e628b0967ba5c2"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/Sha256.cpp",
+      "sha256": "600f8a235a1a520ccaa441ab8055b005c417bc5ecadbc4d81a0510d8bc6516ac"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/update/Sha256.h",
+      "sha256": "cd5c36fa8bc11930542d6f6fff5db7e0db4b81212b8086d44043c17cde737727"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/README.md",
+      "sha256": "b64779bd5b2d3ad069b200f99572fb36d5e1337aaa2f05a16648daa307c041e4"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/build_adapters.py",
+      "sha256": "82cd8a4ee5ffbc2c3ddfb45aea042437bbdea4aa55d95886808ab10c51d57c98"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/certify_adjacent_axis.py",
+      "sha256": "77f8d14b9bd406a36667a96aa02c18791867114dc04224f1aa3dd03e93252658"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/check_assembly_nesting.py",
+      "sha256": "7cd03fb71242860e32c709b8d3b08a03da7427785b198e1465c684745e356b06"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/continuous_pair_path.py",
+      "sha256": "3c4c4947aed2ca3f216257008cde6bc23848e6f6d19681ccea5c548fb03cd8b7"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/core_adapter.cpp",
+      "sha256": "a9d23a6e1c48a8a4cbd515bf37213c67c5efcf119b48aadf9d23097dc1f2b8b5"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/core_python.py",
+      "sha256": "8d7e12f590f4a719218ffc93b0ba79028e4091fa5565f2fe7914be7751af65e7"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/export_evidence.py",
+      "sha256": "af719382451c26b42b2b3bd4f06668cb1ab0589a34603c883f6b97d88fa91bb1"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/export_runtime_route.py",
+      "sha256": "d7a1b0b18f520aaa2babd505857d3f121c71c10b0fc282c44122e551b428960b"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/paired_acquisition.py",
+      "sha256": "da60275132f21b7e65635e63fe4d0c8f43d4924b987e01db4b6def9c2011c912"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/paired_prone_model.py",
+      "sha256": "f82cf101658c08db46a6db04a573c6823f771b0dd1bcc843998f1ff6d8e4ece2"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/review_joint_clearance.py",
+      "sha256": "953342aaed1197720120e0e3ba7985c0424a4cbf5323ec118d7bd8a88ce6293d"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/serve_trace.py",
+      "sha256": "4d1236a4999a436b69f80a659a6c22023fbbb173561c36f7ef9eb205ea161c99"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/test_frozen_geometry.py",
+      "sha256": "575b08b552609df5ec495fcfe22d09597b1cf63246dad7ff9ac9e201958dc3ee"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/verify_strengthened.py",
+      "sha256": "0c7a76838ad3ec9f35f6ebfedc57db3fdb7f9e6e87d8b8d873e5b297dcd56dc3"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/walk_adapter.cpp",
+      "sha256": "6be1666d171423b29d776e7a0ed58b72b0a3021e83ea507180c9ff4b30499d18"
+    },
+    {
+      "path": "06_Software/Matdog_Core/motion/paired_prone/walk_after_stand.py",
+      "sha256": "db675ede2eb1c0ef7d94dd8da03d42e18f835c653a6b9afc782b9973af3e9ced"
+    }
+  ],
+  "physical_authorization": false,
+  "route_source_sha256": "f86ad336ffdaa1bf287f54d8a1a233494bf935156439610fd35ebc25bed411f2",
+  "snapshot_verification": {
+    "status": "PASS",
+    "tracked_files": 466,
+    "algorithm": "SHA256 of committed blobs; LFS entries use committed oid SHA256 plus resolved size",
+    "resolved_git_lfs_files": 35,
+    "compiled_firmware_changed_after_build": false,
+    "post_build_test_print_change": [
+      "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_transport_mode.py"
+    ]
+  }
+}
