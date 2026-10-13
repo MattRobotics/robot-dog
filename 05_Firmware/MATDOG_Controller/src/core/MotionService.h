@@ -8,6 +8,7 @@ struct MotionReadiness {
  bool walk_qualified=false,first_stride_only=false;double max_vx=0,max_vy=0,max_yaw_rate=0;
  bool hardware_approved=false, operational_permit=false, support_observable=false;
  bool local_fixture_session=false; // local session owns micro-test lifecycle
+ bool local_operator_owns_session=false; // ownership persists between segments/strides
  bool power_ok=false, bms_ok=false, fault=false, inhibited=false, authority_live=false;
  OperatingMode mode=OperatingMode::MAINTENANCE;
 };

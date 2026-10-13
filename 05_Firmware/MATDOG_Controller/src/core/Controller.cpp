@@ -1068,6 +1068,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   operational_feedback_=operational_producer_.snapshot(now_ms,reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500);
   const auto& calibration = runtime_restore_.snapshot();
   MotionReadiness ready;
+  ready.local_operator_owns_session=reviewed_motion_bound_&&operational_session_.state()!=execution::MotionSessionState::OFF;
   ready.calibration_restored=calibration.restored;
   ready.calibration_accepted=calibration.calibration_accepted;
   ready.limits_approved=calibration.operational_limits_approved;

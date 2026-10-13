@@ -87,9 +87,9 @@ class NetworkAuditTest(unittest.TestCase):
         ]
         # Radio role by operating mode.
         mutations += [
-          ('NetworkPolicy.h','if (!i.run)\n    return RoleReason::MAINTENANCE_AP;','if (!i.run && !i.sta_profile)\n    return RoleReason::MAINTENANCE_AP;'),
+          ('NetworkPolicy.h','return i.maintenance_lan && i.sta_profile && !i.recovery ? RoleReason::MAINTENANCE_STA_READONLY : RoleReason::MAINTENANCE_AP;','return i.sta_profile ? RoleReason::RUN_STA : RoleReason::MAINTENANCE_AP;'),
           ('NetworkPolicy.h','return i.recovery ? RoleReason::RUN_RECOVERY_AP : RoleReason::RUN_STA;','return RoleReason::RUN_STA;'),
-          ('NetworkPolicy.h','return r == RoleReason::RUN_STA;','return r != RoleReason::MAINTENANCE_AP;'),
+          ('NetworkPolicy.h','return r == RoleReason::RUN_STA || r == RoleReason::MAINTENANCE_STA_READONLY;','return r != RoleReason::MAINTENANCE_AP;'),
           ('NetworkPolicy.h','bool run = false, sta_profile = false, recovery = false;','bool run = false, sta_profile = false, recovery = false, ap_always = false;'),
           ('NetworkPolicy.h','if (!i.sta_profile)\n    return RoleReason::RUN_NO_PROFILE_AP;','if (!i.sta_profile || i.ap_always)\n    return RoleReason::RUN_NO_PROFILE_AP;'),
           ('WifiManager.cpp','in.recovery = recovery_;','in.recovery = recovery_ || config_.ap_always;'),

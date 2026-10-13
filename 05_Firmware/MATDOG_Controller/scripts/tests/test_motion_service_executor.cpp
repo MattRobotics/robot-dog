@@ -331,6 +331,13 @@ void serviceUnavailableActionsAndTeleopStop() {
   }
 }
 
+void localSessionOwnershipSurvivesCommandBoundaries(){
+ Rig rig;Planner planner;MotionService service;service.begin(&rig.executor,&planner);auto qualified=ready();qualified.local_operator_owns_session=true;qualified.first_stride_only=true;service.refresh(qualified,100);CHECK(rig.arm());
+ unsigned seq=140;for(auto intent:{motion::Intent::STAND,motion::Intent::BASE_VELOCITY,motion::Intent::GAIT_SELECT}){auto web=command(intent,seq++);web.vx=.001;strcpy(web.gait,"WALK");auto a=service.command(web,100);CHECK(a.outcome==motion::CommandOutcome::REJECTED);REASON(a.reason,"LOCAL_OPERATOR_CONTROLS_SESSION");}
+ auto local=command(motion::Intent::STAND,1);local.owner=motion::ClientOwner::LOCAL;CHECK(service.command(local,100).outcome==motion::CommandOutcome::ACCEPTED);service.refresh(qualified,101);CHECK(service.activeAck().outcome==motion::CommandOutcome::COMPLETED);
+ auto web=command(motion::Intent::STAND,160);web.issued_at_ms=101;CHECK(service.command(web,101).outcome==motion::CommandOutcome::REJECTED);CHECK(!service.available(*motion::findAction("posture.stand")));CHECK(service.available(*motion::findAction("motion.stop")));
+}
+
 void coordinatedStopIsPendingAndEmergencyStillDeescalates() {
   Rig rig; Planner planner; MotionService service; service.begin(&rig.executor, &planner);
   service.refresh(ready(), 100); CHECK(rig.arm());
@@ -543,6 +550,7 @@ void jsonCapabilityVisibilityAndStaleTelemetry() {
 }  // namespace
 
 int main() {
+ localSessionOwnershipSurvivesCommandBoundaries();
   entireFramePrevalidationAndMapping(); runtimeGatesAndRevocation(); safetyOffAndFailureOutcomes();
   rateTrackingFeedbackAndProofGates(); serviceContractReplayAndOwners();
   serviceUnavailableActionsAndTeleopStop(); jsonStrictBoundary(); jsonCapabilityVisibilityAndStaleTelemetry();

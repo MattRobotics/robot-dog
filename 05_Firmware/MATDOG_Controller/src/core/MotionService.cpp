@@ -30,7 +30,7 @@ const char* MotionService::refusal() const {
  if(!executor_||!planner_)return "EXECUTOR_NOT_BOUND";
  return nullptr;
 }
-bool MotionService::available(const motion::MotionAction& a) const { return a.implemented&&(command_owner_!=motion::ClientOwner::LOCAL||!active_command_||a.intent==motion::Intent::STOP||a.intent==motion::Intent::STATUS)&&(a.intent!=motion::Intent::BASE_VELOCITY||readiness_.walk_qualified)&&(a.intent==motion::Intent::STOP||a.intent==motion::Intent::STATUS||!refusal()); }
+bool MotionService::available(const motion::MotionAction& a) const { return a.implemented&&((!readiness_.local_operator_owns_session&&(command_owner_!=motion::ClientOwner::LOCAL||!active_command_))||a.intent==motion::Intent::STOP||a.intent==motion::Intent::STATUS)&&(a.intent!=motion::Intent::BASE_VELOCITY||readiness_.walk_qualified)&&(a.intent==motion::Intent::STOP||a.intent==motion::Intent::STATUS||!refusal()); }
 void MotionService::finishActive(motion::CommandOutcome outcome,const char* reason) {
  if(!active_command_)return;
  active_ack_.outcome=outcome;active_ack_.reason=reason;
@@ -88,6 +88,7 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& incoming,u
   const auto* a=motion::findAction(c.action_id);
   if(!a)why="UNKNOWN_ACTION";else if(!a->implemented)why="ACTION_NOT_VALIDATED";else {c.intent=a->intent;if(!strcmp(a->id,"gait.walk"))std::strcpy(c.gait,"WALK");}
  }
+ if(!why&&readiness_.local_operator_owns_session&&c.owner!=motion::ClientOwner::LOCAL&&c.intent!=motion::Intent::STOP&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES)why="LOCAL_OPERATOR_CONTROLS_SESSION";
  if(!why)switch(c.intent) {
   case motion::Intent::STOP:
    finishActive(motion::CommandOutcome::ABORTED,"STOP_REQUESTED");
@@ -136,7 +137,7 @@ bool MotionService::capabilitiesJson(char* out,size_t cap) const {
  if(!out||!cap)return false;
  JsonWriter w{out,cap};const auto* refusal_reason=refusal();
  w.add("{\"version\":1,\"hardware_approved\":%s,\"teleoperation\":%s,\"limits\":{\"vx_m_s\":%.17g,\"vy_m_s\":%.17g,\"yaw_rate_rad_s\":%.17g},\"gaits\":[\"WALK\"],\"actions\":[",readiness_.hardware_approved?"true":"false",(refusal_reason||!readiness_.walk_qualified||(command_owner_==motion::ClientOwner::LOCAL&&active_command_))?"false":"true",readiness_.walk_qualified?readiness_.max_vx:0,readiness_.walk_qualified?readiness_.max_vy:0,readiness_.walk_qualified?readiness_.max_yaw_rate:0);
- for(size_t i=0;i<motion::kMotionActionCount;i++){const auto& a=motion::actionCatalog()[i];w.add("%s{\"id\":\"%s\",\"category\":\"%s\",\"label\":\"%s\",\"parameters\":\"%s\",\"prerequisites\":\"%s\",\"capability\":\"%s\",\"implemented\":%s,\"implementation\":\"%s\",\"available\":%s,\"reason\":\"%s\"}",i?",":"",a.id,a.category,a.label,a.parameters,(a.intent==motion::Intent::STOP||a.intent==motion::Intent::STATUS)?"none":a.prerequisites,a.capability,a.implemented?"true":"false",a.implemented?"software_tested":"planned",available(a)?"true":"false",available(a)?"OK":a.implemented?(refusal_reason?refusal_reason:command_owner_==motion::ClientOwner::LOCAL&&active_command_?"LOCAL_OPERATOR_CONTROLS_SESSION":a.intent==motion::Intent::BASE_VELOCITY&&!readiness_.walk_qualified?"LOCAL_WALK_ADMISSION_REQUIRED":"UNAVAILABLE"):"ACTION_NOT_VALIDATED");}
+ for(size_t i=0;i<motion::kMotionActionCount;i++){const auto& a=motion::actionCatalog()[i];w.add("%s{\"id\":\"%s\",\"category\":\"%s\",\"label\":\"%s\",\"parameters\":\"%s\",\"prerequisites\":\"%s\",\"capability\":\"%s\",\"implemented\":%s,\"implementation\":\"%s\",\"available\":%s,\"reason\":\"%s\"}",i?",":"",a.id,a.category,a.label,a.parameters,(a.intent==motion::Intent::STOP||a.intent==motion::Intent::STATUS)?"none":a.prerequisites,a.capability,a.implemented?"true":"false",a.implemented?"software_tested":"planned",available(a)?"true":"false",available(a)?"OK":a.implemented?(refusal_reason?refusal_reason:(readiness_.local_operator_owns_session||(command_owner_==motion::ClientOwner::LOCAL&&active_command_))?"LOCAL_OPERATOR_CONTROLS_SESSION":a.intent==motion::Intent::BASE_VELOCITY&&!readiness_.walk_qualified?"LOCAL_WALK_ADMISSION_REQUIRED":"UNAVAILABLE"):"ACTION_NOT_VALIDATED");}
  w.add("]}");return w.ok;
 }
 bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
