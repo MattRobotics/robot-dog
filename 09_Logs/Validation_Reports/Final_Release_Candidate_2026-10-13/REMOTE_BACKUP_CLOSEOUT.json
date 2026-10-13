@@ -1,0 +1,30 @@
+{
+  "result": "NO_GO",
+  "primary_blocker": "CURRENT_INDEPENDENT_RECOVERABLE_BACKUP_UNAVAILABLE_GPG_PINENTRY_TIMEOUT_CANCELLED",
+  "private_session": "/home/matteo-manicardi/MATDOG/private-preflight/20261013T180138Z",
+  "backup_size_each": 16777216,
+  "backup_sha256": "9a2bf4bd25b581abc50eabadb70c5c4f54c802c789fdbd908723040939e76c83",
+  "A_B_byte_identical": true,
+  "read_durations_seconds": [
+    1586.4,
+    1550.9
+  ],
+  "installed_application": {
+    "offset": 65536,
+    "slot": "app0",
+    "size": 1226384,
+    "sha256": "ccbce2ff6ffee9a5e132bad8646f379fb31fdd305c0d577df992e85e2ebf4b43",
+    "source_commit": "b08322dedc5564c080f691dc98047511ef2b953f"
+  },
+  "layout_gen1_production_validation": "PASS",
+  "prior_servo_feedback": "23-command prior capture revalidated; 13 OFF are historical, not new readbacks",
+  "recovery_attempt": "GPG AES256 secure pinentry failed with agent Timeout / Operation cancelled; no ciphertext uploaded",
+  "physical_preflash_review": "NOT_GRANTED; no physical/continuity evidence invented",
+  "candidate_source_commit": "b147f3884b227ec819e98a6f00c214a0aac2278e",
+  "candidate_application_sha256": "5577bd3c8da5f6c44d8fb9ca9b3d049399e73ccf37d218e716b773e3a87b5914",
+  "firmware_and_manifest_unchanged": true,
+  "flash_executed": false,
+  "motion_torque_on_nvs_eeprom_bms_writes": false,
+  "left_state": "ROM, installed b08322d application preserved",
+  "private_final_report_sha256": "4e10ea160c1895adc3846c2b8970db97ab6a1d679018ef8787f5af6003eb0bd5"
+}

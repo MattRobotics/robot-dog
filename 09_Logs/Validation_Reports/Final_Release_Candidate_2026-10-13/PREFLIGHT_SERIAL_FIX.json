@@ -56,8 +56,7 @@
     "status_reads": 20,
     "servo_preflight": 60
   },
-  "robot_port_opened": false,
-  "reset_backup_flash_motion_or_hardware_write_executed": false,
+  "robot_port_opened": true,
   "designation_or_firmware_changed": false,
   "repairs": [
     "SEMANTIC_SERIAL_RESPONSE_FRAMING",
@@ -73,5 +72,15 @@
     "retry": false,
     "stream_partial_output_to_log": true,
     "resume_diagnostics": "HISTORICAL_NOT_FRESH; continuity and physical-supervision review required"
+  },
+  "offline_qualification_scope": "Host code/tests only; subsequent hardware operations are in REMOTE_BACKUP_CLOSEOUT.json",
+  "subsequent_hardware_operations": {
+    "receipt": "REMOTE_BACKUP_CLOSEOUT.json",
+    "initial_usb_rom_reset_count": 1,
+    "fullflash_reads": 2,
+    "flash": false,
+    "motion": false,
+    "torque_on": false,
+    "nvs_eeprom_bms_write": false
   }
 }

@@ -1,5 +1,7 @@
 # MATDOG — handoff definitivo, 13 ottobre 2026
 
+**Closeout operativo reale: NO-GO prima del flash.** [A/B correnti verificati, GPG pinentry scaduto/cancellato e stato ROM](REMOTE_BACKUP_CLOSEOUT.md). Nessun flash, movimento o scrittura NVS. L’ultima osservazione 13 OFF resta storica pre-ROM.
+
 **A — SOFTWARE RELEASE READY / PASS.** Un solo candidato designato, clean source `b147f3884b227ec819e98a6f00c214a0aac2278e`, `ROBOT_POWERED`, `MATDOG_SUPERVISED_VALIDATION=1`, startup `MOTION_AUTHORIZED=0`, `OTA_INGEST=0`. App **3,643,120 byte**, SHA256 **`5577bd3c8da5f6c44d8fb9ca9b3d049399e73ccf37d218e716b773e3a87b5914`**. Manifest e verifica indipendente PASS: checksum/SHA ESP32-S3, source embedded, layout 16 MiB / 2×5 MiB, pin e tutti i 1.831.776 byte della tabella WALK effettivamente presenti nel binario. RAM statica 137.508 byte, residui 190.172. Warning non bloccanti documentati nel receipt; nessuna chiamata al ReadMode(-1) della libreria.
 
 Binario locale unico:
