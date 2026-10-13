@@ -4,6 +4,7 @@
 #include <esp_https_server.h>
 #include <esp_random.h>
 #include <esp_timer.h>
+#include <esp_wifi.h>
 #include <freertos/task.h>
 #include <lwip/sockets.h>
 #include <stdarg.h>
@@ -269,7 +270,7 @@ bool HttpTransport::motionStaAdmitted(const HttpTransportRequest& r) const {
     r.admin_generation==gate.generation()&&!gate.closing.load()&&!gate.radio_fault.load()&&
     gate.phase.load()==NetworkPhase::CLIENT_STA&&w.run_mode&&w.connected&&
     static_cast<RoleReason>(w.role_reason)==RoleReason::RUN_STA&&
-    esp_wifi_get_mode(&mode)==ESP_OK&&mode==WIFI_STA&&esp_wifi_sta_get_ap_info(&ap)==ESP_OK;
+    esp_wifi_get_mode(&mode)==ESP_OK&&mode==WIFI_MODE_STA&&esp_wifi_sta_get_ap_info(&ap)==ESP_OK;
 }
 bool HttpTransport::admitMotion(HttpTransportRequest& r){
   if(r.ap_socket)return admitAdmin(r);
