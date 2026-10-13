@@ -1,0 +1,101 @@
+{
+  "schema": "MATDOG_FINAL_BUILD_RECEIPT_V1",
+  "status": "PASS",
+  "source_commit": "b147f3884b227ec819e98a6f00c214a0aac2278e",
+  "source_state": "CLEAN",
+  "application_sha256": "5577bd3c8da5f6c44d8fb9ca9b3d049399e73ccf37d218e716b773e3a87b5914",
+  "application_size_bytes": 3643120,
+  "application_path": "/home/matteo-manicardi/MATDOG/verification-artifacts/FINAL_RC_20261013/final_candidate/artifacts/ROBOT_POWERED-ota0/MATDOG_Controller.ino.bin",
+  "artifact_directory": "/home/matteo-manicardi/MATDOG/verification-artifacts/FINAL_RC_20261013/final_candidate/artifacts/ROBOT_POWERED-ota0",
+  "manifest_sha256": "1be4d3775cc7285addd6f942737f9358285154ae55e492fbe64c5b707d0948be",
+  "manifest": {
+    "MATDOG_MANIFEST_VERSION": "2",
+    "SOURCE_COMMIT": "b147f3884b227ec819e98a6f00c214a0aac2278e",
+    "BUILD_ID": "b147f3884b22",
+    "SOURCE_STATE": "CLEAN",
+    "HARDWARE_PROFILE": "ROBOT_POWERED",
+    "OTA_INGEST_ENABLED": "0",
+    "FQBN": "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=custom,DebugLevel=none,PSRAM=opi",
+    "APPLICATION_BINARY": "MATDOG_Controller.ino.bin",
+    "APPLICATION_SIZE": "3643120",
+    "APPLICATION_SHA256": "5577bd3c8da5f6c44d8fb9ca9b3d049399e73ccf37d218e716b773e3a87b5914",
+    "LAYOUT_ID": "MATDOG_16M_2x5M_NVS_V1",
+    "PARTITION_TABLE_SHA256": "8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7",
+    "APP_PARTITION_SIZE": "5242880",
+    "FW_VERSION": "0.2.0-dev.4",
+    "GIT_SHA": "b147f3884b227ec819e98a6f00c214a0aac2278e",
+    "GIT_DIRTY": "0",
+    "FLASH_LAYOUT": "MATDOG_16M_2x5M_NVS_V1",
+    "CAL_RECORD_SCHEMA": "1",
+    "CAL_MARKER_SCHEMA": "2",
+    "OTA_INGEST": "0",
+    "MOTION_STACK": "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED",
+    "MOTION_AUTHORIZED": "0",
+    "APP_SHA256": "5577bd3c8da5f6c44d8fb9ca9b3d049399e73ccf37d218e716b773e3a87b5914",
+    "BUILD_UTC": "2026-10-13T15:53:43Z",
+    "BUILD_UTC_POLICY": "UTC_NOW",
+    "SUPERVISED_VALIDATION_CAPABLE": "1",
+    "BOOT_MOTION_AUTHORIZED": "0",
+    "PRIVATE_TLS_CONFIGURATION_SHA256": "d4b22b029058d0e3b13f3d12f32ce8e96dac3cd05d066438c1b2c0ed247c62c7"
+  },
+  "independent_checks": {
+    "esp32s3_image_checksum_and_appended_sha": "PASS",
+    "embedded_source_identity": "PASS",
+    "partition_table_and_layout": "PASS",
+    "compiled_entire_first_stride_payload": "PASS",
+    "compiled_payload_offset_in_application": 152336,
+    "compiled_payload_bytes": 1831776,
+    "embedded_certificate_pins": "PASS",
+    "local_adapter_supervised_compile_flags": "PASS",
+    "public_tls_certificate_and_private_configuration_digest": "PASS",
+    "test_source_inventory_matches_frozen_commit": "PASS",
+    "manifest_negative_tests_83": "PASS"
+  },
+  "toolchain": {
+    "arduino_cli": {
+      "Application": "arduino-cli",
+      "VersionString": "1.5.1",
+      "Commit": "01f3d4f2b",
+      "Status": "",
+      "Date": "2026-06-05T10:22:17Z"
+    },
+    "arduino_cli_sha256": "cbb47ec4742ee49854031728a0eaeb678a2b36d7a797ef833a1a5b02062149c6",
+    "core": "esp32 3.3.11",
+    "idf": "5.5.5",
+    "compiler": "xtensa-esp-elf-g++ (crosstool-NG esp-14.2.0_20260121) 14.2.0",
+    "compiler_sha256": "004e294577ab054218508eaba90f92f9c2d504217ba6b78ecbd1d81f58f6ae73",
+    "compile_commands_sha256": "425ab41042b8305532bb87d6ce6f252ea3a711cbccfda99b68dbe8bd975ff4ae",
+    "sdkconfig_sha256": "534f3457aaf3ffbc82c45dc21d6b3ac57388c82d0d9a24bd2b8e6cadc3e48d9d"
+  },
+  "memory": {
+    "static_ram_bytes": 137508,
+    "remaining_static_ram_bytes": 190172,
+    "app_slot_bytes": 5242880,
+    "app_slot_used_percent": 69.487
+  },
+  "certificates_sha256": {
+    "fixture_final_margin_route_6mrad.json": "30a21dbe531d48a08386aa0fdefcd85290ac72fa49508bcbe1edbdf9d56e58d9",
+    "stand_tracking_tube_6mrad.json": "0a1459c3cedf61deb3fb39de2fde23be8946faef4637fe7613e9bd664fd1db67",
+    "first_stride_30mm_qualified_clock_swept_6mrad.json": "df4c61029d44c5a8e2608c04921ba434be120fc16174519a511eecdd89fcf014"
+  },
+  "test_receipt_sha256": "37ce029e2ac6f3d2067b9d421a171d6c253820347faf9d00c6ab855945aec134",
+  "build_log_sha256": "892c909676cafe3b3463d8734dce74ae7ddc536c5fd38d67ecc681e3516328d5",
+  "hardware_access": false,
+  "flash_executed": false,
+  "motion_authorized": false,
+  "physical_gate_status": "BLOCKED_PENDING_CURRENT_HARDWARE_MEASUREMENTS_AND_OPERATOR_REVIEW",
+  "warnings": [
+    {
+      "source": "MATDOG ServoBus",
+      "warning": "unused local lambda; no runtime effect"
+    },
+    {
+      "source": "SCServo SCSCL",
+      "warning": "unused ACC parameter; SCSCL actuator path not used"
+    },
+    {
+      "source": "SCServo SMS_STS::ReadMode(-1)",
+      "warning": "library cached-mode negative index; no ReadMode calls in firmware; production feedback uses bounded Read blocks"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+......REFUSED=SOURCE_COMMIT_MISMATCH
+DETAIL=manifest built from 34afbc7808e276d7483de9f2c817750683a65088, HEAD is 1a8c5bc3ced4f49ea36902526f232b2785a7ab70
+.REFUSED=TREE_NOT_CLEAN
+DETAIL=working tree is DIRTY
+.REFUSED=FQBN_MISMATCH
+DETAIL=manifest FQBN 'esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=custom,DebugLevel=none,PSRAM=opi' != expected 'esp32:esp32:esp32s3:FlashSize=8M'
+.REFUSED=MANIFEST_MISSING
+DETAIL=no build manifest next to the application binary
+..REFUSED=BINARY_SIZE_MISMATCH
+DETAIL=manifest 59 bytes, binary on disk 31 bytes
+..REFUSED=MANIFEST_UNPARSEABLE
+DETAIL=line 1: no '=' separator: 'this is not a manifest'
+.REFUSED=BINARY_SIZE_MISMATCH
+DETAIL=manifest 59 bytes, binary on disk 14 bytes
+.REFUSED=PARTITION_TABLE_ARTIFACT_MISSING
+DETAIL=the binary partition table the build produced is not next to the application binary
+.REFUSED=PARTITION_TABLE_MISMATCH
+DETAIL=manifest partition table 8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7 != table artifact on disk a1dabdd8ca9f59731b6c6ec9819ff80615e9c2f692ae354a60849206d4bbecaf
+.REFUSED=FQBN_NOT_CUSTOM_LAYOUT
+DETAIL=PartitionScheme='default', must be 'custom'
+REFUSED=FQBN_LEGACY_SCHEME
+DETAIL=FQBN selects the legacy app3M_fat9M_16MB scheme
+.REFUSED=LAYOUT_ID_NOT_IN_BINARY
+DETAIL='MATDOG_LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1' not in /tmp/tmp8vh0wa53/MATDOG_Controller.ino.bin
+.REFUSED=BINARY_MISSING
+DETAIL=application binary not found: /tmp/tmp4iss2bm2/nope.bin
+.REFUSED=TABLE_EMPTY
+DETAIL=no partition entries
+.REFUSED=OTA_INGEST_UNKNOWN
+DETAIL=unknown ota-ingest value 'TRUE'
+.REFUSED=PROFILE_UNKNOWN
+DETAIL=unknown profile 'SOMETHING_ELSE'
+.REFUSED=PARTITION_TABLE_ARTIFACT_MISSING
+DETAIL=not found: /tmp/tmpb3pfqo1j/MATDOG_Controller.ino.partitions.bin
+.REFUSED=OTA_INGEST_MISMATCH
+DETAIL=manifest built with OTA_INGEST_ENABLED=1, flash requested 0 — flashing an image with OTA ingest compiled in requires explicit authorization (MATDOG_FLASH_OTA_INGEST=1)
+.REFUSED=PROFILE_MISMATCH
+DETAIL=manifest built ROBOT_POWERED, flash requested USB_ONLY — flashing a ROBOT_POWERED image requires explicit authorization (MATDOG_FLASH_PROFILE=ROBOT_POWERED)
+.REFUSED=PROFILE_MISMATCH
+DETAIL=manifest built USB_ONLY, flash requested ROBOT_POWERED
+.........................................................
+----------------------------------------------------------------------
+Ran 83 tests in 0.130s
+
+OK
