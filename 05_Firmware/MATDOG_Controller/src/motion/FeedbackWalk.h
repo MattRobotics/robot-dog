@@ -9,6 +9,8 @@ struct PlanarVelocityCommand {
 };
 struct WalkSpecification {
   double periodS=0, rampDurationS=0, liftM=0, duty=0;
+  double swayXM=0,standShiftDurationS=0;
+  bool stlContactReference=false; // explicit qualification axis, not authority
   double maxVxMps=0, maxVyMps=0, maxYawRateRadS=0;
   double maxCommandTtlS=0;
   uint32_t firstTargetSequence=1;
@@ -34,7 +36,8 @@ class FeedbackWalk {
   LocomotionFrame generate(double nextClockS);
   FeedbackPolicy policy_{};
   WalkSpecification specification_{};
-  PlanarVelocityCommand command_{};
+  PlanarVelocityCommand command_{},queuedCommand_{};
+  bool queuedVelocity_=false;
   GaitParameters gait_{};
   BodyPose origin_{};
   LocomotionFrame previous_{}, pendingSolution_{};

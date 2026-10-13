@@ -21,7 +21,7 @@ def between(s,a,b):
     return s.split(a,1)[1].split(b,1)[0]
 tree=ast.parse((here/'test_ap_transport.py').read_text())
 fixture=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='fixture' for t in n.targets))
-fixture=fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <atomic>\n#include <thread>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"\n#include "motion/MotionContract.h"')
+fixture=fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <atomic>\n#include <thread>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"\n#include "motion/MotionContract.h"\n#include "network/NetworkPolicy.h"')
 fixture=fixture.replace('memset(p,0x42,n)', 'static unsigned seed=0;memset(p,++seed,n)')
 fixture=fixture.replace('constexpr int ESP_OK=0, HTTP_GET=0','constexpr int HTTP_GET=0')
 # The portal now answers with two Set-Cookie headers; the HTTPD double keeps both.
@@ -30,11 +30,16 @@ assert 'h+="\\n"' in fixture
 fixture=fixture.replace('struct FakeService {', '''class WifiManager { public: static bool verifyAdminRadio(); };
 struct FakeService {
  AdminAccess gate;
+ struct {bool run_mode=false,connected=false;uint32_t ipv4=0;uint8_t role_reason=0;} motion_wifi;
+ const auto& wifiStatus() const {return motion_wifi;}
  FakeService() { gate.begin(); gate.phase.store(NetworkPhase::ADMIN_AP); gate.open(); }
  AdminAccess &networkAdminAccess() {return gate;}
 ''')
 fixture=fixture.replace('configureNetwork(const ConfigPatch&)', 'configureNetwork(const ConfigPatch&,uint32_t)').replace('accessPoint(bool)', 'accessPoint(bool,uint32_t)')
-fixture=fixture.replace(' static esp_err_t handleWifi', ''' uint32_t portal_generation_=0;
+fixture=fixture.replace(' static esp_err_t handleWifi', ''' bool portal_sta_=false;
+ bool admitMotion(HttpTransportRequest&);
+ bool motionStaAdmitted(const HttpTransportRequest&) const;
+ uint32_t portal_generation_=0;
  bool revoke_before_service=false;
  bool admitAdmin(HttpTransportRequest&);
  void lifecycleTick();
@@ -106,8 +111,8 @@ int main() {
  auto page=request(s,"/","");page.method=HTTP_GET;check(HttpTransport::handlePage(&page)==0&&page.status==403,"page denied in CLIENT_STA");
  s.service.gate.phase.store(NetworkPhase::ADMIN_AP);
  registered.clear();check(s.registerHandlers(nullptr,false),"register HTTPS role");
- check(registered.size()==3&&std::none_of(registered.begin(),registered.end(),[](auto &u){return u=="/"||u.find("/wifi/")==0||u.find("/api/motion/")==0;}),"HTTPS has only non-admin routes");
- registered.clear();check(s.registerHandlers(nullptr,true)&&registered.size()==15,"HTTP admin route inventory");
+ check(registered.size()==10&&std::none_of(registered.begin(),registered.end(),[](auto &u){return u.find("/wifi/")==0;}),"HTTPS exposes scoped motion/auth routes and no WiFi administration");
+ registered.clear();check(s.registerHandlers(nullptr,true)&&registered.size()==18,"HTTP admin route inventory");
  for(int mode:{WIFI_STA,WIFI_AP_STA}) {WiFi.mode_value=mode;check(action(s)==403,"driver STA/APSTA deny");}
  adminRadio();WiFi.mode_read_ok=false;check(action(s)==403,"driver unverifiable deny");WiFi.mode_read_ok=true;
  WiFi.STA.running=true;check(action(s)==403,"operational STA bits deny");adminRadio();

@@ -242,7 +242,27 @@ int main(int argc,char** argv){
   // The stopped footprint can restart G4 at its new world transform.
   cmd.sequence++;cmd.stampS=now;FeedbackWalk restart;CHECK(restart.start(s,o,cmd,spec,p,now));
   auto replay=cmd;CHECK(!restart.command(replay,now));CHECK(restart.reason()==FeedbackReason::SEQUENCE_REPLAY);
-  auto changed=cmd;changed.sequence++;changed.vxMps=.002;CHECK(!restart.command(changed,now));CHECK(restart.state()==FeedbackWalkState::STOPPING);
+  auto changed=cmd;changed.sequence++;changed.vxMps=.002;CHECK(restart.command(changed,now));CHECK(restart.state()==FeedbackWalkState::STOPPING);
+  changed.vyMps=.0002;changed.yawRateRadS=.002;changed.sequence++;CHECK(restart.command(changed,now));
+  unsigned transitionFrames=0;bool transitioned=false;
+  for(unsigned guard=0;guard<1500&&!transitioned;++guard){
+    changed.stampS=now;changed.sequence++;CHECK(restart.command(changed,now));o.stampS=now;
+    auto f=restart.update(o,now);CHECK(restart.state()!=FeedbackWalkState::REJECTED);
+    if(f.target.valid){CHECK(restart.assess(syntheticAssessment(f,now),now));auto accepted=restart.update(o,now);CHECK(accepted.executable);
+      now+=p.samplePeriodS;follow(o,accepted,now);++transitionFrames;
+    }else now+=p.samplePeriodS;
+    transitioned=restart.state()==FeedbackWalkState::STARTING;
+  }
+  CHECK(transitioned&&transitionFrames>0);restart.requestStop();CHECK(restart.state()==FeedbackWalkState::STOPPING);
+  // STOP clears the queued velocity even if a parameter transition was pending.
+  changed.sequence++;changed.stampS=now;changed.vxMps=.001;CHECK(restart.command(changed,now));restart.requestStop();
+  for(unsigned guard=0;guard<1500&&restart.state()!=FeedbackWalkState::STAND;++guard){
+    o.stampS=now;auto f=restart.update(o,now);CHECK(restart.state()!=FeedbackWalkState::REJECTED);
+    if(f.target.valid){CHECK(restart.assess(syntheticAssessment(f,now),now));auto accepted=restart.update(o,now);CHECK(accepted.executable);
+      now+=p.samplePeriodS;follow(o,accepted,now);
+    }else now+=p.samplePeriodS;
+  }
+  CHECK(restart.state()==FeedbackWalkState::STAND);
   auto timeoutWalk=FeedbackWalk{};cmd.sequence++;cmd.stampS=now;CHECK(timeoutWalk.start(s,o,cmd,spec,p,now));o.stampS=now+.26;timeoutWalk.update(o,now+.26);CHECK(timeoutWalk.state()==FeedbackWalkState::STOPPING);
   // API receives SI velocity, including lateral/diagonal/yaw. Qualification
   // of a physical finite-cylinder contact remains a separate geometry gate.

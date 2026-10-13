@@ -20,12 +20,14 @@ def between(text, start, end):
 tree = ast.parse((HERE/'test_ap_transport.py').read_text())
 fixture = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'fixture' for t in n.targets))
 fixture = fixture[:fixture.index('int main(int argc,char**)')]
-fixture = fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"\n#include "core/MotionService.h"\n#include "core/MotionJson.h"')
+fixture = fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"\n#include "network/NetworkPolicy.h"\n#include "network/NetworkPolicy.h"\n#include "core/MotionService.h"\n#include "core/MotionJson.h"')
 fixture = fixture.replace('constexpr int ESP_OK=0, HTTP_GET=0', 'constexpr int HTTP_GET=0')
 fixture = fixture.replace('memset(p,0x42,n)', 'static unsigned seed=0;memset(p,++seed,n)')
 fixture = fixture.replace('struct FakeService {', '''class WifiManager { public: static bool verifyAdminRadio(); };
 struct FakeService {
  AdminAccess gate;
+ struct {bool run_mode=false,connected=false;uint32_t ipv4=0;uint8_t role_reason=0;} motion_wifi;
+ const auto& wifiStatus() const {return motion_wifi;}
  core::MotionService motion;
  unsigned command_calls=0,status_calls=0,catalog_calls=0;
  FakeService() { gate.begin(); gate.phase.store(NetworkPhase::ADMIN_AP); gate.open(); motion.begin(nullptr,nullptr); }
@@ -35,7 +37,10 @@ struct FakeService {
  motion::MotionAck motionCommand(const motion::MotionCommand& command,uint32_t now) { ++command_calls;return motion.command(command,now); }
  bool motionAck(const motion::MotionAck& ack,char* out,size_t cap) { return motion.ackJson(ack,out,cap); }
 ''')
-fixture = fixture.replace(' static esp_err_t handleWifi(httpd_req_t*);', ''' uint32_t portal_generation_=0;
+fixture = fixture.replace(' static esp_err_t handleWifi(httpd_req_t*);', ''' bool portal_sta_=false;
+ bool admitMotion(HttpTransportRequest&);
+ bool motionStaAdmitted(const HttpTransportRequest&) const;
+ uint32_t portal_generation_=0;
  bool busy=false,revoke_before_service=false;
  char motion_capabilities_[kMotionCapabilitiesBytes]{};
  bool admitAdmin(HttpTransportRequest&);
@@ -121,7 +126,25 @@ int main() {
  s.service.gate.phase.store(NetworkPhase::ADMIN_AP);
  for(int mode:{WIFI_STA,WIFI_AP_STA}){WiFi.mode_value=mode;auto r=request(s,"/api/motion/capabilities","");r.method=HTTP_GET;runMotion(r);check(r.status==403,"STA/APSTA driver state rejects motion read");}
  adminRadio();WiFi.mode_read_ok=false;auto unverifiable=request(s,"/api/motion/status","");unverifiable.method=HTTP_GET;runMotion(unverifiable);check(unverifiable.status==403,"unverifiable radio rejects");WiFi.mode_read_ok=true;
- s.service.gate.phase.store(NetworkPhase::CLIENT_STA);WiFi.mode_value=WIFI_STA;endpoint(local_addr,local_len,0xc0a80110u,true,443);auto sta=request(s,"/api/motion/status","");sta.method=HTTP_GET;runMotion(sta);check(sta.status==403,"STA TLS cannot access motion API");adminRadio();endpoints();s.service.gate.phase.store(NetworkPhase::ADMIN_AP);
+ s.service.gate.phase.store(NetworkPhase::CLIENT_STA);WiFi.mode_value=WIFI_STA;endpoint(local_addr,local_len,0xc0a80110u,true,443);auto sta=request(s,"/api/motion/status","");sta.method=HTTP_GET;runMotion(sta);check(sta.status==403,"STA TLS cannot access motion API");
+ // Real RUN_STA TLS route, independent authenticated session and no authority.
+ s.service.motion_wifi.run_mode=true;s.service.motion_wifi.connected=true;
+ s.service.motion_wifi.role_reason=static_cast<uint8_t>(RoleReason::RUN_STA);
+ s.service.motion_wifi.ipv4=htonl(0xc0a80110u);WiFi.connected=true;WiFi.STA.running=true;
+ s.service.gate.closing.store(false);
+ clock_ms+=1000;auto tlsLogin=request(s,"/api/motion/login","token="+token,"192.168.1.16","https://192.168.1.16");run(tlsLogin);
+ check(tlsLogin.status==200,"RUN_STA TLS credential login");
+ check(tlsLogin.response_headers["Set-Cookie"].find("; Secure")!=std::string::npos,"TLS session Secure cookie");
+ auto tlsStatus=request(s,"/api/motion/status","","192.168.1.16","https://192.168.1.16");tlsStatus.method=HTTP_GET;
+ runMotion(tlsStatus);check(tlsStatus.status==403,"STA GET requires session");
+ tlsStatus.status=200;tlsStatus.headers["Cookie"]="md_session="+std::string(s.portal_.cookie());runMotion(tlsStatus);
+ check(tlsStatus.status==200,"authenticated STA actual/status snapshot");
+ auto tlsStop=motionRequest(s,command("MOTION.STOP"));tlsStop.headers["Host"]="192.168.1.16";tlsStop.headers["Origin"]="https://192.168.1.16";
+ runMotion(tlsStop);check(tlsStop.status==200,"authenticated STA semantic STOP");
+ auto insecure=tlsStop;endpoint(local_addr,local_len,0xc0a80110u,true,80);runMotion(insecure);check(insecure.status==403,"plain STA HTTP denied");
+ endpoint(local_addr,local_len,0xc0a80110u,true,443);s.service.motion_wifi.connected=false;auto lost=tlsStop;runMotion(lost);check(lost.status==403,"STA link loss fences command");
+ s.service.motion_wifi.run_mode=false;adminRadio();endpoints();s.service.gate.phase.store(NetworkPhase::ADMIN_AP);
+ login(s);
  s.revoke_before_service=true;auto pending=motionRequest(s,command("MOTION.STOP"));runMotion(pending);check(pending.status==403,"revocation between handler and Controller service fences request");s.revoke_before_service=false;s.service.gate.open();
  auto old=motionRequest(s,command("MOTION.STOP"));runMotion(old);check(old.status==403,"generation change resets portal session");login(s);
  s.busy=true;auto busy=request(s,"/api/motion/status","");busy.method=HTTP_GET;runMotion(busy);check(busy.status==500&&busy.response=="Controller busy","mailbox failure explicit");s.busy=false;
@@ -137,12 +160,12 @@ admit = 'bool HttpTransport::admitAdmin('+between(c, 'bool HttpTransport::admitA
 verify = 'bool WifiManager::verifyAdminRadio()'+between(w, 'bool WifiManager::verifyAdminRadio()', '// Arduino delivers role events asynchronously.')
 admission = between(c, '  resp.sequence = req.sequence;\n', '  switch (req.kind) {')
 cases = 'case HttpRequestKind::MOTION_STATUS:'+between(c, 'case HttpRequestKind::MOTION_STATUS:', 'case HttpRequestKind::WIFI_STATUS:')
-login_case = 'case HttpRequestKind::WIFI_LOGIN:'+between(c, 'case HttpRequestKind::WIFI_LOGIN:', 'case HttpRequestKind::WIFI_SESSION:')
+login_case = 'case HttpRequestKind::MOTION_LOGIN: case HttpRequestKind::WIFI_LOGIN:'+between(c, 'case HttpRequestKind::WIFI_LOGIN:', 'case HttpRequestKind::WIFI_SESSION:')
 copy_start = c.index('      if(request.kind==HttpRequestKind::MOTION_CAPABILITIES')
 copy = c[copy_start:c.index('      xSemaphoreGive(slot_free_);', copy_start)]
 unit = fixture.replace('// PRODUCTION_TYPES',types).replace('// PRODUCTION_HELPERS',helpers+admit+verify).replace('// PRODUCTION_HANDLER',handler+wifi_handler).replace('// PRODUCTION_SERVICE_CASES',cases+login_case).replace('// PRODUCTION_SERVICE_ADMISSION',admission).replace('// PRODUCTION_CATALOG_COPY',copy)
 with tempfile.TemporaryDirectory(prefix='matdog-motion-http-') as temp:
     cpp, exe = Path(temp)/'probe.cpp', Path(temp)/'probe';cpp.write_text(unit)
     sources = ['network/AdminAccess.cpp','network/PortalSecurity.cpp','network/NetworkConfig.cpp','update/Sha256.cpp','update/Hmac256.cpp','core/MotionService.cpp','core/MotionJson.cpp','execution/MotionExecutor.cpp','actuator/ActuatorRuntime.cpp','actuator/ActuatorWritePolicy.cpp','actuator/CalibrationGeometryProfile.cpp','actuator/CalibrationTargetResolver.cpp','actuator/CalibrationSequencePlan.cpp','calibration/StartupRecoveryReference.cpp','calibration/CalibrationDomain.cpp','servo/ServoPopulation.cpp','core/ActuatorAuthority.cpp','core/OperatingMode.cpp']
-    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-DDISABLED=0x00','-O1','-pthread','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(SRC),'-I',str(HERE/'network_stubs'),'-I',str(HERE/'nvs_stub'),str(cpp),*[str(SRC/p) for p in sources],*[str(SRC/'motion'/p) for p in ['MotionContract.cpp','MotionFeedback.cpp','AdaptiveStand.cpp','FeedbackWalk.cpp','BodyPose.cpp','PoseSupport.cpp','Gait.cpp','Locomotion.cpp','TimedStand.cpp','StandTransition.cpp','StandTrajectory.cpp','FootContact.cpp','ContactMode.cpp','TiltedContactIk.cpp','LegKinematics.cpp','LegInverseKinematics.cpp','MotionState.cpp','StartupAcquisition.cpp']],'-o',str(exe)],check=True)
+    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-DDISABLED=0x00','-O1','-pthread','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(SRC),'-I',str(HERE/'network_stubs'),'-I',str(HERE/'nvs_stub'),str(cpp),*[str(SRC/p) for p in sources],*[str(SRC/'motion'/p) for p in ['PairedProneRoute.cpp','StlContactGait.cpp','MotionContract.cpp','MotionFeedback.cpp','AdaptiveStand.cpp','FeedbackWalk.cpp','BodyPose.cpp','PoseSupport.cpp','Gait.cpp','Locomotion.cpp','TimedStand.cpp','StandTransition.cpp','StandTrajectory.cpp','FootContact.cpp','ContactMode.cpp','TiltedContactIk.cpp','LegKinematics.cpp','LegInverseKinematics.cpp','MotionState.cpp','StartupAcquisition.cpp']],'-o',str(exe)],check=True)
     subprocess.run([str(exe)],check=True)

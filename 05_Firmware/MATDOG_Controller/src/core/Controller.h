@@ -12,6 +12,9 @@
 #include "../calibration/CalibrationPersistenceService.h"
 #include "../calibration/CalibrationRuntimeRestore.h"
 #include "../execution/MotionCoordinator.h"
+#include "../execution/OperationalFeedback.h"
+#include "../execution/MotionSession.h"
+#include "../execution/ReviewedMotionRuntime.h"
 #include "../calibration/CalibrationRecordNvsBackend.h"
 #include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/CalibrationQ0CaptureSession.h"
@@ -47,6 +50,13 @@ class Controller {
  public:
   void begin();
   void update(uint32_t now_ms);
+  // Local C++ operator-adapter boundary; never registered with HTTP. Binding
+  // consumes approvals, it does not grant limits, permit or image authority.
+  bool bindReviewedMotionRuntime(const execution::ReviewedMotionRuntime&);
+  bool requestLocalMotionTrial(const execution::LocalTrialEvidence&,uint32_t permit_generation,uint32_t permit_expires_at_ms);
+  bool publishLocalMotionObservation(const motion::AdaptiveObservation&);
+  bool publishLocalMotionAssessment(const motion::SegmentAssessment&);
+  bool requestLocalFixtureMicro(unsigned joint,double delta_rad,double duration_s,const execution::FrameValidation&);
 
  private:
   void printBootBanner();
@@ -174,7 +184,15 @@ class Controller {
   execution::MotionCoordinator motion_coordinator_;
   MotionService motion_service_;
   execution::MotionExecutionFacts operational_facts_{};
+  execution::MotionSession operational_session_{};
+  execution::LocalTrialEvidence local_trial_evidence_{};
+  execution::ReviewedMotionRuntime reviewed_motion_{};
+  bool reviewed_motion_bound_=false;
+  motion::AdaptiveObservation local_motion_observation_{};
   execution::JointFeedback operational_feedback_{};
+  execution::OperationalFeedback operational_producer_{};
+  uint8_t operational_poll_next_=0;
+  uint32_t operational_poll_at_ms_=0;
   uint16_t motion_safe_off_mask_=0;
   uint8_t motion_safe_off_next_=0;
 

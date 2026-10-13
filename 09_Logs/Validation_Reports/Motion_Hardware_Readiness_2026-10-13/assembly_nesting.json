@@ -1,0 +1,168 @@
+{
+  "schema": "MATDOG_INITIAL_ASSEMBLY_NESTING_V1",
+  "source_sha256": "f86ad336ffdaa1bf287f54d8a1a233494bf935156439610fd35ebc25bed411f2",
+  "topology": [
+    {
+      "link": "base_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "lf_hip_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "lf_upper_leg_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "lf_lower_leg_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "lf_foot_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "rf_hip_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "rf_upper_leg_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "rf_lower_leg_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "rf_foot_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "rh_hip_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "rh_upper_leg_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "rh_lower_leg_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "rh_foot_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "lh_hip_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "lh_upper_leg_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "lh_lower_leg_link",
+      "closed": true,
+      "components": 1
+    },
+    {
+      "link": "lh_foot_link",
+      "closed": true,
+      "components": 1
+    }
+  ],
+  "rows": [
+    {
+      "joint": "lf_hip_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    },
+    {
+      "joint": "lf_upper_leg_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    },
+    {
+      "joint": "lf_lower_leg_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    },
+    {
+      "joint": "rf_hip_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    },
+    {
+      "joint": "rf_upper_leg_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    },
+    {
+      "joint": "rf_lower_leg_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    },
+    {
+      "joint": "rh_hip_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    },
+    {
+      "joint": "rh_upper_leg_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    },
+    {
+      "joint": "rh_lower_leg_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    },
+    {
+      "joint": "lh_hip_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    },
+    {
+      "joint": "lh_upper_leg_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    },
+    {
+      "joint": "lh_lower_leg_joint",
+      "nested_parent_components": [],
+      "nested_child_components": [],
+      "status": "PASS_NO_NESTED_SURFACE"
+    }
+  ],
+  "all_initial_adjacent_non_nested": true,
+  "physical_fit_or_load_qualified": false,
+  "inference": "Combined with adjacent_axis continuous separation, initial closed components cannot newly cross or enter each other along this route. CAD solid semantics remain a physical assembly review requirement."
+}

@@ -22,6 +22,7 @@ const char* MotionService::refusal() const {
  if(!readiness_.limits_approved)return "OPERATIONAL_LIMITS_REQUIRED";
  if(!readiness_.hardware_approved)return "HARDWARE_QUALIFICATION_REQUIRED";
  if(!readiness_.operational_permit)return "OPERATOR_GO_REQUIRED";
+ if(readiness_.local_fixture_session)return "LOCAL_FIXTURE_MICRO_ONLY";
  if(!readiness_.support_observable)return "SUPPORT_UNOBSERVABLE";
  if(!readiness_.power_ok||!readiness_.bms_ok)return "POWER_OR_BMS";
  if(readiness_.mode!=OperatingMode::RUN)return "MODE_RUN_REQUIRED";
@@ -46,7 +47,7 @@ void MotionService::refresh(const MotionReadiness& r,uint32_t now) {
  if(active_command_&&executor_&&active_arm_generation_!=executor_->status().arm_generation)
   finishActive(motion::CommandOutcome::ABORTED,"SESSION_CHANGED");
  const char* gate=refusal();
- if((gate&&((executor_&&executor_->active())||active_command_))||
+ if((gate&&((executor_&&executor_->active()&&!r.local_fixture_session)||active_command_))||
     (teleop_deadline_ms_&&static_cast<int32_t>(now-teleop_deadline_ms_)>=0))disconnected(now);
  if(!active_command_)return;
  const auto state=executor_?executor_->status().state:execution::ExecutorState::OFF;
@@ -144,11 +145,16 @@ bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
  const auto* s=executor_?&executor_->status():nullptr;const char* r=refusal();
  w.add("{\"version\":1,\"now_ms\":%lu,\"last_sequence\":%lu,\"owner\":\"%s\",\"executor_state\":\"%s\",\"stand_state\":\"%s\",\"fault\":%s,\"reason\":\"%s\",\"stale\":%s,\"tracking_error_rad\":%.6f,\"completed_sequence\":%lu,\"telemetry\":{\"sampled_at_ms\":%lu,\"actual_rad\":",(unsigned long)now,(unsigned long)last_ack_.sequence,motion::toString(command_owner_),s?execution::toString(s->state):"OFF",planner_?planner_->state():"OBSERVE",readiness_.fault?"true":"false",r?r:(s?s->reason:"OFF"),stale?"true":"false",s?s->max_tracking_error_rad:0,(unsigned long)(s?s->completed_sequence:0),(unsigned long)telemetry_.sampled_at_ms);
  if(telemetry_.joints_valid){w.add("[");for(unsigned i=0;i<12;i++)w.add("%s%.8f",i?",":"",telemetry_.actual_rad[i]);w.add("]");}else w.add("null");
+ w.add(",\"joint_at_ms\":[");for(unsigned i=0;i<12;++i)w.add("%s%lu",i?",":"",static_cast<unsigned long>(telemetry_.joint_at_ms[i]));w.add("]");
+ w.add(",\"raw_ticks\":");if(telemetry_.raw_valid){w.add("[");for(unsigned i=0;i<12;++i)w.add("%s%u",i?",":"",telemetry_.raw_ticks[i]);w.add("]");}else w.add("null");
  w.add(",\"target_rad\":");if(s&&s->accepted_sequence){w.add("[");for(unsigned i=0;i<12;i++)w.add("%s%.8f",i?",":"",executor_->targetRadians()[i]);w.add("]");}else w.add("null");
  w.add(",\"quaternion\":");if(telemetry_.quaternion_valid&&now-telemetry_.quaternion_at_ms<=500){w.add("[%.8f,%.8f,%.8f,%.8f]",telemetry_.quaternion[0],telemetry_.quaternion[1],telemetry_.quaternion[2],telemetry_.quaternion[3]);}else w.add("null");
  w.add(",\"base_height_m\":");if(telemetry_.height_valid)w.add("%.6f",telemetry_.base_height_m);else w.add("null");
  w.add(",\"feet\":null},\"active_command\":");
  char active[512]{};if(active_ack_.sequence&&ackJson(active_ack_,active,sizeof(active)))w.add("%s",active);else w.add("null");
+ w.add(",\"readiness\":{\"restore\":%s,\"calibration_accepted\":%s,\"limits_approved\":%s,\"permit\":%s,\"support_observable\":%s,\"hardware_approved\":%s}",
+ readiness_.calibration_restored?"true":"false",readiness_.calibration_accepted?"true":"false",readiness_.limits_approved?"true":"false",readiness_.operational_permit?"true":"false",readiness_.support_observable?"true":"false",readiness_.hardware_approved?"true":"false");
+ w.add(",\"local_session\":{\"state\":\"%s\",\"reason\":\"%s\"}",telemetry_.session_state,telemetry_.session_reason);
  w.add("}");return w.ok;
 }
 } }

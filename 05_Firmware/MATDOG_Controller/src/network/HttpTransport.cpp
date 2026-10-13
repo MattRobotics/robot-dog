@@ -78,11 +78,19 @@ bool socketFacts(httpd_req_t *req, HttpTransportRequest &r) {
     return false;
   r.ap_socket = ntohl(local_ip) == 0xc0a80401u;
   r.peer = peer_ip;
+  r.local_ipv4=local_ip;
   r.tls = local_port == 443;
   char host[64]{}, origin[64]{};
   httpd_req_get_hdr_value_str(req, "Host", host, sizeof(host));
   httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin));
   r.local_authorized = portalOrigin(r.ap_socket, host, origin);
+  if(r.tls&&!r.ap_socket){
+    char address[64]{},expected[72]{};
+    const auto* bytes=reinterpret_cast<const uint8_t*>(&local_ip);
+    snprintf(address,sizeof(address),"%u.%u.%u.%u",bytes[0],bytes[1],bytes[2],bytes[3]);
+    snprintf(expected,sizeof(expected),"https://%s",address);
+    r.local_authorized=!strcmp(host,address)&&!strcmp(origin,expected);
+  }
   return true;
 }
 // One 64-character cookie value, by exact name. Missing, wrong length or a
@@ -176,9 +184,12 @@ bool HttpTransport::registerHandlers(httpd_handle_t server, bool admin) {
       {"/wifi/logout", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/api/motion/status", HTTP_GET, &HttpTransport::handleMotion, this},
       {"/api/motion/capabilities", HTTP_GET, &HttpTransport::handleMotion, this},
-      {"/api/motion/command", HTTP_POST, &HttpTransport::handleMotion, this}};
+      {"/api/motion/command", HTTP_POST, &HttpTransport::handleMotion, this},
+      {"/api/motion/login", HTTP_POST, &HttpTransport::handleWifi, this},
+      {"/api/motion/session", HTTP_POST, &HttpTransport::handleWifi, this},
+      {"/api/motion/logout", HTTP_POST, &HttpTransport::handleWifi, this}};
   for (const auto &uri : uris) {
-    if (!admin && (strcmp(uri.uri, "/") == 0 || strncmp(uri.uri, "/wifi/", 6) == 0 || strncmp(uri.uri, "/api/motion/", 12) == 0)) continue;
+    if (!admin && strncmp(uri.uri, "/wifi/", 6) == 0) continue;
     if (httpd_register_uri_handler(server, &uri) != ESP_OK) return false;
   }
   return true;
@@ -202,7 +213,7 @@ void HttpTransport::lifecycleTick() {
     if (desired_.load() && !server_) {
       httpd_config_t c = HTTPD_DEFAULT_CONFIG();
       c.stack_size = 24576;
-      c.max_uri_handlers = 18;
+      c.max_uri_handlers = 21;
       c.max_open_sockets = 2;
       // A phone browser may open more connections than the two this listener
       // holds; the least recently used one is closed instead of stalling.
@@ -251,6 +262,20 @@ bool HttpTransport::admitAdmin(HttpTransportRequest &request) {
   request.admin_generation = gate.generation();
   return gate.allowed(request.admin_generation) && WifiManager::verifyAdminRadio();
 }
+bool HttpTransport::motionStaAdmitted(const HttpTransportRequest& r) const {
+  const auto& w=service_->wifiStatus();auto& gate=service_->networkAdminAccess();
+  wifi_mode_t mode=WIFI_MODE_NULL;wifi_ap_record_t ap{};
+  return r.tls&&!r.ap_socket&&r.local_ipv4&&r.local_ipv4==w.ipv4&&
+    r.admin_generation==gate.generation()&&!gate.closing.load()&&!gate.radio_fault.load()&&
+    gate.phase.load()==NetworkPhase::CLIENT_STA&&w.run_mode&&w.connected&&
+    static_cast<RoleReason>(w.role_reason)==RoleReason::RUN_STA&&
+    esp_wifi_get_mode(&mode)==ESP_OK&&mode==WIFI_STA&&esp_wifi_sta_get_ap_info(&ap)==ESP_OK;
+}
+bool HttpTransport::admitMotion(HttpTransportRequest& r){
+  if(r.ap_socket)return admitAdmin(r);
+  r.admin_generation=service_->networkAdminAccess().generation();
+  return motionStaAdmitted(r);
+}
 bool HttpTransport::dispatch(const HttpTransportRequest &request,
                              HttpTransportResponse *response, char* large_text, size_t large_cap) {
   if (xSemaphoreTake(slot_free_, pdMS_TO_TICKS(kDispatchTimeoutMs)) != pdTRUE)
@@ -258,6 +283,7 @@ bool HttpTransport::dispatch(const HttpTransportRequest &request,
   xSemaphoreTake(response_ready_,
                  0); // drain prior late wake; IDs remain authoritative
   if (request.kind >= HttpRequestKind::WIFI_STATUS &&
+      !(request.kind>=HttpRequestKind::MOTION_STATUS&&motionStaAdmitted(request)) &&
       (!service_->networkAdminAccess().allowed(request.admin_generation) ||
        !WifiManager::verifyAdminRadio())) {
     xSemaphoreGive(slot_free_); return false;
@@ -302,11 +328,14 @@ void HttpTransport::update(uint32_t now_ms) {
     memcpy(previous_admin_digest_, service_->networkAdminDigest(), 32);
   }
   auto &gate = service_->networkAdminAccess();
-  if (!gate.allowed(portal_generation_)) { portal_.reset(); portal_generation_ = 0; }
+  if ((!portal_sta_&&!gate.allowed(portal_generation_)) ||
+      (portal_sta_&&(gate.closing.load()||gate.phase.load()!=NetworkPhase::CLIENT_STA||!service_->wifiStatus().connected||!service_->wifiStatus().run_mode))) {
+    portal_.reset();portal_generation_=0;portal_sta_=false;
+  }
   tls_desired_.store(
       !manual_stop_.load() && !gate.closing.load() &&
       gate.phase.load() == NetworkPhase::CLIENT_STA && config::kTlsIdentityPresent &&
-      (service_->remoteUpdateAllowed() ||
+      ((service_->wifiStatus().run_mode&&service_->wifiStatus().connected) || service_->remoteUpdateAllowed() ||
        (session_.sessionAuthenticated() && service_->wifiStatus().connected)));
   if (session_.sessionAuthenticated() &&
       (session_.timedOut(now_ms) || !service_->wifiStatus().connected ||
@@ -331,14 +360,19 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   resp.sequence = req.sequence;
 
   auto &gate = service_->networkAdminAccess();
-  const bool admin_request = req.kind >= HttpRequestKind::WIFI_STATUS;
+  const bool sta_motion=req.kind>=HttpRequestKind::MOTION_STATUS&&motionStaAdmitted(req);
+  const bool admin_request = req.kind >= HttpRequestKind::WIFI_STATUS&&!sta_motion;
   AdminLease lease(gate);
   if (admin_request && (!lease || !gate.allowed(req.admin_generation) ||
                         !WifiManager::verifyAdminRadio())) {
     resp.message = "ADMIN_AP_REQUIRED"; return;
   }
-  if (admin_request && portal_generation_ != req.admin_generation) {
-    portal_.reset(); portal_generation_ = req.admin_generation;
+  if ((admin_request||sta_motion)&&(portal_generation_!=req.admin_generation||portal_sta_!=sta_motion)) {
+    portal_.reset();portal_generation_=req.admin_generation;portal_sta_=sta_motion;
+  }
+  if(sta_motion&&req.kind!=HttpRequestKind::MOTION_LOGIN&&req.kind!=HttpRequestKind::MOTION_SESSION&&
+      req.kind!=HttpRequestKind::MOTION_LOGOUT&&!portal_.current(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie)){
+    resp.message="AUTH_FAILED";return;
   }
   switch (req.kind) {
   case HttpRequestKind::WEB_STATUS: {
@@ -449,6 +483,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     wifiResponse(resp);
     break;
   }
+  case HttpRequestKind::MOTION_LOGIN:
   case HttpRequestKind::WIFI_LOGIN: {
     uint8_t random[64 + kPortalDeviceIdBytes];
     esp_fill_random(random, sizeof(random));
@@ -468,6 +503,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     memset(random, 0, sizeof(random));
     break;
   }
+  case HttpRequestKind::MOTION_SESSION:
   case HttpRequestKind::WIFI_SESSION: {
     // Page load or expired session. The holder of the live session is told
     // its CSRF token again; otherwise a remembered-device credential opens a
@@ -493,6 +529,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     }
     break;
   }
+  case HttpRequestKind::MOTION_LOGOUT:
   case HttpRequestKind::WIFI_LOGOUT: {
     // Ends the session if the caller holds it; the response clears the
     // browser's cookies either way. A remembered device is not individually
@@ -1001,8 +1038,8 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
 esp_err_t HttpTransport::handlePage(httpd_req_t *req) {
   auto *self = static_cast<HttpTransport *>(req->user_ctx);
   HttpTransportRequest r{};
-  if (!self->admitAdmin(r))
-    return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "ADMIN_AP_REQUIRED");
+  if(!socketFacts(req,r)||!self->admitMotion(r))
+    return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"MOTION_TRANSPORT_REQUIRED");
   httpd_resp_set_type(req, "text/html; charset=utf-8");
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
   httpd_resp_set_hdr(req, "X-Frame-Options", "DENY");
@@ -1017,8 +1054,10 @@ esp_err_t HttpTransport::handlePage(httpd_req_t *req) {
 esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
   auto* self=static_cast<HttpTransport*>(req->user_ctx);
   HttpTransportRequest r{};
-  if(!socketFacts(req,r) || !self->admitAdmin(r))
+  if(!socketFacts(req,r) || !self->admitMotion(r))
     return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"ADMIN_AP_REQUIRED");
+  char session_cookie[256]{};httpd_req_get_hdr_value_str(req,"Cookie",session_cookie,sizeof(session_cookie));
+  cookieValue(session_cookie,"md_session",r.cookie);
   if(req->method==HTTP_GET) {
     r.kind=strcmp(req->uri,"/api/motion/status")==0?HttpRequestKind::MOTION_STATUS:HttpRequestKind::MOTION_CAPABILITIES;
   } else {
@@ -1061,8 +1100,9 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   HttpTransportRequest r{};
   if (!socketFacts(req, r))
     return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "Socket unavailable");
-  if (!self->admitAdmin(r))
-    return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "ADMIN_AP_REQUIRED");
+  const bool motion_auth=!strcmp(req->uri,"/api/motion/login")||!strcmp(req->uri,"/api/motion/session")||!strcmp(req->uri,"/api/motion/logout");
+  if(motion_auth?!self->admitMotion(r):!self->admitAdmin(r))
+    return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"ADMIN_AP_OR_MOTION_TLS_REQUIRED");
   if (req->method == HTTP_GET)
     r.kind = HttpRequestKind::WIFI_STATUS;
   else {
@@ -1088,10 +1128,10 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
                                    "Truncated body");
       read += got;
     }
-    if (strcmp(req->uri, "/wifi/login") == 0) {
-      r.kind = HttpRequestKind::WIFI_LOGIN;
+    if (strcmp(req->uri, "/wifi/login") == 0||strcmp(req->uri,"/api/motion/login")==0) {
+      r.kind = motion_auth?HttpRequestKind::MOTION_LOGIN:HttpRequestKind::WIFI_LOGIN;
       // token=<64 hex>, optionally followed by &remember=1 and nothing else.
-      r.remember = read == 81 && memcmp(body + 70, "&remember=1", 11) == 0;
+      r.remember = !motion_auth && read == 81 && memcmp(body + 70, "&remember=1", 11) == 0;
       if ((read != 70 && !r.remember) || strncmp(body, "token=", 6) != 0)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid login");
       memcpy(r.login, body + 6, 64);
@@ -1121,9 +1161,9 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
                                      "Invalid AP action");
         r.ap_on = body[3] == '1';
       } else if (strcmp(req->uri, "/wifi/session") == 0 ||
-                 strcmp(req->uri, "/wifi/logout") == 0) {
-        r.kind = req->uri[6] == 's' ? HttpRequestKind::WIFI_SESSION
-                                    : HttpRequestKind::WIFI_LOGOUT;
+                 strcmp(req->uri, "/wifi/logout") == 0 || motion_auth) {
+        r.kind=motion_auth?(!strcmp(req->uri,"/api/motion/session")?HttpRequestKind::MOTION_SESSION:HttpRequestKind::MOTION_LOGOUT):
+          (req->uri[6]=='s'?HttpRequestKind::WIFI_SESSION:HttpRequestKind::WIFI_LOGOUT);
         if (read)
           return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
                                      "Empty body required");
@@ -1149,11 +1189,11 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   // is scoped to /wifi/session, so it is sent only to open a session.
   char cookie[160], device[176];
   if (r.kind == HttpRequestKind::WIFI_LOGIN ||
-      r.kind == HttpRequestKind::WIFI_SESSION) {
+      r.kind == HttpRequestKind::WIFI_SESSION||r.kind==HttpRequestKind::MOTION_LOGIN||r.kind==HttpRequestKind::MOTION_SESSION) {
     snprintf(
         cookie, sizeof(cookie),
-        "md_session=%s; HttpOnly; SameSite=Strict; Path=/; Max-Age=300",
-        resp.cookie);
+        "md_session=%s; HttpOnly; SameSite=Strict; Path=/; Max-Age=300%s",
+        resp.cookie,r.tls?"; Secure":"");
     httpd_resp_set_hdr(req, "Set-Cookie", cookie);
     if (resp.device[0]) {
       snprintf(device, sizeof(device),
@@ -1163,7 +1203,7 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
     }
     return httpd_resp_send(req, resp.text, resp.text_len);
   }
-  if (r.kind == HttpRequestKind::WIFI_LOGOUT) {
+  if (r.kind == HttpRequestKind::WIFI_LOGOUT||r.kind==HttpRequestKind::MOTION_LOGOUT) {
     httpd_resp_set_hdr(
         req, "Set-Cookie",
         "md_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0");

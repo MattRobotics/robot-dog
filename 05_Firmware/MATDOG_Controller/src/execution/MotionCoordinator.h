@@ -3,6 +3,7 @@
 #include "../core/MotionService.h"
 #include "../motion/AdaptiveStand.h"
 #include "../motion/FeedbackWalk.h"
+#include "MotionSession.h"
 namespace matdog { namespace execution {
 // The semantic service, planner and executor share one Controller thread.
 // Configuration/evidence are supplied locally by reviewed artifacts, never Web.
@@ -10,6 +11,7 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
  public:
   void begin(MotionExecutor*,actuator::SafeActuatorPolicy*);
   bool configure(const motion::FeedbackPolicy&,const motion::WalkSpecification&,const motion::AcquisitionRoute*);
+  void bindSession(MotionSession* session){session_=session;}
   void observe(const motion::AdaptiveObservation&);
   bool assess(const motion::SegmentAssessment&,uint32_t now_ms);
   const char* accept(const motion::MotionCommand&,uint32_t now_ms) override;
@@ -21,6 +23,7 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
  private:
   void synchronizeSession();
   MotionExecutor* executor_=nullptr;
+  MotionSession* session_=nullptr;
   actuator::SafeActuatorPolicy* policy_=nullptr;
   motion::AdaptiveStand stand_{};
   motion::FeedbackWalk walk_{};

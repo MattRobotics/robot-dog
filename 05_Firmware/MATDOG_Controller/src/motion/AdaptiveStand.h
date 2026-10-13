@@ -1,8 +1,8 @@
 #ifndef MATDOG_MOTION_ADAPTIVE_STAND_H
 #define MATDOG_MOTION_ADAPTIVE_STAND_H
-#include "MotionFeedback.h"
+#include "PairedProneRoute.h"
 namespace matdog { namespace motion {
-enum class AdaptiveStandState : uint8_t { IDLE, OBSERVE, CLASSIFY, ACQUIRE_SUPPORT, RISE, VERIFY_STAND, STAND, REJECTED, STOPPED };
+enum class AdaptiveStandState : uint8_t { IDLE, OBSERVE, CLASSIFY, ACQUIRE_SUPPORT, RISE, VERIFY_STAND, STAND, REJECTED, STOPPED, PRE_ALIGN, REAR_DEPLOY, FRONT_DEPLOY, LOAD_TRANSFER, PAIRED_RISE };
 enum class ObservedPoseClass : uint8_t { UNKNOWN, BELLY_FOLDED, SUPPORTED_INTERMEDIATE, SUPPORTED_STAND, NOMINAL_STAND, UNRECOVERABLE, PARTIAL_SUPPORT };
 const char* adaptiveStandStateName(AdaptiveStandState state);
 struct AcquisitionWaypoint {
@@ -20,6 +20,7 @@ struct AcquisitionRoute {
   static constexpr uint8_t kMaxWaypoints=32;
   AcquisitionWaypoint waypoints[kMaxWaypoints]{};
   uint8_t count=0;
+  bool pairedProne=false; // immutable profile, no editable waypoint copy
   bool geometryIdentityVerified=false;
   EvidenceSource source=EvidenceSource::UNKNOWN;
 };
@@ -45,6 +46,7 @@ class AdaptiveStand {
   FeedbackFrame reject(FeedbackReason reason);
   bool beginSegment(const AcquisitionWaypoint& endpoint);
   bool beginRise();
+  bool beginPairedSegment();
   FeedbackFrame generate(double nowS);
   FeedbackPolicy policy_{};
   AdaptiveStandRequest request_{};
@@ -52,12 +54,13 @@ class AdaptiveStand {
   AdaptiveStandState state_=AdaptiveStandState::IDLE;
   ObservedPoseClass poseClass_=ObservedPoseClass::UNKNOWN;
   FeedbackReason reason_=FeedbackReason::NOT_REQUESTED;
-  LocomotionFrame previous_{}, segmentStart_{};
+  LocomotionFrame previous_{}, segmentStart_{}, pendingSolution_{};
   AcquisitionWaypoint endpoint_{};
   FeedbackFrame pending_{};
   SegmentAssessment assessment_{};
   uint32_t sequence_=0, segmentIndex_=0, segmentIntervals_=0;
   uint8_t routeIndex_=0;
+  uint16_t pairedSegment_=0;
   double lastNow_=0, pendingSince_=0, verifySince_=0;
   bool pendingValid_=false, assessed_=false, physicalReady_=false;
 };

@@ -31,7 +31,8 @@ enum class HttpRequestKind : uint8_t {
   WIFI_LOGOUT,
   MOTION_STATUS,
   MOTION_CAPABILITIES,
-  MOTION_COMMAND
+  MOTION_COMMAND,
+  MOTION_LOGIN, MOTION_SESSION, MOTION_LOGOUT
 };
 constexpr size_t kMotionCapabilitiesBytes=20480;
 constexpr size_t kHttpChunkBufferBytes = 1024, kHttpStatusTextBytes = 4096;
@@ -45,7 +46,7 @@ struct HttpTransportRequest {
   uint32_t chunk_len = 0;
   bool local_authorized = false, tls = false, ap_socket = false, ap_on = false,
        remember = false;
-  uint32_t peer = 0, admin_generation = 0;
+  uint32_t peer = 0, admin_generation = 0, local_ipv4=0;
   char cookie[65]{}, csrf[65]{}, login[65]{}, device[65]{};
   ConfigPatch patch{};
   motion::MotionCommand motion_command{};
@@ -87,6 +88,9 @@ private:
   void lifecycleTick();
   bool admitAdmin(HttpTransportRequest &request);
   uint32_t portal_generation_ = 0;
+  bool portal_sta_=false;
+  bool admitMotion(HttpTransportRequest&);
+  bool motionStaAdmitted(const HttpTransportRequest&) const;
   bool registerHandlers(httpd_handle_t server, bool admin = true);
   bool dispatch(const HttpTransportRequest &request,
                 HttpTransportResponse *response, char* large_text=nullptr, size_t large_cap=0);

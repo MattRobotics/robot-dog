@@ -78,7 +78,7 @@ class NetworkAuditTest(unittest.TestCase):
           ('HttpTransport.cpp','Path=/wifi/session; Max-Age=34560000','Path=/; Max-Age=34560000'),
           ('HttpTransport.cpp','if (req.local_authorized && !portal_.current(now, req.peer, req.cookie))','if (!portal_.current(now, req.peer, req.cookie))'),
           ('HttpTransport.cpp','{"/wifi/session", HTTP_POST','{"/wifi/session", HTTP_GET'),
-          ('HttpTransport.cpp','r.remember = read == 81 && memcmp(body + 70, "&remember=1", 11) == 0','r.remember = read > 70'),
+          ('HttpTransport.cpp','r.remember = !motion_auth && read == 81 && memcmp(body + 70, "&remember=1", 11) == 0','r.remember = read > 70'),
           ('HttpTransport.h','WIFI_STATUS,','WIFI_SESSION, WIFI_STATUS,'),
           ('WifiManager.cpp','const bool proven = match && now - test_stable_since_ >= kStaTestHoldMs;','const bool proven = match;'),
           ('WifiManager.cpp','transaction_.update(now, proven, link_up, critical)','transaction_.update(now, link_up, link_up, critical)'),

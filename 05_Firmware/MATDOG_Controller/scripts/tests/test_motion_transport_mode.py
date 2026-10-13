@@ -21,7 +21,7 @@ fixture = (HERE/'test_wifi_mode_policy.cpp').read_text().split('int main() {', 1
 fixture = fixture.replace('"../../src/network/WifiManager.h"', '"network/WifiManager.h"')
 source = (SRC/'network/HttpTransport.cpp').read_text()
 start = source.index('bool HttpTransport::admitAdmin(')
-end = source.index('bool HttpTransport::dispatch(', start)
+end = source.index('bool HttpTransport::motionStaAdmitted(', start)
 admit = source[start:end].replace('HttpTransport::', 'TransportProbe::')
 unit = fixture + r'''
 #include "core/MotionService.h"

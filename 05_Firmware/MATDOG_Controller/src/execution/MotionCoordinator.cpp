@@ -24,13 +24,15 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
  if(!executor_||!executor_->active())return "EXECUTOR_NOT_ARMED";
  switch(c.intent){
   case motion::Intent::STAND:{
+   if(session_&&session_->scope()==TrialScope::FIXTURE_MICRO)return "AUTONOMOUS_STAND_SCOPE_REQUIRED";
    if(walking_)return "WALK_MUST_STOP_FIRST";
    motion::AdaptiveStandRequest r;r.targetHeightM=c.target_height_m;r.firstSequence=executor_->status().accepted_sequence+1;
-   if(acquisition_.count)r.acquisition=&acquisition_;
+   if(acquisition_.count||acquisition_.pairedProne)r.acquisition=&acquisition_;
    return stand_.request(r,feedback_policy_,now/1000.0)?nullptr:motion::feedbackReasonName(stand_.reason());
   }
   case motion::Intent::GAIT_SELECT:return nullptr; // only WALK survived service validation
   case motion::Intent::BASE_VELOCITY:{
+   if(session_&&session_->scope()!=TrialScope::AUTONOMOUS_WALK)return "LOCAL_WALK_SCOPE_REQUIRED";
    motion::PlanarVelocityCommand v;v.vxMps=c.vx;v.vyMps=c.vy;v.yawRateRadS=c.yaw_rate;v.stampS=c.issued_at_ms/1000.0;v.ttlS=c.ttl_ms/1000.0;v.sequence=c.sequence;
    if(walking_)return walk_.command(v,now/1000.0)?nullptr:motion::feedbackReasonName(walk_.reason());
    if(v.vxMps==0&&v.vyMps==0&&v.yawRateRadS==0)return nullptr;
@@ -41,7 +43,7 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
   default:return "ACTION_NOT_VALIDATED";
  }
 }
-void MotionCoordinator::stop(uint32_t){if(walking_)walk_.requestStop();else stand_.stop();}
+void MotionCoordinator::stop(uint32_t){if(walking_)walk_.requestStop();else {stand_.stop();if(session_)session_->revoke("LOCAL_OPERATOR_STOP");}}
 const char* MotionCoordinator::state() const {
  if(!walking_)return motion::adaptiveStandStateName(stand_.state());
  switch(walk_.state()){case motion::FeedbackWalkState::IDLE:return "IDLE";case motion::FeedbackWalkState::STARTING:return "WALK_STARTING";case motion::FeedbackWalkState::WALK:return "WALK";case motion::FeedbackWalkState::STOPPING:return "STOPPING";case motion::FeedbackWalkState::STAND:return "STAND";default:return "REJECTED";}

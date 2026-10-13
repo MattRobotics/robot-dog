@@ -6,6 +6,8 @@ FW="$(cd "$TESTS/../.." && pwd)"
 export PYTHONDONTWRITEBYTECODE=1
 bash "$TESTS/run_calibration_restore_tests.sh"
 bash "$TESTS/run_motion_service_executor_tests.sh"
+python3 "$TESTS/run_paired_runtime_tests.py"
+python3 "$TESTS/test_stl_gait_adapter.py"
 bash "$TESTS/run_motion_lifecycle_tests.sh"
 python3 "$TESTS/run_adaptive_motion_tests.py" --trace "${MATDOG_TEST_TRACE:-/tmp/matdog-adaptive-rc.jsonl}"
 python3 "$TESTS/test_ap_only_transport.py"

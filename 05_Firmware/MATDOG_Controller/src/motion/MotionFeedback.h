@@ -3,7 +3,7 @@
 #include "Gait.h"
 namespace matdog { namespace motion {
 // This pure boundary contains SI observations and evidence, never actuator authority.
-enum class EvidenceSource : uint8_t { UNKNOWN, SYNTHETIC, EXTERNAL_MEASURED };
+enum class EvidenceSource : uint8_t { UNKNOWN, SYNTHETIC, EXTERNAL_MEASURED, OFFLINE_CERTIFIED };
 enum class FeedbackMode : uint8_t { SIMULATION, PHYSICAL_REVIEW };
 enum class FeedbackReason : uint8_t {
   OK, NOT_REQUESTED, INVALID_POLICY, INVALID_COMMAND, STALE_OBSERVATION,

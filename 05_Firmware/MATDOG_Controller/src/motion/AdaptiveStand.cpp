@@ -9,7 +9,7 @@ Vector3 rate(Vector3 a,Vector3 b,double s){return {(b.x-a.x)*s,(b.y-a.y)*s,(b.z-
 double distance(Vector3 a,Vector3 b){return std::hypot(std::hypot(a.x-b.x,a.y-b.y),a.z-b.z);}
 bool sameRotation(const BodyPose& a,const BodyPose& b){for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j)if(std::abs(a.rotation[i][j]-b.rotation[i][j])>1e-10)return false;return true;}
 }
-const char* adaptiveStandStateName(AdaptiveStandState s){const char* n[]={"IDLE","OBSERVE","CLASSIFY","ACQUIRE_SUPPORT","RISE","VERIFY_STAND","STAND","REJECTED","STOPPED"};unsigned i=static_cast<unsigned>(s);return i<sizeof(n)/sizeof(n[0])?n[i]:"UNKNOWN";}
+const char* adaptiveStandStateName(AdaptiveStandState s){const char* n[]={"IDLE","OBSERVE","CLASSIFY","ACQUIRE_SUPPORT","RISE","VERIFY_STAND","STAND","REJECTED","STOPPED","PRE_ALIGN","REAR_DEPLOY","FRONT_DEPLOY","LOAD_TRANSFER","RISE"};unsigned i=static_cast<unsigned>(s);return i<sizeof(n)/sizeof(n[0])?n[i]:"UNKNOWN";}
 bool restGroundAcquisitionCandidate(AcquisitionRoute& route){
   const auto* rest=researchedPose(0);if(!rest||!rest->joints.valid)return false;
   route.count=0;route.geometryIdentityVerified=true;route.source=EvidenceSource::SYNTHETIC;
@@ -41,12 +41,12 @@ bool restGroundAcquisitionCandidate(AcquisitionRoute& route){
 bool AdaptiveStand::request(const AdaptiveStandRequest& r,const FeedbackPolicy& p,double now){
   state_=AdaptiveStandState::IDLE;poseClass_=ObservedPoseClass::UNKNOWN;reason_=FeedbackReason::NOT_REQUESTED;
   previous_={};segmentStart_={};pending_=FeedbackFrame{};assessment_={};pendingValid_=assessed_=physicalReady_=false;
-  route_.count=0;routeIndex_=0;segmentIndex_=segmentIntervals_=0;
+  route_.count=0;route_.pairedProne=false;pairedSegment_=0;routeIndex_=0;segmentIndex_=segmentIntervals_=0;
   policy_=p;request_=r;lastNow_=now;verifySince_=now;sequence_=r.firstSequence;
   if(!validFeedbackPolicy(p)){reject(FeedbackReason::INVALID_POLICY);return false;}
   if(!std::isfinite(now)||!std::isfinite(r.targetHeightM)||r.targetHeightM<=0||r.targetHeightM>.150||
     !std::isfinite(r.riseDurationS)||r.riseDurationS<=0||r.firstSequence==0){reject(FeedbackReason::INVALID_COMMAND);return false;}
-  if(r.acquisition){route_=*r.acquisition;if(route_.count<2||route_.count>AcquisitionRoute::kMaxWaypoints){reject(FeedbackReason::ROUTE_MISMATCH);return false;}}
+  if(r.acquisition){route_=*r.acquisition;if(!route_.pairedProne&&(route_.count<2||route_.count>AcquisitionRoute::kMaxWaypoints)){reject(FeedbackReason::ROUTE_MISMATCH);return false;}}
   request_.acquisition=nullptr;state_=AdaptiveStandState::OBSERVE;reason_=FeedbackReason::OK;return true;
 }
 FeedbackFrame AdaptiveStand::reject(FeedbackReason r){state_=AdaptiveStandState::REJECTED;reason_=r;pendingValid_=false;physicalReady_=false;FeedbackFrame f;f.reason=r;return f;}
@@ -71,7 +71,25 @@ bool AdaptiveStand::beginRise(){
   for(unsigned i=0;i<4;++i)e.feetWorldM[i]=previous_.cartesian.feet[i];
   e.requiredFeet=15;e.durationS=request_.riseDurationS;state_=AdaptiveStandState::RISE;return beginSegment(e);
 }
+bool AdaptiveStand::beginPairedSegment(){
+  if(pairedSegment_>=kPairedProneSegments)return false;
+  const AdaptiveStandState states[]={AdaptiveStandState::PRE_ALIGN,AdaptiveStandState::REAR_DEPLOY,
+    AdaptiveStandState::FRONT_DEPLOY,AdaptiveStandState::LOAD_TRANSFER,AdaptiveStandState::PAIRED_RISE};
+  state_=states[static_cast<unsigned>(pairedPronePhase(pairedSegment_))];
+  endpoint_.durationS=pairedProneDuration(pairedSegment_);
+  const double n=std::ceil(endpoint_.durationS/policy_.samplePeriodS);
+  if(n<1||n>1000000)return false;
+  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;return true;
+}
 FeedbackFrame AdaptiveStand::generate(double now){
+  if(route_.pairedProne){
+    auto f=pairedProneSample(pairedSegment_,static_cast<double>(segmentIndex_+1)/segmentIntervals_);
+    auto r=checkSegment(f,previous_.target,policy_);if(r!=FeedbackReason::OK)return reject(r);
+    if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
+    pendingSolution_=f;pending_=feedbackFrame(f,sequence_++);pending_.timeS=now;
+    pending_.bellySupportRequired=static_cast<unsigned>(pairedPronePhase(pairedSegment_))<3;
+    pendingValid_=true;assessed_=false;pendingSince_=now;return pending_;
+  }
   const double u=static_cast<double>(segmentIndex_+1)/segmentIntervals_;
   const auto law=quinticTimeLaw(u,endpoint_.durationS);if(!law.valid)return reject(FeedbackReason::INVALID_COMMAND);
   CartesianSample c;c.body=endpoint_.body;c.body.translationM=mix(segmentStart_.cartesian.body.translationM,endpoint_.body.translationM,law.progress);
@@ -121,10 +139,14 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
     if(r==FeedbackReason::FEEDBACK_PENDING){pending_.reason=r;return pending_;}
     if(r!=FeedbackReason::OK)return reject(r);
     if(now-pendingSince_+1e-9<endpoint_.durationS/segmentIntervals_){pending_.reason=FeedbackReason::FEEDBACK_PENDING;return pending_;}
-    previous_=observedSolution(o);if(!previous_.target.valid)return reject(FeedbackReason::IK_FAILURE);
+    previous_=route_.pairedProne?pendingSolution_:observedSolution(o);if(!previous_.target.valid)return reject(FeedbackReason::IK_FAILURE);
     pendingValid_=false;physicalReady_=pending_.physicalReadiness;++segmentIndex_;
     if(segmentIndex_==segmentIntervals_){
-      if(state_==AdaptiveStandState::ACQUIRE_SUPPORT){++routeIndex_;
+      if(route_.pairedProne){
+        ++pairedSegment_;
+        if(pairedSegment_<kPairedProneSegments){if(!beginPairedSegment())return reject(FeedbackReason::ROUTE_MISMATCH);}
+        else {state_=AdaptiveStandState::VERIFY_STAND;verifySince_=now;}
+      } else if(state_==AdaptiveStandState::ACQUIRE_SUPPORT){++routeIndex_;
         if(routeIndex_<route_.count){if(!beginSegment(route_.waypoints[routeIndex_]))return reject(FeedbackReason::ROUTE_MISMATCH);}
         else {if(o.confirmedFeet!=15||o.bellySupported)return reject(FeedbackReason::SUPPORT_INVALID);if(!beginRise())return reject(FeedbackReason::ROUTE_MISMATCH);}}
       else {state_=AdaptiveStandState::VERIFY_STAND;verifySince_=now;}
@@ -134,7 +156,14 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
   if(state_==AdaptiveStandState::CLASSIFY){
     if(!o.stationary)return reject(FeedbackReason::UNRECOVERABLE_POSE);
     previous_=observedSolution(o);if(!previous_.target.valid)return reject(FeedbackReason::IK_FAILURE);
-    if(o.confirmedFeet==15&&!o.bellySupported){
+    if(route_.pairedProne){
+      if(request_.targetHeightM!=.150||!route_.geometryIdentityVerified||route_.source==EvidenceSource::UNKNOWN||
+        (policy_.mode==FeedbackMode::PHYSICAL_REVIEW&&route_.source!=EvidenceSource::EXTERNAL_MEASURED&&route_.source!=EvidenceSource::OFFLINE_CERTIFIED))return reject(FeedbackReason::ROUTE_REQUIRED);
+      const int knot=pairedProneMatch(o,policy_);if(knot<0)return reject(FeedbackReason::ROUTE_MISMATCH);
+      poseClass_=knot==0?ObservedPoseClass::BELLY_FOLDED:ObservedPoseClass::PARTIAL_SUPPORT;
+      if(knot==static_cast<int>(kPairedProneSegments)){state_=AdaptiveStandState::VERIFY_STAND;verifySince_=now;}
+      else {pairedSegment_=static_cast<uint16_t>(knot);if(!beginPairedSegment())return reject(FeedbackReason::ROUTE_MISMATCH);}
+    } else if(o.confirmedFeet==15&&!o.bellySupported){
       for(unsigned i=0;i<4;++i)if(std::abs(previous_.cartesian.feet[i].z)>policy_.contactToleranceM)return reject(FeedbackReason::SUPPORT_INVALID);
       if(std::abs(o.body.translationM.z-request_.targetHeightM)<=policy_.heightToleranceM){poseClass_=ObservedPoseClass::NOMINAL_STAND;state_=AdaptiveStandState::VERIFY_STAND;verifySince_=now;}
       else {poseClass_=o.body.translationM.z<.100?ObservedPoseClass::SUPPORTED_INTERMEDIATE:ObservedPoseClass::SUPPORTED_STAND;

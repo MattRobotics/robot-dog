@@ -55,6 +55,9 @@ constexpr const char* kGitSha          = MATDOG_GIT_SHA;
 constexpr bool kGitDirty              = MATDOG_GIT_DIRTY != 0;
 constexpr const char* kBuildUtc        = MATDOG_BUILD_UTC;
 constexpr const char* kMotionStack     = "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED";
+// A new source review is required for any operationally authorized image.
+// There is deliberately no build override or HTTP authority flag.
+constexpr bool kOperationalMotionAuthorized = false;
 
 // The active profile and everything derived from it. kProfileExpectations
 // is the value every module consults (via core::expectedStateFor*()) to

@@ -36,7 +36,7 @@ FeedbackReason checkObservation(const AdaptiveObservation& o,const FeedbackPolic
   if(!evidence(o.heightSource,p.mode))return FeedbackReason::UNOBSERVABLE_HEIGHT;
   if(!evidence(o.supportSource,p.mode)||!o.flatPlaneConfirmed||
     (!o.bellySupported&&!o.externalSupportConfirmed&&o.confirmedFeet==0)||o.confirmedFeet>15)return FeedbackReason::UNOBSERVABLE_SUPPORT;
-  if(!o.actual.valid||!supportsFlatContactIk(o.body)||o.body.translationM.z<0)return FeedbackReason::INVALID_POSE;
+  if(!o.actual.valid||!validBodyPose(o.body)||o.body.translationM.z<0)return FeedbackReason::INVALID_POSE;
   for(unsigned i=0;i<4;++i){double q[3];components(o.actual.legs[i],q);
     if(forwardKinematics(static_cast<LegId>(i),o.actual.legs[i]).status!=KinematicsStatus::OK)return FeedbackReason::JOINT_LIMIT;
     for(unsigned j=0;j<3;++j)if(q[j]<p.jointLimits[i][j].lower||q[j]>p.jointLimits[i][j].upper)return FeedbackReason::JOINT_LIMIT;}
@@ -71,7 +71,7 @@ FeedbackReason checkTracking(const AdaptiveObservation& o,const FeedbackFrame& f
   for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j)
     if(std::abs(o.body.rotation[i][j]-f.body.rotation[i][j])>p.maxTrackingErrorRad)return FeedbackReason::TRACKING_ERROR;
   for(unsigned i=0;i<4;++i)if(f.requiredFeet&(1<<i)){
-    const auto fk=contactForwardKinematics(static_cast<LegId>(i),o.actual.legs[i]);Vector3 world;
+    const auto fk=contactForwardKinematics(static_cast<LegId>(i),o.actual.legs[i],{o.body.rotation[2][0],o.body.rotation[2][1],o.body.rotation[2][2]});Vector3 world;
     if(fk.status!=ContactStatus::OK||fk.support!=SupportMode::NOMINAL_STRIP||!pointToWorld(o.body,fk.referenceM,world)||
        std::abs(world.z)>p.contactToleranceM)return FeedbackReason::SUPPORT_INVALID;
     if(std::hypot(world.x-f.feetWorldM[i].x,world.y-f.feetWorldM[i].y)>p.contactToleranceM)return FeedbackReason::TRACKING_ERROR;
@@ -90,8 +90,13 @@ FeedbackReason checkHeldSupport(const AdaptiveObservation& o,const LocomotionFra
 }
 LocomotionFrame observedSolution(const AdaptiveObservation& o){
   LocomotionFrame f;f.cartesian.body=o.body;f.cartesian.valid=true;
-  for(unsigned i=0;i<4;++i){const auto leg=static_cast<LegId>(i);const auto fk=contactForwardKinematics(leg,o.actual.legs[i]);
+  for(unsigned i=0;i<4;++i){const auto leg=static_cast<LegId>(i);const auto fk=contactForwardKinematics(leg,o.actual.legs[i],{o.body.rotation[2][0],o.body.rotation[2][1],o.body.rotation[2][2]});
     if(fk.status!=ContactStatus::OK||!pointToWorld(o.body,fk.referenceM,f.cartesian.feet[i]))return {};
+    if(!supportsFlatContactIk(o.body)){
+      // Tilted acquisition consumes the pinned semantic profile, never a flat
+      // inverse-contact solve. FK remains an observation, not a support proof.
+      f.target.legs[i]=o.actual.legs[i];f.cartesian.phases[i].stance=(o.confirmedFeet&(1<<i))!=0;continue;
+    }
     ContactIkOptions opts;opts.requireNominalStrip=false;opts.kinematics.seed=o.actual.legs[i];
     auto ik=worldContactInverseKinematics(leg,f.cartesian.feet[i],o.body,opts);
     if(ik.status!=WorldContactIkResult::Status::OK)return {};

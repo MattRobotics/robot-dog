@@ -108,7 +108,7 @@ class Continuous:
                     # Use conservative triangle projections before subdivision;
                     # this changes proof strength only, never geometry/tolerances.
                     from matdog_startup_geometry_v5 import mesh_separation_bound
-                    refined=mesh_separation_bound(self.s,(na,nb),q,max(.001,minimum_separation_m+sum(moves)))
+                    refined=mesh_separation_bound(self.s,(na,nb),q,max(.001,minimum_separation_m+sum(moves)+1e-5))
                     if refined.clearance_m is not None and refined.clearance_m>sum(moves)+minimum_separation_m:
                         minimum=min(minimum,refined.clearance_m-sum(moves));continue
                     remaining.append((na,nb));continue
@@ -117,7 +117,7 @@ class Continuous:
                 margin=result.clearance_m
                 if margin is None or margin<=sum(moves)+minimum_separation_m:
                     from matdog_startup_geometry_v5 import mesh_separation_bound
-                    refined=mesh_separation_bound(self.s,(na,nb),q,max(.001,minimum_separation_m+sum(moves)))
+                    refined=mesh_separation_bound(self.s,(na,nb),q,max(.001,minimum_separation_m+sum(moves)+1e-5))
                     margin=max(margin or 0.,refined.clearance_m or 0.)
                 if margin is not None and margin>sum(moves)+minimum_separation_m:
                     minimum=min(minimum,margin-sum(moves));continue

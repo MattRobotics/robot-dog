@@ -10,8 +10,13 @@ import re
 
 SRC = Path(__file__).resolve().parents[2] / "src"
 REQUIRED = {
+    "config/BuildConfig.h": ("constexpr bool kOperationalMotionAuthorized = false;",),
+    "core/Controller.h": ("bool reviewed_motion_bound_=false;", "execution::LocalTrialEvidence local_trial_evidence_{};",),
+    "execution/MotionSession.cpp": ("if(!image)", "WALK_DYNAMICS_REQUIRED", "FIXTURE_SUPPORT_REQUIRED", "PRIME_REQUIRES_OFF_AND_LIMITS", "policy_->plan(", "runtime_->execute(",),
     "core/Controller.cpp": (
-        "ready.hardware_approved=false;", "ready.support_observable=false;",
+        "ready.hardware_approved=scoped", "ready.support_observable=reviewed_motion_bound_",
+        "build::kOperationalMotionAuthorized", "r.policy_epoch!=actuator_policy_.epoch()",
+        "motion::pairedProneMatch(local_motion_observation_", "e.scope!=reviewed_motion_.scope",
         "motion_service_.begin(&motion_executor_, &motion_coordinator_);",
         "service_.bindMotionService(&motion_service_);",
         "motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms);",
@@ -39,12 +44,12 @@ REQUIRED = {
         "if(active_intent_==motion::Intent::STOP)", "SAFE_OFF_VERIFIED",
     ),
     "network/HttpTransport.cpp": (
-        "!socketFacts(req,r) || !self->admitAdmin(r)", "req->content_len>1024",
+        "!socketFacts(req,r) || !self->admitMotion(r)", "req->content_len>1024",
         "r.motion_command.owner!=motion::ClientOwner::DASHBOARD",
         "req.peer,req.cookie,req.csrf))",
         "service_->motionCommand(req.motion_command,now_ms)",
         "char[kMotionCapabilitiesBytes]", "memcpy(large_text,motion_capabilities_,response->text_len+1)",
-        'strncmp(uri.uri, "/api/motion/", 12) == 0',
+        'strncmp(uri.uri, "/wifi/", 6) == 0',
     ),
     "core/CommandRouterPersistence.cpp": (
         "persistenceQuietViolation()", "CONFIRM_CURRENT_INSTALLATION",
@@ -62,8 +67,8 @@ def violations(files):
             if token not in code:
                 bad.append(f"{path}: missing {token}")
     controller = files["core/Controller.cpp"]
-    if re.search(r"motion_(?:executor|coordinator)_\.(?:arm|configure|assess|observe)\s*\(", controller):
-        bad.append("No reviewed physical artifact/observation/arming producer exists in this RC")
+    if re.search(r"motion_executor_\.arm\s*\(", controller):
+        bad.append("Controller must arm only through the scoped local MotionSession")
     ordering = [controller.find(token) for token in (
         "motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms);",
         "motion_executor_.update(operational_facts_,operational_feedback_,now_ms);",

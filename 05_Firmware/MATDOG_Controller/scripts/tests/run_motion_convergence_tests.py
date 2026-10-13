@@ -66,6 +66,7 @@ def check_sources():
                          "core/MotionService.h", "core/MotionService.cpp", "core/MotionJson.h", "core/MotionJson.cpp",
                          "execution/MotionExecutor.h", "execution/MotionExecutor.cpp",
                          "execution/MotionCoordinator.h", "execution/MotionCoordinator.cpp",
+                         "execution/MotionSession.h", "execution/MotionSession.cpp", "execution/ReviewedMotionRuntime.h",
                          "network/HttpTransport.h", "network/HttpTransport.cpp"}
     for path in sorted((FW / "src").rglob("*")):
         if not path.is_file() or path.suffix not in (".h", ".cpp") or path.is_relative_to(motion):

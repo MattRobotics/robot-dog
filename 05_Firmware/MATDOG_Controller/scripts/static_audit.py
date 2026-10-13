@@ -1054,20 +1054,11 @@ def check_uncertain_write_propagation(files, sketch_dir):
 
 
 def check_actuator_runtime_boundaries(files):
-    """I4: the Safe Actuator runtime adapter (src/actuator/ActuatorRuntime.*)
-    must stay host-linkable exactly like ActuatorWritePolicy itself, and its
-    mere existence must not make ordinary physical motion reachable. There is
-    CR3-M3 adds exactly one production ServoBusActuatorBackend and two narrow
-    ServoBus write primitives, but Controller remains null-wired until the
-    separately reviewed activation gate.
-
-    2026-09-25 objective change: Controller.{h,cpp} may now own an
-    ActuatorRuntime instance as fail-closed status/lifecycle infrastructure
-    (it must be wired with a null backend - see
-    check_actuator_infrastructure_wired_fail_closed()). Every OTHER file
-    stays excluded, in particular CommandRouter.cpp and ControllerService.h:
-    neither may reference this class by name, which is what keeps "Controller
-    owns one" from silently growing into "a command can reach one"."""
+    """Safe Actuator runtime stays host-linkable. Only the reviewed sole
+    backend, Controller, calibration, Executor and scoped local MotionSession
+    may reference it. Network/command presentation cannot acquire a runtime
+    or authority. Physical calls remain gated independently at plan/execute.
+    """
     names = {p.name for p, _ in files}
     for required in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
         if required not in names:
@@ -1084,7 +1075,7 @@ def check_actuator_runtime_boundaries(files):
     allowed_dirs = {"actuator", "calibration", "tests"}
     allowed_names = {"ActuatorRuntime.h", "ActuatorRuntime.cpp", "Controller.h", "Controller.cpp",
                      "ServoBusActuatorBackend.h", "ServoBusActuatorBackend.cpp",
-                     "MotionExecutor.h", "MotionExecutor.cpp"}
+                     "MotionExecutor.h", "MotionExecutor.cpp", "MotionSession.h", "MotionSession.cpp"}
     for path, code in files:
         if path.name in allowed_names:
             continue
@@ -1092,7 +1083,7 @@ def check_actuator_runtime_boundaries(files):
             continue
         if re.search(r"\bActuatorRuntime\b", code):
             fail(f"{path}: references ActuatorRuntime - I4's runtime adapter has no production "
-                 f"backend (ServoBus exposes no torque-on/GoalPosition write) and must not be "
+                 f"outside the reviewed Controller/Executor/Session lifecycle and must not be "
                  f"constructed or referenced outside src/actuator/, src/calibration/, "
                  f"Controller.{{h,cpp}} (fail-closed status infrastructure only) or the offline "
                  f"test suite")
@@ -2593,10 +2584,10 @@ def check_led_status_boundaries(files):
                     remaining, count = re.subn(allowed, "", remaining)
                     if count != 1:
                         fail(f"{path}: {fact} requires one exact passthrough and selector read")
-            elif path.name == "CommandRouter.cpp":
+            elif path.name in ("CommandRouter.cpp", "HttpTransport.cpp"):
                 remaining, count = re.subn(rf'\bled\.{fact}\s*\?\s*""\s*:\s*""',
                                           "", remaining)
-                if count != 1 or f"{fact}=%s" not in code:
+                if count != 1 or (f"{fact}=%s" not in code and f"led_{fact}=%s" not in code):
                     fail(f"{path}: @LED STATUS must observe reserved {fact}")
             if re.search(rf"\b{fact}\b", remaining):
                 fail(f"{path}: {fact} has no reviewed production producer; "
@@ -6261,7 +6252,7 @@ def check_portal_page_text(page, where="src/network/PortalPage.h"):
             fail(f"{where}: portal section {name!r} missing")
     for endpoint in ("'/status'","'/wifi/status'","'/wifi/session'","'/wifi/logout'","'/wifi/login'"):
         if endpoint not in script:fail(f"{where}: endpoint {endpoint} not used")
-    if re.search(r"/(servo|motion|torque|actuator|calibration)[/'\"]",script,re.I):
+    if re.search(r"/(servo|motion|torque|actuator|calibration)[/'\"]",re.sub(r"/api/motion/(?:login|session|logout)", "", script),re.I):
         fail(f"{where}: the portal must not address an actuator or calibration endpoint")
 
 
@@ -6311,7 +6302,7 @@ def check_network_v3_boundaries(files, sketch_dir):
                              (compact_manager,"admin_.allowed(r.generation)",2),
                              (compact_transport,"httpd_stop(server_)==ESP_OK",2),
                              (compact_transport,"httpd_ssl_stop(tls_server_)==ESP_OK",2),
-                             (compact_transport,"self->admitAdmin(r)",3),
+                             (compact_transport,"self->admitAdmin(r)",1),
                              (compact_transport,"gate.allowed(req.admin_generation)",2)):
         if code.count(token)!=count:fail("AP-only fence coverage changed: "+token)
     if re.search(r"\b(?:WIFI_AP_STA|WIFI_MODE_APSTA)\b", manager):
@@ -6369,7 +6360,7 @@ def check_network_v3_boundaries(files, sketch_dir):
                   "if(req.local_authorized&&!portal_.current(now,req.peer,req.cookie))",
                   "resp.ok=req.local_authorized&&portal_.current(",
                   '{"/wifi/session",HTTP_POST','{"/wifi/logout",HTTP_POST',
-                  "r.remember=read==81&&memcmp(body+70,\"&remember=1\",11)==0",
+                  "r.remember=!motion_auth&&read==81&&memcmp(body+70,\"&remember=1\",11)==0",
                   "Path=/wifi/session;Max-Age=34560000"):
         if token not in compact_transport:fail("Remembered-device transport invariant missing: "+token)
     for token in ("httpd_req_get_url_query","httpd_query_key_value","Serial.","ESP_LOG","log_e(","log_i(","log_d("):
@@ -6462,6 +6453,21 @@ def check_motion_convergence_gate(sketch_dir):
         print(result.stdout.strip())
 
 
+def check_operational_session_boundaries(files):
+    by_name={p.name:(p,c) for p,c in files if "scripts" not in p.parts}
+    session=by_name.get("MotionSession.cpp",(None,""))[1]
+    for token in ('if(!image)', 'gate(e,input,fb,now)', 'policy_->plan(', 'runtime_->execute(',
+                  'fb.torque_on[i]||!resolve(', 'executor_->arm(', 'policy_->epoch()!=epoch_',
+                  'e.scope==TrialScope::FIXTURE_MICRO', 'AUTONOMOUS_SUPPORT_LOAD_REQUIRED', 'WALK_DYNAMICS_REQUIRED'):
+        if token not in session:fail("MotionSession operational invariant missing: "+token)
+    config=by_name.get("BuildConfig.h",(None,""))[1]
+    if not re.search(r'constexpr bool kOperationalMotionAuthorized\s*=\s*false\s*;',config):
+        fail("Operational image must retain MOTION_AUTHORIZED=0")
+    for path,code in files:
+        if path.parent.name=="network" and any(t in code for t in ('requestLocalMotionTrial(', 'requestFixtureMicro(', 'bindReviewedMotionRuntime(', '.request(core::ActuatorAuthority::MOTION')):
+            fail(str(path)+": network may not grant operational authority or trial evidence")
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -6469,6 +6475,7 @@ def main():
         fail(f"no source files found under {SKETCH_DIR}")
 
     check_forbidden_literals(files)
+    check_operational_session_boundaries(files)
     check_torque_enable(files)
     check_servo_motion_write_surface(files)
     check_servo_id_write(files)

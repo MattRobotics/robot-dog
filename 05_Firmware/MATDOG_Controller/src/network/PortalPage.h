@@ -219,7 +219,7 @@ function needLogin(){$('#login').hidden=false;$('#login').scrollIntoView&&$('#lo
 async function send(path,body){const r=await fetch(path,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Csrf-Token':csrf},body});const t=await r.text();if(!r.ok){const e=Error(t);e.status=r.status;throw e}return t}
 // Reopens the session without the token: the live session cookie, or the
 // remembered-device cookie, is sent by the browser only to /wifi/session.
-async function resume(){resumeAt=Date.now();try{csrf='';csrf=await send('/wifi/session','');sessionAt=Date.now();authUi();return true}catch(e){csrf='';authUi();return false}}
+async function resume(){resumeAt=Date.now();try{csrf='';csrf=await send(location.protocol==='https:'?'/api/motion/session':'/wifi/session','');sessionAt=Date.now();authUi();return true}catch(e){csrf='';authUi();return false}}
 async function adminPost(path,body){
  if(!csrf&&!(await resume())){needLogin();throw Error('Serve l\'accesso amministratore per modificare la configurazione.')}
  try{return await send(path,body)}catch(e){if(e.message!=='AUTH_FAILED')throw e;if(await resume())return send(path,body);needLogin();throw Error('Sessione scaduta: accedi di nuovo.')}
@@ -227,9 +227,9 @@ async function adminPost(path,body){
 $('#loginOpen').onclick=async()=>{if(store.get('md_remember')&&await resume())show('Amministratore connesso: dispositivo riconosciuto.','ok');else needLogin()};
 $('#loginForm').onsubmit=async e=>{e.preventDefault();const f=e.target,token=f.elements.token.value.trim(),remember=f.elements.remember.checked;
  if(!/^[0-9a-fA-F]{64}$/.test(token)){show('Il token deve avere esattamente 64 cifre esadecimali.','bad');return}
- try{csrf=await send('/wifi/login','token='+token+(remember?'&remember=1':''));sessionAt=Date.now();store.set('md_remember',remember?'1':null);store.set('md_login',String(sessionAt));authUi();show(remember?'Amministratore connesso. Questo dispositivo verrà riconosciuto senza reinserire il token.':'Amministratore connesso per 5 minuti (dispositivo non ricordato).','ok')}
+ try{csrf=await send(location.protocol==='https:'?'/api/motion/login':'/wifi/login','token='+token+(remember&&location.protocol!=='https:'?'&remember=1':''));sessionAt=Date.now();store.set('md_remember',remember?'1':null);store.set('md_login',String(sessionAt));authUi();show(remember?'Amministratore connesso. Questo dispositivo verrà riconosciuto senza reinserire il token.':'Amministratore connesso per 5 minuti (dispositivo non ricordato).','ok')}
  catch(x){csrf='';authUi();show(x.message==='AUTH_FAILED'?'Token rifiutato. Dopo un errore attendi qualche secondo prima di riprovare (60 s dopo cinque errori).':'Accesso non riuscito: '+x.message,'bad')}finally{f.reset()}};
-$('#logout').onclick=async()=>{try{await send('/wifi/logout','')}catch(e){}csrf='';store.set('md_remember',null);store.set('md_login',null);authUi();show('Disconnesso. Questo dispositivo non è più ricordato.','ok')};
+$('#logout').onclick=async()=>{try{await send(location.protocol==='https:'?'/api/motion/logout':'/wifi/logout','')}catch(e){}csrf='';store.set('md_remember',null);store.set('md_login',null);authUi();show('Disconnesso. Questo dispositivo non è più ricordato.','ok')};
 // ---- Forms -----------------------------------------------------------------
 for(let i=0;i<2;i++){const f=E('fieldset');f.append(E('legend','',['Primary','Secondary'][i]));
  const add=(key,label,type,extra)=>{const l=E('label','',label);let c;if(type==='select'){c=E('select');for(const [v,t] of extra)c.append(Object.assign(E('option','',t),{value:v}))}else{c=E('input');c.type=type;Object.assign(c,extra||{})}c.name='p'+i+'_'+key;l.append(c);l.dataset.key=key;f.append(l);return c};
