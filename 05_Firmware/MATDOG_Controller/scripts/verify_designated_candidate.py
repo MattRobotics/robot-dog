@@ -10,6 +10,7 @@ HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[2]
 def git(*args):return subprocess.check_output(['git','-C',str(ROOT),*args],text=True).strip()
 HOST_SERIAL_PATCH_FILES=(
  '05_Firmware/MATDOG_Controller/scripts/release/motion_remote_preflight.py',
+ '05_Firmware/MATDOG_Controller/scripts/release/review_preflash.py',
  '05_Firmware/MATDOG_Controller/scripts/tests/test_remote_preflight.py',
  '05_Firmware/MATDOG_Controller/scripts/verify_designated_candidate.py',
 )

@@ -3,13 +3,14 @@
 Run ON ASUS over a PC maintenance connection independent of robot Wi-Fi.
 No flash writer, Motion grant, calibration, BMS write or NVS writer is present.
 """
-import argparse,datetime,hashlib,json,os,re,shutil,struct,subprocess,sys,time,zlib
+import argparse,datetime,hashlib,json,os,re,selectors,shutil,struct,subprocess,sys,time,zlib
 from pathlib import Path
 HERE=Path(__file__).resolve().parent;FW=HERE.parents[1];REPO=FW.parents[1]
 sys.path.insert(0,str(FW/'scripts'))
 import matdog_layout as layout
 PORT='/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00'
 MAC='14:c1:9f:22:75:94';SIZE=16*1024*1024
+ROM_BAUD=115200;ROM_READ_TIMEOUT=3600;ROM_IDENTITY_TIMEOUT=60
 IDS=(11,12,13,21,22,23,31,32,33,41,42,43,51)
 READS=('@STATUS','@SYSTEM SOURCE_SIGNATURE','@AUTHORITY STATUS','@CALIBRATION STATUS','@CALIBRATION PERSIST STATUS','@IMU STATUS','@BMS STATUS','@WIFI STATUS','@LED STATUS','@SERVO PREFLIGHT')
 def response_rules(command):
@@ -108,6 +109,61 @@ class SerialResponseReader:
 def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 def check(b,s):
  if not b:raise RuntimeError(s)
+def rom_command(esptool,port,operation,args,before='no-reset'):
+ check(operation in ('read-mac','flash-id','read-flash'),'ROM operation not read-only')
+ check(before=='no-reset' or (before=='usb-reset' and operation=='read-mac'),'unexpected ROM reset')
+ return [str(esptool),'--chip','esp32s3','--port',str(port),'--baud',str(ROM_BAUD),'--no-stub','--connect-attempts','1','--before',before,'--after','no-reset',operation,*args]
+
+def run_logged(command,log,timeout):
+ """Stream even a failed/timed-out acquisition; one process, no retry/reset."""
+ check(0<timeout<=ROM_READ_TIMEOUT,'finite ROM process deadline required')
+ started=time.monotonic()
+ with log.open('xb') as audit:
+  audit.write((json.dumps({'command':command,'timeout_seconds':timeout,'started_utc':datetime.datetime.now(datetime.timezone.utc).isoformat()})+'\n').encode());audit.flush()
+  process=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,bufsize=0)
+  try:
+   with selectors.DefaultSelector() as selector:
+    selector.register(process.stdout,selectors.EVENT_READ)
+    while selector.get_map():
+     remaining=timeout-(time.monotonic()-started)
+     check(remaining>0,'ROM process deadline exceeded; partial log preserved: '+str(log))
+     for key,_ in selector.select(min(1,remaining)):
+      chunk=os.read(key.fd,8192)
+      if chunk:audit.write(chunk);audit.flush()
+      else:selector.unregister(key.fileobj)
+    code=process.wait(timeout=max(.001,timeout-(time.monotonic()-started)))
+    audit.write(('\n'+json.dumps({'exit_code':code,'elapsed_seconds':round(time.monotonic()-started,3)})+'\n').encode());audit.flush()
+    check(code==0,'ROM command failed; log preserved: '+str(log))
+  except BaseException:
+   if process.poll() is None:process.kill()
+   process.wait();audit.write(b'\nABORTED_NO_RETRY\n');audit.flush();raise
+  finally:process.stdout.close()
+ return log.read_text(errors='replace')
+
+def resume_diagnostics(path,designation):
+ """Revalidate old readbacks for a ROM-only backup, never mark them fresh."""
+ previous=json.loads(path.read_text());root=Path(previous['session_directory'])
+ check(root.resolve()==path.parent.resolve(),'previous capture directory mismatch')
+ check(previous.get('mode')=='EXECUTED_READONLY' and previous.get('flash_executed') is False and previous.get('motion_executed') is False,'previous capture is not read-only')
+ check(all(previous.get('gates',{}).get(k) is True for k in ('diagnostics_received','servo_persistent_profile','13_servo_readbacks_off')),'previous diagnostics incomplete')
+ check(previous['candidate']['application_sha256']==designation['application_sha256'],'previous capture designated a different candidate')
+ raw=(root/'usb_readonly.log').read_text().splitlines();commands=[*READS,*[f'@SERVO READ {i}' for i in IDS]];starts=[i for i,line in enumerate(raw) if line in commands]
+ check([raw[i] for i in starts]==commands,'previous command attribution/order ambiguous')
+ known=[re.compile(pattern) for command in commands for pattern,_ in response_rules(command)]+[re.compile('^SERVO_PREFLIGHT=')]
+ for at,(start,command) in enumerate(zip(starts,commands)):
+  lines=[line.strip() for line in raw[start+1:starts[at+1] if at+1<len(starts) else len(raw)]];rules=response_rules(command);stage=0;response=[];started=None
+  for line in lines:
+   check(not re.match(r'^(?:ERROR(?:[=: ]|$)|REASON(?:[=: ]|$)|SERVO_READ .*result=)',line),'previous diagnostic error')
+   if command=='@SERVO PREFLIGHT' and line.startswith('SERVO_PREFLIGHT=STARTED '):
+    check(stage==0 and started is None,'previous ambiguous preflight start');started=line_fields(line);check(started.get('joints')=='12','previous invalid preflight start');continue
+   if stage<len(rules) and re.match(rules[stage][0],line):
+    fields=line_fields(line);empty=('ssid','bssid') if command=='@WIFI STATUS' else ();check(all(k in fields and (fields[k] or k in empty) for k in rules[stage][1].split()),'previous incomplete response fields')
+    response.append(line);stage+=1
+   else:check(not any(pattern.match(line) for pattern in known),'previous duplicate/foreign/late response')
+  check(stage==len(rules),'previous incomplete semantic response: '+command);validate_response(command,response)
+  if command=='@SERVO PREFLIGHT':check(started is not None and started.get('profile')==line_fields(response[0])['profile'],'previous missing/discordant preflight start')
+ check(previous['installed_source_commit']==designation['installed_historical_source_commit'],'previous installed source mismatch')
+ return previous,root/'usb_readonly.log'
 def candidate(path):
  designation=json.loads(path.read_text());root=Path(designation['artifact_directory']);manifest={}
  for line in (root/'matdog_build_manifest.txt').read_text().splitlines():
@@ -147,7 +203,7 @@ def application_image(slot):
  return slot[:end]
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('--execute-readonly',action='store_true');p.add_argument('--confirm-asus-independent-maintenance-link',action='store_true');p.add_argument('--port',default=PORT);p.add_argument('--esptool',type=Path,default=Path.home()/'.arduino15/packages/esp32/tools/esptool_py/5.3.1/esptool');p.add_argument('--designation',type=Path,default=REPO/'09_Logs/Validation_Reports/Final_Release_Candidate_2026-10-13/designated_candidate.json');p.add_argument('--session-root',type=Path,default=Path.home()/'MATDOG/private-preflight');p.add_argument('--independent-copy-dir',type=Path);a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--execute-readonly',action='store_true');p.add_argument('--confirm-asus-independent-maintenance-link',action='store_true');p.add_argument('--port',default=PORT);p.add_argument('--esptool',type=Path,default=Path.home()/'.arduino15/packages/esp32/tools/esptool_py/5.3.1/esptool');p.add_argument('--designation',type=Path,default=REPO/'09_Logs/Validation_Reports/Final_Release_Candidate_2026-10-13/designated_candidate.json');p.add_argument('--session-root',type=Path,default=Path.home()/'MATDOG/private-preflight');p.add_argument('--independent-copy-dir',type=Path);p.add_argument('--resume-rom-session',type=Path,help='Previous diagnostic report; no runtime commands, verify ROM once and acquire fresh A/B. Historical readbacks require continuity review before flash.');p.add_argument('--enter-rom-once',action='store_true',help='Single initial USB-JTAG ROM entry; never repeated or used as a retry. Subsequent operations use no-reset.');a=p.parse_args()
  plan={'mode':'PLAN_ONLY','port':a.port,'expected_mac':MAC,'reads':[*READS,*[f'@SERVO READ {i}' for i in IDS]],'backup':'two complete 16MiB ROM reads; no erase/write; remain in ROM after capture','required':'independent ASUS link, SAFE_OFF readbacks, current gen-1, external recoverable backup copy, candidate release review','flash':'SEPARATE_EXPLICIT_GO; this program never invokes flash'}
  if not a.execute_readonly:print(json.dumps(plan,indent=2));return 0
  check(a.confirm_asus_independent_maintenance_link,'independent ASUS link must be explicitly confirmed')
@@ -168,30 +224,37 @@ def main():
   report['tool_identity_sha256']={str(f.relative_to(FW)):sha(f) for f in [Path(__file__).resolve(),FW/'scripts/flash_app_only.sh',FW/'scripts/build_manifest.py',FW/'scripts/matdog_layout.py',FW/'scripts/ota_partition_logic.py',FW/'scripts/release/validate_record_offline.cpp']}
   report['esptool_sha256']=sha(a.esptool)
   lock=open(str(a.session_root/'serial.lock'),'a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-  s=serial.Serial();s.port=a.port;s.baudrate=115200;s.timeout=.05;s.dtr=False;s.rts=False;s.open()
-  with log.open('a') as audit:
-   reader=SerialResponseReader(s,lambda text:(audit.write(text),audit.flush()))
-   observed={command:reader.read(command) for command in READS}
-  report['gates']['diagnostics_received']=all(observed.values())
-  check(re.search(r'(?:authority|AUTHORITY|owner)=NONE(?:\s|$)',observed['@STATUS']+' '+observed['@AUTHORITY STATUS']) is not None,'authority not independently observed NONE')
-  check('SERVO_PREFLIGHT=PASS' in observed['@SERVO PREFLIGHT'] and 'evaluated=12 pass=12' in observed['@SERVO PREFLIGHT'],'12-servo persistent profile/model/mapping preflight required; no writes performed')
-  report['gates']['servo_persistent_profile']=True
-  persist=observed['@CALIBRATION PERSIST STATUS'];check('VALID_ACKNOWLEDGED' in persist and 'ACKNOWLEDGED_GENERATION=1 ' in persist and 'MARKER_STATE=IDLE' in persist and 'ACKNOWLEDGED_RECORD_INTACT=1' in persist,'current acknowledged gen-1 is not proven by production persistence reader')
-  installed_source=re.search(r'GIT_SHA=([0-9a-f]{40})',observed['@SYSTEM SOURCE_SIGNATURE']);check(installed_source is not None,'installed source identity unavailable');report['installed_source_commit']=installed_source[1]
-  for i in IDS:
-   with log.open('a') as audit:text=SerialResponseReader(s,lambda text:(audit.write(text),audit.flush())).read(f'@SERVO READ {i}')
-   m=re.search(rf'SERVO_READ id={i} position=(\d+).*?torque=(\d+)',text)
-   check(m is not None and int(m[1])<4096 and m[2]=='0',f'fresh valid torque-OFF required for ID {i}; no ROM reset performed')
-  report['gates']['13_servo_readbacks_off']=True;s.close();save()
+  if a.resume_rom_session:
+   previous,prior_log=resume_diagnostics(a.resume_rom_session,designation);shutil.copyfile(prior_log,log)
+   report['diagnostic_evidence']={'origin':'PREVIOUS_PRE_ROM_CAPTURE_NOT_FRESH','report_path':str(a.resume_rom_session.resolve()),'report_sha256':sha(a.resume_rom_session),'log_sha256':sha(prior_log),'hardware_continuity_verified':False}
+   report['installed_source_commit']=previous['installed_source_commit']
+   for gate in ('diagnostics_received','servo_persistent_profile','13_servo_readbacks_off'):report['gates'][gate]=previous['gates'][gate]
+  else:
+   s=serial.Serial();s.port=a.port;s.baudrate=115200;s.timeout=.05;s.dtr=False;s.rts=False;s.open()
+   with log.open('a') as audit:
+    reader=SerialResponseReader(s,lambda text:(audit.write(text),audit.flush()))
+    observed={command:reader.read(command) for command in READS}
+   report['gates']['diagnostics_received']=all(observed.values())
+   check(re.search(r'(?:authority|AUTHORITY|owner)=NONE(?:\s|$)',observed['@STATUS']+' '+observed['@AUTHORITY STATUS']) is not None,'authority not independently observed NONE')
+   check('SERVO_PREFLIGHT=PASS' in observed['@SERVO PREFLIGHT'] and 'evaluated=12 pass=12' in observed['@SERVO PREFLIGHT'],'12-servo persistent profile/model/mapping preflight required; no writes performed')
+   report['gates']['servo_persistent_profile']=True
+   persist=observed['@CALIBRATION PERSIST STATUS'];check('VALID_ACKNOWLEDGED' in persist and 'ACKNOWLEDGED_GENERATION=1 ' in persist and 'MARKER_STATE=IDLE' in persist and 'ACKNOWLEDGED_RECORD_INTACT=1' in persist,'current acknowledged gen-1 is not proven by production persistence reader')
+   installed_source=re.search(r'GIT_SHA=([0-9a-f]{40})',observed['@SYSTEM SOURCE_SIGNATURE']);check(installed_source is not None,'installed source identity unavailable');report['installed_source_commit']=installed_source[1]
+   for i in IDS:
+    with log.open('a') as audit:text=SerialResponseReader(s,lambda text:(audit.write(text),audit.flush())).read(f'@SERVO READ {i}')
+    m=re.search(rf'SERVO_READ id={i} position=(\d+).*?torque=(\d+)',text)
+    check(m is not None and int(m[1])<4096 and m[2]=='0',f'fresh valid torque-OFF required for ID {i}; no ROM reset performed')
+   report['gates']['13_servo_readbacks_off']=True;s.close()
+  save()
   def tool(operation,args,before='no-reset'):
-   check(operation in ('read-mac','flash-id','read-flash'),'ROM operation not read-only')
-   command=[str(a.esptool),'--chip','esp32s3','--port',a.port,'--baud','921600','--no-stub','--before',before,'--after','no-reset',operation,*args]
-   result=subprocess.run(command,capture_output=True,text=True,timeout=900);(root/(operation+'_'+str(time.time_ns())+'.log')).write_text(result.stdout+result.stderr);check(result.returncode==0,operation+' failed');return result.stdout
-  text=tool('read-mac',[],before='usb-reset');check(MAC in text.lower(),'MAC mismatch')
+   command=rom_command(a.esptool,a.port,operation,args,before)
+   report['stage']=operation;save()
+   return run_logged(command,root/(operation+'_'+str(time.time_ns())+'.log'),ROM_READ_TIMEOUT if operation=='read-flash' else ROM_IDENTITY_TIMEOUT)
+  text=tool('read-mac',[],before='no-reset' if a.resume_rom_session and not a.enter_rom_once else 'usb-reset');check(MAC in text.lower() and 'Connected to ESP32-S3' in text and 'Staying in bootloader' in text,'current ROM/MAC identity mismatch');report['gates']['current_rom_identity']=True;report['rom_entry']={'initial_usb_reset':not a.resume_rom_session or a.enter_rom_once,'subsequent_reset_or_stub':False};save()
   text=tool('flash-id',[]);check('16MB' in text or '16 MB' in text,'16MiB flash not identified')
   paths=[root/'fullflash_A.bin',root/'fullflash_B.bin']
   for dest in paths:tool('read-flash',['0x0',str(SIZE),str(dest)]);check(dest.stat().st_size==SIZE,'full backup length');os.chmod(dest,0o600)
-  digest=sha(paths[0]);check(digest==sha(paths[1]),'independent full reads differ');full=paths[0].read_bytes()
+  digest=sha(paths[0]);check(digest==sha(paths[1]) and paths[0].read_bytes()==paths[1].read_bytes(),'independent full reads differ');full=paths[0].read_bytes()
   table=full[0x8000:0x8c00];report['backup_sha256']=digest;report['partition_sha256']=hashlib.sha256(table).hexdigest()
   (root/'partition_table.bin').write_bytes(table);(root/'default_nvs.bin').write_bytes(full[0x9000:0xe000]);(root/'matdog_nvs.bin').write_bytes(full[0xfe0000:0xff0000])
   entries=layout.parse_partition_table(table);layout.check_entries(entries);report['gates']['layout_preserves_nvs']=True

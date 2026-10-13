@@ -8,7 +8,7 @@ Authority e calibrazione richiedono le rispettive risposte complete, senza owner
 
 **16 test PASS**, con GIT_SHA ritardato a 1,2 s e coda a 1,4 s: AUTHORITY viene inviato soltanto dopo la coda. Coperti boot ritardato, framing dei 23 comandi, campi mancanti/discordanti, timeout, errori, ID/OFF, preflight incompleto e provenance negativa. I contratti delle 10 risposte già presenti nel log privato sono stati verificati offline; non sono nuove misure hardware. [Log test](test_logs/preflight_serial_fix.log) · [Receipt e digest](PREFLIGHT_SERIAL_FIX.json).
 
-Il controllo host di provenance distingue questa precisa riparazione dalla sorgente compilata. Richiede checkout pulito, digest vecchi e nuovi dei soli tre file host nominati nel receipt e SHA dell’app invariato. Qualsiasi altro cambiamento a firmware, input Motion o tool viene rifiutato. Nessun gate di authority, backup, layout, identità, review o autorizzazione del flash viene rimosso. Il receipt host è separato dal manifest firmware.
+Il controllo host di provenance distingue questa precisa riparazione dalla sorgente compilata. Richiede checkout pulito, digest vecchi e nuovi dei soli file host nominati nel receipt e SHA dell’app invariato. Qualsiasi altro cambiamento a firmware, input Motion o tool viene rifiutato. Nessun gate di authority, backup, layout, identità, review o autorizzazione del flash viene rimosso. Il receipt host è separato dal manifest firmware.
 
 **Immagine invariata:** sorgente compilata `b147f3884b227ec819e98a6f00c214a0aac2278e`, 3.643.120 byte, SHA256 `5577bd3c8da5f6c44d8fb9ca9b3d049399e73ccf37d218e716b773e3a87b5914`. Manifest, designation, calibrazione e NVS invariati. Nessuna compilazione, apertura del dispositivo, reset, backup, flash o movimento effettuato per questa patch. Non sono state eseguite regressioni Motion estranee.
 
@@ -19,3 +19,5 @@ python3 /home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot
 ```
 
 Il comando mantiene il workflow esistente: prima diagnosi USB read-only; soltanto dopo tutti i gate, reset al ROM e due backup completi confrontati. Non esegue flash né movimento e lascia il robot nel ROM dopo il backup. La sessione produce un nuovo report privato; serve ancora la review del backup recuperabile e l’autorizzazione separata per l’esatto SHA designato. [Procedura completa](REMOTE_PREFLIGHT.md).
+
+**Aggiornamento backup:** [ROM 115200, timeout e ripresa](ROM_BACKUP_FIX.md). Il receipt corrente include anche il tool di review fisica e la regressione ROM; il log dei 16 test originari è preservato.

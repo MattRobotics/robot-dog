@@ -1,5 +1,7 @@
 # Preflight remoto e un solo APP-ONLY
 
+**Fix backup ROM 115200 obbligatorio:** [ripresa, timeout e log](ROM_BACKUP_FIX.md). Un’ora per singola immagine, nessuno stub/retry. Le evidenze riprese sono storiche e richiedono continuità verificata.
+
 **Fix seriale obbligatorio prima del nuovo tentativo:** [predicate multilinea, test e receipt host](PREFLIGHT_SERIAL_FIX.md). Risposte complete ordinate, timeout 20/60 s, nessun riuso di righe tardive; firmware e manifest restano invariati.
 
 Il programma `05_Firmware/MATDOG_Controller/scripts/release/motion_remote_preflight.py` è PLAN di default. I comandi diagnostici sono presenti nel sorgente realmente installato `b08322dedc5564c080f691dc98047511ef2b953f`, verificato con Git: STATUS, SYSTEM SOURCE_SIGNATURE, AUTHORITY STATUS, CALIBRATION STATUS/PERSIST STATUS, IMU/BMS/WIFI/LED STATUS, SERVO PREFLIGHT e SERVO READ 11–43/51. Non usa nuovi endpoint Motion dell'immagine futura. Compatibilità sorgente verificata; collegamento/risposte hardware da verificare quando sarà acceso.
@@ -23,3 +25,5 @@ Dopo tutti i gate, il proprietario approva esplicitamente **l'unico app SHA desi
 Post-flash, read-only: source/build/app identity, boot SAFE_OFF 13/13, persist gen1, RESTORE ancora esplicito, 12 encoder/IMU/BMS, LED, LAN/AP e TLS/sessioni. Motion OFF e authority NONE; nessun movimento/torque automatico. Provisionare sul PC nome `matdog-227594.local` e fiducia nel certificato pubblico dopo confronto fingerprint; chiave privata fuori da Git. La verifica sul vero hardware e del client mobile resta da fare. Lasciare disarmato per la sessione serale.
 
 Review finale solo offline: `scripts/release/review_preflash.py --report <preflight_report.json> --review <review_privata.json>`. Il JSON deve nominare il SHA del report e reviewer/UTC freschi, il percorso del backup recuperato/decrittato e le conferme specifiche di indipendenza fisica, reread/download, canale ASUS, identità, record/mapping, 13 OFF, alimentazione stabile/power cut, snapshot BNO085/DALY elettrico/termico, layout/NVS/slot e candidate/toolchain. Il tool rilegge log e backup A/B/recuperato, SHA/size e candidate; non apre USB. Anche il suo technical GO mantiene `flash_authorized=false`: l’autorizzazione esplicita per quel SHA è successiva. I file privati di review/dump non vanno pubblicati.
+
+La review preflash deve inoltre attestare `operator_physically_present_with_emergency_stop=true`; per una ripresa ROM, anche `hardware_continuity_since_diagnostics_verified=true`. Questi dati richiedono evidenza dell’operatore, non un’inferenza software.

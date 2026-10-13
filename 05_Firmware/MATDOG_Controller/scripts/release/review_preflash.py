@@ -7,6 +7,10 @@ import argparse,datetime,hashlib,json
 from pathlib import Path
 from motion_remote_preflight import check,candidate,SIZE
 def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def review_physical_conditions(report,r):
+ check(r.get('operator_physically_present_with_emergency_stop') is True,'physical operator supervision/emergency stop not verified')
+ if report.get('diagnostic_evidence',{}).get('origin')=='PREVIOUS_PRE_ROM_CAPTURE_NOT_FRESH':
+  check(r.get('hardware_continuity_since_diagnostics_verified') is True,'prior readbacks cannot be fresh evidence after unverified power/configuration changes')
 def review(report_path,review_path):
  report=json.loads(report_path.read_text());r=json.loads(review_path.read_text())
  check(report.get('mode')=='EXECUTED_READONLY' and 'error' not in report,'capture incomplete')
@@ -22,6 +26,7 @@ def review(report_path,review_path):
  check(recovered.resolve() not in ((root/'fullflash_A.bin').resolve(),(root/'fullflash_B.bin').resolve()),'local A/B cannot prove independent recovery')
  for key in ('independent_physical_storage_verified','recovery_download_or_medium_reread_verified','asus_link_independent_of_robot_radio','current_mcu_identity_matches','current_gen1_identity_mapping_matches','13_torque_off_readbacks_reviewed','stable_flash_power_and_physical_servo_cut_reviewed','current_bno085_snapshot_reviewed','current_daly_fault_voltage_thermal_snapshot_reviewed','layout_nvs_and_installed_slot_reviewed','candidate_public_manifest_and_toolchain_reviewed'):
   check(r.get(key) is True,'required review missing: '+key)
+ review_physical_conditions(report,r)
  gates=report['gates']
  for key in ('servo_persistent_profile','13_servo_readbacks_off','layout_preserves_nvs','gen1_semantic_validation','active_application_identity','candidate_file_identity','installed_source_identity'):
   check(gates.get(key) is True,'capture gate incomplete: '+key)

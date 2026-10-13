@@ -1,0 +1,26 @@
+test_host_patch_receipt_is_scoped_to_exact_old_new_bytes_and_image (__main__.ProvenanceTests.test_host_patch_receipt_is_scoped_to_exact_old_new_bytes_and_image) ... ok
+test_failed_or_timed_out_read_preserves_partial_log_without_retry (__main__.RomBackupTests.test_failed_or_timed_out_read_preserves_partial_log_without_retry) ... ok
+test_physical_supervision_and_continuity_cannot_be_inferred (__main__.RomBackupTests.test_physical_supervision_and_continuity_cannot_be_inferred) ... ok
+test_progress_is_live_and_existing_log_is_preserved (__main__.RomBackupTests.test_progress_is_live_and_existing_log_is_preserved) ... ok
+test_rom_method_deadline_and_single_connect_are_pinned (__main__.RomBackupTests.test_rom_method_deadline_and_single_connect_are_pinned) ... ok
+test_rom_resume_requires_complete_old_diagnostics_without_claiming_freshness (__main__.RomBackupTests.test_rom_resume_requires_complete_old_diagnostics_without_claiming_freshness) ... ok
+test_all_23_contracts_fragmented_multiline_with_telemetry (__main__.SerialTests.test_all_23_contracts_fragmented_multiline_with_telemetry) ... ok
+test_authority_and_calibration_mutations_are_denied (__main__.SerialTests.test_authority_and_calibration_mutations_are_denied) ... ok
+test_boot_delay_does_not_complete_status (__main__.SerialTests.test_boot_delay_does_not_complete_status) ... ok
+test_delayed_git_sha_is_not_assigned_to_authority (__main__.SerialTests.test_delayed_git_sha_is_not_assigned_to_authority) ... ok
+test_foreign_duplicate_or_stale_response_is_never_reused (__main__.SerialTests.test_foreign_duplicate_or_stale_response_is_never_reused) ... ok
+test_no_reset_input_or_unbounded_wait_and_raw_error_retained (__main__.SerialTests.test_no_reset_input_or_unbounded_wait_and_raw_error_retained) ... ok
+test_preflight_requires_start_all_12_rows_and_final_availability (__main__.SerialTests.test_preflight_requires_start_all_12_rows_and_final_availability) ... ok
+test_signature_missing_or_discordant_fields_fail_closed (__main__.SerialTests.test_signature_missing_or_discordant_fields_fail_closed) ... ok
+test_thirteen_servo_reads_enforce_requested_id_off_and_all_fields (__main__.SerialTests.test_thirteen_servo_reads_enforce_requested_id_off_and_all_fields) ... ok
+test_timeout_does_not_send_next_request (__main__.SerialTests.test_timeout_does_not_send_next_request) ... ok
+test_active_image_integrity_and_exact_length (__main__.Tests.test_active_image_integrity_and_exact_length) ... ok
+test_native_gen1_semantics_and_crc (__main__.Tests.test_native_gen1_semantics_and_crc) ... ok
+test_no_rom_writer_exists (__main__.Tests.test_no_rom_writer_exists) ... ok
+test_partial_review_cannot_grant_go (__main__.Tests.test_partial_review_cannot_grant_go) ... ok
+test_plan_has_no_execution (__main__.Tests.test_plan_has_no_execution) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 9.857s
+
+OK

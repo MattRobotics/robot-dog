@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """No serial port is opened. Verify plan, native gen-1 decoder and image parser."""
-import importlib.util,json,subprocess,sys,tempfile,unittest,hashlib,struct,zlib
+import importlib.util,json,subprocess,sys,tempfile,unittest,hashlib,struct,zlib,time,threading
 from pathlib import Path
 FW=Path(__file__).resolve().parents[2];sys.path.insert(0,str(FW/'scripts/release'));sys.path.insert(0,str(FW/'scripts'))
 import motion_remote_preflight as p
@@ -128,6 +128,48 @@ class SerialTests(unittest.TestCase):
   for timeout in (0,61):
    with self.assertRaises(RuntimeError):r.read('@STATUS',timeout)
   with self.assertRaises(RuntimeError):r.read('@CALIBRATION RESTORE 1')
+
+class RomBackupTests(unittest.TestCase):
+ def test_rom_method_deadline_and_single_connect_are_pinned(self):
+  command=p.rom_command('/not/executed/esptool','/not/opened/port','read-flash',['0x0',str(p.SIZE),'new.bin'])
+  self.assertEqual(command[command.index('--baud')+1],'115200');self.assertIn('--no-stub',command)
+  self.assertEqual(command[command.index('--connect-attempts')+1],'1');self.assertEqual(command[command.index('--before')+1],'no-reset');self.assertEqual(command[command.index('--after')+1],'no-reset');self.assertGreaterEqual(p.ROM_READ_TIMEOUT,2700)
+  for operation in ('write-flash','erase-flash','run'):
+   with self.assertRaises(RuntimeError):p.rom_command('tool','port',operation,[])
+  with self.assertRaises(RuntimeError):p.rom_command('tool','port','read-flash',[],'usb-reset')
+ def test_progress_is_live_and_existing_log_is_preserved(self):
+  with tempfile.TemporaryDirectory() as temp:
+   log=Path(temp)/'read.log';errors=[]
+   def run():
+    try:p.run_logged([sys.executable,'-c','import time; print("READ_PROGRESS",flush=True); time.sleep(.5); print("DONE",flush=True)'],log,2)
+    except BaseException as e:errors.append(e)
+   thread=threading.Thread(target=run);thread.start();deadline=time.monotonic()+1
+   while time.monotonic()<deadline and (not log.exists() or b'READ_PROGRESS' not in log.read_bytes()):time.sleep(.01)
+   self.assertIn(b'READ_PROGRESS',log.read_bytes());self.assertTrue(thread.is_alive());thread.join(3);self.assertFalse(thread.is_alive());self.assertFalse(errors);self.assertIn(b'DONE',log.read_bytes())
+   before=log.read_bytes()
+   with self.assertRaises(FileExistsError):p.run_logged([sys.executable,'-c','raise SystemExit(99)'],log,1)
+   self.assertEqual(log.read_bytes(),before)
+ def test_failed_or_timed_out_read_preserves_partial_log_without_retry(self):
+  with tempfile.TemporaryDirectory() as temp:
+   for name,code,timeout in [('failed','print("READ_6_PERCENT",flush=True); raise SystemExit(7)',2),('timeout','import time; print("READ_PARTIAL",flush=True); time.sleep(5)',.2)]:
+    log=Path(temp)/(name+'.log')
+    with self.assertRaises(RuntimeError):p.run_logged([sys.executable,'-c',code],log,timeout)
+    self.assertIn(b'READ_',log.read_bytes());self.assertIn(b'ABORTED_NO_RETRY',log.read_bytes());self.assertEqual(log.read_bytes().count(b'"started_utc"'),1)
+ def test_rom_resume_requires_complete_old_diagnostics_without_claiming_freshness(self):
+  with tempfile.TemporaryDirectory() as temp:
+   root=Path(temp);report=root/'preflight_report.json';log=root/'usb_readonly.log';commands=[*p.READS,*[f'@SERVO READ {i}' for i in p.IDS]]
+   transcript=''.join(c+'\n'+wire_reply(c) for c in commands);log.write_text(transcript)
+   designation={'application_sha256':'a'*64,'installed_historical_source_commit':'b08322dedc5564c080f691dc98047511ef2b953f'}
+   data={'mode':'EXECUTED_READONLY','session_directory':str(root),'flash_executed':False,'motion_executed':False,'gates':{'diagnostics_received':True,'servo_persistent_profile':True,'13_servo_readbacks_off':True},'candidate':designation,'installed_source_commit':designation['installed_historical_source_commit'],'error':'read-flash timed out'};report.write_text(json.dumps(data))
+   previous,path=p.resume_diagnostics(report,designation);self.assertEqual(path,log);self.assertEqual(previous,data)
+   for bad in [transcript.replace('torque=0','torque=1',1),transcript.replace('ACKNOWLEDGED_GENERATION=1','ACKNOWLEDGED_GENERATION=2'),transcript.replace('@SERVO READ 51\n',''),transcript+wire_reply('@AUTHORITY STATUS')]:
+    log.write_text(bad)
+    with self.assertRaises(RuntimeError):p.resume_diagnostics(report,designation)
+ def test_physical_supervision_and_continuity_cannot_be_inferred(self):
+  resumed={'diagnostic_evidence':{'origin':'PREVIOUS_PRE_ROM_CAPTURE_NOT_FRESH'}}
+  for report,review in [({},{}),(resumed,{'operator_physically_present_with_emergency_stop':True}),(resumed,{'operator_physically_present_with_emergency_stop':True,'hardware_continuity_since_diagnostics_verified':False})]:
+   with self.assertRaises(RuntimeError):review_preflash.review_physical_conditions(report,review)
+  review_preflash.review_physical_conditions(resumed,{'operator_physically_present_with_emergency_stop':True,'hardware_continuity_since_diagnostics_verified':True})
 
 class ProvenanceTests(unittest.TestCase):
  def test_host_patch_receipt_is_scoped_to_exact_old_new_bytes_and_image(self):
