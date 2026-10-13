@@ -1,0 +1,39 @@
+{
+  "purpose": "PREFLIGHT_SERIAL_RESPONSE_FRAMING_FIX",
+  "status": "PASS",
+  "created_utc": "2026-10-13T16:54:24.347297+00:00",
+  "compiled_source_commit": "b147f3884b227ec819e98a6f00c214a0aac2278e",
+  "application_sha256": "5577bd3c8da5f6c44d8fb9ca9b3d049399e73ccf37d218e716b773e3a87b5914",
+  "application_size_bytes": 3643120,
+  "firmware_manifest_sha256_unchanged": "1be4d3775cc7285addd6f942737f9358285154ae55e492fbe64c5b707d0948be",
+  "files": {
+    "05_Firmware/MATDOG_Controller/scripts/release/motion_remote_preflight.py": {
+      "compiled_source_file_sha256": "aec141b656afa41afd270d850e1b053ca560c03c4b6178746ae03b5c62e285d7",
+      "current_file_sha256": "fcbf8fcb76a667045ea59ede16760693ad989f99cbac4818fb4ee8e0faefaed2"
+    },
+    "05_Firmware/MATDOG_Controller/scripts/tests/test_remote_preflight.py": {
+      "compiled_source_file_sha256": "3e65b017c983b114a150ce2536ad0159b7972d509c55afa54df4f586d65504ce",
+      "current_file_sha256": "f0fcec4cd6f22ac7b26e77c08a126cdb85b98adbb5ae0b4f98e554a406816a8e"
+    },
+    "05_Firmware/MATDOG_Controller/scripts/verify_designated_candidate.py": {
+      "compiled_source_file_sha256": "424a10e0c9c850a13d2e6a89d421903bdebbd903e32cec8e32d14fef402748b2",
+      "current_file_sha256": "e4ac5cd6e1da93c5cb3bad490dcd352383028400b3d81dcd25c8f4e75fe1941c"
+    }
+  },
+  "tests": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 05_Firmware/MATDOG_Controller/scripts/tests/test_remote_preflight.py -v",
+    "count": 16,
+    "result": "PASS",
+    "log": "test_logs/preflight_serial_fix.log",
+    "log_sha256": "e8e2c59e8269b0d4d33bea29ac4a6eca8e2205e0c29514df6c9b24fcec19a255",
+    "existing_private_capture_contracts": "10/10 PASS; offline parsing of already acquired capture; capture remains private",
+    "fresh_hardware_evidence": false
+  },
+  "serial_deadlines_seconds": {
+    "status_reads": 20,
+    "servo_preflight": 60
+  },
+  "robot_port_opened": false,
+  "reset_backup_flash_motion_or_hardware_write_executed": false,
+  "designation_or_firmware_changed": false
+}
