@@ -41,5 +41,45 @@ def verify(path):
  if manifest.get('SUPERVISED_VALIDATION_CAPABLE')!='1' or manifest.get('BOOT_MOTION_AUTHORIZED')!='0' or manifest['OTA_INGEST_ENABLED']!='0' or manifest['HARDWARE_PROFILE']!='ROBOT_POWERED':raise ValueError('candidate capability/profile mismatch')
  if d.get('release_ready')!='PASS':raise ValueError('designated release review is not PASS')
  return source,root
+def verify_frozen_qualification(root,source):
+ """Reuse completed suites only with exact compiled inventory and log identities.
+ No test process is launched. The separately pinned host repairs must carry
+ their own successful regression and APP-ONLY audit receipts.
+ """
+ report=root/'09_Logs/Validation_Reports/Final_Release_Candidate_2026-10-13'
+ def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+ build=json.loads((report/'BUILD_RECEIPT.json').read_text())
+ tests_path=report/'TEST_RECEIPT.json';tests=json.loads(tests_path.read_text())
+ if build.get('status')!='PASS' or build.get('source_commit')!=source or build.get('test_receipt_sha256')!=sha(tests_path) or tests.get('status')!='PASS':raise ValueError('frozen qualification identity/status mismatch')
+ inventory=tests.get('source_files',{})
+ if not inventory:raise ValueError('frozen qualification has no source inventory')
+ for name,expected in inventory.items():
+  path=root/name
+  if not path.resolve().is_relative_to(root.resolve()):raise ValueError('qualification inventory path escapes repository')
+  original=subprocess.check_output(['git','-C',str(root),'show',source+':'+name])
+  if hashlib.sha256(original).hexdigest()!=expected:raise ValueError('qualification differs from compiled source: '+name)
+  if name not in HOST_SERIAL_PATCH_FILES and sha(path)!=expected:raise ValueError('qualified source changed: '+name)
+ def logs(entries):
+  if not entries:raise ValueError('qualification logs absent')
+  for entry in entries:
+   if entry.get('status',entry.get('result'))!='PASS' or entry.get('exit_code',0)!=0:raise ValueError('qualification test not PASS')
+   if 'log' not in entry:
+    name=entry.get('name','').removeprefix('geometry_')
+    expected=build.get('certificates_sha256',{}).get(name)
+    if not expected or sha(report/name)!=expected:raise ValueError('qualified certificate identity mismatch')
+    continue
+   path=report/entry['log']
+   if not path.resolve().is_relative_to(report.resolve()) or sha(path)!=entry['log_sha256']:raise ValueError('qualification log identity mismatch')
+ logs(tests.get('tests',[]))
+ full=next((x for x in tests['tests'] if x['name']=='full_static_and_host_led_network_nvs_startup'),None)
+ if full is None or 'STATIC_AUDIT = PASS' not in (report/full['log']).read_text():raise ValueError('completed static audit PASS absent')
+ repair=json.loads((report/'PREFLIGHT_SERIAL_FIX.json').read_text())
+ host=repair['tests'];audit=host['targeted_app_only_audit']
+ if host.get('result')!='PASS' or audit.get('result')!='PASS' or audit.get('checks')!=4:raise ValueError('host repair qualification incomplete')
+ logs([dict(status=host['result'],log=host['log'],log_sha256=host['log_sha256']),dict(status=audit['result'],log=audit['log'],log_sha256=audit['log_sha256'])])
+ reuse=host.get('frozen_qualification_gate',{})
+ if reuse.get('result')!='PASS':raise ValueError('frozen qualification gate regression incomplete')
+ logs([dict(status=reuse['result'],log=reuse['log'],log_sha256=reuse['log_sha256'])])
+ return 'STATIC_AUDIT = PASS (frozen source/log identities; separately qualified host repairs; no repeated firmware suites)'
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('designation',type=Path);p.add_argument('--field',choices=('source','directory'),required=True);a=p.parse_args();source,root=verify(a.designation);print(source if a.field=='source' else root)
+ p=argparse.ArgumentParser();p.add_argument('designation',type=Path);p.add_argument('--field',choices=('source','directory','qualification'),required=True);a=p.parse_args();source,root=verify(a.designation);print(verify_frozen_qualification(ROOT,source) if a.field=='qualification' else source if a.field=='source' else root)

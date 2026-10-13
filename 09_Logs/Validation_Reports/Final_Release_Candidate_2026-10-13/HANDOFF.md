@@ -40,3 +40,7 @@ Quando il robot verrà acceso, eseguire **sull’ASUS** soltanto:
 ```bash
 python3 /home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller/scripts/release/motion_remote_preflight.py --execute-readonly --confirm-asus-independent-maintenance-link
 ```
+
+## Completamento archivio — 13 ottobre, 19:12 UTC
+
+[Copia GitHub indipendente recuperabile PASS](RECOVERY_ARCHIVE.md), con AES-256, download e decifratura verificati. Il precedente NO_GO GPG resta storico e preservato. Issue #46 aggiornata, ancora aperta; release stabile subordinata ai test hardware Motion. Nessuna nuova lettura integrale, build o calibrazione. Identità ROM corrente e partizione app0 riconfermate con sole letture senza reset. Il flash resta subordinato alla singola conferma fisica finale e alla review tecnica documentata.

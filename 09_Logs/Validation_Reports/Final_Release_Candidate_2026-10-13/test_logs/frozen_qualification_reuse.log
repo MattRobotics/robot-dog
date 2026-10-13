@@ -1,0 +1,6 @@
+test_frozen_qualification_rejects_failed_receipts_or_changed_source_and_logs (__main__.ProvenanceTests.test_frozen_qualification_rejects_failed_receipts_or_changed_source_and_logs) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.062s
+
+OK

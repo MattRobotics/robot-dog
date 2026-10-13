@@ -207,8 +207,17 @@ VERIFIED_BACKUP_SHA256="$(echo "$BACKUP_GATE_INFO" | grep '^VERIFIED_BACKUP_SHA2
 [ -n "$VERIFIED_BACKUP_SHA256" ] || refuse "backup verification produced no VERIFIED_BACKUP_SHA256"
 
 # --- Gate: static safety audit PASS ----------------------------------------
-if ! python3 "$SCRIPT_DIR/static_audit.py" "$SKETCH_DIR"; then
-  refuse "static safety audit did not PASS"
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ]; then
+  # The frozen release already completed its campaign. Reuse only after
+  # proving all compiled source bytes, successful log hashes and the
+  # independently qualified, exact host-only repairs. No generic skip flag.
+  if ! python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field qualification; then
+    refuse "frozen static safety qualification did not PASS"
+  fi
+else
+  if ! python3 "$SCRIPT_DIR/static_audit.py" "$SKETCH_DIR"; then
+    refuse "static safety audit did not PASS"
+  fi
 fi
 
 # --- Gate: serial device present and identity matches ----------------------

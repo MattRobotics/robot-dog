@@ -190,6 +190,32 @@ class RomBackupTests(unittest.TestCase):
   review_preflash.review_physical_conditions(resumed,{'operator_physically_present_with_emergency_stop':True,'hardware_continuity_since_diagnostics_verified':True})
 
 class ProvenanceTests(unittest.TestCase):
+ def test_frozen_qualification_rejects_failed_receipts_or_changed_source_and_logs(self):
+  with tempfile.TemporaryDirectory(prefix='matdog-frozen-qualification-') as temp:
+   root=Path(temp);report=root/'09_Logs/Validation_Reports/Final_Release_Candidate_2026-10-13';report.mkdir(parents=True)
+   name='05_Firmware/MATDOG_Controller/src/core/qualified.cpp';path=root/name;path.parent.mkdir(parents=True);path.write_text('qualified source\n')
+   subprocess.run(['git','-C',str(root),'init','-q'],check=True);subprocess.run(['git','-C',str(root),'add','.'],check=True);subprocess.run(['git','-C',str(root),'-c','user.name=Offline test','-c','user.email=offline@example.invalid','commit','-qm','fixture'],check=True)
+   source=subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip()
+   log=report/'audit.log';log.write_text('STATIC_AUDIT = PASS\n');digest=hashlib.sha256(log.read_bytes()).hexdigest()
+   tests={'status':'PASS','source_files':{name:hashlib.sha256(path.read_bytes()).hexdigest()},'tests':[{'name':'full_static_and_host_led_network_nvs_startup','status':'PASS','log':log.name,'log_sha256':digest}]}
+   def receipts():
+    (report/'TEST_RECEIPT.json').write_text(json.dumps(tests));(report/'BUILD_RECEIPT.json').write_text(json.dumps({'status':'PASS','source_commit':source,'test_receipt_sha256':hashlib.sha256((report/'TEST_RECEIPT.json').read_bytes()).hexdigest()}))
+   receipts()
+   entry={'result':'PASS','log':log.name,'log_sha256':digest}
+   repair={'tests':{**entry,'targeted_app_only_audit':{**entry,'checks':4},'frozen_qualification_gate':entry}}
+   def host(): (report/'PREFLIGHT_SERIAL_FIX.json').write_text(json.dumps(repair))
+   host();self.assertIn('STATIC_AUDIT = PASS',provenance.verify_frozen_qualification(root,source))
+   for changed in ['qualified source modified\n','']:
+    path.write_text(changed)
+    with self.assertRaises(ValueError):provenance.verify_frozen_qualification(root,source)
+   path.write_text('qualified source\n');log.write_text('STATIC_AUDIT = FAIL\n')
+   with self.assertRaises(ValueError):provenance.verify_frozen_qualification(root,source)
+   log.write_text('STATIC_AUDIT = PASS\n');tests['tests'][0]['status']='FAIL';receipts()
+   with self.assertRaises(ValueError):provenance.verify_frozen_qualification(root,source)
+   tests['tests'][0]['status']='PASS';receipts();repair['tests']['frozen_qualification_gate']['result']='BLOCKED';host()
+   with self.assertRaises(ValueError):provenance.verify_frozen_qualification(root,source)
+   repair['tests']['frozen_qualification_gate']['result']='PASS';host();tests['source_files'][name]='0'*64;receipts()
+   with self.assertRaises(ValueError):provenance.verify_frozen_qualification(root,source)
  def test_host_patch_receipt_is_scoped_to_exact_old_new_bytes_and_image(self):
   with tempfile.TemporaryDirectory(prefix='matdog-host-receipt-') as temp:
    root=Path(temp);names=provenance.HOST_SERIAL_PATCH_FILES;image='a'*64

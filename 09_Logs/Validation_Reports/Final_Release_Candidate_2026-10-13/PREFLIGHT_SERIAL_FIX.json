@@ -17,15 +17,15 @@
     },
     "05_Firmware/MATDOG_Controller/scripts/tests/test_remote_preflight.py": {
       "compiled_source_file_sha256": "3e65b017c983b114a150ce2536ad0159b7972d509c55afa54df4f586d65504ce",
-      "current_file_sha256": "5e0c0d6c118e491cfc273120092edd4601e1ec53b19f7a336cd667eb06be4ec8"
+      "current_file_sha256": "9ab8c632d0fb1c63e0993089804c443fafa4a715ba353d0b75329e24797556c4"
     },
     "05_Firmware/MATDOG_Controller/scripts/verify_designated_candidate.py": {
       "compiled_source_file_sha256": "424a10e0c9c850a13d2e6a89d421903bdebbd903e32cec8e32d14fef402748b2",
-      "current_file_sha256": "1ee4a9ca7050d8272b56d2ee1c0721b72f12baecf5f0f18b86d3590bfbcfaa97"
+      "current_file_sha256": "70aff8be5ce0e2129255f1e69258fa93d1a08c8e556676e56b727e398fd945fb"
     },
     "05_Firmware/MATDOG_Controller/scripts/flash_app_only.sh": {
       "compiled_source_file_sha256": "11f6fb385d887fa018fdfe92b711b102b1e5dae499f58cd54efa5353454f190d",
-      "current_file_sha256": "411f86c8522ff5f123308ee9915229f11f88b518b5f48c0311fc37d9efd01f8e"
+      "current_file_sha256": "6f3ad2abeec7ffc87a4c6ee6b5ddf901ac815eb11ef3d116e16dfdd256e90142"
     },
     "05_Firmware/MATDOG_Controller/scripts/verify_application_partition.py": {
       "compiled_source_file_sha256": "26ce0711571adabf11e9e3a2e700bd99bb076881addec8903d4cb18c59ceeac7",
@@ -47,10 +47,23 @@
     "targeted_app_only_audit": {
       "result": "PASS",
       "checks": 4,
-      "log": "test_logs/rom_backup_fix_targeted_audit.log",
-      "log_sha256": "003c51f0b6713365707b9359b6b238b4b9bd0e87e115b27527106c0a74f98d85"
+      "log": "test_logs/frozen_qualification_targeted_audit.log",
+      "log_sha256": "67a8b650d598e4db90d9e9273038f54b3556a0eeafac94cec58dde3c2f5514dc"
     },
-    "full_static_audit": "Stopped to avoid unrelated firmware suite repeats; not claimed PASS. Frozen firmware qualification remains unchanged."
+    "full_static_audit": "Stopped to avoid unrelated firmware suite repeats; not claimed PASS. Frozen firmware qualification remains unchanged.",
+    "frozen_qualification_gate": {
+      "result": "PASS",
+      "count": 1,
+      "negative_cases": [
+        "changed_current_source",
+        "changed_compiled_inventory",
+        "changed_or_failed_audit_log",
+        "failed_test_status",
+        "unqualified_host_gate"
+      ],
+      "log": "test_logs/frozen_qualification_reuse.log",
+      "log_sha256": "1ff3aaa6b14fa26700d940fd7674c878bc8499ec166fbac495fcbb9e019a317c"
+    }
   },
   "serial_deadlines_seconds": {
     "status_reads": 20,
@@ -61,9 +74,10 @@
   "repairs": [
     "SEMANTIC_SERIAL_RESPONSE_FRAMING",
     "ROM_NOSTUB_115200_BOUNDED_STREAMED_BACKUP_AND_RESUME",
-    "CANONICAL_APP_ONLY_ROM_TRANSPORT_NO_STUB_NO_AUTOMATIC_BOOT"
+    "CANONICAL_APP_ONLY_ROM_TRANSPORT_NO_STUB_NO_AUTOMATIC_BOOT",
+    "FROZEN_QUALIFICATION_REUSE_EXACT_SOURCE_AND_RECEIPT_LOG_IDENTITIES"
   ],
-  "updated_utc": "2026-10-13T18:00:38.680249+00:00",
+  "updated_utc": "2026-10-13T19:18:27.342493+00:00",
   "rom_backup": {
     "baud": 115200,
     "stub": false,
