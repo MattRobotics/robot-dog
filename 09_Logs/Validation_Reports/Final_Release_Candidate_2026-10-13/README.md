@@ -1,5 +1,7 @@
 # MATDOG — candidato single-flash, 13 ottobre 2026
 
+**Aggiornamento finale 13 ottobre, 19:29 UTC: [FLASH_SUCCESS / post-flash PASS](FLASH_CLOSEOUT.md).** Candidato originale installato una sola volta APP-ONLY dopo conferma fisica e recupero GitHub verificato. Robot in MAINTENANCE, authority NONE, 13 servo OFF, Motion session OFF; validazione Motion ancora separata. Le precedenti indicazioni NO-GO sono il quadro storico prima del completamento.
+
 Un’unica immagine integra diagnostica, RESTORE, admission locale RAM-only, STAND per segmenti e prima falcata WALK. Non autorizza flash o movimento. Nessuna operazione sul robot è stata eseguita durante lo sviluppo.
 
 [Handoff operativo](HANDOFF.md) · [readiness dei 12 limiti](JOINT_LIMITS.md) · [admission](RUNTIME_ADMISSION.md) · [sessione serale](SUPERVISED_SESSION.md) · [preflight/backup/APP-ONLY](REMOTE_PREFLIGHT.md) · [48 azioni](DASHBOARD_ACTIONS.md) · [galleria](visuals/README.md).
